@@ -13,7 +13,7 @@ import {
  * S04 (cookie-compliance; ADR-0033, PLAN §3): a session change in one tab reaches every other tab of the browser.
  *
  * Alive tabs hear an in-memory message on one BroadcastChannel; the message carries no identity, no time and no id,
- * and nothing is stored (R05). Sleeping tabs are never trusted to hear it: a sleep drops the panel's copy and a wake
+ * and nothing is stored (R05). Sleeping tabs are never trusted to hear it: a sleep parks the panel (nothing shown) and a wake
  * runs one gate on facts read after the wake (R02). Every channel call — open, post, close, listener installs —
  * sits in its own `try`, because the receiver is on every page and one throw would take every page down (R06).
  */
@@ -26,6 +26,8 @@ type ResetListener = (reason: ConversationResetReason) => void;
 type WakeListener = () => void;
 
 const SIGNED_OUT: WakeFacts = Object.freeze({ signedIn: false, currentSessionStartedAtMs: null });
+/** FIX p1 (SD-B1): the sign-in state could not be read; the gate erases rather than guess (D-S04-20). */
+const UNKNOWN: WakeFacts = Object.freeze({ signedIn: "unknown", currentSessionStartedAtMs: null });
 
 /**
  * The reset generation: one more on every receipt, every local announcement, every sleep and every wake. A gate run
@@ -108,14 +110,17 @@ export function onConversationWake(listener: WakeListener): () => void {
 
 /**
  * What the server says now: signed in (`GET /api/v1/session` answers ok) and, if so, when the current session began
- * (`created_at` of the `current: true` row of `GET /v1/auth/sessions`, the API's clock). A list that cannot be read
- * leaves the start unknown, which the verdict treats as "no proof the session is older" (D-S04-20).
+ * (`created_at` of the `current: true` row of `GET /v1/auth/sessions`, the API's clock). Only a 401 — the API's
+ * `SESSION_REQUIRED` — means signed out; any other refusal, a 5xx from the proxy while the API restarts, or no answer
+ * is "unknown" (FIX p1, SD-B1). A list that cannot be read leaves the start unknown, which the verdict treats as
+ * "no proof the session is older" (D-S04-20).
  */
 export async function readWakeFacts(): Promise<WakeFacts> {
   const response = await fetch("/api/v1/session", {
     method: "GET", cache: "no-store", credentials: "same-origin"
   });
-  if (!response.ok) return SIGNED_OUT;
+  if (response.status === 401) return SIGNED_OUT;
+  if (!response.ok) return UNKNOWN;
   let currentSessionStartedAtMs: number | null = null;
   try {
     const current = (await contractClient.listSessions()).sessions.find((session) => session.current);
@@ -142,9 +147,14 @@ export function settleStoredConversation(readFacts: () => Promise<WakeFacts> = r
     try {
       facts = await readFacts();
     } catch {
-      facts = SIGNED_OUT;
+      facts = UNKNOWN;
     }
     if (generation !== startedIn) return;
+    if (facts.signedIn === "unknown") {
+      // Neither (a) nor (b) can be told apart from a keep, so the copy goes, whoever wrote it (SD-B1).
+      clearStoredSupportConversation(storage);
+      return;
+    }
     const kept = restoreSupportConversation(storage, facts.signedIn);
     if (kept !== null && storedConversationVerdict(kept, facts) === "erase") {
       clearStoredSupportConversation(storage);

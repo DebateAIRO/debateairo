@@ -37,7 +37,8 @@ type SupportConversationStorage = Readonly<{
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }>;
-type WakeFacts = Readonly<{ signedIn: boolean; currentSessionStartedAtMs: number | null }>;
+/** FIX p1 (SD-B1): "unknown" when the sign-in state could not be read (a 5xx, a non-401 refusal, a network failure). */
+type WakeFacts = Readonly<{ signedIn: boolean | "unknown"; currentSessionStartedAtMs: number | null }>;
 type ConversationResetReason = "session-change" | "sleep";
 type ConversationModule = Readonly<{
   SUPPORT_CONVERSATION_STORAGE_KEY: string;
@@ -300,11 +301,13 @@ describe("S04-C1 storage helper, stored value, wake verdict (S1.1-S1.4)", () => 
       ["2 in/change/out", true, false, "erase"],
       ["3 out/change/in", false, true, "erase"],
       ["5 in/no-change/in", true, true, "keep"],
-      ["6 out/no-change/out", false, false, "keep"]
+      ["6 out/no-change/out", false, false, "keep"],
+      // R02 (c) "at or after": a session that began in the same second as the stored time is erased (CT-N4)
+      ["7 in/change-same-second/in", true, true, "erase"]
     ];
     const created: Record<string, number | null> = {
       "1 in/change/in": (t + 30) * 1000, "2 in/change/out": null, "3 out/change/in": (t + 30) * 1000,
-      "5 in/no-change/in": (t - 600) * 1000, "6 out/no-change/out": null
+      "5 in/no-change/in": (t - 600) * 1000, "6 out/no-change/out": null, "7 in/change-same-second/in": t * 1000
     };
     vi.useFakeTimers();
     let asserted = 0;
@@ -320,7 +323,7 @@ describe("S04-C1 storage helper, stored value, wake verdict (S1.1-S1.4)", () => 
         asserted += 1;
       }
     }
-    expect(asserted).toBe(15);
+    expect(asserted).toBe(18);
   });
 
   it("U08 a signed-in transcript with no serverTime, read while signed in, is erased", () => {
@@ -369,6 +372,18 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
     probe.postMessage({ type: "session-change" });
     expect(await waitUntil(() => window.sessionStorage.getItem(KEY) === null, 100), "another tab still erases").toBe(true);
     expect(resets).toEqual(["session-change", "session-change", "session-change"]);
+    // CT-N5: another tab's message and this page's own announcement in the same synchronous tick: neither is
+    // swallowed — this page resets once per change, the other tab's message erases, the other tab hears one message.
+    storeTranscript(false);
+    resets.length = 0;
+    probe.received.length = 0;
+    probe.postMessage({ type: "session-change" });
+    announceSessionChange();
+    expect(await waitUntil(() => resets.length >= 2 && probe.received.length > 0, 1000), "both changes land").toBe(true);
+    await wait(60);
+    expect(resets, "one reset per change").toEqual(["session-change", "session-change"]);
+    expect(window.sessionStorage.getItem(KEY), "the other tab's message erased").toBeNull();
+    expect(probe.received, "the other tab hears this page's one announcement").toStrictEqual([{ type: "session-change" }]);
     // A receiver that slept (channel closed) or was disposed is no route: the announcement still reaches the others.
     window.dispatchEvent(pageTransition("pagehide"));
     probe.received.length = 0;
@@ -509,15 +524,39 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
     expect(calls, "no session list while signed out").toEqual(["/api/v1/session"]);
   });
 
-  it("U16 facts that cannot be read: the settle resolves, a signed-in transcript is erased, a signed-out one is kept", async () => {
-    storeTranscript(true, T);
-    await nextGeneration();
-    await expect(settleStoredConversation(async () => { throw new Error("offline"); })).resolves.toBeUndefined();
-    expect(window.sessionStorage.getItem(KEY)).toBeNull();
-    storeTranscript(false);
-    await nextGeneration();
-    await expect(settleStoredConversation(() => Promise.reject(new TypeError("Failed to fetch")))).resolves.toBeUndefined();
-    expect(storedText()).toBe("old conversation");
+  it("U16 facts that cannot be read are unknown, and unknown erases a transcript written signed in and one written signed out", async () => {
+    // FIX p1 (SD-B1, R02 (b), D-S04-20 "errs toward erasing"): only a 401 means signed out (the API's
+    // SESSION_REQUIRED); any other refusal, a 5xx from the proxy during an API restart, or a network failure is unknown.
+    const json = (body: unknown, status: number) => new Response(JSON.stringify(body), {
+      status, headers: { "content-type": "application/json" }
+    });
+    let status = 401;
+    fetchRoute.handler = async (url) => {
+      if (url === "/api/v1/session") return status === 0 ? Promise.reject(new TypeError("Failed to fetch")) : json({}, status);
+      throw new Error(`UNEXPECTED_FETCH:${url}`);
+    };
+    expect(await readWakeFacts(), "401").toEqual({ signedIn: false, currentSessionStartedAtMs: null });
+    for (const failing of [500, 502, 503, 504, 403]) {
+      status = failing;
+      expect(await readWakeFacts(), `status ${failing}`).toEqual({ signedIn: "unknown", currentSessionStartedAtMs: null });
+    }
+    for (const written of [true, false]) {
+      expect(storedConversationVerdict(
+        { language: "en", identityBound: written, messages: [], ...(written ? { serverTime: T } : {}) },
+        { signedIn: "unknown", currentSessionStartedAtMs: null }
+      ), `verdict, written signed ${written ? "in" : "out"}`).toBe("erase");
+    }
+    for (const [written, readFacts] of [
+      [true, async () => { throw new Error("offline"); }],
+      [false, () => Promise.reject(new TypeError("Failed to fetch"))],
+      [false, readWakeFacts]
+    ] as const) {
+      status = 503;
+      storeTranscript(written, written ? T : undefined);
+      await nextGeneration();
+      await expect(settleStoredConversation(readFacts)).resolves.toBeUndefined();
+      expect(window.sessionStorage.getItem(KEY), `written signed ${written ? "in" : "out"}`).toBeNull();
+    }
   });
 
   it("U17 with BroadcastChannel deleted the receiver installs, still sleeps and wakes, and disposes without throwing", () => {

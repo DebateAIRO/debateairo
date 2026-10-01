@@ -46,6 +46,8 @@ const KEY = SUPPORT_CONVERSATION_STORAGE_KEY;
 const DATE = "Wed, 30 Sep 2026 11:42:23 GMT";
 const T = 1_790_768_543;
 const OLD = "lantern orchard question";
+const DRAFT = "unsent draft words";
+const PENDING = "pending question words";
 const REPLY = "meadow river answer";
 const CASE_TOKEN = `${"Abcdefghij".repeat(4)}abc`;
 const ASSISTANT_SOURCE = resolve(import.meta.dirname, "../../apps/ui/components/support/Assistant.tsx");
@@ -81,6 +83,8 @@ function sessionList(createdAtSec: number) {
 
 type Api = {
   signedIn: boolean;
+  /** When set, `/api/v1/session` answers this status ("reject" = a network failure) instead of 200/401 (SD-B1). */
+  sessionStatus: number | "reject" | null;
   /** `created_at` of the current session, whole seconds: T-600 keeps the stored transcript, T+30 erases it. */
   createdAtSec: number;
   calls: Call[];
@@ -93,16 +97,18 @@ type Api = {
   supportSessions: number;
 };
 
-function installApi(overrides: Partial<Pick<Api, "signedIn" | "createdAtSec">> = {}): Api {
+function installApi(overrides: Partial<Pick<Api, "signedIn" | "createdAtSec" | "sessionStatus">> = {}): Api {
   const api: Api = {
-    signedIn: true, createdAtSec: T - 600, calls: [], holdSessions: null, holdMessage: null,
+    signedIn: true, sessionStatus: null, createdAtSec: T - 600, calls: [], holdSessions: null, holdMessage: null,
     afterFirstIdentity: null, supportSessions: 0, ...overrides
   };
   let identityRequests = 0;
   fetchRoute.handler = (url, init) => {
     api.calls.push(Object.freeze({ url, method: init?.method ?? "GET", lifecycle }));
     if (url === "/api/v1/session") {
-      const answer = Promise.resolve(api.signedIn ? json({}) : json({ error: "SESSION_REQUIRED" }, 401));
+      const answer = api.sessionStatus === "reject" ? Promise.reject(new TypeError("Failed to fetch"))
+        : api.sessionStatus !== null ? Promise.resolve(json({ error: "BAD_GATEWAY" }, api.sessionStatus))
+        : Promise.resolve(api.signedIn ? json({}) : json({ error: "SESSION_REQUIRED" }, 401));
       identityRequests += 1;
       const after = api.afterFirstIdentity;
       if (identityRequests === 1 && after !== null) void answer.then(() => { setTimeout(after, 0); });
@@ -276,20 +282,36 @@ async function sleepWakeRun(
   await mount(<SupportConversationGuard />);
   const panel = await mount(<Assistant fullPage />);
   expect(await until(() => (panel.textContent ?? "").includes(OLD)), "kept at mount").toBe(true);
-  if (!flip) {
-    // a case opened before the sleep: its code lives in memory only, and the sleep drops it with the transcript
-    await act(async () => { panel.querySelector<HTMLButtonElement>(".supportEscalation button")!.click(); });
-    expect(await until(() => panel.querySelector('a[href^="/help#case="]') !== null), "a live case link").toBe(true);
-    expect(await until(() => (storedRaw() ?? "").includes("caseOpened")), "the notice is stored").toBe(true);
-  }
+  // the rest of the conversation (SPEC-v2 Terms: every message, case code and case link; PT-B1): a support
+  // session and a case opened in this tab — the case code lives in memory only (DL1-F5c) — and an unsent draft
+  await act(async () => { panel.querySelector<HTMLButtonElement>(".supportEscalation button")!.click(); });
+  expect(await until(() => panel.querySelector('a[href^="/help#case="]') !== null), "a live case link").toBe(true);
+  expect(await until(() => (storedRaw() ?? "").includes("caseOpened")), "the notice is stored").toBe(true);
+  const composer = () => panel.querySelector<HTMLInputElement>('input[name="support-message"]')!;
+  // a question whose answer is still in flight when the page sleeps (PT-B1 member 5)
+  const inFlight = deferred();
+  api.holdMessage = inFlight;
+  await send(panel, PENDING);
+  expect(await until(() => api.calls.some((call) => call.url.endsWith("/messages"))), "in flight").toBe(true);
+  composer().value = DRAFT;
+  expect(api.supportSessions, "one support session before the sleep").toBe(1);
 
-  // check 1: parked at once, and no gate begins while asleep
+  // check 1: parked at once — nothing of the conversation on screen — and no gate begins while asleep
   await dispatchSleep(...sleep);
-  expect(panel.textContent, "0 messages rendered at once").not.toContain(OLD);
+  const parkedScreen = () => {
+    expect(panel.textContent, "0 messages rendered at once").not.toContain(OLD);
+    expect(panel.querySelector('a[href^="/help#case="]'), "no case link while parked").toBeNull();
+    expect(composer().value, "no draft while parked").toBe("");
+    expect(panel.textContent, "no support-session reference while parked").not.toContain("HLP-SUPP");
+  };
+  parkedScreen();
+  inFlight.release();
   await pause(100);
   expect(requestsWhileAsleep(api, "/api/v1/session", "/api/v1/auth/sessions"), "no request until the wake")
     .toEqual([]);
-  expect(panel.textContent).not.toContain(OLD);
+  parkedScreen();
+  expect(panel.textContent, "the answer that landed while parked is not shown").not.toContain(REPLY);
+  const postsBeforeWake = api.calls.filter((call) => call.url.endsWith("/messages")).length;
 
   if (flip) {
     // check 2: X signed out and Y signed in while this tab slept
@@ -303,12 +325,30 @@ async function sleepWakeRun(
     expect(fromWake.seen(), "never rendered from the wake on").toBe(false);
     expect(keyHoldsNoMessage()).toBe(true);
     fromWake.stop();
+    // the erase is a new conversation (R03): no case link, no draft, the next message opens a new support session
+    expect(panel.querySelector('a[href^="/help#case="]'), "no case link after the erase").toBeNull();
+    expect(composer().value, "no draft after the erase").toBe("");
+    expect(panel.textContent, "no question or answer of the old conversation").not.toMatch(new RegExp(`${PENDING}|${REPLY}`, "u"));
+    await send(panel, "willow harbor note");
+    expect(await until(() => api.calls.filter((call) => call.url.endsWith("/messages")).length > postsBeforeWake), "sent")
+      .toBe(true);
+    expect(api.supportSessions, "a new support session").toBe(2);
+    expect(api.calls.filter((call) => call.url.endsWith("/messages")).slice(postsBeforeWake).map((call) => call.url))
+      .toEqual(["/api/v1/support/sessions/support-2/messages"]);
   } else {
-    // check 4: nothing changed, the transcript comes back
+    // check 4: nothing changed — the whole conversation comes back (R04): transcript, case link, draft, session
     await dispatchWake(...wake);
     expect(await until(() => (panel.textContent ?? "").includes(OLD)), "kept after the wake").toBe(true);
     expect(storedRaw()).toContain(OLD);
-    expect(panel.querySelector('a[href^="/help#case="]'), "the case code did not survive the sleep").toBeNull();
+    expect(panel.querySelector('a[href^="/help#case="]'), "the case link survives a no-change sleep").not.toBeNull();
+    expect(composer().value, "the draft survives a no-change sleep").toBe(DRAFT);
+    expect(panel.textContent, "the answer that landed while parked is shown").toContain(REPLY);
+    await send(panel, "willow harbor note");
+    expect(await until(() => api.calls.filter((call) => call.url.endsWith("/messages")).length > postsBeforeWake), "sent")
+      .toBe(true);
+    expect(api.supportSessions, "the same support session").toBe(1);
+    expect(api.calls.filter((call) => call.url.endsWith("/messages")).slice(postsBeforeWake).map((call) => call.url))
+      .toEqual(["/api/v1/support/sessions/support-1/messages"]);
   }
 }
 
@@ -404,7 +444,7 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
     ]);
   });
 
-  it("A03 a reply that lands after the announcement is dropped, and the composer is usable again", async () => {
+  it("A03 a reply that lands after the announcement is dropped, the composer is usable again, and nothing old is written back after an erase", async () => {
     const api = installApi();
     await mount(<SupportConversationGuard />);
     const panel = await mount(<Assistant fullPage />);
@@ -424,6 +464,46 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
     expect(storedRaw() ?? "").not.toContain(REPLY);
     const sendButton = panel.querySelector<HTMLButtonElement>("button.supportSend");
     expect(sendButton?.disabled, "the composer is not left busy").toBe(false);
+
+    // SD-N1: a session change that lands between a reply's DOM commit and that commit's write effect. The erase
+    // comes first (a member erases, then announces, E1-E7), so the write effect, still holding the old closure,
+    // must not put the old conversation back in the key. Outside act, as a browser schedules it.
+    await unmountAll();
+    window.sessionStorage.clear();
+    announceSessionChange();
+    installApi();
+    await mount(<SupportConversationGuard />);
+    const racing = await mount(<Assistant fullPage />);
+    await pause(30);
+    let phase: "before" | "after" = "before";
+    const writesAfter: string[] = [];
+    const realSetItem = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+      if (key === KEY && phase === "after") writesAfter.push(value);
+      realSetItem.call(this, key, value);
+    });
+    const inject = new MutationObserver(() => {
+      if (phase === "after" || !(racing.textContent ?? "").includes(REPLY)) return;
+      phase = "after";
+      clearStoredSupportConversation(window.sessionStorage);
+      announceSessionChange();
+    });
+    inject.observe(racing, { subtree: true, childList: true, characterData: true });
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", false);
+    try {
+      const input = racing.querySelector<HTMLInputElement>('input[name="support-message"]')!;
+      input.value = OLD;
+      input.form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      const started = Date.now();
+      while (Date.now() - started < 600) await new Promise((done) => setTimeout(done, 10));
+    } finally {
+      inject.disconnect();
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    }
+    expect(phase, "the change landed after the reply's commit").toBe("after");
+    expect(writesAfter.filter((value) => value.includes(OLD) || value.includes(REPLY)),
+      "no write of the old conversation after the erase").toEqual([]);
+    expect(storedRaw() ?? "").not.toContain(OLD);
   });
 
   it("A04 a tab that sleeps through a session change parks at once and decides on facts read after the wake", async () => {
@@ -530,7 +610,7 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
     await sleepWakeRun(["pagehide", "freeze"], ["resume", "pageshow"], false);
   });
 
-  it("A06 a signed-in transcript older than the current session is never shown and the key is emptied", async () => {
+  it("A06 a signed-in transcript older than the current session is never shown, and an unreadable sign-in state never keeps or writes a signed-out one", async () => {
     installApi({ createdAtSec: T + 30 });
     storeTranscript(OLD, true, T);
     const host = container();
@@ -543,6 +623,46 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
     expect(watched.seen(), "never rendered").toBe(false);
     expect(keyHoldsNoMessage()).toBe(true);
     watched.stop();
+
+    // SD-B1 (R02 (b)): a transcript written signed out, someone signed in now, and the sign-in state cannot be read
+    // (the proxy answers 502/503/504 while the API restarts, or the network fails). Unknown is never "signed out":
+    // nothing is restored, nothing is written as signed out, and the next exchange is written under the identity
+    // the server reports once it answers.
+    for (const status of [502, 503, 504, "reject"] as const) {
+      await unmountAll();
+      window.sessionStorage.clear();
+      announceSessionChange();
+      const unknown = installApi({ signedIn: true, sessionStatus: status });
+      storeTranscript(OLD, false);
+      const writes: string[] = [];
+      const realSetItem = Storage.prototype.setItem;
+      const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+        if (key === KEY) writes.push(value);
+        realSetItem.call(this, key, value);
+      });
+      const host2 = container();
+      const watched2 = watchText(host2, OLD);
+      await mountInto(host2, <Assistant fullPage />);
+      await pause(150);
+      expect(watched2.seen(), `status ${status}: never rendered`).toBe(false);
+      expect(storedRaw() ?? "", `status ${status}: not kept`).not.toContain(OLD);
+      expect(writes.filter((value) => (JSON.parse(value) as { identityBound: boolean }).identityBound === false),
+        `status ${status}: nothing written as signed out`).toEqual([]);
+      watched2.stop();
+      // a message sent while the state is still unknown is answered, and still not written as signed out
+      await send(host2, "first note words");
+      expect(await until(() => (host2.textContent ?? "").includes(REPLY)), `status ${status}: answered`).toBe(true);
+      await pause(50);
+      expect(writes.filter((value) => (JSON.parse(value) as { identityBound: boolean }).identityBound === false),
+        `status ${status}: still nothing written as signed out`).toEqual([]);
+      unknown.sessionStatus = null;
+      await send(host2, "willow harbor note");
+      expect(await until(() => (storedRaw() ?? "").includes("willow harbor note")),
+        `status ${status}: the next exchange is stored`).toBe(true);
+      expect((JSON.parse(storedRaw()!) as { identityBound: boolean }).identityBound,
+        `status ${status}: under the identity the server reports`).toBe(true);
+      spy.mockRestore();
+    }
   });
 
   it("A07 a signed-in transcript newer than the current session is shown", async () => {
@@ -633,19 +753,18 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
     const panel = await mount(<Assistant fullPage />);
     expect(await until(() => (panel.textContent ?? "").includes(OLD)), "an anonymous transcript is kept").toBe(true);
 
-    // C1 F1: this tab's own guard hears its broadcast, so a same-tab change resets the panel twice
-    const resets: number[] = [];
-    const stopCounting = onConversationReset(() => { resets.push(performance.now()); });
+    // C1 rework 2: this tab's own guard no longer hears its own announcement, so the panel resets exactly once
+    let resets = 0;
+    const stopCounting = onConversationReset(() => { resets += 1; });
     api.signedIn = true;
     await act(async () => {
       clearStoredSupportConversation(window.sessionStorage);
       announceSessionChange();
     });
-    await until(() => resets.length >= 2, 500);
-    stopCounting();
-    console.info(`F1 measurement: resets=${resets.length} gapMs=${resets.length >= 2
-      ? (resets[1]! - resets[0]!).toFixed(1) : "n/a"}`);
     expect(await until(() => !(panel.textContent ?? "").includes(OLD)), "reset").toBe(true);
+    await pause(60);
+    stopCounting();
+    expect(resets, "one reset per same-tab announcement").toBe(1);
 
     await pause(50);
     await send(panel, "willow harbor note");

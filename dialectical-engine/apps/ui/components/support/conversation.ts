@@ -129,8 +129,12 @@ export function serverTimeFromDateHeader(value: string | null): number | undefin
   return seconds >= 0 ? seconds : undefined;
 }
 
-/** What a waking tab reads from the server: signed in now, and when the current session began (API clock). */
-export type WakeFacts = Readonly<{ signedIn: boolean; currentSessionStartedAtMs: number | null }>;
+/**
+ * What a waking tab reads from the server: signed in now, and when the current session began (API clock).
+ * `signedIn` is "unknown" when the sign-in state could not be read — any answer but 200 or 401, or no answer
+ * (FIX p1, SD-B1): a 502 while the API restarts is not "signed out".
+ */
+export type WakeFacts = Readonly<{ signedIn: boolean | "unknown"; currentSessionStartedAtMs: number | null }>;
 
 /**
  * S04-R02 (PLAN §3): may this stored transcript be shown in this tab now? E4 (a)/(b) first; then (c): a transcript
@@ -140,7 +144,8 @@ export type WakeFacts = Readonly<{ signedIn: boolean; currentSessionStartedAtMs:
 export function storedConversationVerdict(
   stored: StoredSupportConversation, facts: WakeFacts
 ): "keep" | "erase" {
-  if (stored.identityBound !== facts.signedIn) return "erase";               // (a), (b)
+  // (a), (b) — and an unknown sign-in state (SD-B1), which never equals either boolean: errs toward erasing (D-S04-20)
+  if (stored.identityBound !== facts.signedIn) return "erase";
   if (!stored.identityBound) return "keep";                                   // (d): not required either way; V-14 default
   if (stored.serverTime === undefined || facts.currentSessionStartedAtMs === null) return "erase"; // (c) second sentence; D-S04-20
   return facts.currentSessionStartedAtMs >= stored.serverTime * 1000 ? "erase" : "keep";            // (c) / R04 keep

@@ -274,10 +274,17 @@ function withServerTime<T extends object>(value: T,response: Response): T & Serv
 }
 
 export const supportAssistantClient: SupportAssistantClient = Object.freeze({
+  /**
+   * FIX p1 (SD-B1): only a 401 — the API's SESSION_REQUIRED — means signed out. Any other refusal, or a 5xx from
+   * the proxy while the API restarts, is not an answer: it rejects, and the panel treats the identity as unknown.
+   */
   async isSignedIn() {
-    return (await fetch("/api/v1/session",{
+    const response = await fetch("/api/v1/session",{
       method: "GET",cache: "no-store",credentials: "same-origin"
-    })).ok;
+    });
+    if (response.status === 401) return false;
+    if (!response.ok) throw new Error("SUPPORT_IDENTITY_UNKNOWN");
+    return true;
   },
   async createSession(language) {
     const response = await supportPost("/api/v1/support/sessions",{ language });
@@ -366,6 +373,8 @@ function caseOpenedMessage(
 
 export { SUPPORT_CONVERSATION_STORAGE_KEY };
 
+const NO_MESSAGES: readonly ConversationMessage[] = Object.freeze([]);
+
 export function Assistant({
   client = supportAssistantClient,signedIn,
   fullPage = false,auxiliaryContent,onClose
@@ -396,6 +405,16 @@ export function Assistant({
   // known, so a signed-out first paint can never show a signed-in transcript.
   const [identityResolved,setIdentityResolved] = useState(signedIn !== undefined);
   /**
+   * FIX p1 (SD-B1): false while the sign-in state could not be read. Nothing is written under an unknown identity,
+   * so a transcript is never stored as "signed out" for a person who is signed in.
+   */
+  const [identityKnown,setIdentityKnown] = useState(signedIn !== undefined);
+  /**
+   * FIX p1 (PT-B1): from a sleep until the wake's gate decides, the conversation is held in memory but not shown —
+   * no message, no case link, no draft, no session reference. A keep shows it again; an erase discards it.
+   */
+  const [concealed,setConcealed] = useState(false);
+  /**
    * S04 (PLAN S3.2): the stored transcript is restored only through the gate. "pending" waits for the identity,
    * "settling" awaits the gate, "done" lets the write effect run, "asleep" is a parked page: no gate, no fetch,
    * no write until it wakes.
@@ -413,18 +432,40 @@ export function Assistant({
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const followLatestRef = useRef(true);
   /**
-   * S04 (D-S04-17, D-S04-24): one more on every session change, sleep and wake. Every async path captures it
-   * before its first await and applies nothing when it moved.
+   * S04 (D-S04-17): the conversation's generation — one more whenever the conversation is discarded (a session
+   * change, or a wake whose gate erases). Every async path captures it before its first await and applies nothing
+   * when it moved. A sleep does not move it (PT-B1): a reply that lands while parked is held with the rest.
    */
   const generationRef = useRef(0);
+  /**
+   * S04 (D-S04-24): the restore gate's generation — one more on every session change, sleep and wake. A gate run
+   * that began before one of them applies nothing; the newer one owns the phase.
+   */
+  const gateRef = useRef(0);
   /**
    * S04 (D-S04-32, D-ORCH-ARCHREV3): set before the sleep's flushSync, cleared on wake. React flushes the last
    * commit's pending effects inside that flushSync; without this ref a restore effect left pending there runs the
    * gate on the old facts and puts the old transcript on screen while the page sleeps. The ref keeps it off the
-   * screen; the wake's generation bump keeps its verdict out of storage. Both are required.
+   * screen; the module's wake bump (sessionChange.ts) keeps its verdict out of storage. Both are required.
    */
   const parkedRef = useRef(false);
+  /** PT-B1: what a sleep holds — null when nothing is held; `restored` when the gate had finished before it. */
+  const heldRef = useRef<Readonly<{ restored: boolean }> | null>(null);
+  /** PT-B1: the unsent draft, taken off the screen at the sleep and put back on a keep. */
+  const draftRef = useRef("");
+  /**
+   * SD-N1: set by every reset BEFORE any state call, cleared when the next gate is done. A write effect still
+   * holding the previous commit's closure runs after the receiver's erase; this keeps it from writing the old
+   * conversation back.
+   */
+  const writeBlockedRef = useRef(false);
+  const restorePhaseRef = useRef<"pending" | "settling" | "done" | "asleep">("pending");
   const mountedRef = useRef(false);
+
+  function enterPhase(phase: "pending" | "settling" | "done" | "asleep"): void {
+    restorePhaseRef.current = phase;
+    setRestorePhase(phase);
+  }
 
   useEffect(() => {
     mountedRef.current = true;
@@ -437,35 +478,47 @@ export function Assistant({
   useEffect(() => {
     if (!persistent || !identityResolved || restorePhase !== "pending") return;
     if (parkedRef.current) return;
-    setRestorePhase("settling");
-    const generation = generationRef.current;
+    enterPhase("settling");
+    const gate = gateRef.current;
     void settleStoredConversation().then(() => {
       // A sleep, wake or session change landed while the gate settled: the newer one owns the phase.
-      if (!mountedRef.current || generationRef.current !== generation) return;
+      if (!mountedRef.current || gateRef.current !== gate) return;
+      const held = heldRef.current;
+      heldRef.current = null;
+      // The gate has judged what storage holds on facts read now (an unknown sign-in state erases, SD-B1).
       const conversation = restoreSupportConversation(
         browserSupportConversationStorage(),identityAvailable
       );
-      if (conversation !== null) {
-        if (conversation.language !== language) {
-          clearStoredSupportConversation(browserSupportConversationStorage());
-        } else {
+      if (conversation !== null && conversation.language !== language) {
+        clearStoredSupportConversation(browserSupportConversationStorage());
+        if (held !== null) discardConversation();
+      } else if (conversation === null) {
+        // Erased by the gate (or nothing stored, or storage blocked): nothing held may come back.
+        if (held !== null) discardConversation();
+      } else {
+        // Kept. A conversation held since before the sleep is already in memory, whole (PT-B1).
+        if (held === null || !held.restored) {
           setMessages(conversation.messages);
           setServerTime(conversation.serverTime);
         }
+        if (held !== null) restoreDraft();
       }
-      setRestorePhase("done");
+      writeBlockedRef.current = false;
+      setConcealed(false);
+      enterPhase("done");
     });
   },[identityAvailable,identityResolved,language,persistent,restorePhase]);
 
-  // DL3-F3: the transcript is written against the identity that produced it,
-  // and never while the gate is pending, settling or the page is parked (B1).
+  // DL3-F3: the transcript is written against the identity that produced it, and
+  // never while the gate is pending, settling or the page is parked (B1), while
+  // the identity is unknown (SD-B1), or after a reset until its gate is done (SD-N1).
   useEffect(() => {
-    if (!persistent || restorePhase !== "done") return;
+    if (!persistent || restorePhase !== "done" || !identityKnown || writeBlockedRef.current) return;
     writeStoredSupportConversation(browserSupportConversationStorage(),{
       language,identityBound: identityAvailable,messages,
       ...(serverTime === undefined ? {} : { serverTime })
     });
-  },[identityAvailable,language,messages,persistent,restorePhase,serverTime]);
+  },[identityAvailable,identityKnown,language,messages,persistent,restorePhase,serverTime]);
 
   useEffect(() => {
     if (!fullPage || !followLatestRef.current) return;
@@ -478,10 +531,12 @@ export function Assistant({
   useEffect(() => {
     if (signedIn !== undefined) {
       setIdentityAvailable(signedIn);
+      setIdentityKnown(true);
       setIdentityResolved(true);
       return;
     }
     if (client.isSignedIn === undefined) {
+      setIdentityKnown(true);
       setIdentityResolved(true);
       return;
     }
@@ -489,44 +544,59 @@ export function Assistant({
     void client.isSignedIn().then((available) => {
       if (!active) return;
       setIdentityAvailable(available);
+      setIdentityKnown(true);
       setIdentityResolved(true);
     }).catch(() => {
       if (!active) return;
+      // SD-B1: shown as a guest, but unknown — nothing is restored or written under it.
       setIdentityAvailable(false);
+      setIdentityKnown(false);
       setIdentityResolved(true);
     });
     return () => { active = false; };
   },[client,signedIn,identityEpoch]);
 
   // S04 (PLAN S3.3, ADR-0033): a session change in any tab resets this panel to
-  // "New conversation"; a sleep parks it at once; a wake re-resolves identity
-  // and runs the gate on facts read after the wake.
+  // "New conversation"; a sleep parks it at once — hidden, held in memory
+  // (PT-B1); a wake re-resolves identity and runs the gate on facts read after
+  // the wake, which shows the held conversation again or discards it.
   useEffect(() => {
-    const clearConversation = () => {
-      clearConversationState();
-      setServerTime(undefined);
-      // A request in flight belongs to the old conversation and drops its result (S3.4).
-      setBusy(false);
-    };
     const stopReset = onConversationReset((reason) => {
-      generationRef.current += 1;
+      writeBlockedRef.current = true;
+      gateRef.current += 1;
       if (reason === "sleep") {
+        if (!parkedRef.current) {
+          // The first sleep event holds the conversation; the harness sends a second one (pagehide, then freeze).
+          heldRef.current = Object.freeze({ restored: restorePhaseRef.current === "done" });
+          draftRef.current = inputRef.current?.value ?? "";
+        }
         parkedRef.current = true;
         flushSync(() => {
-          clearConversation();
-          setRestorePhase("asleep");
+          if (inputRef.current !== null) inputRef.current.value = "";
+          setConcealed(true);
+          enterPhase("asleep");
         });
         return;
       }
-      clearConversation();
-      setRestorePhase("pending");
+      discardConversation();
+      enterPhase("pending");
       setIdentityResolved(false);
       setIdentityEpoch((epoch) => epoch + 1);
     });
     const stopWake = onConversationWake(() => {
       parkedRef.current = false;
-      generationRef.current += 1;
-      setRestorePhase("pending");
+      // CT-N2: defence in depth. While parkedRef holds no gate can begin between a sleep and this wake, so no
+      // test can fail without this line; it drops such a gate if the ref is ever bypassed.
+      gateRef.current += 1;
+      if (!persistent) {
+        // Nothing is stored for a transport-injected panel, so there is no gate to wait for.
+        heldRef.current = null;
+        restoreDraft();
+        writeBlockedRef.current = false;
+        setConcealed(false);
+        return;
+      }
+      enterPhase("pending");
       setIdentityResolved(false);
       setIdentityEpoch((epoch) => epoch + 1);
     });
@@ -583,6 +653,25 @@ export function Assistant({
     if (persistent) clearStoredSupportConversation(browserSupportConversationStorage());
   }
 
+  /**
+   * A session change, or a wake whose gate erased: the old conversation goes whole — messages, support session,
+   * case code and link, draft, topic — and a request in flight drops its result (S3.4, R03).
+   */
+  function discardConversation(): void {
+    generationRef.current += 1;
+    heldRef.current = null;
+    draftRef.current = "";
+    clearConversationState();
+    setServerTime(undefined);
+    setBusy(false);
+    setConcealed(false);
+  }
+
+  function restoreDraft(): void {
+    if (inputRef.current !== null && draftRef.current !== "") inputRef.current.value = draftRef.current;
+    draftRef.current = "";
+  }
+
   function rememberServerTime(value: number | undefined): void {
     if (value !== undefined) setServerTime(value);
   }
@@ -634,13 +723,17 @@ export function Assistant({
     if (signedIn !== undefined) {
       currentIdentity = signedIn;
     } else if (client.isSignedIn !== undefined) {
+      let known = true;
       try {
         currentIdentity = await client.isSignedIn();
       } catch {
+        // SD-B1: unknown, not signed out — the server binds the session it opens; nothing is written until known.
         currentIdentity = false;
+        known = false;
       }
       if (superseded(generation)) return null;
       setIdentityAvailable(currentIdentity);
+      setIdentityKnown(known);
     }
     if (!discardCurrent && session !== null && session.identityBound === currentIdentity) {
       return session;
@@ -743,7 +836,9 @@ export function Assistant({
     }
   }
 
-  const last = messages.at(-1);
+  // PT-B1: while parked, and until the wake's gate decides, nothing of the conversation is on screen.
+  const shownMessages = concealed ? NO_MESSAGES : messages;
+  const last = shownMessages.at(-1);
   const canRate = last?.outcome === "ANSWER_GROUNDED" || last?.outcome === "NO_SOURCE";
 
   async function rateLast(messageId: string,rating: "yes" | "no"): Promise<void> {
@@ -771,13 +866,13 @@ export function Assistant({
    * and all of them after a reload or in another tab, render the stored
    * token-free notice with no link, because the code is not there to render.
    */
-  const liveCaseMessageId = caseBearer === null ? null : messages.reduce<string | null>(
+  const liveCaseMessageId = caseBearer === null ? null : shownMessages.reduce<string | null>(
     (newest,message) => message.caseOpened === true ? message.id : newest,null
   );
 
   const conversation = <div className="supportConversation"
     aria-label={t(chromeCatalog,"support.conversation")} aria-live="polite">
-    {messages.map((message) => {
+    {shownMessages.map((message) => {
       const bearer = caseBearer !== null && message.id === liveCaseMessageId ? caseBearer : null;
       const text = bearer === null ? message.text : bearer.text;
       const link = bearer === null ? safeFirstPartyLink(message.link) : supportCaseLink(bearer.token);
@@ -862,7 +957,7 @@ export function Assistant({
   const statusState = statusUnavailable || pageStatus?.available === false
     ? "UNAVAILABLE" : pageStatus === null ? "CHECKING" : "ONLINE";
   const statusLabel = t(chromeCatalog,SUPPORT_STATUS_LABEL_KEYS[statusState]);
-  const reference = session === null ? "HLP—NEW" : `HLP-${session.sessionId.slice(0,4).toUpperCase()}`;
+  const reference = session === null || concealed ? "HLP—NEW" : `HLP-${session.sessionId.slice(0,4).toUpperCase()}`;
   const privacyShortcut = resolveSupportActions(["privacy-preferences"],{
     signedIn: identityAvailable,language
   }).at(0);
