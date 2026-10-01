@@ -6957,6 +6957,7 @@ a:focus-visible {
   cursor: pointer;
 }
 .mfaPrimary:disabled { opacity: 0.45; cursor: not-allowed; }
+.mfaDoneLink { display: inline-block; margin-top: 18px; text-decoration: none; }
 
 .mfaCodes {
   display: grid;
@@ -9467,6 +9468,220 @@ a:focus-visible {
   }
 }
 /* === end crisis support === */
+
+/* ============================================================
+   Phone layout — 2026-09-30 responsiveness pass.
+   Placed after every layout rule (only the delimited consent-ui blocks,
+   which must end the file, follow it): each rule here corrects a
+   phone-width overflow measured at 320–414px and must win over the
+   earlier breakpoints it adjusts.
+   ============================================================ */
+
+@media (max-width: 640px) {
+  /* The app bar held six actions in one unwrapped row (431px on a 375px
+     phone), which widened every page. Account and ⚙ both open /settings,
+     so the phone keeps the labelled icon and drops the duplicate; the
+     asker chip is a role placeholder the settings page already states. */
+  .topBar {
+    min-width: 0;
+  }
+  .topBarActions > .btn:not(.btnDark),
+  .topBarActions > .roleChip {
+    display: none;
+  }
+
+  /* Debate header: four controls sat in a three-column grid, so the
+     fourth wrapped and pushed the row above the bar. Two rows instead —
+     brand and utilities on top, the full view switch underneath — and
+     every view stays reachable on a phone. */
+  .debateTopBar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
+    column-gap: 8px;
+    row-gap: 6px;
+    padding: 6px 12px 8px;
+  }
+  .debateTopControlRow {
+    display: contents;
+  }
+
+  /* The debate column was one 100dvh box: on a 320×640 phone the header,
+     AI notice, language offer and story panel took 634px and left the
+     reading views 6px. On a phone the column scrolls as a page instead —
+     the header stays pinned, the notices scroll away, and the reading
+     views keep a full screen under the header. */
+  .debateView {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .debateTopBar {
+    position: sticky;
+    top: 0;
+  }
+  .debateMain {
+    flex: 0 0 auto;
+    height: calc(100dvh - 100px);
+  }
+  /* The pinned header's 80% tint let scrolled text show through it. */
+  .debateTopBar {
+    background: var(--bg);
+  }
+
+  /* Thread: each nesting level cost a 16px rail plus a 12px gap, so at
+     320px a reply's text was 140px wide (~15 characters a line). Narrower
+     rails and paddings keep a second-level reply near 200px. */
+  .threadInner,
+  .splitInner {
+    padding-inline: 10px;
+  }
+  .threadRow {
+    gap: 6px;
+  }
+  .threadLane,
+  .threadElbow {
+    flex-basis: 10px;
+    width: 10px;
+  }
+  .threadLaneLine {
+    left: 5px;
+  }
+  .threadElbowShape {
+    width: 10px;
+  }
+  .threadRootShell,
+  .threadCardShell {
+    padding: 4px;
+  }
+  .threadRoot {
+    padding: 16px 14px 12px;
+  }
+  .threadCard {
+    padding: 14px 12px 10px;
+  }
+  .debateTopBar .languageSwitcher {
+    margin-left: auto;
+  }
+  .debateTopBar .segment {
+    order: 10;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .debateTopBar .segment button,
+  .debateTopBar .segment button:not([aria-pressed="true"]) {
+    display: block;
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 4px;
+  }
+  /* The overflow menu's ? and ⚙ rows carry only an aria-label; show it. */
+  .debateOverflowMenu .iconBtn.debateOverflowAction::after {
+    content: attr(aria-label);
+    margin-left: 8px;
+    font-size: 13px;
+  }
+  .debateOverflowMenu .iconBtn.debateOverflowAction {
+    width: auto;
+    justify-content: flex-start;
+    padding-inline: 12px;
+  }
+
+  /* Model pills were cut mid-name inside unwrapped meta rows. */
+  .nodeArgHeader,
+  .threadMetaRow,
+  .nodeReviewLine,
+  .splitCardMeta,
+  .splitFocusHead {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .modelPill {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Split: the case-for / case-against meter was 410px wide and made the
+     whole view scroll sideways. */
+  .splitMeter {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .splitMeterSide {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* The challenge menu is anchored to the clicked card and was not kept
+     on screen; on a phone it opens as a bottom sheet. */
+  .popAnchor {
+    left: 12px !important;
+    right: 12px;
+    top: auto !important;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    transform: none;
+  }
+  .popCard {
+    width: auto;
+    margin-bottom: 0;
+  }
+
+  /* MFA setup: the stacked column kept align-items:flex-start, so the
+     setup text sized to its content (418px in a 341px card) and hid the
+     verify button. */
+  .mfaSetup {
+    align-items: stretch;
+  }
+  .mfaSecret {
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+  .mfaCodeRow {
+    flex-wrap: wrap;
+  }
+  .mfaCodeRow .mfaCodeInput {
+    flex: 1 1 100%;
+  }
+  .mfaCodeRow > button {
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 380px) {
+  /* The 39-character setup key is typed by hand into an authenticator, so it
+     has to show whole; at 320px that needs the card's inner padding back. */
+  .mfaBody,
+  .mfaStep {
+    padding-inline: 12px;
+  }
+  .mfaSecret {
+    padding-inline: 6px;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 720px) {
+  /* New-debate gauge rows wrapped only once the label had shrunk to
+     nothing (53px at 375px); give the label a real basis so the control
+     drops below it instead. Slider rows already take a full-width label
+     at this width, and their track must keep the rest of the row. */
+  .ndRow:not(.ndRowSlider) .ndRowText {
+    flex: 1 1 220px;
+  }
+}
+
+/* A keyboard shortcut and a hover instruction mean nothing on a
+   touch-only device. */
+@media (hover: none) and (pointer: coarse) {
+  .ndKeyHint,
+  .mapReadoutFooter > span:first-child {
+    display: none;
+  }
+}
 
 /* === consent-ui S01 === */
 /* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
