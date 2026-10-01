@@ -5,6 +5,8 @@ import {
   type SupportCorpusLanguage,type SupportSourcePolicy
 } from "./catalog.js";
 import { SUPPORT_TOPIC_PROMPTS,SUPPORT_UI_LABEL_ALIASES,SUPPORT_UI_LABELS } from "./ui-labels.js";
+import { supportSourceProjection } from "./control-names.js";
+import { supportCapabilityName } from "./capability-names.js";
 
 export type SupportKnowledgeReference<CanonicalId extends string = string> = Readonly<{
   reference: string;
@@ -263,6 +265,17 @@ function isParentDestination(
     && (childUrl.search !== "" || childUrl.hash !== "");
 }
 
+/**
+ * cookie-compliance S05 (SPEC-v4 R02, R04): the action label the model reads in the capability line — en/ro the
+ * catalogue's, the other 33 the generated screen label. Exported so the R02 dump reads the same function.
+ */
+export function supportCapabilityActionLabel(id: SupportActionId, language: SupportLanguage): string | undefined {
+  const action = SUPPORT_ACTION_CATALOG.find((candidate) => candidate.id === id);
+  if (action === undefined) return undefined;
+  return isLegacyLanguage(language) ? action.labels[language]
+    : id === "forgot-password" ? undefined : SUPPORT_UI_LABELS[language][id];
+}
+
 function baseSection(
   capabilities: readonly SupportCapability[],
   language: SupportLanguage,
@@ -270,7 +283,6 @@ function baseSection(
   availableActionIds: ReadonlySet<SupportActionId>,
 ): string {
   const policy = POLICY[corpusLocale].map((line) => `- ${line}`).join("\n");
-  const actionById = new Map(SUPPORT_ACTION_CATALOG.map((action) => [action.id,action]));
   const availability: Readonly<Record<SupportCapability["availability"],Readonly<Record<SupportCorpusLanguage,string>>>> = {
     public: { en:"available to all visitors",ro:"disponibilă tuturor vizitatorilor" },
     "signed-out": { en:"available to signed-out visitors",ro:"disponibilă vizitatorilor neautentificați" },
@@ -283,17 +295,15 @@ function baseSection(
   const catalog = capabilities.map((item) => {
     const available = item.actionIds.filter((id) => availableActionIds.has(id));
     const actions = available.length === 0 ? "none" : available
-      .map((id) => isLegacyLanguage(language) ? actionById.get(id)?.labels[language]
-        : id === "forgot-password" || actionById.get(id) === undefined
-          ? undefined : SUPPORT_UI_LABELS[language][id])
+      .map((id) => supportCapabilityActionLabel(id,language))
       .filter((label): label is string => label !== undefined).join(", ");
-    return `- ${item.labels[corpusLocale]} | ${availability[item.availability][corpusLocale]} | actions=${actions}`;
+    return `- ${supportCapabilityName(item,language)} | ${availability[item.availability][corpusLocale]} | actions=${actions}`;
   }).join("\n");
   return `SUPPORT POLICY\n${policy}\n\nCAPABILITY CATALOG\n${catalog}`;
 }
 
-function articleSection(entry: HelpCorpusEntry,reference: string): string {
-  return `\n\nSOURCE ${reference}\n${entry.modelProjection ?? ""}`;
+function articleSection(entry: HelpCorpusEntry,reference: string,language: SupportLanguage): string {
+  return `\n\nSOURCE ${reference}\n${supportSourceProjection(entry,language)}`;
 }
 
 function outputContract(
@@ -535,7 +545,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   for (const { entry } of policyAvailable ? ranked : []) {
     if (sourceIds.length >= 3) break;
     const reference = input.referenceFor("source",sourceIds.length);
-    const section = articleSection(entry,reference);
+    const section = articleSection(entry,reference,input.language);
     if ([...`${text}${section}${outputContract(
       [...sourceReferences.map((item) => item.reference),reference],
       actionReferences.map((item) => item.reference)

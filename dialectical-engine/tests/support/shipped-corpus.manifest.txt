@@ -622,8 +622,10 @@ packages/story/src/status.ts
 packages/story/src/validate.ts
 packages/story/src/writer.ts
 packages/support-kb/scripts/generate-ui-labels.mjs
+packages/support-kb/src/capability-names.ts
 packages/support-kb/src/catalog.ts
 packages/support-kb/src/context.ts
+packages/support-kb/src/control-names.ts
 packages/support-kb/src/index.ts
 packages/support-kb/src/locale.ts
 packages/support-kb/src/navigation.ts
