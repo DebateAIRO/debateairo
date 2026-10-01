@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Potrošnja vašeg plana",
+  "billing.usage.line": "Danas {dayPct}% · Ovaj tjedan {weekPct}% · Ovaj mjesec {monthPct}%",
+  "billing.usage.lineFree": "Ovaj mjesec {monthPct}%",
+  "billing.usage.day": "Danas",
+  "billing.usage.week": "Ovaj tjedan",
+  "billing.usage.month": "Ovaj mjesec",
+  "billing.usage.resets": "Resetira se: {time}"
+}

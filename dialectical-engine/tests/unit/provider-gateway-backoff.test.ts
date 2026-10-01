@@ -202,7 +202,7 @@ describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook"
 describe("V-28 — the runner's gateway factory supplies the money seam", () => {
   // Task M1: built for the call's phase, the SAME phase the attempt hook above
   // is asked with.
-  const SEAM = "costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase)";
+  const SEAM = "costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase, providerCallSharedWall(request))";
 
   function factoryBody(source: string): string {
     const start = source.indexOf("export function createPostgresProviderGateway");

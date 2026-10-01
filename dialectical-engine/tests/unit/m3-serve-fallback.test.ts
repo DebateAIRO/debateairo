@@ -831,6 +831,7 @@ describe("M3 polish · what ended the answer-writing loop early, for the owner's
     ["RUN_COST_ENVELOPE_EXHAUSTED", "ATTEMPTS"],
     ["PROVIDER_USAGE_UNREPORTED", "USAGE"],
     ["DAILY_COST_ENVELOPE_REACHED", "DAILY"],
+    ["PERSON_ALLOWANCE_REACHED", "ALLOWANCE"],
     ["SYNTHESIS_TRANSPORT_DEATH", "TRANSPORT_DEATH"],
     ["SYNTHESIS_NO_ARTIFACT", "NO_ARTIFACT"]
   ] as const)("names %s as %s", (code, stop) => {

@@ -10,6 +10,7 @@
   "time.status.claimed": "取得済み",
   "time.status.running": "実行中",
   "time.status.holding": "プロバイダー復旧のため保留中",
+  "time.status.waiting": "開始待ち",
   "time.status.settled": "確定済み",
   "time.status.generating": "生成中",
   "time.status.failed": "失敗",

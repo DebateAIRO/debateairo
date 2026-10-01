@@ -10,6 +10,7 @@
   "time.status.claimed": "已认领",
   "time.status.running": "运行中",
   "time.status.holding": "服务商恢复暂停",
+  "time.status.waiting": "等待中",
   "time.status.settled": "已结算",
   "time.status.generating": "生成中",
   "time.status.failed": "失败",

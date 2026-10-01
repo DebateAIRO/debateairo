@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "このディベートの論証、レビュー、スコア、判定はすべてAIモデルが生成し、機械可読の印が付きますが、不正確な場合があります。",
+  "debateChrome.status.waiting": "開始待ちです。ディベートは{time}に自動的に始まります。",
+  "debateChrome.status.waitingOwnDebates": "現在、ほかのディベートが上限の残りを使っています。このディベートは、そのいずれかが終わりしだい自動的に始まります。",
   "debateChrome.backToLibrary": "← ライブラリに戻る",
   "debateChrome.loading": "読み込み中…",
   "debateChrome.error.claimGenerationFailed": "主張の生成に失敗しました",
@@ -270,5 +272,6 @@
   "requestFailure.kind.UNREADABLE": "コーディネーターからの応答を読み取れなかったため、結果は不明です。",
   "requestFailure.kind.PLAN_TIER_INVALID": "コーディネーターがプランの選択を拒否しました。無料またはプレミアムを選択してから、再試行してください。",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "コーディネーターがリクエストを拒否しました。このプランに必要なモデルが現在利用できません。後でもう一度試すか、別のプランを選択してください。",
+  "requestFailure.kind.ALREADY_WAITING": "待機できる質問は一度に一つだけです。待機中のディベートが始まってから、この質問を送ってください。",
   "requestFailure.kind.UNCLASSIFIED": "応答を受信する前に失敗したため、結果は不明です。これはコーディネーターによる判断ではありません。"
 }

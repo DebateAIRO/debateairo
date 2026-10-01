@@ -22,6 +22,8 @@
   "home.by": "Minn {name}",
   "home.noDebates": "Għad m’hemmx dibattiti — ippubblika l-ewwel pretensjoni hawn fuq.",
   "home.generationFailed": "Il-ġenerazzjoni tad-dibattitu falliet: {reason}",
+  "home.status.waiting": "Qed jistenna biex jibda. Id-dibattitu tiegħek jibda waħdu fi {time}.",
+  "home.status.waitingOwnDebates": "Id-dibattiti l-oħra tiegħek qed jużaw il-bqija tal-limitu tiegħek għalissa. Dan id-dibattitu jibda waħdu hekk kif jispiċċa wieħed minnhom.",
   "home.noPublishedDebates": "Għadu ma ġie ppubblikat l-ebda dibattitu.",
   "home.verdictUnavailable": "Il-verdett mhuwiex disponibbli",
   "home.verdict.supported": "Sostnut",

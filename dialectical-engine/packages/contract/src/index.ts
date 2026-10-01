@@ -120,6 +120,16 @@ export const ExpansionDepthSchema = z.number().int().min(EXPANSION_DEPTH_MIN).ma
 export type ExpansionDepth = z.infer<typeof ExpansionDepthSchema>;
 
 /**
+ * The largest question an ask may carry, in UTF-8 bytes: the API refuses a
+ * larger one, and the boot check (B9, budget spec §2.10) prices the first
+ * position's own call at it. A function, not an exported number: numbers live
+ * in register rows or inside functions.
+ */
+export function askQuestionMaxBytes(): number {
+  return 8_192;
+}
+
+/**
  * The ruled domain, DERIVED from the bound above. Selectors and option lists
  * import this instead of enumerating the values by hand, so widening the bound
  * widens every chooser without touching a consumer.
@@ -150,11 +160,140 @@ export const AskRequestSchema = z.object({
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
+/**
+ * Budget spec 2026-09-28 §2.2 / paid-plans spec §2.4.1 — the limit a question
+ * waits for or is close to: the site's day, or one of the person's windows.
+ * The same four words as `SpendScope` in @debateai/budget (the contract cannot
+ * import it); tests/unit/b6a-waiting-projection.test.ts reads both.
+ */
+export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+
+/**
+ * Final review Part 1b, Important 1 — WHY A QUESTION WAITS when no reset is
+ * what it waits for: OWN_DEBATES, every limit that is full is one of the
+ * person's windows, full only because of their own running debates. The
+ * question starts by itself as soon as one of them finishes, so its expected
+ * start is the waker's next tick and the UI says so instead of naming a reset
+ * or offering an upgrade. Never the site's day (budget spec §2.7). The same
+ * word as `WaitsFor` in @debateai/budget (the contract cannot import it);
+ * tests/unit/b6a-waiting-projection.test.ts reads both.
+ */
+export const WaitsForSchema = z.enum(["OWN_DEBATES"]);
+const PERSON_SCOPES: ReadonlySet<string> = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+
+/**
+ * Paid plans (spec 2026-09-29 §2.3.4): the gauges the SERVER decided for an
+ * ask from the person's plan, present only when billing decided them (hosted,
+ * billing on): the plan's tier, and the risk tier, composition and depth the
+ * run is asked with (for Free, its sealed fixed gauges, which is why a Free
+ * person's controls stay disabled in the UI). It reports the PLAN's tier, not
+ * the roster that runs: when the interim coarse fit moves a paid question that
+ * STARTs to the Free roster (spec §2.6 item 7, A5), `plan_tier` still says
+ * "premium" while the Free roster's models argue. That move is recorded for the
+ * owner only (`core.run_cost_substitution`); whether a paying person is told is
+ * an owner decision (final review Part 1b, Owner item 4).
+ */
+export const AskAppliedSchema = z.object({
+  plan_tier: PlanTierSchema,
+  risk_tier: RiskTierSchema,
+  composition_budget_tier: CompositionBudgetTierSchema,
+  depth: ExpansionDepthSchema
+}).strict();
+export type AskApplied = z.infer<typeof AskAppliedSchema>;
+
 export const AskAcceptedSchema = z.object({
   run_ref: z.string().min(1),
-  status: z.literal("QUEUED")
-}).strict();
+  status: z.enum(["QUEUED", "WAITING"]),
+  // Budget spec §2.7 and AMENDMENTS-R1 A16: a question that waits in line says
+  // when it is expected to start and which limit it waits for. Present iff WAITING.
+  waits_until: z.iso.datetime().optional(),
+  waiting_scope: SpendScopeSchema.optional(),
+  // Final review Part 1b, Important 1: only on a WAITING answer whose person's
+  // own running debates are all that fill their windows (a person scope).
+  waits_for: WaitsForSchema.optional(),
+  applied: AskAppliedSchema.optional()
+}).strict().superRefine((accepted, context) => {
+  const waiting = accepted.status === "WAITING";
+  if (waiting !== (accepted.waits_until !== undefined) || waiting !== (accepted.waiting_scope !== undefined)) {
+    context.addIssue({
+      code: "custom",
+      message: "WAITING requires waits_until and waiting_scope, and QUEUED forbids both"
+    });
+  }
+  if (accepted.waits_for !== undefined && (!waiting || !PERSON_SCOPES.has(accepted.waiting_scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "waits_for names a WAITING answer's person scope only" });
+  }
+});
 export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
+
+/**
+ * Budget spec §2.7 — the 422 body of ASK_ALREADY_WAITING: the waiting run and its
+ * expected start, and nothing else (no figure, no limit, no count). `waits_for`
+ * (final review Part 1b, Important 1) when that start waits on the person's own
+ * running debates rather than a reset.
+ */
+export const AskAlreadyWaitingSchema = z.object({
+  error: z.literal("ASK_ALREADY_WAITING"),
+  message: z.literal("ASK_ALREADY_WAITING"),
+  run_ref: z.string().min(1),
+  waits_until: z.iso.datetime(),
+  waits_for: WaitsForSchema.optional()
+}).strict();
+export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
+
+/** Paid-plans spec §1.2: the four plans, as billingPlans names them (`PlanId` in @debateai/register). */
+export const PlanIdSchema = z.enum(["FREE", "PLUS", "PRO", "MAX"]);
+
+/** Budget spec §2.7: GET /v1/asks/room — the ask's settings class, as query parameters. */
+export const AskRoomQuerySchema = z.object({
+  plan_tier: PlanTierSchema,
+  composition_budget_tier: CompositionBudgetTierSchema,
+  depth: z.string().regex(/^[0-9]{1,2}$/u).transform(Number).pipe(ExpansionDepthSchema)
+}).strict();
+
+/**
+ * Budget spec §2.7 / AMENDMENTS-R1 A16 — THE ROOM READ: a word, the limit it is
+ * about, when that limit resets or the waiting question starts, the person's own
+ * waiting run, and their plan. Never a figure (I6: figures are a capacity oracle).
+ */
+export const AskRoomResponseSchema = z.object({
+  room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
+  scope: SpendScopeSchema.nullable(),
+  resets_at: z.iso.datetime().nullable(),
+  waiting_run_ref: z.string().min(1).nullable(),
+  plan_id: PlanIdSchema.nullable(),
+  // Final review Part 1b, Important 1: a question that would wait (or the one
+  // waiting) waits only for the person's own running debates; `resets_at` is
+  // then the waker's next tick, not a reset.
+  waits_for: WaitsForSchema.optional()
+}).strict().superRefine((answer, context) => {
+  if (answer.waits_for !== undefined
+    && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "waits_for names a person scope of a question that would wait" });
+  }
+  const fits = answer.room === "FITS";
+  if (fits !== (answer.scope === null) || (fits && answer.resets_at !== null)) {
+    context.addIssue({ code: "custom", message: "FITS names no scope and no reset; every other room names its scope" });
+  }
+  if ((answer.room === "ALREADY_WAITING") !== (answer.waiting_run_ref !== null)) {
+    context.addIssue({ code: "custom", message: "only ALREADY_WAITING names the waiting run" });
+  }
+  if ((answer.room === "FULL" || answer.room === "ALREADY_WAITING") && answer.resets_at === null) {
+    context.addIssue({ code: "custom", message: "a question that would wait says when it would start" });
+  }
+});
+export type AskRoomResponse = z.infer<typeof AskRoomResponseSchema>;
+
+/** Paid-plans spec §1.2 (U1): GET /v1/billing/usage — whole percentages per window, never an amount. */
+export const BillingUsageResponseSchema = z.object({
+  plan_id: PlanIdSchema,
+  windows: z.array(z.object({
+    scope: z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]),
+    percent: z.number().int().min(0).max(110),
+    resets_at: z.iso.datetime()
+  }).strict()).max(3)
+}).strict();
+export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
 
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
@@ -172,13 +311,22 @@ export type ArgumentLanguage = z.infer<typeof ArgumentLanguageSchema>;
 export const RunProjectionSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
-  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
+  state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
   hold_until: z.iso.datetime().nullable(),
   // R2 (spec 2026-09-26 §14.3): null on a database without dev's migration
   // 0072; optional, so a reader built before the field still parses.
-  argument_language: ArgumentLanguageSchema.nullable().optional()
+  argument_language: ArgumentLanguageSchema.nullable().optional(),
+  // Budget spec §2.7: when a WAITING run is expected to start (recomputed on
+  // every read). Optional, so a reader built before the field still parses.
+  waits_until: z.iso.datetime().nullable().optional(),
+  // Final review Part 1b, Important 1: a WAITING run that waits only for its
+  // person's own running debates (`waits_until` is then the next tick).
+  waits_for: WaitsForSchema.nullable().optional()
 }).strict().superRefine((run, context) => {
+  if (run.waits_for !== undefined && run.waits_for !== null && run.state !== "WAITING") {
+    context.addIssue({ code: "custom", message: "only a WAITING run waits for anything" });
+  }
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
       code: "custom",
@@ -187,6 +335,9 @@ export const RunProjectionSchema = z.object({
   }
   if ((run.state === "HOLDING") !== (run.hold_until !== null)) {
     context.addIssue({ code: "custom", message: "HOLDING requires hold_until and other states forbid it" });
+  }
+  if ((run.state === "WAITING") !== (run.waits_until !== undefined && run.waits_until !== null)) {
+    context.addIssue({ code: "custom", message: "WAITING requires waits_until and other states forbid it" });
   }
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
@@ -567,7 +718,7 @@ export const AnswerSummarySchema = z.object({
 export const OpenRunSummarySchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
-  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
+  state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
   created_at_sequence: z.number().int().positive()
 }).strict().superRefine((run, context) => {
@@ -909,6 +1060,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/support/case/messages",
     "GET /v1/support/status",
     "POST /v1/asks",
+    "GET /v1/asks/room",
     "GET /v1/session",
     "GET /v1/deployment",
     "GET /v1/dev/evaluator",
@@ -927,10 +1079,12 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/events",
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
-    "POST /v1/runs/{id}/unpublish"
+    "POST /v1/runs/{id}/unpublish",
+    "GET /v1/billing/usage"
   ]),
   resources: Object.freeze({
-    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
+    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
+    BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
     LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,

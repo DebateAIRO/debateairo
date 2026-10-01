@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "כל תוכן הדיון — הטיעונים, הביקורות, הציונים וההכרעה — נוצר בידי מודלים של בינה מלאכותית, מסומן באופן קריא למכונה ועלול להיות שגוי.",
+  "debateChrome.status.waiting": "ממתין להתחלה. הדיון שלכם יתחיל מעצמו ב־{time}.",
+  "debateChrome.status.waitingOwnDebates": "הדיונים האחרים שלכם משתמשים כרגע ביתרת המגבלה שלכם. הדיון הזה יתחיל מעצמו ברגע שאחד מהם יסתיים.",
   "debateChrome.backToLibrary": "→ חזרה לספרייה",
   "debateChrome.loading": "בטעינה…",
   "debateChrome.error.claimGenerationFailed": "יצירת הטענה נכשלה",
@@ -284,5 +286,6 @@
   "requestFailure.kind.UNREADABLE": "לא ניתן היה לקרוא את תשובת המתאם, ולכן התוצאה אינה ידועה.",
   "requestFailure.kind.PLAN_TIER_INVALID": "המתאם דחה את הבחירה ברמת התוכנית. יש לבחור בתוכנית ״חינם״ או בתוכנית ״פרימיום״ ולאחר מכן לנסות שוב.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "המתאם דחה את הבקשה: מודל הנדרש לתוכנית הזו אינו זמין כעת. יש לנסות שוב מאוחר יותר או לבחור בתוכנית האחרת.",
+  "requestFailure.kind.ALREADY_WAITING": "רק שאלה אחת יכולה להמתין בכל פעם. שאלו את השאלה הזו אחרי שהדיון הממתין שלכם יתחיל.",
   "requestFailure.kind.UNCLASSIFIED": "הבקשה נכשלה לפני שהתקבלה תשובה כלשהי, ולכן התוצאה אינה ידועה. זו אינה החלטה שקיבל המתאם."
 }

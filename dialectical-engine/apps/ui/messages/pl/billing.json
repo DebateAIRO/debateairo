@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Wykorzystanie Twojego planu",
+  "billing.usage.line": "Dziś {dayPct}% · W tym tygodniu {weekPct}% · W tym miesiącu {monthPct}%",
+  "billing.usage.lineFree": "W tym miesiącu {monthPct}%",
+  "billing.usage.day": "Dziś",
+  "billing.usage.week": "W tym tygodniu",
+  "billing.usage.month": "W tym miesiącu",
+  "billing.usage.resets": "Odnawia się: {time}"
+}

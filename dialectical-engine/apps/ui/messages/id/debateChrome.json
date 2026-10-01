@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Semua isi debat ini — argumen, tinjauan, skor, dan putusan — dihasilkan oleh model AI, diberi penanda yang dapat dibaca mesin, dan mungkin tidak akurat.",
+  "debateChrome.status.waiting": "Menunggu untuk dimulai. Debat Anda akan dimulai dengan sendirinya pada {time}.",
+  "debateChrome.status.waitingOwnDebates": "Debat Anda yang lain sedang memakai sisa batas Anda untuk saat ini. Debat ini akan dimulai dengan sendirinya begitu salah satunya selesai.",
   "debateChrome.backToLibrary": "← Kembali ke pustaka",
   "debateChrome.loading": "Memuat…",
   "debateChrome.error.claimGenerationFailed": "Pembuatan klaim gagal",
@@ -270,5 +272,6 @@
   "requestFailure.kind.UNREADABLE": "Balasan koordinator tidak dapat dibaca sehingga hasilnya tidak diketahui.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator menolak pilihan paket. Pilih Gratis atau Premium, lalu coba lagi.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator menolak permintaan tersebut: model yang diperlukan paket ini sedang tidak tersedia. Coba lagi nanti, atau pilih paket lain.",
+  "requestFailure.kind.ALREADY_WAITING": "Hanya satu pertanyaan yang dapat menunggu dalam satu waktu. Ajukan pertanyaan ini setelah debat Anda yang menunggu dimulai.",
   "requestFailure.kind.UNCLASSIFIED": "Permintaan gagal sebelum balasan diterima sehingga hasilnya tidak diketahui. Ini bukan keputusan yang dibuat oleh koordinator."
 }

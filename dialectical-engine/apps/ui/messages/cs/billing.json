@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Využití vašeho plánu",
+  "billing.usage.line": "Dnes {dayPct} % · Tento týden {weekPct} % · Tento měsíc {monthPct} %",
+  "billing.usage.lineFree": "Tento měsíc {monthPct} %",
+  "billing.usage.day": "Dnes",
+  "billing.usage.week": "Tento týden",
+  "billing.usage.month": "Tento měsíc",
+  "billing.usage.resets": "Obnoví se: {time}"
+}

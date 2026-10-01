@@ -22,6 +22,8 @@
   "home.by": "Autor {name}",
   "home.noDebates": "Väitlusi veel pole — esitage ülal esimene väide.",
   "home.generationFailed": "Väitluse genereerimine nurjus: {reason}",
+  "home.status.waiting": "Ootab algust. Teie väitlus algab ise {time}.",
+  "home.status.waitingOwnDebates": "Teie teised väitlused kasutavad praegu teie piiri ülejäänud osa. See väitlus algab ise kohe, kui üks neist lõpeb.",
   "home.noPublishedDebates": "Ühtegi väitlust pole veel avaldatud.",
   "home.verdictUnavailable": "Otsus pole saadaval",
   "home.verdict.supported": "Toetatud",

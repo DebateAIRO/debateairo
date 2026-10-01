@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Penggunaan paket Anda",
+  "billing.usage.line": "Hari ini {dayPct}% · Minggu ini {weekPct}% · Bulan ini {monthPct}%",
+  "billing.usage.lineFree": "Bulan ini {monthPct}%",
+  "billing.usage.day": "Hari ini",
+  "billing.usage.week": "Minggu ini",
+  "billing.usage.month": "Bulan ini",
+  "billing.usage.resets": "Diatur ulang pada {time}"
+}

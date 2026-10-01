@@ -18,6 +18,7 @@
   "time.status.claimed": "נלקחה לטיפול",
   "time.status.running": "פועלת",
   "time.status.holding": "בהמתנה להתאוששות הספק",
+  "time.status.waiting": "ממתין",
   "time.status.settled": "הוסדרה",
   "time.status.generating": "בתהליך יצירה",
   "time.status.failed": "נכשלה",

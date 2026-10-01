@@ -12,6 +12,8 @@ import {
   ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
   COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
   COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+  BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
@@ -705,6 +707,12 @@ function developmentRows(
     // from deploy/vps/register/country-policy.example.json — the kit's hosted-register.example.json
     // leaves it out, so no gate by default) — planHostedRegisterPublication drops it otherwise.
     COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+    // Paid plans (spec 2026-09-29 §2.5.1): the plans row and the billing
+    // switch, OFF. Billing runs only in hosted mode AND when a published
+    // billingPolicy says enabled: true; a hosted operator file may supersede
+    // either row (B11a). Changing a value here is a new register version.
+    BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+    BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
     ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs),
     // Verdict story (spec 2026-09-26 §9): OPTIONAL rows. Every reader treats

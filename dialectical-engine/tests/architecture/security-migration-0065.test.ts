@@ -27,7 +27,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // compared with this list, so a new schema fails the test rather than silently
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
-  "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
+  "billing", "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
   "obs", "observation", "register", "scorecard", "serve", "support"
 ] as const;
 
@@ -442,7 +442,19 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0081_publication_check_record.sql",
         // Hate-speech S02 FIX p1 (sd-N1, sd-N2): identifier grammar, call count and distinct members on the record.
         // Written as 0079; renamed with its table's file (DROP CONSTRAINT IF EXISTS before each ADD). No pair.
-        "0082_publication_check_record_identifiers.sql"
+        "0082_publication_check_record_identifiers.sql",
+        // Budget spec 2026-09-28 (B3): the holds, the waiting line, the owner record of
+        // cheaper models, and the ALLOWANCE stop kind on serve.serve_disclosure. The
+        // spec named it 0077; dev's age gate took 0077, the sensitive-data consent holds
+        // 0078, the change-email turn 0079, legal acceptance is 0080 and dev's publication check
+        // record holds 0081 and 0082 (RULINGS-R3 R3-1). A new prefix, no pair.
+        "0083_budget_holds_waiting_line.sql",
+        // Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): the entitlement,
+        // the run's charge scope and the runner's windows view. The next free
+        // prefix after dev's 0077 (age gate), the colleague's 0078
+        // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
+        // (publication check record) and B3's 0083. No pair.
+        "0084_billing_entitlement.sql"
       ]);
   });
 });

@@ -20,6 +20,7 @@ export {
   COST_MICROS_PER_USD,
   DAILY_COST_ENVELOPE_REACHED,
   MAX_REPORTED_USAGE_COUNTER,
+  PERSON_ALLOWANCE_REACHED,
   PROJECTED_INPUT_BYTES_PER_TOKEN,
   PROVIDER_USAGE_UNREPORTED,
   RUN_COST_ENVELOPE_MONEY_REACHED,
@@ -36,6 +37,7 @@ export {
   readReportedUsage,
   readUsageCounters,
   runCostEnvelopeReached,
+  sharedWallReached,
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
   type DailyCostEnvelopeDecision,
@@ -53,6 +55,7 @@ export {
   CostEnvelopeGuard,
   DEFAULT_RESERVATION_TTL_MS,
   PostgresModelSpendStore,
+  assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
   mostOneRunMaySpendMicros,
   type CostEnvelopeGuardInput,
@@ -61,8 +64,51 @@ export {
   type ModelSpendStore,
   type ProviderCostSeam,
   type ProviderSeamInput,
-  type RunProviderSeamInput
+  type RunProviderSeamInput,
+  type RunOwnerSpendReader,
+  type SharedWallApplication,
+  type SharedWallInput
 } from "./model-spend.js";
+
+/**
+ * Budget spec 2026-09-28 §2.3 with the paid-plans spec §2.4.1 (B1): the room for
+ * one scope, the admission over every scope, the running wall, and the person's
+ * windows as billing supplies them.
+ */
+export {
+  decideAdmission,
+  decideRoom,
+  decideSharedWall,
+  waitingUntil,
+  type Admission,
+  type Room,
+  type ScopeRoom,
+  type WaitsFor,
+  type Wall
+} from "./room.js";
+export {
+  NO_PERSON_ALLOWANCE,
+  type PersonAllowanceSource,
+  type PersonWindow,
+  type SpendScope
+} from "./person-allowance.js";
+
+/** Budget spec 2026-09-28 §2.5 (B2): the estimate a hold and a room are decided with. */
+export {
+  PostgresRecentRunUsageSource,
+  RecentRunsCostEstimator,
+  estimateFromSampleCosts,
+  priceRecentRun,
+  settingsClassKey,
+  type CostEstimator,
+  type RecentRunCharge,
+  type RecentRunUsage,
+  type RecentRunUsageSource,
+  type RunSettingsClass
+} from "./estimate.js";
+
+/** Budget spec 2026-09-28 §2.6 (B3): the day lock, then the person lock, for every room decision. */
+export { withSpendDecisionLock } from "./spend-lock.js";
 
 
 export const RATIFIED_BATTERY_ROW_IDS = [

@@ -18,6 +18,7 @@
   "time.status.claimed": "Atribuído",
   "time.status.running": "Em execução",
   "time.status.holding": "Em espera pela recuperação do fornecedor",
+  "time.status.waiting": "A aguardar",
   "time.status.settled": "Resolvido",
   "time.status.generating": "A gerar",
   "time.status.failed": "Falhou",

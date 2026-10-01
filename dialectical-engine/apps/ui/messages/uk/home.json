@@ -22,6 +22,8 @@
   "home.by": "Автор: {name}",
   "home.noDebates": "Дебатів ще немає — запропонуйте першу тезу вище.",
   "home.generationFailed": "Не вдалося створити дебати: {reason}",
+  "home.status.waiting": "Очікує початку. Ваші дебати почнуться самі о {time}.",
+  "home.status.waitingOwnDebates": "Ваші інші дебати поки що використовують залишок вашого ліміту. Ці дебати почнуться самі, щойно одні з них завершаться.",
   "home.noPublishedDebates": "Ще не оприлюднено жодних дебатів.",
   "home.verdictUnavailable": "Вердикт недоступний",
   "home.verdict.supported": "Підтримано",

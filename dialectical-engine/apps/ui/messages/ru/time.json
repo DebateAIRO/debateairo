@@ -22,6 +22,7 @@
   "time.status.claimed": "Назначено",
   "time.status.running": "Выполняется",
   "time.status.holding": "Ожидание восстановления поставщика",
+  "time.status.waiting": "Ожидает",
   "time.status.settled": "Урегулировано",
   "time.status.generating": "Создаётся",
   "time.status.failed": "Ошибка",

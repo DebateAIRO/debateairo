@@ -99,7 +99,8 @@ test("every public and protected entry point reaches the dedicated auth routes",
   // Review F2 (REV-FIX-CATALOGS): the gate now receives the served newDebate
   // catalogue; the route (settings behind the AuthGate) is unchanged.
   // L4: the settings page is never covered by the accept screen.
-  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} \/>/);
+  // B10c: the page also serves the billing catalogue, for the usage bars.
+  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\} \/>/);
   assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\} legalGate=\{false\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
@@ -120,11 +121,11 @@ test("the project home confirms a real session before exposing its debate compos
   // catalogue, to say today's limit for new debates where the person typed.
   // Sensitive-data consent (V, 2026-09-29): it also records the interface locale with the consent.
   // Crisis check (V, 2026-09-30): and the edge's country, for the help-numbers screen.
-  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} locale=\{locale\} crisisCountryHint=\{crisisCountryHint\} \/>/);
+  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} roomCatalog=\{roomCatalog\} locale=\{locale\} crisisCountryHint=\{crisisCountryHint\} \/>/);
   // Task 16 (M8 review): only the two values the daily-limit message prints ship to the browser.
   assert.match(home, /const newDebateCatalog = dailyLimitMessageCatalog\(await loadNamespace\(locale, "newDebate"\)\);/);
   assert.match(home, /id="start-a-debate"/);
-  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} locale=\{locale\} crisisCountryHint=\{crisisCountryHint\} \/>[\s\S]*?\{error \?/);
+  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} roomCatalog=\{roomCatalog\} locale=\{locale\} crisisCountryHint=\{crisisCountryHint\} \/>[\s\S]*?\{error \?/);
 });
 
 test("the login route sends an already-authenticated browser back to its debate workspace", () => {

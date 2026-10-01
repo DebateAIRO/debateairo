@@ -32,6 +32,8 @@ import {
   parseCanonicalRegisterJson,
   readAdmissionPolicy,
   readAuthPolicy,
+  readBillingPlans,
+  readBillingPolicy,
   readCostEnvelopePolicy,
   readDeploymentRiskTier,
   readEnvelopeFormulaInputs,
@@ -321,5 +323,14 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     })).rejects.toMatchObject({
       code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:GEO_AVAILABILITY_ADMISSION_UNSEALED"
     });
+  }, 120_000);
+
+  it("seals the billing rows both boots read, billing off (B11a)", async () => {
+    const plan = await planOf(hostedFile());
+    const result = await publishHostedRegister({ plan, operations: createPostgresHostedRegisterOperations(database.pool) });
+    const version = registerVersionToSafeLegacyNumber(result.registerVersion);
+    await expect(readBillingPolicy(database.pool, version)).resolves.toMatchObject({ enabled: false });
+    expect((await readBillingPlans(database.pool, version))?.plans.map((plan) => plan.planId))
+      .toEqual(["FREE", "PLUS", "PRO", "MAX"]);
   }, 120_000);
 });
