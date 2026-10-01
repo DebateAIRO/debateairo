@@ -65,7 +65,8 @@ describe("sentence C on the debate page", () => {
       />
     );
     expect(html).toContain(before!.trim());
-    expect(html).toMatch(new RegExp(`<time datetime="${WAITS_UNTIL.replace(/\./gu, "\\.")}"`, "iu"));
+    // React writes the attribute as dateTime; HTML attribute names are case-insensitive.
+    expect(html.toLowerCase()).toContain(`<time datetime="${WAITS_UNTIL.toLowerCase()}"`);
     expect(html).toContain(">Waiting<");
     // C sits in its own full-width line, outside the top bar's claim row (hidden on a
     // phone, globals.css `.debateTopClaim` at 920px and below) and outside the clamped,
@@ -181,7 +182,7 @@ describe("a twenty-day wait still says when to the minute (formatReset's date br
         storyCatalog={publicEnglish}
       />
     );
-    expect(html).toMatch(new RegExp(`<time datetime="${TWENTY_DAYS.replace(/\./gu, "\\.")}"`, "iu"));
+    expect(html.toLowerCase()).toContain(`<time datetime="${TWENTY_DAYS.toLowerCase()}"`);
     const container = await mounted(
       <ResetSentence text={t(debateChrome, "debateChrome.status.waiting", { time: RESET_TIME_MARK })} at={TWENTY_DAYS} locale="en" />
     );
