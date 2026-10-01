@@ -12,4 +12,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca procesul de compoziție. Planul Free păstrează valoarea implicită curentă fixă. Cu planul Premium selectat, poți alege **Low**, **Medium** sau **High** înainte să pornești rularea. Acest control nu dovedește un abonament plătit, o plată sau disponibilitatea garantată a modelelor.
+Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca procesul de compoziție. Planul Gratuit păstrează valoarea implicită curentă fixă. Cu planul Premium selectat, poți alege **Redus**, **Mediu** sau **Ridicat** înainte să pornești rularea. Acest control nu dovedește un abonament plătit, o plată sau disponibilitatea garantată a modelelor.
