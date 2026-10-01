@@ -14,6 +14,7 @@ apps/api/src/account-erasure.ts
 apps/api/src/admission.ts
 apps/api/src/ask-billing.ts
 apps/api/src/ask-room.ts
+apps/api/src/billing/connectors.ts
 apps/api/src/billing/index.ts
 apps/api/src/billing/usage.ts
 apps/api/src/boot-custody.ts
@@ -549,6 +550,7 @@ packages/battery/src/split.ts
 packages/battery/src/terminal.ts
 packages/billing-core/src/allowance-source.ts
 packages/billing-core/src/calendar.ts
+packages/billing-core/src/company.ts
 packages/billing-core/src/index.ts
 packages/billing-core/src/money.ts
 packages/billing-core/src/plan-lookup.ts

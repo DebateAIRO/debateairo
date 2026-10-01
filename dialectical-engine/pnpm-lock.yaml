@@ -161,6 +161,9 @@ importers:
       '@debateai/battery':
         specifier: workspace:*
         version: link:../../packages/battery
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../../packages/billing-core
       '@debateai/contract':
         specifier: workspace:*
         version: link:../../packages/contract
@@ -179,6 +182,9 @@ importers:
       '@debateai/geo':
         specifier: workspace:*
         version: link:../../packages/geo
+      '@debateai/invoice-smartbill':
+        specifier: workspace:*
+        version: link:../../packages/invoice-smartbill
       '@debateai/judgement':
         specifier: workspace:*
         version: link:../../packages/judgement
@@ -197,6 +203,9 @@ importers:
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:../../packages/obs-capture
+      '@debateai/payments-xmoney':
+        specifier: workspace:*
+        version: link:../../packages/payments-xmoney
       '@debateai/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -215,6 +224,9 @@ importers:
       '@debateai/support-kb':
         specifier: workspace:*
         version: link:../../packages/support-kb
+      '@debateai/tax-quaderno':
+        specifier: workspace:*
+        version: link:../../packages/tax-quaderno
       '@hatchet-dev/typescript-sdk':
         specifier: 1.28.1
         version: 1.28.1(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.4.3)

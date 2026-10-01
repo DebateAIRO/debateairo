@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -28,6 +28,8 @@ import {
   costEnvelopeCeilings,
   readBillingPlans,
   readBillingPolicy,
+  readBillingEnvironmentGroup,
+  type BillingPolicy,
   loadApiEnvironment,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
@@ -61,6 +63,7 @@ import {
 } from "@debateai/budget";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
+import { SELLER_COMPANY } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
@@ -78,6 +81,9 @@ import { AskRoom, everyWholeMinute } from "./ask-room.js";
 import type { AskBilling } from "./ask-billing.js";
 import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
+import {
+  assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
+} from "./billing/connectors.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
@@ -214,7 +220,9 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
     { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt },
     { path: environment.RECORDS_KEY_PATH, material: recordsKey }
   ],
-  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
+  // Paid plans: the billing custody files are text, not 32-byte keys, so they cannot be pairwise compared
+  // as key material — but they are refused here if they alias any key, store or each other by path or inode.
+  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH, ...billingCustodyPaths(environment)]
 }));
 const pool = boot.hold(createPool(environment.DATABASE_URL));
 const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!));
@@ -523,6 +531,42 @@ const askBilling: AskBilling | undefined = askRoomComposition === undefined
       }),
       clock: () => new Date()
     });
+/**
+ * Paid plans (spec 2026-09-29 §2.2 rule 1, §2.11; amendments R1 A22/A23; rulings R-5, R-7). Billing exists only
+ * when this is the hosted site AND the billingPolicy row in force says enabled; local mode never reads the row.
+ * Billing on must pass B4a's one readiness question (plans row + the three budget members), and only then is the
+ * billing group of the environment validated, by name (BILLING_CONFIGURATION_INCOMPLETE:<KEY>), and SmartBill's
+ * code built from the legal notice's facts before any secret is read (BILLING_COMPANY_FACTS_UNVERIFIED:cui while the
+ * CUI is still bracketed, and :vat in SMARTBILL_CIF_FORM's "ro" form while the RO VAT code is; RULINGS-R3 R3-4).
+ */
+const billingPolicy: BillingPolicy | null = environment.DEPLOYMENT_MODE === "hosted"
+  ? await boot.run("billing-policy", () => readBillingPolicy(pool, environment.REGISTER_VERSION))
+  : null;
+if (billingPolicy?.enabled === true) {
+  await boot.run("billing-readiness", async () => {
+    assertBillingReady({
+      policy: billingPolicy,
+      plans: await readBillingPlans(pool, environment.REGISTER_VERSION),
+      envelope: await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+    });
+  });
+}
+const billingConnectors: BillingConnectors | null = billingPolicy?.enabled === true
+  ? boot.runSync("billing-connectors", () => loadBillingConnectors({
+      environment: readBillingEnvironmentGroup(environment),
+      // RULINGS-R3 R3-4: SmartBill's CIF is built from the legal notice's facts (COMPANY, mirrored), never a setting.
+      company: SELLER_COMPANY,
+      recordsKey,
+      hold: (resource) => boot.hold(resource)
+    }))
+  : null;
+// Stage and live are two xMoney systems: going live with sandbox subscriptions still open would leave them ACTIVE
+// for ever (the live renewal pass never rebills a stage order). The runbook's switch-on step closes them first.
+if (billingConnectors?.xmoneyEnvironment === "live") {
+  await boot.run("billing-stage-records", async () => {
+    assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"));
+  });
+}
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
 // V-3: over the RING, so a record still wrapped by the previous key opens for
 // the length of a changeover. Writes stay under the current key. Under the
@@ -1065,7 +1109,9 @@ const startup = installStartupResourceOwner({
     // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
     { end: async () => { geoLookup?.close(); } },
     // L1: the records key outlives the boot ledger; it is zeroed after every pool has closed.
-    { end: async () => { recordsKey.fill(0); } }
+    { end: async () => { recordsKey.fill(0); } },
+    // P6a: the xMoney private key outlives the boot ledger too; P7/P8 consume the connectors.
+    ...(billingConnectors === null ? [] : [{ end: async () => { billingConnectors.xmoneyPrivateKey.fill(0); } }])
   ],
   // L2-F7: zeroed after every pool that borrows from them has closed. A
   // changeover's PREVIOUS keys are in this list for the same reason the current

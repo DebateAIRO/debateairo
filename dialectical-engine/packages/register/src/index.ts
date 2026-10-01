@@ -861,7 +861,12 @@ export {
   parseReplaySelfTestEnvironment,
   parseRunnerEnvironment,
   parseServeDisclosureReportEnvironment,
-  parseSettlementEnvironment
+  parseSettlementEnvironment,
+  // P6a (paid plans): the billing group of the API environment, validated late (A22).
+  BILLING_ENVIRONMENT_KEYS,
+  readBillingEnvironmentGroup,
+  type BillingEnvironmentGroup,
+  type BillingEnvironmentKey
 } from "./runtime-environment.js";
 
 export {
