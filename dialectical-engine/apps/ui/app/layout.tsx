@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { TopBar } from "@/components/TopBar";
 import { CookieConsent } from "@/components/consent/CookieConsent";
 import { LegalDocumentsProvider } from "@/components/consent/LegalDocumentsProvider";
+import { SupportConversationGuard } from "@/components/support/SupportConversationGuard";
 import { ConsentCatalogProvider } from "@/components/consent/useConsentCatalog";
 import { cookies } from "next/headers";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
@@ -112,6 +113,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {children}
                 <CookieConsent />
                 <SiteFooter variant="line" />
+                <SupportConversationGuard />
               </div>
             </LegalDocumentsProvider>
           </ConsentCatalogProvider>

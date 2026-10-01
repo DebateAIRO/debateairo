@@ -330,11 +330,13 @@ apps/ui/components/modeTransition.test.mjs
 apps/ui/components/modeTransition.ts
 apps/ui/components/support/Assistant.tsx
 apps/ui/components/support/CaseView.tsx
+apps/ui/components/support/SupportConversationGuard.tsx
 apps/ui/components/support/SupportWidget.tsx
 apps/ui/components/support/caseLink.test.mjs
 apps/ui/components/support/caseLink.ts
 apps/ui/components/support/conversation.ts
 apps/ui/components/support/http.ts
+apps/ui/components/support/sessionChange.ts
 apps/ui/components/support/supportConversation.test.mjs
 apps/ui/content-security-policy.d.mts
 apps/ui/content-security-policy.mjs
