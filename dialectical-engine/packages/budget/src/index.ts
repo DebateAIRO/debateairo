@@ -83,6 +83,7 @@ export {
   type Admission,
   type Room,
   type ScopeRoom,
+  type WaitsFor,
   type Wall
 } from "./room.js";
 export {

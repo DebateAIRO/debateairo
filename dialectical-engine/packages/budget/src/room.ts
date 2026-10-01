@@ -21,10 +21,23 @@ import type { SpendScope } from "./person-allowance.js";
  *    against the finish edge. Holds are not counted here.
  */
 export type Room = "FITS" | "CLOSE" | "FULL";
-export type ScopeRoom = Readonly<{ scope: SpendScope; room: Room; resetsAt: Date }>;
+/**
+ * Final review Part 1b, Important 1: why a question waits when no reset is what
+ * it waits for. OWN_DEBATES: every scope that is FULL is one of the person's
+ * windows full only because of their own running debates' counted holds, so
+ * the question starts as soon as one of those debates settles, and is expected
+ * at the waker's next tick. The site's day never waits for this (budget spec §2.7).
+ */
+export type WaitsFor = "OWN_DEBATES";
+/**
+ * One scope's room and when it resets. `fullOnOwnHolds`: a person window that
+ * is FULL only with the person's own counted holds — it would not be FULL on
+ * spend alone. Only a FULL person window may carry it.
+ */
+export type ScopeRoom = Readonly<{ scope: SpendScope; room: Room; resetsAt: Date; fullOnOwnHolds?: boolean }>;
 export type Admission =
   | Readonly<{ kind: "START"; worst: Room; worstScope: SpendScope | null }>
-  | Readonly<{ kind: "WAIT"; waitsUntil: Date; worstScope: SpendScope }>
+  | Readonly<{ kind: "WAIT"; waitsUntil: Date; worstScope: SpendScope; waitsFor?: WaitsFor }>
   | Readonly<{ kind: "REFUSE_ALREADY_WAITING" }>;
 export type Wall = "WITHIN" | "WOULD_CROSS";
 
@@ -81,6 +94,11 @@ function checkedRooms(rooms: unknown): ReadonlyArray<ScopeRoom> {
     }
     rankOf(entry.room);
     validDate(entry.resetsAt, "BUDGET_ADMISSION_ROOMS_INVALID");
+    const ownHolds = entry.fullOnOwnHolds;
+    if (ownHolds !== undefined && (typeof ownHolds !== "boolean"
+      || (ownHolds && (entry.room !== "FULL" || entry.scope === "SITE_DAY")))) {
+      throw new TypeError("BUDGET_ADMISSION_ROOMS_INVALID");
+    }
     seen.add(entry.scope);
   }
   return rooms as ReadonlyArray<ScopeRoom>;
@@ -123,16 +141,27 @@ export function decideSharedWall(input: Readonly<{
  * start", paid-plans §2.4.1): the LATEST reset among the FULL scopes — so the
  * later of the site's midnight and the person's reset when both apply — or the
  * next tick when no scope is full and the question only waits for the waker.
+ * Final review Part 1b, Important 1: a person window FULL only on the person's
+ * own counted holds lifts when one of their debates settles, not at its reset,
+ * so it names no reset. When every FULL scope is such a window, the question
+ * is expected at the next tick and waits for OWN_DEBATES (the longest such
+ * window names the scope); otherwise a FULL site day, or a window FULL on
+ * spend, decides as before.
  */
 export function waitingUntil(input: Readonly<{
   rooms: ReadonlyArray<ScopeRoom>;
   nextTickAt: Date;
-}>): Readonly<{ waitsUntil: Date; worstScope: SpendScope }> {
+}>): Readonly<{ waitsUntil: Date; worstScope: SpendScope; waitsFor?: WaitsFor }> {
   const rooms = checkedRooms(input?.rooms);
   const nextTickAt = validDate(input?.nextTickAt, "BUDGET_ADMISSION_TICK_INVALID");
   let latest: ScopeRoom | null = null;
+  let ownHolds: ScopeRoom | null = null;
   for (const entry of rooms) {
     if (entry.room !== "FULL") continue;
+    if (entry.fullOnOwnHolds === true) {
+      if (ownHolds === null || precedenceOf(entry.scope) < precedenceOf(ownHolds.scope)) ownHolds = entry;
+      continue;
+    }
     if (latest === null
       || entry.resetsAt.getTime() > latest.resetsAt.getTime()
       || (entry.resetsAt.getTime() === latest.resetsAt.getTime()
@@ -140,9 +169,11 @@ export function waitingUntil(input: Readonly<{
       latest = entry;
     }
   }
-  return latest === null
-    ? Object.freeze({ waitsUntil: nextTickAt, worstScope: "SITE_DAY" as const })
-    : Object.freeze({ waitsUntil: latest.resetsAt, worstScope: latest.scope });
+  if (latest !== null) return Object.freeze({ waitsUntil: latest.resetsAt, worstScope: latest.scope });
+  if (ownHolds !== null) {
+    return Object.freeze({ waitsUntil: nextTickAt, worstScope: ownHolds.scope, waitsFor: "OWN_DEBATES" as const });
+  }
+  return Object.freeze({ waitsUntil: nextTickAt, worstScope: "SITE_DAY" as const });
 }
 
 export function decideAdmission(input: Readonly<{
@@ -167,7 +198,12 @@ export function decideAdmission(input: Readonly<{
       return Object.freeze({ kind: "REFUSE_ALREADY_WAITING" as const });
     }
     const until = waitingUntil({ rooms, nextTickAt });
-    return Object.freeze({ kind: "WAIT" as const, waitsUntil: until.waitsUntil, worstScope: until.worstScope });
+    return Object.freeze({
+      kind: "WAIT" as const,
+      waitsUntil: until.waitsUntil,
+      worstScope: until.worstScope,
+      ...(until.waitsFor === undefined ? {} : { waitsFor: until.waitsFor })
+    });
   }
   let worst: ScopeRoom | null = null;
   for (const entry of rooms) {

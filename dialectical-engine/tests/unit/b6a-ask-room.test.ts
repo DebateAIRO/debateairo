@@ -266,8 +266,10 @@ describe("B6a the person's windows (paid-plans spec §2.4.1)", () => {
       windows: { [OWNER]: [window("PERSON_DAY", 1_000, DAY_RESET)] },
       ledger: { ownerHolds: { [OWNER]: 1_000 } }
     });
+    // Full on the holds alone, so the question waits — for the person's own debates, from the next tick
+    // (final review Part 1b, Important 1), not until the day's reset.
     await expect(decisionOf(room)).resolves.toMatchObject({
-      admission: { kind: "WAIT", waitsUntil: DAY_RESET, worstScope: "PERSON_DAY" }
+      admission: { kind: "WAIT", waitsUntil: NEXT_MINUTE, worstScope: "PERSON_DAY", waitsFor: "OWN_DEBATES" }
     });
   });
 
@@ -279,6 +281,90 @@ describe("B6a the person's windows (paid-plans spec §2.4.1)", () => {
     await expect(decisionOf(room)).resolves.toMatchObject({
       admission: { kind: "START", worst: "CLOSE", worstScope: "PERSON_MONTH" }, estimateMicros: 360_000
     });
+  });
+});
+
+/**
+ * Final review Part 1b, Important 1 — A WINDOW FULL ONLY ON THE PERSON'S OWN
+ * RUNNING DEBATES. used = spent + the person's counted holds, so a window can be
+ * FULL on holds alone, and the waker starts the question minutes later, when one
+ * of those debates settles. Every answer the person reads then names the next
+ * tick and says why (OWN_DEBATES), instead of the window's far reset. A window
+ * FULL on spend, and the site's day, keep their resets.
+ */
+describe("Important 1: a window full only because of the person's own running debates", () => {
+  const held = (ledger: Partial<Ledger>, windows: readonly PersonWindow[] = [
+    window("PERSON_DAY", 1_000, DAY_RESET), window("PERSON_WEEK", 2_500, WEEK_RESET), window("PERSON_MONTH", 5_000, MONTH_RESET)
+  ]) => arrange({ windows: { [OWNER]: windows }, ledger });
+
+  it("holds-only FULL: the decision, the first look, the room read and a waiting run's start all name the next tick and OWN_DEBATES", async () => {
+    // 400 spent and 600 held fill the day (1 000) but nothing on spend alone.
+    const ledger = { ownerSpent: { [OWNER]: 400 }, ownerHolds: { [OWNER]: 600 } };
+    const expected = { kind: "WAIT", waitsUntil: NEXT_MINUTE, worstScope: "PERSON_DAY", waitsFor: "OWN_DEBATES" };
+    await expect(decisionOf(held(ledger).room)).resolves.toMatchObject({ admission: expected });
+    await expect(held(ledger).room.precheck(MINE)).resolves.toMatchObject({ admission: expected });
+    await expect(held(ledger).room.readRoom(MINE)).resolves.toEqual({
+      room: "FULL", scope: "PERSON_DAY", resetsAt: NEXT_MINUTE, waitingRunRef: null, planId: null, waitsFor: "OWN_DEBATES"
+    });
+    const waiting = waitingRun({ ownerRef: OWNER, legacyAskerId: null });
+    const { room } = arrange({ windows: { [OWNER]: [window("PERSON_DAY", 1_000, DAY_RESET)] }, ledger, line: [waiting] });
+    await expect(room.expectedStart(waiting.runId)).resolves.toEqual({
+      waitsUntil: NEXT_MINUTE, scope: "PERSON_DAY", waitsFor: "OWN_DEBATES"
+    });
+  });
+
+  it("holds-only FULL in every window: the longest names the wait, still from the next tick", async () => {
+    await expect(decisionOf(held({ ownerSpent: { [OWNER]: 0 }, ownerHolds: { [OWNER]: 5_000 } }).room)).resolves.toMatchObject({
+      admission: { kind: "WAIT", waitsUntil: NEXT_MINUTE, worstScope: "PERSON_MONTH", waitsFor: "OWN_DEBATES" }
+    });
+  });
+
+  it("FULL on spend: the window's own reset, and no OWN_DEBATES anywhere", async () => {
+    const ledger = { ownerSpent: { [OWNER]: 1_000 } };
+    const { admission } = await decisionOf(held(ledger, [window("PERSON_DAY", 1_000, DAY_RESET)]).room);
+    expect(admission).toEqual({ kind: "WAIT", waitsUntil: DAY_RESET, worstScope: "PERSON_DAY" });
+    await expect(held(ledger, [window("PERSON_DAY", 1_000, DAY_RESET)]).room.readRoom(MINE)).resolves.toEqual({
+      room: "FULL", scope: "PERSON_DAY", resetsAt: DAY_RESET, waitingRunRef: null, planId: null
+    });
+  });
+
+  it("mixed: a window FULL on spend still wins with its reset over one full only on holds", async () => {
+    // 2 500 spent and 600 held: the day (3 000) is FULL only with the holds, the week (2 500) is FULL on
+    // spend, and the month (5 000) is not full.
+    const ledger = { ownerSpent: { [OWNER]: 2_500 }, ownerHolds: { [OWNER]: 600 } };
+    const windows = [
+      window("PERSON_DAY", 3_000, DAY_RESET), window("PERSON_WEEK", 2_500, WEEK_RESET), window("PERSON_MONTH", 5_000, MONTH_RESET)
+    ];
+    const { admission } = await decisionOf(held(ledger, windows).room);
+    expect(admission).toEqual({ kind: "WAIT", waitsUntil: WEEK_RESET, worstScope: "PERSON_WEEK" });
+    await expect(held(ledger, windows).room.readRoom(MINE)).resolves.not.toHaveProperty("waitsFor");
+  });
+
+  it("keeps the site's day: with the site FULL too, the question waits for midnight, and says nothing of OWN_DEBATES", async () => {
+    const ledger = { daySpent: 100_000, ownerSpent: { [OWNER]: 400 }, ownerHolds: { [OWNER]: 600 } };
+    const { admission } = await decisionOf(held(ledger).room);
+    expect(admission).toEqual({ kind: "WAIT", waitsUntil: MIDNIGHT, worstScope: "SITE_DAY" });
+  });
+
+  it("the 422 and the room read for a person who already waits carry OWN_DEBATES and the next tick", async () => {
+    const waiting = { runId: randomUUID(), waitingSince: new Date("2026-09-30T12:00:00.000Z") };
+    const arranged = arrange({
+      windows: { [OWNER]: [window("PERSON_DAY", 1_000, DAY_RESET)] },
+      ledger: { ownerSpent: { [OWNER]: 400 }, ownerHolds: { [OWNER]: 600 } },
+      mine: [waiting]
+    });
+    const refusal = await arranged.room.precheck(MINE).then(() => null, (error: unknown) => error);
+    expect(refusal).toBeInstanceOf(AskAlreadyWaitingError);
+    expect(refusal).toMatchObject({ runRef: waiting.runId, waitsUntil: NEXT_MINUTE, waitsFor: "OWN_DEBATES" });
+    await expect(arranged.room.readRoom(MINE)).resolves.toEqual({
+      room: "ALREADY_WAITING", scope: "PERSON_DAY", resetsAt: NEXT_MINUTE, waitingRunRef: waiting.runId,
+      planId: null, waitsFor: "OWN_DEBATES"
+    });
+    // Full on spend instead: the 422 names the reset and no OWN_DEBATES.
+    const onSpend = arrange({
+      windows: { [OWNER]: [window("PERSON_DAY", 1_000, DAY_RESET)] }, ledger: { ownerSpent: { [OWNER]: 1_000 } }, mine: [waiting]
+    });
+    await expect(onSpend.room.precheck(MINE)).rejects.toMatchObject({ waitsUntil: DAY_RESET, waitsFor: null });
   });
 });
 
@@ -332,9 +418,10 @@ describe("B6a why a WAIT waits, written with its place in line (budget spec §2.
       windows: { [OWNER]: [window("PERSON_DAY", 1_000, DAY_RESET), window("PERSON_MONTH", 5_000, MONTH_RESET)] },
       ledger: { ownerSpent: { [OWNER]: 400 }, ownerHolds: { [OWNER]: 600 } }
     });
-    // Full only on the person's own live hold: the recheck is the next minute, long before the day's reset.
+    // Full only on the person's own live hold: the recheck is the next minute, long before the day's reset,
+    // and so is the expected start (Important 1).
     await expect(onHolds.room.precheck(MINE)).resolves.toMatchObject({
-      admission: { kind: "WAIT", waitsUntil: DAY_RESET, worstScope: "PERSON_DAY" },
+      admission: { kind: "WAIT", waitsUntil: NEXT_MINUTE, worstScope: "PERSON_DAY", waitsFor: "OWN_DEBATES" },
       waitReason: { waitsFor: "PERSON", personRecheckAt: NEXT_MINUTE }
     });
     await waitIn(onHolds.room);

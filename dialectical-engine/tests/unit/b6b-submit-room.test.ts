@@ -217,13 +217,32 @@ describe("B6b an ask with a room", () => {
     expect(lines).toEqual([{ event: "api.ask.waiting", runId: RUN_ID, scope: "SITE_DAY" }]);
   });
 
+  it("WAIT for the person's own debates (Important 1): the 202 says so, with the next tick as its start", async () => {
+    const nextTick = new Date("2026-09-30T18:01:00.000Z");
+    const { submit } = arrange({
+      decision: Object.freeze({ kind: "WAIT", waitsUntil: nextTick, worstScope: "PERSON_DAY", waitsFor: "OWN_DEBATES" })
+    });
+    await expect(submit()).resolves.toEqual({
+      run_ref: RUN_ID, status: "WAITING", waits_until: nextTick.toISOString(), waiting_scope: "PERSON_DAY",
+      waits_for: "OWN_DEBATES"
+    });
+  });
+
+  it("carries OWN_DEBATES from the room's refusal onto the asker's ASK_ALREADY_WAITING", async () => {
+    const nextTick = new Date("2026-09-30T18:01:00.000Z");
+    const { submit } = arrange({
+      precheck: async () => { throw new AskAlreadyWaitingError("run:waiting", nextTick, "OWN_DEBATES"); }
+    });
+    await expect(submit()).rejects.toMatchObject({ runRef: "run:waiting", waitsUntil: nextTick, waitsFor: "OWN_DEBATES" });
+  });
+
   it("refuses a question that may not even wait before any vendor is probed, and creates nothing", async () => {
     const { submit, order } = arrange({
       precheck: async () => { throw new AskAlreadyWaitingError("run:waiting", MIDNIGHT); }
     });
     const refusal = await submit().then(() => null, (error: unknown) => error);
     expect(refusal).toBeInstanceOf(AskAlreadyWaitingRefusal);
-    expect(refusal).toMatchObject({ code: "ASK_ALREADY_WAITING", runRef: "run:waiting", waitsUntil: MIDNIGHT });
+    expect(refusal).toMatchObject({ code: "ASK_ALREADY_WAITING", runRef: "run:waiting", waitsUntil: MIDNIGHT, waitsFor: null });
     expect(order).toEqual(["lease", "precheck", "release"]);
   });
 

@@ -13,7 +13,8 @@ import {
   type PersonWindow,
   type RunSettingsClass,
   type ScopeRoom,
-  type SpendScope
+  type SpendScope,
+  type WaitsFor
 } from "@debateai/budget";
 import type { RunOwnershipAccess, WaitReason, WaitingRun, WaitingRunCursor, WaitingRunRef } from "@debateai/db";
 import { planById, type BillingPlans, type PlanId } from "@debateai/register";
@@ -39,9 +40,13 @@ import { planById, type BillingPlans, type PlanId } from "@debateai/register";
  * is asked ONE question (`siteLineBlocking`), never walked: a run waiting only
  * for its own person holds nobody back (budget spec §2.3 rule 1). Figures never
  * reach a client: the answers on the wire are words.
+ * Final review Part 1b, Important 1: a person window FULL only because of the
+ * person's own running debates' counted holds is marked (`fullOnOwnHolds`), so
+ * a question it alone makes wait is expected at the next tick and every answer
+ * says why (`waitsFor: "OWN_DEBATES"`) instead of naming the window's reset.
  */
 export class AskAlreadyWaitingError extends TypedDomainError {
-  constructor(readonly runRef: string, readonly waitsUntil: Date) {
+  constructor(readonly runRef: string, readonly waitsUntil: Date, readonly waitsFor: WaitsFor | null = null) {
     super("ASK_ALREADY_WAITING", "One question can wait at a time; the waiting one starts first");
   }
 }
@@ -156,16 +161,24 @@ export interface AskRoomPort {
     heldMicros: number;
     now: Date;
   }>): Promise<void>;
-  expectedStart(runId: string): Promise<Readonly<{ waitsUntil: Date; scope: SpendScope }> | null>;
+  expectedStart(runId: string): Promise<ExpectedStart | null>;
 }
 
-/** Budget spec §2.7 (B7a): what GET /v1/asks/room answers, before the wire's snake case. */
+/** A waiting run's expected start and the limit it waits for; `waitsFor` only when no reset is what it waits for. */
+export type ExpectedStart = Readonly<{ waitsUntil: Date; scope: SpendScope; waitsFor?: WaitsFor }>;
+
+/**
+ * Budget spec §2.7 (B7a): what GET /v1/asks/room answers, before the wire's snake
+ * case. `waitsFor` (Important 1) only on FULL or ALREADY_WAITING, and only when
+ * the person's own running debates are all that fill their windows.
+ */
 export type AskRoomAnswer = Readonly<{
   room: "FITS" | "CLOSE" | "FULL" | "ALREADY_WAITING";
   scope: SpendScope | null;
   resetsAt: Date | null;
   waitingRunRef: string | null;
   planId: PlanId | null;
+  waitsFor?: WaitsFor;
 }>;
 
 export interface AskRoomReader {
@@ -226,8 +239,13 @@ type RoomEvaluation = Readonly<{
   waitReason: WaitReason;
   estimateMicros: number;
   waiting: ReadonlyArray<WaitingRunRef>;
-  expected: Readonly<{ waitsUntil: Date; worstScope: SpendScope }>;
+  expected: Readonly<{ waitsUntil: Date; worstScope: SpendScope; waitsFor?: WaitsFor }>;
 }>;
+
+/** `waitsFor` as an optional member: present only when there is one. */
+function waitsForOf(expected: Readonly<{ waitsFor?: WaitsFor }>): Readonly<{ waitsFor?: WaitsFor }> {
+  return expected.waitsFor === undefined ? {} : { waitsFor: expected.waitsFor };
+}
 
 /** The entitlement a START pins its run to (billing on), read once. */
 type PinnedEntitlement = Readonly<{ planId: PlanId; eventId: string }>;
@@ -281,7 +299,7 @@ export function accessOfWaitingRun(run: WaitingRun): RunOwnershipAccess {
 function alreadyWaiting(evaluation: RoomEvaluation): AskAlreadyWaitingError {
   const oldest = evaluation.waiting[0];
   if (oldest === undefined) throw new TypeError("ASK_ROOM_WAITING_LINE_INCONSISTENT");
-  return new AskAlreadyWaitingError(oldest.runId, evaluation.expected.waitsUntil);
+  return new AskAlreadyWaitingError(oldest.runId, evaluation.expected.waitsUntil, evaluation.expected.waitsFor ?? null);
 }
 
 export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
@@ -361,15 +379,15 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     await this.#openStartWith(tx, input, entitlement);
   }
 
-  /** A waiting run's expected start, recomputed on every read (budget spec §2.7). */
-  async expectedStart(runId: string): Promise<Readonly<{ waitsUntil: Date; scope: SpendScope }> | null> {
+  /** A waiting run's expected start, recomputed on every read (budget spec §2.7), and why when no reset is what it waits for. */
+  async expectedStart(runId: string): Promise<ExpectedStart | null> {
     const run = await this.#options.line.readWaiting(runId);
     if (run === null) return null;
     const now = this.#clock();
     const estimateMicros = await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run));
     const { rooms } = await this.#measure(accessOfWaitingRun(run), estimateMicros, now);
     const until = waitingUntil({ rooms, nextTickAt: nextWholeMinute(now) });
-    return Object.freeze({ waitsUntil: until.waitsUntil, scope: until.worstScope });
+    return Object.freeze({ waitsUntil: until.waitsUntil, scope: until.worstScope, ...waitsForOf(until) });
   }
 
   /** GET /v1/asks/room: the admission's shape, deciding nothing and writing nothing. */
@@ -388,11 +406,13 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
           scope: evaluation.expected.worstScope,
           resetsAt: evaluation.expected.waitsUntil,
           waitingRunRef: evaluation.waiting[0]?.runId ?? null,
-          planId
+          planId,
+          ...waitsForOf(evaluation.expected)
         });
       case "WAIT":
         return Object.freeze({
-          room: "FULL" as const, scope: admission.worstScope, resetsAt: admission.waitsUntil, waitingRunRef: null, planId
+          room: "FULL" as const, scope: admission.worstScope, resetsAt: admission.waitsUntil, waitingRunRef: null, planId,
+          ...waitsForOf(admission)
         });
       case "START": {
         const scope = admission.worstScope;
@@ -553,7 +573,10 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * the person's), looked at again when the latest window full on SPEND alone
    * resets — or at the next tick when only the person's own live holds fill
    * them, since those end with the person's running debate, not at a reset;
-   * SITE otherwise.
+   * SITE otherwise. A window FULL with the holds but not on spend alone is
+   * marked `fullOnOwnHolds` (Important 1): the expected start is then the next
+   * tick, by the same rule, and the answers say the person's own debates are
+   * what the question waits for.
    */
   async #measure(access: RunOwnershipAccess, estimateMicros: number, now: Date): Promise<RoomMeasure> {
     const day = costEnvelopeDay(now);
@@ -587,10 +610,10 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
           limitMicros: window.limitMicros,
           closeBasisPoints: window.closeBasisPoints
         });
+        const fullOnSpend = spent >= window.limitMicros;
         if (room === "FULL") {
           personFull = true;
-          if (spent >= window.limitMicros
-            && (fullOnSpendUntil === null || window.resetsAt.getTime() > fullOnSpendUntil.getTime())) {
+          if (fullOnSpend && (fullOnSpendUntil === null || window.resetsAt.getTime() > fullOnSpendUntil.getTime())) {
             fullOnSpendUntil = window.resetsAt;
           }
         }
@@ -601,7 +624,12 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
           resetsAt: window.resetsAt,
           closeBasisPoints: window.closeBasisPoints
         }));
-        rooms.push(Object.freeze({ scope: window.scope, room, resetsAt: window.resetsAt }));
+        rooms.push(Object.freeze({
+          scope: window.scope,
+          room,
+          resetsAt: window.resetsAt,
+          ...(room === "FULL" && !fullOnSpend ? { fullOnOwnHolds: true } : {})
+        }));
       }
     }
     const waitReason: WaitReason = personFull

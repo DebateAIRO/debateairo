@@ -83,6 +83,51 @@ describe("B6b the waiting answers on the wire (budget spec §2.7, A16)", () => {
     expect(response.headers["retry-after"]).toBeUndefined();
   });
 
+  /**
+   * Final review Part 1b, Important 1: when the person's own running debates are
+   * all that fill their windows, both answers say so (waits_for), and the time
+   * they carry is the waker's next tick.
+   */
+  it("answers 202 WAITING with waits_for when only the person's own debates fill their window", async () => {
+    const response = await ask(async () => ({
+      run_ref: RUN_ID, status: "WAITING", waits_until: "2026-09-30T18:01:00.000Z", waiting_scope: "PERSON_DAY",
+      waits_for: "OWN_DEBATES"
+    }));
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      run_ref: RUN_ID, status: "WAITING", waits_until: "2026-09-30T18:01:00.000Z", waiting_scope: "PERSON_DAY",
+      waits_for: "OWN_DEBATES"
+    });
+  });
+
+  it("answers 422 ASK_ALREADY_WAITING with waits_for when the waiting run waits only for the person's own debates", async () => {
+    const response = await ask(async () => {
+      throw new AskAlreadyWaitingRefusal(new AskAlreadyWaitingError(
+        WAITING_RUN, new Date("2026-09-30T18:01:00.000Z"), "OWN_DEBATES"
+      ));
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({
+      error: "ASK_ALREADY_WAITING", message: "ASK_ALREADY_WAITING",
+      run_ref: WAITING_RUN, waits_until: "2026-09-30T18:01:00.000Z", waits_for: "OWN_DEBATES"
+    });
+  });
+
+  it("types waits_for: a WAITING answer's person scope only, and one word", () => {
+    const waiting = { run_ref: RUN_ID, status: "WAITING", waits_until: "2026-10-01T00:00:00.000Z" } as const;
+    for (const scope of ["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"] as const) {
+      expect(AskAcceptedSchema.safeParse({ ...waiting, waiting_scope: scope, waits_for: "OWN_DEBATES" }).success, scope).toBe(true);
+    }
+    expect(AskAcceptedSchema.safeParse({ ...waiting, waiting_scope: "SITE_DAY", waits_for: "OWN_DEBATES" }).success).toBe(false);
+    expect(AskAcceptedSchema.safeParse({ run_ref: RUN_ID, status: "QUEUED", waits_for: "OWN_DEBATES" }).success).toBe(false);
+    expect(AskAcceptedSchema.safeParse({ ...waiting, waiting_scope: "PERSON_DAY", waits_for: "RESET" }).success).toBe(false);
+    const refusal = {
+      error: "ASK_ALREADY_WAITING", message: "ASK_ALREADY_WAITING", run_ref: WAITING_RUN, waits_until: "2026-10-01T00:00:00.000Z"
+    } as const;
+    expect(AskAlreadyWaitingSchema.safeParse({ ...refusal, waits_for: "OWN_DEBATES" }).success).toBe(true);
+    expect(AskAlreadyWaitingSchema.safeParse({ ...refusal, waits_for: "RESET" }).success).toBe(false);
+  });
+
   it("answers the old settings' day-spent refusal exactly as today: 429, the code only, Retry-After", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const response = await ask(async () => {

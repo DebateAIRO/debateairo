@@ -74,7 +74,7 @@ import {
 } from "@debateai/contract";
 import type { Pool, PoolClient } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
-import type { SpendScope } from "@debateai/budget";
+import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RunCostSubstitutionRepository,
@@ -119,6 +119,7 @@ import {
   AskAlreadyWaitingError,
   nextWholeMinute,
   runSettingsClassOfAsk,
+  type AskRoomAnswer,
   type AskRoomPort,
   type AskRoomReader,
   type AskWaitingLinePort,
@@ -1531,17 +1532,21 @@ export class AskRefusal extends Error {
 
 /**
  * Budget spec §2.7 (B6b) — ASK_ALREADY_WAITING: the one ask refusal whose body
- * names something, the person's own waiting run and its expected start.
+ * names something, the person's own waiting run and its expected start, and
+ * (final review Part 1b, Important 1) whether that start waits on the person's
+ * own running debates rather than a reset.
  */
 export class AskAlreadyWaitingRefusal extends AskRefusal {
   readonly runRef: string;
   readonly waitsUntil: Date;
+  readonly waitsFor: WaitsFor | null;
 
   constructor(refusal: AskAlreadyWaitingError) {
     super(refusal);
     this.name = "AskAlreadyWaitingRefusal";
     this.runRef = refusal.runRef;
     this.waitsUntil = refusal.waitsUntil;
+    this.waitsFor = refusal.waitsFor;
   }
 }
 
@@ -1962,7 +1967,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         error: "ASK_ALREADY_WAITING",
         message: "ASK_ALREADY_WAITING",
         run_ref: knownError.runRef,
-        waits_until: knownError.waitsUntil.toISOString()
+        waits_until: knownError.waitsUntil.toISOString(),
+        ...(knownError.waitsFor === null ? {} : { waits_for: knownError.waitsFor })
       }));
     }
     const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
@@ -2647,7 +2653,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
-    const answer = options.askRoom === undefined
+    const answer: AskRoomAnswer = options.askRoom === undefined
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
       : await options.askRoom.readRoom({
           access,
@@ -2663,7 +2669,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       scope: answer.scope,
       resets_at: answer.resetsAt?.toISOString() ?? null,
       waiting_run_ref: answer.waitingRunRef,
-      plan_id: answer.planId
+      plan_id: answer.planId,
+      ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor })
     }));
   });
 
@@ -3239,7 +3246,7 @@ async function evaluationOrRefusal(settings: RunCreationSettings, ask: AskReques
 /** What the room's locked decision produced inside the lease. */
 type RoomOutcome =
   | Readonly<{ kind: "START"; runId: string; workItemId: string }>
-  | Readonly<{ kind: "WAIT"; runId: string; waitsUntil: Date; scope: SpendScope }>;
+  | Readonly<{ kind: "WAIT"; runId: string; waitsUntil: Date; scope: SpendScope; waitsFor: WaitsFor | null }>;
 
 /**
  * A run's first job, named once: `submit` queues it, and a failed setup records
@@ -3637,7 +3644,10 @@ export class PostgresAskApplication implements AskApplication {
           if (admission.kind === "WAIT") {
             setupStep = "WAITING_LINE";
             await room.enterWait(tx, runId, now);
-            return Object.freeze({ kind: "WAIT" as const, runId, waitsUntil: admission.waitsUntil, scope: admission.worstScope });
+            return Object.freeze({
+              kind: "WAIT" as const, runId, waitsUntil: admission.waitsUntil, scope: admission.worstScope,
+              waitsFor: admission.waitsFor ?? null
+            });
           }
           setupStep = "ROOM_HOLD";
           await room.openStart(tx, { runId, access: ownership, heldMicros: estimateMicros, now });
@@ -3664,7 +3674,8 @@ export class PostgresAskApplication implements AskApplication {
         run_ref: outcome.runId,
         status: "WAITING" as const,
         waits_until: outcome.waitsUntil.toISOString(),
-        waiting_scope: outcome.scope
+        waiting_scope: outcome.scope,
+        ...(outcome.waitsFor === null ? {} : { waits_for: outcome.waitsFor })
       });
     }
     try {
@@ -3816,6 +3827,7 @@ export class PostgresAskApplication implements AskApplication {
     if (run === null) return null;
     // Budget spec §2.7: a waiting run's expected start, recomputed on every read.
     let waitsUntil: Date | null = null;
+    let waitsFor: WaitsFor | null = null;
     if (run.state === "WAITING") {
       // With no room composed nothing would ever start it. B6b's boot refuses a
       // hosted register without the band while any run waits, so this is a
@@ -3826,7 +3838,10 @@ export class PostgresAskApplication implements AskApplication {
       }
       // A run the line no longer lists (its owner's account is not active: suspended or
       // age-frozen) keeps the next tick.
-      waitsUntil = (await room.expectedStart(runId))?.waitsUntil ?? nextWholeMinute(new Date());
+      const expected = await room.expectedStart(runId);
+      waitsUntil = expected?.waitsUntil ?? nextWholeMinute(new Date());
+      // Final review Part 1b, Important 1: the person's own running debates are all it waits for.
+      waitsFor = expected?.waitsFor ?? null;
     }
     return RunProjectionSchema.parse({
       run_ref: run.runRef,
@@ -3835,7 +3850,8 @@ export class PostgresAskApplication implements AskApplication {
       terminal_reason: run.terminalReason,
       hold_until: run.holdUntil?.toISOString() ?? null,
       argument_language: runArgumentLanguage(run.argumentLanguage),
-      ...(waitsUntil === null ? {} : { waits_until: waitsUntil.toISOString() })
+      ...(waitsUntil === null ? {} : { waits_until: waitsUntil.toISOString() }),
+      ...(waitsFor === null ? {} : { waits_for: waitsFor })
     });
   }
 

@@ -172,6 +172,51 @@ describe("B1 decideAdmission — START, WAIT, REFUSE_ALREADY_WAITING", () => {
     expect(waitingUntil({ rooms: [site("CLOSE")], nextTickAt: NEXT_TICK }))
       .toEqual({ waitsUntil: NEXT_TICK, worstScope: "SITE_DAY" });
   });
+
+  /**
+   * Final review Part 1b, Important 1: a person window FULL only on the
+   * person's own counted holds lifts when one of their debates settles, not at
+   * its reset; the site's day keeps its midnight (budget spec §2.7).
+   */
+  describe("a window full only on the person's own debates (Important 1)", () => {
+    const held = (scoped: ScopeRoom): ScopeRoom => ({ ...scoped, fullOnOwnHolds: true });
+
+    it("waits for the next tick, for OWN_DEBATES, when every FULL scope is such a window; the longest names it", () => {
+      expect(admit([site("FITS"), held(day("FULL"))]))
+        .toEqual({ kind: "WAIT", waitsUntil: NEXT_TICK, worstScope: "PERSON_DAY", waitsFor: "OWN_DEBATES" });
+      expect(admit([site("CLOSE"), held(day("FULL")), held(week("FULL")), held(month("FULL"))]))
+        .toEqual({ kind: "WAIT", waitsUntil: NEXT_TICK, worstScope: "PERSON_MONTH", waitsFor: "OWN_DEBATES" });
+      expect(waitingUntil({ rooms: [held(week("FULL"))], nextTickAt: NEXT_TICK }))
+        .toEqual({ waitsUntil: NEXT_TICK, worstScope: "PERSON_WEEK", waitsFor: "OWN_DEBATES" });
+    });
+
+    it("lets a window FULL on spend win with its reset, and names no OWN_DEBATES", () => {
+      expect(admit([site("FITS"), held(day("FULL")), month("FULL")]))
+        .toEqual({ kind: "WAIT", waitsUntil: MONTH_END, worstScope: "PERSON_MONTH" });
+      // Even when the window full on spend resets sooner than the one full on holds would.
+      expect(admit([site("FITS"), day("FULL"), held(month("FULL"))]))
+        .toEqual({ kind: "WAIT", waitsUntil: DAY_END, worstScope: "PERSON_DAY" });
+    });
+
+    it("keeps the site's day: a FULL site waits for its midnight, whatever the person's own debates fill", () => {
+      expect(admit([site("FULL"), held(day("FULL"))]))
+        .toEqual({ kind: "WAIT", waitsUntil: MIDNIGHT, worstScope: "SITE_DAY" });
+    });
+
+    it("still refuses a second waiting question", () => {
+      expect(admit([site("FITS"), held(day("FULL"))], { personWaitingCount: 1 })).toEqual({ kind: "REFUSE_ALREADY_WAITING" });
+    });
+
+    it("refuses the mark on the site's day, on a room that is not FULL, or as anything but a boolean", () => {
+      expect(() => admit([held(site("FULL"))])).toThrow("BUDGET_ADMISSION_ROOMS_INVALID");
+      expect(() => admit([site("FITS"), held(day("CLOSE"))])).toThrow("BUDGET_ADMISSION_ROOMS_INVALID");
+      expect(() => admit([site("FITS"), { ...day("FULL"), fullOnOwnHolds: "yes" as never }]))
+        .toThrow("BUDGET_ADMISSION_ROOMS_INVALID");
+      // `false` says nothing: the window is FULL on spend, as without the member.
+      expect(admit([site("FITS"), { ...day("FULL"), fullOnOwnHolds: false }]))
+        .toEqual({ kind: "WAIT", waitsUntil: DAY_END, worstScope: "PERSON_DAY" });
+    });
+  });
 });
 
 describe("B1 NO_PERSON_ALLOWANCE", () => {

@@ -168,6 +168,19 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
 export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
 
 /**
+ * Final review Part 1b, Important 1 — WHY A QUESTION WAITS when no reset is
+ * what it waits for: OWN_DEBATES, every limit that is full is one of the
+ * person's windows, full only because of their own running debates. The
+ * question starts by itself as soon as one of them finishes, so its expected
+ * start is the waker's next tick and the UI says so instead of naming a reset
+ * or offering an upgrade. Never the site's day (budget spec §2.7). The same
+ * word as `WaitsFor` in @debateai/budget (the contract cannot import it);
+ * tests/unit/b6a-waiting-projection.test.ts reads both.
+ */
+export const WaitsForSchema = z.enum(["OWN_DEBATES"]);
+const PERSON_SCOPES: ReadonlySet<string> = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+
+/**
  * Paid plans (spec 2026-09-29 §2.3.4): the gauges the SERVER decided for an
  * ask from the person's plan, present only when billing decided them (hosted,
  * billing on): the plan's tier, and the risk tier, composition and depth the
@@ -194,6 +207,9 @@ export const AskAcceptedSchema = z.object({
   // when it is expected to start and which limit it waits for. Present iff WAITING.
   waits_until: z.iso.datetime().optional(),
   waiting_scope: SpendScopeSchema.optional(),
+  // Final review Part 1b, Important 1: only on a WAITING answer whose person's
+  // own running debates are all that fill their windows (a person scope).
+  waits_for: WaitsForSchema.optional(),
   applied: AskAppliedSchema.optional()
 }).strict().superRefine((accepted, context) => {
   const waiting = accepted.status === "WAITING";
@@ -203,18 +219,24 @@ export const AskAcceptedSchema = z.object({
       message: "WAITING requires waits_until and waiting_scope, and QUEUED forbids both"
     });
   }
+  if (accepted.waits_for !== undefined && (!waiting || !PERSON_SCOPES.has(accepted.waiting_scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "waits_for names a WAITING answer's person scope only" });
+  }
 });
 export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
 
 /**
  * Budget spec §2.7 — the 422 body of ASK_ALREADY_WAITING: the waiting run and its
- * expected start, and nothing else (no figure, no limit, no count).
+ * expected start, and nothing else (no figure, no limit, no count). `waits_for`
+ * (final review Part 1b, Important 1) when that start waits on the person's own
+ * running debates rather than a reset.
  */
 export const AskAlreadyWaitingSchema = z.object({
   error: z.literal("ASK_ALREADY_WAITING"),
   message: z.literal("ASK_ALREADY_WAITING"),
   run_ref: z.string().min(1),
-  waits_until: z.iso.datetime()
+  waits_until: z.iso.datetime(),
+  waits_for: WaitsForSchema.optional()
 }).strict();
 export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
 
@@ -238,8 +260,16 @@ export const AskRoomResponseSchema = z.object({
   scope: SpendScopeSchema.nullable(),
   resets_at: z.iso.datetime().nullable(),
   waiting_run_ref: z.string().min(1).nullable(),
-  plan_id: PlanIdSchema.nullable()
+  plan_id: PlanIdSchema.nullable(),
+  // Final review Part 1b, Important 1: a question that would wait (or the one
+  // waiting) waits only for the person's own running debates; `resets_at` is
+  // then the waker's next tick, not a reset.
+  waits_for: WaitsForSchema.optional()
 }).strict().superRefine((answer, context) => {
+  if (answer.waits_for !== undefined
+    && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "waits_for names a person scope of a question that would wait" });
+  }
   const fits = answer.room === "FITS";
   if (fits !== (answer.scope === null) || (fits && answer.resets_at !== null)) {
     context.addIssue({ code: "custom", message: "FITS names no scope and no reset; every other room names its scope" });
@@ -288,8 +318,14 @@ export const RunProjectionSchema = z.object({
   argument_language: ArgumentLanguageSchema.nullable().optional(),
   // Budget spec §2.7: when a WAITING run is expected to start (recomputed on
   // every read). Optional, so a reader built before the field still parses.
-  waits_until: z.iso.datetime().nullable().optional()
+  waits_until: z.iso.datetime().nullable().optional(),
+  // Final review Part 1b, Important 1: a WAITING run that waits only for its
+  // person's own running debates (`waits_until` is then the next tick).
+  waits_for: WaitsForSchema.nullable().optional()
 }).strict().superRefine((run, context) => {
+  if (run.waits_for !== undefined && run.waits_for !== null && run.state !== "WAITING") {
+    context.addIssue({ code: "custom", message: "only a WAITING run waits for anything" });
+  }
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
       code: "custom",

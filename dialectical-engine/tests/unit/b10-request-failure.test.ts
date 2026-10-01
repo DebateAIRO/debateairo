@@ -31,6 +31,18 @@ describe("the contract client keeps the waiting run's start from the 422 body (b
       .submitAsk(anAsk).catch((error: unknown) => error);
     expect(malformed).toMatchObject({ serverCode: "ASK_ALREADY_WAITING", waiting: null });
   });
+
+  it("keeps waits_for OWN_DEBATES from the 422 body, and none when the body names none (Important 1)", async () => {
+    const ownDebates = await answering(422, {
+      error: "ASK_ALREADY_WAITING", message: "ASK_ALREADY_WAITING", run_ref: "run:waiting", waits_until: WAITS_UNTIL,
+      waits_for: "OWN_DEBATES"
+    }).submitAsk(anAsk).catch((error: unknown) => error);
+    expect(ownDebates).toMatchObject({ waiting: { runRef: "run:waiting", waitsUntil: WAITS_UNTIL, waitsFor: "OWN_DEBATES" } });
+    const reset = await answering(422, {
+      error: "ASK_ALREADY_WAITING", message: "ASK_ALREADY_WAITING", run_ref: "run:waiting", waits_until: WAITS_UNTIL
+    }).submitAsk(anAsk).catch((error: unknown) => error);
+    expect((reset as ContractHttpError).waiting).toEqual({ runRef: "run:waiting", waitsUntil: WAITS_UNTIL });
+  });
 });
 
 describe("422 ASK_ALREADY_WAITING is its own kind (budget spec §2.11)", () => {

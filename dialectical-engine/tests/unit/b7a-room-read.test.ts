@@ -40,6 +40,8 @@ function fixtureApplication(): AskApplication {
 function roomWith(input: {
   readonly daySpent?: number;
   readonly ownerSpent?: number;
+  /** The person's own running debates' counted holds. */
+  readonly ownerHolds?: number;
   readonly windows?: readonly PersonWindow[];
   readonly mine?: readonly WaitingRunRef[];
   /** The line's one answer: does a run waiting for the site hold this question back? */
@@ -53,7 +55,7 @@ function roomWith(input: {
       readDaySpentMicros: async () => input.daySpent ?? 0,
       readSiteCountedHoldsMicros: async () => 0,
       readOwnerSpentMicros: async () => input.ownerSpent ?? 0,
-      readOwnerCountedHoldsMicros: async () => 0,
+      readOwnerCountedHoldsMicros: async () => input.ownerHolds ?? 0,
       openHold: async () => undefined
     },
     line: {
@@ -159,6 +161,40 @@ describe("B7a GET /v1/asks/room on the wire", () => {
     });
     expect(Object.values(body).some((value) => typeof value === "number")).toBe(false);
     for (const figure of ["123457", "99981", "4321"]) expect(response.body).not.toContain(figure);
+  });
+
+  /**
+   * Final review Part 1b, Important 1: a month full only because of the
+   * person's own running debates answers FULL with the next tick and
+   * waits_for OWN_DEBATES, so the page shows its own sentence, not P1–P4.
+   */
+  it("says waits_for OWN_DEBATES, with the next tick, when only the person's own debates fill the window", async () => {
+    const response = await readRoute(roomWith({ windows: [month(1_000)], ownerSpent: 400, ownerHolds: 600 }));
+    expect(response.statusCode).toBe(200);
+    expect(AskRoomResponseSchema.parse(response.json())).toEqual({
+      room: "FULL", scope: "PERSON_MONTH", resets_at: "2026-09-30T18:01:00.000Z", waiting_run_ref: null, plan_id: null,
+      waits_for: "OWN_DEBATES"
+    });
+    // Full on spend: the month's own reset, and no waits_for.
+    const onSpend = await readRoute(roomWith({ windows: [month(1_000)], ownerSpent: 1_000 }));
+    expect(onSpend.json()).toEqual({
+      room: "FULL", scope: "PERSON_MONTH", resets_at: MONTH_RESET.toISOString(), waiting_run_ref: null, plan_id: null
+    });
+  });
+
+  it("types waits_for: only on FULL or ALREADY_WAITING, and only with a person scope", () => {
+    const answer = { scope: "PERSON_DAY", resets_at: "2026-09-30T18:01:00.000Z", waiting_run_ref: null, plan_id: null } as const;
+    expect(AskRoomResponseSchema.safeParse({ ...answer, room: "FULL", waits_for: "OWN_DEBATES" }).success).toBe(true);
+    expect(AskRoomResponseSchema.safeParse({
+      ...answer, room: "ALREADY_WAITING", waiting_run_ref: "run:waiting", waits_for: "OWN_DEBATES"
+    }).success).toBe(true);
+    expect(AskRoomResponseSchema.safeParse({ ...answer, room: "CLOSE", resets_at: null, waits_for: "OWN_DEBATES" }).success)
+      .toBe(false);
+    expect(AskRoomResponseSchema.safeParse({ ...answer, room: "FULL", scope: "SITE_DAY", waits_for: "OWN_DEBATES" }).success)
+      .toBe(false);
+    expect(AskRoomResponseSchema.safeParse({
+      room: "FITS", scope: null, resets_at: null, waiting_run_ref: null, plan_id: null, waits_for: "OWN_DEBATES"
+    }).success).toBe(false);
   });
 
   it("refuses a malformed settings query", async () => {

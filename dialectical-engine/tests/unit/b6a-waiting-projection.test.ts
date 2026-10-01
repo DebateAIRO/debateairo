@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 import type { Pool, PoolClient, QueryResult } from "pg";
-import { OpenRunSummarySchema, RunProjectionSchema, SpendScopeSchema, type Session } from "@debateai/contract";
-import type { SpendScope } from "@debateai/budget";
+import { OpenRunSummarySchema, RunProjectionSchema, SpendScopeSchema, WaitsForSchema, type Session } from "@debateai/contract";
+import type { SpendScope, WaitsFor } from "@debateai/budget";
 import { RunRepository } from "@debateai/db";
 import { PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
 import type { AskRoomPort } from "../../apps/api/src/ask-room.js";
@@ -28,6 +28,19 @@ describe("B6a the contract carries WAITING with its expected start (budget spec 
       run_ref: "run:waiting", question_line: "Messi or Ronaldo?", state: "WAITING",
       terminal_reason: null, created_at_sequence: 7
     }).state).toBe("WAITING");
+  });
+
+  it("carries waits_for OWN_DEBATES on a WAITING run only (final review Part 1b, Important 1)", () => {
+    const waiting = { ...RUN, state: "WAITING", waits_until: "2026-09-30T18:01:00.000Z" } as const;
+    expect(RunProjectionSchema.parse({ ...waiting, waits_for: "OWN_DEBATES" }).waits_for).toBe("OWN_DEBATES");
+    expect(RunProjectionSchema.parse({ ...waiting, waits_for: null }).waits_for).toBeNull();
+    expect(RunProjectionSchema.safeParse({ ...RUN, state: "QUEUED", waits_for: "OWN_DEBATES" }).success).toBe(false);
+    expect(RunProjectionSchema.safeParse({ ...waiting, waits_for: "RESET" }).success).toBe(false);
+  });
+
+  it("names the same word as WaitsFor in @debateai/budget", () => {
+    const budgetWords = { OWN_DEBATES: true } satisfies Record<WaitsFor, true>;
+    expect([...WaitsForSchema.options].sort()).toEqual(Object.keys(budgetWords).sort());
   });
 
   it("names the same four scopes as SpendScope in @debateai/budget", () => {
@@ -109,6 +122,21 @@ describe("B6a readRun answers a waiting run's expected start", () => {
     } as unknown as AskRoomPort;
     await expect(application(room).readRun("run:waiting", session, { ownerRef: null, legacyAskerId: "asker:a" }))
       .resolves.toMatchObject({ state: "WAITING", waits_until: "2026-10-01T00:00:00.000Z" });
+  });
+
+  it("says waits_for OWN_DEBATES when the room says only the person's own debates hold the run back", async () => {
+    waitingProjection();
+    const room = {
+      expectedStart: vi.fn(async () => ({
+        waitsUntil: new Date("2026-09-30T18:01:00.000Z"), scope: "PERSON_DAY" as const, waitsFor: "OWN_DEBATES" as const
+      }))
+    } as unknown as AskRoomPort;
+    await expect(application(room).readRun("run:waiting", session, { ownerRef: null, legacyAskerId: "asker:a" }))
+      .resolves.toMatchObject({ state: "WAITING", waits_until: "2026-09-30T18:01:00.000Z", waits_for: "OWN_DEBATES" });
+    // A run that waits for a reset carries no waits_for.
+    const reset = { expectedStart: async () => ({ waitsUntil: new Date("2026-10-01T00:00:00.000Z"), scope: "SITE_DAY" as const }) };
+    await expect(application(reset as unknown as AskRoomPort).readRun("run:waiting", session, { ownerRef: null, legacyAskerId: "asker:a" }))
+      .resolves.not.toHaveProperty("waits_for");
   });
 
   it("never invents a start time when no room is composed: a waiting run with no waker is refused by name", async () => {

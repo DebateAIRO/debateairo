@@ -81,6 +81,9 @@ export type ContractErrorCode =
   | "NETWORK_FAILURE"
   | "INVALID_RESPONSE";
 
+/** What a 422 ASK_ALREADY_WAITING says about the person's waiting run. */
+export type ContractWaitingRefusal = Readonly<{ runRef: string; waitsUntil: string; waitsFor?: "OWN_DEBATES" }>;
+
 export class ContractHttpError extends Error {
   constructor(
     readonly code: ContractErrorCode,
@@ -90,10 +93,11 @@ export class ContractHttpError extends Error {
     /**
      * Budget spec §2.7: set only for 422 ASK_ALREADY_WAITING whose body parses
      * as `AskAlreadyWaitingSchema`: the waiting run and its expected start (no
-     * figure). The ask page shows sentence D with that time when its room
-     * re-read fails.
+     * figure), and `waitsFor` when that start waits on the person's own running
+     * debates rather than a reset (final review Part 1b, Important 1). The ask
+     * page shows sentence D with that time when its room re-read fails.
      */
-    readonly waiting: Readonly<{ runRef: string; waitsUntil: string }> | null = null
+    readonly waiting: ContractWaitingRefusal | null = null
   ) {
     super(message);
     this.name = "ContractHttpError";
@@ -113,7 +117,7 @@ function codeForStatus(status: number): ContractErrorCode {
 async function contractErrorForResponse(response: Response): Promise<ContractHttpError> {
   let serverCode: string | null = null;
   let serverMessage: string | null = null;
-  let waiting: Readonly<{ runRef: string; waitsUntil: string }> | null = null;
+  let waiting: ContractWaitingRefusal | null = null;
   try {
     const candidate: unknown = await response.json();
     if (typeof candidate === "object" && candidate !== null) {
@@ -122,7 +126,11 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
       serverMessage = typeof body.message === "string" && body.message.trim().length > 0 ? body.message : null;
       const refusal = response.status === 422 ? AskAlreadyWaitingSchema.safeParse(body) : null;
       if (refusal?.success === true) {
-        waiting = Object.freeze({ runRef: refusal.data.run_ref, waitsUntil: refusal.data.waits_until });
+        waiting = Object.freeze({
+          runRef: refusal.data.run_ref,
+          waitsUntil: refusal.data.waits_until,
+          ...(refusal.data.waits_for === undefined ? {} : { waitsFor: refusal.data.waits_for })
+        });
       }
     }
   } catch {
