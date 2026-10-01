@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { chmod, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -27,6 +29,29 @@ const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 // Ephemeral ports: a developer's running stack may hold 8797–8799. The receipt records the real ones.
 const profile = { ...DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE, billingFakePorts: [0, 0, 0] as const };
+
+async function listening(server: Server, port: number): Promise<number> {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", () => { server.off("error", reject); resolve(); });
+  });
+  return (server.address() as AddressInfo).port;
+}
+
+async function closed(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => server.close((error) => (error === undefined ? resolve() : reject(error))));
+}
+
+/** Three loopback ports that were free a moment ago: each is bound on 0, read and released. */
+async function freePorts(): Promise<readonly [number, number, number]> {
+  const ports: number[] = [];
+  for (let index = 0; index < 3; index += 1) {
+    const probe = createServer();
+    ports.push(await listening(probe, 0));
+    await closed(probe);
+  }
+  return ports as unknown as readonly [number, number, number];
+}
 
 async function repository(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "p6b-dev-billing-"));
@@ -91,4 +116,24 @@ describe("P6b — development billing fakes", () => {
     await expect(startDevelopmentBillingFakes({ repositoryRoot, commandEnvironment: {}, profile }))
       .rejects.toThrow("DEV_BILLING_FAKES_SECRET_INVALID");
   });
+
+  // A busy port must fail the start (not hang it), and the fakes already started must be stopped: the second start on
+  // the same three ports can only succeed if nothing from the failed start still holds them.
+  it("fails, instead of hanging, when a billing port is busy, and stops the fakes it had started", async () => {
+    const repositoryRoot = await repository();
+    for (const busy of [0, 1, 2] as const) {
+      const billingFakePorts = await freePorts();
+      const busyProfile = { ...DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE, billingFakePorts };
+      const holder = createServer();
+      await listening(holder, billingFakePorts[busy]);
+      try {
+        await expect(startDevelopmentBillingFakes({ repositoryRoot, commandEnvironment: {}, profile: busyProfile }))
+          .rejects.toThrow("EADDRINUSE");
+      } finally {
+        await closed(holder);
+      }
+      const retried = await startDevelopmentBillingFakes({ repositoryRoot, commandEnvironment: {}, profile: busyProfile });
+      await retried.stop();
+    }
+  }, 15_000);
 });

@@ -108,7 +108,13 @@ export async function startFakeQuaderno(options: Readonly<{ apiKey?: string; por
       send(response, 404, '{"error":"not found"}');
     });
   });
-  await new Promise<void>((resolve) => server.listen(options.port ?? 0, "127.0.0.1", () => resolve()));
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(options.port ?? 0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
   const port = (server.address() as AddressInfo).port;
   return Object.freeze({
     baseUrl: `http://127.0.0.1:${port}/api`,
