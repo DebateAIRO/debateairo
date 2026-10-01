@@ -309,6 +309,54 @@ export const BillingPlansResponseSchema = z.object({
 }).strict();
 export type BillingPlansResponse = z.infer<typeof BillingPlansResponseSchema>;
 
+const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
+
+/** POST /v1/billing/quote (paid-plans spec §2.5.3; P19's pre-fill makes `country` optional; R-15 adds `name`). */
+export const BillingQuoteRequestSchema = z.object({
+  plan_id: PlanIdSchema.exclude(["FREE"]),
+  /** Absent: the country of the caller's address is used, and answered back as `country`. */
+  country: BillingIso2Schema.optional(),
+  /** The buyer's own name; a Romanian invoice needs it (or the company's). */
+  name: z.string().trim().min(1).max(256).optional(),
+  /** The county (RO) or state (US/CA). */
+  region: z.string().trim().min(1).max(64).optional(),
+  postal_code: z.string().trim().min(1).max(16).optional(),
+  city: z.string().trim().min(1).max(128).optional(),
+  company: z.object({
+    name: z.string().trim().min(1).max(256),
+    vat_id: z.string().trim().min(2).max(32),
+    address: z.string().trim().min(1).max(512)
+  }).strict().optional()
+}).strict();
+export type BillingQuoteRequest = z.infer<typeof BillingQuoteRequestSchema>;
+
+/** The page builds "VAT 21% (Romania)" itself (spec §2.5.3) from tax_name, the rate and the country. */
+export const BillingQuoteResponseSchema = z.object({
+  quote_ref: z.uuid(),
+  plan_id: PlanIdSchema.exclude(["FREE"]),
+  net: BillingDecimalMoneySchema,
+  tax: BillingDecimalMoneySchema,
+  total: BillingDecimalMoneySchema,
+  tax_name: z.string().min(1).max(64),
+  /** Basis points; a US rate may be fractional (8.875 % = 887.5). */
+  tax_rate_bp: z.number().min(0).max(10_000),
+  tax_country: BillingIso2Schema,
+  tax_region: z.string().max(64).nullable(),
+  tax_status: z.enum(["TAXABLE", "NON_TAXABLE", "NOT_REGISTERED", "REVERSE_CHARGE"]),
+  /** The country the quote was made for: the one sent, or the connection's. */
+  country: BillingIso2Schema,
+  /** The connection's country; sentence G3 names it when `country_confirm_needed`. */
+  ip_country: z.string().regex(/^[A-Z]{2}$/),
+  country_confirm_needed: z.boolean(),
+  /** R-15: the invoice issuer needs the buyer's name, city and county before the checkout can start. */
+  address_required: z.boolean(),
+  renews_on: z.iso.datetime(),
+  /** Null where no withdrawal right applies (outside `withdrawalCountries`). */
+  withdrawal_days: z.number().int().positive().nullable(),
+  expires_at: z.iso.datetime()
+}).strict();
+export type BillingQuoteResponse = z.infer<typeof BillingQuoteResponseSchema>;
+
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
  * `core.run.argument_language_tag` (a BCP-47 tag, "und" when detection was not
@@ -1095,7 +1143,8 @@ export const contractInventory = Object.freeze({
     "POST /v1/runs/{id}/publish",
     "POST /v1/runs/{id}/unpublish",
     "GET /v1/billing/usage",
-    "GET /v1/billing/plans"
+    "GET /v1/billing/plans",
+    "POST /v1/billing/quote"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
@@ -1118,6 +1167,7 @@ export const contractInventory = Object.freeze({
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
-    AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema
+    AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema,
+    BillingQuoteRequestSchema, BillingQuoteResponseSchema
   })
 });

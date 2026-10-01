@@ -9,6 +9,7 @@ import type { BillingConnectors } from "./connectors.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
 import { BillingOutboxWorker } from "./outbox.js";
+import { QuoteService } from "./quote.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
 
 /**
@@ -67,7 +68,13 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     }));
   }
   // P8b onward add their members to this object literal.
-  const routes: BillingRouteOptions = Object.freeze({ plans: deps.plans, legal: deps.legal, clock: deps.clock });
+  const routes: BillingRouteOptions = Object.freeze({
+    plans: deps.plans, legal: deps.legal, clock: deps.clock,
+    quotes: new QuoteService({
+      repository, tax: deps.connectors.tax, geo: deps.geo, countryPolicy: deps.countryPolicy, policy: deps.policy,
+      plans: deps.plans, recordsKey: deps.connectors.recordsKey, audit: deps.audit
+    })
+  });
   const drain = createCoalescingSingleFlight(() => outbox.drain(10), () => deps.reportPending("BILLING_OUTBOX_PENDING"));
   const timers: Array<ReturnType<typeof setInterval>> = [];
   return Object.freeze({

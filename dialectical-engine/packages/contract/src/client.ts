@@ -29,6 +29,8 @@ import {
   AskAlreadyWaitingSchema,
   AskRoomResponseSchema,
   BillingPlansResponseSchema,
+  BillingQuoteRequestSchema,
+  BillingQuoteResponseSchema,
   BillingUsageResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
@@ -58,6 +60,8 @@ import {
   type AskRequest,
   type AskRoomResponse,
   type BillingPlansResponse,
+  type BillingQuoteRequest,
+  type BillingQuoteResponse,
   type BillingUsageResponse,
   type Deployment,
   type EmailChangePending,
@@ -383,6 +387,7 @@ export interface ContractClient {
   getBillingUsage(): Promise<BillingUsageResponse>;
   /** Paid-plans spec §2.5.3: the public plans list; 404 when billing is off. */
   getBillingPlans(): Promise<BillingPlansResponse>;
+  createBillingQuote(input: BillingQuoteRequest): Promise<BillingQuoteResponse>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -668,6 +673,10 @@ export function createContractClient(
     }).toString()}`, AskRoomResponseSchema),
     getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
     getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),
+    createBillingQuote: (input: BillingQuoteRequest) => request(
+      "/v1/billing/quote", BillingQuoteResponseSchema,
+      { method: "POST", body: JSON.stringify(BillingQuoteRequestSchema.parse(input)) }
+    ),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),

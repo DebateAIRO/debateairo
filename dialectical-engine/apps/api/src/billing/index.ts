@@ -1,9 +1,12 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { BillingPlansResponseSchema, BillingUsageResponseSchema } from "@debateai/contract";
+import {
+  BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema
+} from "@debateai/contract";
 import { allowanceVsPlus, microsToDecimal } from "@debateai/billing-core";
 import type { BillingPlans, PlanId } from "@debateai/register";
 import { clientIpNetworkScope } from "../client-ip.js";
 import type { LegalAcceptanceApplication } from "../legal.js";
+import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { BillingRefusal } from "./refusal.js";
 
 /**
@@ -19,7 +22,8 @@ import { BillingRefusal } from "./refusal.js";
  */
 export const BILLING_ROUTE_PATHS = Object.freeze([
   "GET /v1/billing/usage",
-  "GET /v1/billing/plans"
+  "GET /v1/billing/plans",
+  "POST /v1/billing/quote"
 ] as const);
 export type BillingRoutePath = typeof BILLING_ROUTE_PATHS[number];
 
@@ -42,7 +46,7 @@ export interface BillingUsageReader {
 export type BillingLegalGate = Pick<LegalAcceptanceApplication, "requiresReacceptance">;
 
 /** The sealed admission scopes billing charges (the admission policy's next versions, contract §2). */
-export type BillingAdmissionScope = "publicReads";
+export type BillingAdmissionScope = "publicReads" | "billingQuote";
 
 /** Like `SupportAdmission`: a scope the register version does not publish admits. */
 export type BillingAdmission = Readonly<{
@@ -63,6 +67,8 @@ export type BillingRouteDeps = Readonly<{
   /** P8a: composed by the billing runtime, present only when hosted with billing on. */
   plans?: BillingPlans;
   legal?: BillingLegalGate;
+  /** P8b. */
+  quotes?: QuoteServicePort;
 }>;
 
 /**
@@ -97,6 +103,22 @@ export async function answerRefusal(reply: FastifyReply, work: () => Promise<Fas
 
 /** Spec §2.5.3: the public plans list may be cached by the browser and by any shared cache for 60 seconds. */
 const PLANS_CACHE_CONTROL = "public, max-age=60";
+
+/** Quote, checkout and card bodies are small; each declares the 16 KiB credential-route ceiling. */
+const BILLING_BODY_LIMIT_BYTES = 16_384;
+
+function quoteResponse(result: QuoteResult): Readonly<Record<string, unknown>> {
+  const { quote } = result;
+  return BillingQuoteResponseSchema.parse({
+    quote_ref: quote.quoteId, plan_id: quote.planId,
+    net: microsToDecimal(quote.netMicros), tax: microsToDecimal(quote.taxMicros), total: microsToDecimal(quote.totalMicros),
+    tax_name: quote.taxName, tax_rate_bp: quote.taxRateBasisPoints, tax_country: quote.taxCountry,
+    tax_region: quote.taxRegion, tax_status: quote.taxStatus, country: result.declaredCountry,
+    ip_country: result.ipCountry, country_confirm_needed: result.countryConfirmNeeded,
+    address_required: result.addressRequired, renews_on: result.renewsOn.toISOString(),
+    withdrawal_days: result.withdrawalDays, expires_at: quote.expiresAt.toISOString()
+  });
+}
 
 /** The fallbacks match apps/api/src/index.ts's own rule: no limiter composed = no budget to charge. */
 const ADMIT_WITHOUT_LIMITER: BillingAdmission = Object.freeze({ gate: () => true });
@@ -145,5 +167,31 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       }))
     });
     return reply.send(plansBody);
+  });
+
+  api.post("/v1/billing/quote", { ...deps.policy("POST /v1/billing/quote"), bodyLimit: BILLING_BODY_LIMIT_BYTES }, async (request, reply) => {
+    const { quotes, legal } = deps;
+    if (quotes === undefined || legal === undefined) return billingNotFound(reply);
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    // Owner-keyed (contract §2: 10 an hour per owner), so no network scope applies here.
+    if (!admit.gate(reply, "billingQuote", "POST /v1/billing/quote", authenticated.ownerRef)) return reply;
+    const parsed = BillingQuoteRequestSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    const body = parsed.data;
+    return answerRefusal(reply, async () => {
+      if (await legal.requiresReacceptance(authenticated.ownerRef)) {
+        throw new BillingRefusal(403, "LEGAL_REACCEPTANCE_REQUIRED");
+      }
+      const result = await quotes.create({
+        ownerRef: authenticated.ownerRef, ip: source(request).ip, planId: body.plan_id, country: body.country ?? null,
+        name: body.name ?? null, region: body.region ?? null, postalCode: body.postal_code ?? null,
+        city: body.city ?? null,
+        company: body.company === undefined ? null
+          : { name: body.company.name, vatId: body.company.vat_id, address: body.company.address },
+        now: clock()
+      });
+      return reply.send(quoteResponse(result));
+    });
   });
 }

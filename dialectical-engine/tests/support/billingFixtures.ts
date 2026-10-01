@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { AskApplication } from "@debateai/api";
 import type { SubscriptionEvent } from "@debateai/billing-core";
+import type { GeoLookup } from "@debateai/geo";
 import type { BillingPlans, BillingPolicy, CountryPolicy, CountryRule } from "@debateai/register";
+// R-16: tests import the fakes through tests/support/ (P4's fake-tax-engine.ts re-exports the tax rules).
+import { FakeTaxEngine, fakeTaxMicros } from "./fake-tax-engine.js";
 
 export const testBillingPlans: BillingPlans = Object.freeze({
   currency: "USD",
@@ -81,4 +84,27 @@ export function activeSubscriptionEvents(ownerRef: string, at: Date, planId: "PL
         reactivated: false
       } }
   ];
+}
+
+/**
+ * P4's in-memory FakeTaxEngine (fixed rates RO 21 %, DE 19 %, FR 20 %, the VALID reverse-charge rule, idempotent
+ * records), plus one test lever: a per-country rate override, so a renewal can find a changed total (A7).
+ */
+export class AdjustableTaxEngine extends FakeTaxEngine {
+  readonly rateOverride = new Map<string, number>();
+
+  override async quote(input: Parameters<FakeTaxEngine["quote"]>[0]): ReturnType<FakeTaxEngine["quote"]> {
+    const base = await super.quote(input);
+    const rate = this.rateOverride.get(base.taxCountry);
+    if (rate === undefined || base.status !== "TAXABLE") return base;
+    const taxMicros = fakeTaxMicros(input.netMicros, rate);
+    return Object.freeze({ ...base, taxMicros, totalMicros: input.netMicros + taxMicros, taxRateBasisPoints: rate });
+  }
+}
+
+export class StubGeo implements GeoLookup {
+  country = "RO";
+  tor = false;
+  lookup(_ip: string): { country: string; tor: boolean } { return { country: this.country, tor: this.tor }; }
+  close(): void {}
 }

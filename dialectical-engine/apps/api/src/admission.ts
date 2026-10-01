@@ -7,7 +7,7 @@ import type { AdmissionPolicy } from "@debateai/register";
  * refusal, it is an absence, and the caller must be able to tell them apart.
  */
 export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
-  | "supportReads" | "supportSessions" | "supportModelCalls" | "geoAvailability";
+  | "supportReads" | "supportSessions" | "supportModelCalls" | "geoAvailability" | "billingQuote";
 
 export type AdmissionDecision =
   | Readonly<{ allowed: true }>
@@ -28,7 +28,7 @@ interface AdmissionBucket {
   readonly policy: NonNullable<AdmissionPolicy["asks"] | AdmissionPolicy["publicReads"]
     | AdmissionPolicy["recoveryStart"] | AdmissionPolicy["supportReads"]
     | AdmissionPolicy["supportSessions"] | AdmissionPolicy["supportModelCalls"]
-    | AdmissionPolicy["geoAvailability"]>;
+    | AdmissionPolicy["geoAvailability"] | AdmissionPolicy["billingQuote"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -67,6 +67,10 @@ export class AdmissionLimiter {
       // Paid plans G3a: present only when the resolved register version carries it.
       ...(policy.geoAvailability === null ? [] : [[
         "geoAvailability", { policy: policy.geoAvailability, entries: new Map() }
+      ] as const]),
+      // Paid plans P8b: present only when the resolved register version carries it.
+      ...(policy.billingQuote === null ? [] : [[
+        "billingQuote", { policy: policy.billingQuote, entries: new Map() }
       ] as const])
     ]);
   }

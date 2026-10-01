@@ -1232,7 +1232,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
-  { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" }
+  { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
+  { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
