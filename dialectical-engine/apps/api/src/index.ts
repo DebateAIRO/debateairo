@@ -3226,6 +3226,16 @@ type RunSetupStep =
  */
 type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
 
+/** An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. */
+async function evaluationOrRefusal(settings: RunCreationSettings, ask: AskRequest): Promise<AskEvaluation | AskRefusal> {
+  try {
+    return await evaluateAskAdmission(settings, ask);
+  } catch (error) {
+    if (error instanceof AskRefusal) return error;
+    throw error;
+  }
+}
+
 /** What the room's locked decision produced inside the lease. */
 type RoomOutcome =
   | Readonly<{ kind: "START"; runId: string; workItemId: string }>
@@ -3498,6 +3508,12 @@ export class PostgresAskApplication implements AskApplication {
    * and the plan's own admission, so it waits on its plan's roster and
    * settings: B7b's PLAN_CHANGED guard sees it as premium, and the waker starts
    * it on that roster (Q-11: the waker does not re-pick).
+   * Final review Part 1b, Important 2: a refused cheaper roster never stops a
+   * question its plan's own roster can run. When the swapped ask is refused
+   * (a Free-roster model is unavailable) and the plan's own is not, the swap is
+   * dropped: no substitution is recorded, and the precheck is taken again and
+   * the decision made for the plan's own ask and settings class, so the
+   * question starts (CLOSE) or waits on its own roster (A5).
    */
   async #submitWithRoom(
     ask: AskRequest,
@@ -3521,32 +3537,40 @@ export class PostgresAskApplication implements AskApplication {
     try {
       outcome = await withOwnerAskAdmissionLease(admissionPool, ownership, async (lease) => {
         await room.precheck(question);
-        const swappedEvaluation = await evaluateAskAdmission(this.settings, ask);
         // B8 (A5): the locked decision may still say WAIT (the site's day, the
         // line, or a person window that turned FULL after the coarse fit's
         // unlocked read), and a waiting question keeps its plan's ask. So when
         // the roster was swapped, the plan's own admission is taken here too,
         // still outside the decision's locks (the provider probe is cached
-        // within probeFreshnessMs). Its refusal is kept as a value, not thrown:
-        // it matters only if the decision says WAIT. Without a swap `plannedAsk`
-        // is `ask`, and so is its evaluation.
-        let plannedEvaluation: AskEvaluation | AskRefusal = swappedEvaluation;
-        if (substitutedAt !== null) {
-          try {
-            plannedEvaluation = await evaluateAskAdmission(this.settings, plannedAsk);
-          } catch (error) {
-            if (!(error instanceof AskRefusal)) throw error;
-            plannedEvaluation = error;
-          }
+        // within probeFreshnessMs). Both refusals are kept as values, not
+        // thrown: the plan's matters only if the decision says WAIT, and the
+        // swapped one only if the plan's own roster cannot run either. Without
+        // a swap `plannedAsk` is `ask`, and so is its evaluation.
+        let startAsk = ask;
+        let swappedAt = substitutedAt;
+        let decisionQuestion = question;
+        let swappedEvaluation = await evaluationOrRefusal(this.settings, ask);
+        const plannedEvaluation = substitutedAt === null
+          ? swappedEvaluation
+          : await evaluationOrRefusal(this.settings, plannedAsk);
+        if (swappedAt !== null && swappedEvaluation instanceof AskRefusal && !(plannedEvaluation instanceof AskRefusal)) {
+          // Important 2: the cheaper roster cannot run, the plan's own can. Drop the swap.
+          startAsk = plannedAsk;
+          swappedAt = null;
+          swappedEvaluation = plannedEvaluation;
+          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk) });
+          await room.precheck(decisionQuestion);
         }
-        const decided = await room.decide(question, async ({ admission, estimateMicros, now, tx }): Promise<RoomOutcome> => {
+        if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;
+        const startEvaluation = swappedEvaluation;
+        const decided = await room.decide(decisionQuestion, async ({ admission, estimateMicros, now, tx }): Promise<RoomOutcome> => {
           // B8 (A5, spec §2.3.4): only a START runs on the swapped roster. A
           // question that WAITs is stored on its plan's roster and settings.
           // Nothing is written yet, so a refusal of the plan's own admission
           // rolls the decision back and no run exists.
-          const keepsPlan = substitutedAt !== null && admission.kind === "WAIT";
-          const runAsk = keepsPlan ? plannedAsk : ask;
-          const evaluated = keepsPlan ? plannedEvaluation : swappedEvaluation;
+          const keepsPlan = swappedAt !== null && admission.kind === "WAIT";
+          const runAsk = keepsPlan ? plannedAsk : startAsk;
+          const evaluated = keepsPlan ? plannedEvaluation : startEvaluation;
           if (evaluated instanceof AskRefusal) throw evaluated;
           await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
           const runId = await this.#runs.startRun({
@@ -3578,13 +3602,14 @@ export class PostgresAskApplication implements AskApplication {
             batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
           }, lease.client);
           createdRunId = runId;
-          if (substitutedAt !== null && admission.kind === "START") {
+          if (swappedAt !== null && admission.kind === "START") {
             // B8 (budget spec §2.9): the interim swap's owner record, in the room
             // decision's own transaction. It commits with the run's hold (START),
             // or not at all; a failure rolls the decision back and records the
-            // run FAILED (RUN_SETUP_FAILED:COST_RECORD). A WAIT swapped nothing.
+            // run FAILED (RUN_SETUP_FAILED:COST_RECORD). A WAIT, or a swap
+            // dropped because the cheaper roster cannot run, swapped nothing.
             setupStep = "COST_RECORD";
-            await this.#recordRosterSubstitution(runId, substitutedAt, tx);
+            await this.#recordRosterSubstitution(runId, swappedAt, tx);
           }
           setupStep = "MEMORY_QUESTION";
           await this.#serve.recordMemoryQuestion({

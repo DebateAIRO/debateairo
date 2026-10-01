@@ -439,6 +439,61 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
     expect(started[0]!.discoveredPanel.map((panelMember) => panelMember.model_id)).toEqual([...PLAN_TIER_ROSTERS.free]);
     expect(substitutions).toHaveBeenCalledTimes(1);
   });
+
+  /**
+   * Final review Part 1b, Important 2 — THE MIRROR CASE. A refused cheaper
+   * roster never stops a question its plan's own roster can run: the swap is
+   * dropped, and the question starts (CLOSE) or waits on its plan's roster
+   * (A5: start at the cheapest choice that can run). The precheck is taken
+   * again and the decision is made for the plan's own settings class, so the
+   * hold is the premium estimate; no substitution row is written.
+   */
+  const premiumClass = Object.freeze({
+    planTier: "premium", compositionBudgetTier: "medium", makerCount: PLAN_TIER_ROSTERS.premium.length, depth: 3
+  });
+  const swappedClass = Object.freeze({
+    planTier: "free", compositionBudgetTier: "medium", makerCount: PLAN_TIER_ROSTERS.free.length, depth: 3
+  });
+
+  it("drops the swap and STARTs on the plan's own roster when only the Free roster is unavailable, with no substitution row", async () => {
+    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { room, questions } = recordingRoom();
+    const { application, started, substitutions, enqueuedOnRoom } = arrange(billing, room, PLAN_TIER_ROSTERS.premium);
+    const accepted = AskAcceptedSchema.parse(await application.submit(ask(), serverSession, serverPrincipal));
+    expect(accepted).toMatchObject({ run_ref: RUN_ID, status: "QUEUED" });
+    expect(accepted.applied?.plan_tier).toBe("premium");
+    expect(started).toHaveLength(1);
+    expect(started[0]).toMatchObject({ planTier: "premium", compositionBudgetTier: "medium", depthParams: { depth: 3 } });
+    expect(started[0]!.discoveredPanel.map((panelMember) => panelMember.model_id)).toEqual([...PLAN_TIER_ROSTERS.premium]);
+    expect(substitutions).not.toHaveBeenCalled();
+    // The first look was the swapped ask's; once the swap is dropped, the precheck and the locked decision are the plan's.
+    expect(questions.map((question) => question.settingsClass)).toEqual([swappedClass, premiumClass, premiumClass]);
+    expect(enqueuedOnRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the swap and WAITs on the plan's own roster when only the Free roster is unavailable", async () => {
+    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { room, questions } = recordingRoom(WAIT_SITE_DAY);
+    const { application, started, substitutions, enqueuedOnRoom } = arrange(billing, room, PLAN_TIER_ROSTERS.premium);
+    const accepted = AskAcceptedSchema.parse(await application.submit(ask(), serverSession, serverPrincipal));
+    expect(accepted).toMatchObject({ run_ref: RUN_ID, status: "WAITING", waiting_scope: "SITE_DAY" });
+    expect(started[0]).toMatchObject({ planTier: "premium" });
+    expect(started[0]!.discoveredPanel.map((panelMember) => panelMember.model_id)).toEqual([...PLAN_TIER_ROSTERS.premium]);
+    expect(substitutions).not.toHaveBeenCalled();
+    expect(questions.at(-1)!.settingsClass).toEqual(premiumClass);
+    expect(enqueuedOnRoom).not.toHaveBeenCalled();
+  });
+
+  it("still refuses, before any run exists, when neither roster is available", async () => {
+    const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
+    const { room } = recordingRoom();
+    const { application, started, substitutions, setupFailures } = arrange(billing, room, []);
+    await expect(application.submit(ask(), serverSession, serverPrincipal))
+      .rejects.toMatchObject({ name: "AskRefusal", code: "ASK_PLAN_TIER_MODEL_UNAVAILABLE" });
+    expect(started).toHaveLength(0);
+    expect(substitutions).not.toHaveBeenCalled();
+    expect(setupFailures).not.toHaveBeenCalled();
+  });
 });
 
 describe("the room read decides its settings the way submit does (R-28)", () => {
