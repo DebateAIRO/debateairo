@@ -25,6 +25,12 @@ export function isCrisisSupportRefusal(failure: unknown): boolean {
  * step — before the consent screen, before the session is even checked — and, when it trips,
  * opens the help screen and answers `true`: the caller starts nothing. `offer()` opens it when
  * the API refused (`isCrisisSupportRefusal`). `dialog` is rendered by the caller.
+ *
+ * `flags(question)` lets a caller enable its Start control for a question too short to be a
+ * debate that still trips the check ("我想死", "死にたい", "kys"), so pressing Start opens
+ * the help screen instead of doing nothing. It answers `false` until the patterns are warm, so
+ * a keystroke never waits for the first compile; the caller's Start runs `offerIfCrisis`
+ * first either way.
  */
 export function useCrisisSupport({
   catalog,
@@ -32,13 +38,17 @@ export function useCrisisSupport({
   countryHint = null
 }: Readonly<{ catalog: MessageCatalog; locale: string; countryHint?: string | null }>): Readonly<{
   offerIfCrisis: (question: string) => boolean;
+  flags: (question: string) => boolean;
   offer: () => void;
   dialog: React.ReactElement | null;
 }> {
   const [open, setOpen] = React.useState(false);
   // The first check compiles every pattern (close to a second). Do it in idle slices after the
   // composer appears, so the press of "Start" never waits for it.
-  React.useEffect(() => warmInIdleSlices(), []);
+  // `warm` re-renders the caller once every pattern is compiled, so a question that was already
+  // in the field (a /new?topic= link) gets its Start control enabled by `flags`.
+  const [warm, setWarm] = React.useState(false);
+  React.useEffect(() => warmInIdleSlices(() => setWarm(true)), []);
 
   const offerIfCrisis = (question: string): boolean => {
     if (!detectCrisis(question).crisis) return false;
@@ -54,16 +64,20 @@ export function useCrisisSupport({
       onBack={() => setOpen(false)}
     />
   ) : null;
-  return { offerIfCrisis, offer: () => setOpen(true), dialog };
+  const flags = (question: string): boolean =>
+    question.trim().length > 0 && (warm || warmCrisisCheck(() => false)) && detectCrisis(question).crisis;
+
+  return { offerIfCrisis, flags, offer: () => setOpen(true), dialog };
 }
 
-function warmInIdleSlices(): () => void {
+function warmInIdleSlices(onWarm: () => void): () => void {
   let cancelled = false;
   let handle: ReturnType<typeof setTimeout> | undefined;
   const step = (): void => {
     if (cancelled) return;
     const until = performance.now() + 8;
-    if (!warmCrisisCheck(() => performance.now() < until)) handle = setTimeout(step, 16);
+    if (warmCrisisCheck(() => performance.now() < until)) onWarm();
+    else handle = setTimeout(step, 16);
   };
   handle = setTimeout(step, 200);
   return () => {

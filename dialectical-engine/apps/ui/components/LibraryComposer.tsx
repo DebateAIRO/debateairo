@@ -37,13 +37,15 @@ export function LibraryComposer({
   const consent = useSensitiveDataConsent({ catalog, locale });
   const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint });
 
-  const ready = topic.trim().length > 6;
+  // A question too short to debate still reaches the crisis check ("我想死" is three letters).
+  const ready = topic.trim().length > 6 || crisis.flags(topic);
 
   async function start() {
-    if (!ready || busy) return;
+    if (busy) return;
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
-    // debate — and before anything else, the consent screen included.
+    // debate — and before anything else, the length rule and the consent screen included.
     if (crisis.offerIfCrisis(topic)) return;
+    if (!ready) return;
     setBusy(true);
     setError(null);
     try {

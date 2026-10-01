@@ -173,10 +173,10 @@ function NewDebateForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!ready) return;
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
-    // debate — and before anything else, the consent screen included.
+    // debate — and before anything else, the form's own rules and the consent screen included.
     if (crisis.offerIfCrisis(topic)) return;
+    if (!ready) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -426,7 +426,7 @@ function NewDebateForm({
           ) : null}
 
           <div className="ndActions">
-            <button data-support-primary-control type="submit" className="ndStart" disabled={!ready || submitting}>
+            <button data-support-primary-control type="submit" className="ndStart" disabled={!(ready || crisis.flags(topic)) || submitting}>
               {t(catalog, submitting ? "newDebate.starting" : "newDebate.startRun")} <span aria-hidden>→</span>
             </button>
             <button type="button" className="ndCancel" onClick={() => router.push("/")}>
