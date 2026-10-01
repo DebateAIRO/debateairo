@@ -215,3 +215,38 @@ describe("B-I2 — a changed consumer prompt is a new version, not a silent edit
     });
   });
 });
+
+describe("S01 R4 — the content rule is part of the door", () => {
+  // Property: every shape in which the in-frame rule is altered or missing is refused
+  // before the fetch boundary, even when a verbatim copy sits elsewhere (REV-S01 p1 ct N1 + sd N1).
+  const MUTATIONS: Readonly<Record<string, (system: string, rule: string) => string>> = {
+    "deleted": (system, rule) => system.replace(rule, ""),
+    "one character changed": (system) => system.replace("dehumanises", "dehumanizes"),
+    "one character changed after rule 3": (system) => system.replace("someone else to post.", "someone else to post!"),
+    "changed only in case": (system) => system.replace("Never deny", "never deny"),
+    "altered, verbatim copy after the end marker": (system, rule) => `${system.replace("Never produce", "Always produce")}\n${rule}`,
+    "altered, verbatim copy under a second banner": (system, rule) => `--- SAFETY FRAME\n${rule}\n\n${system.replace("Never produce", "Always produce")}`
+  };
+  it.each(Object.keys(MUTATIONS))("refuses a rule %s without posting", async (mutation) => {
+    const { CONTENT_RULE_TEXT } = await import("@debateai/providers");
+    const sent: PromptPacket["messages"][] = [];
+    const provider = createOpenAiPublicAggregateProvider({
+      endpoint: "https://fixture.invalid/v1", providerRef: "provider:consumer", model: "consumer/model", maker: "consumer",
+      fetchImplementation: async (_url, init) => {
+        sent.push(JSON.parse(String(init?.body)).messages);
+        return new Response(JSON.stringify({ model: "consumer/model", choices: [{ message: { content: JSON.stringify({
+          bias_pattern_name: "none observed", capability_summary: "The aggregate supports no bias claim.", adjacent_domain_flags: []
+        }) } }] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+    });
+    const built = framed().packet;
+    const packet = { messages: built.messages.map((message, i) => i === 0 ? {
+      ...message, content: MUTATIONS[mutation]!(message.content, CONTENT_RULE_TEXT)
+    } : message) };
+    expect(packet.messages[0]!.content).not.toBe(built.messages[0]!.content);
+    await expect(provider.classify({ consumerModelId: "consumer/model", packet,
+      bound: { maxAttempts: 1, tokenCeiling: 256, deadlineMs: 5_000 }, allowedAdjacentDomainRefs: []
+    })).rejects.toMatchObject({ code: "PROMPT_FRAME_ABSENT", message: "The safety frame carries no content rule" });
+    expect(sent).toHaveLength(0);
+  });
+});

@@ -120,6 +120,14 @@ function createRunnerEnvironment(
     ...(primary.authorizationHeader === undefined
       ? {} : { VLLM_AUTHORIZATION: primary.authorizationHeader }),
     PROVIDER_DISCOVERY_TARGETS_JSON: apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON!,
+    // FIX-HS1-probe-timeout: the runner re-probes each panel member at claim
+    // time with this timeout. Unforwarded, the schema default (5 s) applied
+    // while the API probed the same CLIs with its own 180 s, and a CLI that
+    // answered in 6 s emptied the panel (RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM).
+    // One value, read from the API's environment. When the API carries none,
+    // neither does the runner: both then read the same schema default.
+    ...(apiEnvironment.PROVIDER_PROBE_TIMEOUT_MS === undefined
+      ? {} : { PROVIDER_PROBE_TIMEOUT_MS: apiEnvironment.PROVIDER_PROBE_TIMEOUT_MS }),
     HATCHET_CLIENT_TOKEN: apiEnvironment.HATCHET_CLIENT_TOKEN!,
     HATCHET_HOST_PORT: apiEnvironment.HATCHET_HOST_PORT!,
     HATCHET_API_URL: apiEnvironment.HATCHET_API_URL!,

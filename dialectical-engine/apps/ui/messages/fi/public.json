@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Tämä raportti ei ole saatavilla.",
   "public.report.error.tryAgain": "Raporttia ei voitu laatia juuri nyt. Yritä hetken kuluttua uudelleen.",
   "public.story.morePaths.one": "ja {count} muu kanta",
-  "public.story.morePaths.other": "ja {count} muuta kantaa"
+  "public.story.morePaths.other": "ja {count} muuta kantaa",
+  "public.publication.contentCheck.refusedHeading": "Emme julkaisseet tätä keskustelua",
+  "public.publication.contentCheck.refusedWhatBlock": "Automaattinen tarkistus löysi tästä keskustelusta sääntöjämme rikkovaa tekstiä, joten keskustelua ei julkaistu.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Automaattinen tarkistus ei voinut vahvistaa, että tämä keskustelu noudattaa sääntöjämme, joten keskustelua ei julkaistu.",
+  "public.publication.contentCheck.partsIntro": "Mistä tarkistus löysi tekstin:",
+  "public.publication.contentCheck.part.question": "Kysymys",
+  "public.publication.contentCheck.part.summary": "Yhteenveto, johtopäätöksen huomautukset ja jäljellä olevat vastaväitteet",
+  "public.publication.contentCheck.part.arguments": "Argumentit",
+  "public.publication.contentCheck.part.reviews": "Arvioijien kommentit",
+  "public.publication.contentCheck.part.story": "Johtopäätöksen tarina",
+  "public.publication.contentCheck.groundTerms": "Peruste: Käyttöehdot, kohta 7 (väkivaltaan tai vihaan yllyttävä sisältö on kielletty).",
+  "public.publication.contentCheck.groundIllegal": "Teksti saattaa myös olla lainvastainen.",
+  "public.publication.contentCheck.automated": "Tämän päätöksen teki automaattinen työkalu. Kukaan ihminen ei ole vielä tarkistanut sitä.",
+  "public.publication.contentCheck.stillPrivate": "Keskustelusi pysyy yksityisenä ja muuttumattomana. Vain sinä näet sen.",
+  "public.publication.contentCheck.appeal": "Voit pyytää ihmistä tarkistamaan tämän päätöksen kirjoittamalla osoitteeseen [appeals@dezbatere.ro] kuuden kuukauden kuluessa.",
+  "public.publication.contentCheck.unavailable": "Sisällön tarkistus ei ole juuri nyt käytettävissä, joten mitään ei julkaistu. Keskustelusi pysyy yksityisenä. Yritä uudelleen muutaman minuutin kuluttua."
 }

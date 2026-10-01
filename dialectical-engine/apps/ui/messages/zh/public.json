@@ -188,5 +188,20 @@
   "public.report.error.signIn": "请登录以下载此报告。",
   "public.report.error.notAvailable": "此报告不可用。",
   "public.report.error.tryAgain": "暂时无法生成报告。请稍后重试。",
-  "public.story.morePaths.other": "另有 {count} 个立场"
+  "public.story.morePaths.other": "另有 {count} 个立场",
+  "public.publication.contentCheck.refusedHeading": "我们没有发布这场辩论",
+  "public.publication.contentCheck.refusedWhatBlock": "自动检查发现这场辩论中有违反我们规则的文本，因此未予发布。",
+  "public.publication.contentCheck.refusedWhatUnsure": "自动检查无法确认这场辩论符合我们的规则，因此未予发布。",
+  "public.publication.contentCheck.partsIntro": "检查发现文本的位置：",
+  "public.publication.contentCheck.part.question": "问题",
+  "public.publication.contentCheck.part.summary": "摘要、结论说明和剩余异议",
+  "public.publication.contentCheck.part.arguments": "论点",
+  "public.publication.contentCheck.part.reviews": "评审意见",
+  "public.publication.contentCheck.part.story": "结论故事",
+  "public.publication.contentCheck.groundTerms": "依据：我们的《服务条款》第7节（禁止煽动暴力或仇恨的内容）。",
+  "public.publication.contentCheck.groundIllegal": "这些文本也可能违法。",
+  "public.publication.contentCheck.automated": "此决定由自动化工具作出，尚未经人工复核。",
+  "public.publication.contentCheck.stillPrivate": "您的辩论仍为私密状态，内容没有改变，只有您可以查看。",
+  "public.publication.contentCheck.appeal": "如需申请人工复核此决定，请在六个月内致信 [appeals@dezbatere.ro]。",
+  "public.publication.contentCheck.unavailable": "内容检查目前不可用，因此没有发布任何内容。您的辩论仍为私密状态，请几分钟后重试。"
 }

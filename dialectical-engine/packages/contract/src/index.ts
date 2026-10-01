@@ -315,6 +315,33 @@ export const StepUpResponseSchema = z.object({
   step_up_grant: StepUpGrantResponseSchema.optional()
 }).strict();
 
+export const PUBLICATION_PART_KINDS = ["QUESTION", "SUMMARY", "ARGUMENTS", "REVIEWS", "STORY"] as const;
+export const PublicationPartKindSchema = z.enum(PUBLICATION_PART_KINDS);
+export type PublicationPartKind = z.infer<typeof PublicationPartKindSchema>;
+export const PublicationRefusalGroundSchema = z.enum(["TERMS", "TERMS_AND_POSSIBLY_ILLEGAL"]);
+export const PublicationRefusalStatementSchema = z.object({
+  outcome: z.enum(["BLOCK", "UNSURE"]),
+  parts: z.array(PublicationPartKindSchema).min(1),
+  ground: PublicationRefusalGroundSchema,
+  automated: z.literal(true),
+  visibility: z.literal("PRIVATE")
+}).strict().superRefine((statement, context) => {
+  if (!statement.parts.every((part, index, parts) => index === 0
+    || PUBLICATION_PART_KINDS.indexOf(parts[index - 1]!) < PUBLICATION_PART_KINDS.indexOf(part))) {
+    context.addIssue({ code: "custom", path: ["parts"], message: "Parts must be unique and in publication order" });
+  }
+  if (statement.outcome === "UNSURE" && statement.ground !== "TERMS") {
+    context.addIssue({ code: "custom", path: ["ground"], message: "An uncertain refusal must use the Terms ground" });
+  }
+});
+export type PublicationRefusalStatement = z.infer<typeof PublicationRefusalStatementSchema>;
+export const PUBLICATION_CONTENT_REFUSED_MESSAGE = "The content check refused to publish this debate. It stays private.";
+export const PublicationContentRefusalSchema = z.object({
+  error: z.literal("PUBLICATION_CONTENT_REFUSED"),
+  message: z.literal(PUBLICATION_CONTENT_REFUSED_MESSAGE),
+  statement: PublicationRefusalStatementSchema
+}).strict();
+
 export const PublishDebateRequestSchema = z.object({
   step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   warning_acknowledged: z.literal(true)

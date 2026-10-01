@@ -188,5 +188,20 @@
   "public.report.error.signIn": "このレポートをダウンロードするには、ログインしてください。",
   "public.report.error.notAvailable": "このレポートはご利用いただけません。",
   "public.report.error.tryAgain": "レポートを作成できませんでした。しばらくしてから、もう一度お試しください。",
-  "public.story.morePaths.other": "ほか{count}件の立場"
+  "public.story.morePaths.other": "ほか{count}件の立場",
+  "public.publication.contentCheck.refusedHeading": "この議論は公開されませんでした",
+  "public.publication.contentCheck.refusedWhatBlock": "自動チェックにより、この議論にルールに違反する文章が見つかったため、議論は公開されませんでした。",
+  "public.publication.contentCheck.refusedWhatUnsure": "自動チェックでこの議論がルールに従っていることを確認できなかったため、議論は公開されませんでした。",
+  "public.publication.contentCheck.partsIntro": "チェックで該当する文章が見つかった箇所：",
+  "public.publication.contentCheck.part.question": "質問",
+  "public.publication.contentCheck.part.summary": "要約、判定に関する注記、残された反論",
+  "public.publication.contentCheck.part.arguments": "論拠",
+  "public.publication.contentCheck.part.reviews": "レビュー担当モデルのコメント",
+  "public.publication.contentCheck.part.story": "判定のストーリー",
+  "public.publication.contentCheck.groundTerms": "根拠：利用規約第7条（暴力や憎悪を扇動するコンテンツの禁止）。",
+  "public.publication.contentCheck.groundIllegal": "この文章は違法である可能性もあります。",
+  "public.publication.contentCheck.automated": "この判断は自動ツールによるものです。まだ人による確認は行われていません。",
+  "public.publication.contentCheck.stillPrivate": "議論は非公開のまま変更されません。閲覧できるのはあなただけです。",
+  "public.publication.contentCheck.appeal": "この判断について人による再確認を希望する場合は、6か月以内に [appeals@dezbatere.ro] までご連絡ください。",
+  "public.publication.contentCheck.unavailable": "現在、コンテンツチェックを利用できないため、何も公開されませんでした。議論は非公開のままです。数分後にもう一度お試しください。"
 }

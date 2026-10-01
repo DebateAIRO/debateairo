@@ -191,5 +191,20 @@
   "public.story.morePaths.one": "и ещё {count} позиция",
   "public.story.morePaths.few": "и ещё {count} позиции",
   "public.story.morePaths.many": "и ещё {count} позиций",
-  "public.story.morePaths.other": "и ещё {count} позиции"
+  "public.story.morePaths.other": "и ещё {count} позиции",
+  "public.publication.contentCheck.refusedHeading": "Мы не опубликовали эту дискуссию",
+  "public.publication.contentCheck.refusedWhatBlock": "Автоматическая проверка обнаружила в этой дискуссии текст, нарушающий наши правила, поэтому дискуссия не была опубликована.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Автоматическая проверка не смогла подтвердить, что эта дискуссия соответствует нашим правилам, поэтому дискуссия не была опубликована.",
+  "public.publication.contentCheck.partsIntro": "Где проверка обнаружила текст:",
+  "public.publication.contentCheck.part.question": "Вопрос",
+  "public.publication.contentCheck.part.summary": "Резюме, примечания к вердикту и оставшиеся возражения",
+  "public.publication.contentCheck.part.arguments": "Аргументы",
+  "public.publication.contentCheck.part.reviews": "Комментарии рецензентов",
+  "public.publication.contentCheck.part.story": "История вердикта",
+  "public.publication.contentCheck.groundTerms": "Основание: наши Условия использования, раздел 7 (запрет контента, подстрекающего к насилию или ненависти).",
+  "public.publication.contentCheck.groundIllegal": "Текст также может быть незаконным.",
+  "public.publication.contentCheck.automated": "Это решение принято автоматическим инструментом. Человек его ещё не проверял.",
+  "public.publication.contentCheck.stillPrivate": "Ваша дискуссия остаётся приватной и неизменной. Только вы можете её видеть.",
+  "public.publication.contentCheck.appeal": "Чтобы попросить человека пересмотреть это решение, напишите на [appeals@dezbatere.ro] в течение шести месяцев.",
+  "public.publication.contentCheck.unavailable": "Проверка контента сейчас недоступна, поэтому ничего не было опубликовано. Ваша дискуссия остаётся приватной. Попробуйте снова через несколько минут."
 }

@@ -433,7 +433,16 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // legal.acceptance, the retention purge, the sign-up consent wrapper (with the age record)
         // and the G3a country-gate audit capability. 0078 and 0079 are the colleague's consent and
         // change-email files, so R3-1 moves this to 0080; no pair.
-        "0080_legal_acceptance.sql"
+        "0080_legal_acceptance.sql",
+        // Hate-speech S02 R10: append-only, content-free publication check record.
+        // Written as 0078 on the slice branch; renamed to the next free prefix after
+        // dev's 0078/0079/0080 when origin/dev merged in (INTEG-HS-dev). Idempotent
+        // statement by statement, so a database that applied it as 0078 re-applies it
+        // harmlessly under this name (the runner tracks migrations by full file name). No pair.
+        "0081_publication_check_record.sql",
+        // Hate-speech S02 FIX p1 (sd-N1, sd-N2): identifier grammar, call count and distinct members on the record.
+        // Written as 0079; renamed with its table's file (DROP CONSTRAINT IF EXISTS before each ADD). No pair.
+        "0082_publication_check_record_identifiers.sql"
       ]);
   });
 });

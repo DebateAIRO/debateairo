@@ -11,6 +11,8 @@ import type {
 } from "@debateai/crypto";
 import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
 
+export * from "./publication-check.js";
+
 export {
   PostgresSessionRepository,
   type LoginChallengeRecord,
@@ -416,6 +418,14 @@ export async function acquireRunContentLease(
       throw error;
     }
   }
+}
+
+/**
+ * FIX-HS2-p1 sd-B1: true while the calling async context holds a run content lease (a pooled client). A caller
+ * that is about to await an external service asserts it is false, so no pooled client waits on that service.
+ */
+export function isRunContentLeaseHeld(): boolean {
+  return contentLeaseScope.getStore() !== undefined;
 }
 
 export async function withRunContentLease<T>(

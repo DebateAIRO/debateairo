@@ -1577,6 +1577,8 @@ export class VllmOpenAICompatibleProviderGateway implements ProviderGateway {
 
 // V-11 addendum layers 1-3: THE one frame every hand-off is built with, and the
 // door that refuses a packet built any other way. See ./prompt-frame.ts.
+export { CONTENT_RULE_ID, CONTENT_RULE_TEXT, CONTENT_RULE_HEADING } from "./content-rule.js";
+
 export {
   FRAMED_MATERIAL_FORMAT,
   PROMPT_FRAME_VERSION,

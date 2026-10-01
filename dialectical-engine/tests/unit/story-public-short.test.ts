@@ -99,6 +99,7 @@ async function publishWith(
     ? new PostgresPublicationApplication(repository, cipher, () => new Date("2026-09-26T12:00:00.000Z"))
     : new PostgresPublicationApplication(repository, cipher, () => new Date("2026-09-26T12:00:00.000Z"), repository, stories);
   const transition = await application.publish({
+    contentCheck: { check: async () => ({ outcome: "ALLOW" }) },
     runId: RUN_ID,
     answer: buildFairShapedAnswer({ run_ref: RUN_ID, answer_id: STORY_TEST_ANSWER_ID }),
     authenticated,
