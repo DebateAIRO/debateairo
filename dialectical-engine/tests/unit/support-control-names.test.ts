@@ -7,7 +7,7 @@ import {
 } from "../../packages/support-kb/src/control-names.js";
 import { SUPPORT_CONTROL_NAMES } from "../../packages/support-kb/src/ui-labels.js";
 import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
-import { buildSupportKnowledgeContext, supportCapabilityActionLabel } from "../../packages/support-kb/src/context.js";
+import { buildSupportKnowledgeContext, supportCapabilityActionLabel, supportCorpusLanguage } from "../../packages/support-kb/src/context.js";
 import { SUPPORT_ACTION_IDS, SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
 import { createHelpCorpusSnapshotLookup, type HelpCorpusEntry, type LoadedHelpCorpus } from "../../packages/support-kb/src/index.js";
@@ -44,8 +44,17 @@ describe("S05 control names for the 33 locales without their own help texts (SPE
     expect(localizeSupportControlNames("Highlights, ReHigh, help and Helpdesk stay.", "de")).toBe("Highlights, ReHigh, help and Helpdesk stay.");
   });
   it("leaves every protected exclusion sentence verbatim in all 33 locales", () => {
-    for (const phrase of SUPPORT_CONTROL_NAME_PROTECTED_PHRASES)
+    // REV-S05-p1 ct N1: the expectation comes from the source of record, never from the list under test — the context
+    // strings of S05's frozen checks/parity-exclusions.json (D-ORCH-S05-3), each still present in the en text it protects.
+    const PROTECTED: readonly (readonly [string, string])[] = [
+      ["Export a debate as JSON", "packages/support-kb/content/export-json.en.md"],
+      ["The Privacy policy, Terms of service, Cookies and Legal notice pages", "packages/support-kb/recovery/components.json"]
+    ];
+    expect([...SUPPORT_CONTROL_NAME_PROTECTED_PHRASES].sort()).toEqual(PROTECTED.map(([phrase]) => phrase).sort());
+    for (const [phrase, file] of PROTECTED) {
+      expect(readFileSync(resolve(process.cwd(), file), "utf8"), file).toContain(phrase);
       for (const loc of OTHER) expect(localizeSupportControlNames(`See ${phrase}.`, loc)).toBe(`See ${phrase}.`);
+    }
   });
   it("uses the named exception for start-debate (fr home.startDebateLabel, not the composer button)", () => {
     expect(localizeSupportControlNames("Choose Start a debate.", "fr")).toBe(`Choose ${msg("fr","home","home.startDebateLabel")}.`);
@@ -101,5 +110,16 @@ describe("S05 control names for the 33 locales without their own help texts (SPE
     expect(result.text).toBe(supportRecoveryFallback(e, "de"));
     expect(result.text).not.toBe(e.fallback);
     expect(result.sources?.[0]?.label).toBe(supportSourceLabel(e, "de"));
+    // REV-S05-p1 ct N5 (SPEC-v4 R02, "no second rendering path"): respond(), the knowledge context and the R02 dump pick
+    // the corpus a locale is served from through ONE function; the rule is written once, in context.ts.
+    expect(SUPPORT_LOCALES.map((loc) => supportCorpusLanguage(loc))).toEqual(SUPPORT_LOCALES.map((loc) => loc === "ro" ? "ro" : "en"));
+    const RULE = /===\s*"ro"\s*\?\s*"ro"\s*:\s*"en"/gu;
+    const source = (file: string) => readFileSync(resolve(process.cwd(), file), "utf8");
+    expect(source("packages/support-kb/src/context.ts").match(RULE) ?? []).toHaveLength(1);
+    for (const [file, call] of [["apps/api/src/support/answer.ts", "supportCorpusLanguage(request.language)"],
+      ["tests/support/supportDeliveredNames.ts", "supportCorpusLanguage(language)"]] as const) {
+      expect(source(file).match(RULE) ?? [], file).toEqual([]);
+      expect(source(file), file).toContain(call);
+    }
   });
 });

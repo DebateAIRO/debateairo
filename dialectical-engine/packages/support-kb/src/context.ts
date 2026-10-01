@@ -230,6 +230,14 @@ function isLegacyLanguage(language: SupportLanguage): language is SupportCorpusL
   return language === "en" || language === "ro";
 }
 
+/**
+ * cookie-compliance S05 (SPEC-v4 R02; REV-S05-p1 ct N5): the corpus a locale is answered from — ro its own, every other
+ * locale the English corpus (V-18). One rule for respond(), the knowledge context and the R02 dump.
+ */
+export function supportCorpusLanguage(language: SupportLanguage): SupportCorpusLanguage {
+  return language === "ro" ? "ro" : "en";
+}
+
 function actionEvidenceScore(
   query: string,definition: SupportActionDefinition,language: SupportLanguage,
   corpusLocale: SupportCorpusLanguage
@@ -327,7 +335,7 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   referenceFor(kind: "source" | "action",index: number): string;
 }>): SupportKnowledgeContext {
   if (input.historyText !== "") throw new Error("SUPPORT_KB_HISTORY_NOT_AVAILABLE_IN_CP1");
-  const corpusLocale: SupportCorpusLanguage = input.language === "ro" ? "ro" : "en";
+  const corpusLocale: SupportCorpusLanguage = supportCorpusLanguage(input.language);
   const availableActionIds = new Set(input.availableActionIds);
   const base = baseSection(input.capabilities,input.language,corpusLocale,availableActionIds);
 

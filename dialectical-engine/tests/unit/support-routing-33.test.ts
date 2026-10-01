@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadHelpCorpus } from "../../packages/support-kb/src/index.js";
 import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
@@ -14,6 +15,9 @@ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/m
 // or action answers. Queries are fixed: the 6 localized topic prompts plus a question built from 20 screen labels read
 // from apps/ui/messages (which S05 never edits). The golden was written at the base, before any S05 product edit, with
 // S05_WRITE_ROUTING_GOLDEN=1, and is never regenerated on the branch.
+// REV-S05-p1 ct N4: with S05_WRITE_ROUTING_GOLDEN=1 the test writes today's routing to the OS temp directory (never to
+// the committed golden) and FAILS, so a run with the variable set can never pass or rewrite the pin. Regenerating at the
+// base (SV's content check) means: check out the base tree, run with the variable, diff the temp file with the golden.
 // D-ORCH-S05-2 (N2): the same 26 queries in ENGLISH are routed for every one of the 33 locales too (keys `…|en<n>`):
 // a 33-locale visitor who types English is scored against the en catalogue names, which a localized name must not move.
 const GOLDEN = resolve(process.cwd(), "tests/support/fixtures/support-routing-33.json");
@@ -66,7 +70,11 @@ function routing(): Record<string, string> {
 describe("S05 33-locale routing pin (SPEC-v5 R10, R13)", () => {
   it("routes every fixed 33-locale query exactly as at S05's base", () => {
     const now = routing();
-    if (process.env.S05_WRITE_ROUTING_GOLDEN === "1") writeFileSync(GOLDEN, `${JSON.stringify(now, null, 2)}\n`);
+    if (process.env.S05_WRITE_ROUTING_GOLDEN === "1") {
+      const written = join(tmpdir(), "support-routing-33.golden.json");
+      writeFileSync(written, `${JSON.stringify(now, null, 2)}\n`);
+      throw new Error(`S05_WRITE_ROUTING_GOLDEN=1 wrote ${written}; the committed golden is never regenerated here (D-ORCH-S05-3)`);
+    }
     const golden = JSON.parse(readFileSync(GOLDEN, "utf8")) as Record<string, string>;
     expect(Object.keys(golden)).toHaveLength(33 * 2 * (2 * (6 + QUERY_KEYS.length) + 2 * 20));
     expect(now).toEqual(golden);

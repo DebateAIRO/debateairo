@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { loadHelpCorpus } from "../../packages/support-kb/src/index.js";
 import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
 import { SUPPORT_ACTION_IDS, SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
-import { supportCapabilityActionLabel } from "../../packages/support-kb/src/context.js";
+import { supportCapabilityActionLabel, supportCorpusLanguage } from "../../packages/support-kb/src/context.js";
 import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
 import { SUPPORT_TEMPLATE_IDS, supportTemplate } from "../../packages/support-kb/src/templates.js";
 import { supportRecoveryFallback, supportSourceLabel, supportSourceProjection } from "../../packages/support-kb/src/control-names.js";
@@ -23,7 +23,7 @@ const REF = "00000000-0000-4000-8000-000000000001";                           //
 const dump: Record<string, Record<string, string>> = {};
 let units = 0;
 for (const language of SUPPORT_LOCALES) {
-  const corpusLocale = language === "ro" ? "ro" : "en";                        // answer.ts:246
+  const corpusLocale = supportCorpusLanguage(language);                         // the rule respond() uses (answer.ts)
   const texts: Record<string, string> = {};
   for (const entry of corpus.entries.filter(({ lang }) => lang === corpusLocale)) {
     texts[`${entry.id}.title`] = supportSourceLabel(entry, language);          // answer.ts source label
