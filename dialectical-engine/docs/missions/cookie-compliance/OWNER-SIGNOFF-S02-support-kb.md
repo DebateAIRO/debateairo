@@ -1,6 +1,6 @@
 # OWNER sign-off — S02 support catalogue labels, 8 help articles, 16 recovery texts (cookie-compliance)
 
-Status: DRAFT for V0 — not signed. The API refuses to start until the orchestrator records V's answer.
+Status: SIGNED by V on 2026-10-01 (V0).
 What changes: since the 2026-09-29 signature (ffd72986…) the catalogue changes only the 34 en/ro labels of 22 rows listed under "catalogue labels" (old -> new; V-17: each label is the one the screen shows); 8 article files are rewritten; 15 of the 16 recovery texts are rewritten (14 carried the false wording, SPEC-v2 §2 M12; the Romanian settings-help-menus fallback named controls by their English labels, V-17); the English settings-help-menus fallback text keeps its words and is re-signed because its article's hash changed (K7).
 
 ### catalogue labels
@@ -357,3 +357,7 @@ recovery account-settings.ro.modelProjection fa20ef501c9e570895a4a849cf0987463be
 recovery account-settings.ro.fallback f882a60898dc0a73e1ae850f05791a399c4451523afc4a9a7139afea82191e85
 component-file 3bee596b83919014b4215d5b116d7356838e79da73bbaa1871297adbdd8a4300
 ~~~
+
+## V0 signature
+
+V answered "Signed" in chat on 2026-10-01. Session: 6f8863c5-3b17-4860-99d7-b3543f7474c7. Recorded by the orchestrator.

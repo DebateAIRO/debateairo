@@ -76,11 +76,11 @@ const OWNER_REVIEW = Object.freeze({
 // writes V's (REV-S02 p1 SD-N1 — a placeholder string here was itself a loader-valid OWNER record).
 const S02_OWNER_REVIEW = Object.freeze({
   reviewedBy: "OWNER",
-  reviewerSession: "",
-  reviewedOn: "2026-09-30",
+  reviewerSession: "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
+  reviewedOn: "2026-10-01",
   evidence: "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
   ratifiedBy: "V",
-  ratifiedOn: "2026-09-30",
+  ratifiedOn: "2026-10-01",
 });
 const S02_IDS = new Set(["privacy-consent", "settings-help-menus", "app-navigation", "account-settings"]);
 
