@@ -14,6 +14,7 @@ import type { BillingConnectors } from "./connectors.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoice-quaderno.js";
+import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillPdfResolver } from "./invoice-smartbill.js";
 import { NoticeIntake } from "./notice-intake.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { QuoteService } from "./quote.js";
@@ -101,6 +102,12 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   outbox.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
   outbox.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
   const attachments = new Map<BillingAttachmentKind, AttachmentResolver>(deps.mail?.attachments ?? []);
+  // P10b: the legal documents of a Romanian charge (spec §2.5.8, A17), and SmartBill's PDF on the RO receipt (A26b).
+  // The EMAIL handler below holds this same `attachments` map, so the resolver is seen at send time.
+  const smartbill = { ...invoiceDeps, jobs, issuer: deps.connectors.invoiceRo };
+  outbox.register("SMARTBILL_INVOICE", createSmartBillInvoiceHandler(smartbill));
+  outbox.register("SMARTBILL_STORNO", createSmartBillStornoHandler(smartbill));
+  attachments.set("SMARTBILL_INVOICE_PDF", smartBillPdfResolver({ issuer: smartbill.issuer }));
   if (deps.mail !== undefined) {
     outbox.register("EMAIL", createEmailJobHandler({
       repository, recordsKey: deps.connectors.recordsKey, ownerReportEmail: deps.connectors.ownerReportEmail,
