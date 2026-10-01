@@ -523,3 +523,11 @@ framed prompt** on the run's other configured makers, cheapest first. "Refused f
   time).
 - **Swap choice is limited:** until the scorecard branch merges, the only models to swap to are the run's own
   2 (Free) or 3 (Premium).
+
+### 2.17 Amendments after the build (1 October 2026)
+
+These record rulings made at Part 1b's final review of the paid-plans program; the paid-plans spec's amendment A28 carries the same text.
+
+- **§2.6 (holds):** a run whose first job is born but never dispatched kept its hold counting until a runner restart, so "a run that dies at birth cannot wedge the day shut" did not hold for it. The waker now re-dispatches the first job of a started run left `READY` and unclaimed for more than 300 seconds (the job claim keeps a double dispatch to one run). The wording of migration 0081's comments, which repeat the old claim, cannot change (an applied migration is never edited); this section is the record.
+- **§2.7 (the waiting line), for a person's window:** a window that is FULL only because of the person's own counted holds reports the next whole-minute tick, not its reset, and the answers carry `waits_for: "OWN_DEBATES"`; the person sees one sentence ("Your other debates are using the rest of your limit for now. This one starts by itself as soon as one of them finishes.", the owner's wording pick) instead of P1–P4. The site's day keeps sentence A and midnight.
+- **§2.10 (boot check):** the check also runs when the hosted register is published, whenever the file carries the budget band: the publish command already holds the priced provider targets and the sealed JUDGE bound, so "cannot run at register publish" no longer holds. The boot checks stay.
