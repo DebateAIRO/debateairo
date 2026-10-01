@@ -11,6 +11,7 @@ import {
   type SupportAction,type SupportCorpusLanguage
 } from "@debateai/support-kb/catalog";
 import { buildSupportKnowledgeContext } from "@debateai/support-kb/context";
+import { supportRecoveryFallback,supportSourceLabel } from "@debateai/support-kb/control-names";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { redactSupportMessage, type SupportMessageCipherPort } from "./session.js";
 import { SupportModelError, type SupportModelPort, type SupportModelUsage } from "./model.js";
@@ -414,11 +415,14 @@ export function createSupportAnswerService(input: Readonly<{
               authorityDraft.sourceIds,context!.sourcePolicy
             ) ? null : authorityDraft;
         const rejected = structured && draft === null;
+        // cookie-compliance S05 (SPEC-v4 R02): the recovery text a visitor is shown, names localized (V-18).
+        const fallbackText = recoveryEntry === undefined
+          ? undefined : supportRecoveryFallback(recoveryEntry,request.language);
         const recovered = rejected
-          && recoveryEntry?.fallback !== undefined
-          && screenSupportModelText(recoveryEntry.fallback);
+          && fallbackText !== undefined
+          && screenSupportModelText(fallbackText);
         const modelText = structured
-          ? recovered ? recoveryEntry.fallback
+          ? recovered ? fallbackText!
           : rejected ? supportTemplate("REFUSE_SAFETY",request.language) : draft!.text
           : withoutModelSources(completion.text);
         if (modelText === "") throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
@@ -432,7 +436,7 @@ export function createSupportAnswerService(input: Readonly<{
         const outcome = rejected && !recovered ? "REFUSE_SAFETY" as const : "ANSWER_GROUNDED" as const;
         const sources = rejected && !recovered ? Object.freeze([]) : Object.freeze((recovered
           ? [recoveryEntry!] : entries.filter((entry) => structured ? draft!.sourceIds.includes(entry.id) : true))
-          .map((entry) => Object.freeze({ id: entry.id,label: entry.title })));
+          .map((entry) => Object.freeze({ id: entry.id,label: supportSourceLabel(entry,request.language) })));
         const actions = rejected && !recovered || !structured ? Object.freeze([]) : resolveSupportActions(
           recovered ? sourceActionIds : draft!.actionIds,
           { signedIn: request.signedIn === true,language: request.language }

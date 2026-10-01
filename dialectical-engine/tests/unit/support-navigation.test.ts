@@ -13,10 +13,10 @@ import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
 import { SUPPORT_UI_LABELS } from "../../packages/support-kb/src/ui-labels.js";
 
 const LABEL_SOURCES = {
-  home: ["chrome","chrome.brandHome"],"start-debate": ["home","home.startDebateLabel"],
-  "sign-in": ["chrome","chrome.account"],"sign-up": ["auth","auth.login.createOne"],
+  home: ["chrome","chrome.footer.home"],"start-debate": ["home","home.startDebateLabel"],
+  "sign-in": ["home","home.logIn"],"sign-up": ["home","home.createAccount"],
   help: ["chrome","chrome.help"],"support-status": ["support","support.serviceStatus"],
-  method: ["chrome","chrome.howItWorks"],"sample-transcript": ["chrome","chrome.transcripts"],
+  method: ["chrome","chrome.method"],"sample-transcript": ["chrome","chrome.transcripts"],
   settings: ["chrome","chrome.settings"],"active-sessions": ["settings","settings.sessions.title"],
   "privacy-preferences": ["consent","consent.settings.title"],
   "claim-legacy": ["settings","settings.legacy.title"],
