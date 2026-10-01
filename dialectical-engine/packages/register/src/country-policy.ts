@@ -72,9 +72,11 @@ const PROVIDERS_REFUSE: RuleValue = Object.freeze({ signup: false, pay: false, r
  * The §1.5 table, every code spelled out. EU 27 + Norway and Iceland (Terms Annex A.1; one EU
  * return for the whole EU); US, Canada, Australia, New Zealand, Singapore, Japan (tax only past
  * thresholds Quaderno watches); Liechtenstein (shares Switzerland's VAT, which needs a Swiss tax
- * representative) and the two tax-from-first-sale countries the Terms list, the UK and South Korea:
- * sign-up yes, pay not until the owner registers there; Switzerland, Israel, Taiwan, Ukraine: no
- * Terms section yet (Ukraine also needs occupied-region blocking); Turkey, Brazil, Indonesia and,
+ * representative), the two tax-from-first-sale countries the Terms list, the UK and South Korea, and,
+ * since the owner's amendment of 1 October 2026, Switzerland, Israel, Taiwan and Moldova (Terms
+ * Annex A.6, A.9, A.10, A.7; each has its own tax rule for foreign digital sellers, not yet checked):
+ * sign-up yes, pay not until the owner registers there; Ukraine: closed until the occupied regions
+ * can be blocked; Turkey, Brazil, Indonesia and,
  * since the owner's amendment of 1 October 2026 (high risk, low benefit), Saudi Arabia, India, the
  * UAE, Mexico, Argentina, Colombia, Chile, Thailand and the Philippines: kept out by the Terms until
  * a local annex exists — not offered, not blocked (none is sanctioned, and the AI providers serve
@@ -88,8 +90,8 @@ const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = O
     "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "NO", "IS"], OFFERED],
   [["LI"], SIGN_UP_ONLY],
   [["US", "CA", "AU", "NZ", "SG", "JP"], OFFERED],
-  [["GB", "KR"], SIGN_UP_ONLY],
-  [["CH", "IL", "TW", "UA"], NOT_YET],
+  [["GB", "KR", "CH", "IL", "TW", "MD"], SIGN_UP_ONLY],
+  [["UA"], NOT_YET],
   [["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH"], EXCLUDED],
   [["RU", "BY", "KP"], SANCTIONED],
   [["CN", "HK", "MO", "IR", "CU", "SY", "VE", "VN"], PROVIDERS_REFUSE]
