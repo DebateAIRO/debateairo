@@ -112,7 +112,7 @@ export function codeOf(error: unknown): string | null {
  * The content-free code a failure the tick counts carries on its report line: a declared code, a Node errno name or a
  * SQLSTATE passes; anything else (no code, or free text in `code`) becomes UNKNOWN, so no text reaches the line.
  */
-function failureCode(error: unknown): string {
+export function failureCode(error: unknown): string {
   const code = codeOf(error);
   return code !== null && /^[A-Z0-9][A-Z0-9_]{2,63}$/.test(code) ? code : "UNKNOWN";
 }

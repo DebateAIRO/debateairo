@@ -5,7 +5,7 @@ import type { BillingPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import { emailJob } from "./email-job.js";
 import { enqueueOnce } from "./outbox.js";
-import { codeOf, type PricedRenewal, type RenewalService } from "./renewal.js";
+import { codeOf, failureCode, type PricedRenewal, type RenewalService } from "./renewal.js";
 import { addDays, anniversaryDue, dunningProgress } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
 
@@ -41,6 +41,8 @@ export class BillingMaintenance {
     const lookAhead = this.lastLookAheadDay !== today;
     this.lastLookAheadDay = today;
     const pageSize = 200;
+    // The distinct codes of this pass's failed visits (`failureCode`), for its one report line.
+    const codes = new Set<string>();
     let after: string | null = null;
     for (;;) {
       const ids = await this.deps.jobs.liveSubscriptionIds(after, pageSize);
@@ -48,12 +50,17 @@ export class BillingMaintenance {
         report.visited += 1;
         try {
           await this.visit(subscriptionId, now, lookAhead, report);
-        } catch {
+        } catch (error) {
           report.failed += 1;
+          codes.add(failureCode(error));
         }
       }
       if (ids.length < pageSize) break;
       after = ids[ids.length - 1]!;
+    }
+    // The count and the codes only, never an id: a failed visit leaves this trace for the owner.
+    if (report.failed > 0) {
+      this.deps.audit("billing.maintenance.report", { failed: report.failed, codes: [...codes].sort().join(",") });
     }
     return report;
   }

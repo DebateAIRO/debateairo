@@ -60,6 +60,8 @@ export type BillingAuditEvent =
   | "billing.renewal.history_invalid"
   /** P11a: a subscription whose recurring net price was never recorded; it is not charged at a guessed price. */
   | "billing.renewal.price_missing"
+  /** P11b: one line per maintenance pass whose visits failed; the count and the failures' distinct codes only. */
+  | "billing.maintenance.report"
   /** D5 5i: xMoney refused our credentials (401/403). An operator alarm: nothing was charged, failed or emailed. */
   | "billing.xmoney.credentials_refused"
   /** D5 5i: listed xMoney rows the parser refused and skipped (`onRejected`); the count and code only. */
