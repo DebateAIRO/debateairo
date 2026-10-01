@@ -57,14 +57,13 @@ overrides:
   # GHSA-6j4f-fj2g-mc7p / GHSA-qhr7-859c-m2p7 / GHSA-q2hr-2g5m-vwhr (brace-expansion 2.x <2.1.7,
   # test tooling only: testcontainers > archiver > minimatch). Floors published 2026-09-14/15:
   # cooldown satisfied, no exclusion.
-  # 2026-10-01: GHSA-c29m-xwm3-cm6r / GHSA-mghh-pgcx-3jjj and the toFormData prototype-pollution
-  # gadget (axios 1.15.x-1.19.x), reached only through @hatchet-dev/typescript-sdk. 1.20.0 was
-  # published 2026-08-26: cooldown satisfied, no exclusion.
-  'axios@>=1.15.0 <1.20.0': '1.20.0'
-  # 2026-10-01: GHSA-m9gg-hp2v-232j (@grpc/grpc-js 1.14.0-1.14.4), reached through the Hatchet SDK
-  # and testcontainers > dockerode. 1.14.5 was published 2026-09-17: cooldown satisfied. fastify
-  # (GHSA-667r-xxjv-c9mm, -p68q-wchp-6fh7, -hwr6-493r-vm6h, -9q9j-q6p8-xq58, all <5.12.2) is a
-  # direct pin, raised from 5.12.1 to 5.12.5 (published 2026-09-16) in package.json files.
+  # 2026-10-01: the fastify advisories of < 5.12.2 (request body replacement, authentication,
+  # request and header validation bypasses) and < 5.12.5 (an unhandled-error denial of service)
+  # are fixed by raising the direct pin to 5.12.5 (published 2026-09-16) in package.json and
+  # apps/api/package.json; the axios advisories of 1.x < 1.20.0 (through the Hatchet SDK) and the
+  # @grpc/grpc-js one of >=1.14.0 <1.14.5 (test tooling only: testcontainers > dockerode) by the
+  # floors below, published 2026-08-26 and 2026-09-17: cooldown satisfied, no exclusion.
+  'axios@>=1.0.0 <1.20.0': '1.20.0'
   '@grpc/grpc-js@>=1.14.0 <1.14.5': '1.14.5'
   'fast-uri@<3.1.8': '3.1.8'
   'fast-uri@>=4.0.0 <4.1.5': '4.1.5'
