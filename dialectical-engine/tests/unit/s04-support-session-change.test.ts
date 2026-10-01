@@ -55,7 +55,7 @@ type SessionChangeModule = Readonly<{
   onConversationReset(listener: (reason: ConversationResetReason) => void): () => void;
   onConversationWake(listener: () => void): () => void;
   readWakeFacts(): Promise<WakeFacts>;
-  settleStoredConversation(readFacts?: () => Promise<WakeFacts>): Promise<WakeFacts | null>;
+  settleStoredConversation(readFacts?: () => Promise<WakeFacts>, options?: Readonly<{ fresh?: boolean }>): Promise<WakeFacts | null>;
   scheduleRecheck(recheck: () => void, attempt?: number): () => void;
   installSessionChangeReceiver(): () => void;
   sessionChangeGeneration(): number;
@@ -585,6 +585,29 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
     await settleStoredConversation(counted);
     expect(reads, "a decided answer is remembered for the generation").toBe(3);
     expect(storedText(), "signed out now, written signed out: kept").toBe("old conversation");
+    // FIX p3 (sd N1): a re-check asks for a fresh read — it never gets the verdict cached for the generation, and
+    // decides on what it reads now (here: signed in, so the copy written signed out goes)
+    answer = { signedIn: true, currentSessionStartedAtMs: (T - 600) * 1000 };
+    await expect(settleStoredConversation(counted, { fresh: true }), "fresh: read now").resolves.toEqual(answer);
+    expect(reads, "fresh reads although a decided answer was cached").toBe(4);
+    expect(storedText(), "decided on the fresh facts: (b) erased").toBeNull();
+    await settleStoredConversation(counted);
+    expect(reads, "the fresh decided answer is the one remembered").toBe(4);
+    // a fresh read that comes back unknown leaves nothing remembered: the next call reads again
+    storeTranscript(false);
+    answer = { signedIn: "unknown", currentSessionStartedAtMs: null };
+    await settleStoredConversation(counted, { fresh: true });
+    expect(reads).toBe(5);
+    answer = { signedIn: false, currentSessionStartedAtMs: null };
+    await expect(settleStoredConversation(counted), "after a fresh unknown: read again").resolves.toEqual(answer);
+    expect(reads, "no older verdict reused after a fresh unknown").toBe(6);
+    // ... also when the fresh reader fails at once (before any await)
+    storeTranscript(false);
+    await settleStoredConversation(() => { throw new Error("at once"); }, { fresh: true });
+    answer = { signedIn: true, currentSessionStartedAtMs: (T - 600) * 1000 };
+    await expect(settleStoredConversation(counted), "after a fresh read that failed at once: read again")
+      .resolves.toEqual(answer);
+    expect(reads, "the verdict cached before the fresh read is gone").toBe(7);
 
     // the re-check: once, at the first of online / visible / the backoff delay (1 s, 2 s, 4 s, 8 s, then 15 s)
     vi.useFakeTimers();
@@ -602,6 +625,7 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
     cleanups.push(cancelOnline);
     window.dispatchEvent(new Event("online"));
     window.dispatchEvent(new Event("online"));
+    expect(fired, "online fires it at once, before any timer (ct p3 N3 b)").toEqual(["online"]);
     vi.advanceTimersByTime(20_000);
     expect(fired, "online fires it once, and the timer no longer does").toEqual(["online"]);
     fired.length = 0;

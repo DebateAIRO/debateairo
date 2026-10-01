@@ -464,14 +464,18 @@ export function Assistant({
   const parkedRef = useRef(false);
   /**
    * PT-B1: what a sleep holds — null when nothing is held. `restored` when the gate had finished before it; then
-   * the identity and server time the conversation was kept under, which the wake judges (PT2-N1). `identityBound`
-   * is null when the identity was unknown at the sleep.
+   * the identity the conversation was last KNOWN under and its server time, which the wake judges (PT2-N1). A
+   * sleep before any identity was known holds `restored: false`, and the wake judges what storage holds instead.
    */
-  const heldRef = useRef<Readonly<{
-    restored: boolean;
-    identityBound: boolean | null;
-    serverTime: number | undefined;
-  }> | null>(null);
+  const heldRef = useRef<Readonly<
+    { restored: false } | { restored: true; identityBound: boolean; serverTime: number | undefined }
+  > | null>(null);
+  /**
+   * FIX p3 (V-24, pt B1): the identity last read successfully. A later failed read (a Send during an API restart)
+   * leaves it as it was, so an unknown answer is never carried into a sleep as a decision (D-ORCH-REV3).
+   */
+  const knownIdentityRef = useRef<boolean | null>(null);
+  if (identityKnown) knownIdentityRef.current = identityAvailable;
   /** PT2-N4: the reading position at the sleep, put back on a keep. */
   const scrollAtSleepRef = useRef<number | null>(null);
   const pendingScrollRef = useRef<number | null>(null);
@@ -480,8 +484,8 @@ export function Assistant({
   /** PT2-B1: re-checks made since the sign-in state became unreadable (the backoff index). */
   const recheckAttemptRef = useRef(0);
   /** The values a reset listener reads; it is installed once, so it reads them here, not from its closure. */
-  const latestRef = useRef({ identityAvailable,identityKnown,serverTime });
-  latestRef.current = { identityAvailable,identityKnown,serverTime };
+  const latestRef = useRef({ serverTime });
+  latestRef.current = { serverTime };
   /** PT-B1: the unsent draft, taken off the screen at the sleep and put back on a keep. */
   const draftRef = useRef("");
   /**
@@ -517,7 +521,8 @@ export function Assistant({
     enterPhase("settling");
     const gate = gateRef.current;
     const stale = () => !mountedRef.current || gateRef.current !== gate;
-    void settleStoredConversation().then(async (settled) => {
+    // sd N1: a re-check (attempt > 0) reads the facts now, never the verdict cached at the wake.
+    void settleStoredConversation(readWakeFacts,{ fresh: recheckAttemptRef.current > 0 }).then(async (settled) => {
       // A sleep, wake or session change landed while the gate settled: the newer one owns the phase.
       if (stale()) return;
       const held = heldRef.current;
@@ -536,8 +541,8 @@ export function Assistant({
       }
       recheckAttemptRef.current = 0;
       heldRef.current = null;
-      if (holding && facts !== null) {
-        const verdict = held.identityBound === null ? "erase" : storedConversationVerdict({
+      if (held !== null && held.restored && facts !== null) {
+        const verdict = storedConversationVerdict({
           language,identityBound: held.identityBound,messages: [],
           ...(held.serverTime === undefined ? {} : { serverTime: held.serverTime })
         },facts);
@@ -650,17 +655,16 @@ export function Assistant({
         if (!parkedRef.current) {
           // The first sleep event holds the conversation; the harness sends a second one (pagehide, then freeze).
           if (heldRef.current === null) {
-            const atSleep = latestRef.current;
-            heldRef.current = Object.freeze({
-              restored: restorePhaseRef.current === "done",
-              identityBound: atSleep.identityKnown ? atSleep.identityAvailable : null,
-              serverTime: atSleep.serverTime
-            });
+            const known = knownIdentityRef.current;
+            heldRef.current = Object.freeze(restorePhaseRef.current === "done" && known !== null
+              ? { restored: true,identityBound: known,serverTime: latestRef.current.serverTime }
+              : { restored: false });
             draftRef.current = inputRef.current?.value ?? "";
             scrollAtSleepRef.current = conversationPaneRef.current?.scrollTop ?? null;
-          } else if (draftRef.current === "") {
-            // Still undecided from an earlier wake: what was held stays held; text typed since is kept too.
-            draftRef.current = inputRef.current?.value ?? "";
+          } else {
+            // Still undecided from an earlier wake: what was held stays held, and the newest text typed wins — the
+            // composer holds only what was typed since that wake (ct N1, D-S04-NEWEST-TEXT).
+            draftRef.current = inputRef.current?.value || draftRef.current;
           }
         }
         parkedRef.current = true;
@@ -678,8 +682,9 @@ export function Assistant({
     });
     const stopWake = onConversationWake(() => {
       parkedRef.current = false;
-      // CT-N2: defence in depth. While parkedRef holds no gate can begin between a sleep and this wake, so no
-      // test can fail without this line; it drops such a gate if the ref is ever bypassed.
+      // CT-N2: while parkedRef holds no gate can begin between a sleep and this wake; this drops such a gate if the
+      // ref is ever bypassed. Since FIX p2 A05's harness-order keep row also fails without it (the reading position
+      // is lost; REV-S04-p3 ct R1).
       gateRef.current += 1;
       if (!persistent) {
         // A transport-injected panel has no gate to judge what it holds, so it errs toward erasing (D-S04-20).
@@ -764,7 +769,10 @@ export function Assistant({
     conceal(false);
   }
 
-  /** On a keep, the draft held at the sleep comes back — unless something was typed since the wake (CT2-B1). */
+  /**
+   * On a keep, the draft held at the sleep comes back — unless something was typed since the wake (CT2-B1): the
+   * newest text typed wins and the older held draft is dropped (pt N2, D-S04-NEWEST-TEXT).
+   */
   function restoreDraft(): void {
     if (inputRef.current !== null && draftRef.current !== "" && inputRef.current.value === "") {
       inputRef.current.value = draftRef.current;

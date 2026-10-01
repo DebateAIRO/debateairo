@@ -583,7 +583,7 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
     expect(parks, "parkedRef.current = true in the sleep branch").toBeGreaterThan(-1);
     expect(flush, "flushSync( in the sleep branch").toBeGreaterThan(-1);
     expect(parks, "the ref is set before flushSync").toBeLessThan(flush);
-    const gate = source.indexOf("settleStoredConversation()");
+    const gate = source.indexOf("void settleStoredConversation(");
     const restoreEffect = source.lastIndexOf("useEffect(", gate);
     expect(gate, "the restore effect runs the gate").toBeGreaterThan(-1);
     expect(source.slice(restoreEffect, gate), "the restore effect returns while parked")
@@ -684,6 +684,44 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
     await dispatchWake("pageshow");
     await pause(100);
     expect(own.textContent, "nothing old after the wake").not.toMatch(new RegExp(`${OLD}|${REPLY}`, "u"));
+
+    // FIX p3 (ct N1 / pt N2, REV-S04-p3): the page sleeps AGAIN while undecided. What was held at the first sleep stays
+    // held, and the newest text the person typed wins: text typed while undecided is what the composer shows after
+    // the keep, whether or not a draft was held at the first sleep, also with site data blocked (D-S04-NEWEST-TEXT)
+    for (const [label, heldDraft, typed, blocked] of [
+      ["a draft held at the first sleep", true, true, false],
+      ["no draft held", false, true, false],
+      ["a draft held, nothing typed while undecided", true, false, false],
+      ["a draft held, site data blocked", true, true, true]
+    ] as const) {
+      await unmountAll();
+      window.sessionStorage.clear();
+      announceSessionChange();
+      if (blocked) denyStorage("sessionStorage");
+      const twice = installApi();
+      await mount(<SupportConversationGuard />);
+      const again = await mount(<Assistant fullPage />);
+      await until(() => twice.calls.some((call) => call.url === "/api/v1/session"));
+      await pause(40);
+      await send(again, OLD);
+      expect(await until(() => (again.textContent ?? "").includes(REPLY)), `${label}: answered`).toBe(true);
+      const box = again.querySelector<HTMLInputElement>('input[name="support-message"]')!;
+      box.value = heldDraft ? DRAFT : "";
+      await dispatchSleep("pagehide");
+      twice.sessionStatus = 503;
+      await dispatchWake("pageshow");
+      await pause(150);
+      expect(again.textContent, `${label}: undecided, nothing shown`).not.toContain(REPLY);
+      box.value = typed ? TYPED : "";
+      await dispatchSleep("freeze");
+      expect(box.value, `${label}: parked again, nothing in the composer`).toBe("");
+      twice.sessionStatus = null;
+      await dispatchWake("resume");
+      expect(await until(() => (again.textContent ?? "").includes(REPLY)), `${label}: back once known`).toBe(true);
+      expect(again.textContent, `${label}: the whole conversation`).toContain(OLD);
+      expect(box.value, typed ? `${label}: the text typed while undecided` : `${label}: the held draft`)
+        .toBe(typed ? TYPED : DRAFT);
+    }
   });
 
   it("A06 a signed-in transcript older than the current session is never shown, and an unreadable sign-in state never keeps or writes a signed-out one", async () => {
@@ -787,6 +825,89 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
       }
       watched3.stop();
     }
+
+    // FIX p3 (V-24, pt B1) + ct N2: a Send whose identity read fails (the API restarting) leaves the panel's state
+    // unknown. That unknown is never carried into a sleep as a decision: with the API back, a no-change sleep keeps the
+    // conversation and its case link (R04). While unknown nothing is written as signed out (the write guard), and a
+    // sleep across a session change still discards it (the verdict on the identity it was last known under).
+    for (const change of [false, true]) {
+      const label = change ? "a failed send, then a change while asleep" : "a failed send, then a no-change sleep";
+      await unmountAll();
+      window.sessionStorage.clear();
+      announceSessionChange();
+      const restart = installApi({ signedIn: true });
+      await mount(<SupportConversationGuard />);
+      const host4 = await mount(<Assistant fullPage />);
+      await until(() => restart.calls.some((call) => call.url === "/api/v1/session"));
+      await pause(40);
+      await send(host4, OLD);
+      expect(await until(() => (host4.textContent ?? "").includes(REPLY)), `${label}: answered`).toBe(true);
+      await act(async () => { host4.querySelector<HTMLButtonElement>(".supportEscalation button")!.click(); });
+      expect(await until(() => host4.querySelector('a[href^="/help#case="]') !== null), `${label}: a live case link`)
+        .toBe(true);
+      const writes: string[] = [];
+      const realSetItem = Storage.prototype.setItem;
+      const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, key: string, value: string) {
+        if (key === KEY) writes.push(value);
+        realSetItem.call(this, key, value);
+      });
+      restart.sessionSeq = [503];
+      await send(host4, "second note words");
+      expect(await until(() => (host4.textContent ?? "").split(REPLY).length > 2), `${label}: answered during the restart`)
+        .toBe(true);
+      await pause(50);
+      expect(writes.filter((value) => (JSON.parse(value) as { identityBound: boolean }).identityBound === false),
+        `${label}: nothing written as signed out while unknown`).toEqual([]);
+      spy.mockRestore();
+      await dispatchSleep("pagehide", "freeze");
+      if (change) restart.createdAtSec = T + 30;
+      const watched4 = watchText(host4, OLD);
+      await dispatchWake("resume", "pageshow");
+      if (change) {
+        await pause(300);
+        expect(watched4.seen(), `${label}: nothing old after the wake`).toBe(false);
+        expect(host4.querySelector('a[href^="/help#case="]'), `${label}: no case link`).toBeNull();
+        expect(keyHoldsNoMessage(), `${label}: the stored copy goes`).toBe(true);
+      } else {
+        expect(await until(() => (host4.textContent ?? "").includes(OLD)), `${label}: kept`).toBe(true);
+        expect(host4.querySelector('a[href^="/help#case="]'), `${label}: with its case link`).not.toBeNull();
+        expect(host4.textContent, `${label}: and the exchange made during the restart`).toContain("second note words");
+        expect((host4.textContent ?? "").split(REPLY).length - 1, `${label}: with the answer that came during the restart`)
+          .toBe(2);
+      }
+      watched4.stop();
+    }
+
+    // FIX p3 (sd N1): the panel's re-check decides on facts read AT the re-check, never on the wake's cached verdict.
+    // Without a BroadcastChannel: at the wake the guard reads X (keep) but the panel's own identity read fails; X signs
+    // out and Y signs in elsewhere (no signal reaches this tab); the re-check discards X's conversation.
+    await unmountAll();
+    window.sessionStorage.clear();
+    announceSessionChange();
+    globalThis.BroadcastChannel = class {
+      constructor() { throw new DOMException("denied", "SecurityError"); }
+    } as unknown as typeof BroadcastChannel;
+    const cached = installApi({ signedIn: true });
+    await mount(<SupportConversationGuard />);
+    const host5 = await mount(<Assistant fullPage />);
+    await until(() => cached.calls.some((call) => call.url === "/api/v1/session"));
+    await pause(40);
+    await send(host5, OLD);
+    expect(await until(() => (host5.textContent ?? "").includes(REPLY)), "X answered").toBe(true);
+    expect(await until(() => (storedRaw() ?? "").includes(OLD)), "X's conversation stored").toBe(true);
+    await dispatchSleep("pagehide");
+    cached.sessionSeq = [null, 503]; // the guard's wake read answers; the panel's own identity read fails
+    const watched5 = watchText(host5, OLD);
+    await dispatchWake("pageshow");
+    await pause(150);
+    expect(watched5.seen(), "undecided: nothing shown").toBe(false);
+    cached.createdAtSec = T + 30;
+    await act(async () => { window.dispatchEvent(new Event("online")); });
+    await pause(300);
+    expect(watched5.seen(), "the re-check never shows X's conversation to Y").toBe(false);
+    expect(storedRaw() === null || !storedRaw()!.includes(OLD), "and X's stored copy goes").toBe(true);
+    watched5.stop();
+    globalThis.BroadcastChannel = RealBroadcastChannel;
   });
 
   it("A07 a signed-in transcript newer than the current session is shown", async () => {

@@ -143,12 +143,16 @@ export async function readWakeFacts(): Promise<WakeFacts> {
  * `storedConversationVerdict`. One run per reset generation; nothing stored means no request; facts that land
  * after the generation moved apply nothing. Resolves with the facts it judged on, or null when nothing was stored
  * or the run went stale. Unknown facts leave the copy untouched and are not remembered, so the next call reads
- * again (FIX p2, PT2-B1: decide later, never on a guess). Never rejects.
+ * again (FIX p2, PT2-B1: decide later, never on a guess). `fresh` (FIX p3, sd N1) is a re-check: it drops the
+ * answer remembered for the generation and reads the facts now, so it never decides on a verdict read before a
+ * change it could not hear about. Never rejects.
  */
 export function settleStoredConversation(
-  readFacts: () => Promise<WakeFacts> = readWakeFacts
+  readFacts: () => Promise<WakeFacts> = readWakeFacts,
+  options: Readonly<{ fresh?: boolean }> = {}
 ): Promise<WakeFacts | null> {
-  if (settled !== null && settled.generation === generation) return settled.promise;
+  if (options.fresh === true) settled = null;
+  else if (settled !== null && settled.generation === generation) return settled.promise;
   const startedIn = generation;
   let entry: Readonly<{ generation: number; promise: Promise<WakeFacts | null> }> | null = null;
   let forget = false;
