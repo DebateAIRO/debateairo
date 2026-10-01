@@ -347,6 +347,39 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
     expect(resets).toEqual(["session-change"]);
     expect(await waitUntil(() => probe.received.length > 0, 1000)).toBe(true);
     expect(probe.received).toStrictEqual([{ type: "session-change" }]);
+
+    // Rework 2 (C3 F1, C2 F1-C2): with this page's own receiver installed (the layout guard), the announcing page
+    // resets ONCE — its receiver must not hear the page's own announcement — while the other tabs still hear
+    // exactly one message per announcement, and a message from another tab still resets this page.
+    const dispose = install();
+    probe.received.length = 0;
+    resets.length = 0;
+    storeTranscript(false);
+    announceSessionChange();
+    expect(await waitUntil(() => probe.received.length > 0, 1000)).toBe(true);
+    await wait(60);
+    expect(resets, "the announcing page resets once").toEqual(["session-change"]);
+    expect(probe.received, "the other tabs hear one message").toStrictEqual([{ type: "session-change" }]);
+    expect(storedText(), "the announcement leaves the erase to its caller (E1-E7)").toBe("old conversation");
+    announceSessionChange();
+    expect(await waitUntil(() => probe.received.length > 1, 1000)).toBe(true);
+    await wait(60);
+    expect(resets, "every announcement, once each").toEqual(["session-change", "session-change"]);
+    expect(probe.received).toStrictEqual([{ type: "session-change" }, { type: "session-change" }]);
+    probe.postMessage({ type: "session-change" });
+    expect(await waitUntil(() => window.sessionStorage.getItem(KEY) === null, 100), "another tab still erases").toBe(true);
+    expect(resets).toEqual(["session-change", "session-change", "session-change"]);
+    // A receiver that slept (channel closed) or was disposed is no route: the announcement still reaches the others.
+    window.dispatchEvent(pageTransition("pagehide"));
+    probe.received.length = 0;
+    announceSessionChange();
+    expect(await waitUntil(() => probe.received.length > 0, 1000), "announced while this receiver sleeps").toBe(true);
+    window.dispatchEvent(pageTransition("pageshow"));
+    dispose();
+    probe.received.length = 0;
+    announceSessionChange();
+    expect(await waitUntil(() => probe.received.length > 0, 1000), "announced after the receiver is gone").toBe(true);
+    expect(probe.received).toStrictEqual([{ type: "session-change" }]);
   });
 
   it("U11 announceSessionChange() never throws: BroadcastChannel deleted, throwing constructor, throwing post, throwing close", () => {

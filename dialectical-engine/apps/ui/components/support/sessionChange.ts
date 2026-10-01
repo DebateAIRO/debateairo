@@ -35,6 +35,13 @@ let generation = 0;
 let settled: Readonly<{ generation: number; promise: Promise<void> }> | null = null;
 const resetListeners = new Set<ResetListener>();
 const wakeListeners = new Set<WakeListener>();
+/**
+ * The open channels of this page's receivers (the layout guard mounts one). A BroadcastChannel never delivers a
+ * message to the instance that posted it, so an announcement posted THROUGH this page's receiver reaches every
+ * other tab and not this page again (rework 2: the announcing page used to reset twice, 1-79 ms apart, and a
+ * message typed between the two resets was dropped). The payload stays EXACT `{type:"session-change"}` (R05).
+ */
+const receiverChannels: BroadcastChannel[] = [];
 
 function notifyReset(reason: ConversationResetReason): void {
   for (const listener of [...resetListeners]) {
@@ -78,6 +85,11 @@ function isPersisted(event: Event): boolean {
 export function announceSessionChange(): void {
   generation += 1;
   notifyReset("session-change");
+  const own = receiverChannels[0];
+  if (own !== undefined) {
+    try { own.postMessage({ type: "session-change" }); } catch { /* the other tabs decide on wake instead */ }
+    return;
+  }
   const channel = openChannel();
   if (channel === null) return;
   try { channel.postMessage({ type: "session-change" }); } catch { /* the other tabs decide on wake instead */ }
@@ -164,6 +176,7 @@ export function installSessionChangeReceiver(): () => void {
     try {
       next.addEventListener("message", onMessage);
       channel = next;
+      receiverChannels.push(next);
     } catch {
       closeChannel(next);
     }
@@ -173,6 +186,8 @@ export function installSessionChangeReceiver(): () => void {
     const current = channel;
     channel = null;
     if (current === null) return;
+    const index = receiverChannels.indexOf(current);
+    if (index !== -1) receiverChannels.splice(index, 1);
     try { current.removeEventListener("message", onMessage); } catch { /* closing below ends delivery anyway */ }
     closeChannel(current);
   };
