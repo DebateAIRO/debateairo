@@ -56,6 +56,36 @@ describe("the runbook's cost envelopes (B11b)", () => {
     expect(publishing).toMatch(/^\| `COST_ENVELOPE_POLICY_INVALID` \|[^\n]*`waiting_line_per_person`/mu);
   });
 
+  /**
+   * Final review Part 1b, Minor 1 (and deferred 42): every failure signal the
+   * waiting line and the money engine print has a runbook row. The API's
+   * `api.wait.*` events are swept from the source, so a new one reddens this
+   * row the day it is written; the bare marker and the runner's two lines are
+   * named by the code that prints them.
+   */
+  it("gives every waiting-line and money failure signal the code prints a row in the signal tables", async () => {
+    const signals = readme.slice(readme.indexOf("#### What the runner's log says"), readme.indexOf("### Publishing the settings register on this host"));
+    const api = await read("apps/api/src/index.ts");
+    const waker = [...new Set([...api.matchAll(/event: "(api\.wait\.[a-z_]+)"/gu)].map((match) => match[1]!))];
+    // The sweep must find the waker's own lines, or it is a test that cannot fail.
+    expect(waker).toEqual(expect.arrayContaining(["api.wait.start_failed", "api.wait.redispatch_failed", "api.wait.tick"]));
+    for (const event of waker) {
+      expect(readme.includes(`\`${event}\``) || readme.includes(`"event":"${event}"`), event).toBe(true);
+    }
+    for (const event of ["api.wait.start_failed", "api.wait.redispatch_failed", "api.run.setup_failure_unrecorded"]) {
+      expect(signals, event).toContain(`| \`"event":"${event}"\``);
+    }
+    expect(await read("apps/api/src/main.ts")).toContain('console.error("[ASK_WAITING_LINE_WAKE_PENDING]")');
+    expect(signals).toContain("| `[ASK_WAITING_LINE_WAKE_PENDING]`");
+    expect(await read("apps/runner/src/index.ts")).toContain('log("RUN_COST_SUBSTITUTION_WRITE_FAILED", {');
+    expect(signals).toContain('| `"kind":"DEBATEAI_BODY_COST_FALLBACK"`, `"event":"RUN_COST_SUBSTITUTION_WRITE_FAILED"`');
+    expect(await read("apps/runner/src/main.ts"))
+      .toContain('console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));');
+    expect(signals).toContain('| `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}`');
+    // The setup-failure row no longer says nothing will start a debate whose first job is queued.
+    expect(signals).not.toContain("because nothing will ever start it");
+  });
+
   it("lists the new members in the register file's README", async () => {
     const fileReadme = await read("deploy/vps/register/README.md");
     for (const needle of ["| `billingPlans` |", "| `billingPolicy` |", "`admission_close_basis_points`"]) {
