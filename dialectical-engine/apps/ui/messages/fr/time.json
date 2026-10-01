@@ -18,6 +18,7 @@
   "time.status.claimed": "Pris en charge",
   "time.status.running": "En cours",
   "time.status.holding": "En attente de rétablissement du fournisseur",
+  "time.status.waiting": "En attente",
   "time.status.settled": "Stabilisé",
   "time.status.generating": "Génération en cours",
   "time.status.failed": "Échec",

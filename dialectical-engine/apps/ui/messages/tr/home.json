@@ -22,6 +22,8 @@
   "home.by": "{name} tarafından",
   "home.noDebates": "Henüz tartışma yok — yukarıda ilk iddiayı yayımlayın.",
   "home.generationFailed": "Tartışma oluşturulamadı: {reason}",
+  "home.status.waiting": "Başlamayı bekliyor. Tartışmanız {time} itibarıyla kendiliğinden başlayacak.",
+  "home.status.waitingOwnDebates": "Diğer tartışmalarınız şimdilik sınırınızın kalanını kullanıyor. Bu tartışma, bunlardan biri biter bitmez kendiliğinden başlayacak.",
   "home.noPublishedDebates": "Henüz bir tartışma yayımlanmadı.",
   "home.verdictUnavailable": "Hüküm kullanılamıyor",
   "home.verdict.supported": "Destekleniyor",

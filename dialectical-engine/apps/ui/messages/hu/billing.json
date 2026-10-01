@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Előfizetése felhasználása",
+  "billing.usage.line": "Ma {dayPct}% · Ezen a héten {weekPct}% · Ebben a hónapban {monthPct}%",
+  "billing.usage.lineFree": "Ebben a hónapban {monthPct}%",
+  "billing.usage.day": "Ma",
+  "billing.usage.week": "Ezen a héten",
+  "billing.usage.month": "Ebben a hónapban",
+  "billing.usage.resets": "Visszaáll: {time}"
+}

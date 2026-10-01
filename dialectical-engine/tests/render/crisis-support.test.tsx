@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   readSession: vi.fn(),
   readSensitiveDataConsent: vi.fn(),
   giveSensitiveDataConsent: vi.fn(),
+  getAskRoom: vi.fn(),
   push: vi.fn()
 }));
 
@@ -34,7 +35,8 @@ vi.mock("@/lib/api", () => ({
   contractClient: {
     readSession: mocks.readSession,
     readSensitiveDataConsent: mocks.readSensitiveDataConsent,
-    giveSensitiveDataConsent: mocks.giveSensitiveDataConsent
+    giveSensitiveDataConsent: mocks.giveSensitiveDataConsent,
+    getAskRoom: mocks.getAskRoom
   }
 }));
 vi.mock("@/components/AuthGate", () => ({
@@ -128,6 +130,8 @@ beforeEach(() => {
   mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
   mocks.readSensitiveDataConsent.mockReset().mockResolvedValue({ status: "given" });
   mocks.giveSensitiveDataConsent.mockReset().mockResolvedValue({ status: "given" });
+  // No room unless a case sets one: the room read fails and the page asks as before.
+  mocks.getAskRoom.mockReset().mockRejectedValue(new Error("no room in render test"));
   mocks.push.mockReset();
 });
 
@@ -289,5 +293,41 @@ describe("crisis check on /new", () => {
     expect(mocks.readSensitiveDataConsent).not.toHaveBeenCalled();
     expect(mocks.createDebate).not.toHaveBeenCalled();
     expect(crisisDialog()!.querySelector(".crisisSupportCall")?.getAttribute("href")).toBe("tel:000000");
+  });
+});
+
+// Part 1b merged with the crisis check (2026-10-01): a person whose earlier question already
+// waits for the budget (sentence D) can still reach the help numbers. While a question waits
+// both start buttons are disabled, except for a question the crisis check flags: that one
+// enables them, and Start opens the help screen instead of sending anything.
+describe("crisis check while another question already waits", () => {
+  const waiting = () => ({
+    room: "ALREADY_WAITING", scope: "PERSON", resets_at: new Date(Date.now() + 86_400_000).toISOString(),
+    waiting_run_ref: "run:waiting", plan_id: null
+  });
+
+  it("shows help numbers on the home composer", async () => {
+    mocks.getAskRoom.mockResolvedValue(waiting());
+    await startFromHome(CRISIS, "RO");
+    expect(crisisDialog()).not.toBeNull();
+    expect(mocks.createDebate).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it("shows help numbers on /new from its Start button", async () => {
+    mocks.getAskRoom.mockResolvedValue(waiting());
+    const container = await mount(
+      <NewDebatePage
+        catalog={catalogue("en", "newDebate")}
+        homeCatalog={catalogue("en", "home")}
+        chromeCatalog={catalogue("en", "chrome")}
+        locale="en"
+        crisisCountryHint="GB"
+      />
+    );
+    await type(container.querySelector<HTMLTextAreaElement>("textarea")!, CRISIS);
+    await click(container.querySelector(".ndStart"));
+    expect(crisisDialog()).not.toBeNull();
+    expect(mocks.createDebate).not.toHaveBeenCalled();
   });
 });

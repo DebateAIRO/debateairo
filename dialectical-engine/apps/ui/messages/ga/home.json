@@ -22,6 +22,8 @@
   "home.by": "Le {name}",
   "home.noDebates": "Níl aon díospóireacht ann fós — cuir an chéad mhaíomh isteach thuas.",
   "home.generationFailed": "Theip ar ghiniúint na díospóireachta: {reason}",
+  "home.status.waiting": "Ag fanacht le tosú. Tosóidh do dhíospóireacht léi féin ag {time}.",
+  "home.status.waitingOwnDebates": "Tá do dhíospóireachtaí eile ag úsáid an chuid eile de do theorainn faoi láthair. Tosóidh an díospóireacht seo léi féin chomh luath agus a chríochnaíonn ceann acu.",
   "home.noPublishedDebates": "Níor foilsíodh aon díospóireacht fós.",
   "home.verdictUnavailable": "Níl breithiúnas ar fáil",
   "home.verdict.supported": "Tacaíocht leis",

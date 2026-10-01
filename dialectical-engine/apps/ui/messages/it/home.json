@@ -22,6 +22,8 @@
   "home.by": "Di {name}",
   "home.noDebates": "Nessun dibattito per ora: pubblica la prima affermazione qui sopra.",
   "home.generationFailed": "Generazione del dibattito non riuscita: {reason}",
+  "home.status.waiting": "In attesa di partire. Il tuo dibattito partirà da solo alle {time}.",
+  "home.status.waitingOwnDebates": "Gli altri tuoi dibattiti stanno usando per ora il resto del tuo limite. Questo dibattito partirà da solo non appena uno di essi sarà concluso.",
   "home.noPublishedDebates": "Non è stato ancora pubblicato alcun dibattito.",
   "home.verdictUnavailable": "Verdetto non disponibile",
   "home.verdict.supported": "Sostenuta",

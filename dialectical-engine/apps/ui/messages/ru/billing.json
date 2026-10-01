@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Использование вашего тарифа",
+  "billing.usage.line": "Сегодня {dayPct}% · На этой неделе {weekPct}% · В этом месяце {monthPct}%",
+  "billing.usage.lineFree": "В этом месяце {monthPct}%",
+  "billing.usage.day": "Сегодня",
+  "billing.usage.week": "На этой неделе",
+  "billing.usage.month": "В этом месяце",
+  "billing.usage.resets": "Сброс: {time}"
+}

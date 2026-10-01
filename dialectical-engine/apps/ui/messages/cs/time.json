@@ -22,6 +22,7 @@
   "time.status.claimed": "Převzato",
   "time.status.running": "Probíhá",
   "time.status.holding": "Pozastavení obnovení poskytovatele",
+  "time.status.waiting": "Čeká",
   "time.status.settled": "Uzavřeno",
   "time.status.generating": "Generování",
   "time.status.failed": "Nepodařilo se",

@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Nutzung Ihres Tarifs",
+  "billing.usage.line": "Heute {dayPct} % · Diese Woche {weekPct} % · Dieser Monat {monthPct} %",
+  "billing.usage.lineFree": "Dieser Monat {monthPct} %",
+  "billing.usage.day": "Heute",
+  "billing.usage.week": "Diese Woche",
+  "billing.usage.month": "Dieser Monat",
+  "billing.usage.resets": "Wird zurückgesetzt: {time}"
+}

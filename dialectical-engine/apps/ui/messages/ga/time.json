@@ -26,6 +26,7 @@
   "time.status.claimed": "Glactha",
   "time.status.running": "Ar siúl",
   "time.status.holding": "Téarnamh an tsoláthraí ar feitheamh",
+  "time.status.waiting": "Ag fanacht",
   "time.status.settled": "Socraithe",
   "time.status.generating": "Á ghiniúint",
   "time.status.failed": "Teipthe",

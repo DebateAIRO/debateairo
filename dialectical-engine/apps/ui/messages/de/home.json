@@ -22,6 +22,8 @@
   "home.by": "Von {name}",
   "home.noDebates": "Noch keine Debatten – stellen Sie oben die erste Behauptung auf.",
   "home.generationFailed": "Erzeugung der Debatte fehlgeschlagen: {reason}",
+  "home.status.waiting": "Wartet auf den Start. Ihre Debatte startet von selbst um {time}.",
+  "home.status.waitingOwnDebates": "Ihre anderen Debatten nutzen im Moment den Rest Ihres Limits. Diese Debatte startet von selbst, sobald eine davon beendet ist.",
   "home.noPublishedDebates": "Es wurden noch keine Debatten veröffentlicht.",
   "home.verdictUnavailable": "Urteil nicht verfügbar",
   "home.verdict.supported": "Gestützt",

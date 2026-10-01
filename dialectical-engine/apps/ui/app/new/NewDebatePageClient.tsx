@@ -2,14 +2,17 @@
 
 import { AiNotice } from "@/components/AiNotice";
 
-import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useEffect, useState } from "react";
+import { CSSProperties, FormEvent, KeyboardEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN } from "@debateai/contract";
 import { createDebate, contractClient } from "@/lib/api";
 import { modelDot } from "@/lib/models";
 import { SCRUTINY_DEPTHS, ScrutinyDepth } from "@/lib/scrutinyDepth";
-import { requestFailureMessage } from "@/lib/v3/requestFailure";
+import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
+import { RoomNotice } from "@/components/billing/RoomNotice";
+import { UsageBars } from "@/components/billing/UsageBars";
+import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
 import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
@@ -24,6 +27,7 @@ import {
   type CompositionBudgetTier,
   type RiskTier
 } from "./defaults";
+import billingEnglish from "@/messages/en/billing.json";
 
 type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
 
@@ -52,6 +56,15 @@ const PLAN_TIER_OPTIONS = [
 ] as const;
 
 type PlanTier = (typeof PLAN_TIER_OPTIONS)[number]["value"];
+type DecidedPlan = NonNullable<AskRoom["plan_id"]>;
+
+/** Ruling Q-8: the line that stands where the chooser was, once the server's plan is known. */
+const CURRENT_PLAN_KEYS: Readonly<Record<DecidedPlan, string>> = Object.freeze({
+  FREE: "newDebate.plan.current.FREE",
+  PLUS: "newDebate.plan.current.PLUS",
+  PRO: "newDebate.plan.current.PRO",
+  MAX: "newDebate.plan.current.MAX"
+});
 
 /* The document draws every text field at its resting height — one line for the
    question — so the field grows with its content instead of scrolling inside a
@@ -71,6 +84,7 @@ export default function NewDebatePageClient({
   homeCatalog,
   chromeCatalog,
   locale = "en",
+  billingCatalog = billingEnglish,
   crisisCountryHint = null
 }: {
   catalog: MessageCatalog;
@@ -78,13 +92,15 @@ export default function NewDebatePageClient({
   chromeCatalog: MessageCatalog;
   /** The interface locale, recorded with the sensitive-data consent. */
   locale?: string;
+  /** The locale's `billing` catalogue: the usage bars (paid-plans spec §2.10). */
+  billingCatalog?: MessageCatalog;
   /** The edge's country, so the crisis screen shows that country's helplines first. */
   crisisCountryHint?: string | null;
 }) {
   return (
     <Suspense fallback={null}>
       <AuthGate catalog={catalog}>{(token) => (
-        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} crisisCountryHint={crisisCountryHint} />
+        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} billingCatalog={billingCatalog} crisisCountryHint={crisisCountryHint} />
       )}</AuthGate>
     </Suspense>
   );
@@ -96,6 +112,7 @@ function NewDebateForm({
   homeCatalog,
   chromeCatalog,
   locale,
+  billingCatalog,
   crisisCountryHint
 }: {
   token: string;
@@ -103,6 +120,7 @@ function NewDebateForm({
   homeCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
   locale: string;
+  billingCatalog: MessageCatalog;
   crisisCountryHint: string | null;
 }) {
   // Everything the AI notice can read, in every variant: home + chrome (+ newDebate).
@@ -128,6 +146,33 @@ function NewDebateForm({
   const [submitting, setSubmitting] = useState(false);
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
   const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
+  // Budget spec §2.11: the room for the ask this form would send. It is a
+  // word (FITS/CLOSE/FULL/ALREADY_WAITING), never a figure.
+  const [room, setRoom] = useAskRoom(contractClient, {
+    plan_tier: planTier, composition_budget_tier: budgetTier, depth
+  });
+  // Paid plans (spec 2026-09-29 §2.3.4; ruling Q-8): the plan the SERVER decided
+  // for this person (B8), as the room read (and B10c's usage read) names it. It
+  // is remembered once known: a later failed or plan-less read never clears it,
+  // so the chooser below never comes back. Null with billing off or locally.
+  const [decidedPlan, setDecidedPlan] = useState<DecidedPlan | null>(null);
+  const rememberPlan = useCallback((planId: DecidedPlan | null) => {
+    if (planId !== null) setDecidedPlan(planId);
+  }, []);
+  useEffect(() => {
+    if (room !== null) rememberPlan(room.plan_id);
+  }, [room, rememberPlan]);
+  const decidedTier: PlanTier | null = decidedPlan === null ? null : decidedPlan === "FREE" ? "free" : "premium";
+  // Follow the decided tier ONCE per decision. Moving the form's tier changes
+  // the room query and the room is read again; the guard keeps that re-read
+  // from moving it a second time (or undoing what the person set since).
+  const followedTier = useRef<PlanTier | null>(null);
+  useEffect(() => {
+    if (decidedTier === null || followedTier.current === decidedTier) return;
+    followedTier.current = decidedTier;
+    if (decidedTier === "free") choosePlanTier("free");
+    else setPlanTier("premium");
+  }, [decidedTier]);
 
   useEffect(() => {
     let active = true;
@@ -177,6 +222,9 @@ function NewDebateForm({
     // debate — and before anything else, the form's own rules and the consent screen included.
     if (crisis.offerIfCrisis(topic)) return;
     if (!ready) return;
+    // Sentence D: one question already waits (the button is disabled too, except for a question
+    // the crisis check flags, which the line above has answered).
+    if (room?.room === "ALREADY_WAITING") return;
     setSubmitting(true);
     setError(null);
     try {
@@ -208,9 +256,20 @@ function NewDebateForm({
         crisis.offer();
         return;
       }
-      // DL3-F7: see lib/v3/requestFailure.ts — the banner states what this page
-      // observed, not whatever sentence arrived from upstream.
-      setError(requestFailureMessage("DEBATE_CREATE",exc,catalog));
+      // DL3-F7: see lib/v3/requestFailure.ts. ALREADY_WAITING is answered by
+      // the room notice (sentence D, with its start time), not by a banner:
+      // from the room re-read, or, when that read fails, from the refusal's
+      // own body. The banner is the last fallback, when neither has a time.
+      if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "ALREADY_WAITING") {
+        const fresh = await readAskRoom(contractClient, {
+          plan_tier: planTier, composition_budget_tier: budgetTier, depth
+        });
+        const shown = fresh === null ? waitingRoomOf(exc) : fresh;
+        setRoom(shown);
+        if (shown?.room !== "ALREADY_WAITING") setError(requestFailureMessage("DEBATE_CREATE", exc, catalog));
+      } else {
+        setError(requestFailureMessage("DEBATE_CREATE", exc, catalog));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -230,42 +289,51 @@ function NewDebateForm({
         <p className="ndEyebrow">{t(catalog, "newDebate.eyebrow")}</p>
         <h1 className="ndTitle">{t(catalog, "newDebate.title")}</h1>
         <div className="ndAiDisclosure"><AiNotice catalog={noticeCatalog} body={t(catalog, "newDebate.aiNotice")} /></div>
+        <UsageBars catalog={billingCatalog} locale={locale} onPlan={rememberPlan} />
         <form onSubmit={submit} onKeyDown={onKeyDown}>
           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
           {consent.declined ? (
             <p className="sensitiveConsentDeclined" role="status">{t(homeCatalog, "home.sensitiveConsent.declined")}</p>
           ) : null}
 
-          <div className="ndTier" role="radiogroup" aria-label={t(catalog, "newDebate.planTier")}>
-            {PLAN_TIER_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                id={`planTier-${option.value}`}
-                data-field="planTier"
-                data-value={option.value}
-                aria-checked={planTier === option.value}
-                className="ndTierOption"
-                onClick={() => choosePlanTier(option.value)}
-              >
-                <span className="ndTierName">{t(catalog, option.nameKey)}</span>
-                <span className="ndTierPromise">{t(catalog, option.promiseKey)}</span>
-                <span className="ndTierModels">
-                  {PLAN_TIER_ROSTERS[option.value].map((modelId) => (
-                    <span key={modelId} className="ndTierModel">
-                      <span
-                        className="modelDot"
-                        style={{ "--dot": modelDot(modelId) } as CSSProperties}
-                        aria-hidden
-                      />
-                      {modelId}
-                    </span>
-                  ))}
-                </span>
-              </button>
-            ))}
-          </div>
+          {decidedPlan === null ? (
+            <div className="ndTier" role="radiogroup" aria-label={t(catalog, "newDebate.planTier")}>
+              {PLAN_TIER_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  id={`planTier-${option.value}`}
+                  data-field="planTier"
+                  data-value={option.value}
+                  aria-checked={planTier === option.value}
+                  className="ndTierOption"
+                  onClick={() => choosePlanTier(option.value)}
+                >
+                  <span className="ndTierName">{t(catalog, option.nameKey)}</span>
+                  <span className="ndTierPromise">{t(catalog, option.promiseKey)}</span>
+                  <span className="ndTierModels">
+                    {PLAN_TIER_ROSTERS[option.value].map((modelId) => (
+                      <span key={modelId} className="ndTierModel">
+                        <span
+                          className="modelDot"
+                          style={{ "--dot": modelDot(modelId) } as CSSProperties}
+                          aria-hidden
+                        />
+                        {modelId}
+                      </span>
+                    ))}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            // Paid plans (spec §2.3.4; ruling Q-8): with billing on the server
+            // decides the tier (B8), so there is nothing to choose. The page names
+            // the person's plan; Free's settings below stay disabled, a paid
+            // plan's stay editable.
+            <p className="ndPlanCurrent" data-plan={decidedPlan}>{t(catalog, CURRENT_PLAN_KEYS[decidedPlan])}</p>
+          )}
 
           <label className="srOnly" htmlFor="topic">
             {t(catalog, "newDebate.topic")}
@@ -425,8 +493,9 @@ function NewDebateForm({
             </div>
           ) : null}
 
+          <RoomNotice room={room} catalog={catalog} locale={locale} />
           <div className="ndActions">
-            <button data-support-primary-control type="submit" className="ndStart" disabled={!(ready || crisis.flags(topic)) || submitting}>
+            <button data-support-primary-control type="submit" className="ndStart" disabled={!(ready || crisis.flags(topic)) || submitting || (room?.room === "ALREADY_WAITING" && !crisis.flags(topic))}>
               {t(catalog, submitting ? "newDebate.starting" : "newDebate.startRun")} <span aria-hidden>→</span>
             </button>
             <button type="button" className="ndCancel" onClick={() => router.push("/")}>

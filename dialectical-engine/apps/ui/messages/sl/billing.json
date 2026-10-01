@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Poraba vašega paketa",
+  "billing.usage.line": "Danes {dayPct} % · Ta teden {weekPct} % · Ta mesec {monthPct} %",
+  "billing.usage.lineFree": "Ta mesec {monthPct} %",
+  "billing.usage.day": "Danes",
+  "billing.usage.week": "Ta teden",
+  "billing.usage.month": "Ta mesec",
+  "billing.usage.resets": "Ponastavi se: {time}"
+}

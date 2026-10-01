@@ -81,8 +81,8 @@ export function conditionMarkLabel(
  *
  * "SERVICE" is a vendor that reports no usage (fix round 1): that is a problem
  * with an AI service, not the budget, so it is never worded as one. "BUDGET" is
- * every other stop (money, the attempt ceiling, the day's spend). Null for any
- * other record, which keeps the runner's own remedy.
+ * every other stop (money, the attempt ceiling, the day's spend and a person's
+ * allowance). Null for any other record, which keeps the runner's own remedy.
  */
 export type PanelSpendStopKind = "BUDGET" | "SERVICE";
 
@@ -92,7 +92,8 @@ type MarkRecord = Pick<Answer["condition_mark_records"][number], "mark" | "reaso
  * The kind of spend stop a record's reason names (the runner writes the stop's
  * code there, alone or after member failures, `;`-separated), from the kernel's
  * one list: "SERVICE" for a vendor that reports no usage, "BUDGET" for money,
- * the attempt ceiling and the day's spend; null when it names none.
+ * the attempt ceiling, the day's spend and a person's allowance; null when it
+ * names none.
  */
 function spendStopKindOfReason(reason: string): PanelSpendStopKind | null {
   const parts = reason.split(";").map((part) => part.trim());
@@ -104,6 +105,19 @@ function spendStopKindOfReason(reason: string): PanelSpendStopKind | null {
 export function panelSpendStopKind(record: MarkRecord): PanelSpendStopKind | null {
   if (record.mark !== "PANEL-PARTIAL" && record.mark !== "PANEL-DEGRADED-SINGLE-VOICE") return null;
   return spendStopKindOfReason(record.reason);
+}
+
+/**
+ * B9 (paid-plans spec §2.4.1) — A LIFT PATH THAT IS THE OPERATOR'S ALONE. A
+ * debate that rests on one lineage because the run owner's allowance was
+ * reached is lifted by that person's window resetting or a larger plan. The
+ * runner's remedy for it is English, names engine words ("maker positions") and
+ * speaks of the run owner in the third person, so the reader's drawer never
+ * prints it, in any language; it stays on the record for the operator. Every
+ * other lift path is printed as it always was.
+ */
+export function liftPathIsOperatorOnly(record: MarkRecord): boolean {
+  return record.mark === "SINGLE-LINEAGE" && record.reason === "PERSON_ALLOWANCE_REACHED";
 }
 
 /**

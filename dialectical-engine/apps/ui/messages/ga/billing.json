@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Úsáid do phlean",
+  "billing.usage.line": "Inniu {dayPct}% · An tseachtain seo {weekPct}% · An mhí seo {monthPct}%",
+  "billing.usage.lineFree": "An mhí seo {monthPct}%",
+  "billing.usage.day": "Inniu",
+  "billing.usage.week": "An tseachtain seo",
+  "billing.usage.month": "An mhí seo",
+  "billing.usage.resets": "Athshocrú: {time}"
+}

@@ -40,10 +40,12 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `format` | exactly `debateai.hosted-register.v1` | the command |
 | `sourceRef` | a short, non-secret line saying why this version exists; it is sealed into the register (see "What `sourceRef` becomes" below) | the command |
 | `configuredProviderSet` | `requiredDistinctMakers` and the vendor list: `providerRef`, `adapterKind` (`openai-compatible-http`), `maker`, `vetting` | `buildConfiguredProviderSetDeploymentRow` — `PROVIDER_VENDOR_NOT_VETTED` |
-| `costEnvelopePolicy` | the V-28 ceilings in USD micro-units, as the register row stores them; optionally `serve_reserve_basis_points` (the share kept for writing the answer) and `serve_overrun_basis_points` (how far the answer may go over), both 0 when left out — see "The cost envelopes" in `deploy/vps/README.md` | the register's own schema — `COST_ENVELOPE_POLICY_INVALID` |
+| `costEnvelopePolicy` | the V-28 ceilings in USD micro-units, as the register row stores them; optionally `serve_reserve_basis_points` (the share kept for writing the answer) and `serve_overrun_basis_points` (how far the answer may go over), both 0 when left out — see "The cost envelopes" in `deploy/vps/README.md`; optionally, all three or none, the budget rule's `admission_close_basis_points`, `finish_up_to_basis_points` and `waiting_line_per_person` (the example carries 9500, 11500 and 1; see "The band, holds and the waiting line" in `deploy/vps/README.md`) | the register's own schema — `COST_ENVELOPE_POLICY_INVALID` |
 | `countryPolicy` | optional, and NOT in the example: for every country, the two switches `signup` and `pay`, the reason, and `blocked`; unknown connections and Tor are refused. Left out, no `countryPolicy` row is published and that register version has no country gate (A14); the member turns the gate on, and is added only as "The country gate's switches" below says | the register's own parser — `COUNTRY_POLICY_INVALID` (a `pay: true` with `signup: false`, or a blocked country with a switch on, is refused; so are a `null` member and `"blocked": false` — `blocked` is `true` or left out) |
 | `providerTargets` | the SAME array you put in `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` | the checks both services run at boot — relays, loopback and private addresses, inline credentials, missing or zero prices |
 | `synthesisRoles` | optional: `synthesizerRoleRef` and `evaluatorRoleRef`. Leave it out and the first two different makers are used; with a single maker you must name them | the command — `HOSTED_REGISTER_ROLE_REF_UNCONFIGURED` |
+| `billingPlans` | optional: the paid plans (prices, monthly credit, day and week shares, the finish edge, Free's fixed gauges) as the register row stores them. Left out, the engine's own row is sealed | the register's own parser — `BILLING_PLANS_INVALID` |
+| `billingPolicy` | optional: the billing switch (`enabled`) and its rules. Left out, the engine's own row is sealed: billing OFF | the register's own parser — `BILLING_POLICY_INVALID`; switched on without the budget members, `BILLING_REQUIRES_ENVELOPE_MEMBERS` |
 
 Any other member is refused (`HOSTED_REGISTER_FILE_KEY_UNKNOWN`). `providerTargets` is checked and
 **never published**: prices, addresses and credential paths stay in the two `EnvironmentFile`s,
@@ -70,6 +72,7 @@ Your `sourceRef` is sealed in these places, and only there:
 
 - the publication's own source reference (why this version exists);
 - the `costEnvelopePolicy` row's source reference, verbatim;
+- the `billingPlans` and `billingPolicy` rows' source reference, verbatim, when the file supplies them;
 - the `countryPolicy` row's source reference, verbatim, when the file carries the member;
 - the `configuredProviderSet` row's source reference: your `sourceRef` followed by the fixed V-9
   sentence `+ V-9 ruled 2026-09-22 (V, chat): versioned configuredProviderSet row carrying each
