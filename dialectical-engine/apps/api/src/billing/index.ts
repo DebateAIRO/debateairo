@@ -10,6 +10,7 @@ import type { LegalAcceptanceApplication } from "../legal.js";
 import type { AuthenticatedSession } from "../sessions.js";
 import type { ChargeStatusPort } from "./charge-status.js";
 import type { CheckoutServicePort } from "./checkout.js";
+import type { NoticeIntakePort } from "./notice-intake.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { BillingRefusal } from "./refusal.js";
 
@@ -29,7 +30,8 @@ export const BILLING_ROUTE_PATHS = Object.freeze([
   "GET /v1/billing/plans",
   "POST /v1/billing/quote",
   "POST /v1/billing/checkout",
-  "GET /v1/billing/charges/{chargeRef}"
+  "GET /v1/billing/charges/{chargeRef}",
+  "POST /v1/billing/xmoney/notify"
 ] as const);
 export type BillingRoutePath = typeof BILLING_ROUTE_PATHS[number];
 
@@ -52,7 +54,7 @@ export interface BillingUsageReader {
 export type BillingLegalGate = Pick<LegalAcceptanceApplication, "requiresReacceptance">;
 
 /** The sealed admission scopes billing charges (the admission policy's next versions, contract §2). */
-export type BillingAdmissionScope = "publicReads" | "billingQuote" | "billingCheckout";
+export type BillingAdmissionScope = "publicReads" | "billingQuote" | "billingCheckout" | "billingNotify";
 
 /** Like `SupportAdmission`: a scope the register version does not publish admits. */
 export type BillingAdmission = Readonly<{
@@ -84,6 +86,8 @@ export type BillingRouteDeps = Readonly<{
   /** P8c. */
   checkout?: CheckoutServicePort;
   charges?: ChargeStatusPort;
+  /** P9a. */
+  notices?: NoticeIntakePort;
   /**
    * P8c (R3-2): the age gate's reader. Only `buildApi` supplies it, from `options.sessions`; absent, the checkout
    * refuses 503 AGE_CHECK_UNAVAILABLE (this guard fails closed).
@@ -146,6 +150,42 @@ const PLANS_CACHE_CONTROL = "public, max-age=60";
 /** Quote, checkout and card bodies are small; each declares the 16 KiB credential-route ceiling. */
 const BILLING_BODY_LIMIT_BYTES = 16_384;
 
+const NOTIFY_PATH = "/v1/billing/xmoney/notify";
+const NOTIFY_BODY_LIMIT_BYTES = 65_536;
+
+/** A transport fault the house error handler already maps to its constant envelope (index.ts TRANSPORT_FAULT_ENVELOPES). */
+function transportFault(code: "FST_ERR_CTP_INVALID_MEDIA_TYPE" | "FST_ERR_CTP_BODY_TOO_LARGE", statusCode: 413 | 415): Error {
+  return Object.assign(new Error(code), { code, statusCode });
+}
+
+function readBoundedBody(payload: NodeJS.ReadableStream, limit: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let settled = false;
+    payload.on("data", (chunk: Buffer | string) => {
+      if (settled) return;
+      const bytes = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
+      size += bytes.length;
+      if (size > limit) {
+        settled = true;
+        reject(transportFault("FST_ERR_CTP_BODY_TOO_LARGE", 413));
+        return;
+      }
+      chunks.push(bytes);
+    });
+    payload.on("end", () => { if (!settled) { settled = true; resolve(Buffer.concat(chunks).toString("utf8")); } });
+    payload.on("error", (error: Error) => { if (!settled) { settled = true; reject(error); } });
+  });
+}
+
+/** A form body decodes "+" as a space and base64 has no spaces, so a space here was a "+". */
+export function opensslResultOf(body: unknown): string {
+  if (typeof body !== "object" || body === null) return "";
+  const value = (body as Readonly<Record<string, unknown>>).opensslResult;
+  return typeof value === "string" ? value.replaceAll(" ", "+") : "";
+}
+
 function quoteResponse(result: QuoteResult): Readonly<Record<string, unknown>> {
   const { quote } = result;
   return BillingQuoteResponseSchema.parse({
@@ -178,6 +218,19 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
         scope: window.scope, percent: window.percent, resets_at: window.resetsAt.toISOString()
       }))
     }));
+  });
+
+  // Root-level, because Fastify parsers are per encapsulation context and a plugin would register the route
+  // asynchronously; gated on the one route that accepts form bodies, so every other route keeps its 415.
+  api.addContentTypeParser("application/x-www-form-urlencoded", (request, payload, done) => {
+    if (request.routeOptions.url !== NOTIFY_PATH) {
+      done(transportFault("FST_ERR_CTP_INVALID_MEDIA_TYPE", 415), undefined);
+      return;
+    }
+    readBoundedBody(payload, NOTIFY_BODY_LIMIT_BYTES).then(
+      (text) => done(null, Object.fromEntries(new URLSearchParams(text))),
+      (error: Error) => done(error, undefined)
+    );
   });
 
   // The plans come from the register version read at boot, so one body serves every caller until restart.
@@ -273,4 +326,17 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       return reply.send(BillingChargeStatusResponseSchema.parse({ state: status.state, reason_code: status.reasonCode }));
     }
   );
+
+  // P9a (Q-2): 200 "OK" once stored and for anything that does not decrypt; 429 over the source's budget; a failed
+  // store write reaches the house error handler as 500, so xMoney sends the notice again. Installed last, in
+  // BILLING_ROUTE_PATHS order; its form parser is registered above, before the plans route.
+  api.post(NOTIFY_PATH, { ...deps.policy("POST /v1/billing/xmoney/notify"), bodyLimit: NOTIFY_BODY_LIMIT_BYTES }, async (request, reply) => {
+    const { notices } = deps;
+    if (notices === undefined) return billingNotFound(reply);
+    if (!admit.gate(reply, "billingNotify", "POST /v1/billing/xmoney/notify", clientIpNetworkScope(source(request).ip))) {
+      return reply;
+    }
+    await notices.receive(opensslResultOf(request.body));
+    return reply.status(200).header("content-type", "text/plain; charset=utf-8").send("OK");
+  });
 }

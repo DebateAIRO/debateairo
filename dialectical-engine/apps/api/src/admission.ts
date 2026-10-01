@@ -8,7 +8,7 @@ import type { AdmissionPolicy } from "@debateai/register";
  */
 export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
   | "supportReads" | "supportSessions" | "supportModelCalls" | "geoAvailability" | "billingQuote"
-  | "billingCheckout";
+  | "billingCheckout" | "billingNotify";
 
 export type AdmissionDecision =
   | Readonly<{ allowed: true }>
@@ -30,7 +30,7 @@ interface AdmissionBucket {
     | AdmissionPolicy["recoveryStart"] | AdmissionPolicy["supportReads"]
     | AdmissionPolicy["supportSessions"] | AdmissionPolicy["supportModelCalls"]
     | AdmissionPolicy["geoAvailability"] | AdmissionPolicy["billingQuote"]
-    | AdmissionPolicy["billingCheckout"]>;
+    | AdmissionPolicy["billingCheckout"] | AdmissionPolicy["billingNotify"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -77,6 +77,10 @@ export class AdmissionLimiter {
       // Paid plans P8c: present only when the resolved register version carries it.
       ...(policy.billingCheckout === null ? [] : [[
         "billingCheckout", { policy: policy.billingCheckout, entries: new Map() }
+      ] as const]),
+      // Paid plans P9a: present only when the resolved register version carries it.
+      ...(policy.billingNotify === null ? [] : [[
+        "billingNotify", { policy: policy.billingNotify, entries: new Map() }
       ] as const])
     ]);
   }

@@ -1025,6 +1025,11 @@ const billingRuntime = billingConnectors === null
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingCheckout admission scope");
     }
+    // Paid plans P9a: xMoney's notices charge the source-keyed billingNotify budget (contract §2: 120 a minute).
+    if (admissionPolicy.billingNotify === null) {
+      throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+        "Billing is on, so the register must seal the billingNotify admission scope");
+    }
     return createBillingRuntime({
       pool, connectors: billingConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore, mail: undefined,

@@ -22,6 +22,7 @@ apps/api/src/billing/codes.ts
 apps/api/src/billing/connectors.ts
 apps/api/src/billing/email-job.ts
 apps/api/src/billing/index.ts
+apps/api/src/billing/notice-intake.ts
 apps/api/src/billing/order-text.ts
 apps/api/src/billing/outbox.ts
 apps/api/src/billing/place.ts

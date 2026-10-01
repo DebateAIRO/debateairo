@@ -136,7 +136,8 @@ const admissionPolicyValueSchema = z.object({
   support_model_calls: admissionScopeValueSchema("source").optional(),
   geo_availability: admissionScopeValueSchema("source").optional(),
   billing_quote: admissionScopeValueSchema("owner").optional(),
-  billing_checkout: admissionScopeValueSchema("owner").optional()
+  billing_checkout: admissionScopeValueSchema("owner").optional(),
+  billing_notify: admissionScopeValueSchema("source").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -163,6 +164,8 @@ export type AdmissionPolicy = Readonly<{
   billingQuote: AdmissionScopePolicy<"owner"> | null;
   /** Paid plans P8c: checkouts, 10 an hour per owner (spec §2.7; value pending V-1). */
   billingCheckout: AdmissionScopePolicy<"owner"> | null;
+  /** Paid plans P9a: xMoney's notices, 120 a minute per source (contract §2). */
+  billingNotify: AdmissionScopePolicy<"source"> | null;
   sourceRef: string;
 }>;
 
@@ -228,7 +231,8 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     + " V ratification pending (V-1)"
     + " + paid plans G3a geo_availability, V ratification pending (V-1)"
     + " + paid plans P8b billing_quote, V ratification pending (V-1)"
-    + " + paid plans P8c billing_checkout, V ratification pending (V-1)",
+    + " + paid plans P8c billing_checkout, V ratification pending (V-1)"
+    + " + paid plans P9a billing_notify, V ratification pending (V-1)",
   value: Object.freeze({
     ...ADMISSION_POLICY_REGISTER_ROW.value,
     support_reads: Object.freeze({
@@ -252,6 +256,10 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     // Paid plans P8c: checkouts, 10 an hour per owner (spec §2.7 names the scope, not its number; V-1).
     billing_checkout: Object.freeze({
       key: "owner" as const, limit: 10, window_ms: 60 * 60_000, capacity: 65_536
+    }),
+    // Paid plans P9a: xMoney's notices, 120 a minute per source (contract §2).
+    billing_notify: Object.freeze({
+      key: "source" as const, limit: 120, window_ms: 60_000, capacity: 65_536
     })
   })
 });
@@ -316,6 +324,12 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.billing_checkout.limit,
       windowMs: policy.billing_checkout.window_ms,
       capacity: policy.billing_checkout.capacity
+    }),
+    billingNotify: policy.billing_notify === undefined ? null : Object.freeze({
+      key: policy.billing_notify.key,
+      limit: policy.billing_notify.limit,
+      windowMs: policy.billing_notify.window_ms,
+      capacity: policy.billing_notify.capacity
     }),
     sourceRef
   });

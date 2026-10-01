@@ -4,6 +4,7 @@ import type { ReadableUserDekStore } from "@debateai/crypto";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository } from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
 import { currentDocument } from "@debateai/legal-manifest";
+import { decryptNotice } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/register";
 import { DekAccountEmailReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
@@ -12,6 +13,7 @@ import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
+import { NoticeIntake } from "./notice-intake.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { QuoteService } from "./quote.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
@@ -92,7 +94,12 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       repository, tax: deps.connectors.tax, geo: deps.geo, countryPolicy: deps.countryPolicy, policy: deps.policy,
       plans: deps.plans, recordsKey: deps.connectors.recordsKey, audit: deps.audit
     }),
-    checkout, charges: new ChargeStatusReader(repository)
+    checkout, charges: new ChargeStatusReader(repository),
+    // P9a: `drain` is declared below; the kick only runs once a notice arrives.
+    notices: new NoticeIntake({
+      repository, decrypt: (value) => decryptNotice(value, deps.connectors.xmoneyPrivateKey), audit: deps.audit,
+      clock: deps.clock, kick: () => drain(), xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    })
   });
   const drain = createCoalescingSingleFlight(() => outbox.drain(10), () => deps.reportPending("BILLING_OUTBOX_PENDING"));
   const timers: Array<ReturnType<typeof setInterval>> = [];

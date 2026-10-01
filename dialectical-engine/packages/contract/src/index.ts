@@ -1189,7 +1189,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",
     "POST /v1/billing/checkout",
-    "GET /v1/billing/charges/{chargeRef}"
+    "GET /v1/billing/charges/{chargeRef}",
+    "POST /v1/billing/xmoney/notify"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
