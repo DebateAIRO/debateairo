@@ -1,4 +1,4 @@
--- 0082 — paid plans, Part 1b: who has which plan, and which person a run counts
+-- 0084 — paid plans, Part 1b: who has which plan, and which person a run counts
 -- against (docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md
 -- §2.4.2-§2.4.3; amendments R1 A6, A8, A20; rulings R-22 and Q-1; interface contract §1).
 --

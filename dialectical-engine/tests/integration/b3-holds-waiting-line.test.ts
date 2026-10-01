@@ -9,7 +9,7 @@ import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/dis
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * Migration 0081 (budget spec §2.6, §2.7, §2.9): the holds, the waiting line, why
+ * Migration 0083 (budget spec §2.6, §2.7, §2.9): the holds, the waiting line, why
  * each run waits, and the owner record of cheaper models — in real SQL — and the
  * first job queued on a caller's transaction. CI skips this directory, so run it
  * before merging the migration.
@@ -105,7 +105,7 @@ const APPEND_ONLY = [
   "ledger.model_spend_hold", "core.run_wait", "core.run_wait_start", "core.run_wait_reason", "core.run_cost_substitution"
 ] as const;
 
-describe("B3 migration 0081 — five append-only tables, verified", () => {
+describe("B3 migration 0083 — five append-only tables, verified", () => {
   it("installs the truncate guard and the reject-mutation trigger on all five", async () => {
     const triggers = await database.pool.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM pg_catalog.pg_trigger AS trigger
@@ -142,7 +142,7 @@ describe("B3 migration 0081 — five append-only tables, verified", () => {
   });
 
   it("is replay-safe: applying the file again changes nothing", async () => {
-    const sql = await readFile(new URL("../../migrations/0081_budget_holds_waiting_line.sql", import.meta.url), "utf8");
+    const sql = await readFile(new URL("../../migrations/0083_budget_holds_waiting_line.sql", import.meta.url), "utf8");
     await database.pool.query(sql);
     const view = await database.pool.query<{ exists: boolean }>(
       "SELECT to_regclass('core.run_waiting_v') IS NOT NULL AS exists"

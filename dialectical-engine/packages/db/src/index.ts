@@ -56,7 +56,7 @@ export {
 } from "./serve-disclosure.js";
 
 // Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): who has which plan and
-// which person a run counts against (migration 0082).
+// which person a run counts against (migration 0084).
 export {
   ENTITLEMENT_CAUSES,
   ENTITLEMENT_PLAN_IDS,
@@ -67,7 +67,7 @@ export {
   type EntitlementPlanId
 } from "./billing-entitlement.js";
 
-// Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0081).
+// Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0083).
 // B8 records the interim roster swap; B9c the runner's cheaper-model calls.
 export {
   RUN_COST_SUBSTITUTION_REASONS,
@@ -77,7 +77,7 @@ export {
   type RunCostSubstitutionReason
 } from "./run-cost-substitution.js";
 
-// Budget spec 2026-09-28 §2.7 (migration 0081): the waiting line, read through
+// Budget spec 2026-09-28 §2.7 (migration 0083): the waiting line, read through
 // core.run_waiting_v so no owner is stored beside a wait.
 export {
   RunWaitRepository,
@@ -742,7 +742,7 @@ async function argumentLanguageColumnsAreApplied(
 }
 
 /**
- * Budget spec §2.7 (migration 0081). Written against information_schema.columns
+ * Budget spec §2.7 (migration 0083). Written against information_schema.columns
  * on purpose: the projection's unit stubs answer every such probe "not applied".
  */
 async function runWaitingLineIsApplied(

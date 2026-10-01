@@ -6,7 +6,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 /**
  * R-2: `RunCostSubstitutionRepository` is the one writer of
- * `core.run_cost_substitution` (B3's table, 0081). B8 records the interim roster
+ * `core.run_cost_substitution` (B3's table, 0083). B8 records the interim roster
  * swap with it; B9c records the runner's cheaper-model calls with it and keeps
  * its own case (the describe block B9c appends to tests/integration/database.test.ts).
  */
@@ -33,7 +33,7 @@ async function createRun(): Promise<string> {
   });
 }
 
-describe("the interim coarse fit's owner record (core.run_cost_substitution, 0081)", () => {
+describe("the interim coarse fit's owner record (core.run_cost_substitution, 0083)", () => {
   it("records a roster swap for a run with reason PERSON, content-free, and lists it back", async () => {
     const runId = await createRun();
     const repository = new RunCostSubstitutionRepository(database.pool);

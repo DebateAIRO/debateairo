@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 
 /**
- * Budget spec 2026-09-28 §2.7 (migration 0081) — THE WAITING LINE.
+ * Budget spec 2026-09-28 §2.7 (migration 0083) — THE WAITING LINE.
  *
  * `core.run_wait` / `core.run_wait_start` / `core.run_wait_reason` are
  * append-only and content-free; the line is read through `core.run_waiting_v`,

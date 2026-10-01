@@ -8927,11 +8927,11 @@ describe("B9b — the shared wall stops the arguing, never the debate (productio
     const reasonsOf = (mark: string) => (scenario.answer?.condition_mark_records ?? [])
       .filter((record) => record.mark === mark).map((record) => record.reason);
     expect(reasonsOf("ENVELOPE_EXHAUSTED")).toEqual(["PERSON_ALLOWANCE_REACHED"]);
-    // 0076's CHECK knew four stop kinds; the row is written only because 0081 widened it (B3, ruling R-20).
+    // 0076's CHECK knew four stop kinds; the row is written only because 0083 widened it (B3, ruling R-20).
     expect(await disclosureRowOf(answerId)).toMatchObject({ bodyStop: "ALLOWANCE" });
   });
 
-  it("lets the owner's disclosure row name the person's allowance (0081 widened 0076's two stop CHECKs, R-20)", async () => {
+  it("lets the owner's disclosure row name the person's allowance (0083 widened 0076's two stop CHECKs, R-20)", async () => {
     const definitions = await database.pool.query<{ conname: string; definition: string }>(
       `SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint
         WHERE conrelid = 'serve.serve_disclosure'::regclass

@@ -2,13 +2,13 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 /**
- * Migration 0081 read as TEXT, so the CI gate proves its shape without a
+ * Migration 0083 read as TEXT, so the CI gate proves its shape without a
  * database (the behaviour is proven in tests/integration/b3-holds-waiting-line.test.ts,
  * which CI skips).
  */
-const sql = await readFile(new URL("../../migrations/0081_budget_holds_waiting_line.sql", import.meta.url), "utf8");
+const sql = await readFile(new URL("../../migrations/0083_budget_holds_waiting_line.sql", import.meta.url), "utf8");
 
-describe("B3 migration 0081 as text", () => {
+describe("B3 migration 0083 as text", () => {
   it("lets the owner's disclosure row name the person's allowance as a stop, replay-safely (R-20)", () => {
     for (const name of ["serve_disclosure_body_stop_check", "serve_disclosure_serve_stop_check"]) {
       const drop = sql.indexOf(`ALTER TABLE serve.serve_disclosure DROP CONSTRAINT IF EXISTS ${name};`);

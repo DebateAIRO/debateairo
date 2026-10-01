@@ -1429,3 +1429,4 @@ While the plan was being written, the colleague merged three pieces of work into
   - `0085` withdrawal step-up
   - `0086` erasure hook
   - `0087` scorecard
+  - These are the numbers this design started from. `dev` later took `0079` (30 September 2026) and `0081`–`0082` (1 October 2026), so ours moved up; the plan's rule R1 holds the current numbers: `0080` legal acceptance, `0083` holds and waiting line, `0084`–`0087` billing, `0088` withdrawal step-up, `0089` erasure hook, `0090` scorecard.

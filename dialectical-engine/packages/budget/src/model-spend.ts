@@ -140,7 +140,7 @@ export interface ProviderCostSeam {
  * B9 (budget spec §2.9, paid-plans spec §2.4.2) — WHERE THE WALL READS A RUN'S
  * OWNER AND WHAT THAT OWNER HAS SPENT. `PostgresModelSpendStore` is the shipped
  * reader: the owner billing pinned on the run at admission
- * (`billing.run_charge_scope`, migration 0082) and the owner's RUN + STORY spend
+ * (`billing.run_charge_scope`, migration 0084) and the owner's RUN + STORY spend
  * recorded inside a window (`readOwnerSpentMicros`, task B6a). A run with no
  * pinned owner — billing off (B6 writes the row only when hosted billing is on,
  * ruling R-19), local mode, a legacy asker, a run admitted before billing — has
@@ -894,10 +894,10 @@ export class PostgresModelSpendStore implements ModelSpendStore {
 
   /**
    * B9 — the run's owner as billing pinned it at admission
-   * (`billing.run_charge_scope`, migration 0082, task B5), or null. With
+   * (`billing.run_charge_scope`, migration 0084, task B5), or null. With
    * `billing.person_windows_v` (read through `EntitlementRepository.readOnlyPort()`
    * by `BillingPersonAllowanceSource`) this is everything the runner reads of
-   * billing's schema (amendment A20); 0082 grants the runner's role SELECT on
+   * billing's schema (amendment A20); 0084 grants the runner's role SELECT on
    * both (ruling R-12). `run_id` is the table's primary key: one index probe
    * per call.
    */

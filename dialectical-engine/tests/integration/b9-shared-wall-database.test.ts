@@ -16,7 +16,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 /**
  * B9a over the real ledger: the owner the wall reads is the one billing pinned on the run at admission
- * (`billing.run_charge_scope`, 0082), and the owner's spend is B6a's RUN + STORY sum over that table. The last
+ * (`billing.run_charge_scope`, 0084), and the owner's spend is B6a's RUN + STORY sum over that table. The last
  * case builds the windows exactly as the shipped runner does (B9b): `BillingPersonAllowanceSource` over
  * `EntitlementRepository.readOnlyPort()`, which reads `billing.person_windows_v` and never writes (A20, R-12).
  */

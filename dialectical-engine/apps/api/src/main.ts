@@ -234,7 +234,7 @@ const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL));
 // a decision waiting for the lock must never hold a connection the decision it
 // waits for needs (packages/budget/src/spend-lock.ts). The runtime principal's
 // URL on purpose: the hold, the wait row and the run's charge scope are
-// debateai_runtime's grants (0081, 0082), never the content-provision role's.
+// debateai_runtime's grants (0083, 0084), never the content-provision role's.
 const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL,{ max: 4 }));
 await boot.run("ask-admission-pools", async () => {
   if (serverAskAdmissionPool === contentProvisionPool

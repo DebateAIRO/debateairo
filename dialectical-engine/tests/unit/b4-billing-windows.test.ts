@@ -208,7 +208,7 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
       .toEqual([4_000_000, 10_000_000, 20_000_000]);
   });
 
-  it("refuses a close edge outside 5000-10000 and an override below one micro-unit (0082's CHECK says > 0)", () => {
+  it("refuses a close edge outside 5000-10000 and an override below one micro-unit (0084's CHECK says > 0)", () => {
     expect(() => personWindowsFor(planById(plans, "PLUS"), anchor, now, 4_999))
       .toThrowError(expect.objectContaining({ code: "BILLING_WINDOW_INPUT_INVALID" }));
     for (const override of [-1, 0]) {

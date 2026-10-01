@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from "pg";
 /**
  * Budget spec §2.9 ("Owner record") and paid-plans spec §2.6 item 7 — A MODEL
  * CHOSEN FOR COST, for the owner and the operator (`core.run_cost_substitution`,
- * migration 0081, task B3). Ruling R-2: this is the table's ONE writer. B8
+ * migration 0083, task B3). Ruling R-2: this is the table's ONE writer. B8
  * records the interim roster swap (reason PERSON); B9c records the runner's
  * cheaper-model calls while arguing.
  *

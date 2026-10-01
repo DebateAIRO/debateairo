@@ -4,7 +4,7 @@ import { TypedDomainError } from "@debateai/kernel";
 
 /**
  * PAID PLANS, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3; R1 A6, A8, A20) — WHO HAS
- * WHICH PLAN (migration 0082).
+ * WHICH PLAN (migration 0084).
  *
  * `packages/db` may not import `@debateai/register`, so the plan ids are
  * restated here as `EntitlementPlanId`. They are structurally identical to
@@ -17,7 +17,7 @@ export type EntitlementPlanId = typeof ENTITLEMENT_PLAN_IDS[number];
 
 /**
  * The contract's eleven causes, plus three that exist only to extend a paid
- * plan's `paid_through` (A8a), and that 0082 refuses on a FREE row:
+ * plan's `paid_through` (A8a), and that 0084 refuses on a FREE row:
  *  - RENEWAL_POSTPONED (R-22): a renewal waiting for its notice (A7);
  *  - PAST_DUE_GRACE (R-22): a charge being retried (dunning);
  *  - RENEWAL_PENDING (ruling Q-1): a renewal waiting out an xMoney or tax-service

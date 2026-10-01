@@ -94,7 +94,7 @@ export function personWindowsFor(
     throw new TypedDomainError("BILLING_WINDOW_INPUT_INVALID", "The close edge is outside 5000-10000 basis points");
   }
   // A 0-micro limit would make budget's room refuse every ask (BUDGET_ROOM_LIMIT_INVALID);
-  // 0082's CHECK already stores only overrides > 0, and this refuses the same.
+  // 0084's CHECK already stores only overrides > 0, and this refuses the same.
   if (monthCreditOverrideMicros !== null
     && (!Number.isSafeInteger(monthCreditOverrideMicros) || monthCreditOverrideMicros < 1)) {
     throw new TypedDomainError("BILLING_WINDOW_INPUT_INVALID", "A month credit override is a positive whole number of micro-units");

@@ -446,13 +446,15 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // Budget spec 2026-09-28 (B3): the holds, the waiting line, the owner record of
         // cheaper models, and the ALLOWANCE stop kind on serve.serve_disclosure. The
         // spec named it 0077; dev's age gate took 0077, the sensitive-data consent holds
-        // 0078, the change-email turn 0079 and legal acceptance is 0080 (RULINGS-R3). A new prefix, no pair.
-        "0081_budget_holds_waiting_line.sql",
+        // 0078, the change-email turn 0079, legal acceptance is 0080 and dev's publication check
+        // record holds 0081 and 0082 (RULINGS-R3 R3-1). A new prefix, no pair.
+        "0083_budget_holds_waiting_line.sql",
         // Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): the entitlement,
         // the run's charge scope and the runner's windows view. The next free
         // prefix after dev's 0077 (age gate), the colleague's 0078
-        // (sensitive-data consent) and 0079 (change email), L3a's 0080 and B3's 0081. No pair.
-        "0082_billing_entitlement.sql"
+        // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
+        // (publication check record) and B3's 0083. No pair.
+        "0084_billing_entitlement.sql"
       ]);
   });
 });

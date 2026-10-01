@@ -1,9 +1,9 @@
--- 0081 — the budget spec 2026-09-28 "A debate is (almost) never stopped for
+-- 0083 — the budget spec 2026-09-28 "A debate is (almost) never stopped for
 -- money" (§2.6 holds, §2.7 the waiting line, §2.9 the owner record of cheaper
 -- models), amended by the paid-plans spec 2026-09-29 §2.4. The spec named this
 -- file 0077; dev's age gate took 0077, 0078 is the sensitive-data consent,
--- 0079 the change-email turn and 0080 is legal acceptance, so the budget's file
--- is 0081.
+-- 0079 the change-email turn, 0080 is legal acceptance, and 0081 and 0082 are
+-- dev's publication check record, so the budget's file is 0083.
 --
 -- Forward-only, idempotent and replayable, and this file OWNS every object it
 -- creates. It also re-creates 0076's two stop CHECKs on serve.serve_disclosure

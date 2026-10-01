@@ -2,14 +2,14 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 /**
- * Migration 0082 (spec 2026-09-29 §2.4.2-§2.4.3, contract §1; R1 A6, A8, A15,
+ * Migration 0084 (spec 2026-09-29 §2.4.2-§2.4.3, contract §1; R1 A6, A8, A15,
  * A20; rulings R-12, R-13, R-22), read as text so the CI gate proves the shape
  * without a database. The behaviour is proven on a real database in
  * tests/integration/b5-billing-entitlement.test.ts.
  */
-const sql = await readFile(new URL("../../migrations/0082_billing_entitlement.sql", import.meta.url), "utf8");
+const sql = await readFile(new URL("../../migrations/0084_billing_entitlement.sql", import.meta.url), "utf8");
 
-describe("0082 is append-only, erasure-safe and granted to the runtime alone", () => {
+describe("0084 is append-only, erasure-safe and granted to the runtime alone", () => {
   it("guards both tables against UPDATE, DELETE and TRUNCATE with the purge-aware guard, and verifies the four triggers", () => {
     for (const table of ["billing.entitlement_event", "billing.run_charge_scope"]) {
       expect(sql).toContain(`SELECT core.install_truncate_guard('${table}');`);
