@@ -511,6 +511,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
       '@debateai/crypto':
         specifier: workspace:*
         version: link:../crypto

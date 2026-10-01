@@ -615,6 +615,7 @@ packages/crypto/src/records.ts
 packages/db/src/account-erasure.ts
 packages/db/src/auth-risk.ts
 packages/db/src/billing-entitlement.ts
+packages/db/src/billing.ts
 packages/db/src/email-change.ts
 packages/db/src/identity.ts
 packages/db/src/index.ts

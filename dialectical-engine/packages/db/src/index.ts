@@ -67,6 +67,34 @@ export {
   type EntitlementPlanId
 } from "./billing-entitlement.js";
 
+// Paid plans (spec 2026-09-29 §2.5.2): every billing.* statement except the entitlement (migrations 0085–0087).
+export {
+  BillingRepository,
+  type BillingReadExecutor,
+  type ChargeEventInput,
+  type ChargeEventKind,
+  type ChargeEventRow,
+  type ChargeKind,
+  type ChargeRow,
+  type CustomerXMoneyEnvironment,
+  type DueRenewalCursor,
+  type DueRenewalsOptions,
+  type InvoiceIntentRow,
+  type InvoiceIssuerName,
+  type InvoiceKind,
+  type InvoiceRow,
+  type LocationEvidenceRow,
+  type LocationVerdict,
+  type NoticeRow,
+  type OutboxClaimFence,
+  type OutboxJob,
+  type OutboxKind,
+  type OutboxPayload,
+  type QuoteKind,
+  type QuoteRow,
+  type TaxSummaryRow
+} from "./billing.js";
+
 // Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0083).
 // B8 records the interim roster swap; B9c the runner's cheaper-model calls.
 export {
