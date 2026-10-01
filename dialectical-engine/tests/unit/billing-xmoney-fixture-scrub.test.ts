@@ -106,6 +106,43 @@ describe("X0 — xMoney fixture scrubbing", () => {
     }
   });
 
+  it("gives one id one pseudonym whether a capture carries it as a number or as its digit text", () => {
+    const scrubber = new XMoneyScrubber();
+    const payment = scrubber.scrub({ code: 200, data: { id: 7, orderId: 88123 } }) as { data: { id: unknown } };
+    const listing = scrubber.scrub({
+      code: 200, data: [{ id: 8, transactionType: "refund", relatedTransactionIds: ["7"] }]
+    }) as { data: Array<{ relatedTransactionIds: unknown[] }> };
+    const related = listing.data[0]!.relatedTransactionIds[0];
+    expect(typeof payment.data.id).toBe("number");
+    expect(payment.data.id).not.toBe(7);
+    expect(typeof related).toBe("string");
+    expect(String(related)).toBe(String(payment.data.id));
+    expect(linkedRefundRows(listing, String(payment.data.id))).toHaveLength(1);
+    const asText = scrubber.scrub({ siteId: "4242" }) as { siteId: unknown };
+    const asNumber = scrubber.scrub({ siteId: 4242 }) as { siteId: unknown };
+    expect(typeof asText.siteId).toBe("string");
+    expect(typeof asNumber.siteId).toBe("number");
+    expect(asText.siteId).not.toBe("4242");
+    expect(String(asNumber.siteId)).toBe(asText.siteId);
+  });
+
+  it("scrubs a named field whole when xMoney sends it as an object or a list, not only as text", () => {
+    const scrubbed = new XMoneyScrubber().scrub({
+      address: { line1: "Str. Reala 5", city: "Cluj" },
+      customData: { note: "Stefan" },
+      externalCustomData: ["Stefan Real"],
+      cardExpiryDate: { month: 9, year: 29 }
+    });
+    expect(scrubbed).toEqual({
+      address: "SCRUBBED", customData: "SCRUBBED", externalCustomData: "SCRUBBED", cardExpiryDate: "12/99"
+    });
+    for (const original of ["Reala", "Stefan"]) {
+      expect(JSON.stringify(scrubbed), original).not.toContain(original);
+    }
+    expect(new XMoneyScrubber().scrub({ firstName: { given: "Stefan" }, nameOnCard: ["Stefan", "Real"] }))
+      .toEqual({ firstName: "Test", nameOnCard: "Test Person" });
+  });
+
   it("decrypts a captured notice with the owner's key, records its framing and outer field names, and re-encrypts it under the test key", () => {
     const root = privateRoot();
     const captures = captureFolder(root);
@@ -162,6 +199,26 @@ describe("X0 — xMoney fixture scrubbing", () => {
     };
     expect(fixture.framing.plusArrivedAsSpace).toBe(true);
     expect(fixture.body.transactionStatus).toBe("complete-ok");
+  });
+
+  it("refuses a form notice body that ends with a line break, whichever field comes last, instead of stripping it", () => {
+    const root = privateRoot();
+    const owner = ownerKeyFile(root);
+    const opensslResult = encryptUnder(owner.key, JSON.stringify(NOTICE));
+    const signature = "ab".repeat(64);
+    const bodies = {
+      opensslResultLast: `${new URLSearchParams({ signature, opensslResult }).toString()}\n`,
+      signatureLast: `${new URLSearchParams({ opensslResult, signature }).toString()}\n`,
+      signatureLastWindows: `${new URLSearchParams({ opensslResult, signature }).toString()}\r\n`
+    };
+    for (const [order, body] of Object.entries(bodies)) {
+      const captures = join(root, order);
+      mkdirSync(captures, { mode: 0o700 });
+      writeFileSync(join(captures, "notice-success.raw"), `content-type: application/x-www-form-urlencoded\n\n${body}`);
+      expect(() => writeXMoneyFixtures({
+        captureDir: captures, key: readXMoneyKeyFile(owner.path), outDir: join(root, `${order}-out`), recordedOn: "2026-10-02"
+      }), order).toThrow("XMONEY_CAPTURE_FRAMING_UNEXPECTED:TRAILING_LINE_BREAK");
+    }
   });
 
   it("refuses a real notice outside P3a's grammar — wrapped lines or the URL-safe alphabet — before decrypting it", () => {

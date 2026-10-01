@@ -92,6 +92,14 @@ export class XMoneyScrubber {
 
   scrub(value: unknown, key = ""): unknown {
     const name = key.toLowerCase();
+    // Replaced by key name whatever the value's shape: an `address` object or a `customData` list is scrubbed whole,
+    // so nothing nested under one of these names can carry personal data into a fixture.
+    if (value !== null) {
+      if (SCRUBBED_KEYS.has(name)) return "SCRUBBED";
+      if (EXPIRY_KEYS.has(name)) return "12/99";
+      const replacement = NAME_KEYS.get(name);
+      if (replacement !== undefined) return replacement;
+    }
     if (Array.isArray(value)) {
       return value.map((item) => (name === "components" && isRecord(item)
         ? this.#scrubComponent(item)
@@ -101,9 +109,6 @@ export class XMoneyScrubber {
       return Object.fromEntries(Object.entries(value).map(([childKey, child]) => [childKey, this.scrub(child, childKey)]));
     }
     if (ID_KEYS.has(name) && (typeof value === "number" || typeof value === "string")) return this.#pseudonym(value);
-    if (NAME_KEYS.has(name) && typeof value === "string") return NAME_KEYS.get(name)!;
-    if (EXPIRY_KEYS.has(name) && value !== null) return "12/99";
-    if (SCRUBBED_KEYS.has(name) && value !== null) return "SCRUBBED";
     if (typeof value !== "string") return value;
     if (name === "backurl") return scrubBackUrl(value);
     if (name === "cardnumber") return MASKED_CARD.test(value) ? value : "411111******1111";
@@ -119,7 +124,9 @@ export class XMoneyScrubber {
   }
 
   #pseudonym(original: number | string): number | string {
-    const lookup = `${typeof original}:${String(original)}`;
+    // Keyed by the id's text alone: P3a and P3b read every JSON number as its digit text, so the number 7 and the
+    // string "7" are one id to them and must share one pseudonym. Each occurrence keeps its own type below.
+    const lookup = String(original);
     let replacement = this.#pseudonyms.get(lookup);
     if (replacement === undefined) {
       replacement = this.#next;
@@ -242,6 +249,10 @@ function readNoticeCapture(text: string): NoticeCapture {
       fields.set(name, typeof value === "string" || typeof value === "number" ? String(value) : "");
     }
   } else {
+    // `serve` writes a form body verbatim, so a final line break is either a real fact xMoney sent (which P3a must
+    // know about) or one an editor added to a hand-saved body. Either way it is refused, never stripped silently:
+    // it would otherwise land in the last field and fail the framing check or misdescribe the signature.
+    if (body.endsWith("\n")) framingUnexpected("TRAILING_LINE_BREAK");
     for (const [name, value] of new URLSearchParams(body)) fields.set(name, value);
   }
   const opensslResult = fields.get("opensslResult");
