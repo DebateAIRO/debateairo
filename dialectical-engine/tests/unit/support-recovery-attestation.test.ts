@@ -87,7 +87,7 @@ const S02_OWNER_REVIEW = Object.freeze({
 // this case is RED on the branch by design (blank session: the loader refuses it, so no manifest can match early).
 const S05_OWNER_REVIEW = Object.freeze({
   reviewedBy: "OWNER",
-  reviewerSession: "",
+  reviewerSession: "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V1 question on 2026-10-01)",
   reviewedOn: "2026-10-01",
   evidence: "docs/missions/cookie-compliance/OWNER-SIGNOFF-S05-support-kb.md",
   ratifiedBy: "V",

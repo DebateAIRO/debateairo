@@ -1,6 +1,6 @@
 # OWNER sign-off — S05 help-bot control names: 12 help articles, 13 recovery rows (cookie-compliance)
 
-Status: DRAFT for V1 — not signed. The API refuses to start until the orchestrator records V's answer.
+Status: SIGNED by V on 2026-10-01 (V1).
 What changes (SPEC-v5 R06-R08): in 12 of the 12 article files and 22 of the 26 recovery texts below, only control names change — each becomes the label the screen shows in that language (V-17, V-18). Two further changes, both shown in the marks. First, in the Romanian texts „…” quotes are added in two kinds of place only: around button names used inside a sentence (V-26), and around „Export” and „Nivel de risc” in the 6 places where one of them is a sentence's subject (V-28). Other Romanian labels used as a sentence's subject stay unquoted: the workspace tab names Fir, Divizat, Arbore, Hartă, Bibliotecă, Reluare, Spațiu de lucru, Onestitate and Cum funcționează (and Export where it stands in the list of those tabs), the plan names Gratuit and Premium, and Acasă — the V-29 default, which you can change at V1 by naming any you want quoted; the status indicators Motorul de dezbatere, Coada de punctare and Flota de modele already carry the Romanian article. Second, account-access no longer names a "Forgot password" control — it says a password reset flow exists but Support does not offer it yet (R06). A recovery text marked "unchanged" keeps its words and is re-signed because its row's article hash changed. Not in this signature: the catalogue (signed at S02's V0) and the templates (they carry no owner digest).
 
 ### article account-access.en
@@ -688,3 +688,7 @@ recovery support-status-limits.en.modelProjection 932f33969c279c6e7db4dc9d0d47fe
 recovery support-status-limits.en.fallback 875854ecea195464759705f8035052bd5389c71a1acc439713326784bb5e2981
 component-file 6c05d583e0afc6683ea63a7163bac38f531964c01117cbed478cc989d29fd41c
 ~~~
+
+## V1 signature
+
+V answered "Signed" in chat on 2026-10-01. Session: 6f8863c5-3b17-4860-99d7-b3543f7474c7. Recorded by the orchestrator.
