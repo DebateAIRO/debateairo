@@ -31,6 +31,10 @@ const OTHER = SUPPORT_LOCALES.filter((l) => l !== "en" && l !== "ro");
 const NON_LATIN = new Set(["ar", "he", "hi", "ja", "zh", "ko", "ru", "uk", "bg", "el"]);
 const LATIN_ALLOW = new Set(["Dialectical", "Engine", "MFA", "AI", "US", "JSON", "DebateAI"]);
 const PLACEHOLDER = /^(?:todo|tbd|tbc|fixme|xxx+|lorem|ipsum|placeholder|translate|translation|untranslated)$/iu;   // not "n/a": Irish "na" is a word
+// REV-S05-p2 ct N1: a WHOLE name "N/A", "NA", "X", "XX"… is a placeholder (inside a name, Irish "na" stays legal), and an
+// upper-case locale code ("DE: …") is not a word of the locale's own language.
+const PLACEHOLDER_NAME = /^\s*(?:n\/?a|x+)\s*$/iu;
+const LOCALE_CODES = new Set(SUPPORT_LOCALES.map((loc) => loc.toLowerCase()));
 const words = (text: string): string[] => text.split(/[^\p{L}]+/u).filter((word) => word !== "");
 const ENGLISH = new Set([
   ...SUPPORT_CAPABILITIES.flatMap(({ labels, searchTerms }) => words([labels.en, ...searchTerms.en].join(" "))),
@@ -88,7 +92,9 @@ describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22
         expect(labels, `${loc} ${id}`).not.toContain(name.trim());                              // D-S05-35 (d), full set
         expect(supportCapabilityName(capability(id), loc)).toBe(name);
         if (!NON_LATIN.has(loc)) {                                                              // ct N2
-          const own = words(name).filter((word) => !LATIN_ALLOW.has(word));
+          const own = words(name).filter((word) => !LATIN_ALLOW.has(word)
+            && !(word === word.toUpperCase() && LOCALE_CODES.has(word.toLowerCase())));
+          expect(name, `${loc} ${id} placeholder name`).not.toMatch(PLACEHOLDER_NAME);
           expect(own.filter((word) => PLACEHOLDER.test(word)), `${loc} ${id} placeholder`).toEqual([]);
           expect(own.length === 0 || own.every((word) => ENGLISH.has(word.toLowerCase())), `${loc} ${id} "${name}" has no word of its own language`).toBe(false);
         }

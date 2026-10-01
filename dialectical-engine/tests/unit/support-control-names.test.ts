@@ -110,16 +110,23 @@ describe("S05 control names for the 33 locales without their own help texts (SPE
     expect(result.text).toBe(supportRecoveryFallback(e, "de"));
     expect(result.text).not.toBe(e.fallback);
     expect(result.sources?.[0]?.label).toBe(supportSourceLabel(e, "de"));
-    // REV-S05-p1 ct N5 (SPEC-v4 R02, "no second rendering path"): respond(), the knowledge context and the R02 dump pick
-    // the corpus a locale is served from through ONE function; the rule is written once, in context.ts.
+    // REV-S05-p1 ct N5, REV-S05-p2 ct N2 (SPEC-v4 R02, "no second rendering path"): respond(), the knowledge context and
+    // the R02 dump pick the corpus a locale is served from through supportCorpusLanguage. Pinned by BEHAVIOUR, never by
+    // source text: the shared function's result for all 35 locales, respond() above (a de visitor recovered from the en
+    // entry, the only one in its snapshot), and the context below (a de visitor is given the en source, a ro visitor the
+    // ro one). The dump's use is judged by names-gate's MISSING rule (required ids come from the base's en corpus).
     expect(SUPPORT_LOCALES.map((loc) => supportCorpusLanguage(loc))).toEqual(SUPPORT_LOCALES.map((loc) => loc === "ro" ? "ro" : "en"));
-    const RULE = /===\s*"ro"\s*\?\s*"ro"\s*:\s*"en"/gu;
-    const source = (file: string) => readFileSync(resolve(process.cwd(), file), "utf8");
-    expect(source("packages/support-kb/src/context.ts").match(RULE) ?? []).toHaveLength(1);
-    for (const [file, call] of [["apps/api/src/support/answer.ts", "supportCorpusLanguage(request.language)"],
-      ["tests/support/supportDeliveredNames.ts", "supportCorpusLanguage(language)"]] as const) {
-      expect(source(file).match(RULE) ?? [], file).toEqual([]);
-      expect(source(file), file).toContain(call);
+    const pair = [entry({ id: "support-cases", lang: "en" }), entry({ id: "support-cases", lang: "ro", title: "Vorbiți cu o persoană",
+      modelProjection: "Alegeți Vorbiți cu o persoană.", fallback: "Alegeți Vorbiți cu o persoană." })];
+    for (const [language, lang] of [["de", "en"], ["ro", "ro"], ["ja", "en"]] as const) {
+      const routed = buildSupportKnowledgeContext({
+        entries: pair, capabilities: SUPPORT_CAPABILITIES, language, query: "How do I talk to a human support case?",
+        historyText: "", maxCodePoints: 24_000,
+        availableActionIds: resolveSupportActions(SUPPORT_ACTION_IDS, { signedIn: false, language }).map(({ id }) => id),
+        referenceFor: createSupportModelReferenceFactory("10000000-0000-4000-8000-000000000001").referenceFor
+      });
+      const projection = supportSourceProjection(pair.find((candidate) => candidate.lang === lang)!, language);
+      expect(routed.text, `${language} is served the ${lang} corpus`).toContain(`\n${projection}`);
     }
   });
 });
