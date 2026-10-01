@@ -548,8 +548,12 @@ packages/battery/src/index.ts
 packages/battery/src/split.ts
 packages/battery/src/terminal.ts
 packages/billing-core/src/allowance-source.ts
+packages/billing-core/src/calendar.ts
 packages/billing-core/src/index.ts
+packages/billing-core/src/money.ts
 packages/billing-core/src/plan-lookup.ts
+packages/billing-core/src/ports.ts
+packages/billing-core/src/subscription.ts
 packages/billing-core/src/windows.ts
 packages/budget/src/cost-envelope.ts
 packages/budget/src/estimate.ts
