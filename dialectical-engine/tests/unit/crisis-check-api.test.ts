@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { CRISIS_SUPPORT_OFFERED } from "@debateai/contract";
+import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
+import type { CountryGate } from "../../apps/api/src/country-gate.js";
 import type { SessionApplication } from "../../apps/api/src/sessions.js";
 import {
   TEST_APP_ORIGIN,
@@ -131,5 +134,77 @@ describe("crisis check before a debate starts", () => {
     } finally {
       await api.close();
     }
+  });
+
+  // V, 2026-10-01: "make sure this crisis check is done in the pre-flight. if a question is
+  // flagged as a crisis thing, no debate start and do the crisis workflow." Every rule that
+  // could refuse the ask some other way comes after the crisis check, so the person gets help
+  // numbers, never a quota, country or malformed-request refusal instead.
+  it("answers before the quota and the country rule, and touches neither", async () => {
+    const identity = testHttpIdentity("crisis-preflight");
+    const { sessions } = sessionsWithConsent(identity, "given");
+    const asks = askSpy();
+    let quotaReads = 0;
+    let countryReads = 0;
+    const admission = { decide: () => {
+      quotaReads += 1;
+      return { allowed: false, reason: "ASKS_EXHAUSTED", retryAfterMs: 60_000, windowMs: 60_000 };
+    } } as unknown as AdmissionLimiter;
+    const countryGate = {
+      // The session's source record reads it (recorded, never decisive): not a refusal.
+      recordedCountry: () => null,
+      ask: () => { countryReads += 1; return "COUNTRY_ASK_BLOCKED"; }
+    } as unknown as CountryGate;
+    const api = buildApi({ application: asks.app, sessions, admission, countryGate, allowedOrigin: TEST_APP_ORIGIN });
+    try {
+      const crisis = await api.inject({
+        method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
+        payload: { ...ASK, question_line: "I want to kill myself tonight" }
+      });
+      expect(crisis.statusCode).toBe(422);
+      expect(crisis.json().error).toBe(CRISIS_SUPPORT_OFFERED);
+      expect([quotaReads, countryReads, asks.submitted()]).toEqual([0, 0, 0]);
+      // The same route still applies its rules to every other question.
+      const policy = await api.inject({
+        method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
+        payload: { ...ASK }
+      });
+      expect(policy.statusCode).toBe(429);
+      expect(quotaReads).toBe(1);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("answers a crisis question even when the rest of the ask is malformed", async () => {
+    const identity = testHttpIdentity("crisis-malformed");
+    const { sessions } = sessionsWithConsent(identity, "given");
+    const asks = askSpy();
+    const api = buildApi({ application: asks.app, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    try {
+      const response = await api.inject({
+        method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
+        payload: { question_line: "我想死" }
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toBe(CRISIS_SUPPORT_OFFERED);
+      expect(asks.submitted()).toBe(0);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("stays the first step of the ask pre-flight: nothing in the route runs before it", () => {
+    // A later pre-flight check of the question (the hate-speech check, S03) belongs after this
+    // line: a person in crisis must never meet its refusal or its "check unavailable" message,
+    // and their words must not reach its judge model.
+    const source = readFileSync(new URL("../../apps/api/src/index.ts", import.meta.url), "utf8");
+    const start = source.indexOf('api.post("/v1/asks"');
+    expect(start).toBeGreaterThan(-1);
+    const handler = source.slice(start, source.indexOf("\n  api.", start + 1));
+    const crisisAt = handler.indexOf("detectCrisis(questionLine)");
+    expect(crisisAt).toBeGreaterThan(-1);
+    const beforeCrisis = handler.slice(0, crisisAt).replace(/\/\/.*$/gm, "");
+    expect(beforeCrisis).not.toMatch(/\bawait\b|\boptions\.|admitOrRefuse|parseRequest|reply\.status/);
   });
 });

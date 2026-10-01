@@ -34,6 +34,20 @@ lane each, parallel translator seats, no board.
   `tests/unit/crisis-check-fixtures/<lang>.json`: must-trigger and must-pass questions),
   `tests/unit/crisis-check-api.test.ts`, `tests/render/crisis-support.test.tsx`.
 
+## Pre-flight (V, 2026-10-01: "make sure this crisis check is done in the pre-flight") — branch `feat/crisis-preflight`
+
+The crisis check is step 1 of the ask pre-flight, on both sides:
+
+- **API** (`POST /v1/asks`): the check is the first statement of the route. The consent rule,
+  the quota, the country rule, the request's own validation and any later pre-flight check of
+  the question (the hate-speech check, hate-speech S03) all come after it. A person in crisis
+  never meets a refusal or a "check unavailable" message instead of help, and their words go
+  to no judge model. A source test in `tests/unit/crisis-check-api.test.ts` fails if anything
+  is put in front of it.
+- **UI** (home composer, /new): the check runs before the form's own rules too. A crisis
+  question too short to be a debate ("我想死", "死にたい", "kys") used to leave Start disabled
+  and nothing happened; Start is now enabled for it and opens the help screen.
+
 ## S02 — the prompt rule (lane `.worktrees/crisis-s02`, branch `feat/crisis-prompt-rule`, off `slice/hate-speech-s01`)
 
 The one content rule every model reads (hate-speech S01) becomes `debateai.content-rule.v2`:
