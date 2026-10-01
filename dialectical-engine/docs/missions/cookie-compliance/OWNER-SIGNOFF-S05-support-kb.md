@@ -1,7 +1,7 @@
 # OWNER sign-off — S05 help-bot control names: 12 help articles, 13 recovery rows (cookie-compliance)
 
 Status: DRAFT for V1 — not signed. The API refuses to start until the orchestrator records V's answer.
-What changes (SPEC-v5 R06-R08): in 12 of the 12 article files and 22 of the 26 recovery texts below, only control names change — each becomes the label the screen shows in that language (V-17, V-18). The one exception to names-only: account-access no longer names a "Forgot password" control; it says a password reset flow exists but Support does not offer it yet (R06). A recovery text marked "unchanged" keeps its words and is re-signed because its row's article hash changed. Not in this signature: the catalogue (signed at S02's V0) and the templates (they carry no owner digest).
+What changes (SPEC-v5 R06-R08): in 12 of the 12 article files and 22 of the 26 recovery texts below, only control names change — each becomes the label the screen shows in that language (V-17, V-18). Two further changes, both shown in the marks: in the Romanian texts, a screen label used inside a sentence as a button name or as the sentence's subject is put in „…” quotes (V-26, V-28); and account-access no longer names a "Forgot password" control — it says a password reset flow exists but Support does not offer it yet (R06). A recovery text marked "unchanged" keeps its words and is re-signed because its row's article hash changed. Not in this signature: the catalogue (signed at S02's V0) and the templates (they carry no owner digest).
 
 ### article account-access.en
 
@@ -151,7 +151,7 @@ Scrie în **Subiect** întrebarea sau afirmația pe care vrei să o examinezi. F
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
 ~ După ce dezbaterea are un arbore, [-Thread-]{+Fir+} arată argumentul ca o succesiune, [-Split-]{+Divizat+} compară ramurile, [-Tree-]{+Arbore+} arată ierarhia, iar [-Map-]{+Hartă+} arată relațiile. Informațiile de evaluare apar împreună cu dezbaterea când sunt disponibile. Categoriile publice ale diagnosticului pot arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul împreună cu momentele verificării sau generării; cache sau învechire; numărul afirmațiilor curente, evaluate, omise și trunchiate și filtrele bazate pe scor; golurile nerezolvate și marcajele fatale; și investigațiile recomandate. O categorie sau o valoare poate lipsi când datele de evaluare nu sunt disponibile. Asistența poate explica aceste categorii publice, dar nu poate citi dezbaterea sau valorile ei de evaluare. [-Library-]{+Bibliotecă+} revine la pagina Acasă.
-~ [-Replay-]{+Reluare+} pornește o altă generare din spațiul curent al proprietarului. [-Workspace-]{+Spațiu de lucru+} deschide artefactele locale ale dezbaterii, iar [-Honesty-]{+Onestitate+} deschide detaliile despre proveniență și limitări. Export este disponibil numai când există un răspuns exportabil. [-How it works-]{+Cum funcționează+} deschide ghidul din pagină. Dezbaterile publicate pot afișa un set mai mic de vizualizări, numai pentru citire.
+~ [-Replay-]{+Reluare+} pornește o altă generare din spațiul curent al proprietarului. [-Workspace-]{+Spațiu de lucru+} deschide artefactele locale ale dezbaterii, iar [-Honesty-]{+Onestitate+} deschide detaliile despre proveniență și limitări. [-Export-]{+„Export”+} este disponibil numai când există un răspuns exportabil. [-How it works-]{+Cum funcționează+} deschide ghidul din pagină. Dezbaterile publicate pot afișa un set mai mic de vizualizări, numai pentru citire.
 ~~~
 
 full text:
@@ -177,7 +177,7 @@ ratified_on: ""
 
 După ce dezbaterea are un arbore, Fir arată argumentul ca o succesiune, Divizat compară ramurile, Arbore arată ierarhia, iar Hartă arată relațiile. Informațiile de evaluare apar împreună cu dezbaterea când sunt disponibile. Categoriile publice ale diagnosticului pot arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul împreună cu momentele verificării sau generării; cache sau învechire; numărul afirmațiilor curente, evaluate, omise și trunchiate și filtrele bazate pe scor; golurile nerezolvate și marcajele fatale; și investigațiile recomandate. O categorie sau o valoare poate lipsi când datele de evaluare nu sunt disponibile. Asistența poate explica aceste categorii publice, dar nu poate citi dezbaterea sau valorile ei de evaluare. Bibliotecă revine la pagina Acasă.
 
-Reluare pornește o altă generare din spațiul curent al proprietarului. Spațiu de lucru deschide artefactele locale ale dezbaterii, iar Onestitate deschide detaliile despre proveniență și limitări. Export este disponibil numai când există un răspuns exportabil. Cum funcționează deschide ghidul din pagină. Dezbaterile publicate pot afișa un set mai mic de vizualizări, numai pentru citire.
+Reluare pornește o altă generare din spațiul curent al proprietarului. Spațiu de lucru deschide artefactele locale ale dezbaterii, iar Onestitate deschide detaliile despre proveniență și limitări. „Export” este disponibil numai când există un răspuns exportabil. Cum funcționează deschide ghidul din pagină. Dezbaterile publicate pot afișa un set mai mic de vizualizări, numai pentru citire.
 
 Aceste controale acționează asupra dezbaterii deja deschise în browserul vizitatorului. Asistența poate explica scopul, condițiile și limitele lor, dar nu poate citi o dezbatere privată, alege identificatorul ei, reporni generarea, inspecta artefactele sau opera controalele proprietarului. O legătură către dezbaterea proprietarului este disponibilă numai când aplicația furnizează o referință validată pentru proprietarul curent.
 ~~~
@@ -215,7 +215,7 @@ Autentifică-te și deschide `/new` pentru formularul complet al dezbaterii. Int
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea [-Challenge-]{+„Contestați”+} schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
+~ Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea [-Challenge-]{+„Contestați”+} schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. [-Exportul-]{+„Export”+} este JSON condiționat, nu Markdown.
 ~~~
 
 full text:
@@ -236,14 +236,14 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea „Contestați” schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Export este JSON condiționat, nu Markdown.
+Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea „Contestați” schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. „Export” este JSON condiționat, nu Markdown.
 ~~~
 
 ### article risk-tier-choice.ro
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ [-Nivelul de risc-]{+Nivel de risc+} înregistrează cât de mult depinde de răspuns. Planul [-Free-]{+Gratuit+} îl fixează la **Standard**. Cu planul Premium selectat, poți alege **[-Casual-]{+Informal+}**, **Standard** sau **[-High stakes-]{+Miză ridicată+}** înainte să pornești rularea. Rularea trimisă înregistrează selecția efectivă; Asistența nu o poate schimba după trimitere.
+~ [-Nivelul de risc-]{+„Nivel de risc”+} înregistrează cât de mult depinde de răspuns. Planul [-Free-]{+Gratuit+} îl fixează la **Standard**. Cu planul Premium selectat, poți alege **[-Casual-]{+Informal+}**, **Standard** sau **[-High stakes-]{+Miză ridicată+}** înainte să pornești rularea. Rularea trimisă înregistrează selecția efectivă; Asistența nu o poate schimba după trimitere.
 ~~~
 
 full text:
@@ -262,7 +262,7 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Nivel de risc înregistrează cât de mult depinde de răspuns. Planul Gratuit îl fixează la **Standard**. Cu planul Premium selectat, poți alege **Informal**, **Standard** sau **Miză ridicată** înainte să pornești rularea. Rularea trimisă înregistrează selecția efectivă; Asistența nu o poate schimba după trimitere.
+„Nivel de risc” înregistrează cât de mult depinde de răspuns. Planul Gratuit îl fixează la **Standard**. Cu planul Premium selectat, poți alege **Informal**, **Standard** sau **Miză ridicată** înainte să pornești rularea. Rularea trimisă înregistrează selecția efectivă; Asistența nu o poate schimba după trimitere.
 ~~~
 
 ### article support-cases.ro
@@ -508,36 +508,36 @@ Autentifică-te, alege Pornește o dezbatere și introdu o întrebare sau afirma
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. [-Challenge-]{+„Contestați”+} schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
+~ Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. [-Challenge-]{+„Contestați”+} schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. [-Exportul-]{+„Export”+} este JSON condiționat, nu Markdown.
 ~~~
 
 full text:
 ~~~text
-Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. „Contestați” schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Export este JSON condiționat, nu Markdown.
+Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. „Contestați” schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. „Export” este JSON condiționat, nu Markdown.
 ~~~
 
 ### recovery guide-how-it-works.ro.fallback
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. [-Challenge-]{+„Contestați”+} schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
+~ Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. [-Challenge-]{+„Contestați”+} schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. [-Exportul-]{+„Export”+} este JSON condiționat, nu Markdown.
 ~~~
 
 full text:
 ~~~text
-Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. „Contestați” schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. Export este JSON condiționat, nu Markdown.
+Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. „Contestați” schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. „Export” este JSON condiționat, nu Markdown.
 ~~~
 
 ### recovery risk-tier-choice.ro.modelProjection
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ [-Nivelul de risc-]{+Nivel de risc+} înregistrează cât de mult depinde de răspuns. [-Free-]{+Gratuit+} îl fixează la Standard. Premium permite alegerea [-Casual-]{+Informal+}, Standard sau [-High stakes-]{+Miză ridicată+} înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.
+~ [-Nivelul de risc-]{+„Nivel de risc”+} înregistrează cât de mult depinde de răspuns. [-Free-]{+Gratuit+} îl fixează la Standard. Premium permite alegerea [-Casual-]{+Informal+}, Standard sau [-High stakes-]{+Miză ridicată+} înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.
 ~~~
 
 full text:
 ~~~text
-Nivel de risc înregistrează cât de mult depinde de răspuns. Gratuit îl fixează la Standard. Premium permite alegerea Informal, Standard sau Miză ridicată înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.
+„Nivel de risc” înregistrează cât de mult depinde de răspuns. Gratuit îl fixează la Standard. Premium permite alegerea Informal, Standard sau Miză ridicată înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.
 ~~~
 
 ### recovery risk-tier-choice.ro.fallback
@@ -653,10 +653,10 @@ article account-access.ro cab1683e79fd20cf4cc1186f9e886acaa588b0fd60f989ce61c9e8
 article ai-transparency.ro 718eac9d78a08da5c2ecb66f4a9671213cb0ee71a020bf81bc57f1c282602857
 article budget-tier-choice.ro cf06b479e61a00510082943d904c7999e2375fba942c6fd2670894e34b20b89a
 article debate-topic-and-description.ro 1a07bb0133eca4b8039984945b3f58137f1b6c1d77d74b59b30c37cb2aec2a64
-article debate-workspace-menus.ro 722c996850311bc6a607fabd655dd26ed95cfa43dee4ec50ff4cd827ef0ec081
+article debate-workspace-menus.ro 8ad990c00886c52fb547cac2d5f4d3351d5c0fc48b937d36ec8e3459fedbf6b1
 article getting-started-debate.ro 1edec9fe3ae21b3f1f4ea59e6be3e4124be7b5332bf5b29e1e2d31977cd4deca
-article guide-how-it-works.ro 8b6512cb457c072784cde1cf3caa9293ff851e20202125609948bb808037b329
-article risk-tier-choice.ro 41d65efb7378a56a5727a34c93954134c869d29fa6d51c6b7a378b7d40a2dc82
+article guide-how-it-works.ro c396a00502bb96aaf7e981d20482a4068ba14f4d796fb1f8079162d3aa5b0568
+article risk-tier-choice.ro 00cffb0532c7f79072da508618c3f2f0b5d93fac02dc5c574b662f3355032173
 article support-cases.ro 94112fb709ec5cf8a408106eef2d9efc43e51cfcd74b25cc7d6a41912a054749
 article support-status-limits.ro ca0b2c95cbce0f684867a92c6f2551829b89c0c18e83b9c1af921a9f8af3d2be
 article unsupported-capabilities.ro b2ebdc765ec96488ec564c1b5cd00d9d3f9e390abaf17cd5868ec7b505197f85
@@ -674,9 +674,9 @@ recovery debate-workspace-menus.ro.modelProjection b9a0bf0de664fcb0b6548121e532e
 recovery debate-workspace-menus.ro.fallback 5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97
 recovery getting-started-debate.ro.modelProjection 33a8fc6a0bd1dd38de5e0bdea12600a422f00d7d0d4819c7bc182554e0d9d734
 recovery getting-started-debate.ro.fallback a5d2d9f051896716213aabe9f48c97257778ded6cb054dec0d7b32d615549c4a
-recovery guide-how-it-works.ro.modelProjection 10e46c0185bcb5d6b5a8b8e63e7b677240b6ef4467b669b1f9bb59b226be3f1b
-recovery guide-how-it-works.ro.fallback 912f21ed951d1a536c4ddaada3fac2a25d02528050b4004af0d493a8321c2f37
-recovery risk-tier-choice.ro.modelProjection 2c826f1a596a76a8f2acf47b0a5b2384f134d6dc9c96c961f976d334ede818c2
+recovery guide-how-it-works.ro.modelProjection f34118491cc1fdfd73f1a810c00e6acd298928a51cb906710179ec8e644599b7
+recovery guide-how-it-works.ro.fallback cbf7d875d34bbb3a6a9ae338cb47a622340ddb3de3f6c1278336b1515d52a872
+recovery risk-tier-choice.ro.modelProjection cbdf51987dff98813c12728216ba81b88559869d2e165018698ed286dcb928a5
 recovery risk-tier-choice.ro.fallback 3d938be89e4673f9958381aa1e652ce2ee377d38cb5701c689701391f8774874
 recovery support-cases.ro.modelProjection 752edeef206e2675bed63f5c2179f287e66db694e4243df56dbd97382d586eb9
 recovery support-cases.ro.fallback 6a6d5f9d737e0e0c692a7ae9b0dc24434ba5871de62b3fcd0e955e6fe1894a9f
@@ -686,5 +686,5 @@ recovery unsupported-capabilities.ro.modelProjection b8d3adac101ca1f2814fa32e3b7
 recovery unsupported-capabilities.ro.fallback b223418e6d366bd25ac2d36bfc64b43c40206776c1fc298839327349e721b8d0
 recovery support-status-limits.en.modelProjection 932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385
 recovery support-status-limits.en.fallback 875854ecea195464759705f8035052bd5389c71a1acc439713326784bb5e2981
-component-file 6e8e9c8c6003dfd2ab6f1eca64df0a849958818dbb3066643e54c5bd9d657bb3
+component-file 6c05d583e0afc6683ea63a7163bac38f531964c01117cbed478cc989d29fd41c
 ~~~

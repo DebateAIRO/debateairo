@@ -109,7 +109,7 @@
     {
       "id": "debate-workspace-menus",
       "lang": "ro",
-      "articleSha256": "722c996850311bc6a607fabd655dd26ed95cfa43dee4ec50ff4cd827ef0ec081",
+      "articleSha256": "8ad990c00886c52fb547cac2d5f4d3351d5c0fc48b937d36ec8e3459fedbf6b1",
       "modelProjection": "Când dezbaterea are un arbore, Fir arată o succesiune, Divizat compară ramurile, Arbore arată ierarhia, iar Hartă arată relațiile. Evaluarea apare numai când este disponibilă. Diagnosticul public poate arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul cu momentele verificării sau generării; cache sau învechire; numărul afirmațiilor curente, evaluate, omise și trunchiate și filtrele bazate pe scor; golurile nerezolvate și marcajele fatale; și investigațiile recomandate. O categorie sau o valoare poate lipsi când datele de evaluare nu sunt disponibile. Asistența poate explica aceste categorii publice, dar nu poate citi dezbaterea sau valorile ei. Reluare, Spațiu de lucru, Onestitate, Export și Cum funcționează acționează asupra dezbaterii deja deschise; dezbaterile publice oferă un set mai mic, numai pentru citire.",
       "fallback": "Diagnosticul de evaluare poate arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul; cache sau învechire; numărul afirmațiilor și filtrele; golurile nerezolvate, marcajele fatale și investigațiile recomandate când datele sunt disponibile. Asistența poate explica aceste categorii, dar nu poate citi dezbaterea sau valorile ei."
     },
@@ -165,9 +165,9 @@
     {
       "id": "guide-how-it-works",
       "lang": "ro",
-      "articleSha256": "8b6512cb457c072784cde1cf3caa9293ff851e20202125609948bb808037b329",
-      "modelProjection": "Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. „Contestați” schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Export este JSON condiționat, nu Markdown.",
-      "fallback": "Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. „Contestați” schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. Export este JSON condiționat, nu Markdown."
+      "articleSha256": "c396a00502bb96aaf7e981d20482a4068ba14f4d796fb1f8079162d3aa5b0568",
+      "modelProjection": "Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. „Contestați” schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. „Export” este JSON condiționat, nu Markdown.",
+      "fallback": "Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. „Contestați” schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. „Export” este JSON condiționat, nu Markdown."
     },
     {
       "id": "privacy-consent",
@@ -235,8 +235,8 @@
     {
       "id": "risk-tier-choice",
       "lang": "ro",
-      "articleSha256": "41d65efb7378a56a5727a34c93954134c869d29fa6d51c6b7a378b7d40a2dc82",
-      "modelProjection": "Nivel de risc înregistrează cât de mult depinde de răspuns. Gratuit îl fixează la Standard. Premium permite alegerea Informal, Standard sau Miză ridicată înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.",
+      "articleSha256": "00cffb0532c7f79072da508618c3f2f0b5d93fac02dc5c574b662f3355032173",
+      "modelProjection": "„Nivel de risc” înregistrează cât de mult depinde de răspuns. Gratuit îl fixează la Standard. Premium permite alegerea Informal, Standard sau Miză ridicată înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.",
       "fallback": "În formularul dezbaterii, Gratuit fixează riscul la Standard. Cu Premium selectat, alege Informal, Standard sau Miză ridicată înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba ulterior."
     },
     {
