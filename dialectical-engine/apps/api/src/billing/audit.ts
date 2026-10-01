@@ -21,6 +21,12 @@ export type BillingAuditEvent =
   | "billing.country.refused"
   | "billing.notice.undecryptable"
   | "billing.outbox.dead"
+  /**
+   * P7: the worker could not record a handled job's outcome because complete/fail threw (a lost connection, or a
+   * code that billing.outbox's last_error_code CHECK '^[A-Z0-9_:-]{1,96}$' refuses); the job runs again after its
+   * lease; the fields are the kind, the handler's outcome and attempts only.
+   */
+  | "billing.outbox.settle_failed"
   | "billing.renewal.unknown"
   /**
    * P11a (A2, Q-1): a renewal whose rebill never reached xMoney, or whose outcome stayed unknown, past its window;

@@ -88,6 +88,20 @@ describe("P7 billing outbox worker", () => {
     expect(audit).not.toHaveBeenCalled();
   });
 
+  it("writes one content-free line when a settle throws, and still runs the rest of the batch", async () => {
+    const audit = vi.fn();
+    const { repository, worker } = workerOn([job("EMAIL", 1, "first"), job("EMAIL", 1, "second")], audit);
+    repository.complete.mockRejectedValueOnce(new Error("connection terminated"));
+    worker.register("EMAIL", async () => ({ kind: "DONE" }));
+    expect(await worker.runOnce()).toEqual([
+      { jobId: "job-EMAIL-first", kind: "EMAIL", outcome: "RETRY" },
+      { jobId: "job-EMAIL-second", kind: "EMAIL", outcome: "DONE" }
+    ]);
+    expect(audit).toHaveBeenCalledTimes(1);
+    expect(audit).toHaveBeenCalledWith("billing.outbox.settle_failed", { kind: "EMAIL", outcome: "DONE", attempts: 1 });
+    expect(repository.fail).not.toHaveBeenCalled();
+  });
+
   it("retries a thrown handler on 1m/5m/30m/2h/12h, then dead-letters it with one audit line", async () => {
     expect([1, 2, 3, 4, 5].map((attempts) => failureRetryAt(attempts, NOW)!.getTime() - NOW.getTime()))
       .toEqual([MINUTE, 5 * MINUTE, 30 * MINUTE, 120 * MINUTE, 720 * MINUTE]);

@@ -117,7 +117,10 @@ export class BillingOutboxWorker {
         const settled = await this.settle(job, outcome);
         report.push(settled === null ? lostClaim(job) : Object.freeze({ jobId: job.jobId, kind: job.kind, outcome: settled }));
       } catch {
-        // The claim lease makes the job claimable again; later jobs in the batch still get their attempt.
+        // The job keeps its claim and runs again after its 5-minute lease, so a DONE side effect (an email) may
+        // repeat: delivery is at-least-once, and this line is the operator's signal. Later jobs in the batch
+        // still get their attempt.
+        this.options.audit("billing.outbox.settle_failed", { kind: job.kind, outcome: outcome.kind, attempts: job.attempts });
         report.push(Object.freeze({ jobId: job.jobId, kind: job.kind, outcome: "RETRY" as const }));
       }
     }
