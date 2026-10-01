@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Sämtliche Inhalte dieser Debatte – Argumente, Prüfungen, Bewertungen und das Urteil – werden von KI-Modellen erzeugt, maschinenlesbar gekennzeichnet und können fehlerhaft sein.",
+  "debateChrome.status.waiting": "Wartet auf den Start. Ihre Debatte startet von selbst um {time}.",
   "debateChrome.backToLibrary": "← Zurück zur Bibliothek",
   "debateChrome.loading": "Wird geladen…",
   "debateChrome.error.claimGenerationFailed": "Erzeugung der Behauptung fehlgeschlagen",

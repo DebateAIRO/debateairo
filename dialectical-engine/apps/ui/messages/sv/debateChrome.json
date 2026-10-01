@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Allt i den här debatten — argument, granskningar, poäng och utslag — genereras av AI-modeller, är maskinläsbart märkt och kan vara felaktigt.",
+  "debateChrome.status.waiting": "Väntar på att starta. Din debatt startar av sig själv {time}.",
   "debateChrome.backToLibrary": "← Tillbaka till biblioteket",
   "debateChrome.loading": "Läser in…",
   "debateChrome.error.claimGenerationFailed": "Det gick inte att generera påståendet",

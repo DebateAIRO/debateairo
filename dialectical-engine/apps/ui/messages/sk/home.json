@@ -22,6 +22,7 @@
   "home.by": "Autor: {name}",
   "home.noDebates": "Zatiaľ tu nie sú žiadne debaty — zadajte prvé tvrdenie vyššie.",
   "home.generationFailed": "Generovanie debaty zlyhalo: {reason}",
+  "home.status.waiting": "Čaká na spustenie. Vaša debata sa spustí sama v čase {time}.",
   "home.noPublishedDebates": "Zatiaľ nebola zverejnená žiadna debata.",
   "home.verdictUnavailable": "Verdikt nie je k dispozícii",
   "home.verdict.supported": "Podporené",

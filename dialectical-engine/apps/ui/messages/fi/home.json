@@ -22,6 +22,7 @@
   "home.by": "Tekijä: {name}",
   "home.noDebates": "Ei vielä väittelyjä — esitä ensimmäinen väite yllä.",
   "home.generationFailed": "Väittelyn luonti epäonnistui: {reason}",
+  "home.status.waiting": "Odottaa alkamista. Väittelysi alkaa itsestään {time}.",
   "home.noPublishedDebates": "Väittelyjä ei ole vielä julkaistu.",
   "home.verdictUnavailable": "Tuomio ei ole saatavilla",
   "home.verdict.supported": "Tuettu",

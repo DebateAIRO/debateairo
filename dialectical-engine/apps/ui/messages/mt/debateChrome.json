@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Kollox f’dan id-dibattitu — l-argumenti, ir-rieżamijiet, il-punteġġi u l-verdett — huwa ġġenerat minn mudelli tal-IA, immarkat b’mod li jista’ jinqara minn magna, u jista’ ma jkunx preċiż.",
+  "debateChrome.status.waiting": "Qed jistenna biex jibda. Id-dibattitu tiegħek jibda waħdu fi {time}.",
   "debateChrome.backToLibrary": "← Lura għal-librerija",
   "debateChrome.loading": "Qed jitgħabba…",
   "debateChrome.error.claimGenerationFailed": "Il-ġenerazzjoni tal-pretensjoni falliet",

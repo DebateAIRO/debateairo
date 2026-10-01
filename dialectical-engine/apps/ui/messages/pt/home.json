@@ -22,6 +22,7 @@
   "home.by": "Por {name}",
   "home.noDebates": "Ainda não há debates — submeta a primeira alegação acima.",
   "home.generationFailed": "Falha na geração do debate: {reason}",
+  "home.status.waiting": "A aguardar o início. O seu debate começará sozinho às {time}.",
   "home.noPublishedDebates": "Ainda não foi publicado nenhum debate.",
   "home.verdictUnavailable": "Veredito indisponível",
   "home.verdict.supported": "Sustentado",

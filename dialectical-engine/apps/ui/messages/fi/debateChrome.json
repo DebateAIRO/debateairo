@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Kaikki tässä väittelyssä — argumentit, arviot, pisteet ja ratkaisu — on tekoälymallien tuottamaa, koneellisesti luettavasti merkittyä ja mahdollisesti virheellistä.",
+  "debateChrome.status.waiting": "Odottaa alkamista. Väittelysi alkaa itsestään {time}.",
   "debateChrome.backToLibrary": "← Takaisin kirjastoon",
   "debateChrome.loading": "Ladataan…",
   "debateChrome.error.claimGenerationFailed": "Väitteen luonti epäonnistui",

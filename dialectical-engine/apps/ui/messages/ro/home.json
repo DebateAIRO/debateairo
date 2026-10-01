@@ -22,6 +22,7 @@
   "home.by": "De {name}",
   "home.noDebates": "Nicio dezbatere încă — publicați prima afirmație mai sus.",
   "home.generationFailed": "Generarea dezbaterii a eșuat: {reason}",
+  "home.status.waiting": "Așteaptă să pornească. Dezbaterea dvs. va porni singură la {time}.",
   "home.noPublishedDebates": "Nu a fost publicată încă nicio dezbatere.",
   "home.verdictUnavailable": "Verdict indisponibil",
   "home.verdict.supported": "Susținut",

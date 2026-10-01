@@ -22,6 +22,7 @@
   "home.by": "作者：{name}",
   "home.noDebates": "暂无辩论 — 请在上方提交第一个主张。",
   "home.generationFailed": "辩论生成失败：{reason}",
+  "home.status.waiting": "等待开始。您的辩论将于{time}自动开始。",
   "home.noPublishedDebates": "尚未发布任何辩论。",
   "home.verdictUnavailable": "裁决不可用",
   "home.verdict.supported": "受支持",

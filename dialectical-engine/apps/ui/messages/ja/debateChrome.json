@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "このディベートの論証、レビュー、スコア、判定はすべてAIモデルが生成し、機械可読の印が付きますが、不正確な場合があります。",
+  "debateChrome.status.waiting": "開始待ちです。ディベートは{time}に自動的に始まります。",
   "debateChrome.backToLibrary": "← ライブラリに戻る",
   "debateChrome.loading": "読み込み中…",
   "debateChrome.error.claimGenerationFailed": "主張の生成に失敗しました",

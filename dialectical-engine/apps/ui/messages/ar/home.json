@@ -22,6 +22,7 @@
   "home.by": "بواسطة {name}",
   "home.noDebates": "لا توجد مناظرات بعد — انشر الادعاء الأول أعلاه.",
   "home.generationFailed": "فشل إنشاء المناظرة: {reason}",
+  "home.status.waiting": "بانتظار البدء. ستبدأ مناظرتك تلقائيًا في {time}.",
   "home.noPublishedDebates": "لم تُنشر أي مناظرات بعد.",
   "home.verdictUnavailable": "الحكم غير متاح",
   "home.verdict.supported": "مدعوم",

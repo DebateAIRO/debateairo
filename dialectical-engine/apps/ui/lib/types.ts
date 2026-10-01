@@ -7,6 +7,8 @@ export type DebateSummary = {
   models: string[];
   created_at_sequence?: number;
   terminal_reason?: string | null;
+  /** Budget spec §2.7: the expected start of a WAITING run (ISO); null otherwise. */
+  waits_until?: string | null;
 };
 
 export type Generation = {
@@ -719,6 +721,8 @@ export type DebateDetail = {
   run_state?: "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
   /** Honest provider-recovery deadline when run_state is HOLDING. */
   hold_until?: string | null;
+  /** Budget spec §2.7: when a WAITING run is expected to start (ISO); null otherwise. */
+  waits_until?: string | null;
   config: DebateConfig;
   direct_answer: null;
   root_node_id: string | null;

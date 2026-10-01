@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Vše v této debatě – argumenty, kontroly, skóre i verdikt – je generováno modely AI, strojově čitelně označeno a může být nepřesné.",
+  "debateChrome.status.waiting": "Čeká na spuštění. Vaše debata se spustí sama v {time}.",
   "debateChrome.backToLibrary": "← Zpět do knihovny",
   "debateChrome.loading": "Načítání…",
   "debateChrome.error.claimGenerationFailed": "Generování tvrzení selhalo",

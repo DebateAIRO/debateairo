@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "كل ما في هذه المناظرة — الحجج والمراجعات والدرجات والحكم — مولّد بنماذج الذكاء الاصطناعي وموسوم بما يمكن للآلة قراءته، وقد يكون غير دقيق.",
+  "debateChrome.status.waiting": "بانتظار البدء. ستبدأ مناظرتك تلقائيًا في {time}.",
   "debateChrome.backToLibrary": "← العودة إلى المكتبة",
   "debateChrome.loading": "جارٍ التحميل…",
   "debateChrome.error.claimGenerationFailed": "فشل إنشاء الادعاء",

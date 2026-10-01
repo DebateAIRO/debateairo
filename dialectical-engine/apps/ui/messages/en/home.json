@@ -22,6 +22,7 @@
   "home.by": "By {name}",
   "home.noDebates": "No debates yet — post the first claim above.",
   "home.generationFailed": "Debate generation failed: {reason}",
+  "home.status.waiting": "Waiting to start. Your debate will begin by itself at {time}.",
   "home.noPublishedDebates": "No debates have been published yet.",
   "home.verdictUnavailable": "Verdict unavailable",
   "home.verdict.supported": "Supported",

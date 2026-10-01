@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Gineann samhlacha IS gach rud sa díospóireacht seo — argóintí, athbhreithnithe, scóir agus an breithiúnas — marcáiltear ar bhealach atá inléite ag meaisín é, agus d’fhéadfadh sé a bheith míchruinn.",
+  "debateChrome.status.waiting": "Ag fanacht le tosú. Tosóidh do dhíospóireacht léi féin ag {time}.",
   "debateChrome.backToLibrary": "← Ar ais chuig an leabharlann",
   "debateChrome.loading": "Á lódáil…",
   "debateChrome.error.claimGenerationFailed": "Theip ar ghiniúint an mhaímh",

@@ -22,6 +22,7 @@
   "home.by": "Avtor: {name}",
   "home.noDebates": "Razprav še ni — zgoraj objavite prvo trditev.",
   "home.generationFailed": "Ustvarjanje razprave ni uspelo: {reason}",
+  "home.status.waiting": "Čaka na začetek. Vaša razprava se bo začela sama ob {time}.",
   "home.noPublishedDebates": "Objavljena ni bila še nobena razprava.",
   "home.verdictUnavailable": "Razsodba ni na voljo",
   "home.verdict.supported": "Podprto",

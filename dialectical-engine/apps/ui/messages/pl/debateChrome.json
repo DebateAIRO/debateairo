@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Wszystko w tej debacie — argumenty, recenzje, oceny i werdykt — jest generowane przez modele AI, oznaczone w sposób możliwy do odczytu maszynowego i może być niedokładne.",
+  "debateChrome.status.waiting": "Czeka na rozpoczęcie. Twoja debata rozpocznie się sama o {time}.",
   "debateChrome.backToLibrary": "← Wróć do biblioteki",
   "debateChrome.loading": "Wczytywanie…",
   "debateChrome.error.claimGenerationFailed": "Generowanie tezy nie powiodło się",

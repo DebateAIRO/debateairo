@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Visu šajās debatēs — argumentus, pārskatus, vērtējumus un spriedumu — ģenerē MI modeļi; saturs ir mašīnlasāmi marķēts un var būt neprecīzs.",
+  "debateChrome.status.waiting": "Gaida sākumu. Jūsu debates sāksies pašas {time}.",
   "debateChrome.backToLibrary": "← Atpakaļ uz bibliotēku",
   "debateChrome.loading": "Ielādē…",
   "debateChrome.error.claimGenerationFailed": "Apgalvojuma ģenerēšana neizdevās",

@@ -10,6 +10,7 @@
   "time.status.claimed": "Telah diambil",
   "time.status.running": "Sedang berjalan",
   "time.status.holding": "Ditahan untuk pemulihan penyedia",
+  "time.status.waiting": "Menunggu",
   "time.status.settled": "Dituntaskan",
   "time.status.generating": "Sedang dibuat",
   "time.status.failed": "Gagal",

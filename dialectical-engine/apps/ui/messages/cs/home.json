@@ -22,6 +22,7 @@
   "home.by": "Od {name}",
   "home.noDebates": "Zatím žádné diskuse – první tvrzení zveřejněte výše.",
   "home.generationFailed": "Generování debaty selhalo: {reason}",
+  "home.status.waiting": "Čeká na spuštění. Vaše debata se spustí sama v {time}.",
   "home.noPublishedDebates": "Dosud nebyly zveřejněny žádné debaty.",
   "home.verdictUnavailable": "Verdikt není k dispozici",
   "home.verdict.supported": "Podpořeno",

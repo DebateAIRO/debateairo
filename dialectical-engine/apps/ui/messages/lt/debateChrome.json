@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Viską šiuose debatuose — argumentus, peržiūras, įverčius ir verdiktą — generuoja DI modeliai; turinys pažymėtas kompiuterio skaitoma žyma ir gali būti netikslus.",
+  "debateChrome.status.waiting": "Laukiama pradžios. Jūsų debatai prasidės patys {time}.",
   "debateChrome.backToLibrary": "← Grįžti į biblioteką",
   "debateChrome.loading": "Įkeliama…",
   "debateChrome.error.claimGenerationFailed": "Nepavyko sugeneruoti teiginio",

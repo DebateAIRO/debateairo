@@ -22,6 +22,7 @@
   "home.by": "{name}による投稿",
   "home.noDebates": "まだディベートはありません — 上から最初の主張を投稿してください。",
   "home.generationFailed": "ディベートの生成に失敗しました：{reason}",
+  "home.status.waiting": "開始待ちです。ディベートは{time}に自動的に始まります。",
   "home.noPublishedDebates": "公開されたディベートはまだありません。",
   "home.verdictUnavailable": "判定を利用できません",
   "home.verdict.supported": "支持",

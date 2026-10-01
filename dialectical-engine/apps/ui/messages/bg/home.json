@@ -22,6 +22,7 @@
   "home.by": "От {name}",
   "home.noDebates": "Все още няма дебати — въведете първото си твърдение по-горе.",
   "home.generationFailed": "Генерирането на дебата е неуспешно: {reason}",
+  "home.status.waiting": "Изчаква старт. Дебатът ви ще започне сам в {time}.",
   "home.noPublishedDebates": "Все още няма публикувани дебати.",
   "home.verdictUnavailable": "Присъдата не е достъпна",
   "home.verdict.supported": "Подкрепено",

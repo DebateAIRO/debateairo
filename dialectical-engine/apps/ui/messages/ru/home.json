@@ -22,6 +22,7 @@
   "home.by": "Автор: {name}",
   "home.noDebates": "Дебатов пока нет — выдвиньте первый тезис выше.",
   "home.generationFailed": "Не удалось создать дебаты: {reason}",
+  "home.status.waiting": "Ожидает начала. Ваши дебаты начнутся сами в {time}.",
   "home.noPublishedDebates": "Пока не опубликовано ни одних дебатов.",
   "home.verdictUnavailable": "Вердикт недоступен",
   "home.verdict.supported": "Поддержан",

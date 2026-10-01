@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Alles in dit debat — argumenten, beoordelingen, scores en het oordeel — is door AI-modellen gegenereerd, machineleesbaar gemarkeerd en kan onnauwkeurig zijn.",
+  "debateChrome.status.waiting": "Wacht op de start. Uw debat start vanzelf om {time}.",
   "debateChrome.backToLibrary": "← Terug naar bibliotheek",
   "debateChrome.loading": "Laden…",
   "debateChrome.error.claimGenerationFailed": "Genereren van stelling mislukt",

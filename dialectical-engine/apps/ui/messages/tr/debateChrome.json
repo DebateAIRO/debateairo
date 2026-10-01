@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Bu tartışmadaki her şey — argümanlar, değerlendirmeler, puanlar ve hüküm — yapay zekâ modelleri tarafından üretilir, makinece okunabilir biçimde işaretlenir ve hatalı olabilir.",
+  "debateChrome.status.waiting": "Başlamayı bekliyor. Tartışmanız {time} itibarıyla kendiliğinden başlayacak.",
   "debateChrome.backToLibrary": "← Kütüphaneye dön",
   "debateChrome.loading": "Yükleniyor…",
   "debateChrome.error.claimGenerationFailed": "İddia oluşturulamadı",

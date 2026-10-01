@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "כל תוכן הדיון — הטיעונים, הביקורות, הציונים וההכרעה — נוצר בידי מודלים של בינה מלאכותית, מסומן באופן קריא למכונה ועלול להיות שגוי.",
+  "debateChrome.status.waiting": "ממתין להתחלה. הדיון שלכם יתחיל מעצמו ב־{time}.",
   "debateChrome.backToLibrary": "→ חזרה לספרייה",
   "debateChrome.loading": "בטעינה…",
   "debateChrome.error.claimGenerationFailed": "יצירת הטענה נכשלה",

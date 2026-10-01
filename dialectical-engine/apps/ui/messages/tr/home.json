@@ -22,6 +22,7 @@
   "home.by": "{name} tarafından",
   "home.noDebates": "Henüz tartışma yok — yukarıda ilk iddiayı yayımlayın.",
   "home.generationFailed": "Tartışma oluşturulamadı: {reason}",
+  "home.status.waiting": "Başlamayı bekliyor. Tartışmanız {time} itibarıyla kendiliğinden başlayacak.",
   "home.noPublishedDebates": "Henüz bir tartışma yayımlanmadı.",
   "home.verdictUnavailable": "Hüküm kullanılamıyor",
   "home.verdict.supported": "Destekleniyor",

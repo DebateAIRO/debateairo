@@ -22,6 +22,7 @@
   "home.by": "Autor: {name}",
   "home.noDebates": "Nie ma jeszcze debat — opublikuj pierwszą tezę powyżej.",
   "home.generationFailed": "Generowanie debaty nie powiodło się: {reason}",
+  "home.status.waiting": "Czeka na rozpoczęcie. Twoja debata rozpocznie się sama o {time}.",
   "home.noPublishedDebates": "Nie opublikowano jeszcze żadnej debaty.",
   "home.verdictUnavailable": "Werdykt niedostępny",
   "home.verdict.supported": "Poparta",

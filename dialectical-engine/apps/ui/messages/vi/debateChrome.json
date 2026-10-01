@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Mọi nội dung trong cuộc tranh luận này — lập luận, đánh giá, điểm số và phán quyết — đều do các mô hình AI tạo ra, được đánh dấu để máy đọc và có thể không chính xác.",
+  "debateChrome.status.waiting": "Đang chờ bắt đầu. Cuộc tranh luận của bạn sẽ tự bắt đầu lúc {time}.",
   "debateChrome.backToLibrary": "← Quay lại thư viện",
   "debateChrome.loading": "Đang tải…",
   "debateChrome.error.claimGenerationFailed": "Không thể tạo luận đề",

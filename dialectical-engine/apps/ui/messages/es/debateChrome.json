@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Todo el contenido de este debate —argumentos, revisiones, puntuaciones y veredicto— lo generan modelos de IA, lleva una marca legible por máquina y puede ser inexacto.",
+  "debateChrome.status.waiting": "Esperando para empezar. Su debate empezará por sí solo a las {time}.",
   "debateChrome.backToLibrary": "← Volver a la biblioteca",
   "debateChrome.loading": "Cargando…",
   "debateChrome.error.claimGenerationFailed": "No se pudo generar la afirmación",

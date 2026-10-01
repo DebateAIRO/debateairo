@@ -22,6 +22,7 @@
   "home.by": "Av {name}",
   "home.noDebates": "Inga debatter ännu — lägg fram det första påståendet ovan.",
   "home.generationFailed": "Det gick inte att generera debatten: {reason}",
+  "home.status.waiting": "Väntar på att starta. Din debatt startar av sig själv {time}.",
   "home.noPublishedDebates": "Inga debatter har publicerats ännu.",
   "home.verdictUnavailable": "Utslaget är inte tillgängligt",
   "home.verdict.supported": "Har stöd",

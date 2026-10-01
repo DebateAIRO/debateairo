@@ -22,6 +22,7 @@
   "home.by": "Par {name}",
   "home.noDebates": "Aucun débat pour l’instant — soumettez votre première affirmation ci-dessus.",
   "home.generationFailed": "Échec de la génération du débat : {reason}",
+  "home.status.waiting": "En attente de démarrage. Votre débat démarrera de lui-même à {time}.",
   "home.noPublishedDebates": "Aucun débat n’a encore été publié.",
   "home.verdictUnavailable": "Verdict indisponible",
   "home.verdict.supported": "Étayé",

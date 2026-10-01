@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Kõik selles väitluses — argumendid, hinnangud, hinded ja otsus — on loodud tehisintellektimudelitega, masinloetavalt märgistatud ning võivad olla ebatäpsed.",
+  "debateChrome.status.waiting": "Ootab algust. Teie väitlus algab ise {time}.",
   "debateChrome.backToLibrary": "← Tagasi raamatukokku",
   "debateChrome.loading": "Laadimine…",
   "debateChrome.error.claimGenerationFailed": "Väite genereerimine nurjus",

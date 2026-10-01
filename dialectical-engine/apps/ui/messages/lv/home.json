@@ -22,6 +22,7 @@
   "home.by": "Autors: {name}",
   "home.noDebates": "Debašu vēl nav — iesniedziet pirmo apgalvojumu augstāk.",
   "home.generationFailed": "Debašu ģenerēšana neizdevās: {reason}",
+  "home.status.waiting": "Gaida sākumu. Jūsu debates sāksies pašas {time}.",
   "home.noPublishedDebates": "Vēl nav publicētas nevienas debates.",
   "home.verdictUnavailable": "Spriedums nav pieejams",
   "home.verdict.supported": "Pamatots",

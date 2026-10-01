@@ -22,6 +22,7 @@
   "home.by": "Autor: {name}",
   "home.noDebates": "Još nema rasprava — postavite prvu tvrdnju iznad.",
   "home.generationFailed": "Stvaranje rasprave nije uspjelo: {reason}",
+  "home.status.waiting": "Čeka na početak. Vaša će rasprava započeti sama u {time}.",
   "home.noPublishedDebates": "Nijedna rasprava još nije objavljena.",
   "home.verdictUnavailable": "Presuda nije dostupna",
   "home.verdict.supported": "Potkrijepljeno",

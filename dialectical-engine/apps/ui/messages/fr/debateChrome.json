@@ -1,5 +1,6 @@
 {
   "debateChrome.aiNotice": "Tout ce qui figure dans ce débat — arguments, évaluations, scores et verdict — est généré par des modèles d’IA, signalé dans un format lisible par machine et peut être inexact.",
+  "debateChrome.status.waiting": "En attente de démarrage. Votre débat démarrera de lui-même à {time}.",
   "debateChrome.backToLibrary": "← Retour à la bibliothèque",
   "debateChrome.loading": "Chargement…",
   "debateChrome.error.claimGenerationFailed": "Échec de la génération de l’affirmation",
