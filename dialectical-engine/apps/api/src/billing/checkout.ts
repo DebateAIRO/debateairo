@@ -12,7 +12,7 @@ import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js"
 import { englishOrderText, planName, type BillingOrderText } from "./order-text.js";
 import { decidePaymentPlace, placeRefusal } from "./place.js";
 import { addressRequired, LIVE_SUBSCRIPTION_STATUSES } from "./quote.js";
-import { openQuoteLocation, sealBillingProfile } from "./records.js";
+import { openQuoteLocation, sealBillingProfile, type QuoteLocation } from "./records.js";
 import { BillingRefusal } from "./refusal.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "./rows.js";
 
@@ -124,6 +124,16 @@ export function inFlightAttemptFresh(createdAt: Date | null, now: Date): boolean
   return createdAt === null || now.getTime() - createdAt.getTime() < inFlightAttemptLifeMs();
 }
 
+/** Whether two quotes declare the same buyer (A3(b)); `ip` and `ipCountry` are quote-time evidence, not the buyer. */
+function samePurchaser(a: QuoteLocation, b: QuoteLocation): boolean {
+  const sameCompany = a.company === null || b.company === null
+    ? a.company === b.company
+    : a.company.name === b.company.name && a.company.vatId === b.company.vatId
+      && a.company.address === b.company.address && a.company.vatValidated === b.company.vatValidated;
+  return a.name === b.name && a.country === b.country && a.region === b.region && a.postalCode === b.postalCode
+    && a.city === b.city && a.street === b.street && sameCompany;
+}
+
 type Prepared = Readonly<{ chargeId: string; customerId: string; totalMicros: number; planId: PlanId; reused: boolean }>;
 
 export class CheckoutService implements CheckoutServicePort {
@@ -166,9 +176,11 @@ export class CheckoutService implements CheckoutServicePort {
       if (existing !== null && existing.status === "CREATED") {
         // D7 #5: a fresh payment on its way is answered CHECKOUT_PENDING, before any reuse or abandonment.
         await this.assertNoPaymentUnderway(client, existing, input.now);
-        const reusable = await this.reusableCharge(client, existing, quote, input.now);
+        const reusable = await this.reusableCharge(client, existing, quote, location, input.now);
         const known = reusable === null ? null : await this.deps.repository.customerByOwner(input.ownerRef, undefined, client);
         if (reusable !== null && known !== null) {
+          // Spec §2.5.3 step 2, §2.3: this checkout's consents are recorded even when its charge is the open one.
+          await this.deps.acceptances.record(client, this.consentRows(input));
           return { chargeId: reusable.chargeId, customerId: known.customerId, totalMicros: reusable.totalMicros, planId: existing.planId, reused: true };
         }
         await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(
@@ -285,9 +297,15 @@ export class CheckoutService implements CheckoutServicePort {
 
   /**
    * A3(b): the same open charge, when it is young, for the same plan and total, in this xMoney system (a stage order
-   * cannot be paid at live, R-14), and has no outcome yet. Read through the checkout transaction's `client`.
+   * cannot be paid at live, R-14), has no outcome yet, and is for an unchanged purchase: its own quote has the same tax
+   * country and the same declared buyer (name, country, region, postal code, city, street and company). The quote's
+   * `ip` and `ipCountry` are quote-time evidence and are not compared. A changed purchase is not reused, so the
+   * caller abandons the open checkout and makes a new charge, profile and order from what the person last declared.
+   * Read through the checkout transaction's `client`.
    */
-  private async reusableCharge(client: PoolClient, existing: SubscriptionState, quote: QuoteRow, now: Date): Promise<ChargeRow | null> {
+  private async reusableCharge(
+    client: PoolClient, existing: SubscriptionState, quote: QuoteRow, location: QuoteLocation, now: Date
+  ): Promise<ChargeRow | null> {
     const reuseWindowMs = 30 * 60_000;
     const events = await this.deps.repository.subscriptionEvents(existing.subscriptionId, client);
     const created = events.find((event) => event.kind === "CREATED");
@@ -297,6 +315,10 @@ export class CheckoutService implements CheckoutServicePort {
       .find((charge) => charge.kind === "INITIAL");
     if (initial === undefined || initial.totalMicros !== quote.totalMicros) return null;
     if (initial.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return null;
+    const opened = initial.quoteId === null ? null : await this.deps.repository.quote(initial.quoteId, existing.ownerRef, client);
+    if (opened === null || opened.taxCountry !== quote.taxCountry) return null;
+    const declared = openQuoteLocation(this.deps.recordsKey, opened.quoteId, opened.locationCiphertext);
+    if (!samePurchaser(declared, location)) return null;
     const withEvents = await this.deps.repository.charge(initial.chargeId, client);
     if (withEvents === null || withEvents.events.some((event) => event.kind !== "REQUESTED")) return null;
     return initial;

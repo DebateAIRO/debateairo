@@ -69,11 +69,30 @@ describe("P8c the checkout", () => {
     expect(await h.repository.chargesForSubscription(first.subscriptionId)).toHaveLength(1);
     const secondQuoteUse = await h.database.pool.query("SELECT 1 FROM billing.quote_use WHERE quote_id=$1", [again.quoteId]);
     expect(secondQuoteUse.rowCount).toBe(0);
+    // Spec §2.5.3 step 2, §2.3: the reused checkout's consents are recorded too.
+    const acceptances = await h.database.pool.query("SELECT kind FROM legal.acceptance WHERE owner_ref=$1 ORDER BY kind", [ownerRef]);
+    expect(acceptances.rows.map((row: { kind: string }) => row.kind))
+      .toEqual(["IMMEDIATE_START", "IMMEDIATE_START", "RENEWAL_TERMS", "RENEWAL_TERMS"]);
     h.clock.advance(31 * 60_000);
     const later = await h.buy({ ownerRef });
     expect(later.chargeId).not.toBe(first.chargeId);
     const ended = (await h.repository.subscriptionEvents(first.subscriptionId)).at(-1);
     expect(ended).toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED" } });
+  });
+
+  it("makes a new charge, from the new quote, when the buyer's details changed within 30 minutes (A3(b))", async () => {
+    const ownerRef = randomUUID();
+    const first = await h.buy({ ownerRef });
+    const moved = await quoteFor(ownerRef, { name: "Test Buyer", city: "Cluj-Napoca" });
+    const again = await startWith(ownerRef, moved.quote.quoteId);
+    expect(again.reused).toBe(false);
+    expect(again.chargeId).not.toBe(first.chargeId);
+    expect(await h.repository.charge(again.chargeId)).toMatchObject({ quoteId: moved.quote.quoteId });
+    expect((await h.repository.subscriptionEvents(first.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED", reason: "NEW_CHECKOUT" } });
+    const customer = await h.repository.customerByOwner(ownerRef);
+    const profile = await h.repository.latestProfile(customer!.customerId);
+    expect(openBillingProfile(h.recordsKey, customer!.customerId, profile!.profileCiphertext)).toMatchObject({ city: "Cluj-Napoca" });
   });
 
   it("makes one charge for two concurrent checkouts by one owner, and one xMoney customer", async () => {
