@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "Tudo neste debate — argumentos, revisões, pontuações e o veredito — é gerado por modelos de IA, marcado de forma legível por máquina e pode conter imprecisões.",
   "debateChrome.status.waiting": "A aguardar o início. O seu debate começará sozinho às {time}.",
+  "debateChrome.status.waitingOwnDebates": "Os seus outros debates estão a usar, por agora, o resto do seu limite. Este debate começará sozinho assim que um deles terminar.",
   "debateChrome.backToLibrary": "← Voltar à biblioteca",
   "debateChrome.loading": "A carregar…",
   "debateChrome.error.claimGenerationFailed": "Falha ao gerar a alegação",

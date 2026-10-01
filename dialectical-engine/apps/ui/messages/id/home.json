@@ -23,6 +23,7 @@
   "home.noDebates": "Belum ada debat — ajukan klaim pertama di atas.",
   "home.generationFailed": "Pembuatan debat gagal: {reason}",
   "home.status.waiting": "Menunggu untuk dimulai. Debat Anda akan dimulai dengan sendirinya pada {time}.",
+  "home.status.waitingOwnDebates": "Debat Anda yang lain sedang memakai sisa batas Anda untuk saat ini. Debat ini akan dimulai dengan sendirinya begitu salah satunya selesai.",
   "home.noPublishedDebates": "Belum ada debat yang diterbitkan.",
   "home.verdictUnavailable": "Putusan tidak tersedia",
   "home.verdict.supported": "Didukung",

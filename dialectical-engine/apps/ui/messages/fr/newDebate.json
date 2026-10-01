@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Vous avez atteint la limite du mois de votre formule. Vous pouvez tout de même poser votre question : votre débat démarrera de lui-même le {time}.",
   "newDebate.room.freeMonthFull": "Vous avez utilisé les débats gratuits de ce mois-ci. Votre prochain débat pourra démarrer le {time}, ou choisissez une formule pour continuer maintenant.",
   "newDebate.room.personClose": "Vous approchez de la limite de votre formule. Ce débat se déroulera tout de même en entier.",
+  "newDebate.room.ownDebatesFull": "Vos autres débats utilisent pour l’instant le reste de votre limite. Celui-ci démarrera de lui-même dès que l’un d’eux sera terminé.",
   "newDebate.room.upgradeLink": "Voir les formules",
   "newDebate.room.openWaiting": "Ouvrir le débat en attente",
   "newDebate.plan.current.FREE": "Votre formule : Gratuite",

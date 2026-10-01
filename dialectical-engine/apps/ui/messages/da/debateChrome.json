@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "Alt i denne debat — argumenter, gennemgange, bedømmelser og konklusionen — er genereret af AI-modeller, maskinlæsbart markeret og kan være unøjagtigt.",
   "debateChrome.status.waiting": "Venter på at starte. Din debat starter af sig selv {time}.",
+  "debateChrome.status.waitingOwnDebates": "Dine andre debatter bruger resten af din grænse lige nu. Denne debat starter af sig selv, så snart en af dem er færdig.",
   "debateChrome.backToLibrary": "← Tilbage til biblioteket",
   "debateChrome.loading": "Indlæser…",
   "debateChrome.error.claimGenerationFailed": "Generering af påstand mislykkedes",

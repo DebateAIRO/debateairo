@@ -1186,6 +1186,9 @@ export default function DebatePageClient({
   const waitingStart = debate?.run_state === "WAITING" && typeof debate.waits_until === "string"
     ? debate.waits_until
     : null;
+  // Final review Part 1b, Important 1: a debate that waits only for its
+  // person's own running debates says so in C's place, with no time.
+  const waitingOnOwnDebates = waitingStart !== null && debate?.waits_for === "OWN_DEBATES";
 
   const progress = useMemo(() => {
     if (!debate) return { pct: 0, label: "", count: "" };
@@ -1708,11 +1711,15 @@ export default function DebatePageClient({
           where it wraps and is never cut. */}
       {waitingStart !== null ? (
         <div className="debateWaitingNotice" role="status">
-          <ResetSentence
-            text={t(debateChromeCatalog, "debateChrome.status.waiting", { time: RESET_TIME_MARK })}
-            at={waitingStart}
-            locale={locale}
-          />
+          {waitingOnOwnDebates ? (
+            <span>{t(debateChromeCatalog, "debateChrome.status.waitingOwnDebates")}</span>
+          ) : (
+            <ResetSentence
+              text={t(debateChromeCatalog, "debateChrome.status.waiting", { time: RESET_TIME_MARK })}
+              at={waitingStart}
+              locale={locale}
+            />
+          )}
         </div>
       ) : null}
 

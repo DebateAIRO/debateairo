@@ -66,6 +66,22 @@ describe("the WAITING run in the UI's own shapes", () => {
     ]);
   });
 
+  it("carries waits_for OWN_DEBATES to the debate page and the home list, and nothing for any other run (Important 1)", async () => {
+    const ownDebates = { ...waitingRun, waits_for: "OWN_DEBATES" as const };
+    expect(debateDetailFromRunProjection(ownDebates as never)).toMatchObject({ run_state: "WAITING", waits_for: "OWN_DEBATES" });
+    expect(debateDetailFromRunProjection(waitingRun as never).waits_for).toBeNull();
+    expect(debateDetailFromRunProjection({ ...waitingRun, state: "QUEUED", waits_until: null } as never).waits_for).toBeNull();
+    const client = {
+      readAnswerIndex: async () => ({
+        items: [], limit: 50, offset: 0, total: 1,
+        open_runs: [{ run_ref: "run:waiting", question_line: "Q1?", state: "WAITING", terminal_reason: null, created_at_sequence: 1 }]
+      }),
+      readRun: async () => ownDebates
+    } as unknown as ContractClient;
+    const page = await listDebatesPageServer("session", client);
+    expect(page.summaries[0]).toMatchObject({ status: "waiting", waits_until: WAITS_UNTIL, waits_for: "OWN_DEBATES" });
+  });
+
   it("still lists a waiting run whose own read failed, without a time", async () => {
     const client = {
       readAnswerIndex: async () => ({

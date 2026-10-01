@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "Ebben a vitában mindent – az érveket, felülvizsgálatokat, pontszámokat és az ítéletet – MI-modellek hoznak létre; a tartalom géppel olvasható jelölést kap, és pontatlan lehet.",
   "debateChrome.status.waiting": "Indulásra vár. A vitája magától elindul ekkor: {time}.",
+  "debateChrome.status.waitingOwnDebates": "A többi vitája egyelőre a korlátja fennmaradó részét használja. Ez a vita magától elindul, amint valamelyik befejeződik.",
   "debateChrome.backToLibrary": "← Vissza a könyvtárhoz",
   "debateChrome.loading": "Betöltés…",
   "debateChrome.error.claimGenerationFailed": "Az állítás létrehozása sikertelen",

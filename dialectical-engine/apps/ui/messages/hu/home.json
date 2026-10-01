@@ -23,6 +23,7 @@
   "home.noDebates": "Még nincsenek viták — tegye közzé fent az első állítást.",
   "home.generationFailed": "A vita létrehozása sikertelen: {reason}",
   "home.status.waiting": "Indulásra vár. A vitája magától elindul ekkor: {time}.",
+  "home.status.waitingOwnDebates": "A többi vitája egyelőre a korlátja fennmaradó részét használja. Ez a vita magától elindul, amint valamelyik befejeződik.",
   "home.noPublishedDebates": "Még nem tettek közzé vitát.",
   "home.verdictUnavailable": "Az ítélet nem érhető el",
   "home.verdict.supported": "Alátámasztott",

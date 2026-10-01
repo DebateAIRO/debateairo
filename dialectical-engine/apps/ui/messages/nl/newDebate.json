@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "U hebt de limiet van deze maand voor uw abonnement bereikt. U kunt toch een vraag stellen: uw debat start vanzelf op {time}.",
   "newDebate.room.freeMonthFull": "U hebt de gratis debatten van deze maand gebruikt. Uw volgende debat kan starten op {time}, of kies een abonnement om nu verder te gaan.",
   "newDebate.room.personClose": "U zit dicht bij de limiet van uw abonnement. Dit debat wordt toch volledig gevoerd.",
+  "newDebate.room.ownDebatesFull": "Uw andere debatten gebruiken voorlopig de rest van uw limiet. Dit debat start vanzelf zodra er een klaar is.",
   "newDebate.room.upgradeLink": "Abonnementen bekijken",
   "newDebate.room.openWaiting": "Wachtend debat openen",
   "newDebate.plan.current.FREE": "Uw abonnement: Gratis",

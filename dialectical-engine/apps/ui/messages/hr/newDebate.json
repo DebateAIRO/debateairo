@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Dosegnuli ste ograničenje svog plana za ovaj mjesec. I dalje možete postaviti pitanje: vaša će rasprava započeti sama u {time}.",
   "newDebate.room.freeMonthFull": "Iskoristili ste besplatne rasprave za ovaj mjesec. Vaša sljedeća rasprava može započeti u {time} ili odaberite plan i nastavite odmah.",
   "newDebate.room.personClose": "Blizu ste ograničenja svog plana. Ova će se rasprava ipak odvijati u cijelosti.",
+  "newDebate.room.ownDebatesFull": "Vaše ostale rasprave zasad koriste ostatak vašeg ograničenja. Ova će rasprava započeti sama čim jedna od njih završi.",
   "newDebate.room.upgradeLink": "Pogledajte planove",
   "newDebate.room.openWaiting": "Otvorite raspravu na čekanju",
   "newDebate.plan.current.FREE": "Vaš plan: Besplatno",

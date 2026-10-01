@@ -126,9 +126,13 @@ async function withWaitingStarts(summaries: DebateSummary[], client: ContractCli
     if (summary.status !== "waiting") return summary;
     try {
       const run = await client.readRun(summary.id);
-      return { ...summary, waits_until: run.state === "WAITING" ? run.waits_until ?? null : null };
+      return {
+        ...summary,
+        waits_until: run.state === "WAITING" ? run.waits_until ?? null : null,
+        waits_for: run.state === "WAITING" ? run.waits_for ?? null : null
+      };
     } catch {
-      return { ...summary, waits_until: null };
+      return { ...summary, waits_until: null, waits_for: null };
     }
   }));
 }

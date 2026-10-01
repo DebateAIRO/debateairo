@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Laħaqt il-limitu ta’ dan ix-xahar tal-pjan tiegħek. Xorta tista’ tistaqsi: id-dibattitu tiegħek jibda waħdu fi {time}.",
   "newDebate.room.freeMonthFull": "Użajt id-dibattiti b’xejn ta’ dan ix-xahar. Id-dibattitu li jmiss tiegħek jista’ jibda fi {time}, jew agħżel pjan biex tkompli issa.",
   "newDebate.room.personClose": "Qed toqrob il-limitu tal-pjan tiegħek. Dan id-dibattitu xorta jsir kollu.",
+  "newDebate.room.ownDebatesFull": "Id-dibattiti l-oħra tiegħek qed jużaw il-bqija tal-limitu tiegħek għalissa. Dan id-dibattitu jibda waħdu hekk kif jispiċċa wieħed minnhom.",
   "newDebate.room.upgradeLink": "Ara l-pjanijiet",
   "newDebate.room.openWaiting": "Iftaħ id-dibattitu li qed jistenna",
   "newDebate.plan.current.FREE": "Il-pjan tiegħek: B’xejn",

@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "Vse v tej razpravi — argumente, preglede, ocene in razsodbo — ustvarjajo modeli UI; vsebina je strojno berljivo označena in je lahko netočna.",
   "debateChrome.status.waiting": "Čaka na začetek. Vaša razprava se bo začela sama ob {time}.",
+  "debateChrome.status.waitingOwnDebates": "Vaše druge razprave zaenkrat porabljajo preostanek vaše omejitve. Ta razprava se bo začela sama, takoj ko se ena od njih konča.",
   "debateChrome.backToLibrary": "← Nazaj v knjižnico",
   "debateChrome.loading": "Nalaganje …",
   "debateChrome.error.claimGenerationFailed": "Ustvarjanje trditve ni uspelo",

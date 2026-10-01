@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "Všetko v tejto debate — argumenty, kontroly, hodnotenia a verdikt — je vytvorené modelmi AI, strojovo čitateľne označené a môže byť nepresné.",
   "debateChrome.status.waiting": "Čaká na spustenie. Vaša debata sa spustí sama v čase {time}.",
+  "debateChrome.status.waitingOwnDebates": "Vaše ostatné debaty zatiaľ využívajú zvyšok vášho limitu. Táto debata sa spustí sama, len čo niektorá z nich skončí.",
   "debateChrome.backToLibrary": "← Späť do knižnice",
   "debateChrome.loading": "Načítava sa…",
   "debateChrome.error.claimGenerationFailed": "Generovanie tvrdenia zlyhalo",

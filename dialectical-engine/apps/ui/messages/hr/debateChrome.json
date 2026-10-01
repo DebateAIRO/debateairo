@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "Sve u ovoj raspravi — argumente, preglede, rezultate i presudu — generiraju modeli umjetne inteligencije; sav je taj sadržaj strojno čitljivo označen i može biti netočan.",
   "debateChrome.status.waiting": "Čeka na početak. Vaša će rasprava započeti sama u {time}.",
+  "debateChrome.status.waitingOwnDebates": "Vaše ostale rasprave zasad koriste ostatak vašeg ograničenja. Ova će rasprava započeti sama čim jedna od njih završi.",
   "debateChrome.backToLibrary": "← Natrag u knjižnicu",
   "debateChrome.loading": "Učitavanje…",
   "debateChrome.error.claimGenerationFailed": "Stvaranje tvrdnje nije uspjelo",

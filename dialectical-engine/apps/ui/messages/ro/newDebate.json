@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Ați atins limita din această lună a abonamentului dvs. Puteți întreba în continuare: dezbaterea dvs. va porni singură pe {time}.",
   "newDebate.room.freeMonthFull": "Ați folosit dezbaterile gratuite din această lună. Următoarea dezbatere poate porni pe {time} sau alegeți un abonament pentru a continua acum.",
   "newDebate.room.personClose": "Sunteți aproape de limita abonamentului dvs. Această dezbatere va rula în întregime.",
+  "newDebate.room.ownDebatesFull": "Celelalte dezbateri ale dvs. folosesc deocamdată restul limitei dvs. Această dezbatere va porni singură imediat ce una dintre ele se încheie.",
   "newDebate.room.upgradeLink": "Vedeți abonamentele",
   "newDebate.room.openWaiting": "Deschideți dezbaterea în așteptare",
   "newDebate.plan.current.FREE": "Abonamentul dvs.: Gratuit",

@@ -23,6 +23,7 @@
   "home.noDebates": "Nog geen debatten – plaats hierboven de eerste stelling.",
   "home.generationFailed": "Genereren van het debat mislukt: {reason}",
   "home.status.waiting": "Wacht op de start. Uw debat start vanzelf om {time}.",
+  "home.status.waitingOwnDebates": "Uw andere debatten gebruiken voorlopig de rest van uw limiet. Dit debat start vanzelf zodra er een klaar is.",
   "home.noPublishedDebates": "Er zijn nog geen debatten gepubliceerd.",
   "home.verdictUnavailable": "Oordeel niet beschikbaar",
   "home.verdict.supported": "Ondersteund",

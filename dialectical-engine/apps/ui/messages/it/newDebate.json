@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Hai raggiunto il limite di questo mese del tuo piano. Puoi comunque fare la tua domanda: il dibattito partirà da solo il {time}.",
   "newDebate.room.freeMonthFull": "Hai usato i dibattiti gratuiti di questo mese. Il tuo prossimo dibattito potrà partire il {time}, oppure scegli un piano per continuare subito.",
   "newDebate.room.personClose": "Sei vicino al limite del tuo piano. Questo dibattito si svolgerà comunque per intero.",
+  "newDebate.room.ownDebatesFull": "Gli altri tuoi dibattiti stanno usando per ora il resto del tuo limite. Questo dibattito partirà da solo non appena uno di essi sarà concluso.",
   "newDebate.room.upgradeLink": "Vedi i piani",
   "newDebate.room.openWaiting": "Apri il dibattito in attesa",
   "newDebate.plan.current.FREE": "Il tuo piano: Gratuito",

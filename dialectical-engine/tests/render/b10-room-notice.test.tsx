@@ -55,6 +55,7 @@ import NewDebatePage from "../../apps/ui/app/new/NewDebatePageClient.js";
 import { LibraryComposer } from "../../apps/ui/components/LibraryComposer.js";
 import { RoomNotice } from "../../apps/ui/components/billing/RoomNotice.js";
 import { formatReset } from "../../apps/ui/lib/billing/formatReset.js";
+import { composerRoomCatalog } from "../../apps/ui/lib/billing/roomCatalog.js";
 
 const MESSAGES = resolve(process.cwd(), "apps/ui/messages");
 const catalogue = (locale: string, namespace: string): Record<string, string> =>
@@ -176,6 +177,36 @@ describe("RoomNotice picks exactly one sentence", () => {
     expect(container.querySelector(".roomNoticeText")?.textContent).toBe(timed(key));
     expect(container.querySelector(".roomNoticeText")?.textContent).not.toContain("upgrade");
     expect(container.querySelector('a[href="/pricing"]')).toBeNull();
+  });
+
+  /**
+   * Final review Part 1b, Important 1: the window is full only because of the
+   * person's own running debates, so the question starts as soon as one of
+   * them finishes. ONE sentence instead of P1–P4, whatever the scope or plan:
+   * no time and no upgrade offer.
+   */
+  it.each([
+    ["today's window on Plus", "PERSON_DAY", "PLUS"],
+    ["this week's window on Pro", "PERSON_WEEK", "PRO"],
+    ["Free's month", "PERSON_MONTH", "FREE"],
+    ["the month on the highest plan", "PERSON_MONTH", "MAX"]
+  ])("shows the own-debates sentence instead of P1–P4 for %s: no time, no plans link", async (_name, scope, planId) => {
+    const nextTick = new Date(Date.now() + 60_000).toISOString();
+    const container = await mount(<RoomNotice
+      room={room({ room: "FULL", scope, resets_at: nextTick, plan_id: planId, waits_for: "OWN_DEBATES" }) as never}
+      catalog={en} locale="en" />);
+    expect(container.querySelector(".roomNoticeText")?.textContent).toBe(en["newDebate.room.ownDebatesFull"]);
+    expect(container.querySelector("time")).toBeNull();
+    expect(container.querySelector('a[href="/pricing"]')).toBeNull();
+    expect(container.querySelector(".roomNotice")?.getAttribute("data-room")).toBe("FULL");
+  });
+
+  it("speaks the own-debates sentence in the interface's language, through the composer's room keys", async () => {
+    const ro = catalogue("ro", "newDebate");
+    const container = await mount(<RoomNotice
+      room={room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, plan_id: "PLUS", waits_for: "OWN_DEBATES" }) as never}
+      catalog={composerRoomCatalog(ro)} locale="ro" />);
+    expect(container.querySelector(".roomNoticeText")?.textContent).toBe(ro["newDebate.room.ownDebatesFull"]);
   });
 
   it("shows D with the waiting debate's start and a link to it", async () => {
@@ -345,6 +376,15 @@ describe("the home composer shows the same sentences where the person types", ()
       locale={locale}
     />
   );
+
+  it("shows the own-debates sentence under the composer, not P1, when only the person's own debates fill the day", async () => {
+    mocks.getAskRoom.mockResolvedValue(room({
+      room: "FULL", scope: "PERSON_DAY", resets_at: RESET, plan_id: "PLUS", waits_for: "OWN_DEBATES"
+    }));
+    const container = await mount(composer("en"));
+    expect(container.querySelector(".libComposer .roomNoticeText")?.textContent).toBe(en["newDebate.room.ownDebatesFull"]);
+    expect(container.querySelector('.libComposer a[href="/pricing"]')).toBeNull();
+  });
 
   it("shows P1 under the composer when today's plan limit is full", async () => {
     mocks.getAskRoom.mockResolvedValue(room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, plan_id: "PLUS" }));

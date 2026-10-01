@@ -700,8 +700,10 @@ export function debateDetailFromRunProjection(
     active_generation: null,
     children: []
   }), run_state: presentedState, hold_until: run.hold_until,
-  // Budget spec §2.7: a waiting run says when it will start (sentence C).
+  // Budget spec §2.7: a waiting run says when it will start (sentence C), or
+  // (Important 1) that it starts once one of its person's own debates finishes.
   waits_until: run.state === "WAITING" ? run.waits_until ?? null : null,
+  waits_for: run.state === "WAITING" ? run.waits_for ?? null : null,
   ...(holdReason === null ? {} : {
     completion: { state: "running" as const, reasonCode: "PROVIDER_RECOVERY_HOLD", humanReason: holdReason }
   }) };

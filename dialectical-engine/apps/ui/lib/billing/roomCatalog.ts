@@ -13,6 +13,7 @@ export const ROOM_KEYS = Object.freeze([
   "newDebate.room.personMonthFullTopPlan",
   "newDebate.room.freeMonthFull",
   "newDebate.room.personClose",
+  "newDebate.room.ownDebatesFull",
   "newDebate.room.upgradeLink",
   "newDebate.room.openWaiting"
 ] as const);

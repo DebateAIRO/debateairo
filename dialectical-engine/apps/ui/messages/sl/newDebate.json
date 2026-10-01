@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Dosegli ste omejitev svojega paketa za ta mesec. Vprašanje lahko še vedno zastavite: vaša razprava se bo začela sama ob {time}.",
   "newDebate.room.freeMonthFull": "Porabili ste brezplačne razprave za ta mesec. Vaša naslednja razprava se lahko začne ob {time}, ali pa izberite paket in nadaljujte takoj.",
   "newDebate.room.personClose": "Blizu ste omejitve svojega paketa. Ta razprava bo kljub temu potekala v celoti.",
+  "newDebate.room.ownDebatesFull": "Vaše druge razprave zaenkrat porabljajo preostanek vaše omejitve. Ta razprava se bo začela sama, takoj ko se ena od njih konča.",
   "newDebate.room.upgradeLink": "Oglejte si pakete",
   "newDebate.room.openWaiting": "Odprite čakajočo razpravo",
   "newDebate.plan.current.FREE": "Vaš paket: Brezplačno",

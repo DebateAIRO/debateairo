@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Anda telah mencapai batas bulan ini untuk paket Anda. Anda tetap dapat bertanya: debat Anda akan dimulai dengan sendirinya pada {time}.",
   "newDebate.room.freeMonthFull": "Anda telah menggunakan jatah debat gratis bulan ini. Debat Anda berikutnya dapat dimulai pada {time}, atau pilih paket untuk melanjutkan sekarang.",
   "newDebate.room.personClose": "Anda hampir mencapai batas paket Anda. Debat ini tetap berjalan penuh.",
+  "newDebate.room.ownDebatesFull": "Debat Anda yang lain sedang memakai sisa batas Anda untuk saat ini. Debat ini akan dimulai dengan sendirinya begitu salah satunya selesai.",
   "newDebate.room.upgradeLink": "Lihat paket",
   "newDebate.room.openWaiting": "Buka debat yang menunggu",
   "newDebate.plan.current.FREE": "Paket Anda: Gratis",

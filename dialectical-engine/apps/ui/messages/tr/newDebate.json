@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Planınızın bu ayki sınırına ulaştınız. Yine de soru sorabilirsiniz: tartışmanız {time} itibarıyla kendiliğinden başlayacak.",
   "newDebate.room.freeMonthFull": "Bu ayki ücretsiz tartışma hakkınızı kullandınız. Sonraki tartışmanız {time} itibarıyla başlayabilir veya hemen devam etmek için bir plan seçin.",
   "newDebate.room.personClose": "Planınızın sınırına yaklaştınız. Bu tartışma yine de eksiksiz yürütülecek.",
+  "newDebate.room.ownDebatesFull": "Diğer tartışmalarınız şimdilik sınırınızın kalanını kullanıyor. Bu tartışma, bunlardan biri biter bitmez kendiliğinden başlayacak.",
   "newDebate.room.upgradeLink": "Planları görün",
   "newDebate.room.openWaiting": "Bekleyen tartışmayı açın",
   "newDebate.plan.current.FREE": "Planınız: Ücretsiz",

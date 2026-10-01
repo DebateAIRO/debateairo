@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Olete jõudnud oma paketi selle kuu piirini. Saate siiski küsida: teie väitlus algab ise {time}.",
   "newDebate.room.freeMonthFull": "Olete selle kuu tasuta väitlused ära kasutanud. Teie järgmine väitlus saab alata {time} või valige pakett, et kohe jätkata.",
   "newDebate.room.personClose": "Olete oma paketi piirile lähedal. See väitlus toimub siiski täies mahus.",
+  "newDebate.room.ownDebatesFull": "Teie teised väitlused kasutavad praegu teie piiri ülejäänud osa. See väitlus algab ise kohe, kui üks neist lõpeb.",
   "newDebate.room.upgradeLink": "Vaadake pakette",
   "newDebate.room.openWaiting": "Avage ootel väitlus",
   "newDebate.plan.current.FREE": "Teie pakett: Tasuta",

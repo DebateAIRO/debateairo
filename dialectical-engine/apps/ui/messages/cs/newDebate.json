@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Dosáhli jste limitu svého plánu pro tento měsíc. Otázku můžete položit i tak: debata se spustí sama v {time}.",
   "newDebate.room.freeMonthFull": "Vyčerpali jste bezplatné debaty pro tento měsíc. Další debata může začít v {time}, nebo si vyberte plán a pokračujte hned.",
   "newDebate.room.personClose": "Blížíte se limitu svého plánu. Tato debata proběhne celá.",
+  "newDebate.room.ownDebatesFull": "Vaše ostatní debaty zatím využívají zbytek vašeho limitu. Tato debata se spustí sama, jakmile některá z nich skončí.",
   "newDebate.room.upgradeLink": "Zobrazit plány",
   "newDebate.room.openWaiting": "Otevřít čekající debatu",
   "newDebate.plan.current.FREE": "Váš plán: Zdarma",

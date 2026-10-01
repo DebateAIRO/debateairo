@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "Всё в этих дебатах — аргументы, рецензии, оценки и вердикт — создаётся моделями ИИ, имеет машиночитаемую маркировку и может содержать неточности.",
   "debateChrome.status.waiting": "Ожидает начала. Ваши дебаты начнутся сами в {time}.",
+  "debateChrome.status.waitingOwnDebates": "Ваши другие дебаты пока используют остаток вашего лимита. Эти дебаты начнутся сами, как только одни из них закончатся.",
   "debateChrome.backToLibrary": "← Вернуться в библиотеку",
   "debateChrome.loading": "Загрузка…",
   "debateChrome.error.claimGenerationFailed": "Не удалось создать тезис",

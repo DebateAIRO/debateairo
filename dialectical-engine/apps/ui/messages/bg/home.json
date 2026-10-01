@@ -23,6 +23,7 @@
   "home.noDebates": "Все още няма дебати — въведете първото си твърдение по-горе.",
   "home.generationFailed": "Генерирането на дебата е неуспешно: {reason}",
   "home.status.waiting": "Изчаква старт. Дебатът ви ще започне сам в {time}.",
+  "home.status.waitingOwnDebates": "Другите ви дебати засега използват остатъка от лимита ви. Този дебат ще започне сам веднага щом някой от тях приключи.",
   "home.noPublishedDebates": "Все още няма публикувани дебати.",
   "home.verdictUnavailable": "Присъдата не е достъпна",
   "home.verdict.supported": "Подкрепено",

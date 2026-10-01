@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "لقد بلغت حدّ هذا الشهر لخطتك. لا يزال بإمكانك طرح سؤالك: ستبدأ مناظرتك تلقائيًا في {time}.",
   "newDebate.room.freeMonthFull": "لقد استخدمت حصة المناظرات المجانية لهذا الشهر. يمكن أن تبدأ مناظرتك التالية في {time}، أو اختر خطة لتتابع الآن.",
   "newDebate.room.personClose": "أنت قريب من حدّ خطتك. ستُجرى هذه المناظرة كاملةً.",
+  "newDebate.room.ownDebatesFull": "مناظراتك الأخرى تستخدم ما تبقّى من حدّك في الوقت الحالي. ستبدأ هذه المناظرة تلقائيًا فور انتهاء إحداها.",
   "newDebate.room.upgradeLink": "عرض الخطط",
   "newDebate.room.openWaiting": "فتح المناظرة المنتظِرة",
   "newDebate.plan.current.FREE": "خطتك: المجانية",

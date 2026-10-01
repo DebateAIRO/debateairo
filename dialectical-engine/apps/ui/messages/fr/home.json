@@ -23,6 +23,7 @@
   "home.noDebates": "Aucun débat pour l’instant — soumettez votre première affirmation ci-dessus.",
   "home.generationFailed": "Échec de la génération du débat : {reason}",
   "home.status.waiting": "En attente de démarrage. Votre débat démarrera de lui-même à {time}.",
+  "home.status.waitingOwnDebates": "Vos autres débats utilisent pour l’instant le reste de votre limite. Celui-ci démarrera de lui-même dès que l’un d’eux sera terminé.",
   "home.noPublishedDebates": "Aucun débat n’a encore été publié.",
   "home.verdictUnavailable": "Verdict indisponible",
   "home.verdict.supported": "Étayé",

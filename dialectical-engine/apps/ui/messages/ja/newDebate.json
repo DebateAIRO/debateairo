@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "ご利用のプランの今月の上限に達しました。質問はこのまま送れます。ディベートは{time}に自動的に始まります。",
   "newDebate.room.freeMonthFull": "今月の無料ディベート枠を使い切りました。次のディベートは{time}から始められます。今すぐ続けるには、プランを選んでください。",
   "newDebate.room.personClose": "ご利用のプランの上限に近づいています。このディベートは最後まで行われます。",
+  "newDebate.room.ownDebatesFull": "現在、ほかのディベートが上限の残りを使っています。このディベートは、そのいずれかが終わりしだい自動的に始まります。",
   "newDebate.room.upgradeLink": "プランを見る",
   "newDebate.room.openWaiting": "待機中のディベートを開く",
   "newDebate.plan.current.FREE": "ご利用のプラン：無料",

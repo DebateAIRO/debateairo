@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "You've reached this month's limit for your plan. You can still ask: your debate will start by itself on {time}.",
   "newDebate.room.freeMonthFull": "You've used this month's free debate allowance. Your next debate can start on {time}, or choose a plan to continue now.",
   "newDebate.room.personClose": "You're close to your plan's limit. This debate will still run in full.",
+  "newDebate.room.ownDebatesFull": "Your other debates are using the rest of your limit for now. This one starts by itself as soon as one of them finishes.",
   "newDebate.room.upgradeLink": "See plans",
   "newDebate.room.openWaiting": "Open the waiting debate",
   "newDebate.plan.current.FREE": "Your plan: Free",

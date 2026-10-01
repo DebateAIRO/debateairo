@@ -9,6 +9,8 @@ export type DebateSummary = {
   terminal_reason?: string | null;
   /** Budget spec §2.7: the expected start of a WAITING run (ISO); null otherwise. */
   waits_until?: string | null;
+  /** Final review Part 1b, Important 1: a WAITING run that waits only for its person's own running debates. */
+  waits_for?: "OWN_DEBATES" | null;
 };
 
 export type Generation = {
@@ -723,6 +725,8 @@ export type DebateDetail = {
   hold_until?: string | null;
   /** Budget spec §2.7: when a WAITING run is expected to start (ISO); null otherwise. */
   waits_until?: string | null;
+  /** Final review Part 1b, Important 1: a WAITING run that waits only for its person's own running debates. */
+  waits_for?: "OWN_DEBATES" | null;
   config: DebateConfig;
   direct_answer: null;
   root_node_id: string | null;

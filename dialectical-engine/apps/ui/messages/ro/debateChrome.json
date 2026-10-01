@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "Tot conținutul acestei dezbateri — argumentele, evaluările, punctajele și verdictul — este generat de modele de IA, marcat într-un format care poate fi citit automat și poate conține inexactități.",
   "debateChrome.status.waiting": "Așteaptă să pornească. Dezbaterea dvs. va porni singură la {time}.",
+  "debateChrome.status.waitingOwnDebates": "Celelalte dezbateri ale dvs. folosesc deocamdată restul limitei dvs. Această dezbatere va porni singură imediat ce una dintre ele se încheie.",
   "debateChrome.backToLibrary": "← Înapoi la bibliotecă",
   "debateChrome.loading": "Se încarcă…",
   "debateChrome.error.claimGenerationFailed": "Generarea afirmației a eșuat",

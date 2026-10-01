@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Sie haben das Limit Ihres Tarifs für diesen Monat erreicht. Sie können trotzdem fragen: Ihre Debatte startet von selbst am {time}.",
   "newDebate.room.freeMonthFull": "Sie haben die kostenlosen Debatten dieses Monats aufgebraucht. Ihre nächste Debatte kann am {time} starten, oder wählen Sie einen Tarif, um jetzt weiterzumachen.",
   "newDebate.room.personClose": "Sie sind nah am Limit Ihres Tarifs. Diese Debatte läuft trotzdem vollständig.",
+  "newDebate.room.ownDebatesFull": "Ihre anderen Debatten nutzen im Moment den Rest Ihres Limits. Diese Debatte startet von selbst, sobald eine davon beendet ist.",
   "newDebate.room.upgradeLink": "Tarife ansehen",
   "newDebate.room.openWaiting": "Wartende Debatte öffnen",
   "newDebate.plan.current.FREE": "Ihr Tarif: Kostenlos",

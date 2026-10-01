@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Bạn đã đạt giới hạn tháng này của gói. Bạn vẫn có thể đặt câu hỏi: cuộc tranh luận của bạn sẽ tự bắt đầu lúc {time}.",
   "newDebate.room.freeMonthFull": "Bạn đã dùng hết lượt tranh luận miễn phí của tháng này. Cuộc tranh luận tiếp theo có thể bắt đầu lúc {time}, hoặc chọn một gói để tiếp tục ngay.",
   "newDebate.room.personClose": "Bạn sắp đạt giới hạn của gói. Cuộc tranh luận này vẫn sẽ diễn ra đầy đủ.",
+  "newDebate.room.ownDebatesFull": "Hiện các cuộc tranh luận khác của bạn đang dùng phần còn lại của giới hạn. Cuộc tranh luận này sẽ tự bắt đầu ngay khi một trong số đó kết thúc.",
   "newDebate.room.upgradeLink": "Xem các gói",
   "newDebate.room.openWaiting": "Mở cuộc tranh luận đang chờ",
   "newDebate.plan.current.FREE": "Gói của bạn: Miễn phí",

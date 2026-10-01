@@ -23,6 +23,7 @@
   "home.noDebates": "Ingen debatter endnu - post den første påstand ovenfor.",
   "home.generationFailed": "Generering af debat mislykkedes: {reason}",
   "home.status.waiting": "Venter på at starte. Din debat starter af sig selv {time}.",
+  "home.status.waitingOwnDebates": "Dine andre debatter bruger resten af din grænse lige nu. Denne debat starter af sig selv, så snart en af dem er færdig.",
   "home.noPublishedDebates": "Der er endnu ikke offentliggjort nogen debatter.",
   "home.verdictUnavailable": "Konklusion ikke tilgængelig",
   "home.verdict.supported": "Understøttet",

@@ -23,6 +23,7 @@
   "home.noDebates": "Debatų dar nėra — paskelbkite pirmąjį teiginį aukščiau.",
   "home.generationFailed": "Nepavyko sugeneruoti debatų: {reason}",
   "home.status.waiting": "Laukiama pradžios. Jūsų debatai prasidės patys {time}.",
+  "home.status.waitingOwnDebates": "Kiti jūsų debatai kol kas naudoja likusią jūsų ribos dalį. Šie debatai prasidės patys, kai tik vieni iš jų baigsis.",
   "home.noPublishedDebates": "Dar nepaskelbta nė vienų debatų.",
   "home.verdictUnavailable": "Verdiktas nepasiekiamas",
   "home.verdict.supported": "Pagrįstas",

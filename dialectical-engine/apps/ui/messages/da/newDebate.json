@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Du har nået denne måneds grænse for din plan. Du kan stadig stille dit spørgsmål: din debat starter af sig selv {time}.",
   "newDebate.room.freeMonthFull": "Du har brugt denne måneds gratis debatter. Din næste debat kan starte {time}, eller vælg en plan for at fortsætte nu.",
   "newDebate.room.personClose": "Du er tæt på din plans grænse. Denne debat kører stadig fuldt ud.",
+  "newDebate.room.ownDebatesFull": "Dine andre debatter bruger resten af din grænse lige nu. Denne debat starter af sig selv, så snart en af dem er færdig.",
   "newDebate.room.upgradeLink": "Se planer",
   "newDebate.room.openWaiting": "Åbn den ventende debat",
   "newDebate.plan.current.FREE": "Din plan: Gratis",

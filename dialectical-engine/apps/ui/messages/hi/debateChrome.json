@@ -1,6 +1,7 @@
 {
   "debateChrome.aiNotice": "इस वाद-विवाद की हर चीज़ — तर्क, समीक्षाएँ, अंक और निर्णय — AI मॉडलों द्वारा जनरेट की गई है, मशीन-पठनीय रूप में चिह्नित है और गलत हो सकती है।",
   "debateChrome.status.waiting": "शुरू होने की प्रतीक्षा में। आपका वाद-विवाद {time} पर अपने-आप शुरू होगा।",
+  "debateChrome.status.waitingOwnDebates": "आपके अन्य वाद-विवाद अभी आपकी बची हुई सीमा का उपयोग कर रहे हैं। यह वाद-विवाद उनमें से किसी एक के समाप्त होते ही अपने-आप शुरू हो जाएगा।",
   "debateChrome.backToLibrary": "← संग्रह पर वापस जाएँ",
   "debateChrome.loading": "लोड हो रहा है…",
   "debateChrome.error.claimGenerationFailed": "दावा तैयार नहीं हो सका",

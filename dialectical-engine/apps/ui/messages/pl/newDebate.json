@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Osiągnięto limit Twojego planu na ten miesiąc. Nadal możesz zadać pytanie: Twoja debata rozpocznie się sama {time}.",
   "newDebate.room.freeMonthFull": "Wykorzystano bezpłatne debaty na ten miesiąc. Twoja następna debata może rozpocząć się {time} albo wybierz plan, aby kontynuować teraz.",
   "newDebate.room.personClose": "Zbliżasz się do limitu Twojego planu. Ta debata i tak odbędzie się w całości.",
+  "newDebate.room.ownDebatesFull": "Twoje pozostałe debaty wykorzystują na razie resztę Twojego limitu. Ta debata rozpocznie się sama, gdy tylko jedna z nich się zakończy.",
   "newDebate.room.upgradeLink": "Zobacz plany",
   "newDebate.room.openWaiting": "Otwórz oczekującą debatę",
   "newDebate.plan.current.FREE": "Twój plan: Bezpłatny",

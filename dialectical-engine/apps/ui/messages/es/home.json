@@ -23,6 +23,7 @@
   "home.noDebates": "Aún no hay debates; publique arriba la primera afirmación.",
   "home.generationFailed": "No se pudo generar el debate: {reason}",
   "home.status.waiting": "Esperando para empezar. Su debate empezará por sí solo a las {time}.",
+  "home.status.waitingOwnDebates": "Sus otros debates están usando por ahora el resto de su límite. Este debate empezará por sí solo en cuanto termine uno de ellos.",
   "home.noPublishedDebates": "Aún no se ha publicado ningún debate.",
   "home.verdictUnavailable": "Veredicto no disponible",
   "home.verdict.supported": "Respaldada",

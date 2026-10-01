@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Tá teorainn na míosa seo do do phlean sroichte agat. Is féidir leat ceist a chur fós: tosóidh do dhíospóireacht léi féin ar {time}.",
   "newDebate.room.freeMonthFull": "D’úsáid tú díospóireachtaí saor in aisce na míosa seo. Is féidir le do chéad díospóireacht eile tosú ar {time}, nó roghnaigh plean chun leanúint ar aghaidh anois.",
   "newDebate.room.personClose": "Tá tú gar do theorainn do phlean. Rithfear an díospóireacht seo ina hiomláine fós.",
+  "newDebate.room.ownDebatesFull": "Tá do dhíospóireachtaí eile ag úsáid an chuid eile de do theorainn faoi láthair. Tosóidh an díospóireacht seo léi féin chomh luath agus a chríochnaíonn ceann acu.",
   "newDebate.room.upgradeLink": "Féach ar na pleananna",
   "newDebate.room.openWaiting": "Oscail an díospóireacht atá ag fanacht",
   "newDebate.plan.current.FREE": "Do phlean: Saor in aisce",

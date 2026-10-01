@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Jūs esat sasnieguši sava plāna šī mēneša ierobežojumu. Jūs joprojām varat uzdot jautājumu: jūsu debates sāksies pašas {time}.",
   "newDebate.room.freeMonthFull": "Jūs esat izmantojuši šī mēneša bezmaksas debates. Jūsu nākamās debates varēs sākties {time}, vai izvēlieties plānu, lai turpinātu tūlīt.",
   "newDebate.room.personClose": "Jūs tuvojaties sava plāna ierobežojumam. Šīs debates tik un tā notiks pilnībā.",
+  "newDebate.room.ownDebatesFull": "Jūsu pārējās debates pagaidām izmanto atlikušo jūsu ierobežojuma daļu. Šīs debates sāksies pašas, tiklīdz kādas no tām beigsies.",
   "newDebate.room.upgradeLink": "Skatīt plānus",
   "newDebate.room.openWaiting": "Atvērt gaidošās debates",
   "newDebate.plan.current.FREE": "Jūsu plāns: Bezmaksas",

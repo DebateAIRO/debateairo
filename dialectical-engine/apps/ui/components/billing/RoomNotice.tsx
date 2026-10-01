@@ -34,6 +34,12 @@ function timed(key: string, topPlanKey: string, room: AskRoom): RoomSentence | n
 }
 
 function fullSentence(room: AskRoom): RoomSentence | null {
+  // Final review Part 1b, Important 1: only the person's own running debates
+  // fill their windows, so the question starts as soon as one of them finishes.
+  // One sentence, with no time and no upgrade: nothing was used up.
+  if (room.waits_for === "OWN_DEBATES") {
+    return Object.freeze({ key: "newDebate.room.ownDebatesFull", at: null, upgrade: false, waitingRunRef: null });
+  }
   switch (room.scope) {
     case null:
     case "SITE_DAY":
@@ -59,6 +65,9 @@ function fullSentence(room: AskRoom): RoomSentence | null {
  *  - CLOSE: B (the site's day) or P5 (a person window).
  *  - FULL: A (the site's day), or P1, P2, P3 or P4 (Free's month); on the
  *    highest plan, P1–P3 without the upgrade clause and without the link.
+ *    When the person's own running debates are all that fill their windows
+ *    (`waits_for: OWN_DEBATES`), one sentence instead of P1–P4: no time, no
+ *    upgrade.
  *  - ALREADY_WAITING: D, with a link to the waiting debate.
  * None shows a figure or an internal.
  */

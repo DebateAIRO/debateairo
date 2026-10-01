@@ -95,6 +95,52 @@ describe("sentence C on the debate page", () => {
   });
 });
 
+/**
+ * Final review Part 1b, Important 1: a debate that waits only for its person's
+ * own running debates says so in C's place — the one new sentence, with no
+ * time — on the debate page and in the home list.
+ */
+describe("the own-debates sentence in C's place", () => {
+  const NEXT_TICK = new Date(Date.now() + 60_000).toISOString();
+
+  it("on the debate page: in C's own line, with no start time", () => {
+    const html = renderToStaticMarkup(
+      <DebatePageClient
+        id="run:waiting"
+        initialDebate={debateDetailFromRunProjection({
+          run_ref: "run:waiting", question_line: "Should cities ban cars downtown?", state: "WAITING",
+          terminal_reason: null, hold_until: null, waits_until: NEXT_TICK, waits_for: "OWN_DEBATES"
+        } as never)}
+        initialPending
+        storyLocale="en"
+        storyCatalog={publicEnglish}
+      />
+    );
+    const page = new DOMParser().parseFromString(html, "text/html");
+    const notice = page.querySelector(".debateWaitingNotice");
+    expect(notice?.textContent).toBe(catalogue("en", "debateChrome")["debateChrome.status.waitingOwnDebates"]);
+    expect(notice?.querySelector("time")).toBeNull();
+    expect(html).not.toContain(before!.trim());
+  });
+
+  it("in the home list: the row says it, with no start time", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    await act(async () => root!.render(<>{DebatesBuffer({
+      debates: [{
+        id: "run:waiting", topic: "Q?", status: "waiting", created_at: "", completed_at: null, models: [],
+        waits_until: NEXT_TICK, waits_for: "OWN_DEBATES"
+      }],
+      catalog: catalogue("en", "home"), timeCatalog: catalogue("en", "time"), locale: "en"
+    })}</>));
+    expect(container.querySelector(".libStatus")?.textContent).toBe("Waiting");
+    expect(container.querySelector(".libRowMeta")?.textContent).toBe(catalogue("en", "home")["home.status.waitingOwnDebates"]);
+    expect(container.querySelector(".libRowMeta time")).toBeNull();
+  });
+});
+
 describe("a twenty-day wait still says when to the minute (formatReset's date branch keeps the time)", () => {
   const TWENTY_DAYS = new Date(Date.now() + 20 * 86_400_000).toISOString();
   // The clock time of the start in this machine's zone, as the browser would show it.

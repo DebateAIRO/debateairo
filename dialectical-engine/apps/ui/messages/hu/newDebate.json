@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Elérte előfizetése havi korlátját. Így is felteheti a kérdését: a vitája magától elindul ekkor: {time}.",
   "newDebate.room.freeMonthFull": "Felhasználta e havi ingyenes vitáit. A következő vitája ekkor indulhat: {time}, vagy válasszon előfizetést, hogy most folytathassa.",
   "newDebate.room.personClose": "Közel jár előfizetése korlátjához. Ez a vita így is teljes egészében lefut.",
+  "newDebate.room.ownDebatesFull": "A többi vitája egyelőre a korlátja fennmaradó részét használja. Ez a vita magától elindul, amint valamelyik befejeződik.",
   "newDebate.room.upgradeLink": "Előfizetések megtekintése",
   "newDebate.room.openWaiting": "A várakozó vita megnyitása",
   "newDebate.plan.current.FREE": "Az Ön előfizetése: Ingyenes",

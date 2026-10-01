@@ -23,6 +23,7 @@
   "home.noDebates": "Chưa có cuộc tranh luận nào — hãy đăng luận điểm đầu tiên ở trên.",
   "home.generationFailed": "Không thể tạo cuộc tranh luận: {reason}",
   "home.status.waiting": "Đang chờ bắt đầu. Cuộc tranh luận của bạn sẽ tự bắt đầu lúc {time}.",
+  "home.status.waitingOwnDebates": "Hiện các cuộc tranh luận khác của bạn đang dùng phần còn lại của giới hạn. Cuộc tranh luận này sẽ tự bắt đầu ngay khi một trong số đó kết thúc.",
   "home.noPublishedDebates": "Chưa có cuộc tranh luận nào được xuất bản.",
   "home.verdictUnavailable": "Không có phán quyết",
   "home.verdict.supported": "Được ủng hộ",

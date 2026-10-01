@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "הגעתם למגבלה החודשית של התוכנית שלכם. עדיין אפשר לשאול: הדיון שלכם יתחיל מעצמו ב־{time}.",
   "newDebate.room.freeMonthFull": "ניצלתם את הדיונים החינמיים של החודש. הדיון הבא שלכם יוכל להתחיל ב־{time}, או בחרו תוכנית כדי להמשיך עכשיו.",
   "newDebate.room.personClose": "אתם קרובים למגבלה של התוכנית שלכם. הדיון הזה עדיין יתקיים במלואו.",
+  "newDebate.room.ownDebatesFull": "הדיונים האחרים שלכם משתמשים כרגע ביתרת המגבלה שלכם. הדיון הזה יתחיל מעצמו ברגע שאחד מהם יסתיים.",
   "newDebate.room.upgradeLink": "צפייה בתוכניות",
   "newDebate.room.openWaiting": "פתיחת הדיון הממתין",
   "newDebate.plan.current.FREE": "התוכנית שלכם: חינם",

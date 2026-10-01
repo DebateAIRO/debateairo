@@ -109,6 +109,7 @@
   "newDebate.room.personMonthFullTopPlan": "Olet saavuttanut tilauksesi tämän kuun rajan. Voit silti kysyä: väittelysi alkaa itsestään {time}.",
   "newDebate.room.freeMonthFull": "Olet käyttänyt tämän kuun maksuttomat väittelyt. Seuraava väittelysi voi alkaa {time}, tai valitse tilaus jatkaaksesi nyt.",
   "newDebate.room.personClose": "Olet lähellä tilauksesi rajaa. Tämä väittely käydään silti loppuun.",
+  "newDebate.room.ownDebatesFull": "Muut väittelysi käyttävät toistaiseksi loput rajastasi. Tämä väittely alkaa itsestään heti, kun yksi niistä päättyy.",
   "newDebate.room.upgradeLink": "Katso tilaukset",
   "newDebate.room.openWaiting": "Avaa odottava väittely",
   "newDebate.plan.current.FREE": "Tilauksesi: Maksuton",

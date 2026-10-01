@@ -99,8 +99,12 @@ export function DebatesBuffer({
     const failed = debate.status === "failed";
     const waitsUntil = debate.status === "waiting" ? debate.waits_until ?? null : null;
     // Budget spec §2.11: a waiting debate says when it will start (C). The time
-    // is formatted in the reader's browser, in their own zone.
-    const meta: ReactNode = waitsUntil !== null
+    // is formatted in the reader's browser, in their own zone. Final review
+    // Part 1b, Important 1: one that waits only for its person's own running
+    // debates says so in C's place, with no time.
+    const meta: ReactNode = waitsUntil !== null && debate.waits_for === "OWN_DEBATES"
+      ? t(catalog, "home.status.waitingOwnDebates")
+      : waitsUntil !== null
       ? <ResetSentence text={t(catalog, "home.status.waiting", { time: RESET_TIME_MARK })} at={waitsUntil} locale={locale} />
       : debate.terminal_reason === null || debate.terminal_reason === undefined
         ? joinMeta([relativeTime(debate.created_at, timeCatalog, locale),
