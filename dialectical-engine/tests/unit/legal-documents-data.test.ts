@@ -136,6 +136,16 @@ describe("legal documents — generated data", () => {
       expect(list.items[1]!.startsWith("Moderation decisions about content and accounts.")).toBe(true);
     });
 
+    it("says the support chat sends text to a model too, right after the debate paragraph", () => {
+      const content = texts(section(TERMS_OF_SERVICE, "08"));
+      expect(content[2]!.startsWith("How your content reaches AI providers. To run a debate")).toBe(true);
+      const support = content[3]!;
+      expect(support.startsWith("What the support chat sends. The support assistant is also an AI model.")).toBe(true);
+      expect(support).toContain("we send your message to an external model provider");
+      expect(support).toContain("we also send the conversation, masked the same way, to the model");
+      expect(support).toContain("the model receives anything else you type in the chat");
+    });
+
     it("decodes the HTML-entity bracket and preserves every placeholder verbatim", () => {
       expect(texts(section(TERMS_OF_SERVICE, "12"))[0]).toBe(
         "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]"

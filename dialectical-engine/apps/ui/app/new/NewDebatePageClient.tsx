@@ -218,10 +218,13 @@ function NewDebateForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!ready) return;
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
-    // debate — and before anything else, the consent screen included.
+    // debate — and before anything else, the form's own rules and the consent screen included.
     if (crisis.offerIfCrisis(topic)) return;
+    if (!ready) return;
+    // Sentence D: one question already waits (the button is disabled too, except for a question
+    // the crisis check flags, which the line above has answered).
+    if (room?.room === "ALREADY_WAITING") return;
     setSubmitting(true);
     setError(null);
     try {
@@ -492,7 +495,7 @@ function NewDebateForm({
 
           <RoomNotice room={room} catalog={catalog} locale={locale} />
           <div className="ndActions">
-            <button data-support-primary-control type="submit" className="ndStart" disabled={!ready || submitting}>
+            <button data-support-primary-control type="submit" className="ndStart" disabled={!(ready || crisis.flags(topic)) || submitting || (room?.room === "ALREADY_WAITING" && !crisis.flags(topic))}>
               {t(catalog, submitting ? "newDebate.starting" : "newDebate.startRun")} <span aria-hidden>→</span>
             </button>
             <button type="button" className="ndCancel" onClick={() => router.push("/")}>

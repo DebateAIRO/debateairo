@@ -2623,10 +2623,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
-    // Crisis check (V, 2026-09-30): a question that reads as a person in crisis gets help
-    // numbers, never a debate. First of all, so a person in crisis is refused before any
-    // consent or quota rule, and nothing of the question is kept. `country` is the edge's
-    // guess, only to pick which helplines the screen shows first.
+    // Ask pre-flight, step 1 — the crisis check (V, 2026-09-30; V, 2026-10-01: "make sure this
+    // crisis check is done in the pre-flight"). A question that reads as a person in crisis gets
+    // help numbers, never a debate. It stays the FIRST thing this route does: before the
+    // consent, quota and country rules, and before any other pre-flight check of the question
+    // (the hate-speech check, S03). A person in crisis must never meet a refusal or a "check
+    // unavailable" message instead of help, and their words go to no judge model. Nothing of
+    // the question is kept. `country` is the edge's guess, only to pick which helplines the
+    // screen shows first. Pinned by tests/unit/crisis-check-api.test.ts.
     const questionLine = typeof request.body === "object" && request.body !== null
       && "question_line" in request.body && typeof request.body.question_line === "string"
       ? request.body.question_line : "";

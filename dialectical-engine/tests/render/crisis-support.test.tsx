@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { act, type ReactElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ContractHttpError } from "@debateai/contract";
+import { ContractHttpError, warmCrisisCheck } from "@debateai/contract";
 
 /**
  * Crisis check (V, 2026-09-30): a question that reads as a person in crisis gets help numbers,
@@ -73,6 +73,8 @@ const catalogue = (locale: string, namespace: string): Record<string, string> =>
 const HOME_EN = catalogue("en", "home");
 const CRISIS = "Should I kill myself?";
 const POLICY = "Should assisted suicide be legal?";
+/** "I want to die", three letters: shorter than any debate question, still a crisis. */
+const SHORT_CRISIS = "\u6211\u60f3\u6b7b";
 
 let root: Root | null = null;
 
@@ -227,6 +229,48 @@ describe("crisis check on the home composer", () => {
   });
 });
 
+// V, 2026-10-01: "make sure this crisis check is done in the pre-flight. if a question is
+// flagged as a crisis thing, no debate start and do the crisis workflow." The pre-flight runs
+// before the form's own rules too: a crisis question too short to be a debate still gets help.
+describe("crisis check before the form's own rules", () => {
+  beforeEach(() => { warmCrisisCheck(); });
+
+  it("opens the screen on the home composer for a crisis question too short to debate", async () => {
+    const catalog = Object.freeze({ ...catalogue("en", "home"), ...catalogue("en", "chrome") });
+    const container = await mount(
+      <LibraryComposer catalog={catalog} newDebateCatalog={catalogue("en", "newDebate")} locale="en" crisisCountryHint="RO" />
+    );
+    const field = container.querySelector<HTMLTextAreaElement>("#library-claim")!;
+    await type(field, "hello");
+    expect(container.querySelector<HTMLButtonElement>(".libStart")!.disabled).toBe(true);
+    await type(field, SHORT_CRISIS);
+    expect(container.querySelector<HTMLButtonElement>(".libStart")!.disabled).toBe(false);
+    await click(container.querySelector(".libStart"));
+    expect(crisisDialog()).not.toBeNull();
+    expect(mocks.validateSession).not.toHaveBeenCalled();
+    expect(mocks.createDebate).not.toHaveBeenCalled();
+  });
+
+  it("opens the screen on /new for a crisis question too short to debate", async () => {
+    const container = await mount(
+      <NewDebatePage
+        catalog={catalogue("en", "newDebate")}
+        homeCatalog={catalogue("en", "home")}
+        chromeCatalog={catalogue("en", "chrome")}
+        locale="en"
+        crisisCountryHint="GB"
+      />
+    );
+    await type(container.querySelector<HTMLTextAreaElement>("textarea")!, SHORT_CRISIS);
+    const button = container.querySelector<HTMLButtonElement>(".ndStart")!;
+    expect(button.disabled).toBe(false);
+    await click(button);
+    expect(crisisDialog()).not.toBeNull();
+    expect(mocks.readSensitiveDataConsent).not.toHaveBeenCalled();
+    expect(mocks.createDebate).not.toHaveBeenCalled();
+  });
+});
+
 describe("crisis check on /new", () => {
   it("shows help numbers instead of a debate, before the consent screen", async () => {
     mocks.readSensitiveDataConsent.mockResolvedValue({ status: "required" });
@@ -253,9 +297,9 @@ describe("crisis check on /new", () => {
 });
 
 // Part 1b merged with the crisis check (2026-10-01): a person whose earlier question already
-// waits for the budget (sentence D) can still reach the help numbers. Both start buttons stay
-// active while a question waits, so the crisis check runs first; any other question is
-// answered by the server's 422 ASK_ALREADY_WAITING and shown as sentence D.
+// waits for the budget (sentence D) can still reach the help numbers. While a question waits
+// both start buttons are disabled, except for a question the crisis check flags: that one
+// enables them, and Start opens the help screen instead of sending anything.
 describe("crisis check while another question already waits", () => {
   const waiting = () => ({
     room: "ALREADY_WAITING", scope: "PERSON", resets_at: new Date(Date.now() + 86_400_000).toISOString(),

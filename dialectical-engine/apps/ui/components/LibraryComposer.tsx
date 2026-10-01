@@ -47,16 +47,18 @@ export function LibraryComposer({
   const consent = useSensitiveDataConsent({ catalog, locale });
   const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint });
 
-  const ready = topic.trim().length > 6;
+  // A question too short to debate still reaches the crisis check ("我想死" is three letters).
+  const ready = topic.trim().length > 6 || crisis.flags(topic);
 
   async function start() {
-    if (!ready || busy) return;
+    if (busy) return;
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
-    // debate — and before anything else, the consent screen included.
+    // debate — and before anything else, the length rule and the consent screen included.
     if (crisis.offerIfCrisis(topic)) return;
-    // While a question already waits (sentence D) the button stays active, so the line above
-    // can always offer help; any other question is refused by the server's 422
-    // ASK_ALREADY_WAITING and answered with D below.
+    if (!ready) return;
+    // Sentence D: one question already waits, so this one is not sent. The button is disabled
+    // too, except for a question the crisis check flags, which the line above has answered.
+    if (room?.room === "ALREADY_WAITING") return;
     setBusy(true);
     setError(null);
     try {
@@ -135,7 +137,7 @@ export function LibraryComposer({
         <div className="libComposerFoot">
           <p className="libComposerHint">{t(catalog, "home.composerHint")}</p>
           <span className="libComposerSpacer" aria-hidden />
-          <button type="button" className="libStart" onClick={start} disabled={!ready || busy}>
+          <button type="button" className="libStart" onClick={start} disabled={!ready || busy || (room?.room === "ALREADY_WAITING" && !crisis.flags(topic))}>
             {t(catalog, busy ? "home.starting" : "home.startDebate")} <span aria-hidden>→</span>
           </button>
         </div>
