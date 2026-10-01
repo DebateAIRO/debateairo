@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 
 let root: Root;
 let host: HTMLDivElement;
@@ -124,7 +125,7 @@ describe("register form F2 confirm email", () => {
     expect(validity().textContent).toBe("✓ Addresses match");
     await submit();
     expect(register.mock.calls).toEqual([[
-      "you@institution.edu", "Correct horse 7!", "recovery@example.test", "1990-01-01"
+      "you@institution.edu", "Correct horse 7!", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
     ]]);
   });
 
@@ -161,7 +162,7 @@ describe("register form F2 confirm email", () => {
     field("confirm-email").value = "\u00a0you@INSTITUTION.edu\u00a0";
     await submit();
     expect(register.mock.calls).toEqual([[
-      "YOU@institution.edu", "Correct horse 7!", "recovery@example.test", "1990-01-01"
+      "YOU@institution.edu", "Correct horse 7!", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
     ]]);
   });
 

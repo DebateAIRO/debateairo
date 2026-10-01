@@ -48,7 +48,8 @@ export async function createDevApiEnvironmentAssemblyFixture(): Promise<Readonly
     writeFile(join(custodyRoot, "secrets", "support-kek.bin"), Buffer.alloc(32, 5), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "corpus-kek.bin"), Buffer.alloc(32, 4), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "blind-index-key.bin"), Buffer.alloc(32, 2), { mode: 0o600 }),
-    writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 3), { mode: 0o600 })
+    writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 3), { mode: 0o600 }),
+    writeFile(join(custodyRoot, "secrets", "records-key.bin"), Buffer.alloc(32, 9), { mode: 0o600 })
   ]);
   const databaseCredentials = DEVELOPMENT_DATABASE_PRINCIPALS.map((principal, index) =>
     `${principal.environmentKey}=postgresql://${principal.roleName}:dev-password-${index}-abcdefghijklmnopqrstuvwxyz@127.0.0.1:55432/debateai`

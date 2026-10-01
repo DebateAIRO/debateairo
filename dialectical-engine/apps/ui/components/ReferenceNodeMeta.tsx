@@ -1,6 +1,6 @@
 "use client";
 
-import type { Node as ContractNode } from "@debateai/contract";
+import type { ContractNode } from "@/lib/v3/adapter";
 import type { DebateNode } from "@/lib/types";
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { v3NodeScoreState, v3ScorePresentation } from "@/lib/v3/adapter";

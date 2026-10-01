@@ -90,12 +90,14 @@ describe("policy", () => {
 
 describe("R2", () => {
   // Property: every schema string is explicitly checked or explicitly excluded, exclusively.
-  it("covers the schema with 26 checked paths and 36 excluded strings", async () => {
+  // INTEG-HS-dev: origin/dev's public-lineage trim (C17/B11, PublicMakerLineageSchema = { maker, model_id }) drops
+  // transport + provider_ref from the two public lineages — 4 string leaves, both subtrees R2-excluded: 62 → 58, 36 → 32.
+  it("covers the schema with 26 checked paths and 32 excluded strings", async () => {
     const m = await import("../../apps/api/src/publication-check/material.js");
     expect(m.CHECKED_TEXT_PATHS).toEqual(paths.map(([path, kind]) => ({ path, kind })));
     const leaves = walk(PublicDebateSchema).filter(l => l.type === "string");
-    expect(leaves).toHaveLength(62);
-    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(36);
+    expect(leaves).toHaveLength(58);
+    expect(leaves.filter(l => m.isExcludedTextPath(l.path, l.type))).toHaveLength(32);
     for (const leaf of walk(PublicDebateSchema)) {
       const checked = m.CHECKED_TEXT_PATHS.some(p => p.path === leaf.path);
       expect(Number(checked) + Number(m.isExcludedTextPath(leaf.path, leaf.type)), leaf.path).toBe(1);

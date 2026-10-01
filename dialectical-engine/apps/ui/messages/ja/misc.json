@@ -79,7 +79,7 @@
   "misc.answerHonesty.weights": "重み {source}",
   "misc.answerHonesty.weightsBy": "重み {source}、設定者 {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "判断が覆る条件",
-  "misc.model.houseUnavailable": "モデル陣営を利用できません",
-  "misc.model.noRecordedHouse": "この論拠で利用できるモデル陣営の記録はありません。",
+  "misc.model.houseUnavailable": "モデル開発元の記録なし",
+  "misc.model.noRecordedHouse": "この論拠には、モデル開発元の記録がありません。",
   "misc.scoring.unavailable": "採点画面を利用できません。"
 }

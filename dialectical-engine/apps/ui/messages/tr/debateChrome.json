@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "Oluşturma bütçesi içinde özet hazırlanamadı",
   "debateChrome.condition.protectedCoreGuardRetired": "Yürütme bütçe nedeniyle durdu; yeniden ifade denetimi artık engel oluşturmadı",
   "debateChrome.condition.hiddenUnjudgeable": "Gizli: değerlendirilemedi — okumak için gizli öğeleri gösterin",
-  "debateChrome.condition.derivedStandingUnreviewed": "Değerlendirilmiş argümanlarına dayanıyor — kendi çapraz model incelemesi eksik",
+  "debateChrome.condition.derivedStandingUnreviewed": "Değerlendirilmiş argümanlarına dayanıyor — başka bir üreticinin modeli tarafından yapılan kendi incelemesi eksik",
   "debateChrome.condition.hiddenLowScore": "Gizli: gösterilen eşiğin altında puanlandı",
   "debateChrome.condition.unauthoredBranchHalted": "Genişletme burada durdu — gizlenecek veya gösterilecek bir metin yazılmadı",
   "debateChrome.condition.labelBasisIncomplete": "Hükmün dayanağı eksik — karşıt görüş veya karşılaştırma yapacak ikinci hakem yok",

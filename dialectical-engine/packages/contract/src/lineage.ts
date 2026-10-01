@@ -14,3 +14,17 @@ export const MakerLineageSchema = z.object({
   provider_ref: z.string().min(1)
 }).strict();
 export type MakerLineage = z.infer<typeof MakerLineageSchema>;
+
+/**
+ * The lineage an anonymous reader gets: who made it and which model, nothing
+ * about how we reached the model. transport and provider_ref name our own
+ * wiring (compliance C17/B11), so they stay owner-side. Not strict on purpose:
+ * snapshots published before the trim still carry both fields inside their
+ * ciphertext, and parsing strips them on the way out instead of refusing the
+ * whole debate.
+ */
+export const PublicMakerLineageSchema = z.object({
+  maker: MakerLineageSchema.shape.maker,
+  model_id: MakerLineageSchema.shape.model_id
+});
+export type PublicMakerLineage = z.infer<typeof PublicMakerLineageSchema>;

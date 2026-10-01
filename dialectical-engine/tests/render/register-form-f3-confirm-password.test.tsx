@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 
 let root: Root;
 let host: HTMLDivElement;
@@ -150,14 +151,14 @@ describe("register-form F3 confirm password", () => {
     // A bare submit isolates the exact-match rule from the primary field's HTML minLength.
     await submit();
     expect(register.mock.calls).toEqual([[
-      "person@example.test", "   ", "recovery@example.test", "1990-01-01"
+      "person@example.test", "   ", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
     ]]);
   });
 
-  // Property: a visible-route match shows success and sends exactly the original four arguments.
+  // Property: a visible-route match shows success and sends exactly the four registration arguments and the displayed document pairs.
   // Breaks: refusing a match, altered ok feedback, or leaking confirmation as another argument.
   // The 4th argument is the ISO date of birth, not `true`: the age gate replaced the 18+ box (Turn 8).
-  it("accepts a typed match on the native route with exactly the original four arguments", async () => {
+  it("accepts a typed match on the native route with exactly the four registration arguments and the displayed document pairs", async () => {
     await type("password", "Passw0rd!");
     await type("confirm-password", "Passw0rd!");
     await fillOtherFields();
@@ -165,7 +166,7 @@ describe("register-form F3 confirm password", () => {
     expect(validity().textContent).toBe("✓ Passwords match");
     await submit(false);
     expect(register.mock.calls).toEqual([[
-      "person@example.test", "Passw0rd!", "recovery@example.test", "1990-01-01"
+      "person@example.test", "Passw0rd!", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
     ]]);
   });
 
@@ -201,7 +202,7 @@ describe("register-form F3 confirm password", () => {
     field("confirm-password").value = " Passw0rd! ";
     await submit();
     expect(register.mock.calls).toEqual([[
-      "person@example.test", " Passw0rd! ", "recovery@example.test", "1990-01-01"
+      "person@example.test", " Passw0rd! ", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
     ]]);
   });
 

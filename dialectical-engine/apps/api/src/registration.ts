@@ -17,6 +17,8 @@ import {
   type UserDekStore
 } from "@debateai/crypto";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
+import type { RegisterLegalDocuments } from "@debateai/contract";
+import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
 
 export const REGISTRATION_PUBLIC_RESPONSE = Object.freeze({
@@ -38,8 +40,16 @@ export interface RegisterInput {
   readonly adultAffirmed: boolean;
 }
 
+/**
+ * Paid plans L3b: the request-scoped facts the frozen register mount cannot pass in its four input members
+ * (apps/api/src/index.ts, S04 — tests/unit/obs-l2-s04-zone.test.ts hashes that region). The age gate's
+ * edge country already rides here (AuthSourceContext.countryCode); the Terms and Privacy pairs the page
+ * displayed ride here too, parsed by the register preHandler hook and added by sourceFor.
+ */
+export type RegistrationSource = AuthSourceContext & Readonly<{ legal?: RegisterLegalDocuments }>;
+
 export interface RegistrationApplication {
-  register(input: RegisterInput, source: AuthSourceContext): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
+  register(input: RegisterInput, source: RegistrationSource): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
   verifyEmail(input: { readonly token: string }, source: AuthSourceContext): Promise<{ readonly status: "mfa_required" }>;
   resendVerification(
     input: { readonly email: string },
@@ -98,7 +108,8 @@ export class AuthFlowError extends Error {
     | "MFA_TOTP_INVALID"
     | "MFA_TOTP_REPLAYED"
     | "MFA_RECOVERY_CONFIRMATION_INVALID"
-    | "MFA_RATE_LIMITED",
+    | "MFA_RATE_LIMITED"
+    | "LEGAL_DOCUMENT_STALE",
     options?: ErrorOptions
   ) {
     super(code, options);
@@ -108,7 +119,8 @@ export class AuthFlowError extends Error {
   get statusCode(): 400 | 401 | 409 | 429 | 503 {
     return this.code === "AUTH_CREDENTIALS_INVALID" ? 401
       : this.code === "AUTH_RATE_LIMITED" || this.code === "MFA_RATE_LIMITED" ? 429
-      : this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED" ? 409
+      : this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
+        || this.code === "LEGAL_DOCUMENT_STALE" ? 409
       : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY"
         || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" ? 503 : 400;
   }
@@ -428,6 +440,7 @@ interface PendingRegistration {
   readonly passwordHash: string;
   readonly requestedAt: Date;
   readonly countryCode: string | null;
+  readonly documents: SignUpDocuments | null;
   readonly source: AuthSourceContext;
 }
 
@@ -613,6 +626,12 @@ export class RegistrationService implements RegistrationApplication {
     readonly clock?: () => Date;
     readonly sleep?: (milliseconds: number) => Promise<void>;
     readonly verificationTokenFactory?: () => string;
+    /**
+     * Paid plans L3: the records key the acceptance evidence is sealed under. main.ts always
+     * supplies it (tests/unit/legal-signup.test.ts pins that); a composition without it is a test
+     * that predates the acceptance record and registers exactly as before.
+     */
+    readonly legalAcceptance?: Readonly<{ recordsKey: Buffer }>;
   }) {
     this.clock = dependencies.clock ?? (() => new Date());
     this.sleep = dependencies.sleep ?? (async (milliseconds) => {
@@ -1274,6 +1293,13 @@ export class RegistrationService implements RegistrationApplication {
         const recoveryEmailCiphertext = encrypt(dek, Buffer.from(input.recoveryEmail, "utf8"), [
           "identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
+        const acceptances = input.documents === null || this.dependencies.legalAcceptance === undefined
+          ? undefined
+          : signUpAcceptanceRows({
+            recordsKey: this.dependencies.legalAcceptance.recordsKey,
+            documents: input.documents,
+            source: input.source
+          });
         const created = await this.dependencies.repository.createPendingAccount({
           userId,
           emailBlindIndex: input.emailBlindIndex,
@@ -1290,7 +1316,8 @@ export class RegistrationService implements RegistrationApplication {
           verificationTokenHash: tokenHash,
           verificationExpiresAt: expiresAt,
           occurredAt: input.requestedAt,
-          source: input.source
+          source: input.source,
+          ...(acceptances === undefined ? {} : { acceptances })
         }, () => this.dependencies.dekStore.store(userId, dek));
         if (created.status === "pseudonym_collision") continue;
         if (created.status === "email_duplicate") {
@@ -1367,7 +1394,7 @@ export class RegistrationService implements RegistrationApplication {
     }
   }
 
-  async register(input: RegisterInput, rawSource: AuthSourceContext): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
+  async register(input: RegisterInput, rawSource: RegistrationSource): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
     const requestedAt = new Date(this.clock().getTime());
     const startedAt = performance.now();
     const correlationId = randomUUID();
@@ -1388,9 +1415,17 @@ export class RegistrationService implements RegistrationApplication {
           || input.adultAffirmed !== true) {
           throw new AuthFlowError("AUTH_INPUT_INVALID");
         }
-        // Age gate: the edge's country is recorded with the result, never decisive.
+        // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
+        // recorded with the result, never decisive.
         const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
           ? rawSource.countryCode : null;
+        // L3b: the pairs of the documents the person read. Input validation, so it runs before
+        // the admission gate and spends no budget; the refusal still sits behind the clamp.
+        const documents = this.dependencies.legalAcceptance === undefined
+          ? null : resolveSignUpDocuments(rawSource.legal);
+        if (this.dependencies.legalAcceptance !== undefined && documents === null) {
+          throw new AuthFlowError("LEGAL_DOCUMENT_STALE");
+        }
         const source = sourceContext(rawSource);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
@@ -1455,7 +1490,7 @@ export class RegistrationService implements RegistrationApplication {
         mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, countryCode, source
+            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents
           }));
           const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
           if (preTransportWorkMs

@@ -16,8 +16,10 @@ import { AuthShell } from "@/components/AuthShell";
 import { DateOfBirthField, EMPTY_DOB } from "@/components/DateOfBirthField";
 import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
 import { TermsOfServiceModal } from "@/components/consent/TermsOfServiceModal";
+import { useLegalDocument } from "@/components/consent/useLegalDocument";
 import { contractClient } from "@/lib/api";
 import { resolveDobLocale, type DobLocale } from "@/lib/dob/dobLocale";
+import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import authEnglish from "@/messages/en/auth.json";
 
@@ -138,7 +140,8 @@ export function SignUpFlow({
   catalog = authEnglish,
   client = contractClient,
   dobLocale = resolveDobLocale("en"),
-  refused: refusedOnArrival = false
+  refused: refusedOnArrival = false,
+  reloadPage = () => window.location.reload()
 }: Readonly<{
   catalog?: MessageCatalog;
   client?: RegistrationClient;
@@ -146,6 +149,8 @@ export function SignUpFlow({
   dobLocale?: DobLocale;
   /** The page found the age-gate lockout cookie: the refusal is all this browser sees (8j). */
   refused?: boolean;
+  /** Paid plans L3b: reloads the page after LEGAL_DOCUMENT_STALE (a prop so render tests stay in jsdom). */
+  reloadPage?: () => void;
 }>) {
   const [email, setEmail] = useState("");
   const [confirmEmail, setConfirmEmail] = useState("");
@@ -175,6 +180,13 @@ export function SignUpFlow({
   const [termsOpen, setTermsOpen] = useState(false);
   const privacyInputRef = useRef<HTMLInputElement | null>(null);
   const termsInputRef = useRef<HTMLInputElement | null>(null);
+  /* L3b: the pairs of the documents THIS page displays — the same modules the two modals render,
+     in the same locale — so the server records exactly what the person read. */
+  const { locale } = useChromeI18n();
+  const termsDocument = useLegalDocument("terms");
+  const privacyDocument = useLegalDocument("privacy");
+  /* L3b: the server said the documents on this page are no longer the current ones. */
+  const [documentsStale, setDocumentsStale] = useState(false);
 
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("next");
@@ -216,6 +228,7 @@ export function SignUpFlow({
     const submitted = String(data.get("email") ?? "").trim();
     setBusy(true);
     setError(null);
+    setDocumentsStale(false);
     const isoDate = dobToIso(dateOfBirth);
     try {
       /* THE AGE GATE (8j). A separate check before register; a refusal shows the refusal and
@@ -229,13 +242,37 @@ export function SignUpFlow({
         submitted,
         String(data.get("password") ?? ""),
         String(data.get("recovery-email") ?? "").trim(),
-        isoDate
+        isoDate,
+        {
+          terms: { version: termsDocument.version, sha256: termsDocument.sha256 },
+          privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 },
+          locale
+        }
       );
       setSubmittedEmail(submitted);
       setMessageKey("auth.signUp.registrationSent");
     } catch (failure) {
       if (failure instanceof ContractHttpError && failure.serverCode === "AUTH_AGE_REFUSED") {
         setRefused(true);
+        return;
+      }
+      if (failure instanceof ContractHttpError && failure.serverCode === "LEGAL_DOCUMENT_STALE") {
+        /* Spec §2.3.2: "The UI then reloads the document." The documents ship with the page, so the
+           page is what reloads. Until it does, both document acknowledgements are withdrawn — the DOM
+           (FormData is the truth at submit) and the mirrors (the button's live `disabled`) — so this
+           page cannot send the stale pair again. The date of birth is kept: the age gate answered. */
+        if (privacyInputRef.current !== null) privacyInputRef.current.checked = false;
+        if (termsInputRef.current !== null) termsInputRef.current.checked = false;
+        setPrivacyAccepted(false);
+        setTermsAccepted(false);
+        setDocumentsStale(true);
+        setError(t(catalog, "auth.signUp.documentsUpdated"));
+        return;
+      }
+      if (failure instanceof ContractHttpError && (failure.serverCode === "COUNTRY_SIGNUP_UNAVAILABLE"
+        || failure.serverCode === "COUNTRY_UNKNOWN" || failure.serverCode === "TOR_REFUSED")) {
+        // Paid plans G3b (sentence G1): the register gate refused this address's country.
+        setError(t(catalog, "auth.signUp.countryUnavailable"));
         return;
       }
       setError(t(catalog, "auth.signUp.creationFailed"));
@@ -302,6 +339,11 @@ export function SignUpFlow({
       footer={null}
     >
       {error ? <div className="authAlert" role="alert">{error}</div> : null}
+      {documentsStale ? (
+        <button className="authTextButton" type="button" onClick={reloadPage}>
+          {t(catalog, "auth.signUp.reloadDocuments")}
+        </button>
+      ) : null}
 
       <form className="authForm" data-form="signup" method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
         <div className="authField">

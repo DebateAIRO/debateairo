@@ -139,7 +139,7 @@ describe("publication check record table", () => {
     ["model edge whitespace", { judge_model_id: "model\n" }, "model"],
     ["free-text policy", { policy_version: "arbitrary text" }, "policy"],
     ["negative count", { judge_call_count: -1 }, "count"],
-    // FIX-HS2-p1 sd-N1 (migration 0079): the identifier columns hold identifiers, never text, an email or a uuid.
+    // FIX-HS2-p1 sd-N1 (migration 0082): the identifier columns hold identifiers, never text, an email or a uuid.
     ["provider with a space", { judge_provider_ref: "test judge" }, "provider_grammar"],
     ["provider that is an email", { judge_provider_ref: "victim.owner@example.com" }, "provider_grammar"],
     ["provider that is a user uuid", { judge_provider_ref: "66666666-6666-4666-8666-666666666666" }, "provider_grammar"],
@@ -202,7 +202,7 @@ describe("publication check record repository", () => {
       ground: null, judge_provider_ref: null, judge_model_id: null, judge_call_count: 0 }
   ] satisfies Omit<PublicationCheckRecordRow, "run_id" | "attempted_at" | "policy_version">[];
 
-  // FIX-HS2-p1 sd-N1: the identifiers the product composes today are accepted by the 0079 grammar.
+  // FIX-HS2-p1 sd-N1: the identifiers the product composes today are accepted by the 0082 grammar.
   it.each([["development:hermes-glm-5.3-flash", "z-ai/glm-5.3-flash"], ["vendor:acme", "Acme-Large_2.1+beta"]])(
     "accepts the configured identifier pair %s / %s as debateai_runtime", async (provider, model) => {
       await asRuntime(async (client) => {

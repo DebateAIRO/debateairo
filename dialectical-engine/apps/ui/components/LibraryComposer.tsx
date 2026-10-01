@@ -5,6 +5,8 @@ import { useState } from "react";
 import { COOKIE_SESSION_MARKER, createDebate, validateSession } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
+import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
+import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
 
 /* The claim field rests at one line and grows with what is typed. */
 function grow(field: HTMLTextAreaElement | null): void {
@@ -16,31 +18,65 @@ function grow(field: HTMLTextAreaElement | null): void {
 
 export function LibraryComposer({
   catalog,
-  newDebateCatalog
+  newDebateCatalog,
+  locale,
+  crisisCountryHint = null
 }: {
   catalog: MessageCatalog;
   /** The interface locale's `newDebate` catalogue: the refusal words /new uses. */
   newDebateCatalog: MessageCatalog;
+  /** The interface locale, recorded with the sensitive-data consent. */
+  locale: string;
+  /** The edge's country, so the crisis screen shows that country's helplines first. */
+  crisisCountryHint?: string | null;
 }) {
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const consent = useSensitiveDataConsent({ catalog, locale });
+  const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint });
 
-  const ready = topic.trim().length > 6;
+  // A question too short to debate still reaches the crisis check ("我想死" is three letters).
+  const ready = topic.trim().length > 6 || crisis.flags(topic);
 
   async function start() {
-    if (!ready || busy) return;
+    if (busy) return;
+    // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
+    // debate — and before anything else, the length rule and the consent screen included.
+    if (crisis.offerIfCrisis(topic)) return;
+    if (!ready) return;
     setBusy(true);
     setError(null);
     try {
       await validateSession();
-      const debate = await createDebate(
+      // V, 2026-09-29: no debate starts before the one-time sensitive-data consent.
+      if (!await consent.ensureConsent()) {
+        setBusy(false);
+        return;
+      }
+      const create = () => createDebate(
         topic.trim(), { max_depth: 3, branching: 2, max_tokens: 800 }, COOKIE_SESSION_MARKER
       );
+      let debate;
+      try {
+        debate = await create();
+      } catch (refusal) {
+        if (!isSensitiveDataConsentRefusal(refusal)) throw refusal;
+        if (!await consent.ensureConsent({ known: "required" })) {
+          setBusy(false);
+          return;
+        }
+        debate = await create();
+      }
       router.push(`/debate/${debate.id}`);
       return;
     } catch (exc) {
+      if (isCrisisSupportRefusal(exc)) {
+        crisis.offer();
+        setBusy(false);
+        return;
+      }
       // Task M8 (spec 2026-09-26 §14.4.7): today's limit for new debates is an
       // answer, not a detour. /new would only refuse the same ask again, so the
       // person reads it here, where they typed, in the words /new uses.
@@ -85,7 +121,12 @@ export function LibraryComposer({
           </button>
         </div>
         {error ? <div className="error" style={{ marginTop: 12 }}>{error}</div> : null}
+        {consent.declined ? (
+          <p className="sensitiveConsentDeclined" role="status">{t(catalog, "home.sensitiveConsent.declined")}</p>
+        ) : null}
       </div>
+      {consent.dialog}
+      {crisis.dialog}
     </div>
   );
 }

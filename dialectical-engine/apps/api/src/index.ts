@@ -2,9 +2,15 @@ import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
+  AccountEmailSchema,
   AccountErasureScheduleRequestSchema,
   AccountErasureCancelRequestSchema,
   AccountErasureStatusSchema,
+  EmailChangeCancelledSchema,
+  EmailChangeConfirmedSchema,
+  EmailChangeLinkRequestSchema,
+  EmailChangePendingSchema,
+  EmailChangeRequestSchema,
   AnswerSchema,
   AnswerIndexSchema,
   AnswerStorySchema,
@@ -48,12 +54,23 @@ import {
   type Node,
   type RunProjection,
   type Session,
+  CRISIS_SUPPORT_OFFERED,
+  detectCrisis,
+  warmCrisisCheck,
+  SENSITIVE_DATA_CONSENT_REQUIRED,
+  SENSITIVE_DATA_NOTICE_VERSION,
+  SensitiveDataConsentRequestSchema,
   AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
   AGE_REFUSAL_COOKIE_NAME,
   AGE_REFUSAL_COOKIE_VALUE,
   AgeCheckRequestSchema,
   DateOfBirthSchema,
-  PUBLICATION_CONTENT_REFUSED_MESSAGE
+  PUBLICATION_CONTENT_REFUSED_MESSAGE,
+  RegisterLegalDocumentsSchema,
+  type RegisterLegalDocuments,
+  LegalAcceptRequestSchema,
+  LegalStatusResponseSchema,
+  GeoAvailabilityResponseSchema
 } from "@debateai/contract";
 import type { Pool } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
@@ -96,6 +113,7 @@ import {
 } from "./registration.js";
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
 import type { MfaApplication } from "./mfa.js";
+import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
@@ -103,8 +121,17 @@ import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+import type { LegalAcceptanceApplication } from "./legal.js";
+import type { CountryGate } from "./country-gate.js";
+import {
+  EmailChangeError,
+  type EmailChangeErrorCode,
+  type EmailChangePending,
+  type EmailChangeSession,
+  type EmailSettings
+} from "./email-change.js";
 import type { RecoveryApplication } from "./recovery.js";
-import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+import { clientIpNetworkScope, normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import {
   installSupportRoutes,
   type SupportAdmission,
@@ -1103,13 +1130,27 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
   { route: "GET /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "read-age-confirmation" },
   { route: "POST /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "confirm-age" },
+  // Sensitive-data consent (V, 2026-09-29): the one-time agreement before the first debate.
+  { route: "GET /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "read-sensitive-data-consent" },
+  { route: "POST /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "give-sensitive-data-consent" },
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
+  // Turn 14 — change email. The owner routes ride the cookie session and CSRF;
+  // the two link routes need only the first-party Origin and the mailed bearer.
+  { route: "GET /v1/account/email", auth: "user", resource: "identity", action: "read-email" },
+  { route: "POST /v1/account/email/change", auth: "user", resource: "identity", action: "request-email-change" },
+  { route: "POST /v1/account/email/change/resend", auth: "user", resource: "identity", action: "resend-email-change" },
+  { route: "DELETE /v1/account/email/change", auth: "user", resource: "identity", action: "cancel-email-change" },
+  { route: "POST /v1/account/email/change/confirm", auth: "public", origin: "trusted", resource: "identity", action: "confirm-email-change" },
+  { route: "POST /v1/account/email/change/cancel", auth: "public", origin: "trusted", resource: "identity", action: "cancel-email-change-link" },
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+  { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // DL1-F7: every mutating support route requires the exact first-party Origin,
   // for anonymous callers too. Without it a page on any site could drive every
   // one of its visitors' browsers into the support surface — spending the shared
@@ -1153,7 +1194,7 @@ export const authorizationPolicyInventory = Object.freeze([
   session?: RouteSessionPolicy;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status";
+    "support-status" | "geo";
   action: string;
 }>[]);
 
@@ -1308,6 +1349,30 @@ export type AskPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
 
+export interface EmailChangeApplication {
+  settings(session: EmailChangeSession): Promise<EmailSettings | null>;
+  request(
+    session: EmailChangeSession,
+    input: Readonly<{ newEmail: string; grantToken: string }>,
+    source: AuthSourceContext
+  ): Promise<EmailChangePending>;
+  resend(session: EmailChangeSession, source: AuthSourceContext): Promise<EmailChangePending>;
+  cancel(session: EmailChangeSession, source: AuthSourceContext): Promise<void>;
+  confirm(token: string, source: AuthSourceContext): Promise<void>;
+  cancelByLink(token: string, source: AuthSourceContext): Promise<void>;
+}
+
+const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Object.freeze({
+  EMAIL_INVALID: 422,
+  EMAIL_UNCHANGED: 422,
+  STEP_UP_REQUIRED: 403,
+  RESEND_COOLDOWN: 429,
+  NO_PENDING_CHANGE: 404,
+  LINK_INVALID: 404,
+  LINK_EXPIRED: 410,
+  ADDRESS_UNAVAILABLE: 409
+});
+
 export interface ApiOptions {
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
@@ -1338,6 +1403,10 @@ export interface ApiOptions {
   readonly disclosures?: AnswerDisclosureApplication;
   readonly accountErasure?: AccountErasureApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
+  /** Paid plans L4: re-acceptance of the Terms and the Privacy Policy; the routes answer 503 without it. */
+  readonly legal?: LegalAcceptanceApplication;
+  /** Turn 14 — change email; the routes answer a closed 503 when it is absent. */
+  readonly emailChange?: EmailChangeApplication;
   readonly allowedOrigin?: string;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
@@ -1346,6 +1415,11 @@ export interface ApiOptions {
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
   readonly support?: SupportApplication;
+  /**
+   * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
+   * register version in force publishes `countryPolicy`; absent, every route behaves exactly as before.
+   */
+  readonly countryGate?: CountryGate;
 }
 
 /**
@@ -1563,6 +1637,13 @@ function ageRefused(reply: FastifyReply): FastifyReply {
     .send({ error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" });
 }
 
+/** Fails closed: without the consent store, no debate can be admitted and none is recorded. */
+function sensitiveDataConsentUnavailable(reply: FastifyReply): FastifyReply {
+  return reply.status(503).send({
+    error: "SENSITIVE_DATA_CONSENT_UNAVAILABLE", message: "SENSITIVE_DATA_CONSENT_UNAVAILABLE"
+  });
+}
+
 function refreshedCookies(input: Readonly<{
   sessionToken: string;
   csrfToken: string | null;
@@ -1574,6 +1655,8 @@ function refreshedCookies(input: Readonly<{
 }
 
 export function buildApi(options: ApiOptions): FastifyInstance {
+  // Crisis check: compile its patterns now, not on the first question (about a second, once).
+  warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
     ? undefined : new URL(options.allowedOrigin).origin;
   const api = Fastify({
@@ -1611,24 +1694,38 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.decorateRequest("session");
   api.decorateRequest("authenticatedSession");
   api.decorateRequest("cookieRefresh");
+  /**
+   * Paid plans L3b: the Terms and Privacy pairs a register request carried, keyed by the request object
+   * (filled by the register preHandler hook below, read by sourceFor). A WeakMap, so nothing outlives the
+   * request and no request decoration is added.
+   */
+  const registerLegalDocuments = new WeakMap<object, RegisterLegalDocuments>();
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
     readonly headers: Readonly<Record<string, unknown>>;
     readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
   }) => {
-    const countryCode = edgeCountry(request.headers);
+    // Registration, MFA and sessions share T2's one canonical public source.
+    const ip = normalizeClientIp(request.ip)
+      ?? normalizeClientIp(request.raw.socket.remoteAddress)
+      ?? "unknown";
+    // Age gate + paid plans G3a (RULINGS-R3 R3-3): the country recorded with an age check — the edge's
+    // cf-ipcountry when a Cloudflare edge reported one, else the country gate's own lookup of this
+    // address when a gate is composed (the V3 kit has Caddy, no Cloudflare). Recorded, never decisive.
+    const countryCode = edgeCountry(request.headers) ?? options.countryGate?.recordedCountry(ip) ?? null;
+    // Paid plans L3b: present only on a register request whose hook parsed a well-formed triple.
+    const legal = registerLegalDocuments.get(request);
     return Object.freeze({
-      // Registration, MFA and sessions share T2's one canonical public source.
-      ip: normalizeClientIp(request.ip)
-        ?? normalizeClientIp(request.raw.socket.remoteAddress)
-        ?? "unknown",
+      ip,
       userAgent: typeof request.headers["user-agent"] === "string"
         ? request.headers["user-agent"] as string
         : "unknown",
       requestId: request.id,
-      // Age gate: the edge's country for the source, only when it reported one.
-      ...(countryCode === null ? {} : { countryCode })
+      // Age gate (R3-3): the country computed above (the edge's, else the country gate's lookup),
+      // left out when neither gives one.
+      ...(countryCode === null ? {} : { countryCode }),
+      ...(legal === undefined ? {} : { legal })
     });
   };
   const admissionRefusalAuditedUntil = new Map<string, number>();
@@ -1754,6 +1851,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
   /**
+   * Paid plans G3a (spec §2.3.3): the country gate in front of register. The registration mount region
+   * is frozen (S04), so — like the age gate below — the refusal is decided in a hook, before the date of
+   * birth is judged and before any account work. The answer is the code only.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
+    if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
+  });
+  /**
    * Age gate (8d → 8j) in front of register. The registration mount region is frozen (S04), so
    * the date is decided here: a browser inside its 30-day lockout, or an under-age date, is
    * refused with the lockout cookie and the service is never called; a malformed or impossible
@@ -1770,6 +1877,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (body === null || dateOfBirth === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (!meetsMinimumAge(dateOfBirth)) return ageRefused(reply);
     body.adult_affirmed = true;
+  });
+  /**
+   * Paid plans L3b (spec §2.3.2): the pairs of the documents the sign-up page displayed. The registration
+   * mount region is frozen (S04), so — as the age gate does for the date — they are read here and travel to
+   * the service on the source (sourceFor), never in the region's four input members. A missing or malformed
+   * triple travels as absent, which the service refuses as LEGAL_DOCUMENT_STALE when the records key is
+   * composed. Runs after the age gate's hook, so a refused date never gets this far.
+   */
+  api.addHook("preHandler", async (request) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown>
+      : null;
+    if (body === null) return;
+    const legal = RegisterLegalDocumentsSchema.safeParse({
+      terms: body.terms, privacy: body.privacy, locale: body.locale
+    });
+    if (legal.success) registerLegalDocuments.set(request, legal.data);
   });
   /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
@@ -1940,17 +2065,39 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (dateOfBirth === null) {
         return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
+      const source = sourceFor(request);
       const outcome = await options.sessions!.confirmAccountAge(authenticated, {
         passed: meetsMinimumAge(dateOfBirth),
         minAgeApplied: MIN_AGE,
-        countryCode: edgeCountry(request.headers),
+        // R3-3: the same recorded country as registration — the edge's, else the country gate's.
+        countryCode: source.countryCode ?? null,
         ruleVersion: AGE_RULE_VERSION
-      }, sourceFor(request));
+      }, source);
       if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
       if (outcome === "passed") return reply.send({ outcome: "allowed" });
       // Frozen: every session of the account is gone; this browser keeps the refusal.
       reply.header("set-cookie", [...expiredCookies(), ageRefusalCookie()]);
       return reply.send({ outcome: "refused" });
+    });
+    // Sensitive-data consent (V, 2026-09-29): read and give the one-time agreement.
+    api.get("/v1/account/sensitive-data-consent", routePolicy("GET /v1/account/sensitive-data-consent"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      return reply.send({ status: await options.sessions!.readSensitiveDataConsent(authenticated) });
+    });
+    api.post("/v1/account/sensitive-data-consent", credentialRoutePolicy("POST /v1/account/sensitive-data-consent"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.recordSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      const body = SensitiveDataConsentRequestSchema.safeParse(request.body);
+      if (!body.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      const outcome = await options.sessions!.recordSensitiveDataConsent(authenticated, {
+        noticeVersion: SENSITIVE_DATA_NOTICE_VERSION,
+        locale: body.data.locale
+      });
+      if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      return reply.send({ status: "given" });
     });
     api.post("/v1/auth/step-up", credentialRoutePolicy("POST /v1/auth/step-up"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
@@ -1968,7 +2115,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         password: typeof body.password === "string" ? body.password : "",
         code: typeof body.code === "string" ? body.code : "",
         ...(authorization === undefined ? {} : { authorization:
-          authorization.action === "DELETE_ACCOUNT"
+          !("target_run_id" in authorization)
             ? { action: authorization.action }
             : { action: authorization.action, targetRunId: authorization.target_run_id }
         })
@@ -1984,7 +2131,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           || rotated.grantToken === undefined
           || rotated.grantExpiresAt === undefined
           ? {}
-          : { step_up_grant: authorization.action === "DELETE_ACCOUNT"
+          : { step_up_grant: !("target_run_id" in authorization)
               ? {
                   token: rotated.grantToken,
                   action: authorization.action,
@@ -2080,6 +2227,93 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }));
     }
   );
+  // Turn 14 — change email (design doc 14A/14B/14C).
+  const emailChangeSession = (authenticated: AuthenticatedSession): EmailChangeSession =>
+    Object.freeze({ userId: authenticated.userId, sessionId: authenticated.session.session_id });
+  const pendingBody = (pending: EmailChangePending) => EmailChangePendingSchema.parse({
+    status: "PENDING", new_email: pending.newEmail, expires_at: pending.expiresAt.toISOString()
+  });
+  const emailChangeRefusal = (reply: FastifyReply, error: unknown) => {
+    if (error instanceof EmailChangeError) {
+      return reply.status(EMAIL_CHANGE_STATUS[error.code]).send({ error: error.code });
+    }
+    throw error;
+  };
+  api.get("/v1/account/email", routePolicy("GET /v1/account/email"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+    const settings = await options.emailChange.settings(emailChangeSession(authenticated));
+    if (settings === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    return reply.send(AccountEmailSchema.parse({
+      email: settings.email,
+      recovery_email: settings.recoveryEmail,
+      pending: settings.pending === null ? null : {
+        new_email: settings.pending.newEmail, expires_at: settings.pending.expiresAt.toISOString()
+      }
+    }));
+  });
+  api.post("/v1/account/email/change", credentialRoutePolicy("POST /v1/account/email/change"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeRequestSchema, request.body);
+      try {
+        const pending = await options.emailChange.request(emailChangeSession(authenticated), {
+          newEmail: input.new_email, grantToken: input.step_up_grant
+        }, sourceFor(request));
+        return reply.status(202).send(pendingBody(pending));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/resend", credentialRoutePolicy("POST /v1/account/email/change/resend"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      try {
+        const pending = await options.emailChange.resend(emailChangeSession(authenticated), sourceFor(request));
+        return reply.status(202).send(pendingBody(pending));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.delete("/v1/account/email/change", credentialRoutePolicy("DELETE /v1/account/email/change"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      try {
+        await options.emailChange.cancel(emailChangeSession(authenticated), sourceFor(request));
+        return reply.status(204).send();
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/confirm", credentialRoutePolicy("POST /v1/account/email/change/confirm"),
+    async (request, reply) => {
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeLinkRequestSchema, request.body);
+      try {
+        await options.emailChange.confirm(input.token, sourceFor(request));
+        return reply.send(EmailChangeConfirmedSchema.parse({ status: "CONFIRMED" }));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/cancel", credentialRoutePolicy("POST /v1/account/email/change/cancel"),
+    async (request, reply) => {
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeLinkRequestSchema, request.body);
+      try {
+        await options.emailChange.cancelByLink(input.token, sourceFor(request));
+        return reply.send(EmailChangeCancelledSchema.parse({ status: "CANCELLED" }));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
   api.delete<{ Params:{ id:string } }>(
     "/v1/debates/:id",
     credentialRoutePolicy("DELETE /v1/debates/{id}"),
@@ -2195,6 +2429,56 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.send({ outcome: "refused" });
     });
   }
+  // Paid plans L4: re-acceptance. Mounted after the registration region (S04), whatever the list order.
+  const LegalLocaleSchema = z.string().regex(/^[a-z]{2}$/u);
+  api.get<{ Querystring: { locale?: string } }>(
+    "/v1/account/legal-status",
+    routePolicy("GET /v1/account/legal-status"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.legal === undefined) return reply.status(503).send({ error: "LEGAL_ACCEPTANCE_UNAVAILABLE" });
+      const locale = LegalLocaleSchema.safeParse(request.query.locale ?? "en");
+      if (!locale.success) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      const mustAccept = await options.legal.status(authenticated.ownerRef, locale.data);
+      return reply.send(LegalStatusResponseSchema.parse({ must_accept: mustAccept }));
+    }
+  );
+  api.post(
+    "/v1/account/legal-accept",
+    credentialRoutePolicy("POST /v1/account/legal-accept"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.legal === undefined) return reply.status(503).send({ error: "LEGAL_ACCEPTANCE_UNAVAILABLE" });
+      const input = parseRequest(LegalAcceptRequestSchema, request.body);
+      const source = sourceFor(request);
+      const outcome = await options.legal.accept({
+        ownerRef: authenticated.ownerRef,
+        locale: input.locale,
+        documents: input.documents,
+        source: { ip: source.ip, userAgent: source.userAgent }
+      });
+      if (outcome === "STALE") return reply.status(409).send({ error: "LEGAL_DOCUMENT_STALE" });
+      return reply.status(204).send();
+    }
+  );
+  // Paid plans G3a: the sign-up page's country check. Public, after the registration region (S04), and
+  // keyed by the source's NETWORK scope (DL5-F3: an IPv6 address counts as its /64).
+  api.get("/v1/geo/availability", routePolicy("GET /v1/geo/availability"), async (request, reply) => {
+    const source = sourceFor(request);
+    if (options.admission?.configured("geoAvailability") === true
+      && !admitOrRefuse(reply, "geoAvailability", "GET /v1/geo/availability", clientIpNetworkScope(source.ip))) {
+      return reply;
+    }
+    // No gate composed (local mode, or hosted without countryPolicy): sign-up is open and payment is
+    // not offered through this answer.
+    return reply.send(GeoAvailabilityResponseSchema.parse(
+      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false }
+    ));
+  });
 
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
@@ -2298,8 +2582,41 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
+    // Ask pre-flight, step 1 — the crisis check (V, 2026-09-30; V, 2026-10-01: "make sure this
+    // crisis check is done in the pre-flight"). A question that reads as a person in crisis gets
+    // help numbers, never a debate. It stays the FIRST thing this route does: before the
+    // consent, quota and country rules, and before any other pre-flight check of the question
+    // (the hate-speech check, S03). A person in crisis must never meet a refusal or a "check
+    // unavailable" message instead of help, and their words go to no judge model. Nothing of
+    // the question is kept. `country` is the edge's guess, only to pick which helplines the
+    // screen shows first. Pinned by tests/unit/crisis-check-api.test.ts.
+    const questionLine = typeof request.body === "object" && request.body !== null
+      && "question_line" in request.body && typeof request.body.question_line === "string"
+      ? request.body.question_line : "";
+    // Only a question the API would accept is checked: a longer one is refused as malformed
+    // below anyway, and checking 256 KB of text would hold the event loop for seconds.
+    if (Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES && detectCrisis(questionLine).crisis) {
+      return reply.status(422).send({
+        error: CRISIS_SUPPORT_OFFERED, message: CRISIS_SUPPORT_OFFERED,
+        country: edgeCountry(request.headers)
+      });
+    }
+    // Sensitive-data consent (V, 2026-09-29): an account that has not agreed starts no
+    // debate. Checked before admission, so a refusal here spends none of the account's quota.
+    const asker = request.authenticatedSession;
+    if (asker !== undefined) {
+      if (options.sessions?.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      if (await options.sessions.readSensitiveDataConsent(asker) !== "given") {
+        return reply.status(403).send({
+          error: SENSITIVE_DATA_CONSENT_REQUIRED, message: SENSITIVE_DATA_CONSENT_REQUIRED
+        });
+      }
+    }
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
+    // Paid plans G3a: no new debate from an always-blocked country. Reading is never gated.
+    const countryRefusal = options.countryGate?.ask(sourceFor(request)) ?? null;
+    if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
     const ask = parseRequest(AskRequestSchema, request.body);
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });

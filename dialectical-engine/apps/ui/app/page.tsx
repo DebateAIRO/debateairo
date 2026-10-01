@@ -5,6 +5,8 @@ import { AgeConfirmationFlow } from "@/components/AgeConfirmationFlow";
 import { resolveDobLocale } from "@/lib/dob/dobLocale";
 import { createServerContractClient, listDebatesPageServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
+import { readCrisisCountryHint } from "@/lib/crisisLines";
+import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { SupportWidget } from "@/components/support/SupportWidget";
@@ -13,7 +15,7 @@ import type { DebateSummary } from "@/lib/types";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
-import { dailyLimitMessageCatalog } from "@/lib/v3/requestFailure";
+import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +46,8 @@ export default async function HomePage({
       : token !== null ? "yours" : "public";
   const userAgent = (await headers()).get("user-agent") ?? undefined;
   const clientIp = readTrustedClientIp(await headers());
+  // Crisis check (V, 2026-09-30): the edge's country, so help numbers show that country first.
+  const crisisCountryHint = readCrisisCountryHint(await headers());
   // Task M8 (spec 2026-09-26 §14.4.7): the composer says today's limit for new
   // debates in the words /new uses, so it reads that catalogue too — only the
   // two values that message prints, as the composer's props ship to the browser.
@@ -85,6 +89,20 @@ export default async function HomePage({
     const dobLocale = resolveDobLocale(locale, (await headers()).get("accept-language"));
     return <AgeConfirmationFlow catalog={authCatalog} dobLocale={dobLocale} />;
   }
+  // Paid plans L4 (spec 2026-09-29 §2.3.2, R3-2): sign-in lands here, so the blocking accept
+  // screen covers this page too — read only once the age check above is not owed. Ruling Q-10:
+  // a failed read counts as nothing owed, and the page renders exactly as it did before.
+  let legalGateCatalog: ReturnType<typeof legalGateMessageCatalog> | null = null;
+  if (sessionConfirmed) {
+    try {
+      const legal = await createServerContractClient(fetch, token, userAgent, clientIp).getLegalStatus(locale);
+      if (legal.must_accept.length > 0) {
+        legalGateCatalog = legalGateMessageCatalog(await loadNamespace(locale, "newDebate"));
+      }
+    } catch {
+      legalGateCatalog = null;
+    }
+  }
 
   // V's ruling of 2026-09-20: the chip counts what is on screen. It used to
   // show the account-wide or corpus-wide aggregate, so a reader saw "41 TOTAL"
@@ -99,7 +117,7 @@ export default async function HomePage({
   // identical (globals.css:2325 and :6765), so carrying both recovers the
   // dropped name with no visual change.
 
-  return (
+  const home = (
     <div className="screen scroll libScreen">
       <div className="libInner">
         <p className="libEyebrow">{t(catalog, "home.reasoningInstrument")}</p>
@@ -124,7 +142,7 @@ export default async function HomePage({
             session; an unconfirmed one gets the notice above instead. */}
         {sessionConfirmed ? (
           <section data-support-primary-control id="start-a-debate" aria-label={t(catalog, "home.startDebateLabel")}>
-            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} />
+            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} locale={locale} crisisCountryHint={crisisCountryHint} />
           </section>
         ) : null}
 
@@ -171,4 +189,6 @@ export default async function HomePage({
       <SupportWidget />
     </div>
   );
+  // While documents are owed the accept screen shows first; the composer and the library only after acceptance.
+  return legalGateCatalog === null ? home : <LegalAcceptGate catalog={legalGateCatalog}>{home}</LegalAcceptGate>;
 }

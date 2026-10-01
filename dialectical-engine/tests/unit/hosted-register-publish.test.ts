@@ -29,6 +29,7 @@ import {
   ALGORITHM_REGISTER_ROW_KEYS,
   COST_ENVELOPE_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
+  COUNTRY_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   loadBootstrapRegister,
   parseRegisterVersionText,
@@ -179,6 +180,19 @@ describe("Task 14b · the operator's hosted register file", () => {
     expect(plan.vendorRefs.length).toBeGreaterThanOrEqual(2);
     // Every example vendor sits under a reserved example name, so the plan says so.
     expect(plan.exampleTargetRefs).toEqual(plan.vendorRefs);
+  });
+
+  /**
+   * Final review I-3. Bring-up step 4b copies this example into the live hosted file, so what it
+   * carries is the kit's default: NO countryPolicy member, so the first publication has no country
+   * gate (A14). The switches live in country-policy.example.json, merged in only once the gate's
+   * preconditions hold (the DB-IP credit on the site among them; README "Country data").
+   */
+  it("ships the example WITHOUT countryPolicy, so a hosted file built from it has no country gate", async () => {
+    const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
+    expect(Object.hasOwn(example, "countryPolicy")).toBe(false);
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
+    expect(plan.rows.some((row) => row.rowKey === COUNTRY_POLICY_ROW_KEY)).toBe(false);
   });
 
   /**

@@ -1,6 +1,6 @@
 -- Hate-speech S02, FIX-HS2-p1 (REV-S02-p1 sd-N1, sd-N2): the content-free record
--- enforces its own guarantees instead of trusting its writer. 0078 is applied on
--- shared volumes, so the rules arrive as new constraints (ruling R-M).
+-- enforces its own guarantees instead of trusting its writer. 0081 (first applied as
+-- 0078) is on shared volumes, so the rules arrive as new constraints (ruling R-M).
 --
 -- sd-N1: judge_provider_ref / judge_model_id are operator identifiers, never text:
 --   1-256 characters of [A-Za-z0-9._:/+-], starting alphanumeric (no space, no
@@ -30,7 +30,7 @@ ALTER TABLE serve.publication_check_record
   ),
   -- No helper function (a new function is EXECUTE-able by PUBLIC, which the
   -- erasure role's isolation witness refuses): rules and part_kinds are already
-  -- subsets of closed sets (0078), so each member occurs at most once.
+  -- subsets of closed sets (0081), so each member occurs at most once.
   DROP CONSTRAINT IF EXISTS publication_check_record_distinct_check,
   ADD CONSTRAINT publication_check_record_distinct_check CHECK (
     cardinality(array_positions(rules, 1::smallint)) <= 1

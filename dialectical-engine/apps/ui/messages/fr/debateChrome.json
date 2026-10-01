@@ -204,7 +204,7 @@
   "debateChrome.condition.digestCannotExist": "Aucun condensé n’a pu être produit dans le budget de composition",
   "debateChrome.condition.protectedCoreGuardRetired": "Exécution arrêtée faute de budget ; la vérification de reformulation n’était plus bloquante",
   "debateChrome.condition.hiddenUnjudgeable": "Masqué : impossible à évaluer — affichez les éléments masqués pour le lire",
-  "debateChrome.condition.derivedStandingUnreviewed": "Repose sur ses arguments évalués — sa propre évaluation croisée est absente",
+  "debateChrome.condition.derivedStandingUnreviewed": "Repose sur ses arguments évalués — sa propre évaluation par un modèle d’un autre concepteur est absente",
   "debateChrome.condition.hiddenLowScore": "Masqué : score inférieur au seuil affiché",
   "debateChrome.condition.unauthoredBranchHalted": "Développement arrêté ici — aucun texte n’a été rédigé : il n’y a rien à masquer ni à afficher",
   "debateChrome.condition.labelBasisIncomplete": "Fondement du verdict incomplet — aucune position rivale ou aucun second juge pour effectuer la comparaison",

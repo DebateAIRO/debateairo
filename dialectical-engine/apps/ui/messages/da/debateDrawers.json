@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Huller",
   "debateDrawers.node.honestyAriaLabel": "Redelighed for V3-knudepunkt",
   "debateDrawers.node.noArgumentText": "Ingen argumenttekst endnu.",
-  "debateDrawers.node.noCompletedReview": "Der er ikke registreret en fuldført gennemgang fra en anden ophavsperson for dette knudepunkt.",
+  "debateDrawers.node.noCompletedReview": "Der er ikke registreret en fuldført gennemgang fra en anden modeludvikler for dette knudepunkt.",
   "debateDrawers.node.noPreviousGenerations": "Ingen tidligere genereringer.",
   "debateDrawers.node.noScoringRecommendation": "Der er ingen bedømmelsesanbefaling til dette argument.",
   "debateDrawers.node.notUseful": "ikke nyttig",

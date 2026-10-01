@@ -10,9 +10,11 @@ import {
   LEGAL_BROWSER_STORAGE,
   LEGAL_COOKIES,
   LEGAL_PAGES,
-  MODEL_PROVIDERS,
+  PROVIDER_REGISTER,
   TERMS_VERSIONS,
-  type LegalPageKey
+  type LegalPageKey,
+  type ProviderPurpose,
+  type ProviderRegisterEntry
 } from "@/lib/legal/pages";
 
 /**
@@ -304,30 +306,70 @@ export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalo
   );
 }
 
+const PURPOSE_KEYS: Readonly<Record<ProviderPurpose, string>> = {
+  arguments: "legal.providers.purpose.arguments",
+  judging: "legal.providers.purpose.judging",
+  story: "legal.providers.purpose.story",
+  support: "legal.providers.purpose.support"
+};
+
+const FLAG_KEYS: Readonly<Record<ProviderRegisterEntry["zeroRetention"] | ProviderRegisterEntry["training"], string>> = {
+  yes: "legal.providers.yes",
+  no: "legal.providers.no",
+  unconfirmed: "legal.providers.unconfirmed",
+  notNeeded: "legal.providers.zeroNotNeeded"
+};
+
+/**
+ * The AI Provider Register (`/providers`), which Privacy Policy §5 makes part of the policy: one
+ * label/value table per provider with every fact §5 promises, so it stays readable on a phone.
+ * Facts come from `PROVIDER_REGISTER`; the catalogues carry only labels and the words around them.
+ */
 export function LegalProvidersBody({ legalCatalog }: { legalCatalog: MessageCatalog }) {
   return (
     <>
       <p className="legalIntro">{t(legalCatalog, "legal.providers.intro")}</p>
-      <table className="legalTable legalProviderTable">
-        <thead>
-          <tr>
-            <th scope="col">{t(legalCatalog, "legal.providers.colProvider")}</th>
-            <th scope="col">{t(legalCatalog, "legal.providers.colModels")}</th>
-            <th scope="col">{t(legalCatalog, "legal.providers.colLocation")}</th>
-            <th scope="col">{t(legalCatalog, "legal.providers.colBasis")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {MODEL_PROVIDERS.map(({ family, provider, models, modelsKey, locationKey, basisKey }) => (
-            <tr key={family}>
-              <th scope="row">{provider}</th>
-              <td>{modelsKey === null ? models : `${models} · ${t(legalCatalog, modelsKey)}`}</td>
-              <td>{t(legalCatalog, locationKey)}</td>
-              <td>{t(legalCatalog, basisKey)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {PROVIDER_REGISTER.map((entry) => {
+        const name = entry.nameKey === null ? entry.provider : t(legalCatalog, entry.nameKey);
+        const rows: ReadonlyArray<readonly [string, ReactNode]> = [
+          ["legal.providers.colModels", entry.modelsKey === null ? <bdi>{entry.models}</bdi> : `${entry.models} · ${t(legalCatalog, entry.modelsKey)}`],
+          ["legal.providers.colEntity", <bdi>{entry.entity}</bdi>],
+          ["legal.providers.colCountry", t(legalCatalog, entry.homeCountryKey)],
+          [
+            "legal.providers.colPurpose",
+            <div className="legalProviderPurposes">
+              <ul>
+                {entry.purposes.map((purpose) => (
+                  <li key={purpose}>{t(legalCatalog, PURPOSE_KEYS[purpose])}</li>
+                ))}
+              </ul>
+              {entry.purposesConfirmed ? null : <span className="legalFactNote">{t(legalCatalog, "legal.providers.purposesUnconfirmed")}</span>}
+            </div>
+          ],
+          ["legal.providers.colLocation", t(legalCatalog, entry.locationKey)],
+          ["legal.providers.colRetention", t(legalCatalog, entry.retentionKey)],
+          ["legal.providers.colZeroRetention", t(legalCatalog, FLAG_KEYS[entry.zeroRetention])],
+          ["legal.providers.colTraining", t(legalCatalog, FLAG_KEYS[entry.training])],
+          ["legal.providers.colBasis", t(legalCatalog, entry.basisKey)],
+          ["legal.providers.colContact", <Email address={entry.contact} />],
+          ["legal.providers.colChecked", entry.checkedOn === null ? t(legalCatalog, "legal.providers.notChecked") : <bdi>{entry.checkedOn}</bdi>]
+        ];
+        return (
+          <section key={entry.key} className="legalProviderEntry" aria-labelledby={`legal-provider-${entry.key}`}>
+            <h2 id={`legal-provider-${entry.key}`}>{name}</h2>
+            <table className="legalTable legalFactTable">
+              <tbody>
+                {rows.map(([labelKey, value]) => (
+                  <tr key={labelKey}>
+                    <th scope="row">{t(legalCatalog, labelKey)}</th>
+                    <td>{value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        );
+      })}
     </>
   );
 }

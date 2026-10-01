@@ -62,7 +62,7 @@ const PUBLICATION_CHECK_MAX_CALLS_IN_FLIGHT = 8;
 
 /**
  * FIX-HS2-p1 sd-N1: the record's `judge_provider_ref` / `judge_model_id` hold operator identifiers, never text.
- * The same grammar is a CHECK on the table (migrations/0079_publication_check_record_identifiers.sql): no space,
+ * The same grammar is a CHECK on the table (migrations/0082_publication_check_record_identifiers.sql): no space,
  * no `@`, 1–256 characters, and never uuid-shaped. A judge whose identifiers fail it is not a configured judge.
  */
 const JUDGE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,255}$/u;

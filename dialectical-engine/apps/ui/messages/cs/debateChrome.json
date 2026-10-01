@@ -203,7 +203,7 @@
   "debateChrome.condition.digestCannotExist": "V rámci rozpočtu kompozice nebylo možné vytvořit souhrn",
   "debateChrome.condition.protectedCoreGuardRetired": "Běh se zastavil na rozpočtu; kontrola přeformulování jej již neomezovala",
   "debateChrome.condition.hiddenUnjudgeable": "Skryto: nebylo možné posoudit — obsah zobrazíte zapnutím skrytých položek",
-  "debateChrome.condition.derivedStandingUnreviewed": "Stojí na posouzených argumentech — chybí vlastní kontrola napříč poskytovateli modelů",
+  "debateChrome.condition.derivedStandingUnreviewed": "Stojí na posouzených argumentech — chybí vlastní kontrola modelem jiného tvůrce",
   "debateChrome.condition.hiddenLowScore": "Skryto: skóre je pod zobrazenou prahovou hodnotou",
   "debateChrome.condition.unauthoredBranchHalted": "Rozšiřování zde skončilo — nebylo napsáno nic, co by šlo skrýt nebo zobrazit",
   "debateChrome.condition.labelBasisIncomplete": "Základ verdiktu není úplný — chybí konkurenční postoj nebo druhý hodnotitel ke srovnání",

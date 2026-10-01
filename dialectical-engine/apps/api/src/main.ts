@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
 import type { AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -31,6 +31,7 @@ import {
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
+  readCountryPolicy,
   readStoryPolicyFromRegister,
   readAuthPolicy,
   readMfaPolicy,
@@ -52,7 +53,10 @@ import {
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
+import { RepositoryLegalAcceptanceApplication } from "./legal.js";
 import { AdmissionLimiter } from "./admission.js";
+import { openGeoLookup } from "@debateai/geo";
+import { CountryGate, countryPolicyInForce } from "./country-gate.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
@@ -63,7 +67,8 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
-import { SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
+import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
+import { EMAIL_CHANGE_LINK_TTL_MS, EMAIL_CHANGE_RESEND_COOLDOWN_MS, EmailChangeService } from "./email-change.js";
 import {
   AccountErasureNotificationReconciler,
   createSingleFlightErasureReconciler,
@@ -155,6 +160,12 @@ const sourceIpSalt = loadSecretKey(environment.AUDIT_SOURCE_IP_SALT_PATH);
 // finding.
 boot.hold({ end: async () => { blindIndexKey.fill(0); } });
 boot.hold({ end: async () => { sourceIpSalt.fill(0); } });
+// Paid plans L1 (spec §2.3.1): the records key. Loaded under the ledger AFTER the two plain
+// secrets are held, so a missing or mis-permissioned file zeroes the KEKs, the blind-index key
+// and the audit salt already held; it lives for the whole process (the acceptance writer and,
+// later, the billing profile use it) and is zeroed by the startup owner.
+const recordsKey = boot.runSync("records-key", () => loadSecretKey(environment.RECORDS_KEY_PATH));
+boot.hold({ end: async () => { recordsKey.fill(0); } });
 // L2-F8: this guarded the whole check on publication being enabled, so a
 // private-only deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one
 // file and boot. The private domains are always checked; the corpus KEK and
@@ -178,7 +189,8 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   ],
   additionalSecrets: [
     { path: environment.BLIND_INDEX_KEY_PATH, material: blindIndexKey },
-    { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt }
+    { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt },
+    { path: environment.RECORDS_KEY_PATH, material: recordsKey }
   ],
   additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
 }));
@@ -222,6 +234,29 @@ const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environ
 const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(pool, environment.REGISTER_VERSION));
 const recoveryPolicy = await boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION));
+/**
+ * Paid plans G3a (amendment A14): the country gate runs only in hosted mode AND when the register
+ * version in force publishes `countryPolicy` — one decision, countryPolicyInForce, which never reads
+ * the row in local mode. The row is read under the ledger; the data files are opened
+ * (GEOIP_PATHS_REQUIRED already guaranteed their paths in hosted mode) and held, so a missing file
+ * refuses the boot with its own code and zeroes nothing it should not.
+ */
+const countryPolicy = await boot.run("country-policy", () => countryPolicyInForce(
+  environment.DEPLOYMENT_MODE,
+  () => readCountryPolicy(pool, environment.REGISTER_VERSION)
+));
+await boot.run("country-gate-admission", async () => {
+  if (countryPolicy !== null && admissionPolicy.geoAvailability === null) {
+    throw new TypedDomainError("GEO_AVAILABILITY_ADMISSION_UNSEALED",
+      "A hosted register with countryPolicy must also seal the geoAvailability admission scope");
+  }
+});
+const geoLookup = countryPolicy === null ? undefined : boot.runSync("geo-lookup", () => openGeoLookup({
+  countryDbPath: environment.GEOIP_COUNTRY_DB_PATH!,
+  torListPath: environment.TOR_EXIT_LIST_PATH!,
+  onReloadFailure: (code) => console.error(JSON.stringify({ event: "geo.reload.failed", code }))
+}));
+if (geoLookup !== undefined) boot.hold({ end: async () => { geoLookup.close(); } });
 /**
  * TASK 11 AMENDMENT (V-28, from task 8's review). The support chat's three
  * admission budgets are OPTIONAL members of the row, so a host pinned to an
@@ -290,6 +325,12 @@ const auditContextHasher = new AuditContextHasher(
 // The hasher holds the Argon2 salt copy; it closes with the rest of the boot.
 boot.hold({ end: async () => auditContextHasher.close() });
 const identityRepository = new PostgresIdentityRepository(pool, auditContextHasher);
+const countryGate = countryPolicy === null || geoLookup === undefined ? undefined : new CountryGate({
+  policy: countryPolicy,
+  lookup: geoLookup,
+  audit: identityRepository,
+  onAuditFailure: (code) => console.error(JSON.stringify({ event: "api.country_gate.audit_failed", code }))
+});
 sourceIpSalt.fill(0);
 const hatchet = new Hatchet({
   token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
@@ -405,7 +446,18 @@ const registration = new RegistrationService({
     authPolicy.rateLimitBucketCapacity,
     authPolicy.rateLimitRefusalAuditIntervalMs
   ),
-  argon2: argon2Pool
+  argon2: argon2Pool,
+  // Paid plans L3b: the acceptance record's evidence is sealed under the records key (L1).
+  legalAcceptance: { recordsKey }
+});
+// Paid plans L4: re-acceptance of the Terms and the Privacy Policy, over the acceptance record.
+// Hosted: an account with no record owes both documents (it must accept before it can pay).
+// Local: only a manifest floor makes a document owed, so local mode keeps today's behaviour
+// (spec §2.2 rule 1, §2.3.2) until the owners move a floor.
+const legal = new RepositoryLegalAcceptanceApplication({
+  acceptances: new AcceptanceRepository(pool),
+  recordsKey,
+  owedWithoutRecord: environment.DEPLOYMENT_MODE === "hosted"
 });
 const mfa = new MfaEnrollmentService({
   repository: identityRepository,
@@ -426,6 +478,21 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   sessionPolicy,
   blindIndexKey
 }));
+// Turn 14 — change email: the capabilities of migration 0079 are granted to the
+// authorization role, beside the step-up that mints their CHANGE_EMAIL grant.
+const emailChange = new EmailChangeService({
+  repository: new PostgresEmailChangeRepository(authorizationPool, auditContextHasher),
+  users: dekStore,
+  blindIndexKey,
+  mail: new SendmailEmailChangeMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    publicAppUrl: environment.PUBLIC_APP_URL,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  tokenTtlMs: EMAIL_CHANGE_LINK_TTL_MS,
+  resendCooldownMs: EMAIL_CHANGE_RESEND_COOLDOWN_MS
+});
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
@@ -576,7 +643,8 @@ const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
     environment.KEK_PATH,
     environment.CORPUS_KEK_PATH,
     environment.BLIND_INDEX_KEY_PATH,
-    environment.AUDIT_SOURCE_IP_SALT_PATH
+    environment.AUDIT_SOURCE_IP_SALT_PATH,
+    environment.RECORDS_KEY_PATH
   ].filter((path): path is string => path !== undefined)
 }));
 // DL7-F7: the support KEK is the third key the boot holds, and every stage
@@ -748,8 +816,11 @@ const api = buildApi({
   mfa,
   sessions,
   legacyRunClaim,
+  legal,
+  emailChange,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
+  ...(countryGate === undefined ? {} : { countryGate }),
   support: {
     configuration: supportConfiguration,
     // DL5-F3: the caller's network is pseudonymised under a key derived from
@@ -819,7 +890,11 @@ const startup = installStartupResourceOwner({
     supportPool,
     supportRelayLeasePool,
     { end: () => supportKeys.close() },
-    { end: () => supportConfiguration.close() }
+    { end: () => supportConfiguration.close() },
+    // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
+    { end: async () => { geoLookup?.close(); } },
+    // L1: the records key outlives the boot ledger; it is zeroed after every pool has closed.
+    { end: async () => { recordsKey.fill(0); } }
   ],
   // L2-F7: zeroed after every pool that borrows from them has closed. A
   // changeover's PREVIOUS keys are in this list for the same reason the current
