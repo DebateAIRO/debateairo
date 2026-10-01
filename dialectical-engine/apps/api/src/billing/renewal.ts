@@ -108,6 +108,15 @@ export function codeOf(error: unknown): string | null {
   return typeof error === "object" && error !== null && "code" in error && typeof error.code === "string" ? error.code : null;
 }
 
+/**
+ * The content-free code a failure the tick counts carries on its report line: a declared code, a Node errno name or a
+ * SQLSTATE passes; anything else (no code, or free text in `code`) becomes UNKNOWN, so no text reaches the line.
+ */
+function failureCode(error: unknown): string {
+  const code = codeOf(error);
+  return code !== null && /^[A-Z0-9][A-Z0-9_]{2,63}$/.test(code) ? code : "UNKNOWN";
+}
+
 /** P4's detail on a tax refusal (`QUADERNO_HTTP_401`, `QUADERNO_HTTP_422`, …), content-free; anything else is UNKNOWN. */
 function refusalDetail(error: unknown): string {
   return error instanceof TypedDomainError && /^QUADERNO_[A-Z0-9_]{1,48}$/.test(error.message) ? error.message : "UNKNOWN";
@@ -125,31 +134,39 @@ export class RenewalService {
       charged: 0, postponed: 0, skipped: 0, dunning: 0, busy: 0, recovered: 0, held: 0, failed: 0, taxRefused: 0, invalid: 0
     };
     const now = this.deps.clock();
+    // The distinct codes of this tick's failures (`failureCode`), for its one report line.
+    const codes = new Set<string>();
     // D5 5d: each pass has its own try, so a failure in one never stops the next.
     try {
-      await this.renewDue(now, report);
-    } catch {
+      await this.renewDue(now, report, codes);
+    } catch (error) {
       report.failed += 1;
+      codes.add(failureCode(error));
     }
     try {
-      await this.recoverOpen(now, report);
-    } catch {
+      await this.recoverOpen(now, report, codes);
+    } catch (error) {
       report.failed += 1;
+      codes.add(failureCode(error));
     }
     try {
-      await this.holdUnverified(now, report);
-    } catch {
+      await this.holdUnverified(now, report, codes);
+    } catch (error) {
       report.failed += 1;
+      codes.add(failureCode(error));
     }
-    // One content-free line per tick with trouble: the counts only (P16's owner summary lists the subscriptions).
+    // One content-free line per tick with trouble: the counts and the failures' distinct codes, never an id. A failure
+    // the tick counts here may name no charge or hold (a renewal that fails before either), so this line is its record.
     if (report.failed > 0 || report.taxRefused > 0) {
-      this.deps.audit("billing.renewal.report", { failed: report.failed, taxRefused: report.taxRefused });
+      this.deps.audit("billing.renewal.report", {
+        failed: report.failed, taxRefused: report.taxRefused, codes: report.failed > 0 ? [...codes].sort().join(",") : ""
+      });
     }
     return report;
   }
 
   /** Every due subscription of this xMoney system, page by page (P1b's cursor), until a page is short. */
-  private async renewDue(now: Date, report: RenewalReport): Promise<void> {
+  private async renewDue(now: Date, report: RenewalReport, codes: Set<string>): Promise<void> {
     const invalid = new Set<string>();
     let after: DueRenewalCursor | null = null;
     try {
@@ -169,7 +186,10 @@ export class RenewalService {
           } catch (error) {
             // A tax refusal is its own alarm (`taxRefused`), never a failure of the tick.
             if (codeOf(error) === "TAX_SERVICE_REFUSED") report.taxRefused += 1;
-            else report.failed += 1;
+            else {
+              report.failed += 1;
+              codes.add(failureCode(error));
+            }
           }
         }
         const last = due.at(-1);
@@ -186,7 +206,7 @@ export class RenewalService {
   }
 
   /** A2's recovery of open RENEWAL charges, paged on (created_at, charge_id) so none starves another (D6b). */
-  private async recoverOpen(now: Date, report: RenewalReport): Promise<void> {
+  private async recoverOpen(now: Date, report: RenewalReport, codes: Set<string>): Promise<void> {
     let after: Readonly<{ createdAt: Date; chargeId: string }> | null = null;
     for (let page = 0; page < MAX_PAGES; page += 1) {
       const open = await this.deps.jobs.openCharges({
@@ -198,8 +218,9 @@ export class RenewalService {
         try {
           const leased = await this.deps.jobs.withSubscriptionLease(charge.subscriptionId, () => this.recoverOpenCharge(charge.chargeId));
           if (leased.kind === "RAN" && leased.value) report.recovered += 1;
-        } catch {
+        } catch (error) {
           report.failed += 1;
+          codes.add(failureCode(error));
         }
       }
       const last = open.at(-1);
@@ -216,7 +237,7 @@ export class RenewalService {
    * writes at most one row per period and nothing once the window is over; the charge is never closed here (a real
    * transaction exists and may have moved money: VERIFY_PAYMENT and P14a own its outcome).
    */
-  private async holdUnverified(now: Date, report: RenewalReport): Promise<void> {
+  private async holdUnverified(now: Date, report: RenewalReport, codes: Set<string>): Promise<void> {
     let after: Readonly<{ createdAt: Date; chargeId: string }> | null = null;
     for (let page = 0; page < MAX_PAGES; page += 1) {
       const waiting = await this.deps.jobs.unverifiedRenewals({
@@ -231,8 +252,9 @@ export class RenewalService {
             return this.holdPending(state, charge.periodStart, now, "PAYMENT_NOT_VERIFIED");
           });
           if (leased.kind === "RAN" && leased.value) report.held += 1;
-        } catch {
+        } catch (error) {
           report.failed += 1;
+          codes.add(failureCode(error));
         }
       }
       const last = waiting.at(-1);
@@ -636,8 +658,11 @@ export class RenewalService {
    * between an unknown submit and the resubmission moves the subscription to the new card's order while the lost
    * payment sits on the old one; listing only the current order would read "nothing there" and charge the new card
    * again. The caller resubmits only after this answers false for all of them, and a listing that fails throws, so
-   * nothing is resubmitted on a partial look. xMoney stamps creation to the whole second; a rebill made in the charge
-   * row's own second must not read as older. Rows the parser refuses are counted in one line for the look (D5 5i).
+   * nothing is resubmitted on a partial look. xMoney stamps creation to the whole second, and its clock may run a few
+   * seconds behind ours: the listing itself starts at the floor the rows are checked against (the charge's whole second
+   * minus 5 s), so a rebill stamped in the charge row's own second, or a few seconds before it, is listed and never read
+   * as older (a listing from the charge's own instant would drop it at xMoney, and the one resubmission would charge
+   * the card twice). Rows the parser refuses are counted in one line for the look (D5 5i).
    */
   private async adopt(charge: ChargeRow, now: Date): Promise<boolean> {
     const orders = ordersHoldingCharge(await this.deps.repository.subscriptionEvents(charge.subscriptionId), charge.createdAt);
@@ -646,7 +671,7 @@ export class RenewalService {
     try {
       for (const orderId of orders) {
         const listed = await this.deps.xmoney.listTransactions({
-          from: charge.createdAt, to: now, orderId, dateType: "creation", onRejected: rejected.onRejected
+          from: new Date(earliest), to: now, orderId, dateType: "creation", onRejected: rejected.onRejected
         });
         for (const transaction of listed) {
           if (!ADOPTABLE_TYPES.has(transaction.transactionType)) continue;

@@ -75,7 +75,9 @@ describe("P11a the renewal tick (D5 5d)", () => {
     expect(unverifiedRenewals).toHaveBeenCalledWith(expect.objectContaining({
       environment: "stage", periodStartTo: NOW, submittedBefore: new Date(NOW.getTime() - 60_000), after: null
     }));
-    expect(audit).toHaveBeenCalledWith("billing.renewal.report", { failed: 1, taxRefused: 0 });
+    // The plain Error carries no code: the line names UNKNOWN, never its text.
+    expect(audit).toHaveBeenCalledWith("billing.renewal.report", { failed: 1, taxRefused: 0, codes: "UNKNOWN" });
+    expect(JSON.stringify(audit.mock.calls)).not.toContain("database away");
   });
 
   it("counts a tax refusal apart from failures, in the same one line per tick", async () => {
@@ -87,7 +89,32 @@ describe("P11a the renewal tick (D5 5d)", () => {
     vi.spyOn(service, "renew").mockRejectedValueOnce(new TypedDomainError("TAX_SERVICE_REFUSED", "QUADERNO_HTTP_401"));
     const report = await service.runOnce();
     expect([report.taxRefused, report.failed]).toEqual([1, 0]);
-    expect(audit).toHaveBeenCalledWith("billing.renewal.report", { failed: 0, taxRefused: 1 });
+    expect(audit).toHaveBeenCalledWith("billing.renewal.report", { failed: 0, taxRefused: 1, codes: "" });
+  });
+
+  it("names a failed renewal's declared code on the tick's line", async () => {
+    const due = {
+      ...created("s-missing"), status: "ACTIVE", periodAnchorAt: new Date(NOW.getTime() - 31 * 86_400_000),
+      xmoneyOrderId: "4800123", xmoneyCustomerId: "4700123"
+    } as SubscriptionState;
+    const { service, audit } = tick((async () => [due]) as unknown as BillingRepository["dueRenewals"]);
+    vi.spyOn(service, "renew").mockRejectedValueOnce(new TypedDomainError("BILLING_STORED_CONTEXT_MISSING", "x"));
+    const report = await service.runOnce();
+    expect([report.taxRefused, report.failed]).toEqual([0, 1]);
+    expect(audit).toHaveBeenCalledWith("billing.renewal.report", { failed: 1, taxRefused: 0, codes: "BILLING_STORED_CONTEXT_MISSING" });
+  });
+
+  it("writes UNKNOWN, never the text, for a failure whose code is not a code", async () => {
+    const due = {
+      ...created("s-text"), status: "ACTIVE", periodAnchorAt: new Date(NOW.getTime() - 31 * 86_400_000),
+      xmoneyOrderId: "4800123", xmoneyCustomerId: "4700123"
+    } as SubscriptionState;
+    const { service, audit } = tick((async () => [due]) as unknown as BillingRepository["dueRenewals"]);
+    vi.spyOn(service, "renew").mockRejectedValueOnce(Object.assign(new Error("x"), { code: "not a code" }));
+    const report = await service.runOnce();
+    expect(report.failed).toBe(1);
+    expect(audit).toHaveBeenCalledWith("billing.renewal.report", { failed: 1, taxRefused: 0, codes: "UNKNOWN" });
+    expect(JSON.stringify(audit.mock.calls)).not.toContain("not a code");
   });
 
   it("writes no report line for a quiet tick", async () => {

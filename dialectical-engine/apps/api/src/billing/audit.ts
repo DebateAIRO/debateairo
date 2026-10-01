@@ -48,7 +48,7 @@ export type BillingAuditEvent =
    * alarm, once per subscription period per process: no charge, no dunning, no email. The code and P4's detail only.
    */
   | "billing.renewal.tax_refused"
-  /** P11a: one line per renewal tick that had failures or tax refusals; the counts only. */
+  /** P11a: one line per renewal tick that had failures or tax refusals; the counts and the failures' codes only. */
   | "billing.renewal.report"
   /**
    * P11a (R-34, R3-2): the stop port named this owner (an account erasure pending or finished, or an account the age

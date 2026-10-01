@@ -150,6 +150,28 @@ describe("P11a monthly renewal", () => {
     expect(rebills(paid)).toBe(1);
   });
 
+  it("lists from the clock-skew floor, so a lost rebill xMoney stamped seconds before the charge is still adopted", async () => {
+    const { paid } = await dueNow();
+    h.clock.advance(400);
+    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN", true);
+    await h.renewal.runOnce();
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN"));
+    // xMoney's clock runs behind ours: its transaction reads 2 s before the charge row's own whole second.
+    const [lost] = rebillTransactions(paid);
+    h.xmoney.transactions.set(lost!.transactionId, Object.freeze({
+      ...lost!, createdAt: new Date(Math.floor(charge!.createdAt.getTime() / 1_000) * 1_000 - 2_000)
+    }));
+    h.clock.advance(MINUTE);
+    await h.renewal.runOnce();
+    expect(rebills(paid)).toBe(1);
+    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "SUBMITTED"))
+      .toMatchObject({ xmoneyTransactionId: lost!.transactionId });
+    h.clock.advance(31 * MINUTE);
+    await h.renewal.runOnce();
+    expect(rebills(paid)).toBe(1);
+  });
+
   it("resubmits an unknown rebill only once, keeps the plan for 72 hours, then starts the normal dunning (A2, Q-1)", async () => {
     const { paid, end } = await dueNow();
     h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
