@@ -84,12 +84,12 @@ describe("Support navigation", () => {
     expect(actions).toEqual([
       { id: "home", label: "Home", href: "/" },
       { id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" },
-      { id: "sign-in", label: "Sign in", href: "/login" },
+      { id: "sign-in", label: "Log in", href: "/login" },
       { id: "sign-up", label: "Create account", href: "/sign-up" },
-      { id: "help", label: "Help desk", href: "/help" },
-      { id: "support-status", label: "Support status", href: "/help#service-status" },
-      { id: "method", label: "How it works", href: "/#method" },
-      { id: "sample-transcript", label: "Sample debate", href: "/#transcripts" },
+      { id: "help", label: "Help", href: "/help" },
+      { id: "support-status", label: "Service status", href: "/help#service-status" },
+      { id: "method", label: "Method", href: "/#method" },
+      { id: "sample-transcript", label: "Transcripts", href: "/#transcripts" },
     ]);
     expect(actions.every(({ href }) => href.startsWith("/") && !href.startsWith("//"))).toBe(true);
   });
@@ -108,7 +108,7 @@ describe("Support navigation", () => {
         href: "/settings#consent-privacy-heading",
       },
       { id: "public-catalog", label: "Dezbateri publice", href: "/?tab=public" },
-      { id: "your-debates", label: "Dezbaterile tale", href: "/?tab=yours" },
+      { id: "your-debates", label: "Dezbaterile dvs.", href: "/?tab=yours" },
     ]);
 
     expect(resolveSupportActions(["owner-debate", "public-debate"], {
@@ -135,8 +135,8 @@ describe("Support navigation", () => {
     expect(resolveSupportActions(ids,{ signedIn:false,language:"en" })).toEqual([]);
     expect(resolveSupportActions(ids,{ signedIn:true,language:"ro" })).toEqual([
       { id:"active-sessions",label:"Sesiuni active",href:"/settings#active-sessions-heading" },
-      { id:"claim-legacy",label:"Revendică dezbaterile vechi",href:"/settings#legacy-run-claim-heading" },
-      { id:"delete-account",label:"Șterge contul",href:"/settings#account-deletion-heading" }
+      { id:"claim-legacy",label:"Revendicați dezbaterile vechi",href:"/settings#legacy-run-claim-heading" },
+      { id:"delete-account",label:"Ștergeți contul",href:"/settings#account-deletion-heading" }
     ]);
   });
 
@@ -161,7 +161,7 @@ describe("Support navigation", () => {
     // Property: repeated model ids cannot duplicate controls, and callers cannot rewrite trusted destinations.
     const actions = resolveSupportActions(["help", "help"], { signedIn: false, language: "en" });
 
-    expect(actions).toEqual([{ id: "help", label: "Help desk", href: "/help" }]);
+    expect(actions).toEqual([{ id: "help", label: "Help", href: "/help" }]);
     expect(Object.isFrozen(actions)).toBe(true);
     expect(Object.isFrozen(actions[0])).toBe(true);
   });

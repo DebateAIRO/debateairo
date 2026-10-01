@@ -1,7 +1,7 @@
 # OWNER sign-off — S02 support catalogue line, 8 help articles, 16 recovery texts (cookie-compliance)
 
 Status: DRAFT for V0 — not signed. The API refuses to start until the orchestrator records V's answer.
-What changes: the catalogue's only change since the 2026-09-29 signature (ffd72986…) is the privacy-preferences label; 8 article files are rewritten; 15 of the 16 recovery texts are rewritten (14 carried the false wording, SPEC-v2 §2 M12; the Romanian settings-help-menus fallback named controls by their English labels, V-17); the English settings-help-menus fallback text keeps its words and is re-signed because its article's hash changed (K7).
+What changes: since the 2026-09-29 signature (ffd72986…) the catalogue changes only the en/ro labels of these actions (old -> new; V-17: each label is the one the screen shows): sign-in en: Sign in -> Log in, ro: Autentificare -> Autentificați-vă · sign-up ro: Creează un cont -> Creați un cont · help en: Help desk -> Help, ro: Centrul de ajutor -> Ajutor · support-status en: Support status -> Service status, ro: Starea serviciului de asistență -> Starea serviciului · method en: How it works -> Method, ro: Cum funcționează -> Metodă · sample-transcript en: Sample debate -> Transcripts, ro: Exemplu de dezbatere -> Transcrieri · privacy-preferences en: Privacy preferences -> Privacy, ro: Preferințe de confidențialitate -> Confidențialitate · claim-legacy ro: Revendică dezbaterile vechi -> Revendicați dezbaterile vechi · delete-account ro: Șterge contul -> Ștergeți contul · your-debates ro: Dezbaterile tale -> Dezbaterile dvs.; 8 article files are rewritten; 15 of the 16 recovery texts are rewritten (14 carried the false wording, SPEC-v2 §2 M12; the Romanian settings-help-menus fallback named controls by their English labels, V-17); the English settings-help-menus fallback text keeps its words and is re-signed because its article's hash changed (K7).
 
 ### catalog privacy-preferences
 ~~~text
@@ -298,7 +298,7 @@ După autentificare, alege „Setări” pentru revizuirea sau revocarea sesiuni
 ## Fingerprints (sha256)
 
 ~~~text
-catalog-canonical 33bdc2ab16d94a704afc75d51531b1a9f534496c81a1301505b61817a374faa0
+catalog-canonical ab80349756855f9c12d7c834b76ea2b5f91fa4cf8d38b6d0dcff2c51ad6b10fa
 article privacy-consent.en 0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f
 article privacy-consent.ro a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6
 article settings-help-menus.en 53b4612d883133874617b1a8647df9450dc75e2301e8f93a56e7eceaa169a084

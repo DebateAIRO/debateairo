@@ -502,9 +502,9 @@ describe("Support knowledge context", () => {
     expect(result.requestedActionIds).toEqual(expectedActionIds);
     if (expectedActionIds.includes("help")) {
       const [action] = resolveSupportActions(result.requestedActionIds,{ signedIn:false,language });
-      // Scope audit B6: en/ro keep dev's reviewed catalog labels.
-      expect(action?.label).toBe(language === "ro" ? "Centrul de ajutor" : "Help desk");
-      expect(result.text).toContain(language === "ro" ? "Centrul de ajutor" : "Help desk");
+      // en/ro catalog labels equal the label the screen renders (chrome.help; cookie-compliance S02 FIX, V-17).
+      expect(action?.label).toBe(language === "ro" ? "Ajutor" : "Help");
+      expect(result.text).toContain(language === "ro" ? "Ajutor" : "Help");
     }
   });
 
