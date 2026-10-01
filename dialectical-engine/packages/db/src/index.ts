@@ -1909,6 +1909,7 @@ export {
   type SignUpAcceptanceRow
 } from "./legal-acceptance.js";
 export * from "./obs-schema.js";
+export { BillingJobQueries } from "./billing-jobs.js";
 export {
   accountRecoveryChannelRefsAad,
   PostgresRecoveryStartRepository

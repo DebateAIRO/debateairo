@@ -1,0 +1,47 @@
+/**
+ * The closed vocabularies billing writes into its own rows and audit lines. Every value is a literal declared
+ * here, never text taken from a provider, so a stored code can be shown to an operator verbatim.
+ */
+export type BillingRefundReason =
+  /** P9b: the card was issued in an always-blocked country. */
+  | "CARD_COUNTRY_BLOCKED"
+  /** P9b (A8c): a late payment for an abandoned checkout while the owner already has a live plan. */
+  | "ALREADY_SUBSCRIBED"
+  /** P9b/P11a: a payment arrived for a subscription that is no longer live. */
+  | "SUBSCRIPTION_ENDED"
+  /** P12d (A4b): the withdrawal refund, split per transaction newest first. */
+  | "WITHDRAWAL"
+  /** P12e (A12): the release (void) of a card change's 1.00 USD authorization. */
+  | "CARD_CHECK_RELEASE"
+  /** P12e: a new card from an always-blocked country; the hold is released and nothing changes. */
+  | "CARD_CHECK_REFUSED"
+  /**
+   * P9b (D5 5f): a second payment on a charge another transaction already paid (a reused checkout paid twice). It
+   * bought nothing: refunded in full, M11_DUPLICATE, never a credit note (it was never a sale).
+   */
+  | "DUPLICATE_PAYMENT"
+  /** P9c (A9): refunded in the xMoney dashboard, not by us. Recorded, never requested. */
+  | "PROVIDER_REFUND"
+  /** P9c (A9): voided or cancelled at xMoney after it had succeeded. Recorded, never requested. */
+  | "PROVIDER_VOID";
+
+/** The reasons for which WE move money back; each is executed by P9b's `RefundDesk` (R-32). */
+export type RequestedRefundReason = Exclude<BillingRefundReason, "PROVIDER_REFUND" | "PROVIDER_VOID">;
+
+/**
+ * The reasons for which we refused the payment itself: the charge status reads FAILED with this reason. Not
+ * `DUPLICATE_PAYMENT`: the charge WAS paid (by its first transaction), and its status must read SUCCEEDED.
+ */
+export const REFUND_REASONS_REFUSING_THE_PAYMENT: ReadonlySet<BillingRefundReason> = new Set<BillingRefundReason>([
+  "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "CARD_CHECK_REFUSED"
+]);
+
+export type ChargeFailureCode = "PAYMENT_DECLINED" | "VOIDED" | "REBILL_REFUSED" | "NO_TRANSACTION";
+
+/**
+ * `billing.xmoney_notice_outcome.outcome` (A21). `UNRECORDED_REFUND` (P9c): a second refund made elsewhere on a
+ * payment that already holds one, which P1a's one-request-per-transaction key cannot record; handed to the owner.
+ */
+export type NoticeOutcome =
+  | "APPLIED" | "DUPLICATE" | "MISMATCH" | "FAILED" | "REFUNDING" | "REFUNDED" | "CHARGEBACK" | "REPRESENTED"
+  | "UNRECORDED_REFUND";

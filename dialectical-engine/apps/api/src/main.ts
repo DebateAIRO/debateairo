@@ -81,6 +81,8 @@ import { AskRoom, everyWholeMinute } from "./ask-room.js";
 import type { AskBilling } from "./ask-billing.js";
 import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
+import { consoleBillingAudit } from "./billing/audit.js";
+import { createBillingRuntime } from "./billing/runtime.js";
 import {
   assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
 } from "./billing/connectors.js";
@@ -1012,6 +1014,27 @@ const billingRouteOptions: BillingRouteOptions | undefined =
           spend: askRoomComposition.spend
         })
       });
+/**
+ * Paid plans P7: the billing runtime (the durable outbox worker and, later, every billing job and route), composed
+ * only while billing is on (P6a built the connectors). Billing on with no plans row, country policy or country lookup
+ * is a configuration error, refused at boot by name.
+ */
+const billingRuntime = billingConnectors === null
+  ? undefined
+  : boot.runSync("billing-runtime", () => {
+    const billingPlans = askBilling?.plans ?? null;
+    if (billingPolicy === null || billingPlans === null || countryPolicy === null || geoLookup === undefined) {
+      throw new TypedDomainError(
+        "BILLING_CONFIGURATION_INCOMPLETE", "billing needs billingPlans, countryPolicy and the country lookup"
+      );
+    }
+    return createBillingRuntime({
+      pool, connectors: billingConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
+      geo: geoLookup, dekStore, mail: undefined,
+      audit: consoleBillingAudit, clock: () => new Date(),
+      reportPending: (code) => console.error(`[${code}]`)
+    });
+  });
 const api = buildApi({
   application,
   stories: new RepositoryAnswerStoryApplication(storyRepository),
@@ -1077,6 +1100,7 @@ if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
+api.addHook("onClose",async () => billingRuntime?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => askWaker?.stop());
 const startup = installStartupResourceOwner({
@@ -1152,6 +1176,7 @@ await startup.run("listen", async () => {
 // user-key destruction before completion delivery succeeds.
 triggerErasureReconciliation();
 triggerAuthenticationRiskCleanup();
+billingRuntime?.start();
 if (askRoom !== undefined) {
   triggerAskWake();
   askWaker = everyWholeMinute(triggerAskWake);
