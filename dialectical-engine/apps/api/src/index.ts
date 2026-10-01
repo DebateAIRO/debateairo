@@ -3258,7 +3258,18 @@ export type WaitingLineTick = Readonly<{
   skipped: number;
   failed: number;
   stopped: boolean;
+  /** Final review Part 1b, Important 4: started runs' first jobs handed to the job system again this tick. */
+  redispatched: number;
 }>;
+
+/**
+ * Final review Part 1b, Important 4: how long a started run's first job may
+ * stay READY before the waker hands it to the job system again, and how long
+ * this process waits before handing the same job over once more. A dispatch
+ * takes well under a second; a job that waits in the job system's queue for a
+ * free runner is READY too, so it is dispatched again at most once per bound.
+ */
+const STALLED_START_SECONDS = 300;
 
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
@@ -3271,6 +3282,8 @@ export class PostgresAskApplication implements AskApplication {
   readonly #legacyAskAdmissionPool: Pool;
   /** B7b: set once a tick of this process has read the whole line with every person-recorded run in it. */
   #wakeSweptEveryPerson = false;
+  /** Important 4: when this process last handed each stalled first job over again (epoch ms), by work item id. */
+  readonly #redispatchedAt = new Map<string, number>();
 
   constructor(
     private readonly pool: Pool,
@@ -3674,12 +3687,16 @@ export class PostgresAskApplication implements AskApplication {
    * on Free is recorded FAILED (`RUN_SETUP_FAILED:PLAN_CHANGED`) and leaves the
    * line. The tick stops at the first run the site's day cannot hold, because
    * nobody after it fits the day; a run whose own person is full is skipped. A
-   * start that throws wrote nothing and stays in line for the next tick. Ids and
-   * counts only.
+   * start that throws wrote nothing and stays in line for the next tick. Then
+   * (final review Part 1b, Important 4) the started runs whose first job was
+   * never handed to a runner are handed over again (`#redispatchStalledStarts`).
+   * Ids and counts only.
    */
   async wakeWaitingRuns(): Promise<WaitingLineTick> {
     const line = this.settings.waitingLine;
-    if (line === undefined) return Object.freeze({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false });
+    if (line === undefined) {
+      return Object.freeze({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
+    }
     const everyPerson = !this.#wakeSweptEveryPerson;
     const persons = new Set<string>();
     let waiting = 0;
@@ -3736,9 +3753,54 @@ export class PostgresAskApplication implements AskApplication {
       }
     }
     if (!stopped) this.#wakeSweptEveryPerson = true;
-    const tick: WaitingLineTick = Object.freeze({ waiting, started, skipped, failed, stopped });
-    if (waiting > 0) console.info(JSON.stringify(Object.freeze({ event: "api.wait.tick", ...tick })));
+    const redispatched = await this.#redispatchStalledStarts();
+    const tick: WaitingLineTick = Object.freeze({ waiting, started, skipped, failed, stopped, redispatched });
+    if (waiting > 0 || redispatched > 0) console.info(JSON.stringify(Object.freeze({ event: "api.wait.tick", ...tick })));
     return tick;
+  }
+
+  /**
+   * Final review Part 1b, Important 4 — A STARTED RUN NOBODY HANDED TO A
+   * RUNNER. A started run's hold counts while its first job is READY or
+   * CLAIMED (budget spec §2.6), so a job committed with its hold but never
+   * dispatched — the API stopped between the decision's commit and the
+   * dispatch, or the dispatch failed and so did its FAILED write — would keep
+   * the hold counting on every later day and window until some runner
+   * restarted. Each tick hands such a job (READY past `STALLED_START_SECONDS`,
+   * `listStalledStarts`) to the job system again, as the runner's start-up
+   * reconciliation re-dispatches READY work. A second dispatch runs the debate
+   * ONCE: a runner claims the job by its id only while it is READY or its claim
+   * has lapsed, FOR UPDATE SKIP LOCKED (`WorkItemRepository.claimById`), so the
+   * dispatch that loses finds nothing to run. This process hands the same job
+   * over at most once per bound, so a job that only waits in the job system's
+   * queue is not dispatched again every minute. A failed dispatch is logged and
+   * tried on a later tick; it never records the run FAILED, since the job may
+   * already be on its way. Ids, codes and counts only.
+   */
+  async #redispatchStalledStarts(): Promise<number> {
+    const stalled = await this.#work.listStalledStarts({ olderThanSeconds: STALLED_START_SECONDS, limit: 100 });
+    const listed = new Set(stalled.map((job) => job.workItemId));
+    for (const workItemId of [...this.#redispatchedAt.keys()]) {
+      if (!listed.has(workItemId)) this.#redispatchedAt.delete(workItemId);
+    }
+    let redispatched = 0;
+    for (const job of stalled) {
+      const nowMs = Date.now();
+      const last = this.#redispatchedAt.get(job.workItemId);
+      if (last !== undefined && nowMs - last < STALLED_START_SECONDS * 1_000) continue;
+      try {
+        await this.dispatcher.dispatch({ runId: job.runId, workItemId: job.workItemId });
+      } catch (error) {
+        console.error(JSON.stringify(Object.freeze({
+          event: "api.wait.redispatch_failed", runId: job.runId, diagnostic: apiOperationalErrorDiagnostic(error)
+        })));
+        continue;
+      }
+      this.#redispatchedAt.set(job.workItemId, nowMs);
+      redispatched += 1;
+      console.info(JSON.stringify(Object.freeze({ event: "api.wait.redispatched", runId: job.runId })));
+    }
+    return redispatched;
   }
 
   readAnswer(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null> {

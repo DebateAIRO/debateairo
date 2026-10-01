@@ -276,6 +276,41 @@ export class WorkItemRepository {
   }
 
   /**
+   * Final review Part 1b, Important 4 — STARTED RUNS NOBODY HANDED TO A RUNNER.
+   * A run the room started carries a hold (`ledger.model_spend_hold`), written
+   * in the same transaction as its first job, so the hold's `opened_at` is when
+   * that job became READY. A job still READY — never claimed: nothing turns a
+   * job back to READY — more than `olderThanSeconds` later was never dispatched
+   * (the API stopped between the decision's commit and the dispatch, or the
+   * dispatch failed and so did its FAILED write), and its hold counts on every
+   * later day and window until a runner claims it. Oldest first, by the
+   * database's clock, the one `opened_at` was written by. A run without a hold
+   * (no room composed) is not listed: nothing of it counts.
+   */
+  async listStalledStarts(input: Readonly<{ olderThanSeconds: number; limit: number }>): Promise<readonly DispatchableWorkItem[]> {
+    if (!Number.isSafeInteger(input?.olderThanSeconds) || input.olderThanSeconds < 1) {
+      throw new TypeError("Stalled start bound must be a positive whole number of seconds");
+    }
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 1_000) {
+      throw new TypeError("Stalled start limit must be an integer between 1 and 1000");
+    }
+    const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
+      `SELECT work.work_item_id, work.run_id
+       FROM core.work_item AS work
+       JOIN ledger.model_spend_hold AS hold ON hold.run_id = work.run_id
+       WHERE work.state = 'READY'
+         AND hold.opened_at <= clock_timestamp() - make_interval(secs => $1)
+       ORDER BY work.created_at_seq, work.work_item_id
+       LIMIT $2`,
+      [input.olderThanSeconds, input.limit]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      runId: row.run_id,
+      workItemId: row.work_item_id
+    })));
+  }
+
+  /**
    * Queues a job on a transaction the caller owns and will commit — the room's
    * locked decision (budget spec §2.6, B6b/B7b): the job then commits with the
    * run's hold, its charge scope and its start mark, or not at all, so no READY

@@ -43,12 +43,19 @@ function arrange(input: {
   readonly pages: ReadonlyArray<ReadonlyArray<WaitingRun>>;
   readonly outcomes?: Readonly<Record<string, Outcome>>;
   readonly dispatchFails?: ReadonlySet<string>;
+  /** Important 4: the started runs whose first job is still READY past the bound (the repository's answer). */
+  readonly stalled?: ReadonlyArray<string>;
 }) {
   let pages = input.pages;
   const tried: string[] = [];
   const dispatched: string[] = [];
   const recorded: unknown[] = [];
   const reads: Array<Readonly<{ after: string | null; everyPerson: boolean }>> = [];
+  const stalledAsked: unknown[] = [];
+  vi.spyOn(WorkItemRepository.prototype, "listStalledStarts").mockImplementation(async (asked) => {
+    stalledAsked.push(asked);
+    return (input.stalled ?? []).map((runId) => Object.freeze({ runId, workItemId: `job:${runId}` }));
+  });
   // The first job goes on the start's transaction, never on a connection of its own.
   vi.spyOn(WorkItemRepository.prototype, "enqueueOn").mockImplementation(async (client, job) => {
     if (client !== TX) throw new Error("test: the first job must be queued on the start's transaction");
@@ -94,7 +101,7 @@ function arrange(input: {
   );
   const lines = () => [...info.mock.calls, ...error.mock.calls].map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
   const setPages = (next: ReadonlyArray<ReadonlyArray<WaitingRun>>) => { pages = next; };
-  return { application, tried, dispatched, recorded, reads, lines, setPages };
+  return { application, tried, dispatched, recorded, reads, lines, setPages, stalledAsked };
 }
 
 afterEach(() => { vi.restoreAllMocks(); });
@@ -105,7 +112,7 @@ describe("B7b one tick of the waiting line (budget spec §2.7)", () => {
     const a2 = waitingRun({ legacyAskerId: "legacy:a" });
     const b1 = waitingRun({ ownerRef: OWNER });
     const { application, tried, dispatched } = arrange({ pages: [[a1, a2, b1]] });
-    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 3, started: 2, skipped: 1, failed: 0, stopped: false });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 3, started: 2, skipped: 1, failed: 0, stopped: false, redispatched: 0 });
     expect(tried).toEqual([a1.runId, b1.runId]);
     expect(dispatched).toEqual([a1.runId, b1.runId]);
   });
@@ -130,7 +137,7 @@ describe("B7b one tick of the waiting line (budget spec §2.7)", () => {
   it("skips a run whose own person is full, or that no longer waits, and goes on", async () => {
     const [a, b, c] = [waitingRun({ legacyAskerId: "legacy:a" }), waitingRun({ legacyAskerId: "legacy:b" }), waitingRun({ legacyAskerId: "legacy:c" })];
     const { application, dispatched } = arrange({ pages: [[a, b, c]], outcomes: { [a.runId]: "PERSON_FULL", [b.runId]: "GONE" } });
-    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 3, started: 1, skipped: 2, failed: 0, stopped: false });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 3, started: 1, skipped: 2, failed: 0, stopped: false, redispatched: 0 });
     expect(dispatched).toEqual([c.runId]);
   });
 
@@ -158,7 +165,7 @@ describe("B7b one tick of the waiting line (budget spec §2.7)", () => {
     expect(recorded).toEqual([]);
     // console.info lines first (the tick), then console.error lines (the failed start).
     expect(lines()).toEqual([
-      { event: "api.wait.tick", waiting: 1, started: 0, skipped: 0, failed: 1, stopped: false },
+      { event: "api.wait.tick", waiting: 1, started: 0, skipped: 0, failed: 1, stopped: false, redispatched: 0 },
       { event: "api.wait.start_failed", runId: a.runId, diagnostic: expect.any(String) }
     ]);
     expect(JSON.stringify(lines())).not.toContain("test: ");
@@ -177,8 +184,70 @@ describe("B7b one tick of the waiting line (budget spec §2.7)", () => {
 
   it("does nothing, and logs nothing, with an empty line", async () => {
     const { application, lines } = arrange({ pages: [] });
-    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
     expect(lines()).toEqual([]);
+  });
+});
+
+/**
+ * Final review Part 1b, Important 4 — a started run whose first job was never
+ * handed to a runner. Its hold counts while that job is READY, on every later
+ * day and window, so each tick hands such a job (READY past the bound) to the
+ * job system again, counts it in api.wait.tick, and never records it FAILED.
+ */
+describe("Important 4: the waker hands a stalled first job to the job system again", () => {
+  const BOUND_MS = 300_000;
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("asks for jobs READY past five minutes, re-dispatches them, and counts them in the tick even with an empty line", async () => {
+    const [first, second] = [randomUUID(), randomUUID()];
+    const { application, dispatched, recorded, lines, stalledAsked } = arrange({ pages: [], stalled: [first, second] });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({
+      waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 2
+    });
+    expect(stalledAsked).toEqual([{ olderThanSeconds: BOUND_MS / 1_000, limit: 100 }]);
+    expect(dispatched).toEqual([first, second]);
+    expect(recorded).toEqual([]);
+    expect(lines()).toEqual([
+      { event: "api.wait.redispatched", runId: first },
+      { event: "api.wait.redispatched", runId: second },
+      { event: "api.wait.tick", waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 2 }
+    ]);
+  });
+
+  it("re-dispatches after the line's own work, in the same tick", async () => {
+    const waiting = waitingRun({ legacyAskerId: "legacy:a" });
+    const stalled = randomUUID();
+    const { application, dispatched } = arrange({ pages: [[waiting]], stalled: [stalled] });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, redispatched: 1 });
+    expect(dispatched).toEqual([waiting.runId, stalled]);
+  });
+
+  it("hands the same job over at most once per bound from this process, then again once the bound has passed", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-01T09:00:00.000Z") });
+    const stalled = randomUUID();
+    const { application, dispatched } = arrange({ pages: [], stalled: [stalled] });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ redispatched: 1 });
+    vi.setSystemTime(new Date("2026-10-01T09:04:59.999Z"));
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ redispatched: 0 });
+    vi.setSystemTime(new Date("2026-10-01T09:05:00.000Z"));
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ redispatched: 1 });
+    expect(dispatched).toEqual([stalled, stalled]);
+  });
+
+  it("logs a failed re-dispatch by code, never records the run FAILED, and tries again on the next tick", async () => {
+    const stalled = randomUUID();
+    const { application, dispatched, recorded, lines } = arrange({
+      pages: [], stalled: [stalled], dispatchFails: new Set([stalled])
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ redispatched: 0, failed: 0 });
+    expect(recorded).toEqual([]);
+    expect(lines()).toEqual([{ event: "api.wait.redispatch_failed", runId: stalled, diagnostic: expect.any(String) }]);
+    expect(JSON.stringify(lines())).not.toContain("test: ");
+    await application.wakeWaitingRuns();
+    // Not remembered as handed over: the next tick tries again.
+    expect(lines().filter((line) => line.event === "api.wait.redispatch_failed")).toHaveLength(2);
+    expect(dispatched).toEqual([]);
   });
 });
 

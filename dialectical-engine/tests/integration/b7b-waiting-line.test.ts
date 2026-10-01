@@ -395,6 +395,70 @@ describe("B7b the waiting line, woken", () => {
   });
 });
 
+/**
+ * Final review Part 1b, Important 4 — a started run whose first job was never
+ * handed to a runner (the API stopped between the decision's commit and the
+ * dispatch, or the dispatch failed and so did its FAILED write). Its hold counts
+ * while the job is READY, on every later day and window, so the waker's tick
+ * hands such a job to the job system again; the job's claim keeps the two
+ * dispatches to ONE run of the debate.
+ */
+describe("Important 4: the waker re-dispatches a started run's first job left READY", () => {
+  const BOUND_SECONDS = 300;
+
+  /** A started run as the room leaves it — its hold and its READY first job — the hold opened `minutesAgo` ago by the database's clock. */
+  async function startedRun(minutesAgo: number | null): Promise<Readonly<{ runId: string; workItemId: string }>> {
+    const runId = await newRun();
+    if (minutesAgo !== null) {
+      await database.pool.query(
+        `INSERT INTO ledger.model_spend_hold (hold_id, run_id, held_micros, opened_at)
+         VALUES (gen_random_uuid(), $1, 1000, clock_timestamp() - make_interval(mins => $2::integer))`,
+        [runId, minutesAgo]
+      );
+    }
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", commandKey: `S00:${runId}:Q1`, nodeSet: []
+    });
+    return Object.freeze({ runId, workItemId });
+  }
+
+  it("lists only a held run's first job still READY past the bound: not a younger one, a claimed one or one without a hold", async () => {
+    const work = new WorkItemRepository(database.pool);
+    const stalled = await startedRun(10);
+    await startedRun(1);
+    const claimed = await startedRun(10);
+    await expect(work.claimById({ workItemId: claimed.workItemId, workerId: "runner:b7b", claimSeconds: 600 }))
+      .resolves.not.toBeNull();
+    await startedRun(null);
+    await expect(work.listStalledStarts({ olderThanSeconds: BOUND_SECONDS, limit: 100 }))
+      .resolves.toEqual([{ runId: stalled.runId, workItemId: stalled.workItemId }]);
+  });
+
+  it("hands it to the job system from the tick, once per bound, and two dispatches of it run the debate once", async () => {
+    const stalled = await startedRun(10);
+    const { dispatched, dispatcher } = recording();
+    const application = applicationWith(roomWith(), dispatcher);
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ waiting: 0, redispatched: 1 });
+    expect(dispatched).toEqual([stalled.runId]);
+    expect(info.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown)).toContainEqual({
+      event: "api.wait.tick", waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 1
+    });
+    // The same process does not hand it over again within the bound.
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ redispatched: 0 });
+    expect(dispatched).toEqual([stalled.runId]);
+    // The original dispatch and the re-dispatch both reach a runner, which claims by the job's id:
+    // exactly one claim wins, the other finds nothing to run.
+    const work = new WorkItemRepository(database.pool);
+    const claims = await Promise.all(["runner:a", "runner:b"].map((workerId) =>
+      work.claimById({ workItemId: stalled.workItemId, workerId, claimSeconds: 600 })));
+    expect(claims.filter((claim) => claim !== null)).toHaveLength(1);
+    await expect(work.claimById({ workItemId: stalled.workItemId, workerId: "runner:c", claimSeconds: 600 })).resolves.toBeNull();
+    // Claimed, it is a live run's job: nothing is stalled any more.
+    await expect(work.listStalledStarts({ olderThanSeconds: BOUND_SECONDS, limit: 100 })).resolves.toEqual([]);
+  });
+});
+
 describe("B7b a run waiting only for its own person holds nobody back (budget spec §2.3 rule 1)", () => {
   it("lets 600 of them wait while a new question STARTs, the room read says FITS, and one tick starts a site run behind them", async () => {
     now = new Date("2031-10-01T10:00:00.000Z");
