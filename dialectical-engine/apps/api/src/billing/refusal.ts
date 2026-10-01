@@ -1,3 +1,5 @@
+import type { FastifyReply } from "fastify";
+
 /**
  * A refusal a billing route answers with `{error: code, message: code}` (plus `charge_ref` for CHECKOUT_PENDING);
  * never a 5xx, never text.
@@ -40,5 +42,27 @@ export class BillingRefusal extends Error {
   constructor(readonly status: BillingRefusalStatus, readonly code: BillingRefusalCode, readonly chargeRef: string | null = null) {
     super(code);
     this.name = "BillingRefusal";
+  }
+}
+
+/** The house 404 every billing route answers while its dependency is absent. */
+export function billingNotFound(reply: FastifyReply): FastifyReply {
+  return reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" });
+}
+
+/**
+ * Maps a `BillingRefusal` to its status and code (and, for CHECKOUT_PENDING, the charge the page should wait on);
+ * every other error reaches the house error handler.
+ */
+export async function answerRefusal(reply: FastifyReply, work: () => Promise<FastifyReply>): Promise<FastifyReply> {
+  try {
+    return await work();
+  } catch (error) {
+    if (error instanceof BillingRefusal) {
+      return reply.status(error.status).send({
+        error: error.code, message: error.code, ...(error.chargeRef === null ? {} : { charge_ref: error.chargeRef })
+      });
+    }
+    throw error;
   }
 }

@@ -5,7 +5,7 @@ import {
   BillingSubscriptionResponseSchema
 } from "@debateai/contract";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
-import { BillingRefusal } from "./refusal.js";
+import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
 import { cancelForOwner, revokeCancelForOwner, scheduleDowngrade } from "./subscription-actions.js";
 import { listInvoices, readSubscriptionView } from "./subscription-view.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
@@ -20,25 +20,12 @@ export const SUBSCRIPTION_ROUTE_PATHS = Object.freeze([
 ] as const);
 export type SubscriptionRoutePath = typeof SUBSCRIPTION_ROUTE_PATHS[number];
 
-function notFound(reply: FastifyReply): FastifyReply {
-  return reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" });
-}
-
 function malformed(reply: FastifyReply): FastifyReply {
   return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
 }
 
 function ownerOf(request: FastifyRequest): string | null {
   return request.authenticatedSession?.ownerRef ?? null;
-}
-
-async function answer(reply: FastifyReply, work: () => Promise<FastifyReply>): Promise<FastifyReply> {
-  try {
-    return await work();
-  } catch (error) {
-    if (error instanceof BillingRefusal) return reply.status(error.status).send({ error: error.code, message: error.code });
-    throw error;
-  }
 }
 
 /**

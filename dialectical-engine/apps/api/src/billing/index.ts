@@ -12,7 +12,7 @@ import type { ChargeStatusPort } from "./charge-status.js";
 import type { CheckoutServicePort } from "./checkout.js";
 import type { NoticeIntakePort } from "./notice-intake.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
-import { BillingRefusal } from "./refusal.js";
+import { answerRefusal, BillingRefusal, billingNotFound } from "./refusal.js";
 import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
@@ -109,27 +109,8 @@ export type BillingRouteDeps = Readonly<{
  */
 export type BillingRouteOptions = Omit<BillingRouteDeps, "policy" | "admission" | "source" | "ageConfirmation">;
 
-/** The house 404 every billing route answers while its dependency is absent. */
-export function billingNotFound(reply: FastifyReply): FastifyReply {
-  return reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" });
-}
-
-/**
- * Maps a `BillingRefusal` to its status and code (and, for CHECKOUT_PENDING, the charge the page should wait on);
- * every other error reaches the house error handler.
- */
-export async function answerRefusal(reply: FastifyReply, work: () => Promise<FastifyReply>): Promise<FastifyReply> {
-  try {
-    return await work();
-  } catch (error) {
-    if (error instanceof BillingRefusal) {
-      return reply.status(error.status).send({
-        error: error.code, message: error.code, ...(error.chargeRef === null ? {} : { charge_ref: error.chargeRef })
-      });
-    }
-    throw error;
-  }
-}
+/** The house 404 and the refusal envelope (B7a, P8a) are defined once, in ./refusal.ts, and exported here. */
+export { answerRefusal, billingNotFound };
 
 /**
  * R3-2 (the age gate, 0077): the checkout takes no money from an account that still owes its one-time age check.
