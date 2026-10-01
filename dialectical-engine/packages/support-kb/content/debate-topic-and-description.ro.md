@@ -12,4 +12,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Scrie în **Topic** întrebarea sau afirmația pe care vrei să o examinezi. Formularul cere mai mult de șase caractere. Planul Premium îți permite și să adaugi câte o selecție de îndrumare pe linie și adnotări libere. Planul Free golește și dezactivează aceste câmpuri de îndrumare. Formularul curent nu are un câmp separat pentru descriere.
+Scrie în **Subiect** întrebarea sau afirmația pe care vrei să o examinezi. Formularul cere mai mult de șase caractere. Planul Premium îți permite și să adaugi câte o selecție de îndrumare pe linie și adnotări libere. Planul Gratuit golește și dezactivează aceste câmpuri de îndrumare. Formularul curent nu are un câmp separat pentru descriere.

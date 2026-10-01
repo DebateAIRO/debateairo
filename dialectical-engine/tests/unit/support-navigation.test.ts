@@ -13,10 +13,10 @@ import { SUPPORT_LOCALES } from "../../packages/support-kb/src/locale.js";
 import { SUPPORT_UI_LABELS } from "../../packages/support-kb/src/ui-labels.js";
 
 const LABEL_SOURCES = {
-  home: ["chrome","chrome.brandHome"],"start-debate": ["home","home.startDebateLabel"],
-  "sign-in": ["chrome","chrome.account"],"sign-up": ["auth","auth.login.createOne"],
+  home: ["chrome","chrome.footer.home"],"start-debate": ["home","home.startDebateLabel"],
+  "sign-in": ["home","home.logIn"],"sign-up": ["home","home.createAccount"],
   help: ["chrome","chrome.help"],"support-status": ["support","support.serviceStatus"],
-  method: ["chrome","chrome.howItWorks"],"sample-transcript": ["chrome","chrome.transcripts"],
+  method: ["chrome","chrome.method"],"sample-transcript": ["chrome","chrome.transcripts"],
   settings: ["chrome","chrome.settings"],"active-sessions": ["settings","settings.sessions.title"],
   "privacy-preferences": ["consent","consent.settings.title"],
   "claim-legacy": ["settings","settings.legacy.title"],
@@ -84,12 +84,12 @@ describe("Support navigation", () => {
     expect(actions).toEqual([
       { id: "home", label: "Home", href: "/" },
       { id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" },
-      { id: "sign-in", label: "Sign in", href: "/login" },
+      { id: "sign-in", label: "Log in", href: "/login" },
       { id: "sign-up", label: "Create account", href: "/sign-up" },
-      { id: "help", label: "Help desk", href: "/help" },
-      { id: "support-status", label: "Support status", href: "/help#service-status" },
-      { id: "method", label: "How it works", href: "/#method" },
-      { id: "sample-transcript", label: "Sample debate", href: "/#transcripts" },
+      { id: "help", label: "Help", href: "/help" },
+      { id: "support-status", label: "Service status", href: "/help#service-status" },
+      { id: "method", label: "Method", href: "/#method" },
+      { id: "sample-transcript", label: "Transcripts", href: "/#transcripts" },
     ]);
     expect(actions.every(({ href }) => href.startsWith("/") && !href.startsWith("//"))).toBe(true);
   });
@@ -104,11 +104,11 @@ describe("Support navigation", () => {
       { id: "settings", label: "Setări", href: "/settings" },
       {
         id: "privacy-preferences",
-        label: "Preferințe de confidențialitate",
+        label: "Confidențialitate",
         href: "/settings#consent-privacy-heading",
       },
       { id: "public-catalog", label: "Dezbateri publice", href: "/?tab=public" },
-      { id: "your-debates", label: "Dezbaterile tale", href: "/?tab=yours" },
+      { id: "your-debates", label: "Dezbaterile dvs.", href: "/?tab=yours" },
     ]);
 
     expect(resolveSupportActions(["owner-debate", "public-debate"], {
@@ -128,6 +128,20 @@ describe("Support navigation", () => {
         href: "/public/debate/8f781594-f277-48eb-b8fe-36ce21480fc4",
       },
     ]);
+
+    // One source per chip (REV S02 RECHECK p1 B1): the owner and public debate chips have no screen
+    // control of their own, so the chip is the control; en/ro catalogue labels equal the message the
+    // other 33 locales render for the same chip (support.action.*).
+    for (const language of ["en", "ro"] as const) {
+      const proof = {
+        signedIn: true, language,
+        ownerDebateId: "8a4e47f1-65a3-41a3-9759-c586d3eea3f5",
+        publicDebateRef: "8f781594-f277-48eb-b8fe-36ce21480fc4",
+      };
+      for (const action of resolveSupportActions(["owner-debate", "public-debate"], proof)) {
+        expect(action.label).toBe(SUPPORT_UI_LABELS[language][action.id as keyof typeof LABEL_SOURCES]);
+      }
+    }
   });
 
   it("resolves the three static Settings sections only for signed-in visitors", () => {
@@ -135,8 +149,8 @@ describe("Support navigation", () => {
     expect(resolveSupportActions(ids,{ signedIn:false,language:"en" })).toEqual([]);
     expect(resolveSupportActions(ids,{ signedIn:true,language:"ro" })).toEqual([
       { id:"active-sessions",label:"Sesiuni active",href:"/settings#active-sessions-heading" },
-      { id:"claim-legacy",label:"Revendică dezbaterile vechi",href:"/settings#legacy-run-claim-heading" },
-      { id:"delete-account",label:"Șterge contul",href:"/settings#account-deletion-heading" }
+      { id:"claim-legacy",label:"Revendicați dezbaterile vechi",href:"/settings#legacy-run-claim-heading" },
+      { id:"delete-account",label:"Ștergeți contul",href:"/settings#account-deletion-heading" }
     ]);
   });
 
@@ -161,7 +175,7 @@ describe("Support navigation", () => {
     // Property: repeated model ids cannot duplicate controls, and callers cannot rewrite trusted destinations.
     const actions = resolveSupportActions(["help", "help"], { signedIn: false, language: "en" });
 
-    expect(actions).toEqual([{ id: "help", label: "Help desk", href: "/help" }]);
+    expect(actions).toEqual([{ id: "help", label: "Help", href: "/help" }]);
     expect(Object.isFrozen(actions)).toBe(true);
     expect(Object.isFrozen(actions[0])).toBe(true);
   });
