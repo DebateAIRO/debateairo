@@ -7,7 +7,7 @@ What changes (SPEC-v4 R06-R08): in 12 of the 12 article files and 22 of the 26 r
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Use `/login` to sign in with your password and then complete the required second verification step with an authenticator code or a saved unused recovery code. The login page offers **Use a recovery code** after the password step. Use `/sign-up` to register; email verification and authenticator enrollment continue only from their valid account-flow state. The product owner confirms a separate [-Forgot-]{+password+} [-password-]{+reset+} flow, but Support keeps that action unavailable until its exact existing destination is verified. Never put a password, verification token, authenticator secret, or recovery code in Support.
+~ Use `/login` to sign in with your password and then complete the required second verification step with an authenticator code or a saved unused recovery code. The login page offers **Use a recovery code** after the password step. Use `/sign-up` to register; email verification and authenticator enrollment continue only from their valid account-flow state. The product owner confirms a separate [-Forgot password-]{+password reset+} flow, but Support keeps that action unavailable until its exact existing destination is verified. Never put a password, verification token, authenticator secret, or recovery code in Support.
 ~~~
 
 full text:
@@ -35,7 +35,7 @@ Use `/login` to sign in with your password and then complete the required second
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Folosește `/login` pentru a te autentifica prin parolă, apoi finalizează al doilea pas obligatoriu de verificare cu un cod de autentificator sau cu un cod de recuperare salvat și nefolosit. Pagina de autentificare oferă [-**Use-]{+**Folosiți+} [-a-]{+un+} [-recovery-]{+cod+} [-code**-]{+de recuperare**+} după pasul parolei. Folosește `/sign-up` pentru înregistrare; verificarea emailului și înscrierea autentificatorului continuă numai din starea validă a fluxului contului. Proprietarul produsului confirmă un flux separat pentru parola uitată, dar Asistența păstrează această acțiune indisponibilă până la verificarea destinației existente exacte. Nu introduce în Asistență parola, tokenul de verificare, secretul autentificatorului sau codul de recuperare.
+~ Folosește `/login` pentru a te autentifica prin parolă, apoi finalizează al doilea pas obligatoriu de verificare cu un cod de autentificator sau cu un cod de recuperare salvat și nefolosit. Pagina de autentificare oferă **[-Use a recovery code-]{+Folosiți un cod de recuperare+}** după pasul parolei. Folosește `/sign-up` pentru înregistrare; verificarea emailului și înscrierea autentificatorului continuă numai din starea validă a fluxului contului. Proprietarul produsului confirmă un flux separat pentru parola uitată, dar Asistența păstrează această acțiune indisponibilă până la verificarea destinației existente exacte. Nu introduce în Asistență parola, tokenul de verificare, secretul autentificatorului sau codul de recuperare.
 ~~~
 
 full text:
@@ -63,8 +63,8 @@ Folosește `/login` pentru a te autentifica prin parolă, apoi finalizează al d
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Pagina AI transparency, la care duce legătura [-How-]{+Cum+} [-we-]{+etichetăm+} [-label-]{+conținutul+} [-AI-]{+generat+} [-content,-]{+de IA,+} arată că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Tratează-le ca pe un material de analizat, nu ca pe fapte, și verifică afirmațiile și sursele lor înainte să te bazezi pe ele. Scorurile și verdictele evaluează argumentele; nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat.
-~ Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă și un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI. Întrebarea ta și mesajele tale către asistență nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran și nici un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI. Pentru a cere ajutorul unei persoane, folosește [-Talk-]{+Vorbiți+} [-to-]{+cu+} [-a-]{+o+} [-human-]{+persoană+} sau [-Escalate-]{+Escaladați+} [-to-]{+către+} [-a-]{+o+} [-human-]{+persoană+} în Ajutor.
+~ Pagina AI transparency, la care duce legătura [-How we label AI content-]{+Cum etichetăm conținutul generat de IA+}, arată că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Tratează-le ca pe un material de analizat, nu ca pe fapte, și verifică afirmațiile și sursele lor înainte să te bazezi pe ele. Scorurile și verdictele evaluează argumentele; nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat.
+~ Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă și un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI. Întrebarea ta și mesajele tale către asistență nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran și nici un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI. Pentru a cere ajutorul unei persoane, folosește [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} în Ajutor.
 ~~~
 
 full text:
@@ -98,7 +98,7 @@ Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotec
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca procesul de compoziție. Planul [-Free-]{+Gratuit+} păstrează valoarea implicită curentă fixă. Cu planul Premium selectat, poți alege [-**Low**,-]{+**Redus**,+} [-**Medium**-]{+**Mediu**+} sau [-**High**-]{+**Ridicat**+} înainte să pornești rularea. Acest control nu dovedește un abonament plătit, o plată sau disponibilitatea garantată a modelelor.
+~ Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca procesul de compoziție. Planul [-Free-]{+Gratuit+} păstrează valoarea implicită curentă fixă. Cu planul Premium selectat, poți alege **[-Low-]{+Redus+}**, **[-Medium-]{+Mediu+}** sau **[-High-]{+Ridicat+}** înainte să pornești rularea. Acest control nu dovedește un abonament plătit, o plată sau disponibilitatea garantată a modelelor.
 ~~~
 
 full text:
@@ -124,7 +124,7 @@ Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca proce
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Scrie în [-**Topic**-]{+**Subiect**+} întrebarea sau afirmația pe care vrei să o examinezi. Formularul cere mai mult de șase caractere. Planul Premium îți permite și să adaugi câte o selecție de îndrumare pe linie și adnotări libere. Planul [-Free-]{+Gratuit+} golește și dezactivează aceste câmpuri de îndrumare. Formularul curent nu are un câmp separat pentru descriere.
+~ Scrie în **[-Topic-]{+Subiect+}** întrebarea sau afirmația pe care vrei să o examinezi. Formularul cere mai mult de șase caractere. Planul Premium îți permite și să adaugi câte o selecție de îndrumare pe linie și adnotări libere. Planul [-Free-]{+Gratuit+} golește și dezactivează aceste câmpuri de îndrumare. Formularul curent nu are un câmp separat pentru descriere.
 ~~~
 
 full text:
@@ -151,7 +151,7 @@ Scrie în **Subiect** întrebarea sau afirmația pe care vrei să o examinezi. F
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
 ~ După ce dezbaterea are un arbore, [-Thread-]{+Fir+} arată argumentul ca o succesiune, [-Split-]{+Divizat+} compară ramurile, [-Tree-]{+Arbore+} arată ierarhia, iar [-Map-]{+Hartă+} arată relațiile. Informațiile de evaluare apar împreună cu dezbaterea când sunt disponibile. Categoriile publice ale diagnosticului pot arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul împreună cu momentele verificării sau generării; cache sau învechire; numărul afirmațiilor curente, evaluate, omise și trunchiate și filtrele bazate pe scor; golurile nerezolvate și marcajele fatale; și investigațiile recomandate. O categorie sau o valoare poate lipsi când datele de evaluare nu sunt disponibile. Asistența poate explica aceste categorii publice, dar nu poate citi dezbaterea sau valorile ei de evaluare. [-Library-]{+Bibliotecă+} revine la pagina Acasă.
-~ [-Replay-]{+Reluare+} pornește o altă generare din spațiul curent al proprietarului. [-Workspace-]{+Spațiu de lucru+} deschide artefactele locale ale dezbaterii, iar [-Honesty-]{+Onestitate+} deschide detaliile despre proveniență și limitări. Export este disponibil numai când există un răspuns exportabil. [-How-]{+Cum+} [-it works-]{+funcționează+} deschide ghidul din pagină. Dezbaterile publicate pot afișa un set mai mic de vizualizări, numai pentru citire.
+~ [-Replay-]{+Reluare+} pornește o altă generare din spațiul curent al proprietarului. [-Workspace-]{+Spațiu de lucru+} deschide artefactele locale ale dezbaterii, iar [-Honesty-]{+Onestitate+} deschide detaliile despre proveniență și limitări. Export este disponibil numai când există un răspuns exportabil. [-How it works-]{+Cum funcționează+} deschide ghidul din pagină. Dezbaterile publicate pot afișa un set mai mic de vizualizări, numai pentru citire.
 ~~~
 
 full text:
@@ -186,7 +186,7 @@ Aceste controale acționează asupra dezbaterii deja deschise în browserul vizi
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Autentifică-te și deschide `/new` pentru formularul complet al dezbaterii. Introdu o întrebare sau o afirmație cu mai mult de șase caractere. Planul [-Free-]{+Gratuit+} păstrează valori fixe pentru controalele vizibile de risc, buget, adâncime și îndrumare. Planul Premium îți permite să modifici controalele curente de risc, buget, adâncime și îndrumare înainte să selectezi [-**Start-]{+**Începeți+} [-run**.-]{+rularea**.+} Compozitorul din pagina principală poate transfera subiectul la `/new` când pornirea directă nu este disponibilă; Asistența nu pornește dezbaterea în locul tău.
+~ Autentifică-te și deschide `/new` pentru formularul complet al dezbaterii. Introdu o întrebare sau o afirmație cu mai mult de șase caractere. Planul [-Free-]{+Gratuit+} păstrează valori fixe pentru controalele vizibile de risc, buget, adâncime și îndrumare. Planul Premium îți permite să modifici controalele curente de risc, buget, adâncime și îndrumare înainte să selectezi **[-Start run-]{+Începeți rularea+}**. Compozitorul din pagina principală poate transfera subiectul la `/new` când pornirea directă nu este disponibilă; Asistența nu pornește dezbaterea în locul tău.
 ~~~
 
 full text:
@@ -243,7 +243,7 @@ Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împ�
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ [-Nivelul-]{+Nivel+} de risc înregistrează cât de mult depinde de răspuns. Planul [-Free-]{+Gratuit+} îl fixează la **Standard**. Cu planul Premium selectat, poți alege [-**Casual**,-]{+**Informal**,+} **Standard** sau [-**High-]{+**Miză+} [-stakes**-]{+ridicată**+} înainte să pornești rularea. Rularea trimisă înregistrează selecția efectivă; Asistența nu o poate schimba după trimitere.
+~ [-Nivelul de risc-]{+Nivel de risc+} înregistrează cât de mult depinde de răspuns. Planul [-Free-]{+Gratuit+} îl fixează la **Standard**. Cu planul Premium selectat, poți alege **[-Casual-]{+Informal+}**, **Standard** sau **[-High stakes-]{+Miză ridicată+}** înainte să pornești rularea. Rularea trimisă înregistrează selecția efectivă; Asistența nu o poate schimba după trimitere.
 ~~~
 
 full text:
@@ -269,7 +269,7 @@ Nivel de risc înregistrează cât de mult depinde de răspuns. Planul Gratuit �
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Folosește [-**Talk-]{+**Vorbiți+} [-to-]{+cu+} [-a-]{+o+} [-human**-]{+persoană**+} sau [-**Escalate-]{+**Escaladați+} [-to-]{+către+} [-a-]{+o+} [-human**-]{+persoană**+} în Asistență pentru a crea un caz asincron. Cazul nu este un apel telefonic. Emailul de asistență este un flux separat de mail: emailul de asistență nu creează acest caz și nu primește confirmarea, termenul de răspuns sau legătura privată a cazului. Confirmarea serverului pentru caz indică un termen țintă de răspuns de 48 de ore, iar un alt panou din Asistență spune în prezent că răspunsurile sosesc într-o zi lucrătoare, în zilele lucrătoare. Bazează-te pe confirmarea cazului până când textele sunt aliniate. Păstrează confirmarea cazului privată deoarece ea controlează accesul la caz. Asistența nu verifică livrarea în inbox.
+~ Folosește **[-Talk to a human-]{+Vorbiți cu o persoană+}** sau **[-Escalate to a human-]{+Escaladați către o persoană+}** în Asistență pentru a crea un caz asincron. Cazul nu este un apel telefonic. Emailul de asistență este un flux separat de mail: emailul de asistență nu creează acest caz și nu primește confirmarea, termenul de răspuns sau legătura privată a cazului. Confirmarea serverului pentru caz indică un termen țintă de răspuns de 48 de ore, iar un alt panou din Asistență spune în prezent că răspunsurile sosesc într-o zi lucrătoare, în zilele lucrătoare. Bazează-te pe confirmarea cazului până când textele sunt aliniate. Păstrează confirmarea cazului privată deoarece ea controlează accesul la caz. Asistența nu verifică livrarea în inbox.
 ~~~
 
 full text:
@@ -294,7 +294,7 @@ Folosește **Vorbiți cu o persoană** sau **Escaladați către o persoană** î
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Blocul [-Service-]{+Starea+} [-status-]{+serviciului+} din Ajutor publică trei indicatori limitați: [-Debate-]{+Motorul+} [-engine,-]{+de+} [-Scoring-]{+dezbatere,+} [-queue-]{+Coada de punctare+} și [-Model-]{+Flota+} [-fleet.-]{+de+} [-Debate-]{+modele.+} [-engine-]{+Motorul de dezbatere+} reflectă disponibilitatea cererii publice de stare, [-Scoring-]{+Coada+} [-queue-]{+de punctare+} îndrumă vizitatorul către starea din aplicație, iar [-Model-]{+Flota+} [-fleet-]{+de modele+} arată starea releului Asistenței sau faptul că verificarea este încă în curs.
+~ Blocul [-Service status-]{+Starea serviciului+} din Ajutor publică trei indicatori limitați: [-Debate engine-]{+Motorul de dezbatere+}, [-Scoring queue-]{+Coada de punctare+} și [-Model fleet-]{+Flota de modele+}. [-Debate engine-]{+Motorul de dezbatere+} reflectă disponibilitatea cererii publice de stare, [-Scoring queue-]{+Coada de punctare+} îndrumă vizitatorul către starea din aplicație, iar [-Model fleet-]{+Flota de modele+} arată starea releului Asistenței sau faptul că verificarea este încă în curs.
 ~~~
 
 full text:
@@ -358,7 +358,7 @@ Sign in begins on the account page with the password step. The required second s
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Choose [-Sign-]{+Log+} in. After the password step, the required second step offers the configured authenticator code or a saved unused recovery code. Choose Create account to register. Email verification is required. Authenticator enrollment is also required. Both stages continue only from valid account-flow state. Support cannot receive passwords, verification tokens, authenticator secrets, or recovery codes.
+~ Choose [-Sign in-]{+Log in+}. After the password step, the required second step offers the configured authenticator code or a saved unused recovery code. Choose Create account to register. Email verification is required. Authenticator enrollment is also required. Both stages continue only from valid account-flow state. Support cannot receive passwords, verification tokens, authenticator secrets, or recovery codes.
 ~~~
 
 full text:
@@ -379,7 +379,7 @@ Autentificarea începe în pagina contului cu pasul parolei. Al doilea pas oblig
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Alege [-Autentificare.-]{+Autentificați-vă.+} După pasul parolei, al doilea pas obligatoriu oferă un cod din autentificatorul configurat sau un cod de recuperare salvat și nefolosit. Alege [-Creează-]{+Creați+} un cont pentru înregistrare. Verificarea emailului este obligatorie. Este obligatorie și înrolarea autentificatorului. Ambele etape continuă numai din starea validă a fluxului contului. Nu introduce în Asistență parole, tokeni de verificare, secrete de autentificator sau coduri de recuperare.
+~ Alege [-Autentificare-]{+Autentificați-vă+}. După pasul parolei, al doilea pas obligatoriu oferă un cod din autentificatorul configurat sau un cod de recuperare salvat și nefolosit. Alege [-Creează un cont-]{+Creați un cont+} pentru înregistrare. Verificarea emailului este obligatorie. Este obligatorie și înrolarea autentificatorului. Ambele etape continuă numai din starea validă a fluxului contului. Nu introduce în Asistență parole, tokeni de verificare, secrete de autentificator sau coduri de recuperare.
 ~~~
 
 full text:
@@ -391,7 +391,7 @@ Alege Autentificați-vă. După pasul parolei, al doilea pas obligatoriu oferă 
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Pagina AI transparency, la care duce legătura [-How-]{+Cum+} [-we-]{+etichetăm+} [-label-]{+conținutul+} [-AI-]{+generat+} [-content,-]{+de IA,+} precizează că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Pagina recomandă ca ele să fie tratate ca material de analizat, nu ca fapte, iar afirmațiile și sursele lor să fie verificate înainte de a fi folosite. Scorurile și verdictele evaluează argumentele și nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat. Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI; întrebările și mesajele către asistență scrise de oameni nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran sau un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI; [-Talk-]{+Vorbiți+} [-to-]{+cu+} [-a-]{+o+} [-human-]{+persoană+} sau [-Escalate-]{+Escaladați+} [-to-]{+către+} [-a-]{+o+} [-human-]{+persoană+} din Ajutor solicită ajutorul unei persoane.
+~ Pagina AI transparency, la care duce legătura [-How we label AI content-]{+Cum etichetăm conținutul generat de IA+}, precizează că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Pagina recomandă ca ele să fie tratate ca material de analizat, nu ca fapte, iar afirmațiile și sursele lor să fie verificate înainte de a fi folosite. Scorurile și verdictele evaluează argumentele și nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat. Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI; întrebările și mesajele către asistență scrise de oameni nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran sau un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI; [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} din Ajutor solicită ajutorul unei persoane.
 ~~~
 
 full text:
@@ -403,7 +403,7 @@ Pagina AI transparency, la care duce legătura Cum etichetăm conținutul genera
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Pagina AI transparency explică faptul că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete, așa că analizează-le în loc să le tratezi ca fapte. Scorurile și verdictele nu sunt o garanție a adevărului, iar publicarea nu este precedată de nicio revizuire editorială umană. Conținutul generat poartă un marcaj într-un format citibil automat, care nu este un filigran. Pentru a vorbi cu o persoană, folosește [-Talk-]{+Vorbiți+} [-to-]{+cu+} [-a-]{+o+} [-human-]{+persoană+} sau [-Escalate-]{+Escaladați+} [-to-]{+către+} [-a-]{+o+} [-human-]{+persoană+} în Ajutor.
+~ Pagina AI transparency explică faptul că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete, așa că analizează-le în loc să le tratezi ca fapte. Scorurile și verdictele nu sunt o garanție a adevărului, iar publicarea nu este precedată de nicio revizuire editorială umană. Conținutul generat poartă un marcaj într-un format citibil automat, care nu este un filigran. Pentru a vorbi cu o persoană, folosește [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} în Ajutor.
 ~~~
 
 full text:
@@ -415,7 +415,7 @@ Pagina AI transparency explică faptul că argumentele, recenziile, scorurile, v
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca procesul. Planul [-Free-]{+Gratuit+} păstrează valoarea implicită fixă. Premium permite alegerea [-Low,-]{+Redus,+} [-Medium-]{+Mediu+} sau [-High-]{+Ridicat+} înainte de pornirea rulării. Alegerea nu dovedește un abonament plătit, o plată sau disponibilitatea garantată a unui model.
+~ Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca procesul. Planul [-Free-]{+Gratuit+} păstrează valoarea implicită fixă. Premium permite alegerea [-Low-]{+Redus+}, [-Medium-]{+Mediu+} sau [-High-]{+Ridicat+} înainte de pornirea rulării. Alegerea nu dovedește un abonament plătit, o plată sau disponibilitatea garantată a unui model.
 ~~~
 
 full text:
@@ -427,7 +427,7 @@ Nivelul bugetului de compoziție înregistrează câtă muncă poate aloca proce
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ În formularul dezbaterii, [-Free-]{+Gratuit+} păstrează bugetul compoziției la valoarea implicită fixă. Cu Premium selectat, alege [-Low,-]{+Redus,+} [-Medium-]{+Mediu+} sau [-High-]{+Ridicat+} înainte de pornirea rulării. Selecția nu dovedește plata și nu garantează disponibilitatea unui model.
+~ În formularul dezbaterii, [-Free-]{+Gratuit+} păstrează bugetul compoziției la valoarea implicită fixă. Cu Premium selectat, alege [-Low-]{+Redus+}, [-Medium-]{+Mediu+} sau [-High-]{+Ridicat+} înainte de pornirea rulării. Selecția nu dovedește plata și nu garantează disponibilitatea unui model.
 ~~~
 
 full text:
@@ -463,7 +463,7 @@ Scrie întrebarea sau afirmația în Subiect folosind mai mult de șase caracter
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Când dezbaterea are un arbore, [-Thread-]{+Fir+} arată o succesiune, [-Split-]{+Divizat+} compară ramurile, [-Tree-]{+Arbore+} arată ierarhia, iar [-Map-]{+Hartă+} arată relațiile. Evaluarea apare numai când este disponibilă. Diagnosticul public poate arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul cu momentele verificării sau generării; cache sau învechire; numărul afirmațiilor curente, evaluate, omise și trunchiate și filtrele bazate pe scor; golurile nerezolvate și marcajele fatale; și investigațiile recomandate. O categorie sau o valoare poate lipsi când datele de evaluare nu sunt disponibile. Asistența poate explica aceste categorii publice, dar nu poate citi dezbaterea sau valorile ei. [-Replay,-]{+Reluare,+} [-Workspace,-]{+Spațiu+} [-Honesty,-]{+de lucru, Onestitate,+} Export și [-How-]{+Cum+} [-it works-]{+funcționează+} acționează asupra dezbaterii deja deschise; dezbaterile publice oferă un set mai mic, numai pentru citire.
+~ Când dezbaterea are un arbore, [-Thread-]{+Fir+} arată o succesiune, [-Split-]{+Divizat+} compară ramurile, [-Tree-]{+Arbore+} arată ierarhia, iar [-Map-]{+Hartă+} arată relațiile. Evaluarea apare numai când este disponibilă. Diagnosticul public poate arăta disponibilitatea, starea încărcării și a reîmprospătării; furnizorul și modelul cu momentele verificării sau generării; cache sau învechire; numărul afirmațiilor curente, evaluate, omise și trunchiate și filtrele bazate pe scor; golurile nerezolvate și marcajele fatale; și investigațiile recomandate. O categorie sau o valoare poate lipsi când datele de evaluare nu sunt disponibile. Asistența poate explica aceste categorii publice, dar nu poate citi dezbaterea sau valorile ei. [-Replay-]{+Reluare+}, [-Workspace-]{+Spațiu de lucru+}, [-Honesty-]{+Onestitate+}, Export și [-How it works-]{+Cum funcționează+} acționează asupra dezbaterii deja deschise; dezbaterile publice oferă un set mai mic, numai pentru citire.
 ~~~
 
 full text:
@@ -484,7 +484,7 @@ Diagnosticul de evaluare poate arăta disponibilitatea, starea încărcării și
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Formularul complet al dezbaterii cere autentificare și un subiect mai lung de șase caractere. [-Free-]{+Gratuit+} păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea controalelor curente înainte de [-Start-]{+Începeți+} [-run.-]{+rularea.+} Compozitorul din Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea pentru vizitator.
+~ Formularul complet al dezbaterii cere autentificare și un subiect mai lung de șase caractere. [-Free-]{+Gratuit+} păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea controalelor curente înainte de [-Start run-]{+Începeți rularea+}. Compozitorul din Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea pentru vizitator.
 ~~~
 
 full text:
@@ -496,7 +496,7 @@ Formularul complet al dezbaterii cere autentificare și un subiect mai lung de �
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Autentifică-te, alege Pornește o dezbatere și introdu o întrebare sau afirmație cu mai mult de șase caractere. [-Free-]{+Gratuit+} păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea lor înainte de [-Start-]{+Începeți+} [-run.-]{+rularea.+} Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea în locul tău.
+~ Autentifică-te, alege Pornește o dezbatere și introdu o întrebare sau afirmație cu mai mult de șase caractere. [-Free-]{+Gratuit+} păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea lor înainte de [-Start run-]{+Începeți rularea+}. Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea în locul tău.
 ~~~
 
 full text:
@@ -532,7 +532,7 @@ Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împ�
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ [-Nivelul-]{+Nivel+} de risc înregistrează cât de mult depinde de răspuns. [-Free-]{+Gratuit+} îl fixează la Standard. Premium permite alegerea [-Casual,-]{+Informal,+} Standard sau [-High-]{+Miză+} [-stakes-]{+ridicată+} înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.
+~ [-Nivelul de risc-]{+Nivel de risc+} înregistrează cât de mult depinde de răspuns. [-Free-]{+Gratuit+} îl fixează la Standard. Premium permite alegerea [-Casual-]{+Informal+}, Standard sau [-High stakes-]{+Miză ridicată+} înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba după trimitere.
 ~~~
 
 full text:
@@ -544,7 +544,7 @@ Nivel de risc înregistrează cât de mult depinde de răspuns. Gratuit îl fixe
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ În formularul dezbaterii, [-Free-]{+Gratuit+} fixează riscul la Standard. Cu Premium selectat, alege [-Casual,-]{+Informal,+} Standard sau [-High-]{+Miză+} [-stakes-]{+ridicată+} înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba ulterior.
+~ În formularul dezbaterii, [-Free-]{+Gratuit+} fixează riscul la Standard. Cu Premium selectat, alege [-Casual-]{+Informal+}, Standard sau [-High stakes-]{+Miză ridicată+} înainte de pornirea rulării. Rularea trimisă înregistrează selecția efectivă, iar Asistența nu o poate schimba ulterior.
 ~~~
 
 full text:
@@ -556,7 +556,7 @@ full text:
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ [-Talk-]{+Vorbiți+} [-to-]{+cu+} [-a-]{+o+} [-human-]{+persoană+} sau [-Escalate-]{+Escaladați+} [-to-]{+către+} [-a-]{+o+} [-human-]{+persoană+} creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează cazul din această aplicație și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.
+~ [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează cazul din această aplicație și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.
 ~~~
 
 full text:
@@ -568,7 +568,7 @@ Vorbiți cu o persoană sau Escaladați către o persoană creează un caz asinc
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Alege [-Talk-]{+Vorbiți+} [-to-]{+cu+} [-a-]{+o+} [-human-]{+persoană+} sau [-Escalate-]{+Escaladați+} [-to-]{+către+} [-a-]{+o+} [-human-]{+persoană+} pentru a crea un caz asincron; nu este un apel telefonic. Emailul de asistență este un flux separat și nu creează acel caz și nu primește confirmarea, termenul sau legătura privată. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune o zi lucrătoare și păstrează confirmarea privată.
+~ Alege [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} pentru a crea un caz asincron; nu este un apel telefonic. Emailul de asistență este un flux separat și nu creează acel caz și nu primește confirmarea, termenul sau legătura privată. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune o zi lucrătoare și păstrează confirmarea privată.
 ~~~
 
 full text:
@@ -580,7 +580,7 @@ Alege Vorbiți cu o persoană sau Escaladați către o persoană pentru a crea u
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Blocul [-Service-]{+Starea+} [-status-]{+serviciului+} din Ajutor publică trei indicatori limitați: [-Debate-]{+Motorul+} [-engine,-]{+de+} [-Scoring-]{+dezbatere,+} [-queue-]{+Coada de punctare+} și [-Model-]{+Flota+} [-fleet.-]{+de+} [-Debate-]{+modele.+} [-engine-]{+Motorul de dezbatere+} reflectă disponibilitatea cererii publice de stare, [-Scoring-]{+Coada+} [-queue-]{+de punctare+} indică starea din aplicație, iar [-Model-]{+Flota+} [-fleet-]{+de modele+} arată starea releului Asistenței sau CHECKING. Indicatorii pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private despre dezbatere, coadă, cont sau furnizor.
+~ Blocul [-Service status-]{+Starea serviciului+} din Ajutor publică trei indicatori limitați: [-Debate engine-]{+Motorul de dezbatere+}, [-Scoring queue-]{+Coada de punctare+} și [-Model fleet-]{+Flota de modele+}. [-Debate engine-]{+Motorul de dezbatere+} reflectă disponibilitatea cererii publice de stare, [-Scoring queue-]{+Coada de punctare+} indică starea din aplicație, iar [-Model fleet-]{+Flota de modele+} arată starea releului Asistenței sau CHECKING. Indicatorii pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private despre dezbatere, coadă, cont sau furnizor.
 ~~~
 
 full text:
@@ -592,7 +592,7 @@ Blocul Starea serviciului din Ajutor publică trei indicatori limitați: Motorul
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Deschide [-Support-]{+Starea+} [-status-]{+serviciului+} în Ajutor pentru indicatorii publici [-Debate-]{+Motorul+} [-engine,-]{+de+} [-Scoring-]{+dezbatere,+} [-queue-]{+Coada de punctare+} și [-Model-]{+Flota+} [-fleet.-]{+de modele.+} Ei pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private de stare.
+~ Deschide [-Support status-]{+Starea serviciului+} în Ajutor pentru indicatorii publici [-Debate engine-]{+Motorul de dezbatere+}, [-Scoring queue-]{+Coada de punctare+} și [-Model fleet-]{+Flota de modele+}. Ei pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private de stare.
 ~~~
 
 full text:
@@ -637,7 +637,7 @@ The Help Service status block publishes three limited indicators: Debate engine,
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Open [-Support-]{+Service+} status on Help for the public Debate engine, Scoring queue, and Model fleet indicators. They can be unavailable, incomplete, or stale and do not prove every debate, job, model, provider, or deployment is healthy. Support cannot inspect private status records.
+~ Open [-Support status-]{+Service status+} on Help for the public Debate engine, Scoring queue, and Model fleet indicators. They can be unavailable, incomplete, or stale and do not prove every debate, job, model, provider, or deployment is healthy. Support cannot inspect private status records.
 ~~~
 
 full text:
