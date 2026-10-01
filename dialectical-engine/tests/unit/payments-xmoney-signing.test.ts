@@ -1,10 +1,12 @@
 // tests/unit/payments-xmoney-signing.test.ts
+import { createCipheriv } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   aesKeyFromPrivateKey,
   decryptNotice,
+  parseJsonKeepingNumberText,
   signOrderPayload,
   xmoneyEnvironmentOf,
   type XMoneyEmbeddedOrder
@@ -83,6 +85,37 @@ describe("P3a — decrypting a notice", () => {
   });
 });
 
+describe("P3a — numbers keep their source text past what a double can hold", () => {
+  it("decrypts ids above 2^53 and a trailing-zero amount exactly as xMoney wrote them", () => {
+    const plaintext = `{"transactionStatus":"complete-ok","orderId":12345678901234567890,"externalOrderId":"${"b".repeat(32)}",`
+      + `"transactionId":9007199254740993,"customerId":55,"amount":24.20,"currency":"USD","cardId":77,"timestamp":1790000000}`;
+    const iv = Buffer.from("000102030405060708090a0b0c0d0e0f", "hex");
+    const cipher = createCipheriv("aes-256-cbc", KEY, iv);
+    const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+    const notice = decryptNotice(`${iv.toString("base64")},${ciphertext.toString("base64")}`, KEY);
+    expect(notice.orderId).toBe("12345678901234567890");
+    expect(notice.transactionId).toBe("9007199254740993");
+    expect(notice.amountDecimal).toBe("24.20");
+  });
+  it("keeps the text of numbers inside arrays (P3b's relatedTransactionIds shape)", () => {
+    expect(parseJsonKeepingNumberText('{"ids":[9007199254740993],"amount":24.20}'))
+      .toEqual({ ids: ["9007199254740993"], amount: "24.20" });
+  });
+  it("refuses, rather than losing digits, on a runtime that gives the reviver no source text", () => {
+    const realParse = JSON.parse;
+    const spy = vi.spyOn(JSON, "parse").mockImplementation((text: string, reviver?: (key: string, value: unknown) => unknown) => (
+      reviver === undefined
+        ? realParse(text)
+        : realParse(text, function (this: unknown, key: string, value: unknown) { return reviver.call(this, key, value); })
+    ) as unknown);
+    try {
+      expect(() => parseJsonKeepingNumberText('{"id":1}')).toThrow("JSON_NUMBER_SOURCE_UNAVAILABLE");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe("P3a — the environment follows the base URL (A22)", () => {
   it("is live only for the live API host", () => {
     expect(xmoneyEnvironmentOf("https://api.xmoney.com")).toBe("live");
@@ -103,7 +136,8 @@ describe("P3a — what X0's recording page signs is what this package signs", ()
 });
 
 // X0's fixture of the order the stage form ACCEPTED, re-signed under the published test key. Skipped by name
-// until the owner records it; P23's checklist carries "all 25 required X0 kinds present and the X0 suites green".
+// until the owner records it; P22's go-live checklist row 14 (docs/missions/2026-09-01-security-hardening/
+// GO-LIVE-CHECKLIST.md) carries "all 25 required X0 kinds present and the X0 suites green".
 const ACCEPTED_ORDER = resolve(import.meta.dirname, "../fixtures/xmoney/order-payload.json");
 describe.runIf(existsSync(ACCEPTED_ORDER))("P3a — the order xMoney's stage accepted (X0 fixture)", () => {
   it("is reproduced byte for byte: payload and checksum", () => {
