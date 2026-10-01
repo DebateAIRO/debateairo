@@ -1435,6 +1435,13 @@ The publish command asks the same question before anything is sealed, a dry run 
 
 #### Each person's windows (billing)
 
+**Do not switch `billingPolicy` on before Part 2 (plans and payments) is deployed.** Nothing in this release stops you, but with billing on now:
+- every signed-in person becomes Free: 0.20 USD of credit a month, the sealed fixed settings and the Free plan's two models;
+- there is no way to subscribe, because checkout is Part 2;
+- the "See plans" link under the full-limit sentences (Free's ends "or choose a plan to continue now") goes to `/pricing`, a page that does not exist yet.
+
+Until then, keep `enabled: false`, as the kit's example and the engine's own row have it.
+
 With billing on (hosted, and a published `billingPolicy` saying `enabled: true`), each person also has three windows:
 - the **month**, from the day they subscribed (Free: the day they signed up);
 - the **week**, in 7-day blocks from the month start;

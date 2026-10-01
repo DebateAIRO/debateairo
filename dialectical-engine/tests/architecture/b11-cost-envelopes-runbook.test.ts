@@ -37,6 +37,14 @@ describe("the runbook's cost envelopes (B11b)", () => {
     ]) expect(money, needle).toContain(needle);
   });
 
+  it("says plainly not to switch billing on before Part 2 is deployed, and why (final review Part 1b, Owner item 1)", () => {
+    const windows = money.slice(money.indexOf("#### Each person's windows (billing)"));
+    expect(windows).toContain("**Do not switch `billingPolicy` on before Part 2 (plans and payments) is deployed.**");
+    for (const needle of ["becomes Free", "no way to subscribe", "`/pricing`", "does not exist yet"]) {
+      expect(windows, needle).toContain(needle);
+    }
+  });
+
   it("keeps the first paid run's values and their provisional flag", () => {
     for (const needle of ["`250000`", "`2000000`", "0.25 USD", "2.00 USD", "provisional: true", "provisional: false"]) {
       expect(money, needle).toContain(needle);
