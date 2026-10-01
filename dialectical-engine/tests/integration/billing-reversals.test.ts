@@ -91,6 +91,34 @@ describe("P9c reversals of a verified payment", () => {
     // The first refund's own report, settled twice, is never the owner's: both of its checks complete.
     expect((await h.outboxRows(refundRow!.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === refundRow!.transactionId)
       .map((row) => [row.done, row.dead])).toEqual([[true, false], [true, false]]);
+    // A third refund elsewhere of the FIRST refund's amount is not that refund replayed: it is another refund
+    // transaction, so it too is the owner's.
+    await h.xmoney.refund({ transactionId: paid.transaction.transactionId, amountDecimal: "5.00", reason: "customer-demand", message: "dashboard" });
+    const third = h.xmoney.refundTransactionsOf(paid.transaction.transactionId)
+      .find((row) => row.transactionId !== refundRow!.transactionId && row.transactionId !== second!.transactionId);
+    const linesBeforeThird = h.auditLines.length;
+    await h.settle(third!.transactionId);
+    expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "REFUNDED")).toHaveLength(1);
+    expect((await h.outboxRows(third!.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === third!.transactionId))
+      .toEqual([expect.objectContaining({ dead: true, lastErrorCode: "REFUND_UNRECORDED" })]);
+    expect(h.auditLines.slice(linesBeforeThird)).toContainEqual({ event: "billing.refund.unrecorded", reason: "PROVIDER_REFUND" });
+  });
+
+  it("takes a full dashboard refund reported both as the payment's refund-ok and as its refund transaction as one refund", async () => {
+    const paid = await h.activate();
+    // The full refund turns the payment refund-ok AND lists its own 24.20 refund transaction (D5's model).
+    await h.xmoney.refund({ transactionId: paid.transaction.transactionId, amountDecimal: null, reason: "customer-demand", message: "dashboard" });
+    const [refundRow] = h.xmoney.refundTransactionsOf(paid.transaction.transactionId);
+    const linesBefore = h.auditLines.length;
+    await h.settle(paid.transaction.transactionId);
+    await h.settle(refundRow!.transactionId);
+    expect((await h.repository.charge(paid.chargeId))!.events.filter((event) => event.kind === "REFUNDED")
+      .map((event) => [event.errorCode, event.amountMicros, event.xmoneyTransactionId])).toEqual([
+      ["PROVIDER_REFUND", 24_200_000, paid.transaction.transactionId]
+    ]);
+    expect((await h.outboxRows(refundRow!.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === refundRow!.transactionId)
+      .map((row) => [row.done, row.dead])).toEqual([[true, false]]);
+    expect(h.auditLines.slice(linesBefore).filter((line) => line.event === "billing.refund.unrecorded")).toEqual([]);
   });
 
   it("fails a charge voided before it succeeded, and fully refunds one voided after, with its credit note", async () => {
@@ -131,6 +159,14 @@ describe("P9c reversals of a verified payment", () => {
     await h.settle(representment.transactionId);
     expect((await h.repository.charge(paid.chargeId))!.events.find((event) => event.kind === "CHARGEBACK_REPRESENTED"))
       .toMatchObject({ xmoneyTransactionId: representment.transactionId });
+    // The same representment reported again is a replay: recorded once, and its second check completes too.
+    await h.notices.receive(h.noticeFor(h.xmoney.transactions.get(representment.transactionId)!));
+    await h.worker.drain(10);
+    expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "CHARGEBACK_REPRESENTED")).toHaveLength(1);
+    expect(await noticeOutcomes(representment.transactionId)).toEqual([{ outcome: "DUPLICATE" }]);
+    expect((await h.outboxRows(representment.transactionId))
+      .filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === representment.transactionId)
+      .map((row) => [row.done, row.dead])).toEqual([[true, false], [true, false]]);
     expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED", "SUSPENDED"]);
   });
 

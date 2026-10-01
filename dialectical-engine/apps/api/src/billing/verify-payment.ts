@@ -667,8 +667,12 @@ export class VerifyPaymentHandler {
     const held = charge.events.filter((event) => (event.kind === "REFUND_REQUESTED" || event.kind === "REFUNDED")
       && refundTarget(event) === paymentId);
     if (held.length > 0) {
-      const replay = held.some((event) => event.kind === "REFUNDED" && event.amountMicros === amountMicros
-        && (event.errorCode === "PROVIDER_REFUND" || event.errorCode === "PROVIDER_VOID"));
+      // A replay is only this refund transaction recorded already, or the same provider refund reported on the
+      // payment's own row (its refund-ok or void) at this amount. Another refund transaction's REFUNDED, of any amount,
+      // or one of ours, makes this one a second refund elsewhere.
+      const replay = held.some((event) => event.kind === "REFUNDED" && (event.xmoneyTransactionId === transaction.transactionId
+        || (event.xmoneyTransactionId === paymentId && event.amountMicros === amountMicros
+          && (event.errorCode === "PROVIDER_REFUND" || event.errorCode === "PROVIDER_VOID"))));
       if (replay) {
         await this.outcome(noticeId, now, "DUPLICATE");
         return DONE;
@@ -734,12 +738,15 @@ export class VerifyPaymentHandler {
 
   /** A9: evidence was submitted in our favour; the outcome itself arrives by the owner's command (P14b). */
   private async represented(job: OutboxJob, transaction: XMoneyTransaction, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
-    const target = await this.chargedBackCharge(transaction, job.payload);
-    if (target === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
-    if (target.events.some((event) => event.kind === "CHARGEBACK_REPRESENTED" && event.xmoneyTransactionId === transaction.transactionId)) {
+    // Recorded already, on whichever charge: a replay. Checked before choosing a target, because the charge it was
+    // recorded on no longer counts as a charged-back charge waiting for its representment.
+    if (await this.deps.jobs.chargeIdForTransaction(transaction.transactionId, "CHARGEBACK_REPRESENTED", this.deps.xmoneyEnvironment) !== null) {
       await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
     }
+    const target = await this.chargedBackCharge(transaction, job.payload);
+    // No charged-back charge yet: the representment arrived before its chargeback.
+    if (target === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.repository.appendChargeEvent(client, chargeEvent(target.chargeId, "CHARGEBACK_REPRESENTED", now, {
         xmoneyTransactionId: transaction.transactionId, amountMicros: target.totalMicros, errorCode: null
