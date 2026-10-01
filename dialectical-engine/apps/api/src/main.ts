@@ -16,13 +16,18 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, ServeDisclosureRepository } from "@debateai/db";
-import type { AskRequest } from "@debateai/contract";
+import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
+  assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
+  costEnvelopeBand,
+  costEnvelopeCeilings,
+  readBillingPlans,
+  readBillingPolicy,
   loadApiEnvironment,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
@@ -34,6 +39,7 @@ import {
   readCountryPolicy,
   readStoryPolicyFromRegister,
   readAuthPolicy,
+  readJudgeTokenCeiling,
   readMfaPolicy,
   readProductRolePolicy,
   readRecoveryPolicy,
@@ -43,7 +49,18 @@ import {
 } from "@debateai/register";
 // V-28 (DL4-F2): the application-wide daily spending ceiling, over the persisted
 // model-spend ledger migration 0066 created.
-import { CostEnvelopeGuard, PostgresModelSpendStore, costEnvelopeGuardPolicy } from "@debateai/budget";
+import {
+  CostEnvelopeGuard,
+  NO_PERSON_ALLOWANCE,
+  PostgresModelSpendStore,
+  PostgresRecentRunUsageSource,
+  RecentRunsCostEstimator,
+  assertRunCeilingCoversOneCall,
+  costEnvelopeGuardPolicy,
+  mostOneRunMaySpendMicros
+} from "@debateai/budget";
+import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
+import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
@@ -57,6 +74,10 @@ import { RepositoryLegalAcceptanceApplication } from "./legal.js";
 import { AdmissionLimiter } from "./admission.js";
 import { openGeoLookup } from "@debateai/geo";
 import { CountryGate, countryPolicyInForce } from "./country-gate.js";
+import { AskRoom, everyWholeMinute } from "./ask-room.js";
+import type { AskBilling } from "./ask-billing.js";
+import { PersonUsageReader } from "./billing/usage.js";
+import type { BillingRouteOptions } from "./billing/index.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
@@ -81,6 +102,7 @@ import { RecoveryStartService } from "./recovery.js";
 import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
+  buildApiProviderPriceMap,
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets,
   resolveProviderTargetCredentials
@@ -207,6 +229,13 @@ const contentProvisionPool = boot.hold(createPool(environment.CONTENT_PROVISION_
 // instances so lock waiters cannot consume ordinary runtime/provision capacity.
 const serverAskAdmissionPool=boot.hold(createPool(environment.CONTENT_PROVISION_DATABASE_URL));
 const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL));
+// Budget spec §2.6 (B6b): the room decision holds the site's day lock while the
+// run is created, so its transaction takes a connection from a pool of its own —
+// a decision waiting for the lock must never hold a connection the decision it
+// waits for needs (packages/budget/src/spend-lock.ts). The runtime principal's
+// URL on purpose: the hold, the wait row and the run's charge scope are
+// debateai_runtime's grants (0083, 0084), never the content-provision role's.
+const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL,{ max: 4 }));
 await boot.run("ask-admission-pools", async () => {
   if (serverAskAdmissionPool === contentProvisionPool
     || serverAskAdmissionPool === pool
@@ -277,33 +306,33 @@ await boot.run("support-admission-scopes", async () => {
  * `assertDailyCostEnvelope` is absent below and every ask is admitted exactly as
  * it is today.
  */
-const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
-  ? new CostEnvelopeGuard({
-      store: new PostgresModelSpendStore(pool),
-      policy: await boot.run("cost-envelope-policy", async () => {
-        const runPolicy = await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION);
-        // Verdict story (spec §8): an admitted run may also write its story,
-        // whose spend counts toward the day, so the day reserves the story's own
-        // ceiling beside the run's. The rows are OPTIONAL: a register without
-        // them, or with a malformed family, reserves the run's ceiling alone.
-        // An unreadable family is logged by code, as the runner logs it.
-        const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
-          .catch((error: unknown) => {
-            console.warn(JSON.stringify({
-              kind: "DEBATEAI_STORY",
-              event: "STORY_POLICY_UNREADABLE",
-              code: error instanceof TypedDomainError ? error.code : "UNTYPED"
-            }));
-            return null;
-          });
-        // Engine money rule, Task M7 (spec §14.4.1, §14.4.6): the story's
-        // overrun travels with its ceiling, and the ONE check over both money
-        // rows refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT) when the
-        // day cannot hold one full run plus its story.
-        return costEnvelopeGuardPolicy(runPolicy, storyPolicy);
-      })
+const costEnvelopeRows = environment.DEPLOYMENT_MODE === "hosted"
+  ? await boot.run("cost-envelope-policy", async () => {
+      const runPolicy = await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION);
+      // Verdict story (spec §8): an admitted run may also write its story,
+      // whose spend counts toward the day, so the day reserves the story's own
+      // ceiling beside the run's. The rows are OPTIONAL: a register without
+      // them, or with a malformed family, reserves the run's ceiling alone.
+      // An unreadable family is logged by code, as the runner logs it.
+      const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
+        .catch((error: unknown) => {
+          console.warn(JSON.stringify({
+            kind: "DEBATEAI_STORY",
+            event: "STORY_POLICY_UNREADABLE",
+            code: error instanceof TypedDomainError ? error.code : "UNTYPED"
+          }));
+          return null;
+        });
+      // Engine money rule, Task M7 (spec §14.4.1, §14.4.6): the story's
+      // overrun travels with its ceiling, and the ONE check over both money
+      // rows refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT) when the
+      // day cannot hold one full run plus its story.
+      return Object.freeze({ runPolicy, guardPolicy: costEnvelopeGuardPolicy(runPolicy, storyPolicy) });
     })
   : undefined;
+const costEnvelopeGuard = costEnvelopeRows === undefined
+  ? undefined
+  : new CostEnvelopeGuard({ store: new PostgresModelSpendStore(pool), policy: costEnvelopeRows.guardPolicy });
 await boot.run("product-role-policy", () => readProductRolePolicy(pool, environment.REGISTER_VERSION));
 // Exactly ONE process-owned Argon2 worker pool. It is created before the
 // repository and the registration service, both of which receive this same
@@ -380,6 +409,29 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
   assertPricedProviderTargets(declared, environment.DEPLOYMENT_MODE);
   return declared;
 });
+/**
+ * B9 (budget spec §2.10) — the API refuses to boot, like the runner, when the
+ * run's ceiling for arguing is below the first position's own call at the
+ * cheapest price among each plan's models — every plan's cheapest must fit —
+ * (RUN_CEILING_BELOW_ONE_CALL). Hosted (B6b read the policy row only there),
+ * and only with the row's three band members (the same `costEnvelopeBand`
+ * question B6b's room asks); the boot ledger names the stage when it refuses.
+ * The row is not read a second time.
+ */
+await boot.run("run-ceiling-covers-one-call", async () => {
+  if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
+  assertRunCeilingCoversOneCall({
+    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,
+    firstCallsByRoster: firstCallsByPlanRoster({
+      projections: firstPositionCallProjections({
+        targets: declaredProviderTargets,
+        judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),
+        questionMaxBytes: askQuestionMaxBytes()
+      }),
+      rosters: PLAN_TIER_ROSTERS
+    })
+  });
+});
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
@@ -391,6 +443,86 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
 });
+/**
+ * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM.
+ * Hosted, and only once the costEnvelopePolicy in force carries the band; without
+ * it the API answers exactly as today (the daily guard's 429 and its 30-minute
+ * reservation). B4a's one readiness check comes first (R-5): billing switched on
+ * without a billingPlans row, or without the band, refuses this boot by name
+ * (BILLING_PLANS_UNRESOLVED / BILLING_REQUIRES_ENVELOPE_MEMBERS, A22); it answers
+ * the plans when billing is on and null when it is off. Billing on supplies each
+ * person's windows and pins every started run to its person (R-19); billing off
+ * leaves the room the site's day alone and writes no charge scope. A version
+ * WITHOUT the band builds no room and no waker, so a run already waiting would
+ * never start: that boot is refused (WAITING_LINE_REQUIRES_BAND) while the line
+ * lists any run — publish such a version only once the line is empty.
+ */
+const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvelopeRows !== undefined
+  ? await boot.run("ask-room", async () => {
+      const billingPlans = assertBillingReady({
+        policy: await readBillingPolicy(pool, environment.REGISTER_VERSION),
+        plans: await readBillingPlans(pool, environment.REGISTER_VERSION),
+        envelope: costEnvelopeRows.runPolicy
+      });
+      const band = costEnvelopeBand(costEnvelopeRows.runPolicy);
+      if (band === null) {
+        const stranded = await new RunWaitRepository(pool).countWaiting();
+        if (stranded > 0) {
+          throw new TypedDomainError(
+            "WAITING_LINE_REQUIRES_BAND",
+            "Questions are waiting in line, and a register version without the band has no waker to start them"
+          );
+        }
+        return undefined;
+      }
+      const spend = new PostgresModelSpendStore(pool);
+      const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
+      const personAllowance = entitlements === null || billingPlans === null
+        ? NO_PERSON_ALLOWANCE
+        : new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
+      const estimator = new RecentRunsCostEstimator({
+        source: new PostgresRecentRunUsageSource(pool),
+        prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
+        maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)
+      });
+      const room = new AskRoom({
+        lockPool: roomDecisionPool,
+        spend,
+        line: new RunWaitRepository(pool),
+        estimator,
+        personAllowance,
+        entitlements,
+        billingPlans,
+        dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
+        closeBasisPoints: band.closeBasisPoints,
+        waitingLinePerPerson: band.waitingLinePerPerson
+      });
+      // B7a (the usage read) and B8 (the server-decided ask and its coarse fit)
+      // reuse these same instances and this one readiness answer.
+      return Object.freeze({ room, spend, estimator, entitlements, personAllowance, billingPlans });
+    })
+  : undefined;
+const askRoom = askRoomComposition?.room;
+/**
+ * Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; rulings R-5, R-28):
+ * the server decides the ask ONLY when the room's composition carries billing —
+ * hosted, the band published, and a billingPolicy saying enabled: true with its
+ * plans (B6b's `ask-room` step asked `assertBillingReady`). The coarse fit reads
+ * the room's own person windows, spend store and estimator.
+ */
+const askBilling: AskBilling | undefined = askRoomComposition === undefined
+  || askRoomComposition.entitlements === null || askRoomComposition.billingPlans === null
+  ? undefined
+  : Object.freeze({
+      plans: askRoomComposition.billingPlans,
+      entitlements: askRoomComposition.entitlements,
+      coarseFit: Object.freeze({
+        personAllowance: askRoomComposition.personAllowance,
+        spend: askRoomComposition.spend,
+        estimator: askRoomComposition.estimator
+      }),
+      clock: () => new Date()
+    });
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
 // V-3: over the RING, so a record still wrapped by the previous key opens for
 // the length of a changeover. Writes stay under the current key. Under the
@@ -503,9 +635,14 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   settlementWatchHandle: environment.SETTLEMENT_WATCH_HANDLE,
   // V-28(2): asked FIRST of every new ask, before the panel is discovered —
   // discovery probes the paid vendors, and a probe is itself a request.
-  ...(costEnvelopeGuard === undefined ? {} : {
-    assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
-  }),
+  // B6b: the room when it is composed, INSTEAD of the daily guard; the guard
+  // (today's 429) for every hosted register without the band; neither locally.
+  ...(askRoom !== undefined
+    ? { room: askRoom, waitingLine: askRoom }
+    : costEnvelopeGuard === undefined ? {} : {
+        assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
+      }),
+  ...(askBilling === undefined ? {} : { billing: askBilling }),
   resolveDiscoveredPanel: resolveProviderPanel,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
@@ -623,6 +760,18 @@ const authenticationRiskCleanupTimer=setInterval(
   triggerAuthenticationRiskCleanup,60_000
 );
 authenticationRiskCleanupTimer.unref();
+/**
+ * Budget spec 2026-09-28 §2.7 (B7b) — THE WAKER. Single-flight like every timer
+ * here; once right after listen (a raised site limit arrives as a restart, and
+ * the line must not sleep through it), then on every whole minute — the very
+ * instants `nextWholeMinute` tells a waiting question — unref'd and stopped on
+ * close. Only when the room is composed; nothing can wait otherwise.
+ */
+const triggerAskWake = createSingleFlightErasureReconciler(
+  async () => { await application.wakeWaitingRuns(); },
+  () => console.error("[ASK_WAITING_LINE_WAKE_PENDING]")
+);
+let askWaker: Readonly<{ stop(): void }> | undefined;
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
   ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!))
   : undefined;
@@ -804,6 +953,21 @@ const supportAnswers = createSupportAnswerService({
   modelFor: () => supportAdmittedModel
 });
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
+/**
+ * Paid plans (B7a onward): the billing routes' dependencies, only while billing is
+ * on (hosted, and the room composed with entitlements). Later billing tasks ADD
+ * their members to this one object; absent, every billing route answers 404.
+ */
+const billingRouteOptions: BillingRouteOptions | undefined =
+  askRoomComposition === undefined || askRoomComposition.entitlements === null
+    ? undefined
+    : Object.freeze({
+        usage: new PersonUsageReader({
+          entitlements: askRoomComposition.entitlements,
+          allowance: askRoomComposition.personAllowance,
+          spend: askRoomComposition.spend
+        })
+      });
 const api = buildApi({
   application,
   stories: new RepositoryAnswerStoryApplication(storyRepository),
@@ -820,6 +984,11 @@ const api = buildApi({
   emailChange,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
+  // B7a: the room read and, while billing is on, the usage read. Absent, the
+  // room answers FITS and the usage route 404.
+  ...(askRoom === undefined ? {} : { askRoom }),
+  ...(askBilling === undefined ? {} : { askBilling }),
+  ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   ...(countryGate === undefined ? {} : { countryGate }),
   support: {
     configuration: supportConfiguration,
@@ -865,6 +1034,7 @@ if (publicationCleanupTimer !== undefined) {
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
+api.addHook("onClose",async () => askWaker?.stop());
 const startup = installStartupResourceOwner({
   api,
   registration,
@@ -881,6 +1051,7 @@ const startup = installStartupResourceOwner({
       ? [] : [contentProvisionPool]),
     serverAskAdmissionPool,
     legacyAskAdmissionPool,
+    roomDecisionPool,
     ...(erasurePool === pool
         || erasurePool === authorizationPool
         || erasurePool === publicationCleanupPool
@@ -935,3 +1106,7 @@ await startup.run("listen", async () => {
 // user-key destruction before completion delivery succeeds.
 triggerErasureReconciliation();
 triggerAuthenticationRiskCleanup();
+if (askRoom !== undefined) {
+  triggerAskWake();
+  askWaker = everyWholeMinute(triggerAskWake);
+}

@@ -18,6 +18,7 @@
   "time.status.claimed": "Preuzeto",
   "time.status.running": "U tijeku",
   "time.status.holding": "Zadržano do oporavka pružatelja",
+  "time.status.waiting": "Čeka",
   "time.status.settled": "Zaključeno",
   "time.status.generating": "Stvara se",
   "time.status.failed": "Neuspješno",

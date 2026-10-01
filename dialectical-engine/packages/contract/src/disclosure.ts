@@ -54,10 +54,10 @@ export type DisclosedRole = z.infer<typeof DisclosedRoleSchema>;
  */
 export const FloorReasonSchema = z.enum(["ENVELOPE_EXHAUSTED", "DIGEST_CANNOT_EXIST", "TRANSPORT_DEATH", "NO_ARTIFACT"]);
 
-/** What cut the ARGUING short (§14.4.1): a stop kind, or null when nothing did. */
-export const ArguingStopSchema = z.enum(["MONEY", "ATTEMPTS", "USAGE", "DAILY"]);
+/** What cut the ARGUING short (§14.4.1): a stop kind, or null when nothing did. ALLOWANCE: the run owner's window (B9). */
+export const ArguingStopSchema = z.enum(["MONEY", "ATTEMPTS", "USAGE", "DAILY", "ALLOWANCE"]);
 /** What cut the ANSWER-WRITING loop short (§14.4.2), whether or not a round was kept. */
-export const AnswerWritingStopSchema = z.enum(["MONEY", "ATTEMPTS", "USAGE", "DAILY", "TRANSPORT_DEATH", "NO_ARTIFACT"]);
+export const AnswerWritingStopSchema = z.enum(["MONEY", "ATTEMPTS", "USAGE", "DAILY", "ALLOWANCE", "TRANSPORT_DEATH", "NO_ARTIFACT"]);
 
 /**
  * GET /v1/answers/{id}/disclosure — the owner-scoped read of the record.

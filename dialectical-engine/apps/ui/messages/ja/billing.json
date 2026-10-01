@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "ご利用のプランの使用状況",
+  "billing.usage.line": "本日 {dayPct}% · 今週 {weekPct}% · 今月 {monthPct}%",
+  "billing.usage.lineFree": "今月 {monthPct}%",
+  "billing.usage.day": "本日",
+  "billing.usage.week": "今週",
+  "billing.usage.month": "今月",
+  "billing.usage.resets": "リセット：{time}"
+}

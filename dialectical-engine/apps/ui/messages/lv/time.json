@@ -18,6 +18,7 @@
   "time.status.claimed": "Piešķirts",
   "time.status.running": "Notiek",
   "time.status.holding": "Apturēts pakalpojumu sniedzēja atkopšanai",
+  "time.status.waiting": "Gaida",
   "time.status.settled": "Nokārtots",
   "time.status.generating": "Ģenerē",
   "time.status.failed": "Neizdevās",

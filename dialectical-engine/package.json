@@ -72,6 +72,7 @@
     "@debateai/api": "workspace:*",
     "@debateai/battery": "workspace:*",
     "@debateai/battery-decision": "workspace:*",
+    "@debateai/billing-core": "workspace:*",
     "@debateai/budget": "workspace:*",
     "@debateai/contract": "workspace:*",
     "@debateai/critique": "workspace:*",

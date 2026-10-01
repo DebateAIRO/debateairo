@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Utilizarea abonamentului dvs.",
+  "billing.usage.line": "Azi {dayPct}% · Săptămâna aceasta {weekPct}% · Luna aceasta {monthPct}%",
+  "billing.usage.lineFree": "Luna aceasta {monthPct}%",
+  "billing.usage.day": "Azi",
+  "billing.usage.week": "Săptămâna aceasta",
+  "billing.usage.month": "Luna aceasta",
+  "billing.usage.resets": "Se resetează: {time}"
+}

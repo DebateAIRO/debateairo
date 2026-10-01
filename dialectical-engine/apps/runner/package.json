@@ -19,6 +19,7 @@
     "@debateai/graph": "workspace:*",
     "@debateai/judgement": "workspace:*",
     "@debateai/battery": "workspace:*",
+    "@debateai/billing-core": "workspace:*",
     "@debateai/budget": "workspace:*",
     "@debateai/propagation": "workspace:*",
     "@debateai/serve": "workspace:*",

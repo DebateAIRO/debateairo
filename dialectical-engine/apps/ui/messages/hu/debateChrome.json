@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Ebben a vitában mindent – az érveket, felülvizsgálatokat, pontszámokat és az ítéletet – MI-modellek hoznak létre; a tartalom géppel olvasható jelölést kap, és pontatlan lehet.",
+  "debateChrome.status.waiting": "Indulásra vár. A vitája magától elindul ekkor: {time}.",
+  "debateChrome.status.waitingOwnDebates": "A többi vitája egyelőre a korlátja fennmaradó részét használja. Ez a vita magától elindul, amint valamelyik befejeződik.",
   "debateChrome.backToLibrary": "← Vissza a könyvtárhoz",
   "debateChrome.loading": "Betöltés…",
   "debateChrome.error.claimGenerationFailed": "Az állítás létrehozása sikertelen",
@@ -277,5 +279,6 @@
   "requestFailure.kind.UNREADABLE": "A koordinátor válasza nem volt olvasható, ezért a kérés kimenetele ismeretlen.",
   "requestFailure.kind.PLAN_TIER_INVALID": "A koordinátor elutasította az előfizetési szint kiválasztását. Válassza az Ingyenes vagy a Prémium lehetőséget, majd próbálja újra.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "A koordinátor elutasította a kérést: az ehhez az előfizetési szinthez szükséges egyik modell jelenleg nem érhető el. Próbálja újra később, vagy válassza a másik előfizetési szintet.",
+  "requestFailure.kind.ALREADY_WAITING": "Egyszerre csak egy kérdés várakozhat. Ezt a kérdést azután tegye fel, hogy a várakozó vitája elindult.",
   "requestFailure.kind.UNCLASSIFIED": "A kérés még azelőtt meghiúsult, hogy válasz érkezett volna, ezért a kimenetele ismeretlen. Erről nem a koordinátor döntött."
 }

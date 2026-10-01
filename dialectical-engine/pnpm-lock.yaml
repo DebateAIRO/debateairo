@@ -44,6 +44,9 @@ importers:
       '@debateai/battery-decision':
         specifier: workspace:*
         version: link:packages/battery/decision
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:packages/billing-core
       '@debateai/budget':
         specifier: workspace:*
         version: link:packages/budget
@@ -167,6 +170,9 @@ importers:
       '@debateai/geo':
         specifier: workspace:*
         version: link:../../packages/geo
+      '@debateai/judgement':
+        specifier: workspace:*
+        version: link:../../packages/judgement
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
@@ -252,6 +258,9 @@ importers:
       '@debateai/battery':
         specifier: workspace:*
         version: link:../../packages/battery
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../../packages/billing-core
       '@debateai/budget':
         specifier: workspace:*
         version: link:../../packages/budget
@@ -436,6 +445,12 @@ importers:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../../kernel
+
+  packages/billing-core:
+    dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
 
   packages/budget:
     dependencies:

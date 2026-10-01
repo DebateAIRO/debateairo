@@ -22,6 +22,8 @@
   "home.by": "מאת {name}",
   "home.noDebates": "אין עדיין דיונים — הציגו את הטענה הראשונה למעלה.",
   "home.generationFailed": "יצירת הדיון נכשלה: {reason}",
+  "home.status.waiting": "ממתין להתחלה. הדיון שלכם יתחיל מעצמו ב־{time}.",
+  "home.status.waitingOwnDebates": "הדיונים האחרים שלכם משתמשים כרגע ביתרת המגבלה שלכם. הדיון הזה יתחיל מעצמו ברגע שאחד מהם יסתיים.",
   "home.noPublishedDebates": "עדיין לא פורסמו דיונים.",
   "home.verdictUnavailable": "ההכרעה אינה זמינה",
   "home.verdict.supported": "נתמך",

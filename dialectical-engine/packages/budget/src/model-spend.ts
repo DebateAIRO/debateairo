@@ -28,7 +28,7 @@ import {
   type CostEnvelopePolicy,
   type StoryPolicy
 } from "@debateai/register";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   chargeMicrosForUsage,
@@ -42,11 +42,14 @@ import {
   providerUsageUnreported,
   readReportedUsage,
   runCostEnvelopeReached,
+  sharedWallReached,
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
   type ProviderTargetPrice,
   type RunCostEnvelopeDecision
 } from "./cost-envelope.js";
+import type { PersonAllowanceSource } from "./person-allowance.js";
+import { decideSharedWall } from "./room.js";
 
 /**
  * Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat;
@@ -133,6 +136,47 @@ export interface ProviderCostSeam {
   assertUsageReported(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
 }
 
+/**
+ * B9 (budget spec §2.9, paid-plans spec §2.4.2) — WHERE THE WALL READS A RUN'S
+ * OWNER AND WHAT THAT OWNER HAS SPENT. `PostgresModelSpendStore` is the shipped
+ * reader: the owner billing pinned on the run at admission
+ * (`billing.run_charge_scope`, migration 0084) and the owner's RUN + STORY spend
+ * recorded inside a window (`readOwnerSpentMicros`, task B6a). A run with no
+ * pinned owner — billing off (B6 writes the row only when hosted billing is on,
+ * ruling R-19), local mode, a legacy asker, a run admitted before billing — has
+ * no person scope.
+ */
+export interface RunOwnerSpendReader {
+  readRunChargeOwnerRef(runId: string): Promise<string | null>;
+  readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number>;
+}
+
+/**
+ * B9 — the shared wall's terms: the site day's finish edge (or none), and
+ * where the owner's windows come from. The two halves are independent: the
+ * person half applies to every run billing pinned an owner on (ruling R-19),
+ * whether or not the register sealed the band.
+ */
+export interface SharedWallInput {
+  /**
+   * `costEnvelopePolicy.finishBasisPoints` (11 500; 10 000-20 000, as B1's
+   * `decideSharedWall` requires): the site day's finish edge. Null when the
+   * register version sealed no band: then there is no site-day wall and the day
+   * is never read, and the person half still applies.
+   */
+  readonly finishBasisPoints: number | null;
+  /** The run owner's windows, each carrying its own finish edge (11 000); `NO_PERSON_ALLOWANCE` supplies none. */
+  readonly persons: PersonAllowanceSource;
+  readonly owners: RunOwnerSpendReader;
+}
+
+/**
+ * B9 — whether ONE call is measured against the shared wall. "EXEMPT" is the
+ * first position's own call: a started debate always gets its first position.
+ * Answer-writing (SERVE) calls and story calls are never walled, whatever this says.
+ */
+export type SharedWallApplication = "APPLY" | "EXEMPT";
+
 export interface CostEnvelopeGuardInput {
   readonly store: ModelSpendStore;
   readonly policy: Readonly<{
@@ -202,6 +246,14 @@ export interface CostEnvelopeGuardInput {
    * admitting one late.
    */
   readonly reservationTtlMs?: number;
+  /**
+   * B9 (budget spec §2.9): the shared wall. Present whenever hosted (the
+   * shipped runner, B9b); its site-day half only with the `costEnvelopePolicy`
+   * row's three band members (`finishBasisPoints` non-null), its person half
+   * always. Absent (local mode) means no wall, exactly as before: a run under
+   * way is held to its own ceiling alone.
+   */
+  readonly sharedWall?: SharedWallInput;
 }
 
 export const DEFAULT_RESERVATION_TTL_MS = 1_800_000 as const;
@@ -284,6 +336,45 @@ export function costEnvelopeGuardPolicy(
   return policy;
 }
 
+/**
+ * B9 (budget spec §2.10) — A LIMIT BELOW ONE CALL REFUSES THE BOOT, not a
+ * person's debate. Beside `costEnvelopeGuardPolicy`, where both inputs are
+ * known: the arguing ceiling (`costEnvelopeCeilings(...).bodyMicros`) must hold
+ * the first position's own call at the cheapest price among each plan's models
+ * — every plan's cheapest must fit — because a run's makers are its plan's
+ * roster and its first call can move only among them. The caller hands one
+ * group of first calls per plan (`firstCallsByPlanRoster`); this function knows
+ * no plan. It refuses when the ceiling is below the LARGEST of the per-group
+ * minima; equality fits, as it does in the seam; no group (or only empty ones)
+ * means nothing to refuse. The prices live in the environment, not the
+ * register, so both boots ask it; the hosted publish command asks it too, of
+ * the operator file's priced targets (which must equal the environment's) and
+ * the JUDGE bound it is about to seal, so a dry run refuses by the same code
+ * (final review Part 1b, Important 3). No figure in the message; the runbook
+ * gives the fix.
+ */
+export function assertRunCeilingCoversOneCall(input: Readonly<{
+  bodyCeilingMicros: number;
+  firstCallsByRoster: ReadonlyArray<ReadonlyArray<Readonly<{
+    price: ProviderTargetPrice;
+    requestBytes: number;
+    completionTokenCeiling: number;
+  }>>>;
+}>): void {
+  const cheapestPerPlan = input.firstCallsByRoster
+    .filter((group) => group.length > 0)
+    .map((group) => Math.min(...group.map((call) => projectedCallCeilingMicros(call.price, call))));
+  if (cheapestPerPlan.length === 0) return;
+  if (input.bodyCeilingMicros < Math.max(...cheapestPerPlan)) {
+    throw new TypedDomainError(
+      "RUN_CEILING_BELOW_ONE_CALL",
+      "The run's ceiling for arguing is below the projected cost of the first position's own call at the cheapest"
+        + " price among each plan's models (every plan's cheapest must fit): raise per_run_ceiling_micros, or lower"
+        + " serve_reserve_basis_points, in a new register version"
+    );
+  }
+}
+
 /** The two spend sources a gateway money seam charges (the support chat keeps its own accounting). */
 type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY">;
 
@@ -314,6 +405,8 @@ export interface ProviderSeamInput {
  */
 export interface RunProviderSeamInput extends ProviderSeamInput {
   readonly phase: CostEnvelopePhase;
+  /** B9: absent means "APPLY"; the runner's gateway passes "EXEMPT" for the first position's own call. */
+  readonly sharedWall?: SharedWallApplication;
 }
 
 /**
@@ -332,6 +425,7 @@ export class CostEnvelopeGuard {
   readonly #storyCeilingMicros: number | null;
   readonly #clock: () => Date;
   readonly #reservationTtlMs: number;
+  readonly #sharedWall: SharedWallInput | null;
 
   constructor(input: CostEnvelopeGuardInput) {
     if (input?.store === undefined || input?.policy === undefined) {
@@ -356,6 +450,25 @@ export class CostEnvelopeGuard {
     const ttl = input.reservationTtlMs ?? DEFAULT_RESERVATION_TTL_MS;
     if (!Number.isInteger(ttl) || ttl < 1) throw new TypeError("COST_ENVELOPE_RESERVATION_TTL_INVALID");
     this.#reservationTtlMs = ttl;
+    // B9: a wall that could not be asked is refused here, at construction, the
+    // way a reserve or an overrun the policy row would refuse is. The site's
+    // finish edge is null (no band: no site-day wall) or held to the range
+    // `decideSharedWall` (B1) answers for — 10 000-20 000 basis points, the
+    // same range the costEnvelopePolicy row's `finish_up_to_basis_points` is
+    // sealed in — so no walled call can meet B1's TypeError mid-run.
+    const wall = input.sharedWall;
+    if (wall !== undefined && (
+      (wall.finishBasisPoints !== null && (
+        !Number.isSafeInteger(wall.finishBasisPoints)
+        || wall.finishBasisPoints < 10_000 || wall.finishBasisPoints > 20_000
+      ))
+      || typeof wall.persons?.read !== "function"
+      || typeof wall.owners?.readRunChargeOwnerRef !== "function"
+      || typeof wall.owners?.readOwnerSpentMicros !== "function"
+    )) {
+      throw new TypeError("COST_ENVELOPE_GUARD_INPUT_INVALID");
+    }
+    this.#sharedWall = wall ?? null;
   }
 
   /**
@@ -364,18 +477,27 @@ export class CostEnvelopeGuard {
    * `assertCallAllowed` runs before the request is sent and refuses the call
    * whose configured maximum would take this run past its ceiling.
    * `recordCall` runs after a completed call and charges what the vendor
-   * reported. Neither consults the DAILY ceiling: a run already under way
-   * finishes, which is V-28(2) in as many words.
+   * reported.
    *
    * Task M1: the ceiling is the PHASE's. A call made while the debate is argued
    * (BODY) is compared with the per-run ceiling less the answer's reserve; an
    * answer-writing call (SERVE) with the per-run ceiling plus its overrun. Both
    * compare the run's WHOLE debate spend, so the body simply stops sooner and
    * leaves the answer its money. The refusal code is the same for both.
+   *
+   * B9 (budget spec §2.9): on a guard with a shared wall (hosted) a BODY call
+   * is ALSO measured against it — the site's day (only with the band's finish
+   * edge) and the run owner's windows, each at its finish edge — unless it is
+   * the first position's own call. A SERVE call never is: a started debate
+   * always gets its answer.
    */
   providerSeam(input: RunProviderSeamInput): ProviderCostSeam {
     if (!isCostEnvelopePhase(input?.phase)) throw new TypeError("MODEL_SPEND_PHASE_INVALID");
-    return this.#meteredSeam(input, "RUN", input.phase);
+    const application = input.sharedWall ?? "APPLY";
+    if (application !== "APPLY" && application !== "EXEMPT") {
+      throw new TypeError("COST_ENVELOPE_GUARD_INPUT_INVALID");
+    }
+    return this.#meteredSeam(input, "RUN", input.phase, input.phase === "BODY" && application === "APPLY");
   }
 
   /**
@@ -390,7 +512,7 @@ export class CostEnvelopeGuard {
    * story seam at all (STORY_ENVELOPE_MISSING).
    */
   storySeam(input: ProviderSeamInput): ProviderCostSeam {
-    return this.#meteredSeam(input, "STORY", null);
+    return this.#meteredSeam(input, "STORY", null, false);
   }
 
   /**
@@ -403,7 +525,8 @@ export class CostEnvelopeGuard {
   #meteredSeam(
     input: ProviderSeamInput,
     spendSource: MeteredSpendSource,
-    phase: CostEnvelopePhase | null
+    phase: CostEnvelopePhase | null,
+    walled: boolean
   ): ProviderCostSeam {
     if (typeof input?.runId !== "string" || input.runId.trim() === "") {
       throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
@@ -429,12 +552,17 @@ export class CostEnvelopeGuard {
     }
     return {
       assertCallAllowed: async (projection) => {
+        const projectedMicros = projectedCallCeilingMicros(input.price, projection);
         const decision = decideRunCostEnvelope({
           spentMicros: await envelope.readSpentMicros(input.runId),
-          projectedMicros: projectedCallCeilingMicros(input.price, projection),
+          projectedMicros,
           ceilingMicros: envelope.ceilingMicros
         });
         if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
+        // B9: then the shared wall, for a walled BODY call on a guard that has one.
+        if (walled && this.#sharedWall !== null) {
+          await this.#assertSharedWall(this.#sharedWall, input.runId, projectedMicros);
+        }
       },
       // I4: charging never refuses. Nothing is written for a call whose vendor
       // said nothing at all about usage — a zero row would read as "this call
@@ -535,6 +663,48 @@ export class CostEnvelopeGuard {
   }
 
   /**
+   * B9 (budget spec §2.3 "the running wall", paid-plans spec §2.4.1) — THE
+   * SHARED WALL, asked after the run's own ceiling admitted the call.
+   *
+   *  · SITE_DAY: the day's whole spend, every source (`readDaySpentMicros`),
+   *    plus this call's projected maximum, against the daily ceiling's finish
+   *    edge (115%) — only when the wall carries that edge (the band); with
+   *    `finishBasisPoints: null` there is no site-day wall and the day is not
+   *    read.
+   *  · each of the run owner's windows: the owner's RUN + STORY spend inside the
+   *    window plus this call, against that window's own finish edge (110%),
+   *    with or without the band (ruling R-19: the person wall applies iff the
+   *    run has a charge scope).
+   *
+   * Real spend only: holds are not counted (budget spec §2.3). The day is read
+   * at most once per call and each window once; a run with no pinned owner has
+   * no person scope, and its windows are never asked for.
+   */
+  async #assertSharedWall(wall: SharedWallInput, runId: string, projectedMicros: number): Promise<void> {
+    const now = this.#clock();
+    if (wall.finishBasisPoints !== null && decideSharedWall({
+      spentMicros: await this.#store.readDaySpentMicros(costEnvelopeDay(now)),
+      projectedMicros,
+      limitMicros: this.#policy.dailyCeilingMicros,
+      finishBasisPoints: wall.finishBasisPoints
+    }) === "WOULD_CROSS") {
+      throw sharedWallReached("SITE_DAY");
+    }
+    const ownerRef = await wall.owners.readRunChargeOwnerRef(runId);
+    if (ownerRef === null) return;
+    for (const window of await wall.persons.read(ownerRef, now)) {
+      if (decideSharedWall({
+        spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt),
+        projectedMicros,
+        limitMicros: window.limitMicros,
+        finishBasisPoints: window.finishBasisPoints
+      }) === "WOULD_CROSS") {
+        throw sharedWallReached(window.scope);
+      }
+    }
+  }
+
+  /**
    * THE DAILY GUARD, asked when a NEW run is requested and at no other time.
    *
    * It is deliberately not consulted per call: V-28(2) stops the next run, not
@@ -629,6 +799,114 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       [day]
     );
     return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * Budget spec §2.6 — THE HOLD a started run carries: the estimate, written once
+   * in the locked transaction that started it (the ask's START or the waker's).
+   * The caller then queues the run's first job on the SAME transaction
+   * (`WorkItemRepository.enqueueOn`), so the hold and its job commit together:
+   * a committed hold always has its job, and a READY job always has its hold.
+   * Nothing ever releases it.
+   */
+  async openHold(
+    client: Pick<PoolClient, "query">,
+    input: Readonly<{ runId: string; heldMicros: number }>
+  ): Promise<void> {
+    if (typeof input?.runId !== "string" || input.runId.trim() === "") {
+      throw new TypeError("MODEL_SPEND_HOLD_RUN_REQUIRED");
+    }
+    if (!Number.isSafeInteger(input.heldMicros) || input.heldMicros < 1) {
+      throw new TypeError("MODEL_SPEND_HOLD_INVALID");
+    }
+    await client.query(
+      `INSERT INTO ledger.model_spend_hold (hold_id, run_id, held_micros, opened_at)
+       VALUES (gen_random_uuid(), $1, $2, clock_timestamp())`,
+      [input.runId, input.heldMicros]
+    );
+  }
+
+  /**
+   * Budget spec §2.2/§2.6 — THE COUNTED HOLDS ON THE SITE'S DAY: for every run that
+   * still has a READY or CLAIMED job and whose hold was opened no later than that
+   * UTC day, the part of its hold it has not yet spent (RUN + STORY), never less
+   * than zero. Read from the live jobs outward (`work_item_live_run_idx`).
+   */
+  async readSiteCountedHoldsMicros(day: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
+       FROM (
+         SELECT DISTINCT work.run_id FROM core.work_item AS work
+         WHERE work.run_id IS NOT NULL AND work.state IN ('READY','CLAIMED')
+       ) AS live
+       JOIN ledger.model_spend_hold AS hold ON hold.run_id = live.run_id
+       LEFT JOIN LATERAL (
+         SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
+         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
+       ) AS spent ON true
+       WHERE hold.opened_at < (($1::date + 1)::timestamp AT TIME ZONE 'UTC')`,
+      [day]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * Paid-plans spec §2.4.2 (B6) — WHAT ONE PERSON HAS SPENT IN A WINDOW: the RUN
+   * and STORY charges of the runs `billing.run_charge_scope` pins to them whose
+   * `recorded_at` falls in `[from, to)`. One indexed query per window.
+   */
+  async readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(spend.charge_micros),0)::text AS total
+       FROM billing.run_charge_scope AS scope
+       JOIN ledger.model_spend AS spend ON spend.run_id = scope.run_id
+       WHERE scope.owner_ref = $1::uuid
+         AND scope.admitted_at < $3
+         AND spend.spend_source IN ('RUN','STORY')
+         AND spend.recorded_at >= $2 AND spend.recorded_at < $3`,
+      [ownerRef, from, to]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * Paid-plans spec §2.4.2 (B6) — ONE PERSON'S COUNTED HOLDS: the unspent part
+   * of each hold whose run is pinned to them and still has a READY or CLAIMED job.
+   */
+  async readOwnerCountedHoldsMicros(ownerRef: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
+       FROM billing.run_charge_scope AS scope
+       JOIN ledger.model_spend_hold AS hold ON hold.run_id = scope.run_id
+       LEFT JOIN LATERAL (
+         SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
+         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
+       ) AS spent ON true
+       WHERE scope.owner_ref = $1::uuid
+         AND EXISTS (
+           SELECT 1 FROM core.work_item AS work
+           WHERE work.run_id = hold.run_id AND work.state IN ('READY','CLAIMED')
+         )`,
+      [ownerRef]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * B9 — the run's owner as billing pinned it at admission
+   * (`billing.run_charge_scope`, migration 0084, task B5), or null. With
+   * `billing.person_windows_v` (read through `EntitlementRepository.readOnlyPort()`
+   * by `BillingPersonAllowanceSource`) this is everything the runner reads of
+   * billing's schema (amendment A20); 0084 grants the runner's role SELECT on
+   * both (ruling R-12). `run_id` is the table's primary key: one index probe
+   * per call.
+   */
+  async readRunChargeOwnerRef(runId: string): Promise<string | null> {
+    const result = await this.pool.query<{ owner_ref: string }>(
+      "SELECT owner_ref::text AS owner_ref FROM billing.run_charge_scope WHERE run_id = $1::uuid",
+      [runId]
+    );
+    return result.rows[0]?.owner_ref ?? null;
   }
 
   /**

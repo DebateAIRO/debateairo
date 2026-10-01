@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Jūsu plāna lietojums",
+  "billing.usage.line": "Šodien {dayPct}% · Šonedēļ {weekPct}% · Šomēnes {monthPct}%",
+  "billing.usage.lineFree": "Šomēnes {monthPct}%",
+  "billing.usage.day": "Šodien",
+  "billing.usage.week": "Šonedēļ",
+  "billing.usage.month": "Šomēnes",
+  "billing.usage.resets": "Atiestatās: {time}"
+}

@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Kaikki tässä väittelyssä — argumentit, arviot, pisteet ja ratkaisu — on tekoälymallien tuottamaa, koneellisesti luettavasti merkittyä ja mahdollisesti virheellistä.",
+  "debateChrome.status.waiting": "Odottaa alkamista. Väittelysi alkaa itsestään {time}.",
+  "debateChrome.status.waitingOwnDebates": "Muut väittelysi käyttävät toistaiseksi loput rajastasi. Tämä väittely alkaa itsestään heti, kun yksi niistä päättyy.",
   "debateChrome.backToLibrary": "← Takaisin kirjastoon",
   "debateChrome.loading": "Ladataan…",
   "debateChrome.error.claimGenerationFailed": "Väitteen luonti epäonnistui",
@@ -277,5 +279,6 @@
   "requestFailure.kind.UNREADABLE": "Koordinaattorin vastausta ei voitu lukea, joten lopputulos ei ole tiedossa.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinaattori hylkäsi tilaustason valinnan. Valitse Maksuton tai Premium ja yritä sitten uudelleen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinaattori hylkäsi pyynnön: tämän tilaustason tarvitsema malli ei ole juuri nyt saatavilla. Yritä myöhemmin uudelleen tai valitse toinen tilaustaso.",
+  "requestFailure.kind.ALREADY_WAITING": "Vain yksi kysymys voi odottaa kerrallaan. Esitä tämä, kun odottava väittelysi on alkanut.",
   "requestFailure.kind.UNCLASSIFIED": "Pyyntö epäonnistui ennen vastauksen saapumista, joten lopputulos ei ole tiedossa. Tämä ei ole koordinaattorin tekemä päätös."
 }

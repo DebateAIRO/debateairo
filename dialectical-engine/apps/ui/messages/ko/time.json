@@ -10,6 +10,7 @@
   "time.status.claimed": "할당됨",
   "time.status.running": "실행 중",
   "time.status.holding": "제공자 복구 대기",
+  "time.status.waiting": "시작 대기",
   "time.status.settled": "확정됨",
   "time.status.generating": "생성 중",
   "time.status.failed": "실패",

@@ -493,6 +493,7 @@ console.log(JSON.stringify({
 export function createPool() {}
 export function configureContentEncryption() {}
 export class RunRepository {}
+export class EntitlementRepository {}
 const uncaught = process.listenerCount("uncaughtExceptionMonitor");
 const exitSink = process.listenerCount("exit");
 if (uncaught < 1 || exitSink < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");
@@ -517,7 +518,9 @@ export async function resolve(specifier, context, nextResolve) {
       // sealed money ceilings — and this case went RED at link time again
       // until the stub caught up. The verdict story (Task 7) added
       // \`readStoryPolicyFromRegister\`, the optional story rows' boot read.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {}",
+      // Paid plans B9b added \`EntitlementRepository\` (@debateai/db, above),
+      // \`costEnvelopeBand\` and \`readBillingPlans\`; B9d added \`costEnvelopeCeilings\`.
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {

@@ -2,7 +2,8 @@ import type {
   DiscoveredPanelMember,
   ProviderProbeRecord
 } from "@debateai/db";
-import { probeTarget, type ProviderDiscoveryTarget } from "@debateai/providers";
+import { probeTarget, providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
+import type { ProviderTargetPrice } from "@debateai/budget";
 export {
   assertDeploymentProviderTargets,
   assertHostedProviderTargets,
@@ -99,4 +100,24 @@ export function createProviderDiscoveryResolver(input: Readonly<{
     inFlight = shared;
     return shared;
   };
+}
+
+/**
+ * Budget spec 2026-09-28 §2.5 (B2) — THE API'S PRICE MAP, for the estimate:
+ * providerRef → the target's price, built exactly as the runner builds its own
+ * (`buildProviderPriceMap`, apps/runner/src/index.ts:2024) from the same
+ * PROVIDER_DISCOVERY_TARGETS_JSON. Hosted only: local mode never estimates, and
+ * a target with no declared price is left out (hosted refuses one at boot).
+ */
+export function buildApiProviderPriceMap(
+  targets: readonly ProviderDiscoveryTarget[],
+  mode: "hosted" | "local"
+): ReadonlyMap<string, ProviderTargetPrice> {
+  const prices = new Map<string, ProviderTargetPrice>();
+  if (mode !== "hosted") return prices;
+  for (const target of targets) {
+    const price = providerTargetPrice(target);
+    if (price !== null) prices.set(target.providerRef, Object.freeze({ ...price }));
+  }
+  return prices;
 }

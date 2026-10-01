@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Teie paketi kasutus",
+  "billing.usage.line": "Täna {dayPct}% · Sel nädalal {weekPct}% · Sel kuul {monthPct}%",
+  "billing.usage.lineFree": "Sel kuul {monthPct}%",
+  "billing.usage.day": "Täna",
+  "billing.usage.week": "Sel nädalal",
+  "billing.usage.month": "Sel kuul",
+  "billing.usage.resets": "Lähtestub: {time}"
+}

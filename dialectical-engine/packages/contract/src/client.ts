@@ -26,6 +26,9 @@ import {
   AnswerStorySchema,
   AnswerDisclosureSchema,
   AskAcceptedSchema,
+  AskAlreadyWaitingSchema,
+  AskRoomResponseSchema,
+  BillingUsageResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
   InspectionSchema,
@@ -52,6 +55,8 @@ import {
   type AnswerDisclosure,
   type AskAccepted,
   type AskRequest,
+  type AskRoomResponse,
+  type BillingUsageResponse,
   type Deployment,
   type EmailChangePending,
   type ExecutionLedgerDigest,
@@ -59,6 +64,7 @@ import {
   type InvestigationAccepted,
   type InvestigationRequest,
   type Node,
+  type PlanTier,
   type PublicDebate,
   type RunEvent,
   type RunProjection,
@@ -77,13 +83,24 @@ export type ContractErrorCode =
   | "NETWORK_FAILURE"
   | "INVALID_RESPONSE";
 
+/** What a 422 ASK_ALREADY_WAITING says about the person's waiting run. */
+export type ContractWaitingRefusal = Readonly<{ runRef: string; waitsUntil: string; waitsFor?: "OWN_DEBATES" }>;
+
 export class ContractHttpError extends Error {
   constructor(
     readonly code: ContractErrorCode,
     readonly status: number,
     message: string,
     readonly serverCode: string | null = null,
-    readonly statement: PublicationRefusalStatement | null = null
+    readonly statement: PublicationRefusalStatement | null = null,
+    /**
+     * Budget spec §2.7: set only for 422 ASK_ALREADY_WAITING whose body parses
+     * as `AskAlreadyWaitingSchema`: the waiting run and its expected start (no
+     * figure), and `waitsFor` when that start waits on the person's own running
+     * debates rather than a reset (final review Part 1b, Important 1). The ask
+     * page shows sentence D with that time when its room re-read fails.
+     */
+    readonly waiting: ContractWaitingRefusal | null = null
   ) {
     super(message);
     this.name = "ContractHttpError";
@@ -104,6 +121,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   let serverCode: string | null = null;
   let serverMessage: string | null = null;
   let statement: PublicationRefusalStatement | null = null;
+  let waiting: ContractWaitingRefusal | null = null;
   try {
     const candidate: unknown = await response.json();
     if (response.status === 409) {
@@ -114,6 +132,14 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
       const body = candidate as Record<string, unknown>;
       serverCode = typeof body.error === "string" && body.error.trim().length > 0 ? body.error : null;
       serverMessage = typeof body.message === "string" && body.message.trim().length > 0 ? body.message : null;
+      const refusal = response.status === 422 ? AskAlreadyWaitingSchema.safeParse(body) : null;
+      if (refusal?.success === true) {
+        waiting = Object.freeze({
+          runRef: refusal.data.run_ref,
+          waitsUntil: refusal.data.waits_until,
+          ...(refusal.data.waits_for === undefined ? {} : { waitsFor: refusal.data.waits_for })
+        });
+      }
     }
   } catch {
     // A non-JSON failure still retains its transport status below.
@@ -121,7 +147,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   const detail = serverCode !== null && serverMessage !== null
     ? `${serverCode}: ${serverMessage}`
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
-  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode, statement);
+  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode, statement, waiting);
 }
 
 async function requestJson<T>(
@@ -345,6 +371,14 @@ export interface ContractClient {
   confirmEmailChange(token: string): Promise<{ status: "CONFIRMED" }>;
   cancelEmailChangeByLink(token: string): Promise<{ status: "CANCELLED" }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
+  /** Budget spec §2.7: the room this ask would find — a word, never a figure. */
+  getAskRoom(input: Readonly<{
+    plan_tier: PlanTier;
+    composition_budget_tier: "low" | "medium" | "high";
+    depth: number;
+  }>): Promise<AskRoomResponse>;
+  /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
+  getBillingUsage(): Promise<BillingUsageResponse>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -619,6 +653,16 @@ export function createContractClient(
     ),
     getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    getAskRoom: (input: Readonly<{
+      plan_tier: PlanTier;
+      composition_budget_tier: "low" | "medium" | "high";
+      depth: number;
+    }>) => request(`/v1/asks/room?${new URLSearchParams({
+      plan_tier: input.plan_tier,
+      composition_budget_tier: input.composition_budget_tier,
+      depth: String(input.depth)
+    }).toString()}`, AskRoomResponseSchema),
+    getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),

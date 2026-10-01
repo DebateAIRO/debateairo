@@ -416,12 +416,17 @@ export function exhaustive(value: never): never {
  * panel, to the phase that records the stop — or, on the first root's panel,
  * back to the runner with the voices already heard (the author alone only when
  * no member had answered yet).
+ *
+ * B9 (budget spec §2.9): `PERSON_ALLOWANCE_REACHED`, the shared wall of one of
+ * the run owner's allowance windows, is here too, for the same reason the day
+ * is: it is the RUN's stop, never a member's.
  */
 export const RUN_LEVEL_SPEND_STOP_CODES = Object.freeze([
   "RUN_COST_ENVELOPE_MONEY_REACHED",
   "RUN_COST_ENVELOPE_EXHAUSTED",
   "DAILY_COST_ENVELOPE_REACHED",
-  "PROVIDER_USAGE_UNREPORTED"
+  "PROVIDER_USAGE_UNREPORTED",
+  "PERSON_ALLOWANCE_REACHED"
 ] as const);
 
 export type RunLevelSpendStopCode = typeof RUN_LEVEL_SPEND_STOP_CODES[number];
