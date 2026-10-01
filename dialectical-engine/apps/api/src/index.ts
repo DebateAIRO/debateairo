@@ -2678,9 +2678,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // screen shows first. Pinned by tests/unit/crisis-check-api.test.ts.
     const questionLine = typeof request.body === "object" && request.body !== null
       && "question_line" in request.body && typeof request.body.question_line === "string"
-      ? request.body.question_line : "";
+      ? request.body.question_line.trim() : "";
     // Only a question the API would accept is checked: a longer one is refused as malformed
-    // below anyway, and checking 256 KB of text would hold the event loop for seconds.
+    // below anyway, and checking 256 KB of text would hold the event loop for seconds. Trimmed
+    // first, exactly as AskRequestSchema keeps it, so the limit measured here is the limit
+    // below: padding a crisis question past 8 KB with spaces must not skip the check.
     if (Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES && detectCrisis(questionLine).crisis) {
       return reply.status(422).send({
         error: CRISIS_SUPPORT_OFFERED, message: CRISIS_SUPPORT_OFFERED,
