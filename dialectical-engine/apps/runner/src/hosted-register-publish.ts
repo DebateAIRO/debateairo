@@ -804,16 +804,21 @@ export async function verifyHostedRegisterBootReadiness(
   await readRecoveryPolicy(pool, version);
   const admission = await readAdmissionPolicy(pool, version);
   // Paid plans G3a: main.ts's country-policy and country-gate-admission stages, in their order.
-  if (await readCountryPolicy(pool, version) !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
+  const countryPolicy = await readCountryPolicy(pool, version);
+  if (countryPolicy !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
   assertHostedSupportAdmissionSealed("hosted", admission);
   const envelope = await readCostEnvelopePolicy(pool, version);
   // Paid plans (R1 A22, R-5): the readiness question the API asks at boot (B6b's
   // ask-room step, P6a). The runner never asks it: it reads no billingPolicy (A20).
+  const billingPolicy = await readBillingPolicy(pool, version);
   assertBillingReady({
-    policy: await readBillingPolicy(pool, version),
+    policy: billingPolicy,
     plans: await readBillingPlans(pool, version),
     envelope
   });
+  // Paid plans P7/P8b: main.ts's billing-runtime stage, in its order (country policy first, then the admission scope).
+  if (billingPolicy?.enabled === true && countryPolicy === null) refuse("BILLING_CONFIGURATION_INCOMPLETE");
+  if (billingPolicy?.enabled === true && admission.billingQuote === null) refuse("BILLING_ADMISSION_UNSEALED");
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);
   if (!makers.deploymentMakerCapability) refuse("HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT");

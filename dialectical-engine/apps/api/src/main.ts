@@ -1015,6 +1015,7 @@ const billingRuntime = billingConnectors === null
     }
     // Paid plans P8b: the quote route charges the owner's billingQuote budget (contract §2), so billing on with an
     // admission row that does not seal it is refused at boot by name.
+    // The hosted publish asks the same question in verifyHostedRegisterBootReadiness, so a billing admission scope required here is required there too.
     if (admissionPolicy.billingQuote === null) {
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingQuote admission scope");
