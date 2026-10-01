@@ -201,7 +201,7 @@ describe("production Support recovery attestation", () => {
       schemaVersion: 2,
       catalog: {
         sha256:
-          "bbd47807cbbd1e7535de0c7828db2c29239f919357a4440d555d2fc2e14c0ddc",
+          "83e5d6c08d5d23f7b2ec2cf82bd82f0a37e3b808086fd407a3260ac08894bec6",
         ...S02_OWNER_REVIEW,
       },
       recovery: {

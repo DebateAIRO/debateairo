@@ -208,7 +208,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "home-library",
     route: "/",
-    labels: labels("Home and debate library", "Pagina principală și biblioteca de dezbateri"),
+    labels: labels("Home and debate library", "Acasă și biblioteca de dezbateri"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -357,7 +357,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "sign-in",
     route: "/login",
-    labels: labels("Log in and saved MFA recovery", "Autentificare și recuperare MFA salvată"),
+    labels: labels("Log in and saved MFA recovery", "Autentificați-vă și recuperare MFA salvată"),
     audience: "anonymous",
     availability: "signed-out",
     disposition: "action",
@@ -379,7 +379,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "settings",
     route: "/settings",
-    labels: labels("Account settings", "Setările contului"),
+    labels: labels("Settings", "Setări"),
     audience: "member",
     availability: "signed-in",
     disposition: "action",

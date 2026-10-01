@@ -1,7 +1,7 @@
 # OWNER sign-off — S02 support catalogue labels, 8 help articles, 16 recovery texts (cookie-compliance)
 
 Status: DRAFT for V0 — not signed. The API refuses to start until the orchestrator records V's answer.
-What changes: since the 2026-09-29 signature (ffd72986…) the catalogue changes only the 30 en/ro labels of 20 rows listed under "catalogue labels" (old -> new; V-17: each label is the one the screen shows); 8 article files are rewritten; 15 of the 16 recovery texts are rewritten (14 carried the false wording, SPEC-v2 §2 M12; the Romanian settings-help-menus fallback named controls by their English labels, V-17); the English settings-help-menus fallback text keeps its words and is re-signed because its article's hash changed (K7).
+What changes: since the 2026-09-29 signature (ffd72986…) the catalogue changes only the 34 en/ro labels of 22 rows listed under "catalogue labels" (old -> new; V-17: each label is the one the screen shows); 8 article files are rewritten; 15 of the 16 recovery texts are rewritten (14 carried the false wording, SPEC-v2 §2 M12; the Romanian settings-help-menus fallback named controls by their English labels, V-17); the English settings-help-menus fallback text keeps its words and is re-signed because its article's hash changed (K7).
 
 ### catalogue labels
 ~~~text
@@ -23,6 +23,7 @@ action delete-account ro: Șterge contul -> Ștergeți contul
 action your-debates ro: Dezbaterile tale -> Dezbaterile dvs.
 action owner-debate ro: Deschide dezbaterea ta -> Deschideți dezbaterea dumneavoastră
 action public-debate ro: Deschide dezbaterea publică -> Deschideți dezbaterea publică
+capability home-library ro: Pagina principală și biblioteca de dezbateri -> Acasă și biblioteca de dezbateri
 capability ai-transparency ro: Transparență AI -> Transparență privind IA
 capability legal-terms ro: Termeni și condiții -> Termenii serviciului
 capability legal-terms-versions en: Earlier versions of the terms -> Terms versions
@@ -33,8 +34,11 @@ capability legal-cookies ro: Politica privind cookie-urile -> Politica privind m
 capability legal-providers en: AI model providers -> Model providers
 capability legal-providers ro: Furnizorii de modele AI -> Furnizori de modele
 capability sign-in en: Sign in and saved MFA recovery -> Log in and saved MFA recovery
+capability sign-in ro: Autentificare și recuperare MFA salvată -> Autentificați-vă și recuperare MFA salvată
 capability sign-up en: Create an account -> Create account
 capability sign-up ro: Creează un cont -> Creați un cont
+capability settings en: Account settings -> Settings
+capability settings ro: Setările contului -> Setări
 ~~~
 
 ### article privacy-consent.en
@@ -326,7 +330,7 @@ După autentificare, alege „Setări” pentru revizuirea sau revocarea sesiuni
 ## Fingerprints (sha256)
 
 ~~~text
-catalog-canonical bbd47807cbbd1e7535de0c7828db2c29239f919357a4440d555d2fc2e14c0ddc
+catalog-canonical 83e5d6c08d5d23f7b2ec2cf82bd82f0a37e3b808086fd407a3260ac08894bec6
 article privacy-consent.en 0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f
 article privacy-consent.ro a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6
 article settings-help-menus.en 53b4612d883133874617b1a8647df9450dc75e2301e8f93a56e7eceaa169a084
