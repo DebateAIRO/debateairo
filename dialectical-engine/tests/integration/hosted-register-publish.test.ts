@@ -342,21 +342,22 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     };
   }
 
-  it("publishes a billing-on version whose code-owned admission row seals the billingQuote scope", async () => {
+  it("publishes a billing-on version whose code-owned admission row seals the billingQuote and billingCheckout scopes", async () => {
     const result = await publishHostedRegister({
       plan: await planOf(billingOnFile()),
       operations: createPostgresHostedRegisterOperations(database.pool)
     });
     expect(result.outcome).toBe("CREATED");
     const version = registerVersionToSafeLegacyNumber(result.registerVersion);
-    expect((await readAdmissionPolicy(database.pool, version)).billingQuote).toEqual({
-      key: "owner", limit: 10, windowMs: 3_600_000, capacity: 65_536
-    });
+    const admission = await readAdmissionPolicy(database.pool, version);
+    expect(admission.billingQuote).toEqual({ key: "owner", limit: 10, windowMs: 3_600_000, capacity: 65_536 });
+    expect(admission.billingCheckout).toEqual({ key: "owner", limit: 10, windowMs: 3_600_000, capacity: 65_536 });
   }, 120_000);
 
   // One row per admission member a billing-on boot requires (P8c, P9a and P13 each add theirs).
   it.each([
-    ["billing_quote"]
+    ["billing_quote"],
+    ["billing_checkout"]
   ])("refuses, after publishing, a billing-on version whose admission row lacks %s", async (member) => {
     const plan = await planOf(billingOnFile());
     const rows = plan.rows.map((row) => {

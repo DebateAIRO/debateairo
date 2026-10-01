@@ -357,6 +357,49 @@ export const BillingQuoteResponseSchema = z.object({
 }).strict();
 export type BillingQuoteResponse = z.infer<typeof BillingQuoteResponseSchema>;
 
+const BillingDocumentPairSchema = z.object({
+  version: z.string().min(1).max(64),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/)
+}).strict();
+
+export const BillingCheckoutRequestSchema = z.object({
+  quote_ref: z.uuid(),
+  /** The interface locale the consents were shown in; it is also the locale of every billing email. */
+  locale: z.string().regex(/^[a-z]{2}$/),
+  consents: z.object({ renewal_terms: BillingDocumentPairSchema, immediate_start: BillingDocumentPairSchema }).strict(),
+  country_confirmed: z.literal(true).optional()
+}).strict();
+export type BillingCheckoutRequest = z.infer<typeof BillingCheckoutRequestSchema>;
+
+export const BillingCheckoutResponseSchema = z.object({
+  public_key: z.string().min(1).max(256),
+  order_payload: z.string().min(1).max(16_384),
+  order_checksum: z.string().min(1).max(512),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/),
+  sdk_environment: z.enum(["stage", "live"])
+}).strict();
+export type BillingCheckoutResponse = z.infer<typeof BillingCheckoutResponseSchema>;
+
+/**
+ * The 409 body the checkout answers while a payment for the person's open checkout is already on its way (a stored
+ * notice, an open check or an xMoney transaction for that charge): the page waits on `charge_ref` instead of
+ * mounting a second card form (D7 #5).
+ */
+export const BillingCheckoutPendingErrorSchema = z.object({
+  error: z.literal("CHECKOUT_PENDING"),
+  message: z.literal("CHECKOUT_PENDING"),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/)
+}).strict();
+/** What `startBillingCheckout` resolves to for that 409, beside the signed order. */
+export type BillingCheckoutPendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
+
+/** NEEDS_ACTION: the bank declined and the person can try again; FAILED: refused or voided, final. */
+export const BillingChargeStatusResponseSchema = z.object({
+  state: z.enum(["PENDING", "SUCCEEDED", "FAILED", "NEEDS_ACTION"]),
+  reason_code: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/).nullable()
+}).strict();
+export type BillingChargeStatusResponse = z.infer<typeof BillingChargeStatusResponseSchema>;
+
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
  * `core.run.argument_language_tag` (a BCP-47 tag, "und" when detection was not
@@ -1144,7 +1187,9 @@ export const contractInventory = Object.freeze({
     "POST /v1/runs/{id}/unpublish",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
-    "POST /v1/billing/quote"
+    "POST /v1/billing/quote",
+    "POST /v1/billing/checkout",
+    "GET /v1/billing/charges/{chargeRef}"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
@@ -1168,6 +1213,7 @@ export const contractInventory = Object.freeze({
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
     AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema,
-    BillingQuoteRequestSchema, BillingQuoteResponseSchema
+    BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
+    BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema
   })
 });

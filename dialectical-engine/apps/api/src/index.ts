@@ -1233,7 +1233,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
-  { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" }
+  { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
+  { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
+  { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
@@ -3119,6 +3121,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     gate: (reply, scope, route, key) => options.admission?.configured(scope) !== true
       || admitOrRefuse(reply, scope, route, key)
   });
+  // P8c (R3-2, the age gate): the checkout refuses an account that still owes its one-time age check. Bound, because
+  // SessionService reads its repository through `this` (apps/api/src/sessions.ts:561-564).
+  const billingSessions = options.sessions;
+  const billingAgeConfirmation = billingSessions?.readAgeConfirmation?.bind(billingSessions);
   installBillingRoutes(api, {
     ...(options.billing ?? {}),
     policy: (route: BillingRoutePath) => routePolicy(route),
@@ -3128,7 +3134,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     source: (request) => {
       const { ip, userAgent } = sourceFor(request);
       return Object.freeze({ ip, userAgent });
-    }
+    },
+    ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation })
   });
   return api;
 }

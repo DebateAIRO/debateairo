@@ -18,6 +18,13 @@ export type BillingRefusalCode =
   | "QUOTE_EXPIRED"
   /** P8c (D7 #5): a payment for the open checkout is already on its way; `chargeRef` names it. */
   | "CHECKOUT_PENDING"
+  /** P8c (R3-2): the account still owes the age gate's one-time check; nothing is charged (403). */
+  | "AGE_CONFIRMATION_REQUIRED"
+  /**
+   * P8c (R3-2): the age check could not be read; the age gate's own code (its `GET /v1/auth/age-confirmation`
+   * answer in apps/api/src/index.ts), 503.
+   */
+  | "AGE_CHECK_UNAVAILABLE"
   | "PAYMENT_PROVIDER_UNAVAILABLE";
 
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;

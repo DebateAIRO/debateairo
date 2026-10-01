@@ -1020,6 +1020,11 @@ const billingRuntime = billingConnectors === null
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingQuote admission scope");
     }
+    // Paid plans P8c: the checkout charges its own owner-keyed billingCheckout budget (spec §2.7).
+    if (admissionPolicy.billingCheckout === null) {
+      throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+        "Billing is on, so the register must seal the billingCheckout admission scope");
+    }
     return createBillingRuntime({
       pool, connectors: billingConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore, mail: undefined,

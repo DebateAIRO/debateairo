@@ -1,11 +1,15 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+  BillingChargeStatusResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
   BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema
 } from "@debateai/contract";
 import { allowanceVsPlus, microsToDecimal } from "@debateai/billing-core";
 import type { BillingPlans, PlanId } from "@debateai/register";
 import { clientIpNetworkScope } from "../client-ip.js";
 import type { LegalAcceptanceApplication } from "../legal.js";
+import type { AuthenticatedSession } from "../sessions.js";
+import type { ChargeStatusPort } from "./charge-status.js";
+import type { CheckoutServicePort } from "./checkout.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { BillingRefusal } from "./refusal.js";
 
@@ -23,7 +27,9 @@ import { BillingRefusal } from "./refusal.js";
 export const BILLING_ROUTE_PATHS = Object.freeze([
   "GET /v1/billing/usage",
   "GET /v1/billing/plans",
-  "POST /v1/billing/quote"
+  "POST /v1/billing/quote",
+  "POST /v1/billing/checkout",
+  "GET /v1/billing/charges/{chargeRef}"
 ] as const);
 export type BillingRoutePath = typeof BILLING_ROUTE_PATHS[number];
 
@@ -46,7 +52,7 @@ export interface BillingUsageReader {
 export type BillingLegalGate = Pick<LegalAcceptanceApplication, "requiresReacceptance">;
 
 /** The sealed admission scopes billing charges (the admission policy's next versions, contract §2). */
-export type BillingAdmissionScope = "publicReads" | "billingQuote";
+export type BillingAdmissionScope = "publicReads" | "billingQuote" | "billingCheckout";
 
 /** Like `SupportAdmission`: a scope the register version does not publish admits. */
 export type BillingAdmission = Readonly<{
@@ -54,6 +60,12 @@ export type BillingAdmission = Readonly<{
 }>;
 
 export type BillingRequestSource = (request: FastifyRequest) => Readonly<{ ip: string; userAgent: string }>;
+
+/**
+ * R3-2 (the age gate, PR #41): whether a session's account still owes its one-time age check. It is
+ * `SessionApplication.readAgeConfirmation` (apps/api/src/sessions.ts:77), bound to its session application.
+ */
+export type BillingAgeConfirmation = (session: AuthenticatedSession) => Promise<"required" | "confirmed">;
 
 export type BillingRouteDeps = Readonly<{
   /** `routePolicy` of apps/api/src/index.ts, so the authorization inventory stays the one source. */
@@ -69,6 +81,14 @@ export type BillingRouteDeps = Readonly<{
   legal?: BillingLegalGate;
   /** P8b. */
   quotes?: QuoteServicePort;
+  /** P8c. */
+  checkout?: CheckoutServicePort;
+  charges?: ChargeStatusPort;
+  /**
+   * P8c (R3-2): the age gate's reader. Only `buildApi` supplies it, from `options.sessions`; absent, the checkout
+   * refuses 503 AGE_CHECK_UNAVAILABLE (this guard fails closed).
+   */
+  ageConfirmation?: BillingAgeConfirmation;
 }>;
 
 /**
@@ -76,8 +96,9 @@ export type BillingRouteDeps = Readonly<{
  * those only `buildApi` can build (the route policy). A later task that adds a
  * member only `buildApi` knows adds its name to this Omit as well.
  * (B7a's type; P8a adds `admission` and `source`, which `buildApi` supplies.)
+ * (P8c adds ageConfirmation, the age gate's reader, which buildApi binds.)
  */
-export type BillingRouteOptions = Omit<BillingRouteDeps, "policy" | "admission" | "source">;
+export type BillingRouteOptions = Omit<BillingRouteDeps, "policy" | "admission" | "source" | "ageConfirmation">;
 
 /** The house 404 every billing route answers while its dependency is absent. */
 export function billingNotFound(reply: FastifyReply): FastifyReply {
@@ -99,6 +120,24 @@ export async function answerRefusal(reply: FastifyReply, work: () => Promise<Fas
     }
     throw error;
   }
+}
+
+/**
+ * R3-2 (the age gate, 0077): the checkout takes no money from an account that still owes its one-time age check.
+ * Answered under 18, that check freezes the account (`age_frozen`, every session revoked) while a plan bought
+ * before it would go on renewing. The UI sends such a session to the interstitial first and may fail open (Q-10);
+ * this guard fails closed: no reader, or a read that fails, is the age gate's own 503 AGE_CHECK_UNAVAILABLE
+ * (`GET /v1/auth/age-confirmation`, apps/api/src/index.ts). Anything but "confirmed" is owed.
+ */
+async function refuseUnconfirmedAge(read: BillingAgeConfirmation | undefined, session: AuthenticatedSession): Promise<void> {
+  if (read === undefined) throw new BillingRefusal(503, "AGE_CHECK_UNAVAILABLE");
+  let status: "required" | "confirmed";
+  try {
+    status = await read(session);
+  } catch {
+    throw new BillingRefusal(503, "AGE_CHECK_UNAVAILABLE");
+  }
+  if (status !== "confirmed") throw new BillingRefusal(403, "AGE_CONFIRMATION_REQUIRED");
 }
 
 /** Spec §2.5.3: the public plans list may be cached by the browser and by any shared cache for 60 seconds. */
@@ -194,4 +233,44 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       return reply.send(quoteResponse(result));
     });
   });
+
+  api.post("/v1/billing/checkout", { ...deps.policy("POST /v1/billing/checkout"), bodyLimit: BILLING_BODY_LIMIT_BYTES }, async (request, reply) => {
+    const { checkout, legal } = deps;
+    if (checkout === undefined || legal === undefined) return billingNotFound(reply);
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (!admit.gate(reply, "billingCheckout", "POST /v1/billing/checkout", authenticated.ownerRef)) return reply;
+    const parsed = BillingCheckoutRequestSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    const body = parsed.data;
+    return answerRefusal(reply, async () => {
+      // R3-2: the age check first (403 AGE_CONFIRMATION_REQUIRED, or 503 AGE_CHECK_UNAVAILABLE), then L4's legal gate.
+      await refuseUnconfirmedAge(deps.ageConfirmation, authenticated);
+      if (await legal.requiresReacceptance(authenticated.ownerRef)) {
+        throw new BillingRefusal(403, "LEGAL_REACCEPTANCE_REQUIRED");
+      }
+      const from = source(request);
+      const result = await checkout.start({
+        ownerRef: authenticated.ownerRef, userId: authenticated.userId, ip: from.ip, userAgent: from.userAgent,
+        quoteRef: body.quote_ref, locale: body.locale,
+        consents: { renewal: body.consents.renewal_terms, immediateStart: body.consents.immediate_start },
+        countryConfirmed: body.country_confirmed === true, now: clock()
+      });
+      return reply.send(BillingCheckoutResponseSchema.parse({
+        public_key: result.publicKey, order_payload: result.orderPayload, order_checksum: result.orderChecksum,
+        charge_ref: result.chargeId, sdk_environment: result.sdkEnvironment
+      }));
+    });
+  });
+  api.get<{ Params: { chargeRef: string } }>(
+    "/v1/billing/charges/:chargeRef", deps.policy("GET /v1/billing/charges/{chargeRef}"), async (request, reply) => {
+      const { charges } = deps;
+      if (charges === undefined) return billingNotFound(reply);
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      const status = await charges.read(request.params.chargeRef, authenticated.ownerRef);
+      if (status === null) return billingNotFound(reply);
+      return reply.send(BillingChargeStatusResponseSchema.parse({ state: status.state, reason_code: status.reasonCode }));
+    }
+  );
 }

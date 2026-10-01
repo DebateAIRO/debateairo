@@ -87,7 +87,9 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
-  { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" }
+  { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
+  { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
+  { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" }
 ] as const);
 
 const validAskPayload = () => ({
@@ -234,6 +236,7 @@ describe("S7 deny-by-default authorization", () => {
       const requestUrl = template
         .replace("{nodeId}", NODE_ID)
         .replace("{gapRef}", "gap:test")
+        .replace("{chargeRef}", "0".repeat(32))
         .replace("{id}", policy.route.includes("/runs/") ? OWNED_RUN_ID : ANSWER_ID);
       const response = await api.inject({ method: httpMethod, url: requestUrl });
       expect(response.statusCode, policy.route).toBe(401);
@@ -482,7 +485,8 @@ describe("S7 deny-by-default authorization", () => {
     for (const policy of authorizationPolicyInventory.filter(({ route }) => route.startsWith("GET "))) {
       const url = policy.route.slice(4)
         .replace("{id}", OWNED_RUN_ID)
-        .replace("{nodeId}", "22222222-2222-4222-8222-222222222222");
+        .replace("{nodeId}", "22222222-2222-4222-8222-222222222222")
+        .replace("{chargeRef}", "0".repeat(32));
       expect((await api.inject({
         method: "HEAD", url,
         headers: USER_HEADERS

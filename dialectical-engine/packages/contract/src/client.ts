@@ -31,6 +31,10 @@ import {
   BillingPlansResponseSchema,
   BillingQuoteRequestSchema,
   BillingQuoteResponseSchema,
+  BillingCheckoutPendingErrorSchema,
+  BillingCheckoutRequestSchema,
+  BillingCheckoutResponseSchema,
+  BillingChargeStatusResponseSchema,
   BillingUsageResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
@@ -62,6 +66,10 @@ import {
   type BillingPlansResponse,
   type BillingQuoteRequest,
   type BillingQuoteResponse,
+  type BillingCheckoutPendingResponse,
+  type BillingCheckoutRequest,
+  type BillingCheckoutResponse,
+  type BillingChargeStatusResponse,
   type BillingUsageResponse,
   type Deployment,
   type EmailChangePending,
@@ -163,7 +171,9 @@ async function requestJson<T>(
   schema: { parse(value: unknown): T },
   init: RequestInit = {},
   auth: ContractClientAuth,
-  expectedStatus?: number
+  expectedStatus?: number,
+  /** A documented refusal the caller reads as data (P8c: 409 CHECKOUT_PENDING); `null` keeps the error. */
+  recover?: (status: number, body: unknown) => T | null
 ): Promise<T> {
   let response: Response;
   try {
@@ -185,7 +195,15 @@ async function requestJson<T>(
   } catch (error) {
     throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
   }
-  if (!response.ok) throw await contractErrorForResponse(response);
+  if (!response.ok) {
+    if (recover !== undefined) {
+      // A clone, so the error path below still reads the body when the hook declines.
+      const body: unknown = await response.clone().json().catch(() => null);
+      const recovered = recover(response.status, body);
+      if (recovered !== null) return recovered;
+    }
+    throw await contractErrorForResponse(response);
+  }
   if (expectedStatus !== undefined && response.status !== expectedStatus) {
     throw new ContractHttpError(
       "INVALID_RESPONSE",
@@ -388,6 +406,9 @@ export interface ContractClient {
   /** Paid-plans spec §2.5.3: the public plans list; 404 when billing is off. */
   getBillingPlans(): Promise<BillingPlansResponse>;
   createBillingQuote(input: BillingQuoteRequest): Promise<BillingQuoteResponse>;
+  /** A payment already on its way for the open checkout resolves as `{state: "PENDING", charge_ref}` (409 CHECKOUT_PENDING). */
+  startBillingCheckout(input: BillingCheckoutRequest): Promise<BillingCheckoutResponse | BillingCheckoutPendingResponse>;
+  getBillingCharge(chargeRef: string): Promise<BillingChargeStatusResponse>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -676,6 +697,18 @@ export function createContractClient(
     createBillingQuote: (input: BillingQuoteRequest) => request(
       "/v1/billing/quote", BillingQuoteResponseSchema,
       { method: "POST", body: JSON.stringify(BillingQuoteRequestSchema.parse(input)) }
+    ),
+    startBillingCheckout: (input: BillingCheckoutRequest) => requestJson<BillingCheckoutResponse | BillingCheckoutPendingResponse>(
+      root.href, fetchImplementation, "/v1/billing/checkout", BillingCheckoutResponseSchema,
+      { method: "POST", body: JSON.stringify(BillingCheckoutRequestSchema.parse(input)) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const pending = BillingCheckoutPendingErrorSchema.safeParse(body);
+        return pending.success ? Object.freeze({ state: "PENDING" as const, charge_ref: pending.data.charge_ref }) : null;
+      }
+    ),
+    getBillingCharge: (chargeRef: string) => request(
+      `/v1/billing/charges/${encodeURIComponent(chargeRef)}`, BillingChargeStatusResponseSchema
     ),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),

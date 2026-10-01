@@ -158,7 +158,8 @@ describe("DL1-F2 the support budgets supersede, never edit, the sealed row", () 
         key: "source", limit: 40, window_ms: 24 * 60 * 60_000, capacity: 65_536
       },
       geo_availability: { key: "source", limit: 60, window_ms: 60_000, capacity: 65_536 },
-      billing_quote: { key: "owner", limit: 10, window_ms: 3_600_000, capacity: 65_536 }
+      billing_quote: { key: "owner", limit: 10, window_ms: 3_600_000, capacity: 65_536 },
+      billing_checkout: { key: "owner", limit: 10, window_ms: 3_600_000, capacity: 65_536 }
     });
     expect(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef)
       .toContain(ADMISSION_POLICY_REGISTER_ROW.sourceRef);

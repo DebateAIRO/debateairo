@@ -816,9 +816,10 @@ export async function verifyHostedRegisterBootReadiness(
     plans: await readBillingPlans(pool, version),
     envelope
   });
-  // Paid plans P7/P8b: main.ts's billing-runtime stage, in its order (country policy first, then the admission scope).
+  // Paid plans P7/P8b/P8c: main.ts's billing-runtime stage, in its order (country policy first, then the admission scopes).
   if (billingPolicy?.enabled === true && countryPolicy === null) refuse("BILLING_CONFIGURATION_INCOMPLETE");
   if (billingPolicy?.enabled === true && admission.billingQuote === null) refuse("BILLING_ADMISSION_UNSEALED");
+  if (billingPolicy?.enabled === true && admission.billingCheckout === null) refuse("BILLING_ADMISSION_UNSEALED");
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);
   if (!makers.deploymentMakerCapability) refuse("HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT");
