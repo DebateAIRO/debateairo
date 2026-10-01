@@ -542,7 +542,9 @@ async function keepExtrasBefore(c) {
   }));
   await c.a.locator(".supportEscalation button").click();
   await c.a.locator('a[href*="#case="]').first().waitFor({ state: "visible", timeout: 10000 });
-  const draft = `unsent draft ${c.tag}`;
+  // A1: words, never c.tag. The tag's 6 random hex chars are all digits ~6% of the time ((10/16)^6), and the panel shows a
+  // 6-digit run as "[REDACTED_SECRET_LIKE]" (packages/kernel/src/index.ts:446 \b\d{6}\b), which made the exact-text waits flaky.
+  const draft = `unsent draft ${nonce()}`;
   await c.a.locator("#support-message").fill(draft);
   const st = await fakeState();
   const sessionId = st.messageRequests.filter((r) => r.status === 200).at(-1)?.sessionId ?? null;
@@ -555,7 +557,7 @@ async function keepExtrasAfter(c, before) {
   if (caseLink === 0) reasons.push("keep: the case link opened before the sleep is gone");
   const draft = await c.a.locator("#support-message").inputValue();
   if (draft !== before.draft) reasons.push(`keep: the draft is "${draft}", expected "${before.draft}"`);
-  const next = `after the keep ${c.tag}`;
+  const next = `after the keep ${nonce()}`; // A1: words, as in every other sent text (see markerFor)
   await sendA(c, next);
   const st = await fakeState();
   const used = st.messageRequests.filter((r) => (r.text ?? "") === next).at(-1)?.sessionId ?? null;
