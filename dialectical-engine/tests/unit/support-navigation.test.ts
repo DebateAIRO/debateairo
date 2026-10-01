@@ -128,6 +128,20 @@ describe("Support navigation", () => {
         href: "/public/debate/8f781594-f277-48eb-b8fe-36ce21480fc4",
       },
     ]);
+
+    // One source per chip (REV S02 RECHECK p1 B1): the owner and public debate chips have no screen
+    // control of their own, so the chip is the control; en/ro catalogue labels equal the message the
+    // other 33 locales render for the same chip (support.action.*).
+    for (const language of ["en", "ro"] as const) {
+      const proof = {
+        signedIn: true, language,
+        ownerDebateId: "8a4e47f1-65a3-41a3-9759-c586d3eea3f5",
+        publicDebateRef: "8f781594-f277-48eb-b8fe-36ce21480fc4",
+      };
+      for (const action of resolveSupportActions(["owner-debate", "public-debate"], proof)) {
+        expect(action.label).toBe(SUPPORT_UI_LABELS[language][action.id as keyof typeof LABEL_SOURCES]);
+      }
+    }
   });
 
   it("resolves the three static Settings sections only for signed-in visitors", () => {

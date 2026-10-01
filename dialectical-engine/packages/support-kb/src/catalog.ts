@@ -135,8 +135,8 @@ export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object
   action({ id: "delete-account", labels: labels("Delete account", "Ștergeți contul"), availability: "signed-in", href: "/settings#account-deletion-heading" }),
   action({ id: "public-catalog", labels: labels("Public debates", "Dezbateri publice"), availability: "signed-in", href: "/?tab=public" }),
   action({ id: "your-debates", labels: labels("Your debates", "Dezbaterile dvs."), availability: "signed-in", href: "/?tab=yours" }),
-  action({ id: "owner-debate", labels: labels("Open your debate", "Deschide dezbaterea ta"), availability: "owner", href: null }),
-  action({ id: "public-debate", labels: labels("Open public debate", "Deschide dezbaterea publică"), availability: "public-reference", href: null }),
+  action({ id: "owner-debate", labels: labels("Open your debate", "Deschideți dezbaterea dumneavoastră"), availability: "owner", href: null }),
+  action({ id: "public-debate", labels: labels("Open public debate", "Deschideți dezbaterea publică"), availability: "public-reference", href: null }),
   action({ id: "forgot-password", labels: labels("Forgot password", "Am uitat parola"), availability: "unresolved", href: null }),
 ]);
 
@@ -263,7 +263,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "ai-transparency",
     route: "/ai-transparency",
-    labels: labels("AI transparency", "Transparență AI"),
+    labels: labels("AI transparency", "Transparență privind IA"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -291,7 +291,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-terms",
     route: "/terms",
-    labels: labels("Terms of service", "Termeni și condiții"),
+    labels: labels("Terms of service", "Termenii serviciului"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -302,7 +302,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-terms-versions",
     route: "/terms/versions",
-    labels: labels("Earlier versions of the terms", "Versiunile anterioare ale termenilor"),
+    labels: labels("Terms versions", "Versiunile termenilor"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -324,7 +324,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-health-data",
     route: "/privacy/us-health-data",
-    labels: labels("US consumer health data privacy policy", "Politica privind datele de sănătate ale consumatorilor din SUA"),
+    labels: labels("US health data privacy", "Datele de sănătate (SUA)"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -335,7 +335,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-cookies",
     route: "/cookies",
-    labels: labels("Cookie policy", "Politica privind cookie-urile"),
+    labels: labels("Cookie policy", "Politica privind modulele cookie"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -346,7 +346,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-providers",
     route: "/providers",
-    labels: labels("AI model providers", "Furnizorii de modele AI"),
+    labels: labels("Model providers", "Furnizori de modele"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -357,7 +357,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "sign-in",
     route: "/login",
-    labels: labels("Sign in and saved MFA recovery", "Autentificare și recuperare MFA salvată"),
+    labels: labels("Log in and saved MFA recovery", "Autentificare și recuperare MFA salvată"),
     audience: "anonymous",
     availability: "signed-out",
     disposition: "action",
@@ -368,7 +368,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "sign-up",
     route: "/sign-up",
-    labels: labels("Create an account", "Creează un cont"),
+    labels: labels("Create account", "Creați un cont"),
     audience: "anonymous",
     availability: "signed-out",
     disposition: "action",

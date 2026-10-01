@@ -1,12 +1,40 @@
-# OWNER sign-off — S02 support catalogue line, 8 help articles, 16 recovery texts (cookie-compliance)
+# OWNER sign-off — S02 support catalogue labels, 8 help articles, 16 recovery texts (cookie-compliance)
 
 Status: DRAFT for V0 — not signed. The API refuses to start until the orchestrator records V's answer.
-What changes: since the 2026-09-29 signature (ffd72986…) the catalogue changes only the en/ro labels of these actions (old -> new; V-17: each label is the one the screen shows): sign-in en: Sign in -> Log in, ro: Autentificare -> Autentificați-vă · sign-up ro: Creează un cont -> Creați un cont · help en: Help desk -> Help, ro: Centrul de ajutor -> Ajutor · support-status en: Support status -> Service status, ro: Starea serviciului de asistență -> Starea serviciului · method en: How it works -> Method, ro: Cum funcționează -> Metodă · sample-transcript en: Sample debate -> Transcripts, ro: Exemplu de dezbatere -> Transcrieri · privacy-preferences en: Privacy preferences -> Privacy, ro: Preferințe de confidențialitate -> Confidențialitate · claim-legacy ro: Revendică dezbaterile vechi -> Revendicați dezbaterile vechi · delete-account ro: Șterge contul -> Ștergeți contul · your-debates ro: Dezbaterile tale -> Dezbaterile dvs.; 8 article files are rewritten; 15 of the 16 recovery texts are rewritten (14 carried the false wording, SPEC-v2 §2 M12; the Romanian settings-help-menus fallback named controls by their English labels, V-17); the English settings-help-menus fallback text keeps its words and is re-signed because its article's hash changed (K7).
+What changes: since the 2026-09-29 signature (ffd72986…) the catalogue changes only the 30 en/ro labels of 20 rows listed under "catalogue labels" (old -> new; V-17: each label is the one the screen shows); 8 article files are rewritten; 15 of the 16 recovery texts are rewritten (14 carried the false wording, SPEC-v2 §2 M12; the Romanian settings-help-menus fallback named controls by their English labels, V-17); the English settings-help-menus fallback text keeps its words and is re-signed because its article's hash changed (K7).
 
-### catalog privacy-preferences
+### catalogue labels
 ~~~text
-en: Privacy preferences -> Privacy
-ro: Preferințe de confidențialitate -> Confidențialitate
+action sign-in en: Sign in -> Log in
+action sign-in ro: Autentificare -> Autentificați-vă
+action sign-up ro: Creează un cont -> Creați un cont
+action help en: Help desk -> Help
+action help ro: Centrul de ajutor -> Ajutor
+action support-status en: Support status -> Service status
+action support-status ro: Starea serviciului de asistență -> Starea serviciului
+action method en: How it works -> Method
+action method ro: Cum funcționează -> Metodă
+action sample-transcript en: Sample debate -> Transcripts
+action sample-transcript ro: Exemplu de dezbatere -> Transcrieri
+action privacy-preferences en: Privacy preferences -> Privacy
+action privacy-preferences ro: Preferințe de confidențialitate -> Confidențialitate
+action claim-legacy ro: Revendică dezbaterile vechi -> Revendicați dezbaterile vechi
+action delete-account ro: Șterge contul -> Ștergeți contul
+action your-debates ro: Dezbaterile tale -> Dezbaterile dvs.
+action owner-debate ro: Deschide dezbaterea ta -> Deschideți dezbaterea dumneavoastră
+action public-debate ro: Deschide dezbaterea publică -> Deschideți dezbaterea publică
+capability ai-transparency ro: Transparență AI -> Transparență privind IA
+capability legal-terms ro: Termeni și condiții -> Termenii serviciului
+capability legal-terms-versions en: Earlier versions of the terms -> Terms versions
+capability legal-terms-versions ro: Versiunile anterioare ale termenilor -> Versiunile termenilor
+capability legal-health-data en: US consumer health data privacy policy -> US health data privacy
+capability legal-health-data ro: Politica privind datele de sănătate ale consumatorilor din SUA -> Datele de sănătate (SUA)
+capability legal-cookies ro: Politica privind cookie-urile -> Politica privind modulele cookie
+capability legal-providers en: AI model providers -> Model providers
+capability legal-providers ro: Furnizorii de modele AI -> Furnizori de modele
+capability sign-in en: Sign in and saved MFA recovery -> Log in and saved MFA recovery
+capability sign-up en: Create an account -> Create account
+capability sign-up ro: Creează un cont -> Creați un cont
 ~~~
 
 ### article privacy-consent.en
@@ -298,7 +326,7 @@ După autentificare, alege „Setări” pentru revizuirea sau revocarea sesiuni
 ## Fingerprints (sha256)
 
 ~~~text
-catalog-canonical ab80349756855f9c12d7c834b76ea2b5f91fa4cf8d38b6d0dcff2c51ad6b10fa
+catalog-canonical bbd47807cbbd1e7535de0c7828db2c29239f919357a4440d555d2fc2e14c0ddc
 article privacy-consent.en 0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f
 article privacy-consent.ro a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6
 article settings-help-menus.en 53b4612d883133874617b1a8647df9450dc75e2301e8f93a56e7eceaa169a084
