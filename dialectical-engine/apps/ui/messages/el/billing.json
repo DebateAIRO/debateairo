@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Χρήση του προγράμματός σας",
+  "billing.usage.line": "Σήμερα {dayPct}% · Αυτή την εβδομάδα {weekPct}% · Αυτόν τον μήνα {monthPct}%",
+  "billing.usage.lineFree": "Αυτόν τον μήνα {monthPct}%",
+  "billing.usage.day": "Σήμερα",
+  "billing.usage.week": "Αυτή την εβδομάδα",
+  "billing.usage.month": "Αυτόν τον μήνα",
+  "billing.usage.resets": "Μηδενίζεται: {time}"
+}

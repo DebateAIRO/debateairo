@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "השימוש בתוכנית שלכם",
+  "billing.usage.line": "היום {dayPct}% · השבוע {weekPct}% · החודש {monthPct}%",
+  "billing.usage.lineFree": "החודש {monthPct}%",
+  "billing.usage.day": "היום",
+  "billing.usage.week": "השבוע",
+  "billing.usage.month": "החודש",
+  "billing.usage.resets": "מתאפס ב־{time}"
+}

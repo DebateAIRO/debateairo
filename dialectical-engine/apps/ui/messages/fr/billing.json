@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Utilisation de votre formule",
+  "billing.usage.line": "Aujourd’hui {dayPct} % · Cette semaine {weekPct} % · Ce mois-ci {monthPct} %",
+  "billing.usage.lineFree": "Ce mois-ci {monthPct} %",
+  "billing.usage.day": "Aujourd’hui",
+  "billing.usage.week": "Cette semaine",
+  "billing.usage.month": "Ce mois-ci",
+  "billing.usage.resets": "Réinitialisation : {time}"
+}

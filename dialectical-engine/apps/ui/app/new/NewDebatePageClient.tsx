@@ -11,6 +11,7 @@ import { SCRUTINY_DEPTHS, ScrutinyDepth } from "@/lib/scrutinyDepth";
 import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
+import { UsageBars } from "@/components/billing/UsageBars";
 import { readAskRoom, useAskRoom, waitingRoomOf, type AskRoom } from "@/lib/billing/room";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
@@ -25,6 +26,7 @@ import {
   type CompositionBudgetTier,
   type RiskTier
 } from "./defaults";
+import billingEnglish from "@/messages/en/billing.json";
 
 type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
 
@@ -80,18 +82,21 @@ export default function NewDebatePageClient({
   catalog,
   homeCatalog,
   chromeCatalog,
-  locale = "en"
+  locale = "en",
+  billingCatalog = billingEnglish
 }: {
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
   /** The interface locale, recorded with the sensitive-data consent. */
   locale?: string;
+  /** The locale's `billing` catalogue: the usage bars (paid-plans spec §2.10). */
+  billingCatalog?: MessageCatalog;
 }) {
   return (
     <Suspense fallback={null}>
       <AuthGate catalog={catalog}>{(token) => (
-        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} />
+        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} billingCatalog={billingCatalog} />
       )}</AuthGate>
     </Suspense>
   );
@@ -102,13 +107,15 @@ function NewDebateForm({
   catalog,
   homeCatalog,
   chromeCatalog,
-  locale
+  locale,
+  billingCatalog
 }: {
   token: string;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
   locale: string;
+  billingCatalog: MessageCatalog;
 }) {
   // Everything the AI notice can read, in every variant: home + chrome (+ newDebate).
   const noticeCatalog = { ...homeCatalog, ...chromeCatalog, ...catalog };
@@ -265,6 +272,7 @@ function NewDebateForm({
         <p className="ndEyebrow">{t(catalog, "newDebate.eyebrow")}</p>
         <h1 className="ndTitle">{t(catalog, "newDebate.title")}</h1>
         <div className="ndAiDisclosure"><AiNotice catalog={noticeCatalog} body={t(catalog, "newDebate.aiNotice")} /></div>
+        <UsageBars catalog={billingCatalog} locale={locale} onPlan={rememberPlan} />
         <form onSubmit={submit} onKeyDown={onKeyDown}>
           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
           {consent.declined ? (

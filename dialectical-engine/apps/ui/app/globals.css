@@ -9283,6 +9283,13 @@ a:focus-visible {
   background: var(--gen-bg); color: var(--gen-text); font-size: 13.5px; line-height: 1.45;
 }
 @media (max-width: 600px) { .debateWaitingNotice { padding: 8px 12px; } }
+/* Paid plans (spec 2026-09-29 §1.2, §2.10): usage bars, in percent, never money. */
+.usageBars { display: grid; gap: 10px; margin-top: 14px; }
+.usageLine { margin: 0; font-size: 13.5px; color: var(--text-2); }
+.usageBar { display: grid; gap: 4px; }
+.usageTrack { height: 6px; border-radius: 3px; background: var(--muted-bg); overflow: hidden; }
+.usageFill { display: block; height: 100%; background: var(--reasoning); }
+.usageReset { font-size: 12px; color: var(--text-2); }
 
 /* === consent-ui S01 === */
 /* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).

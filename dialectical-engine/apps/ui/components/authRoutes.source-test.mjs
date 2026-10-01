@@ -99,7 +99,8 @@ test("every public and protected entry point reaches the dedicated auth routes",
   // Review F2 (REV-FIX-CATALOGS): the gate now receives the served newDebate
   // catalogue; the route (settings behind the AuthGate) is unchanged.
   // L4: the settings page is never covered by the accept screen.
-  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} \/>/);
+  // B10c: the page also serves the billing catalogue, for the usage bars.
+  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\} \/>/);
   assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\} legalGate=\{false\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);

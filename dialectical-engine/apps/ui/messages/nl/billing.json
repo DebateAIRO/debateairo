@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Gebruik van uw abonnement",
+  "billing.usage.line": "Vandaag {dayPct}% · Deze week {weekPct}% · Deze maand {monthPct}%",
+  "billing.usage.lineFree": "Deze maand {monthPct}%",
+  "billing.usage.day": "Vandaag",
+  "billing.usage.week": "Deze week",
+  "billing.usage.month": "Deze maand",
+  "billing.usage.resets": "Wordt gereset: {time}"
+}
