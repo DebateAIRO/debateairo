@@ -1,0 +1,318 @@
+// tests/unit/billing-xmoney-fixture-scrub.test.ts
+import { createCipheriv, createHmac, randomBytes } from "node:crypto";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, describe, expect, it } from "vitest";
+import {
+  XMONEY_FIXTURE_FORMAT,
+  XMONEY_FIXTURE_TEST_KEY,
+  XMONEY_OPTIONAL_FIXTURE_KINDS,
+  XMONEY_REQUIRED_FIXTURE_KINDS,
+  XMoneyScrubber,
+  decryptOpensslResult,
+  noticeFraming,
+  readXMoneyKeyFile,
+  writeXMoneyFixtures
+} from "../../tools/billing/scrub-xmoney-fixture.js";
+import {
+  RECORDING_PERMISSIONS_POLICY,
+  describeXMoneyKeyShape,
+  linkedRefundRows,
+  recordingContentSecurityPolicy,
+  recordingHeaders,
+  recordingOrder,
+  recordingPage,
+  signRecordingOrder
+} from "../../tools/billing/xmoney-sandbox.js";
+
+const roots: string[] = [];
+function privateRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), "x0-scrub-"));
+  chmodSync(root, 0o700);
+  roots.push(root);
+  return root;
+}
+afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+
+function captureFolder(root: string): string {
+  const captures = join(root, "captures");
+  mkdirSync(captures, { mode: 0o700 });
+  return captures;
+}
+
+function ownerKeyFile(root: string): Readonly<{ key: Buffer; path: string }> {
+  const key = Buffer.from(randomBytes(16).toString("hex"), "latin1");
+  const path = join(root, "private-key");
+  writeFileSync(path, `${key.toString("latin1")}\n`, { mode: 0o600 });
+  return { key, path };
+}
+
+function encryptUnder(key: Buffer, plaintext: string): string {
+  const iv = randomBytes(16);
+  const cipher = createCipheriv("aes-256-cbc", key, iv);
+  return `${iv.toString("base64")},${Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]).toString("base64")}`;
+}
+
+const NOTICE = {
+  transactionStatus: "complete-ok", orderId: 7, transactionId: 8, customerId: 9,
+  externalOrderId: "00112233445566778899aabbccddeeff", amount: 1, currency: "USD", cardId: 10,
+  identifier: "ffeeddccbbaa99887766554433221100"
+};
+
+describe("X0 — xMoney fixture scrubbing", () => {
+  it("replaces personal data and keeps id equalities across records of one run", () => {
+    const scrubber = new XMoneyScrubber();
+    const notice = scrubber.scrub({
+      transactionStatus: "complete-ok", orderId: 88123, transactionId: 99001, customerId: 5501,
+      externalOrderId: "9f0c2a1e5b7d4c3a8e6f1b2d3c4a5e6f", amount: 24.2, currency: "USD",
+      identifier: "c0ffee00c0ffee00c0ffee00c0ffee00"
+    }) as Record<string, unknown>;
+    const transaction = scrubber.scrub({
+      id: 99001, orderId: 88123, customerId: 5501, ip: "81.196.12.34", email: "owner@realmail.ro",
+      transactionStatus: "complete-ok", amount: "24.20", currency: "USD", customerCountry: "RO",
+      cardHolderName: "Stefan Real", cardNumber: "411111******1111",
+      backUrl: "https://dezbatere.ro/checkout/return?charge=9f0c2a1e5b7d4c3a8e6f1b2d3c4a5e6f",
+      components: [{ componentId: 1, providerRrn: "123456789012", data: { raw: "anything" } }]
+    }) as Record<string, unknown>;
+    expect(notice.orderId).toBe(transaction.orderId);
+    expect(notice.transactionId).toBe(transaction.id);
+    expect(notice.orderId).not.toBe(88123);
+    expect(typeof notice.orderId).toBe("number");
+    expect(notice.externalOrderId).toMatch(/^[0-9a-f]{32}$/u);
+    expect(notice.externalOrderId).not.toBe("9f0c2a1e5b7d4c3a8e6f1b2d3c4a5e6f");
+    expect(transaction.ip).toBe("203.0.113.10");
+    expect(transaction.email).toBe("person@example.test");
+    expect(transaction.cardHolderName).toBe("Test Person");
+    expect(transaction.cardNumber).toBe("411111******1111");
+    expect(transaction.backUrl).toBe("https://debateai.test/checkout/return?charge=SCRUBBED");
+    expect(transaction.components).toEqual([{ componentId: expect.any(Number), providerRrn: "SCRUBBED", data: {} }]);
+    expect(transaction.transactionStatus).toBe("complete-ok");
+    expect(transaction.amount).toBe("24.20");
+    expect(transaction.customerCountry).toBe("RO");
+    expect(JSON.stringify(transaction)).not.toContain("Stefan");
+    expect(JSON.stringify(transaction)).not.toContain("realmail");
+    // The Customer and Transaction fields xMoney's schema adds that name a person's region or card.
+    const customer = scrubber.scrub({
+      customerData: { firstName: "Stefan", lastName: "Real", state: "Cluj", city: "Cluj-Napoca", country: "RO" },
+      cardHolderState: "Cluj", cardExpiryDate: "09/29", cardHolderCountry: "RO"
+    });
+    expect(customer).toEqual({
+      customerData: { firstName: "Test", lastName: "Person", state: "SCRUBBED", city: "SCRUBBED", country: "RO" },
+      cardHolderState: "SCRUBBED", cardExpiryDate: "12/99", cardHolderCountry: "RO"
+    });
+    for (const original of ["Stefan", "Real", "Cluj", "09/29"]) {
+      expect(JSON.stringify(customer), original).not.toContain(original);
+    }
+  });
+
+  it("decrypts a captured notice with the owner's key, records its framing and outer field names, and re-encrypts it under the test key", () => {
+    const root = privateRoot();
+    const captures = captureFolder(root);
+    const out = join(root, "fixtures");
+    const owner = ownerKeyFile(root);
+    const opensslResult = encryptUnder(owner.key, JSON.stringify(NOTICE));
+    const signature = "ab".repeat(64);
+    writeFileSync(
+      join(captures, "notice-success.raw"),
+      `content-type: application/x-www-form-urlencoded\n\n${new URLSearchParams({ opensslResult, signature }).toString()}`
+    );
+    writeFileSync(join(captures, "card.json"), JSON.stringify({
+      code: 200, message: "Success", data: { id: 10, customerId: 9, binInfo: { countryCode: "RO", bank: "Real Bank" } }
+    }));
+    const written = writeXMoneyFixtures({
+      captureDir: captures, key: readXMoneyKeyFile(owner.path), outDir: out, recordedOn: "2026-10-02"
+    });
+    expect(written.sort()).toEqual(["card.json", "notice-success.json"]);
+    const text = readFileSync(join(out, "notice-success.json"), "utf8");
+    const notice = JSON.parse(text) as Record<string, unknown>;
+    expect(notice.format).toBe(XMONEY_FIXTURE_FORMAT);
+    expect(notice.contentType).toBe("application/x-www-form-urlencoded");
+    expect(notice.framing).toEqual({ ivBytes: 16, alphabet: "standard", padded: true, lineBreaks: false, plusArrivedAsSpace: false });
+    expect(notice.outerFields).toEqual({ signature: { length: 128, charset: "hex" } });
+    expect(text).not.toContain(signature);
+    const body = notice.body as Record<string, unknown>;
+    expect(body.transactionStatus).toBe("complete-ok");
+    expect(body.orderId).not.toBe(7);
+    const reopened = JSON.parse(decryptOpensslResult(
+      notice.testKeyOpensslResult as string, Buffer.from(XMONEY_FIXTURE_TEST_KEY, "latin1")
+    ).toString("utf8"));
+    expect(reopened).toEqual(body);
+    const card = JSON.parse(readFileSync(join(out, "card.json"), "utf8")) as Record<string, unknown>;
+    expect((card.body as { data: { binInfo: { countryCode: string } } }).data.binInfo.countryCode).toBe("RO");
+    expect((card.body as { data: { customerId: number } }).data.customerId).toBe(body.customerId);
+    expect(card).toMatchObject({ testKeyOpensslResult: null, framing: null, outerFields: null, testKeySignature: null });
+    expect(text).not.toContain(owner.key.toString("latin1"));
+  });
+
+  it("records a + that the form body carried unescaped (it arrives as a space) and still decrypts the notice", () => {
+    const root = privateRoot();
+    const captures = captureFolder(root);
+    const owner = ownerKeyFile(root);
+    let opensslResult = encryptUnder(owner.key, JSON.stringify(NOTICE));
+    while (!opensslResult.includes("+")) opensslResult = encryptUnder(owner.key, JSON.stringify(NOTICE));
+    writeFileSync(
+      join(captures, "notice-rebill.raw"),
+      `content-type: application/x-www-form-urlencoded\n\nopensslResult=${opensslResult}`
+    );
+    const out = join(root, "fixtures");
+    writeXMoneyFixtures({ captureDir: captures, key: readXMoneyKeyFile(owner.path), outDir: out, recordedOn: "2026-10-02" });
+    const fixture = JSON.parse(readFileSync(join(out, "notice-rebill.json"), "utf8")) as {
+      framing: { plusArrivedAsSpace: boolean }; body: { transactionStatus: string };
+    };
+    expect(fixture.framing.plusArrivedAsSpace).toBe(true);
+    expect(fixture.body.transactionStatus).toBe("complete-ok");
+  });
+
+  it("refuses a real notice outside P3a's grammar — wrapped lines or the URL-safe alphabet — before decrypting it", () => {
+    const iv = Buffer.alloc(16, 1).toString("base64");
+    const ciphertext = randomBytes(96).toString("base64");
+    const wrapped = `${iv},${ciphertext.slice(0, 64)}\n${ciphertext.slice(64)}`;
+    // 0xfb 0xff 0xbf encodes as "-_-_" in the URL-safe alphabet, so the case never passes by chance.
+    const urlSafe = `${iv},${Buffer.concat([Buffer.from([0xfb, 0xff, 0xbf]), randomBytes(93)]).toString("base64url")}`;
+    expect(() => noticeFraming(wrapped, false)).toThrow("XMONEY_CAPTURE_FRAMING_UNEXPECTED:CIPHERTEXT_ALPHABET");
+    expect(() => noticeFraming(urlSafe, false)).toThrow("XMONEY_CAPTURE_FRAMING_UNEXPECTED:CIPHERTEXT_ALPHABET");
+    expect(() => noticeFraming(`${Buffer.alloc(8, 1).toString("base64")},${ciphertext}`, false))
+      .toThrow("XMONEY_CAPTURE_FRAMING_UNEXPECTED:IV_LENGTH");
+    expect(() => noticeFraming(`${iv},${randomBytes(20).toString("base64")}`, false))
+      .toThrow("XMONEY_CAPTURE_FRAMING_UNEXPECTED:CIPHERTEXT_LENGTH");
+    // Through the writer, with a key that could not decrypt it anyway: the framing refusal comes first.
+    const root = privateRoot();
+    const captures = captureFolder(root);
+    writeFileSync(join(captures, "notice-failed.raw"), `content-type: application/json\n\n${JSON.stringify({ opensslResult: wrapped })}`);
+    expect(() => writeXMoneyFixtures({
+      captureDir: captures, key: Buffer.alloc(32, 1), outDir: join(root, "out"), recordedOn: "2026-10-02"
+    })).toThrow("XMONEY_CAPTURE_FRAMING_UNEXPECTED:CIPHERTEXT_ALPHABET");
+  });
+
+  it("refuses a key file other users can read, a capture it cannot classify, and two captures of one kind", () => {
+    expect(XMONEY_REQUIRED_FIXTURE_KINDS).toHaveLength(25);
+    expect(XMONEY_OPTIONAL_FIXTURE_KINDS).toHaveLength(6);
+    for (const kind of ["transaction-list-refund-after-partial", "transaction-refund-second-partial",
+      "transaction-list-refund-after-second-partial"]) {
+      expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[], kind).toContain(kind);
+    }
+    expect(XMONEY_OPTIONAL_FIXTURE_KINDS as readonly string[]).toEqual(expect.arrayContaining([
+      "rebill-declined-response", "transaction-rebill-declined"
+    ]));
+    expect(XMONEY_REQUIRED_FIXTURE_KINDS.filter((kind) => (XMONEY_OPTIONAL_FIXTURE_KINDS as readonly string[]).includes(kind))).toEqual([]);
+    const root = privateRoot();
+    const keyFile = join(root, "loose-key");
+    writeFileSync(keyFile, XMONEY_FIXTURE_TEST_KEY, { mode: 0o644 });
+    chmodSync(keyFile, 0o644);
+    expect(() => readXMoneyKeyFile(keyFile)).toThrow("XMONEY_KEY_FILE_MODE_UNSAFE");
+    const write = (captures: string) => writeXMoneyFixtures({
+      captureDir: captures, key: Buffer.alloc(32, 1), outDir: join(root, "out"), recordedOn: "2026-10-02"
+    });
+    const unknown = join(root, "unknown");
+    mkdirSync(unknown, { mode: 0o700 });
+    writeFileSync(join(unknown, "mystery.json"), "{}");
+    expect(() => write(unknown)).toThrow("XMONEY_CAPTURE_KIND_UNKNOWN");
+    // The single "transaction" kind is retired: each read now names its step (transaction-initial, -rebill, …).
+    const retired = join(root, "retired");
+    mkdirSync(retired, { mode: 0o700 });
+    writeFileSync(join(retired, "transaction.json"), "{}");
+    expect(() => write(retired)).toThrow("XMONEY_CAPTURE_KIND_UNKNOWN");
+    const duplicates = join(root, "duplicates");
+    mkdirSync(duplicates, { mode: 0o700 });
+    writeFileSync(join(duplicates, "transaction-rebill-1790000000001.json"), "{}");
+    writeFileSync(join(duplicates, "transaction-rebill-1790000000002.json"), "{}");
+    expect(() => write(duplicates)).toThrow("XMONEY_CAPTURE_KIND_DUPLICATE:transaction-rebill");
+  });
+
+  it("turns the order the stage form accepted into a test-key vector, and refuses a payload that is not its order", () => {
+    const root = privateRoot();
+    const captures = captureFolder(root);
+    const owner = ownerKeyFile(root);
+    const order = recordingOrder({
+      publicKey: "pk_stage_real_owner", siteId: "4242", identifier: "c0ffee00c0ffee00c0ffee00c0ffee00",
+      email: "owner@realmail.ro", country: "RO", chargeId: "9f0c2a1e5b7d4c3a8e6f1b2d3c4a5e6f", amount: "1.00",
+      mode: "authAndCapture", description: "DebateAI stage recording",
+      backUrl: "http://127.0.0.1:8780/return?charge=9f0c2a1e5b7d4c3a8e6f1b2d3c4a5e6f"
+    });
+    const signed = signRecordingOrder(order, owner.key);
+    writeFileSync(join(captures, "order-payload-1790000000000.json"), JSON.stringify({ order, ...signed }));
+    const out = join(root, "fixtures");
+    writeXMoneyFixtures({ captureDir: captures, key: readXMoneyKeyFile(owner.path), outDir: out, recordedOn: "2026-10-02" });
+    const text = readFileSync(join(out, "order-payload.json"), "utf8");
+    const fixture = JSON.parse(text) as {
+      body: { order: Record<string, unknown> }; testKeySignature: { payload: string; checksum: string };
+    };
+    const json = JSON.stringify(fixture.body.order);
+    expect(Object.keys(fixture.body.order)).toEqual(Object.keys(order));
+    expect(fixture.testKeySignature).toEqual({
+      payload: Buffer.from(json, "utf8").toString("base64"),
+      checksum: createHmac("sha512", Buffer.from(XMONEY_FIXTURE_TEST_KEY, "latin1")).update(json, "utf8").digest("base64")
+    });
+    for (const original of ["owner@realmail.ro", "pk_stage_real_owner", "9f0c2a1e5b7d4c3a8e6f1b2d3c4a5e6f", signed.checksum]) {
+      expect(text, original).not.toContain(original);
+    }
+    rmSync(join(captures, "order-payload-1790000000000.json"));
+    writeFileSync(join(captures, "order-payload.json"), JSON.stringify({ order: { ...order, saveCard: false }, ...signed }));
+    expect(() => writeXMoneyFixtures({ captureDir: captures, key: owner.key, outDir: out, recordedOn: "2026-10-02" }))
+      .toThrow("XMONEY_CAPTURE_ORDER_PAYLOAD_MISMATCH");
+  });
+
+  it("describes a key without revealing it, and serves a report-only page with production's other headers", () => {
+    expect(describeXMoneyKeyShape(Buffer.from("0123456789abcdef0123456789abcdef", "latin1"))).toEqual({
+      bytes: 32, printableAscii: true, lowerHex: true, underscorePrefix: false, aes256KeyLength: true
+    });
+    expect(describeXMoneyKeyShape(Buffer.from("sk_test_abc", "latin1"))).toEqual({
+      bytes: 11, printableAscii: true, lowerHex: false, underscorePrefix: true, aes256KeyLength: false
+    });
+    const policy = recordingContentSecurityPolicy("n0nce");
+    expect(policy).toContain("script-src 'nonce-n0nce' 'strict-dynamic'");
+    expect(policy).toContain("frame-src 'self'");
+    expect(policy).toContain("report-uri /csp-report");
+    const production = recordingHeaders("n0nce", "production");
+    expect(production["content-security-policy-report-only"]).toBe(policy);
+    expect(production["cross-origin-opener-policy"]).toBe("same-origin");
+    expect(production["referrer-policy"]).toBe("no-referrer");
+    expect(production["permissions-policy"]).toBe(RECORDING_PERMISSIONS_POLICY);
+    expect(production["permissions-policy"]).toContain("payment=()");
+    const without = recordingHeaders("n0nce", "none");
+    expect(Object.keys(without)).not.toContain("permissions-policy");
+    expect(without["referrer-policy"]).toBe("no-referrer");
+    // The referrer comparison (D7 Open question 16): production's no-referrer is the default; strict-origin is the
+    // one other policy P19 may give the card routes, so it is the one the owner compares against.
+    const referred = recordingHeaders("n0nce", "production", "strict-origin");
+    expect(referred["referrer-policy"]).toBe("strict-origin");
+    expect(referred["permissions-policy"]).toBe(RECORDING_PERMISSIONS_POLICY);
+    expect(recordingHeaders("n0nce", "production", "production")).toEqual(production);
+    const signed = signRecordingOrder({ a: 1 }, Buffer.from("0123456789abcdef0123456789abcdef", "latin1"));
+    expect(signed.payload).toBe(Buffer.from('{"a":1}', "utf8").toString("base64"));
+    const page = recordingPage({
+      nonce: "n0nce", sdkOrigin: "https://secure-stage.xmoney.com", publicKey: "pk</script>", payload: signed.payload,
+      checksum: signed.checksum, locale: "ro"
+    });
+    expect(page).toContain('<script nonce="n0nce" src="https://secure-stage.xmoney.com/sdk/v2/xmoney.js"></script>');
+    expect(page).not.toContain("pk</script>");
+    expect(page).toContain("pk\\u003c/script>");
+    // Production hides the save-card box (spec §2.5.3); an unticked box would skew the rebill measurement.
+    expect(page).toContain("displaySaveCardOption: false");
+    expect(page).toContain('locale: "ro"');
+    // The same call P19's XMoneyCardForm makes (D7 Open question 4): the container element, xMoney's own button
+    // hidden, our button pressing the handle's submit(), destroy() once done — so the recording confirms each name.
+    expect(page).toContain("displaySubmitButton: false");
+    expect(page).not.toContain("displaySubmitButton: true");
+    expect(page).toContain('container: document.getElementById("card")');
+    expect(page).toContain("form.submit();");
+    expect(page).toContain("form.destroy();");
+    expect(page).toContain("onPaymentComplete(transaction)");
+    expect(page).toContain("handle: shape()");
+  });
+
+  it("counts the rows a refund listing links to one payment, and nothing else (X0 (g))", () => {
+    const listing = { code: 200, message: "Success", data: [
+      { id: 7, transactionType: "deposit", transactionStatus: "complete-ok", amount: "1.00" },
+      { id: 8, transactionType: "refund", transactionStatus: "complete-ok", amount: "0.40", relatedTransactionIds: [7] },
+      { id: 9, transactionType: "refund", transactionStatus: "complete-ok", amount: "0.30", relatedTransactionIds: ["7"] },
+      { id: 10, transactionType: "refund", transactionStatus: "complete-ok", amount: "0.50", relatedTransactionIds: [70] },
+      // The payment itself, listed again under its refund date, never counts as one of its own refunds.
+      { id: 7, transactionType: "deposit", transactionStatus: "refund-ok", relatedTransactionIds: [7] }
+    ] };
+    expect(linkedRefundRows(listing, "7").map((row) => row.id)).toEqual([8, 9]);
+    expect(linkedRefundRows({ code: 200, message: "Success", data: {} }, "7")).toEqual([]);
+    expect(linkedRefundRows(null, "7")).toEqual([]);
+  });
+});
