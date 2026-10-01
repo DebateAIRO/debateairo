@@ -51,7 +51,7 @@ describe("sentence C in the home list", () => {
 });
 
 describe("sentence C on the debate page", () => {
-  it("replaces the generic status line while the run waits, and names the state in the pill", () => {
+  it("says C in its own line below the top bar while the run waits, and names the state in the pill", () => {
     const html = renderToStaticMarkup(
       <DebatePageClient
         id="run:waiting"
@@ -67,6 +67,31 @@ describe("sentence C on the debate page", () => {
     expect(html).toContain(before!.trim());
     expect(html).toMatch(new RegExp(`<time datetime="${WAITS_UNTIL.replace(/\./gu, "\\.")}"`, "iu"));
     expect(html).toContain(">Waiting<");
+    // C sits in its own full-width line, outside the top bar's claim row (hidden on a
+    // phone, globals.css `.debateTopClaim` at 920px and below) and outside the clamped,
+    // ellipsed `.topSwitchStatus` slot, so its start time is never cut.
+    const page = new DOMParser().parseFromString(html, "text/html");
+    const time = page.querySelector(`time[datetime="${WAITS_UNTIL}"]`);
+    expect(time, "the page carries C's start instant").not.toBeNull();
+    expect(time!.closest(".debateWaitingNotice")).not.toBeNull();
+    expect(time!.closest(".debateTopClaim, .topSwitchStatus")).toBeNull();
+  });
+
+  it("styles C's line so it wraps and is never clamped, cut or hidden", () => {
+    const css = readFileSync(resolve(process.cwd(), "apps/ui/app/globals.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
+    // Innermost rules only: a rule nested in an @media block yields its own selector.
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/gu)]
+      .map(([, selector, body]) => ({ selector: selector!.trim(), body: body! }))
+      .filter(({ selector }) => selector.includes(".debateWaitingNotice"));
+    expect(rules.length, "globals.css styles .debateWaitingNotice").toBeGreaterThan(0);
+    for (const { selector, body } of rules) {
+      expect(body, selector).not.toMatch(/white-space\s*:\s*nowrap/iu);
+      expect(body, selector).not.toMatch(/text-overflow/iu);
+      expect(body, selector).not.toMatch(/max-width/iu);
+      expect(body, selector).not.toMatch(/overflow(?:-[xy])?\s*:\s*hidden/iu);
+      expect(body, selector).not.toMatch(/display\s*:\s*none/iu);
+      expect(body, selector).not.toMatch(/line-clamp/iu);
+    }
   });
 });
 

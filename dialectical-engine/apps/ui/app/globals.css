@@ -9275,6 +9275,14 @@ a:focus-visible {
 .roomNoticeLink { color: var(--link); text-decoration: underline; }
 /* Paid plans (spec 2026-09-29 §2.3.4; ruling Q-8): the person's plan, where the chooser was. */
 .ndPlanCurrent { margin: 18px 0 0; font-size: 14px; font-weight: 600; color: var(--text-2); }
+/* Budget spec §2.11: sentence C on the debate page, a full-width line below the
+   top bar. It wraps at every width and is never clamped, so its start time shows. */
+.debateWaitingNotice {
+  flex: 0 0 auto; padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--gen-bg); color: var(--gen-text); font-size: 13.5px; line-height: 1.45;
+}
+@media (max-width: 600px) { .debateWaitingNotice { padding: 8px 12px; } }
 
 /* === consent-ui S01 === */
 /* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).

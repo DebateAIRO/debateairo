@@ -1496,15 +1496,7 @@ export default function DebatePageClient({
               <span className="dot" />
               {statusLabel(debate.run_state ?? debate.status, timeCatalog)}
             </span>
-            {waitingStart !== null ? (
-              <span className="topSwitchStatus" role="status">
-                <ResetSentence
-                  text={t(debateChromeCatalog, "debateChrome.status.waiting", { time: RESET_TIME_MARK })}
-                  at={waitingStart}
-                  locale={locale}
-                />
-              </span>
-            ) : completionReason ? (
+            {completionReason ? (
               <span className="topSwitchStatus" role="status" title={completionReason}>
                 {completionReason}
               </span>
@@ -1709,6 +1701,20 @@ export default function DebatePageClient({
           </section>
         )}
       </ScoringErrorBoundary>
+
+      {/* Budget spec §2.11: sentence C, with its start time, in its own full-width
+          line below the top bar. The top bar's status slot is clamped to one
+          ellipsed line and the claim row is hidden on a phone, so C lives here,
+          where it wraps and is never cut. */}
+      {waitingStart !== null ? (
+        <div className="debateWaitingNotice" role="status">
+          <ResetSentence
+            text={t(debateChromeCatalog, "debateChrome.status.waiting", { time: RESET_TIME_MARK })}
+            at={waitingStart}
+            locale={locale}
+          />
+        </div>
+      ) : null}
 
       {/* ---- generation progress strip ---- */}
       {generating ? (
