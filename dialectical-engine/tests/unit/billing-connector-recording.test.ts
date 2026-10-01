@@ -6,7 +6,10 @@ import { QuadernoTaxEngine } from "@debateai/tax-quaderno";
 import {
   CONNECTOR_CAPTURE_FORMAT,
   ConnectorRecorder,
-  quadernoRecordingSale
+  QUADERNO_RECORDING_STEPS,
+  QUADERNO_REVERSE_CHARGE_CHECK,
+  quadernoRecordingSale,
+  recordQuadernoRun
 } from "../../tools/billing/record-connector.js";
 import {
   CONNECTOR_FIXTURE_FORMATS,
@@ -14,6 +17,7 @@ import {
   writeConnectorFixtures
 } from "../../tools/billing/scrub-connector-fixture.js";
 import { REPLAY_BASE_URL, replayFetch } from "../support/connectorReplay.js";
+import { startFakeQuaderno } from "../support/fake-quaderno.js";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -88,6 +92,73 @@ describe("P4 — the connector recorder and its scrubber", () => {
     // Idempotent, so a replay can scrub what the client sends today and compare it with the recording.
     const once = scrubConnectorValue({ tax_id: "DE811569869", email: "a@b.ro" }, ["DE811569869"]);
     expect(scrubConnectorValue(once, [])).toEqual(once);
+  });
+
+  it("erases a secret inside a longer text and a VAT id without its country letters, and a second pass changes nothing", () => {
+    const echoed = {
+      notes: "Reverse charge: customer VAT number DE811569869", tax_id: "811569869",
+      legends: [{ text: "VAT ID 811569869 (DE)" }], first_name: "Firma DE811569869", email: "billing@de811569869.example",
+      contact: "owner@firma.ro", total: "20.00"
+    };
+    const once = scrubConnectorValue(echoed, ["DE811569869", "owner@firma.ro"]);
+    expect(JSON.stringify(once)).not.toContain("811569869");
+    expect(JSON.stringify(once)).not.toContain("owner@firma.ro");
+    expect(once).toEqual({
+      notes: "Reverse charge: customer VAT number SCRUBBED-ID", tax_id: "SCRUBBED-ID",
+      legends: [{ text: "VAT ID SCRUBBED-ID (DE)" }], first_name: "Test", email: "person@example.test",
+      contact: "SCRUBBED-ID", total: "20.00"
+    });
+    expect(scrubConnectorValue(once, ["DE811569869", "owner@firma.ro"])).toEqual(once);
+    expect(scrubConnectorValue(once, [])).toEqual(once);
+  });
+
+  it("runs every Quaderno step in order, the company pair under a second id whose lookups find nothing", async () => {
+    const fake = await startFakeQuaderno();
+    try {
+      const recorder = new ConnectorRecorder(fake.baseUrl);
+      const engine = new QuadernoTaxEngine({ baseUrl: fake.baseUrl, apiKey: fake.apiKey, fetch: recorder.fetch });
+      await recordQuadernoRun({ recorder, engine, vatCountry: "DE", vatId: "DE-VALID-42", transactionId: "1790000000000" });
+      const capture = recorder.capture("quaderno");
+      expect(capture.steps.map((step) => `${step.step}:${step.outcome}`))
+        .toEqual(QUADERNO_RECORDING_STEPS.map((step) => `${step}:OK`));
+      const step = (name: string) => capture.steps.find((candidate) => candidate.step === name)!;
+      expect(step("record-sale").exchanges[0]!.request.query).toEqual({ processor_id: "1790000000000" });
+      for (const [name, path] of [["record-company-sale", "/invoices"], ["record-company-refund", "/credits"]] as const) {
+        expect(step(name).exchanges[0]!.request).toEqual({ method: "GET", path, query: { processor_id: "1790000000001" }, body: null });
+        expect(step(name).exchanges[0]!.response.body).toEqual([]);
+      }
+      const company = fake.sales.find((recorded) => recorded.processor_id === "1790000000001")!;
+      expect(company).toMatchObject({
+        customer: { first_name: "Test Company Ltd", email: "person@example.test", country: "DE", street_line_1: "1 Test Street",
+          tax_id: "DE-VALID-42", kind: "company" },
+        evidence: { billing_country: "DE", bank_country: "DE" },
+        items: [{ quantity: 1, amount: 20, tax: { country: "DE", rate: 0, tax_code: "saas" } }]
+      });
+      expect(fake.refunds.map((recorded) => recorded.processor_id)).toEqual(["1790000000000", "1790000000001"]);
+      expect(QUADERNO_REVERSE_CHARGE_CHECK).toContain("Reverse charge");
+    } finally {
+      await fake.stop();
+    }
+  });
+
+  it("books the company refund only when the company sale was booked", async () => {
+    const fake = await startFakeQuaderno();
+    try {
+      // Quaderno refuses the company sale (422), as it would a shape it does not accept.
+      const refusingCompany: typeof fetch = async (input, init) => (
+        init?.method === "POST" && typeof init.body === "string" && init.body.includes('"kind":"company"')
+          ? new Response('{"error":"refused"}', { status: 422, headers: { "content-type": "application/json" } })
+          : fetch(input, init)
+      );
+      const recorder = new ConnectorRecorder(fake.baseUrl, refusingCompany);
+      const engine = new QuadernoTaxEngine({ baseUrl: fake.baseUrl, apiKey: fake.apiKey, fetch: recorder.fetch });
+      await recordQuadernoRun({ recorder, engine, vatCountry: "DE", vatId: "DE-VALID-42", transactionId: "1790000000000" });
+      const outcomes = recorder.capture("quaderno").steps.map((step) => `${step.step}:${step.outcome}`);
+      expect(outcomes.slice(-2)).toEqual(["record-refund-again:OK", "record-company-sale:TAX_SERVICE_REFUSED:QUADERNO_HTTP_422"]);
+      expect(fake.refunds.map((recorded) => recorded.processor_id)).toEqual(["1790000000000"]);
+    } finally {
+      await fake.stop();
+    }
   });
 
   it("replays a recorded step and names every request that differs from what the client sends today", async () => {

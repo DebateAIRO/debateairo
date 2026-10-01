@@ -106,13 +106,20 @@ describe("P4 — Quaderno client against the fake", () => {
   });
 
   it("never adopts another sale's document, even when Quaderno ignores the processor filter", async () => {
-    await engine.recordSale(sale("7101"));
-    fake.returnUnfilteredLists();
-    const mine = await engine.recordSale({ ...sale("7102"), chargeId: "d00dfeedd00dfeedd00dfeedd00dfeed" });
-    expect(fake.sales.filter((recorded) => recorded.processor_id === "7102")).toHaveLength(1);
-    const again = await engine.recordSale({ ...sale("7102"), chargeId: "d00dfeedd00dfeedd00dfeedd00dfeed" });
-    expect(again).toEqual(mine);
-    expect(fake.sales.filter((recorded) => recorded.processor_id === "7102")).toHaveLength(1);
+    // Its own fake: returnUnfilteredLists() lasts for the fake's life, and the shared one must stay filtered.
+    const unfiltered = await startFakeQuaderno();
+    try {
+      const local = new QuadernoTaxEngine({ baseUrl: unfiltered.baseUrl, apiKey: unfiltered.apiKey, timeoutMs: 300 });
+      await local.recordSale(sale("7101"));
+      unfiltered.returnUnfilteredLists();
+      const mine = await local.recordSale({ ...sale("7102"), chargeId: "d00dfeedd00dfeedd00dfeedd00dfeed" });
+      expect(unfiltered.sales.filter((recorded) => recorded.processor_id === "7102")).toHaveLength(1);
+      const again = await local.recordSale({ ...sale("7102"), chargeId: "d00dfeedd00dfeedd00dfeedd00dfeed" });
+      expect(again).toEqual(mine);
+      expect(unfiltered.sales.filter((recorded) => recorded.processor_id === "7102")).toHaveLength(1);
+    } finally {
+      await unfiltered.stop();
+    }
   });
 
   it("invents no customer name: a buyer without one is sent without first_name", async () => {
@@ -135,8 +142,15 @@ describe("P4 — Quaderno client against the fake", () => {
       refundTotalMicros: 11_900_000, original: { documentId: "1", number: "Q-1" },
       description: "Rückerstattung zu Rechnung Q-1"
     };
+    const sent = fake.requests.length;
     const first = await engine.recordRefund(refund);
     expect(await engine.recordRefund(refund)).toEqual(first);
+    // Both calls looked the credit up by the sale's processor id first (the shared fake filters on it).
+    const lookups = fake.requests.slice(sent).filter((request) => request.method === "GET");
+    expect(lookups).toEqual([
+      { method: "GET", path: "/api/credits", query: { processor_id: "7001" } },
+      { method: "GET", path: "/api/credits", query: { processor_id: "7001" } }
+    ]);
     const recorded = fake.refunds.filter((candidate) => candidate.processor_id === "7001");
     expect(recorded).toHaveLength(1);
     expect(recorded[0]).toMatchObject({ items: [{ description: "Rückerstattung zu Rechnung Q-1", quantity: 1, amount: 11.9 }] });
@@ -158,6 +172,51 @@ describe("P4 — a lookup that does not answer a list never leads to a second do
     })).rejects.toMatchObject({ code: "TAX_SERVICE_REFUSED", message: "QUADERNO_RESPONSE_INVALID" });
     expect(methods).toEqual(["GET", "GET"]);
   });
+});
+
+describe("P4 — R-24's charge-id half: the same processor id is not enough to adopt a document", () => {
+  const CHARGE = "c0ffee00c0ffee00c0ffee00c0ffee00";
+  const refund = {
+    chargeId: CHARGE, transactionId: "7501", issuedOn: new Date("2026-10-05T10:00:00Z"),
+    refundTotalMicros: 1_000_000, original: { documentId: "1", number: "Q-1" }, description: "Gutschrift"
+  };
+  /** Lists `listed` on every GET and books a new document on POST; remembers each call's method and path. */
+  function stubListing(listed: unknown): { fetch: typeof fetch; calls: string[] } {
+    const calls: string[] = [];
+    return {
+      calls,
+      fetch: async (input, init) => {
+        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+        const method = init?.method ?? "GET";
+        calls.push(`${method} ${url.pathname}`);
+        const body = method === "GET" ? [listed]
+          : { id: 9901, number: "Q-9901", permalink: "https://quaderno.test/documents/9901" };
+        return new Response(JSON.stringify(body), { status: method === "GET" ? 200 : 201, headers: { "content-type": "application/json" } });
+      }
+    };
+  }
+  const cases = [
+    ["this transaction's processor id under another charge id",
+      { id: 7777, number: "Q-7777", processor_id: "7501", custom_metadata: { charge_id: "d00dfeedd00dfeedd00dfeedd00dfeed" }, permalink: "https://quaderno.test/documents/7777" }],
+    ["this transaction's processor id and no custom_metadata (a document made by hand in Quaderno's dashboard)",
+      { id: 7778, number: "Q-7778", processor_id: "7501", permalink: "https://quaderno.test/documents/7778" }]
+  ] as const;
+
+  for (const [label, listed] of cases) {
+    it(`posts a new sale, never adopting a listed one with ${label}`, async () => {
+      const stub = stubListing(listed);
+      const local = new QuadernoTaxEngine({ baseUrl: "https://quaderno.test/api", apiKey: "fake", fetch: stub.fetch });
+      expect(await local.recordSale(sale("7501"))).toEqual({ documentId: "9901", number: "Q-9901", url: "https://quaderno.test/documents/9901" });
+      expect(stub.calls).toEqual(["GET /api/invoices", "POST /api/transactions"]);
+    });
+
+    it(`posts a new credit, never adopting a listed one with ${label}`, async () => {
+      const stub = stubListing(listed);
+      const local = new QuadernoTaxEngine({ baseUrl: "https://quaderno.test/api", apiKey: "fake", fetch: stub.fetch });
+      expect(await local.recordRefund(refund)).toEqual({ documentId: "9901", number: "Q-9901" });
+      expect(stub.calls).toEqual(["GET /api/credits", "POST /api/transactions"]);
+    });
+  }
 });
 
 describe("P4 — numbers keep their source text (the P3 review's rule, applied to Quaderno)", () => {

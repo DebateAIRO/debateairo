@@ -5,6 +5,9 @@
 // text and document numbers are kept — they are what the fixtures exist to pin.
 //   pnpm exec tsx tools/billing/scrub-connector-fixture.ts --capture <capture file> --out tests/fixtures/<connector> \
 //     --recorded-on 2026-10-02 [--secret <a VAT id, CIF or e-mail to erase>]…
+// A secret is erased wherever it appears, also inside a longer text (a booked invoice may echo the buyer's VAT id in a
+// sentence), and a VAT id given with its two country letters (DE811569869) is also erased without them (811569869).
+// Afterwards, search every fixture for the id with AND without its country letters.
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,22 +44,58 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** A VAT id's two country letters and what follows (at least six characters, with a digit): DE811569869 -> 811569869. */
+const COUNTRY_PREFIXED_ID = /^[A-Za-z]{2}([0-9A-Za-z+*]{6,})$/u;
+/** At most this many erasing rounds; a text still changing after them (a pathological secret list) is refused. */
+const SECRET_ROUNDS = 8;
+
+/** Every form of the secrets to erase, longest first; an empty one, or one inside the placeholder, would never settle. */
+function secretForms(secrets: ReadonlyArray<string>): string[] {
+  const forms = new Set<string>();
+  for (const secret of secrets) {
+    forms.add(secret);
+    const bare = COUNTRY_PREFIXED_ID.exec(secret)?.[1];
+    if (bare !== undefined && /[0-9]/u.test(bare)) forms.add(bare);
+  }
+  return [...forms].filter((form) => form.length > 0 && !SECRET_PLACEHOLDER.includes(form))
+    .sort((left, right) => right.length - left.length);
+}
+
+/**
+ * Replaces every occurrence of every secret form with the placeholder, repeating until nothing changes, so a second
+ * pass with the same secrets changes nothing (idempotent). Stateless: the result depends only on the inputs.
+ */
+function eraseSecrets(value: string, forms: ReadonlyArray<string>): string {
+  let current = value;
+  for (let round = 0; round < SECRET_ROUNDS; round += 1) {
+    const next = forms.reduce((text, form) => text.split(form).join(SECRET_PLACEHOLDER), current);
+    if (next === current) return current;
+    current = next;
+  }
+  throw new TypeError("CONNECTOR_SECRET_SCRUB_UNSTABLE");
+}
+
 export function scrubConnectorValue(value: unknown, secrets: ReadonlyArray<string>, key = ""): unknown {
+  return scrubWith(value, secretForms(secrets), key);
+}
+
+function scrubWith(value: unknown, forms: ReadonlyArray<string>, key: string): unknown {
   const name = key.toLowerCase();
-  if (Array.isArray(value)) return value.map((item) => scrubConnectorValue(item, secrets));
+  if (Array.isArray(value)) return value.map((item) => scrubWith(item, forms, ""));
   if (isRecord(value)) {
-    return Object.fromEntries(Object.entries(value).map(([childKey, child]) => [childKey, scrubConnectorValue(child, secrets, childKey)]));
+    return Object.fromEntries(Object.entries(value).map(([childKey, child]) => [childKey, scrubWith(child, forms, childKey)]));
   }
   if (typeof value !== "string") return value;
-  if (secrets.includes(value)) return SECRET_PLACEHOLDER;
+  // The secrets first, wherever they appear; the field rules below then see the erased text (so a second pass agrees).
+  const text = eraseSecrets(value, forms);
   if (NAME_KEYS.has(name)) return NAME_KEYS.get(name)!;
   if (SCRUBBED_KEYS.has(name)) return "SCRUBBED";
-  if (EMAIL.test(value)) return value.endsWith("@example.test") ? value : "person@example.test";
-  if (IPV4.test(value)) return "203.0.113.10";
+  if (EMAIL.test(text)) return text.endsWith("@example.test") ? text : "person@example.test";
+  if (IPV4.test(text)) return "203.0.113.10";
   for (const host of ACCOUNT_HOSTS) {
-    if (host.pattern.test(value)) return value.replace(host.pattern, host.replacement);
+    if (host.pattern.test(text)) return text.replace(host.pattern, host.replacement);
   }
-  return value;
+  return text;
 }
 
 export function writeConnectorFixtures(input: Readonly<{

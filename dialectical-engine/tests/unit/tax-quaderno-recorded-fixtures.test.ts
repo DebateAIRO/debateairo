@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 import { QuadernoTaxEngine } from "@debateai/tax-quaderno";
 import {
   QUADERNO_RECORDING_STEPS,
+  quadernoRecordingCompanyRefund,
+  quadernoRecordingCompanySale,
   quadernoRecordingRefund,
   quadernoRecordingSale,
   type RecordedExchange
@@ -38,6 +40,19 @@ async function replayed<T>(step: string, use: (engine: QuadernoTaxEngine) => Pro
 
 const firstQuery = (step: string): Readonly<Record<string, string>> => fixture(step).exchanges[0]!.request.query;
 
+/** The step's POST /transactions exchange (the booking itself). */
+function posted(step: string): RecordedExchange {
+  const found = fixture(step).exchanges.find((exchange) => exchange.request.method === "POST");
+  if (found === undefined) throw new Error(`${step}: the recording holds no POST /transactions`);
+  return found;
+}
+
+/** Quaderno's own total for a booked document, in dollars (it answers total_cents or total). */
+function quadernoTotal(exchange: RecordedExchange): number {
+  const reply = exchange.response.body as { total_cents?: unknown; total?: unknown };
+  return typeof reply.total_cents === "number" ? reply.total_cents / 100 : Number(reply.total);
+}
+
 describe.runIf(fixtures.length > 0)("P4 — the recorded Quaderno sandbox run", () => {
   it("holds every step, each answered without a refusal", () => {
     expect(QUADERNO_RECORDING_STEPS.filter((step) => !fixtures.some((candidate) => candidate.step === step)), "missing steps").toEqual([]);
@@ -66,11 +81,9 @@ describe.runIf(fixtures.length > 0)("P4 — the recorded Quaderno sandbox run", 
     const sale = await replayed("record-sale", (engine) => engine.recordSale(quadernoRecordingSale(transactionId)));
     expect(sale.number.length).toBeGreaterThan(0);
     // The ⚠ fact: our items[].amount is the line INCLUDING tax. Quaderno's own total for the booked sale must be it.
-    const posted = fixture("record-sale").exchanges.find((exchange) => exchange.request.method === "POST")!;
-    const sent = (posted.request.body as { items: Array<{ amount: number }> }).items[0]!.amount;
-    const reply = posted.response.body as { total_cents?: unknown; total?: unknown };
-    const total = typeof reply.total_cents === "number" ? reply.total_cents / 100 : Number(reply.total);
-    expect(total, "Quaderno's total for the sale (total_cents or total)").toBe(sent);
+    const booking = posted("record-sale");
+    const sent = (booking.request.body as { items: Array<{ amount: number }> }).items[0]!.amount;
+    expect(quadernoTotal(booking), "Quaderno's total for the sale (total_cents or total)").toBe(sent);
     const again = await replayed("record-sale-again", (engine) => engine.recordSale(quadernoRecordingSale(transactionId)));
     expect(again).toEqual(sale);
   });
@@ -81,5 +94,32 @@ describe.runIf(fixtures.length > 0)("P4 — the recorded Quaderno sandbox run", 
     const refund = await replayed("record-refund", (engine) => engine.recordRefund(quadernoRecordingRefund(transactionId, sale)));
     expect(await replayed("record-refund-again", (engine) => engine.recordRefund(quadernoRecordingRefund(transactionId, sale))))
       .toEqual(refund);
+  });
+
+  it("looks the second transaction up while the first one's documents exist, and finds nothing: the processor_id filter works", () => {
+    const firstId = firstQuery("record-sale").processor_id!;
+    const secondId = firstQuery("record-company-sale").processor_id;
+    expect(secondId, "the company pair must run under a second, fresh transaction id").not.toBe(firstId);
+    for (const [step, path] of [["record-company-sale", "/invoices"], ["record-company-refund", "/credits"]] as const) {
+      const lookup = fixture(step).exchanges[0]!;
+      expect(lookup.request, `${step}: its first call must be the GET ${path} lookup by the second id`)
+        .toEqual({ method: "GET", path, query: { processor_id: secondId }, body: null });
+      // A lookup that ignored processor_id would have listed the first pair's sale or credit here.
+      expect(lookup.response.body, `${step}: Quaderno ignored the processor_id filter — GET ${path} for a new id listed documents`)
+        .toEqual([]);
+    }
+  });
+
+  it("books the reverse-charge company sale at 0 VAT (its total is the net sent) and its refund, with the request the client sends today", async () => {
+    const secondId = firstQuery("record-company-sale").processor_id!;
+    const customer = (posted("record-company-sale").request.body as { customer: { country: string; tax_id: string } }).customer;
+    expect(customer.tax_id, "the scrubbed VAT id").toBe("SCRUBBED-ID");
+    const record = quadernoRecordingCompanySale(secondId, customer.country, customer.tax_id);
+    const sale = await replayed("record-company-sale", (engine) => engine.recordSale(record));
+    expect(sale.number.length).toBeGreaterThan(0);
+    const net = record.lines[0]!.netMicros / 1_000_000;
+    expect(quadernoTotal(posted("record-company-sale")), "Quaderno's total for the company sale must be the net sent (0 VAT)").toBe(net);
+    const refund = await replayed("record-company-refund", (engine) => engine.recordRefund(quadernoRecordingCompanyRefund(secondId, sale)));
+    expect(refund.number.length).toBeGreaterThan(0);
   });
 });
