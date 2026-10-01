@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import { authorizationPolicyInventory, buildApi } from "@debateai/api";
 import { BillingPlansResponseSchema, contractInventory } from "@debateai/contract";
@@ -87,5 +88,150 @@ describe("P8a GET /v1/billing/plans", () => {
     expect(paths.indexOf("GET /v1/billing/plans")).toBe(paths.indexOf("GET /v1/billing/usage") + 1);
     const routes = contractInventory.routes as readonly string[];
     expect(routes.indexOf("GET /v1/billing/plans")).toBe(routes.indexOf("GET /v1/billing/usage") + 1);
+  });
+});
+
+/**
+ * P8a's production wiring (F33 class, the B7a judge's ruling): apps/api/src/main.ts hands buildApi the billing
+ * runtime's routes, and those routes carry L4's own legal gate. Source pins, not a call of createBillingRuntime:
+ * from P12d its required() helper refuses to compose without inputs this task does not pass, and P23's whole-flow
+ * test exercises runtime.routes behaviourally. The pins read only TOP-LEVEL members of each object literal, because
+ * from P8b the services built inside the routes literal also receive `plans: deps.plans` / `legal: deps.legal`, and
+ * a substring match would still pass with the top-level member gone. They tolerate whitespace, comments and the
+ * members later tasks append.
+ */
+describe("P8a the API root hands the billing runtime's routes to buildApi", () => {
+  /** The source with every comment and string body blanked (same length), so brackets and commas in them never count. */
+  function code(source: string): string {
+    let out = "";
+    let i = 0;
+    while (i < source.length) {
+      const c = source[i] ?? "";
+      const next = source[i + 1] ?? "";
+      if (c === "/" && next === "/") {
+        while (i < source.length && source[i] !== "\n") { out += " "; i += 1; }
+      } else if (c === "/" && next === "*") {
+        const end = source.indexOf("*/", i + 2);
+        const stop = end === -1 ? source.length : end + 2;
+        for (; i < stop; i += 1) out += source[i] === "\n" ? "\n" : " ";
+      } else if (c === "\"" || c === "'" || c === "`") {
+        out += c;
+        i += 1;
+        while (i < source.length && source[i] !== c) {
+          if (source[i] === "\\") { out += " "; i += 1; }
+          out += source[i] === "\n" ? "\n" : " ";
+          i += 1;
+        }
+        out += c;
+        i += 1;
+      } else {
+        out += c;
+        i += 1;
+      }
+    }
+    return out;
+  }
+
+  /** The index of the bracket that closes the one at `open`, in blanked source. */
+  function closing(text: string, open: number): number {
+    let depth = 0;
+    for (let i = open; i < text.length; i += 1) {
+      const c = text[i];
+      if (c === "(" || c === "[" || c === "{") depth += 1;
+      else if (c === ")" || c === "]" || c === "}") {
+        depth -= 1;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  /** The depth-1 members of the object literal whose `{` is at `open`, whitespace collapsed. */
+  function topLevelMembers(text: string, open: number): string[] {
+    expect(text[open]).toBe("{");
+    const close = closing(text, open);
+    expect(close).toBeGreaterThan(open);
+    const members: string[] = [];
+    let depth = 0;
+    let start = open + 1;
+    for (let i = open + 1; i < close; i += 1) {
+      const c = text[i];
+      if (c === "(" || c === "[" || c === "{") depth += 1;
+      else if (c === ")" || c === "]" || c === "}") depth -= 1;
+      else if (c === "," && depth === 0) {
+        members.push(text.slice(start, i));
+        start = i + 1;
+      }
+    }
+    members.push(text.slice(start, close));
+    return members.map((member) => member.replace(/\s+/gu, " ").trim()).filter((member) => member !== "");
+  }
+
+  /** The `{` that a match of `pattern` (ending at that brace) opens; the pattern must match exactly once. */
+  function braceAfter(text: string, pattern: RegExp, from = 0, to = text.length): number {
+    const region = text.slice(from, to);
+    const matches = [...region.matchAll(new RegExp(pattern.source, "gu"))];
+    expect(matches.length, `${pattern.source} matches once`).toBe(1);
+    const match = matches[0];
+    const index = from + (match?.index ?? 0) + (match?.[0].length ?? 0) - 1;
+    expect(text[index]).toBe("{");
+    return index;
+  }
+
+  it("spreads the billing runtime's routes into the billing options main.ts hands buildApi", async () => {
+    const main = code(await readFile("apps/api/src/main.ts", "utf8"));
+    const start = main.search(/const\s+billingRouteOptions\s*:\s*BillingRouteOptions\s*\|\s*undefined\s*=/u);
+    expect(start).toBeGreaterThan(-1);
+    const end = main.indexOf(";", start);
+    expect(end).toBeGreaterThan(start);
+    expect(main.slice(start, end + 1)).toMatch(
+      /\.\.\.\(\s*billingRuntime\s*===\s*undefined\s*\?\s*\{\s*\}\s*:\s*billingRuntime\.routes\s*\)/u
+    );
+  });
+
+  it("composes the runtime with L4's legal gate, main.ts's own binding, never an inline object", async () => {
+    const main = code(await readFile("apps/api/src/main.ts", "utf8"));
+    const open = braceAfter(main, /\bcreateBillingRuntime\(\s*\{/u);
+    const legal = topLevelMembers(main, open).filter((member) => /^legal\b/u.test(member));
+    expect(legal.length, "createBillingRuntime gets one top-level legal member").toBe(1);
+    expect(legal[0]).toMatch(/^legal(?:\s*:\s*legal)?$/u);
+    expect(main.match(/\bconst\s+legal\s*=\s*new\s+RepositoryLegalAcceptanceApplication\(/gu)?.length).toBe(1);
+    // No second binding named legal (a shadow inside the billing-runtime closure, say) can stand in for L4's.
+    expect(main.match(/\b(?:const|let|var)\s+legal\b/gu)?.length).toBe(1);
+  });
+
+  it("puts plans and the legal gate at the top level of the runtime's routes, and returns those routes", async () => {
+    const runtime = code(await readFile("apps/api/src/billing/runtime.ts", "utf8"));
+    const signature = runtime.search(/export\s+function\s+createBillingRuntime\(/u);
+    expect(signature).toBeGreaterThan(-1);
+    const params = runtime.indexOf("(", signature);
+    const bodyOpen = runtime.indexOf("{", closing(runtime, params));
+    const bodyClose = closing(runtime, bodyOpen);
+    expect(bodyClose).toBeGreaterThan(bodyOpen);
+
+    const routesOpen = braceAfter(
+      runtime, /\bconst\s+routes\s*(?::[^=]+)?=\s*(?:Object\.freeze\(\s*)?\{/u, bodyOpen, bodyClose
+    );
+    const routes = topLevelMembers(runtime, routesOpen);
+    expect(routes.filter((member) => /^plans\s*:\s*deps\.plans$/u.test(member)), routes.join(" | ")).toHaveLength(1);
+    expect(routes.filter((member) => /^legal\s*:\s*deps\.legal$/u.test(member)), routes.join(" | ")).toHaveLength(1);
+
+    // The function's own return (depth 0 of its body; nested helpers' returns sit deeper) lists `routes`.
+    const returns: number[] = [];
+    let depth = 0;
+    for (let i = bodyOpen + 1; i < bodyClose; i += 1) {
+      const c = runtime[i];
+      if (c === "(" || c === "[" || c === "{") depth += 1;
+      else if (c === ")" || c === "]" || c === "}") depth -= 1;
+      else if (depth === 0 && runtime.startsWith("return", i)
+        && !/[\w$]/u.test(runtime[i - 1] ?? "") && !/[\w$]/u.test(runtime[i + 6] ?? "")) {
+        returns.push(i);
+      }
+    }
+    expect(returns.length, "createBillingRuntime has one top-level return").toBe(1);
+    const returned = /^return\s+(?:Object\.freeze\(\s*)?\{/u.exec(runtime.slice(returns[0]));
+    expect(returned, "createBillingRuntime returns an object literal").not.toBeNull();
+    const returnOpen = (returns[0] ?? 0) + (returned?.[0].length ?? 0) - 1;
+    expect(topLevelMembers(runtime, returnOpen)).toContainEqual(expect.stringMatching(/^routes(?:\s*:\s*routes)?$/u));
   });
 });
