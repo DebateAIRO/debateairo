@@ -2,11 +2,16 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
-import type { XMoneyStatus, XMoneyTransaction } from "@debateai/payments-xmoney";
+import type { XMoneyNotice, XMoneyStatus, XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPlans } from "@debateai/register";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
 import { CheckoutService, type CheckoutDeps, type ConsentKind } from "../../apps/api/src/billing/checkout.js";
+import { NoticeIntake } from "../../apps/api/src/billing/notice-intake.js";
+import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
 import { QuoteService } from "../../apps/api/src/billing/quote.js";
+import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
+import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
+import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { consentDocument } from "../../apps/ui/scripts/legal-consent-manifest.mjs";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
 import { AdjustableTaxEngine, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy } from "./billingFixtures.js";
@@ -28,6 +33,9 @@ export class MutableClock {
   readonly read = (): Date => this.now;
   advance(ms: number): void { this.now = new Date(this.now.getTime() + ms); }
 }
+
+/** The expected side of an `eventKinds` comparison. */
+export const kindsOf = (...kinds: string[]): string[] => [...kinds].sort();
 
 /**
  * `work`, or `POOL_STARVED` after `ms`: a pool whose connections all wait on each other never settles, and the test
@@ -256,6 +264,19 @@ export type BillingHarness = Readonly<{
     ownerRef?: string; userId?: string; planId?: "PLUS" | "PRO" | "MAX"; country?: string; chargeId?: string;
     countryConfirmed?: boolean; company?: Readonly<{ name: string; vatId: string; address: string }>;
   }>): Promise<Purchase>;
+  refunds: RefundDesk;
+  verify: VerifyPaymentHandler;
+  worker: BillingOutboxWorker;
+  notices: NoticeIntake;
+  /** An opaque "opensslResult" that the harness's notice intake decrypts to this transaction's notice. */
+  noticeFor(transaction: XMoneyTransaction): string;
+  /** Enqueues VERIFY_PAYMENT for a transaction, as a notice or a rebill would, and drains the worker. */
+  settle(transactionId: string, payload?: Readonly<Record<string, string | null>>): Promise<void>;
+  activate(input?: Parameters<BillingHarness["buy"]>[0] & Readonly<{ cardCountry?: string }>): Promise<Purchase & Readonly<{ transaction: XMoneyTransaction }>>;
+  outboxRows(ref: string): Promise<Array<Readonly<{ kind: string; ref: string; done: boolean; dead: boolean; lastErrorCode: string | null; notBefore: Date; payload: Readonly<Record<string, unknown>> }>>>;
+  entitlementRows(ownerRef: string): Promise<Array<Readonly<{ planId: string; cause: string; paidThrough: Date | null }>>>;
+  /** The charge's event kinds as a sorted multiset: events written in one transaction share one instant. */
+  eventKinds(chargeId: string): Promise<string[]>;
   stop(): Promise<void>;
 }>;
 
@@ -285,6 +306,26 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   };
   const checkoutWith = (overrides: Partial<CheckoutDeps>): CheckoutService => new CheckoutService({ ...checkoutDeps, ...overrides } as CheckoutDeps);
   const checkout = checkoutWith({});
+  const refunds = new RefundDesk({ repository, jobs, xmoney, policy: testBillingPolicy, audit, clock: clock.read });
+  const verify = new VerifyPaymentHandler({
+    repository, jobs, xmoney, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy, recordsKey, audit,
+    xmoneyEnvironment: "stage"
+  });
+  verify.registerSettlement("INITIAL", createInitialSettlement({
+    repository, entitlements, acceptances, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
+  }));
+  const worker = new BillingOutboxWorker({ repository, workerId: "harness", clock: clock.read, audit, batchSize: 20 });
+  worker.register("VERIFY_PAYMENT", verify.handle);
+  worker.register("XMONEY_REFUND", refunds.handle);
+  const noticeTokens = new Map<string, XMoneyNotice>();
+  const notices = new NoticeIntake({
+    repository, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
+    decrypt: (token) => {
+      const notice = noticeTokens.get(token);
+      if (notice === undefined) throw new Error("UNDECRYPTABLE");
+      return notice;
+    }
+  });
   /** A quote service under another `billingPlans` version (a price published later; P11a's price test). */
   const quotesWith = (plans: BillingPlans): QuoteService => new QuoteService({
     repository, tax, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy, plans, recordsKey, audit
@@ -316,6 +357,48 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
         totalDecimal: microsToDecimal(charge.totalMicros), orderPayload: started.orderPayload,
         orderChecksum: started.orderChecksum, reused: started.reused
       });
+    },
+    refunds, verify, worker, notices,
+    noticeFor(transaction) {
+      const token = `notice-${randomUUID()}`;
+      noticeTokens.set(token, Object.freeze({
+        transactionStatus: transaction.status, orderId: transaction.orderId, externalOrderId: transaction.externalOrderId,
+        transactionId: transaction.transactionId, customerId: transaction.customerId, amountDecimal: transaction.amountDecimal,
+        currency: transaction.currency, cardId: transaction.cardId, timestamp: null
+      }));
+      return token;
+    },
+    async settle(transactionId, payload = {}) {
+      await repository.withTransaction((client) => repository.enqueue(client, {
+        kind: "VERIFY_PAYMENT", ref: transactionId, notBefore: clock.now, payload
+      }));
+      await worker.drain(10);
+    },
+    async activate(input = {}) {
+      const bought = await this.buy(input);
+      const transaction = xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: input.cardCountry ?? "RO" });
+      await this.settle(transaction.transactionId);
+      return Object.freeze({ ...bought, transaction });
+    },
+    async outboxRows(ref) {
+      const result = await database.pool.query<{ kind: string; ref: string; done_at: Date | null; dead_at: Date | null; last_error_code: string | null; not_before: Date; payload: Record<string, unknown> }>(
+        "SELECT kind, ref, done_at, dead_at, last_error_code, not_before, payload FROM billing.outbox WHERE ref=$1 OR ref LIKE $2 ORDER BY not_before, kind",
+        [ref, `%${ref}%`]
+      );
+      return result.rows.map((row) => Object.freeze({
+        kind: row.kind, ref: row.ref, done: row.done_at !== null, dead: row.dead_at !== null,
+        lastErrorCode: row.last_error_code, notBefore: row.not_before, payload: row.payload
+      }));
+    },
+    async entitlementRows(ownerRef) {
+      const result = await database.pool.query<{ plan_id: string; cause: string; paid_through: Date | null }>(
+        "SELECT plan_id, cause, paid_through FROM billing.entitlement_event WHERE owner_ref=$1 AND cause <> 'SIGNED_UP_FREE' ORDER BY effective_at, event_id",
+        [ownerRef]
+      );
+      return result.rows.map((row) => Object.freeze({ planId: row.plan_id, cause: row.cause, paidThrough: row.paid_through }));
+    },
+    async eventKinds(chargeId) {
+      return ((await repository.charge(chargeId))?.events ?? []).map((event) => event.kind).sort();
     },
     async stop() { await database.stop(); }
   });

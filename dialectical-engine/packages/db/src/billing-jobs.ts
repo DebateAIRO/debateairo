@@ -60,6 +60,42 @@ export class BillingJobQueries {
     }
   }
 
+  /**
+   * The stage an external call reached, kept in the open job's own `last_error_code` (A19 grants UPDATE on that
+   * column). A later attempt tells "the call may have moved money / created the document" (the stage is still there:
+   * the process died mid-call) from "the call proved nothing was sent" (the worker overwrote it with that code).
+   * RefundDesk (P9b) and the SmartBill jobs (P10b, A17b) use it.
+   */
+  async markJobStage(jobId: string, code: string): Promise<void> {
+    await this.pool.query(
+      "UPDATE billing.outbox SET last_error_code=$2 WHERE job_id=$1 AND done_at IS NULL AND dead_at IS NULL", [jobId, code]
+    );
+  }
+
+  async jobStage(jobId: string): Promise<string | null> {
+    const result = await this.pool.query<{ last_error_code: string | null }>(
+      "SELECT last_error_code FROM billing.outbox WHERE job_id=$1", [jobId]
+    );
+    return result.rows[0]?.last_error_code ?? null;
+  }
+
+  /**
+   * A1(1): the charge that recorded this xMoney transaction in an event of `kind` (any kind when null), in ONE xMoney
+   * system (D5 5h): stage and live number their transactions separately, so a live id never matches a stage row.
+   * The event's `xmoney_environment` is its charge's (P1a's foreign key on `(charge_id, xmoney_environment)`).
+   */
+  async chargeIdForTransaction(
+    transactionId: string, kind: string | null, environment: CustomerXMoneyEnvironment
+  ): Promise<string | null> {
+    const result = await this.pool.query<{ charge_id: string }>(
+      `SELECT charge_id FROM billing.charge_event
+        WHERE xmoney_transaction_id=$1 AND ($2::text IS NULL OR kind=$2) AND xmoney_environment=$3
+        ORDER BY at LIMIT 1`,
+      [transactionId, kind, environment]
+    );
+    return result.rows[0]?.charge_id ?? null;
+  }
+
   async outboxJobExists(client: PoolClient, kind: string, ref: string): Promise<boolean> {
     const result = await client.query("SELECT 1 FROM billing.outbox WHERE kind=$1 AND ref=$2 LIMIT 1", [kind, ref]);
     return result.rowCount !== null && result.rowCount > 0;

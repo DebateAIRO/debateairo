@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import type { ReadableUserDekStore } from "@debateai/crypto";
-import { AcceptanceRepository, BillingJobQueries, BillingRepository } from "@debateai/db";
+import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
 import { currentDocument } from "@debateai/legal-manifest";
 import { decryptNotice } from "@debateai/payments-xmoney";
@@ -16,7 +16,10 @@ import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
 import { NoticeIntake } from "./notice-intake.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { QuoteService } from "./quote.js";
+import { RefundDesk } from "./refunds.js";
+import { createInitialSettlement } from "./settlement-initial.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
+import { VerifyPaymentHandler } from "./verify-payment.js";
 
 /**
  * Everything billing needs, composed once in apps/api/src/main.ts, and only when hosted with billing on (P6a builds
@@ -56,6 +59,10 @@ export type BillingRuntime = Readonly<{
   checkout: CheckoutService;
   /** P8a onward: the billing routes' members this runtime composes (main.ts's `billingRouteOptions`). */
   routes: BillingRouteOptions;
+  /** P9b: VERIFY_PAYMENT; P11a and P12 register their charge kinds' settlements on it. */
+  verify: VerifyPaymentHandler;
+  /** P9b (R-32): the one refund executor; P12d and P12e move money back through it. */
+  refunds: RefundDesk;
   kick(): void;
   start(): void;
   stop(): void;
@@ -70,6 +77,20 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     repository, workerId: `billing-api-${process.pid}-${randomUUID()}`, clock: deps.clock, audit: deps.audit,
     batchSize: 20
   });
+  const entitlements = new EntitlementRepository(deps.pool);
+  const refunds = new RefundDesk({
+    repository, jobs, xmoney: deps.connectors.xmoney, policy: deps.policy, audit: deps.audit, clock: deps.clock
+  });
+  outbox.register("XMONEY_REFUND", refunds.handle);
+  const verify = new VerifyPaymentHandler({
+    repository, jobs, xmoney: deps.connectors.xmoney, refunds, entitlements, countryPolicy: deps.countryPolicy,
+    policy: deps.policy, recordsKey: deps.connectors.recordsKey, audit: deps.audit,
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+  });
+  verify.registerSettlement("INITIAL", createInitialSettlement({
+    repository, entitlements, acceptances, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl
+  }));
+  outbox.register("VERIFY_PAYMENT", verify.handle);
   const attachments = new Map<BillingAttachmentKind, AttachmentResolver>(deps.mail?.attachments ?? []);
   if (deps.mail !== undefined) {
     outbox.register("EMAIL", createEmailJobHandler({
@@ -107,6 +128,8 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     outbox,
     checkout,
     routes,
+    verify,
+    refunds,
     kick: drain,
     start() {
       if (timers.length > 0) return;
