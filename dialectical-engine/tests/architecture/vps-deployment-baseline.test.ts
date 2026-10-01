@@ -912,3 +912,53 @@ describe("VPS baseline: the country data refresh (paid plans G4)", () => {
     expect(readme.indexOf("systemctl start debateai-geoip-refresh.service")).toBeGreaterThan(-1);
   });
 });
+
+/**
+ * Found while judging paid plans G4: backup.sh and restore-drill.sh were committed 100644 from
+ * d38b7511 on. systemd runs a unit's Exec*= program directly, a shell runs a path the same way, and
+ * Linux refuses a file without the execute bit even to root — the nightly backup failed 203/EXEC
+ * before it wrote anything, and the drill with "Permission denied". The pins above read the
+ * scripts' text and no test runs them, so only the mode git commits catches this. It is read for
+ * every kit file the units or the runbook run by its path, not for a fixed list.
+ */
+describe("VPS baseline: every kit file run by its path is committed executable", () => {
+  const ENGINE_ON_HOST = "/opt/debateai/dialectical-engine/";
+
+  /** The engine-relative paths (`deploy/…`) of the programs that name a file in the kit. */
+  function kitFiles(programs: ReadonlyArray<string>): string[] {
+    return [...new Set(programs.filter((program) => program.startsWith(`${ENGINE_ON_HOST}deploy/`))
+      .map((program) => program.slice(ENGINE_ON_HOST.length)))].sort();
+  }
+
+  /** `<git mode> <path>` for each path not committed 100755; a path git does not track reads `untracked`. */
+  function notExecutable(paths: ReadonlyArray<string>): string[] {
+    return paths.map((path) => {
+      const mode = execFileSync("git", ["ls-files", "-s", "--", path], { cwd: engineRoot, encoding: "utf8" }).split(" ")[0];
+      return `${mode || "untracked"} ${path}`;
+    }).filter((line) => !line.startsWith("100755 "));
+  }
+
+  it("a unit's Exec*= program in the kit is committed 100755", () => {
+    const units = readdirSync(resolve(engineRoot, "deploy/vps/systemd")).filter((name) => name.endsWith(".service"));
+    // The program is the first word of the command line, after systemd's prefixes (-, @, :, +, !).
+    const programs = kitFiles(units.flatMap((unit) => [...read(`deploy/vps/systemd/${unit}`)
+      .matchAll(/^\s*Exec[A-Za-z]*\s*=\s*[-@:+!]*(\S+)/gmu)].map((match) => match[1] ?? "")));
+    for (const known of ["deploy/vps/backup.sh", "deploy/vps/geoip-refresh.sh"]) expect(programs).toContain(known);
+    expect(notExecutable(programs)).toEqual([]);
+  });
+
+  it("a script the README runs by its /opt path is committed 100755", () => {
+    const programs: string[] = [];
+    for (const block of read("deploy/vps/README.md").matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      const lines = (block[1] ?? "").replace(/\\\n\s*/gu, " ").split("\n").filter((line) => !line.trim().startsWith("#"));
+      for (const command of lines.flatMap((line) => line.split(/&&|\|\||[;|]/u))) {
+        // The program is the first word after any leading NAME=value assignments.
+        const program = /^[\s(]*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s"'])*\s+)*(\S+)/u.exec(command)?.[1];
+        if (program !== undefined) programs.push(program);
+      }
+    }
+    const scripts = kitFiles(programs);
+    expect(scripts).toContain("deploy/vps/restore-drill.sh");
+    expect(notExecutable(scripts)).toEqual([]);
+  });
+});

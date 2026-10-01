@@ -810,9 +810,10 @@ checkout in place, with its dependencies installed: this release adds the `mmdb-
    changed). After that backup the owner runs the drill once: §9 "Owner confirmation — the records
    key in escrow" (OWNER-RUN). Both scripts must be executable on this host; check with
    `ls -l /opt/debateai/dialectical-engine/deploy/vps/backup.sh /opt/debateai/dialectical-engine/deploy/vps/restore-drill.sh`.
-   The kit commits them without the execute bit, a gap older than this release that is fixed
-   separately. Until both show `x`, `debateai-backup.service` cannot start `backup.sh` (`203/EXEC`),
-   so no nightly backup runs at all, and the drill cannot start.
+   The kit committed them without the execute bit from their first commit through this release;
+   the fix that followed it commits both executable. Until both show `x`, `debateai-backup.service`
+   cannot start `backup.sh` (`203/EXEC`), so no nightly backup runs at all, and the drill cannot
+   start.
 6. **Leave the country gate off.** Nothing in this release turns it on: a hosted file without the
    `countryPolicy` member — every file copied from the kit's example — publishes no row. It stays
    off until every condition in §5 "Country data" holds; that section says how to turn it on.
