@@ -65,8 +65,9 @@ let database: TestDatabase;
  * The pool's one encrypted owner. `provisionStoryEncryptedOwner` configures the
  * pool's content cipher, which a pool takes once (CONTENT_CIPHER_ALREADY_CONFIGURED),
  * so both cases ask as this owner; each case keeps its own day. Billing off writes
- * no entitlement and pins no run, so the billing-on case still meets the owner's
- * Free sign-up for the first time.
+ * no entitlement and pins no run, so the billing-on case should meet the owner's
+ * Free sign-up for the first time; it checks that premise (no entitlement event
+ * for this owner yet) before it asks.
  */
 let owner: StoryEncryptedOwner;
 let now = new Date("2031-10-01T10:00:00.000Z");
@@ -632,6 +633,8 @@ describe("budget spec §2.14 — one hosted debate under a tiny daily limit wait
   }, 300_000);
 
   it("with billing on: a Free owner's question waits for the site's day, wakes pinned to its person, and answers", async () => {
+    // The owner's first question with billing on, and billing off writes none: the one SIGNED_UP_FREE checked after the answer is this ask's.
+    expect((await database.pool.query("SELECT 1 FROM billing.entitlement_event WHERE owner_ref=$1::uuid", [owner.ownerRef])).rowCount).toBe(0);
     await waitWakeAndAnswer({
       label: "budget-e2e-billing-on",
       billing: true,
