@@ -321,7 +321,7 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     expect(due.some((state) => state.subscriptionId === healthy)).toBe(true);
     expect(invalid.filter((subscriptionId) => subscriptionId === poisoned)).toHaveLength(1);
     // The broken one takes no limit slot.
-    expect(await billing.dueRenewals(edge, 300_000, 1, { environment: "stage" })).toHaveLength(1);
+    expect((await billing.dueRenewals(edge, 300_000, due.length, { environment: "stage" })).map((state) => state.subscriptionId)).toEqual(due.map((state) => state.subscriptionId));
     // A read for that one owner still fails closed.
     await expect(billing.subscriptionForOwner(poisonedOwner)).rejects.toMatchObject({ code: "BILLING_SUBSCRIPTION_EVENTS_INVALID" });
   });
@@ -420,7 +420,9 @@ describe("P1b — invoices, notices and the tax summary", () => {
     expect(await billing.withTransaction((c) => billing.insertNotice(c, notice))).toBe("INSERTED");
     expect(await billing.withTransaction((c) => billing.insertNotice(c, { ...notice, noticeId: randomUUID() }))).toBe("DUPLICATE");
     await billing.withTransaction((c) => billing.recordNoticeOutcome(c, { noticeId: notice.noticeId, at: new Date(), outcome: "VERIFY_ENQUEUED" }));
-    await billing.withTransaction((c) => billing.recordNoticeOutcome(c, { noticeId: notice.noticeId, at: new Date(), outcome: "VERIFY_ENQUEUED" }));
+    await billing.withTransaction((c) => billing.recordNoticeOutcome(c, { noticeId: notice.noticeId, at: new Date(), outcome: "DUPLICATE" }));
+    const outcomes = await database.pool.query<{ outcome: string }>("SELECT outcome FROM billing.xmoney_notice_outcome WHERE notice_id = $1", [notice.noticeId]);
+    expect(outcomes.rows).toEqual([{ outcome: "VERIFY_ENQUEUED" }]);
   });
 
   it("lists one SALE per paid charge and one REFUND per refund in the quarter, as P16b reads them (R-31)", async () => {
