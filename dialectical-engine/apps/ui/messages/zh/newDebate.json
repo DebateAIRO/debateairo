@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "无法读取协调器的响应，因此结果未知。",
   "requestFailure.kind.PLAN_TIER_INVALID": "协调器拒绝了所选方案。请选择免费版或高级版，然后重试。",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "协调器拒绝了该请求：此方案所需的某个模型目前不可用。请稍后重试，或选择另一方案。",
-  "requestFailure.kind.UNCLASSIFIED": "在收到任何响应之前请求便已失败，因此结果未知。这并非协调器作出的决定。"
+  "requestFailure.kind.UNCLASSIFIED": "在收到任何响应之前请求便已失败，因此结果未知。这并非协调器作出的决定。",
+  "newDebate.legalGate.eyebrow": "条款与隐私",
+  "newDebate.legalGate.title": "请阅读并接受当前文件",
+  "newDebate.legalGate.body": "继续之前，请打开下面的每份文件，读到末尾，然后接受。",
+  "newDebate.legalGate.readTerms": "阅读服务条款",
+  "newDebate.legalGate.readPrivacy": "阅读隐私政策",
+  "newDebate.legalGate.done": "已读完",
+  "newDebate.legalGate.accept": "接受并继续",
+  "newDebate.legalGate.accepting": "正在保存…",
+  "newDebate.legalGate.failed": "无法保存您的接受记录。请重试。",
+  "newDebate.legalGate.stale": "其中一份文件刚刚发生变更。请重新加载页面，阅读当前版本。",
+  "newDebate.legalGate.reload": "重新加载页面",
+  "newDebate.legalGate.manageAccount": "管理或删除您的账户",
+  "newDebate.legalGate.signOut": "退出登录",
+  "newDebate.legalGate.signOutFailed": "退出登录未完成。请重试。",
+  "newDebate.room.locationBlocked": "无法从您当前所在的位置发起新辩论。您的辩论仍可继续阅读。"
 }

@@ -41,6 +41,8 @@ import { ConsentCatalogProvider } from "../../apps/ui/components/consent/useCons
 
 const localizedPrivacy: LegalDocument = {
   key: "privacy",
+  version: "3.0",
+  sha256: "0".repeat(64),
   eyebrow: "プライバシー",
   title: "保存する情報",
   lede: "日本語の説明",

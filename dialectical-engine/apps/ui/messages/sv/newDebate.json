@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "Koordinatorns svar kunde inte läsas, så resultatet är okänt.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatorn avvisade valet av abonnemang. Välj ”Kostnadsfri” eller ”Premium” och försök sedan igen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatorn avvisade begäran: en modell som krävs för det här abonnemanget är inte tillgänglig just nu. Försök igen senare eller välj det andra abonnemanget.",
-  "requestFailure.kind.UNCLASSIFIED": "Begäran misslyckades innan något svar kom, så resultatet är okänt. Det här är inte ett beslut som koordinatorn har fattat."
+  "requestFailure.kind.UNCLASSIFIED": "Begäran misslyckades innan något svar kom, så resultatet är okänt. Det här är inte ett beslut som koordinatorn har fattat.",
+  "newDebate.legalGate.eyebrow": "Villkor och integritet",
+  "newDebate.legalGate.title": "Läs och godkänn de gällande dokumenten",
+  "newDebate.legalGate.body": "Innan du fortsätter öppnar du varje dokument nedan, läser det till slutet och godkänner det sedan.",
+  "newDebate.legalGate.readTerms": "Läs användarvillkoren",
+  "newDebate.legalGate.readPrivacy": "Läs integritetspolicyn",
+  "newDebate.legalGate.done": "Läst",
+  "newDebate.legalGate.accept": "Godkänn och fortsätt",
+  "newDebate.legalGate.accepting": "Sparar…",
+  "newDebate.legalGate.failed": "Ditt godkännande kunde inte sparas. Försök igen.",
+  "newDebate.legalGate.stale": "Ett av dokumenten ändrades nyss. Ladda om sidan för att läsa den gällande versionen.",
+  "newDebate.legalGate.reload": "Ladda om sidan",
+  "newDebate.legalGate.manageAccount": "Hantera eller radera ditt konto",
+  "newDebate.legalGate.signOut": "Logga ut",
+  "newDebate.legalGate.signOutFailed": "Utloggningen slutfördes inte. Försök igen.",
+  "newDebate.room.locationBlocked": "Nya debatter kan inte startas från din nuvarande plats. Dina debatter finns kvar att läsa."
 }

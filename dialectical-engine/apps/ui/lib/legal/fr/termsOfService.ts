@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pays dans lesquels nous proposons DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Nous proposons DebateAI aux personnes qui résident dans [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
+      { kind: "p", text: "Nous proposons DebateAI aux personnes qui résident dans [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
     ]
   },
   {
@@ -299,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Royaume-Uni (uniquement s’il figure à la section 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Notre représentant au Royaume-Uni au titre de l’article 27 du UK GDPR est [name, address, email]. Le Consumer Rights Act 2015 s’applique à vous et rien dans les présentes Conditions ne limite les droits qu’il vous confère ; à compter de [January 2027], les règles relatives aux abonnements du Digital Markets, Competition and Consumers Act 2024 s’appliqueront aux formules payantes, notamment un délai de réflexion après les renouvellements et les essais gratuits. Comment nous protégeons les utilisateurs contre les contenus illicites : [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Technologie proactive que nous utilisons : [describe, or \"none\"]. Vérification de l’âge : [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. La procédure de réclamation de la section 10 accueille les réclamations relatives aux contenus illicites, à la suppression injustifiée de votre contenu, aux restrictions imposées à votre compte, à l’utilisation d’outils automatisés affectant votre contenu et à toute évaluation de l’âge qui vous bloque à tort. Elle est ouverte aux personnes affectées par un contenu qui ne sont pas utilisatrices." }
+      { kind: "p", text: "Notre représentant au Royaume-Uni au titre de l’article 27 du UK GDPR est [name, address, email]. Le Consumer Rights Act 2015 s’applique à vous et rien dans les présentes Conditions ne limite les droits qu’il vous confère ; lorsque les règles relatives aux abonnements du Digital Markets, Competition and Consumers Act 2024 entreront en vigueur (prévu en 2027), elles s’appliqueront aux formules payantes, notamment un délai de réflexion après les renouvellements et les essais gratuits. Comment nous protégeons les utilisateurs contre les contenus illicites : [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Technologie proactive que nous utilisons : [describe, or \"none\"]. Vérification de l’âge : [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. La procédure de réclamation de la section 10 accueille les réclamations relatives aux contenus illicites, à la suppression injustifiée de votre contenu, aux restrictions imposées à votre compte, à l’utilisation d’outils automatisés affectant votre contenu et à toute évaluation de l’âge qui vous bloque à tort. Elle est ouverte aux personnes affectées par un contenu qui ne sont pas utilisatrices. L’annexe B.2 de notre Politique de confidentialité couvre vos données." }
     ]
   },
   {
@@ -309,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Convention d’arbitrage et renonciation aux actions collectives. Si vous résidez aux États-Unis, vous et DebateAIRO convenez de régler tout litige découlant des présentes Conditions ou du service par un arbitrage individuel contraignant administré par [the American Arbitration Association / JAMS] conformément à son règlement relatif aux consommateurs, plutôt que devant une juridiction, étant entendu que chacun de nous peut introduire une demande individuelle devant une juridiction de proximité. Vous pouvez refuser cette convention en envoyant un e-mail à [address] dans les 30 jours suivant votre première acceptation des présentes Conditions. Cette convention est régie par le Federal Arbitration Act. Nous acquittons les frais de dépôt de l’arbitrage. Les actions collectives, conjointes et représentatives font l’objet d’une renonciation dans la mesure permise par la loi. La présente section ne s’applique que pour l’avenir et ne s’applique pas aux réclamations nées avant votre acceptation." },
       { kind: "p", text: "Notifications et retraits. Les images intimes non consenties peuvent être signalées à l’adresse [URL] sans compte et sont retirées dans les 48 heures suivant une demande valide. Les plaintes relatives au droit d’auteur sont adressées à notre agent désigné, mentionné à la section 16." },
-      { kind: "p", text: "Dispositions propres aux États. Californie : les conditions de renouvellement automatique de la section 12 s’appliquent ; vous pouvez résilier en ligne à tout moment ; nous conservons votre consentement aux conditions de renouvellement pendant au moins trois ans. New York : vous pouvez résilier dans les 14 jours suivant toute facturation à un prix augmenté et obtenir un remboursement au prorata. Texas et Nebraska : nous ne vendons pas de données à caractère personnel sensibles ; si cela devait changer, nous obtiendrions d’abord votre consentement [statutory notice language]. Washington : notre Consumer Health Data Privacy Notice disponible à l’adresse [URL] s’applique aux informations liées à la santé. Colorado : le service ne prend aucune décision produisant des effets significatifs à votre égard." }
+      { kind: "p", text: "Dispositions propres aux États. Californie : les conditions de renouvellement automatique de la section 12 s’appliquent ; vous pouvez résilier en ligne à tout moment ; nous conservons votre consentement aux conditions de renouvellement pendant au moins trois ans. New York : vous pouvez résilier dans les 14 jours suivant toute facturation à un prix augmenté et obtenir un remboursement au prorata. Texas et Nebraska : nous ne vendons pas de données à caractère personnel sensibles. Washington : notre Consumer Health Data Privacy Notice disponible à l’adresse [URL] s’applique aux informations liées à la santé. Colorado : le service ne prend aucune décision produisant des effets significatifs à votre égard. L’annexe B.3 de notre Politique de confidentialité couvre vos données et les droits en matière de vie privée que vous confère la loi de votre État." }
     ]
   },
   {
@@ -317,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada et Québec (uniquement s’ils figurent dans la liste)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Notre responsable de la protection de la vie privée est [name, email]. Québec : les présentes Conditions sont disponibles en français à l’adresse [URL] et la version française vous a été présentée en premier ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant." }
+      { kind: "p", text: "Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est [name], privacy@dezbatere.ro. L’annexe B.4 de notre Politique de confidentialité couvre vos données. Québec : les présentes Conditions sont disponibles en français ; choisissez le français dans le sélecteur de langue ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant ; aucune convention d’arbitrage ni renonciation aux actions collectives ne vous est applicable." }
     ]
   },
   {
@@ -330,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Amérique latine (annexe en langue espagnole ; uniquement si elle figure dans la liste)",
+    title: "Suisse (uniquement si elle figure dans la liste)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Le consentement constitue la base du traitement lorsque celui-ci n’est pas nécessaire à l’exécution d’un contrat ; vous consentez expressément, avant votre premier débat, au traitement de toute donnée sensible que vous choisissez d’inclure. Vos droits ARCO peuvent être exercés à l’adresse [address], avec des réponses dans un délai de [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexique : l’aviso de privacidad complet est disponible à l’adresse [URL] ; rétractation dans un délai de [5] jours. Argentine : [AAIP legend] ; utilisez le botón de arrepentimiento à l’adresse [URL] dans un délai de 10 jours. Colombie : la política de tratamiento est disponible à l’adresse [URL] ; rétractation dans un délai de 5 jours. Chili (à compter du 1er décembre 2026) : les coordonnées de l’Agence sont […] ; vous pouvez résilier par le même moyen que celui utilisé pour vous abonner ; aucun droit de rétractation ne s’applique aux services numériques." }
+      { kind: "p", text: "La loi fédérale suisse sur la protection des données s’applique à vos données (Politique de confidentialité, annexe B.6). Vous pouvez agir devant les tribunaux du lieu de votre domicile en Suisse. Aucun droit légal de rétractation ne s’applique à la formule payante ; notre politique de remboursement est […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Golfe — Émirats arabes unis et Arabie saoudite (uniquement s’ils figurent dans la liste)",
+    title: "Moldavie (uniquement si elle figure dans la liste)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Lorsque nous traitons vos données à d’autres fins que la fourniture du service, nous le faisons avec votre consentement, que vous pouvez retirer. Vos données sont traitées en dehors de [UAE / Kingdom of Saudi Arabia], notamment dans l’Union européenne et aux États-Unis, en vertu de [SDAIA standard contractual clauses / the mechanism in the Register]. Il vous incombe de vous assurer que tout ce que vous publiez respecte le droit du pays dans lequel vous vous trouvez, y compris les lois relatives à la religion, à l’ordre public et aux bonnes mœurs ; nous pouvons restreindre la publication de débats sur de tels sujets dans votre région." }
+      { kind: "p", text: "Vous bénéficiez, au titre des présentes Conditions, des mêmes droits qu’un consommateur de l’Union européenne, y compris du droit de rétractation de 14 jours prévu à la section 13. Vous pouvez agir devant les tribunaux de Moldavie. La loi moldave n° 195/2024 sur la protection des données à caractère personnel s’applique à vos données (Politique de confidentialité, annexe B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Asie-Pacifique (uniquement les lignes relatives aux régions figurant dans la liste)",
+    title: "Ukraine (uniquement si elle figure dans la liste)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapour : notre délégué à la protection des données est [name, email] ; les transferts reposent sur des protections contractuelles comparables à celles de la PDPA ; aucun délai légal de réflexion ne s’applique à la formule payante et notre politique de remboursement est […]. Japon : l’information légale au titre du Specified Commercial Transactions Act est disponible à l’adresse [URL] ; aucun droit général de rétractation ne s’applique aux abonnements en ligne et notre politique de remboursement est […] ; votre contenu peut être transféré à des fournisseurs situés dans [named countries], ce que vous acceptez par les consentements donnés lors de l’inscription. Corée du Sud : les consentements aux traitements facultatifs et à la prospection sont recueillis séparément des éléments nécessaires à l’exploitation du service ; notre responsable de la protection de la vie privée est [name] ; vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, sous réserve de l’E-Commerce Act ; nous obtenons à nouveau votre consentement avant toute hausse récurrente de prix ou conversion d’une formule gratuite en formule payante ; lorsque l’AI Basic Act l’exige, nous vous informons à l’avance que le service repose sur l’IA et apposons une mention sur les résultats. Inde (lorsque les règles de la DPDP s’appliqueront) : l’information relative au consentement disponible à l’adresse [URL] s’applique ; les utilisateurs de moins de 18 ans doivent disposer d’un consentement parental vérifiable. Thaïlande : notre représentant en Thaïlande est [name] [if appointed]. Philippines : notre identification commerciale et notre mécanisme de recours au titre de l’Internet Transactions Act sont disponibles à l’adresse [URL] ; les réclamations peuvent être déposées auprès de la National Privacy Commission." }
+      { kind: "p", text: "Nous proposons DebateAI en Ukraine, à l’exception des zones qui ne sont pas contrôlées par le gouvernement ukrainien. Le produit et les présentes Conditions sont disponibles en ukrainien. La loi ukrainienne « sur la protection des données à caractère personnel » s’applique à vos données (Politique de confidentialité, annexe B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Réservé",
+    title: "Israël (uniquement s’il figure dans la liste)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Vous pouvez résilier une formule payante dans les conditions prévues par la loi sur la protection du consommateur 5741-1981 [state the cancellation terms]. Les présentes Conditions et notre Politique de confidentialité sont disponibles en hébreu. La loi israélienne sur la protection de la vie privée s’applique à vos données (Politique de confidentialité, annexe B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Asie-Pacifique (uniquement les lignes relatives aux régions figurant dans la liste)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapour : notre délégué à la protection des données est [name, email] ; les transferts reposent sur des protections contractuelles comparables à celles de la PDPA ; aucun délai légal de réflexion ne s’applique à la formule payante et notre politique de remboursement est […]. Japon : l’information légale au titre du Specified Commercial Transactions Act est disponible à l’adresse [URL] ; aucun droit général de rétractation ne s’applique aux abonnements en ligne et notre politique de remboursement est […] ; nous envoyons votre contenu à des fournisseurs d’IA situés aux États-Unis et dans l’Union européenne, chacun en vertu d’un contrat exigeant une protection équivalente à celle de l’Act on the Protection of Personal Information japonais, et, sur demande, nous vous indiquons quelles sont ces mesures. Corée du Sud : les consentements aux traitements facultatifs et à la prospection sont recueillis séparément des éléments nécessaires à l’exploitation du service ; notre responsable de la protection de la vie privée est [name], privacy@dezbatere.ro ; vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, sous réserve de l’E-Commerce Act ; nous obtenons à nouveau votre consentement avant toute hausse récurrente de prix ou conversion d’une formule gratuite en formule payante ; le service utilise l’IA générative, nous vous en informons avant que vous ne l’utilisiez et apposons une mention sur les résultats générés par l’IA. Taïwan : vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, en vertu du Consumer Protection Act ; le Personal Data Protection Act de Taïwan s’applique à vos données (Politique de confidentialité, annexe B.10). Thaïlande : notre représentant en Thaïlande est [name] [if appointed]. Philippines : notre identification commerciale et notre mécanisme de recours au titre de l’Internet Transactions Act sont disponibles à l’adresse [URL] ; les réclamations peuvent être déposées auprès de la National Privacy Commission." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Réservé",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "La Turquie, le Brésil et l’Indonésie exigent chacun une annexe en langue locale, un représentant ou un enregistrement, ainsi que des formalités déclaratives. Ces pays ne sont pas traités ici et demeurent hors du champ de la section 2 tant qu’ils n’y sont pas expressément inclus. La Chine, le Viêt Nam et la Russie ne sont pas desservis." }
     ]
@@ -364,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "5c7fcc44f423c4d72cab2c17f9b1e4e9e70462e117827b548dfa223c5c8e331f",
   eyebrow: "CONDITIONS D’UTILISATION · v2.0 · PRISE D’EFFET [DATE]",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DebateAIRO S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",

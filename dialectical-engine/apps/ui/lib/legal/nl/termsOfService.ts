@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Waar wij DebateAI aanbieden",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wij bieden DebateAI aan personen die wonen in [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
+      { kind: "p", text: "Wij bieden DebateAI aan personen die wonen in [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
     ]
   },
   {
@@ -299,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Verenigd Koninkrijk (uitsluitend indien vermeld in hoofdstuk 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Onze Britse vertegenwoordiger krachtens artikel 27 UK GDPR is [name, address, email]. De Consumer Rights Act 2015 is op u van toepassing en niets in deze Voorwaarden beperkt uw rechten daaronder; vanaf [January 2027] zijn de abonnementsregels van de Digital Markets, Competition and Consumers Act 2024 van toepassing op betaalde abonnementen, waaronder een bedenktijd na verlengingen en na gratis proefperioden. Hoe wij gebruikers tegen illegale inhoud beschermen: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proactieve technologie die wij gebruiken: [describe, or \"none\"]. Leeftijdscontrole: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Via de klachtenprocedure in hoofdstuk 10 kunnen klachten worden ingediend over illegale inhoud, onterechte verwijdering van uw inhoud, beperkingen van uw account, het gebruik van geautomatiseerde hulpmiddelen die uw inhoud raken en een leeftijdsbeoordeling die u ten onrechte blokkeert. Zij staat open voor personen die door inhoud worden getroffen en geen gebruiker zijn." }
+      { kind: "p", text: "Onze Britse vertegenwoordiger krachtens artikel 27 UK GDPR is [name, address, email]. De Consumer Rights Act 2015 is op u van toepassing en niets in deze Voorwaarden beperkt uw rechten daaronder; wanneer de abonnementsregels van de Digital Markets, Competition and Consumers Act 2024 in werking treden (verwacht in 2027), zijn zij van toepassing op betaalde abonnementen, waaronder een bedenktijd na verlengingen en na gratis proefperioden. Hoe wij gebruikers tegen illegale inhoud beschermen: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proactieve technologie die wij gebruiken: [describe, or \"none\"]. Leeftijdscontrole: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Via de klachtenprocedure in hoofdstuk 10 kunnen klachten worden ingediend over illegale inhoud, onterechte verwijdering van uw inhoud, beperkingen van uw account, het gebruik van geautomatiseerde hulpmiddelen die uw inhoud raken en een leeftijdsbeoordeling die u ten onrechte blokkeert. Zij staat open voor personen die door inhoud worden getroffen en geen gebruiker zijn. Bijlage B.2 van ons Privacybeleid heeft betrekking op uw gegevens." }
     ]
   },
   {
@@ -309,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Arbitrageovereenkomst en afstand van het recht op collectieve vorderingen. Als u in de Verenigde Staten woont, komen u en DebateAIRO overeen elk geschil dat uit deze Voorwaarden of de dienst voortvloeit, op te lossen door bindende individuele arbitrage beheerd door [the American Arbitration Association / JAMS] overeenkomstig haar consumentenregels, in plaats van voor de rechter, behalve dat ieder van ons een individuele vordering bij een rechter voor geringe vorderingen kan instellen. U kunt hiervan afzien door binnen 30 dagen nadat u deze Voorwaarden voor het eerst hebt aanvaard een e-mail naar [address] te sturen. Op deze overeenkomst is de Federal Arbitration Act van toepassing. Wij betalen de kosten voor het aanhangig maken van de arbitrage. Van collectieve, gezamenlijke en representatieve vorderingen wordt afstand gedaan voor zover de wet dit toestaat. Deze arbitrageovereenkomst geldt uitsluitend voor de toekomst en niet voor vorderingen die ontstonden voordat u deze aanvaardde." },
       { kind: "p", text: "Kennisgevingen en verwijderingen. Intieme beelden zonder toestemming kunnen zonder account worden gemeld op [URL] en worden binnen 48 uur na een geldig verzoek verwijderd. Auteursrechtklachten gaan naar onze in hoofdstuk 16 genoemde aangewezen vertegenwoordiger." },
-      { kind: "p", text: "Per staat. Californië: de voorwaarden voor automatische verlenging in hoofdstuk 12 zijn van toepassing; u kunt te allen tijde online opzeggen; wij bewaren uw instemming met verlengingsvoorwaarden ten minste drie jaar. New York: u kunt binnen 14 dagen na elke afschrijving tegen een verhoogde prijs opzeggen en een terugbetaling naar rato ontvangen. Texas en Nebraska: wij verkopen geen gevoelige persoonsgegevens; als dat ooit verandert, verkrijgen wij eerst uw toestemming [statutory notice language]. Washington: onze Consumer Health Data Privacy Notice op [URL] is van toepassing op gezondheidsgerelateerde informatie. Colorado: niets in de dienst neemt beslissingen over u die aanzienlijke gevolgen hebben." }
+      { kind: "p", text: "Per staat. Californië: de voorwaarden voor automatische verlenging in hoofdstuk 12 zijn van toepassing; u kunt te allen tijde online opzeggen; wij bewaren uw instemming met verlengingsvoorwaarden ten minste drie jaar. New York: u kunt binnen 14 dagen na elke afschrijving tegen een verhoogde prijs opzeggen en een terugbetaling naar rato ontvangen. Texas en Nebraska: wij verkopen geen gevoelige persoonsgegevens. Washington: onze Consumer Health Data Privacy Notice op [URL] is van toepassing op gezondheidsgerelateerde informatie. Colorado: niets in de dienst neemt beslissingen over u die aanzienlijke gevolgen hebben. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens en uw privacyrechten in uw staat." }
     ]
   },
   {
@@ -317,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada en Quebec (uitsluitend indien vermeld)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Onze privacyfunctionaris is [name, email]. Quebec: deze Voorwaarden zijn in het Frans beschikbaar op [URL] en de Franse versie is u als eerste voorgelegd; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen." }
+      { kind: "p", text: "Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is [name], privacy@dezbatere.ro. Bijlage B.4 van ons Privacybeleid heeft betrekking op uw gegevens. Quebec: deze Voorwaarden zijn in het Frans beschikbaar; kies Frans met de taalkeuzeschakelaar; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen; er geldt voor u geen arbitrageovereenkomst of afstand van groepsacties." }
     ]
   },
   {
@@ -330,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latijns-Amerika (Spaanstalige annex; uitsluitend indien vermeld)",
+    title: "Zwitserland (uitsluitend indien vermeld)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Toestemming is de grondslag voor verwerking wanneer geen noodzaak voor de uitvoering van de overeenkomst bestaat; vóór uw eerste debat geeft u uitdrukkelijk toestemming voor gevoelige gegevens die u zelf wilt opnemen. U kunt uw ARCO-rechten uitoefenen via [address], met antwoorden binnen [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexico: het volledige aviso de privacidad staat op [URL]; herroeping binnen [5] dagen. Argentinië: [AAIP legend]; gebruik de botón de arrepentimiento op [URL] binnen 10 dagen. Colombia: de política de tratamiento staat op [URL]; herroeping binnen 5 dagen. Chili (vanaf 1 december 2026): het contactpunt van het agentschap is […]; u kunt opzeggen via dezelfde weg waarlangs u zich hebt geabonneerd; voor digitale diensten geldt geen herroepingsrecht." }
+      { kind: "p", text: "De Zwitserse federale wet inzake gegevensbescherming is van toepassing op uw gegevens (Privacybeleid, Bijlage B.6). U kunt een procedure aanhangig maken bij de rechter van de plaats in Zwitserland waar u woont. Voor het betaalde abonnement geldt geen wettelijk herroepingsrecht; ons terugbetalingsbeleid is […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Golfregio — Verenigde Arabische Emiraten en Saoedi-Arabië (uitsluitend indien vermeld)",
+    title: "Moldavië (uitsluitend indien vermeld)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Wanneer wij uw gegevens verwerken voor andere doeleinden dan het leveren van de dienst, doen wij dat met uw toestemming, die u kunt intrekken. Uw gegevens worden buiten de [UAE / Kingdom of Saudi Arabia] verwerkt, waaronder in de Europese Unie en de Verenigde Staten, krachtens [SDAIA standard contractual clauses / the mechanism in the Register]. U bent ervoor verantwoordelijk dat alles wat u publiceert voldoet aan het recht van het land waar u zich bevindt, waaronder wetten inzake religie, openbare orde en goede zeden; wij kunnen de publicatie van debatten over dergelijke onderwerpen in uw regio beperken." }
+      { kind: "p", text: "U hebt op grond van deze Voorwaarden dezelfde rechten als een consument in de Europese Unie, waaronder het herroepingsrecht van 14 dagen in hoofdstuk 13. U kunt een procedure aanhangig maken bij de Moldavische rechter. De Moldavische wet nr. 195/2024 inzake de bescherming van persoonsgegevens is van toepassing op uw gegevens (Privacybeleid, Bijlage B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Azië-Pacific (uitsluitend de regels voor de vermelde regio's)",
+    title: "Oekraïne (uitsluitend indien vermeld)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapore: onze functionaris voor gegevensbescherming is [name, email]; doorgiften berusten op contractuele bescherming die vergelijkbaar is met de PDPA; voor het betaalde abonnement geldt geen wettelijke bedenktijd en ons terugbetalingsbeleid is […]. Japan: de wettelijk verplichte openbaarmaking krachtens de Specified Commercial Transactions Act staat op [URL]; voor onlineabonnementen geldt geen algemene bedenktijd en ons terugbetalingsbeleid is […]; uw inhoud kan worden doorgegeven aan aanbieders in [named countries] en u stemt hiermee in via de toestemmingen bij registratie. Zuid-Korea: toestemming voor optionele verwerking en marketing wordt afzonderlijk verkregen, los van de toestemming voor wat nodig is om de dienst te laten functioneren; onze privacyfunctionaris is [name]; u kunt een betaald abonnement binnen 7 dagen na afsluiting herroepen overeenkomstig de E-Commerce Act; wij verkrijgen opnieuw uw toestemming vóór elke terugkerende prijsverhoging of omzetting van gratis naar betaald; wanneer de AI Basic Act dit vereist, stellen wij u vooraf in kennis dat de dienst op AI is gebaseerd en labelen wij uitvoer. India (zodra de DPDP-regels van toepassing zijn): de toestemmingskennisgeving op [URL] is van toepassing; gebruikers jonger dan 18 hebben verifieerbare ouderlijke toestemming nodig. Thailand: onze vertegenwoordiger in Thailand is [name] [if appointed]. Filipijnen: onze bedrijfsidentificatie en ons verhaalmechanisme krachtens de Internet Transactions Act staan op [URL]; klachten kunnen bij de National Privacy Commission worden ingediend." }
+      { kind: "p", text: "Wij bieden DebateAI aan in Oekraïne, behalve in de gebieden die niet onder controle van de Oekraïense regering staan. Het product en deze Voorwaarden zijn beschikbaar in het Oekraïens. De Oekraïense wet „Inzake de bescherming van persoonsgegevens” is van toepassing op uw gegevens (Privacybeleid, Bijlage B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Gereserveerd",
+    title: "Israël (uitsluitend indien vermeld)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "U kunt een betaald abonnement opzeggen zoals de Consumer Protection Law, 5741-1981, toestaat [state the cancellation terms]. Deze Voorwaarden en ons Privacybeleid zijn beschikbaar in het Hebreeuws. De Israëlische Protection of Privacy Law is van toepassing op uw gegevens (Privacybeleid, Bijlage B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Azië-Pacific (uitsluitend de regels voor de vermelde regio's)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapore: onze functionaris voor gegevensbescherming is [name, email]; doorgiften berusten op contractuele bescherming die vergelijkbaar is met de PDPA; voor het betaalde abonnement geldt geen wettelijke bedenktijd en ons terugbetalingsbeleid is […]. Japan: de wettelijk verplichte openbaarmaking krachtens de Specified Commercial Transactions Act staat op [URL]; voor onlineabonnementen geldt geen algemene bedenktijd en ons terugbetalingsbeleid is […]; wij sturen uw inhoud naar AI-aanbieders in de Verenigde Staten en de Europese Unie, elk op grond van een contract dat bescherming vereist die gelijkwaardig is aan de Japanse Act on the Protection of Personal Information, en op verzoek vertellen wij u welke maatregelen dat zijn. Zuid-Korea: toestemming voor optionele verwerking en marketing wordt afzonderlijk verkregen, los van de toestemming voor wat nodig is om de dienst te laten functioneren; onze privacyfunctionaris is [name], privacy@dezbatere.ro; u kunt een betaald abonnement binnen 7 dagen na afsluiting herroepen overeenkomstig de E-Commerce Act; wij verkrijgen opnieuw uw toestemming vóór elke terugkerende prijsverhoging of omzetting van gratis naar betaald; de dienst maakt gebruik van generatieve AI, wij vertellen u dat voordat u de dienst gebruikt en wij labelen door AI gegenereerde uitvoer. Taiwan: u kunt een betaald abonnement binnen 7 dagen na afsluiting herroepen, op grond van de Consumer Protection Act; de Taiwanese Personal Data Protection Act is van toepassing op uw gegevens (Privacybeleid, Bijlage B.10). Thailand: onze vertegenwoordiger in Thailand is [name] [if appointed]. Filipijnen: onze bedrijfsidentificatie en ons verhaalmechanisme krachtens de Internet Transactions Act staan op [URL]; klachten kunnen bij de National Privacy Commission worden ingediend." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Gereserveerd",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Turkije, Brazilië en Indonesië vereisen elk een bijlage in de lokale taal, een vertegenwoordiger of registratie en indieningen. Deze zijn hier niet opgesteld en vallen buiten hoofdstuk 2 totdat zij bewust worden opgenomen. China, Vietnam en Rusland worden niet bediend." }
     ]
@@ -364,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "d009085e560ca793d3a2fa8c068aa8da8dc7ba54f3b2f06f1b9ca04094ded646",
   eyebrow: "SERVICEVOORWAARDEN · v2.0 · VAN KRACHT OP [DATE]",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DebateAIRO S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",

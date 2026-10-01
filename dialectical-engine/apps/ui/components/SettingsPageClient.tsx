@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { getSettingsView } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
 import { AccountErasureControls } from "@/components/AccountErasureControls";
+import {
+  ChangeEmailScreen,
+  EmailChangeLinkScreen,
+  EmailSettingsCard,
+  takeEmailChangeLink,
+  type EmailChangeLink
+} from "@/components/EmailSettings";
 import { EvaluatorDevMenu, type SettingsI18nProps } from "@/components/EvaluatorDevMenu";
 import { LegacyRunClaimControls } from "@/components/LegacyRunClaimControls";
 import { SessionControls } from "@/components/SessionControls";
@@ -25,14 +32,27 @@ export function SettingsPageClient({
   /** The locale's `newDebate` catalogue: the session gate's copy (review F2). */
   newDebateCatalog?: MessageCatalog;
 }) {
+  // Turn 14: a link mailed by the change-email flow opens Settings with its
+  // bearer in the fragment. It is spent without a session (the bearer is the
+  // proof), so its screen stands in for the sign-in gate.
+  const [emailLink, setEmailLink] = useState<EmailChangeLink | null>(null);
+  useEffect(() => {
+    const link = takeEmailChangeLink(window);
+    if (link !== null) setEmailLink(link);
+  }, []);
+  if (emailLink !== null) {
+    return <EmailChangeLinkScreen catalog={catalog} link={emailLink} onDone={() => setEmailLink(null)} />;
+  }
   return (
-    <AuthGate catalog={newDebateCatalog}>
+    <AuthGate catalog={newDebateCatalog} legalGate={false}>
       {() => <AccountSettingsScreen catalog={catalog} locale={locale} />}
     </AuthGate>
   );
 }
 
 function AccountSettingsScreen({ catalog, locale }: Required<SettingsI18nProps>) {
+  const [changingFrom, setChangingFrom] = useState<string | null>(null);
+  const [emailNotice, setEmailNotice] = useState<string | null>(null);
   const identityRows = [
     {
       key: "asker",
@@ -53,6 +73,20 @@ function AccountSettingsScreen({ catalog, locale }: Required<SettingsI18nProps>)
       absent: false
     }
   ] as const;
+
+  if (changingFrom !== null) {
+    return (
+      <ChangeEmailScreen
+        catalog={catalog}
+        currentEmail={changingFrom}
+        onBack={() => setChangingFrom(null)}
+        onRequested={() => {
+          setEmailNotice(t(catalog, "settings.email.requested"));
+          setChangingFrom(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="screen scroll setScreen">
@@ -75,6 +109,14 @@ function AccountSettingsScreen({ catalog, locale }: Required<SettingsI18nProps>)
             </div>
           </div>
 
+          <EmailSettingsCard
+            catalog={catalog}
+            notice={emailNotice}
+            onChange={(currentEmail) => {
+              setEmailNotice(null);
+              setChangingFrom(currentEmail);
+            }}
+          />
           <SessionControls catalog={catalog} locale={locale} />
           <ConsentSettingsPanel />
           <LegacyRunClaimControls catalog={catalog} locale={locale} />

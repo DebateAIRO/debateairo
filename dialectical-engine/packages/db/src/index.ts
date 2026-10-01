@@ -20,6 +20,16 @@ export {
 } from "./sessions.js";
 
 export {
+  PostgresEmailChangeRepository,
+  type EmailChangeCancelOutcome,
+  type EmailChangeConfirmOutcome,
+  type EmailChangePendingRecord,
+  type EmailChangeRequestOutcome,
+  type EmailChangeResendOutcome,
+  type EmailSettingsRecord
+} from "./email-change.js";
+
+export {
   PostgresLegacyRunClaimRepository,
   type LegacyRunClaimOutcome
 } from "./legacy-claim.js";
@@ -1795,6 +1805,13 @@ export {
   type ResendPreparation,
   type TotpEnrollmentRecord
 } from "./identity.js";
+export {
+  AcceptanceRepository,
+  type AcceptanceInput,
+  type AcceptanceKind,
+  type AcceptanceSurface,
+  type SignUpAcceptanceRow
+} from "./legal-acceptance.js";
 export * from "./obs-schema.js";
 export {
   accountRecoveryChannelRefsAad,

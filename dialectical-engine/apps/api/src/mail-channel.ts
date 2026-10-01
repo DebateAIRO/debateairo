@@ -9,7 +9,7 @@ import { spawn } from "node:child_process";
 // ever widened.
 const RECIPIENT_SHAPE = /^[^\s@]+@[^\s@]+$/;
 
-function isSingleDeliverableRecipient(recipient: string): boolean {
+export function isSingleDeliverableRecipient(recipient: string): boolean {
   return RECIPIENT_SHAPE.test(recipient)
     && !/[\r\n]/.test(recipient)
     && !/\s/.test(recipient)
@@ -200,5 +200,126 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
       child.stdin.once("error",()=>fail("SENDMAIL_STDIN_FAILED"));
       child.stdin.end(message,"utf8");
     });
+  }
+}
+
+// Turn 14 — change email. Three messages, all plain text through `sendmail -t`:
+// the confirmation link to the NEW address, a notice with a cancel link to the
+// CURRENT address, and, when the new address already belongs to an account, a
+// note to that address instead of a link (the requester is never told). Both
+// bearers ride the URL fragment of the Settings page, like the verify link.
+export type EmailChangeMail =
+  | Readonly<{ kind: "confirmation"; recipient: string; token: string; expiresAt: Date }>
+  | Readonly<{ kind: "notice"; recipient: string; newEmail: string; cancelToken: string; expiresAt: Date }>
+  | Readonly<{ kind: "address-unavailable"; recipient: string }>;
+
+export interface EmailChangeMailSender {
+  sendEmailChange(mail: EmailChangeMail): Promise<void>;
+}
+
+export class MemoryEmailChangeMailSender implements EmailChangeMailSender {
+  readonly messages: EmailChangeMail[] = [];
+
+  async sendEmailChange(mail: EmailChangeMail): Promise<void> {
+    this.messages.push(Object.freeze({ ...mail }));
+  }
+}
+
+const EMAIL_CHANGE_BEARER = /^[A-Za-z0-9_-]{43}$/;
+
+export function emailChangeLink(publicAppUrl: string, action: "confirm" | "cancel", token: string): string {
+  if (!EMAIL_CHANGE_BEARER.test(token)) throw new MailDeliveryError("MAIL_INPUT_INVALID");
+  const url = new URL("/settings", publicAppUrl);
+  url.hash = `email-change=${action}&token=${token}`;
+  return url.toString();
+}
+
+export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
+  constructor(private readonly options: {
+    readonly executable: string;
+    readonly from: string;
+    readonly publicAppUrl: string;
+    readonly timeoutMs: number;
+  }) {
+    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
+      || options.executable.trim() === ""
+      || !/^https:\/\//.test(options.publicAppUrl)
+      || !Number.isInteger(options.timeoutMs)
+      || options.timeoutMs <= 0) {
+      throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
+    }
+  }
+
+  async sendEmailChange(mail: EmailChangeMail): Promise<void> {
+    if (!isSingleDeliverableRecipient(mail.recipient)
+      || (mail.kind === "notice" && !isSingleDeliverableRecipient(mail.newEmail))) {
+      throw new MailDeliveryError("MAIL_INPUT_INVALID");
+    }
+    const [subject, body] = this.render(mail);
+    const message = [
+      `From: ${this.options.from}`,
+      `To: ${mail.recipient}`,
+      `Subject: ${subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=UTF-8",
+      "",
+      ...body,
+      ""
+    ].join("\r\n");
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
+        stdio: ["pipe", "ignore", "ignore"]
+      });
+      let settled = false;
+      const fail = (code: string): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(new MailDeliveryError(code));
+      };
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        fail("SENDMAIL_TIMEOUT");
+      }, this.options.timeoutMs);
+      child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
+      child.once("exit", (code, signal) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (code === 0) resolve();
+        else reject(new MailDeliveryError(
+          signal === null ? `SENDMAIL_EXIT_${String(code ?? "UNKNOWN")}` : `SENDMAIL_SIGNAL_${signal}`
+        ));
+      });
+      child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
+      child.stdin.end(message, "utf8");
+    });
+  }
+
+  private render(mail: EmailChangeMail): readonly [string, readonly string[]] {
+    if (mail.kind === "confirmation") {
+      return ["Confirm your new DebateAI email", [
+        "Confirm this address for your DebateAI account by opening this link:",
+        emailChangeLink(this.options.publicAppUrl, "confirm", mail.token),
+        "",
+        `This link expires at ${mail.expiresAt.toISOString()}.`,
+        "If you did not ask for this, ignore this message. Nothing changes until the link is opened."
+      ]];
+    }
+    if (mail.kind === "notice") {
+      return ["Your DebateAI email is being changed", [
+        `Someone signed in to your DebateAI account asked to change its email to ${mail.newEmail}.`,
+        "Your current address keeps working until the new one is confirmed.",
+        "",
+        "If this wasn't you, cancel the change by opening this link:",
+        emailChangeLink(this.options.publicAppUrl, "cancel", mail.cancelToken),
+        "",
+        "Then sign in and review your active sessions in Settings."
+      ]];
+    }
+    return ["DebateAI email change", [
+      "Someone asked to use this address for a DebateAI account, but it already belongs to one.",
+      "Nothing was changed. If this was you, sign in with this address instead."
+    ]];
   }
 }

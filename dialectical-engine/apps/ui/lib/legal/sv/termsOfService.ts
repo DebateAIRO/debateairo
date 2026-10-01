@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Var vi erbjuder DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi erbjuder DebateAI till personer som bor i [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten." }
+      { kind: "p", text: "Vi erbjuder DebateAI till personer som bor i [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten." }
     ]
   },
   {
@@ -299,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Storbritannien (endast om landet anges i avsnitt 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Vår företrädare i Storbritannien enligt artikel 27 i UK GDPR är [name, address, email]. Consumer Rights Act 2015 gäller för dig, och ingenting i dessa villkor begränsar dina rättigheter enligt den; från och med [January 2027] gäller abonnemangsreglerna i Digital Markets, Competition and Consumers Act 2024 för betalabonnemang, däribland en betänketid efter förnyelser och efter kostnadsfria provperioder. Så skyddar vi användare mot olagligt innehåll: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktiv teknik som vi använder: [describe, or \"none\"]. Ålderskontroll: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Klagomålsförfarandet i avsnitt 10 tar emot klagomål om olagligt innehåll, felaktigt avlägsnande av ditt innehåll, begränsningar av ditt konto, användning av automatiserade verktyg som påverkar ditt innehåll samt varje åldersbedömning som felaktigt blockerar dig. Förfarandet är öppet för personer som påverkas av innehåll men inte är användare." }
+      { kind: "p", text: "Vår företrädare i Storbritannien enligt artikel 27 i UK GDPR är [name, address, email]. Consumer Rights Act 2015 gäller för dig, och ingenting i dessa villkor begränsar dina rättigheter enligt den; när abonnemangsreglerna i Digital Markets, Competition and Consumers Act 2024 träder i kraft (väntas ske 2027) gäller de för betalabonnemang, däribland en betänketid efter förnyelser och efter kostnadsfria provperioder. Så skyddar vi användare mot olagligt innehåll: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktiv teknik som vi använder: [describe, or \"none\"]. Ålderskontroll: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Klagomålsförfarandet i avsnitt 10 tar emot klagomål om olagligt innehåll, felaktigt avlägsnande av ditt innehåll, begränsningar av ditt konto, användning av automatiserade verktyg som påverkar ditt innehåll samt varje åldersbedömning som felaktigt blockerar dig. Förfarandet är öppet för personer som påverkas av innehåll men inte är användare. Vår integritetspolicy, bilaga B.2, beskriver hur vi behandlar dina uppgifter." }
     ]
   },
   {
@@ -309,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Skiljeavtal och avstående från grupptalan. Om du bor i USA samtycker du och DebateAIRO till att varje tvist som uppkommer med anledning av dessa villkor eller tjänsten ska avgöras genom bindande individuellt skiljeförfarande som administreras av [the American Arbitration Association / JAMS] enligt dess konsumentregler, i stället för i domstol, med undantag för att var och en av oss får väcka ett individuellt anspråk vid domstol för mindre tvistemål. Du får välja att stå utanför genom att skicka e-post till [address] inom 30 dagar från det att du först godkände dessa villkor. Detta avtal regleras av Federal Arbitration Act. Vi betalar ansökningsavgifterna för skiljeförfarandet. Du och DebateAIRO avstår, i den utsträckning lagen tillåter, från grupptalan, kollektiv talan och representativ talan. Detta avsnitt gäller endast framåt i tiden och gäller inte anspråk som uppkom innan du godkände det." },
       { kind: "p", text: "Meddelanden och borttaganden. Intima bilder utan samtycke kan rapporteras på [URL] utan konto och tas bort inom 48 timmar från en giltig begäran. Upphovsrättsliga klagomål skickas till vårt utsedda ombud som anges i avsnitt 16." },
-      { kind: "p", text: "Delstatsspecifikt. Kalifornien: villkoren om automatisk förnyelse i avsnitt 12 gäller; du får säga upp online när som helst; vi bevarar ditt samtycke till förnyelsevillkoren i minst tre år. New York: du får säga upp inom 14 dagar från en debitering till ett höjt pris och få en proportionell återbetalning. Texas och Nebraska: vi säljer inte känsliga personuppgifter; om detta någonsin ändras inhämtar vi först ditt samtycke [statutory notice language]. Washington: vårt integritetsmeddelande om konsumenthälsouppgifter på [URL] gäller för hälsorelaterade uppgifter. Colorado: ingenting i tjänsten fattar beslut med betydande följder om dig." }
+      { kind: "p", text: "Delstatsspecifikt. Kalifornien: villkoren om automatisk förnyelse i avsnitt 12 gäller; du får säga upp online när som helst; vi bevarar ditt samtycke till förnyelsevillkoren i minst tre år. New York: du får säga upp inom 14 dagar från en debitering till ett höjt pris och få en proportionell återbetalning. Texas och Nebraska: vi säljer inte känsliga personuppgifter. Washington: vårt integritetsmeddelande om konsumenthälsouppgifter på [URL] gäller för hälsorelaterade uppgifter. Colorado: ingenting i tjänsten fattar beslut med betydande följder om dig. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter och vilka integritetsrättigheter du har enligt lagen i din delstat." }
     ]
   },
   {
@@ -317,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada och Quebec (endast om de anges)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vår integritetsansvariga är [name, email]. Quebec: dessa villkor finns på franska på [URL], och den franska versionen visades för dig först; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras." }
+      { kind: "p", text: "Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är [name], privacy@dezbatere.ro. Vår integritetspolicy, bilaga B.4, beskriver hur vi behandlar dina uppgifter. Quebec: dessa villkor finns på franska; välj franska i språkväljaren; inställningarna som håller dina debatter privata är aktiverade som standard; du får begära att personuppgifter om dig avindexeras; inget skiljeavtal och inget avstående från grupptalan gäller för dig." }
     ]
   },
   {
@@ -330,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latinamerika (spanskspråkig bilaga; endast om regionen anges)",
+    title: "Schweiz (endast om landet anges)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Samtycke är grunden för behandling om behandlingen inte är nödvändig för avtalets fullgörande; före din första debatt samtycker du uttryckligen till behandling av känsliga uppgifter som du väljer att ta med. Dina ARCO-rättigheter kan utövas på [address], med svar inom [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexiko: det fullständiga aviso de privacidad finns på [URL]; frånträdande inom [5] dagar. Argentina: [AAIP legend]; använd botón de arrepentimiento på [URL] inom 10 dagar. Colombia: política de tratamiento finns på [URL]; frånträdande inom 5 dagar. Chile (från och med den 1 december 2026): myndighetens kontaktuppgifter är […]; du får säga upp på samma sätt som du tecknade abonnemanget; ingen ångerrätt gäller för digitala tjänster." }
+      { kind: "p", text: "Schweiz federala dataskyddslag gäller för dina uppgifter (integritetspolicyn, bilaga B.6). Du får väcka talan vid domstolarna på den ort i Schweiz där du bor. Ingen lagstadgad ångerrätt gäller för betalabonnemanget; vår återbetalningspolicy är […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Gulfstaterna — Förenade Arabemiraten och Saudiarabien (endast om de anges)",
+    title: "Moldavien (endast om landet anges)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Om vi behandlar dina uppgifter för andra ändamål än att tillhandahålla tjänsten gör vi det med ditt samtycke, som du får återkalla. Dina uppgifter behandlas utanför [UAE / Kingdom of Saudi Arabia], däribland i Europeiska unionen och USA, enligt [SDAIA standard contractual clauses / the mechanism in the Register]. Du ansvarar för att allt du publicerar följer lagen i det land där du befinner dig, däribland lagar om religion, allmän ordning och moral; vi kan begränsa publiceringen av debatter om sådana ämnen i din region." }
+      { kind: "p", text: "Enligt dessa villkor har du samma rättigheter som en konsument i Europeiska unionen, däribland ångerrätten på 14 dagar i avsnitt 13. Du får väcka talan vid domstolarna i Moldavien. Moldaviens lag nr 195/2024 om skydd av personuppgifter gäller för dina uppgifter (integritetspolicyn, bilaga B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Asien och Stillahavsområdet (endast raderna för angivna regioner)",
+    title: "Ukraina (endast om landet anges)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapore: vårt dataskyddsombud är [name, email]; överföringar grundas på avtalsmässiga skydd som är jämförbara med PDPA; ingen lagstadgad betänketid gäller för betalabonnemanget och vår återbetalningspolicy är […]. Japan: den lagstadgade informationen enligt Specified Commercial Transactions Act finns på [URL]; ingen allmän betänketid gäller för onlineabonnemang och vår återbetalningspolicy är […]; ditt innehåll kan överföras till leverantörer i [named countries], och du godkänner detta genom samtyckena vid registreringen. Sydkorea: samtycken till valfri behandling och marknadsföring inhämtas separat från de uppgifter som behövs för att driva tjänsten; vår integritetsansvariga är [name]; du får frånträda ett betalabonnemang inom 7 dagar från tecknandet i enlighet med E-Commerce Act; vi inhämtar ditt nya samtycke före varje återkommande prishöjning eller övergång från kostnadsfritt abonnemang till betalabonnemang; om AI Basic Act kräver det underrättar vi dig i förväg om att tjänsten är AI-baserad och märker resultaten. Indien (när DPDP-reglerna börjar gälla): meddelandet om samtycke på [URL] gäller; användare under 18 år behöver verifierbart föräldrasamtycke. Thailand: vår företrädare i Thailand är [name] [if appointed]. Filippinerna: vår företagsidentifiering och mekanism för gottgörelse enligt Internet Transactions Act finns på [URL]; klagomål kan lämnas in till National Privacy Commission." }
+      { kind: "p", text: "Vi erbjuder DebateAI i Ukraina utom i de områden som inte kontrolleras av den ukrainska regeringen. Produkten och dessa villkor finns på ukrainska. Ukrainas lag ”Om skydd av personuppgifter” gäller för dina uppgifter (integritetspolicyn, bilaga B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Reserverat",
+    title: "Israel (endast om landet anges)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Du får säga upp ett betalabonnemang i den utsträckning Consumer Protection Law, 5741-1981, tillåter [state the cancellation terms]. Dessa villkor och vår integritetspolicy finns på hebreiska. Israels Protection of Privacy Law gäller för dina uppgifter (integritetspolicyn, bilaga B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Asien och Stillahavsområdet (endast raderna för angivna regioner)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapore: vårt dataskyddsombud är [name, email]; överföringar grundas på avtalsmässiga skydd som är jämförbara med PDPA; ingen lagstadgad betänketid gäller för betalabonnemanget och vår återbetalningspolicy är […]. Japan: den lagstadgade informationen enligt Specified Commercial Transactions Act finns på [URL]; ingen allmän betänketid gäller för onlineabonnemang och vår återbetalningspolicy är […]; vi skickar ditt innehåll till AI-leverantörer i USA och Europeiska unionen, var och en enligt ett avtal som kräver ett skydd likvärdigt med Japans Act on the Protection of Personal Information, och på begäran berättar vi vilka dessa åtgärder är. Sydkorea: samtycken till valfri behandling och marknadsföring inhämtas separat från de uppgifter som behövs för att driva tjänsten; vår integritetsansvariga är [name], privacy@dezbatere.ro; du får frånträda ett betalabonnemang inom 7 dagar från tecknandet i enlighet med E-Commerce Act; vi inhämtar ditt nya samtycke före varje återkommande prishöjning eller övergång från kostnadsfritt abonnemang till betalabonnemang; tjänsten använder generativ AI, vi talar om det för dig innan du använder den och vi märker AI-genererade resultat. Taiwan: du får frånträda ett betalabonnemang inom 7 dagar från tecknandet enligt Consumer Protection Act; Taiwans Personal Data Protection Act gäller för dina uppgifter (integritetspolicyn, bilaga B.10). Thailand: vår företrädare i Thailand är [name] [if appointed]. Filippinerna: vår företagsidentifiering och mekanism för gottgörelse enligt Internet Transactions Act finns på [URL]; klagomål kan lämnas in till National Privacy Commission." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Reserverat",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Turkiet, Brasilien och Indonesien kräver var för sig en bilaga på det lokala språket, en företrädare eller registrering samt myndighetsinlagor. Dessa har inte utarbetats här och ligger utanför avsnitt 2 tills de avsiktligt förs in. Tjänsten erbjuds inte i Kina, Vietnam eller Ryssland." }
     ]
@@ -364,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "fe24ca15c9ce9c1671a1fee28c726ef453614db66e0ac26780a9625483a5d187",
   eyebrow: "ANVÄNDARVILLKOR · v2.0 · GÄLLER FRÅN [DATE]",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DebateAIRO S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",

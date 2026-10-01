@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
-import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
+import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
+export * from "./crisis.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -232,6 +233,37 @@ export const AgeCheckResultSchema = z.object({ outcome: z.enum(["allowed", "refu
 export type AgeCheckResult = z.infer<typeof AgeCheckResultSchema>;
 export const AgeConfirmationStatusSchema = z.object({ status: z.enum(["required", "confirmed"]) }).strict();
 export type AgeConfirmationStatus = z.infer<typeof AgeConfirmationStatusSchema>;
+/** Paid plans L2/L3b: a legal document as the manifest names it — `Version N.M` and the draft's sha256. */
+export const LegalDocumentPairSchema = z.object({
+  version: z.string().regex(/^[0-9]{1,4}\.[0-9]{1,4}$/u),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/u)
+}).strict();
+export type LegalDocumentPairWire = z.infer<typeof LegalDocumentPairSchema>;
+
+/** What sign-up sends for the two documents it displayed, and the locale it displayed them in. */
+export const RegisterLegalDocumentsSchema = z.object({
+  terms: LegalDocumentPairSchema,
+  privacy: LegalDocumentPairSchema,
+  locale: z.string().regex(/^[a-z]{2}$/u)
+}).strict();
+export type RegisterLegalDocuments = z.infer<typeof RegisterLegalDocumentsSchema>;
+
+/** Paid plans L4. Only the Terms and the Privacy Policy are ever re-accepted. */
+export const LegalReacceptableKindSchema = z.enum(["TERMS", "PRIVACY"]);
+export const LegalStatusDocumentSchema = LegalDocumentPairSchema.extend({ kind: LegalReacceptableKindSchema }).strict();
+export const LegalStatusResponseSchema = z.object({
+  must_accept: z.array(LegalStatusDocumentSchema).max(2)
+}).strict();
+export type LegalStatusResponse = z.infer<typeof LegalStatusResponseSchema>;
+export const LegalAcceptRequestSchema = z.object({
+  documents: z.array(LegalStatusDocumentSchema).min(1).max(2)
+    .refine((documents) => new Set(documents.map((document) => document.kind)).size === documents.length),
+  locale: z.string().regex(/^[a-z]{2}$/u)
+}).strict();
+export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
+/** Paid plans G3a: two booleans — never the country the server saw. */
+export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean() }).strict();
+export type GeoAvailabilityResponse = z.infer<typeof GeoAvailabilityResponseSchema>;
 
 /**
  * Sensitive-data consent (V's ruling of 2026-09-29). Before the first debate an account
@@ -256,7 +288,8 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
     action: RunTargetedGrantActionSchema,
     target_run_id: z.uuid()
   }).strict(),
-  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict()
+  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
+  z.object({ action: z.literal("CHANGE_EMAIL") }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
@@ -268,6 +301,11 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     action: z.literal("DELETE_ACCOUNT"),
+    expires_at: z.iso.datetime()
+  }).strict(),
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: z.literal("CHANGE_EMAIL"),
     expires_at: z.iso.datetime()
   }).strict()
 ]);
@@ -306,6 +344,35 @@ export const AccountErasureCancelRequestSchema = z.object({
 export const AccountErasureCancelledSchema = z.object({
   status:z.literal("CANCELLED")
 }).strict();
+// Turn 14 — change email. The request needs a CHANGE_EMAIL step-up grant; the
+// two link routes carry only the bearer mailed to the new (confirm) or the
+// current (cancel) address.
+const EmailAddressSchema = z.string().min(3).max(254);
+export const AccountEmailSchema = z.object({
+  email: EmailAddressSchema,
+  recovery_email: EmailAddressSchema,
+  pending: z.object({
+    new_email: EmailAddressSchema,
+    expires_at: z.iso.datetime()
+  }).strict().nullable()
+}).strict();
+export type AccountEmail = z.infer<typeof AccountEmailSchema>;
+export const EmailChangeRequestSchema = z.object({
+  new_email: EmailAddressSchema,
+  step_up_grant: StepUpGrantTokenSchema
+}).strict();
+export const EmailChangePendingSchema = z.object({
+  status: z.literal("PENDING"),
+  new_email: EmailAddressSchema,
+  expires_at: z.iso.datetime()
+}).strict();
+export type EmailChangePending = z.infer<typeof EmailChangePendingSchema>;
+export const EmailChangeLinkRequestSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+}).strict();
+export const EmailChangeConfirmedSchema = z.object({ status: z.literal("CONFIRMED") }).strict();
+export const EmailChangeCancelledSchema = z.object({ status: z.literal("CANCELLED") }).strict();
+
 export const PrivateDebateErasureRequestSchema = z.object({
   step_up_grant:StepUpGrantTokenSchema
 }).strict();
@@ -522,8 +589,15 @@ export const NodeSchema = z.object({
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
 
+export const PublicNodeReviewSchema = NodeReviewSchema.extend({
+  reviewer_lineage: PublicMakerLineageSchema
+});
+export type PublicNodeReview = z.infer<typeof PublicNodeReviewSchema>;
+
 export const PublicNodeSchema = NodeSchema.omit({ disagreement: true }).extend({
-  disagreement: z.null()
+  disagreement: z.null(),
+  maker_lineage: PublicMakerLineageSchema.nullable(),
+  review: PublicNodeReviewSchema.nullable()
 });
 export type PublicNode = z.infer<typeof PublicNodeSchema>;
 
@@ -784,10 +858,19 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
+    "GET /v1/account/legal-status",
+    "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
+    "GET /v1/account/email",
+    "POST /v1/account/email/change",
+    "POST /v1/account/email/change/resend",
+    "DELETE /v1/account/email/change",
+    "POST /v1/account/email/change/confirm",
+    "POST /v1/account/email/change/cancel",
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
+    "GET /v1/geo/availability",
     "POST /v1/support/sessions",
     "GET /v1/support/sessions/{id}",
     "POST /v1/support/sessions/{id}/messages",
@@ -822,7 +905,8 @@ export const contractInventory = Object.freeze({
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
-    AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema,
+    AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
+    LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
@@ -830,6 +914,8 @@ export const contractInventory = Object.freeze({
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
+    AccountEmailSchema,EmailChangeRequestSchema,EmailChangePendingSchema,EmailChangeLinkRequestSchema,
+    EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,

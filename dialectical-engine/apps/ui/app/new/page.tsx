@@ -1,4 +1,5 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { readCrisisCountryHint } from "@/lib/crisisLines";
 import NewDebatePageClient from "./NewDebatePageClient";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
@@ -13,5 +14,5 @@ export default async function NewDebatePage() {
     loadNamespace(locale, "home"),
     loadNamespace(locale, "chrome")
   ]);
-  return <NewDebatePageClient catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} />;
+  return <NewDebatePageClient catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} crisisCountryHint={readCrisisCountryHint(await headers())} />;
 }

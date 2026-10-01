@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "Het antwoord van de coördinator kon niet worden gelezen, waardoor de uitkomst onbekend is.",
   "requestFailure.kind.PLAN_TIER_INVALID": "De coördinator heeft de abonnementskeuze afgewezen. Kies Gratis of Premium en probeer het opnieuw.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "De coördinator heeft het verzoek afgewezen: een model dat voor dit abonnement nodig is, is momenteel niet beschikbaar. Probeer het later opnieuw of kies het andere abonnement.",
-  "requestFailure.kind.UNCLASSIFIED": "Het verzoek is mislukt voordat er een antwoord is ontvangen, waardoor de uitkomst onbekend is. De coördinator heeft hierover geen beslissing genomen."
+  "requestFailure.kind.UNCLASSIFIED": "Het verzoek is mislukt voordat er een antwoord is ontvangen, waardoor de uitkomst onbekend is. De coördinator heeft hierover geen beslissing genomen.",
+  "newDebate.legalGate.eyebrow": "Voorwaarden en privacy",
+  "newDebate.legalGate.title": "Lees de huidige documenten en accepteer ze",
+  "newDebate.legalGate.body": "Open voordat u verdergaat elk document hieronder, lees het tot het einde en accepteer het daarna.",
+  "newDebate.legalGate.readTerms": "Servicevoorwaarden lezen",
+  "newDebate.legalGate.readPrivacy": "Privacybeleid lezen",
+  "newDebate.legalGate.done": "Gelezen",
+  "newDebate.legalGate.accept": "Accepteren en doorgaan",
+  "newDebate.legalGate.accepting": "Opslaan…",
+  "newDebate.legalGate.failed": "Uw acceptatie kon niet worden opgeslagen. Probeer het opnieuw.",
+  "newDebate.legalGate.stale": "Een van de documenten is zojuist gewijzigd. Laad de pagina opnieuw om de huidige versie te lezen.",
+  "newDebate.legalGate.reload": "Pagina opnieuw laden",
+  "newDebate.legalGate.manageAccount": "Uw account beheren of verwijderen",
+  "newDebate.legalGate.signOut": "Afmelden",
+  "newDebate.legalGate.signOutFailed": "Het afmelden is niet voltooid. Probeer het opnieuw.",
+  "newDebate.room.locationBlocked": "Vanaf uw huidige locatie kunnen geen nieuwe debatten worden gestart. Uw debatten blijven beschikbaar om te lezen."
 }

@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI 的服务地域",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "我们向居住在 [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea] 的人士提供 DebateAI。我们不在其他地方提供本服务。如果您居住在这些国家以外，可能仍能访问网站，但本服务并非面向您提供；我们不接受您的付款，且本条款及《隐私政策》并未针对您所在国家的法律作相应调整。附件 A 规定了我们所服务各区域的适用内容。" }
+      { kind: "p", text: "我们向居住在 [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] 的人士提供 DebateAI。我们不在其他地方提供本服务。如果您居住在这些国家以外，可能仍能访问网站，但本服务并非面向您提供；我们不接受您的付款，且本条款及《隐私政策》并未针对您所在国家的法律作相应调整。附件 A 规定了我们所服务各区域的适用内容。" }
     ]
   },
   {
@@ -299,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "英国 (仅在第 2 节列明时适用)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "我们依据英国 GDPR 第 27 条任命的英国代表为 [name, address, email]。《2015 年消费者权利法》适用于您，本条款中的任何内容均不限制您在该法下的权利；自 [January 2027] 起，《2024 年数字市场、竞争与消费者法》的订阅规则适用于付费方案，包括续订后及免费试用后的冷静期。我们如何保护用户免受违法内容侵害：[terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]。我们使用的主动技术：[describe, or \"none\"]。年龄保证：[describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]。第 10 节的投诉程序受理有关以下事项的投诉：违法内容；错误移除您的内容；限制您的账户；使用影响您内容的自动化工具；以及错误阻止您的任何年龄评估。受内容影响但并非用户的人士亦可使用该程序。" }
+      { kind: "p", text: "我们依据英国 GDPR 第 27 条任命的英国代表为 [name, address, email]。《2015 年消费者权利法》适用于您，本条款中的任何内容均不限制您在该法下的权利；《2024 年数字市场、竞争与消费者法》的订阅规则生效后（预计于 2027 年），将适用于付费方案，包括续订后及免费试用后的冷静期。我们如何保护用户免受违法内容侵害：[terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]。我们使用的主动技术：[describe, or \"none\"]。年龄保证：[describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]。第 10 节的投诉程序受理有关以下事项的投诉：违法内容；错误移除您的内容；限制您的账户；使用影响您内容的自动化工具；以及错误阻止您的任何年龄评估。受内容影响但并非用户的人士亦可使用该程序。有关您的数据，见我们《隐私政策》的附件 B.2。" }
     ]
   },
   {
@@ -309,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "仲裁协议与集体诉讼弃权。 如果您居住在美国，您与 DebateAIRO 同意，因本条款或服务产生的任何争议均由 [the American Arbitration Association / JAMS] 根据其消费者规则通过具有约束力的个别仲裁解决，而不诉诸法院；但任何一方均可向小额索赔法院提出个别请求。您可以选择退出，但须在首次接受本条款后 30 天内向 [address] 发送电子邮件。本协议受《联邦仲裁法》管辖。仲裁申请费由我们承担。在法律允许的范围内，各方放弃提起集体、共同或代表性诉讼。本节仅向将来适用，不适用于您接受本节之前产生的请求。" },
       { kind: "p", text: "通知和下架。 无需账户即可通过 [URL] 举报未经同意的私密影像；我们会在收到有效请求后 48 小时内移除。著作权投诉应提交给第 16 节所述我们的指定代理人。" },
-      { kind: "p", text: "各州特别规定。 加利福尼亚州：适用第 12 节的自动续订条款；您可以随时在线取消；我们会将您对续订条款的同意至少保留三年。纽约州：您可在按提高后的价格收取任何费用后的 14 天内取消，并获得按比例计算的退款。得克萨斯州和内布拉斯加州：我们不出售敏感个人数据；如果日后改变该做法，我们会事先征得您的同意，[statutory notice language]。华盛顿州：我们载于 [URL] 的《消费者健康数据隐私通知》适用于健康相关信息。科罗拉多州：本服务不会对您作出具有重大后果的决定。" }
+      { kind: "p", text: "各州特别规定。 加利福尼亚州：适用第 12 节的自动续订条款；您可以随时在线取消；我们会将您对续订条款的同意至少保留三年。纽约州：您可在按提高后的价格收取任何费用后的 14 天内取消，并获得按比例计算的退款。得克萨斯州和内布拉斯加州：我们不出售敏感个人数据。华盛顿州：我们载于 [URL] 的《消费者健康数据隐私通知》适用于健康相关信息。科罗拉多州：本服务不会对您作出具有重大后果的决定。有关您的数据及您依据各州法律享有的隐私权利，见我们《隐私政策》的附件 B.3。" }
     ]
   },
   {
@@ -317,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "加拿大和魁北克 (仅在列明时适用)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "我们的隐私负责人为 [name, email]。魁北克：本条款的法语版本见 [URL]，且法语版本已优先向您展示；使您的辩论保持私密的设置默认开启；您可以请求取消对与您有关的个人信息编制索引。" }
+      { kind: "p", text: "我们的隐私负责人（在魁北克亦为个人信息保护负责人）为 [name]，privacy@dezbatere.ro。有关您的数据，见我们《隐私政策》的附件 B.4。魁北克：本条款提供法语版本；请通过语言切换器选择法语；使您的辩论保持私密的设置默认开启；您可以请求取消对与您有关的个人信息编制索引；仲裁协议和集体诉讼弃权对您不适用。" }
     ]
   },
   {
@@ -330,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "拉丁美洲 (西班牙语附件；仅在列明时适用)",
+    title: "瑞士 (仅在列明时适用)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] 在不存在合同必要性的情况下，同意是处理的依据；您在首次辩论之前明确同意我们处理您选择加入的任何敏感数据。您可以通过 [address] 行使 ARCO 权利，答复期限为 [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]。墨西哥：完整的 aviso de privacidad 见 [URL]；撤回期限为 [5] 天。阿根廷：[AAIP legend]；请在 10 天内使用 [URL] 的 botón de arrepentimiento。哥伦比亚： política de tratamiento 见 [URL]；撤回期限为 5 天。智利（自 2026 年 12 月 1 日起）：主管机构的联系方式为 […]；您可以通过订阅时使用的相同方式取消；数字服务不适用撤回权。" }
+      { kind: "p", text: "《瑞士联邦数据保护法》适用于您的数据（《隐私政策》附件 B.6）。您可以向您在瑞士居住地的法院提起诉讼。付费方案不适用法定撤回权；我们的退款政策为 […]。" }
     ]
   },
   {
     no: "A.7",
-    title: "海湾地区 — 阿拉伯联合酋长国和沙特阿拉伯 (仅在列明时适用)",
+    title: "摩尔多瓦 (仅在列明时适用)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "如果我们出于提供服务以外的目的处理您的数据，会征得您的同意，且您可以撤回同意。您的数据会在 [UAE / Kingdom of Saudi Arabia] 境外处理，包括在欧盟和美国，并依据 [SDAIA standard contractual clauses / the mechanism in the Register] 进行处理。您有责任确保您发布的任何内容均符合您所在国家的法律，包括有关宗教、公共秩序和道德的法律；我们可能限制在您所在区域发布此类主题的辩论。" }
+      { kind: "p", text: "根据本条款，您享有与欧盟消费者相同的权利，包括第 13 节规定的 14 天撤回权。您可以向摩尔多瓦法院提起诉讼。摩尔多瓦关于个人数据保护的第 195/2024 号法律适用于您的数据（《隐私政策》附件 B.7）。" }
     ]
   },
   {
     no: "A.8",
-    title: "亚太地区 (仅适用于列明区域的相应内容)",
+    title: "乌克兰 (仅在列明时适用)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "新加坡：我们的数据保护负责人为 [name, email]；数据传输以与 PDPA 相当的合同保障为基础；付费方案不适用法定冷静期，我们的退款政策为 […]。日本：《特定商业交易法》规定的法定披露见 [URL]；在线订阅不适用一般冷静期，我们的退款政策为 […]；您的内容可能传输给位于 [named countries] 的提供商，您通过注册时作出的同意对此表示同意。韩国：对可选处理和营销的同意，与运行服务所需事项的同意分别征得；我们的隐私负责人为 [name]；根据《电子商务法》，您可在订阅付费方案后的 7 天内撤回；在任何定期提价或从免费转为付费前，我们会重新征得您的同意；如《人工智能基本法》要求，我们会事先通知您本服务以 AI 为基础，并为输出加注标识。印度（DPDP 规则适用后）：适用 [URL] 的同意通知；未满 18 周岁的用户须取得可核验的父母同意。泰国：我们在泰国的代表为 [name] [if appointed]。菲律宾：我们依据《互联网交易法》提供的商业身份信息和救济机制见 [URL]；可向国家隐私委员会提出投诉。" }
+      { kind: "p", text: "除乌克兰政府未控制的地区外，我们在乌克兰提供 DebateAI。本产品和本条款提供乌克兰语版本。乌克兰《个人数据保护法》适用于您的数据（《隐私政策》附件 B.8）。" }
     ]
   },
   {
     no: "A.9",
-    title: "保留",
+    title: "以色列 (仅在列明时适用)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "您可以按照《消费者保护法》（5741-1981）的规定取消付费方案 [state the cancellation terms]。本条款和我们的《隐私政策》提供希伯来语版本。以色列《隐私保护法》适用于您的数据（《隐私政策》附件 B.9）。" }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "亚太地区 (仅适用于列明区域的相应内容)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "新加坡：我们的数据保护负责人为 [name, email]；数据传输以与 PDPA 相当的合同保障为基础；付费方案不适用法定冷静期，我们的退款政策为 […]。日本：《特定商业交易法》规定的法定披露见 [URL]；在线订阅不适用一般冷静期，我们的退款政策为 […]；我们将您的内容发送给位于美国和欧盟的 AI 提供商，每家提供商均受合同约束，须提供与日本《个人信息保护法》同等的保护；应您的请求，我们会告知您这些措施的内容。韩国：对可选处理和营销的同意，与运行服务所需事项的同意分别征得；我们的隐私负责人为 [name]，privacy@dezbatere.ro；根据《电子商务法》，您可在订阅付费方案后的 7 天内撤回；在任何定期提价或从免费转为付费前，我们会重新征得您的同意；本服务使用生成式 AI，我们会在您使用前告知您，并为 AI 生成的输出加注标识。台湾：根据《消费者保护法》，您可在订阅付费方案后的 7 天内撤回；台湾《个人资料保护法》适用于您的数据（《隐私政策》附件 B.10）。泰国：我们在泰国的代表为 [name] [if appointed]。菲律宾：我们依据《互联网交易法》提供的商业身份信息和救济机制见 [URL]；可向国家隐私委员会提出投诉。" }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "保留",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "土耳其、巴西和印度尼西亚各自均要求提供当地语言附件、指定代表或进行注册，并完成申报。目前尚未起草相关内容；在有意将其纳入前，这些国家不属于第 2 节范围。我们不向中国、越南和俄罗斯提供服务。" }
     ]
@@ -364,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "4a9595f6483cb47ad16b74a4e0f9a0841660501a68b886d8945301ad18cb94c4",
   eyebrow: "服务条款 · v2.0 · 生效日期 [DATE]",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DebateAIRO S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",

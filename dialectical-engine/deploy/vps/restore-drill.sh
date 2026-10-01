@@ -111,6 +111,7 @@ echo "RESTORE_DRILL_CHAIN broken=$BROKEN roots=$ROOTS total=$TOTAL form=post-004
 : "${USER_DEK_STORE_PATH:?}"
 : "${KEK_PATH:?}"
 : "${SUPPORT_KEK_PATH:?}"
+: "${RECORDS_KEY_PATH:?}"
 ESCROW_ARTEFACT="${BACKUP_ESCROW_ARTEFACT:-}"
 if [ -z "$ESCROW_ARTEFACT" ]; then
   # shellcheck disable=SC2012
@@ -135,6 +136,13 @@ if [ ! -f "$DRILL_SUPPORT_KEK" ] || [ "$(wc -c < "$DRILL_SUPPORT_KEK" | tr -d ' 
   echo "RESTORE_DRILL_REFUSED no restored support KEK" >&2; exit 1
 fi
 echo "RESTORE_DRILL_SUPPORT_KEK bytes=32"
+
+# Paid plans L1: the records key is the sixth escrowed secret. Presence and size only.
+DRILL_RECORDS_KEY="$WORK/keys/$(basename "$RECORDS_KEY_PATH")"
+if [ ! -f "$DRILL_RECORDS_KEY" ] || [ "$(wc -c < "$DRILL_RECORDS_KEY" | tr -d ' ')" != "32" ]; then
+  echo "RESTORE_DRILL_REFUSED no restored records key" >&2; exit 1
+fi
+echo "RESTORE_DRILL_RECORDS_KEY bytes=32"
 
 # The probe runs as the postgres OS user (peer auth is the only way into the scratch database),
 # so the restored custody must be readable by it and by nobody else: the crypto loaders require

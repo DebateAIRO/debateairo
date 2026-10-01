@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Onde disponibilizamos a DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Disponibilizamos a DebateAI a pessoas que residam na [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
+      { kind: "p", text: "Disponibilizamos a DebateAI a pessoas que residam na [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
     ]
   },
   {
@@ -299,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Reino Unido (apenas se indicado na secção 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "O nosso representante no Reino Unido ao abrigo do artigo 27.º do RGPD do Reino Unido é [name, address, email]. O Consumer Rights Act 2015 é-lhe aplicável e nada nestes Termos limita os direitos que lhe confere; a partir de [January 2027], as regras relativas a subscrições do Digital Markets, Competition and Consumers Act 2024 aplicam-se aos planos pagos, incluindo um período de reflexão após renovações e períodos experimentais gratuitos. Como protegemos os utilizadores contra conteúdos ilegais: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Tecnologia proativa que utilizamos: [describe, or \"none\"]. Verificação da idade: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. O procedimento de reclamação da secção 10 aceita reclamações relativas a conteúdos ilegais, remoção indevida do seu conteúdo, restrições à sua conta, utilização de ferramentas automatizadas que afetem o seu conteúdo e qualquer avaliação etária que o bloqueie indevidamente. Está disponível a pessoas afetadas por conteúdos que não sejam utilizadores." }
+      { kind: "p", text: "O nosso representante no Reino Unido ao abrigo do artigo 27.º do RGPD do Reino Unido é [name, address, email]. O Consumer Rights Act 2015 é-lhe aplicável e nada nestes Termos limita os direitos que lhe confere; quando as regras relativas a subscrições do Digital Markets, Competition and Consumers Act 2024 entrarem em vigor (o que se prevê para 2027), aplicar-se-ão aos planos pagos, incluindo um período de reflexão após renovações e períodos experimentais gratuitos. Como protegemos os utilizadores contra conteúdos ilegais: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Tecnologia proativa que utilizamos: [describe, or \"none\"]. Verificação da idade: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. O procedimento de reclamação da secção 10 aceita reclamações relativas a conteúdos ilegais, remoção indevida do seu conteúdo, restrições à sua conta, utilização de ferramentas automatizadas que afetem o seu conteúdo e qualquer avaliação etária que o bloqueie indevidamente. Está disponível a pessoas afetadas por conteúdos que não sejam utilizadores. O Anexo B.2 da nossa Política de Privacidade abrange os seus dados." }
     ]
   },
   {
@@ -309,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Convenção de arbitragem e renúncia a ações coletivas. Se residir nos Estados Unidos, o utilizador e a DebateAIRO concordam em resolver qualquer litígio decorrente destes Termos ou do serviço através de arbitragem individual vinculativa administrada por [the American Arbitration Association / JAMS] ao abrigo das respetivas regras de arbitragem de consumo, em vez de recorrer aos tribunais, com a exceção de que qualquer uma das partes pode apresentar uma pretensão individual num tribunal de pequenas causas. Pode optar pela não aplicação enviando uma mensagem para [address] no prazo de 30 dias após a primeira aceitação destes Termos. Esta convenção é regida pelo Federal Arbitration Act. Suportamos as taxas de apresentação da arbitragem. Há renúncia a ações coletivas, conjuntas e representativas na medida permitida por lei. Esta secção aplica-se apenas para o futuro e não se aplica a pretensões surgidas antes da sua aceitação." },
       { kind: "p", text: "Notificações e remoções. As imagens íntimas não consentidas podem ser denunciadas em [URL] sem uma conta e são removidas no prazo de 48 horas após um pedido válido. As reclamações relativas a direitos de autor são dirigidas ao nosso agente designado referido na secção 16." },
-      { kind: "p", text: "Disposições específicas de cada estado. Califórnia: aplicam-se as condições de renovação automática da secção 12; pode cancelar em linha a qualquer momento; conservamos o seu consentimento para as condições de renovação durante pelo menos três anos. Nova Iorque: pode cancelar no prazo de 14 dias após qualquer cobrança a um preço aumentado e receber um reembolso proporcional. Texas e Nebraska: não vendemos dados pessoais sensíveis; se isso alguma vez mudar, obteremos primeiro o seu consentimento [statutory notice language]. Washington: o nosso Aviso de Privacidade de Dados de Saúde dos Consumidores, disponível em [URL], aplica-se a informações relacionadas com a saúde. Colorado: nada no serviço toma decisões com consequências significativas a seu respeito." }
+      { kind: "p", text: "Disposições específicas de cada estado. Califórnia: aplicam-se as condições de renovação automática da secção 12; pode cancelar em linha a qualquer momento; conservamos o seu consentimento para as condições de renovação durante pelo menos três anos. Nova Iorque: pode cancelar no prazo de 14 dias após qualquer cobrança a um preço aumentado e receber um reembolso proporcional. Texas e Nebraska: não vendemos dados pessoais sensíveis. Washington: o nosso Aviso de Privacidade de Dados de Saúde dos Consumidores, disponível em [URL], aplica-se a informações relacionadas com a saúde. Colorado: nada no serviço toma decisões com consequências significativas a seu respeito. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados e os direitos de privacidade previstos no seu estado." }
     ]
   },
   {
@@ -317,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canadá e Quebeque (apenas se indicados)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "O nosso responsável pela privacidade é [name, email]. Quebeque: estes Termos estão disponíveis em francês em [URL] e a versão francesa foi-lhe apresentada em primeiro lugar; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito." }
+      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é [name], privacy@dezbatere.ro. O Anexo B.4 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; escolha francês no seletor de idioma; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito; não se lhe aplica qualquer convenção de arbitragem nem renúncia a ações coletivas." }
     ]
   },
   {
@@ -330,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "América Latina (anexo em língua espanhola; apenas se indicada)",
+    title: "Suíça (apenas se indicada)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] O consentimento constitui o fundamento do tratamento quando não exista necessidade contratual; presta consentimento expresso, antes do seu primeiro debate, para quaisquer dados sensíveis que opte por incluir. Os seus direitos ARCO podem ser exercidos em [address], com respostas no prazo de [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. México: o aviso de privacidad completo está disponível em [URL]; retratação no prazo de [5] dias. Argentina: [AAIP legend]; utilize o botón de arrepentimiento em [URL] no prazo de 10 dias. Colômbia: a política de tratamiento está disponível em [URL]; retratação no prazo de 5 dias. Chile (a partir de 1 de dezembro de 2026): o contacto da Agência é […]; pode cancelar através dos mesmos meios que utilizou para subscrever; não se aplica qualquer direito de retratação a serviços digitais." }
+      { kind: "p", text: "A Lei Federal suíça sobre a Proteção de Dados aplica-se aos seus dados (Política de Privacidade, Anexo B.6). Pode intentar ações nos tribunais do local da Suíça onde reside. Não se aplica ao plano pago qualquer direito legal de retratação; a nossa política de reembolso é […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Golfo — Emirados Árabes Unidos e Arábia Saudita (apenas se indicados)",
+    title: "Moldávia (apenas se indicada)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Quando tratamos os seus dados para finalidades distintas da prestação do serviço, fazemo-lo com o seu consentimento, que pode retirar. Os seus dados são tratados fora dos [UAE / Kingdom of Saudi Arabia], incluindo na União Europeia e nos Estados Unidos, ao abrigo de [SDAIA standard contractual clauses / the mechanism in the Register]. É responsável por garantir que tudo o que publica cumpre a legislação do país onde se encontra, incluindo a legislação relativa a religião, ordem pública e moralidade; podemos restringir a publicação de debates sobre esses temas na sua região." }
+      { kind: "p", text: "Ao abrigo destes Termos, tem os mesmos direitos que um consumidor na União Europeia, incluindo o direito de retratação de 14 dias previsto na secção 13. Pode intentar ações nos tribunais da Moldávia. A Lei n.º 195/2024 da Moldávia relativa à proteção de dados pessoais aplica-se aos seus dados (Política de Privacidade, Anexo B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Ásia-Pacífico (apenas as linhas relativas às regiões indicadas)",
+    title: "Ucrânia (apenas se indicada)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapura: o nosso Encarregado da Proteção de Dados é [name, email]; as transferências assentam em proteções contratuais comparáveis às da PDPA; não se aplica ao plano pago qualquer período legal de reflexão e a nossa política de reembolso é […]. Japão: a divulgação legal ao abrigo do Specified Commercial Transactions Act está disponível em [URL]; não se aplica um período geral de reflexão às subscrições em linha e a nossa política de reembolso é […]; o seu conteúdo pode ser transferido para fornecedores em [named countries], e o utilizador concorda com essa transferência através dos consentimentos prestados no momento do registo. Coreia do Sul: os consentimentos para tratamento facultativo e marketing são recolhidos separadamente dos elementos necessários ao funcionamento do serviço; o nosso Responsável pela Privacidade é [name]; pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do E-Commerce Act; obtemos novamente o seu consentimento antes de qualquer aumento de preço recorrente ou conversão de gratuito para pago; quando o AI Basic Act o exigir, informá-lo-emos previamente de que o serviço se baseia em IA e identificaremos os resultados. Índia (quando as regras DPDP forem aplicáveis): aplica-se o aviso de consentimento disponível em [URL]; os utilizadores com menos de 18 anos necessitam de consentimento parental verificável. Tailândia: o nosso representante na Tailândia é [name] [if appointed]. Filipinas: a nossa identificação comercial e o mecanismo de reparação ao abrigo do Internet Transactions Act estão disponíveis em [URL]; podem ser apresentadas reclamações à National Privacy Commission." }
+      { kind: "p", text: "Disponibilizamos a DebateAI na Ucrânia, exceto nas zonas que não são controladas pelo governo ucraniano. O produto e estes Termos estão disponíveis em ucraniano. A Lei da Ucrânia «Sobre a Proteção de Dados Pessoais» aplica-se aos seus dados (Política de Privacidade, Anexo B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Reservado",
+    title: "Israel (apenas se indicado)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Pode cancelar um plano pago nos termos permitidos pela Consumer Protection Law, 5741-1981 [state the cancellation terms]. Estes Termos e a nossa Política de Privacidade estão disponíveis em hebraico. A Protection of Privacy Law de Israel aplica-se aos seus dados (Política de Privacidade, Anexo B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Ásia-Pacífico (apenas as linhas relativas às regiões indicadas)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapura: o nosso Encarregado da Proteção de Dados é [name, email]; as transferências assentam em proteções contratuais comparáveis às da PDPA; não se aplica ao plano pago qualquer período legal de reflexão e a nossa política de reembolso é […]. Japão: a divulgação legal ao abrigo do Specified Commercial Transactions Act está disponível em [URL]; não se aplica um período geral de reflexão às subscrições em linha e a nossa política de reembolso é […]; enviamos o seu conteúdo para fornecedores de IA nos Estados Unidos e na União Europeia, cada um ao abrigo de um contrato que exige uma proteção equivalente à da Act on the Protection of Personal Information do Japão, e, mediante pedido, informamo-lo sobre essas medidas. Coreia do Sul: os consentimentos para tratamento facultativo e marketing são recolhidos separadamente dos elementos necessários ao funcionamento do serviço; o nosso responsável pela privacidade é [name], privacy@dezbatere.ro; pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do E-Commerce Act; obtemos novamente o seu consentimento antes de qualquer aumento de preço recorrente ou conversão de gratuito para pago; o serviço utiliza IA generativa, informamo-lo disso antes de o utilizar e identificamos os resultados gerados por IA. Taiwan: pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do Consumer Protection Act; a Personal Data Protection Act de Taiwan aplica-se aos seus dados (Política de Privacidade, Anexo B.10). Tailândia: o nosso representante na Tailândia é [name] [if appointed]. Filipinas: a nossa identificação comercial e o mecanismo de reparação ao abrigo do Internet Transactions Act estão disponíveis em [URL]; podem ser apresentadas reclamações à National Privacy Commission." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Reservado",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "A Turquia, o Brasil e a Indonésia exigem, cada um, um anexo no idioma local, um representante ou registo e formalidades. Esses elementos não estão aqui redigidos e esses países permanecem fora da secção 2 até serem deliberadamente incluídos. A China, o Vietname e a Rússia não são abrangidos pela oferta." }
     ]
@@ -364,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "dad7ac82ac3b1587d64cfe0dddbd389eb5aec04cd481629a5aa209492fbb99f3",
   eyebrow: "TERMOS DE SERVIÇO · v2.0 · EM VIGOR DESDE [DATE]",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DebateAIRO S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",

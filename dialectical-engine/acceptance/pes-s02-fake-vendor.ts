@@ -1,9 +1,10 @@
 import type { LookupFunction } from "node:net";
-import { spawnSync } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import * as https from "node:https";
 import { join } from "node:path";
 import * as tls from "node:tls";
+import { resolveConfiguredBinary } from "./relay-core.js";
 
 export const FAKE_VENDOR_AUTHORIZATION = "Bearer pes-s02-fake-vendor-token";
 export const FAKE_VENDOR_HOST = "api.localtest.me";
@@ -19,30 +20,85 @@ export type FakeVendor = Readonly<{
   close(): Promise<void>;
 }>;
 
-export function isPortListening(port: number): boolean {
-  const result = spawnSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" });
+/**
+ * `openssl` and `lsof` are HOST facts, deduced the way relay-core.ts (D10)
+ * deduces a maker CLI: the operator's key when it is set, otherwise the NAME on
+ * the PATH of the environment handed in, and never a compiled-in path. The file
+ * found is admitted as a program before it is ever started, and the absolute
+ * path admitted is the path spawned, directly and never through a shell, so a
+ * damaged tool is refused by name instead of being read back as a script (the
+ * 2026-09-17 fork bomb). A refusal keeps this fixture's own code; the
+ * resolver's reason and path travel as its `cause`.
+ */
+const OPENSSL_BINARY_ENV_KEY = "ACCEPTANCE_OPENSSL_BINARY" as const;
+const LSOF_BINARY_ENV_KEY = "ACCEPTANCE_LSOF_BINARY" as const;
+
+function resolveHostTool(
+  name: string,
+  environmentKey: string,
+  unavailableCode: string,
+  source: NodeJS.ProcessEnv
+): string {
+  try {
+    return resolveConfiguredBinary(name, environmentKey, unavailableCode, source);
+  } catch (refusal) {
+    throw new Error(unavailableCode, { cause: refusal });
+  }
+}
+
+type ToolExit = Readonly<{ status: number | null; stdout: string; errorCode: string | undefined }>;
+
+/** Runs an admitted absolute path with an argument array and waits for it; never rejects. */
+function runHostTool(binary: string, args: readonly string[], captureStdout: boolean): Promise<ToolExit> {
+  return new Promise((resolve) => {
+    const stdout: Buffer[] = [];
+    let settled = false;
+    const settle = (status: number | null, errorCode: string | undefined): void => {
+      if (settled) return;
+      settled = true;
+      resolve({ status, stdout: Buffer.concat(stdout).toString("utf8"), errorCode });
+    };
+    let child: ChildProcess;
+    try {
+      child = spawn(binary, args, { stdio: ["ignore", captureStdout ? "pipe" : "ignore", "ignore"] });
+    } catch (error) {
+      settle(null, (error as NodeJS.ErrnoException).code ?? "SPAWN_FAILED");
+      return;
+    }
+    const fail = (error: NodeJS.ErrnoException): void => settle(null, error.code ?? "SPAWN_FAILED");
+    child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stdout?.on("error", fail);
+    child.on("error", fail);
+    child.once("close", (status) => settle(status, undefined));
+  });
+}
+
+export async function isPortListening(port: number, source: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  const lsof = resolveHostTool("lsof", LSOF_BINARY_ENV_KEY, "PES_S02_LSOF_UNAVAILABLE", source);
+  const result = await runHostTool(lsof, ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN"], true);
   if (result.status === 1 && result.stdout === "") return false;
   if (result.status === 0) return true;
   throw new Error("PES_S02_LSOF_UNAVAILABLE");
 }
 
-export function pickFreePort(
+export async function pickFreePort(
   candidates: readonly number[],
-  listening: (port: number) => boolean
-): Readonly<{ port: number; evidence: string }> {
+  listening: (port: number) => Promise<boolean>
+): Promise<Readonly<{ port: number; evidence: string }>> {
   for (const port of candidates) {
     if (port <= 4400 || FAKE_VENDOR_EXCLUDED_PORTS.has(port)) continue;
-    if (listening(port) === false) {
+    if ((await listening(port)) === false) {
       return { port, evidence: `lsof -nP -iTCP:${port} -sTCP:LISTEN rc=1 lines=0` };
     }
   }
   throw new Error("PES_S02_NO_FREE_PORT");
 }
 
-export function createFixtureCertificate(
+export async function createFixtureCertificate(
   directory: string,
-  opensslExecutable: string
-): Readonly<{ keyPem: string; certPem: string }> {
+  source: NodeJS.ProcessEnv = process.env
+): Promise<Readonly<{ keyPem: string; certPem: string }>> {
+  const openssl = resolveHostTool("openssl", OPENSSL_BINARY_ENV_KEY, "PES_S02_OPENSSL_UNAVAILABLE", source);
   writeFileSync(join(directory, "openssl.cnf"), [
     "[req]",
     "distinguished_name = dn",
@@ -54,14 +110,12 @@ export function createFixtureCertificate(
     "subjectAltName = DNS:api.localtest.me",
     "basicConstraints = critical,CA:TRUE"
   ].join("\n") + "\n");
-  const result = spawnSync(opensslExecutable, [
+  const result = await runHostTool(openssl, [
     "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
     "-keyout", join(directory, "key.pem"), "-out", join(directory, "cert.pem"),
     "-config", join(directory, "openssl.cnf")
-  ], { stdio: ["ignore", "ignore", "pipe"] });
-  if (result.error && "code" in result.error && result.error.code === "ENOENT") {
-    throw new Error("PES_S02_OPENSSL_UNAVAILABLE");
-  }
+  ], false);
+  if (result.errorCode === "ENOENT") throw new Error("PES_S02_OPENSSL_UNAVAILABLE");
   if (result.status !== 0) throw new Error(`PES_S02_OPENSSL_RC_${result.status}`);
   return {
     keyPem: readFileSync(join(directory, "key.pem"), "utf8"),

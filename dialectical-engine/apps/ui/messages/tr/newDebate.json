@@ -81,5 +81,20 @@
   "requestFailure.kind.UNREADABLE": "Koordinatörün yanıtı okunamadığı için sonuç bilinmiyor.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatör plan seçimini reddetti. Ücretsiz veya Premium planı seçip yeniden deneyin.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatör isteği reddetti: Bu planın gerektirdiği bir model şu anda kullanılamıyor. Daha sonra yeniden deneyin veya diğer planı seçin.",
-  "requestFailure.kind.UNCLASSIFIED": "Herhangi bir yanıt gelmeden önce işlem başarısız olduğundan sonuç bilinmiyor. Bu, koordinatörün verdiği bir karar değil."
+  "requestFailure.kind.UNCLASSIFIED": "Herhangi bir yanıt gelmeden önce işlem başarısız olduğundan sonuç bilinmiyor. Bu, koordinatörün verdiği bir karar değil.",
+  "newDebate.legalGate.eyebrow": "Koşullar ve gizlilik",
+  "newDebate.legalGate.title": "Lütfen güncel belgeleri okuyup kabul edin",
+  "newDebate.legalGate.body": "Devam etmeden önce aşağıdaki her belgeyi açın, sonuna kadar okuyun ve ardından kabul edin.",
+  "newDebate.legalGate.readTerms": "Hizmet Koşullarını oku",
+  "newDebate.legalGate.readPrivacy": "Gizlilik Politikasını oku",
+  "newDebate.legalGate.done": "Okundu",
+  "newDebate.legalGate.accept": "Kabul et ve devam et",
+  "newDebate.legalGate.accepting": "Kaydediliyor…",
+  "newDebate.legalGate.failed": "Kabulünüz kaydedilemedi. Lütfen tekrar deneyin.",
+  "newDebate.legalGate.stale": "Belgelerden biri az önce değişti. Güncel sürümü okumak için sayfayı yeniden yükleyin.",
+  "newDebate.legalGate.reload": "Sayfayı yeniden yükle",
+  "newDebate.legalGate.manageAccount": "Hesabınızı yönetin veya silin",
+  "newDebate.legalGate.signOut": "Oturumu kapat",
+  "newDebate.legalGate.signOutFailed": "Oturum kapatma tamamlanamadı. Lütfen tekrar deneyin.",
+  "newDebate.room.locationBlocked": "Bulunduğunuz konumdan yeni tartışma başlatılamaz. Tartışmalarınızı okumaya devam edebilirsiniz."
 }

@@ -252,14 +252,14 @@ function publicationHarness() {
   );
   return {
     application,
-    async storeLegacy() {
+    async storeLegacy(content: (publicationRef: string) => unknown = publicDebate) {
       const publicationRef = randomUUID();
       const prepared = await cipher.create(publicationRef, PUBLICATION_RUN_ID);
       try {
         storedSnapshot = {
           publicationRef,
           runId: PUBLICATION_RUN_ID,
-          contentCiphertext: prepared.encrypt(publicDebate(publicationRef)),
+          contentCiphertext: prepared.encrypt(content(publicationRef)),
           createdAt
         };
       } finally {
@@ -280,9 +280,11 @@ function publicationHarness() {
       if (snapshot === null) throw new TypeError("S01_TEST_SNAPSHOT_MISSING");
       const prepared = await cipher.open(snapshot.publicationRef, snapshot.runId);
       try {
+        const stored: unknown = prepared.decrypt(snapshot.contentCiphertext);
         return {
           transition,
-          debate: PublicDebateSchema.parse(prepared.decrypt(snapshot.contentCiphertext))
+          stored,
+          debate: PublicDebateSchema.parse(stored)
         };
       } finally {
         prepared.close();
@@ -1015,7 +1017,7 @@ describe("S8 publication crypto and projection", () => {
       outcome: inputNode.review.outcome,
       reasons: inputNode.review.reasons,
       provenance_ref: REDACTED_OWNER_ONLY,
-      reviewer_lineage: inputNode.review.reviewer_lineage
+      reviewer_lineage: { maker: "reviewer", model_id: "review-model" }
     });
     expect(JSON.stringify(debate)).not.toContain("raw-artifact-id-SHOULD-NOT-LEAK");
   });
@@ -1129,6 +1131,75 @@ describe("S8 publication crypto and projection", () => {
       "gpt-5.6-sol",
       "claude-opus-5"
     ]);
+  });
+
+  it("publishes each lineage as maker and model only, never transport or provider_ref", async () => {
+    const answer = answerWithTree();
+    const inputNode = answer.nodes[0]!;
+    inputNode.maker_lineage = {
+      maker: "OpenAI",
+      model_id: "gpt-5.6-sol",
+      transport: "openai-compatible-http",
+      provider_ref: "development:codex-cli"
+    };
+    inputNode.review = {
+      outcome: "agree",
+      reasons: ["The evidence supports this node."],
+      provenance_ref: "review:raw",
+      reviewer_lineage: {
+        maker: "Anthropic",
+        model_id: "claude-opus-5",
+        transport: "openai-compatible-http",
+        provider_ref: "development:claude-cli"
+      }
+    };
+
+    const { stored, debate } = await publicationHarness().publish(answer);
+    const publishedNode = debate.answer.nodes?.find((node) => node.node_id === inputNode.node_id);
+
+    expect.soft(publishedNode?.maker_lineage).toEqual({ maker: "OpenAI", model_id: "gpt-5.6-sol" });
+    expect.soft(publishedNode?.review?.reviewer_lineage).toEqual({ maker: "Anthropic", model_id: "claude-opus-5" });
+    // The encrypted snapshot itself, before any schema parse on the way out.
+    const storedText = JSON.stringify(stored);
+    for (const internal of ["transport", "provider_ref", "openai-compatible-http", "development:"]) {
+      expect.soft(storedText).not.toContain(internal);
+    }
+  });
+
+  it("strips transport and provider_ref from a snapshot published before the trim", async () => {
+    const answer = answerWithTree();
+    const fullLineage = {
+      maker: "OpenAI",
+      model_id: "gpt-5.6-sol",
+      transport: "openai-compatible-http",
+      provider_ref: "development:codex-cli"
+    };
+    const oldNode = {
+      ...answer.nodes[0]!,
+      provenance_ref: REDACTED_OWNER_ONLY,
+      stranger_restatement: { check_status: "PASS" },
+      disagreement: null,
+      abstention: null,
+      maker_lineage: fullLineage,
+      review: {
+        outcome: "agree",
+        reasons: ["The evidence supports this node."],
+        provenance_ref: REDACTED_OWNER_ONLY,
+        reviewer_lineage: fullLineage
+      }
+    };
+    const harness = publicationHarness();
+    const publicationRef = await harness.storeLegacy((ref) => {
+      const legacy = publicDebate(ref);
+      return { ...legacy, answer: { ...legacy.answer, nodes: [oldNode], edges: [], tree_included: true } };
+    });
+
+    const read = await harness.application.readPublicDebate(publicationRef);
+
+    expect(read).not.toBeNull();
+    expect.soft(read!.answer.nodes?.[0]?.maker_lineage).toEqual({ maker: "OpenAI", model_id: "gpt-5.6-sol" });
+    expect.soft(read!.answer.nodes?.[0]?.review?.reviewer_lineage).toEqual({ maker: "OpenAI", model_id: "gpt-5.6-sol" });
+    expect(JSON.stringify(read)).not.toContain("provider_ref");
   });
 
   it("reads a legacy answer-only snapshot without fabricating a tree", async () => {
