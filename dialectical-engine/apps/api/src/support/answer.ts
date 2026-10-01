@@ -10,7 +10,7 @@ import {
   SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES,supportLocaleNames,
   type SupportAction,type SupportCorpusLanguage
 } from "@debateai/support-kb/catalog";
-import { buildSupportKnowledgeContext } from "@debateai/support-kb/context";
+import { buildSupportKnowledgeContext,supportCorpusLanguage } from "@debateai/support-kb/context";
 import { supportRecoveryFallback,supportSourceLabel } from "@debateai/support-kb/control-names";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import { redactSupportMessage, type SupportMessageCipherPort } from "./session.js";
@@ -244,7 +244,7 @@ export function createSupportAnswerService(input: Readonly<{
   const clock = input.clock ?? (() => new Date());
   return Object.freeze({
     respond: async (request: Parameters<SupportAnswerPort["respond"]>[0]) => {
-      const corpusLocale: SupportCorpusLanguage = request.language === "ro" ? "ro" : "en";
+      const corpusLocale: SupportCorpusLanguage = supportCorpusLanguage(request.language);
       const prepared = redactSupportMessage(request.text);
       const routeSnapshot = request.snapshot !== undefined
         && typeof request.snapshot.kbVersion === "string"

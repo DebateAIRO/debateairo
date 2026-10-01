@@ -44,7 +44,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   cs: Object.freeze({
     "product-identity": "O Dialectical Engine",
     "home-library": "Domovská stránka a knihovna debat",
-    "new-debate": "Vytvoření debaty s možnostmi tarifu",
+    "new-debate": "Vytvoření debaty s možnostmi plánu",
     "owner-debate": "Pracovní prostor vlastníka debaty",
     "public-debate": "Zveřejněná debata",
     "help-desk": "Konverzace s podporou a případy řešené člověkem",
@@ -68,7 +68,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   de: Object.freeze({
     "product-identity": "Über Dialectical Engine",
     "home-library": "Startseite und Debattenbibliothek",
-    "new-debate": "Debatte mit Planoptionen erstellen",
+    "new-debate": "Debatte mit Tarifoptionen erstellen",
     "owner-debate": "Arbeitsbereich des Debatteneigentümers",
     "public-debate": "Veröffentlichte Debatte",
     "help-desk": "Support-Gespräche und Fälle mit menschlicher Betreuung",
@@ -128,7 +128,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   fr: Object.freeze({
     "product-identity": "À propos de Dialectical Engine",
     "home-library": "Accueil et bibliothèque de débats",
-    "new-debate": "Créer un débat avec les options de l’offre",
+    "new-debate": "Créer un débat avec les options de la formule",
     "owner-debate": "Espace de travail du propriétaire du débat",
     "public-debate": "Débat publié",
     "help-desk": "Conversations d’assistance et dossiers traités par une personne",
@@ -176,7 +176,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   hr: Object.freeze({
     "product-identity": "O proizvodu Dialectical Engine",
     "home-library": "Početna stranica i knjižnica rasprava",
-    "new-debate": "Izrada rasprave s opcijama paketa",
+    "new-debate": "Izrada rasprave s opcijama plana",
     "owner-debate": "Radni prostor vlasnika rasprave",
     "public-debate": "Objavljena rasprava",
     "help-desk": "Razgovori s podrškom i slučajevi koje rješava osoba",
@@ -188,7 +188,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   hu: Object.freeze({
     "product-identity": "A Dialectical Engine névjegye",
     "home-library": "Kezdőlap és vitakönyvtár",
-    "new-debate": "Vita létrehozása a csomag beállításaival",
+    "new-debate": "Vita létrehozása az előfizetési szint beállításaival",
     "owner-debate": "A vita tulajdonosának munkaterülete",
     "public-debate": "Közzétett vita",
     "help-desk": "Ügyfélszolgálati beszélgetések és munkatárs által kezelt ügyek",
@@ -332,7 +332,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   sk: Object.freeze({
     "product-identity": "O Dialectical Engine",
     "home-library": "Domovská stránka a knižnica debát",
-    "new-debate": "Vytvorenie debaty s možnosťami plánu",
+    "new-debate": "Vytvorenie debaty s možnosťami programu",
     "owner-debate": "Pracovný priestor vlastníka debaty",
     "public-debate": "Zverejnená debata",
     "help-desk": "Konverzácie s podporou a prípady riešené človekom",
@@ -356,7 +356,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   sv: Object.freeze({
     "product-identity": "Om Dialectical Engine",
     "home-library": "Startsida och debattbibliotek",
-    "new-debate": "Skapa en debatt med planens alternativ",
+    "new-debate": "Skapa en debatt med abonnemangets alternativ",
     "owner-debate": "Debattägarens arbetsyta",
     "public-debate": "Publicerad debatt",
     "help-desk": "Supportsamtal och ärenden som hanteras av en person",
@@ -380,7 +380,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   uk: Object.freeze({
     "product-identity": "Про Dialectical Engine",
     "home-library": "Головна сторінка та бібліотека дебатів",
-    "new-debate": "Створення дебатів із параметрами тарифу",
+    "new-debate": "Створення дебатів із параметрами плану",
     "owner-debate": "Робоча область власника дебатів",
     "public-debate": "Опубліковані дебати",
     "help-desk": "Розмови з підтримкою та звернення до співробітника",
@@ -404,7 +404,7 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
   zh: Object.freeze({
     "product-identity": "关于 Dialectical Engine",
     "home-library": "首页和辩论资料库",
-    "new-debate": "使用套餐选项创建辩论",
+    "new-debate": "使用方案选项创建辩论",
     "owner-debate": "辩论所有者工作区",
     "public-debate": "已发布的辩论",
     "help-desk": "支持对话和人工处理的案例",
