@@ -459,7 +459,11 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // subscription log; charges, invoices and notices; the outbox and the cancel tokens. No pair.
         "0085_billing_customers_subscriptions.sql",
         "0086_billing_charges_invoices.sql",
-        "0087_billing_outbox_cancel.sql"
+        "0087_billing_outbox_cancel.sql",
+        // Paid plans P12a (amendments R1 A18, ruling R-31; number by R3-1): the
+        // WITHDRAW_SUBSCRIPTION step-up purpose and its one-shot consume function.
+        // The next free prefix after the billing tables, no pair.
+        "0088_billing_withdrawal_step_up.sql"
       ]);
   });
 });

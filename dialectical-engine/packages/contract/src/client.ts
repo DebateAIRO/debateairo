@@ -340,7 +340,7 @@ export interface ContractClient {
       action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
       target_run_id: string;
     }>
-    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" }>): Promise<{
+    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>): Promise<{
     status: "step_up_complete";
     csrf_token: string;
     step_up_grant?: ({
@@ -350,7 +350,7 @@ export interface ContractClient {
       expires_at: string;
     } | {
       token: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION";
       expires_at: string;
     }) | undefined;
   }>;
@@ -586,7 +586,7 @@ export function createContractClient(
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         target_run_id: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" }>) => request(
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>) => request(
       "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,

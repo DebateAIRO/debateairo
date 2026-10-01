@@ -545,7 +545,9 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
     target_run_id: z.uuid()
   }).strict(),
   z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
-  z.object({ action: z.literal("CHANGE_EMAIL") }).strict()
+  z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
+  // A18: withdrawing from a paid plan is account-scoped like account deletion.
+  z.object({ action: z.literal("WITHDRAW_SUBSCRIPTION") }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
@@ -562,6 +564,11 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     action: z.literal("CHANGE_EMAIL"),
+    expires_at: z.iso.datetime()
+  }).strict(),
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: z.literal("WITHDRAW_SUBSCRIPTION"),
     expires_at: z.iso.datetime()
   }).strict()
 ]);

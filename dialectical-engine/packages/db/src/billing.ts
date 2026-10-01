@@ -265,6 +265,21 @@ export class BillingRepository {
   }
 
   /**
+   * P12a (A18). Consumes one WITHDRAW_SUBSCRIPTION grant for this account and
+   * session, inside the caller's transaction, so the grant is spent exactly when
+   * WITHDRAWN is written and never otherwise.
+   */
+  async consumeWithdrawalGrant(client: PoolClient, input: Readonly<{
+    userId: string; ownerRef: string; sessionId: string; grantTokenHash: string;
+  }>): Promise<boolean> {
+    const result = await client.query<{ consumed: boolean }>(
+      "SELECT billing.consume_withdrawal_grant($1,$2,$3,$4) AS consumed",
+      [input.userId, input.ownerRef, input.sessionId, input.grantTokenHash]
+    );
+    return result.rows[0]?.consumed === true;
+  }
+
+  /**
    * The one customer row per owner, and the xMoney customer linked in `environment` — `null` when that environment
    * has none yet (a fresh start, or the first live checkout after stage), so the caller creates one there (R-14).
    */
