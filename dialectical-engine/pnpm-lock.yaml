@@ -5,6 +5,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  axios@>=1.0.0 <1.20.0: 1.20.0
+  '@grpc/grpc-js@>=1.14.0 <1.14.5': 1.14.5
   fast-uri@<3.1.8: 3.1.8
   fast-uri@>=4.0.0 <4.1.5: 4.1.5
   brace-expansion@>=2.0.0 <2.1.7: 2.1.7
@@ -24,8 +26,8 @@ importers:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.21.0)(pg@8.22.0)
       fastify:
-        specifier: 5.12.1
-        version: 5.12.1
+        specifier: 5.12.5
+        version: 5.12.5
       pg:
         specifier: 8.22.0
         version: 8.22.0
@@ -200,10 +202,10 @@ importers:
         version: link:../../packages/support-kb
       '@hatchet-dev/typescript-sdk':
         specifier: 1.28.1
-        version: 1.28.1(@grpc/grpc-js@1.14.4)(debug@4.4.3)(zod@4.4.3)
+        version: 1.28.1(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.4.3)
       fastify:
-        specifier: 5.12.1
-        version: 5.12.1
+        specifier: 5.12.5
+        version: 5.12.5
 
   apps/evaluator-worker:
     dependencies:
@@ -306,7 +308,7 @@ importers:
         version: link:../../packages/valuation
       '@hatchet-dev/typescript-sdk':
         specifier: 1.28.1
-        version: 1.28.1(@grpc/grpc-js@1.14.4)(debug@4.4.3)(zod@4.4.3)
+        version: 1.28.1(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.4.3)
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -1122,8 +1124,8 @@ packages:
   '@fastify/proxy-addr@5.1.0':
     resolution: {integrity: sha512-INS+6gh91cLUjB+PVHfu1UqcB76Sqtpyp7bnL+FYojhjygvOPA9ctiD/JDKsyD9Xgu4hUhCSJBPig/w7duNajw==}
 
-  '@grpc/grpc-js@1.14.4':
-    resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
+  '@grpc/grpc-js@1.14.5':
+    resolution: {integrity: sha512-7VZM+SVdEcUUqSQeNI3zM8Qs/BhQKZndPo2h5VkYkAM8Iz0wJIa8mKV5ekQGqG8UUsnkQ0NMxIxwkIHYvj0qOw==}
     engines: {node: '>=12.10.0'}
 
   '@grpc/proto-loader@0.7.15':
@@ -1140,7 +1142,7 @@ packages:
     resolution: {integrity: sha512-shyyBFjDDStpC4Q5WMMf/+6s5jcoE24PzIpusfTg8ZuD0hlI0BlOf0R+JGHBzcf7e6zj9UdypuugLiWkyk2UnA==}
     peerDependencies:
       '@anthropic-ai/claude-agent-sdk': ^0.3.148
-      '@grpc/grpc-js': ^1.14.3
+      '@grpc/grpc-js': 1.14.5
       '@modelcontextprotocol/sdk': ^1.29.0
       '@openai/agents': 0.13.5
       '@opentelemetry/api': ^1.9.0
@@ -1859,8 +1861,8 @@ packages:
   avvio@9.3.0:
     resolution: {integrity: sha512-g2tQ7LE7oOSqDfwEm3M+ZCMTJc7KiZCdJ4UwyZJb5ckTKyYu50OYmvv0mCFXPuYXoM4zkSt8zM9XQ9KCvxA74A==}
 
-  axios@1.19.0:
-    resolution: {integrity: sha512-ht/iuYZXEjFxLH/Hkezgd7m6JKlHHXEUSneaDz8uZe1Gj5QZtCnpyDsckvAiEnT89OEbCLmnte4R4sn7P0EKFw==}
+  axios@1.20.0:
+    resolution: {integrity: sha512-r8aOh8j9cGKpgQAqpzrUHnSIc6a59Y3Xf/cv8sy1DrHCkZHzQGEuoq1tARk6qSyDdtQGSDgpb9kFlruzPvrgwg==}
 
   b4a@1.8.1:
     resolution: {integrity: sha512-aiqre1Nr0B/6DgE2N5vwTc+2/oQZ4Wh1t4NznYY4E00y8LCt6NqdRv81so00oo27D8MVKTpUa/MwUUtBLXCoDw==}
@@ -2266,8 +2268,8 @@ packages:
   fast-uri@4.1.5:
     resolution: {integrity: sha512-vZeoMRB4epNr7QfdHxel7te/RcX16CxyXI07JCCTFWZA2s4v1azGNESRj+2EoaHSaWFL/Z3GmKT2jF6A202jLg==}
 
-  fastify@5.12.1:
-    resolution: {integrity: sha512-FWi+tQvwxR/PeRX7Z2mhfEF5ozJ3jn9asiiclzKXNSzJRHAYcU924aIOKAdHFJ+YIKieh3cqr1IwCOvTr41B3Q==}
+  fastify@5.12.5:
+    resolution: {integrity: sha512-OB2k1dlxs5/NAABqeKV2FUHkSD2BbENsCak8yULVcymn3fHIPDVa9TI3SDnJSWYSllZmSYuZXy2gTnsT+Sut1A==}
 
   fastq@1.20.1:
     resolution: {integrity: sha512-GGToxJ/w1x32s/D2EKND7kTil4n8OVk/9mycTc4VDza13lOvpUZTGX3mFSCtV9ksdGBVzvsyAVLM6mHFThxXxw==}
@@ -3481,7 +3483,7 @@ snapshots:
       '@fastify/forwarded': 3.0.2
       ipaddr.js: 2.5.0
 
-  '@grpc/grpc-js@1.14.4':
+  '@grpc/grpc-js@1.14.5':
     dependencies:
       '@grpc/proto-loader': 0.8.1
       '@js-sdsl/ordered-map': 4.4.2
@@ -3500,12 +3502,12 @@ snapshots:
       protobufjs: 7.6.5
       yargs: 17.7.3
 
-  '@hatchet-dev/typescript-sdk@1.28.1(@grpc/grpc-js@1.14.4)(debug@4.4.3)(zod@4.4.3)':
+  '@hatchet-dev/typescript-sdk@1.28.1(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.4.3)':
     dependencies:
       '@bufbuild/protobuf': 2.13.0
       '@types/qs': 6.15.1
       abort-controller-x: 0.5.0
-      axios: 1.19.0(debug@4.4.3)
+      axios: 1.20.0(debug@4.4.3)
       long: 5.3.2
       nice-grpc: 2.1.17
       nice-grpc-common: 2.0.4
@@ -3516,7 +3518,7 @@ snapshots:
       zod: 4.4.3
       zod-to-json-schema: 3.25.2(zod@4.4.3)
     optionalDependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
     transitivePeerDependencies:
       - debug
       - supports-color
@@ -4073,7 +4075,7 @@ snapshots:
       '@fastify/error': 4.2.0
       fastq: 1.20.1
 
-  axios@1.19.0(debug@4.4.3):
+  axios@1.20.0(debug@4.4.3):
     dependencies:
       follow-redirects: 1.16.0(debug@4.4.3)
       form-data: 4.0.6
@@ -4276,7 +4278,7 @@ snapshots:
   dockerode@5.0.1:
     dependencies:
       '@balena/dockerignore': 1.0.2
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       '@grpc/proto-loader': 0.7.15
       docker-modem: 5.0.7
       protobufjs: 7.6.5
@@ -4416,7 +4418,7 @@ snapshots:
 
   fast-uri@4.1.5: {}
 
-  fastify@5.12.1:
+  fastify@5.12.5:
     dependencies:
       '@fastify/ajv-compiler': 4.0.5
       '@fastify/error': 4.2.0
@@ -4763,7 +4765,7 @@ snapshots:
 
   nice-grpc@2.1.17:
     dependencies:
-      '@grpc/grpc-js': 1.14.4
+      '@grpc/grpc-js': 1.14.5
       abort-controller-x: 0.5.0
       nice-grpc-common: 2.0.4
 
