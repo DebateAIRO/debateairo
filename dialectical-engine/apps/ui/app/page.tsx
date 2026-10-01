@@ -5,6 +5,7 @@ import { AgeConfirmationFlow } from "@/components/AgeConfirmationFlow";
 import { resolveDobLocale } from "@/lib/dob/dobLocale";
 import { createServerContractClient, listDebatesPageServer, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import { LibraryComposer } from "@/components/LibraryComposer";
+import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
 import { LandingPage } from "@/components/landing/LandingPage";
@@ -45,6 +46,8 @@ export default async function HomePage({
       : token !== null ? "yours" : "public";
   const userAgent = (await headers()).get("user-agent") ?? undefined;
   const clientIp = readTrustedClientIp(await headers());
+  // Crisis check (V, 2026-09-30): the edge's country, so help numbers show that country first.
+  const crisisCountryHint = readCrisisCountryHint(await headers());
   // Task M8 (spec 2026-09-26 §14.4.7): the composer says today's limit for new
   // debates in the words /new uses, so it reads that catalogue too — only the
   // two values that message prints, as the composer's props ship to the browser.
@@ -139,7 +142,7 @@ export default async function HomePage({
             session; an unconfirmed one gets the notice above instead. */}
         {sessionConfirmed ? (
           <section data-support-primary-control id="start-a-debate" aria-label={t(catalog, "home.startDebateLabel")}>
-            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} locale={locale} />
+            <LibraryComposer catalog={catalog} newDebateCatalog={newDebateCatalog} locale={locale} crisisCountryHint={crisisCountryHint} />
           </section>
         ) : null}
 
