@@ -164,7 +164,12 @@ import {
   type SupportApplication,
   type SupportRoutePath
 } from "./support/index.js";
-import { installBillingRoutes, type BillingRouteOptions } from "./billing/index.js";
+import {
+  installBillingRoutes,
+  type BillingAdmission,
+  type BillingRouteOptions,
+  type BillingRoutePath
+} from "./billing/index.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
@@ -1226,7 +1231,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
-  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" }
+  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
+  { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
@@ -3108,7 +3114,21 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
   );
   // Paid plans (R-3): the one billing routes module, always installed.
-  installBillingRoutes(api, { ...options.billing, policy: (route) => routePolicy(route) });
+  const admitBilling: BillingAdmission = Object.freeze({
+    gate: (reply, scope, route, key) => options.admission?.configured(scope) !== true
+      || admitOrRefuse(reply, scope, route, key)
+  });
+  installBillingRoutes(api, {
+    ...(options.billing ?? {}),
+    policy: (route: BillingRoutePath) => routePolicy(route),
+    admission: admitBilling,
+    // R3-3: only the address and the agent. `sourceFor` also carries the age gate's `cf-ipcountry` value;
+    // billing's IP country is the DB-IP lookup's, never the edge header.
+    source: (request) => {
+      const { ip, userAgent } = sourceFor(request);
+      return Object.freeze({ ip, userAgent });
+    }
+  });
   return api;
 }
 

@@ -28,6 +28,7 @@ import {
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
   AskRoomResponseSchema,
+  BillingPlansResponseSchema,
   BillingUsageResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
@@ -56,6 +57,7 @@ import {
   type AskAccepted,
   type AskRequest,
   type AskRoomResponse,
+  type BillingPlansResponse,
   type BillingUsageResponse,
   type Deployment,
   type EmailChangePending,
@@ -379,6 +381,8 @@ export interface ContractClient {
   }>): Promise<AskRoomResponse>;
   /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
   getBillingUsage(): Promise<BillingUsageResponse>;
+  /** Paid-plans spec §2.5.3: the public plans list; 404 when billing is off. */
+  getBillingPlans(): Promise<BillingPlansResponse>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -663,6 +667,7 @@ export function createContractClient(
       depth: String(input.depth)
     }).toString()}`, AskRoomResponseSchema),
     getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
+    getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),

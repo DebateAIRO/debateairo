@@ -7,6 +7,7 @@ import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/regis
 import type { BillingAudit } from "./audit.js";
 import type { BillingConnectors } from "./connectors.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
+import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
 
@@ -23,6 +24,8 @@ export type BillingRuntimeDeps = Readonly<{
   plans: BillingPlans;
   countryPolicy: CountryPolicy;
   geo: GeoLookup;
+  /** L4's re-acceptance answer (main.ts's `legal`): billing routes refuse LEGAL_REACCEPTANCE_REQUIRED. */
+  legal: BillingLegalGate;
   dekStore: ReadableUserDekStore;
   /** P17 supplies the sender and the Terms / withdrawal-form resolvers; until then EMAIL jobs wait in the queue. */
   mail: Readonly<{ sender: BillingMailPort; attachments: ReadonlyMap<BillingAttachmentKind, AttachmentResolver> }> | undefined;
@@ -42,6 +45,8 @@ export type BillingRuntimeDeps = Readonly<{
 
 export type BillingRuntime = Readonly<{
   outbox: BillingOutboxWorker;
+  /** P8a onward: the billing routes' members this runtime composes (main.ts's `billingRouteOptions`). */
+  routes: BillingRouteOptions;
   kick(): void;
   start(): void;
   stop(): void;
@@ -61,10 +66,13 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       mail: deps.mail.sender, attachments
     }));
   }
+  // P8b onward add their members to this object literal.
+  const routes: BillingRouteOptions = Object.freeze({ plans: deps.plans, legal: deps.legal, clock: deps.clock });
   const drain = createCoalescingSingleFlight(() => outbox.drain(10), () => deps.reportPending("BILLING_OUTBOX_PENDING"));
   const timers: Array<ReturnType<typeof setInterval>> = [];
   return Object.freeze({
     outbox,
+    routes,
     kick: drain,
     start() {
       if (timers.length > 0) return;

@@ -295,6 +295,20 @@ export const BillingUsageResponseSchema = z.object({
 }).strict();
 export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
 
+/** Paid-plans spec §2.5.3: money crosses the wire as a decimal string with exactly two places, "20.00". */
+export const BillingDecimalMoneySchema = z.string().regex(/^(?:0|[1-9]\d{0,8})\.\d{2}$/);
+
+/** GET /v1/billing/plans (public). Credit is never shown in dollars: "4" reads "4× the Plus allowance". */
+export const BillingPlansResponseSchema = z.object({
+  currency: z.literal("USD"),
+  plans: z.array(z.object({
+    plan_id: PlanIdSchema,
+    net_price: BillingDecimalMoneySchema,
+    allowance_vs_plus: z.string().regex(/^\d+(?:\.\d+)?$/)
+  }).strict()).min(1)
+}).strict();
+export type BillingPlansResponse = z.infer<typeof BillingPlansResponseSchema>;
+
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
  * `core.run.argument_language_tag` (a BCP-47 tag, "und" when detection was not
@@ -1080,7 +1094,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
     "POST /v1/runs/{id}/unpublish",
-    "GET /v1/billing/usage"
+    "GET /v1/billing/usage",
+    "GET /v1/billing/plans"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
@@ -1103,6 +1118,6 @@ export const contractInventory = Object.freeze({
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
-    AnswerStorySchema, AnswerDisclosureSchema
+    AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema
   })
 });

@@ -1000,21 +1000,6 @@ const supportAnswers = createSupportAnswerService({
 });
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
 /**
- * Paid plans (B7a onward): the billing routes' dependencies, only while billing is
- * on (hosted, and the room composed with entitlements). Later billing tasks ADD
- * their members to this one object; absent, every billing route answers 404.
- */
-const billingRouteOptions: BillingRouteOptions | undefined =
-  askRoomComposition === undefined || askRoomComposition.entitlements === null
-    ? undefined
-    : Object.freeze({
-        usage: new PersonUsageReader({
-          entitlements: askRoomComposition.entitlements,
-          allowance: askRoomComposition.personAllowance,
-          spend: askRoomComposition.spend
-        })
-      });
-/**
  * Paid plans P7: the billing runtime (the durable outbox worker and, later, every billing job and route), composed
  * only while billing is on (P6a built the connectors). Billing on with no plans row, country policy or country lookup
  * is a configuration error, refused at boot by name.
@@ -1030,11 +1015,31 @@ const billingRuntime = billingConnectors === null
     }
     return createBillingRuntime({
       pool, connectors: billingConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
-      geo: geoLookup, dekStore, mail: undefined,
+      geo: geoLookup, legal, dekStore, mail: undefined,
       audit: consoleBillingAudit, clock: () => new Date(),
       reportPending: (code) => console.error(`[${code}]`)
     });
   });
+/**
+ * Paid plans (B7a onward): the billing routes' dependencies, only while billing is
+ * on. B7a's usage reader (the room composed with entitlements) and, from P8a, the
+ * billing runtime's routes; later billing tasks add their members to
+ * `billingRuntime.routes`. Absent, every billing route answers 404.
+ */
+const billingUsageReader = askRoomComposition === undefined || askRoomComposition.entitlements === null
+  ? undefined
+  : new PersonUsageReader({
+      entitlements: askRoomComposition.entitlements,
+      allowance: askRoomComposition.personAllowance,
+      spend: askRoomComposition.spend
+    });
+const billingRouteOptions: BillingRouteOptions | undefined =
+  billingUsageReader === undefined && billingRuntime === undefined
+    ? undefined
+    : Object.freeze({
+        ...(billingUsageReader === undefined ? {} : { usage: billingUsageReader }),
+        ...(billingRuntime === undefined ? {} : billingRuntime.routes)
+      });
 const api = buildApi({
   application,
   stories: new RepositoryAnswerStoryApplication(storyRepository),
