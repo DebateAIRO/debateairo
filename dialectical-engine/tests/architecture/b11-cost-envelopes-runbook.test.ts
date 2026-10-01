@@ -53,6 +53,7 @@ describe("the runbook's cost envelopes (B11b)", () => {
       "| `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` |",
       "| `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` |"
     ]) expect(publishing, needle).toContain(needle);
+    expect(publishing).toMatch(/^\| `COST_ENVELOPE_POLICY_INVALID` \|[^\n]*`waiting_line_per_person`/mu);
   });
 
   it("lists the new members in the register file's README", async () => {
