@@ -194,6 +194,30 @@ describe("crisis check before a debate starts", () => {
     }
   });
 
+  // Hate-speech ARCH review S03 (B2): the API trims the question before its own size limit, so
+  // the crisis check has to measure the same trimmed text. Padded with spaces past 8 KB, a crisis
+  // question used to skip the check and start a debate.
+  it.each([
+    ["spaces", " ".repeat(8_200)],
+    ["new lines and tabs", "\n\t".repeat(4_100)]
+  ])("checks the question as the API keeps it, padded with %s past the size limit", async (_label, padding) => {
+    const identity = testHttpIdentity("crisis-padded");
+    const { sessions } = sessionsWithConsent(identity, "given");
+    const asks = askSpy();
+    const api = buildApi({ application: asks.app, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    try {
+      const response = await api.inject({
+        method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
+        payload: { ...ASK, question_line: `${padding}Should I kill myself?${padding}` }
+      });
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toBe(CRISIS_SUPPORT_OFFERED);
+      expect(asks.submitted()).toBe(0);
+    } finally {
+      await api.close();
+    }
+  });
+
   it("stays the first step of the ask pre-flight: nothing in the route runs before it", () => {
     // A later pre-flight check of the question (the hate-speech check, S03) belongs after this
     // line: a person in crisis must never meet its refusal or its "check unavailable" message,
