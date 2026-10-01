@@ -228,6 +228,8 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     DEBATEAI_DEV_SYNTHESIZER_ROLE_REF: z.string().min(1).optional(),
     DEBATEAI_DEV_EVALUATOR_ROLE_REF: z.string().min(1).optional(),
     DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
+    // Paid plans (P6b): "1" makes dev:auth:up start the fake xMoney, Quaderno and SmartBill servers.
+    DEBATEAI_BILLING_FAKES: z.enum(["0", "1"]).optional(),
     NODE_ENV: z.enum(["development", "test", "production"]).optional()
   });
   return Object.freeze(Object.fromEntries(
