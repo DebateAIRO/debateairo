@@ -71,10 +71,12 @@ const OWNER_REVIEW = Object.freeze({
 
 // cookie-compliance S02 (SPEC-v2 R10): the owner's V0 signature of the catalogue, the 8 rewritten articles and
 // their 8 recovery rows. The orchestrator writes reviewerSession, reviewedOn and ratifiedOn at V0
-// (probes/ARCH-CC-S02/s02-sign.py); until then this case is RED on the branch by design.
+// (probes/ARCH-CC-S02/s02-sign.py); until then this case is RED on the branch by design. The session is
+// blank on purpose: the loader refuses a blank session, so no manifest can match this pin before V0
+// writes V's (REV-S02 p1 SD-N1 — a placeholder string here was itself a loader-valid OWNER record).
 const S02_OWNER_REVIEW = Object.freeze({
   reviewedBy: "OWNER",
-  reviewerSession: "PENDING-V0",
+  reviewerSession: "",
   reviewedOn: "2026-09-30",
   evidence: "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
   ratifiedBy: "V",
