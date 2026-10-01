@@ -280,9 +280,10 @@ export class WorkItemRepository {
    * A run the room started carries a hold (`ledger.model_spend_hold`), written
    * in the same transaction as its first job, so the hold's `opened_at` is when
    * that job became READY. A job still READY — never claimed: nothing turns a
-   * job back to READY — more than `olderThanSeconds` later was never dispatched
-   * (the API stopped between the decision's commit and the dispatch, or the
-   * dispatch failed and so did its FAILED write), and its hold counts on every
+   * job back to READY — more than `olderThanSeconds` later was never claimed:
+   * either never dispatched (the API stopped between the decision's commit and
+   * the dispatch, or the dispatch failed and so did its FAILED write) or
+   * dispatched but still queued, or its task expired; its hold counts on every
    * later day and window until a runner claims it. Oldest first, by the
    * database's clock, the one `opened_at` was written by. A run without a hold
    * (no room composed) is not listed: nothing of it counts.
