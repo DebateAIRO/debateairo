@@ -1,4 +1,4 @@
-import { decimalToMicros, foldSubscription, type SubscriptionEvent } from "@debateai/billing-core";
+import { decimalToMicros, foldSubscription, invoiceIssuerFor, type SubscriptionEvent } from "@debateai/billing-core";
 import type {
   BillingJobQueries, BillingReadExecutor, BillingRepository, ChargeEventRow, ChargeKind, ChargeRow, CustomerXMoneyEnvironment,
   EntitlementRepository, LocationEvidenceRow, OutboxJob, QuoteRow
@@ -10,12 +10,13 @@ import type { BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { PoolClient } from "pg";
 import { credentialsRefused, type BillingAudit } from "./audit.js";
 import type { NoticeOutcome, RequestedRefundReason } from "./codes.js";
+import { enqueueEmail } from "./email-job.js";
 import { locationVerdict } from "./location-verdict.js";
 import { DONE, notFinalRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
-import { covers, pendingRefund, refundedAlready, refundIntentOf, type RefundDesk } from "./refunds.js";
+import { covers, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk } from "./refunds.js";
 import { chargeEvent, refundTarget, subscriptionEvent } from "./rows.js";
-import { enqueueInvoice, type ChargeSettlement, type SettlementContext, type SettlementPrepared } from "./settlement.js";
+import { enqueueCreditNote, enqueueInvoice, type ChargeSettlement, type SettlementContext, type SettlementPrepared } from "./settlement.js";
 
 type ChargeWithEvents = ChargeRow & { events: ChargeEventRow[] };
 type Owner = Readonly<{ ownerRef: string; quote: QuoteRow | null; customerId: string; events: ReadonlyArray<SubscriptionEvent> }>;
@@ -531,7 +532,7 @@ export class VerifyPaymentHandler {
       await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
     }
-    throw new TypedDomainError("BILLING_REVERSAL_UNHANDLED", "a refund we did not request");
+    return this.providerRefund(charge, transaction, noticeId, now, "PROVIDER_REFUND");
   }
 
   /** D5 5g: the charge that recorded the payment a `refund` transaction names (as SUCCEEDED or DUPLICATE_PAYMENT). */
@@ -579,22 +580,189 @@ export class VerifyPaymentHandler {
     return this.providerRefundTransaction(charge, paymentId, transaction, noticeId, now);
   }
 
-  /** P9c: a refund made elsewhere, reported as its own transaction with its amount. */
-  private async providerRefundTransaction(
-    _charge: ChargeWithEvents, _paymentId: string, _transaction: XMoneyTransaction, _noticeId: string | null, _now: Date
+  private async voided(charge: ChargeWithEvents, transaction: XMoneyTransaction, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
+    const settlement = this.settlements.get(charge.kind);
+    if (settlement?.voided !== undefined) {
+      const owner = await this.owner(charge);
+      await this.deps.repository.withTransaction(async (client) => {
+        await this.deps.jobs.lockOwner(client, owner.ownerRef);
+        await settlement.voided!(await this.context(client, charge, transaction, owner, now));
+      });
+      return DONE;
+    }
+    const succeeded = charge.events.some((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === transaction.transactionId);
+    return succeeded
+      ? this.providerRefund(charge, transaction, noticeId, now, "PROVIDER_VOID")
+      : this.failed(charge, transaction, noticeId, now, "VOIDED");
+  }
+
+  /**
+   * A9: a refund or a void made at xMoney, not by us: record it and keep the plan. A void after success is a refund in
+   * full (A9), so its credit note is issued at once. A dashboard refund's amount cannot be read (Open question 11), so
+   * the remaining amount is recorded as an upper bound and its credit note is the owner's, never automatic.
+   */
+  private async providerRefund(
+    charge: ChargeWithEvents, transaction: XMoneyTransaction, noticeId: string | null, now: Date,
+    reason: "PROVIDER_REFUND" | "PROVIDER_VOID"
   ): Promise<OutboxOutcome> {
-    throw new TypedDomainError("BILLING_REVERSAL_UNHANDLED", "a refund transaction we did not request");
+    // Recorded already, on the payment or through its own refund transaction (D5 5g).
+    if (refundedAlready(charge, transaction.transactionId)) {
+      await this.outcome(noticeId, now, "DUPLICATE");
+      return DONE;
+    }
+    const owner = await this.owner(charge);
+    const paidRow = charge.events.find((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === transaction.transactionId);
+    const succeeded = paidRow !== undefined;
+    // What is left of THIS paid transaction, counted per transaction as P1a's guard and `paidTransactions` count it: a
+    // duplicate payment's own refund on the same charge never counts against it. The `!succeeded` path below records
+    // the payment's SUCCEEDED at the charge total, so that is what it paid.
+    const paidMicros = paidRow?.amountMicros ?? charge.totalMicros;
+    const amountMicros = paidMicros - refundedMicros(charge, transaction.transactionId);
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, owner.ownerRef);
+      if (!succeeded) {
+        // We never saw it paid: the money came and went. Record both, with no plan change and no invoice.
+        const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUCCEEDED", now, {
+          xmoneyTransactionId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode: null,
+          xmoneyCreatedAt: transaction.createdAt
+        }));
+        if (inserted === "DUPLICATE") return;
+      }
+      if (amountMicros > 0) {
+        const fields = { xmoneyTransactionId: transaction.transactionId, amountMicros, errorCode: reason };
+        await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUND_REQUESTED", now, fields));
+        await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUNDED", now, fields));
+        if (succeeded && owner.quote !== null && reason === "PROVIDER_VOID") {
+          await enqueueCreditNote(this.deps.repository, client, {
+            charge, quote: owner.quote, policy: this.deps.policy, transactionId: transaction.transactionId, refundMicros: amountMicros, now
+          });
+        }
+      }
+      await this.outcome(noticeId, now, "REFUNDED", client);
+    });
+    if (reason === "PROVIDER_REFUND" && succeeded && owner.quote !== null && amountMicros > 0) {
+      // The owner's summary (P16b) lists this charge: a PROVIDER_REFUND REFUNDED with no CREDIT_NOTE invoice row.
+      this.deps.audit("billing.invoice.unknown", {
+        issuer: invoiceIssuerFor(owner.quote.taxCountry, this.deps.policy.invoiceIssuerRules), kind: "CREDIT_NOTE",
+        code: "CREDIT_NOTE_MANUAL"
+      });
+    }
+    this.deps.audit("billing.refund", { reason, chargeKind: charge.kind });
+    return DONE;
   }
 
-  private async voided(_charge: ChargeWithEvents, _transaction: XMoneyTransaction, _noticeId: string | null, _now: Date): Promise<OutboxOutcome> {
-    throw new TypedDomainError("BILLING_REVERSAL_UNHANDLED", "a void or a cancel");
+  /**
+   * D5 5g: a refund made elsewhere that xMoney reports as its own transaction, so its amount is known. Recorded at
+   * that amount (the request on the payment, the REFUNDED on the refund transaction naming it) with the credit note
+   * for exactly that amount. A payment that already holds a refund record takes no second one (P1a's key): the same
+   * provider refund reported again is a replay (DONE), any other goes to the owner. Its durable mark (D6b's P16b
+   * lists it) is this VERIFY_PAYMENT job itself, keyed by the refund transaction's id: it ends DEAD with the code
+   * `REFUND_UNRECORDED`, with or without a notice (P14a's listing and a notice both reach here), next to one
+   * `billing.refund.unrecorded` line; a notice, when there is one, records `UNRECORDED_REFUND`.
+   */
+  private async providerRefundTransaction(
+    charge: ChargeWithEvents, paymentId: string, transaction: XMoneyTransaction, noticeId: string | null, now: Date
+  ): Promise<OutboxOutcome> {
+    const amountMicros = decimalToMicros(transaction.amountDecimal);
+    const held = charge.events.filter((event) => (event.kind === "REFUND_REQUESTED" || event.kind === "REFUNDED")
+      && refundTarget(event) === paymentId);
+    if (held.length > 0) {
+      const replay = held.some((event) => event.kind === "REFUNDED" && event.amountMicros === amountMicros
+        && (event.errorCode === "PROVIDER_REFUND" || event.errorCode === "PROVIDER_VOID"));
+      if (replay) {
+        await this.outcome(noticeId, now, "DUPLICATE");
+        return DONE;
+      }
+      this.deps.audit("billing.refund.unrecorded", { reason: "PROVIDER_REFUND" });
+      await this.outcome(noticeId, now, "UNRECORDED_REFUND");
+      return Object.freeze({ kind: "DEAD" as const, code: "REFUND_UNRECORDED" });
+    }
+    const owner = await this.owner(charge);
+    const paid = charge.events.some((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === paymentId);
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, owner.ownerRef);
+      const requested = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUND_REQUESTED", now, {
+        xmoneyTransactionId: paymentId, amountMicros, errorCode: "PROVIDER_REFUND"
+      }));
+      if (requested === "DUPLICATE") return;
+      // D5 5m: the refund transaction's own creationDate dates the REFUND tax row.
+      await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUNDED", now, {
+        xmoneyTransactionId: transaction.transactionId, amountMicros, errorCode: "PROVIDER_REFUND",
+        refundsTransactionId: paymentId, xmoneyCreatedAt: transaction.createdAt
+      }));
+      // A second payment we refunded ourselves was never a sale; a charge's own payment gets its credit note.
+      if (paid && owner.quote !== null) {
+        await enqueueCreditNote(this.deps.repository, client, {
+          charge, quote: owner.quote, policy: this.deps.policy, transactionId: paymentId, refundMicros: amountMicros, now
+        });
+      }
+      await this.outcome(noticeId, now, "REFUNDED", client);
+    });
+    this.deps.audit("billing.refund", { reason: "PROVIDER_REFUND", chargeKind: charge.kind });
+    return DONE;
   }
 
-  private async chargedBack(_charge: ChargeWithEvents, _transaction: XMoneyTransaction, _noticeId: string | null, _now: Date): Promise<OutboxOutcome> {
-    throw new TypedDomainError("BILLING_REVERSAL_UNHANDLED", "a chargeback");
+  private async chargedBack(charge: ChargeWithEvents, transaction: XMoneyTransaction, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
+    if (charge.events.some((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId === transaction.transactionId)) {
+      await this.outcome(noticeId, now, "DUPLICATE");
+      return DONE;
+    }
+    const owner = await this.owner(charge);
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, owner.ownerRef);
+      const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
+        xmoneyTransactionId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode: null
+      }));
+      if (inserted === "DUPLICATE") return;
+      const { subscription } = await this.context(client, charge, transaction, owner, now);
+      if (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE") {
+        await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "SUSPENDED", now, { charge_id: charge.chargeId }));
+        await this.deps.entitlements.append(client, {
+          ownerRef: owner.ownerRef, planId: "FREE", periodAnchorAt: subscription.periodAnchorAt ?? now, cause: "SUSPENDED_CHARGEBACK",
+          effectiveAt: now, subscriptionId: subscription.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
+        });
+        await enqueueEmail(this.deps.repository, client, {
+          template: "M10", recipient: { kind: "CUSTOMER", customerId: owner.customerId }, dedupeRef: charge.chargeId,
+          params: { plan: subscription.planId }, notBefore: now
+        });
+      }
+      await this.outcome(noticeId, now, "CHARGEBACK", client);
+    });
+    this.deps.audit("billing.chargeback", { chargeKind: charge.kind });
+    return DONE;
   }
 
-  private async represented(_job: OutboxJob, _transaction: XMoneyTransaction, _noticeId: string | null, _now: Date): Promise<OutboxOutcome> {
-    throw new TypedDomainError("BILLING_REVERSAL_UNHANDLED", "a representment");
+  /** A9: evidence was submitted in our favour; the outcome itself arrives by the owner's command (P14b). */
+  private async represented(job: OutboxJob, transaction: XMoneyTransaction, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
+    const target = await this.chargedBackCharge(transaction, job.payload);
+    if (target === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
+    if (target.events.some((event) => event.kind === "CHARGEBACK_REPRESENTED" && event.xmoneyTransactionId === transaction.transactionId)) {
+      await this.outcome(noticeId, now, "DUPLICATE");
+      return DONE;
+    }
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.repository.appendChargeEvent(client, chargeEvent(target.chargeId, "CHARGEBACK_REPRESENTED", now, {
+        xmoneyTransactionId: transaction.transactionId, amountMicros: target.totalMicros, errorCode: null
+      }));
+      await this.outcome(noticeId, now, "REPRESENTED", client);
+    });
+    return DONE;
+  }
+
+  /** The newest charge of the order's subscription that has a CHARGEBACK and no representment yet. */
+  private async chargedBackCharge(transaction: XMoneyTransaction, payload: OutboxJob["payload"]): Promise<ChargeWithEvents | null> {
+    const external = transaction.externalOrderId
+      ?? (typeof payload.external_order_id === "string" ? payload.external_order_id : null)
+      ?? (await this.deps.xmoney.getOrder(transaction.orderId)).externalOrderId;
+    if (external === null || !/^[0-9a-f]{32}$/.test(external)) return null;
+    const initial = await this.deps.repository.charge(external);
+    if (initial === null) return null;
+    const charges = await this.deps.repository.chargesForSubscription(initial.subscriptionId);
+    const withEvents = (await Promise.all(charges.map((charge) => this.deps.repository.charge(charge.chargeId))))
+      .filter((charge): charge is ChargeWithEvents => charge !== null)
+      .filter((charge) => charge.events.some((event) => event.kind === "CHARGEBACK")
+        && !charge.events.some((event) => event.kind === "CHARGEBACK_REPRESENTED"))
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+    return withEvents[0] ?? null;
   }
 }

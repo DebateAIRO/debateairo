@@ -391,8 +391,10 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       }));
     },
     async entitlementRows(ownerRef) {
+      // In the order 0084's `billing.entitlement_at` resolves them: two rows of one instant (the harness clock does not
+      // move between a plan's activation and its suspension) are ordered by when they were written, never by their id.
       const result = await database.pool.query<{ plan_id: string; cause: string; paid_through: Date | null }>(
-        "SELECT plan_id, cause, paid_through FROM billing.entitlement_event WHERE owner_ref=$1 AND cause <> 'SIGNED_UP_FREE' ORDER BY effective_at, event_id",
+        "SELECT plan_id, cause, paid_through FROM billing.entitlement_event WHERE owner_ref=$1 AND cause <> 'SIGNED_UP_FREE' ORDER BY effective_at, recorded_at, event_id",
         [ownerRef]
       );
       return result.rows.map((row) => Object.freeze({ planId: row.plan_id, cause: row.cause, paidThrough: row.paid_through }));
