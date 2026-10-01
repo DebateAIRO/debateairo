@@ -1,7 +1,7 @@
 import type { BillingRepository, OutboxJob } from "@debateai/db";
 import type { PoolClient } from "pg";
 import type { OutboxHandler, OutboxOutcome } from "./outbox.js";
-import { DONE } from "./outbox.js";
+import { DONE, failureRetryAt } from "./outbox.js";
 import { openBillingProfile, type BillingProfile } from "./records.js";
 
 /**
@@ -115,7 +115,7 @@ export function createEmailJobHandler(deps: Readonly<{
   mail: BillingMailPort;
   attachments: ReadonlyMap<BillingAttachmentKind, AttachmentResolver>;
 }>): OutboxHandler {
-  return async (job) => {
+  return async (job, now) => {
     const { template, recipient, customer_id: customerId, attachments } = job.payload;
     if (typeof template !== "string" || !TEMPLATE_IDS.has(template)) return dead("EMAIL_PAYLOAD_INVALID");
     let to: string;
@@ -141,7 +141,15 @@ export function createEmailJobHandler(deps: Readonly<{
     for (const kind of typeof attachments === "string" && attachments.length > 0 ? attachments.split(",") : []) {
       const resolver = ATTACHMENT_KINDS.has(kind) ? deps.attachments.get(kind as BillingAttachmentKind) : undefined;
       if (resolver === undefined) return dead("EMAIL_ATTACHMENT_UNRESOLVED");
-      const attachment = await resolver(fieldsWithPrefix(job.payload, `attach.${kind}.`), locale);
+      let attachment: BillingMailAttachment | null;
+      try {
+        attachment = await resolver(fieldsWithPrefix(job.payload, `attach.${kind}.`), locale);
+      } catch (error) {
+        // The attempt the worker would dead-letter: the mail (a receipt) still goes out, without this attachment,
+        // rather than never. Every earlier attempt is retried for it.
+        if (failureRetryAt(job.attempts, now) !== null) throw error;
+        attachment = null;
+      }
       if (attachment !== null) resolved.push(attachment);
     }
     await deps.mail.sendTemplated(Object.freeze({

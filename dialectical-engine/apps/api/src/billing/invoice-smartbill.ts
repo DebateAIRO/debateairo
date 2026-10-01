@@ -5,11 +5,9 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { BillingAudit } from "./audit.js";
 import { enqueueEmail, type AttachmentResolver } from "./email-job.js";
 import {
-  invoiceLine, invoicesOfCharge, loadPaidCharge, refundJobOf, saleRecordOf, type InvoiceJobDeps, type PaidCharge
+  creditNoteContext, invoicesOfCharge, loadPaidCharge, saleRecordOf, type InvoiceJobDeps, type PaidCharge
 } from "./invoice-common.js";
-import { englishOrderText } from "./order-text.js";
 import { DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
-import { refundTarget } from "./rows.js";
 
 type SmartBillDocument = IssuedDocument;
 
@@ -85,7 +83,15 @@ async function issueOnce(
   }));
   if (intent === "DUPLICATE" && await deps.jobs.jobStage(job.jobId) !== "INVOICE_SERVICE_UNAVAILABLE") {
     if (deps.issuer.lookup === undefined) return unknownOutcome(deps, kind);
-    const found = await deps.issuer.lookup({ chargeId: paid.charge.chargeId, kind });
+    let found: SmartBillDocument | null;
+    try {
+      found = await deps.issuer.lookup({ chargeId: paid.charge.chargeId, kind });
+    } catch {
+      // A failed lookup proves nothing either way: it must never leave INVOICE_SERVICE_UNAVAILABLE as the stage
+      // (which would let the next attempt call `issue` blindly). The next attempt looks up again; a spent schedule
+      // ends DEAD INVOICE_UNKNOWN for the owner.
+      return retry("INVOICE_UNKNOWN", job.attempts, now);
+    }
     if (found !== null) {
       await record(deps, paid, kind, found, totalMicros, now);
       return DONE;
@@ -121,33 +127,16 @@ export function createSmartBillInvoiceHandler(deps: SmartBillDeps): OutboxHandle
 
 export function createSmartBillStornoHandler(deps: SmartBillDeps): OutboxHandler {
   return async (job, now) => {
-    const refund = refundJobOf(job);
-    if (refund === null) return dead("CREDIT_NOTE_PAYLOAD_INVALID");
-    const paid = await loadPaidCharge(deps, refund.chargeId);
-    if (paid === null) return dead("INVOICE_CHARGE_NOT_PAID");
-    const issued = await invoicesOfCharge(deps.repository, paid);
-    if (issued.some((invoice) => invoice.kind === "CREDIT_NOTE")) {
-      // Refunds of the sale itself only: a DUPLICATE_PAYMENT's refund (D5 5f) was never a sale and has no document.
-      const saleRefunds = paid.charge.events.filter((event) => event.kind === "REFUNDED"
-        && refundTarget(event) === paid.paid.xmoneyTransactionId).length;
-      if (saleRefunds <= 1) return DONE;
-      deps.audit("billing.invoice.unknown", { issuer: "SMARTBILL", kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
-      return dead("CREDIT_NOTE_MANUAL");
-    }
-    const original = issued.find((invoice) => invoice.kind === "INVOICE");
-    if (original === undefined || original.series === null) return retry("INVOICE_ORIGINAL_MISSING", job.attempts, now);
-    // The refund of this paid transaction, on its own row or on a refund transaction naming it (D5 5g).
-    const refunded = paid.charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === refund.transactionId);
+    const context = await creditNoteContext(deps, job, now, "SMARTBILL");
+    if ("kind" in context) return context;
+    const { paid, original } = context;
+    if (original.series === null) return retry("INVOICE_ORIGINAL_MISSING", job.attempts, now);
+    // P5 still names its negative line itself ("Rambursare partiala <series>-<number>", the Romanian legal wording).
     const refundRecord: RefundRecord & Readonly<{ series: string; number: string }> = Object.freeze({
-      chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: refunded?.at ?? now,
-      refundTotalMicros: refund.refundMicros, original: { documentId: original.externalRef, number: original.number },
-      // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language; P5 still names
-      // its negative line itself ("Rambursare partiala <series>-<number>", the Romanian legal wording).
-      description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period),
-      series: original.series, number: original.number
+      ...context.refund, series: original.series, number: original.number
     });
-    if (refund.refundMicros >= paid.charge.totalMicros) {
-      return issueOnce(deps, job, now, paid, "CREDIT_NOTE", refund.refundMicros, () => deps.issuer.storno(refundRecord));
+    if (refundRecord.refundTotalMicros >= paid.charge.totalMicros) {
+      return issueOnce(deps, job, now, paid, "CREDIT_NOTE", refundRecord.refundTotalMicros, () => deps.issuer.storno(refundRecord));
     }
     const creditPartial = deps.issuer.creditPartial;
     if (creditPartial === undefined) {
@@ -155,7 +144,7 @@ export function createSmartBillStornoHandler(deps: SmartBillDeps): OutboxHandler
       return dead("CREDIT_NOTE_MANUAL");
     }
     const customer = saleRecordOf(paid, job.payload, deps.policy.taxCode, deps.orderText).customer;
-    return issueOnce(deps, job, now, paid, "CREDIT_NOTE", refund.refundMicros,
+    return issueOnce(deps, job, now, paid, "CREDIT_NOTE", refundRecord.refundTotalMicros,
       () => creditPartial.call(deps.issuer, {
         ...refundRecord, customer, taxRateBasisPoints: paid.quote.taxRateBasisPoints
       }));
@@ -199,7 +188,15 @@ export function smartBillPdfResolver(deps: Readonly<{ issuer: SmartBillPort }>):
     const { series, number } = fields;
     const pdf = deps.issuer.pdf;
     if (series === undefined || number === undefined || pdf === undefined) return null;
-    const content = await pdf.call(deps.issuer, { series, number });
+    let content: Uint8Array;
+    try {
+      content = await pdf.call(deps.issuer, { series, number });
+    } catch (error) {
+      // SmartBill refused the PDF (a 4xx, or bytes that are not a PDF): it will not pass on a retry, so M2 goes out
+      // now without it and names the invoice for Settings. Anything else (INVOICE_SERVICE_UNAVAILABLE) is retried.
+      if (codeOf(error) === "INVOICE_SERVICE_REFUSED") return null;
+      throw error;
+    }
     const safe = (value: string) => value.replace(/[^A-Za-z0-9._-]/g, "-");
     return Object.freeze({ filename: `${safe(series)}-${safe(number)}.pdf`, contentType: "application/pdf" as const, content });
   };

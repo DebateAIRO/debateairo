@@ -4,12 +4,8 @@ import type { InvoiceRow } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
-import {
-  invoiceLine, invoicesOfCharge, loadPaidCharge, refundJobOf, saleRecordOf, type InvoiceJobDeps
-} from "./invoice-common.js";
-import { englishOrderText } from "./order-text.js";
-import { DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
-import { refundTarget } from "./rows.js";
+import { creditNoteContext, invoicesOfCharge, loadPaidCharge, saleRecordOf, type InvoiceJobDeps } from "./invoice-common.js";
+import { DONE, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 
 type QuadernoDeps = InvoiceJobDeps & Readonly<{ tax: Pick<TaxEngine, "recordSale" | "recordRefund">; audit: BillingAudit }>;
 
@@ -56,39 +52,18 @@ export function createQuadernoSaleHandler(deps: QuadernoDeps): OutboxHandler {
 
 export function createQuadernoRefundHandler(deps: QuadernoDeps): OutboxHandler {
   return async (job, now) => {
-    const refund = refundJobOf(job);
-    if (refund === null) return dead("CREDIT_NOTE_PAYLOAD_INVALID");
-    const paid = await loadPaidCharge(deps, refund.chargeId);
-    if (paid === null) return dead("INVOICE_CHARGE_NOT_PAID");
-    const issued = await invoicesOfCharge(deps.repository, paid);
-    // Refunds of the sale itself only: a DUPLICATE_PAYMENT's refund (D5 5f) was never a sale and has no document.
-    const refundsOnCharge = paid.charge.events.filter((event) => event.kind === "REFUNDED"
-      && refundTarget(event) === paid.paid.xmoneyTransactionId).length;
-    if (issued.some((invoice) => invoice.kind === "CREDIT_NOTE")) {
-      if (refundsOnCharge <= 1) return DONE;
-      deps.audit("billing.invoice.unknown", { issuer: "QUADERNO", kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
-      return dead("CREDIT_NOTE_MANUAL");
-    }
-    const original = issued.find((invoice) => invoice.kind === "INVOICE");
-    if (original === undefined) {
-      return Object.freeze({ kind: "RETRY" as const, code: "INVOICE_ORIGINAL_MISSING", retryAt: failureRetryAt(job.attempts, now) });
-    }
-    // The refund of this paid transaction, on its own row or on a refund transaction naming it (D5 5g).
-    const refunded = paid.charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === refund.transactionId);
+    const context = await creditNoteContext(deps, job, now, "QUADERNO");
+    if ("kind" in context) return context;
+    const { paid, refund } = context;
     await deps.repository.withTransaction((client) => deps.repository.insertInvoiceIntent(client, {
       chargeId: paid.charge.chargeId, kind: "CREDIT_NOTE", issuer: "QUADERNO", requestedAt: now
     }));
-    const note = await quaderno(deps.tax.recordRefund({
-      chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: refunded?.at ?? now,
-      refundTotalMicros: refund.refundMicros, original: { documentId: original.externalRef, number: original.number },
-      // D5 Open question 4: Quaderno prints this line on the buyer's credit note, in the buyer's language, the same
-      // sentence the invoice carried for the period it credits.
-      description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period)
-    }));
+    // D5 Open question 4: Quaderno prints the refund's description on the buyer's credit note, in the buyer's language.
+    const note = await quaderno(deps.tax.recordRefund(refund));
     if (note === "REFUSED") return dead("TAX_SERVICE_REFUSED");
     await deps.repository.withTransaction((client) => deps.repository.insertInvoice(client, Object.freeze({
       invoiceId: randomUUID(), chargeId: paid.charge.chargeId, issuer: "QUADERNO", kind: "CREDIT_NOTE",
-      externalRef: note.documentId, series: null, number: note.number, url: null, totalMicros: refund.refundMicros, at: now
+      externalRef: note.documentId, series: null, number: note.number, url: null, totalMicros: refund.refundTotalMicros, at: now
     }) satisfies InvoiceRow));
     return DONE;
   };

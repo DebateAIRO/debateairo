@@ -10,6 +10,7 @@ import {
 } from "../../apps/api/src/billing/email-job.js";
 import { sealBillingProfile, type BillingProfile } from "../../apps/api/src/billing/records.js";
 import { MailDeliveryError } from "../../apps/api/src/mail-channel.js";
+import { TypedDomainError } from "@debateai/kernel";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
 const KEY = randomBytes(32);
@@ -19,8 +20,8 @@ const profile = (email: string, locale: string): BillingProfile => ({
   email, locale, name: null, country: "RO", region: null, postalCode: null, city: null, street: null, company: null
 });
 
-function asJob(request: ReturnType<typeof emailJob>): OutboxJob {
-  return { jobId: JOB_ID, kind: "EMAIL", ref: request.ref, notBefore: NOW, attempts: 1, payload: request.payload } as unknown as OutboxJob;
+function asJob(request: ReturnType<typeof emailJob>, attempts = 1): OutboxJob {
+  return { jobId: JOB_ID, kind: "EMAIL", ref: request.ref, notBefore: NOW, attempts, payload: request.payload } as unknown as OutboxJob;
 }
 
 function harness(current: BillingProfile | null, attachments = new Map<BillingAttachmentKind, AttachmentResolver>()) {
@@ -121,5 +122,38 @@ describe("P7 the EMAIL job", () => {
       attachments: new Map()
     });
     await expect(failing(asJob(request), NOW)).rejects.toBeInstanceOf(MailDeliveryError);
+  });
+
+  const failingPdf = () => {
+    const terms = Buffer.from("terms");
+    const attachments = new Map<BillingAttachmentKind, AttachmentResolver>([
+      ["SMARTBILL_INVOICE_PDF", async () => { throw new TypedDomainError("INVOICE_SERVICE_UNAVAILABLE", "502"); }],
+      ["ACCEPTED_TERMS", async () => ({ filename: "terms.txt", contentType: "text/plain; charset=UTF-8", content: terms })]
+    ]);
+    const request = emailJob({
+      template: "M2_INVOICE_ATTACHED", recipient: { kind: "CUSTOMER", customerId: CUSTOMER }, dedupeRef: "charge-3",
+      params: { plan: "PLUS", totalAmount: "24.20", chargeDate: NOW.toISOString(), invoiceNumber: "DBAI 0043" },
+      attachments: [
+        { kind: "SMARTBILL_INVOICE_PDF", fields: { series: "DBAI", number: "0043" } },
+        { kind: "ACCEPTED_TERMS", fields: { sha256: "b".repeat(64) } }
+      ],
+      notBefore: NOW
+    });
+    return { terms, request, ...harness(profile("person@example.test", "ro"), attachments) };
+  };
+
+  it("sends the receipt without an attachment that still fails on the attempt the worker would dead-letter", async () => {
+    const { terms, request, handler, sent } = failingPdf();
+    // Attempt 6: failureRetryAt(6, now) is null, so a throw here would dead-letter the receipt.
+    expect(await handler(asJob(request, 6), NOW)).toEqual({ kind: "DONE" });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ templateId: "M2_INVOICE_ATTACHED", params: { invoiceNumber: "DBAI 0043" } });
+    expect(sent[0]?.attachments).toEqual([{ filename: "terms.txt", contentType: "text/plain; charset=UTF-8", content: terms }]);
+  });
+
+  it("retries an attachment that fails on an earlier attempt, sending nothing yet", async () => {
+    const { request, handler, sent } = failingPdf();
+    await expect(handler(asJob(request, 1), NOW)).rejects.toMatchObject({ code: "INVOICE_SERVICE_UNAVAILABLE" });
+    expect(sent).toEqual([]);
   });
 });

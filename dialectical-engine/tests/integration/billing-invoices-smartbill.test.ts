@@ -24,6 +24,8 @@ class RecordingSmartBill {
   failIssue: "REFUSED" | "UNKNOWN" | "DOWN" | "CRASH" | null = null;
   withLookup = true;
   withCredit = true;
+  /** One-shot: the next lookup throws INVOICE_SERVICE_UNAVAILABLE (SmartBill could not be reached). */
+  failLookup = false;
   private counter = 0;
   port(): SmartBillPort {
     const next = (): Document => { this.counter += 1; return { series: "DBAI", number: String(this.counter).padStart(4, "0"), externalRef: `sb-${this.counter}` }; };
@@ -42,7 +44,12 @@ class RecordingSmartBill {
       },
       storno: async (refund) => { this.stornos.push(refund); const document = next(); this.documents.set(`CREDIT_NOTE:${refund.chargeId}`, document); return document; },
       pdf: async ({ series, number }) => Buffer.from(`%PDF ${series} ${number}`),
-      ...(this.withLookup ? { lookup: async ({ chargeId, kind }: { chargeId: string; kind: "INVOICE" | "CREDIT_NOTE" }) => this.documents.get(`${kind}:${chargeId}`) ?? null } : {}),
+      ...(this.withLookup ? { lookup: async ({ chargeId, kind }: { chargeId: string; kind: "INVOICE" | "CREDIT_NOTE" }) => {
+        const failure = this.failLookup;
+        this.failLookup = false;
+        if (failure) throw new TypedDomainError("INVOICE_SERVICE_UNAVAILABLE", "429");
+        return this.documents.get(`${kind}:${chargeId}`) ?? null;
+      } } : {}),
       ...(this.withCredit ? {
         creditPartial: async (refund: Parameters<NonNullable<SmartBillPort["creditPartial"]>>[0]) => {
           this.credits.push(refund);
@@ -134,6 +141,21 @@ describe("P10b SmartBill invoices for Romania", () => {
     await h.worker.drain(10);
     expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
     expect(await invoices(paid.chargeId)).toHaveLength(1);
+  });
+
+  it("never reads a failed lookup as 'nothing was created': it looks up again instead of issuing a second invoice (A17b)", async () => {
+    smartbill.failIssue = "UNKNOWN";
+    const paid = await h.activate();
+    await h.worker.drain(10);
+    h.clock.advance(61_000);
+    smartbill.failLookup = true;
+    await h.worker.drain(10);
+    expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: false, dead: false, lastErrorCode: "INVOICE_UNKNOWN" });
+    h.clock.advance(301_000);
+    await h.worker.drain(10);
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
+    expect(await invoices(paid.chargeId)).toHaveLength(1);
+    expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: true });
   });
 
   it("dead-letters an unknown outcome as INVOICE_UNKNOWN when SmartBill offers no lookup", async () => {

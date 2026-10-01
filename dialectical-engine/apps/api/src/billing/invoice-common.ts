@@ -1,9 +1,12 @@
-import { computeWindows, type SaleRecord } from "@debateai/billing-core";
+import { computeWindows, type RefundRecord, type SaleRecord } from "@debateai/billing-core";
 import type { BillingRepository, ChargeEventRow, ChargeRow, InvoiceRow, OutboxJob, QuoteRow } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { BillingPolicy, PlanId } from "@debateai/register";
+import type { BillingAudit } from "./audit.js";
 import { englishOrderText, invoiceDate, planName, type BillingOrderText } from "./order-text.js";
+import { DONE, failureRetryAt, type OutboxOutcome } from "./outbox.js";
 import { openBillingProfile, openQuoteLocation, type BillingProfile, type QuoteLocation } from "./records.js";
+import { refundTarget } from "./rows.js";
 
 export type InvoiceJobDeps = Readonly<{
   repository: Pick<BillingRepository,
@@ -113,4 +116,45 @@ export function refundJobOf(job: OutboxJob): Readonly<{ chargeId: string; transa
   const { charge_id: chargeId, transaction_id: transactionId, refund_micros: refundMicros } = job.payload;
   return typeof chargeId === "string" && typeof transactionId === "string" && typeof refundMicros === "number" && refundMicros > 0
     ? Object.freeze({ chargeId, transactionId, refundMicros }) : null;
+}
+
+/** What a credit-note job knows once its opening checks pass: the paid charge, the invoice it credits, the refund. */
+export type CreditNoteContext = Readonly<{ paid: PaidCharge; original: InvoiceRow; refund: RefundRecord }>;
+
+/**
+ * The opening steps every credit-note job (Quaderno's refund, SmartBill's storno) shares, in one definition: an
+ * outcome when the job ends here, or the context to issue the credit note from.
+ */
+export async function creditNoteContext(
+  deps: InvoiceJobDeps & Readonly<{ audit: BillingAudit }>, job: OutboxJob, now: Date, issuer: "QUADERNO" | "SMARTBILL"
+): Promise<OutboxOutcome | CreditNoteContext> {
+  const refund = refundJobOf(job);
+  if (refund === null) return Object.freeze({ kind: "DEAD" as const, code: "CREDIT_NOTE_PAYLOAD_INVALID" });
+  const paid = await loadPaidCharge(deps, refund.chargeId);
+  if (paid === null) return Object.freeze({ kind: "DEAD" as const, code: "INVOICE_CHARGE_NOT_PAID" });
+  const issued = await invoicesOfCharge(deps.repository, paid);
+  if (issued.some((invoice) => invoice.kind === "CREDIT_NOTE")) {
+    // Refunds of the sale itself only: a DUPLICATE_PAYMENT's refund (D5 5f) was never a sale and has no document.
+    const saleRefunds = paid.charge.events.filter((event) => event.kind === "REFUNDED"
+      && refundTarget(event) === paid.paid.xmoneyTransactionId).length;
+    if (saleRefunds <= 1) return DONE;
+    deps.audit("billing.invoice.unknown", { issuer, kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
+    return Object.freeze({ kind: "DEAD" as const, code: "CREDIT_NOTE_MANUAL" });
+  }
+  const original = issued.find((invoice) => invoice.kind === "INVOICE");
+  if (original === undefined) {
+    return Object.freeze({ kind: "RETRY" as const, code: "INVOICE_ORIGINAL_MISSING", retryAt: failureRetryAt(job.attempts, now) });
+  }
+  // The refund of this paid transaction, on its own row or on a refund transaction naming it (D5 5g).
+  const refunded = paid.charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === refund.transactionId);
+  return Object.freeze({
+    paid, original,
+    refund: Object.freeze({
+      chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: refunded?.at ?? now,
+      refundTotalMicros: refund.refundMicros, original: { documentId: original.externalRef, number: original.number },
+      // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language, the same sentence
+      // the invoice carried for the period it credits (SmartBill's P5 still names its negative line itself).
+      description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period)
+    })
+  });
 }
