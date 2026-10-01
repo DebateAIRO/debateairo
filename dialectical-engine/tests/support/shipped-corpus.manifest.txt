@@ -34,11 +34,15 @@ apps/api/src/billing/quote.ts
 apps/api/src/billing/records.ts
 apps/api/src/billing/refunds.ts
 apps/api/src/billing/refusal.ts
+apps/api/src/billing/renewal-rules.ts
+apps/api/src/billing/renewal.ts
 apps/api/src/billing/rows.ts
 apps/api/src/billing/runtime.ts
 apps/api/src/billing/settlement-initial.ts
+apps/api/src/billing/settlement-renewal.ts
 apps/api/src/billing/settlement.ts
 apps/api/src/billing/single-flight.ts
+apps/api/src/billing/stored-tax-context.ts
 apps/api/src/billing/usage.ts
 apps/api/src/billing/verify-payment.ts
 apps/api/src/boot-custody.ts

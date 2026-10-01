@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { AskApplication } from "@debateai/api";
 import type { SubscriptionEvent } from "@debateai/billing-core";
 import type { GeoLookup } from "@debateai/geo";
+import { TypedDomainError } from "@debateai/kernel";
 import type { BillingPlans, BillingPolicy, CountryPolicy, CountryRule } from "@debateai/register";
 // R-16: tests import the fakes through tests/support/ (P4's fake-tax-engine.ts re-exports the tax rules).
 import { FakeTaxEngine, fakeTaxMicros } from "./fake-tax-engine.js";
@@ -88,12 +89,23 @@ export function activeSubscriptionEvents(ownerRef: string, at: Date, planId: "PL
 
 /**
  * P4's in-memory FakeTaxEngine (fixed rates RO 21 %, DE 19 %, FR 20 %, the VALID reverse-charge rule, idempotent
- * records), plus one test lever: a per-country rate override, so a renewal can find a changed total (A7).
+ * records), plus three test levers: a per-country rate override, so a renewal can find a changed total (A7); a
+ * one-shot hook run inside the next quote, so a test can land a cancel or an erasure between a renewal's first look
+ * and its charge; and a per-country outage (every quote for a listed country fails TAX_SERVICE_UNAVAILABLE, as P4's
+ * client does on a 5xx), so a test's outage in a shared harness never lands on another test's subscription.
  */
 export class AdjustableTaxEngine extends FakeTaxEngine {
   readonly rateOverride = new Map<string, number>();
+  readonly unavailableCountries = new Set<string>();
+  beforeQuote: (() => Promise<void>) | null = null;
 
   override async quote(input: Parameters<FakeTaxEngine["quote"]>[0]): ReturnType<FakeTaxEngine["quote"]> {
+    const hook = this.beforeQuote;
+    this.beforeQuote = null;
+    if (hook !== null) await hook();
+    if (this.unavailableCountries.has(input.location.country)) {
+      throw new TypedDomainError("TAX_SERVICE_UNAVAILABLE", "fake tax engine outage");
+    }
     const base = await super.quote(input);
     const rate = this.rateOverride.get(base.taxCountry);
     if (rate === undefined || base.status !== "TAXABLE") return base;

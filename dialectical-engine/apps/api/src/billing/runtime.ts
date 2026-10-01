@@ -6,6 +6,7 @@ import type { GeoLookup } from "@debateai/geo";
 import { currentDocument } from "@debateai/legal-manifest";
 import { decryptNotice } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/register";
+import { createSingleFlightErasureReconciler } from "../account-erasure.js";
 import { DekAccountEmailReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
 import { ChargeStatusReader } from "./charge-status.js";
@@ -19,7 +20,9 @@ import { NoticeIntake } from "./notice-intake.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { QuoteService } from "./quote.js";
 import { RefundDesk } from "./refunds.js";
+import { RenewalService } from "./renewal.js";
 import { createInitialSettlement } from "./settlement-initial.js";
+import { createRenewalSettlement } from "./settlement-renewal.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
 import { VerifyPaymentHandler } from "./verify-payment.js";
 
@@ -65,6 +68,8 @@ export type BillingRuntime = Readonly<{
   verify: VerifyPaymentHandler;
   /** P9b (R-32): the one refund executor; P12d and P12e move money back through it. */
   refunds: RefundDesk;
+  /** P11a: the renewal timer's service; P11b's maintenance pass and P12 reuse its writers. */
+  renewal: RenewalService;
   kick(): void;
   start(): void;
   stop(): void;
@@ -92,6 +97,23 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl
   }));
+  const renewalSettlement = createRenewalSettlement({
+    repository, entitlements, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl
+  });
+  verify.registerSettlement("RENEWAL", renewalSettlement);
+  // P11a: `drain` is declared below; the kick only runs once a tick does. P15 adds
+  // `erasurePending: erasurePendingOf(repository)` here, over `billing.owner_erasure_pending` (which P15 makes answer
+  // true for an `age_frozen` owner as well, R3-2).
+  const renewal = new RenewalService({
+    repository, jobs, entitlements, xmoney: deps.connectors.xmoney, tax: deps.connectors.tax, settlement: renewalSettlement,
+    policy: deps.policy, plans: deps.plans, recordsKey: deps.connectors.recordsKey,
+    publicAppUrl: deps.connectors.publicAppUrl, audit: deps.audit, clock: deps.clock, kick: () => drain(),
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+  });
+  const renewTick = createSingleFlightErasureReconciler(
+    async () => { await renewal.runOnce(); },
+    () => deps.reportPending("BILLING_RENEWAL_PENDING")
+  );
   outbox.register("VERIFY_PAYMENT", verify.handle);
   // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). No `orderText` yet: the task that adds the
   // catalogue sentences passes its resolver here, as it does to the checkout below.
@@ -146,6 +168,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     routes,
     verify,
     refunds,
+    renewal,
     kick: drain,
     start() {
       if (timers.length > 0) return;
@@ -153,6 +176,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       outboxTimer.unref();
       timers.push(outboxTimer);
       drain();
+      const renewalTimer = setInterval(renewTick, 60_000);
+      renewalTimer.unref();
+      timers.push(renewalTimer);
+      renewTick();
     },
     stop() {
       for (const timer of timers.splice(0)) clearInterval(timer);

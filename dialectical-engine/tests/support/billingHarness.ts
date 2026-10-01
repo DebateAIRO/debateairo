@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
+import { decimalToMicros, foldSubscription, microsToDecimal } from "@debateai/billing-core";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { XMoneyNotice, XMoneyStatus, XMoneyTransaction } from "@debateai/payments-xmoney";
@@ -10,7 +10,9 @@ import { NoticeIntake } from "../../apps/api/src/billing/notice-intake.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
 import { QuoteService } from "../../apps/api/src/billing/quote.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
+import { RenewalService, type RenewalDeps } from "../../apps/api/src/billing/renewal.js";
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
+import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { consentDocument } from "../../apps/ui/scripts/legal-consent-manifest.mjs";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
@@ -277,6 +279,19 @@ export type BillingHarness = Readonly<{
   entitlementRows(ownerRef: string): Promise<Array<Readonly<{ planId: string; cause: string; paidThrough: Date | null }>>>;
   /** The charge's event kinds as a sorted multiset: events written in one transaction share one instant. */
   eventKinds(chargeId: string): Promise<string[]>;
+  renewal: RenewalService;
+  /** A renewal service on its own pool: a second API process sharing the database. */
+  renewalFor(pool: Pool): RenewalService;
+  /** A renewal service with some deps replaced, e.g. `plans` from a later `billingPlans` version (Terms §12). */
+  renewalWith(overrides: Partial<RenewalDeps>): RenewalService;
+  periodEndOf(subscriptionId: string): Promise<Date>;
+  /** Owners whose account erasure a test marks as pending (the stand-in for P15's lookup). */
+  erasures: Set<string>;
+  /**
+   * Owners whose account a test marks as frozen by the age gate (0077's `age_frozen`, R3-2): the stand-in for the
+   * same lookup, which P15 widens so that `billing.owner_erasure_pending` answers true for such an owner too.
+   */
+  frozen: Set<string>;
   stop(): Promise<void>;
 }>;
 
@@ -314,6 +329,22 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
   }));
+  const erasures = new Set<string>();
+  const frozen = new Set<string>();
+  const renewalSettlement = createRenewalSettlement({
+    repository, entitlements, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
+  });
+  verify.registerSettlement("RENEWAL", renewalSettlement);
+  const renewalDeps = (pool: Pool | null): RenewalDeps => ({
+    repository: pool === null ? repository : new BillingRepository(pool),
+    jobs: pool === null ? jobs : new BillingJobQueries(pool),
+    entitlements: pool === null ? entitlements : new EntitlementRepository(pool),
+    xmoney, tax, settlement: renewalSettlement, policy: testBillingPolicy, plans: testBillingPlans, recordsKey,
+    publicAppUrl: TEST_PUBLIC_APP_URL, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
+    erasurePending: async (ownerRef) => erasures.has(ownerRef) || frozen.has(ownerRef)
+  });
+  const renewalOn = (pool: Pool | null): RenewalService => new RenewalService(renewalDeps(pool));
+  const renewal = renewalOn(null);
   const worker = new BillingOutboxWorker({ repository, workerId: "harness", clock: clock.read, audit, batchSize: 20 });
   worker.register("VERIFY_PAYMENT", verify.handle);
   worker.register("XMONEY_REFUND", refunds.handle);
@@ -359,6 +390,14 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       });
     },
     refunds, verify, worker, notices,
+    renewal, erasures, frozen,
+    renewalFor: (pool) => renewalOn(pool),
+    renewalWith: (overrides) => new RenewalService({ ...renewalDeps(null), ...overrides }),
+    async periodEndOf(subscriptionId) {
+      const end = foldSubscription(await repository.subscriptionEvents(subscriptionId)).currentPeriodEnd;
+      if (end === null) throw new Error("HARNESS_NO_PERIOD");
+      return end;
+    },
     noticeFor(transaction) {
       const token = `notice-${randomUUID()}`;
       noticeTokens.set(token, Object.freeze({

@@ -140,6 +140,80 @@ export class BillingJobQueries {
     return result.rows[0]?.charge_id ?? null;
   }
 
+  /**
+   * A2: charges of these kinds, in this xMoney system (D5 5h), that were requested but carry no transaction and no
+   * outcome yet: one keyset page after `after`, oldest first (D6b: paged like P14a's `adoptionCandidates`, so old
+   * charges never starve fresh ones). A charge holding two or more SUBMIT_UNKNOWN events has spent A2's one extra
+   * submission and is only adopted (P14a's daily pass does that too): it is left out until its close can be due,
+   * when P11a lists it once more and closes it — a renewal's own charge (attempt 1) once it was created at or before
+   * `renewalCloseBefore` (Q-1: 72 hours; P11a's `renewalPendingUntil` decides the exact instant, which a notice
+   * postponement can make later), a dunning retry once its latest SUBMIT_UNKNOWN is at or before `closeBefore`.
+   */
+  async openCharges(input: Readonly<{
+    environment: CustomerXMoneyEnvironment;
+    kinds: ReadonlyArray<string>;
+    after: Readonly<{ createdAt: Date; chargeId: string }> | null;
+    closeBefore: Date;
+    renewalCloseBefore: Date;
+    limit: number;
+  }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; createdAt: Date }>>> {
+    const result = await this.pool.query<{ charge_id: string; subscription_id: string; created_at: Date }>(
+      `SELECT c.charge_id, c.subscription_id, c.created_at FROM billing.charge c
+        WHERE c.xmoney_environment = $1 AND c.kind = ANY($2::text[])
+          AND ($3::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($3::timestamptz, $4::text))
+          AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
+                           WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUCCEEDED', 'FAILED'))
+          AND (
+            (SELECT count(*) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') < 2
+            OR (c.attempt = 1 AND c.created_at <= $6)
+            OR (c.attempt > 1
+                AND (SELECT max(u.at) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') <= $5)
+          )
+        ORDER BY c.created_at, c.charge_id LIMIT $7`,
+      [
+        input.environment, [...input.kinds], input.after?.createdAt ?? null, input.after?.chargeId ?? null,
+        input.closeBefore, input.renewalCloseBefore, input.limit
+      ]
+    );
+    return result.rows.map((row) => Object.freeze({
+      chargeId: row.charge_id, subscriptionId: row.subscription_id, createdAt: row.created_at
+    }));
+  }
+
+  /**
+   * Q-1 ("a rebill outcome still unknown"): the renewals of this xMoney system whose rebill answered (SUBMITTED, at
+   * or before `submittedBefore`) and whose VERIFY_PAYMENT has not settled them (no SUCCEEDED, no FAILED), for a period
+   * that started in `(periodStartFrom, periodStartTo]`. Only a renewal's own charge (attempt 1): a dunning retry
+   * already runs on its grace. One keyset page on `(created_at, charge_id)`, like `openCharges`.
+   */
+  async unverifiedRenewals(input: Readonly<{
+    environment: CustomerXMoneyEnvironment;
+    periodStartFrom: Date;
+    periodStartTo: Date;
+    submittedBefore: Date;
+    after: Readonly<{ createdAt: Date; chargeId: string }> | null;
+    limit: number;
+  }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; periodStart: Date; createdAt: Date }>>> {
+    const result = await this.pool.query<{ charge_id: string; subscription_id: string; period_start: Date; created_at: Date }>(
+      `SELECT c.charge_id, c.subscription_id, c.period_start, c.created_at FROM billing.charge c
+        WHERE c.xmoney_environment = $1 AND c.kind = 'RENEWAL' AND c.attempt = 1
+          AND c.period_start > $2 AND c.period_start <= $3
+          AND ($5::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($5::timestamptz, $6::text))
+          AND EXISTS (SELECT 1 FROM billing.charge_event s
+                       WHERE s.charge_id = c.charge_id AND s.kind = 'SUBMITTED' AND s.at <= $4)
+          AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
+                           WHERE e.charge_id = c.charge_id AND e.kind IN ('SUCCEEDED', 'FAILED'))
+        ORDER BY c.created_at, c.charge_id LIMIT $7`,
+      [
+        input.environment, input.periodStartFrom, input.periodStartTo, input.submittedBefore,
+        input.after?.createdAt ?? null, input.after?.chargeId ?? null, input.limit
+      ]
+    );
+    return result.rows.map((row) => Object.freeze({
+      chargeId: row.charge_id, subscriptionId: row.subscription_id, periodStart: row.period_start, createdAt: row.created_at
+    }));
+  }
+
   async outboxJobExists(client: PoolClient, kind: string, ref: string): Promise<boolean> {
     const result = await client.query("SELECT 1 FROM billing.outbox WHERE kind=$1 AND ref=$2 LIMIT 1", [kind, ref]);
     return result.rowCount !== null && result.rowCount > 0;
