@@ -14,8 +14,8 @@ import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js"
 import { enqueueEmail } from "./email-job.js";
 import { sealQuoteLocation, type QuoteLocation } from "./records.js";
 import {
-  dunningProgress, ordersHoldingCharge, recurringNetOf, renewalNoticeDecision, renewalPendingMs, renewalPendingUntil,
-  unverifiedLookBackMs
+  dunningProgress, ordersHoldingCharge, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingMs,
+  renewalPendingUntil, unverifiedLookBackMs
 } from "./renewal-rules.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "./rows.js";
 import type { ChargeSettlement } from "./settlement.js";
@@ -171,7 +171,7 @@ export class RenewalService {
     let after: DueRenewalCursor | null = null;
     try {
       for (let page = 0; page < MAX_PAGES; page += 1) {
-        const due = await this.deps.repository.dueRenewals(now, 5 * 60_000, PAGE, {
+        const due = await this.deps.repository.dueRenewals(now, renewalLeadMs(), PAGE, {
           environment: this.deps.xmoneyEnvironment, after, onInvalid: (subscriptionId) => { invalid.add(subscriptionId); }
         });
         for (const state of due) {

@@ -161,3 +161,11 @@ export function anniversaryDue(activatedAt: Date, now: Date, windowDays: number)
   if (years < 1) return null;
   return now.getTime() < addDays(addYearsClamped(activatedAt, years), windowDays).getTime() ? years : null;
 }
+
+/**
+ * How long before its period ends a renewal is due (P11a's `dueRenewals` horizon). An upgrade inside this lead
+ * could race the renewal charge, so P12b's view and P12c's quote refuse it; one function, so the two never drift.
+ */
+export function renewalLeadMs(): number {
+  return 5 * 60_000;
+}

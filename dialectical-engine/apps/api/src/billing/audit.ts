@@ -68,7 +68,13 @@ export type BillingAuditEvent =
   | "billing.xmoney.row_rejected"
   /** P9c: a second refund made at xMoney on a transaction that already holds one; the owner records it by hand. */
   | "billing.refund.unrecorded"
-  | "billing.invoice.unknown";
+  | "billing.invoice.unknown"
+  /** P12b: a cancel request was written; the field is its source (SETTINGS or EMAIL_LINK). */
+  | "billing.cancel"
+  /** P12b: a pending cancel was revoked. No field. */
+  | "billing.cancel.revoked"
+  /** P12b: a downgrade to a lower plan was scheduled for the next renewal; the field is the plan id. */
+  | "billing.downgrade.scheduled";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

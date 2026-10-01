@@ -45,6 +45,11 @@ apps/api/src/billing/settlement-renewal.ts
 apps/api/src/billing/settlement.ts
 apps/api/src/billing/single-flight.ts
 apps/api/src/billing/stored-tax-context.ts
+apps/api/src/billing/subscription-actions.ts
+apps/api/src/billing/subscription-core.ts
+apps/api/src/billing/subscription-deps.ts
+apps/api/src/billing/subscription-routes.ts
+apps/api/src/billing/subscription-view.ts
 apps/api/src/billing/usage.ts
 apps/api/src/billing/verify-payment.ts
 apps/api/src/boot-custody.ts
@@ -588,6 +593,7 @@ packages/billing-core/src/plan-lookup.ts
 packages/billing-core/src/ports.ts
 packages/billing-core/src/subscription.ts
 packages/billing-core/src/windows.ts
+packages/billing-core/src/withdrawal-deadline.ts
 packages/budget/src/cost-envelope.ts
 packages/budget/src/estimate.ts
 packages/budget/src/index.ts

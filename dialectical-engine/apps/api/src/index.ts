@@ -1236,7 +1236,13 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
-  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" }
+  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  // P12: the subscriber's own subscription. Every mutation carries the CSRF pair like any user route.
+  { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
+  { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },
+  { route: "POST /v1/billing/subscription/downgrade", auth: "user", resource: "billing", action: "downgrade" },
+  { route: "POST /v1/billing/subscription/cancel", auth: "user", resource: "billing", action: "cancel" },
+  { route: "POST /v1/billing/subscription/cancel-revoke", auth: "user", resource: "billing", action: "cancel-revoke" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;

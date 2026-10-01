@@ -26,6 +26,7 @@ import { createRenewalNoticeHandler } from "./renewal-notice-job.js";
 import { createInitialSettlement } from "./settlement-initial.js";
 import { createRenewalSettlement } from "./settlement-renewal.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
+import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 import { VerifyPaymentHandler } from "./verify-payment.js";
 
 /**
@@ -167,6 +168,21 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     xmoneyPublicKey: deps.connectors.xmoneyPublicKey, siteId: deps.connectors.siteId,
     publicAppUrl: deps.connectors.publicAppUrl, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit
   });
+  // P12b: the subscriber's routes (every later P12/P13 task adds to it).
+  const subscription: SubscriptionRouteDeps = Object.freeze({
+    billing: repository,
+    jobs,
+    entitlements,
+    plans: deps.plans,
+    policy: deps.policy,
+    tax: deps.connectors.tax,
+    recordsKey: deps.connectors.recordsKey,
+    // R-7/A22: the one origin, P6a's; BillingRuntimeDeps carries no publicAppUrl of its own.
+    publicAppUrl: deps.connectors.publicAppUrl,
+    legal: deps.legal,
+    audit: deps.audit,
+    clock: deps.clock
+  });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
     plans: deps.plans, legal: deps.legal, clock: deps.clock,
@@ -179,7 +195,8 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     notices: new NoticeIntake({
       repository, decrypt: (value) => decryptNotice(value, deps.connectors.xmoneyPrivateKey), audit: deps.audit,
       clock: deps.clock, kick: () => drain(), xmoneyEnvironment: deps.connectors.xmoneyEnvironment
-    })
+    }),
+    subscription
   });
   const drain = createCoalescingSingleFlight(() => outbox.drain(10), () => deps.reportPending("BILLING_OUTBOX_PENDING"));
   const timers: Array<ReturnType<typeof setInterval>> = [];

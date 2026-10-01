@@ -25,7 +25,13 @@ export type BillingRefusalCode =
    * answer in apps/api/src/index.ts), 503.
    */
   | "AGE_CHECK_UNAVAILABLE"
-  | "PAYMENT_PROVIDER_UNAVAILABLE";
+  | "PAYMENT_PROVIDER_UNAVAILABLE"
+  /** P12b: no ACTIVE or PAST_DUE subscription to cancel, revoke or downgrade (409). */
+  | "NOT_SUBSCRIBED"
+  /** P12b: the downgrade target is not cheaper than the plan in force (422). */
+  | "DOWNGRADE_NOT_LOWER"
+  /** P12b (P2 review fix round 1, finding 1): the renewal charge for the next period is already written (409). */
+  | "DOWNGRADE_NOT_AVAILABLE_NOW";
 
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 

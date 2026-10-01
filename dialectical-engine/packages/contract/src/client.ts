@@ -35,6 +35,8 @@ import {
   BillingCheckoutRequestSchema,
   BillingCheckoutResponseSchema,
   BillingChargeStatusResponseSchema,
+  BillingInvoicesResponseSchema,
+  BillingSubscriptionResponseSchema,
   BillingUsageResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
@@ -70,6 +72,8 @@ import {
   type BillingCheckoutRequest,
   type BillingCheckoutResponse,
   type BillingChargeStatusResponse,
+  type BillingInvoicesResponse,
+  type BillingSubscriptionResponse,
   type BillingUsageResponse,
   type Deployment,
   type EmailChangePending,
@@ -409,6 +413,11 @@ export interface ContractClient {
   /** A payment already on its way for the open checkout resolves as `{state: "PENDING", charge_ref}` (409 CHECKOUT_PENDING). */
   startBillingCheckout(input: BillingCheckoutRequest): Promise<BillingCheckoutResponse | BillingCheckoutPendingResponse>;
   getBillingCharge(chargeRef: string): Promise<BillingChargeStatusResponse>;
+  getBillingSubscription(): Promise<BillingSubscriptionResponse>;
+  getBillingInvoices(): Promise<BillingInvoicesResponse>;
+  downgradeSubscription(planId: "PLUS" | "PRO"): Promise<void>;
+  cancelSubscription(): Promise<void>;
+  revokeSubscriptionCancel(): Promise<void>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -709,6 +718,19 @@ export function createContractClient(
     ),
     getBillingCharge: (chargeRef: string) => request(
       `/v1/billing/charges/${encodeURIComponent(chargeRef)}`, BillingChargeStatusResponseSchema
+    ),
+    getBillingSubscription: () => request("/v1/billing/subscription", BillingSubscriptionResponseSchema),
+    getBillingInvoices: () => request("/v1/billing/invoices", BillingInvoicesResponseSchema),
+    downgradeSubscription: (planId: "PLUS" | "PRO") => requestNoContent(
+      root.href, fetchImplementation, "/v1/billing/subscription/downgrade",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan_id: planId }) },
+      auth
+    ),
+    cancelSubscription: () => requestNoContent(
+      root.href, fetchImplementation, "/v1/billing/subscription/cancel", { method: "POST" }, auth
+    ),
+    revokeSubscriptionCancel: () => requestNoContent(
+      root.href, fetchImplementation, "/v1/billing/subscription/cancel-revoke", { method: "POST" }, auth
     ),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),

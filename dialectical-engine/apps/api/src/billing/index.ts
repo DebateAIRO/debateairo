@@ -13,6 +13,8 @@ import type { CheckoutServicePort } from "./checkout.js";
 import type { NoticeIntakePort } from "./notice-intake.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { BillingRefusal } from "./refusal.js";
+import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
+import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
 /**
  * Paid-plans spec §2.5 — THE BILLING ROUTES, installed by `installBillingRoutes`
@@ -31,7 +33,8 @@ export const BILLING_ROUTE_PATHS = Object.freeze([
   "POST /v1/billing/quote",
   "POST /v1/billing/checkout",
   "GET /v1/billing/charges/{chargeRef}",
-  "POST /v1/billing/xmoney/notify"
+  "POST /v1/billing/xmoney/notify",
+  ...SUBSCRIPTION_ROUTE_PATHS
 ] as const);
 export type BillingRoutePath = typeof BILLING_ROUTE_PATHS[number];
 
@@ -93,6 +96,8 @@ export type BillingRouteDeps = Readonly<{
    * refuses 503 AGE_CHECK_UNAVAILABLE (this guard fails closed).
    */
   ageConfirmation?: BillingAgeConfirmation;
+  /** P12/P13: present only when hosted with billing on; absent, the subscriber's routes answer 404. */
+  subscription?: SubscriptionRouteDeps;
 }>;
 
 /**
@@ -339,4 +344,7 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     await notices.receive(opensslResultOf(request.body));
     return reply.status(200).header("content-type", "text/plain; charset=utf-8").send("OK");
   });
+
+  // P12b onward: the subscriber's own routes, in BILLING_ROUTE_PATHS order after the notice route.
+  installSubscriptionRoutes(api, deps.subscription, deps.policy, admit, source);
 }

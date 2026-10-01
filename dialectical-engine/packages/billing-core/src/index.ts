@@ -40,3 +40,6 @@ export type {
 
 // P6a (paid plans, RULINGS-R3 R3-4): the mirror of the legal notice's company facts for the API and the mail.
 export { SELLER_COMPANY, isUnverifiedCompanyFact, type SellerCompany, type SellerVatStatus } from "./company.js";
+
+// P12b (paid plans, R2 Q-6): the 14 calendar days of the withdrawal right, in the consumer's own calendar.
+export { withdrawalDeadline, type WithdrawalDeadline } from "./withdrawal-deadline.js";

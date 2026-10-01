@@ -401,6 +401,44 @@ export const BillingChargeStatusResponseSchema = z.object({
 export type BillingChargeStatusResponse = z.infer<typeof BillingChargeStatusResponseSchema>;
 
 /**
+ * The paid subset of B7a's `PlanIdSchema`: a subscription is never on Free (0085 CHECKs plan_id IN PLUS/PRO/MAX).
+ * tests/unit/billing-subscription-view.test.ts pins every member to `PlanIdSchema`.
+ */
+export const SubscribedPlanIdSchema = z.enum(["PLUS", "PRO", "MAX"]);
+
+export const BillingSubscriptionResponseSchema = z.object({
+  subscription: z.object({
+    plan_id: SubscribedPlanIdSchema,
+    status: z.enum(["CREATED", "ACTIVE", "PAST_DUE", "SUSPENDED", "ENDED", "WITHDRAWN"]),
+    cancel_requested: z.boolean(),
+    current_period_end: z.iso.datetime().nullable(),
+    renews_on: z.iso.datetime().nullable(),
+    renewal_total: BillingDecimalMoneySchema.nullable(),
+    scheduled_downgrade_plan_id: SubscribedPlanIdSchema.nullable(),
+    withdrawal_open_until: z.iso.datetime().nullable(),
+    /** The window's last day in the consumer's own calendar (the UI's "withdraw until {date}"); null with no window. */
+    withdrawal_last_day: z.iso.date().nullable(),
+    can_upgrade: z.boolean(),
+    can_change_card: z.boolean()
+  }).strict().nullable()
+}).strict();
+export type BillingSubscriptionResponse = z.infer<typeof BillingSubscriptionResponseSchema>;
+
+/** A downgrade target is a paid plan below Max; Free is reached by cancelling. */
+export const BillingDowngradeRequestSchema = z.object({ plan_id: z.enum(["PLUS", "PRO"]) }).strict();
+
+export const BillingInvoicesResponseSchema = z.object({
+  invoices: z.array(z.object({
+    number: z.string().min(1).max(64),
+    issued_on: z.iso.date(),
+    total: BillingDecimalMoneySchema,
+    kind: z.enum(["INVOICE", "CREDIT_NOTE"]),
+    url: z.url().nullable()
+  }).strict())
+}).strict();
+export type BillingInvoicesResponse = z.infer<typeof BillingInvoicesResponseSchema>;
+
+/**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
  * `core.run.argument_language_tag` (a BCP-47 tag, "und" when detection was not
  * confident) and `argument_language_name`, the English name the debate's model
@@ -1197,7 +1235,12 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/quote",
     "POST /v1/billing/checkout",
     "GET /v1/billing/charges/{chargeRef}",
-    "POST /v1/billing/xmoney/notify"
+    "POST /v1/billing/xmoney/notify",
+    "GET /v1/billing/subscription",
+    "GET /v1/billing/invoices",
+    "POST /v1/billing/subscription/downgrade",
+    "POST /v1/billing/subscription/cancel",
+    "POST /v1/billing/subscription/cancel-revoke"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
@@ -1222,6 +1265,7 @@ export const contractInventory = Object.freeze({
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
     AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
-    BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema
+    BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
+    BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema
   })
 });
