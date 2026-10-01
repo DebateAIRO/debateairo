@@ -149,20 +149,31 @@ export class XMoneyClient {
     this.#timeoutMs = o.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
+  /**
+   * Idempotent per identifier. After any failure of the POST that may have left the customer created (a refusal of
+   * any 4xx — xMoney's duplicate answer is not recorded — an unknown outcome, an unreadable 2xx), the customer is
+   * looked up by identifier and adopted only when a listed row carries exactly that identifier. Only
+   * XMONEY_UNAVAILABLE and XMONEY_CREDENTIALS_REFUSED skip the lookup: they prove nothing was processed. When the
+   * lookup fails or lists no exact match, the POST's own error is thrown, unchanged.
+   */
   async createCustomer(i: Readonly<{ identifier: string; email: string; country: string | null }>): Promise<{ customerId: string }> {
     const body = new URLSearchParams({ identifier: i.identifier, email: i.email, siteId: this.#siteId });
     if (i.country !== null) body.set("country", i.country);
     try {
       return { customerId: requiredId(dataOf(await this.#call("POST", "/customer", body, "WRITE")).id) };
     } catch (error) {
-      const recoverable = error instanceof TypedDomainError
-        && (error.code === "XMONEY_OUTCOME_UNKNOWN" || error.message.startsWith("XMONEY_REFUSED:409:"));
-      if (!recoverable) throw error;
-      const query = new URLSearchParams({ identifier: i.identifier });
-      const found = (await this.#call("GET", `/customer?${query.toString()}`, null, "READ")).data;
-      const first = Array.isArray(found) ? found[0] : undefined;
-      if (!isRecord(first)) throw error;
-      return { customerId: requiredId(first.id) };
+      const mayExist = error instanceof TypedDomainError
+        && error.code !== "XMONEY_UNAVAILABLE" && error.code !== "XMONEY_CREDENTIALS_REFUSED";
+      if (!mayExist) throw error;
+      try {
+        const query = new URLSearchParams({ identifier: i.identifier });
+        const found = (await this.#call("GET", `/customer?${query.toString()}`, null, "READ")).data;
+        const match = Array.isArray(found) ? found.find((row) => isRecord(row) && row.identifier === i.identifier) : undefined;
+        if (isRecord(match)) return { customerId: requiredId(match.id) };
+      } catch {
+        // The lookup proves nothing either way; the POST's own failure is the answer.
+      }
+      throw error;
     }
   }
 
@@ -237,17 +248,24 @@ export class XMoneyClient {
    * order (`from`/`to` bound the refund date), rows of type `refund` whose relatedTransactionIds name the payment (the
    * payment listed again under its refund date is not one of its own refunds; a row listed twice counts once),
    * summed exactly in cents. `null` when no such row is listed: xMoney then said nothing, which is UNKNOWN, never
-   * "nothing refunded", so a caller that must not refund twice stays fail-closed. Rows in two currencies are refused
+   * "nothing refunded", so a caller that must not refund twice stays fail-closed. `null` too when the listing holds
+   * ANY row the parser refuses (the caller's `onRejected` still hears each one): that row may be one of this
+   * payment's refunds, so the listing is UNKNOWN, never a smaller sum. Rows in two currencies are refused
    * (XMONEY_RESPONSE_INVALID), never summed. The recorded suite fails if xMoney's listing reads differently from the
    * fake's, so a caller relies on what X0 recorded, not on a guess.
    */
   async refundsOf(i: Readonly<{
     transactionId: string; orderId: string; from: Date; to: Date; onRejected?: (transactionId: string | null) => void;
   }>): Promise<XMoneyRefundsSeen | null> {
+    let unreadable = false;
     const listed = await this.listTransactions({
       from: i.from, to: i.to, dateType: "refund", orderId: i.orderId,
-      ...(i.onRejected === undefined ? {} : { onRejected: i.onRejected })
+      onRejected: (transactionId) => {
+        unreadable = true;
+        i.onRejected?.(transactionId);
+      }
     });
+    if (unreadable) return null;
     const byId = new Map<string, XMoneyTransaction>();
     for (const transaction of listed) {
       if (transaction.transactionType === "refund" && transaction.transactionId !== i.transactionId

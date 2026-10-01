@@ -230,4 +230,44 @@ describe("P3b — xMoney client against the fake", () => {
       .resolves.toBeUndefined();
     await expect(quiet.getTransaction("1")).rejects.toMatchObject({ code: "XMONEY_RESPONSE_INVALID" });
   });
+
+  it("adopts a customer only when the lookup lists exactly the identifier asked for", async () => {
+    const identifier = randomBytes(16).toString("hex");
+    const stub = (post: Response, listed: ReadonlyArray<Record<string, unknown>>) => new XMoneyClient({
+      baseUrl: "https://stage.invalid", privateKey: Buffer.alloc(32, 1), siteId: "1",
+      fetch: async (_url, init) => init?.method === "POST"
+        ? post
+        : new Response(JSON.stringify({ code: 200, message: "ok", data: listed }), { status: 200 })
+    });
+    // A 409 whose lookup lists someone else's customer is the 409, never that stranger's id.
+    const conflict = new Response(JSON.stringify({ code: 409, message: "conflict", error: [{ code: 1627, message: "exists" }] }), { status: 409 });
+    await expect(stub(conflict, [{ id: 777, identifier: randomBytes(16).toString("hex") }])
+      .createCustomer({ identifier, email: "person@example.test", country: "RO" }))
+      .rejects.toMatchObject({ code: "XMONEY_REFUSED", message: "XMONEY_REFUSED:409:1627" });
+    // Any refusal (xMoney's real duplicate status is not recorded) is answered by the exact-identifier lookup.
+    const refused = new Response(JSON.stringify({ code: 400, message: "bad request", error: [{ code: 1001, message: "x" }] }), { status: 400 });
+    await expect(stub(refused, [{ id: 555, identifier }])
+      .createCustomer({ identifier, email: "person@example.test", country: "RO" }))
+      .resolves.toEqual({ customerId: "555" });
+  });
+
+  it("reads a refund listing with any row it cannot read as unknown, never as a smaller sum", async () => {
+    const row = (id: number, amount: string) => ({
+      id, orderId: 1, customerId: 1, transactionType: "refund", transactionStatus: "complete-ok", amount,
+      currency: "USD", creationDate: "2026-09-30T10:00:00+00:00", relatedTransactionIds: [1]
+    });
+    const listing = (rows: ReadonlyArray<Record<string, unknown>>) => new XMoneyClient({
+      baseUrl: "https://stage.invalid", privateKey: Buffer.alloc(32, 1), siteId: "1",
+      fetch: async () => new Response(JSON.stringify({ code: 200, message: "ok", data: rows }), { status: 200 })
+    });
+    const window = { transactionId: "1", orderId: "1", from: new Date("2026-09-30T00:00:00Z"), to: new Date("2026-10-01T00:00:00Z") };
+    // Control: one readable row is summed.
+    expect((await listing([row(11, "5.05")]).refundsOf(window))?.refundedDecimal).toBe("5.05");
+    // The refused row may be one of this payment's refunds: the sum is unknown, and the caller still hears it once.
+    const rejected: Array<string | null> = [];
+    const both = [row(11, "5.05"), row(12, "-12.10")];
+    expect(await listing(both).refundsOf({ ...window, onRejected: (id) => rejected.push(id) })).toBeNull();
+    expect(rejected).toEqual(["12"]);
+    expect(await listing(both).refundsOf(window)).toBeNull();
+  });
 });
