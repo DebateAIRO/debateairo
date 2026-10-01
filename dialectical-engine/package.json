@@ -96,6 +96,7 @@
     "@debateai/serve": "workspace:*",
     "@debateai/settlement": "workspace:*",
     "@debateai/story": "workspace:*",
+    "@debateai/tax-quaderno": "workspace:*",
     "@debateai/valuation": "workspace:*",
     "@types/node": "26.2.0",
     "@types/pg": "8.21.0",

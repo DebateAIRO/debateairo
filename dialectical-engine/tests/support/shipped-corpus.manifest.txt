@@ -730,5 +730,6 @@ packages/support-kb/src/navigation.ts
 packages/support-kb/src/recovery.ts
 packages/support-kb/src/templates.ts
 packages/support-kb/src/ui-labels.ts
+packages/tax-quaderno/src/index.ts
 packages/valuation/src/index.ts
 web/next.config.mjs

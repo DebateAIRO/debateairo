@@ -116,6 +116,9 @@ importers:
       '@debateai/story':
         specifier: workspace:*
         version: link:packages/story
+      '@debateai/tax-quaderno':
+        specifier: workspace:*
+        version: link:packages/tax-quaderno
       '@debateai/valuation':
         specifier: workspace:*
         version: link:packages/valuation
@@ -808,6 +811,15 @@ importers:
 
   packages/support-kb:
     dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
+  packages/tax-quaderno:
+    dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel

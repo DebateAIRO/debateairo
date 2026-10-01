@@ -35,6 +35,8 @@ const rows: readonly Row[] = [
   ["billing-core", "packages/billing-core", ["kernel"]],
   // Paid plans (A26(a)): xMoney order signing, notice decryption and (P3b) the HTTP client.
   ["payments-xmoney", "packages/payments-xmoney", ["kernel"]],
+  // Paid plans (A26(a)): the Quaderno tax connector over plain fetch (P4).
+  ["tax-quaderno", "packages/tax-quaderno", ["kernel", "billing-core"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
   // Verdict story (2026-09-26): the story package. The edges its later tasks need
