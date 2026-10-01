@@ -112,6 +112,7 @@ SET search_path = pg_catalog
 AS $$
 DECLARE
   v_charge_kind text;
+  v_charge_total bigint;
   v_target text;
   v_succeeded bigint;
   v_paid_total bigint;
@@ -130,8 +131,9 @@ BEGIN
   ) THEN
     RETURN NEW;
   END IF;
-  SELECT charge.kind INTO v_charge_kind FROM billing.charge AS charge WHERE charge.charge_id = NEW.charge_id;
-  IF NEW.amount_micros = 0 AND v_charge_kind IS DISTINCT FROM 'CARD_CHECK' THEN
+  SELECT charge.kind, charge.total_micros INTO v_charge_kind, v_charge_total
+  FROM billing.charge AS charge WHERE charge.charge_id = NEW.charge_id;
+  IF NEW.amount_micros = 0 AND (v_charge_kind IS DISTINCT FROM 'CARD_CHECK' OR v_charge_total IS DISTINCT FROM 0) THEN
     RAISE EXCEPTION 'REFUND_AMOUNT_INVALID' USING ERRCODE = '23514';
   END IF;
   v_target := COALESCE(NEW.refunds_transaction_id, NEW.xmoney_transaction_id);

@@ -298,6 +298,13 @@ describe("P1a — money invariants in SQL", () => {
     await chargeEvent(chargeId, "SUCCEEDED", "9142", 24_200_000);
     await expect(chargeEvent(chargeId, "REFUND_REQUESTED", "9142", 0))
       .rejects.toMatchObject({ code: "23514", message: "REFUND_AMOUNT_INVALID" });
+    // A card-check hold that took real money (1.00) is a real payment: a zero refund of it is refused too, and the
+    // refused zero takes no (transaction, kind) key, so the full release of the 1.00 still goes in.
+    const realHold = await seedCardCheck(1_000_000);
+    await chargeEvent(realHold, "SUCCEEDED", "9143", 1_000_000);
+    await expect(chargeEvent(realHold, "REFUND_REQUESTED", "9143", 0))
+      .rejects.toMatchObject({ code: "23514", message: "REFUND_AMOUNT_INVALID" });
+    expect((await chargeEvent(realHold, "REFUND_REQUESTED", "9143", 1_000_000)).rowCount).toBe(1);
   });
 
   it("keeps stage and live transaction ids apart: the same number in live is a new payment", async () => {
@@ -372,6 +379,17 @@ describe("P1a — money invariants in SQL", () => {
     await database.pool.query("INSERT INTO billing.quote_use (quote_id, used_at, charge_id) VALUES ($1, clock_timestamp(), $2)", [seeded.quoteId, seeded.chargeId]);
     await expect(database.pool.query("INSERT INTO billing.quote_use (quote_id, used_at, charge_id) VALUES ($1, clock_timestamp(), $2)", [seeded.quoteId, seeded.chargeId]))
       .rejects.toMatchObject({ code: "23505" });
+    // A cancel link works once: a second use of the same token is refused. Dated now, so no purge count moves.
+    const tokenSha256 = chargeIdOf() + chargeIdOf();
+    await database.pool.query(`
+      INSERT INTO billing.cancel_token (token_sha256, subscription_id, issued_at, expires_at)
+      VALUES ($1, $2, clock_timestamp(), clock_timestamp() + interval '1 hour')
+    `, [tokenSha256, seeded.subscriptionId]);
+    const useToken = () => database.pool.query(
+      "INSERT INTO billing.cancel_token_use (token_sha256, used_at) VALUES ($1, clock_timestamp())", [tokenSha256]
+    );
+    expect((await useToken()).rowCount).toBe(1);
+    await expect(useToken()).rejects.toMatchObject({ code: "23505" });
   });
 
   it("an upgrade quote names the recurring total it announces (A7, R-31)", async () => {
