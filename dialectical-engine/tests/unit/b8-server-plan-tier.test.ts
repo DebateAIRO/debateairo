@@ -230,10 +230,18 @@ describe("normaliseAskForPlan: Free's gauges are the server's (§2.3.4)", () => 
     expect(normaliseAskForPlan(sent, planById(plans, "FREE"))).toEqual({ ask: sent, normalised: false });
   });
 
-  it("gives a paid plan premium whatever the client chose, and keeps its gauges", () => {
+  it("gives a paid plan premium whatever the client chose, keeps its gauges, and says it raised the tier", () => {
     const result = normaliseAskForPlan(ask({ plan_tier: "free", risk_tier: "casual", depth_params: { depth: 1 } }), planById(plans, "PLUS"));
     expect(result.ask).toMatchObject({ plan_tier: "premium", risk_tier: "casual", depth_params: { depth: 1 } });
-    expect(result.normalised).toBe(false);
+    // Final review Part 1b, Minor 4: raising free to premium IS a change, so the flag reports it.
+    expect(result.normalised).toBe(true);
+  });
+
+  it("changes nothing, and says so, for a paid plan's ask that is already premium", () => {
+    const sent = ask({ plan_tier: "premium", risk_tier: "high-stakes", composition_budget_tier: "high", depth_params: { depth: 5 } });
+    for (const planId of ["PLUS", "PRO", "MAX"] as const) {
+      expect(normaliseAskForPlan(sent, planById(plans, planId))).toEqual({ ask: sent, normalised: false });
+    }
   });
 });
 

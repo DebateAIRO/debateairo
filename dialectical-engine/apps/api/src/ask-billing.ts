@@ -88,10 +88,13 @@ export function decideSettingsForPlan<T extends AskSettings>(settings: T, plan: 
 /**
  * The plan's tier, and for Free its sealed fixed gauges, as /new's Free reset
  * would have sent them. A paid plan keeps every gauge the person chose.
+ * `normalised` says whether the server changed the ask: for a paid plan, that
+ * it raised a Free tier to premium (final review Part 1b, Minor 4).
  */
 export function normaliseAskForPlan(ask: AskRequest, plan: BillingPlan): Readonly<{ ask: AskRequest; normalised: boolean }> {
   if (plan.tier === "premium") {
-    return Object.freeze({ ask: decideSettingsForPlan(ask, plan), normalised: false });
+    const decided = decideSettingsForPlan(ask, plan);
+    return Object.freeze({ ask: decided, normalised: decided !== ask });
   }
   const gauges = freeGaugesOf(plan);
   const normalised = ask.plan_tier !== "free"
