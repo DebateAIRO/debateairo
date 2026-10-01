@@ -1,7 +1,7 @@
 # OWNER sign-off — S05 help-bot control names: 12 help articles, 13 recovery rows (cookie-compliance)
 
 Status: DRAFT for V1 — not signed. The API refuses to start until the orchestrator records V's answer.
-What changes (SPEC-v4 R06-R08): in 12 of the 12 article files and 22 of the 26 recovery texts below, only control names change — each becomes the label the screen shows in that language (V-17, V-18). The one exception to names-only: account-access no longer names a "Forgot password" control; it says a password reset flow exists but Support does not offer it yet (R06). A recovery text marked "unchanged" keeps its words and is re-signed because its row's article hash changed. Not in this signature: the catalogue (signed at S02's V0) and the templates (they carry no owner digest).
+What changes (SPEC-v5 R06-R08): in 12 of the 12 article files and 22 of the 26 recovery texts below, only control names change — each becomes the label the screen shows in that language (V-17, V-18). The one exception to names-only: account-access no longer names a "Forgot password" control; it says a password reset flow exists but Support does not offer it yet (R06). A recovery text marked "unchanged" keeps its words and is re-signed because its row's article hash changed. Not in this signature: the catalogue (signed at S02's V0) and the templates (they carry no owner digest).
 
 ### article account-access.en
 
@@ -63,8 +63,8 @@ Folosește `/login` pentru a te autentifica prin parolă, apoi finalizează al d
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Pagina AI transparency, la care duce legătura [-How we label AI content-]{+Cum etichetăm conținutul generat de IA+}, arată că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Tratează-le ca pe un material de analizat, nu ca pe fapte, și verifică afirmațiile și sursele lor înainte să te bazezi pe ele. Scorurile și verdictele evaluează argumentele; nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat.
-~ Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă și un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI. Întrebarea ta și mesajele tale către asistență nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran și nici un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI. Pentru a cere ajutorul unei persoane, folosește [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} în Ajutor.
+~ Pagina [-AI transparency-]{+Transparență privind IA+}, la care duce legătura [-How we label AI content-]{+Cum etichetăm conținutul generat de IA+}, arată că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Tratează-le ca pe un material de analizat, nu ca pe fapte, și verifică afirmațiile și sursele lor înainte să te bazezi pe ele. Scorurile și verdictele evaluează argumentele; nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat.
+~ Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă și un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI. Întrebarea ta și mesajele tale către asistență nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran și nici un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI. Pentru a cere ajutorul unei persoane, folosește [-Talk to a human-]{+„Vorbiți cu o persoană”+} sau [-Escalate to a human-]{+„Escaladați către o persoană”+} în Ajutor.
 ~~~
 
 full text:
@@ -89,9 +89,9 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Pagina AI transparency, la care duce legătura Cum etichetăm conținutul generat de IA, arată că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Tratează-le ca pe un material de analizat, nu ca pe fapte, și verifică afirmațiile și sursele lor înainte să te bazezi pe ele. Scorurile și verdictele evaluează argumentele; nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat.
+Pagina Transparență privind IA, la care duce legătura Cum etichetăm conținutul generat de IA, arată că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Tratează-le ca pe un material de analizat, nu ca pe fapte, și verifică afirmațiile și sursele lor înainte să te bazezi pe ele. Scorurile și verdictele evaluează argumentele; nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat.
 
-Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă și un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI. Întrebarea ta și mesajele tale către asistență nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran și nici un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI. Pentru a cere ajutorul unei persoane, folosește Vorbiți cu o persoană sau Escaladați către o persoană în Ajutor.
+Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă și un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI. Întrebarea ta și mesajele tale către asistență nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran și nici un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI. Pentru a cere ajutorul unei persoane, folosește „Vorbiți cu o persoană” sau „Escaladați către o persoană” în Ajutor.
 ~~~
 
 ### article budget-tier-choice.ro
@@ -215,7 +215,7 @@ Autentifică-te și deschide `/new` pentru formularul complet al dezbaterii. Int
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea [-Challenge-]{+Contestați+} schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
+~ Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea [-Challenge-]{+„Contestați”+} schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
 ~~~
 
 full text:
@@ -236,7 +236,7 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea Contestați schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Export este JSON condiționat, nu Markdown.
+Spațiul de lucru poate prezenta arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezile și detaliile de onestitate atunci când aceste artefacte există. Cardurile afirmațiilor indică modelul și partea. Acțiunea „Contestați” schimbă starea locală de examinare și investigație din pagina curentă; nu dovedește o rulare durabilă de răspuns. Istoricul generărilor poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Export este JSON condiționat, nu Markdown.
 ~~~
 
 ### article risk-tier-choice.ro
@@ -321,7 +321,7 @@ Aceste etichete pot fi indisponibile, incomplete sau învechite. Ele nu dovedesc
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Produsul V3 curent nu are resurse pentru regenerarea nodului, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Controalele pentru modul adâncimii, profunzimea examinării, lățimea ramificării, concurență și numărul maxim de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul rulării V3. [-Challenge-]{+Contestați+} schimbă acum starea locală a paginii, fără să pornească un răspuns durabil. Încărcarea istoricului generărilor poate eșua și poate afișa un panou gol. Asistența nu poate transforma aceste limitări în acțiuni funcționale.
+~ Produsul V3 curent nu are resurse pentru regenerarea nodului, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Controalele pentru modul adâncimii, profunzimea examinării, lățimea ramificării, concurență și numărul maxim de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul rulării V3. [-Challenge-]{+„Contestați”+} schimbă acum starea locală a paginii, fără să pornească un răspuns durabil. Încărcarea istoricului generărilor poate eșua și poate afișa un panou gol. Asistența nu poate transforma aceste limitări în acțiuni funcționale.
 ~~~
 
 full text:
@@ -342,7 +342,7 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Produsul V3 curent nu are resurse pentru regenerarea nodului, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Controalele pentru modul adâncimii, profunzimea examinării, lățimea ramificării, concurență și numărul maxim de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul rulării V3. Contestați schimbă acum starea locală a paginii, fără să pornească un răspuns durabil. Încărcarea istoricului generărilor poate eșua și poate afișa un panou gol. Asistența nu poate transforma aceste limitări în acțiuni funcționale.
+Produsul V3 curent nu are resurse pentru regenerarea nodului, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Controalele pentru modul adâncimii, profunzimea examinării, lățimea ramificării, concurență și numărul maxim de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul rulării V3. „Contestați” schimbă acum starea locală a paginii, fără să pornească un răspuns durabil. Încărcarea istoricului generărilor poate eșua și poate afișa un panou gol. Asistența nu poate transforma aceste limitări în acțiuni funcționale.
 ~~~
 
 ### recovery account-access.en.modelProjection
@@ -379,36 +379,36 @@ Autentificarea începe în pagina contului cu pasul parolei. Al doilea pas oblig
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Alege [-Autentificare-]{+Autentificați-vă+}. După pasul parolei, al doilea pas obligatoriu oferă un cod din autentificatorul configurat sau un cod de recuperare salvat și nefolosit. Alege [-Creează un cont-]{+Creați un cont+} pentru înregistrare. Verificarea emailului este obligatorie. Este obligatorie și înrolarea autentificatorului. Ambele etape continuă numai din starea validă a fluxului contului. Nu introduce în Asistență parole, tokeni de verificare, secrete de autentificator sau coduri de recuperare.
+~ Alege [-Autentificare-]{+„Autentificați-vă”+}. După pasul parolei, al doilea pas obligatoriu oferă un cod din autentificatorul configurat sau un cod de recuperare salvat și nefolosit. Alege [-Creează un cont-]{+„Creați un cont”+} pentru înregistrare. Verificarea emailului este obligatorie. Este obligatorie și înrolarea autentificatorului. Ambele etape continuă numai din starea validă a fluxului contului. Nu introduce în Asistență parole, tokeni de verificare, secrete de autentificator sau coduri de recuperare.
 ~~~
 
 full text:
 ~~~text
-Alege Autentificați-vă. După pasul parolei, al doilea pas obligatoriu oferă un cod din autentificatorul configurat sau un cod de recuperare salvat și nefolosit. Alege Creați un cont pentru înregistrare. Verificarea emailului este obligatorie. Este obligatorie și înrolarea autentificatorului. Ambele etape continuă numai din starea validă a fluxului contului. Nu introduce în Asistență parole, tokeni de verificare, secrete de autentificator sau coduri de recuperare.
+Alege „Autentificați-vă”. După pasul parolei, al doilea pas obligatoriu oferă un cod din autentificatorul configurat sau un cod de recuperare salvat și nefolosit. Alege „Creați un cont” pentru înregistrare. Verificarea emailului este obligatorie. Este obligatorie și înrolarea autentificatorului. Ambele etape continuă numai din starea validă a fluxului contului. Nu introduce în Asistență parole, tokeni de verificare, secrete de autentificator sau coduri de recuperare.
 ~~~
 
 ### recovery ai-transparency.ro.modelProjection
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Pagina AI transparency, la care duce legătura [-How we label AI content-]{+Cum etichetăm conținutul generat de IA+}, precizează că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Pagina recomandă ca ele să fie tratate ca material de analizat, nu ca fapte, iar afirmațiile și sursele lor să fie verificate înainte de a fi folosite. Scorurile și verdictele evaluează argumentele și nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat. Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI; întrebările și mesajele către asistență scrise de oameni nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran sau un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI; [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} din Ajutor solicită ajutorul unei persoane.
+~ Pagina [-AI transparency-]{+Transparență privind IA+}, la care duce legătura [-How we label AI content-]{+Cum etichetăm conținutul generat de IA+}, precizează că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Pagina recomandă ca ele să fie tratate ca material de analizat, nu ca fapte, iar afirmațiile și sursele lor să fie verificate înainte de a fi folosite. Scorurile și verdictele evaluează argumentele și nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat. Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI; întrebările și mesajele către asistență scrise de oameni nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran sau un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI; [-Talk to a human-]{+„Vorbiți cu o persoană”+} sau [-Escalate to a human-]{+„Escaladați către o persoană”+} din Ajutor solicită ajutorul unei persoane.
 ~~~
 
 full text:
 ~~~text
-Pagina AI transparency, la care duce legătura Cum etichetăm conținutul generat de IA, precizează că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Pagina recomandă ca ele să fie tratate ca material de analizat, nu ca fapte, iar afirmațiile și sursele lor să fie verificate înainte de a fi folosite. Scorurile și verdictele evaluează argumentele și nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat. Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI; întrebările și mesajele către asistență scrise de oameni nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran sau un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI; Vorbiți cu o persoană sau Escaladați către o persoană din Ajutor solicită ajutorul unei persoane.
+Pagina Transparență privind IA, la care duce legătura Cum etichetăm conținutul generat de IA, precizează că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete. Pagina recomandă ca ele să fie tratate ca material de analizat, nu ca fapte, iar afirmațiile și sursele lor să fie verificate înainte de a fi folosite. Scorurile și verdictele evaluează argumentele și nu sunt o garanție a adevărului. Publicarea nu este precedată de nicio revizuire editorială umană, iar nicio persoană anume nu poartă responsabilitatea editorială pentru conținutul generat. Notificările privind AI apar înainte de pornirea unei dezbateri, în bibliotecă, în dezbaterile private și publicate și în conversațiile de asistență, iar atribuirea înregistrată a modelului însoțește argumentele atunci când există. Conținutul generat poartă un marcaj într-un format citibil automat, iar descărcările JSON ale dezbaterilor includ o declarație privind AI; întrebările și mesajele către asistență scrise de oameni nu sunt etichetate ca generate de AI. Aceste marcaje nu sunt un filigran sau un certificat de autenticitate, iar copierea textului simplu le poate elimina. Asistentul de suport este un sistem AI; „Vorbiți cu o persoană” sau „Escaladați către o persoană” din Ajutor solicită ajutorul unei persoane.
 ~~~
 
 ### recovery ai-transparency.ro.fallback
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Pagina AI transparency explică faptul că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete, așa că analizează-le în loc să le tratezi ca fapte. Scorurile și verdictele nu sunt o garanție a adevărului, iar publicarea nu este precedată de nicio revizuire editorială umană. Conținutul generat poartă un marcaj într-un format citibil automat, care nu este un filigran. Pentru a vorbi cu o persoană, folosește [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} în Ajutor.
+~ Pagina [-AI transparency-]{+Transparență privind IA+} explică faptul că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete, așa că analizează-le în loc să le tratezi ca fapte. Scorurile și verdictele nu sunt o garanție a adevărului, iar publicarea nu este precedată de nicio revizuire editorială umană. Conținutul generat poartă un marcaj într-un format citibil automat, care nu este un filigran. Pentru a vorbi cu o persoană, folosește [-Talk to a human-]{+„Vorbiți cu o persoană”+} sau [-Escalate to a human-]{+„Escaladați către o persoană”+} în Ajutor.
 ~~~
 
 full text:
 ~~~text
-Pagina AI transparency explică faptul că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete, așa că analizează-le în loc să le tratezi ca fapte. Scorurile și verdictele nu sunt o garanție a adevărului, iar publicarea nu este precedată de nicio revizuire editorială umană. Conținutul generat poartă un marcaj într-un format citibil automat, care nu este un filigran. Pentru a vorbi cu o persoană, folosește Vorbiți cu o persoană sau Escaladați către o persoană în Ajutor.
+Pagina Transparență privind IA explică faptul că argumentele, recenziile, scorurile, verdictele și răspunsurile asistenței sunt generate de modele AI și pot fi inexacte sau incomplete, așa că analizează-le în loc să le tratezi ca fapte. Scorurile și verdictele nu sunt o garanție a adevărului, iar publicarea nu este precedată de nicio revizuire editorială umană. Conținutul generat poartă un marcaj într-un format citibil automat, care nu este un filigran. Pentru a vorbi cu o persoană, folosește „Vorbiți cu o persoană” sau „Escaladați către o persoană” în Ajutor.
 ~~~
 
 ### recovery budget-tier-choice.ro.modelProjection
@@ -484,48 +484,48 @@ Diagnosticul de evaluare poate arăta disponibilitatea, starea încărcării și
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Formularul complet al dezbaterii cere autentificare și un subiect mai lung de șase caractere. [-Free-]{+Gratuit+} păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea controalelor curente înainte de [-Start run-]{+Începeți rularea+}. Compozitorul din Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea pentru vizitator.
+~ Formularul complet al dezbaterii cere autentificare și un subiect mai lung de șase caractere. [-Free-]{+Gratuit+} păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea controalelor curente înainte de [-Start run-]{+„Începeți rularea”+}. Compozitorul din Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea pentru vizitator.
 ~~~
 
 full text:
 ~~~text
-Formularul complet al dezbaterii cere autentificare și un subiect mai lung de șase caractere. Gratuit păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea controalelor curente înainte de Începeți rularea. Compozitorul din Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea pentru vizitator.
+Formularul complet al dezbaterii cere autentificare și un subiect mai lung de șase caractere. Gratuit păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea controalelor curente înainte de „Începeți rularea”. Compozitorul din Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea pentru vizitator.
 ~~~
 
 ### recovery getting-started-debate.ro.fallback
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Autentifică-te, alege Pornește o dezbatere și introdu o întrebare sau afirmație cu mai mult de șase caractere. [-Free-]{+Gratuit+} păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea lor înainte de [-Start run-]{+Începeți rularea+}. Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea în locul tău.
+~ Autentifică-te, alege Pornește o dezbatere și introdu o întrebare sau afirmație cu mai mult de șase caractere. [-Free-]{+Gratuit+} păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea lor înainte de [-Start run-]{+„Începeți rularea”+}. Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea în locul tău.
 ~~~
 
 full text:
 ~~~text
-Autentifică-te, alege Pornește o dezbatere și introdu o întrebare sau afirmație cu mai mult de șase caractere. Gratuit păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea lor înainte de Începeți rularea. Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea în locul tău.
+Autentifică-te, alege Pornește o dezbatere și introdu o întrebare sau afirmație cu mai mult de șase caractere. Gratuit păstrează fixe controalele vizibile pentru risc, buget, adâncime și îndrumare. Premium permite modificarea lor înainte de „Începeți rularea”. Acasă poate transfera subiectul în formularul complet când pornirea directă nu este disponibilă. Asistența nu pornește dezbaterea în locul tău.
 ~~~
 
 ### recovery guide-how-it-works.ro.modelProjection
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. [-Challenge-]{+Contestați+} schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
+~ Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. [-Challenge-]{+„Contestați”+} schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
 ~~~
 
 full text:
 ~~~text
-Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. Contestați schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Export este JSON condiționat, nu Markdown.
+Când artefactele există, spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, o hartă, starea răspunsului, dovezi și detalii de onestitate. Cardurile afirmațiilor indică modelul și partea. „Contestați” schimbă starea locală de examinare și investigație, dar nu dovedește o rulare durabilă de răspuns. Istoricul poate fi indisponibil, iar un panou gol nu dovedește că nu au existat versiuni mai vechi. Export este JSON condiționat, nu Markdown.
 ~~~
 
 ### recovery guide-how-it-works.ro.fallback
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. [-Challenge-]{+Contestați+} schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
+~ Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. [-Challenge-]{+„Contestați”+} schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. [-Exportul-]{+Export+} este JSON condiționat, nu Markdown.
 ~~~
 
 full text:
 ~~~text
-Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. Contestați schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. Export este JSON condiționat, nu Markdown.
+Spațiul dezbaterii poate afișa arborele argumentelor, fire, vizualizarea împărțită, harta, starea răspunsului, dovezile și detaliile de onestitate când sunt disponibile. Cardurile arată modelul și partea. „Contestați” schimbă examinarea locală; nu dovedește o rulare durabilă de răspuns. Istoricul gol nu dovedește absența versiunilor mai vechi. Export este JSON condiționat, nu Markdown.
 ~~~
 
 ### recovery risk-tier-choice.ro.modelProjection
@@ -556,36 +556,36 @@ full text:
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează cazul din această aplicație și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.
+~ [-Talk to a human-]{+„Vorbiți cu o persoană”+} sau [-Escalate to a human-]{+„Escaladați către o persoană”+} creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează cazul din această aplicație și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.
 ~~~
 
 full text:
 ~~~text
-Vorbiți cu o persoană sau Escaladați către o persoană creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează cazul din această aplicație și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.
+„Vorbiți cu o persoană” sau „Escaladați către o persoană” creează un caz asincron de Asistență, nu un apel telefonic. Emailul de asistență este un flux separat de mail și nu creează cazul din această aplicație și nu primește confirmarea, termenul de răspuns sau legătura privată. Confirmarea serverului oferă un termen țintă de patruzeci și opt de ore, iar alt panou spune în prezent o zi lucrătoare în zilele lucrătoare. Bazează-te pe confirmare până la alinierea textelor. Păstreaz-o privată deoarece controlează accesul la caz. Asistența nu verifică livrarea în inbox.
 ~~~
 
 ### recovery support-cases.ro.fallback
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Alege [-Talk to a human-]{+Vorbiți cu o persoană+} sau [-Escalate to a human-]{+Escaladați către o persoană+} pentru a crea un caz asincron; nu este un apel telefonic. Emailul de asistență este un flux separat și nu creează acel caz și nu primește confirmarea, termenul sau legătura privată. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune o zi lucrătoare și păstrează confirmarea privată.
+~ Alege [-Talk to a human-]{+„Vorbiți cu o persoană”+} sau [-Escalate to a human-]{+„Escaladați către o persoană”+} pentru a crea un caz asincron; nu este un apel telefonic. Emailul de asistență este un flux separat și nu creează acel caz și nu primește confirmarea, termenul sau legătura privată. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune o zi lucrătoare și păstrează confirmarea privată.
 ~~~
 
 full text:
 ~~~text
-Alege Vorbiți cu o persoană sau Escaladați către o persoană pentru a crea un caz asincron; nu este un apel telefonic. Emailul de asistență este un flux separat și nu creează acel caz și nu primește confirmarea, termenul sau legătura privată. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune o zi lucrătoare și păstrează confirmarea privată.
+Alege „Vorbiți cu o persoană” sau „Escaladați către o persoană” pentru a crea un caz asincron; nu este un apel telefonic. Emailul de asistență este un flux separat și nu creează acel caz și nu primește confirmarea, termenul sau legătura privată. Bazează-te pe termenul de patruzeci și opt de ore din confirmarea serverului cât timp alt panou spune o zi lucrătoare și păstrează confirmarea privată.
 ~~~
 
 ### recovery support-status-limits.ro.modelProjection
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Blocul [-Service status-]{+Starea serviciului+} din Ajutor publică trei indicatori limitați: [-Debate engine-]{+Motorul de dezbatere+}, [-Scoring queue-]{+Coada de punctare+} și [-Model fleet-]{+Flota de modele+}. [-Debate engine-]{+Motorul de dezbatere+} reflectă disponibilitatea cererii publice de stare, [-Scoring queue-]{+Coada de punctare+} indică starea din aplicație, iar [-Model fleet-]{+Flota de modele+} arată starea releului Asistenței sau CHECKING. Indicatorii pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private despre dezbatere, coadă, cont sau furnizor.
+~ Blocul [-Service status-]{+Starea serviciului+} din Ajutor publică trei indicatori limitați: [-Debate engine-]{+Motorul de dezbatere+}, [-Scoring queue-]{+Coada de punctare+} și [-Model fleet-]{+Flota de modele+}. [-Debate engine-]{+Motorul de dezbatere+} reflectă disponibilitatea cererii publice de stare, [-Scoring queue-]{+Coada de punctare+} indică starea din aplicație, iar [-Model fleet-]{+Flota de modele+} arată starea releului Asistenței sau [-CHECKING-]{+SE VERIFICĂ+}. Indicatorii pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private despre dezbatere, coadă, cont sau furnizor.
 ~~~
 
 full text:
 ~~~text
-Blocul Starea serviciului din Ajutor publică trei indicatori limitați: Motorul de dezbatere, Coada de punctare și Flota de modele. Motorul de dezbatere reflectă disponibilitatea cererii publice de stare, Coada de punctare indică starea din aplicație, iar Flota de modele arată starea releului Asistenței sau CHECKING. Indicatorii pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private despre dezbatere, coadă, cont sau furnizor.
+Blocul Starea serviciului din Ajutor publică trei indicatori limitați: Motorul de dezbatere, Coada de punctare și Flota de modele. Motorul de dezbatere reflectă disponibilitatea cererii publice de stare, Coada de punctare indică starea din aplicație, iar Flota de modele arată starea releului Asistenței sau SE VERIFICĂ. Indicatorii pot fi indisponibili, incompleți sau învechiți și nu dovedesc starea fiecărei dezbateri, sarcini, model, furnizor sau implementare. Asistența nu poate inspecta înregistrări private despre dezbatere, coadă, cont sau furnizor.
 ~~~
 
 ### recovery support-status-limits.ro.fallback
@@ -604,24 +604,24 @@ Deschide Starea serviciului în Ajutor pentru indicatorii publici Motorul de dez
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Produsul curent nu are resurse pentru regenerarea unui nod, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Modul adâncimii, profunzimea examinării, lățimea ramificării, concurența și limita de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul curent al rulării. [-Challenge-]{+Contestați+} schimbă starea locală a paginii în loc să pornească un răspuns durabil. Istoricul generărilor poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma limitele în acțiuni funcționale.
+~ Produsul curent nu are resurse pentru regenerarea unui nod, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Modul adâncimii, profunzimea examinării, lățimea ramificării, concurența și limita de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul curent al rulării. [-Challenge-]{+„Contestați”+} schimbă starea locală a paginii în loc să pornească un răspuns durabil. Istoricul generărilor poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma limitele în acțiuni funcționale.
 ~~~
 
 full text:
 ~~~text
-Produsul curent nu are resurse pentru regenerarea unui nod, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Modul adâncimii, profunzimea examinării, lățimea ramificării, concurența și limita de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul curent al rulării. Contestați schimbă starea locală a paginii în loc să pornească un răspuns durabil. Istoricul generărilor poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma limitele în acțiuni funcționale.
+Produsul curent nu are resurse pentru regenerarea unui nod, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Modul adâncimii, profunzimea examinării, lățimea ramificării, concurența și limita de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul curent al rulării. „Contestați” schimbă starea locală a paginii în loc să pornească un răspuns durabil. Istoricul generărilor poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma limitele în acțiuni funcționale.
 ~~~
 
 ### recovery unsupported-capabilities.ro.fallback
 
 base -> new (changed lines; [-removed-] {+added+}):
 ~~~text
-~ Produsul curent nu poate regenera un nod, trimite feedback de evaluare, scrie setări sau aproba adâncimea adaptivă. Mai multe controale de adâncime, lățime, concurență și tokeni sunt afișaje vechi și nu sunt trimise cu rularea curentă. [-Challenge-]{+Contestați+} schimbă numai starea locală, iar istoricul poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma aceste limite în acțiuni funcționale.
+~ Produsul curent nu poate regenera un nod, trimite feedback de evaluare, scrie setări sau aproba adâncimea adaptivă. Mai multe controale de adâncime, lățime, concurență și tokeni sunt afișaje vechi și nu sunt trimise cu rularea curentă. [-Challenge-]{+„Contestați”+} schimbă numai starea locală, iar istoricul poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma aceste limite în acțiuni funcționale.
 ~~~
 
 full text:
 ~~~text
-Produsul curent nu poate regenera un nod, trimite feedback de evaluare, scrie setări sau aproba adâncimea adaptivă. Mai multe controale de adâncime, lățime, concurență și tokeni sunt afișaje vechi și nu sunt trimise cu rularea curentă. Contestați schimbă numai starea locală, iar istoricul poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma aceste limite în acțiuni funcționale.
+Produsul curent nu poate regenera un nod, trimite feedback de evaluare, scrie setări sau aproba adâncimea adaptivă. Mai multe controale de adâncime, lățime, concurență și tokeni sunt afișaje vechi și nu sunt trimise cu rularea curentă. „Contestați” schimbă numai starea locală, iar istoricul poate eșua la încărcare și poate apărea gol. Asistența nu poate transforma aceste limite în acțiuni funcționale.
 ~~~
 
 ### recovery support-status-limits.en.modelProjection
@@ -650,41 +650,41 @@ Open Service status on Help for the public Debate engine, Scoring queue, and Mod
 ~~~text
 article account-access.en 9f7b29640233d9c395a65c9905bd4cec340a1483459550338d1c11bc14b66ac2
 article account-access.ro cab1683e79fd20cf4cc1186f9e886acaa588b0fd60f989ce61c9e831116b5ec2
-article ai-transparency.ro 6ef1353314bad0c456cf12ebc560d749dd5ed4ca477566e9acd51d60e62aea97
+article ai-transparency.ro 718eac9d78a08da5c2ecb66f4a9671213cb0ee71a020bf81bc57f1c282602857
 article budget-tier-choice.ro cf06b479e61a00510082943d904c7999e2375fba942c6fd2670894e34b20b89a
 article debate-topic-and-description.ro 1a07bb0133eca4b8039984945b3f58137f1b6c1d77d74b59b30c37cb2aec2a64
 article debate-workspace-menus.ro 722c996850311bc6a607fabd655dd26ed95cfa43dee4ec50ff4cd827ef0ec081
 article getting-started-debate.ro 1edec9fe3ae21b3f1f4ea59e6be3e4124be7b5332bf5b29e1e2d31977cd4deca
-article guide-how-it-works.ro a74f191c828c1f74bc7b1bb0d031e8c0df3169bad8ca297e2e8b95578bb51b69
+article guide-how-it-works.ro 8b6512cb457c072784cde1cf3caa9293ff851e20202125609948bb808037b329
 article risk-tier-choice.ro 41d65efb7378a56a5727a34c93954134c869d29fa6d51c6b7a378b7d40a2dc82
 article support-cases.ro 94112fb709ec5cf8a408106eef2d9efc43e51cfcd74b25cc7d6a41912a054749
 article support-status-limits.ro ca0b2c95cbce0f684867a92c6f2551829b89c0c18e83b9c1af921a9f8af3d2be
-article unsupported-capabilities.ro 0a9d8dd4ef03ac8d26b5398b5322cb4414fc256d36ca3a5dfe1ea226276dac7f
+article unsupported-capabilities.ro b2ebdc765ec96488ec564c1b5cd00d9d3f9e390abaf17cd5868ec7b505197f85
 recovery account-access.en.modelProjection c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a
 recovery account-access.en.fallback 8d1e8ab2f22c91a590bd7a17b87edd6ffb5a5df3a857655f19da10dcec8c69b5
 recovery account-access.ro.modelProjection e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98
-recovery account-access.ro.fallback 2b0be203cb83ceec39af71240dcdc3368968d920eac715d7fb915e524307c7eb
-recovery ai-transparency.ro.modelProjection a6f5d8e5a329c93be4475145866125709c9f7107f13c0949a81bde2bb1a5eaa7
-recovery ai-transparency.ro.fallback 5baad9f99b31d6a98769fd580a6ad2982a1d94c94135be804e078e9e127db3b4
+recovery account-access.ro.fallback aeab73ba56ee61fdf6845823af3ac4361b3ccd1ebb65cea77d10eecf3015351c
+recovery ai-transparency.ro.modelProjection f748a1052e62a6498393eb93f57378e09efa1f4f61568b43880179beb470b6d0
+recovery ai-transparency.ro.fallback b983acd7d0168ad805ac73d049060bd9c7ca8c4cc28e29ee0933688e8430a3fe
 recovery budget-tier-choice.ro.modelProjection b593d7c0ed2d166849df568cb76bf3873a04d4fca4604908ccf6cd626d67e892
 recovery budget-tier-choice.ro.fallback c32cf5a845ad6fa8d51cef9952430b27c8579ca9f4d42e8dfcb2e1ef58d10690
 recovery debate-topic-and-description.ro.modelProjection 0dfb64e716c3c402ff62538e682d8b2ca04edfc45d840a140f20e4120585db32
 recovery debate-topic-and-description.ro.fallback 7b8d200c8c31b60c633111556f4957847a0194069c4596be88600383d554cc6c
 recovery debate-workspace-menus.ro.modelProjection b9a0bf0de664fcb0b6548121e532e4bcbf27861d68614fef9cbb00563f3f87ec
 recovery debate-workspace-menus.ro.fallback 5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97
-recovery getting-started-debate.ro.modelProjection fb31cb677b335d8d89b6d80e131baafd20f192696e58fe207b9410f7f6ff5e7d
-recovery getting-started-debate.ro.fallback 66b838b553bc46d3e0971a143a0dbc619fe82e767b7e5dc6364a9a0347f479f2
-recovery guide-how-it-works.ro.modelProjection f431615b47e0d90a1b87b6619bf1447dd727b080b7f847c40e396087a8201ff9
-recovery guide-how-it-works.ro.fallback 33acc7c78b50ab0c68f43842aca5c73286ecdf07c8bd4cb357f53c78516e4095
+recovery getting-started-debate.ro.modelProjection 33a8fc6a0bd1dd38de5e0bdea12600a422f00d7d0d4819c7bc182554e0d9d734
+recovery getting-started-debate.ro.fallback a5d2d9f051896716213aabe9f48c97257778ded6cb054dec0d7b32d615549c4a
+recovery guide-how-it-works.ro.modelProjection 10e46c0185bcb5d6b5a8b8e63e7b677240b6ef4467b669b1f9bb59b226be3f1b
+recovery guide-how-it-works.ro.fallback 912f21ed951d1a536c4ddaada3fac2a25d02528050b4004af0d493a8321c2f37
 recovery risk-tier-choice.ro.modelProjection 2c826f1a596a76a8f2acf47b0a5b2384f134d6dc9c96c961f976d334ede818c2
 recovery risk-tier-choice.ro.fallback 3d938be89e4673f9958381aa1e652ce2ee377d38cb5701c689701391f8774874
-recovery support-cases.ro.modelProjection 7c15fafb2b660050163590eadc31e070018bff46b25aa85fc4d3a78203c87551
-recovery support-cases.ro.fallback 1d602c803bf564c94ebebff9ddbfc26ee1d1329bd090e73b177597c7ecc09c5b
-recovery support-status-limits.ro.modelProjection 2796124487fceac55a1200ef7b64e65898bb9da4a7552dabf940d1892f4c52f0
+recovery support-cases.ro.modelProjection 752edeef206e2675bed63f5c2179f287e66db694e4243df56dbd97382d586eb9
+recovery support-cases.ro.fallback 6a6d5f9d737e0e0c692a7ae9b0dc24434ba5871de62b3fcd0e955e6fe1894a9f
+recovery support-status-limits.ro.modelProjection 6976ed6a37edafff50ea7d0e82d31cc2fc82a6ee4f194cc1e13aa911904a093e
 recovery support-status-limits.ro.fallback f4a18f49bb1010aa86579a2eac64761a0ac85f6fbbe2afeba8495acbe2e084da
-recovery unsupported-capabilities.ro.modelProjection ad8e72087a36842e2d6305aae296484fd0410d097ea9c3dcff1a0aeac6fc375c
-recovery unsupported-capabilities.ro.fallback facce9231bff468b80ed53aed3efd4526a0d552fd6acb8107f47159925e2a41c
+recovery unsupported-capabilities.ro.modelProjection b8d3adac101ca1f2814fa32e3b7cd307ed497f3158881dc834ea7cd2d5136da4
+recovery unsupported-capabilities.ro.fallback b223418e6d366bd25ac2d36bfc64b43c40206776c1fc298839327349e721b8d0
 recovery support-status-limits.en.modelProjection 932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385
 recovery support-status-limits.en.fallback 875854ecea195464759705f8035052bd5389c71a1acc439713326784bb5e2981
-component-file e863b4e17b8ed7c1d1b3b4b9b5551b87b818f523aa3c22f181798fbc4aeee99c
+component-file 6e8e9c8c6003dfd2ab6f1eca64df0a849958818dbb3066643e54c5bd9d657bb3
 ~~~
