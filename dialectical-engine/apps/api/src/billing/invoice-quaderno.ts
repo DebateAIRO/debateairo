@@ -66,7 +66,7 @@ export function createQuadernoRefundHandler(deps: QuadernoDeps): OutboxHandler {
       && refundTarget(event) === paid.paid.xmoneyTransactionId).length;
     if (issued.some((invoice) => invoice.kind === "CREDIT_NOTE")) {
       if (refundsOnCharge <= 1) return DONE;
-      deps.audit("billing.invoice.unknown", { issuer: "QUADERNO", code: "CREDIT_NOTE_MANUAL" });
+      deps.audit("billing.invoice.unknown", { issuer: "QUADERNO", kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
       return dead("CREDIT_NOTE_MANUAL");
     }
     const original = issued.find((invoice) => invoice.kind === "INVOICE");

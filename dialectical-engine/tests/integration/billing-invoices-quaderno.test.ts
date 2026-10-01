@@ -23,6 +23,20 @@ async function activateInGermany() {
 const invoices = async (chargeId: string) => (await h.database.pool.query(
   "SELECT issuer, kind, number, external_ref FROM billing.invoice WHERE charge_id=$1 ORDER BY kind", [chargeId]
 )).rows;
+const intents = async (chargeId: string) => (await h.database.pool.query(
+  "SELECT kind, issuer FROM billing.invoice_intent WHERE charge_id=$1 ORDER BY kind", [chargeId]
+)).rows;
+
+/** A German sale paid and verified while Quaderno cannot be reached: its sale job fails once and waits for a retry. */
+async function settleWithSaleOutage() {
+  h.geo.country = "DE";
+  const bought = await h.buy({ country: "DE" });
+  const paying = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "DE" });
+  // After the quote (which would take the failure itself), before VERIFY_PAYMENT queues the sale.
+  h.tax.failNext("TAX_SERVICE_UNAVAILABLE");
+  await h.settle(paying.transactionId);
+  return { bought, paying };
+}
 
 describe("P10a Quaderno invoices", () => {
   it("records the sale once with its evidence, stores the invoice and sends M2 with the PDF link", async () => {
@@ -56,6 +70,51 @@ describe("P10a Quaderno invoices", () => {
     await h.settle(paying.transactionId);
     const job = (await h.outboxRows(bought.chargeId)).find((row) => row.kind === "QUADERNO_RECORD_SALE");
     expect(job).toMatchObject({ dead: true, lastErrorCode: "TAX_SERVICE_REFUSED" });
+  });
+
+  it("retries a sale Quaderno could not reach, with its intent on record first, then invoices it once", async () => {
+    const { bought } = await settleWithSaleOutage();
+    const sale = (await h.outboxRows(bought.chargeId)).find((row) => row.kind === "QUADERNO_RECORD_SALE");
+    expect(sale).toMatchObject({ done: false, dead: false, lastErrorCode: "TAX_SERVICE_UNAVAILABLE" });
+    // A17a: the intent is on record before Quaderno is called, so it survives the failed call.
+    expect(await intents(bought.chargeId)).toEqual([{ kind: "INVOICE", issuer: "QUADERNO" }]);
+    expect(await invoices(bought.chargeId)).toEqual([]);
+    expect(h.tax.sales.filter((recorded) => recorded.chargeId === bought.chargeId)).toEqual([]);
+
+    // The first retry falls 60 seconds later (failureRetryAt).
+    h.clock.advance(61_000);
+    await h.worker.drain(5);
+    expect(h.tax.sales.filter((recorded) => recorded.chargeId === bought.chargeId)).toHaveLength(1);
+    expect((await invoices(bought.chargeId)).map((row) => row.kind)).toEqual(["INVOICE"]);
+    expect(await intents(bought.chargeId)).toHaveLength(1);
+    expect((await h.outboxRows(bought.chargeId)).filter((row) => row.ref === `M2_INVOICE_LINK:${bought.chargeId}`)).toHaveLength(1);
+  });
+
+  it("a credit note waits for its original invoice", async () => {
+    const { bought, paying } = await settleWithSaleOutage();
+    // The payment is voided after it succeeded, while its sale is still waiting for Quaderno.
+    h.xmoney.setStatus(paying.transactionId, "cancel-ok");
+    await h.settle(paying.transactionId);
+    await h.worker.drain(5);
+    const waiting = (await h.outboxRows(bought.chargeId)).find((row) => row.kind === "QUADERNO_RECORD_REFUND");
+    expect(waiting).toMatchObject({ done: false, dead: false, lastErrorCode: "INVOICE_ORIGINAL_MISSING" });
+    expect(h.tax.refunds.filter((recorded) => recorded.chargeId === bought.chargeId)).toEqual([]);
+
+    // Both jobs are due 60 seconds later; whichever runs first, the credit note follows within the next retry delays.
+    const stillOpen = async () => (await h.outboxRows(bought.chargeId))
+      .some((row) => (row.kind === "QUADERNO_RECORD_SALE" || row.kind === "QUADERNO_RECORD_REFUND") && !row.done && !row.dead);
+    h.clock.advance(61_000);
+    await h.worker.drain(5);
+    for (let round = 0; round < 3 && await stillOpen(); round += 1) {
+      h.clock.advance(5 * 60_000);
+      await h.worker.drain(5);
+    }
+    const issued = await invoices(bought.chargeId);
+    expect(issued.map((row) => row.kind)).toEqual(["CREDIT_NOTE", "INVOICE"]);
+    const original = issued.find((row) => row.kind === "INVOICE")!;
+    const refunds = h.tax.refunds.filter((recorded) => recorded.chargeId === bought.chargeId);
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0]!.original).toEqual({ documentId: original.external_ref, number: original.number });
   });
 
   it("issues the credit note for a full refund (a void after success) against the original invoice", async () => {
