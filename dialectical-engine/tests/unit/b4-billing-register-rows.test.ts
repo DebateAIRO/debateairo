@@ -153,6 +153,14 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     ]);
   });
 
+  it("accepts a renewal notice of exactly 7 business days and a longer one: 7 is a floor, not a ceiling", () => {
+    for (const days of [7, 10]) {
+      const row = policyRow();
+      row.renewal_notice_business_days = days;
+      expect(policyOf(row)).toMatchObject({ renewalNoticeBusinessDays: days });
+    }
+  });
+
   it("accepts a longer withdrawal period and an extra country: the law sets a floor, not a ceiling", () => {
     const row = policyRow();
     row.withdrawal_days = 30;
@@ -179,7 +187,12 @@ describe("billingPolicy v1 keeps billing switched off", () => {
       row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "GB");
     }],
     ["a withdrawal list of one country", (row: Record<string, unknown>) => { row.withdrawal_countries = ["RO"]; }],
-    ["a quote that lives under a minute", (row: Record<string, unknown>) => { row.quote_ttl_seconds = 30; }]
+    ["a quote that lives under a minute", (row: Record<string, unknown>) => { row.quote_ttl_seconds = 30; }],
+    // Final review Part 1b, Minor 6: a changed renewal needs at least 7 business days' notice (xMoney, M3).
+    ["a renewal notice under the 7 business days a changed renewal needs", (row: Record<string, unknown>) => {
+      row.renewal_notice_business_days = 6;
+    }],
+    ["a renewal notice of a single business day", (row: Record<string, unknown>) => { row.renewal_notice_business_days = 1; }]
   ])("refuses %s (BILLING_POLICY_INVALID)", (_name, mutate) => {
     const row = policyRow();
     mutate(row);

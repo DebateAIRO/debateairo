@@ -50,13 +50,22 @@ const WITHDRAWAL_LAW = Object.freeze({
   ])
 });
 
+/**
+ * The notice a CHANGED renewal needs (spec §1.10 and the global constraints:
+ * M3 at least 7 business days, Monday to Friday UTC, before the charge, as
+ * xMoney's merchant rules require). P11 applies the sealed value directly, so
+ * a row that shortens the notice is refused by name before it can be sealed;
+ * a longer notice is allowed (final review Part 1b, Minor 6).
+ */
+const RENEWAL_NOTICE_RULE = Object.freeze({ leastBusinessDays: 7 });
+
 const billingPolicyValueSchema = z.object({
   kind: z.literal("BILLING_POLICY"),
   enabled: z.boolean(),
   // at most 3 retries, so attempts stay 1..4 (A2), the range 0084's billing.charge.attempt CHECK allows
   dunning_retry_days: z.array(wholeDays(60)).min(1).max(3),
   withdrawal_days: z.number().int().min(WITHDRAWAL_LAW.leastDays).max(60),
-  renewal_notice_business_days: wholeDays(30),
+  renewal_notice_business_days: z.number().int().min(RENEWAL_NOTICE_RULE.leastBusinessDays).max(30),
   look_ahead_business_days: wholeDays(60),
   confirmation_business_days: wholeDays(10),
   quote_ttl_seconds: z.number().int().min(60).max(86_400),
