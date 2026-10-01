@@ -30,11 +30,34 @@ const OTHER = SUPPORT_LOCALES.filter((l) => l !== "en" && l !== "ro");
 // The checker's SCRIPT rule covers the other 10; latin_allow is SPEC-v5 R13 (iii)'s list.
 const NON_LATIN = new Set(["ar", "he", "hi", "ja", "zh", "ko", "ru", "uk", "bg", "el"]);
 const LATIN_ALLOW = new Set(["Dialectical", "Engine", "MFA", "AI", "US", "JSON", "DebateAI"]);
-const PLACEHOLDER = /^(?:todo|tbd|tbc|fixme|xxx+|lorem|ipsum|placeholder|translate|translation|untranslated)$/iu;   // not "n/a": Irish "na" is a word
-// REV-S05-p2 ct N1: a WHOLE name "N/A", "NA", "X", "XX"… is a placeholder (inside a name, Irish "na" stays legal), and an
-// upper-case locale code ("DE: …") is not a word of the locale's own language.
-const PLACEHOLDER_NAME = /^\s*(?:n\/?a|x+)\s*$/iu;
+const PLACEHOLDER = /^(?:todo|tbd|tbc|tba|fixme|xxx+|lorem|ipsum|placeholder|translate|translation|untranslated|null|undefined)$/iu;   // per word; not "n/a": Irish "na" is a word
+// REV-S05-p2 ct N1 + RECHECK-S05 N2 — the class, not its samples. Two shapes are refused, however they are spelled:
+// (1) a placeholder WHOLE name: the name's letters alone (accents, case, spaces, dots, slashes and dashes dropped) are
+//     empty, x…, or a placeholder word — "N/A", "N / A", "N.A.", "n.d.", "N/D", "N.V.", "XX", "TBA", "null", "None", "—";
+//     inside a real name a short word like Irish "na" stays legal, because only the WHOLE name is matched;
+// (2) a locale-code TAG: a code (any case) that opens the name before ":" or a spaced dash, or stands in brackets
+//     anywhere — "DE: …", "de : …", "[de] …", "(DE) …", "de – …". A code joined to a word ("IT-Support", "ET-tugi",
+//     "DE-Nutzer") is not a tag. A code of any case also never counts as a word of the locale's own language, so
+//     "de Support conversations and human cases" is refused by the own-word rule.
+const PLACEHOLDER_LETTERS = new Set(["", "na", "nd", "nv", "nc", "tba", "tbd", "tbc", "todo", "fixme", "null", "undefined",
+  "none", "nil", "empty", "missing", "placeholder", "lorem", "ipsum", "loremipsum", "translate", "translation", "untranslated", "dummy", "wip"]);
+const letters = (text: string): string => text.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}]/gu, "");
+const isPlaceholderName = (name: string): boolean => PLACEHOLDER_LETTERS.has(letters(name)) || /^x+$/u.test(letters(name));
 const LOCALE_CODES = new Set(SUPPORT_LOCALES.map((loc) => loc.toLowerCase()));
+const CODE = `(?:${[...LOCALE_CODES].join("|")})`;
+const LOCALE_TAG = new RegExp(`^\\s*[\\[(]?\\s*${CODE}\\s*[\\])]?\\s*(?::|\\s[-–—|]\\s)|[\\[(]\\s*${CODE}\\s*[\\])]`, "iu");
+// The member table the two rules are written against (asserted below, so a rule that loosens fails on the table itself).
+const REFUSE = ["N/A", "N / A", "n.a.", "N.A.", "NA", "N/D", "n.d.", "N.V.", "x", "XX", "xxx", "TBA", "TBD", "TODO", "null",
+  "undefined", "None", "—", "???", "...", "DE: Support conversations and human cases", "de: Support conversations and human cases",
+  "de : Support conversations and human cases", "[de] Support conversations and human cases",
+  "(DE) Support conversations and human cases", "DE - Support conversations and human cases",
+  "de – Support conversations and human cases", "de Support conversations and human cases",
+  "DE Support conversations and human cases", "de: Support-Gespräche und Fälle mit menschlicher Betreuung",
+  "Human help cases", "Support (TBD)", "lorem ipsum", "MFA"];
+const ACCEPT = ["IT-Support-Gespräche mit menschlicher Betreuung", "ET-tugi ja inimeste käsitletud juhtumid",
+  "Support-Gespräche für DE-Nutzer", "Spás oibre úinéir na díospóireachta", "Comhráite tacaíochta agus cásanna le duine",
+  "O Dialectical Engine", "Om Dialectical Engine", "Acerca de Dialectical Engine", "Estado da verificação do e-mail",
+  "Debatte mit Tarifoptionen erstellen (Entwurf)"];
 const words = (text: string): string[] => text.split(/[^\p{L}]+/u).filter((word) => word !== "");
 const ENGLISH = new Set([
   ...SUPPORT_CAPABILITIES.flatMap(({ labels, searchTerms }) => words([labels.en, ...searchTerms.en].join(" "))),
@@ -58,6 +81,16 @@ const contextText = (language: (typeof SUPPORT_LOCALES)[number], signedIn = true
   referenceFor: createSupportModelReferenceFactory("10000000-0000-4000-8000-000000000001").referenceFor
 }).text;
 
+/** Why a Latin-script TRANSLATE name is refused, or "" when it is accepted (ct N2 class, RECHECK-S05 N2). */
+function refusal(name: string): string {
+  if (isPlaceholderName(name)) return "placeholder name";
+  if (LOCALE_TAG.test(name)) return "locale-code tag";
+  const own = words(name).filter((word) => !LATIN_ALLOW.has(word) && !LOCALE_CODES.has(word.toLowerCase()));
+  if (own.some((word) => PLACEHOLDER.test(word))) return "placeholder word";
+  if (own.length === 0 || own.every((word) => ENGLISH.has(word.toLowerCase()))) return "no word of its own language";
+  return "";
+}
+
 describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22)", () => {
   it("covers every catalogue capability with exactly one KEY or TRANSLATE row", () => {
     const rows = new Set([...Object.keys(KEY_ROWS), ...SUPPORT_TRANSLATED_CAPABILITY_IDS]);
@@ -79,6 +112,8 @@ describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22
     // labels that differ from en, so the en labels a locale shows unchanged ("Account", "Privacy" in it/nl) are added
     // back from the other locales' pairs; the union names all 53 lexicon controls today (asserted, so a control that
     // becomes identical in every locale fails here instead of slipping out of the set).
+    for (const name of REFUSE) expect(refusal(name), `refuse ${JSON.stringify(name)}`).not.toBe("");     // RECHECK-S05 N2 class
+    for (const name of ACCEPT) expect(refusal(name), `accept ${JSON.stringify(name)}`).toBe("");
     const allEn = new Set(OTHER.flatMap((loc) => SUPPORT_CONTROL_NAMES[loc].map(([en]) => en)));
     expect(allEn.size).toBe(53);
     for (const loc of OTHER) {
@@ -92,11 +127,7 @@ describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22
         expect(labels, `${loc} ${id}`).not.toContain(name.trim());                              // D-S05-35 (d), full set
         expect(supportCapabilityName(capability(id), loc)).toBe(name);
         if (!NON_LATIN.has(loc)) {                                                              // ct N2
-          const own = words(name).filter((word) => !LATIN_ALLOW.has(word)
-            && !(word === word.toUpperCase() && LOCALE_CODES.has(word.toLowerCase())));
-          expect(name, `${loc} ${id} placeholder name`).not.toMatch(PLACEHOLDER_NAME);
-          expect(own.filter((word) => PLACEHOLDER.test(word)), `${loc} ${id} placeholder`).toEqual([]);
-          expect(own.length === 0 || own.every((word) => ENGLISH.has(word.toLowerCase())), `${loc} ${id} "${name}" has no word of its own language`).toBe(false);
+          expect(refusal(name), `${loc} ${id} "${name}"`).toBe("");
         }
       }
       expect(new Set(SUPPORT_CAPABILITIES.map((item) => supportCapabilityName(item, loc))).size, loc).toBe(20);   // N3
