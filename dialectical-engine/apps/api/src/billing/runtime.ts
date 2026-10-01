@@ -120,7 +120,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   });
   const maintenance = new BillingMaintenance({
     repository, jobs, entitlements, renewal, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
-    audit: deps.audit, clock: deps.clock
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit, clock: deps.clock
   });
   outbox.register("RENEWAL_NOTICE", createRenewalNoticeHandler({ repository, jobs, renewal, policy: deps.policy }));
   let lastMaintenance = Number.NEGATIVE_INFINITY;

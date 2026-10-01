@@ -354,7 +354,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   worker.register("XMONEY_REFUND", refunds.handle);
   const maintenance = new BillingMaintenance({
     repository, jobs, entitlements, renewal, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL,
-    audit, clock: clock.read
+    xmoneyEnvironment: "stage", audit, clock: clock.read
   });
   worker.register("RENEWAL_NOTICE", createRenewalNoticeHandler({ repository, jobs, renewal, policy: testBillingPolicy }));
   const noticeTokens = new Map<string, XMoneyNotice>();

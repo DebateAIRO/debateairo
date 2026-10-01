@@ -1,5 +1,5 @@
 import { addBusinessDays, foldSubscription, microsToDecimal, type SubscriptionState } from "@debateai/billing-core";
-import type { BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
+import type { BillingJobQueries, BillingRepository, CustomerXMoneyEnvironment, EntitlementRepository } from "@debateai/db";
 import { exhaustive } from "@debateai/kernel";
 import type { BillingPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
@@ -17,6 +17,11 @@ export type MaintenanceDeps = Readonly<{
   policy: BillingPolicy;
   /** R-7: PUBLIC_APP_URL. */
   publicAppUrl: string;
+  /**
+   * D5 5h: P6a's connectors.xmoneyEnvironment; a subscription created in the other xMoney system is never retried here,
+   * nor its renewal announced.
+   */
+  xmoneyEnvironment: CustomerXMoneyEnvironment;
   audit: BillingAudit;
   clock: () => Date;
 }>;
@@ -137,6 +142,8 @@ export class BillingMaintenance {
       const events = await this.deps.repository.subscriptionEvents(subscriptionId);
       const state = foldSubscription(events);
       if (state.status !== "PAST_DUE" || state.cancelRequested || state.currentPeriodEnd === null) return false;
+      // D5 5h: the other xMoney system's plan is never charged from here, nor dunned without a charge.
+      if (state.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return false;
       const progress = dunningProgress(events, state);
       if (progress === null) return false;
       const retryDay = this.deps.policy.dunningRetryDays[progress.failedAttempts - 1];
@@ -195,6 +202,8 @@ export class BillingMaintenance {
   private async announce(state: SubscriptionState, now: Date, report: MaintenanceReport): Promise<void> {
     const end = state.currentPeriodEnd;
     if (state.cancelRequested || end === null || end.getTime() <= now.getTime()) return;
+    // D5 5h: P11a's renewal never renews the other xMoney system's plan (`dueRenewals`), so nothing is announced for it.
+    if (state.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return;
     if (addBusinessDays(now, this.deps.policy.lookAheadBusinessDays).getTime() < end.getTime()) return;
     const queued = await this.deps.repository.withTransaction((client) => enqueueOnce(this.deps, client, {
       kind: "RENEWAL_NOTICE", ref: `${state.subscriptionId}:${end.toISOString()}`, notBefore: now, payload: {}

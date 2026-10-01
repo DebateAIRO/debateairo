@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { addBusinessDays, foldSubscription } from "@debateai/billing-core";
+import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { addYearsClamped } from "../../apps/api/src/billing/renewal-rules.js";
 import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
-import { kindsOf, startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
+import { testBillingPolicy } from "../support/billingFixtures.js";
+import { kindsOf, startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
 
 let h: BillingHarness;
 beforeAll(async () => { h = await startBillingHarness(); });
@@ -277,5 +279,48 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
       .toMatchObject({ kind: "ENDED", data: { cause: "DUNNING", reason: "TAX_SERVICE_UNAVAILABLE" } });
     expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "FREE", cause: "ENDED_DUNNING", paidThrough: null });
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`M6:${paid.subscriptionId}`);
+  });
+
+  it("never retries, nor announces a renewal for, a subscription of the other xMoney system, but still ends its cancel (D5 5h)", async () => {
+    // The live runtime's pass, on the same database as the harness's stage subscriptions.
+    const live = new BillingMaintenance({
+      repository: h.repository, jobs: h.jobs, entitlements: h.entitlements, renewal: h.renewal, policy: testBillingPolicy,
+      publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "live", audit: h.audit, clock: h.clock.read
+    });
+    const { paid: pastDue, failedAt } = await firstFailure();
+    const orderId = pastDue.transaction.orderId;
+    const rebillsAfterFailure = h.xmoney.rebillsFor(orderId);
+    const cancelled = await h.activate();
+    await append(cancelled.subscriptionId, "CANCEL_REQUESTED", {});
+    const cancelEnd = await h.periodEndOf(cancelled.subscriptionId);
+    const noticed = await h.activate();
+    const noticedEnd = await h.periodEndOf(noticed.subscriptionId);
+
+    // Past the first retry day: the live pass makes no attempt 2 and bills nothing.
+    h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
+    await live.runOnce();
+    expect(await renewals(pastDue.subscriptionId)).toHaveLength(1);
+    expect(h.xmoney.rebillsFor(orderId)).toBe(rebillsAfterFailure);
+    expect((await h.repository.subscriptionEvents(pastDue.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
+
+    // A changed total inside the look-ahead: the live pass queues no notice (P11a's live renewal never renews it).
+    h.tax.rateOverride.set("RO", 1_900);
+    h.clock.now = new Date(noticedEnd.getTime() - 12 * DAY);
+    await live.runOnce();
+    expect((await h.outboxRows(noticed.subscriptionId)).map((row) => row.ref)).not.toContain(`${noticed.subscriptionId}:${noticedEnd.toISOString()}`);
+    h.tax.rateOverride.clear();
+
+    // A cancel pending past the period end IS ended by it (no xMoney call; README §14.8 step 1).
+    h.clock.now = new Date(Math.max(cancelEnd.getTime(), noticedEnd.getTime()) + MINUTE);
+    await live.runOnce();
+    expect((await h.repository.subscriptionEvents(cancelled.subscriptionId)).at(-1)).toMatchObject({ kind: "ENDED", data: { cause: "CANCEL" } });
+    expect(await h.entitlements.current(cancelled.ownerRef, h.clock.now)).toMatchObject({ planId: "FREE", cause: "ENDED_CANCEL" });
+    expect(await renewals(pastDue.subscriptionId)).toHaveLength(1);
+    expect(h.xmoney.rebillsFor(orderId)).toBe(rebillsAfterFailure);
+
+    // The control: the harness's own stage pass does retry that plan.
+    await h.maintenance.runOnce();
+    expect((await renewals(pastDue.subscriptionId)).map((charge) => charge.attempt)).toEqual([1, 2]);
+    expect(h.xmoney.rebillsFor(orderId)).toBe(rebillsAfterFailure + 1);
   });
 });
