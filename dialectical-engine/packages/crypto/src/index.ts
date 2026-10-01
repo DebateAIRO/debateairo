@@ -5,7 +5,6 @@ import {
   createHmac,
   randomBytes,
   randomFillSync,
-  randomInt,
   timingSafeEqual
 } from "node:crypto";
 import {
@@ -63,6 +62,10 @@ export {
   type RecordAad,
   type RecordCryptoErrorCode
 } from "./records.js";
+
+// Account handles: two pool words and a two-digit number. pseudonym.ts imports node:crypto
+// only, so this re-export cannot form an import cycle with this module.
+export { generatePseudonym, PSEUDONYM_ADJECTIVES, PSEUDONYM_NOUNS } from "./pseudonym.js";
 
 const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
@@ -1736,23 +1739,6 @@ export function hashVerificationToken(token: string): string {
     throw new CryptoInputError("CRYPTO_KEY_INVALID");
   }
   return `sha256:${createHash("sha256").update(token, "utf8").digest("hex")}`;
-}
-
-const PSEUDONYM_ADJECTIVES = Object.freeze([
-  "amber", "brisk", "calm", "clear", "cobalt", "coral", "crisp", "daring",
-  "ember", "gentle", "golden", "honest", "indigo", "lucid", "mellow", "nimble",
-  "open", "patient", "quiet", "rapid", "silver", "steady", "verdant", "vivid"
-]);
-const PSEUDONYM_NOUNS = Object.freeze([
-  "badger", "cedar", "comet", "dolphin", "falcon", "forest", "harbor", "heron",
-  "island", "lantern", "maple", "meadow", "otter", "pebble", "quartz", "raven",
-  "river", "sparrow", "summit", "thistle", "tiger", "willow", "wren", "zephyr"
-]);
-
-export function generatePseudonym(): string {
-  const adjective = PSEUDONYM_ADJECTIVES[randomInt(PSEUDONYM_ADJECTIVES.length)]!;
-  const noun = PSEUDONYM_NOUNS[randomInt(PSEUDONYM_NOUNS.length)]!;
-  return `${adjective}-${noun}-${randomBytes(3).toString("hex")}`;
 }
 
 export interface UserDekStore {

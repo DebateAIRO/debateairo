@@ -804,7 +804,7 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
     const pseudonyms = new Set(Array.from({ length: 200 }, () => generatePseudonym()));
     expect(pseudonyms.size).toBe(200);
     for (const pseudonym of pseudonyms) {
-      expect(pseudonym).toMatch(/^[a-z]+-[a-z]+-[0-9a-f]{6}$/);
+      expect(pseudonym).toMatch(/^[A-Z][a-z]{2,8}[A-Z][a-z]{2,8}[1-9][0-9]$/);
       for (const fragment of forbidden) expect(pseudonym).not.toContain(fragment);
     }
   });
