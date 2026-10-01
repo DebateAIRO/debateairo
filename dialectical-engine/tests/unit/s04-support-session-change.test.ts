@@ -55,7 +55,8 @@ type SessionChangeModule = Readonly<{
   onConversationReset(listener: (reason: ConversationResetReason) => void): () => void;
   onConversationWake(listener: () => void): () => void;
   readWakeFacts(): Promise<WakeFacts>;
-  settleStoredConversation(readFacts?: () => Promise<WakeFacts>): Promise<void>;
+  settleStoredConversation(readFacts?: () => Promise<WakeFacts>): Promise<WakeFacts | null>;
+  scheduleRecheck(recheck: () => void, attempt?: number): () => void;
   installSessionChangeReceiver(): () => void;
   sessionChangeGeneration(): number;
 }>;
@@ -78,6 +79,7 @@ const {
   onConversationReset,
   onConversationWake,
   readWakeFacts,
+  scheduleRecheck,
   sessionChangeGeneration,
   settleStoredConversation
 } = await import(/* @vite-ignore */ SESSION_CHANGE_MODULE) as SessionChangeModule;
@@ -524,9 +526,10 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
     expect(calls, "no session list while signed out").toEqual(["/api/v1/session"]);
   });
 
-  it("U16 facts that cannot be read are unknown, and unknown erases a transcript written signed in and one written signed out", async () => {
-    // FIX p1 (SD-B1, R02 (b), D-S04-20 "errs toward erasing"): only a 401 means signed out (the API's
-    // SESSION_REQUIRED); any other refusal, a 5xx from the proxy during an API restart, or a network failure is unknown.
+  it("U16 facts that cannot be read are unknown: nothing is decided on them, the copy stays, and the gate reads again when the server answers", async () => {
+    // FIX p1 (SD-B1): only a 401 — the API's SESSION_REQUIRED — means signed out; any other refusal, a 5xx from the
+    // proxy during an API restart, or a network failure is unknown. FIX p2 (PT2-B1, orchestrator ruling): unknown
+    // decides nothing — the copy is neither shown nor erased — and the gate runs again once the server answers.
     const json = (body: unknown, status: number) => new Response(JSON.stringify(body), {
       status, headers: { "content-type": "application/json" }
     });
@@ -540,12 +543,14 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
       status = failing;
       expect(await readWakeFacts(), `status ${failing}`).toEqual({ signedIn: "unknown", currentSessionStartedAtMs: null });
     }
+    // the verdict never keeps on unknown (nothing may be SHOWN on it)
     for (const written of [true, false]) {
       expect(storedConversationVerdict(
         { language: "en", identityBound: written, messages: [], ...(written ? { serverTime: T } : {}) },
         { signedIn: "unknown", currentSessionStartedAtMs: null }
       ), `verdict, written signed ${written ? "in" : "out"}`).toBe("erase");
     }
+    // the gate on unknown: the copy stays, the facts come back as unknown, and they are not remembered
     for (const [written, readFacts] of [
       [true, async () => { throw new Error("offline"); }],
       [false, () => Promise.reject(new TypeError("Failed to fetch"))],
@@ -554,9 +559,63 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
       status = 503;
       storeTranscript(written, written ? T : undefined);
       await nextGeneration();
-      await expect(settleStoredConversation(readFacts)).resolves.toBeUndefined();
-      expect(window.sessionStorage.getItem(KEY), `written signed ${written ? "in" : "out"}`).toBeNull();
+      await expect(settleStoredConversation(readFacts), `written signed ${written ? "in" : "out"}`)
+        .resolves.toEqual({ signedIn: "unknown", currentSessionStartedAtMs: null });
+      expect(storedText(), `written signed ${written ? "in" : "out"}: untouched`).toBe("old conversation");
     }
+    // a facts reader that fails at once is unknown too, and not remembered: the next call reads again
+    await nextGeneration();
+    let atOnce = 0;
+    const failsAtOnce = () => { atOnce += 1; throw new Error("at once"); };
+    await expect(settleStoredConversation(failsAtOnce))
+      .resolves.toEqual({ signedIn: "unknown", currentSessionStartedAtMs: null });
+    await settleStoredConversation(failsAtOnce);
+    expect(atOnce, "read again").toBe(2);
+    // same generation: an unknown answer is read again; a decided one is remembered
+    storeTranscript(false);
+    await nextGeneration();
+    let reads = 0;
+    let answer: WakeFacts = { signedIn: "unknown", currentSessionStartedAtMs: null };
+    const counted = async () => { reads += 1; return answer; };
+    await settleStoredConversation(counted);
+    await settleStoredConversation(counted);
+    expect(reads, "unknown is read again").toBe(2);
+    answer = { signedIn: false, currentSessionStartedAtMs: null };
+    await expect(settleStoredConversation(counted)).resolves.toEqual(answer);
+    await settleStoredConversation(counted);
+    expect(reads, "a decided answer is remembered for the generation").toBe(3);
+    expect(storedText(), "signed out now, written signed out: kept").toBe("old conversation");
+
+    // the re-check: once, at the first of online / visible / the backoff delay (1 s, 2 s, 4 s, 8 s, then 15 s)
+    vi.useFakeTimers();
+    const fired: string[] = [];
+    for (const [attempt, delay] of [[0, 1000], [1, 2000], [2, 4000], [3, 8000], [4, 15000], [9, 15000]] as const) {
+      const cancel = scheduleRecheck(() => { fired.push(`a${attempt}`); }, attempt);
+      cleanups.push(cancel);
+      vi.advanceTimersByTime(delay - 1);
+      expect(fired, `attempt ${attempt}: not before ${delay} ms`).not.toContain(`a${attempt}`);
+      vi.advanceTimersByTime(1);
+      expect(fired.filter((f) => f === `a${attempt}`), `attempt ${attempt}: once at ${delay} ms`).toHaveLength(1);
+    }
+    fired.length = 0;
+    const cancelOnline = scheduleRecheck(() => { fired.push("online"); });
+    cleanups.push(cancelOnline);
+    window.dispatchEvent(new Event("online"));
+    window.dispatchEvent(new Event("online"));
+    vi.advanceTimersByTime(20_000);
+    expect(fired, "online fires it once, and the timer no longer does").toEqual(["online"]);
+    fired.length = 0;
+    const cancelVisible = scheduleRecheck(() => { fired.push("visible"); });
+    cleanups.push(cancelVisible);
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(fired, "jsdom reports the page visible: it fires").toEqual(["visible"]);
+    fired.length = 0;
+    const cancelled = scheduleRecheck(() => { fired.push("cancelled"); });
+    cancelled();
+    window.dispatchEvent(new Event("online"));
+    vi.advanceTimersByTime(20_000);
+    expect(fired, "a cancelled re-check never fires").toEqual([]);
+    vi.useRealTimers();
   });
 
   it("U17 with BroadcastChannel deleted the receiver installs, still sleeps and wakes, and disposes without throwing", () => {

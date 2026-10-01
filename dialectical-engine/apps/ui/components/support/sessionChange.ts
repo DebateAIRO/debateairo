@@ -26,15 +26,21 @@ type ResetListener = (reason: ConversationResetReason) => void;
 type WakeListener = () => void;
 
 const SIGNED_OUT: WakeFacts = Object.freeze({ signedIn: false, currentSessionStartedAtMs: null });
-/** FIX p1 (SD-B1): the sign-in state could not be read; the gate erases rather than guess (D-S04-20). */
-const UNKNOWN: WakeFacts = Object.freeze({ signedIn: "unknown", currentSessionStartedAtMs: null });
+/**
+ * FIX p1 (SD-B1) + FIX p2 (PT2-B1, D-ORCH ruling): the sign-in state could not be read. Nothing is decided on it:
+ * the copy is neither shown nor erased, and the gate runs again once the server answers (`scheduleRecheck`).
+ */
+export const UNKNOWN_WAKE_FACTS: WakeFacts = Object.freeze({ signedIn: "unknown", currentSessionStartedAtMs: null });
+const UNKNOWN = UNKNOWN_WAKE_FACTS;
+/** FIX p2 (PT2-B1): the re-check backoff while the sign-in state is unknown; the last delay repeats. */
+export const RECHECK_DELAYS_MS: readonly number[] = Object.freeze([1000, 2000, 4000, 8000, 15000]);
 
 /**
  * The reset generation: one more on every receipt, every local announcement, every sleep and every wake. A gate run
  * that began in an older generation applies nothing (D-S04-24); the wake's increment is load-bearing (D-S04-32).
  */
 let generation = 0;
-let settled: Readonly<{ generation: number; promise: Promise<void> }> | null = null;
+let settled: Readonly<{ generation: number; promise: Promise<WakeFacts | null> }> | null = null;
 const resetListeners = new Set<ResetListener>();
 const wakeListeners = new Set<WakeListener>();
 /**
@@ -135,33 +141,72 @@ export async function readWakeFacts(): Promise<WakeFacts> {
 /**
  * The restore gate for a stored transcript (R02): E4 (a)/(b) through `restoreSupportConversation`, then (c) through
  * `storedConversationVerdict`. One run per reset generation; nothing stored means no request; facts that land
- * after the generation moved apply nothing. Never rejects.
+ * after the generation moved apply nothing. Resolves with the facts it judged on, or null when nothing was stored
+ * or the run went stale. Unknown facts leave the copy untouched and are not remembered, so the next call reads
+ * again (FIX p2, PT2-B1: decide later, never on a guess). Never rejects.
  */
-export function settleStoredConversation(readFacts: () => Promise<WakeFacts> = readWakeFacts): Promise<void> {
+export function settleStoredConversation(
+  readFacts: () => Promise<WakeFacts> = readWakeFacts
+): Promise<WakeFacts | null> {
   if (settled !== null && settled.generation === generation) return settled.promise;
   const startedIn = generation;
-  const promise = (async () => {
+  let entry: Readonly<{ generation: number; promise: Promise<WakeFacts | null> }> | null = null;
+  let forget = false;
+  const run = async (): Promise<WakeFacts | null> => {
     const storage = browserSupportConversationStorage();
-    if (readStoredSupportConversation(storage) === null) return;
+    if (readStoredSupportConversation(storage) === null) return null;
     let facts: WakeFacts;
     try {
       facts = await readFacts();
     } catch {
       facts = UNKNOWN;
     }
-    if (generation !== startedIn) return;
+    if (generation !== startedIn) return null;
     if (facts.signedIn === "unknown") {
-      // Neither (a) nor (b) can be told apart from a keep, so the copy goes, whoever wrote it (SD-B1).
-      clearStoredSupportConversation(storage);
-      return;
+      // Not remembered: the next call reads the facts again.
+      forget = true;
+      if (entry !== null && settled === entry) settled = null;
+      return UNKNOWN;
     }
     const kept = restoreSupportConversation(storage, facts.signedIn);
     if (kept !== null && storedConversationVerdict(kept, facts) === "erase") {
       clearStoredSupportConversation(storage);
     }
-  })().catch(() => undefined);
-  settled = Object.freeze({ generation: startedIn, promise });
+    return facts;
+  };
+  const promise = run().catch(() => null);
+  entry = Object.freeze({ generation: startedIn, promise });
+  if (!forget) settled = entry;
   return promise;
+}
+
+/**
+ * FIX p2 (PT2-B1): calls `recheck` once, at the first of: the browser going `online`, the page becoming visible,
+ * or the backoff delay for this `attempt` (RECHECK_DELAYS_MS; the last delay repeats). Returns a canceller. Never
+ * throws: with no window or document the timer alone remains.
+ */
+export function scheduleRecheck(recheck: () => void, attempt = 0): () => void {
+  let done = false;
+  const delay = RECHECK_DELAYS_MS[Math.min(Math.max(attempt, 0), RECHECK_DELAYS_MS.length - 1)]!;
+  const cancel = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    try { if (typeof window !== "undefined") window.removeEventListener("online", fire); } catch { /* nothing to undo */ }
+    try { if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible); } catch { /* nothing to undo */ }
+  };
+  const fire = () => {
+    if (done) return;
+    cancel();
+    recheck();
+  };
+  const onVisible = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "visible") fire();
+  };
+  const timer = setTimeout(fire, delay);
+  try { if (typeof window !== "undefined") window.addEventListener("online", fire); } catch { /* the timer remains */ }
+  try { if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible); } catch { /* the timer remains */ }
+  return cancel;
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
+import { useEffect,useLayoutEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { redactSupportText } from "@debateai/kernel";
 import type { SupportAction } from "@debateai/support-kb/catalog";
@@ -20,15 +20,24 @@ import {
   hasExactKeys,
   restoreSupportConversation,
   serverTimeFromDateHeader,
+  storedConversationVerdict,
   supportActionsFrom,
   supportSourcesFrom,
   writeStoredSupportConversation,
   SUPPORT_CONVERSATION_STORAGE_KEY,
   type SupportConversationMessage,
-  type SupportSource
+  type SupportSource,
+  type WakeFacts
 } from "./conversation.js";
 import { isStaleSupportSession, supportPost, SupportHttpError } from "./http.js";
-import { onConversationReset, onConversationWake, settleStoredConversation } from "./sessionChange.js";
+import {
+  onConversationReset,
+  onConversationWake,
+  readWakeFacts,
+  scheduleRecheck,
+  settleStoredConversation,
+  UNKNOWN_WAKE_FACTS
+} from "./sessionChange.js";
 
 export type SupportAssistantLanguage = LocaleCode;
 export type SupportAssistantOutcome =
@@ -373,6 +382,8 @@ function caseOpenedMessage(
 
 export { SUPPORT_CONVERSATION_STORAGE_KEY };
 
+type RestorePhase = "pending" | "settling" | "done" | "asleep" | "undecided";
+
 const NO_MESSAGES: readonly ConversationMessage[] = Object.freeze([]);
 
 export function Assistant({
@@ -412,14 +423,16 @@ export function Assistant({
   /**
    * FIX p1 (PT-B1): from a sleep until the wake's gate decides, the conversation is held in memory but not shown —
    * no message, no case link, no draft, no session reference. A keep shows it again; an erase discards it.
+   * FIX p2 (CT2-B1): while concealed the panel is busy — no control acts on what it holds.
    */
   const [concealed,setConcealed] = useState(false);
   /**
    * S04 (PLAN S3.2): the stored transcript is restored only through the gate. "pending" waits for the identity,
    * "settling" awaits the gate, "done" lets the write effect run, "asleep" is a parked page: no gate, no fetch,
-   * no write until it wakes.
+   * no write until it wakes. "undecided" (FIX p2, PT2-B1): the sign-in state could not be read, so nothing is
+   * decided — hidden, untouched, nothing saved or sent — until a re-check reads it.
    */
-  const [restorePhase,setRestorePhase] = useState<"pending" | "settling" | "done" | "asleep">("pending");
+  const [restorePhase,setRestorePhase] = useState<RestorePhase>("pending");
   /** Incremented by a session change or a wake, so the identity effect resolves again on facts read now (B1). */
   const [identityEpoch,setIdentityEpoch] = useState(0);
   /** S04-R05: the server time of the newest support response, written with the transcript. */
@@ -449,8 +462,26 @@ export function Assistant({
    * screen; the module's wake bump (sessionChange.ts) keeps its verdict out of storage. Both are required.
    */
   const parkedRef = useRef(false);
-  /** PT-B1: what a sleep holds — null when nothing is held; `restored` when the gate had finished before it. */
-  const heldRef = useRef<Readonly<{ restored: boolean }> | null>(null);
+  /**
+   * PT-B1: what a sleep holds — null when nothing is held. `restored` when the gate had finished before it; then
+   * the identity and server time the conversation was kept under, which the wake judges (PT2-N1). `identityBound`
+   * is null when the identity was unknown at the sleep.
+   */
+  const heldRef = useRef<Readonly<{
+    restored: boolean;
+    identityBound: boolean | null;
+    serverTime: number | undefined;
+  }> | null>(null);
+  /** PT2-N4: the reading position at the sleep, put back on a keep. */
+  const scrollAtSleepRef = useRef<number | null>(null);
+  const pendingScrollRef = useRef<number | null>(null);
+  /** CT2-B1: mirrors `concealed` for handlers that run before the next render. */
+  const concealedRef = useRef(false);
+  /** PT2-B1: re-checks made since the sign-in state became unreadable (the backoff index). */
+  const recheckAttemptRef = useRef(0);
+  /** The values a reset listener reads; it is installed once, so it reads them here, not from its closure. */
+  const latestRef = useRef({ identityAvailable,identityKnown,serverTime });
+  latestRef.current = { identityAvailable,identityKnown,serverTime };
   /** PT-B1: the unsent draft, taken off the screen at the sleep and put back on a keep. */
   const draftRef = useRef("");
   /**
@@ -459,12 +490,17 @@ export function Assistant({
    * conversation back.
    */
   const writeBlockedRef = useRef(false);
-  const restorePhaseRef = useRef<"pending" | "settling" | "done" | "asleep">("pending");
+  const restorePhaseRef = useRef<RestorePhase>("pending");
   const mountedRef = useRef(false);
 
-  function enterPhase(phase: "pending" | "settling" | "done" | "asleep"): void {
+  function enterPhase(phase: RestorePhase): void {
     restorePhaseRef.current = phase;
     setRestorePhase(phase);
+  }
+
+  function conceal(value: boolean): void {
+    concealedRef.current = value;
+    setConcealed(value);
   }
 
   useEffect(() => {
@@ -480,34 +516,80 @@ export function Assistant({
     if (parkedRef.current) return;
     enterPhase("settling");
     const gate = gateRef.current;
-    void settleStoredConversation().then(() => {
+    const stale = () => !mountedRef.current || gateRef.current !== gate;
+    void settleStoredConversation().then(async (settled) => {
       // A sleep, wake or session change landed while the gate settled: the newer one owns the phase.
-      if (!mountedRef.current || gateRef.current !== gate) return;
+      if (stale()) return;
       const held = heldRef.current;
+      const holding = held !== null && held.restored;
+      let facts: WakeFacts | null = settled;
+      if (holding && facts === null) {
+        // Nothing stored to judge (site data blocked, or never written): the held conversation is judged (PT2-N1).
+        facts = await readWakeFacts().catch(() => UNKNOWN_WAKE_FACTS);
+        if (stale()) return;
+      }
+      if (!identityKnown || facts?.signedIn === "unknown") {
+        // PT2-B1 (orchestrator ruling): decide later. Hidden, untouched, nothing saved or sent; re-checked below.
+        conceal(true);
+        enterPhase("undecided");
+        return;
+      }
+      recheckAttemptRef.current = 0;
       heldRef.current = null;
-      // The gate has judged what storage holds on facts read now (an unknown sign-in state erases, SD-B1).
-      const conversation = restoreSupportConversation(
-        browserSupportConversationStorage(),identityAvailable
-      );
-      if (conversation !== null && conversation.language !== language) {
-        clearStoredSupportConversation(browserSupportConversationStorage());
-        if (held !== null) discardConversation();
-      } else if (conversation === null) {
-        // Erased by the gate (or nothing stored, or storage blocked): nothing held may come back.
-        if (held !== null) discardConversation();
+      if (holding && facts !== null) {
+        const verdict = held.identityBound === null ? "erase" : storedConversationVerdict({
+          language,identityBound: held.identityBound,messages: [],
+          ...(held.serverTime === undefined ? {} : { serverTime: held.serverTime })
+        },facts);
+        if (verdict === "keep") {
+          // Kept: the held conversation is already in memory, whole (PT-B1).
+          restoreDraft();
+          pendingScrollRef.current = scrollAtSleepRef.current;
+        } else {
+          discardConversation(true);
+        }
       } else {
-        // Kept. A conversation held since before the sleep is already in memory, whole (PT-B1).
-        if (held === null || !held.restored) {
+        // The gate has judged what storage holds on facts read now.
+        const conversation = restoreSupportConversation(
+          browserSupportConversationStorage(),identityAvailable
+        );
+        if (conversation !== null && conversation.language !== language) {
+          clearStoredSupportConversation(browserSupportConversationStorage());
+          if (held !== null) discardConversation(true);
+        } else if (conversation === null) {
+          if (held !== null) discardConversation(true);
+        } else {
           setMessages(conversation.messages);
           setServerTime(conversation.serverTime);
+          if (held !== null) restoreDraft();
         }
-        if (held !== null) restoreDraft();
       }
+      scrollAtSleepRef.current = null;
       writeBlockedRef.current = false;
-      setConcealed(false);
+      conceal(false);
       enterPhase("done");
     });
-  },[identityAvailable,identityResolved,language,persistent,restorePhase]);
+  },[identityAvailable,identityKnown,identityResolved,language,persistent,restorePhase]);
+
+  // FIX p2 (PT2-B1): while undecided, the gate runs again at the first of: back online, the page visible again,
+  // or the backoff delay (1 s, 2 s, 4 s, 8 s, then every 15 s). The identity is read again with it.
+  useEffect(() => {
+    if (restorePhase !== "undecided") return;
+    return scheduleRecheck(() => {
+      recheckAttemptRef.current += 1;
+      enterPhase("pending");
+      setIdentityResolved(false);
+      setIdentityEpoch((epoch) => epoch + 1);
+    },recheckAttemptRef.current);
+  },[restorePhase]);
+
+  // PT2-N4: a kept conversation comes back at the reading position it had at the sleep.
+  useLayoutEffect(() => {
+    if (concealed || pendingScrollRef.current === null) return;
+    const top = pendingScrollRef.current;
+    pendingScrollRef.current = null;
+    if (conversationPaneRef.current !== null) conversationPaneRef.current.scrollTop = top;
+  },[concealed]);
 
   // DL3-F3: the transcript is written against the identity that produced it, and
   // never while the gate is pending, settling or the page is parked (B1), while
@@ -567,13 +649,24 @@ export function Assistant({
       if (reason === "sleep") {
         if (!parkedRef.current) {
           // The first sleep event holds the conversation; the harness sends a second one (pagehide, then freeze).
-          heldRef.current = Object.freeze({ restored: restorePhaseRef.current === "done" });
-          draftRef.current = inputRef.current?.value ?? "";
+          if (heldRef.current === null) {
+            const atSleep = latestRef.current;
+            heldRef.current = Object.freeze({
+              restored: restorePhaseRef.current === "done",
+              identityBound: atSleep.identityKnown ? atSleep.identityAvailable : null,
+              serverTime: atSleep.serverTime
+            });
+            draftRef.current = inputRef.current?.value ?? "";
+            scrollAtSleepRef.current = conversationPaneRef.current?.scrollTop ?? null;
+          } else if (draftRef.current === "") {
+            // Still undecided from an earlier wake: what was held stays held; text typed since is kept too.
+            draftRef.current = inputRef.current?.value ?? "";
+          }
         }
         parkedRef.current = true;
         flushSync(() => {
           if (inputRef.current !== null) inputRef.current.value = "";
-          setConcealed(true);
+          conceal(true);
           enterPhase("asleep");
         });
         return;
@@ -589,11 +682,9 @@ export function Assistant({
       // test can fail without this line; it drops such a gate if the ref is ever bypassed.
       gateRef.current += 1;
       if (!persistent) {
-        // Nothing is stored for a transport-injected panel, so there is no gate to wait for.
-        heldRef.current = null;
-        restoreDraft();
+        // A transport-injected panel has no gate to judge what it holds, so it errs toward erasing (D-S04-20).
+        discardConversation();
         writeBlockedRef.current = false;
-        setConcealed(false);
         return;
       }
       enterPhase("pending");
@@ -633,7 +724,7 @@ export function Assistant({
   },[fullPage,persistent]);
 
   function primeComposer(prompt: string): void {
-    if (inputRef.current === null) return;
+    if (inputRef.current === null || concealedRef.current) return;
     inputRef.current.value = prompt;
     inputRef.current.focus();
   }
@@ -649,26 +740,35 @@ export function Assistant({
   }
 
   function beginNewConversation(): void {
+    if (concealedRef.current) return;
     clearConversationState();
     if (persistent) clearStoredSupportConversation(browserSupportConversationStorage());
   }
 
   /**
    * A session change, or a wake whose gate erased: the old conversation goes whole — messages, support session,
-   * case code and link, draft, topic — and a request in flight drops its result (S3.4, R03).
+   * case code and link, draft, topic — and a request in flight drops its result (S3.4, R03). At a wake the
+   * composer holds only what was typed after the wake (the sleep emptied it), so `keepTyped` keeps that text.
    */
-  function discardConversation(): void {
+  function discardConversation(keepTyped = false): void {
+    const typed = keepTyped ? inputRef.current?.value ?? "" : "";
     generationRef.current += 1;
     heldRef.current = null;
     draftRef.current = "";
+    scrollAtSleepRef.current = null;
+    pendingScrollRef.current = null;
     clearConversationState();
+    if (typed !== "" && inputRef.current !== null) inputRef.current.value = typed;
     setServerTime(undefined);
     setBusy(false);
-    setConcealed(false);
+    conceal(false);
   }
 
+  /** On a keep, the draft held at the sleep comes back — unless something was typed since the wake (CT2-B1). */
   function restoreDraft(): void {
-    if (inputRef.current !== null && draftRef.current !== "") inputRef.current.value = draftRef.current;
+    if (inputRef.current !== null && draftRef.current !== "" && inputRef.current.value === "") {
+      inputRef.current.value = draftRef.current;
+    }
     draftRef.current = "";
   }
 
@@ -788,7 +888,7 @@ export function Assistant({
 
   async function sendRequest(rawRequest: string,clearComposer?: () => void): Promise<void> {
     const request = redactSupportText(rawRequest.trim()).text;
-    if (request.length === 0 || busy) return;
+    if (request.length === 0 || busy || concealedRef.current) return;
     const generation = generationRef.current;
     setBusy(true);
     clearComposer?.();
@@ -815,7 +915,7 @@ export function Assistant({
   }
 
   async function escalate(): Promise<void> {
-    if (busy) return;
+    if (busy || concealedRef.current) return;
     const generation = generationRef.current;
     setBusy(true);
     try {
@@ -836,13 +936,16 @@ export function Assistant({
     }
   }
 
+  // CT2-B1: while concealed every control that acts on the conversation is busy (send, suggestions, escalate,
+  // topics, shortcuts, "New conversation"); text typed in the composer stays where it is.
+  const inert = busy || concealed;
   // PT-B1: while parked, and until the wake's gate decides, nothing of the conversation is on screen.
   const shownMessages = concealed ? NO_MESSAGES : messages;
   const last = shownMessages.at(-1);
   const canRate = last?.outcome === "ANSWER_GROUNDED" || last?.outcome === "NO_SOURCE";
 
   async function rateLast(messageId: string,rating: "yes" | "no"): Promise<void> {
-    if (session === null) return;
+    if (session === null || concealedRef.current) return;
     const generation = generationRef.current;
     try {
       const acknowledgement = await client.rate(session,messageId,rating);
@@ -923,9 +1026,9 @@ export function Assistant({
       placeholder={t(chromeCatalog,"support.placeholder")}
     />
     {fullPage ? <div className="supportComposerBar">
-      <button className="supportSend" type="submit" disabled={busy}>{t(chromeCatalog,"support.send")}</button>
+      <button className="supportSend" type="submit" disabled={inert}>{t(chromeCatalog,"support.send")}</button>
     </div> : <div className="supportComposerBar supportComposerBar--compact">
-      <button className="supportSend" type="submit" disabled={busy}>{t(chromeCatalog,"support.send")}</button>
+      <button className="supportSend" type="submit" disabled={inert}>{t(chromeCatalog,"support.send")}</button>
     </div>}
   </form>;
 
@@ -945,7 +1048,7 @@ export function Assistant({
       <button
         type="button"
         className="supportEscalateCompact"
-        disabled={busy}
+        disabled={inert}
         onClick={() => void escalate()}
       >{PERSON_MARK}<span>{t(chromeCatalog,"support.talkToHuman")}</span></button>
       {composer}
@@ -985,6 +1088,7 @@ export function Assistant({
             type="button"
             key={topic.key}
             className="supportTopic"
+            disabled={concealed}
             data-active={activeTopic === topic.key}
             aria-pressed={activeTopic === topic.key}
             onClick={() => {
@@ -1027,7 +1131,7 @@ export function Assistant({
             <p><strong>{t(chromeCatalog,"support.aiLead")}</strong>{" "}
               {t(chromeCatalog,"support.agentLead")}</p>
           </div>
-          <button className="supportNewConversation" type="button" onClick={beginNewConversation}>
+          <button className="supportNewConversation" type="button" disabled={concealed} onClick={beginNewConversation}>
             {t(chromeCatalog,"support.newConversation")}
           </button>
         </header>
@@ -1048,7 +1152,7 @@ export function Assistant({
           {ratingControls}
           <div className="supportSuggestions" aria-label={t(chromeCatalog,"support.suggestions")}>
             {HELP_SUGGESTIONS.map((suggestionKey) => <button
-              type="button" key={suggestionKey} disabled={busy}
+              type="button" key={suggestionKey} disabled={inert}
               onClick={() => void sendRequest(t(chromeCatalog,suggestionKey))}
             >{t(chromeCatalog,suggestionKey)}</button>)}
           </div>
@@ -1073,7 +1177,7 @@ export function Assistant({
           <span className="supportEscalationTab" aria-hidden />
           <h2>{t(chromeCatalog,"support.needPerson")}</h2>
           <p>{t(chromeCatalog,"support.escalateBody")}</p>
-          <button type="button" disabled={busy} onClick={() => void escalate()}>
+          <button type="button" disabled={inert} onClick={() => void escalate()}>
             {t(chromeCatalog,"support.escalate")}
           </button>
           <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
@@ -1089,7 +1193,7 @@ export function Assistant({
               {t(chromeCatalog,"support.cookiePreferences")} <span>↗</span>
             </button></li>
             <li><a href="#service-status">{t(chromeCatalog,"support.modelFleetStatus")} <span>↗</span></a></li>
-            <li><button type="button" onClick={() => primeComposer(t(chromeCatalog,"support.suggestion.bug"))}>
+            <li><button type="button" disabled={concealed} onClick={() => primeComposer(t(chromeCatalog,"support.suggestion.bug"))}>
               {t(chromeCatalog,"support.reportBug")} <span>→</span>
             </button></li>
           </ul>

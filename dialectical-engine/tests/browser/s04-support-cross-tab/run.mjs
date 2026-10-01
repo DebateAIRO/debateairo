@@ -26,7 +26,10 @@
 //   asleep     sleep family: identity requests (`/api/v1/session`) STARTED in [synthetic pagehide, first wake event),
 //              wake excluded (B2-p2). Only the identity request begins a gate, so an in-flight settle's second request
 //              (`/api/v1/auth/sessions`) in that window is printed but is not a failure (N4-p3, packet charge 3).
-//   keep       the marker is rendered in tab A and the key still holds it.
+//   keep       the marker is rendered in tab A and the key still holds it. The sleep keep case (R02-keep-sleep-0) also
+//              holds the rest of the conversation across the sleep (FIX p2, PT2-N5; SPEC-v2 Terms, R04): the case
+//              link opened before the sleep is shown, the unsent draft is back in the composer, and the next message
+//              goes to the support session opened before the sleep.
 //   R01 timing from tab B's session request completing until `absent` holds; FAIL above 2000 ms.
 //   DATE-HEADER precondition: the first `/api/v1/support/sessions` response carries a parseable `date`.
 import { spawn, spawnSync } from "node:child_process";
@@ -529,8 +532,40 @@ async function runR02(c, fam, how) {
   return v.fail ? { fail: `${v.fail}${extra}` } : { ms: Date.now() - t0, extra };
 }
 
+/** PT2-N5: before a no-change sleep — a case opened (its code lives in memory only) and an unsent draft. */
+async function keepExtrasBefore(c) {
+  c.step = "tab A open a case and leave a draft";
+  const caseToken = ("K" + randomBytes(4).toString("hex") + "a".repeat(43)).slice(0, 43);
+  await c.a.route("**/api/v1/support/sessions/*/escalate", (route) => route.fulfill({
+    status: 200, contentType: "application/json", headers: { date: new Date().toUTCString() },
+    body: JSON.stringify({ case_token: caseToken, text: "Case opened words" })
+  }));
+  await c.a.locator(".supportEscalation button").click();
+  await c.a.locator('a[href*="#case="]').first().waitFor({ state: "visible", timeout: 10000 });
+  const draft = `unsent draft ${c.tag}`;
+  await c.a.locator("#support-message").fill(draft);
+  const st = await fakeState();
+  const sessionId = st.messageRequests.filter((r) => r.status === 200).at(-1)?.sessionId ?? null;
+  return { draft, sessionId };
+}
+/** PT2-N5: after the keep — the case link, the draft and the support session are the ones from before the sleep. */
+async function keepExtrasAfter(c, before) {
+  const reasons = [];
+  const caseLink = await c.a.locator('a[href*="#case="]').count();
+  if (caseLink === 0) reasons.push("keep: the case link opened before the sleep is gone");
+  const draft = await c.a.locator("#support-message").inputValue();
+  if (draft !== before.draft) reasons.push(`keep: the draft is "${draft}", expected "${before.draft}"`);
+  const next = `after the keep ${c.tag}`;
+  await sendA(c, next);
+  const st = await fakeState();
+  const used = st.messageRequests.filter((r) => (r.text ?? "") === next).at(-1)?.sessionId ?? null;
+  if (before.sessionId === null || used !== before.sessionId) reasons.push(`keep: the next message used support session ${used}, expected ${before.sessionId}`);
+  return reasons;
+}
+
 async function runSleep(c, fam) {
   await r02Setup(c, fam);
+  const keepBefore = fam === "keep" ? await keepExtrasBefore(c) : null;
   if (INJECT === "gate-at-sleep" || INJECT === "second-at-sleep") {
     await c.a.evaluate((p) => addEventListener("pagehide", () => { void fetch(p, { cache: "no-store" }); }), INJECT === "gate-at-sleep" ? "/api/v1/session" : "/api/v1/auth/sessions");
   }
@@ -553,6 +588,7 @@ async function runSleep(c, fam) {
   const reasons = [];
   if (gates.length) reasons.push(`asleep: ${gates.length} identity request(s) started between the sleep and the first wake`);
   if (v.fail) reasons.push(v.fail);
+  else if (keepBefore !== null) reasons.push(...await keepExtrasAfter(c, keepBefore));
   return reasons.length ? { fail: `${reasons.join("; ")};${info}` } : { ms: Date.now() - t0, extra: info };
 }
 
