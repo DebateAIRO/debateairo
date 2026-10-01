@@ -168,10 +168,16 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
 export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
 
 /**
- * Paid plans (spec 2026-09-29 §2.3.4): the gauges the SERVER applied to an ask,
- * present only when billing decided them (hosted, billing on). A Free person's
- * controls stay disabled in the UI, and this says what actually ran. It never
- * names a cheaper roster: a swap for cost is the owner's record only.
+ * Paid plans (spec 2026-09-29 §2.3.4): the gauges the SERVER decided for an
+ * ask from the person's plan, present only when billing decided them (hosted,
+ * billing on): the plan's tier, and the risk tier, composition and depth the
+ * run is asked with (for Free, its sealed fixed gauges, which is why a Free
+ * person's controls stay disabled in the UI). It reports the PLAN's tier, not
+ * the roster that runs: when the interim coarse fit moves a paid question that
+ * STARTs to the Free roster (spec §2.6 item 7, A5), `plan_tier` still says
+ * "premium" while the Free roster's models argue. That move is recorded for the
+ * owner only (`core.run_cost_substitution`); whether a paying person is told is
+ * an owner decision (final review Part 1b, Owner item 4).
  */
 export const AskAppliedSchema = z.object({
   plan_tier: PlanTierSchema,
