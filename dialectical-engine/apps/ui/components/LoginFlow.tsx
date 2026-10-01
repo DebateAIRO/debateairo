@@ -8,6 +8,7 @@ import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmat
 import { contractClient } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 import { clearStoredSupportConversation } from "@/components/support/conversation";
+import { announceSessionChange } from "@/components/support/sessionChange";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { safeReturnPath } from "@/lib/returnPath";
 import authEnglish from "@/messages/en/auth.json";
@@ -102,6 +103,9 @@ export function LoginFlow({
       // A new sign-in in this tab: the previous person's help-chat transcript goes now. Its stored value carries no
       // person id, so this is the moment the tab can tell a person changed (REV-S01 p1 SD-B1; /cookies row 8).
       clearStoredSupportConversation();
+      // ...and every other tab of this browser drops its copy too (S04-R01). A failure below announces nothing: it is
+      // not a completed sign-in (D-S04-18).
+      announceSessionChange();
       setChallengeToken(null);
       if (result.replacement_recovery_code !== undefined) {
         setRecoveryAcknowledgementPending(true);
