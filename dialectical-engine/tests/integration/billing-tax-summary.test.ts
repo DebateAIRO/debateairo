@@ -149,6 +149,26 @@ describe("P16b the summary reads our own rows", () => {
       expect.objectContaining({ chargeId: ownTransaction.initialChargeId, amountMicros: 3_000_000, amountKnown: true })
     ]));
     expect(refunds).toHaveLength(2);
+    // The check-by-hand list names exactly the refund whose amount is unknown: the one on its own transaction gets its
+    // credit-note job automatically (P9c, D5 5g) and is listed only if that job dies.
+    const handChecks = async () => (await billing.invoiceUnknownItems())
+      .filter((item) => item.chargeId === onPayment.initialChargeId || item.chargeId === ownTransaction.initialChargeId);
+    expect(await handChecks()).toEqual([
+      expect.objectContaining({ chargeId: onPayment.initialChargeId, jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })
+    ]);
+    const stornoRef = `${ownTransaction.initialChargeId}:${ownTransaction.initialTransactionId}`;
+    await billing.withTransaction((client) => billing.enqueue(client, {
+      kind: "SMARTBILL_STORNO", ref: stornoRef, notBefore: new Date(0), payload: {
+        charge_id: ownTransaction.initialChargeId, transaction_id: ownTransaction.initialTransactionId, refund_micros: 3_000_000
+      }
+    }));
+    const [storno] = (await billing.claim(["SMARTBILL_STORNO"], 50, "p16b-test", new Date()))
+      .filter((claimed) => claimed.ref === stornoRef);
+    expect(await billing.fail(storno!.jobId, "CREDIT_NOTE_MANUAL", null, new Date())).toBe(true);
+    const listed = (await handChecks()).filter((item) => item.chargeId === ownTransaction.initialChargeId);
+    expect(listed).toEqual([
+      expect.objectContaining({ chargeId: ownTransaction.initialChargeId, jobKind: "SMARTBILL_STORNO", code: "CREDIT_NOTE_MANUAL" })
+    ]);
   });
 
   it("lists a subscription whose history does not fold, and a renewal closed with its outcome unknown", async () => {

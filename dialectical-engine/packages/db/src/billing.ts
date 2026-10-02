@@ -1082,9 +1082,12 @@ export class BillingRepository {
    * P16b (A17b, D5 5j, P9c): the documents to check by hand, while no invoice row of that kind exists for the charge —
    * invoice jobs P10 gave up on (INVOICE_UNKNOWN: the issuer's answer never came and no lookup could settle it;
    * CREDIT_NOTE_MANUAL: a partial credit note the issuer cannot make; and for SmartBill, the Romanian legal document,
-   * INVOICE_SERVICE_REFUSED / INVOICE_SERVICE_UNAVAILABLE: never issued), and every refund made in the xMoney
-   * dashboard (P9c's PROVIDER_REFUND REFUNDED, job kind DASHBOARD_REFUND) whose charge has no credit note: its amount
-   * is unknown, so P9c issues none automatically.
+   * INVOICE_SERVICE_REFUSED / INVOICE_SERVICE_UNAVAILABLE: never issued), and every dashboard refund P9c recorded on
+   * the payment itself (PROVIDER_REFUND REFUNDED with no `refunds_transaction_id`, job kind DASHBOARD_REFUND) whose
+   * charge has no credit note: its amount is unknown (the rows `quarterSummaryRows` marks `amountKnown: false`), so
+   * P9c issues none automatically. A dashboard refund xMoney reports as its own transaction (D5 5g) names its amount
+   * and gets its credit-note job automatically (none for a second payment, which was never a sale); it reaches this
+   * list only through that job, and only if the job dies with one of the codes above.
    */
   async invoiceUnknownItems(): Promise<Array<{
     chargeId: string; jobKind: string;
@@ -1114,6 +1117,7 @@ export class BillingRepository {
       SELECT refunded.charge_id, 'DASHBOARD_REFUND' AS kind, 'CREDIT_NOTE_MANUAL' AS code, refunded.at AS since
       FROM billing.charge_event AS refunded
       WHERE refunded.kind = 'REFUNDED' AND refunded.error_code = 'PROVIDER_REFUND'
+        AND refunded.refunds_transaction_id IS NULL
         AND NOT EXISTS (
           SELECT 1 FROM billing.invoice AS invoice
           WHERE invoice.charge_id = refunded.charge_id AND invoice.kind = 'CREDIT_NOTE'
