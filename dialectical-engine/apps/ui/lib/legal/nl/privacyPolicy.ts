@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Wij plaatsen twee cookies, die beide strikt noodzakelijk zijn: één waarmee u aangemeld blijft en één waarmee formulieren tegen vervalsing worden beschermd. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het Cookiebeleid op [dezbatere.ro/cookies] vermeldt ze met hun looptijd en legt uit hoe uw keuze wordt opgeslagen. Voordat er een andere cookie wordt toegevoegd, wordt eerst het Cookiebeleid gewijzigd. Wanneer de wet in uw regio sommige cookies anders behandelt — bijvoorbeeld de Britse opt-outregel voor analyse — staat dit in het Cookiebeleid." }
+      { kind: "p", text: "DebateAI gebruikt acht items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door DebateAI worden geplaatst: vier cookies en vier vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het Cookiebeleid op [dezbatere.ro/cookies] vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Cookiebestand (HttpOnly) — Houdt u aangemeld. Het cookie wordt verlengd zolang u de dienst gebruikt. — 14 dagen",
+        "__Host-debateai-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — 14 dagen",
+        "__Host-debateai-age-refusal — Cookiebestand (HttpOnly) — Na een geweigerde leeftijdscontrole voorkomt deze dat deze browser het 30 dagen lang opnieuw probeert. Hij bevat alleen het woord ‘geweigerd’, geen persoonsgegevens. — 30 dagen",
+        "debateai.locale — Cookiebestand — Onthoudt de interfacetaal die u hebt gekozen. — 1 jaar",
+        "debateai.consent — Lokale opslag — Onthoudt dat u de cookiemelding hebt gezien, zodat die maar één keer wordt getoond. — Totdat u dit wist",
+        "debateai.mode — Lokale opslag — Of u de lichte of de donkere weergave gebruikt. — Totdat u dit wist",
+        "debateai.languageOffer.dismissed — Sessieopslag — Onthoudt voor dit tabblad dat u het aanbod hebt afgeslagen om een debat in een andere taal te tonen. — Totdat u het tabblad sluit",
+        "debateai.support.conversation.v2 — Sessieopslag — Houdt uw gesprek met de hulpchat op het scherm zolang het tabblad open blijft. Het wordt gewist wanneer iemand zich in dit tabblad aanmeldt of afmeldt. — Totdat u het tabblad sluit"
+        ]
+      },
+      { kind: "p", text: "Geen enkele andere partij verzamelt via DebateAI informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen." },
+      { kind: "p", text: "Browsers kunnen een „Do Not Track”-signaal of een vergelijkbaar signaal verzenden. DebateAI volgt u niet, dus er is niets wat zo'n signaal kan uitschakelen: de dienst werkt hetzelfde met of zonder dat signaal." },
+      { kind: "p", text: "Om deze items te weigeren, blokkeert of verwijdert u cookies en sitegegevens voor deze site in uw browserinstellingen. Wat er dan niet meer werkt: het aanmelden en het onthouden van uw keuzes voor taal en weergave; ook de cookiemelding wordt opnieuw getoond." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "f5be62cb9215636f2294576a29450bfd39847e7d2d8ff89ce9dc28dfe6c8c3ff",
+  sha256: "8cd9e475a81b48d23f7bc40c812f14e59b4baa1b77955c89fdca04d822df58dc",
   eyebrow: "PRIVACYBELEID · v3.0 · VAN KRACHT OP [DATE]",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

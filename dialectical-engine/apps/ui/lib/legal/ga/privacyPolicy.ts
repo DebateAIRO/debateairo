@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Fianáin",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Socraímid dhá fhianán, agus tá géarghá leis an dá cheann: coinníonn ceann amháin sínithe isteach thú, agus cosnaíonn an ceann eile foirmeacha ar bhrionnú. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad agus a dtréimhsí sa Bheartas Fianán ag [dezbatere.ro/cookies], mínítear ann conas a stóráiltear do rogha, agus athrófar é sula gcuirfear aon fhianán eile leis. Sa chás ina ndéileálann dlí do réigiúin ar bhealach eile le roinnt fianán — mar shampla, riail na Ríochta Aontaithe maidir le rogha an diúltaithe i gcás anailísíochta — deir an Beartas Fianán amhlaidh." }
+      { kind: "p", text: "Úsáideann DebateAI ocht mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach DebateAI iad: ceithre fhianán agus ceithre iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa Bheartas Fianán ag [dezbatere.ro/cookies], mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Fianán (HttpOnly) — Coinníonn sé sínithe isteach thú. Athnuaitear é fad is a bhíonn tú ag úsáid na seirbhíse. — 14 lá",
+        "__Host-debateai-csrf — Fianán — Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. — 14 lá",
+        "__Host-debateai-age-refusal — Fianán (HttpOnly) — Tar éis seiceáil aoise a dhiúltú, cuireann sé cosc ar an mbrabhsálaí seo triail eile a bhaint as ar feadh 30 lá. Níl ann ach an focal “diúltaithe”, gan aon sonraí pearsanta. — 30 lá",
+        "debateai.locale — Fianán — Meabhraíonn sé teanga an chomhéadain a roghnaigh tú. — 1 bhliain",
+        "debateai.consent — Stóras áitiúil — Cuimhníonn sé go bhfaca tú an fógra fianán, ionas nach dtaispeántar é ach uair amháin. — Go dtí go nglanann tú é",
+        "debateai.mode — Stóras áitiúil — Cé acu an mód geal nó an mód dorcha a úsáideann tú. — Go dtí go nglanann tú é",
+        "debateai.languageOffer.dismissed — Stóras seisiúin — Cuimhníonn sé, don chluaisín seo, gur dhiúltaigh tú don tairiscint díospóireacht a thaispeáint i dteanga eile. — Go dtí go ndúnann tú an cluaisín",
+        "debateai.support.conversation.v2 — Stóras seisiúin — Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a shíníonn duine ar bith isteach nó amach sa chluaisín seo. — Go dtí go ndúnann tú an cluaisín"
+        ]
+      },
+      { kind: "p", text: "Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí DebateAI." },
+      { kind: "p", text: "Is féidir le brabhsálaithe comhartha “Do Not Track” nó comhartha cosúil leis a sheoladh. Ní rianaíonn DebateAI thú, mar sin níl aon rud ann le múchadh ag comhartha den sórt sin: oibríonn an tseirbhís ar an mbealach céanna leis nó gan é." },
+      { kind: "p", text: "Chun na míreanna seo a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh an tsuímh seo, nó scrios iad, i socruithe do bhrabhsálaí. Cad a stopann ag obair ansin: síniú isteach, agus cuimhneamh ar do roghanna teanga agus taispeána; taispeánfar an fógra fianán arís freisin." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "9a68b2ee176328e4739e7868c57903b7e161f10b88f80de0a836f42cb25f55d2",
+  sha256: "87d6dd529d72f7e23caaa4ea27d436741ba81c395c9409f00a956536549e09f7",
   eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.0 · I bhFEIDHM [DATE]",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",

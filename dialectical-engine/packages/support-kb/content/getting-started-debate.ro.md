@@ -15,4 +15,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Autentifică-te și deschide `/new` pentru formularul complet al dezbaterii. Introdu o întrebare sau o afirmație cu mai mult de șase caractere. Planul Free păstrează valori fixe pentru controalele vizibile de risc, buget, adâncime și îndrumare. Planul Premium îți permite să modifici controalele curente de risc, buget, adâncime și îndrumare înainte să selectezi **Start run**. Compozitorul din pagina principală poate transfera subiectul la `/new` când pornirea directă nu este disponibilă; Asistența nu pornește dezbaterea în locul tău.
+Autentifică-te și deschide `/new` pentru formularul complet al dezbaterii. Introdu o întrebare sau o afirmație cu mai mult de șase caractere. Planul Gratuit păstrează valori fixe pentru controalele vizibile de risc, buget, adâncime și îndrumare. Planul Premium îți permite să modifici controalele curente de risc, buget, adâncime și îndrumare înainte să selectezi **Începeți rularea**. Compozitorul din pagina principală poate transfera subiectul la `/new` când pornirea directă nu este disponibilă; Asistența nu pornește dezbaterea în locul tău.

@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Instalamos dois cookies, ambos estritamente necessários: um mantém a sua sessão iniciada e outro protege os formulários contra falsificação. Não instalamos cookies de análise, publicidade ou rastreio. A Política de Cookies em [dezbatere.ro/cookies] enumera-os com as respetivas durações, explica como a sua escolha é armazenada e será alterada antes de ser adicionado qualquer outro cookie. Quando a lei da sua região trata alguns cookies de forma diferente — por exemplo, a regra de recusa do Reino Unido para dados analíticos — a Política de Cookies explica-o." }
+      { kind: "p", text: "O DebateAI utiliza oito elementos, todos estritamente necessários para o serviço que pediu e todos definidos apenas pelo DebateAI: quatro cookies e quatro entradas no armazenamento do seu navegador. Não instalamos cookies de análise, publicidade ou rastreio. A Política de Cookies em [dezbatere.ro/cookies] enumera-os, indicando o que cada um faz e quem o recebe, e será alterada antes de ser adicionada qualquer outra coisa." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Ficheiro cookie (HttpOnly) — Mantém a sua sessão iniciada. É renovado enquanto utiliza o serviço. — 14 dias",
+        "__Host-debateai-csrf — Ficheiro cookie — Impede que outros sítios Web submetam formulários em seu nome. — 14 dias",
+        "__Host-debateai-age-refusal — Ficheiro cookie (HttpOnly) — Depois de uma verificação de idade recusada, impede este navegador de tentar novamente durante 30 dias. Contém apenas a palavra «recusado», nenhum dado pessoal. — 30 dias",
+        "debateai.locale — Ficheiro cookie — Memoriza o idioma da interface que escolheu. — 1 ano",
+        "debateai.consent — Armazenamento local — Lembra-se de que já viu o aviso de cookies, para que seja mostrado apenas uma vez. — Até o apagar",
+        "debateai.mode — Armazenamento local — Se utiliza o modo de apresentação claro ou escuro. — Até o apagar",
+        "debateai.languageOffer.dismissed — Armazenamento de sessão — Lembra-se, para este separador, de que recusou a proposta de mostrar um debate noutra língua. — Até fechar o separador",
+        "debateai.support.conversation.v2 — Armazenamento de sessão — Mantém a sua conversa com o chat de ajuda no ecrã enquanto o separador estiver aberto. É apagada quando alguém inicia ou termina sessão neste separador. — Até fechar o separador"
+        ]
+      },
+      { kind: "p", text: "Nenhuma outra parte recolhe, através do DebateAI, informações sobre as suas atividades online ao longo do tempo e em diferentes sítios web." },
+      { kind: "p", text: "Os navegadores podem enviar um sinal «Do Not Track» ou um sinal semelhante. O DebateAI não o rastreia, pelo que não há nada que esse sinal possa desativar: o serviço funciona da mesma forma com ou sem ele." },
+      { kind: "p", text: "Para recusar estes elementos, bloqueie ou elimine os cookies e os dados do site para este site nas definições do seu navegador. O que deixa então de funcionar: o início de sessão e a memorização das suas escolhas de idioma e de apresentação; o aviso de cookies também voltará a ser apresentado." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "fd45b54b4a176ef952fec6427a1bbac421ceebdc5dcafe9a2d7bc34588bc634a",
+  sha256: "fcb21ba352fdcdc4d78f32243fef71bbc63ceefa56d9059673b25bc6555b3eae",
   eyebrow: "POLÍTICA DE PRIVACIDADE · v3.0 · EM VIGOR DESDE [DATE]",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",

@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Çerezler",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Her ikisi de kesinlikle gerekli olan iki çerez yerleştiririz: biri oturumunuzu açık tutar, diğeri formları sahteciliğe karşı korur. Analitik, reklam veya izleme çerezi yerleştirmeyiz. [dezbatere.ro/cookies] adresindeki Çerez Politikası bunları süreleriyle birlikte listeler, seçiminizin nasıl saklandığını açıklar ve başka bir çerez eklenmeden önce değiştirilecektir. Bölgenizdeki hukuk bazı çerezleri farklı ele alıyorsa — örneğin Birleşik Krallık'ın analitik için vazgeçme kuralı — Çerez Politikası bunu açıklar." }
+      { kind: "p", text: "DebateAI, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca DebateAI tarafından yerleştirilen sekiz öğe kullanır: dört çerez ve tarayıcınızın depolama alanında dört kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. [dezbatere.ro/cookies] adresindeki Çerez Politikası bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Çerez (HttpOnly) — Oturumunuzun açık kalmasını sağlar. Hizmeti kullandığınız sürece yenilenir. — 14 gün",
+        "__Host-debateai-csrf — Çerez — Başka web sitelerinin sizin adınıza form göndermesini engeller. — 14 gün",
+        "__Host-debateai-age-refusal — Çerez (HttpOnly) — Bir yaş kontrolü reddedildikten sonra bu tarayıcının 30 gün boyunca yeniden denemesini engeller. Yalnızca “reddedildi” sözcüğünü içerir, kişisel veri içermez. — 30 gün",
+        "debateai.locale — Çerez — Seçtiğiniz arayüz dilini hatırlar. — 1 yıl",
+        "debateai.consent — Yerel depolama — Çerez bildirimini gördüğünüzü hatırlar, böylece bildirim yalnızca bir kez gösterilir. — Siz temizleyene kadar",
+        "debateai.mode — Yerel depolama — Açık ve koyu görünümden hangisini kullandığınız. — Siz temizleyene kadar",
+        "debateai.languageOffer.dismissed — Oturum depolaması — Bu sekme için bir tartışmayı başka bir dilde gösterme önerisini reddettiğinizi hatırlar. — Sekmeyi kapatana kadar",
+        "debateai.support.conversation.v2 — Oturum depolaması — Sekme açık kaldığı sürece yardım sohbetindeki konuşmanızı ekranda tutar. Bu sekmede biri oturum açtığında veya kapattığında silinir. — Sekmeyi kapatana kadar"
+        ]
+      },
+      { kind: "p", text: "Başka hiçbir taraf, DebateAI aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz." },
+      { kind: "p", text: "Tarayıcılar “Do Not Track” sinyali veya benzeri bir sinyal gönderebilir. DebateAI sizi izlemez, bu nedenle böyle bir sinyalin kapatacağı hiçbir şey yoktur: hizmet, sinyal olsa da olmasa da aynı şekilde çalışır." },
+      { kind: "p", text: "Bu öğeleri reddetmek için tarayıcı ayarlarınızda bu sitenin çerezlerini ve site verilerini engelleyin veya silin. Bu durumda çalışmayı durduran şeyler: oturum açma ile dil ve görünüm seçimlerinizin hatırlanması; çerez bildirimi de yeniden gösterilir." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "66f4061ded6718d32be4a2375ef81b8e2742d799b4c17cccb5612b223da46eca",
+  sha256: "3cef4285f044b6f376e8c7f4c1671ccbd387c0bd87f7d08b8600c3cfbf03288e",
   eyebrow: "GİZLİLİK POLİTİKASI · v3.0 · YÜRÜRLÜK TARİHİ [DATE]",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",

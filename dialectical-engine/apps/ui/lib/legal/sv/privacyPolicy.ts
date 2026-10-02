@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Vi placerar två cookies som båda är strikt nödvändiga: en som håller dig inloggad och en som skyddar formulär mot förfalskning. Vi placerar inga cookies för analys, reklam eller spårning. Cookiepolicyn på [dezbatere.ro/cookies] listar dem och deras varaktighet, förklarar hur ditt val lagras och kommer att ändras innan någon annan cookie läggs till. Om lagen i din region behandlar vissa cookies annorlunda — exempelvis Storbritanniens regel om att analys kräver möjlighet till avanmälan — anges detta i cookiepolicyn." }
+      { kind: "p", text: "DebateAI använder åtta objekt, som alla är strikt nödvändiga för den tjänst du har bett om och som alla placeras endast av DebateAI: fyra cookies och fyra poster i din webbläsares lagring. Vi placerar inga cookies för analys, reklam eller spårning. Cookiepolicyn på [dezbatere.ro/cookies] listar dem med vad vart och ett gör och vem som tar emot det, och kommer att ändras innan något annat läggs till." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Kaka (HttpOnly) — Håller dig inloggad. Den förnyas medan du använder tjänsten. — 14 dagar",
+        "__Host-debateai-csrf — Kaka — Hindrar andra webbplatser från att skicka formulär i ditt namn. — 14 dagar",
+        "__Host-debateai-age-refusal — Kaka (HttpOnly) — Efter en nekad ålderskontroll hindrar den den här webbläsaren från att försöka igen i 30 dagar. Den innehåller bara ordet ”nekad”, inga personuppgifter. — 30 dagar",
+        "debateai.locale — Kaka — Kommer ihåg vilket gränssnittsspråk du har valt. — 1 år",
+        "debateai.consent — Lokal lagring — Kommer ihåg att du har sett meddelandet om kakor, så att det bara visas en gång. — Tills du rensar det",
+        "debateai.mode — Lokal lagring — Om du använder ljust eller mörkt läge. — Tills du rensar det",
+        "debateai.languageOffer.dismissed — Sessionslagring — Kommer ihåg, för den här fliken, att du tackade nej till att visa en debatt på ett annat språk. — Tills du stänger fliken",
+        "debateai.support.conversation.v2 — Sessionslagring — Håller ditt samtal med hjälpchatten på skärmen så länge fliken är öppen. Det raderas när någon loggar in eller ut i den här fliken. — Tills du stänger fliken"
+        ]
+      },
+      { kind: "p", text: "Ingen annan part samlar via DebateAI in information om dina aktiviteter på nätet över tid och på olika webbplatser." },
+      { kind: "p", text: "Webbläsare kan skicka en ”Do Not Track”-signal eller en liknande signal. DebateAI spårar dig inte, så det finns inget för en sådan signal att stänga av: tjänsten fungerar likadant med eller utan den." },
+      { kind: "p", text: "För att vägra dessa objekt blockerar eller raderar du cookies och webbplatsdata för den här webbplatsen i webbläsarens inställningar. Det som då slutar fungera: inloggningen och att komma ihåg dina val av språk och visningsläge; cookiemeddelandet visas också igen." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "6a212699d9543ff9a7d67495cfa3d7dbdb2e83b3d9005a4fabc955745ca8529a",
+  sha256: "14c8bf6f09ed8c67b0ed966a0d60cb0ee8a44a5b3963f58378454e8cbd4c2e61",
   eyebrow: "INTEGRITETSPOLICY · v3.0 · GÄLLER FRÅN [DATE]",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",
