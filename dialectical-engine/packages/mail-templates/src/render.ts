@@ -107,6 +107,23 @@ function invalid(name: string): MailTemplateError {
   return new MailTemplateError("MAIL_TEMPLATE_PARAM_INVALID", name);
 }
 
+/**
+ * The one url rule of the emails: an https link with no user or password, in its canonical form (`URL#toString`), at
+ * most 2,048 characters. Returns that canonical form, or null when the value is not such a link. A url param renders
+ * only when it already equals its canonical form, so a caller holding a foreign link passes it through this first.
+ */
+export function mailLinkOf(value: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.username !== "" || url.password !== "") return null;
+  const canonical = url.toString();
+  return canonical.length <= 2_048 ? canonical : null;
+}
+
 /** The shown segment of a param, or null for a flag (checked, never printed). */
 function formatParam(kind: MailParamKind, name: string, value: string, locale: MailLocale, catalogue: Catalogue): Segment | null {
   switch (kind) {
@@ -123,17 +140,10 @@ function formatParam(kind: MailParamKind, name: string, value: string, locale: M
       if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(value) || !Number.isFinite(at.getTime())) throw invalid(name);
       return { kind: "text", value: new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(at) };
     }
-    case "url": {
-      let url: URL;
-      try {
-        url = new URL(value);
-      } catch {
-        throw invalid(name);
-      }
-      if (url.protocol !== "https:" || url.username !== "" || url.password !== ""
-        || value.length > 2_048 || /\s/.test(value) || url.toString() !== value) throw invalid(name);
+    case "url":
+      // A canonical serialisation holds no whitespace, so this is the rule's whole check.
+      if (mailLinkOf(value) !== value) throw invalid(name);
       return { kind: "link", value };
-    }
     case "count":
       if (!/^\d{1,4}$/.test(value)) throw invalid(name);
       return { kind: "text", value: new Intl.NumberFormat(locale).format(Number(value)) };

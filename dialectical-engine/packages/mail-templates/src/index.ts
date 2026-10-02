@@ -20,6 +20,7 @@ export {
   companyFacts,
   companyFactsOf,
   loadMailCatalogues,
+  mailLinkOf,
   mailMessagesDirectory,
   renderMail,
   renderWithdrawalForm,

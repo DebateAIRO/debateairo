@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { microsToDecimal, type TaxEngine } from "@debateai/billing-core";
 import type { InvoiceRow } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
+import { mailLinkOf } from "@debateai/mail-templates";
 import type { BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
 import { creditNoteContext, invoicesOfCharge, loadPaidCharge, saleRecordOf, type InvoiceJobDeps } from "./invoice-common.js";
@@ -19,6 +20,15 @@ async function quaderno<T>(call: Promise<T>): Promise<T | "REFUSED"> {
     if (error instanceof TypedDomainError && error.code === "TAX_SERVICE_REFUSED") return "REFUSED";
     throw error;
   }
+}
+
+/**
+ * The receipt link M2_INVOICE_LINK carries (spec §2.5.10: a receipt on every successful charge). Quaderno's link is
+ * passed through the mail's url rule; one the rule refuses (not https, a user or password, unparsable, too long) falls
+ * back to the account's settings page, so the email is never refused and dead-lettered over the link.
+ */
+export function quadernoInvoiceLink(documentUrl: string | null, publicAppUrl: string): string {
+  return (documentUrl === null ? null : mailLinkOf(documentUrl)) ?? new URL("/settings", publicAppUrl).toString();
 }
 
 export function createQuadernoSaleHandler(deps: QuadernoDeps): OutboxHandler {
@@ -41,7 +51,7 @@ export function createQuadernoSaleHandler(deps: QuadernoDeps): OutboxHandler {
         template: "M2_INVOICE_LINK", recipient: { kind: "CUSTOMER", customerId: paid.customerId }, dedupeRef: paid.charge.chargeId,
         params: {
           plan: paid.quote.planId, totalAmount: microsToDecimal(paid.charge.totalMicros), chargeDate: paid.paid.at.toISOString(),
-          invoiceUrl: document.url ?? new URL("/settings", deps.publicAppUrl).toString()
+          invoiceUrl: quadernoInvoiceLink(document.url, deps.publicAppUrl)
         },
         notBefore: now
       });
