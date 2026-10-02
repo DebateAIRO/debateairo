@@ -5,7 +5,9 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { XMoneyNotice, XMoneyStatus, XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPlans } from "@debateai/register";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
-import { CheckoutService, type CheckoutDeps, type ConsentKind } from "../../apps/api/src/billing/checkout.js";
+import {
+  CheckoutService, type CheckoutDeps, type ConsentKind, type EmbeddedOrderInput, type SignedEmbeddedOrder
+} from "../../apps/api/src/billing/checkout.js";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { NoticeIntake } from "../../apps/api/src/billing/notice-intake.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
@@ -68,6 +70,10 @@ const wholeSecond = (value: Date): Date => new Date(Math.floor(value.getTime() /
  * one (D5): every refund is its own `transactionType: "refund"` transaction (`complete-ok`, its own amount,
  * `relatedTransactionIds: [payment]`); a PARTIAL refund leaves the payment `complete-ok`, and only the refund that
  * leaves nothing turns it `refund-ok`. `refundRowsHidden` models the other reading X0 may record: no refund row.
+ * A1 (P2-I6): our charge id lives on the ORDER only. Every transaction carries `externalOrderId: null`, as P3b's
+ * protocol fake and the OpenAPI copy have it, so a match goes through `getOrder` exactly as it must against xMoney.
+ * A payment is made by the customer its signed order names (`signed`, which the harness's checkout calls): the
+ * xMoney customer `createCustomer` made for that identifier.
  */
 export class StubXMoney {
   readonly transactions = new Map<string, XMoneyTransaction>();
@@ -92,6 +98,13 @@ export class StubXMoney {
   private readonly refundedMicros = new Map<string, number>();
   /** Reads of one transaction that fail before any byte is sent (P3b's XMONEY_UNAVAILABLE), per transaction id. */
   private readonly lookupFailures = new Map<string, number>();
+  /** xMoney's customer per our identifier (`createCustomer`), and the identifier each signed order names. */
+  private readonly customersByIdentifier = new Map<string, string>();
+  private readonly signedOrders = new Map<string, string>();
+  /** Ids `createCustomer` answers next, reserved by a test that pays before its checkout exists. */
+  private readonly reservedCustomers: string[] = [];
+  /** `getOrder` calls so far (the checkout's look asks once per order). */
+  getOrderCalls = 0;
   private sequence = 1_000;
 
   constructor(private readonly clock: () => Date) {}
@@ -122,7 +135,30 @@ export class StubXMoney {
       transaction.transactionType === "refund" && transaction.relatedTransactionIds.includes(paymentId));
   }
 
-  async createCustomer(): Promise<{ customerId: string }> { this.customers += 1; return { customerId: this.next() }; }
+  async createCustomer(input?: Readonly<{ identifier: string }>): Promise<{ customerId: string }> {
+    this.customers += 1;
+    const customerId = this.reservedCustomers.shift() ?? this.next();
+    if (input !== undefined) this.customersByIdentifier.set(input.identifier, customerId);
+    return { customerId };
+  }
+
+  /** The id the next `createCustomer` answers: a payment made before its checkout's customer exists names it. */
+  reserveCustomer(): string {
+    const customerId = this.next();
+    this.reservedCustomers.push(customerId);
+    return customerId;
+  }
+
+  /** An embedded order was signed for this merchant id and customer identifier (the harness's checkout reports it). */
+  signed(externalOrderId: string, customerIdentifier: string): void {
+    this.signedOrders.set(externalOrderId, customerIdentifier);
+  }
+
+  /** The xMoney customer whose signed order has this merchant id, when the stub created that customer. */
+  private customerOfOrder(externalOrderId: string): string | null {
+    const identifier = this.signedOrders.get(externalOrderId);
+    return identifier === undefined ? null : this.customersByIdentifier.get(identifier) ?? null;
+  }
 
   async getTransaction(transactionId: string): Promise<XMoneyTransaction> {
     const failing = this.lookupFailures.get(transactionId) ?? 0;
@@ -136,6 +172,7 @@ export class StubXMoney {
   }
 
   async getOrder(orderId: string): Promise<{ orderId: string; externalOrderId: string | null }> {
+    this.getOrderCalls += 1;
     const found = this.orders.get(orderId);
     if (found === undefined) throw new TypedDomainError("XMONEY_REFUSED", "unknown order");
     return found;
@@ -152,8 +189,7 @@ export class StubXMoney {
     this.rebillFailures.delete(input.orderId);
     if (failure !== null && !failure.afterCreate) throw new TypedDomainError(failure.code, failure.code);
     const transaction = this.add({
-      orderId: input.orderId, externalOrderId: this.orders.get(input.orderId)?.externalOrderId ?? null,
-      customerId: input.customerId, cardId: this.orderCards.get(input.orderId) ?? null, status: "complete-ok",
+      orderId: input.orderId, externalOrderId: null, customerId: input.customerId, cardId: this.orderCards.get(input.orderId) ?? null, status: "complete-ok",
       amountDecimal: input.amountDecimal, transactionSource: "re-bill"
     });
     if (failure !== null) throw new TypedDomainError(failure.code, failure.code);
@@ -178,7 +214,7 @@ export class StubXMoney {
       this.refundedMicros.set(found.transactionId, before + amount);
       if (!this.refundRowsHidden) {
         this.add({
-          orderId: found.orderId, externalOrderId: found.externalOrderId, customerId: found.customerId, cardId: found.cardId,
+          orderId: found.orderId, externalOrderId: null, customerId: found.customerId, cardId: found.cardId,
           status: "complete-ok", amountDecimal: microsToDecimal(amount), transactionType: "refund", transactionSource: null,
           relatedTransactionIds: Object.freeze([found.transactionId])
         });
@@ -205,7 +241,10 @@ export class StubXMoney {
     });
   }
 
-  /** A person paying in the embedded form for the order whose merchant id is `externalOrderId`. */
+  /**
+   * A person paying in the embedded form for the order whose merchant id is `externalOrderId`. The transaction carries
+   * no merchant id (A1); its customer is `customerId`, else the one the signed order names, else a stranger.
+   */
   pay(input: Readonly<{
     externalOrderId: string; amountDecimal: string; cardCountry: string | null; status?: XMoneyStatus;
     customerId?: string; transactionType?: string;
@@ -219,7 +258,8 @@ export class StubXMoney {
     this.cards.set(cardId, input.cardCountry);
     this.orderCards.set(order.orderId, cardId);
     return this.add({
-      orderId: order.orderId, externalOrderId: input.externalOrderId, customerId: input.customerId ?? "9999",
+      orderId: order.orderId, externalOrderId: null,
+      customerId: input.customerId ?? this.customerOfOrder(input.externalOrderId) ?? "9999",
       cardId, status: input.status ?? "complete-ok", amountDecimal: input.amountDecimal,
       ...(input.transactionType === undefined ? {} : { transactionType: input.transactionType })
     });
@@ -239,6 +279,16 @@ export class StubXMoney {
    */
   failNextRebill(orderId: string, code: string, afterCreate = false): void {
     this.rebillFailures.set(orderId, Object.freeze({ code, afterCreate }));
+  }
+}
+
+/** P8c's checkout, reporting every order it signs to the stub: the order's customer is who pays it (A1). */
+class HarnessCheckout extends CheckoutService {
+  constructor(deps: CheckoutDeps, private readonly stub: StubXMoney) { super(deps); }
+
+  override signEmbeddedOrder(input: EmbeddedOrderInput): SignedEmbeddedOrder {
+    this.stub.signed(input.chargeId, input.customerIdentifier);
+    return super.signEmbeddedOrder(input);
   }
 }
 
@@ -272,8 +322,11 @@ export type BillingHarness = Readonly<{
   verify: VerifyPaymentHandler;
   worker: BillingOutboxWorker;
   notices: NoticeIntake;
-  /** An opaque "opensslResult" that the harness's notice intake decrypts to this transaction's notice. */
-  noticeFor(transaction: XMoneyTransaction): string;
+  /**
+   * An opaque "opensslResult" that the harness's notice intake decrypts to this transaction's notice. Like xMoney's,
+   * the notice names the order's merchant id; `overrides` forge fields (a notice is not authenticated, spec §2.1).
+   */
+  noticeFor(transaction: XMoneyTransaction, overrides?: Partial<XMoneyNotice>): string;
   /** Enqueues VERIFY_PAYMENT for a transaction, as a notice or a rebill would, and drains the worker. */
   settle(transactionId: string, payload?: Readonly<Record<string, string | null>>): Promise<void>;
   activate(input?: Parameters<BillingHarness["buy"]>[0] & Readonly<{ cardCountry?: string }>): Promise<Purchase & Readonly<{ transaction: XMoneyTransaction }>>;
@@ -323,7 +376,8 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     consentDocuments: testConsentDocuments, recordsKey, xmoneyPrivateKey, xmoneyPublicKey: "pk_test_harness",
     siteId: "site-test", publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "stage", audit
   };
-  const checkoutWith = (overrides: Partial<CheckoutDeps>): CheckoutService => new CheckoutService({ ...checkoutDeps, ...overrides } as CheckoutDeps);
+  const checkoutWith = (overrides: Partial<CheckoutDeps>): CheckoutService =>
+    new HarnessCheckout({ ...checkoutDeps, ...overrides } as CheckoutDeps, xmoney);
   const checkout = checkoutWith({});
   const refunds = new RefundDesk({ repository, jobs, xmoney, policy: testBillingPolicy, audit, clock: clock.read });
   const verify = new VerifyPaymentHandler({
@@ -407,12 +461,13 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       if (end === null) throw new Error("HARNESS_NO_PERIOD");
       return end;
     },
-    noticeFor(transaction) {
+    noticeFor(transaction, overrides = {}) {
       const token = `notice-${randomUUID()}`;
       noticeTokens.set(token, Object.freeze({
-        transactionStatus: transaction.status, orderId: transaction.orderId, externalOrderId: transaction.externalOrderId,
+        transactionStatus: transaction.status, orderId: transaction.orderId,
+        externalOrderId: xmoney.orders.get(transaction.orderId)?.externalOrderId ?? null,
         transactionId: transaction.transactionId, customerId: transaction.customerId, amountDecimal: transaction.amountDecimal,
-        currency: transaction.currency, cardId: transaction.cardId, timestamp: null
+        currency: transaction.currency, cardId: transaction.cardId, timestamp: null, ...overrides
       }));
       return token;
     },

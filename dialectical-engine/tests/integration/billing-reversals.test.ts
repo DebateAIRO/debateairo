@@ -170,6 +170,31 @@ describe("P9c reversals of a verified payment", () => {
     expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED", "SUSPENDED"]);
   });
 
+  it("ends MISMATCH for a representment notice that names another charged-back charge (P2-I1)", async () => {
+    const mine = await h.activate();
+    const theirs = await h.activate();
+    for (const paid of [mine, theirs]) {
+      h.xmoney.setStatus(paid.transaction.transactionId, "charge-back");
+      await h.settle(paid.transaction.transactionId);
+    }
+    const representment = h.xmoney.pay({
+      externalOrderId: mine.chargeId, amountDecimal: "24.20", cardCountry: "RO", transactionType: "representment"
+    });
+    const lines = h.auditLines.length;
+    await h.notices.receive(h.noticeFor(representment, { externalOrderId: theirs.chargeId }));
+    await h.worker.drain(10);
+    for (const paid of [mine, theirs]) {
+      expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "CHARGEBACK_REPRESENTED")).toEqual([]);
+    }
+    expect(await noticeOutcomes(representment.transactionId)).toEqual([{ outcome: "MISMATCH" }]);
+    expect(h.auditLines.slice(lines)).toEqual([{ event: "billing.payment.mismatch", code: "ORDER_REF_MISMATCH" }]);
+    // xMoney's own reference (the notice without the forged field) records it on the right charge.
+    await h.notices.receive(h.noticeFor(representment));
+    await h.worker.drain(10);
+    expect((await h.eventKinds(mine.chargeId)).filter((kind) => kind === "CHARGEBACK_REPRESENTED")).toHaveLength(1);
+    expect((await h.eventKinds(theirs.chargeId)).filter((kind) => kind === "CHARGEBACK_REPRESENTED")).toEqual([]);
+  });
+
   it("records a dashboard refund of the first payment in full when the charge also holds a duplicate payment's refund", async () => {
     // The duplicate's refund is only requested yet (its call found xMoney down): it still never counts against A.
     const { paid } = await paidTwice(false);

@@ -33,6 +33,14 @@ type RebillCandidate = Readonly<{ state: "OPEN" | "PAID"; charge: ChargeWithEven
  * already recorded as a DUPLICATE_PAYMENT of a charge, whose later statuses are read there (`RECORDED_DUPLICATE`).
  */
 type Resolved = Readonly<{ kind: "CHARGE" | "DUPLICATE" | "MAYBE_REBILL" | "RECORDED_DUPLICATE"; charge: ChargeWithEvents }>;
+/**
+ * Spec §2.7 (P2-I1): a payment xMoney's own records do not tie to the charge. The notice's order reference disagrees
+ * with xMoney's (`ORDER_REF_MISMATCH`), or a first payment or card check was made by another xMoney customer than the
+ * subscription's CREATED one (`CUSTOMER_MISMATCH`). It changes nothing.
+ */
+type Mismatch = Readonly<{ kind: "MISMATCH"; code: "ORDER_REF_MISMATCH" | "CUSTOMER_MISMATCH" }>;
+const ORDER_REF_MISMATCH: Mismatch = Object.freeze({ kind: "MISMATCH" as const, code: "ORDER_REF_MISMATCH" as const });
+const CUSTOMER_MISMATCH: Mismatch = Object.freeze({ kind: "MISMATCH" as const, code: "CUSTOMER_MISMATCH" as const });
 
 /** OpenAPI `Transaction.transactionSource`: what xMoney says made the transaction. */
 const REBILL_SOURCES: ReadonlySet<string> = new Set(["re-bill", "re-bill-micro"]);
@@ -104,6 +112,7 @@ export class VerifyPaymentHandler {
     if (transaction.transactionType === "refund") return this.refundTransaction(job, transaction, noticeId, now);
     const resolved = await this.resolveCharge(transaction, job.payload);
     if (resolved === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
+    if (resolved.kind === "MISMATCH") return this.mismatch(resolved, noticeId, now);
     const { charge } = resolved;
     if (transaction.currency !== "USD") {
       this.deps.audit("billing.payment.mismatch", { chargeKind: charge.kind });
@@ -152,11 +161,38 @@ export class VerifyPaymentHandler {
     }
   }
 
+  /** One content-free line (no id of either person, no amount) and the notice's MISMATCH; nothing else moves. */
+  private async mismatch(mismatch: Mismatch, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
+    this.deps.audit("billing.payment.mismatch", { code: mismatch.code });
+    await this.outcome(noticeId, now, "MISMATCH");
+    return DONE;
+  }
+
+  /**
+   * Spec §2.7 (P2-I1): the order's merchant id, from xMoney only: the transaction's own, else GET /order (A1: a
+   * transaction carries none). A notice is not authenticated (spec §2.1: no MAC), so its `external_order_id` is only a
+   * hint, and one that disagrees with xMoney's is a MISMATCH. X0 follow-up: the notice's `signature` field stays
+   * unverified until X0 records what it is.
+   */
+  private async merchantOrderId(transaction: XMoneyTransaction, payload: OutboxJob["payload"]): Promise<string | null | Mismatch> {
+    const external = transaction.externalOrderId ?? (await this.deps.xmoney.getOrder(transaction.orderId)).externalOrderId;
+    const hint = typeof payload.external_order_id === "string" ? payload.external_order_id : null;
+    return hint !== null && hint !== external ? ORDER_REF_MISMATCH : external;
+  }
+
+  /** P2-I1: whether xMoney's payer of a first payment or card check is the subscription's CREATED xMoney customer. */
+  private async paidByItsCustomer(charge: ChargeRow, transaction: XMoneyTransaction): Promise<boolean> {
+    const created = (await this.deps.repository.subscriptionEvents(charge.subscriptionId)).find((event) => event.kind === "CREATED");
+    const customer = created?.xmoneyCustomerId ?? null;
+    return customer !== null && customer === transaction.customerId;
+  }
+
   /**
    * A1: the job's own charge id, then our SUBMITTED record, then a DUPLICATE_PAYMENT already recorded, then
-   * (INITIAL/CARD_CHECK only) the order's merchant id. Every lookup stays inside this API's xMoney system (D5 5h).
+   * (INITIAL/CARD_CHECK only) the order's merchant id as xMoney holds it, paid by the subscription's own xMoney
+   * customer (spec §2.7, P2-I1). Every lookup stays inside this API's xMoney system (D5 5h).
    */
-  private async resolveCharge(transaction: XMoneyTransaction, payload: OutboxJob["payload"]): Promise<Resolved | null> {
+  private async resolveCharge(transaction: XMoneyTransaction, payload: OutboxJob["payload"]): Promise<Resolved | Mismatch | null> {
     const environment = this.deps.xmoneyEnvironment;
     const own = typeof payload.charge_id === "string" ? payload.charge_id : null;
     const submitted = own ?? await this.deps.jobs.chargeIdForTransaction(transaction.transactionId, "SUBMITTED", environment);
@@ -169,13 +205,13 @@ export class VerifyPaymentHandler {
       const found = await this.deps.repository.charge(duplicateOf);
       return found === null ? null : Object.freeze({ kind: "RECORDED_DUPLICATE" as const, charge: found });
     }
-    const external = transaction.externalOrderId
-      ?? (typeof payload.external_order_id === "string" ? payload.external_order_id : null)
-      ?? (await this.deps.xmoney.getOrder(transaction.orderId)).externalOrderId;
+    const external = await this.merchantOrderId(transaction, payload);
+    if (external !== null && typeof external !== "string") return external;
     if (external === null || !/^[0-9a-f]{32}$/.test(external)) return null;
     const charge = await this.deps.repository.charge(external);
     if (charge === null || (charge.kind !== "INITIAL" && charge.kind !== "CARD_CHECK")) return null;
     if (charge.xmoneyEnvironment !== environment) return null;
+    if (!(await this.paidByItsCustomer(charge, transaction))) return CUSTOMER_MISMATCH;
     const paidByAnother = transaction.status === "complete-ok"
       && charge.events.some((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId !== transaction.transactionId);
     if (!paidByAnother) return Object.freeze({ kind: "CHARGE" as const, charge });
@@ -747,6 +783,7 @@ export class VerifyPaymentHandler {
     const target = await this.chargedBackCharge(transaction, job.payload);
     // No charged-back charge yet: the representment arrived before its chargeback.
     if (target === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
+    if (target.kind === "MISMATCH") return this.mismatch(target, noticeId, now);
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.repository.appendChargeEvent(client, chargeEvent(target.chargeId, "CHARGEBACK_REPRESENTED", now, {
         xmoneyTransactionId: transaction.transactionId, amountMicros: target.totalMicros, errorCode: null
@@ -756,11 +793,15 @@ export class VerifyPaymentHandler {
     return DONE;
   }
 
-  /** The newest charge of the order's subscription that has a CHARGEBACK and no representment yet. */
-  private async chargedBackCharge(transaction: XMoneyTransaction, payload: OutboxJob["payload"]): Promise<ChargeWithEvents | null> {
-    const external = transaction.externalOrderId
-      ?? (typeof payload.external_order_id === "string" ? payload.external_order_id : null)
-      ?? (await this.deps.xmoney.getOrder(transaction.orderId)).externalOrderId;
+  /**
+   * The newest charge of the order's subscription that has a CHARGEBACK and no representment yet; the order's merchant
+   * id comes from xMoney only (P2-I1).
+   */
+  private async chargedBackCharge(
+    transaction: XMoneyTransaction, payload: OutboxJob["payload"]
+  ): Promise<ChargeWithEvents | Mismatch | null> {
+    const external = await this.merchantOrderId(transaction, payload);
+    if (external !== null && typeof external !== "string") return external;
     if (external === null || !/^[0-9a-f]{32}$/.test(external)) return null;
     const initial = await this.deps.repository.charge(external);
     if (initial === null) return null;

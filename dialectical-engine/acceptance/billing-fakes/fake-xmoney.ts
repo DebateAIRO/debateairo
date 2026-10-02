@@ -29,11 +29,14 @@ export type FakeXMoney = Readonly<{
   publicKey: string;
   siteId: string;
   transactions: ReadonlyMap<string, FakeXMoneyTransaction>;
+  /** `status` leaves the payment at that status instead (`3d-pending`: the person is still at the bank's check). */
   completeOrder(i: Readonly<{
     externalOrderId: string; amountDecimal: string; cardCountry: string | null; succeed: boolean;
-    customerIdentifier?: string; cardTransactionMode?: "authAndCapture" | "auth";
+    customerIdentifier?: string; cardTransactionMode?: "authAndCapture" | "auth"; status?: XMoneyStatus;
   }>): Promise<SentNotice>;
-  completeSignedOrder(i: Readonly<{ orderPayload: string; orderChecksum: string; cardCountry: string | null; succeed: boolean }>): Promise<SentNotice>;
+  completeSignedOrder(i: Readonly<{
+    orderPayload: string; orderChecksum: string; cardCountry: string | null; succeed: boolean; status?: XMoneyStatus;
+  }>): Promise<SentNotice>;
   noticeFor(transactionId: string): SentNotice;
   setCardCountry(cardId: string, iso2: string | null): void;
   /** The next rebill is declined with this error code (xMoney sends numbers; a word such as "insufficient-funds" reads as no code). */
@@ -130,7 +133,7 @@ export async function startFakeXMoney(options: FakeXMoneyOptions = {}): Promise<
     cards.set(card.id, card);
     const transaction = addTransaction({
       orderId: order.id, customerId: customer.id, cardId: card.id, transactionType: "deposit",
-      transactionStatus: i.succeed ? "complete-ok" : "complete-failed", transactionSource: "service-call",
+      transactionStatus: i.status ?? (i.succeed ? "complete-ok" : "complete-failed"), transactionSource: "service-call",
       mode: i.cardTransactionMode ?? "authAndCapture", amountCents: cents(i.amountDecimal), currency: "USD",
       ip: "203.0.113.10"
     });
@@ -149,7 +152,8 @@ export async function startFakeXMoney(options: FakeXMoneyOptions = {}): Promise<
     };
     return completeOrder({
       externalOrderId: order.order.orderId, amountDecimal: order.order.amount, cardCountry: i.cardCountry,
-      succeed: i.succeed, customerIdentifier: order.customer.identifier, cardTransactionMode: order.cardTransactionMode
+      succeed: i.succeed, customerIdentifier: order.customer.identifier, cardTransactionMode: order.cardTransactionMode,
+      ...(i.status === undefined ? {} : { status: i.status })
     });
   };
 

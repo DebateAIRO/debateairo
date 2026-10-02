@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { SELLER_COMPANY } from "@debateai/billing-core";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, createPool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
-import { signOrderPayload } from "@debateai/payments-xmoney";
+import { signOrderPayload, XMoneyClient } from "@debateai/payments-xmoney";
 import { inFlightAttemptLifeMs, type CheckoutInput } from "../../apps/api/src/billing/checkout.js";
 import { englishOrderText, planName, type BillingOrderText } from "../../apps/api/src/billing/order-text.js";
 import { openBillingProfile } from "../../apps/api/src/billing/records.js";
@@ -11,6 +11,7 @@ import { activeSubscriptionEvents } from "../support/billingFixtures.js";
 import {
   endPoolWithin, startBillingHarness, testConsentDocuments, within, type BillingHarness
 } from "../support/billingHarness.js";
+import { startFakeXMoney } from "../support/fake-xmoney.js";
 
 let h: BillingHarness;
 beforeAll(async () => { h = await startBillingHarness(); });
@@ -142,7 +143,8 @@ describe("P8c the checkout", () => {
     const ownerRef = randomUUID();
     const quoted = await quoteFor(ownerRef);
     const down = h.checkoutWith({ xmoney: {
-      createCustomer: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "down"); }, listTransactions: async () => []
+      createCustomer: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "down"); }, listTransactions: async () => [],
+      getOrder: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "down"); }
     } });
     await expect(down.start({
       ownerRef, userId: randomUUID(), ip: "198.51.100.7", userAgent: "test", quoteRef: quoted.quote.quoteId, locale: "en",
@@ -261,12 +263,94 @@ describe("P8c the checkout", () => {
     expect(await h.buy({ ownerRef: declined })).toMatchObject({ chargeId: third.chargeId, reused: true });
   });
 
+  it("matches a listed payment by the checkout's own xMoney customer and asks GET /order once per order (P2-I6)", async () => {
+    // A person whose earlier checkout was abandoned: two late attempts on its old order are theirs, but not this
+    // checkout's. Another person's attempt in the same seconds is never even looked up.
+    const ownerRef = randomUUID();
+    const old = await h.buy({ ownerRef });
+    h.clock.advance(31 * 60_000);
+    const current = await h.buy({ ownerRef });
+    expect(current.chargeId).not.toBe(old.chargeId);
+    const stranger = await h.buy();
+    h.xmoney.pay({ externalOrderId: stranger.chargeId, amountDecimal: stranger.totalDecimal, cardCountry: "RO", status: "3d-pending" });
+    h.xmoney.pay({ externalOrderId: old.chargeId, amountDecimal: old.totalDecimal, cardCountry: "RO", status: "3d-pending" });
+    h.xmoney.pay({ externalOrderId: old.chargeId, amountDecimal: old.totalDecimal, cardCountry: "RO", status: "complete-ok" });
+    const calls = h.xmoney.getOrderCalls;
+    expect(await h.buy({ ownerRef })).toMatchObject({ chargeId: current.chargeId, reused: true });
+    expect(h.xmoney.getOrderCalls - calls).toBe(1);
+    // Their attempt on THIS checkout's order is on its way.
+    h.xmoney.pay({ externalOrderId: current.chargeId, amountDecimal: current.totalDecimal, cardCountry: "RO", status: "3d-pending" });
+    await expect(h.buy({ ownerRef })).rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: current.chargeId });
+  });
+
+  it("lists xMoney before it takes the owner lock, and re-checks our own rows under it (P2-I6)", async () => {
+    const ownerRef = randomUUID();
+    const first = await h.buy({ ownerRef });
+    const lockFree: boolean[] = [];
+    const listing = h.checkoutWith({ xmoney: {
+      createCustomer: (input) => h.xmoney.createCustomer(input),
+      getOrder: (orderId) => h.xmoney.getOrder(orderId),
+      listTransactions: async (input) => {
+        // A try on the owner's lock from another connection: it is free while the listing runs.
+        const tried = await h.database.pool.query<{ got: boolean }>(
+          "SELECT pg_try_advisory_xact_lock(hashtextextended('debateai.billing.owner:'||$1,0)) AS got", [ownerRef]
+        );
+        lockFree.push(tried.rows[0]!.got);
+        // The notice comes in while the person is still checking out: only the re-check under the lock can see it.
+        const noticeId = randomUUID();
+        await h.repository.withTransaction((client) => h.repository.insertNotice(client, {
+          noticeId, receivedAt: h.clock.now, payloadSha256: createHash("sha256").update(noticeId).digest("hex"),
+          transactionId: "7710001", orderId: "7710002", externalOrderId: first.chargeId, status: "complete-ok",
+          xmoneyEnvironment: "stage"
+        }));
+        return h.xmoney.listTransactions(input);
+      }
+    } });
+    const quoted = await quoteFor(ownerRef);
+    await expect(listing.start({
+      ownerRef, userId: randomUUID(), ip: "198.51.100.7", userAgent: "test", quoteRef: quoted.quote.quoteId, locale: "en",
+      consents: consents(), countryConfirmed: false, now: h.clock.now
+    })).rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: first.chargeId });
+    expect(lockFree).toEqual([true]);
+  });
+
+  it("answers CHECKOUT_PENDING through xMoney's own API while the first payment is in 3-D Secure (the protocol fake, P2-I6)", async () => {
+    const fake = await startFakeXMoney();
+    try {
+      // The fake stamps transactions with the real clock, so this checkout runs on it too.
+      const now = new Date();
+      const service = h.checkoutWith({
+        xmoney: new XMoneyClient({ baseUrl: fake.baseUrl, privateKey: fake.privateKey, siteId: fake.siteId, timeoutMs: 5_000 }),
+        xmoneyPrivateKey: fake.privateKey, xmoneyPublicKey: fake.publicKey, siteId: fake.siteId
+      });
+      const ownerRef = randomUUID();
+      const quote = (at: Date) => h.quotes.create({
+        ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", region: "B", postalCode: null, company: null, now: at,
+        name: "Test Buyer", city: "Bucuresti"
+      });
+      const checkout = async (at: Date) => service.start({
+        ownerRef, userId: randomUUID(), ip: "198.51.100.7", userAgent: "test", quoteRef: (await quote(at)).quote.quoteId,
+        locale: "en", consents: consents(), countryConfirmed: false, now: at
+      });
+      const first = await checkout(now);
+      // The person is at the bank's check: xMoney has the transaction, no notice has been sent.
+      await fake.completeSignedOrder({
+        orderPayload: first.orderPayload, orderChecksum: first.orderChecksum, cardCountry: "RO", succeed: true, status: "3d-pending"
+      });
+      await expect(checkout(new Date(Math.max(Date.now(), now.getTime() + 1_000))))
+        .rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: first.chargeId });
+    } finally {
+      await fake.stop();
+    }
+  });
+
   it("answers PAYMENT_PROVIDER_UNAVAILABLE and raises the operator alarm when xMoney refuses our credentials (D5 5i)", async () => {
     const ownerRef = randomUUID();
     const quoted = await quoteFor(ownerRef);
     const refused = h.checkoutWith({ xmoney: {
       createCustomer: async () => { throw new TypedDomainError("XMONEY_CREDENTIALS_REFUSED", "XMONEY_CREDENTIALS_REFUSED:401"); },
-      listTransactions: async () => []
+      listTransactions: async () => [],
+      getOrder: async () => { throw new TypedDomainError("XMONEY_CREDENTIALS_REFUSED", "XMONEY_CREDENTIALS_REFUSED:401"); }
     } });
     await expect(refused.start({
       ownerRef, userId: randomUUID(), ip: "198.51.100.7", userAgent: "test", quoteRef: quoted.quote.quoteId, locale: "en",

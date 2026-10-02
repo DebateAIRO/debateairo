@@ -222,9 +222,9 @@ const unconfigured = async (): Promise<never> => {
 const UNCONFIGURED_XMONEY: Pick<XMoneyClient, "rebill" | "refund" | "getTransaction" | "listTransactions"> = Object.freeze({
   rebill: unconfigured, refund: unconfigured, getTransaction: unconfigured, listTransactions: unconfigured
 });
-/** The stand-in for both methods P8c's `CheckoutDeps.xmoney` picks (`listTransactions`: D7 #5's look). */
-const UNCONFIGURED_XMONEY_CUSTOMERS: Pick<XMoneyClient, "createCustomer" | "listTransactions"> = Object.freeze({
-  createCustomer: unconfigured, listTransactions: unconfigured
+/** The stand-in for the methods P8c's `CheckoutDeps.xmoney` picks (`listTransactions`, `getOrder`: D7 #5's look). */
+const UNCONFIGURED_XMONEY_CUSTOMERS: Pick<XMoneyClient, "createCustomer" | "listTransactions" | "getOrder"> = Object.freeze({
+  createCustomer: unconfigured, listTransactions: unconfigured, getOrder: unconfigured
 });
 
 /**

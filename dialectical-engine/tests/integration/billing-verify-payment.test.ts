@@ -131,7 +131,8 @@ describe("P9b VERIFY_PAYMENT", () => {
 
   it("retries a notice that arrives before its charge row, then applies it", async () => {
     const chargeId = newChargeId();
-    const paid = h.xmoney.pay({ externalOrderId: chargeId, amountDecimal: "24.20", cardCountry: "RO" });
+    // Paid by the xMoney customer the checkout below creates (its signed order names that customer).
+    const paid = h.xmoney.pay({ externalOrderId: chargeId, amountDecimal: "24.20", cardCountry: "RO", customerId: h.xmoney.reserveCustomer() });
     await h.notices.receive(h.noticeFor(paid));
     await h.worker.drain(10);
     const [waiting] = (await h.outboxRows(paid.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT");
@@ -169,6 +170,52 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(await h.eventKinds(declined.chargeId)).toEqual(kindsOf("REQUESTED", "FAILED"));
     expect(await subscriptionKinds(declined.subscriptionId)).toEqual(["CREATED"]);
     expect(await status(declined.chargeId, declined.ownerRef)).toEqual({ state: "NEEDS_ACTION", reasonCode: "PAYMENT_DECLINED" });
+  });
+
+  it("ends MISMATCH and moves nothing for a forged notice naming another open charge; the payer's own notice still applies (P2-I1)", async () => {
+    // Spec §2.7: "The browser never decides a payment, and neither does a notice." Two open checkouts of one price; a
+    // notice decrypts under our key (it has no MAC) and names the payer's transaction with the other person's charge.
+    const payer = await h.buy();
+    const other = await h.buy();
+    const paid = h.xmoney.pay({ externalOrderId: payer.chargeId, amountDecimal: payer.totalDecimal, cardCountry: "RO" });
+    const before = h.auditLines.length;
+    expect(await h.notices.receive(h.noticeFor(paid, { externalOrderId: other.chargeId }))).toBe("STORED");
+    await h.worker.drain(10);
+    expect(await h.eventKinds(other.chargeId)).toEqual(kindsOf("REQUESTED"));
+    expect(await subscriptionKinds(other.subscriptionId)).toEqual(["CREATED"]);
+    expect(await h.entitlementRows(other.ownerRef)).toEqual([]);
+    expect(await h.eventKinds(payer.chargeId)).toEqual(kindsOf("REQUESTED"));
+    expect((await h.outboxRows(paid.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT").map((row) => [row.done, row.dead]))
+      .toEqual([[true, false]]);
+    const outcomes = await h.database.pool.query(
+      "SELECT o.outcome FROM billing.xmoney_notice_outcome o JOIN billing.xmoney_notice n USING (notice_id) WHERE n.transaction_id=$1",
+      [paid.transactionId]
+    );
+    expect(outcomes.rows).toEqual([{ outcome: "MISMATCH" }]);
+    // One content-free line: no id of either person, no amount.
+    expect(h.auditLines.slice(before)).toEqual([{ event: "billing.payment.mismatch", code: "ORDER_REF_MISMATCH" }]);
+    // The forged notice does not hold the other person's checkout: their young open charge is simply reused.
+    expect(await h.buy({ ownerRef: other.ownerRef })).toMatchObject({ chargeId: other.chargeId, reused: true });
+    // The payer's own notice (xMoney's order reference) activates the payer's plan with the payer's payment.
+    expect(await h.notices.receive(h.noticeFor(paid))).toBe("STORED");
+    await h.worker.drain(10);
+    expect(await h.eventKinds(payer.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED"));
+    expect(await subscriptionKinds(payer.subscriptionId)).toEqual(["CREATED", "ACTIVATED"]);
+    expect(foldSubscription(await h.repository.subscriptionEvents(payer.subscriptionId)))
+      .toMatchObject({ xmoneyOrderId: paid.orderId, xmoneyCustomerId: paid.customerId, cardRef: paid.cardId });
+  });
+
+  it("ends MISMATCH when a first payment's customer is not the checkout's xMoney customer (P2-I1)", async () => {
+    const bought = await h.buy();
+    const stranger = h.xmoney.pay({
+      externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO", customerId: "4040404"
+    });
+    const before = h.auditLines.length;
+    await h.notices.receive(h.noticeFor(stranger));
+    await h.worker.drain(10);
+    expect(await h.eventKinds(bought.chargeId)).toEqual(kindsOf("REQUESTED"));
+    expect(await subscriptionKinds(bought.subscriptionId)).toEqual(["CREATED"]);
+    expect(h.auditLines.slice(before)).toEqual([{ event: "billing.payment.mismatch", code: "CUSTOMER_MISMATCH" }]);
   });
 
   it("refunds a card from a blocked country through the refund job: intent first, one call, no invoice, M11", async () => {
@@ -490,7 +537,8 @@ describe("P9b VERIFY_PAYMENT", () => {
       succeeded: async (context) => context.cardCountry === "RU" ? { kind: "REFUND", reason: "CARD_CHECK_REFUSED" } : APPLIED,
       failed: async () => undefined
     });
-    const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RU" });
+    // The card-change order is the subscription's own xMoney customer's (P2-I1).
+    const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RU", customerId: paid.transaction.customerId });
     await verifier.handle({ jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: hold.transactionId, payload: {}, attempts: 1,
       notBefore: h.clock.now, createdAt: h.clock.now, claimedBy: "test", claimedAt: h.clock.now } as unknown as Parameters<typeof verifier.handle>[0], h.clock.now);
     await h.worker.drain(10);
@@ -610,7 +658,7 @@ describe("P9b VERIFY_PAYMENT", () => {
         xmoneyTransactionId: null, amountMicros: 1_000_000, errorCode: null
       }));
     });
-    const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RO" });
+    const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RO", customerId: paid.transaction.customerId });
     const state = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));
     await h.repository.withTransaction(async (client) => {
       await h.repository.appendChargeEvent(client, chargeEvent(holdCharge, "SUCCEEDED", h.clock.now, {
