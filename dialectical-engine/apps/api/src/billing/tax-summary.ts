@@ -40,8 +40,9 @@ export type PaymentToCheckItem = Readonly<{
   ref: string;
   /**
    * A dead refund's reason (a WITHDRAWAL refund is due within 14 days of the withdrawal), or the code a charge-less
-   * attempt names (TAX_SERVICE_UNAVAILABLE); else null. Null for REFUND_NOT_REQUESTED: its payload's reason is only
-   * what the job claimed.
+   * attempt names (TAX_SERVICE_UNAVAILABLE: the tax service could not price it; RETRY_TOTAL_CHANGED: P2-M10's retry
+   * priced afresh at a total other than the announced one, so nothing was charged); else null. Null for
+   * REFUND_NOT_REQUESTED: its payload's reason is only what the job claimed.
    */
   reason: string | null;
   since: Date;
@@ -418,7 +419,11 @@ export function renderTaxSummary(summary: TaxSummary): string {
       + " unknown, check whether the card was charged; PAYMENT_UNSETTLED: no outcome after 30 days;"
       + " DUNNING_UNPRICED: a renewal the tax service could not price within the 3-day quiet retry, so the payment"
       + " reminders run with nothing charged, check the tax service; ENDED_UNPRICED: such a plan ended after its last"
-      + " retry day, nothing was charged; RENEWAL_BLOCKED: the tax service refuses to price a renewal (a revoked"
+      + " retry day, nothing was charged; RETRY_TOTAL_CHANGED (named after DUNNING_UNPRICED or ENDED_UNPRICED): the"
+      + " tax service priced a retry again, but at a total the person was never told about (a tax change), so nothing"
+      + " is charged and the plan ends after its last retry day unless a later retry prices at the announced total"
+      + " again; there is nothing to fix in the tax service, and the person can subscribe again at the new price;"
+      + " RENEWAL_BLOCKED: the tax service refuses to price a renewal (a revoked"
       + " Quaderno key or a refused request), so nothing is charged and the person is on Free until it prices again,"
       + " fix the tax service;"
       + " SUBSCRIPTION_HISTORY_INVALID: a subscription whose records do not add up, so renewals skip it, check what its"

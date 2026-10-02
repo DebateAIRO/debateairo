@@ -22,9 +22,12 @@ export type DunningAttempt = Readonly<{
   customerId: string;
   /** 1 is the renewal itself; 2..n the retries (A2's attempt numbers). */
   attempt: number;
-  /** The charge whose attempt failed; null for an attempt that could not be priced (Q-1: no charge without a quote). */
+  /** The charge whose attempt failed; null for a charge-less attempt (Q-1: no charge without a quote; P2-M10). */
   chargeId: string | null;
-  /** Why a charge-less attempt failed (`TAX_SERVICE_UNAVAILABLE`); null with a charge. */
+  /**
+   * Why a charge-less attempt failed: `TAX_SERVICE_UNAVAILABLE` (the tax service could not price it) or
+   * `RETRY_TOTAL_CHANGED` (W5, P2-M10: a fresh price differs from the announced total); null with a charge.
+   */
   reason: string | null;
   periodStart: Date;
   firstFailedAt: Date;

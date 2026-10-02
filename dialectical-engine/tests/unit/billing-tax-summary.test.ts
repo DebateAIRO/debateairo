@@ -82,6 +82,7 @@ describe("P16b the summary", () => {
       { what: "PAYMENT_UNSETTLED", ref: "8".repeat(32), reason: null, since: new Date("2026-10-02T00:00:00.000Z") },
       { what: "DUNNING_UNPRICED", ref: "5b8e1f2a-3c4d-4e5f-8a6b-7c8d9e0f1a2b", reason: "TAX_SERVICE_UNAVAILABLE", since: new Date("2026-11-14T00:00:00.000Z") },
       { what: "ENDED_UNPRICED", ref: "6c9f2a3b-4d5e-4f6a-9b7c-8d9e0f1a2b3c", reason: "TAX_SERVICE_UNAVAILABLE", since: new Date("2026-11-15T00:00:00.000Z") },
+      { what: "DUNNING_UNPRICED", ref: "8e1a4b5c-6d7e-4f8a-9b0c-1d2e3f4a5b6c", reason: "RETRY_TOTAL_CHANGED", since: new Date("2026-11-18T00:00:00.000Z") },
       { what: "RENEWAL_BLOCKED", ref: "7d0a3b4c-5e6f-4a7b-8c8d-9e0f1a2b3c4d", reason: null, since: new Date("2026-11-16T00:00:00.000Z") },
       { what: "SUBSCRIPTION_HISTORY_INVALID", ref: "3c9d2b1a-5e4f-4a6b-8c7d-9e0f1a2b3c4d", reason: null, since: new Date("2026-11-13T00:00:00.000Z") }
     ]
@@ -143,6 +144,13 @@ describe("P16b the summary", () => {
     // R2 Q-1's renewals with no charge (D6a's 4b): named by subscription, with the code that stopped the pricing.
     expect(text).toContain("subscription 5b8e1f2a-3c4d-4e5f-8a6b-7c8d9e0f1a2b: DUNNING_UNPRICED (TAX_SERVICE_UNAVAILABLE), since 2026-11-14");
     expect(text).toContain("subscription 6c9f2a3b-4d5e-4f6a-9b7c-8d9e0f1a2b3c: ENDED_UNPRICED (TAX_SERVICE_UNAVAILABLE), since 2026-11-15");
+    // W5 (P2-M10): a retry priced afresh at a total the person was never told about is charged nothing; the help text
+    // says why, and that the tax service needs no fix.
+    expect(text).toContain("subscription 8e1a4b5c-6d7e-4f8a-9b0c-1d2e3f4a5b6c: DUNNING_UNPRICED (RETRY_TOTAL_CHANGED), since 2026-11-18");
+    expect(text).toContain("RETRY_TOTAL_CHANGED (named after DUNNING_UNPRICED or ENDED_UNPRICED): the tax service priced a"
+      + " retry again, but at a total the person was never told about (a tax change), so nothing is charged and the plan"
+      + " ends after its last retry day unless a later retry prices at the announced total again; there is nothing to fix"
+      + " in the tax service, and the person can subscribe again at the new price;");
     expect(text).toContain("subscription 7d0a3b4c-5e6f-4a7b-8c8d-9e0f1a2b3c4d: RENEWAL_BLOCKED, since 2026-11-16");
     expect(text).toContain("pnpm billing:withdraw --owner <ref> --refund <amount>");
     expect(text).toContain("Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV");
