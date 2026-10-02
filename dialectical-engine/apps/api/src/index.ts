@@ -1249,7 +1249,10 @@ export const authorizationPolicyInventory = Object.freeze([
   // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
   { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
   // P12e (A12): the card change's signed authorization order; the CSRF pair like any user mutation.
-  { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" }
+  { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
+  // P13: cancel without signing in (Terms §12). First-party Origin only; never a session.
+  { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
+  { route: "POST /v1/billing/cancel-by-token", auth: "public", origin: "trusted", resource: "billing", action: "cancel-by-token" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;

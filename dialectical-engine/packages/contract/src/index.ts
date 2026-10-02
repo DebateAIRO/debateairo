@@ -483,6 +483,10 @@ export const BillingCardChangeResponseSchema = BillingCheckoutResponseSchema.ext
   hold_amount: BillingDecimalMoneySchema
 }).strict();
 export type BillingCardChangeResponse = z.infer<typeof BillingCardChangeResponseSchema>;
+/** Any string shaped like an address; whether it belongs to anyone is never answered. */
+export const BillingCancelLinkRequestSchema = z.object({ email: z.string().min(3).max(320) }).strict();
+export const BillingCancelLinkAcceptedSchema = z.object({ status: z.literal("ACCEPTED") }).strict();
+export const BillingCancelByTokenRequestSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
 
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
@@ -1290,7 +1294,9 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/subscription/upgrade-quote",
     "POST /v1/billing/subscription/upgrade",
     "POST /v1/billing/subscription/withdraw",
-    "POST /v1/billing/subscription/card"
+    "POST /v1/billing/subscription/card",
+    "POST /v1/billing/cancel-link",
+    "POST /v1/billing/cancel-by-token"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
@@ -1319,6 +1325,7 @@ export const contractInventory = Object.freeze({
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
     BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
     BillingUpgradeResponseSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
-    BillingCardChangeResponseSchema
+    BillingCardChangeResponseSchema, BillingCancelLinkRequestSchema, BillingCancelLinkAcceptedSchema,
+    BillingCancelByTokenRequestSchema
   })
 });

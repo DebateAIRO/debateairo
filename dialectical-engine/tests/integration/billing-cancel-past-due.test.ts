@@ -1,8 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldSubscription } from "@debateai/billing-core";
 import { startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { mountSubscriptionRoutes, subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
+import { mountSubscriptionRoutes, subscriptionDeps, TEST_PUBLIC_APP_URL } from "../support/billingSubscriptionFixtures.js";
+import { CancelLinkService, cancelTokenSha256 } from "../../apps/api/src/billing/cancel-link.js";
 import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 
 let h: BillingHarness;
@@ -92,5 +94,28 @@ describe("P12b a cancel while PAST_DUE ends the plan and every retry", () => {
     const kinds = (await h.repository.charge(retry.chargeId))!.events.map((event) => [event.kind, event.errorCode]);
     expect(kinds).toEqual(expect.arrayContaining([["REFUND_REQUESTED", "SUBSCRIPTION_ENDED"]]));
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).status).toBe("ENDED");
+  });
+
+  it("ends a PAST_DUE plan through the emailed link exactly as through Settings (P13)", async () => {
+    const { paid, failedAt } = await pastDue(testHttpIdentity("p13-past-due").authenticated.ownerRef);
+    h.clock.now = new Date(failedAt.getTime() + 60 * MINUTE);
+    // The link's token as M9 would carry it; only its hash is stored (P1b's insertCancelToken).
+    const token = randomBytes(32).toString("base64url");
+    await h.repository.withTransaction((client) => h.repository.insertCancelToken(client, {
+      tokenSha256: cancelTokenSha256(token), subscriptionId: paid.subscriptionId,
+      issuedAt: h.clock.now, expiresAt: new Date(h.clock.now.getTime() + DAY)
+    }));
+    const links = new CancelLinkService({
+      billing: h.repository, jobs: h.jobs, entitlements: h.entitlements,
+      identities: { ownerRefByEmailBlindIndex: async () => null }, blindIndexKey: Buffer.alloc(32, 3),
+      recordsKey: h.recordsKey, mail: undefined, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, clock: h.clock.read
+    });
+    expect(await links.cancelByToken(token)).toBe("CANCELLED");
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).slice(-2).map((event) => event.kind))
+      .toEqual(["CANCEL_REQUESTED", "ENDED"]);
+    expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "FREE", cause: "ENDED_CANCEL" });
+    h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
+    await h.maintenance.runOnce();
+    expect(await renewals(paid.subscriptionId)).toEqual([1]);
   });
 });

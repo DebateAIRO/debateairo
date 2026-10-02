@@ -28,6 +28,7 @@ import {
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
   AskRoomResponseSchema,
+  BillingCancelLinkAcceptedSchema,
   BillingCardChangeResponseSchema,
   BillingPlansResponseSchema,
   BillingQuoteRequestSchema,
@@ -433,6 +434,10 @@ export interface ContractClient {
   withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
   /** P12e: the card form's signed 1.00 USD authorization order, released once the new card is seen. */
   startCardChange(): Promise<BillingCardChangeResponse>;
+  /** P13 (A25): always `{status: "ACCEPTED"}`; a link reaches the billing address only if there is a plan to cancel. */
+  requestCancelLink(email: string): Promise<{ status: "ACCEPTED" }>;
+  /** P13: spends the emailed link's token once; 404 CANCEL_LINK_INVALID when it is unknown, spent or expired. */
+  cancelByToken(token: string): Promise<void>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -760,6 +765,14 @@ export function createContractClient(
       { method: "POST", body: JSON.stringify({ step_up_grant: stepUpGrant }) }
     ),
     startCardChange: () => request("/v1/billing/subscription/card", BillingCardChangeResponseSchema, { method: "POST" }),
+    requestCancelLink: (email: string) => request(
+      "/v1/billing/cancel-link", BillingCancelLinkAcceptedSchema,
+      { method: "POST", body: JSON.stringify({ email }) }, 202
+    ),
+    cancelByToken: (token: string) => requestNoContent(
+      root.href, fetchImplementation, "/v1/billing/cancel-by-token",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) }, auth
+    ),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),

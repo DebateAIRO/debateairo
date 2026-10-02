@@ -1,5 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+  BillingCancelByTokenRequestSchema,
+  BillingCancelLinkAcceptedSchema,
+  BillingCancelLinkRequestSchema,
   BillingCardChangeResponseSchema,
   BillingDowngradeRequestSchema,
   BillingInvoicesResponseSchema,
@@ -12,10 +15,12 @@ import {
   BillingWithdrawResponseSchema
 } from "@debateai/contract";
 import { microsToDecimal } from "@debateai/billing-core";
+import { clientIpNetworkScope } from "../client-ip.js";
 import { startCardChange } from "./card-change.js";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
 import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
 import { cancelForOwner, revokeCancelForOwner, scheduleDowngrade } from "./subscription-actions.js";
+import { refuse } from "./subscription-core.js";
 import { listInvoices, readSubscriptionView } from "./subscription-view.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 import { quoteUpgrade, startUpgrade } from "./upgrade.js";
@@ -31,7 +36,9 @@ export const SUBSCRIPTION_ROUTE_PATHS = Object.freeze([
   "POST /v1/billing/subscription/upgrade-quote",
   "POST /v1/billing/subscription/upgrade",
   "POST /v1/billing/subscription/withdraw",
-  "POST /v1/billing/subscription/card"
+  "POST /v1/billing/subscription/card",
+  "POST /v1/billing/cancel-link",
+  "POST /v1/billing/cancel-by-token"
 ] as const);
 export type SubscriptionRoutePath = typeof SUBSCRIPTION_ROUTE_PATHS[number];
 
@@ -151,5 +158,35 @@ export function installSubscriptionRoutes(
     return answer(reply, async () => reply.send(BillingCardChangeResponseSchema.parse(await startCardChange(deps, {
       ownerRef: authenticated.ownerRef, userId: authenticated.userId, ip: source(request).ip, now: deps.clock()
     }))));
+  });
+  // P13 (A25, Terms §12): cancel without signing in. Both routes are public, first-party Origin only, and charge the
+  // source network's billingCancelLink budget (DL5-F3: one IPv6 /64 is one bucket); never a session.
+  const accepted = BillingCancelLinkAcceptedSchema.parse({ status: "ACCEPTED" });
+  api.post("/v1/billing/cancel-link", policy("POST /v1/billing/cancel-link"), async (request, reply) => {
+    if (deps === undefined) return notFound(reply);
+    const parsed = BillingCancelLinkRequestSchema.safeParse(request.body);
+    if (!parsed.success) return malformed(reply);
+    if (!admit.gate(reply, "billingCancelLink", "POST /v1/billing/cancel-link", clientIpNetworkScope(source(request).ip))) {
+      return reply;
+    }
+    const email = parsed.data.email;
+    const links = deps.cancelLinks;
+    // Answer first. Nothing below can change what this caller is told, or when (spec §2.7).
+    setImmediate(() => {
+      links.request(email).catch(() => console.error(JSON.stringify({ event: "billing.cancel_link.failed" })));
+    });
+    return reply.status(202).send(accepted);
+  });
+  api.post("/v1/billing/cancel-by-token", policy("POST /v1/billing/cancel-by-token"), async (request, reply) => {
+    if (deps === undefined) return notFound(reply);
+    const parsed = BillingCancelByTokenRequestSchema.safeParse(request.body);
+    if (!parsed.success) return malformed(reply);
+    if (!admit.gate(reply, "billingCancelLink", "POST /v1/billing/cancel-by-token", clientIpNetworkScope(source(request).ip))) {
+      return reply;
+    }
+    return answer(reply, async () => {
+      if (await deps.cancelLinks.cancelByToken(parsed.data.token) === "INVALID") refuse(404, "CANCEL_LINK_INVALID");
+      return reply.status(204).send();
+    });
   });
 }

@@ -57,7 +57,8 @@ export interface BillingUsageReader {
 export type BillingLegalGate = Pick<LegalAcceptanceApplication, "requiresReacceptance">;
 
 /** The sealed admission scopes billing charges (the admission policy's next versions, contract §2). */
-export type BillingAdmissionScope = "publicReads" | "billingQuote" | "billingCheckout" | "billingNotify";
+export type BillingAdmissionScope = "publicReads" | "billingQuote" | "billingCheckout" | "billingNotify"
+  | "billingCancelLink";
 
 /** Like `SupportAdmission`: a scope the register version does not publish admits. */
 export type BillingAdmission = Readonly<{

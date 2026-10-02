@@ -770,6 +770,24 @@ export class BillingRepository {
     `, [i.tokenSha256, i.subscriptionId, i.issuedAt, i.expiresAt]);
   }
 
+  /**
+   * P13 (A25): how many cancel links one account was sent since `since` — every token of every subscription this
+   * owner ever had, so a new checkout does not reset the limit.
+   */
+  async cancelTokensIssuedForOwnerSince(
+    ownerRef: string, since: Date, executor: BillingReadExecutor = this.pool
+  ): Promise<number> {
+    const result = await executor.query<{ issued: string }>(`
+      SELECT count(*)::text AS issued
+      FROM billing.cancel_token AS token
+      WHERE token.issued_at >= $2
+        AND token.subscription_id IN (
+          SELECT event.subscription_id FROM billing.subscription_event AS event WHERE event.owner_ref = $1
+        )
+    `, [ownerRef, since]);
+    return Number(result.rows[0]?.issued ?? "0");
+  }
+
   async useCancelToken(c: PoolClient, tokenSha256: string, now: Date): Promise<{ subscriptionId: string } | null> {
     const row = (await c.query<{ subscription_id: string }>(`
       WITH usable AS (

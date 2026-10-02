@@ -137,7 +137,8 @@ const admissionPolicyValueSchema = z.object({
   geo_availability: admissionScopeValueSchema("source").optional(),
   billing_quote: admissionScopeValueSchema("owner").optional(),
   billing_checkout: admissionScopeValueSchema("owner").optional(),
-  billing_notify: admissionScopeValueSchema("source").optional()
+  billing_notify: admissionScopeValueSchema("source").optional(),
+  billing_cancel_link: admissionScopeValueSchema("source").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -166,6 +167,8 @@ export type AdmissionPolicy = Readonly<{
   billingCheckout: AdmissionScopePolicy<"owner"> | null;
   /** Paid plans P9a: xMoney's notices, 120 a minute per source (contract §2). */
   billingNotify: AdmissionScopePolicy<"source"> | null;
+  /** P13 (A25): the public cancel link, per source network. */
+  billingCancelLink: AdmissionScopePolicy<"source"> | null;
   sourceRef: string;
 }>;
 
@@ -232,7 +235,8 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     + " + paid plans G3a geo_availability, V ratification pending (V-1)"
     + " + paid plans P8b billing_quote, V ratification pending (V-1)"
     + " + paid plans P8c billing_checkout, V ratification pending (V-1)"
-    + " + paid plans P9a billing_notify, V ratification pending (V-1)",
+    + " + paid plans P9a billing_notify, V ratification pending (V-1)"
+    + " + paid plans P13 billing_cancel_link, V ratification pending (V-1)",
   value: Object.freeze({
     ...ADMISSION_POLICY_REGISTER_ROW.value,
     support_reads: Object.freeze({
@@ -260,6 +264,11 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     // Paid plans P9a: xMoney's notices, 120 a minute per source (contract §2).
     billing_notify: Object.freeze({
       key: "source" as const, limit: 120, window_ms: 60_000, capacity: 65_536
+    }),
+    // P13 (A25): five cancel-link requests or token presses an hour per source; the per-account limit (three
+    // links a day) is counted in the database by the service, silently.
+    billing_cancel_link: Object.freeze({
+      key: "source" as const, limit: 5, window_ms: 60 * 60_000, capacity: 65_536
     })
   })
 });
@@ -330,6 +339,12 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.billing_notify.limit,
       windowMs: policy.billing_notify.window_ms,
       capacity: policy.billing_notify.capacity
+    }),
+    billingCancelLink: policy.billing_cancel_link === undefined ? null : Object.freeze({
+      key: policy.billing_cancel_link.key,
+      limit: policy.billing_cancel_link.limit,
+      windowMs: policy.billing_cancel_link.window_ms,
+      capacity: policy.billing_cancel_link.capacity
     }),
     sourceRef
   });

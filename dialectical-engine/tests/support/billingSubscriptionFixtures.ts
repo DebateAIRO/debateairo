@@ -10,6 +10,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { planById, type PlanId } from "@debateai/register";
 import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
+import type { BillingAdmissionScope } from "../../apps/api/src/billing/index.js";
 import { CheckoutService } from "../../apps/api/src/billing/checkout.js";
 import { sealBillingProfile, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
@@ -281,6 +282,7 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     refunds: new RefundDesk({
       repository: billing, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date()
     }),
+    cancelLinks: { request: async () => "SILENT" as const, cancelByToken: async () => "INVALID" as const },
     ...overrides
   });
 }
@@ -288,11 +290,13 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
 /**
  * Only the subscription routes, on a bare Fastify, with a stand-in for the API's cookie check: the
  * `x-test-session` header names the one identity. Authorization and CSRF are s7-authorization.test.ts's job.
+ * `admitted` sees what a route charges (the scope and the key); the caller's address is the `x-test-ip` header
+ * (canonical, as P8a's source hands it on), `192.0.2.10` without it.
  */
 export async function mountSubscriptionRoutes(
   deps: SubscriptionRouteDeps | undefined,
   identity: TestHttpIdentity | null,
-  admitted: () => boolean = () => true
+  admitted: (scope: BillingAdmissionScope, key: string) => boolean = () => true
 ): Promise<FastifyInstance> {
   const api = Fastify({ logger: false });
   api.decorateRequest("authenticatedSession");
@@ -305,13 +309,16 @@ export async function mountSubscriptionRoutes(
     api, deps,
     () => Object.freeze({ config: Object.freeze({ auth: "user" as const }) }),
     {
-      gate: (reply) => {
-        if (admitted()) return true;
+      gate: (reply, scope, _route, key) => {
+        if (admitted(scope, key)) return true;
         void reply.status(429).send({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
         return false;
       }
     },
-    () => Object.freeze({ ip: "192.0.2.10", userAgent: "p12-test" })
+    (request) => {
+      const ip = request.headers["x-test-ip"];
+      return Object.freeze({ ip: typeof ip === "string" ? ip : "192.0.2.10", userAgent: "p12-test" });
+    }
   );
   await api.ready();
   return api;

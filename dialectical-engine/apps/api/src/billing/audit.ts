@@ -89,7 +89,9 @@ export type BillingAuditEvent =
   /** P12e: a new card from an always-blocked country was refused; the field is its ISO country code. */
   | "billing.card.refused"
   /** P12e (A2): a card change's hold was paid while a renewal's outcome was unknown; nothing changed. No field. */
-  | "billing.card.change.deferred";
+  | "billing.card.change.deferred"
+  /** P13 (A25): an emailed one-time cancel link (M9) was sent. No field: never the address, the owner or the token. */
+  | "billing.cancel_link.sent";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

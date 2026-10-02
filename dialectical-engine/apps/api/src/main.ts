@@ -1030,11 +1030,19 @@ const billingRuntime = billingConnectors === null
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingNotify admission scope");
     }
+    // Paid plans P13 (A25): the public cancel link charges the source-keyed billingCancelLink budget (5 an hour).
+    if (admissionPolicy.billingCancelLink === null) {
+      throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+        "Billing is on, so the register must seal the billingCancelLink admission scope");
+    }
     return createBillingRuntime({
       pool, connectors: billingConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore, mail: undefined,
       // P12d: the owner's model spend, the credit-used share of a withdrawal (the same reader as B6a's room).
       ownerSpend: new PostgresModelSpendStore(pool),
+      // P13 (R-35): the sign-up blind-index key (held by boot.hold above) and the identity lookup of the cancel link.
+      blindIndexKey,
+      identities: identityRepository,
       audit: consoleBillingAudit, clock: () => new Date(),
       reportPending: (code) => console.error(`[${code}]`)
     });

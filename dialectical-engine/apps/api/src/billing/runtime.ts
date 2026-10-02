@@ -10,6 +10,7 @@ import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/regis
 import { createSingleFlightErasureReconciler } from "../account-erasure.js";
 import { DekAccountEmailReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
+import { CancelLinkService } from "./cancel-link.js";
 import { createCardCheckSettlement } from "./card-change.js";
 import { ChargeStatusReader } from "./charge-status.js";
 import { CheckoutService } from "./checkout.js";
@@ -185,6 +186,16 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     xmoneyPublicKey: deps.connectors.xmoneyPublicKey, siteId: deps.connectors.siteId,
     publicAppUrl: deps.connectors.publicAppUrl, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit
   });
+  // P13 (A25): the emailed one-time cancel link. P12d's `required` refuses a composition without either input.
+  const cancelLinks = new CancelLinkService({
+    billing: repository, jobs, entitlements,
+    identities: required(deps.identities, "identities"),
+    blindIndexKey: required(deps.blindIndexKey, "blindIndexKey"),
+    recordsKey: deps.connectors.recordsKey, mail: deps.mail?.sender,
+    // R-7/A22: the one origin, P6a's `BillingConnectors.publicAppUrl`.
+    publicAppUrl: deps.connectors.publicAppUrl,
+    audit: deps.audit, clock: deps.clock
+  });
   // P12b: the subscriber's routes (every later P12/P13 task adds to it).
   const subscription: SubscriptionRouteDeps = Object.freeze({
     billing: repository,
@@ -211,7 +222,9 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     refunds,
     // P12e (R-17): the card change's order is built and signed by the checkout, for the account's own address.
     checkout,
-    accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore)
+    accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore),
+    // P13: the two public cancel routes.
+    cancelLinks
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({

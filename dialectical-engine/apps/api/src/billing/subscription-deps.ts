@@ -5,6 +5,7 @@ import type { XMoneyClient } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { AccountEmailReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
+import type { CancelLinkService } from "./cancel-link.js";
 import type { CheckoutService } from "./checkout.js";
 import type { BillingLegalGate } from "./index.js";
 import type { RefundDesk } from "./refunds.js";
@@ -50,4 +51,6 @@ export type SubscriptionRouteDeps = Readonly<{
   checkout: Pick<CheckoutService, "signEmbeddedOrder">;
   /** P8c's account email reader: the address the card form is opened for, as at checkout. */
   accountEmail: AccountEmailReader;
+  /** P13 (A25): the emailed one-time cancel link, for the two public routes that need no session. */
+  cancelLinks: Pick<CancelLinkService, "request" | "cancelByToken">;
 }>;
