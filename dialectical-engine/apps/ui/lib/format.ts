@@ -30,6 +30,7 @@ export function statusLabel(status: string, catalog?: MessageCatalog): string {
   if (s === "claimed") return t(catalog, "time.status.claimed");
   if (s === "running") return t(catalog, "time.status.running");
   if (s === "holding") return t(catalog, "time.status.holding");
+  if (s === "waiting") return t(catalog, "time.status.waiting");
   if (s === "settled") return t(catalog, "time.status.settled");
   if (s === "generating" || s === "in_progress" || s === "pending") return t(catalog, "time.status.generating");
   if (s === "failed" || s === "error") return t(catalog, "time.status.failed");

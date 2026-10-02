@@ -13,7 +13,14 @@ const SCREEN_TITLES: Record<string, string> = {
   "/new": "chrome.newDebate",
   "/settings": "chrome.settings",
   "/ai-transparency": "chrome.aiTransparency",
-  "/admin/workers": "chrome.workers"
+  "/admin/workers": "chrome.workers",
+  "/legal": "chrome.legalPages",
+  "/terms": "chrome.legalPages",
+  "/terms/versions": "chrome.legalPages",
+  "/privacy": "chrome.legalPages",
+  "/privacy/us-health-data": "chrome.legalPages",
+  "/cookies": "chrome.legalPages",
+  "/providers": "chrome.legalPages"
 };
 
 const AUTH_PATHS = new Set(["/login", "/sign-up", "/verify-email", "/enroll-mfa"]);
@@ -88,13 +95,13 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
-        <Link className="btn" href="/settings">
+        <Link className="btn topBarWide" href="/settings">
           {t(catalog, "chrome.account")}
         </Link>
         <Link className="btn btnDark" href="/new">
-          + {t(catalog, "chrome.newDebate")}
+          <span className="topBarNewLabel">+ {t(catalog, "chrome.newDebate")}</span>
         </Link>
-        <span className="roleChip" title={t(catalog, "chrome.askerRolePlaceholder")}>{t(catalog, "chrome.asker")}</span>
+        <span className="roleChip topBarWide" title={t(catalog, "chrome.askerRolePlaceholder")}>{t(catalog, "chrome.asker")}</span>
         <LanguageSwitcher />
         <ModeToggle />
         <Link className="iconBtn" href="/settings" aria-label={t(catalog, "chrome.settings")} title={t(catalog, "chrome.settings")}>

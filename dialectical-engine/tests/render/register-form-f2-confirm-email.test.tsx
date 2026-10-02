@@ -4,10 +4,12 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 
 let root: Root;
 let host: HTMLDivElement;
 const register = vi.fn();
+const checkAge = vi.fn();
 
 function field(name: string): HTMLInputElement {
   const input = host.querySelector<HTMLInputElement>(`input[name="${name}"]`);
@@ -28,12 +30,21 @@ async function type(name: string, value: string): Promise<void> {
   });
 }
 
-function fillOtherFields(): void {
+/* Age gate replaced the 18+ box (Turn 8): an adult date of birth, typed the way React sees it. */
+async function fillAdultDateOfBirth(): Promise<void> {
+  await type("dob-d", "01");
+  await type("dob-m", "01");
+  await type("dob-y", "1990");
+}
+
+async function fillOtherFields(): Promise<void> {
+  // First: its re-renders would reset the controlled fields assigned directly below.
+  await fillAdultDateOfBirth();
   field("email").value = "you@institution.edu";
   field("recovery-email").value = "recovery@example.test";
   field("password").value = "Correct horse 7!";
   field("confirm-password").value = "Correct horse 7!";
-  for (const name of ["adult-affirmed", "privacy-accepted", "terms-accepted"]) {
+  for (const name of ["privacy-accepted", "terms-accepted"]) {
     field(name).checked = true;
   }
 }
@@ -49,10 +60,11 @@ async function submit(scripted = true): Promise<void> {
 beforeEach(async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   register.mockReset().mockResolvedValue({ message: "Check your inbox for verification instructions." });
+  checkAge.mockReset().mockResolvedValue({ outcome: "allowed" });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => root.render(<SignUpFlow client={{ register }} />));
+  await act(async () => root.render(<SignUpFlow client={{ register, checkAge }} />));
 });
 
 afterEach(async () => {
@@ -72,14 +84,15 @@ describe("register form F2 confirm email", () => {
     expect(confirmation.required).toBe(true);
     expect(confirmation.autocomplete).toBe("off");
     expect(confirmation.parentElement!.className).toBe("authField");
+    // The age gate (Turn 8) adds the date-of-birth inputs after confirm-password, in en-GB's DMY order.
     expect(Array.from(host.querySelectorAll<HTMLInputElement>('input[name]:not([type="checkbox"])'), (input) => input.name))
-      .toEqual(["email", "confirm-email", "recovery-email", "password", "confirm-password"]);
+      .toEqual(["email", "confirm-email", "recovery-email", "password", "confirm-password", "dob-d", "dob-m", "dob-y"]);
   });
 
   // Property: empty confirmation has no feedback and cannot pass either submit route.
   // Breaks: treating two empty values as a match, non-idle feedback, or removing required/guard.
   it("keeps empty confirmation idle and refuses an empty scripted submission", async () => {
-    fillOtherFields();
+    await fillOtherFields();
     field("email").value = "";
     expect(validity().dataset.state).toBe("idle");
     expect(validity().textContent).toBe("");
@@ -93,7 +106,7 @@ describe("register form F2 confirm email", () => {
   it.each([true, false])("refuses a mismatched address (scripted=%s)", async (scripted) => {
     await type("email", "you@institution.edu");
     await type("confirm-email", "you@institutio.edu");
-    fillOtherFields();
+    await fillOtherFields();
     expect(validity().dataset.state).toBe("bad");
     expect(validity().textContent).toBe("✗ The addresses do not match");
     expect(host.querySelector("form")!.checkValidity()).toBe(true);
@@ -103,15 +116,16 @@ describe("register form F2 confirm email", () => {
 
   // Property: matching is trimmed and case-insensitive, and confirmation is absent from the API call.
   // Breaks: exact matching, altered success feedback, or adding/replacing a register argument.
+  // The 4th argument is the ISO date of birth, not `true`: the age gate replaced the 18+ box (Turn 8).
   it("accepts a typed case-folded match and sends exactly the original four arguments", async () => {
     await type("email", "you@institution.edu");
     await type("confirm-email", "You@Institution.edu ");
-    fillOtherFields();
+    await fillOtherFields();
     expect(validity().dataset.state).toBe("ok");
     expect(validity().textContent).toBe("✓ Addresses match");
     await submit();
     expect(register.mock.calls).toEqual([[
-      "you@institution.edu", "Correct horse 7!", "recovery@example.test", true
+      "you@institution.edu", "Correct horse 7!", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
     ]]);
   });
 
@@ -132,7 +146,7 @@ describe("register form F2 confirm email", () => {
   it.each(["email", "confirm-email"])("refuses a DOM mismatch after only %s changes without an event", async (name) => {
     await type("email", "you@institution.edu");
     await type("confirm-email", "you@institution.edu");
-    fillOtherFields();
+    await fillOtherFields();
     field(name).value = "changed@institution.edu";
     await submit();
     expect(register).not.toHaveBeenCalled();
@@ -140,14 +154,15 @@ describe("register form F2 confirm email", () => {
 
   // Property: the FormData comparison trims and folds both operands, independently of mirrors.
   // Breaks: missing either trim/case-fold or refusing a form because its mirrors are empty.
+  // The 4th argument is the ISO date of birth, not `true`: the age gate replaced the 18+ box (Turn 8).
   it("accepts trimmed FormData values while the React mirrors are empty", async () => {
-    fillOtherFields();
+    await fillOtherFields();
     // NBSP survives native email ASCII-whitespace sanitization and exercises String.trim itself.
     field("email").value = "\u00a0YOU@institution.edu\u00a0";
     field("confirm-email").value = "\u00a0you@INSTITUTION.edu\u00a0";
     await submit();
     expect(register.mock.calls).toEqual([[
-      "YOU@institution.edu", "Correct horse 7!", "recovery@example.test", true
+      "YOU@institution.edu", "Correct horse 7!", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
     ]]);
   });
 
@@ -155,7 +170,7 @@ describe("register form F2 confirm email", () => {
   // Breaks: treating trimmed empty values as a match in either feedback or the guard.
   it("keeps whitespace-only confirmation idle and refuses it", async () => {
     await type("confirm-email", "\u00a0");
-    fillOtherFields();
+    await fillOtherFields();
     field("email").value = "";
     expect(validity().dataset.state).toBe("idle");
     expect(validity().textContent).toBe("");
@@ -169,7 +184,7 @@ describe("register form F2 confirm email", () => {
     let resolve!: (value: { message: string }) => void;
     register.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
     expect(field("confirm-email").disabled).toBe(false);
-    fillOtherFields();
+    await fillOtherFields();
     field("confirm-email").value = "you@institution.edu";
     await submit();
     expect(field("email").disabled).toBe(true);
@@ -183,7 +198,7 @@ describe("register form F2 confirm email", () => {
   // Breaks: retaining a disabled confirmation after busy ends without a sent state.
   it("re-enables confirmation after registration fails", async () => {
     register.mockRejectedValueOnce(new Error("offline"));
-    fillOtherFields();
+    await fillOtherFields();
     field("confirm-email").value = "you@institution.edu";
     await submit();
     expect(field("email").disabled).toBe(false);

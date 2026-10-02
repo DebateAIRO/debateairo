@@ -212,6 +212,7 @@ async function publishThroughProduct(answer: Answer): Promise<PublicDebate> {
   );
 
   const transition = await application.publish({
+    contentCheck: { check: async () => ({ outcome: "ALLOW" }) },
     runId: answer.run_ref,
     answer,
     authenticated,

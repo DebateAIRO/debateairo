@@ -455,6 +455,40 @@ export async function readStructuralCeilingPolicyInputs(pool: Pool, registerVers
   });
 }
 
+/**
+ * B9 (budget spec §2.10) — the judge bound's `max_tokens`, for the boot check
+ * that prices the first position's own call. The runner reads the same member
+ * through its own policy reader (`policy.bounds.JUDGE.tokenCeiling`); the API
+ * reads only this. A register without it cannot boot the runner either.
+ */
+export async function readJudgeTokenCeiling(pool: Pool, registerVersion: number): Promise<number> {
+  const result = await pool.query<{ value_json: unknown }>(
+    `SELECT value_json FROM register.register_row
+     WHERE register_version=$1 AND row_key='acceptanceOrganCostBounds'`,
+    [registerVersion]
+  );
+  return judgeTokenCeilingFromValue(result.rows[0]?.value_json);
+}
+
+/**
+ * The same member read from an `acceptanceOrganCostBounds` value already in
+ * hand: the hosted publish command's plan asks the boot check of the rows it is
+ * about to seal (final review Part 1b, Important 3). `undefined` (no row) and a
+ * malformed value both refuse STRUCTURAL_CEILING_INPUTS_UNRESOLVED.
+ */
+export function judgeTokenCeilingFromValue(value: unknown): number {
+  const parsed = z.object({
+    kind: z.literal("ACCEPTANCE_ORGAN_COST_BOUNDS"),
+    organs: z.object({
+      JUDGE: z.object({ tokenCeiling: z.number().int().positive() }).passthrough()
+    }).passthrough()
+  }).passthrough().safeParse(value);
+  if (!parsed.success) {
+    throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "The judge bound's token ceiling is absent");
+  }
+  return parsed.data.organs.JUDGE.tokenCeiling;
+}
+
 export async function readPanelDiscoveryPolicy(pool: Pool, registerVersion: number): Promise<{
   readonly probeFreshnessMs: number;
   readonly probeMaxAttempts: 1;
@@ -845,16 +879,53 @@ export {
   COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
   COST_ENVELOPE_POLICY_ROW_KEY,
   costEnvelopeCeilings,
+  costEnvelopeBand,
   costEnvelopePolicyFromValue,
   readCostEnvelopePolicy,
   storyEnvelopeCeilings,
   type CostEnvelopeCeilings,
+  type CostEnvelopeBand,
   type CostEnvelopeCeilingTerms,
   type CostEnvelopePolicy,
   type CostEnvelopePolicyValue,
   type StoryEnvelopeCeilings,
   type StoryEnvelopeCeilingTerms
 } from "./cost-envelope-policy.js";
+// Paid plans G2: which countries may sign up and pay (optional row: absent = no country gate).
+export {
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COUNTRY_POLICY_ROW_KEY,
+  countryPolicyFromValue,
+  countryRule,
+  readCountryPolicy,
+  type CountryPolicy,
+  type CountryPolicyValue,
+  type CountryReason,
+  type CountryRule
+} from "./country-policy.js";
+// Paid plans (spec 2026-09-29 §2.5.1): the plans row and the billing switch.
+export {
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+  BILLING_PLANS_ROW_KEY,
+  PLAN_IDS,
+  billingPlansFromValue,
+  planById,
+  planCapMicros,
+  readBillingPlans,
+  type BillingPlan,
+  type BillingPlans,
+  type FreeFixedGauges,
+  type PlanId
+} from "./billing-plans.js";
+export {
+  BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
+  BILLING_POLICY_ROW_KEY,
+  assertBillingReady,
+  billingPolicyFromValue,
+  readBillingPolicy,
+  type BillingPolicy,
+  type BillingReadinessEnvelope
+} from "./billing-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,

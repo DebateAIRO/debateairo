@@ -14,4 +14,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Produsul V3 curent nu are resurse pentru regenerarea nodului, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Controalele pentru modul adâncimii, profunzimea examinării, lățimea ramificării, concurență și numărul maxim de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul rulării V3. Challenge schimbă acum starea locală a paginii, fără să pornească un răspuns durabil. Încărcarea istoricului generărilor poate eșua și poate afișa un panou gol. Asistența nu poate transforma aceste limitări în acțiuni funcționale.
+Produsul V3 curent nu are resurse pentru regenerarea nodului, feedback de evaluare, scrierea setărilor sau aprobarea adâncimii adaptive. Controalele pentru modul adâncimii, profunzimea examinării, lățimea ramificării, concurență și numărul maxim de tokeni sunt afișate ca opțiuni vechi, dar nu sunt trimise în contractul rulării V3. „Contestați” schimbă acum starea locală a paginii, fără să pornească un răspuns durabil. Încărcarea istoricului generărilor poate eșua și poate afișa un panou gol. Asistența nu poate transforma aceste limitări în acțiuni funcționale.

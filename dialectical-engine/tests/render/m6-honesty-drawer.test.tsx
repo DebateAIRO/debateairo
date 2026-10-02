@@ -254,7 +254,7 @@ describe("the envelope mark is worded by its record's reason (fix round 2)", () 
 
   it("says a problem with an AI service for a usage stop, and the budget for every other stop", () => {
     expect(conditionRecordLabel(envelopeRecord("PROVIDER_USAGE_UNREPORTED"), chromeEn)).toBe(SERVICE);
-    for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED", "DAILY_COST_ENVELOPE_REACHED"]) {
+    for (const code of ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_EXHAUSTED", "DAILY_COST_ENVELOPE_REACHED", "PERSON_ALLOWANCE_REACHED"]) {
       expect(conditionRecordLabel(envelopeRecord(code), chromeEn), code).toBe(BUDGET);
     }
     // A bare mark takes its answer's record; with none, it names no cause (round 3).
@@ -349,5 +349,38 @@ describe("the envelope mark is worded by its record's reason (fix round 2)", () 
     );
     expect(ro).toContain(`>${words(chromeRo, "debateChrome.condition.endedEarly")}<`);
     expect(words(chromeRo, "debateChrome.condition.endedEarly")).toBe("S-a încheiat mai devreme");
+  });
+});
+/**
+ * B9 (paid-plans spec §2.4.1): the runner's lift path for a debate a person's allowance kept to one lineage is
+ * English and speaks of engine words and of "the run owner" in the third person. It stays on the record for the
+ * operator; the reader's drawer never prints it, in any language. Every other lift path is printed as before.
+ */
+describe("B9 · a person's-allowance lift path is the operator's, never the reader's", () => {
+  function lineageRecord(reason: string, liftPath: string): Record_ {
+    return {
+      mark: "SINGLE-LINEAGE", scope: "answer", subject_ref: "node:fair:pro", reason, lift_path: liftPath, served_root_rule: null,
+      call_site_key: null, planned_leg_count: null, terminal_transport_outcome: null, review_outcome: null,
+      hidden_strength: null, hidden_score_threshold: null, hidden_score_threshold_source_ref: null,
+      excluded_from_served_number: null, judged_basis_count: null, affected_node_ids: ["node:fair:pro"]
+    };
+  }
+  const ALLOWANCE_LIFT = "Re-ask after the run owner's allowance window resets, or on a larger plan, so the other maker positions can be afforded";
+  const DAILY_LIFT = "Re-ask after the daily cost envelope resets so the other maker positions can be afforded";
+  const withLineage = (reason: string, liftPath: string): Answer => buildFairShapedAnswer({
+    condition_marks: [...buildFairShapedAnswer().condition_marks, "SINGLE-LINEAGE"],
+    condition_mark_records: [...buildFairShapedAnswer().condition_mark_records, lineageRecord(reason, liftPath)]
+  });
+
+  it("does not print the runner's remedy for a debate a person's allowance kept to one lineage", () => {
+    for (const locale of ["en", "ro"] as const) {
+      const text = visible(drawer(withLineage("PERSON_ALLOWANCE_REACHED", ALLOWANCE_LIFT), locale));
+      expect(text, locale).not.toContain(ALLOWANCE_LIFT);
+      expect(text, locale).not.toContain("allowance window");
+    }
+  });
+
+  it("keeps every other lift path as it was", () => {
+    expect(visible(drawer(withLineage("DAILY_COST_ENVELOPE_REACHED", DAILY_LIFT)))).toContain(`Lift path: ${DAILY_LIFT}`);
   });
 });

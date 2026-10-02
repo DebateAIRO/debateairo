@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Mức sử dụng gói của bạn",
+  "billing.usage.line": "Hôm nay {dayPct}% · Tuần này {weekPct}% · Tháng này {monthPct}%",
+  "billing.usage.lineFree": "Tháng này {monthPct}%",
+  "billing.usage.day": "Hôm nay",
+  "billing.usage.week": "Tuần này",
+  "billing.usage.month": "Tháng này",
+  "billing.usage.resets": "Đặt lại lúc {time}"
+}

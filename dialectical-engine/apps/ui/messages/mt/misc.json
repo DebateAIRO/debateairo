@@ -91,7 +91,7 @@
   "misc.answerHonesty.weights": "piżijiet {source}",
   "misc.answerHonesty.weightsBy": "piżijiet {source} minn {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "X’jista’ jaqleb dan",
-  "misc.model.houseUnavailable": "Awtur mhux irreġistrat",
-  "misc.model.noRecordedHouse": "Ebda awtur irreġistrat mhuwa disponibbli għal dan l-argument.",
+  "misc.model.houseUnavailable": "Żviluppatur tal-mudell mhux irreġistrat",
+  "misc.model.noRecordedHouse": "Ma huwa rreġistrat ebda żviluppatur tal-mudell għal dan l-argument.",
   "misc.scoring.unavailable": "L-interfaċċa tal-punteġġi mhijiex disponibbli."
 }

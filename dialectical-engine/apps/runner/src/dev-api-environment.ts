@@ -75,7 +75,8 @@ export const DEVELOPMENT_API_ENVIRONMENT_KEYS = Object.freeze([
   "HATCHET_WORKFLOW_NAME",
   "HATCHET_TLS_STRATEGY",
   "DEBATEAI_DEV_MAIL_CAPTURE_DIR",
-  "DEBATEAI_DEPLOYMENT_MODE"
+  "DEBATEAI_DEPLOYMENT_MODE",
+  "RECORDS_KEY_PATH"
 ] as const);
 
 export type DevelopmentApiEnvironmentReceipt = Readonly<{
@@ -461,7 +462,33 @@ function isExactEnvironmentWithoutDeclaredDeploymentMode(
     || isExactProviderRuntimeRefresh(declared, expected, profile)
     || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(declared, expected, profile)
     || isExactPublishedRegisterRefresh(declared, expected, profile)
-    || isExactLegacyEnvironmentWithoutSupportModelTarget(declared, expected, profile);
+    || isExactLegacyEnvironmentWithoutSupportModelTarget(declared, expected, profile)
+    || isExactEnvironmentWithoutRecordsKey(declared, expected, profile);
+}
+
+const RECORDS_KEY_ROW_PREFIX = "RECORDS_KEY_PATH=";
+
+/**
+ * Paid plans L1: an api.env written before the records key existed is this stack's own output
+ * minus its LAST row. It is accepted (and rewritten) only when appending that one row makes it the
+ * expected file, or one of the four refreshes above; anything else stays drift. A file that also
+ * predates the declared deployment mode reaches here through
+ * isExactEnvironmentWithoutDeclaredDeploymentMode, which appends its own row first.
+ */
+function isExactEnvironmentWithoutRecordsKey(
+  existing: string,
+  expected: string,
+  profile: DevelopmentAuthStackProfile
+): boolean {
+  if (!existing.endsWith("\n") || existing.includes(RECORDS_KEY_ROW_PREFIX)) return false;
+  const lastRow = expected.slice(expected.lastIndexOf(RECORDS_KEY_ROW_PREFIX));
+  if (!lastRow.startsWith(RECORDS_KEY_ROW_PREFIX) || !lastRow.endsWith("\n")) return false;
+  const upgraded = existing + lastRow;
+  return upgraded === expected
+    || isExactProviderRuntimeRefresh(upgraded, expected, profile)
+    || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(upgraded, expected, profile)
+    || isExactPublishedRegisterRefresh(upgraded, expected, profile)
+    || isExactLegacyEnvironmentWithoutSupportModelTarget(upgraded, expected, profile);
 }
 
 export async function assembleDevelopmentApiEnvironment(
@@ -481,7 +508,8 @@ export async function assembleDevelopmentApiEnvironment(
     assertSecretFile(join(custodyRoot, "secrets", "support-kek.bin")),
     assertSecretFile(join(custodyRoot, "secrets", "corpus-kek.bin")),
     assertSecretFile(join(custodyRoot, "secrets", "blind-index-key.bin")),
-    assertSecretFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"))
+    assertSecretFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin")),
+    assertSecretFile(join(custodyRoot, "secrets", "records-key.bin"))
   ]);
   const databaseSource = await readPrivateFile(join(custodyRoot, "database-principals.env"));
   const hatchetSource = await readPrivateFile(join(custodyRoot, "hatchet.env"));
@@ -544,7 +572,8 @@ export async function assembleDevelopmentApiEnvironment(
     ["HATCHET_WORKFLOW_NAME", "debateai-dev"],
     ["HATCHET_TLS_STRATEGY", "none"],
     ["DEBATEAI_DEV_MAIL_CAPTURE_DIR", join(custodyRoot, "mail")],
-    ["DEBATEAI_DEPLOYMENT_MODE", "local"]
+    ["DEBATEAI_DEPLOYMENT_MODE", "local"],
+    ["RECORDS_KEY_PATH", join(custodyRoot, "secrets", "records-key.bin")]
   ]);
   const source = environmentSource(values);
   const reused = await publishExactFile(
@@ -556,6 +585,7 @@ export async function assembleDevelopmentApiEnvironment(
       || isExactPublishedRegisterRefresh(existing, source, profile)
       || isExactLegacyEnvironmentWithoutSupportModelTarget(existing, source, profile)
       || isExactEnvironmentWithoutDeclaredDeploymentMode(existing, source, profile)
+      || isExactEnvironmentWithoutRecordsKey(existing, source, profile)
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
 }

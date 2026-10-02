@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Gineann samhlacha IS gach rud sa díospóireacht seo — argóintí, athbhreithnithe, scóir agus an breithiúnas — marcáiltear ar bhealach atá inléite ag meaisín é, agus d’fhéadfadh sé a bheith míchruinn.",
+  "debateChrome.status.waiting": "Ag fanacht le tosú. Tosóidh do dhíospóireacht léi féin ag {time}.",
+  "debateChrome.status.waitingOwnDebates": "Tá do dhíospóireachtaí eile ag úsáid an chuid eile de do theorainn faoi láthair. Tosóidh an díospóireacht seo léi féin chomh luath agus a chríochnaíonn ceann acu.",
   "debateChrome.backToLibrary": "← Ar ais chuig an leabharlann",
   "debateChrome.loading": "Á lódáil…",
   "debateChrome.error.claimGenerationFailed": "Theip ar ghiniúint an mhaímh",
@@ -298,5 +300,6 @@
   "requestFailure.kind.UNREADABLE": "Níorbh fhéidir freagra an chomhordaitheora a léamh, mar sin ní fios cén toradh a bhí ar an iarratas.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Dhiúltaigh an comhordaitheoir do rogha an phlean. Roghnaigh Saor in aisce nó Préimh, ansin bain triail eile as.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Dhiúltaigh an comhordaitheoir don iarratas: níl samhail atá de dhíth ar an bplean seo ar fáil faoi láthair. Bain triail eile as níos déanaí, nó roghnaigh an plean eile.",
+  "requestFailure.kind.ALREADY_WAITING": "Ní féidir ach le ceist amháin fanacht ag an am céanna. Cuir an cheist seo nuair a bheidh do dhíospóireacht atá ag fanacht tosaithe.",
   "requestFailure.kind.UNCLASSIFIED": "Theip ar an iarratas sular tháinig aon fhreagra, mar sin ní fios cén toradh a bhí air. Ní cinneadh de chuid an chomhordaitheora é seo."
 }

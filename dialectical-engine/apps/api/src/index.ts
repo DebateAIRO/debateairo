@@ -2,16 +2,24 @@ import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
+  AccountEmailSchema,
   AccountErasureScheduleRequestSchema,
   AccountErasureCancelRequestSchema,
   AccountErasureStatusSchema,
+  EmailChangeCancelledSchema,
+  EmailChangeConfirmedSchema,
+  EmailChangeLinkRequestSchema,
+  EmailChangePendingSchema,
+  EmailChangeRequestSchema,
   AnswerSchema,
   AnswerIndexSchema,
   AnswerStorySchema,
   AnswerDisclosureSchema,
   ArgumentLanguageSchema,
   AskAcceptedSchema,
+  AskAlreadyWaitingSchema,
   AskRequestSchema,
+  askQuestionMaxBytes,
   DeploymentSchema,
   EventTypeSchema,
   ExecutionLedgerDigestSchema,
@@ -24,6 +32,7 @@ import {
   PrivateDebateErasureRequestSchema,
   PrivateDebateErasureStatusSchema,
   PLAN_TIER_ROSTERS,
+  PublicationContentRefusalSchema,
   PublicationTransitionSchema,
   PublicDebateListSchema,
   PublicDebateSchema,
@@ -39,6 +48,7 @@ import {
   type AnswerStory,
   type ArgumentLanguage,
   type AskAccepted,
+  type AskApplied,
   type AskRequest,
   type Deployment,
   type ExecutionLedgerDigest,
@@ -46,12 +56,33 @@ import {
   type InvestigationAccepted,
   type Node,
   type RunProjection,
-  type Session
+  type Session,
+  CRISIS_SUPPORT_OFFERED,
+  detectCrisis,
+  warmCrisisCheck,
+  SENSITIVE_DATA_CONSENT_REQUIRED,
+  SENSITIVE_DATA_NOTICE_VERSION,
+  SensitiveDataConsentRequestSchema,
+  AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
+  AGE_REFUSAL_COOKIE_NAME,
+  AGE_REFUSAL_COOKIE_VALUE,
+  AgeCheckRequestSchema,
+  DateOfBirthSchema,
+  PUBLICATION_CONTENT_REFUSED_MESSAGE,
+  RegisterLegalDocumentsSchema,
+  type RegisterLegalDocuments,
+  LegalAcceptRequestSchema,
+  LegalStatusResponseSchema,
+  GeoAvailabilityResponseSchema,
+  AskRoomQuerySchema,
+  AskRoomResponseSchema
 } from "@debateai/contract";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
+import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
+  RunCostSubstitutionRepository,
   RunRepository,
   decryptLeasedContentForRun,
   prepareLeasedContentEncryptionForRun,
@@ -59,11 +90,22 @@ import {
   withRunContentLease,
   type CryptoEnvelope,
   type DiscoveredPanelMember,
-  type RunOwnershipAccess
+  type RunOwnershipAccess,
+  type WaitingRunCursor
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
-import { detectArgumentLanguage, TypedDomainError, type RiskTier, type TierSource } from "@debateai/kernel";
+import {
+  AGE_RULE_VERSION,
+  checkDob,
+  detectArgumentLanguage,
+  dobFromIso,
+  meetsMinimumAge,
+  MIN_AGE,
+  TypedDomainError,
+  type RiskTier,
+  type TierSource
+} from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
 import { STORY_UNREADABLE, answerCarriesStoryLabel, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
 import type { Hatchet } from "@hatchet-dev/typescript-sdk";
@@ -78,21 +120,51 @@ import {
   type RegistrationApplication
 } from "./registration.js";
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
+import {
+  AskAlreadyWaitingError,
+  nextWholeMinute,
+  runSettingsClassOfAsk,
+  type AskRoomAnswer,
+  type AskRoomPort,
+  type AskRoomReader,
+  type AskWaitingLinePort,
+  type WaitingStart
+} from "./ask-room.js";
+import {
+  ASK_SIGN_IN_REQUIRED,
+  appliedAskOf,
+  coarseFitFor,
+  decideRoomSettings,
+  resolveBillingAsk,
+  type AskBilling
+} from "./ask-billing.js";
 import type { MfaApplication } from "./mfa.js";
+import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { PublicationApplication } from "./publications.js";
+import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
+import type { LegalAcceptanceApplication } from "./legal.js";
+import type { CountryGate } from "./country-gate.js";
+import {
+  EmailChangeError,
+  type EmailChangeErrorCode,
+  type EmailChangePending,
+  type EmailChangeSession,
+  type EmailSettings
+} from "./email-change.js";
 import type { RecoveryApplication } from "./recovery.js";
-import { normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
+import { clientIpNetworkScope, normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import {
   installSupportRoutes,
   type SupportAdmission,
   type SupportApplication,
   type SupportRoutePath
 } from "./support/index.js";
+import { installBillingRoutes, type BillingRouteOptions } from "./billing/index.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
@@ -207,6 +279,9 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "ANSWER_MEMORY_OBSERVATION_FAILED",
   "ANSWER_PERSIST_FAILED",
   "ARROW_ENDPOINT_ABSENT",
+  "ASK_ALREADY_WAITING",
+  "ASK_COARSE_FIT_INPUT_INVALID",
+  "ASK_ROOM_DAY_UNSETTLED",
   "ATTEMPT_ACCESS_DEPTH_MISSING",
   "AUTH_POLICY_INVALID",
   "AUTH_POLICY_UNRESOLVED",
@@ -228,6 +303,11 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "BAND_LABEL_INVALID",
   "BAND_LABEL_UNKNOWN",
   "BAND_ORDER_INVALID",
+  "BILLING_ENTITLEMENT_ROW_INVALID",
+  "BILLING_OWNER_REF_INVALID",
+  "BILLING_OWNER_UNKNOWN",
+  "BILLING_PLAN_GAUGES_MISSING",
+  "BILLING_PLAN_UNKNOWN",
   "BLANK_QUERY_REFUSED",
   "BLOCKED_TERMINAL_RETIRED",
   "BRANCH_FREEZE_EPSILON_PROVENANCE_MISSING",
@@ -444,6 +524,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PANEL_WEIGHTING_CONTROLS_UNRESOLVED",
   "PANEL_WEIGHTING_UNRESOLVED",
   "PARTIAL_SCORE_RUN_IDENTITY",
+  "PERSON_ALLOWANCE_REACHED",
   "POSITIVE_CAPTURE_REQUIRED",
   "PRESENT_SIGNAL_FRESHNESS_UNKNOWN",
   "PRIVATE_CONTENT_ERASED",
@@ -507,6 +588,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
   "RUN_CEILING_BELOW_FIRST_CALL",
+  "RUN_CEILING_BELOW_ONE_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
@@ -629,6 +711,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "VERDICT_LABEL_CONTROLS_PROVENANCE_MISSING",
   "VERDICT_LABEL_CONTROLS_UNRESOLVED",
   "VERDICT_LABEL_INPUT_INVALID",
+  "WAITING_LINE_REQUIRES_BAND",
   "WAIT_RESOLUTION_INCOMPLETE",
   "WAIT_RESOLUTION_NOT_CURRENT",
   "WAY_OF_KNOWING_DOWNGRADE_NODE_UNRESOLVED",
@@ -1067,6 +1150,8 @@ export function apiOperationalErrorDiagnostic(error: unknown): string {
 }
 
 export const authorizationPolicyInventory = Object.freeze([
+  // Age gate (Turn 8): the browser-only pre-register check, like login held to the exact Origin.
+  { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
@@ -1081,13 +1166,29 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
   { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
+  { route: "GET /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "read-age-confirmation" },
+  { route: "POST /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "confirm-age" },
+  // Sensitive-data consent (V, 2026-09-29): the one-time agreement before the first debate.
+  { route: "GET /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "read-sensitive-data-consent" },
+  { route: "POST /v1/account/sensitive-data-consent", auth: "user", resource: "session-self", action: "give-sensitive-data-consent" },
   { route: "DELETE /v1/account", auth: "user", resource: "identity", action: "schedule-erasure" },
   { route: "GET /v1/account/erasure", auth: "user", resource: "identity", action: "read-erasure" },
   { route: "POST /v1/account/erasure/cancel", auth: "user", resource: "identity", action: "cancel-erasure" },
+  { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
+  // Turn 14 — change email. The owner routes ride the cookie session and CSRF;
+  // the two link routes need only the first-party Origin and the mailed bearer.
+  { route: "GET /v1/account/email", auth: "user", resource: "identity", action: "read-email" },
+  { route: "POST /v1/account/email/change", auth: "user", resource: "identity", action: "request-email-change" },
+  { route: "POST /v1/account/email/change/resend", auth: "user", resource: "identity", action: "resend-email-change" },
+  { route: "DELETE /v1/account/email/change", auth: "user", resource: "identity", action: "cancel-email-change" },
+  { route: "POST /v1/account/email/change/confirm", auth: "public", origin: "trusted", resource: "identity", action: "confirm-email-change" },
+  { route: "POST /v1/account/email/change/cancel", auth: "public", origin: "trusted", resource: "identity", action: "cancel-email-change-link" },
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+  { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // DL1-F7: every mutating support route requires the exact first-party Origin,
   // for anonymous callers too. Without it a page on any site could drive every
   // one of its visitors' browsers into the support surface — spending the shared
@@ -1105,6 +1206,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/support/case/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
+  { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
@@ -1123,7 +1225,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
-  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" }
+  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
+  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
@@ -1131,7 +1234,7 @@ export const authorizationPolicyInventory = Object.freeze([
   session?: RouteSessionPolicy;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status";
+    "support-status" | "geo" | "billing";
   action: string;
 }>[]);
 
@@ -1201,7 +1304,7 @@ export const AUTH_PASSWORD_MAX_BYTES = 1_024 as const;
  * verbatim on every model attempt — so an unbounded question turns one ask into unbounded model
  * spend. Bounded at the route (no contract edit) in UTF-8 bytes, measured after the contract trim.
  */
-export const ASK_QUESTION_MAX_BYTES = 8_192 as const;
+export const ASK_QUESTION_MAX_BYTES = askQuestionMaxBytes();
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const RETIRED_DEV_HEADER=["x","user","dev","token"].join("-");
@@ -1286,6 +1389,30 @@ export type AskPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
 
+export interface EmailChangeApplication {
+  settings(session: EmailChangeSession): Promise<EmailSettings | null>;
+  request(
+    session: EmailChangeSession,
+    input: Readonly<{ newEmail: string; grantToken: string }>,
+    source: AuthSourceContext
+  ): Promise<EmailChangePending>;
+  resend(session: EmailChangeSession, source: AuthSourceContext): Promise<EmailChangePending>;
+  cancel(session: EmailChangeSession, source: AuthSourceContext): Promise<void>;
+  confirm(token: string, source: AuthSourceContext): Promise<void>;
+  cancelByLink(token: string, source: AuthSourceContext): Promise<void>;
+}
+
+const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Object.freeze({
+  EMAIL_INVALID: 422,
+  EMAIL_UNCHANGED: 422,
+  STEP_UP_REQUIRED: 403,
+  RESEND_COOLDOWN: 429,
+  NO_PENDING_CHANGE: 404,
+  LINK_INVALID: 404,
+  LINK_EXPIRED: 410,
+  ADDRESS_UNAVAILABLE: 409
+});
+
 export interface ApiOptions {
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
@@ -1293,6 +1420,13 @@ export interface ApiOptions {
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly publications?: PublicationApplication;
+  /**
+   * hate-speech S02 (SPEC-v2 R1, D-S02-22): the pre-publish content check,
+   * composed in main.ts. Absent, every publish answers 503
+   * PUBLICATION_CHECK_UNAVAILABLE — a composition that forgets the check
+   * publishes nothing (fail closed), never everything.
+   */
+  readonly publicationContentCheck?: PublicationContentCheck;
   /**
    * Verdict story (spec 2026-09-26 §10). Optional like `publications`: the
    * many test compositions of AskApplication do not supply it, and the route
@@ -1309,6 +1443,10 @@ export interface ApiOptions {
   readonly disclosures?: AnswerDisclosureApplication;
   readonly accountErasure?: AccountErasureApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
+  /** Paid plans L4: re-acceptance of the Terms and the Privacy Policy; the routes answer 503 without it. */
+  readonly legal?: LegalAcceptanceApplication;
+  /** Turn 14 — change email; the routes answer a closed 503 when it is absent. */
+  readonly emailChange?: EmailChangeApplication;
   readonly allowedOrigin?: string;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
@@ -1316,7 +1454,61 @@ export interface ApiOptions {
   /** B10 admission budgets; optional for test compositions, always supplied by main. */
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
+  /** Budget spec §2.7 (B7a): the room read. Absent (local mode, or no band) answers FITS. */
+  readonly askRoom?: AskRoomReader;
+  /**
+   * Paid plans (B8, ruling R-28): with billing on, the room read decides its
+   * query's settings as `submit` would (the plan's tier; Free's fixed gauges).
+   * Absent, the room is read for the settings as sent.
+   */
+  readonly askBilling?: AskBilling;
+  /**
+   * Paid plans (spec 2026-09-29 §2.5; B7a onward): the billing routes' dependencies,
+   * supplied by main only when hosted with billing on; each route whose member is
+   * absent answers the house 404, which is local mode and billing off alike.
+   */
+  readonly billing?: BillingRouteOptions;
   readonly support?: SupportApplication;
+  /**
+   * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
+   * register version in force publishes `countryPolicy`; absent, every route behaves exactly as before.
+   */
+  readonly countryGate?: CountryGate;
+}
+
+/**
+ * The check a route composed without `publicationContentCheck` runs: no judge,
+ * no record, always UNAVAILABLE `JUDGE_NOT_CONFIGURED` (SPEC-v2 R7 last cause).
+ * PLAN S02-11 placed it in publication-check/check.ts, which is outside this
+ * cluster's file contract; it lives beside the one route that uses it.
+ */
+const UNCONFIGURED_PUBLICATION_CONTENT_CHECK: PublicationContentCheck = Object.freeze({
+  check: async () => Object.freeze({ outcome: "UNAVAILABLE" as const, cause: "JUDGE_NOT_CONFIGURED" as const })
+});
+
+/**
+ * hate-speech S02 (D-S02-21, SPEC-v2 §6 step 9; FIX-HS2-p1 sd-N5): in a LOCAL deployment, SIGUSR2 switches the
+ * publish check's judge OFF — idempotently: it writes the switch's flag file, and a second signal leaves it off —
+ * and writes one content-free line per signal. Removing the flag file switches the judge back on; the state lives
+ * in the file, so it survives an API restart. Off means every publish answers 503 — the switch can make publishing
+ * refuse, never skip the check. main.ts installs it only when the deployment is not hosted; the boot script itself
+ * registers no process signal (tests/architecture/t1-argon2-worker-contract.test.ts:495, :706-707).
+ */
+export function installPublicationJudgeSwitchSignal(
+  target: Readonly<{ on(event: "SIGUSR2", listener: () => void): unknown }>,
+  judgeSwitch: Readonly<{ switchOff(): boolean }>,
+  log: (line: string) => void = (line) => { console.error(line); }
+): void {
+  // FIX-HS2-p2 api-N2: a listener that throws would take the API down; the failure is logged as a content-free code.
+  target.on("SIGUSR2", () => {
+    let line: string;
+    try {
+      line = JSON.stringify({ event: "api.publication_check.switch", configured: judgeSwitch.switchOff() });
+    } catch {
+      line = JSON.stringify({ event: "api.publication_check.switch", error: "PUBLICATION_JUDGE_SWITCH_FAILED" });
+    }
+    try { log(line); } catch { /* a failing log sink must not end the process either */ }
+  });
 }
 
 export interface EvaluatorDevMenuApplication {
@@ -1344,7 +1536,8 @@ export interface EvaluatorDevMenuApplication {
  * resets — so a caller waits the right amount of time instead of hammering the
  * surface or giving up on a debate it could still have.
  */
-export function askRefusalStatus(code: string): 422 | 429 {
+export function askRefusalStatus(code: string): 401 | 422 | 429 {
+  if (code === ASK_SIGN_IN_REQUIRED) return 401;
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
 
@@ -1382,6 +1575,26 @@ export class AskRefusal extends Error {
     super(refusal.message);
     this.name = "AskRefusal";
     this.code = refusal.code;
+  }
+}
+
+/**
+ * Budget spec §2.7 (B6b) — ASK_ALREADY_WAITING: the one ask refusal whose body
+ * names something, the person's own waiting run and its expected start, and
+ * (final review Part 1b, Important 1) whether that start waits on the person's
+ * own running debates rather than a reset.
+ */
+export class AskAlreadyWaitingRefusal extends AskRefusal {
+  readonly runRef: string;
+  readonly waitsUntil: Date;
+  readonly waitsFor: WaitsFor | null;
+
+  constructor(refusal: AskAlreadyWaitingError) {
+    super(refusal);
+    this.name = "AskAlreadyWaitingRefusal";
+    this.runRef = refusal.runRef;
+    this.waitsUntil = refusal.waitsUntil;
+    this.waitsFor = refusal.waitsFor;
   }
 }
 
@@ -1454,6 +1667,58 @@ function expiredCookies(): readonly string[] {
   ]);
 }
 
+/**
+ * Age gate (8j): the 30-day lockout a refusal leaves behind. It carries no personal data —
+ * one constant value — and only decides which screen is shown and that a new check or
+ * registration from this browser is refused while it lasts.
+ */
+function ageRefusalCookie(): string {
+  return `${AGE_REFUSAL_COOKIE_NAME}=${AGE_REFUSAL_COOKIE_VALUE}; Path=/; `
+    + `Max-Age=${AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+function ageRefusalCookiePresent(raw: unknown): boolean {
+  if (typeof raw !== "string" || /[\r\n\0]/.test(raw)) return false;
+  return raw.split(";").some((member) => {
+    const index = member.indexOf("=");
+    return index > 0 && member.slice(0, index).trim() === AGE_REFUSAL_COOKIE_NAME
+      && member.slice(index + 1).trim() === AGE_REFUSAL_COOKIE_VALUE;
+  });
+}
+
+/** The country the edge reported for this request, when it reported one (recorded, never decisive). */
+function edgeCountry(headers: Readonly<Record<string, unknown>>): string | null {
+  const value = headers["cf-ipcountry"];
+  return typeof value === "string" && /^[A-Z]{2}$/.test(value) && value !== "XX" && value !== "T1"
+    ? value : null;
+}
+
+/** A `YYYY-MM-DD` value, when it is a real calendar date that is not in the future. */
+function dateOfBirthValue(value: unknown): ReturnType<typeof dobFromIso> {
+  const parsed = DateOfBirthSchema.safeParse(value);
+  if (!parsed.success) return null;
+  const parts = dobFromIso(parsed.data);
+  return parts !== null && checkDob(parts).code === "ok" ? parts : null;
+}
+
+/** An age-check body's `date_of_birth` (the body carries nothing else). */
+function requestDateOfBirth(body: unknown): ReturnType<typeof dobFromIso> {
+  const parsed = AgeCheckRequestSchema.safeParse(body);
+  return parsed.success ? dateOfBirthValue(parsed.data.date_of_birth) : null;
+}
+
+function ageRefused(reply: FastifyReply): FastifyReply {
+  return reply.status(403).header("set-cookie", ageRefusalCookie())
+    .send({ error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" });
+}
+
+/** Fails closed: without the consent store, no debate can be admitted and none is recorded. */
+function sensitiveDataConsentUnavailable(reply: FastifyReply): FastifyReply {
+  return reply.status(503).send({
+    error: "SENSITIVE_DATA_CONSENT_UNAVAILABLE", message: "SENSITIVE_DATA_CONSENT_UNAVAILABLE"
+  });
+}
+
 function refreshedCookies(input: Readonly<{
   sessionToken: string;
   csrfToken: string | null;
@@ -1465,6 +1730,8 @@ function refreshedCookies(input: Readonly<{
 }
 
 export function buildApi(options: ApiOptions): FastifyInstance {
+  // Crisis check: compile its patterns now, not on the first question (about a second, once).
+  warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
     ? undefined : new URL(options.allowedOrigin).origin;
   const api = Fastify({
@@ -1502,21 +1769,40 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.decorateRequest("session");
   api.decorateRequest("authenticatedSession");
   api.decorateRequest("cookieRefresh");
+  /**
+   * Paid plans L3b: the Terms and Privacy pairs a register request carried, keyed by the request object
+   * (filled by the register preHandler hook below, read by sourceFor). A WeakMap, so nothing outlives the
+   * request and no request decoration is added.
+   */
+  const registerLegalDocuments = new WeakMap<object, RegisterLegalDocuments>();
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
     readonly headers: Readonly<Record<string, unknown>>;
     readonly raw: { readonly socket: { readonly remoteAddress: string | undefined } };
-  }) => Object.freeze({
+  }) => {
     // Registration, MFA and sessions share T2's one canonical public source.
-    ip: normalizeClientIp(request.ip)
+    const ip = normalizeClientIp(request.ip)
       ?? normalizeClientIp(request.raw.socket.remoteAddress)
-      ?? "unknown",
-    userAgent: typeof request.headers["user-agent"] === "string"
-      ? request.headers["user-agent"] as string
-      : "unknown",
-    requestId: request.id
-  });
+      ?? "unknown";
+    // Age gate + paid plans G3a (RULINGS-R3 R3-3): the country recorded with an age check — the edge's
+    // cf-ipcountry when a Cloudflare edge reported one, else the country gate's own lookup of this
+    // address when a gate is composed (the V3 kit has Caddy, no Cloudflare). Recorded, never decisive.
+    const countryCode = edgeCountry(request.headers) ?? options.countryGate?.recordedCountry(ip) ?? null;
+    // Paid plans L3b: present only on a register request whose hook parsed a well-formed triple.
+    const legal = registerLegalDocuments.get(request);
+    return Object.freeze({
+      ip,
+      userAgent: typeof request.headers["user-agent"] === "string"
+        ? request.headers["user-agent"] as string
+        : "unknown",
+      requestId: request.id,
+      // Age gate (R3-3): the country computed above (the edge's, else the country gate's lookup),
+      // left out when neither gives one.
+      ...(countryCode === null ? {} : { countryCode }),
+      ...(legal === undefined ? {} : { legal })
+    });
+  };
   const admissionRefusalAuditedUntil = new Map<string, number>();
   const ADMISSION_ALLOWED: AdmissionDecision = Object.freeze({ allowed: true as const });
   /**
@@ -1640,6 +1926,52 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
   /**
+   * Paid plans G3a (spec §2.3.3): the country gate in front of register. The registration mount region
+   * is frozen (S04), so — like the age gate below — the refusal is decided in a hook, before the date of
+   * birth is judged and before any account work. The answer is the code only.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
+    if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
+  });
+  /**
+   * Age gate (8d → 8j) in front of register. The registration mount region is frozen (S04), so
+   * the date is decided here: a browser inside its 30-day lockout, or an under-age date, is
+   * refused with the lockout cookie and the service is never called; a malformed or impossible
+   * date is invalid input. Only a date of at least MIN_AGE affirms adulthood for the region,
+   * and it overwrites anything the client claimed. The date itself goes no further.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (ageRefusalCookiePresent(request.headers.cookie)) return ageRefused(reply);
+    const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown>
+      : null;
+    const dateOfBirth = body === null ? null : dateOfBirthValue(body.date_of_birth);
+    if (body === null || dateOfBirth === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    if (!meetsMinimumAge(dateOfBirth)) return ageRefused(reply);
+    body.adult_affirmed = true;
+  });
+  /**
+   * Paid plans L3b (spec §2.3.2): the pairs of the documents the sign-up page displayed. The registration
+   * mount region is frozen (S04), so — as the age gate does for the date — they are read here and travel to
+   * the service on the source (sourceFor), never in the region's four input members. A missing or malformed
+   * triple travels as absent, which the service refuses as LEGAL_DOCUMENT_STALE when the records key is
+   * composed. Runs after the age gate's hook, so a refused date never gets this far.
+   */
+  api.addHook("preHandler", async (request) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown>
+      : null;
+    if (body === null) return;
+    const legal = RegisterLegalDocumentsSchema.safeParse({
+      terms: body.terms, privacy: body.privacy, locale: body.locale
+    });
+    if (legal.success) registerLegalDocuments.set(request, legal.data);
+  });
+  /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
    * stays false), returned Fastify's own {message,error,statusCode} envelope —
    * a framework fingerprint and a route-existence oracle. One constant typed
@@ -1677,6 +2009,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(transportFault.statusCode).send({
         error: transportFault.code, message: transportFault.code
       });
+    }
+    // Budget spec §2.7 (B6b): 422 with the waiting run and its expected start,
+    // and nothing else. Every other refusal keeps the envelope below.
+    if (knownError instanceof AskAlreadyWaitingRefusal) {
+      return reply.status(422).send(AskAlreadyWaitingSchema.parse({
+        error: "ASK_ALREADY_WAITING",
+        message: "ASK_ALREADY_WAITING",
+        run_ref: knownError.runRef,
+        waits_until: knownError.waitsUntil.toISOString(),
+        ...(knownError.waitsFor === null ? {} : { waits_for: knownError.waitsFor })
+      }));
     }
     const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
     const authFlow = knownError instanceof AuthFlowError;
@@ -1789,6 +2132,59 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       reply.header("set-cookie", expiredCookies());
       return reply.send({ revoked });
     });
+    // Age gate (8k): the one-time check for accounts created before the date-of-birth field.
+    api.get("/v1/auth/age-confirmation", routePolicy("GET /v1/auth/age-confirmation"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.readAgeConfirmation === undefined) {
+        return reply.status(503).send({ error: "AGE_CHECK_UNAVAILABLE", message: "AGE_CHECK_UNAVAILABLE" });
+      }
+      return reply.send({ status: await options.sessions!.readAgeConfirmation(authenticated) });
+    });
+    api.post("/v1/auth/age-confirmation", credentialRoutePolicy("POST /v1/auth/age-confirmation"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.confirmAccountAge === undefined) {
+        return reply.status(503).send({ error: "AGE_CHECK_UNAVAILABLE", message: "AGE_CHECK_UNAVAILABLE" });
+      }
+      const dateOfBirth = requestDateOfBirth(request.body);
+      if (dateOfBirth === null) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      const source = sourceFor(request);
+      const outcome = await options.sessions!.confirmAccountAge(authenticated, {
+        passed: meetsMinimumAge(dateOfBirth),
+        minAgeApplied: MIN_AGE,
+        // R3-3: the same recorded country as registration — the edge's, else the country gate's.
+        countryCode: source.countryCode ?? null,
+        ruleVersion: AGE_RULE_VERSION
+      }, source);
+      if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (outcome === "passed") return reply.send({ outcome: "allowed" });
+      // Frozen: every session of the account is gone; this browser keeps the refusal.
+      reply.header("set-cookie", [...expiredCookies(), ageRefusalCookie()]);
+      return reply.send({ outcome: "refused" });
+    });
+    // Sensitive-data consent (V, 2026-09-29): read and give the one-time agreement.
+    api.get("/v1/account/sensitive-data-consent", routePolicy("GET /v1/account/sensitive-data-consent"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      return reply.send({ status: await options.sessions!.readSensitiveDataConsent(authenticated) });
+    });
+    api.post("/v1/account/sensitive-data-consent", credentialRoutePolicy("POST /v1/account/sensitive-data-consent"), async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      if (options.sessions!.recordSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      const body = SensitiveDataConsentRequestSchema.safeParse(request.body);
+      if (!body.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      const outcome = await options.sessions!.recordSensitiveDataConsent(authenticated, {
+        noticeVersion: SENSITIVE_DATA_NOTICE_VERSION,
+        locale: body.data.locale
+      });
+      if (outcome === "SESSION_NOT_FOUND") return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+      return reply.send({ status: "given" });
+    });
     api.post("/v1/auth/step-up", credentialRoutePolicy("POST /v1/auth/step-up"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
       if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
@@ -1805,7 +2201,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         password: typeof body.password === "string" ? body.password : "",
         code: typeof body.code === "string" ? body.code : "",
         ...(authorization === undefined ? {} : { authorization:
-          authorization.action === "DELETE_ACCOUNT"
+          !("target_run_id" in authorization)
             ? { action: authorization.action }
             : { action: authorization.action, targetRunId: authorization.target_run_id }
         })
@@ -1821,7 +2217,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           || rotated.grantToken === undefined
           || rotated.grantExpiresAt === undefined
           ? {}
-          : { step_up_grant: authorization.action === "DELETE_ACCOUNT"
+          : { step_up_grant: !("target_run_id" in authorization)
               ? {
                   token: rotated.grantToken,
                   action: authorization.action,
@@ -1917,6 +2313,93 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }));
     }
   );
+  // Turn 14 — change email (design doc 14A/14B/14C).
+  const emailChangeSession = (authenticated: AuthenticatedSession): EmailChangeSession =>
+    Object.freeze({ userId: authenticated.userId, sessionId: authenticated.session.session_id });
+  const pendingBody = (pending: EmailChangePending) => EmailChangePendingSchema.parse({
+    status: "PENDING", new_email: pending.newEmail, expires_at: pending.expiresAt.toISOString()
+  });
+  const emailChangeRefusal = (reply: FastifyReply, error: unknown) => {
+    if (error instanceof EmailChangeError) {
+      return reply.status(EMAIL_CHANGE_STATUS[error.code]).send({ error: error.code });
+    }
+    throw error;
+  };
+  api.get("/v1/account/email", routePolicy("GET /v1/account/email"), async (request, reply) => {
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+    const settings = await options.emailChange.settings(emailChangeSession(authenticated));
+    if (settings === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    return reply.send(AccountEmailSchema.parse({
+      email: settings.email,
+      recovery_email: settings.recoveryEmail,
+      pending: settings.pending === null ? null : {
+        new_email: settings.pending.newEmail, expires_at: settings.pending.expiresAt.toISOString()
+      }
+    }));
+  });
+  api.post("/v1/account/email/change", credentialRoutePolicy("POST /v1/account/email/change"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeRequestSchema, request.body);
+      try {
+        const pending = await options.emailChange.request(emailChangeSession(authenticated), {
+          newEmail: input.new_email, grantToken: input.step_up_grant
+        }, sourceFor(request));
+        return reply.status(202).send(pendingBody(pending));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/resend", credentialRoutePolicy("POST /v1/account/email/change/resend"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      try {
+        const pending = await options.emailChange.resend(emailChangeSession(authenticated), sourceFor(request));
+        return reply.status(202).send(pendingBody(pending));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.delete("/v1/account/email/change", credentialRoutePolicy("DELETE /v1/account/email/change"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      try {
+        await options.emailChange.cancel(emailChangeSession(authenticated), sourceFor(request));
+        return reply.status(204).send();
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/confirm", credentialRoutePolicy("POST /v1/account/email/change/confirm"),
+    async (request, reply) => {
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeLinkRequestSchema, request.body);
+      try {
+        await options.emailChange.confirm(input.token, sourceFor(request));
+        return reply.send(EmailChangeConfirmedSchema.parse({ status: "CONFIRMED" }));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
+  api.post("/v1/account/email/change/cancel", credentialRoutePolicy("POST /v1/account/email/change/cancel"),
+    async (request, reply) => {
+      if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
+      const input = parseRequest(EmailChangeLinkRequestSchema, request.body);
+      try {
+        await options.emailChange.cancelByLink(input.token, sourceFor(request));
+        return reply.send(EmailChangeCancelledSchema.parse({ status: "CANCELLED" }));
+      } catch (error) {
+        return emailChangeRefusal(reply, error);
+      }
+    });
   api.delete<{ Params:{ id:string } }>(
     "/v1/debates/:id",
     credentialRoutePolicy("DELETE /v1/debates/{id}"),
@@ -2017,6 +2500,71 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(202).send(response);
     });
   }
+  // Age gate (8d → 8j). Stateless: the date is checked and dropped. The UI calls this before
+  // register and never calls register on a refusal; register's own hook re-checks every caller.
+  const registrationMounted = options.registration !== undefined;
+  if (registrationMounted) {
+    api.post("/v1/auth/age-check", credentialRoutePolicy("POST /v1/auth/age-check"), async (request, reply) => {
+      if (ageRefusalCookiePresent(request.headers.cookie)) return reply.send({ outcome: "refused" });
+      const dateOfBirth = requestDateOfBirth(request.body);
+      if (dateOfBirth === null) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      if (meetsMinimumAge(dateOfBirth)) return reply.send({ outcome: "allowed" });
+      reply.header("set-cookie", ageRefusalCookie());
+      return reply.send({ outcome: "refused" });
+    });
+  }
+  // Paid plans L4: re-acceptance. Mounted after the registration region (S04), whatever the list order.
+  const LegalLocaleSchema = z.string().regex(/^[a-z]{2}$/u);
+  api.get<{ Querystring: { locale?: string } }>(
+    "/v1/account/legal-status",
+    routePolicy("GET /v1/account/legal-status"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.legal === undefined) return reply.status(503).send({ error: "LEGAL_ACCEPTANCE_UNAVAILABLE" });
+      const locale = LegalLocaleSchema.safeParse(request.query.locale ?? "en");
+      if (!locale.success) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      const mustAccept = await options.legal.status(authenticated.ownerRef, locale.data);
+      return reply.send(LegalStatusResponseSchema.parse({ must_accept: mustAccept }));
+    }
+  );
+  api.post(
+    "/v1/account/legal-accept",
+    credentialRoutePolicy("POST /v1/account/legal-accept"),
+    async (request, reply) => {
+      const authenticated = request.authenticatedSession;
+      if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      if (options.legal === undefined) return reply.status(503).send({ error: "LEGAL_ACCEPTANCE_UNAVAILABLE" });
+      const input = parseRequest(LegalAcceptRequestSchema, request.body);
+      const source = sourceFor(request);
+      const outcome = await options.legal.accept({
+        ownerRef: authenticated.ownerRef,
+        locale: input.locale,
+        documents: input.documents,
+        source: { ip: source.ip, userAgent: source.userAgent }
+      });
+      if (outcome === "STALE") return reply.status(409).send({ error: "LEGAL_DOCUMENT_STALE" });
+      return reply.status(204).send();
+    }
+  );
+  // Paid plans G3a: the sign-up page's country check. Public, after the registration region (S04), and
+  // keyed by the source's NETWORK scope (DL5-F3: an IPv6 address counts as its /64).
+  api.get("/v1/geo/availability", routePolicy("GET /v1/geo/availability"), async (request, reply) => {
+    const source = sourceFor(request);
+    if (options.admission?.configured("geoAvailability") === true
+      && !admitOrRefuse(reply, "geoAvailability", "GET /v1/geo/availability", clientIpNetworkScope(source.ip))) {
+      return reply;
+    }
+    // No gate composed (local mode, or hosted without countryPolicy): sign-up is open and payment is
+    // not offered through this answer.
+    return reply.send(GeoAvailabilityResponseSchema.parse(
+      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false }
+    ));
+  });
 
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
@@ -2120,8 +2668,43 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.post("/v1/asks", routePolicy("POST /v1/asks"), async (request, reply) => {
+    // Ask pre-flight, step 1 — the crisis check (V, 2026-09-30; V, 2026-10-01: "make sure this
+    // crisis check is done in the pre-flight"). A question that reads as a person in crisis gets
+    // help numbers, never a debate. It stays the FIRST thing this route does: before the
+    // consent, quota and country rules, and before any other pre-flight check of the question
+    // (the hate-speech check, S03). A person in crisis must never meet a refusal or a "check
+    // unavailable" message instead of help, and their words go to no judge model. Nothing of
+    // the question is kept. `country` is the edge's guess, only to pick which helplines the
+    // screen shows first. Pinned by tests/unit/crisis-check-api.test.ts.
+    const questionLine = typeof request.body === "object" && request.body !== null
+      && "question_line" in request.body && typeof request.body.question_line === "string"
+      ? request.body.question_line.trim() : "";
+    // Only a question the API would accept is checked: a longer one is refused as malformed
+    // below anyway, and checking 256 KB of text would hold the event loop for seconds. Trimmed
+    // first, exactly as AskRequestSchema keeps it, so the limit measured here is the limit
+    // below: padding a crisis question past 8 KB with spaces must not skip the check.
+    if (Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES && detectCrisis(questionLine).crisis) {
+      return reply.status(422).send({
+        error: CRISIS_SUPPORT_OFFERED, message: CRISIS_SUPPORT_OFFERED,
+        country: edgeCountry(request.headers)
+      });
+    }
+    // Sensitive-data consent (V, 2026-09-29): an account that has not agreed starts no
+    // debate. Checked before admission, so a refusal here spends none of the account's quota.
+    const asker = request.authenticatedSession;
+    if (asker !== undefined) {
+      if (options.sessions?.readSensitiveDataConsent === undefined) return sensitiveDataConsentUnavailable(reply);
+      if (await options.sessions.readSensitiveDataConsent(asker) !== "given") {
+        return reply.status(403).send({
+          error: SENSITIVE_DATA_CONSENT_REQUIRED, message: SENSITIVE_DATA_CONSENT_REQUIRED
+        });
+      }
+    }
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
+    // Paid plans G3a: no new debate from an always-blocked country. Reading is never gated.
+    const countryRefusal = options.countryGate?.ask(sourceFor(request)) ?? null;
+    if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
     const ask = parseRequest(AskRequestSchema, request.body);
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
@@ -2135,6 +2718,31 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           ownerRef: request.authenticatedSession.ownerRef })
     ));
     return reply.status(202).send(accepted);
+  });
+
+  api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {
+    const query = AskRoomQuerySchema.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    const access = ownershipFor(request);
+    const answer: AskRoomAnswer = options.askRoom === undefined
+      ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
+      : await options.askRoom.readRoom({
+          access,
+          // B8 (R-28): with billing on, the room is read for the ask the server would run.
+          settingsClass: runSettingsClassOfAsk(await decideRoomSettings({
+            plan_tier: query.data.plan_tier,
+            composition_budget_tier: query.data.composition_budget_tier,
+            depth_params: { depth: query.data.depth }
+          }, access.ownerRef, options.askBilling))
+        });
+    return reply.send(AskRoomResponseSchema.parse({
+      room: answer.room,
+      scope: answer.scope,
+      resets_at: answer.resetsAt?.toISOString() ?? null,
+      waiting_run_ref: answer.waitingRunRef,
+      plan_id: answer.planId,
+      ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor })
+    }));
   });
 
   api.get<{ Querystring: { limit?: string; offset?: string } }>("/v1/answers", routePolicy("GET /v1/answers"), async (request, reply) => {
@@ -2394,24 +3002,40 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         });
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
-      const published = await options.application.withContentLease(runId.data, async () => {
-        const answer = await options.application.readRunAnswer(
-          runId.data,
-          request.session,
-          ownershipFor(request)
-        );
-        if (answer === null) return null;
-        return options.publications!.publish({
-          runId: runId.data,
-          answer,
-          authenticated,
-          grantToken: input.step_up_grant,
-          source: sourceFor(request)
-        });
+      // FIX-HS2-p1 sd-B1 (ruling R-P): each private-content phase holds the run's lease (one pooled client) only
+      // for its own reads and writes; `publish` awaits the content check — up to D on an external judge — under
+      // none, and re-reads the answer under a fresh lease before it commits.
+      const contentLease = {
+        run: <T>(use: () => Promise<T>) => options.application.withContentLease(runId.data, use),
+        readAnswer: () => options.application.readRunAnswer(runId.data, request.session, ownershipFor(request))
+      };
+      const answer = await contentLease.run(contentLease.readAnswer);
+      const published = answer === null ? null : await options.publications.publish({
+        runId: runId.data,
+        answer,
+        authenticated,
+        grantToken: input.step_up_grant,
+        source: sourceFor(request),
+        contentCheck: options.publicationContentCheck ?? UNCONFIGURED_PUBLICATION_CONTENT_CHECK,
+        contentLease
       });
-      return published === null
-        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
-        : reply.status(201).send(PublicationTransitionSchema.parse(published));
+      if (published === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      // hate-speech S02 (SPEC-v2 R6, R9): a refusal is 409 with the closed-code
+      // statement and nothing else; an unavailable check is the house 503 shape.
+      if (published.state === "REFUSED") {
+        return reply.status(409).send(PublicationContentRefusalSchema.parse({
+          error: "PUBLICATION_CONTENT_REFUSED",
+          message: PUBLICATION_CONTENT_REFUSED_MESSAGE,
+          statement: published.statement
+        }));
+      }
+      if (published.state === "CHECK_UNAVAILABLE") {
+        return reply.status(503).send({
+          error: "PUBLICATION_CHECK_UNAVAILABLE",
+          message: "PUBLICATION_CHECK_UNAVAILABLE"
+        });
+      }
+      return reply.status(201).send(PublicationTransitionSchema.parse(published));
     }
   );
   api.post<{ Params: { id: string } }>(
@@ -2485,6 +3109,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   installSupportRoutes(
     api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
   );
+  // Paid plans (R-3): the one billing routes module, always installed.
+  installBillingRoutes(api, { ...options.billing, policy: (route) => routePolicy(route) });
   return api;
 }
 
@@ -2531,6 +3157,25 @@ export interface RunCreationSettings {
    * and finish.
    */
   readonly assertDailyCostEnvelope?: () => Promise<void>;
+  /**
+   * Budget spec 2026-09-28 §2.4–§2.7 with the paid-plans spec §2.4 (B6) — THE ROOM.
+   *
+   * Absent means today's behaviour exactly: local mode, or a hosted register whose
+   * costEnvelopePolicy carries no band, keeps `assertDailyCostEnvelope` and its
+   * 429. Present (hosted, band published), the ask is decided by the room instead:
+   * START with a hold, WAIT in line, or ASK_ALREADY_WAITING. main.ts supplies one
+   * or the other, never both.
+   */
+  readonly room?: AskRoomPort;
+  /**
+   * Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7): present ONLY in hosted
+   * mode with billing on. It makes the server decide the ask's plan tier, Free's
+   * fixed gauges and the interim cheaper roster, and refuses a request with no
+   * signed-in owner (ASK_SIGN_IN_REQUIRED). Absent means today's ask exactly.
+   */
+  readonly billing?: AskBilling;
+  /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
+  readonly waitingLine?: AskWaitingLinePort;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
   readonly resolveEnvelopeBasis: (input: {
     readonly depthParams: Readonly<Record<string, unknown>>;
@@ -2652,8 +3297,43 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
   return parsed.success ? parsed.data : null;
 }
 
-/** The step of `submit` after the run row exists; its failure reason is `RUN_SETUP_FAILED:<step>`. */
-type RunSetupStep = "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH";
+/**
+ * The step of `submit` after the run row exists; its failure reason is
+ * `RUN_SETUP_FAILED:<step>`. With a room (B6b) two more: the place in line with
+ * why it waits (`WAITING_LINE`, and its commit) and the hold with the run's
+ * charge scope (`ROOM_HOLD`). There the first job is the decision's LAST write,
+ * so `WORK_QUEUE` covers the job and the decision's commit: a failed commit
+ * rolls the READY job back with everything else. And one the waker records
+ * (B7b): `PLAN_CHANGED`, a waiting premium question whose owner's plan dropped
+ * to Free before room freed up. And one with billing on (B8): `COST_RECORD`,
+ * the owner's record of the interim roster swap, written before the run's first
+ * job on either path; no run spends on the swapped roster without it.
+ */
+type RunSetupStep =
+  | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED"
+  | "COST_RECORD";
+
+/**
+ * What `evaluateAskAdmission` admits an ask with. B8 keeps two inside
+ * `#submitWithRoom` when the interim coarse fit swapped the roster: the swapped
+ * ask's (a START runs on it) and the plan's own (a WAIT keeps it).
+ */
+type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
+
+/** An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. */
+async function evaluationOrRefusal(settings: RunCreationSettings, ask: AskRequest): Promise<AskEvaluation | AskRefusal> {
+  try {
+    return await evaluateAskAdmission(settings, ask);
+  } catch (error) {
+    if (error instanceof AskRefusal) return error;
+    throw error;
+  }
+}
+
+/** What the room's locked decision produced inside the lease. */
+type RoomOutcome =
+  | Readonly<{ kind: "START"; runId: string; workItemId: string }>
+  | Readonly<{ kind: "WAIT"; runId: string; waitsUntil: Date; scope: SpendScope; waitsFor: WaitsFor | null }>;
 
 /**
  * A run's first job, named once: `submit` queues it, and a failed setup records
@@ -2664,14 +3344,40 @@ function firstRunJob(runId: string): Readonly<{ batteryRowId: "Q1"; commandKey: 
   return Object.freeze({ batteryRowId: "Q1", commandKey: `S00:${runId}:Q1` });
 }
 
+/** B7b: what one tick of the waiting line did — counts only, for the operator's log. */
+export type WaitingLineTick = Readonly<{
+  /** The runs the tick looked at (only those worth trying: never a person-blocked run that is not due). */
+  waiting: number;
+  started: number;
+  skipped: number;
+  failed: number;
+  stopped: boolean;
+  /** Final review Part 1b, Important 4: started runs' first jobs handed to the job system again this tick. */
+  redispatched: number;
+}>;
+
+/**
+ * Final review Part 1b, Important 4: how long a started run's first job may
+ * stay READY before the waker hands it to the job system again, and how long
+ * this process waits before handing the same job over once more. A dispatch
+ * takes well under a second; a job that waits in the job system's queue for a
+ * free runner is READY too, so it is dispatched again at most once per bound.
+ */
+const STALLED_START_SECONDS = 300;
+
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
   readonly #serve: ServeRepository;
   readonly #splitLifecycle: Pick<SplitLifecycleProjection, "read">;
   readonly #liveness: LivenessRepository;
+  readonly #substitutions: RunCostSubstitutionRepository;
   readonly #serverAskAdmissionPool: Pool;
   readonly #legacyAskAdmissionPool: Pool;
+  /** B7b: set once a tick of this process has read the whole line with every person-recorded run in it. */
+  #wakeSweptEveryPerson = false;
+  /** Important 4: when this process last handed each stalled first job over again (epoch ms), by work item id. */
+  readonly #redispatchedAt = new Map<string, number>();
 
   constructor(
     private readonly pool: Pool,
@@ -2692,6 +3398,7 @@ export class PostgresAskApplication implements AskApplication {
     this.#serve = new ServeRepository(pool);
     this.#splitLifecycle = splitLifecycle ?? new SplitLifecycleProjection(pool);
     this.#liveness = new LivenessRepository(pool);
+    this.#substitutions = new RunCostSubstitutionRepository(pool);
     this.#serverAskAdmissionPool=askAdmissionPools.server;
     this.#legacyAskAdmissionPool=askAdmissionPools.legacy;
   }
@@ -2701,7 +3408,7 @@ export class PostgresAskApplication implements AskApplication {
   }
 
   async submit(
-    ask: AskRequest,
+    requestedAsk: AskRequest,
     session: Session,
     principal: AskPrincipal
   ): Promise<AskAccepted> {
@@ -2712,9 +3419,45 @@ export class PostgresAskApplication implements AskApplication {
     } else if (session.ownership_provenance === "server_session" || session.asker_id !== principal.legacyAskerId) {
       throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "Legacy scope is valid only for an exact legacy session");
     }
+    // Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; ruling R-28).
+    // With billing on, the SERVER decides the ask. Every later step reads `ask`
+    // — B6b's room branch and B6a's `runSettingsClassOfAsk` included — so each
+    // sees the decided one. `plannedAsk` is the plan-decided ask before the
+    // interim swap: B6b's room creates a question that WAITs from it, so only a
+    // START runs on the Free roster (A5). Without a swap the two are the same.
+    let ask: AskRequest = requestedAsk;
+    let plannedAsk: AskRequest = requestedAsk;
+    let applied: AskApplied | null = null;
+    let substitutedAt: Date | null = null;
+    const billing = this.settings.billing;
+    if (billing !== undefined) {
+      if (principal.kind !== "server") {
+        markAskRefusal(new TypedDomainError(ASK_SIGN_IN_REQUIRED, "Sign in to ask a question"));
+      }
+      const now = billing.clock();
+      const resolved = await resolveBillingAsk(requestedAsk, principal.ownerRef, billing, now);
+      ask = resolved.ask;
+      plannedAsk = resolved.ask;
+      applied = appliedAskOf(resolved.ask);
+      if (await coarseFitFor(ask, principal.ownerRef, billing, now) === "FREE_ROSTER") {
+        ask = Object.freeze({ ...ask, plan_tier: "free" as const });
+        substitutedAt = now;
+      }
+    }
+    const appliedField = applied === null ? {} : { applied };
     const ownership: RunOwnershipAccess = principal.kind === "legacy"
       ? Object.freeze({ ownerRef: null, legacyAskerId: principal.legacyAskerId })
       : Object.freeze({ ownerRef: principal.ownerRef, legacyAskerId: null });
+    // Budget spec §2.7 (B6b): hosted with the band, the room decides. B8: the
+    // room creates the run from `ask` on a START, recording the interim swap
+    // inside its decision (`substitutedAt`), and from `plannedAsk` on a WAIT;
+    // the reply carries what the server applied (QUEUED or WAITING).
+    if (this.settings.room !== undefined) {
+      const accepted = await this.#submitWithRoom(
+        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt
+      );
+      return Object.freeze({ ...accepted, ...appliedField });
+    }
     const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     let runId:string;
@@ -2770,8 +3513,19 @@ export class PostgresAskApplication implements AskApplication {
     // start-up recovery re-sends existing jobs and no sweep looks at runs. So a
     // throw from here on records the run FAILED, naming the step, before the
     // asker's 500 — otherwise the owner's list shows it generating forever.
-    let setupStep: RunSetupStep = "MEMORY_QUESTION";
+    let setupStep: RunSetupStep = substitutedAt === null ? "MEMORY_QUESTION" : "COST_RECORD";
     try {
+      // B8 (budget spec §2.9): the interim swap's owner record comes BEFORE the
+      // run's first job is queued, so a run on the swapped roster never runs
+      // without it. `startRun` committed its own transaction on the lease
+      // client (the content-provision role for a server principal, which holds
+      // no grant on the table), so the record goes on the runtime pool. A
+      // failure records the run FAILED (RUN_SETUP_FAILED:COST_RECORD) and
+      // reaches the asker as their error, exactly like every other setup step.
+      if (substitutedAt !== null) {
+        await this.#recordRosterSubstitution(runId, substitutedAt);
+        setupStep = "MEMORY_QUESTION";
+      }
       await this.#serve.recordMemoryQuestion({
         runId,
         questionLine: ask.question_line,
@@ -2793,7 +3547,7 @@ export class PostgresAskApplication implements AskApplication {
       await this.#recordRunSetupFailure(runId, setupStep);
       throw error;
     }
-    return { run_ref: runId, status: "QUEUED" };
+    return { run_ref: runId, status: "QUEUED", ...appliedField };
   }
 
   /**
@@ -2815,9 +3569,336 @@ export class PostgresAskApplication implements AskApplication {
     }
   }
 
+  /**
+   * The interim coarse fit's owner record (reason PERSON; R-2's one writer).
+   * Every cost substitution is a row (budget spec §2.9), so a failure is NOT
+   * swallowed: the caller records the run FAILED before its first job exists.
+   * `executor` is the room decision's transaction when a room decides.
+   */
+  async #recordRosterSubstitution(runId: string, recordedAt: Date, executor?: PoolClient): Promise<void> {
+    const swap = Object.freeze({
+      runId,
+      callSiteKey: "ASK:roster",
+      plannedProviderRef: "roster:premium",
+      usedProviderRef: "roster:free",
+      reason: "PERSON" as const,
+      recordedAt
+    });
+    if (executor === undefined) await this.#substitutions.record(swap);
+    else await this.#substitutions.record(swap, executor);
+  }
+
   async unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null> {
     const result = await this.#serve.unlinkMemoryForAnswer(answerId, ownership, `asker:${session.asker_id}`);
     return result === null ? null : Object.freeze({ memory_link_id: result.memoryLinkId, state: "UNLINKED" });
+  }
+
+  /**
+   * Budget spec 2026-09-28 §2.7 with the paid-plans spec §2.4.2 (B6b) — THE ASK
+   * WITH A ROOM. The owner's lease is taken FIRST and covers the whole decision,
+   * so one person's two tabs can never both see "nothing waiting". Inside it:
+   *  1. the plan tier's own check, then the room without locks — a question that
+   *     may not even wait is refused before any vendor is probed;
+   *  2. the ask's own checks and panel discovery, exactly as today;
+   *  3. under the site's day lock and the person's lock, the room again, and in
+   *     that SAME transaction the run's place in line and why it waits (WAIT), or
+   *     its hold and charge scope and THEN its first job (START) — the job queued
+   *     on the decision's transaction as its last statement (`enqueueOn`: the one
+   *     shared sequence row it takes is held until COMMIT, so nothing may follow
+   *     it), so the job commits with what counts it or not at all.
+   * The run input is the one `submit` builds, kept apart so today's path stays
+   * byte-for-byte what it is for every composition without a room.
+   * B8 (spec 2026-09-29 §2.3.4, §2.6 item 7; A5): `ask` may carry the interim
+   * cheaper roster (`substitutedAt` set), and `plannedAsk` is the plan's own
+   * ask. Only a START runs on the swapped roster, with its owner record in the
+   * decision's transaction. A question that WAITs is created from `plannedAsk`
+   * and the plan's own admission, so it waits on its plan's roster and
+   * settings: B7b's PLAN_CHANGED guard sees it as premium, and the waker starts
+   * it on that roster (Q-11: the waker does not re-pick).
+   * Final review Part 1b, Important 2: a refused cheaper roster never stops a
+   * question its plan's own roster can run. When the swapped ask is refused
+   * (a Free-roster model is unavailable) and the plan's own is not, the swap is
+   * dropped: no substitution is recorded, and the precheck is taken again and
+   * the decision made for the plan's own ask and settings class, so the
+   * question starts (CLOSE) or waits on its own roster (A5).
+   */
+  async #submitWithRoom(
+    ask: AskRequest,
+    plannedAsk: AskRequest,
+    session: Session,
+    principal: AskPrincipal,
+    ownership: RunOwnershipAccess,
+    room: AskRoomPort,
+    substitutedAt: Date | null
+  ): Promise<AskAccepted> {
+    if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
+      throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
+    }
+    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask) });
+    const argumentLanguage = detectArgumentLanguage(ask.question_line);
+    const admissionPool = principal.kind === "server"
+      ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
+    let createdRunId: string | undefined;
+    let setupStep: RunSetupStep = "ADMISSION_RELEASE";
+    let outcome: RoomOutcome;
+    try {
+      outcome = await withOwnerAskAdmissionLease(admissionPool, ownership, async (lease) => {
+        await room.precheck(question);
+        // B8 (A5): the locked decision may still say WAIT (the site's day, the
+        // line, or a person window that turned FULL after the coarse fit's
+        // unlocked read), and a waiting question keeps its plan's ask. So when
+        // the roster was swapped, the plan's own admission is taken here too,
+        // still outside the decision's locks (the provider probe is cached
+        // within probeFreshnessMs). Both refusals are kept as values, not
+        // thrown: the plan's matters only if the decision says WAIT, and the
+        // swapped one only if the plan's own roster cannot run either. Without
+        // a swap `plannedAsk` is `ask`, and so is its evaluation.
+        let startAsk = ask;
+        let swappedAt = substitutedAt;
+        let decisionQuestion = question;
+        let swappedEvaluation = await evaluationOrRefusal(this.settings, ask);
+        const plannedEvaluation = substitutedAt === null
+          ? swappedEvaluation
+          : await evaluationOrRefusal(this.settings, plannedAsk);
+        if (swappedAt !== null && swappedEvaluation instanceof AskRefusal && !(plannedEvaluation instanceof AskRefusal)) {
+          // Important 2: the cheaper roster cannot run, the plan's own can. Drop the swap.
+          startAsk = plannedAsk;
+          swappedAt = null;
+          swappedEvaluation = plannedEvaluation;
+          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk) });
+          await room.precheck(decisionQuestion);
+        }
+        if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;
+        const startEvaluation = swappedEvaluation;
+        const decided = await room.decide(decisionQuestion, async ({ admission, estimateMicros, now, tx }): Promise<RoomOutcome> => {
+          // B8 (A5, spec §2.3.4): only a START runs on the swapped roster. A
+          // question that WAITs is stored on its plan's roster and settings.
+          // Nothing is written yet, so a refusal of the plan's own admission
+          // rolls the decision back and no run exists.
+          const keepsPlan = swappedAt !== null && admission.kind === "WAIT";
+          const runAsk = keepsPlan ? plannedAsk : startAsk;
+          const evaluated = keepsPlan ? plannedEvaluation : startEvaluation;
+          if (evaluated instanceof AskRefusal) throw evaluated;
+          await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
+          const runId = await this.#runs.startRun({
+            questionLine: runAsk.question_line,
+            argumentLanguageTag: argumentLanguage.tag,
+            argumentLanguageName: argumentLanguage.nameEn,
+            principal,
+            sessionId: session.session_id,
+            callerScope: session.caller_scope,
+            asOf: new Date(runAsk.as_of),
+            askerRiskTier: runAsk.risk_tier,
+            effectiveRiskTier: evaluated.risk.effectiveRiskTier,
+            tierSource: evaluated.risk.tierSource,
+            tierProvenanceRef: evaluated.risk.tierProvenanceRef,
+            compositionBudgetTier: runAsk.composition_budget_tier,
+            planTier: runAsk.plan_tier,
+            depthParams: runAsk.depth_params,
+            discoveredPanel: evaluated.discoveredPanel,
+            strangerSampleRate: this.settings.strangerSampleRate,
+            envelopeBasis: evaluated.envelopeBasis,
+            registerVersion: this.settings.registerVersion,
+            batteryVersion: this.settings.batteryVersion,
+            askContract: {
+              decision_scope: runAsk.decision_scope,
+              steering_presets: runAsk.steering_presets,
+              steering_annotations: runAsk.steering_annotations,
+              critic_unavailable_cap: evaluated.criticUnavailableCap
+            },
+            batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+          }, lease.client);
+          createdRunId = runId;
+          if (swappedAt !== null && admission.kind === "START") {
+            // B8 (budget spec §2.9): the interim swap's owner record, in the room
+            // decision's own transaction. It commits with the run's hold (START),
+            // or not at all; a failure rolls the decision back and records the
+            // run FAILED (RUN_SETUP_FAILED:COST_RECORD). A WAIT, or a swap
+            // dropped because the cheaper roster cannot run, swapped nothing.
+            setupStep = "COST_RECORD";
+            await this.#recordRosterSubstitution(runId, swappedAt, tx);
+          }
+          setupStep = "MEMORY_QUESTION";
+          await this.#serve.recordMemoryQuestion({
+            runId,
+            questionLine: ask.question_line,
+            callerScope: session.caller_scope,
+            askerScope: session.asker_id,
+            asOf: ask.as_of,
+            policyVersion: this.settings.registerVersion,
+            ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+          }, ownership);
+          if (admission.kind === "WAIT") {
+            setupStep = "WAITING_LINE";
+            await room.enterWait(tx, runId, now);
+            return Object.freeze({
+              kind: "WAIT" as const, runId, waitsUntil: admission.waitsUntil, scope: admission.worstScope,
+              waitsFor: admission.waitsFor ?? null
+            });
+          }
+          setupStep = "ROOM_HOLD";
+          await room.openStart(tx, { runId, access: ownership, heldMicros: estimateMicros, now });
+          // LAST: nothing may follow the first job inside the decision (see RunSetupStep).
+          setupStep = "WORK_QUEUE";
+          const workItemId = await this.#work.enqueueOn(tx, { runId, ...firstRunJob(runId), nodeSet: [] });
+          return Object.freeze({ kind: "START" as const, runId, workItemId });
+        });
+        // The decision committed: what can still fail inside the lease is its release.
+        setupStep = "ADMISSION_RELEASE";
+        return decided;
+      });
+    } catch (error) {
+      if (createdRunId !== undefined) await this.#recordRunSetupFailure(createdRunId, setupStep);
+      if (error instanceof AskAlreadyWaitingError) throw new AskAlreadyWaitingRefusal(error);
+      if (error instanceof TypedDomainError && error.code === "OWNER_PRIVATE_HISTORY_SCAN_SATURATED") {
+        throw new AskRefusal(error);
+      }
+      throw error;
+    }
+    if (outcome.kind === "WAIT") {
+      console.info(JSON.stringify(Object.freeze({ event: "api.ask.waiting", runId: outcome.runId, scope: outcome.scope })));
+      return Object.freeze({
+        run_ref: outcome.runId,
+        status: "WAITING" as const,
+        waits_until: outcome.waitsUntil.toISOString(),
+        waiting_scope: outcome.scope,
+        ...(outcome.waitsFor === null ? {} : { waits_for: outcome.waitsFor })
+      });
+    }
+    try {
+      await this.dispatcher.dispatch({ runId: outcome.runId, workItemId: outcome.workItemId });
+    } catch (error) {
+      await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
+      throw error;
+    }
+    return Object.freeze({ run_ref: outcome.runId, status: "QUEUED" as const });
+  }
+
+  /**
+   * Budget spec 2026-09-28 §2.7 (B7b) — ONE TICK OF THE WAITING LINE. Only the
+   * runs worth trying, oldest first, page after page from a cursor; every
+   * person-recorded run too until one tick of this process has read the whole
+   * line. At most one run per person per tick. A run that now fits is started
+   * as `submit` starts one — its first job (`firstRunJob`) queued on the start's
+   * own transaction, then dispatch — and a dispatch that fails records it FAILED
+   * (`RUN_SETUP_FAILED:DISPATCH`, PR #33). A premium question whose owner is now
+   * on Free is recorded FAILED (`RUN_SETUP_FAILED:PLAN_CHANGED`) and leaves the
+   * line. The tick stops at the first run the site's day cannot hold, because
+   * nobody after it fits the day; a run whose own person is full is skipped. A
+   * start that throws wrote nothing and stays in line for the next tick. Then
+   * (final review Part 1b, Important 4) the started runs whose first job was
+   * never handed to a runner are handed over again (`#redispatchStalledStarts`).
+   * Ids and counts only.
+   */
+  async wakeWaitingRuns(): Promise<WaitingLineTick> {
+    const line = this.settings.waitingLine;
+    if (line === undefined) {
+      return Object.freeze({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
+    }
+    const everyPerson = !this.#wakeSweptEveryPerson;
+    const persons = new Set<string>();
+    let waiting = 0;
+    let started = 0;
+    let skipped = 0;
+    let failed = 0;
+    let stopped = false;
+    let after: WaitingRunCursor | null = null;
+    while (!stopped) {
+      const page = await line.wakeCandidates({ after, everyPerson });
+      if (page.length === 0) break;
+      for (const run of page) {
+        after = Object.freeze({ waitingSince: run.waitingSince, runId: run.runId });
+        waiting += 1;
+        const person = run.ownerRef === null ? `legacy:${run.legacyAskerId ?? ""}` : `owner:${run.ownerRef}`;
+        if (persons.has(person)) {
+          skipped += 1;
+          continue;
+        }
+        persons.add(person);
+        let outcome: WaitingStart<string>;
+        try {
+          outcome = await line.startWaiting(run, (tx) => this.#work.enqueueOn(tx, {
+            runId: run.runId, ...firstRunJob(run.runId), nodeSet: []
+          }));
+        } catch (error) {
+          failed += 1;
+          console.error(JSON.stringify(Object.freeze({
+            event: "api.wait.start_failed", runId: run.runId, diagnostic: apiOperationalErrorDiagnostic(error)
+          })));
+          continue;
+        }
+        if (outcome.kind === "SITE_FULL") {
+          stopped = true;
+          break;
+        }
+        if (outcome.kind === "PLAN_CHANGED") {
+          failed += 1;
+          await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");
+          continue;
+        }
+        if (outcome.kind !== "STARTED") {
+          skipped += 1;
+          continue;
+        }
+        try {
+          await this.dispatcher.dispatch({ runId: run.runId, workItemId: outcome.value });
+          started += 1;
+          console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: run.runId })));
+        } catch {
+          failed += 1;
+          await this.#recordRunSetupFailure(run.runId, "DISPATCH");
+        }
+      }
+    }
+    if (!stopped) this.#wakeSweptEveryPerson = true;
+    const redispatched = await this.#redispatchStalledStarts();
+    const tick: WaitingLineTick = Object.freeze({ waiting, started, skipped, failed, stopped, redispatched });
+    if (waiting > 0 || redispatched > 0) console.info(JSON.stringify(Object.freeze({ event: "api.wait.tick", ...tick })));
+    return tick;
+  }
+
+  /**
+   * Final review Part 1b, Important 4 — A STARTED RUN NOBODY HANDED TO A
+   * RUNNER. A started run's hold counts while its first job is READY or
+   * CLAIMED (budget spec §2.6), so a job committed with its hold but never
+   * dispatched — the API stopped between the decision's commit and the
+   * dispatch, or the dispatch failed and so did its FAILED write — would keep
+   * the hold counting on every later day and window until some runner
+   * restarted. Each tick hands such a job (READY past `STALLED_START_SECONDS`,
+   * `listStalledStarts`) to the job system again, as the runner's start-up
+   * reconciliation re-dispatches READY work. A second dispatch runs the debate
+   * ONCE: a runner claims the job by its id only while it is READY or its claim
+   * has lapsed, FOR UPDATE SKIP LOCKED (`WorkItemRepository.claimById`), so the
+   * dispatch that loses finds nothing to run. This process hands the same job
+   * over at most once per bound, so a job that only waits in the job system's
+   * queue is not dispatched again every minute. A failed dispatch is logged and
+   * tried on a later tick; it never records the run FAILED, since the job may
+   * already be on its way. Ids, codes and counts only.
+   */
+  async #redispatchStalledStarts(): Promise<number> {
+    const stalled = await this.#work.listStalledStarts({ olderThanSeconds: STALLED_START_SECONDS, limit: 100 });
+    const listed = new Set(stalled.map((job) => job.workItemId));
+    for (const workItemId of [...this.#redispatchedAt.keys()]) {
+      if (!listed.has(workItemId)) this.#redispatchedAt.delete(workItemId);
+    }
+    let redispatched = 0;
+    for (const job of stalled) {
+      const nowMs = Date.now();
+      const last = this.#redispatchedAt.get(job.workItemId);
+      if (last !== undefined && nowMs - last < STALLED_START_SECONDS * 1_000) continue;
+      try {
+        await this.dispatcher.dispatch({ runId: job.runId, workItemId: job.workItemId });
+      } catch (error) {
+        console.error(JSON.stringify(Object.freeze({
+          event: "api.wait.redispatch_failed", runId: job.runId, diagnostic: apiOperationalErrorDiagnostic(error)
+        })));
+        continue;
+      }
+      this.#redispatchedAt.set(job.workItemId, nowMs);
+      redispatched += 1;
+      console.info(JSON.stringify(Object.freeze({ event: "api.wait.redispatched", runId: job.runId })));
+    }
+    return redispatched;
   }
 
   readAnswer(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null> {
@@ -2830,13 +3911,34 @@ export class PostgresAskApplication implements AskApplication {
 
   async readRun(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null> {
     const run = await this.#runs.readLoadingProjection(runId, ownership);
-    return run === null ? null : RunProjectionSchema.parse({
+    if (run === null) return null;
+    // Budget spec §2.7: a waiting run's expected start, recomputed on every read.
+    let waitsUntil: Date | null = null;
+    let waitsFor: WaitsFor | null = null;
+    if (run.state === "WAITING") {
+      // With no room composed nothing would ever start it. B6b's boot refuses a
+      // hosted register without the band while any run waits, so this is a
+      // bypassed rule, said by name — never a start time that keeps moving.
+      const room = this.settings.room;
+      if (room === undefined) {
+        throw new TypedDomainError("WAITING_LINE_REQUIRES_BAND", "A run waits but no room is composed to start it");
+      }
+      // A run the line no longer lists (its owner's account is not active: suspended or
+      // age-frozen) keeps the next tick.
+      const expected = await room.expectedStart(runId);
+      waitsUntil = expected?.waitsUntil ?? nextWholeMinute(new Date());
+      // Final review Part 1b, Important 1: the person's own running debates are all it waits for.
+      waitsFor = expected?.waitsFor ?? null;
+    }
+    return RunProjectionSchema.parse({
       run_ref: run.runRef,
       question_line: run.questionLine,
       state: run.state,
       terminal_reason: run.terminalReason,
       hold_until: run.holdUntil?.toISOString() ?? null,
-      argument_language: runArgumentLanguage(run.argumentLanguage)
+      argument_language: runArgumentLanguage(run.argumentLanguage),
+      ...(waitsUntil === null ? {} : { waits_until: waitsUntil.toISOString() }),
+      ...(waitsFor === null ? {} : { waits_for: waitsFor })
     });
   }
 

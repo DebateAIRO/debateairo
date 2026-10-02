@@ -359,11 +359,26 @@ describe("V-28 a hosted target whose vendor reports no usage is refused", () => 
  */
 describe("C-I1 a 200 carrying a real vendor's usage block is charged", () => {
   const NOW = new Date("2026-09-22T11:00:00.000Z");
-  /** Verbatim from OpenAI's `chat/completions` today, counts aside. */
+  /**
+   * Verbatim from OpenAI's `chat/completions` today, counts aside.
+   *
+   * The counts are fixture arithmetic, derived here so nobody has to re-derive
+   * them. The case below needs ONE answer to cost exactly the whole of both
+   * ceilings, AND needs that answer's call to be ADMITTED first — so the
+   * answer's charge (prompt + completion tokens at one micro-unit each) must be
+   * at least the call's pre-send projection: ceil(request bytes / 2) + the
+   * 64-token bound. Frame v2 (hate-speech S01) carries the content rule, and its
+   * 1 929 JSON bytes took the fixture request from 1 858 to 3 787 bytes, so the
+   * projection went from 993 to 1 958 micro-units — past the old 1 500-token
+   * answer, which then had its own call refused before it was made. Ten times
+   * those counts (15 000) leaves the frame room to grow to ~29.8 kB before the
+   * precondition the case asserts first — projection within the ceiling — fails
+   * by name.
+   */
   const OPENAI_USAGE = Object.freeze({
-    prompt_tokens: 1_200,
-    completion_tokens: 300,
-    total_tokens: 1_500,
+    prompt_tokens: 12_000,
+    completion_tokens: 3_000,
+    total_tokens: 15_000,
     prompt_tokens_details: { cached_tokens: 0, audio_tokens: 0 },
     completion_tokens_details: {
       reasoning_tokens: 0,
@@ -405,36 +420,50 @@ describe("C-I1 a 200 carrying a real vendor's usage block is charged", () => {
   it("charges it to the ledger, to the run's ceiling and to the day's", async () => {
     const calls = { count: 0 };
     const { store, rows } = ledgerStore();
+    // Prompt + completion tokens at one micro-unit each (PRICE).
+    const answerMicros = OPENAI_USAGE.prompt_tokens + OPENAI_USAGE.completion_tokens;
     const guard = new CostEnvelopeGuard({
       store,
       // Deliberately tight: ONE such answer costs the whole of both ceilings,
       // so the run lands EXACTLY on its own (J28's boundary: still within) and
-      // the day is REACHED. A projection larger than this would refuse the
-      // first call outright and fail the case below, never pass it quietly.
-      policy: { perRunCeilingMicros: 1_500, dailyCeilingMicros: 1_500 },
+      // the day is REACHED.
+      policy: { perRunCeilingMicros: answerMicros, dailyCeilingMicros: answerMicros },
       clock: () => NOW
     });
-    const { gateway } = gatewayWith(
-      vendorReporting(OPENAI_USAGE, calls),
-      guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" })
-    );
+    const seam = guard.providerSeam({ runId: "run-1", price: PRICE, requireReportedUsage: true, phase: "BODY" });
+    // What the guard was asked to admit, priced by the same function it uses.
+    const projected: number[] = [];
+    const { gateway } = gatewayWith(vendorReporting(OPENAI_USAGE, calls), {
+      assertCallAllowed: (projection) => {
+        projected.push(projectedCallCeilingMicros(PRICE, projection));
+        return seam.assertCallAllowed(projection);
+      },
+      recordCall: (observed) => seam.recordCall(observed),
+      assertUsageReported: (observed) => seam.assertUsageReported(observed)
+    });
 
-    await expect(gateway.call()).resolves.toMatchObject({ model: MODEL });
+    const answered = await gateway.call().then((result) => result, (error: unknown) => error);
+
+    // The PRECONDITION, first and by name: a projection larger than the ceiling
+    // refuses the first call before it is made, which says the fixture's counts
+    // no longer cover the frame — not that the money path broke.
+    expect(projected).toHaveLength(1);
+    expect(projected[0]!).toBeLessThanOrEqual(answerMicros);
+    expect(answered).toMatchObject({ model: MODEL });
 
     expect(calls.count).toBe(1);
-    // 1 200 + 300 tokens at one micro-unit each.
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       spendSource: "RUN",
       runId: "run-1",
       providerRef: "provider:test",
       chargedOn: costEnvelopeDay(NOW),
-      chargeMicros: 1_500,
-      inputTokens: 1_200,
-      outputTokens: 300
+      chargeMicros: answerMicros,
+      inputTokens: OPENAI_USAGE.prompt_tokens,
+      outputTokens: OPENAI_USAGE.completion_tokens
     });
-    expect(await store.readRunSpentMicros("run-1")).toBe(1_500);
-    expect(await store.readDaySpentMicros(costEnvelopeDay(NOW))).toBe(1_500);
+    expect(await store.readRunSpentMicros("run-1")).toBe(answerMicros);
+    expect(await store.readDaySpentMicros(costEnvelopeDay(NOW))).toBe(answerMicros);
 
     // The RUN's ceiling now refuses this run's next call...
     await expect(gateway.call()).rejects.toThrowError(
@@ -465,7 +494,9 @@ describe("C-I1 a 200 carrying a real vendor's usage block is charged", () => {
     await expect(gateway.call(callRequest())).resolves.toMatchObject({ model: MODEL });
 
     expect(artifacts[0]?.usage).toEqual({
-      prompt_tokens: 1_200, completion_tokens: 300, total_tokens: 1_500
+      prompt_tokens: OPENAI_USAGE.prompt_tokens,
+      completion_tokens: OPENAI_USAGE.completion_tokens,
+      total_tokens: OPENAI_USAGE.total_tokens
     });
   });
 });

@@ -82,7 +82,7 @@
   "misc.answerHonesty.weights": "vægte {source}",
   "misc.answerHonesty.weightsBy": "vægte {source} efter {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "Hvad kunne ændre dette",
-  "misc.model.houseUnavailable": "Modelgruppe ikke tilgængelig",
-  "misc.model.noRecordedHouse": "Der er ingen registreret modelgruppe til dette argument.",
+  "misc.model.houseUnavailable": "Modeludvikler ikke registreret",
+  "misc.model.noRecordedHouse": "Der er ikke registreret nogen modeludvikler for dette argument.",
   "misc.scoring.unavailable": "Brugerfladen til bedømmelse er ikke tilgængelig."
 }

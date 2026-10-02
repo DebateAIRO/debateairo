@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Використання вашого плану",
+  "billing.usage.line": "Сьогодні {dayPct}% · Цього тижня {weekPct}% · Цього місяця {monthPct}%",
+  "billing.usage.lineFree": "Цього місяця {monthPct}%",
+  "billing.usage.day": "Сьогодні",
+  "billing.usage.week": "Цього тижня",
+  "billing.usage.month": "Цього місяця",
+  "billing.usage.resets": "Скидання: {time}"
+}

@@ -140,6 +140,8 @@ export default function EnrollMfaPage() {
             <p className="mfaEyebrow">{t(catalog, "auth.enroll.mandatoryMfa")}</p>
             <h1 className="mfaTitle">{t(catalog, "auth.enroll.accountProtected")}</h1>
             <p className="mfaLede">{t(catalog, "auth.enroll.activeDescription")}</p>
+            {/* Activation does not sign the account in; without this the screen was a dead end. */}
+            <a className="mfaPrimary mfaDoneLink" href="/login">{t(catalog, "auth.signUp.logIn")}</a>
           </div>
         </div>
       </main>

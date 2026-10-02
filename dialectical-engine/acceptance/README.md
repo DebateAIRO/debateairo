@@ -92,6 +92,16 @@ lines of plain text — and that second file, handed to an interpreter which cou
 not execute it and so re-read it as a script, re-entered itself until the host's
 process table was full.
 
+The hosted-mode fixture (`pes-s02-fake-vendor.ts`) holds its two host tools to
+the same rule: `openssl`, which makes its run-time certificate, and `lsof`, which
+measures its port free, are named by `ACCEPTANCE_OPENSSL_BINARY` and
+`ACCEPTANCE_LSOF_BINARY` or found by name on `PATH`, pass the same check, and are
+started directly. A tool that is missing or refused stops the hosted acceptance
+as `UNVERIFIED tls-material openssl-unavailable` or `UNVERIFIED port
+lsof-unavailable`, and that line is all the run prints. The resolver's reason
+and path (for example `NOT_A_PROGRAM` and the file it refused) are on the
+error's `cause`, which only code calling the fixture directly can read.
+
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size
 ceiling refuses a lawful nonempty debate. Grok's fixed relay port is
@@ -167,8 +177,9 @@ below.
 
 **The ceremony register version.** `ACCEPTANCE_REGISTER_VERSION`
 (`seed-register.ts`) is the version the ceremony seeds and reads, and it is
-**3** since ruling D77 (c) refitted `globalStopDelta` to 0.01 and
-`branchFreezeEpsilon` to 0.005. `seedAcceptanceRegister` carries the rows in
+**4** since S01 of mission hate-speech re-sealed the judge, composer and
+conformance prompt hashes (3 was D77 (c)'s refit of `globalStopDelta` to 0.01
+and `branchFreezeEpsilon` to 0.005). `seedAcceptanceRegister` carries the rows in
 through `importHistorical`, which is replay-only: a version that already exists
 must match the supplied snapshot byte for byte, or the seed stops with
 `REGISTER_PUBLICATION_SEAL_INVALID: historical replay drift`. **Sealed means
@@ -178,10 +189,10 @@ standing `.pgdata` keeps every earlier version exactly as the run that used it
 left it. (Version 2 is what the 2026-09-17 run `d7b73d79` read; version 1
 predates the T16 lane.) Resetting the standing acceptance data directory is
 therefore **no longer the only way** past a seed-freshness stop, and it destroys
-the run database — prefer raising the pin. Reset only when you actually want a
+the run database — preserve history with a new version. Reset only when you actually want a
 database with no history. One caveat: `importHistorical` refuses any version
-above 4, so after 3 exactly one rung is left before the seeding path itself has
-to change.
+above 4, so after 4 no rung is left: the next sealed-prompt change needs the
+seeding path itself changed before it can mint a new ceremony version.
 
 DR-182 makes every nonempty discovered panel lawful at every risk tier. A mono
 answer serves with `SINGLE-LINEAGE` / `CRITIQUE-UNAVAILABLE`, the ruled lower

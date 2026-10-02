@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Användning av ditt abonnemang",
+  "billing.usage.line": "I dag {dayPct} % · Den här veckan {weekPct} % · Den här månaden {monthPct} %",
+  "billing.usage.lineFree": "Den här månaden {monthPct} %",
+  "billing.usage.day": "I dag",
+  "billing.usage.week": "Den här veckan",
+  "billing.usage.month": "Den här månaden",
+  "billing.usage.resets": "Återställs: {time}"
+}

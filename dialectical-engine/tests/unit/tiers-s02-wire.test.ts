@@ -148,9 +148,10 @@ describe("S02 plan-tier run wiring", () => {
     expect(capturedInputs.map((input) => input.planTier)).toEqual(["free", "premium"]);
   });
 
-  // Property: one production startRun caller exists, and that caller supplies planTier.
-  // Production break: remove planTier from the sole call or add another production .startRun call.
-  it("keeps one production startRun caller and wires planTier at that call", () => {
+  // Property: exactly two production startRun callers exist (submit's and
+  // #submitWithRoom's, budget spec §2.7), and each of them supplies planTier.
+  // Production break: remove planTier from either call, or add a third production .startRun call.
+  it("keeps two production startRun callers and wires planTier at each call", () => {
     const repoRoot = process.cwd();
     const calls = productionSourceFiles(repoRoot).flatMap((file) => {
       const source = readFileSync(file, "utf8");
@@ -161,8 +162,10 @@ describe("S02 plan-tier run wiring", () => {
       }));
     });
 
-    expect(calls.map((call) => call.file)).toEqual(["apps/api/src/index.ts"]);
-    const callSite = calls[0]!.source.slice(calls[0]!.offset, calls[0]!.offset + 1_200);
-    expect(callSite).toMatch(/\.startRun\(\{[\s\S]*?\bplanTier\s*:/u);
+    expect(calls.map((call) => call.file)).toEqual(["apps/api/src/index.ts", "apps/api/src/index.ts"]);
+    for (const call of calls) {
+      const callSite = call.source.slice(call.offset, call.offset + 1_200);
+      expect(callSite).toMatch(/\.startRun\(\{[\s\S]*?\bplanTier\s*:/u);
+    }
   });
 });

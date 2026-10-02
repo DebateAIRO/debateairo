@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "Dit debat is in het {language} ({nativeName}). Wilt u de pagina in het {language} weergeven?",
   "chrome.languageOffer.textNative": "Dit debat is in het {language}. Wilt u de pagina in het {language} weergeven?",
   "chrome.languageOffer.switch": "Overschakelen naar het {language}",
-  "chrome.languageOffer.dismiss": "Nee, bedankt"
+  "chrome.languageOffer.dismiss": "Nee, bedankt",
+  "chrome.legalPages": "Juridisch",
+  "chrome.legal.notice": "Wettelijke informatie",
+  "chrome.legal.terms": "Servicevoorwaarden",
+  "chrome.legal.versions": "Versies van de voorwaarden",
+  "chrome.legal.privacy": "Privacybeleid",
+  "chrome.legal.cookies": "Cookiebeleid",
+  "chrome.legal.providers": "Modelaanbieders",
+  "chrome.legal.health": "Gezondheidsgegevens (VS)",
+  "chrome.footer.label": "Voettekst van de website",
+  "chrome.footer.location": "Boekarest, Roemenië",
+  "chrome.footer.product": "Product",
+  "chrome.footer.home": "Startpagina",
+  "chrome.footer.cookiePreferences": "Cookies die we opslaan"
 }

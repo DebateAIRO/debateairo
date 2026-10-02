@@ -71,6 +71,15 @@ const overrunBasisPoints = z.number().int().nonnegative().max(BASIS_POINTS.whole
  */
 export const storyOverrunBasisPointsSchema = overrunBasisPoints;
 
+/**
+ * Budget spec 2026-09-28 §2.4 — THE BAND'S RANGES, beside the one denominator.
+ * The close edge runs from half the limit to the whole of it; the finish edge
+ * from the limit itself to twice it; one to ten waiting questions per person.
+ */
+const closeEdgeBasisPoints = z.number().int().min(BASIS_POINTS.whole / 2).max(BASIS_POINTS.whole);
+const finishEdgeBasisPoints = z.number().int().min(BASIS_POINTS.whole).max(2 * BASIS_POINTS.whole);
+const waitingLinePerPerson = z.number().int().min(1).max(10);
+
 const costEnvelopePolicyValueSchema = z.object({
   kind: z.literal("COST_ENVELOPE_POLICY"),
   currency: z.literal("USD"),
@@ -99,7 +108,20 @@ const costEnvelopePolicyValueSchema = z.object({
    * `per_run x (10000 + overrun) / 10000`. OPTIONAL, missing means 0 — no
    * margin. The day must be able to hold it (the refinement below).
    */
-  serve_overrun_basis_points: overrunBasisPoints.optional()
+  serve_overrun_basis_points: overrunBasisPoints.optional(),
+  /**
+   * Budget spec 2026-09-28 §2.4 — THE BAND. Three OPTIONAL members, all present
+   * or all absent (the refinement below). All absent is today's behaviour
+   * exactly: the 429 refusal, the 30-minute reservation, no waiting line and no
+   * shared wall. All present switches every new behaviour on together.
+   *  - `admission_close_basis_points`: the close edge of every limit (9500 = 95%).
+   *  - `finish_up_to_basis_points`: how far a RUNNING debate may take the SITE's
+   *    day to finish (11500 = 115%). Person windows carry their own (billingPlans).
+   *  - `waiting_line_per_person`: waiting questions one person may have (1).
+   */
+  admission_close_basis_points: closeEdgeBasisPoints.optional(),
+  finish_up_to_basis_points: finishEdgeBasisPoints.optional(),
+  waiting_line_per_person: waitingLinePerPerson.optional()
 }).strict().superRefine((value, ctx) => {
   // A daily ceiling below what ONE run may spend is not a policy, it is a
   // deployment in which no run can ever complete: the first run's own envelope
@@ -118,6 +140,21 @@ const costEnvelopePolicyValueSchema = z.object({
       message: "the daily ceiling must be at least the per-run ceiling plus the answer's overrun"
     });
   }
+  // Budget spec §2.4: the band switches on together or not at all, so a
+  // version can never carry a close edge with no waiting line behind it.
+  const band = [
+    value.admission_close_basis_points,
+    value.finish_up_to_basis_points,
+    value.waiting_line_per_person
+  ];
+  const present = band.filter((member) => member !== undefined).length;
+  if (present !== 0 && present !== band.length) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["admission_close_basis_points"],
+      message: "the close edge, the finish edge and the waiting line are all present or all absent"
+    });
+  }
 });
 
 export type CostEnvelopePolicyValue = z.infer<typeof costEnvelopePolicyValueSchema>;
@@ -133,8 +170,40 @@ export type CostEnvelopePolicy = Readonly<{
   serveReserveBasisPoints: number;
   /** The row's `serve_overrun_basis_points`; 0 when the row predates the member. */
   serveOverrunBasisPoints: number;
+  /** Budget spec §2.4: the close edge in basis points; null when the row predates the band. */
+  closeBasisPoints: number | null;
+  /** Budget spec §2.4: the SITE day's finish edge in basis points; null when the row predates the band. */
+  finishBasisPoints: number | null;
+  /** Budget spec §2.4: waiting questions per person; null when the row predates the band. */
+  waitingLinePerPerson: number | null;
   sourceRef: string;
 }>;
+
+/** Budget spec §2.4: the three band members, read together. */
+export type CostEnvelopeBand = Readonly<{
+  closeBasisPoints: number;
+  finishBasisPoints: number;
+  waitingLinePerPerson: number;
+}>;
+
+/**
+ * The band when the row carries it, or null — today's behaviour. The row's
+ * refinement makes "some but not all" unreachable; this is the one place the
+ * three are read back together, so no caller re-derives the rule.
+ */
+export function costEnvelopeBand(
+  policy: Pick<CostEnvelopePolicy, "closeBasisPoints" | "finishBasisPoints" | "waitingLinePerPerson">
+): CostEnvelopeBand | null {
+  if (policy.closeBasisPoints === null || policy.finishBasisPoints === null
+    || policy.waitingLinePerPerson === null) {
+    return null;
+  }
+  return Object.freeze({
+    closeBasisPoints: policy.closeBasisPoints,
+    finishBasisPoints: policy.finishBasisPoints,
+    waitingLinePerPerson: policy.waitingLinePerPerson
+  });
+}
 
 /**
  * `amount x basisPoints / 10000`, in BigInt so no product of a safe micro-unit
@@ -293,6 +362,11 @@ export function storyEnvelopeCeilings(terms: StoryEnvelopeCeilingTerms): StoryEn
  * supplies `costEnvelopePolicy` (`deploy/vps/register/hosted-register.example.json`),
  * and until the operator publishes a version carrying these members they are 0
  * and the margin is off.
+ *
+ * Budget spec 2026-09-28 §2.4: this constant also carries the band — close at
+ * 9500, the site's day may finish up to 11500, one waiting question per person.
+ * Changing it is a NEW version; hosted operators publish the band in their own
+ * next version.
  */
 export const COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COST_ENVELOPE_POLICY_ROW_KEY,
@@ -308,7 +382,10 @@ export const COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     provisional_reason: "TEMPORARY development ceiling under V-28: the owner seals the real"
       + " values as a NEW version of this row after the first measured paid run",
     serve_reserve_basis_points: 3_000,
-    serve_overrun_basis_points: 2_000
+    serve_overrun_basis_points: 2_000,
+    admission_close_basis_points: 9_500,
+    finish_up_to_basis_points: 11_500,
+    waiting_line_per_person: 1
   })
 });
 
@@ -330,6 +407,10 @@ export function costEnvelopePolicyFromValue(value: unknown, sourceRef: string): 
     // A row sealed before these members existed means "no reserve, no margin".
     serveReserveBasisPoints: parsed.data.serve_reserve_basis_points ?? 0,
     serveOverrunBasisPoints: parsed.data.serve_overrun_basis_points ?? 0,
+    // Budget spec §2.4: a row sealed before the band means "no band": null.
+    closeBasisPoints: parsed.data.admission_close_basis_points ?? null,
+    finishBasisPoints: parsed.data.finish_up_to_basis_points ?? null,
+    waitingLinePerPerson: parsed.data.waiting_line_per_person ?? null,
     sourceRef
   });
 }

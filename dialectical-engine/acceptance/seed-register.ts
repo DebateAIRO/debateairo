@@ -32,20 +32,21 @@ import {
  * `REGISTER_PUBLICATION_SEAL_INVALID: historical replay drift`
  * (`migrations/0055_register_support_publication.sql:1343-1374`). Sealed means
  * immutable PER VERSION, so a refit is a NEW VERSION, never an edit: the pin
- * moves to 3, which becomes the current ceremony register, and a standing data
+ * moved to 3, which became the ceremony register, and a standing data
  * directory keeps every earlier version exactly as the run that used it left
  * it. Raising this constant is the whole of the change — the historical import
  * needs no base and no contiguity, and the mandatory-row profile for the new
  * version is declared by `register._algorithm_publication_profile_guard`
  * (`migrations/0061_algorithm_publication_profiles.sql:10-37`) as it is sealed.
  *
- * NOTE for the next refit: `importHistorical` refuses any version above 4
- * (`packages/register/src/register-publication.ts:777`,
- * `migrations/0055_register_support_publication.sql:1288`), so exactly ONE rung
- * is left on this ladder. A refit after that one needs the ceremony's seeding
- * path changed, not this number.
+ * S01 (hate-speech, 2026-09-29) moved the judge, composer and conformance
+ * prompt hashes, so 4 is the new ceremony version. `importHistorical` accepts
+ * no version above 4 (`packages/register/src/register-publication.ts:840`,
+ * `migrations/0055_register_support_publication.sql:1288`): no rung is left.
+ * The next sealed-prompt change needs the ceremony's seeding path changed,
+ * not this number.
  */
-export const ACCEPTANCE_REGISTER_VERSION = 3 as const;
+export const ACCEPTANCE_REGISTER_VERSION = 4 as const;
 /**
  * The version that predates the T16 lane — the one a ceremony database created
  * before it holds. It names that fact, not "the version below the pin", so the

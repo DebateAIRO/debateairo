@@ -82,28 +82,6 @@ function lineHits(paths: string[], pattern: RegExp): string[] {
   return hits;
 }
 
-/**
- * The EXACT catalogue-key literals that spell a banned token (`analytics.`) or a
- * stored-boolean read (`.quality` / `.analytics`) only because the category's
- * name is part of the key. They are metadata handed to `t()`, not an SDK
- * reference or a consent-state read, so these four — and only these four — are
- * blanked before the two scans below. Any other `consent.` literal is still
- * scanned. The allow-list is itself pinned to the English catalogue (see the
- * first case below), so it can never excuse a string that is not a real key.
- */
-const CATEGORY_MESSAGE_KEYS = [
-  "consent.category.quality.name",
-  "consent.category.quality.description",
-  "consent.category.analytics.name",
-  "consent.category.analytics.description"
-] as const;
-
-const withoutConsentMessageKeys = (line: string): string =>
-  CATEGORY_MESSAGE_KEYS.reduce(
-    (text, key) => text.split(`"${key}"`).join('""').split(`'${key}'`).join("''"),
-    line
-  );
-
 /** `path:line: text` for every line of every file CONTAINING `token` verbatim. */
 function literalHits(paths: string[], token: string): string[] {
   const hits: string[] = [];
@@ -261,86 +239,44 @@ describe("S01-C7 the slice-wide guards", () => {
     // SPELL a banned token even to DENY it (CODE-S01-C5's JSDoc `.focus()`).
     const sdkPattern =
       /gtag|googletagmanager|analytics\.|segment|mixpanel|posthog|amplitude|plausible|datadog|sentry|<script/i;
-    // The allow-list excuses real catalogue keys only: every entry must be a
-    // key of the English consent catalogue, or the exemption is refused.
-    const consentEnglish = JSON.parse(read("apps/ui/messages/en/consent.json")) as Record<string, unknown>;
-    for (const key of CATEGORY_MESSAGE_KEYS) {
-      expect(typeof consentEnglish[key], `${key} is a key of messages/en/consent.json`).toBe("string");
-    }
-    const hits: string[] = [];
-    for (const path of slicesOwnFiles()) {
-      read(path).split("\n").forEach((line, index) => {
-        if (sdkPattern.test(withoutConsentMessageKeys(line))) {
-          hits.push(`${path}:${index + 1}: ${line.trim()}`);
-        }
-      });
-    }
+    // Raw lines: the category-key allow-list this case once carried is gone with the
+    // category keys themselves (PLAN S12), so nothing is blanked before the scan.
+    const hits = lineHits(slicesOwnFiles(), sdkPattern);
 
     expect(hits, `analytics/telemetry references in this slice's files:\n${hits.join("\n")}`).toEqual(
       []
     );
   });
 
-  it("gates no code path on the stored quality or analytics booleans", () => {
-    // S01-S44 arm 2 · serves S01-R23. PROPERTY: the stored decision loads
-    // nothing, unloads nothing and gates nothing today. A future consumer will
-    // read it; until then the record is a record.
+  it("names no quality or analytics member anywhere in the consent code", () => {
+    // SPEC-v2 R03 (a) + (c). PROPERTY: nothing in the consent code claims processing the
+    // product does not do — no non-comment line of `lib/consent.ts` or of
+    // `components/consent/*.tsx` matches R03(a)'s pattern, or names a `quality` or
+    // `analytics` member. A comment line is one whose stripped text starts with a
+    // line-comment, a block-comment opener or an asterisk (R03(a)'s own wording).
     //
-    // Mechanically: every read of `.quality` / `.analytics` in these files sits
-    // in a DATA position — the value of an object-literal property of the same
-    // name, or the operand of a `typeof` shape check — and never in a CONTROL
-    // position. Those two shapes are exactly the PLAN's own carve-out ("outside
-    // the card's own toggle rendering and the R04 write") plus the codec's
-    // validator, made mechanical.
-    //
-    // ONE constant here is deliberately WIDER than the PLAN's sentence, and it
-    // has to be: PLAN.md:561 words the arm as "a conditional whose test is
-    // `decision.quality` or `decision.analytics`", while the mutant it names one
-    // line later is `if (readConsent()?.analytics)` — whose receiver is not
-    // `decision`. Read literally the guard could not catch its own named mutant,
-    // so the RECEIVER is generalised and the PROPERTY is pinned instead. This is
-    // reported as a PLAN defect on ticket t_4c58683b rather than absorbed
-    // silently, and the widening is measured to pass against the shipped code
-    // before it was written (nine occurrences, all in data positions).
-    //
-    // What this does NOT catch, stated rather than implied: the shapes are
-    // matched per OCCURRENCE against the text preceding them ON THE SAME LINE,
-    // so a gate written on a line that also carries a well-formed `quality:`
-    // property would slip past. That is a line-shape limit, not a claim about
-    // the property.
-    //
-    // RED watched against the N7 mutant: `if (readConsent()?.analytics) {
-    // document.body.dataset.consentAnalytics = "on"; }` inside
-    // `CookieConsent.tsx`'s effect.
-    const stored = /\??\.(quality|analytics)\b/g;
-    const typeofOperand = /\btypeof\s+[\w.?[\]]*$/;
-    const dataPosition = (key: string): RegExp =>
-      new RegExp(`(?:^|[,{(=?:])\\s*${key}\\s*:\\s*[^,;{}]*$`);
-
-    const gates: string[] = [];
-    let reads = 0;
-    for (const path of slicesOwnFiles()) {
+    // RED watched against the mutant: `quality: boolean;` restored in a type of
+    // `lib/consent.ts`.
+    const r03a =
+      /analytics|telemetry|model.quality|de_session|de_mfa|de_device|de_quality|de_analytics|MFA state|device record/i;
+    const member = /\b(quality|analytics)\b/i;
+    const files = [
+      "apps/ui/lib/consent.ts",
+      ...consentDirFiles()
+        .filter((name) => name.endsWith(".tsx"))
+        .map((name) => `${CONSENT_DIR}/${name}`)
+    ];
+    expect(files.length, "the consent code is scanned").toBeGreaterThanOrEqual(5);
+    const hits: string[] = [];
+    for (const path of files) {
       read(path)
         .split("\n")
         .forEach((line, index) => {
-          const executableLine = withoutConsentMessageKeys(line);
-          for (const match of executableLine.matchAll(stored)) {
-            reads += 1;
-            const before = executableLine.slice(0, match.index);
-            const key = match[1]!;
-            if (dataPosition(key).test(before) || typeofOperand.test(before)) continue;
-            gates.push(`${path}:${index + 1}: ${line.trim()}`);
-          }
+          if (/^\s*(\/\/|\/\*|\*)/.test(line)) return;
+          if (r03a.test(line) || member.test(line)) hits.push(`${path}:${index + 1}: ${line.trim()}`);
         });
     }
-
-    // Vacuity floor: the files really do read those booleans, so a scan that
-    // found nothing at all would be a broken scan, not a clean slice.
-    expect(reads, "the slice does read the two booleans somewhere").toBeGreaterThan(0);
-    expect(
-      gates,
-      `code paths conditioned on the stored booleans:\n${gates.join("\n")}`
-    ).toEqual([]);
+    expect(hits, `quality/analytics in the consent code:\n${hits.join("\n")}`).toEqual([]);
   });
 
   it("writes no second Esc listener and no second focus trap under components/consent", () => {

@@ -14,6 +14,7 @@
   "time.status.claimed": "Übernommen",
   "time.status.running": "Läuft",
   "time.status.holding": "Warten auf Anbieterwiederherstellung",
+  "time.status.waiting": "Wartet",
   "time.status.settled": "Erledigt",
   "time.status.generating": "Wird erzeugt",
   "time.status.failed": "Fehlgeschlagen",

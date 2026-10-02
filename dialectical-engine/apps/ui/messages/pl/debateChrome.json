@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Wszystko w tej debacie — argumenty, recenzje, oceny i werdykt — jest generowane przez modele AI, oznaczone w sposób możliwy do odczytu maszynowego i może być niedokładne.",
+  "debateChrome.status.waiting": "Czeka na rozpoczęcie. Twoja debata rozpocznie się sama o {time}.",
+  "debateChrome.status.waitingOwnDebates": "Twoje pozostałe debaty wykorzystują na razie resztę Twojego limitu. Ta debata rozpocznie się sama, gdy tylko jedna z nich się zakończy.",
   "debateChrome.backToLibrary": "← Wróć do biblioteki",
   "debateChrome.loading": "Wczytywanie…",
   "debateChrome.error.claimGenerationFailed": "Generowanie tezy nie powiodło się",
@@ -190,7 +192,7 @@
   "debateChrome.condition.unpriced": "Nie wyceniono komórki wstrzymania się od odpowiedzi",
   "debateChrome.condition.unadjudicated": "Nie znaleziono dowodów przeciwnych",
   "debateChrome.condition.uncoveredScope": "Zakres nie został w pełni pokryty",
-  "debateChrome.condition.unservedMakerPosition": "Nie udostępniono stanowiska innego autora",
+  "debateChrome.condition.unservedMakerPosition": "Nie udostępniono stanowiska modelu innego twórcy",
   "debateChrome.condition.nonComparable": "Wyniki nie mają porównywalnego nakładu obliczeniowego",
   "debateChrome.condition.notSampled": "Nie pobrano próby",
   "debateChrome.condition.offSubjectDowngrade": "Obniżono wagę dowodów niezwiązanych z tematem",
@@ -203,7 +205,7 @@
   "debateChrome.condition.digestCannotExist": "Nie udało się utworzyć skrótu w ramach budżetu redagowania",
   "debateChrome.condition.protectedCoreGuardRetired": "Przebieg zatrzymano z powodu budżetu; test przeformułowania przestał go warunkować",
   "debateChrome.condition.hiddenUnjudgeable": "Ukryte: nie można było ocenić — włącz ukryte elementy, aby przeczytać",
-  "debateChrome.condition.derivedStandingUnreviewed": "Utrzymuje się na podstawie ocenionych argumentów — brak własnej recenzji między grupami modeli",
+  "debateChrome.condition.derivedStandingUnreviewed": "Utrzymuje się na podstawie ocenionych argumentów — brak własnej recenzji wykonanej przez model innego twórcy",
   "debateChrome.condition.hiddenLowScore": "Ukryte: ocena poniżej wyświetlanego progu",
   "debateChrome.condition.unauthoredBranchHalted": "Rozwijanie zatrzymano tutaj — nie napisano niczego do ukrycia ani wyświetlenia",
   "debateChrome.condition.labelBasisIncomplete": "Podstawa werdyktu jest niepełna — brak stanowiska przeciwnego lub drugiego sędziego do porównania",
@@ -291,5 +293,6 @@
   "requestFailure.kind.UNREADABLE": "Nie udało się odczytać odpowiedzi koordynatora, dlatego nie wiadomo, jaki jest wynik żądania.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordynator odrzucił wybór planu. Wybierz Bezpłatny lub Premium, a następnie ponów próbę.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordynator odrzucił żądanie: model wymagany przez ten plan jest obecnie niedostępny. Ponów próbę później lub wybierz inny plan.",
+  "requestFailure.kind.ALREADY_WAITING": "Naraz może czekać tylko jedno pytanie. Zadaj to pytanie, gdy rozpocznie się Twoja oczekująca debata.",
   "requestFailure.kind.UNCLASSIFIED": "Błąd wystąpił przed nadejściem odpowiedzi, dlatego nie wiadomo, jaki jest wynik żądania. Nie jest to decyzja koordynatora."
 }

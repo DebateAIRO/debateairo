@@ -40,18 +40,20 @@ describe("DEV-06 mail capture executable contract", () => {
     // The argv array literal of each `spawn(...)`, whitespace removed.
     const spawnArgv = [...mailer.matchAll(/spawn\([\s\S]{0,200}?\[([^\]]*)\]/g)]
       .map((match) => match[1]!.replace(/\s+/g, ""));
-    expect(spawnArgv).toHaveLength(2);
+    // Three senders: verification, account-erasure notices, change email (Turn 14).
+    expect(spawnArgv).toHaveLength(3);
     for (const argv of spawnArgv) {
       // `-t` makes the MTA read recipients from the header block on stdin, so
       // only the fixed envelope sender may reach argv, which every local user
       // can read out of `ps`. No `--`, no recipient, nothing else.
       expect(argv).toBe('"-i","-t","-f",this.options.from');
     }
-    // Both senders route the recipient through the one guard that refuses a
+    // Every sender routes the recipient through the one guard that refuses a
     // separator, which would fan the message out to a second mailbox once the
-    // MTA parses `To:`. One definition, two call sites.
+    // MTA parses `To:`. One definition, four call sites: the change-email
+    // sender also guards the new address it quotes in the notice body.
     expect(mailer).toContain("[,;]");
-    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(3);
+    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(5);
 
     const capture = readFileSync("deploy/dev-auth/sendmail-capture.mjs", "utf8");
     expect(capture).toContain('argv[1] !== "-t"');

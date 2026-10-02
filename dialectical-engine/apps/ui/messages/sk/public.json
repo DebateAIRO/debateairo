@@ -191,5 +191,20 @@
   "public.story.morePaths.one": "a ešte {count} stanovisko",
   "public.story.morePaths.few": "a ešte {count} stanoviská",
   "public.story.morePaths.many": "a ešte {count} stanoviska",
-  "public.story.morePaths.other": "a ešte {count} stanovísk"
+  "public.story.morePaths.other": "a ešte {count} stanovísk",
+  "public.publication.contentCheck.refusedHeading": "Túto debatu sme nezverejnili",
+  "public.publication.contentCheck.refusedWhatBlock": "Automatická kontrola našla v tejto debate text, ktorý porušuje naše pravidlá, preto debata nebola zverejnená.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Automatická kontrola nedokázala potvrdiť, že táto debata dodržiava naše pravidlá, preto debata nebola zverejnená.",
+  "public.publication.contentCheck.partsIntro": "Kde kontrola našla text:",
+  "public.publication.contentCheck.part.question": "Otázka",
+  "public.publication.contentCheck.part.summary": "Zhrnutie, poznámky k verdiktu a zostávajúce námietky",
+  "public.publication.contentCheck.part.arguments": "Argumenty",
+  "public.publication.contentCheck.part.reviews": "Komentáre hodnotiteľov",
+  "public.publication.contentCheck.part.story": "Príbeh verdiktu",
+  "public.publication.contentCheck.groundTerms": "Dôvod: naše Podmienky poskytovania služby, oddiel 7 (zákaz obsahu podnecujúceho násilie alebo nenávisť).",
+  "public.publication.contentCheck.groundIllegal": "Text môže byť aj nezákonný.",
+  "public.publication.contentCheck.automated": "Toto rozhodnutie prijal automatický nástroj. Zatiaľ ho nepreskúmal žiadny človek.",
+  "public.publication.contentCheck.stillPrivate": "Vaša debata zostáva súkromná a nezmenená. Vidíte ju iba vy.",
+  "public.publication.contentCheck.appeal": "Ak chcete požiadať človeka o preskúmanie tohto rozhodnutia, napíšte do šiestich mesiacov na [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.unavailable": "Kontrola obsahu momentálne nie je dostupná, preto sa nič nezverejnilo. Vaša debata zostáva súkromná. Skúste to znova o niekoľko minút."
 }

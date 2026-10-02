@@ -9,6 +9,7 @@ import { CONSENT_KEY } from "../../apps/ui/lib/consent.js";
 import { CookieConsent } from "../../apps/ui/components/consent/CookieConsent.js";
 import { ConsentSettingsPanel } from "../../apps/ui/components/consent/ConsentSettingsPanel.js";
 import { openSurfaceCount } from "../../apps/ui/components/consent/modalSemantics.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
 
 /**
  * Cluster S01-C6 — the cross-slice cluster.
@@ -62,24 +63,43 @@ afterEach(() => {
   expect(openSurfaceCount(), "no surface leaks out of a case").toBe(0);
 });
 
+const EN = consentEnglish as Record<string, string>;
+const WHAT_WE_STORE = EN["consent.bar.whatWeStore"]!;
+const COOKIE_POLICY = EN["consent.link.cookiePolicy"]!;
+
 const bar = (): HTMLElement | null =>
-  document.querySelector<HTMLElement>('[role="region"][aria-label="Cookie consent"]');
+  document.querySelector<HTMLElement>(`[role="region"][aria-label="${EN["consent.bar.label"]}"]`);
 const card = (): HTMLElement | null => document.querySelector<HTMLElement>(".consentCard");
 const policy = (): HTMLElement | null => document.querySelector<HTMLElement>(".policyBezel");
 const dialogs = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('[role="dialog"]')];
-const switches = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('[role="switch"]')];
-const checked = (): string[] =>
-  switches().map((control) => control.getAttribute("aria-checked") ?? "");
+const rows = (): number => card()?.querySelectorAll(".consentCatRow").length ?? 0;
 const raw = (): string | null => localStorage.getItem(CONSENT_KEY);
+const ACK = JSON.stringify({ v: 2, acknowledgedAt: "2026-09-29T00:00:00.000Z" });
 
-/** The one control in the document whose trimmed own text is exactly `label`. */
-function labelled(label: string): HTMLButtonElement {
-  const found = [...document.querySelectorAll<HTMLButtonElement>("button")].filter(
+/** The one button inside `scope` whose trimmed own text is exactly `label`. */
+function labelled(label: string, scope: ParentNode | null = document): HTMLButtonElement {
+  expect(scope, `a scope to look for ${label} in`).not.toBeNull();
+  const found = [...scope!.querySelectorAll<HTMLButtonElement>("button")].filter(
     (button) => button.textContent?.trim() === label
   );
   expect(found.length, `expected exactly one control labelled ${label}`).toBe(1);
   return found[0]!;
 }
+
+/** The bar's what-we-store button (the Settings button carries the same English words). */
+const barOpener = (): HTMLButtonElement => labelled(WHAT_WE_STORE, bar());
+
+/** The Settings → Privacy button, found by its own class: its label is the bar's, in English. */
+function settingsOpener(): HTMLButtonElement {
+  const found = [...document.querySelectorAll<HTMLButtonElement>("button.setBtn")];
+  expect(found.length, "exactly one Settings opener").toBe(1);
+  expect(found[0]!.textContent?.trim(), "its label").toBe(EN["consent.settings.button"]);
+  return found[0]!;
+}
+
+/** The card's own Close button (the read-mode policy carries a Close of its own). */
+const cardClose = (): HTMLButtonElement =>
+  labelled(EN["consent.policy.close"]!, document.querySelector(".consentCardFooter"));
 
 /**
  * Click the opener the way a pointer does: a real browser focuses the control it
@@ -135,7 +155,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // The modal is S02's file and is consumed unchanged; what S01 owns is which
     // props it is handed.
     mountBar();
-    activate(labelled("Choose what to store"));
+    activate(barOpener());
     expect(card(), "the card is open").not.toBeNull();
     expect(policy(), "and no policy modal yet").toBeNull();
 
@@ -164,34 +184,28 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(props, "read mode").toContain('mode="read"');
     expect(props, "the modal is told it is open").toMatch(/<PrivacyPolicyModal\s+open\s/);
     expect(props, "and given a close route").toContain("onClose=");
-    expect(source, "no onAcknowledge anywhere in S01's wiring").not.toContain("onAcknowledge");
+    // Scoped to the modal element: since SPEC-v2 the BAR's own acknowledgement prop is also
+    // spelled `onAcknowledge` (PLAN §5 `CookieBarProps`), and it is not the policy's.
+    expect(props, "no onAcknowledge handed to the read-mode policy").not.toContain("onAcknowledge");
   });
 
   it("changes nothing behind it when the policy is closed", () => {
     // PROPERTY (S01-R20, S01-S39): the read-only modal owns no consent state and
-    // touches no storage, so the card it came from is byte-identical after it
-    // closes. S01 passes `onClose` and asserts the EFFECT; the close route itself
-    // is the helper's `backdropCloseHandler` and Esc arm, which S02 implements.
+    // touches no storage, so the card it came from is unchanged after it closes —
+    // still its eight rows — and nothing was written. S01 passes `onClose` and asserts the
+    // EFFECT; the close route itself is the helper's, which S02 implements.
     mountBar();
-    activate(labelled("Choose what to store"));
-    const [, quality] = switches() as [HTMLElement, HTMLElement, HTMLElement];
-    act(() => quality.click());
-
-    const before = checked();
+    activate(barOpener());
+    expect(rows(), "the card shows its eight rows").toBe(8);
     const storedBefore = raw();
-    expect(before, "a toggle was flipped first, so an unchanged read is not vacuous").toEqual([
-      "true",
-      "false",
-      "false"
-    ]);
 
     activate(labelled("Privacy notice"));
     expect(policy(), "the policy is open").not.toBeNull();
-    activate(labelled("Close"));
+    activate(labelled(EN["consent.policy.close"]!, policy()));
 
     expect(policy(), "the policy is gone").toBeNull();
     expect(card(), "and the card it came from is still there").not.toBeNull();
-    expect(checked(), "with every toggle exactly as it was").toEqual(before);
+    expect(rows(), "with its eight rows").toBe(8);
     expect(raw(), "and storage untouched").toBe(storedBefore);
     expect(raw(), "which is still nothing at all").toBeNull();
     expect(bar(), "the bar stays away while the card is open").toBeNull();
@@ -210,10 +224,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // ARRANGEMENT for this pair — the shape the slice ships and the one V rules
     // on — and is no longer the reason the policy wins.
     mountBar();
-    activate(labelled("Choose what to store"));
-    const [, quality] = switches() as [HTMLElement, HTMLElement, HTMLElement];
-    act(() => quality.click());
-    const before = checked();
+    activate(barOpener());
     activate(labelled("Privacy notice"));
 
     expect(policy(), "the policy is open over the card").not.toBeNull();
@@ -227,7 +238,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
 
     expect(policy(), "(a) the policy dialog is gone").toBeNull();
     expect(card(), "(b) the preferences card is STILL in the document").not.toBeNull();
-    expect(checked(), "with its toggle values unchanged").toEqual(before);
+    expect(rows(), "with its eight rows").toBe(8);
     expect(bar(), "(c) and the bar is still absent").toBeNull();
     expect(openSurfaceCount(), "one surface left").toBe(1);
     expect(raw(), "and nothing was written by a dismissal").toBeNull();
@@ -239,7 +250,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // pin is untouched by C6: `dismiss` re-reads storage, so the bar returns iff no
     // valid decision is stored, never because of where the card was opened from.
     mountBar();
-    activate(labelled("Choose what to store"));
+    activate(barOpener());
     expect(card(), "the card is open").not.toBeNull();
 
     press("Escape");
@@ -255,17 +266,11 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // keystroke, the same helper, and the discriminator is still the stored
     // decision. C6 gives Esc a real route for the first time, so B1's pin is
     // re-asserted through it rather than assumed to survive.
-    const stored = JSON.stringify({
-      v: 1,
-      essential: true,
-      quality: false,
-      analytics: true,
-      decidedAt: "2026-01-01T00:00:00.000Z"
-    });
+    const stored = ACK;
     localStorage.setItem(CONSENT_KEY, stored);
     mountSettings();
-    expect(bar(), "a valid decision means no bar").toBeNull();
-    activate(labelled("Cookie preferences"));
+    expect(bar(), "a stored acknowledgement means no bar").toBeNull();
+    activate(settingsOpener());
     expect(card(), "the card opened from Settings").not.toBeNull();
 
     press("Escape");
@@ -282,30 +287,28 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(
       document.activeElement,
       "focus returns to the Settings opener, which never left the page"
-    ).toBe(labelled("Cookie preferences"));
+    ).toBe(settingsOpener());
   });
 
   it("gives the card its initial focus and its Tab wrap from the shared helper", () => {
-    // PROPERTY (S01-R18, S01-S41): initial focus lands on the first OPERABLE
-    // toggle — Essential is locked and is not a choice — and Tab cycles within the
-    // card. Neither is implemented here: the card hands the helper a container and
-    // an initial-focus target and the helper does the rest.
+    // PROPERTY (S01-R18, R20, D-31): initial focus lands on the card's Close button — the card
+    // has nothing to operate but its three footer controls — and Tab cycles within the card.
+    // Neither is implemented here: the card hands the helper a container and an initial-focus
+    // target and the helper does the rest.
     mountBar();
-    activate(labelled("Choose what to store"));
+    activate(barOpener());
 
-    const controls = switches() as [HTMLElement, HTMLElement, HTMLElement];
-    expect(controls[0].getAttribute("aria-disabled"), "Essential is the locked one").toBe("true");
-    expect(
-      document.activeElement,
-      "initial focus is Model quality telemetry, the first operable toggle"
-    ).toBe(controls[1]);
+    expect(document.activeElement, "initial focus is the card's Close button").toBe(cardClose());
 
     const focusable = [
       ...card()!.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )
     ];
-    expect(focusable.length, "the card's focusable set: three switches and three footer controls").toBe(6);
+    expect(
+      focusable.map((element) => element.textContent?.trim()),
+      "the card's focusable set: Privacy notice, the /cookies link, Close"
+    ).toEqual(["Privacy notice", COOKIE_POLICY, EN["consent.policy.close"]]);
 
     act(() => focusable[focusable.length - 1]!.focus());
     press("Tab");
@@ -325,7 +328,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // inside `{children}` and is NOT unmounted by the card, so the opener is still
     // the same node when the card closes.
     mountSettings();
-    const opener = labelled("Cookie preferences");
+    const opener = settingsOpener();
     activate(opener);
     expect(card(), "the card is open").not.toBeNull();
     expect(document.activeElement, "focus moved into the card").not.toBe(opener);
@@ -333,12 +336,12 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     press("Escape");
 
     expect(card(), "the card is gone").toBeNull();
-    expect(document.activeElement, "focus is back on `Cookie preferences`").toBe(opener);
+    expect(document.activeElement, "focus is back on the Settings opener").toBe(opener);
   });
 
   it("returns focus to the RETURNED bar's opener when the card closes", () => {
     // PROPERTY (S01-R18, S01-S41, the BAR direction; V-22 option (a)): after the card
-    // closes with nothing decided, focus is on the `Choose what to store` control of the
+    // closes with nothing acknowledged, focus is on the `What we store` control of the
     // bar that came back.
     //
     // It is the one direction the captured opener cannot serve, which is why the helper
@@ -357,7 +360,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // focus move of its own: it passes a reference, and the ONE helper moves the focus.
     // The SETTINGS direction, where the opener survives, is the case above.
     mountBar();
-    const opener = labelled("Choose what to store");
+    const opener = barOpener();
     activate(opener);
     expect(card(), "the card is open").not.toBeNull();
     expect(opener.isConnected, "and the bar that owned the opener is gone with it").toBe(false);
@@ -366,7 +369,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
 
     expect(card(), "the card is gone").toBeNull();
     expect(bar(), "and the bar is back").not.toBeNull();
-    const returned = labelled("Choose what to store");
+    const returned = barOpener();
     expect(returned, "as a FRESH node, so no captured reference could have been restored").not.toBe(
       opener
     );
@@ -415,7 +418,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // **B1** measured the premise false — the mutant needs a case that closes the
     // CARD while the policy is open, which is what the two cases below drive.
     mountSettings();
-    activate(labelled("Cookie preferences"));
+    activate(settingsOpener());
     activate(labelled("Privacy notice"));
     expect(policy(), "the policy is open").not.toBeNull();
 
@@ -424,7 +427,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(policy(), "both surfaces closed, one keystroke each").toBeNull();
     expect(card(), "the card too").toBeNull();
 
-    activate(labelled("Cookie preferences"));
+    activate(settingsOpener());
 
     expect(card(), "the card is open again").not.toBeNull();
     expect(policy(), "and the policy did not come back with it").toBeNull();
@@ -446,7 +449,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // the policy element unmount together; the flag lives one level up, in this
     // still-mounted component, and outlives both.
     mountBar();
-    activate(labelled("Choose what to store"));
+    activate(barOpener());
     activate(labelled("Privacy notice"));
     expect(policy(), "the policy is open over the card").not.toBeNull();
     expect(dialogs().length, "two dialogs while the visitor has both open").toBe(2);
@@ -459,7 +462,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(bar(), "the bar returns, because nothing valid is stored").not.toBeNull();
     expect(raw(), "a backdrop dismissal writes nothing").toBeNull();
 
-    activate(labelled("Choose what to store"));
+    activate(barOpener());
 
     expect(card(), "the card is open again").not.toBeNull();
     expect(policy(), "and it is CLEAN — no policy the visitor did not ask for").toBeNull();
@@ -467,41 +470,31 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     expect(openSurfaceCount(), "and exactly one surface on the stack").toBe(1);
   });
 
-  it("opens a CLEAN card after the card was settled by Save choices under an open policy", () => {
-    // PROPERTY: the same per-open property through the OTHER exit class. The case
-    // above leaves by a DISMISSAL (writes nothing, re-reads storage); this one
-    // leaves by a SETTLE (writes a decision and goes Silent), from the Settings
-    // entry, where the opener survives the card. Two exits, two routes to the same
-    // stranded flag — a reset written into `dismiss` instead of `openCard` fixes
-    // the case above and leaves this one red, which is why both are here.
+  it("opens a CLEAN card after the card was closed by its Close button under an open policy", () => {
+    // PROPERTY: the same per-open property through the card's OWN exit. The case above leaves
+    // by the scrim; this one leaves by the card's Close button, from the Settings entry, where
+    // the opener survives the card. A reset written into one route instead of `openCard`
+    // fixes one of the two and leaves the other red, which is why both are here.
     //
-    // `Save choices` sits behind the open policy in paint order and is in the
-    // document and enabled; nothing in this lane's stylesheet covers it.
-    const stored = JSON.stringify({
-      v: 1,
-      essential: true,
-      quality: true,
-      analytics: false,
-      decidedAt: "2026-02-02T00:00:00.000Z"
-    });
-    localStorage.setItem(CONSENT_KEY, stored);
+    // `Close` sits behind the open policy in paint order and is in the document and enabled.
+    localStorage.setItem(CONSENT_KEY, ACK);
     mountSettings();
-    activate(labelled("Cookie preferences"));
+    activate(settingsOpener());
     activate(labelled("Privacy notice"));
     expect(policy(), "the policy is open over the card").not.toBeNull();
 
     // Clicked WITHOUT focusing it, unlike `activate`: the point of the case is
-    // that this control settles the card from behind the policy.
-    act(() => labelled("Save choices").click());
+    // that this control closes the card from behind the policy.
+    act(() => cardClose().click());
 
-    expect(card(), "the card settled and closed").toBeNull();
+    expect(card(), "the card closed").toBeNull();
     expect(policy(), "and the policy element unmounts with it").toBeNull();
-    expect(raw(), "the settle wrote a decision").not.toBeNull();
+    expect(raw(), "Close writes nothing").toBe(ACK);
 
-    activate(labelled("Cookie preferences"));
+    activate(settingsOpener());
 
     expect(card(), "reopened from Settings").not.toBeNull();
-    expect(policy(), "CLEAN — the settle route left no policy behind either").toBeNull();
+    expect(policy(), "CLEAN — the Close route left no policy behind either").toBeNull();
     expect(dialogs().length, "one dialog, not two").toBe(1);
     expect(openSurfaceCount(), "and one surface on the stack").toBe(1);
   });
@@ -509,42 +502,19 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
   it("opens a CLEAN card after EVERY route that closes it under an open policy", () => {
     // PROPERTY (CODE-REV-S01-C6 r2 **N7**, the CLASS the two cases above sample):
     // the reset lives at the ONE entry point — `openCard` — so a card opened
-    // afresh carries no policy WHATEVER closed the previous one. The two cases
-    // above pin two route INSTANCES, and an invariant whose fix is a single
-    // entry point cannot be netted route by route: the reviewer's counterfeit
-    // mutant **MR-E** (the reset deleted from `openCard` and written instead
-    // into `dismiss` and into the `onSave` lambda) scores full marks against
-    // both of them and strands the flag on the third route.
-    //
-    // The third route is `Essential only` (`CookiePreferencesCard.tsx:196`): it
-    // calls `onEssentialOnly` -> `settle` DIRECTLY, never through the `onSave`
-    // lambda, so a per-route fix written for `Save choices` does not reach it.
-    //
-    // So this case asserts the property over the WHOLE closing surface, in two
-    // halves, and the second is worthless without the first:
-    //   1. it pins the card footer's control set on every open, so a FOURTH
-    //      control cannot appear without this case naming it; and
-    //   2. it drives every route that closes the CARD from under an open policy
-    //      — the scrim and the two footer controls that settle — and requires a
-    //      clean reopen after each.
-    //
-    // Escape is deliberately NOT one of those routes and that is a measured
-    // fact, not an omission: with the policy open the policy is the topmost
-    // surface and consumes the keystroke ("moves the visitor exactly ONE
-    // surface per Escape", above), so Escape never closes the card from under a
-    // standing policy. It is used here only to return to a closed card between
-    // routes, by the exact path the CONTROL case above already pins as clean.
-    const stored = JSON.stringify({
-      v: 1,
-      essential: true,
-      quality: true,
-      analytics: false,
-      decidedAt: "2026-03-03T00:00:00.000Z"
-    });
-    // The Settings entry over a valid decision: no bar ever appears, so ONE
-    // opener (`Cookie preferences`) serves every route unchanged and the three
-    // iterations differ in nothing but the route under test.
-    localStorage.setItem(CONSENT_KEY, stored);
+    // afresh carries no policy WHATEVER closed the previous one. An invariant
+    // whose fix is a single entry point cannot be netted route by route, so this
+    // case asserts it over the WHOLE closing surface, in two halves:
+    //   1. it pins the card footer's control set on every open (Privacy notice,
+    //      the /cookies link, Close), so a FOURTH control cannot appear without
+    //      this case naming it; and
+    //   2. it drives every route that closes the CARD while a policy was opened
+    //      over it — the scrim, the card's Close, and Escape (which closes the
+    //      policy first and the card on the second press) — and requires a clean
+    //      reopen after each.
+    // The Settings entry over a stored acknowledgement: no bar ever appears, so ONE opener
+    // serves every route unchanged and the iterations differ in nothing but the route.
+    localStorage.setItem(CONSENT_KEY, ACK);
     mountSettings();
 
     const routes: { name: string; close: () => void }[] = [
@@ -555,29 +525,34 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
           act(() => scrim.dispatchEvent(new MouseEvent("click", { bubbles: true })));
         }
       },
-      // Both footer controls are clicked WITHOUT focusing them, unlike
-      // `activate`: the point is that they settle the card from BEHIND the
-      // policy. Nothing in this lane's stylesheet covers them — a line-scan of
-      // `globals.css` for a `.policy*` selector returns nothing at all.
+      // Clicked WITHOUT focusing it, unlike `activate`: the point is that it closes the card
+      // from BEHIND the policy.
       {
-        name: "Essential only",
-        close: (): void => act(() => labelled("Essential only").click())
+        name: "Close",
+        close: (): void => act(() => cardClose().click())
       },
+      // Escape reaches the topmost surface first (the policy), so the card closes on the
+      // second press; the reopen below must still be clean.
       {
-        name: "Save choices",
-        close: (): void => act(() => labelled("Save choices").click())
+        name: "Escape",
+        close: (): void => {
+          press("Escape");
+          expect(policy(), "Escape: the first press closes the policy").toBeNull();
+          expect(card(), "Escape: and leaves the card").not.toBeNull();
+          press("Escape");
+        }
       }
     ];
 
     for (const route of routes) {
-      activate(labelled("Cookie preferences"));
+      activate(settingsOpener());
       expect(card(), `${route.name}: the card is open`).not.toBeNull();
       expect(
-        [...document.querySelectorAll<HTMLButtonElement>(".consentCardFooter button")].map(
-          (control) => control.textContent?.trim()
-        ),
+        [
+          ...document.querySelectorAll<HTMLElement>(".consentCardFooter button, .consentCardFooter a[href]")
+        ].map((control) => control.textContent?.trim()),
         `${route.name}: the card footer's controls, in DOM order`
-      ).toEqual(["Privacy notice", "Essential only", "Save choices"]);
+      ).toEqual(["Privacy notice", COOKIE_POLICY, EN["consent.policy.close"]]);
 
       activate(labelled("Privacy notice"));
       expect(policy(), `${route.name}: the policy stands over the card`).not.toBeNull();
@@ -588,7 +563,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
       expect(card(), `${route.name}: closed the CARD from under the open policy`).toBeNull();
       expect(policy(), `${route.name}: the policy element unmounted with it`).toBeNull();
 
-      activate(labelled("Cookie preferences"));
+      activate(settingsOpener());
 
       expect(card(), `${route.name}: the card opens again`).not.toBeNull();
       expect(
@@ -609,7 +584,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // ON the scrim, never on a descendant. The negative half is what separates a
     // real backdrop from a click-anywhere dismissal that would eat every control.
     mountBar();
-    activate(labelled("Choose what to store"));
+    activate(barOpener());
     const scrim = document.querySelector<HTMLElement>(".consentScrim")!;
 
     act(() => card()!.dispatchEvent(new MouseEvent("click", { bubbles: true })));

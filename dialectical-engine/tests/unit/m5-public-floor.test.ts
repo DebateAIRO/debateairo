@@ -92,6 +92,7 @@ async function publishWith(answer: Answer, readAnswerFloor: FloorReader) {
   } as unknown as PostgresPublicationRepository;
   const application = new PostgresPublicationApplication(repository, cipher, () => new Date("2026-09-27T12:00:00.000Z"));
   const transition = await application.publish({
+    contentCheck: { check: async () => ({ outcome: "ALLOW" }) },
     runId: RUN_ID,
     answer,
     authenticated,

@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Tot conținutul acestei dezbateri — argumentele, evaluările, punctajele și verdictul — este generat de modele de IA, marcat într-un format care poate fi citit automat și poate conține inexactități.",
+  "debateChrome.status.waiting": "Așteaptă să pornească. Dezbaterea dvs. va porni singură la {time}.",
+  "debateChrome.status.waitingOwnDebates": "Celelalte dezbateri ale dvs. folosesc deocamdată restul limitei dvs. Această dezbatere va porni singură imediat ce una dintre ele se încheie.",
   "debateChrome.backToLibrary": "← Înapoi la bibliotecă",
   "debateChrome.loading": "Se încarcă…",
   "debateChrome.error.claimGenerationFailed": "Generarea afirmației a eșuat",
@@ -191,7 +193,7 @@
   "debateChrome.condition.unpriced": "Celula de abținere nu are cost stabilit",
   "debateChrome.condition.unadjudicated": "Nu au fost găsite dovezi contrare",
   "debateChrome.condition.uncoveredScope": "Domeniul nu este acoperit integral",
-  "debateChrome.condition.unservedMakerPosition": "Poziția altui autor nu a fost furnizată",
+  "debateChrome.condition.unservedMakerPosition": "Poziția unui model al altui dezvoltator nu a fost furnizată",
   "debateChrome.condition.nonComparable": "Rezultatele nu au resurse de calcul echivalente",
   "debateChrome.condition.notSampled": "Neeșantionat",
   "debateChrome.condition.offSubjectDowngrade": "Dovezile fără legătură cu subiectul au fost retrogradate",
@@ -204,7 +206,7 @@
   "debateChrome.condition.digestCannotExist": "Nu s-a putut crea niciun rezumat în limita bugetului de redactare",
   "debateChrome.condition.protectedCoreGuardRetired": "Execuția s-a oprit la limita bugetului; verificarea reformulării nu a mai condiționat-o",
   "debateChrome.condition.hiddenUnjudgeable": "Ascuns: nu a putut fi evaluat — afișați elementele ascunse pentru a-l citi",
-  "debateChrome.condition.derivedStandingUnreviewed": "Se menține pe baza argumentelor evaluate — lipsește propria evaluare încrucișată între familiile de modele",
+  "debateChrome.condition.derivedStandingUnreviewed": "Se menține pe baza argumentelor evaluate — lipsește propria evaluare făcută de un model al altui dezvoltator",
   "debateChrome.condition.hiddenLowScore": "Ascuns: punctaj sub pragul afișat",
   "debateChrome.condition.unauthoredBranchHalted": "Extinderea s-a oprit aici — nu a fost redactat nimic care să fie ascuns sau afișat",
   "debateChrome.condition.labelBasisIncomplete": "Baza verdictului este incompletă — nu există o poziție rivală sau un al doilea evaluator pentru comparație",
@@ -284,5 +286,6 @@
   "requestFailure.kind.UNREADABLE": "Răspunsul coordonatorului nu a putut fi citit, astfel că rezultatul este necunoscut.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Coordonatorul a refuzat alegerea planului. Alegeți Gratuit sau Premium, apoi încercați din nou.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Coordonatorul a refuzat solicitarea: un model necesar acestui plan nu este disponibil momentan. Încercați din nou mai târziu sau alegeți celălalt plan.",
+  "requestFailure.kind.ALREADY_WAITING": "O singură întrebare poate aștepta o dată. Puneți-o pe aceasta după ce a pornit dezbaterea dvs. în așteptare.",
   "requestFailure.kind.UNCLASSIFIED": "Eroarea s-a produs înainte de primirea oricărui răspuns, astfel că rezultatul este necunoscut. Nu este o decizie luată de coordonator."
 }
