@@ -48,7 +48,8 @@ function openWithdrawal(input: WindowInput): WithdrawalDeadline | null {
 
 /**
  * The instant the withdrawal right ends, or null when there is none: only while ACTIVE, for a tax country in
- * `withdrawalCountries` (EU, EEA and UK; spec §2.5.6), before `withdrawalDeadline`'s close (14 calendar days, R2 Q-6).
+ * `withdrawalCountries` (EU, EEA and UK; spec §2.5.6), before `withdrawalDeadline`'s close (14 calendar days, R2 Q-6;
+ * a last day on a weekend moves to the Monday, W6).
  */
 export function withdrawalOpenUntil(input: WindowInput): Date | null {
   return openWithdrawal(input)?.closesAt ?? null;

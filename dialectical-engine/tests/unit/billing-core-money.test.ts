@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   decimalToMicros,
   microsToDecimal,
+  upgradeMonthCreditOverrideMicros,
   upgradeProrationMicros,
-  withdrawalRefundMicros
+  withdrawalRefundMicros,
+  withdrawalRefundPerPaymentMicros
 } from "@debateai/billing-core";
 
 const day = 86_400_000;
@@ -95,5 +97,94 @@ describe("P2 — withdrawal refund (the larger of days used or credit used)", ()
       .toThrow(expect.objectContaining({ code: "BILLING_AMOUNT_NOT_CENTS" }));
     expect(() => withdrawalRefundMicros({ ...base, creditSpentMicros: -1, now: start }))
       .toThrow(expect.objectContaining({ code: "BILLING_AMOUNT_INVALID" }));
+  });
+});
+
+describe("W6 (P2-I8) — withdrawal refund per paid transaction, each over the days it paid for", () => {
+  // The money-data reviewer's worked example (final review F1): Romania (21 % VAT), a 30-day period, Plus paid on
+  // day 0 (24.20), an upgrade to Max quoted and paid on day 13 ((200 − 20) × 17/30 = 102.00 net, 123.42 with VAT),
+  // which covers day 13 to the period end, and a withdrawal on day 13.5.
+  const plus = { paidMicros: 24_200_000, coverageStart: start, coverageEnd: end30 };
+  const max = { paidMicros: 123_420_000, coverageStart: plus30(13 * day), coverageEnd: end30 };
+  const withdrewAt = plus30(13.5 * day);
+  // A6: the month credit in force after the upgrade, Plus's 5.00 plus Max's extra 145.00 for the 17 days left.
+  const creditAfterUpgrade = upgradeMonthCreditOverrideMicros({
+    currentMonthCreditMicros: 5_000_000, oldPlanCreditMicros: 5_000_000, newPlanCreditMicros: 150_000_000,
+    periodStart: start, periodEnd: end30, at: plus30(13 * day)
+  });
+
+  it("refunds each payment the share of its own days still unused: 13.31 of Plus and 119.79 of Max", () => {
+    expect(creditAfterUpgrade).toBe(87_166_666);
+    // Plus keeps 13.5 of 30 days (10.89); Max keeps half a day of its 17 (123.42 × 0.5/17 ≈ 3.63).
+    expect(withdrawalRefundPerPaymentMicros({
+      payments: [plus, max], now: withdrewAt, creditSpentMicros: 0, monthlyCreditMicros: creditAfterUpgrade
+    })).toBe(133_100_000);
+    // The old reading charged the upgrade payment for the 13 days before it was bought: 81.19 of 147.62.
+    expect(withdrawalRefundMicros({
+      paidTotalMicros: 147_620_000, periodStart: start, periodEnd: end30, now: withdrewAt,
+      creditSpentMicros: 0, monthlyCreditMicros: creditAfterUpgrade
+    })).toBe(81_190_000);
+  });
+
+  it("takes the larger of the days share and the credit share for each payment on its own (3.00 of credit spent)", () => {
+    // Plus: the days share 13.5/30 is larger than the credit share 3.00/87.17, so 13.31 back. Max: half a day of 17
+    // (2.94 %) is smaller than the credit share (3.44 %), so 123.42 × (1 − 3.00/87.17) = 119.17 back. 132.48 in all.
+    expect(withdrawalRefundPerPaymentMicros({
+      payments: [plus, max], now: withdrewAt, creditSpentMicros: 3_000_000, monthlyCreditMicros: creditAfterUpgrade
+    })).toBe(132_480_000);
+    // The whole credit spent: nothing comes back from either payment.
+    expect(withdrawalRefundPerPaymentMicros({
+      payments: [plus, max], now: withdrewAt, creditSpentMicros: creditAfterUpgrade, monthlyCreditMicros: creditAfterUpgrade
+    })).toBe(0);
+  });
+
+  it("sums the exact shares and floors to cents once, never each payment on its own", () => {
+    // Two payments of 0.01, each half used: 0.005 + 0.005 = 0.01 back (a floor per payment would pay back nothing).
+    const half = { paidMicros: 10_000, coverageStart: start, coverageEnd: plus30(2) };
+    expect(withdrawalRefundPerPaymentMicros({
+      payments: [half, half], now: plus30(1), creditSpentMicros: 0, monthlyCreditMicros: 0
+    })).toBe(10_000);
+    expect(withdrawalRefundPerPaymentMicros({ payments: [], now: plus30(1), creditSpentMicros: 0, monthlyCreditMicros: 0 }))
+      .toBe(0);
+  });
+
+  it("clamps each payment's days to its own coverage: none used before it starts, all used after it ends", () => {
+    const later = { paidMicros: 10_000_000, coverageStart: plus30(20 * day), coverageEnd: end30 };
+    expect(withdrawalRefundPerPaymentMicros({
+      payments: [later], now: plus30(day), creditSpentMicros: 0, monthlyCreditMicros: 0
+    })).toBe(10_000_000);
+    expect(withdrawalRefundPerPaymentMicros({
+      payments: [plus, later], now: plus30(40 * day), creditSpentMicros: 0, monthlyCreditMicros: 0
+    })).toBe(0);
+  });
+
+  it("is today's single-payment result when there was no upgrade", () => {
+    fc.assert(fc.property(
+      fc.integer({ min: 0, max: 100_000 }), fc.integer({ min: 1, max: 40 * day }), fc.integer({ min: -day, max: 45 * day }),
+      fc.integer({ min: 0, max: 200_000_000 }), fc.integer({ min: 0, max: 150_000_000 }),
+      (cents, spanMs, offsetMs, spent, credit) => {
+        const paidMicros = cents * 10_000;
+        const periodEnd = plus30(spanMs);
+        const now = plus30(offsetMs);
+        expect(withdrawalRefundPerPaymentMicros({
+          payments: [{ paidMicros, coverageStart: start, coverageEnd: periodEnd }], now,
+          creditSpentMicros: spent, monthlyCreditMicros: credit
+        })).toBe(withdrawalRefundMicros({
+          paidTotalMicros: paidMicros, periodStart: start, periodEnd, now, creditSpentMicros: spent, monthlyCreditMicros: credit
+        }));
+      }
+    ));
+  });
+
+  it("refuses an amount that is not cents and a coverage that is not a period", () => {
+    expect(() => withdrawalRefundPerPaymentMicros({
+      payments: [{ ...plus, paidMicros: 1 }], now: withdrewAt, creditSpentMicros: 0, monthlyCreditMicros: 0
+    })).toThrow(expect.objectContaining({ code: "BILLING_AMOUNT_NOT_CENTS" }));
+    expect(() => withdrawalRefundPerPaymentMicros({
+      payments: [{ ...plus, coverageEnd: start }], now: withdrewAt, creditSpentMicros: 0, monthlyCreditMicros: 0
+    })).toThrow(expect.objectContaining({ code: "BILLING_PERIOD_INVALID" }));
+    expect(() => withdrawalRefundPerPaymentMicros({
+      payments: [plus], now: withdrewAt, creditSpentMicros: -1, monthlyCreditMicros: 0
+    })).toThrow(expect.objectContaining({ code: "BILLING_AMOUNT_INVALID" }));
   });
 });

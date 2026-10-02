@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import { BillingJobQueries, BillingRepository, createPool, EntitlementRepository, migrate, type OutboxJob } from "@debateai/db";
-import { foldSubscription, microsToDecimal, withdrawalRefundMicros } from "@debateai/billing-core";
+import { foldSubscription, microsToDecimal, withdrawalRefundPerPaymentMicros } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
 import { testBillingPolicy } from "../support/billingFixtures.js";
@@ -82,13 +82,18 @@ const deskWith = (refund: () => Promise<void>) => new RefundDesk({
 describe("P12d withdrawal on real PostgreSQL", () => {
   it("refunds the unused share across both charges newest first, ends the plan, and sends M8 after the last refund", async () => {
     const run = await start("p12d-happy", { activatedDaysAgo: 1, taxCountry: "RO" });
+    const upgradeAt = new Date(run.now.getTime() - 12 * 3_600_000);
     const upgrade = await seedPaidUpgrade(database.pool, run.seeded, {
-      at: new Date(run.now.getTime() - 12 * 3_600_000), netMicros: 15_000_000, taxMicros: 3_150_000,
+      at: upgradeAt, netMicros: 15_000_000, taxMicros: 3_150_000,
       transactionId: "7700123", monthCreditOverrideMicros: 12_500_000
     });
-    const expected = withdrawalRefundMicros({
-      paidTotalMicros: run.seeded.totalMicros + 18_150_000, periodStart: run.seeded.periodStart,
-      periodEnd: run.seeded.periodEnd, now: run.now, creditSpentMicros: 1_000_000, monthlyCreditMicros: 12_500_000
+    // W6 (P2-I8): each payment over its own coverage; the upgrade's starts at its quote, a minute before it was paid.
+    const expected = withdrawalRefundPerPaymentMicros({
+      payments: [
+        { paidMicros: run.seeded.totalMicros, coverageStart: run.seeded.periodStart, coverageEnd: run.seeded.periodEnd },
+        { paidMicros: 18_150_000, coverageStart: new Date(upgradeAt.getTime() - 60_000), coverageEnd: run.seeded.periodEnd }
+      ],
+      now: run.now, creditSpentMicros: 1_000_000, monthlyCreditMicros: 12_500_000
     });
     // Both transactions are needed: the upgrade alone cannot cover the refund.
     expect(expected).toBeGreaterThan(18_150_000);

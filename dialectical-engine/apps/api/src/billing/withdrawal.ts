@@ -1,12 +1,12 @@
 import type { PoolClient } from "pg";
 import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
-import { microsToDecimal, withdrawalRefundMicros } from "@debateai/billing-core";
+import { microsToDecimal, withdrawalRefundPerPaymentMicros, type WithdrawalPayment } from "@debateai/billing-core";
 import type { ChargeEventRow, ChargeRow } from "@debateai/db";
 import { planById } from "@debateai/register";
 import type { AuthenticatedSession } from "../sessions.js";
 import { enqueueEmail } from "./email-job.js";
-import { allocateRefund, paidTransactions, type RefundAllocation } from "./refunds.js";
+import { allocateRefund, paidTransactions, type PaidTransaction, type RefundAllocation } from "./refunds.js";
 import { appendChecked, lockedSubscription, refuse } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 import { initialTaxCountry, withdrawalOpenUntil } from "./subscription-view.js";
@@ -31,6 +31,32 @@ export type WithdrawalRequest = Readonly<{
 /** The refund on its way back, or null when the owner settles it by hand (a dashboard refund touched a payment). */
 export type WithdrawalOutcome = Readonly<{ refundMicros: number | null }>;
 
+/**
+ * W6 (P2-I8): each paid transaction with what it still holds (never below zero: a provider refund's figure is only an
+ * upper bound, and such a withdrawal goes to the owner) and the stretch of the period it paid for. An UPGRADE charge
+ * covers its own `periodStart`..`periodEnd` (its quote's creation to the period end, upgrade.ts); every other payment
+ * covers the subscription's period, which starts at the activation (P9b), not at the INITIAL charge's provisional
+ * checkout period (checkout.ts), so a withdrawal without an upgrade is measured exactly as before.
+ */
+export function withdrawalPayments(
+  paid: ReadonlyArray<PaidTransaction>,
+  charges: ReadonlyArray<Pick<ChargeRow, "chargeId" | "kind" | "periodStart" | "periodEnd">>,
+  period: Readonly<{ start: Date; end: Date }>
+): WithdrawalPayment[] {
+  return paid.map((row) => {
+    const charge = charges.find((candidate) => candidate.chargeId === row.chargeId);
+    if (charge === undefined) {
+      throw new TypedDomainError("BILLING_SUBSCRIPTION_EVENTS_INVALID", "A paid transaction names a charge of another subscription");
+    }
+    const upgrade = charge.kind === "UPGRADE";
+    return Object.freeze({
+      paidMicros: Math.max(row.paidMicros - row.refundedMicros, 0),
+      coverageStart: upgrade ? charge.periodStart : period.start,
+      coverageEnd: upgrade ? charge.periodEnd : period.end
+    });
+  });
+}
+
 /** Rolls back the refund intents alone when a transaction cannot take one; WITHDRAWN is written after it. */
 const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
 
@@ -42,6 +68,8 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
  * in force at `withdrewAt` (A6's override after an upgrade) and the credit spent from the period start to it
  * ("withdrawal after an upgrade: the paid total is the sum of all successful charges since the first activation");
  * both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is written.
+ * W6 (P2-I8): each of those payments gives back its own share, its days measured over the stretch it paid for
+ * (`withdrawalPayments`: an UPGRADE's starts at its quote's creation), and the sum is floored once.
  *
  * D6a F20(c): when a refund made in the xMoney dashboard touched any paid transaction (`providerRefunded`, whose
  * refunded amount is only an upper bound), or when a transaction already holds a refund request
@@ -89,9 +117,9 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
       if (read !== null) charges.push(read);
     }
     const paid = paidTransactions(charges, activatedAt);
-    const refundMicros = withdrawalRefundMicros({
-      paidTotalMicros: paid.reduce((total, row) => total + row.paidMicros - row.refundedMicros, 0),
-      periodStart, periodEnd, now: withdrewAt, creditSpentMicros: spentMicros,
+    const refundMicros = withdrawalRefundPerPaymentMicros({
+      payments: withdrawalPayments(paid, charges, { start: periodStart, end: periodEnd }),
+      now: withdrewAt, creditSpentMicros: spentMicros,
       monthlyCreditMicros: entitlement.monthCreditOverrideMicros ?? planById(deps.plans, creditPlanId).monthlyCreditMicros
     });
     let byOwner = paid.some((row) => row.providerRefunded);

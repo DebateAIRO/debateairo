@@ -44,27 +44,52 @@ describe("P12b the subscription as the person sees it", () => {
     expect(view({ status: "ENDED" })).toMatchObject({ renews_on: null, renewal_total: null });
   });
 
-  it("closes the withdrawal window at the end of the 14th calendar day, the consumer's time, with no weekend roll (R2 Q-6)", () => {
+  it("closes the withdrawal window at the end of the 14th calendar day, the consumer's time (R2 Q-6)", () => {
     const open = (overrides: Partial<SubscriptionState>, taxCountry: string | null, now: Date) =>
       withdrawalOpenUntil({ state: state(overrides), taxCountry, policy: testBillingPolicy, now, xmoneyEnvironment: "stage" });
     // Romania, activated Thursday 1 October 09:00 UTC: the last day is Thursday 15 October.
     expect(open({}, "RO", new Date("2026-10-15T20:59:59.999Z"))).toEqual(new Date("2026-10-15T21:00:00.000Z"));
     expect(open({}, "RO", new Date("2026-10-15T21:00:00.000Z"))).toBeNull();
-    // Romania, activated Saturday 3 October: the 14th day is Saturday 17 October, and the window closes at its end —
-    // calendar days, so a weekend moves nothing.
-    const saturday = new Date("2026-10-03T09:00:00.000Z");
-    expect(open({ activatedAt: saturday }, "RO", new Date("2026-10-17T20:59:59.999Z")))
-      .toEqual(new Date("2026-10-17T21:00:00.000Z"));
-    expect(open({ activatedAt: saturday }, "RO", new Date("2026-10-17T21:00:00.000Z"))).toBeNull();
-    expect(withdrawalDeadline({ activatedAt: saturday, taxCountry: "RO", withdrawalDays: 14 }).lastDay).toBe("2026-10-17");
-    // The UK counts the same calendar days, at London time (BST).
-    expect(open({ activatedAt: saturday }, "GB", new Date("2026-10-17T12:00:00.000Z")))
-      .toEqual(new Date("2026-10-17T23:00:00.000Z"));
-    expect(open({ activatedAt: saturday }, "GB", new Date("2026-10-17T23:00:00.000Z"))).toBeNull();
     expect(open({}, "DE", NOW)).toEqual(new Date("2026-10-15T22:00:00.000Z"));
     expect(open({}, "US", NOW)).toBeNull();
     expect(open({}, null, NOW)).toBeNull();
     expect(open({ status: "PAST_DUE" }, "RO", NOW)).toBeNull();
+  });
+
+  it("rolls a 14th day on a Saturday or Sunday to the next Monday (W6, P2-I9: Regulation 1182/71 art. 3(4))", () => {
+    const open = (overrides: Partial<SubscriptionState>, taxCountry: string | null, now: Date) =>
+      withdrawalOpenUntil({ state: state(overrides), taxCountry, policy: testBillingPolicy, now, xmoneyEnvironment: "stage" });
+    // Romania, activated Saturday 3 October: the 14th day is Saturday 17 October, so the window stays open through
+    // Sunday 18 and Monday 19 October and closes at Monday's midnight, Bucharest time.
+    const saturday = new Date("2026-10-03T09:00:00.000Z");
+    expect(withdrawalDeadline({ activatedAt: saturday, taxCountry: "RO", withdrawalDays: 14 }))
+      .toEqual({ lastDay: "2026-10-19", closesAt: new Date("2026-10-19T21:00:00.000Z") });
+    expect(open({ activatedAt: saturday }, "RO", new Date("2026-10-18T12:00:00.000Z")))
+      .toEqual(new Date("2026-10-19T21:00:00.000Z"));
+    expect(open({ activatedAt: saturday }, "RO", new Date("2026-10-19T20:59:59.999Z")))
+      .toEqual(new Date("2026-10-19T21:00:00.000Z"));
+    expect(open({ activatedAt: saturday }, "RO", new Date("2026-10-19T21:00:00.000Z"))).toBeNull();
+    // Activated Sunday 4 October: the 14th day is Sunday 18 October, which also rolls to Monday 19 October.
+    expect(withdrawalDeadline({ activatedAt: new Date("2026-10-04T09:00:00.000Z"), taxCountry: "RO", withdrawalDays: 14 }))
+      .toEqual({ lastDay: "2026-10-19", closesAt: new Date("2026-10-19T21:00:00.000Z") });
+    // Activated Friday 2 October: the 14th day is Friday 16 October, a working day, and nothing moves.
+    expect(withdrawalDeadline({ activatedAt: new Date("2026-10-02T09:00:00.000Z"), taxCountry: "RO", withdrawalDays: 14 }))
+      .toEqual({ lastDay: "2026-10-16", closesAt: new Date("2026-10-16T21:00:00.000Z") });
+    // The UK rolls the same Saturday to Monday 19 October, closing at London's midnight (BST, UTC+1).
+    expect(open({ activatedAt: saturday }, "GB", new Date("2026-10-19T12:00:00.000Z")))
+      .toEqual(new Date("2026-10-19T23:00:00.000Z"));
+    expect(open({ activatedAt: saturday }, "GB", new Date("2026-10-19T23:00:00.000Z"))).toBeNull();
+    // Portugal: the date is read in Lisbon and the window closes at the Azores' Monday midnight (summer time, UTC+0).
+    expect(withdrawalDeadline({ activatedAt: saturday, taxCountry: "PT", withdrawalDays: 14 }))
+      .toEqual({ lastDay: "2026-10-19", closesAt: new Date("2026-10-20T00:00:00.000Z") });
+    // A Saturday rolled across a DST change: activated Saturday 17 October, the 14th day is Saturday 31 October, the
+    // window closes at Bucharest's midnight after Monday 2 November, in winter time (UTC+2).
+    expect(withdrawalDeadline({ activatedAt: new Date("2026-10-17T09:00:00.000Z"), taxCountry: "RO", withdrawalDays: 14 }))
+      .toEqual({ lastDay: "2026-11-02", closesAt: new Date("2026-11-02T22:00:00.000Z") });
+    // The person sees the Monday as the last day.
+    expect(view({ activatedAt: saturday }, "RO", new Date("2026-10-18T12:00:00.000Z"))).toMatchObject({
+      withdrawal_open_until: "2026-10-19T21:00:00.000Z", withdrawal_last_day: "2026-10-19"
+    });
   });
 
   it("counts from the consumer's local date, and never closes before any zone of a two-zone country", () => {
