@@ -250,6 +250,49 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     await run.api.close();
   });
 
+  it("records a withdrawal refund under the owner lock first, then the charge's refund lock (the writers' order)", async () => {
+    const run = await start("p12d-lock-order", { activatedDaysAgo: 1, taxCountry: "RO" });
+    expect((await run.withdraw()).statusCode).toBe(200);
+    const ownerRef = run.identity.authenticated.ownerRef;
+    const [request] = (await refundRequests(run.billing, run.seeded.initialChargeId))
+      .filter(([, , reason]) => reason === "WITHDRAWAL");
+    const amountMicros = request![1] as number;
+    const holder = await database.pool.connect();
+    let recording: Promise<void> | undefined;
+    try {
+      await holder.query("BEGIN");
+      await new BillingJobQueries(database.pool).lockOwner(holder, ownerRef);
+      recording = deskWith(async () => undefined).recordRefunded({
+        chargeId: run.seeded.initialChargeId, transactionId: run.seeded.initialTransactionId, amountMicros,
+        whole: false, ownerRef, reason: "WITHDRAWAL"
+      }, new Date());
+      // Wait until the recording is queued behind the owner lock this test holds.
+      const deadline = Date.now() + 5_000;
+      let waiting = false;
+      while (!waiting && Date.now() < deadline) {
+        waiting = ((await database.pool.query(
+          "SELECT 1 FROM pg_locks WHERE locktype='advisory' AND NOT granted"
+        )).rowCount ?? 0) > 0;
+        if (!waiting) await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      expect(waiting).toBe(true);
+      // The recording waits for the owner lock BEFORE its REFUNDED insert takes the charge's refund lock (0086).
+      const free = await holder.query<{ free: boolean }>(
+        "SELECT pg_try_advisory_xact_lock(hashtextextended('debateai.billing.refund:'||$1,0)) AS free",
+        [run.seeded.initialChargeId]
+      );
+      expect(free.rows[0]!.free).toBe(true);
+    } finally {
+      await holder.query("ROLLBACK");
+      holder.release();
+    }
+    await recording;
+    const m8 = await m8Of(run.seeded.subscriptionId);
+    expect(m8).toHaveLength(1);
+    expect(m8[0]!.payload).toMatchObject({ "param.refundAmount": microsToDecimal(amountMicros) });
+    await run.api.close();
+  });
+
   it("withdraws on a pool of ONE connection: every read under the owner lock uses the transaction's own", async () => {
     const small = createPool(database.connectionString, { max: 1 });
     try {

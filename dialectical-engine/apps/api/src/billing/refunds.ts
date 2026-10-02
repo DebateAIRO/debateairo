@@ -345,13 +345,18 @@ export class RefundDesk {
    * REFUNDED once per paid transaction (P1a's unique keys), with the reason's follow-up in one transaction. For a
    * refund xMoney reported as its own transaction, the row is written on that transaction and names the payment it
    * refunds (`refundsTransactionId`, D5 5g), with that refund transaction's `creationDate` (D5 5m: the quarter rows
-   * date the refund by it). A refund read from the payment's own status carries no such time.
+   * date the refund by it). A refund read from the payment's own status carries no such time. A WITHDRAWAL refund
+   * takes the owner lock first, before the REFUNDED row; no other reason takes it.
    */
   async recordRefunded(
     intent: RefundIntent, at: Date, refundTransactionId: string | null = null, refundCreatedAt: Date | null = null
   ): Promise<void> {
     const followUp = await this.followUp(intent);
     await this.deps.repository.withTransaction(async (client) => {
+      // The owner lock comes first, then the charge's refund lock that 0086's trigger takes on the REFUNDED insert:
+      // this is the order the withdrawal and VERIFY_PAYMENT's refund writers use, and the WITHDRAWAL follow-up
+      // decides on M8 under the owner lock.
+      if (intent.reason === "WITHDRAWAL") await this.deps.jobs.lockOwner(client, intent.ownerRef);
       const written = await this.deps.repository.appendChargeEvent(client, chargeEvent(intent.chargeId, "REFUNDED", at, {
         xmoneyTransactionId: refundTransactionId ?? intent.transactionId, amountMicros: intent.amountMicros,
         errorCode: intent.reason, refundsTransactionId: refundTransactionId === null ? null : intent.transactionId,
@@ -425,8 +430,12 @@ export class RefundDesk {
   /**
    * P12d (spec §2.5.6): the credit note for this transaction, and M8 "we refunded {refundAmount}" once the LAST
    * refund of the withdrawal is recorded — never before the money moved, and never for a refund xMoney refused
-   * (that job dies and P14a/P16b list it for the owner). The owner lock serializes the refund jobs of one withdrawal,
-   * so exactly one of them sees every refund recorded; M8's ref `M8:<subscriptionId>` makes a second copy impossible.
+   * (that job dies and P14a/P16b list it for the owner). One M8 per withdrawal rests on three things: (1) the owner
+   * lock, which `recordRefunded` takes before the REFUNDED row, serializes the refund recordings of one withdrawal, so
+   * exactly one of them sees every refund recorded; (2) a repeated REFUNDED returns before its follow-up runs; (3) the
+   * ref `M8:<subscriptionId>` only absorbs a second M8 while the first is still unsent (`enqueue`'s open-job key), so
+   * no WITHDRAWAL request may be added after M8 has gone out (P14c settles only unsettled `refund_by_owner`
+   * withdrawals, and those never get one).
    * The amount is the sum of the withdrawal's own requests (reason WITHDRAWAL): `refund_micros` when P12d computed
    * it, the owner's amount when P14c settled a withdrawal handed to the owner (whose `refund_micros` is null).
    */
@@ -439,7 +448,7 @@ export class RefundDesk {
     }
     return async (client, at) => {
       await creditNote(client, at);
-      await this.deps.jobs.lockOwner(client, intent.ownerRef);
+      // Runs under the owner lock `recordRefunded` took before the REFUNDED row (its only caller).
       const events = await this.deps.repository.subscriptionEvents(charge.subscriptionId, client);
       const withdrawn = events.find((event) => event.kind === "WITHDRAWN");
       if (withdrawn === undefined) return;
