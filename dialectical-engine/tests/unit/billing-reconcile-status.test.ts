@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TypedDomainError } from "@debateai/kernel";
 import type { SubscriptionEvent } from "@debateai/billing-core";
 import type { ChargeEventInput, ChargeEventKind, ChargeEventRow, ChargeRow } from "@debateai/db";
 import type { XMoneyStatus, XMoneyTransactionListQuery } from "@debateai/payments-xmoney";
@@ -221,5 +222,33 @@ describe("P14a one charge that throws never stops the pass for the others", () =
     expect(report.failed).toBe(1);
     expect(appended.map((row) => [row.chargeId, row.kind])).toEqual([[free.chargeId, "FAILED"]]);
     expect(audit).toContainEqual({ event: "billing.reconcile.errors", fields: { pass: "CHECKOUT", count: 1, codes: "55P03" } });
+  });
+});
+
+describe("P14a a refused xMoney key (D5 5i)", () => {
+  const refused = () => new TypedDomainError("XMONEY_CREDENTIALS_REFUSED", "fake: 401");
+
+  it("raises the operator alarm with exactly {operation: 'list'} on a daily listing, and the error still goes on", async () => {
+    const now = new Date("2026-10-10T12:00:00.000Z");
+    const { reconciler, audit } = stubbedReconciler({
+      now, list: async (query) => { if (query.dateType === "creation") throw refused(); return []; }
+    });
+    await expect(reconciler.runDaily(now)).rejects.toMatchObject({ code: "XMONEY_CREDENTIALS_REFUSED" });
+    expect(audit.filter((line) => line.event === "billing.xmoney.credentials_refused"))
+      .toEqual([{ event: "billing.xmoney.credentials_refused", fields: { operation: "list" } }]);
+  });
+
+  it("raises the same alarm on an adoption look-up and leaves the charge as it is", async () => {
+    const now = new Date("2026-10-10T12:00:00.000Z");
+    const waiting = openUpgrade("e".repeat(32), "sub-refused", new Date(now.getTime() - 40 * 60_000));
+    const histories = new Map<string, () => Promise<SubscriptionEvent[]>>([
+      ["sub-refused", async () => [subscriptionEventAt("sub-refused", "CREATED", new Date(now.getTime() - 5 * 86_400_000), "504")]]
+    ]);
+    const { reconciler, audit, appended } = stubbedReconciler({
+      now, charges: [waiting], histories, list: async () => { throw refused(); }
+    });
+    await expect(reconciler.runAdoption(now, "FREQUENT")).resolves.toEqual({ adopted: 0, failed: 0, rejected: 0 });
+    expect(appended).toEqual([]);
+    expect(audit).toEqual([{ event: "billing.xmoney.credentials_refused", fields: { operation: "list" } }]);
   });
 });

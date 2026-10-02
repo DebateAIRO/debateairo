@@ -294,6 +294,13 @@ describe("P14a reconciliation on real PostgreSQL", () => {
     // One refused row in each of the three listings, and more in the adoption look-ups.
     expect(report.rejected).toBeGreaterThanOrEqual(3);
     expect(audit.events).toContainEqual({ event: "billing.reconcile.rows_rejected", fields: { count: 3, pass: "LISTING" } });
+    // The adoption look-ups' refused rows get their own line; other cases' open charges in this shared database are
+    // candidates too, so the count varies.
+    expect(audit.events).toContainEqual({
+      event: "billing.reconcile.rows_rejected", fields: { count: expect.any(Number), pass: "ADOPTION" }
+    });
+    const adoptionLine = audit.events.find(({ event, fields }) => event === "billing.reconcile.rows_rejected" && fields.pass === "ADOPTION");
+    expect(adoptionLine?.fields.count).toBeGreaterThanOrEqual(1);
   });
 
   it("never lets old unknowns hide a fresh one: the frequent pass skips double unknowns, the daily pass pages through all", async () => {
