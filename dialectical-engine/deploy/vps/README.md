@@ -2219,11 +2219,21 @@ read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect 
 
 If it prints that a refund made in the xMoney dashboard already touched one of the payments, nothing is refunded
 automatically. Work out what is still due, then settle it within 14 days of the withdrawal, in this order. Until you
-do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`. What is due is worked out per payment, as
-the site does it: each payment gives back what it paid times (1 minus the larger of two shares). The first share is the
-part of that payment's own days already used: the first payment's days run from the start of the period, an
-upgrade's from the moment it was bought, both to the end of the period. The second share is the credit used. Add the
-payments' amounts and round down to the cent.
+do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`. What is due is worked out per payment, exactly
+as the site does it: each payment gives back its amount times (1 minus the larger of two shares).
+- **Its amount** is what it still holds: what it paid, less what was already refunded on it. For the payment the
+  dashboard refund touched, the amount already refunded is the amount the xMoney dashboard shows as refunded.
+- **The first share** is the part of that payment's own days already used at the moment of the withdrawal. The first
+  payment's days run from the start of the period. An upgrade's days run from the moment its price was quoted, shortly
+  before it was paid (the upgrade charge's `period_start` in `billing.charge`), not from the payment. Both run to the
+  end of the period.
+- **The second share** is the credit used from the start of the period to the withdrawal, divided by the month's
+  credit in force when the person withdrew. After an upgrade, that is the prorated credit the upgrade set
+  (`month_credit_override_micros` on the `UPGRADED` row of `billing.entitlement_event`), never either plan's full
+  monthly credit.
+
+Add the payments' amounts unrounded, and round the sum down to the cent once. That is what is due; the two steps
+below settle it.
 
 1. **First, in the xMoney dashboard,** refund the part due on the payment the dashboard refund touched. The command
    cannot take money back from that payment: it refuses it and writes nothing.
