@@ -15,7 +15,7 @@ const ROOT = process.cwd();
 const LEGAL_DIR = join(ROOT, "apps/ui/legal");
 const LISTED: readonly LegalInventoryItem[] = [...LEGAL_COOKIES, ...LEGAL_BROWSER_STORAGE];
 const LOCALES = readdirSync(LEGAL_DIR, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
+  .filter((entry) => entry.isDirectory() && entry.name !== "archive")   // origin/dev 06b111c8f: archive of published texts
   .map((entry) => entry.name)
   .sort();
 
