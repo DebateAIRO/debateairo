@@ -9,6 +9,7 @@ import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
+import { assertRelayRuntime } from "./relay-deployment-guard.js";
 
 /**
  * FAIR-02 shared CLI-relay core. One OpenAI-compatible HTTP front (P4 gateway
@@ -331,6 +332,9 @@ export async function invokeCli(
   prompt: string,
   timeoutMs: number
 ): Promise<CliCompletion> {
+  // V-9(c) backstop: the one place a CLI is ever started. Whichever entry point
+  // got here, a hosted process never starts one (relay-deployment-guard.ts).
+  assertRelayRuntime(process.env);
   const makerSlug = adapter.maker.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cli";
   const scratchDirectory = await mkdtemp(join(await realpath(tmpdir()), `relay-${makerSlug}-`));
   return new Promise((resolve, reject) => {
@@ -530,6 +534,8 @@ function authorizationMatches(request: IncomingMessage, expectedDigest: Buffer):
 }
 
 export async function startCliRelayServer(options: CliRelayServerOptions): Promise<CliRelayHandle> {
+  // V-9(c) backstop: the one place a relay ever starts listening.
+  assertRelayRuntime(process.env);
   if (!Number.isInteger(options.port) || options.port < 0 || options.port > 65_535) {
     throw new TypeError("CLI_RELAY_PORT_INVALID");
   }
