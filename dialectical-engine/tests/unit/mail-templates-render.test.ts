@@ -1,0 +1,267 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  MAIL_ATTACHMENT_FACTS,
+  MAIL_LOCALES,
+  MAIL_TEMPLATES,
+  MAIL_TEMPLATE_IDS,
+  MailTemplateError,
+  TERMS_ATTACHMENT_FILENAME,
+  WITHDRAWAL_FORM_ATTACHMENT_FILENAME,
+  loadMailCatalogues,
+  mailAttachmentFactsOf,
+  renderMail,
+  renderWithdrawalForm,
+  type MailAttachmentFact,
+  type MailTemplateId
+} from "@debateai/mail-templates";
+
+const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
+  plan: "PLUS",
+  totalAmount: "24.20",
+  refundAmount: "12.10",
+  renewDate: "2026-10-29",
+  chargeDate: "2026-10-29T10:00:00.000Z",
+  retryDate: "2026-10-30",
+  accessEndDate: "2026-10-29",
+  cancelPageUrl: "https://dezbatere.ro/cancel",
+  termsUrl: "https://dezbatere.ro/terms",
+  invoiceUrl: "https://quadernoapp.com/i/abc123",
+  cardPageUrl: "https://dezbatere.ro/settings/card",
+  pricingUrl: "https://dezbatere.ro/pricing",
+  settingsUrl: "https://dezbatere.ro/settings",
+  cancelLinkUrl: `https://dezbatere.ro/cancel#token=${"A".repeat(43)}`,
+  withdrawalDays: "14",
+  canUndo: "true",
+  invoiceNumber: "DBAI 0042",
+  quarter: "2026-Q4",
+  summaryText: "RO  net 100.00  tax 21.00\nDE  net 50.00  tax 9.50",
+  chargeRef: "0123456789abcdef0123456789abcdef",
+  reasonCode: "XMONEY_REFUSED"
+});
+
+/** Every param a template declares, the optional ones included. */
+function paramsFor(id: MailTemplateId): Record<string, string> {
+  const template = MAIL_TEMPLATES[id];
+  return Object.fromEntries(Object.keys({ ...template.params, ...(template.optional ?? {}) }).map((name) => {
+    const value = SAMPLE[name];
+    if (value === undefined) throw new Error(`no sample for ${name}`);
+    return [name, value];
+  }));
+}
+
+/** The other branch of every param condition: optional params left out, flags "false", amounts "0.00". */
+function variantFor(id: MailTemplateId): Record<string, string> {
+  return Object.fromEntries(Object.entries(MAIL_TEMPLATES[id].params).map(([name, kind]) => [
+    name, kind === "flag" ? "false" : kind === "amount" ? "0.00" : SAMPLE[name]!
+  ]));
+}
+
+function codeOf(run: () => unknown): string {
+  try {
+    run();
+  } catch (error) {
+    if (error instanceof MailTemplateError) return error.code;
+    throw error;
+  }
+  throw new Error("expected a MailTemplateError");
+}
+
+const NOTHING: ReadonlySet<MailAttachmentFact> = new Set();
+const EVERYTHING: ReadonlySet<MailAttachmentFact> = new Set(MAIL_ATTACHMENT_FACTS);
+
+describe("P17 renderMail", () => {
+  it("renders every template in every locale, with and without its attachments and on both sides of each param condition, with no placeholder left and no remote resource", () => {
+    for (const id of MAIL_TEMPLATE_IDS) {
+      for (const locale of MAIL_LOCALES) {
+        for (const params of [paramsFor(id), variantFor(id)]) {
+          for (const attached of [NOTHING, EVERYTHING]) {
+            const mail = renderMail(id, locale, params, { attached });
+            for (const part of [mail.subject, mail.text, mail.html]) {
+              expect(part, `${id}/${locale}`).not.toMatch(/\{[A-Za-z][A-Za-z0-9_]*\}/);
+            }
+            expect(mail.subject, `${id}/${locale}`).not.toMatch(/[\r\n]/);
+            expect(mail.html, `${id}/${locale}`).not.toMatch(/<img|src=|url\(|http:\/\//i);
+            for (const [name, kind] of Object.entries(MAIL_TEMPLATES[id].params)) {
+              if (kind === "url") expect(mail.html, `${id}/${locale}`).toContain(`<a href="${SAMPLE[name]}">`);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it("formats the English confirmation email in plain words", () => {
+    const mail = renderMail("M1", "en", paramsFor("M1"));
+    expect(mail.subject).toBe("Your Plus plan is active");
+    expect(mail.text).toContain(
+      "You pay $24.20 a month, tax included. The plan renews on October 29, 2026 and then every month until you cancel."
+    );
+    expect(mail.text).toContain("https://dezbatere.ro/cancel");
+    expect(mail.text).toContain("you may withdraw within 14 days");
+    expect(mail.text).toContain("DebateAIRO S.R.L.");
+    expect(mail.html).toMatch(/^<!doctype html>\n<html lang="en" dir="ltr">/);
+  });
+
+  it("says the accepted Terms are attached only when they are, and never calls the current page the accepted version", () => {
+    const linked = renderMail("M1", "en", paramsFor("M1"));
+    expect(linked.text).toContain("Our current Terms are online at https://dezbatere.ro/terms");
+    expect(linked.text).not.toContain("The Terms you accepted");
+    const attached = renderMail("M1", "en", paramsFor("M1"), { attached: new Set(["TERMS_TEXT"]) });
+    expect(attached.text).toContain("The Terms you accepted are attached. The latest version is always at https://dezbatere.ro/terms");
+    expect(attached.text).not.toContain("Our current Terms");
+    // The page online may change after this email; the email must not say it shows the version accepted.
+    expect(attached.text).not.toMatch(/also online|same as the|accepted are online/u);
+  });
+
+  it("offers the withdrawal right and its form only where it exists (withdrawalDays is optional, P9b)", () => {
+    const { withdrawalDays: _days, ...noRight } = paramsFor("M1");
+    const without = renderMail("M1", "en", noRight).text;
+    expect(without).not.toContain("withdraw");
+    expect(without).not.toContain("withdrawal form");
+    expect(without).toContain("You pay $24.20 a month, tax included.");
+    expect(renderMail("M1", "en", paramsFor("M1")).text).toContain("The model withdrawal form is attached to this email.");
+    expect(codeOf(() => renderMail("M1", "en", { ...paramsFor("M1"), withdrawalDays: "fourteen" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+  });
+
+  it("offers the undo only while the plan still runs (a cancel while a payment is failing ends it at once)", () => {
+    const running = renderMail("M7", "en", paramsFor("M7")).text;
+    expect(running).toContain("You keep your Plus plan until October 29, 2026. You will not be charged again.");
+    expect(running).toContain("Changed your mind? You can undo this in Settings before that date: https://dezbatere.ro/settings");
+    const ended = renderMail("M7", "en", { ...paramsFor("M7"), canUndo: "false" }).text;
+    expect(ended).toContain("Your Plus plan ended on October 29, 2026. You will not be charged again.");
+    expect(ended).toContain("You can choose a plan again at any time in Settings: https://dezbatere.ro/settings");
+    expect(ended).not.toContain("undo");
+    expect(ended).not.toContain("You keep your");
+    // D6b's P12b also ends an ACTIVE plan at once (after the paid month's end, or inside the renewal's lead): the
+    // sentence names no reason, so it never claims a payment failed.
+    expect(ended).not.toMatch(/fail|renew/iu);
+    expect(codeOf(() => renderMail("M7", "en", { ...paramsFor("M7"), canUndo: "yes" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+    const { canUndo: _flag, ...withoutFlag } = paramsFor("M7");
+    expect(codeOf(() => renderMail("M7", "en", withoutFlag))).toBe("MAIL_TEMPLATE_PARAM_MISSING");
+  });
+
+  it("says a withdrawal with nothing due back refunded nothing, and never shows $0.00 as a refund", () => {
+    expect(renderMail("M8", "en", paramsFor("M8")).text).toContain("we refunded $12.10 to your card");
+    const nothing = renderMail("M8", "en", { ...paramsFor("M8"), refundAmount: "0.00" }).text;
+    expect(nothing).toContain("Your Plus plan has ended. The part you already used covers the whole price, so nothing was due back to you.");
+    expect(nothing).not.toContain("refunded");
+    expect(nothing).not.toContain("$0.00");
+  });
+
+  it("says the Romanian invoice is attached only when the PDF is, and otherwise where to find it", () => {
+    const params = paramsFor("M2_INVOICE_ATTACHED");
+    expect(renderMail("M2_INVOICE_ATTACHED", "en", params, { attached: new Set(["INVOICE_PDF"]) }).text)
+      .toContain("Your invoice DBAI 0042 is attached to this email.");
+    const missing = renderMail("M2_INVOICE_ATTACHED", "en", params).text;
+    expect(missing).toContain("Your invoice number is DBAI 0042. It is listed in Settings, under Subscription.");
+    expect(missing).not.toContain("is attached");
+  });
+
+  it("derives the facts from what a message really carries", () => {
+    expect([...mailAttachmentFactsOf([])]).toEqual([]);
+    expect([...mailAttachmentFactsOf([
+      { filename: TERMS_ATTACHMENT_FILENAME, contentType: "text/plain; charset=UTF-8" },
+      { filename: WITHDRAWAL_FORM_ATTACHMENT_FILENAME, contentType: "text/plain; charset=UTF-8" }
+    ])]).toEqual(["TERMS_TEXT"]);
+    expect([...mailAttachmentFactsOf([{ filename: "DBAI-0042.pdf", contentType: "application/pdf" }])]).toEqual(["INVOICE_PDF"]);
+    // A text file that is not the Terms, or a PDF named like the Terms, proves neither sentence.
+    expect([...mailAttachmentFactsOf([{ filename: TERMS_ATTACHMENT_FILENAME, contentType: "application/pdf" }])]).toEqual(["INVOICE_PDF"]);
+  });
+
+  it("M11 never names a plan or the Free plan (a refused card change keeps the paid plan), and M11_DUPLICATE keeps its own subject", () => {
+    const catalogues = loadMailCatalogues();
+    for (const locale of MAIL_LOCALES) {
+      const catalogue = catalogues[locale];
+      const free = catalogue["mail.plan.FREE"]!.toLocaleLowerCase(locale);
+      for (const key of ["mail.M11.subject", "mail.M11.refunded"]) {
+        expect(catalogue[key]!.toLocaleLowerCase(locale), `${locale}:${key}`).not.toContain(free);
+        expect(catalogue[key], `${locale}:${key}`).not.toMatch(/\{plan\}/u);
+      }
+    }
+    // In every locale the localized Free name is checked above; the product names are checked on the English
+    // (a translation may use "Pro" as an ordinary word, as Czech and Slovak do).
+    const english = catalogues.en;
+    for (const key of ["mail.M11.subject", "mail.M11.refunded"]) {
+      expect(english[key], key).not.toMatch(/\b(?:Free|Plus|Pro|Max)\b/u);
+    }
+    const refused = renderMail("M11", "en", paramsFor("M11"));
+    expect(refused.subject).toBe("We couldn't accept your card");
+    expect(refused.subject).not.toContain("refunded your payment");
+    expect(refused.text).toContain("the $12.10 taken or held on it goes back to your card in full.");
+    expect(renderMail("M11_DUPLICATE", "en", paramsFor("M11_DUPLICATE")).subject).toBe("We refunded your payment");
+    expect(MAIL_TEMPLATES.M11_DUPLICATE.subject).not.toBe(MAIL_TEMPLATES.M11.subject);
+  });
+
+  it("reads no catalogue when the package is imported, only on the first render", () => {
+    // P17: apps/api imports this package in every mode, so a bad catalogue or owner edit must never stop its boot.
+    const source = readFileSync(resolve("packages/mail-templates/src/render.ts"), "utf8");
+    const moduleLevel = source.split("\n").filter((line) => /^(?:export\s+)?(?:const|let|var)\s/u.test(line));
+    expect(moduleLevel.filter((line) => /loadMailCatalogues\(|readStringTable\(/u.test(line))).toEqual([]);
+    expect(() => loadMailCatalogues(resolve("packages/mail-templates"))).toThrow("MAIL_TEMPLATE_CATALOGUE_INVALID");
+  });
+
+  it("writes Arabic and Hebrew right to left, and falls back to English for an unknown locale", () => {
+    expect(renderMail("M9", "ar", paramsFor("M9")).html).toContain('<html lang="ar" dir="rtl">');
+    expect(renderMail("M9", "he", paramsFor("M9")).html).toContain('<html lang="he" dir="rtl">');
+    expect(renderMail("M9", "xx", paramsFor("M9"))).toEqual(renderMail("M9", "en", paramsFor("M9")));
+  });
+
+  it("renders the owner's summary in English whatever locale is asked", () => {
+    const owner = renderMail("O1", "ro", paramsFor("O1"));
+    expect(owner.subject).toBe("DebateAI tax summary for 2026-Q4");
+    expect(owner.text).toContain("RO  net 100.00  tax 21.00\nDE  net 50.00  tax 9.50");
+    expect(owner.html).toContain("<pre");
+  });
+
+  it("tells the owner at once, in English, which refund could not be completed (ruling Q-5's O2)", () => {
+    const owner = renderMail("O2", "de", paramsFor("O2"));
+    expect(owner.subject).toBe("A refund could not be completed and needs your attention");
+    expect(owner.text).toContain("Charge reference: 0123456789abcdef0123456789abcdef");
+    expect(owner.text).toContain("Amount to refund: $12.10");
+    expect(owner.text).toContain("Reason code: XMONEY_REFUSED");
+    expect(owner.html).toContain('<html lang="en" dir="ltr">');
+    // Owner-facing, never a customer's data: the charge id, the amount and the code are all it carries.
+    expect(Object.keys(MAIL_TEMPLATES.O2.params).sort()).toEqual(["chargeRef", "reasonCode", "refundAmount"]);
+    expect(codeOf(() => renderMail("O2", "en", { ...paramsFor("O2"), reasonCode: "X\nY" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+  });
+
+  it("refuses missing, unknown, reserved and malformed params with a code and no value", () => {
+    const m1 = paramsFor("M1");
+    const { plan: _plan, ...withoutPlan } = m1;
+    expect(codeOf(() => renderMail("M1", "en", withoutPlan))).toBe("MAIL_TEMPLATE_PARAM_MISSING");
+    expect(codeOf(() => renderMail("M1", "en", { ...m1, extra: "x" }))).toBe("MAIL_TEMPLATE_PARAM_UNKNOWN");
+    expect(codeOf(() => renderMail("M1", "en", { ...m1, merchantName: "x" }))).toBe("MAIL_TEMPLATE_PARAM_UNKNOWN");
+    expect(codeOf(() => renderMail("M1", "en", { ...m1, termsUrl: "http://secret.example/terms" })))
+      .toBe("MAIL_TEMPLATE_PARAM_INVALID");
+    expect(codeOf(() => renderMail("M1", "en", { ...m1, totalAmount: "24.2" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+    expect(codeOf(() => renderMail("M1", "en", { ...m1, plan: "GOLD" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+    expect(codeOf(() => renderMail("M2_INVOICE_ATTACHED", "en", {
+      ...paramsFor("M2_INVOICE_ATTACHED"), invoiceNumber: "1\r\nBcc: x@example.test"
+    }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+    expect(codeOf(() => renderMail("NOPE" as MailTemplateId, "en", {}))).toBe("MAIL_TEMPLATE_UNKNOWN");
+    try {
+      renderMail("M1", "en", { ...m1, termsUrl: "http://secret.example/terms" });
+    } catch (error) {
+      expect(String(error)).not.toContain("secret");
+    }
+  });
+
+  it("escapes every value in the HTML part", () => {
+    const mail = renderMail("M2_INVOICE_ATTACHED", "en", {
+      ...paramsFor("M2_INVOICE_ATTACHED"), invoiceNumber: "<b>1</b>"
+    });
+    expect(mail.html).toContain("&lt;b&gt;1&lt;/b&gt;");
+    expect(mail.html).not.toContain("<b>1</b>");
+    expect(mail.text).toContain("<b>1</b>");
+  });
+
+  it("renders the model withdrawal form with the company (COMPANY's facts, through SELLER_COMPANY) filled in", () => {
+    const english = renderWithdrawalForm("en");
+    expect(english).toContain("Model withdrawal form");
+    expect(english).toContain("To: DebateAIRO S.R.L.");
+    expect(renderWithdrawalForm("ro")).not.toBe(english);
+    expect(renderWithdrawalForm("xx")).toBe(english);
+  });
+});

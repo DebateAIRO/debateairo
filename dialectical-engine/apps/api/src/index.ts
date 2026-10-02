@@ -164,7 +164,13 @@ import {
   type SupportApplication,
   type SupportRoutePath
 } from "./support/index.js";
-import { installBillingRoutes, type BillingRouteOptions } from "./billing/index.js";
+import {
+  installBillingRoutes,
+  type BillingAdmission,
+  type BillingRouteOptions,
+  type BillingRoutePath
+} from "./billing/index.js";
+import type { BillingErasureHook } from "./billing/erasure-hook.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
@@ -1226,7 +1232,28 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
-  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" }
+  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
+  { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
+  { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
+  { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
+  { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
+  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  // P12: the subscriber's own subscription. Every mutation carries the CSRF pair like any user route.
+  { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
+  { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },
+  { route: "POST /v1/billing/subscription/downgrade", auth: "user", resource: "billing", action: "downgrade" },
+  { route: "POST /v1/billing/subscription/cancel", auth: "user", resource: "billing", action: "cancel" },
+  { route: "POST /v1/billing/subscription/cancel-revoke", auth: "user", resource: "billing", action: "cancel-revoke" },
+  // P12c: the upgrade's quote (prorated, taxed, with the new plan's recurring total) and the charge that spends it.
+  { route: "POST /v1/billing/subscription/upgrade-quote", auth: "user", resource: "billing", action: "quote-upgrade" },
+  { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
+  // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
+  { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
+  // P12e (A12): the card change's signed authorization order; the CSRF pair like any user mutation.
+  { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
+  // P13: cancel without signing in (Terms §12). First-party Origin only; never a session.
+  { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
+  { route: "POST /v1/billing/cancel-by-token", auth: "public", origin: "trusted", resource: "billing", action: "cancel-by-token" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
@@ -1468,6 +1495,11 @@ export interface ApiOptions {
    * absent answers the house 404, which is local mode and billing off alike.
    */
   readonly billing?: BillingRouteOptions;
+  /**
+   * P15: scheduling an erasure stops the owner's billing at once. Present only when hosted with billing on; the
+   * reconciler's sweep repeats a stop that failed here.
+   */
+  readonly billingErasure?: Pick<BillingErasureHook, "stop">;
   readonly support?: SupportApplication;
   /**
    * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
@@ -2249,6 +2281,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     if (scheduled===null || scheduled.status==="NONE" || scheduled.executeAt===undefined) {
       return reply.status(404).send({ error:"NOT_FOUND" });
+    }
+    if (options.billingErasure!==undefined) {
+      try {
+        await options.billingErasure.stop(authenticated.ownerRef);
+      } catch {
+        // The erasure is scheduled either way; the billing sweep repeats this stop within minutes.
+        console.error("[BILLING_ERASURE_STOP_PENDING]");
+      }
     }
     return reply.status(202).send(AccountErasureStatusSchema.parse({
       status:scheduled.status,execute_at:scheduled.executeAt.toISOString(),
@@ -3110,7 +3150,26 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
   );
   // Paid plans (R-3): the one billing routes module, always installed.
-  installBillingRoutes(api, { ...options.billing, policy: (route) => routePolicy(route) });
+  const admitBilling: BillingAdmission = Object.freeze({
+    gate: (reply, scope, route, key) => options.admission?.configured(scope) !== true
+      || admitOrRefuse(reply, scope, route, key)
+  });
+  // P8c (R3-2, the age gate): the checkout refuses an account that still owes its one-time age check. Bound, because
+  // SessionService reads its repository through `this` (apps/api/src/sessions.ts:561-564).
+  const billingSessions = options.sessions;
+  const billingAgeConfirmation = billingSessions?.readAgeConfirmation?.bind(billingSessions);
+  installBillingRoutes(api, {
+    ...(options.billing ?? {}),
+    policy: (route: BillingRoutePath) => routePolicy(route),
+    admission: admitBilling,
+    // R3-3: only the address and the agent. `sourceFor` also carries the age gate's `cf-ipcountry` value;
+    // billing's IP country is the DB-IP lookup's, never the edge header.
+    source: (request) => {
+      const { ip, userAgent } = sourceFor(request);
+      return Object.freeze({ ip, userAgent });
+    },
+    ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation })
+  });
   return api;
 }
 

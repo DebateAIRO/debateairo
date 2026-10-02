@@ -60,5 +60,12 @@
   "chrome.footer.location": "Bukarešta, Romunija",
   "chrome.footer.product": "Izdelek",
   "chrome.footer.home": "Domov",
-  "chrome.footer.cookiePreferences": "Piškotki, ki jih shranjujemo"
+  "chrome.footer.cookiePreferences": "Piškotki, ki jih shranjujemo",
+  "chrome.footer.pricing": "Cene",
+  "chrome.footer.cancel": "Preklic paketa",
+  "chrome.footer.withdraw": "Odstop od paketa",
+  "chrome.footer.paymentMarks": "Kartice, ki jih sprejemamo",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

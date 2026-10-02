@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/SiteFooter";
+import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { LEGAL_PAGES, type LegalPageKey } from "@/lib/legal/pages";
 
@@ -15,6 +16,7 @@ export function LegalPageLayout({
   eyebrow,
   title,
   meta,
+  billing = null,
   children
 }: {
   current: LegalPageKey;
@@ -23,6 +25,8 @@ export function LegalPageLayout({
   eyebrow: string;
   title: string;
   meta: string;
+  /** Paid plans (P21, R3-4): what the full footer shows of billing; left out, nothing about paying shows. */
+  billing?: SiteFooterBilling | null;
   children: ReactNode;
 }) {
   return (
@@ -49,7 +53,7 @@ export function LegalPageLayout({
           {children}
         </article>
       </div>
-      <SiteFooter variant="full" />
+      <SiteFooter variant="full" billing={billing} />
     </main>
   );
 }

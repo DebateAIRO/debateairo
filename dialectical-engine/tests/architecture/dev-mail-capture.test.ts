@@ -40,8 +40,9 @@ describe("DEV-06 mail capture executable contract", () => {
     // The argv array literal of each `spawn(...)`, whitespace removed.
     const spawnArgv = [...mailer.matchAll(/spawn\([\s\S]{0,200}?\[([^\]]*)\]/g)]
       .map((match) => match[1]!.replace(/\s+/g, ""));
-    // Three senders: verification, account-erasure notices, change email (Turn 14).
-    expect(spawnArgv).toHaveLength(3);
+    // Four senders: verification, account-erasure notices, change email (Turn 14) and the templated billing mail
+    // (P17, spec 2026-09-29 §2.5.10).
+    expect(spawnArgv).toHaveLength(4);
     for (const argv of spawnArgv) {
       // `-t` makes the MTA read recipients from the header block on stdin, so
       // only the fixed envelope sender may reach argv, which every local user
@@ -50,10 +51,11 @@ describe("DEV-06 mail capture executable contract", () => {
     }
     // Every sender routes the recipient through the one guard that refuses a
     // separator, which would fan the message out to a second mailbox once the
-    // MTA parses `To:`. One definition, four call sites: the change-email
-    // sender also guards the new address it quotes in the notice body.
+    // MTA parses `To:`. One definition, five call sites: the change-email
+    // sender also guards the new address it quotes in the notice body, and the
+    // templated sender's is in composeTemplatedMessage (spec 2026-09-29 §2.5.10).
     expect(mailer).toContain("[,;]");
-    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(5);
+    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(6);
 
     const capture = readFileSync("deploy/dev-auth/sendmail-capture.mjs", "utf8");
     expect(capture).toContain('argv[1] !== "-t"');

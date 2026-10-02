@@ -5,7 +5,12 @@ import { buildApi, type AskApplication } from "@debateai/api";
 import { BillingUsageResponseSchema } from "@debateai/contract";
 import type { PersonWindow } from "@debateai/budget";
 import { PersonUsageReader, usagePercent } from "../../apps/api/src/billing/usage.js";
-import { installBillingRoutes, type BillingRouteDeps, type BillingUsageReader } from "../../apps/api/src/billing/index.js";
+import {
+  BILLING_ROUTE_PATHS,
+  installBillingRoutes,
+  type BillingRouteDeps,
+  type BillingUsageReader
+} from "../../apps/api/src/billing/index.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 const OWNER = testHttpIdentity("b7a-usage-owner");
@@ -151,7 +156,9 @@ describe("B7a installBillingRoutes(api, deps) — the one billing routes module 
     installBillingRoutes(api, deps);
     const response = await api.inject({ method: "GET", url: "/v1/billing/usage" });
     await api.close();
-    expect(asked).toEqual(["GET /v1/billing/usage"]);
+    // Every path the module installs, in its declared order (P8a added the plans list after the usage read).
+    expect(asked).toEqual([...BILLING_ROUTE_PATHS]);
+    expect(asked[0]).toBe("GET /v1/billing/usage");
     expect(response.json()).toEqual({ plan_id: "PLUS", windows: [] });
     expect(seen).toEqual([NOW]);
   });

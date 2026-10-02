@@ -1,0 +1,10 @@
+{
+  "owner.O1.subject": "DebateAI tax summary for {quarter}",
+  "owner.O1.intro": "Here is the tax summary for {quarter}, built from our own charge records. Each line shows the country or state, net sales, tax collected, whether we are registered there, and where and by when to pay.",
+  "owner.O2.subject": "A refund could not be completed and needs your attention",
+  "owner.O2.intro": "xMoney refused a refund we asked for, or its outcome stayed unknown after every retry. No more tries are made by themselves.",
+  "owner.O2.charge": "Charge reference: {chargeRef}",
+  "owner.O2.amount": "Amount to refund: {refundAmount}",
+  "owner.O2.reason": "Reason code: {reasonCode}",
+  "owner.O2.next": "Check this charge in the xMoney dashboard and settle the refund by hand there. The owner summary lists it until then."
+}

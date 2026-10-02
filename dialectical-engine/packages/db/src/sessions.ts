@@ -589,7 +589,7 @@ export class PostgresSessionRepository {
     }> | Readonly<{
       grantId: string;
       grantTokenHash: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION";
       expiresAt: Date;
     }>;
   }>): Promise<boolean> {

@@ -1,0 +1,5 @@
+{
+  "order.planDescription": "DebateAI {plan} aylık planı",
+  "order.cardCheck": "DebateAI kart doğrulaması",
+  "invoice.line": "DebateAI {plan} planı, {from} – {to}"
+}

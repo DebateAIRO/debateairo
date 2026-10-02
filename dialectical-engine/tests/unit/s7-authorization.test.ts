@@ -85,7 +85,24 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
-  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" }
+  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
+  { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
+  { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
+  { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
+  { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
+  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
+  { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },
+  { route: "POST /v1/billing/subscription/downgrade", auth: "user", resource: "billing", action: "downgrade" },
+  { route: "POST /v1/billing/subscription/cancel", auth: "user", resource: "billing", action: "cancel" },
+  { route: "POST /v1/billing/subscription/cancel-revoke", auth: "user", resource: "billing", action: "cancel-revoke" },
+  { route: "POST /v1/billing/subscription/upgrade-quote", auth: "user", resource: "billing", action: "quote-upgrade" },
+  { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
+  { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
+  { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
+  // P13: first-party pages only, like the support mutations (DL1-F7), and never a session.
+  { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
+  { route: "POST /v1/billing/cancel-by-token", auth: "public", origin: "trusted", resource: "billing", action: "cancel-by-token" }
 ] as const);
 
 const validAskPayload = () => ({
@@ -232,6 +249,7 @@ describe("S7 deny-by-default authorization", () => {
       const requestUrl = template
         .replace("{nodeId}", NODE_ID)
         .replace("{gapRef}", "gap:test")
+        .replace("{chargeRef}", "0".repeat(32))
         .replace("{id}", policy.route.includes("/runs/") ? OWNED_RUN_ID : ANSWER_ID);
       const response = await api.inject({ method: httpMethod, url: requestUrl });
       expect(response.statusCode, policy.route).toBe(401);
@@ -480,7 +498,8 @@ describe("S7 deny-by-default authorization", () => {
     for (const policy of authorizationPolicyInventory.filter(({ route }) => route.startsWith("GET "))) {
       const url = policy.route.slice(4)
         .replace("{id}", OWNED_RUN_ID)
-        .replace("{nodeId}", "22222222-2222-4222-8222-222222222222");
+        .replace("{nodeId}", "22222222-2222-4222-8222-222222222222")
+        .replace("{chargeRef}", "0".repeat(32));
       expect((await api.inject({
         method: "HEAD", url,
         headers: USER_HEADERS
