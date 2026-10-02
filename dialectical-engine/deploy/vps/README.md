@@ -881,11 +881,11 @@ Publish no register version that carries `countryPolicy` until ALL of these hold
 
 1. **The site shows the DB-IP credit.** DB-IP's Lite data is licensed CC BY 4.0, and its licence
    requires the credit `IP Geolocation by DB-IP` linking to `https://db-ip.com` wherever its results
-   are used. The site does NOT show it yet: task P21 adds it to the full site footer
-   (`apps/ui/components/SiteFooter.tsx`, the footer of the landing page and the legal pages). Open
-   the landing page, signed out, and check that its footer shows `IP Geolocation by DB-IP`
-   linking to `https://db-ip.com`. Whether the one-line footer of the other screens must carry it
-   too is counsel's open question (P21).
+   are used. The full site footer (`apps/ui/components/SiteFooter.tsx`, the footer of the landing
+   page, the legal pages and the paid-plan pages) shows it, billing on or off (task P21). Open the
+   landing page, signed out, and check that its footer shows `IP Geolocation by DB-IP` linking to
+   `https://db-ip.com`. Whether the one-line footer of the other screens must carry it too is
+   counsel's open question (P21).
 2. **The owner has ruled that the Terms' list of served countries and the `countryPolicy` switches
    match.** The Terms' list is filled from `countryPolicy` (spec §2.12 item 1); the Terms' Annex A
    changed on 2026-09-30 and no longer matches the switches in the example. Whichever side changes,

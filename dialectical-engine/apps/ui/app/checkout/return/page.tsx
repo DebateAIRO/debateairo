@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ChargeStatusPoller } from "@/components/billing/ChargeStatusPoller";
+import { SiteFooter } from "@/components/SiteFooter";
+import { billingPageFooter } from "@/lib/billing/footerBilling";
 import { billingIsOn, sessionConfirmed } from "@/lib/billing/serverBilling";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
@@ -44,6 +46,7 @@ export default async function CheckoutReturnPage({
           )}
         <p className="billingActions"><a className="btn" href="/settings">{t(billingCatalog, "billing.checkout.goToSettings")}</a></p>
       </div>
+      <SiteFooter variant="full" billing={billingPageFooter()} />
     </main>
   );
 }

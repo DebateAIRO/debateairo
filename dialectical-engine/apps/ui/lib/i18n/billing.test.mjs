@@ -14,7 +14,8 @@ const ownedFiles = [
   "components/billing/UsageBars.tsx", "components/billing/PricingCards.tsx", "app/pricing/page.tsx",
   "components/billing/ChargeStatusPoller.tsx", "components/billing/XMoneyCardForm.tsx",
   "components/billing/CheckoutFlow.tsx", "app/checkout/page.tsx", "app/checkout/return/page.tsx",
-  "components/billing/SubscriptionControls.tsx", "components/billing/CardChangeFlow.tsx", "app/settings/card/page.tsx"
+  "components/billing/SubscriptionControls.tsx", "components/billing/CardChangeFlow.tsx", "app/settings/card/page.tsx",
+  "components/billing/CancelFlow.tsx", "app/cancel/page.tsx", "app/withdraw/page.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const englishPath = join(root, "messages/en/billing.json");

@@ -25,5 +25,11 @@
   "billing.withdrawPage.byEmail": "{email} is the company's contact address. Keep 'model withdrawal form': it is the form attached to the confirmation email.",
   "billing.subscription.renewalProcessing": "Shown while a renewal is retried after a short outage at the payment or tax service (up to 3 days). No payment has failed: do not say it failed, and name no date.",
   "billing.cancelPage.confirmLede": "The page cannot know the plan's state, so it states both cases before the button: with a payment overdue the plan ends at once; otherwise it runs to the end of the paid month. Keep both.",
-  "billing.cancelPage.done": "Promise no date here: the confirmation email names the exact day access ends."
+  "billing.cancelPage.done": "Promise no date here: the confirmation email names the exact day access ends.",
+  "chrome.footer.dbipCredit": "Keep exactly 'IP Geolocation by DB-IP' in every locale: DB-IP's free licence requires this credit text.",
+  "chrome.footer.visa": "Brand names: keep 'Visa' and 'Mastercard' as they are.",
+  "legal.notice.s01.seller": "{company} is the company's legal name, filled in from the legal notice's facts; keep both.",
+  "legal.notice.s04.payments": "xMoney is the card processor's brand name; keep it.",
+  "legal.archive.textId": "{id} is the first 12 characters of the text's fingerprint (letters a–f and digits); copy it unchanged.",
+  "legal.archive.title": "{version} is a document version number such as 2.0; keep it as a number."
 }

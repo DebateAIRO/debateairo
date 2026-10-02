@@ -60,5 +60,12 @@
   "chrome.footer.location": "Búcairist, an Rómáin",
   "chrome.footer.product": "Táirge",
   "chrome.footer.home": "Baile",
-  "chrome.footer.cookiePreferences": "Sainroghanna fianán"
+  "chrome.footer.cookiePreferences": "Sainroghanna fianán",
+  "chrome.footer.pricing": "Praghsanna",
+  "chrome.footer.cancel": "Cuir plean ar ceal",
+  "chrome.footer.withdraw": "Tarraing siar ó phlean",
+  "chrome.footer.paymentMarks": "Cártaí a nglacaimid leo",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

@@ -2,7 +2,9 @@ import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { currentDocument } from "@debateai/legal-manifest";
 import { CheckoutFlow, type CheckoutConsents } from "@/components/billing/CheckoutFlow";
+import { SiteFooter } from "@/components/SiteFooter";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
+import { billingPageFooter } from "@/lib/billing/footerBilling";
 import { isPaidPlanId } from "@/lib/billing/plans";
 import { ageConfirmationOwed, billingIsOn, sessionConfirmed } from "@/lib/billing/serverBilling";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
@@ -52,6 +54,7 @@ export default async function CheckoutPage({
           <p className="billingError" role="alert">{t(billingCatalog, "billing.checkout.unknownPlan")}</p>
           <p><a className="btn" href="/pricing">{t(billingCatalog, "billing.checkout.pricingLink")}</a></p>
         </div>
+        <SiteFooter variant="full" billing={billingPageFooter()} />
       </main>
     );
   }
@@ -70,6 +73,7 @@ export default async function CheckoutPage({
           nonce={nonce}
         />
       </div>
+      <SiteFooter variant="full" billing={billingPageFooter()} />
     </main>
   );
 }

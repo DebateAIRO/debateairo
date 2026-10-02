@@ -60,5 +60,12 @@
   "chrome.footer.location": "Boekarest, Roemenië",
   "chrome.footer.product": "Product",
   "chrome.footer.home": "Startpagina",
-  "chrome.footer.cookiePreferences": "Cookievoorkeuren"
+  "chrome.footer.cookiePreferences": "Cookievoorkeuren",
+  "chrome.footer.pricing": "Prijzen",
+  "chrome.footer.cancel": "Abonnement opzeggen",
+  "chrome.footer.withdraw": "Abonnement herroepen",
+  "chrome.footer.paymentMarks": "Kaarten die wij accepteren",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

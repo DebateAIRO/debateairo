@@ -60,5 +60,12 @@
   "chrome.footer.location": "Bukurešt, Rumunjska",
   "chrome.footer.product": "Proizvod",
   "chrome.footer.home": "Početna",
-  "chrome.footer.cookiePreferences": "Postavke kolačića"
+  "chrome.footer.cookiePreferences": "Postavke kolačića",
+  "chrome.footer.pricing": "Cijene",
+  "chrome.footer.cancel": "Otkazivanje plana",
+  "chrome.footer.withdraw": "Raskid ugovora o planu",
+  "chrome.footer.paymentMarks": "Kartice koje prihvaćamo",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

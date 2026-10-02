@@ -10,6 +10,7 @@ import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { SupportWidget } from "@/components/support/SupportWidget";
+import { ContractHttpError } from "@debateai/contract";
 import type { ContractClient } from "@debateai/contract";
 import type { DebateSummary } from "@/lib/types";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
@@ -18,11 +19,19 @@ import { t } from "@/lib/i18n/translate";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
 import { formatUsd } from "@/lib/billing/format";
+import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
+import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 
 export const dynamic = "force-dynamic";
 
-/** The landing's price line: the lowest paid net price, or null when billing is off or the plans cannot be read. */
-async function landingLowestPaidPrice(locale: string, headerStore: Headers): Promise<string | null> {
+type LandingPlans = Readonly<{ lowestPaidPrice: string | null; footer: SiteFooterBilling }>;
+
+/**
+ * The landing's one plans read: the lowest paid net price for the price line, and whether billing is on for the
+ * footer. Only the route's 404 means off (local mode, or hosted before the switch), exactly as billingIsOn() decides.
+ */
+async function landingPlans(locale: string, headerStore: Headers): Promise<LandingPlans> {
+  const footer = (billingOn: boolean): SiteFooterBilling => Object.freeze({ billingOn, marks: availablePaymentMarks() });
   try {
     const answer = await createServerContractClient(
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
@@ -31,9 +40,12 @@ async function landingLowestPaidPrice(locale: string, headerStore: Headers): Pro
       .filter((plan) => plan.plan_id !== "FREE")
       .map((plan) => plan.net_price)
       .sort((left, right) => Number(left) - Number(right))[0];
-    return lowest === undefined ? null : formatUsd(locale, lowest);
-  } catch {
-    return null;
+    return Object.freeze({ lowestPaidPrice: lowest === undefined ? null : formatUsd(locale, lowest), footer: footer(true) });
+  } catch (failure) {
+    return Object.freeze({
+      lowestPaidPrice: null,
+      footer: footer(!(failure instanceof ContractHttpError && failure.status === 404))
+    });
   }
 }
 
@@ -57,8 +69,8 @@ export default async function HomePage({
   ]);
   const catalog = Object.freeze({ ...homeCatalog, ...chromeCatalog });
   if (token === null) {
-    const lowestPaidPrice = await landingLowestPaidPrice(locale, await headers());
-    return <><LandingPage catalog={catalog} lowestPaidPrice={lowestPaidPrice} /><SupportWidget /></>;
+    const plans = await landingPlans(locale, await headers());
+    return <><LandingPage catalog={catalog} lowestPaidPrice={plans.lowestPaidPrice} footerBilling={plans.footer} /><SupportWidget /></>;
   }
   const requestedTab = (await searchParams).tab;
   const tab: "yours" | "public" =

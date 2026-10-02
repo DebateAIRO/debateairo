@@ -2,6 +2,8 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { ContractHttpError } from "@debateai/contract";
 import { PricingCards, type PricingPlan } from "@/components/billing/PricingCards";
+import { SiteFooter } from "@/components/SiteFooter";
+import { billingPageFooter } from "@/lib/billing/footerBilling";
 import { isBillingPlanId } from "@/lib/billing/plans";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
@@ -49,6 +51,7 @@ export default async function PricingPage() {
           </p>
         </section>
       </div>
+      <SiteFooter variant="full" billing={billingPageFooter()} />
     </main>
   );
 }

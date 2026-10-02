@@ -144,8 +144,9 @@ describe("T9-C1 route split & chrome", () => {
     // Paid plans (P18, spec 2026-09-29 §2.10): the branch now awaits exactly ONE
     // price read, the landing's lowest paid price, and nothing else, so no
     // library work can slip in front of the landing.
+    // P21: that one read now answers the price line AND the footer's billing facts.
     const landingBranch =
-      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+lowestPaidPrice\s*=\s*await\s+landingLowestPaidPrice\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{lowestPaidPrice\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
+      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+plans\s*=\s*await\s+landingPlans\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{plans\.lowestPaidPrice\}\s+footerBilling=\{plans\.footer\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
         pageSource
       );
     const landingReturnIndex = landingBranch?.index ?? -1;
@@ -160,6 +161,23 @@ describe("T9-C1 route split & chrome", () => {
 
     const landingSource = readFileSync(landingPath, "utf8");
     expect(landingSource).not.toMatch(/^\s*["']use client["'];/m);
+  });
+
+  it("closes the anonymous landing with the colleague's full footer; with billing off it credits DB-IP and offers nothing to buy", async () => {
+    const document = await renderRoute(null);
+    const footer = document.querySelector("footer.siteFooterFull");
+    expect(footer?.querySelector('a[href="https://db-ip.com"]')?.textContent).toBe("IP Geolocation by DB-IP");
+    expect(footer?.querySelector('a[href="/legal"]')).not.toBeNull();
+    for (const href of ["/pricing", "/cancel", "/withdraw"]) expect(footer?.querySelector(`a[href="${href}"]`), href).toBeNull();
+  });
+
+  it("with billing on, the landing's footer links pricing, cancel and withdraw", async () => {
+    routeMocks.getBillingPlans.mockResolvedValueOnce({
+      currency: "USD",
+      plans: [{ plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1" }]
+    });
+    const footer = (await renderRoute(null)).querySelector("footer.siteFooterFull");
+    for (const href of ["/pricing", "/cancel", "/withdraw"]) expect(footer?.querySelector(`a[href="${href}"]`), href).not.toBeNull();
   });
 });
 

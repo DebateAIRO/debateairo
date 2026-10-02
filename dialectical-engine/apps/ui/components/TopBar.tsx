@@ -20,7 +20,8 @@ const SCREEN_TITLES: Record<string, string> = {
   "/privacy": "chrome.legalPages",
   "/privacy/us-health-data": "chrome.legalPages",
   "/cookies": "chrome.legalPages",
-  "/providers": "chrome.legalPages"
+  "/providers": "chrome.legalPages",
+  "/privacy/versions": "chrome.legalPages"
 };
 
 const AUTH_PATHS = new Set(["/login", "/sign-up", "/verify-email", "/enroll-mfa"]);

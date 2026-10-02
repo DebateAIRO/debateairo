@@ -285,6 +285,7 @@ apps/scheduler/src/index.ts
 apps/ui/app/admin/workers/page.tsx
 apps/ui/app/ai-transparency/page.tsx
 apps/ui/app/api/[...path]/route.ts
+apps/ui/app/cancel/page.tsx
 apps/ui/app/checkout/page.tsx
 apps/ui/app/checkout/return/page.tsx
 apps/ui/app/cookies/page.tsx
@@ -307,6 +308,8 @@ apps/ui/app/page.tsx
 apps/ui/app/pricing/page.tsx
 apps/ui/app/privacy/page.tsx
 apps/ui/app/privacy/us-health-data/page.tsx
+apps/ui/app/privacy/versions/[sha256]/page.tsx
+apps/ui/app/privacy/versions/page.tsx
 apps/ui/app/providers/page.tsx
 apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx
 apps/ui/app/public/debate/[id]/page.tsx
@@ -314,9 +317,11 @@ apps/ui/app/settings/card/page.tsx
 apps/ui/app/settings/page.tsx
 apps/ui/app/sign-up/page.tsx
 apps/ui/app/terms/page.tsx
+apps/ui/app/terms/versions/[sha256]/page.tsx
 apps/ui/app/terms/versions/page.tsx
 apps/ui/app/verify-email/layout.tsx
 apps/ui/app/verify-email/page.tsx
+apps/ui/app/withdraw/page.tsx
 apps/ui/components/AccountErasureControls.tsx
 apps/ui/components/AgeConfirmationFlow.tsx
 apps/ui/components/AgeRefusal.tsx
@@ -369,6 +374,7 @@ apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
 apps/ui/components/authRoutes.source-test.mjs
+apps/ui/components/billing/CancelFlow.tsx
 apps/ui/components/billing/CardChangeFlow.tsx
 apps/ui/components/billing/ChargeStatusPoller.tsx
 apps/ui/components/billing/CheckoutFlow.tsx
@@ -406,6 +412,7 @@ apps/ui/components/languageSwitcherPlacement.source-test.mjs
 apps/ui/components/languageSwitcherState.test.mjs
 apps/ui/components/languageSwitcherState.ts
 apps/ui/components/legal/CookiePreferencesButton.tsx
+apps/ui/components/legal/LegalArchiveBodies.tsx
 apps/ui/components/legal/LegalBodies.tsx
 apps/ui/components/legal/LegalPageLayout.tsx
 apps/ui/components/modeTransition.test.mjs
@@ -427,8 +434,10 @@ apps/ui/lib/api.ts
 apps/ui/lib/authNavigationGuard.ts
 apps/ui/lib/billing/checkoutFailure.ts
 apps/ui/lib/billing/countries.ts
+apps/ui/lib/billing/footerBilling.ts
 apps/ui/lib/billing/format.ts
 apps/ui/lib/billing/formatReset.ts
+apps/ui/lib/billing/paymentMarks.ts
 apps/ui/lib/billing/plans.ts
 apps/ui/lib/billing/room.ts
 apps/ui/lib/billing/roomCatalog.ts
@@ -471,6 +480,7 @@ apps/ui/lib/i18n/translate.test.mjs
 apps/ui/lib/i18n/translate.ts
 apps/ui/lib/legal/ar/privacyPolicy.ts
 apps/ui/lib/legal/ar/termsOfService.ts
+apps/ui/lib/legal/archive.ts
 apps/ui/lib/legal/bg/privacyPolicy.ts
 apps/ui/lib/legal/bg/termsOfService.ts
 apps/ui/lib/legal/cs/privacyPolicy.ts

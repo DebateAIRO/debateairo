@@ -60,5 +60,12 @@
   "chrome.footer.location": "בוקרשט, רומניה",
   "chrome.footer.product": "מוצר",
   "chrome.footer.home": "דף הבית",
-  "chrome.footer.cookiePreferences": "העדפות עוגיות"
+  "chrome.footer.cookiePreferences": "העדפות עוגיות",
+  "chrome.footer.pricing": "מחירים",
+  "chrome.footer.cancel": "ביטול תוכנית",
+  "chrome.footer.withdraw": "ביטול עסקה בתוכנית",
+  "chrome.footer.paymentMarks": "כרטיסים שאנו מקבלים",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }
