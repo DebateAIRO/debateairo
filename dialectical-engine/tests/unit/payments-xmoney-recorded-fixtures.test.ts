@@ -1,7 +1,7 @@
 // tests/unit/payments-xmoney-recorded-fixtures.test.ts
 // X0's recorded stage fixtures, run through the REAL client and the real notice decoder. Until the owner records
 // them this suite is skipped BY NAME (the describe says so) — the one test here that can be inert, and the go-live
-// checklist's row 14 (written by P22) lists "all 25 required X0 kinds present and the X0 suites green" so the skip
+// checklist's row 14 (written by P22) lists "all 26 required X0 kinds present and the X0 suites green" so the skip
 // cannot be forgotten.
 // Once any fixture exists, every required kind must: a missing one fails loudly, never silently passes.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -141,6 +141,39 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
     expect(dataOf("order").externalOrderId).toBe((fixture("notice-success").body as { externalOrderId: unknown }).externalOrderId);
     expect(dataOf("rebill-response").id).toBe(dataOf("order").id);
   });
+
+  // W1 (P2-I1, P2-I6) depends on this fact: VERIFY_PAYMENT's CUSTOMER_MISMATCH check requires a first payment's
+  // customerId to be the subscription's CREATED xmoneyCustomerId (POST /customer's reply), and the checkout's listing
+  // matches deposits by that customer. X0 creates the customer the way production does and pays for it (`serve
+  // --identifier`); one scrub run keeps the equality. If this fails, both checks change before billing is on.
+  it("W1's customer check: the frictionless payment is made by the customer POST /customer created", async () => {
+    const created = await answeredWith(fixture("customer-response").body, { method: "POST", path: /^\/customer$/u },
+      (client) => client.createCustomer({ identifier: "x0-recorded", email: "person@example.test", country: "RO" }));
+    const paid = await answeredWith(fixture("transaction-initial").body, { method: "GET", path: /^\/transaction\/[0-9]+$/u },
+      (client) => client.getTransaction("1"));
+    expect(paid.customerId, "the paying customer is the created one").toBe(created.customerId);
+    expect(String(dataOf("transaction-initial").customerId)).toBe(String(dataOf("customer-response").id));
+  });
+
+  // Optional: what a second POST /customer with the same identifier answers, and the lookup by identifier after it.
+  // The CREATED customer and createCustomer's adopt-by-identifier path depend on it: the client must end with the
+  // customer the first POST created, whether xMoney answers the repeat itself or refuses it and lists the original.
+  it.runIf(fixtures.some((candidate) => candidate.kind === "customer-response-repeat"))(
+    "adopt the customer the first POST created when the same identifier is posted again (W1)", async () => {
+      const recorded = fixture("customer-response-repeat").body as {
+        httpStatus: number; reply: unknown; lookup: { httpStatus: number; reply: unknown };
+      };
+      const identifier = (fixture("order-payload").body as { order: { customer: { identifier: string } } }).order.customer.identifier;
+      const replay = new XMoneyClient({
+        baseUrl: "https://stage.invalid", privateKey: Buffer.alloc(32, 1), siteId: "1",
+        fetch: async (_input, init) => (init?.method === "POST"
+          ? new Response(JSON.stringify(recorded.reply), { status: recorded.httpStatus })
+          : new Response(JSON.stringify(recorded.lookup.reply), { status: recorded.lookup.httpStatus }))
+      });
+      const again = await replay.createCustomer({ identifier, email: "person@example.test", country: "RO" });
+      expect(again.customerId, "a repeated identifier keeps its first customer").toBe(String(dataOf("customer-response").id));
+    }
+  );
 
   it("the fake answers each recorded step as xMoney did: refunds, the hold, its release and the auth-order rebill", async () => {
     const fake = await startFakeXMoney();

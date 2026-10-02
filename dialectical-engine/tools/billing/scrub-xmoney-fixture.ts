@@ -5,7 +5,7 @@
 //     --out tests/fixtures/xmoney --recorded-on 2026-10-02
 // The key is read from a 0600 file and never printed. Standalone on purpose: it runs before
 // packages/payments-xmoney exists and must not share code with the thing its fixtures test.
-import { createCipheriv, createDecipheriv, createHmac } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,8 @@ const FIXTURE_TEST_IV = Buffer.from("000102030405060708090a0b0c0d0e0f", "hex");
 /** Every complete X0 run records these; P3b's recorded suite fails naming any that is missing. */
 export const XMONEY_REQUIRED_FIXTURE_KINDS = Object.freeze([
   "key-shape", "sdk-result", "csp-report", "order-payload",
+  // W1 (P2-I1, P2-I6): the reply of POST /customer for the customer the frictionless payment is made by.
+  "customer-response",
   "notice-success", "notice-failed", "notice-rebill",
   "transaction-initial", "transaction-list", "order", "card",
   "rebill-response", "transaction-rebill",
@@ -30,11 +32,12 @@ export const XMONEY_REQUIRED_FIXTURE_KINDS = Object.freeze([
 ] as const);
 /**
  * Recorded only when xMoney produces them: a refund's or a release's notice, a separate refund transaction, a second
- * payment, and a rebill declined by a stage test amount (its reply, `{httpStatus, reply}`, and its transaction).
+ * payment, a rebill declined by a stage test amount (its reply, `{httpStatus, reply}`, and its transaction), and a
+ * second POST /customer with the same identifier (`{httpStatus, reply, lookup: {httpStatus, reply}}`).
  */
 export const XMONEY_OPTIONAL_FIXTURE_KINDS = Object.freeze([
   "notice-refund", "notice-void", "transaction-refund", "transaction-second-payment",
-  "rebill-declined-response", "transaction-rebill-declined"
+  "rebill-declined-response", "transaction-rebill-declined", "customer-response-repeat"
 ] as const);
 export type XMoneyFixtureKind =
   | typeof XMONEY_REQUIRED_FIXTURE_KINDS[number]
@@ -50,7 +53,50 @@ export type XMoneyNoticeFraming = Readonly<{
 /** A notice field beside opensslResult, described by its NAME's value length and character set — never its value. */
 export type XMoneyOuterField = Readonly<{
   length: number; charset: "digits" | "hex" | "base64" | "base64url" | "printable" | "other";
+  /** Only on `signature`: the name of the one candidate construction it equals, or null when none does. */
+  construction?: XMoneySignatureConstruction | null;
 }>;
+
+/**
+ * The fixed candidates X0 tests the notice's `signature` field against (W1's follow-up: the field stays unverified
+ * until X0 shows what it is). Each is a digest — HMAC-SHA512 keyed by the private key's bytes, or plain SHA-512 —
+ * written in hex or base64, over the opensslResult text (every space put back to `+`) or over the decrypted plaintext.
+ */
+export const XMONEY_SIGNATURE_CONSTRUCTIONS = Object.freeze([
+  "hmac-sha512-hex(opensslResult)", "hmac-sha512-base64(opensslResult)",
+  "hmac-sha512-hex(plaintext)", "hmac-sha512-base64(plaintext)",
+  "sha512-hex(opensslResult)", "sha512-base64(opensslResult)",
+  "sha512-hex(plaintext)", "sha512-base64(plaintext)"
+] as const);
+export type XMoneySignatureConstruction = typeof XMONEY_SIGNATURE_CONSTRUCTIONS[number];
+
+/** The candidate's value for one notice, as the text a `signature` field would carry. */
+export function signatureCandidate(
+  construction: XMoneySignatureConstruction, input: Readonly<{ opensslResult: string; plaintext: Buffer; key: Buffer }>
+): string {
+  const [digest, over] = construction.split("(") as [string, string];
+  const message = over === "opensslResult)" ? Buffer.from(input.opensslResult.replaceAll(" ", "+"), "latin1") : input.plaintext;
+  const hash = digest.startsWith("hmac-") ? createHmac("sha512", input.key) : createHash("sha512");
+  return hash.update(message).digest(digest.endsWith("-hex") ? "hex" : "base64");
+}
+
+/**
+ * The name of the candidate the captured `signature` equals, compared in constant time, or null. Only the name ever
+ * leaves this function: never the field's value nor any candidate's. A space in the field is put back to `+` first
+ * (a form decoder's work on an unescaped base64 `+`); hex is compared without regard to case.
+ */
+export function signatureConstruction(
+  signature: string, input: Readonly<{ opensslResult: string; plaintext: Buffer; key: Buffer }>
+): XMoneySignatureConstruction | null {
+  const restored = signature.replaceAll(" ", "+");
+  for (const construction of XMONEY_SIGNATURE_CONSTRUCTIONS) {
+    const candidate = signatureCandidate(construction, input);
+    const seen = Buffer.from(construction.includes("-hex(") ? restored.toLowerCase() : restored, "latin1");
+    const expected = Buffer.from(candidate, "latin1");
+    if (seen.byteLength === expected.byteLength && timingSafeEqual(seen, expected)) return construction;
+  }
+  return null;
+}
 
 export type XMoneyFixture = Readonly<{
   format: typeof XMONEY_FIXTURE_FORMAT;
@@ -234,6 +280,8 @@ function captureKind(fileName: string): XMoneyFixtureKind {
 type NoticeCapture = Readonly<{
   contentType: string; opensslResult: string; plusArrivedAsSpace: boolean;
   outerFields: Readonly<Record<string, XMoneyOuterField>>;
+  /** Kept in memory only, to name its construction once the notice is decrypted; never written. */
+  signature: string | null;
 }>;
 
 function readNoticeCapture(text: string): NoticeCapture {
@@ -263,7 +311,8 @@ function readNoticeCapture(text: string): NoticeCapture {
     opensslResult,
     // A form decoder turns an unescaped `+` into a space; P3a's decryptNotice puts it back.
     plusArrivedAsSpace: opensslResult.includes(" "),
-    outerFields: Object.fromEntries([...fields].map(([name, value]) => [name, describeOuterField(value)]))
+    outerFields: Object.fromEntries([...fields].map(([name, value]) => [name, describeOuterField(value)])),
+    signature: fields.get("signature") ?? null
   };
 }
 
@@ -294,11 +343,23 @@ export function writeXMoneyFixtures(input: Readonly<{
     if (kind.startsWith("notice-")) {
       const capture = readNoticeCapture(text);
       const framing = noticeFraming(capture.opensslResult, capture.plusArrivedAsSpace);
-      const body = scrubber.scrub(JSON.parse(decryptOpensslResult(capture.opensslResult, input.key).toString("utf8")));
+      const plaintext = decryptOpensslResult(capture.opensslResult, input.key);
+      const body = scrubber.scrub(JSON.parse(plaintext.toString("utf8")));
+      const outerFields = capture.signature === null || capture.outerFields.signature === undefined
+        ? capture.outerFields
+        : {
+          ...capture.outerFields,
+          signature: Object.freeze({
+            ...capture.outerFields.signature,
+            construction: signatureConstruction(capture.signature, {
+              opensslResult: capture.opensslResult, plaintext, key: input.key
+            })
+          })
+        };
       fixture = {
         ...base, kind, contentType: capture.contentType, body,
         testKeyOpensslResult: encryptOpensslResult(JSON.stringify(body), testKey, FIXTURE_TEST_IV),
-        framing, outerFields: capture.outerFields, testKeySignature: null
+        framing, outerFields, testKeySignature: null
       };
     } else if (kind === "order-payload") {
       const capture = JSON.parse(text) as unknown;

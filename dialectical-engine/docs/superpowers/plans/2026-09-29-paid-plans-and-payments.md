@@ -29579,8 +29579,13 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    `bytes` number and ask xMoney: "Which 32 bytes key the AES-256-CBC notice encryption for this key?" (their docs
    pass the key string straight to `createDecipheriv`, which only accepts 32 bytes). Tell the builders the answer;
    P3a's `aesKeyFromPrivateKey` is the one place that changes.
+   **The customer (W1).** `… customer --site-id <id> --email <your email> --country RO` creates your test customer the
+   way our checkout does and prints `XMONEY_CUSTOMER=<HTTP status>:identifier=<identifier>`; write the identifier down
+   and give `--identifier <that identifier>` to every `serve` command of items 3 and 9, so each payment is made by that
+   customer. Then run `… customer --repeat --identifier <that identifier> --site-id <id> --email <your email> --country RO`
+   once and write down its line: it shows what xMoney answers when the same customer is created twice.
 3. **(e) Card form, security policy and Payment Request.**
-   `… serve --public-key <pk…> --site-id <id> --email <your email> --country RO --amount 1.00 --mode authAndCapture`
+   `… serve --public-key <pk…> --site-id <id> --email <your email> --country RO --amount 1.00 --mode authAndCapture --identifier <identifier>`
    and open the printed `http://127.0.0.1:8780/` in Chrome with DevTools open (Console tab). **No box offering to save
    the card should appear** (production hides it; if one appears, write that down — it would skew step 6). The form
    has no pay button of its own (production hides xMoney's and presses it from our page): type the card, then press
@@ -29682,7 +29687,7 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    give it as `--capture-dir` to every command of this item INSTEAD of your capture folder, so none of its files can
    mix with the fixture captures. Stop any other `serve` first (items 6–8 are done, so their notices are in), then run
    the `serve` command of item 3 again (same `--public-key`, `--site-id`, `--email`, `--country RO --amount 1.00
-   --mode authAndCapture`) with `--capture-dir <your in-flight folder>`, open the printed page, and pay with the
+   --mode authAndCapture --identifier <identifier>`) with `--capture-dir <your in-flight folder>`, open the printed page, and pay with the
    3-D Secure test card `5555 5555 5555 5599`,
    12/34, CVV 123. When the bank check opens, close it without answering (close its window, or its frame's close
    button). Write down the time you pressed Pay. Find the attempt's transaction id in the stage dashboard's
@@ -29690,7 +29695,9 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    folder. Leave this `serve` running for the first hour (with item 4 (i), a notice xMoney sends for the attempt lands
    in the in-flight folder as a `notice-….raw` file, and no other payment of yours is running to confuse it). Run
    `… fetch --what transaction --id <that transaction id> --capture-dir <your in-flight folder>`
-   1, 5, 15, 30 and 60 minutes after you pressed Pay, then stop the `serve` with Ctrl-C, and run the same `fetch` once
+   1, 5, 15, 30 and 60 minutes after you pressed Pay. At the 1-minute run only, add `--list-order`: it also prints
+   `XMONEY_IN_FLIGHT_LISTED=<HTTP status>:listed=<yes|no>:customerId=<yes|no>`; write it down (our checkout sees a
+   payment on its way only when both say yes). Then stop the `serve` with Ctrl-C, and run the same `fetch` once
    more 24 hours after you pressed Pay. Each run prints `XMONEY_FETCHED=transaction-initial:200:<status>` (the label is
    fixed; only the status matters here). Write down, for each of the six runs, the time and the status; between which
    two runs the status first changed; and every notice received for this attempt, with the time its file appeared
@@ -29716,8 +29723,9 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    (a), (d), (e) (the page's last line with the SDK names, where the bank check opened and whether the page still
    completed, any `form-action` row, and the Payment Request and the referrer comparisons), (f), (g) (including the refund
    listing's rows and delays), (h), (i) (the test amounts xMoney names and the declined rebill's line), the 0.00
-   question, and the `outerFields` of `notice-success.json` (which fields besides `opensslResult` a notice carries —
-   e.g. a `signature` of 128 hex characters); P3a's and P3b's recorded-fixture tests start running as soon as the
+   question, the two `customer` lines, item 9's `--list-order` line, and the `outerFields` of `notice-success.json`
+   (which fields besides `opensslResult` a notice carries — e.g. a `signature` of 128 hex characters — and, for the
+   `signature`, its `construction`: the name of the scrubber's candidate it matched, or `null`); P3a's and P3b's recorded-fixture tests start running as soon as the
    files are in the repository. Hand over item 9's notes (the six times and statuses, where the status first changed,
    and any notice) once its 24-hour run is done, even if the fixtures went in the day before.
 

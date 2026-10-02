@@ -9,9 +9,10 @@ import {
   parseJsonKeepingNumberText,
   signOrderPayload,
   xmoneyEnvironmentOf,
+  XMoneyClient,
   type XMoneyEmbeddedOrder
 } from "@debateai/payments-xmoney";
-import { recordingOrder, signRecordingOrder } from "../../tools/billing/xmoney-sandbox.js";
+import { customerForm, recordingOrder, signRecordingOrder } from "../../tools/billing/xmoney-sandbox.js";
 
 // Known vectors, computed with node:crypto on 29 Sep 2026 independently of this package.
 const KEY = Buffer.from("0123456789abcdef0123456789abcdef", "latin1");
@@ -135,9 +136,31 @@ describe("P3a — what X0's recording page signs is what this package signs", ()
   });
 });
 
+describe("P3b — what X0's customer step posts is what XMoneyClient.createCustomer posts (W1)", () => {
+  it("posts the same form to POST /customer, with a country and without one", async () => {
+    for (const country of ["RO", null]) {
+      const sent: Array<{ method: string; path: string; body: string }> = [];
+      const client = new XMoneyClient({
+        baseUrl: "https://stage.invalid", privateKey: KEY, siteId: "4242",
+        fetch: async (input, init) => {
+          const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+          sent.push({ method: init?.method ?? "GET", path: url.pathname, body: String(init?.body ?? "") });
+          return new Response(JSON.stringify({ code: 200, message: "Success", data: { id: 5 } }), { status: 200 });
+        }
+      });
+      const identifier = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
+      await client.createCustomer({ identifier, email: "person@example.test", country });
+      expect(sent).toEqual([{
+        method: "POST", path: "/customer",
+        body: customerForm({ identifier, email: "person@example.test", siteId: "4242", country }).toString()
+      }]);
+    }
+  });
+});
+
 // X0's fixture of the order the stage form ACCEPTED, re-signed under the published test key. Skipped by name
 // until the owner records it; P22's go-live checklist row 14 (docs/missions/2026-09-01-security-hardening/
-// GO-LIVE-CHECKLIST.md) carries "all 25 required X0 kinds present and the X0 suites green".
+// GO-LIVE-CHECKLIST.md) carries "all 26 required X0 kinds present and the X0 suites green".
 const ACCEPTED_ORDER = resolve(import.meta.dirname, "../fixtures/xmoney/order-payload.json");
 describe.runIf(existsSync(ACCEPTED_ORDER))("P3a — the order xMoney's stage accepted (X0 fixture)", () => {
   it("is reproduced byte for byte: payload and checksum", () => {

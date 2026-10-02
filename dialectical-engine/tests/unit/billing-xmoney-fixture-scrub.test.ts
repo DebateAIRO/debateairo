@@ -9,15 +9,18 @@ import {
   XMONEY_FIXTURE_TEST_KEY,
   XMONEY_OPTIONAL_FIXTURE_KINDS,
   XMONEY_REQUIRED_FIXTURE_KINDS,
+  XMONEY_SIGNATURE_CONSTRUCTIONS,
   XMoneyScrubber,
   decryptOpensslResult,
   noticeFraming,
   readXMoneyKeyFile,
+  signatureCandidate,
   writeXMoneyFixtures
 } from "../../tools/billing/scrub-xmoney-fixture.js";
 import {
   RECORDING_PERMISSIONS_POLICY,
   describeXMoneyKeyShape,
+  inFlightListing,
   linkedRefundRows,
   recordingContentSecurityPolicy,
   recordingHeaders,
@@ -166,7 +169,8 @@ describe("X0 — xMoney fixture scrubbing", () => {
     expect(notice.format).toBe(XMONEY_FIXTURE_FORMAT);
     expect(notice.contentType).toBe("application/x-www-form-urlencoded");
     expect(notice.framing).toEqual({ ivBytes: 16, alphabet: "standard", padded: true, lineBreaks: false, plusArrivedAsSpace: false });
-    expect(notice.outerFields).toEqual({ signature: { length: 128, charset: "hex" } });
+    // A signature that is none of the candidate constructions is named null (W1's X0 follow-up), never shown.
+    expect(notice.outerFields).toEqual({ signature: { length: 128, charset: "hex", construction: null } });
     expect(text).not.toContain(signature);
     const body = notice.body as Record<string, unknown>;
     expect(body.transactionStatus).toBe("complete-ok");
@@ -180,6 +184,65 @@ describe("X0 — xMoney fixture scrubbing", () => {
     expect((card.body as { data: { customerId: number } }).data.customerId).toBe(body.customerId);
     expect(card).toMatchObject({ testKeyOpensslResult: null, framing: null, outerFields: null, testKeySignature: null });
     expect(text).not.toContain(owner.key.toString("latin1"));
+  });
+
+  it("names which candidate construction a notice's signature is, by name only, for each of the candidates (W1's X0 follow-up)", () => {
+    expect(XMONEY_SIGNATURE_CONSTRUCTIONS).toHaveLength(8);
+    for (const construction of XMONEY_SIGNATURE_CONSTRUCTIONS) {
+      const root = privateRoot();
+      const captures = captureFolder(root);
+      const owner = ownerKeyFile(root);
+      const plaintext = JSON.stringify(NOTICE);
+      const opensslResult = encryptUnder(owner.key, plaintext);
+      const signature = signatureCandidate(construction, {
+        opensslResult, plaintext: Buffer.from(plaintext, "utf8"), key: owner.key
+      });
+      writeFileSync(
+        join(captures, "notice-success.raw"),
+        `content-type: application/x-www-form-urlencoded\n\n${new URLSearchParams({ opensslResult, signature }).toString()}`
+      );
+      const out = join(root, "fixtures");
+      writeXMoneyFixtures({ captureDir: captures, key: readXMoneyKeyFile(owner.path), outDir: out, recordedOn: "2026-10-02" });
+      const text = readFileSync(join(out, "notice-success.json"), "utf8");
+      const fixture = JSON.parse(text) as { outerFields: { signature: Record<string, unknown> } };
+      expect(fixture.outerFields.signature, construction).toEqual({
+        length: signature.length, charset: construction.includes("-hex(") ? "hex" : "base64", construction
+      });
+      expect(text, construction).not.toContain(signature);
+      expect(text, construction).not.toContain(encodeURIComponent(signature));
+    }
+  });
+
+  it("names a base64 signature whose + arrived as a space, and a hex one in capitals, and nothing for a near miss", () => {
+    const root = privateRoot();
+    const owner = ownerKeyFile(root);
+    const plaintext = JSON.stringify(NOTICE);
+    let opensslResult = encryptUnder(owner.key, plaintext);
+    const over = (text: string, construction: typeof XMONEY_SIGNATURE_CONSTRUCTIONS[number]) =>
+      signatureCandidate(construction, { opensslResult: text, plaintext: Buffer.from(plaintext, "utf8"), key: owner.key });
+    while (!over(opensslResult, "hmac-sha512-base64(opensslResult)").includes("+")) {
+      opensslResult = encryptUnder(owner.key, plaintext);
+    }
+    const base64 = over(opensslResult, "hmac-sha512-base64(opensslResult)");
+    const hex = over(opensslResult, "sha512-hex(plaintext)");
+    const nearMiss = `${hex.slice(0, -1)}${hex.endsWith("0") ? "1" : "0"}`;
+    const cases = [
+      // The form body carries both fields unescaped, as a sender that skips percent-encoding would.
+      { name: "plus", body: `opensslResult=${opensslResult}&signature=${base64}`, expected: "hmac-sha512-base64(opensslResult)" },
+      { name: "upper", body: new URLSearchParams({ opensslResult, signature: hex.toUpperCase() }).toString(), expected: "sha512-hex(plaintext)" },
+      { name: "miss", body: new URLSearchParams({ opensslResult, signature: nearMiss }).toString(), expected: null }
+    ];
+    for (const { name, body, expected } of cases) {
+      const captures = join(root, name);
+      mkdirSync(captures, { mode: 0o700 });
+      writeFileSync(join(captures, "notice-success.raw"), `content-type: application/x-www-form-urlencoded\n\n${body}`);
+      const out = join(root, `${name}-out`);
+      writeXMoneyFixtures({ captureDir: captures, key: readXMoneyKeyFile(owner.path), outDir: out, recordedOn: "2026-10-02" });
+      const fixture = JSON.parse(readFileSync(join(out, "notice-success.json"), "utf8")) as {
+        outerFields: { signature: { construction: unknown } };
+      };
+      expect(fixture.outerFields.signature.construction, name).toBe(expected);
+    }
   });
 
   it("records a + that the form body carried unescaped (it arrives as a space) and still decrypts the notice", () => {
@@ -243,8 +306,11 @@ describe("X0 — xMoney fixture scrubbing", () => {
   });
 
   it("refuses a key file other users can read, a capture it cannot classify, and two captures of one kind", () => {
-    expect(XMONEY_REQUIRED_FIXTURE_KINDS).toHaveLength(25);
-    expect(XMONEY_OPTIONAL_FIXTURE_KINDS).toHaveLength(6);
+    expect(XMONEY_REQUIRED_FIXTURE_KINDS).toHaveLength(26);
+    expect(XMONEY_OPTIONAL_FIXTURE_KINDS).toHaveLength(7);
+    // W1 (P2-I1, P2-I6): the customer POST /customer created is required; a second POST of it is optional.
+    expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[]).toContain("customer-response");
+    expect(XMONEY_OPTIONAL_FIXTURE_KINDS as readonly string[]).toContain("customer-response-repeat");
     for (const kind of ["transaction-list-refund-after-partial", "transaction-refund-second-partial",
       "transaction-list-refund-after-second-partial"]) {
       expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[], kind).toContain(kind);
@@ -310,6 +376,45 @@ describe("X0 — xMoney fixture scrubbing", () => {
       .toThrow("XMONEY_CAPTURE_ORDER_PAYLOAD_MISMATCH");
   });
 
+  it("keeps the created customer equal to the paying one, and the repeated identifier equal to the order's, in one scrub run (W1)", () => {
+    const root = privateRoot();
+    const captures = captureFolder(root);
+    const owner = ownerKeyFile(root);
+    const identifier = "6f9619ff-8b86-4011-b42d-00c04fc964ff";
+    const order = recordingOrder({
+      publicKey: "pk_stage_real_owner", siteId: "4242", identifier, email: "owner@realmail.ro", country: "RO",
+      chargeId: "9f0c2a1e5b7d4c3a8e6f1b2d3c4a5e6f", amount: "1.00", mode: "authAndCapture",
+      description: "DebateAI stage recording", backUrl: "http://127.0.0.1:8780/return?charge=9f0c2a1e5b7d4c3a8e6f1b2d3c4a5e6f"
+    });
+    writeFileSync(join(captures, "order-payload-1.json"), JSON.stringify({ order, ...signRecordingOrder(order, owner.key) }));
+    writeFileSync(join(captures, "customer-response-2.json"), JSON.stringify({ code: 201, message: "Created", data: { id: 5501 } }));
+    writeFileSync(join(captures, "customer-response-repeat-3.json"), JSON.stringify({
+      httpStatus: 400, reply: { code: 400, message: "Duplicate" },
+      lookup: { httpStatus: 200, reply: { code: 200, data: [{ id: 5501, identifier, email: "owner@realmail.ro" }] } }
+    }));
+    writeFileSync(join(captures, "transaction-initial-4.json"), JSON.stringify({
+      code: 200, data: { id: 99001, orderId: 88123, customerId: 5501, transactionStatus: "complete-ok", amount: "1.00" }
+    }));
+    const out = join(root, "fixtures");
+    writeXMoneyFixtures({ captureDir: captures, key: readXMoneyKeyFile(owner.path), outDir: out, recordedOn: "2026-10-02" });
+    const read = <T>(kind: string): T => (JSON.parse(readFileSync(join(out, `${kind}.json`), "utf8")) as { body: T }).body;
+    const created = read<{ data: { id: unknown } }>("customer-response").data.id;
+    expect(created).not.toBe(5501);
+    expect(read<{ data: { customerId: unknown } }>("transaction-initial").data.customerId).toBe(created);
+    const repeat = read<{
+      httpStatus: number; lookup: { reply: { data: Array<{ id: unknown; identifier: unknown }> } };
+    }>("customer-response-repeat");
+    expect(repeat.httpStatus).toBe(400);
+    expect(repeat.lookup.reply.data[0]!.id).toBe(created);
+    const scrubbedIdentifier = read<{ order: { customer: { identifier: unknown } } }>("order-payload").order.customer.identifier;
+    expect(scrubbedIdentifier).not.toBe(identifier);
+    expect(repeat.lookup.reply.data[0]!.identifier).toBe(scrubbedIdentifier);
+    for (const kind of ["customer-response-repeat", "order-payload"]) {
+      const text = readFileSync(join(out, `${kind}.json`), "utf8");
+      for (const original of [identifier, "owner@realmail.ro"]) expect(text, `${kind} ${original}`).not.toContain(original);
+    }
+  });
+
   it("describes a key without revealing it, and serves a report-only page with production's other headers", () => {
     expect(describeXMoneyKeyShape(Buffer.from("0123456789abcdef0123456789abcdef", "latin1"))).toEqual({
       bytes: 32, printableAscii: true, lowerHex: true, underscorePrefix: false, aes256KeyLength: true
@@ -357,6 +462,21 @@ describe("X0 — xMoney fixture scrubbing", () => {
     expect(page).toContain("form.destroy();");
     expect(page).toContain("onPaymentComplete(transaction)");
     expect(page).toContain("handle: shape()");
+  });
+
+  it("says only whether the in-flight attempt is listed and carries a customerId (X0 item 9, P2-I6's listing)", () => {
+    const listing = { code: 200, message: "Success", data: [
+      { id: 7, orderId: 3, customerId: 11, transactionStatus: "3d-pending" },
+      { id: 8, orderId: 3, transactionStatus: "3d-pending" },
+      { id: "9", orderId: 3, customerId: "12", transactionStatus: "3d-pending" },
+      { id: 10, orderId: 3, customerId: null, transactionStatus: "start" }
+    ] };
+    expect(inFlightListing(listing, "7")).toEqual({ listed: true, customerId: true });
+    expect(inFlightListing(listing, "8")).toEqual({ listed: true, customerId: false });
+    expect(inFlightListing(listing, "9")).toEqual({ listed: true, customerId: true });
+    expect(inFlightListing(listing, "10")).toEqual({ listed: true, customerId: false });
+    expect(inFlightListing(listing, "70")).toEqual({ listed: false, customerId: false });
+    expect(inFlightListing(null, "7")).toEqual({ listed: false, customerId: false });
   });
 
   it("counts the rows a refund listing links to one payment, and nothing else (X0 (g))", () => {

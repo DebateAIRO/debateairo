@@ -179,7 +179,7 @@ describe("P22 the Billing runbook", () => {
       "payment-marks", "SELLER_COMPANY", "notice URL", "same-origin-allow-popups", "records key",
       "daily ceiling covers the subscribers", "XMONEY_SDK_ORIGIN", "Terms §13", "counsel",
       // D5 5k: the recorded suites cannot stay skipped by accident.
-      "all 25 required X0 kinds present and the X0 suites green", "Permissions-Policy",
+      "all 26 required X0 kinds present and the X0 suites green", "Permissions-Policy",
       "Quaderno and SmartBill fixtures committed and their recorded-fixture suites green",
       "tests/unit/invoice-smartbill-recorded-fixtures.test.ts", "partial-credit shapes are still ⚠",
       // Ruling Q-12: the records key's proof is the drill line.

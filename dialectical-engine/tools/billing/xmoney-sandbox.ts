@@ -3,18 +3,19 @@
 // from a 0600 file and never prints it; outputs go to --capture-dir as RAW captures for
 // scrub-xmoney-fixture.ts, each named `<fixture kind>-<stamp>.json`. Stage only: the base URLs below are fixed.
 //   key-shape --key-file F [--capture-dir D]
+//   customer  --key-file F --capture-dir D --site-id S --email E --country RO [--repeat --identifier I]
 //   serve     --key-file F --public-key P --site-id S --email E --country RO --amount 1.00
-//             --mode authAndCapture|auth --capture-dir D [--port 8780] [--locale en]
+//             --mode authAndCapture|auth --capture-dir D [--port 8780] [--locale en] [--identifier I]
 //             [--permissions-policy production|none] [--referrer-policy production|strict-origin]
 //   fetch     --key-file F --capture-dir D --what transaction|order|card|transaction-list
 //             [--id N] [--customer C] [--as initial|second-payment|refund] [--date-type creation|refund]
-//             [--from ISO] [--to ISO]
+//             [--from ISO] [--to ISO] [--list-order]
 //   rebill    --key-file F --capture-dir D --order O --customer C --amount 1.00
 //             [--as renewal|auth-order|declined]
 //   refund    --key-file F --capture-dir D --transaction T --order O --as partial|second-partial|full|extra
 //             [--amount A] [--wait-seconds 600]
 //   release   --key-file F --capture-dir D --transaction T
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path";
@@ -116,6 +117,34 @@ export function signRecordingOrder(order: unknown, key: Buffer): Readonly<{ payl
   };
 }
 
+/**
+ * X0's customer step: the form P3b's XMoneyClient.createCustomer posts to `POST /customer`, field for field
+ * (identifier, email, siteId, then country when there is one) — tests/unit/payments-xmoney-signing.test.ts pins the
+ * two together. Production creates the customer first, under billing.customer's UUID, and only then signs the order
+ * naming that identifier; the recording does the same, so X0 shows which customer an embedded payment is made by.
+ */
+export function customerForm(i: Readonly<{
+  identifier: string; email: string; siteId: string; country: string | null;
+}>): URLSearchParams {
+  const form = new URLSearchParams({ identifier: i.identifier, email: i.email, siteId: i.siteId });
+  if (i.country !== null) form.set("country", i.country);
+  return form;
+}
+
+/**
+ * X0 item 9: whether the creation-date listing of the attempt's order lists the not-final attempt, and whether the
+ * listed row carries a customerId. P2-I6's checkout filter matches a listed deposit by its customer, and
+ * parseXMoneyTransaction rejects a row without one, so both must hold on a `3d-pending` row. Only yes/no is printed.
+ */
+export function inFlightListing(body: unknown, transactionId: string): Readonly<{ listed: boolean; customerId: boolean }> {
+  const row = listed(body).find((entry) => String(entry.id) === transactionId);
+  const customer = row?.customerId;
+  return Object.freeze({
+    listed: row !== undefined,
+    customerId: (typeof customer === "number" || typeof customer === "string") && /^[0-9]+$/u.test(String(customer))
+  });
+}
+
 function scriptValue(value: string): string {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
@@ -188,7 +217,7 @@ function stageIso(milliseconds: number): string {
 type StageReply = Readonly<{ httpStatus: number; body: unknown }>;
 
 async function stageRequest(
-  key: Buffer, method: "GET" | "PATCH" | "DELETE", path: string, body?: URLSearchParams
+  key: Buffer, method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: URLSearchParams
 ): Promise<StageReply> {
   const response = await fetch(`${STAGE_API}${path}`, {
     method,
@@ -279,6 +308,27 @@ async function main(argv: readonly string[]): Promise<void> {
       return;
     }
     const captureDir = argument(argv, "--capture-dir");
+    if (command === "customer") {
+      // W1 (P2-I1, P2-I6): the customer every recorded payment is made by, created the way production creates it.
+      const repeat = argv.includes("--repeat");
+      const identifier = repeat ? argument(argv, "--identifier") : randomUUID();
+      const reply = await stageRequest(key, "POST", "/customer", customerForm({
+        identifier, email: argument(argv, "--email"), siteId: argument(argv, "--site-id"), country: argument(argv, "--country")
+      }));
+      if (!repeat) {
+        capture(captureDir, "customer-response", reply.body);
+        console.log(`XMONEY_CUSTOMER=${reply.httpStatus}:identifier=${identifier}`);
+        return;
+      }
+      // The same identifier posted again (what a checkout whose first reply was lost does), and the lookup by
+      // identifier that createCustomer's adopt path makes after a refusal: the CREATED customer depends on both.
+      const lookup = await stageRequest(key, "GET", `/customer?${new URLSearchParams({ identifier }).toString()}`);
+      capture(captureDir, "customer-response-repeat", {
+        httpStatus: reply.httpStatus, reply: reply.body, lookup: { httpStatus: lookup.httpStatus, reply: lookup.body }
+      });
+      console.log(`XMONEY_CUSTOMER=repeat:${reply.httpStatus}:lookup=${lookup.httpStatus}`);
+      return;
+    }
     if (command === "fetch") {
       const what = argument(argv, "--what");
       if (what === "transaction-list") {
@@ -302,6 +352,18 @@ async function main(argv: readonly string[]): Promise<void> {
         const reply = await stageRequest(key, "GET", `/transaction/${id}`);
         capture(captureDir, `transaction-${step}`, reply.body);
         console.log(`XMONEY_FETCHED=transaction-${step}:${reply.httpStatus}:${statusOf(reply.body)}`);
+        if (argv.includes("--list-order")) {
+          // Item 9's first in-flight read: the attempt's order listed the way P3b's listTransactions asks.
+          const query = new URLSearchParams({
+            dateType: "creation", orderId: String(dataOf(reply.body)?.orderId ?? ""),
+            createdAtFrom: stageIso(Date.now() - DAY_MS), createdAtTo: stageIso(Date.now() + DAY_MS),
+            page: "1", perPage: "100", reverseSorting: "0"
+          });
+          const list = await stageRequest(key, "GET", `/transaction?${query.toString()}`);
+          const seen = inFlightListing(list.body, argument(argv, "--id"));
+          console.log(`XMONEY_IN_FLIGHT_LISTED=${list.httpStatus}:listed=${seen.listed ? "yes" : "no"}`
+            + `:customerId=${seen.customerId ? "yes" : "no"}`);
+        }
         return;
       }
       const path = what === "order" ? `/order/${id}`
@@ -421,7 +483,8 @@ async function main(argv: readonly string[]): Promise<void> {
       const chargeId = randomBytes(16).toString("hex");
       const publicKey = argument(argv, "--public-key");
       const order = recordingOrder({
-        publicKey, siteId: argument(argv, "--site-id"), identifier: randomBytes(16).toString("hex"),
+        // `--identifier`: the customer step's identifier, so the payment is made the way production makes it.
+        publicKey, siteId: argument(argv, "--site-id"), identifier: argument(argv, "--identifier", randomBytes(16).toString("hex")),
         email: argument(argv, "--email"), country: argument(argv, "--country"), chargeId,
         amount: argument(argv, "--amount"), mode, description: RECORDING_MESSAGE,
         backUrl: `http://127.0.0.1:${port}/return?charge=${chargeId}`
