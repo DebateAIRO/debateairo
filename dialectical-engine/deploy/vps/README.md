@@ -2133,7 +2133,9 @@ systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --prop
 
 **Disputes (chargebacks).** A disputed payment pauses the paid features. xMoney sends no signal when a dispute ends,
 so when xMoney tells you the outcome, record it with `pnpm billing:dispute`, giving the charge reference (find it
-with the command below: match the xMoney transaction id of the dispute) with `--charge` and the outcome with
+with the command below: the list shows the xMoney transaction id of the payment the dispute is about; a dispute that
+xMoney reports as its own transaction is recorded under the payment it names, so match that payment's id, not the
+dispute's own id) with `--charge` and the outcome with
 `--outcome won` or `--outcome lost`:
 
 - `won` gives the plan back;
@@ -2314,12 +2316,19 @@ systemctl restart debateai-api
    - Open the link in the email (M9) and press the button.
    - Expect the cancellation email (M7), and Settings saying when the plan ends.
 6. **What the sandbox cannot show.** The fake stack proves the rest: a failing card through the retries to Free, a
-   card from a blocked country refunded, a rebill whose answer was lost adopted without a second charge, and the
-   Romanian invoice. Run it from the repository's `dialectical-engine` folder on your own computer, not on the host (it
-   starts its own database and fakes, and never touches the stage keys):
+   card from a blocked country refunded, a rebill whose answer was lost adopted without a second charge, the
+   Romanian invoice, and a card dispute found by the daily money check: the plan paused once, with one email, counted
+   once in the quarter summary, and given back by `billing:dispute --outcome won`. Run both commands below from the
+   repository's `dialectical-engine` folder on your own computer, not on the host (each starts its own database and
+   fakes, and never touches the stage keys). Start the second only after the first has finished, because each starts
+   its own database:
 
 ```sh
 pnpm exec vitest run tests/integration/billing-whole-flow.test.ts
+```
+
+```sh
+pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts
 ```
 
 After the run, count what the stage database recorded. You should see one `SUCCEEDED` per paid charge and one

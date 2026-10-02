@@ -44,6 +44,9 @@ describe("P22 the Billing runbook", () => {
       // second payment's charge-back is marked DUPLICATE_PAYMENT, and the command's two newer answers are named.
       "r.xmoney_transaction_id = e.xmoney_transaction_id", "e.error_code", "DUPLICATE_PAYMENT",
       "STILL_DISPUTED", "BILLING_DISPUTE_AMBIGUOUS",
+      // §14.8 (W2, P2-I2): a dispute xMoney reports as its own transaction is listed under the payment it names.
+      "the list shows the xMoney transaction id of the payment the dispute is about",
+      "is recorded under the payment it names, so match that payment's id, not the",
       // §14.8 (D5 5h): no sandbox plan or charge left open when the host moves to live.
       "Going from xMoney's sandbox to live on the same host", "BILLING_STAGE_RECORDS_OPEN",
       "open_sandbox_subscriptions", "open_sandbox_charges",
@@ -199,7 +202,9 @@ describe("P22 the Billing runbook", () => {
       // Row 23 (P23 fix G1): going live moves the invoicers' addresses too, not only xMoney's.
       "SMARTBILL_API_BASE_URL",
       // P24 (2026-10-02): billing stays off until every item of Part 2's final review is closed.
-      "PART2-FINAL-REVIEW-OPEN-ITEMS.md"
+      "PART2-FINAL-REVIEW-OPEN-ITEMS.md",
+      // W2 (P2-I2): row 15's proof includes the dispute fake stack.
+      "billing-dispute-fake-stack.test.ts"
     ]) {
       expect(table, needle).toContain(needle);
     }
@@ -225,7 +230,11 @@ describe("P22 the Billing runbook", () => {
       "beside anything but", "Quaderno's sandbox and a `.invalid` SmartBill address",
       // P23 fix F2: what the moved clock does not reach.
       "its usage bars and a withdrawal's credit-used share", "the fake stack in step 6 proves the bars and the share",
-      "`billing:efactura-status`) also run on the real clock", "so do not run them on this host while the line is set"
+      "`billing:efactura-status`) also run on the real clock", "so do not run them on this host while the line is set",
+      // W2 (P2-I2, P2-M39): the dispute case is part of the owner's proof, run after the whole-flow suite.
+      "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
+      "a card dispute found by the daily money check: the plan paused once, with one email, counted",
+      "Start the second only after the first has finished"
     ]) {
       expect(billing, needle).toContain(needle);
     }
