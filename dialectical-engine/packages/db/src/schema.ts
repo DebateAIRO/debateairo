@@ -1199,3 +1199,26 @@ export const STAFF_ACCESS_SCHEMA_MANIFEST = Object.freeze({
     "owner_possession_receipt", "audit_event", "alert_outbox", "alert_delivery_receipt"
   ])
 });
+
+/** Identifying owned WebAuthn metadata erases with either its account or factor. */
+export const staffWebAuthnMetadata = identity.table("staff_webauthn_metadata", {
+  mfaFactorId: uuid("mfa_factor_id").primaryKey().references(() => mfaFactor.mfaFactorId, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => identityUser.userId, { onDelete: "cascade" }),
+  userHandleSha256: text("user_handle_sha256").notNull(),
+  transports: text("transports").array().notNull().default([])
+});
+export const STAFF_WEBAUTHN_SCHEMA_MANIFEST = Object.freeze({
+  migration: "0086_staff_webauthn.sql",
+  identityMetadataRelation: "identity.staff_webauthn_metadata",
+  identityOwnership: "EXISTING_MFA_FACTOR_OWNER",
+  staffOwnershipRole: "debateai_staff_security_owner",
+  runtimeFunctions: Object.freeze([
+    "staff.begin_owned_webauthn", "staff.read_owned_webauthn_challenge",
+    "staff.fail_owned_webauthn", "staff.complete_owned_webauthn_registration",
+    "staff.complete_owned_webauthn_assertion", "identity.staff_read_owned_webauthn_key"
+  ]),
+  sourcePaths: Object.freeze([
+    "apps/api/src/staff/webauthn.ts", "apps/api/src/staff/webauthn-codec.ts",
+    "apps/api/src/staff/webauthn-verifier.ts", "apps/ui/lib/staffWebAuthn.ts"
+  ])
+});

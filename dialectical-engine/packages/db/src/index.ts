@@ -1860,6 +1860,8 @@ export {
   identitySession,
   identityUser,
   mfaFactor,
+  staffWebAuthnMetadata,
+  STAFF_WEBAUTHN_SCHEMA_MANIFEST,
   recoveryCode
 } from "./schema.js";
 
@@ -1896,4 +1898,4 @@ export {
   type DecryptedAuthenticationRiskSignal
 } from "./auth-risk.js";
 
-export { PostgresStaffRepository, type StaffRepository, type StaffAlertIntent, type StaffInvitationDeliveryIntent, type StaffMutation, type InvitationAcceptCommand } from "./staff-access.js";
+export { PostgresStaffRepository, type StaffRepository, type StaffAlertIntent, type StaffInvitationDeliveryIntent, type StaffMutation, type InvitationAcceptCommand, type StaffWebAuthnRepository, type StaffOrdinarySession, type StaffEnrollmentIntent, type StaffEnrollmentIntentBinding, type StaffEnrollmentIntentFactory, type StaffCeremonyRead, type StaffCeremonyScope, type StaffCeremonyContext, type StaffCeremonyPurpose, type StaffCeremonyChallenge, type StaffCredentialTransport, type StaffOwnedCredential, type StaffAssertionCompletion, type StaffCeremonyBegin } from "./staff-access.js";
