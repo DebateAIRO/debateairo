@@ -5698,7 +5698,8 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           email,
           password: "correct horse battery staple",
           recovery_email: recoveryEmail,
-          date_of_birth: "1990-01-01"
+          date_of_birth: "1990-01-01",
+          country: "RO"
         },
         remoteAddress: ip,
         headers: { "user-agent": "vitest-t9" }

@@ -1,6 +1,6 @@
 import type { AuthSourceContext } from "@debateai/db";
 import { decideAsk, decidePayment, decideSignup, UNKNOWN_COUNTRY, type GeoLookup } from "@debateai/geo";
-import type { CountryPolicy, DeploymentMode } from "@debateai/register";
+import { countryRule, type CountryPolicy, type DeploymentMode } from "@debateai/register";
 
 /**
  * A14's one decision, pure so a test can hold it: the country policy in force is read ONLY in hosted
@@ -69,6 +69,11 @@ export class CountryGate {
     if (decision.kind === "ALLOW") return null;
     this.audit("register", decision.code, evidence.country, source);
     return decision.code;
+  }
+
+  /** Region picker S01: the declared country's sign-up switch, without IP audit evidence. */
+  declaredSignupRefusal(country: string): "COUNTRY_SIGNUP_UNAVAILABLE" | null {
+    return countryRule(this.options.policy, country).signup ? null : "COUNTRY_SIGNUP_UNAVAILABLE";
   }
 
   ask(source: AuthSourceContext): "COUNTRY_ASK_BLOCKED" | null {

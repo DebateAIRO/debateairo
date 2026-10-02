@@ -102,7 +102,9 @@ import {
   dobFromIso,
   meetsMinimumAge,
   MIN_AGE,
+  parseDeclaredRegion,
   TypedDomainError,
+  type DeclaredRegion,
   type RiskTier,
   type TierSource
 } from "@debateai/kernel";
@@ -1775,6 +1777,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * request and no request decoration is added.
    */
   const registerLegalDocuments = new WeakMap<object, RegisterLegalDocuments>();
+  // Region picker S01: parsed region for the current register request only.
+  const registerDeclaredRegions = new WeakMap<object, DeclaredRegion>();
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
@@ -1791,6 +1795,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const countryCode = edgeCountry(request.headers) ?? options.countryGate?.recordedCountry(ip) ?? null;
     // Paid plans L3b: present only on a register request whose hook parsed a well-formed triple.
     const legal = registerLegalDocuments.get(request);
+    const region = registerDeclaredRegions.get(request);
     return Object.freeze({
       ip,
       userAgent: typeof request.headers["user-agent"] === "string"
@@ -1800,7 +1805,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // Age gate (R3-3): the country computed above (the edge's, else the country gate's lookup),
       // left out when neither gives one.
       ...(countryCode === null ? {} : { countryCode }),
-      ...(legal === undefined ? {} : { legal })
+      ...(legal === undefined ? {} : { legal }),
+      ...(region === undefined ? {} : { region })
     });
   };
   const admissionRefusalAuditedUntil = new Map<string, number>();
@@ -1934,6 +1940,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
     const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
     if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
+  });
+  /** Region picker S01 (SPEC R17, R18): parse the declared region after the IP gate and before age. */
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown> : null;
+    const region = body === null ? null : parseDeclaredRegion(body);
+    if (region === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    if (options.countryGate?.declaredSignupRefusal(region.country) === "COUNTRY_SIGNUP_UNAVAILABLE") {
+      return reply.status(403).send({ error: "COUNTRY_SIGNUP_UNAVAILABLE" });
+    }
+    registerDeclaredRegions.set(request, region);
   });
   /**
    * Age gate (8d → 8j) in front of register. The registration mount region is frozen (S04), so

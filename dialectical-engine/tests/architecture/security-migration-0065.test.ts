@@ -65,6 +65,7 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.account_recovery_binding": "recovery binding is rotated in place",
   "identity.age_check": "0077 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.sensitive_data_consent": "0078 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
+  "identity.registration_region": "0085 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.account_erasure_request": "erasure request state machine",
   "identity.account_erasure_notification_outbox": "outbox rows are sent then cleared",
   "identity.private_erasure_audit_binding": "erasure binding is cleared by the sweep",
@@ -454,7 +455,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // prefix after dev's 0077 (age gate), the colleague's 0078
         // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
         // (publication check record) and B3's 0083. No pair.
-        "0084_billing_entitlement.sql"
+        "0084_billing_entitlement.sql",
+        // Region picker S01: identity.registration_region and its definer writer. The next free prefix, no pair.
+        "0085_registration_region.sql"
       ]);
   });
 });

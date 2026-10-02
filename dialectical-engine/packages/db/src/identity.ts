@@ -5,6 +5,7 @@ import {
   type CryptoEnvelope
 } from "@debateai/crypto";
 import type { SignUpAcceptanceRow } from "./legal-acceptance.js";
+import type { DeclaredRegion } from "@debateai/kernel";
 
 export interface AuthSourceContext {
   readonly ip: string;
@@ -16,6 +17,8 @@ export interface AuthSourceContext {
 
 export interface PendingAccountInput {
   readonly userId: string;
+  /** Region picker S01: the declared region; absent only in compositions that bypass the register hook. */
+  readonly declaredRegion?: DeclaredRegion;
   readonly emailBlindIndex: Buffer;
   readonly emailCiphertext: CryptoEnvelope;
   readonly recoveryEmailCiphertext: CryptoEnvelope;
@@ -257,6 +260,12 @@ export class PostgresIdentityRepository {
           input.ageCheck.countryCode,
           input.ageCheck.ruleVersion,
           input.occurredAt
+        ]);
+      }
+      // Region picker S01 (SPEC R19): the declared region, in this transaction, on both creation paths.
+      if (input.declaredRegion !== undefined) {
+        await client.query("SELECT identity.record_registration_region($1,$2,$3)", [
+          row.user_id, input.declaredRegion.country, input.declaredRegion.usState
         ]);
       }
       await beforeCommit();
