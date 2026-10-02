@@ -50,6 +50,8 @@ describe("P22 the Billing runbook", () => {
       // §14.8 (D5 5h): no sandbox plan or charge left open when the host moves to live.
       "Going from xMoney's sandbox to live on the same host", "BILLING_STAGE_RECORDS_OPEN",
       "open_sandbox_subscriptions", "open_sandbox_charges",
+      // §14.8 (P2-I4): and no sandbox refund, invoice or credit-note job still queued (the start-up check counts them).
+      "open_sandbox_jobs",
       // §14.8: sandbox records stay but are never sales (P1b's quarter summary reads live charges only).
       "they never count as sales", "the quarterly tax summary and its email read only live charges",
       // §14.5 (ruling Q-2): the notice address's two non-200 answers, and the card pages' Payment Request policy.

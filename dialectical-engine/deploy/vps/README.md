@@ -2040,9 +2040,11 @@ points at the sandbox:
 
 1. Sign in as each sandbox test account and cancel its plan in Settings (or withdraw it, within 14 days). A cancelled
    plan whose month has not ended yet is fine: it is never renewed.
-2. Wait until every sandbox charge has an outcome. The payment checks run every few minutes; a charge still waiting
-   the next day is settled by the daily reconciliation.
-3. Check that both of these print 0:
+2. Wait until every sandbox charge has an outcome, and every refund, invoice and credit note a sandbox charge queued
+   has run. The payment checks run every few minutes; a charge still waiting the next day is settled by the daily
+   reconciliation. A queued job that keeps failing is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours and
+   12 hours and then given up, so this can take a day.
+3. Check that all three of these print 0:
 
 ```sh
 sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_subscriptions FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'xmoney_environment') = 'stage' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CANCEL_REQUESTED')"
@@ -2052,16 +2054,25 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_subscripti
 sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN'))"
 ```
 
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_jobs FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR (j.kind IN ('QUADERNO_RECORD_SALE', 'SMARTBILL_INVOICE') AND c.charge_id = j.ref)))"
+```
+
+The third counts the sandbox jobs still queued: the refunds, invoices, credit notes and payment checks of sandbox
+charges. Once the host points at live, the live site would take such a job. It would end it without calling any
+service (the site refuses a refund, invoice or credit note of the other xMoney system), but the start-up check below
+still refuses to start while any is left, so the switch is never made with sandbox work waiting.
+
 4. Only then change `XMONEY_API_BASE_URL` to `https://api.xmoney.com` and `XMONEY_SDK_ORIGIN` to
    `https://secure.xmoney.com`, and, in the same edit, `QUADERNO_API_BASE_URL` to your Quaderno account's live address
    and `SMARTBILL_API_BASE_URL` to SmartBill's own address (§14.2; §14.9 set it to `https://smartbill.invalid`). Then
    restart both services. Pointed at live beside Quaderno's sandbox or a `.invalid` SmartBill address, the API refuses
    to start with `BILLING_LIVE_SANDBOX_INVOICER_REFUSED`.
 
-The API checks this itself at start-up: pointed at live while a sandbox plan or charge is still open, it refuses to
-start and prints `BILLING_STAGE_RECORDS_OPEN` with the two counts. The first query can count a cancelled plan that
-had a later event (a card change, say) as open; the start-up check has the last word. If it refuses, put the sandbox
-address back, restart, close what is left, and try again.
+The API checks this itself at start-up: pointed at live while a sandbox plan, charge or queued job is still open, it
+refuses to start and prints `BILLING_STAGE_RECORDS_OPEN` with the three counts. The first query can count a cancelled
+plan that had a later event (a card change, say) as open; the start-up check has the last word. If it refuses, put
+the sandbox address back, restart, close what is left, and try again.
 
 The sandbox plans and charges stay in the database, but they never count as sales:
 the quarterly tax summary and its email read only live charges.
