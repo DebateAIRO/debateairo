@@ -10,9 +10,18 @@ import {
 import { foldSubscription } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
-import { recordingAudit, seedActiveSubscription, TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
+import {
+  recordingAudit,
+  seedActiveSubscription,
+  subscriptionDeps,
+  TEST_RECORDS_KEY
+} from "../support/billingSubscriptionFixtures.js";
 import { BillingErasureHook, erasurePendingOf } from "../../apps/api/src/billing/erasure-hook.js";
 import { openBillingProfile, openQuoteLocation } from "../../apps/api/src/billing/records.js";
+import { revokeCancelForOwner } from "../../apps/api/src/billing/subscription-actions.js";
+import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
+import { readSubscriptionView } from "../../apps/api/src/billing/subscription-view.js";
+import { recordWithdrawal } from "../../apps/api/src/billing/withdrawal.js";
 import { sealAcceptanceEvidence } from "../../apps/api/src/legal.js";
 
 let database: TestDatabase;
@@ -29,6 +38,18 @@ const hookOn = (billing: BillingRepository, audit = recordingAudit()) => new Bil
   billing, jobs: new BillingJobQueries(database.pool), entitlements: new EntitlementRepository(database.pool),
   audit, clock: () => new Date()
 });
+
+/** The person cancels the deletion in Settings before it begins (0040's CHECK: not prepared, not committed). */
+const cancelDeletion = async (erasureId: string): Promise<void> => {
+  await database.pool.query(
+    "UPDATE identity.account_erasure_request SET cancelled_at=clock_timestamp() WHERE erasure_id=$1", [erasureId]
+  );
+};
+
+/** M7 (the cancel confirmation) queued for this subscription, if any. */
+const m7Of = async (subscriptionId: string) => (await database.pool.query<{ ref: string }>(
+  "SELECT ref FROM billing.outbox WHERE kind='EMAIL' AND ref LIKE $1", [`M7:${subscriptionId}%`]
+)).rows;
 
 const PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=1$c2FsdHNhbHRzYWx0c2FsdA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
@@ -57,8 +78,8 @@ async function accountWithoutErasure(): Promise<Readonly<{
 }
 
 describe("P15 erasure stops billing and keeps the money and legal records", () => {
-  it("stops the subscription, survives finalize, still opens with the records key, and still blocks a rebill", async () => {
-    // P1b's fixture: user, both verified channels, one live session, an erasure request already due.
+  it("W7: scheduling stops the renewal and keeps the plan; the erasure's commit ends it; the records survive", async () => {
+    // P1b's fixture: user, both verified channels, one live session, an erasure request already due (not yet run).
     const account = await createBillingTestAccount(database.pool, "p15-stop");
     const seeded = await seedActiveSubscription(database.pool, {
       ownerRef: account.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * 86_400_000),
@@ -78,26 +99,33 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
     expect(await billing.ownerErasurePending(account.ownerRef)).toBe(true);
     expect(await billing.ownerAgeFrozen(account.ownerRef)).toBe(false);
     expect(await billing.pendingErasureOwnerRefs(null, 1_000)).toContain(account.ownerRef);
-    expect(await hook.stop(account.ownerRef)).toBe("STOPPED");
+
+    // Scheduled (the DELETE /v1/account hook): the renewal stops at once, the paid plan goes on.
+    expect(await hook.stop(account.ownerRef)).toBe("RENEWAL_STOPPED");
     expect(await hook.stop(account.ownerRef)).toBe("NOTHING");
-    const stopped = await billing.subscriptionEvents(seeded.subscriptionId);
-    expect(stopped.at(-1)?.kind).toBe("ERASURE_STOPPED");
-    // An erasure's stop carries no mark and says "erasure" (R3-2 keeps the age gate's stop apart from it).
-    expect(stopped.at(-1)?.data).toEqual({});
-    expect(audit.events.map((line) => line.event)).toEqual(["billing.erasure.stopped"]);
-    expect(foldSubscription(stopped)).toMatchObject({ status: "ENDED", endedCause: "ERASURE" });
+    const scheduled = await billing.subscriptionEvents(seeded.subscriptionId);
+    expect(scheduled.at(-1)).toMatchObject({ kind: "CANCEL_REQUESTED", data: { source: "ACCOUNT_ERASURE" } });
+    expect(foldSubscription(scheduled)).toMatchObject({
+      status: "ACTIVE", cancelRequested: true, currentPeriodEnd: seeded.periodEnd
+    });
     expect(await new EntitlementRepository(database.pool).current(account.ownerRef, new Date()))
-      .toMatchObject({ planId: "FREE", cause: "ERASURE_STOPPED" });
-    // Nothing live is left, so the sweep no longer lists this owner.
-    expect(await billing.pendingErasureOwnerRefs(null, 1_000)).not.toContain(account.ownerRef);
+      .toMatchObject({ planId: "PLUS" });
+    expect(audit.events).toEqual([{ event: "billing.cancel", fields: { source: "ACCOUNT_ERASURE" } }]);
+    // The deletion screen said so: no M7 ("your plan ends on …") is mailed to an account being deleted.
+    expect(await m7Of(seeded.subscriptionId)).toEqual([]);
+    // No rebill while the deletion is pending (P11a's guard), and the sweep keeps the owner until the commit.
+    expect(await erasurePendingOf(billing)(account.ownerRef)).toBe(true);
+    expect(await billing.pendingErasureOwnerRefs(null, 1_000)).toContain(account.ownerRef);
+    await hook.sweep(1_000);
+    expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId)).status).toBe("ACTIVE");
 
     const before = {
-      events: stopped.length,
+      events: scheduled.length,
       charges: await count("SELECT count(*)::text AS n FROM billing.charge WHERE subscription_id=$1", [seeded.subscriptionId]),
       acceptances: await count("SELECT count(*)::text AS n FROM legal.acceptance WHERE owner_ref=$1", [account.ownerRef]),
       entitlements: await count("SELECT count(*)::text AS n FROM billing.entitlement_event WHERE owner_ref=$1", [account.ownerRef])
     };
-    // Prepare, acknowledge the completion mail, finalize as the erasure principal (P1b's helper).
+    // Prepare, acknowledge the completion mail, finalize as the erasure principal (P1b's helper): the commit.
     expect(await eraseBillingTestAccount(database.pool, account)).toBe("COMMITTED");
 
     expect(await count(`SELECT count(*)::text AS n FROM identity."user" WHERE user_id=$1`, [account.userId])).toBe(0);
@@ -110,9 +138,112 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
       .toBe("keep-for-ten-years@example.test");
     const quote = await billing.quote(seeded.initialQuoteId, account.ownerRef);
     expect(openQuoteLocation(TEST_RECORDS_KEY, seeded.initialQuoteId, quote!.locationCiphertext).country).toBe("RO");
+
+    // Committed: billing ends as P15 does (ERASURE_STOPPED, no mark, FREE), from the sweep.
+    expect(await billing.ownerErasureCommitted(account.ownerRef)).toBe(true);
+    expect(await hook.sweep(1_000)).toBeGreaterThanOrEqual(1);
+    const stopped = await billing.subscriptionEvents(seeded.subscriptionId);
+    expect(stopped.at(-1)).toMatchObject({ kind: "ERASURE_STOPPED", data: {} });
+    expect(foldSubscription(stopped)).toMatchObject({ status: "ENDED", endedCause: "ERASURE" });
+    expect(await new EntitlementRepository(database.pool).current(account.ownerRef, new Date()))
+      .toMatchObject({ planId: "FREE", cause: "ERASURE_STOPPED" });
+    expect(audit.events.map((line) => line.event)).toContain("billing.erasure.stopped");
+    expect(await billing.pendingErasureOwnerRefs(null, 1_000)).not.toContain(account.ownerRef);
     // The account row is gone, but the owner is in legal.account_closure: P11a's guard still refuses a rebill.
     expect(await billing.ownerErasurePending(account.ownerRef)).toBe(true);
     expect(await erasurePendingOf(billing)(account.ownerRef)).toBe(true);
+    // And the withdrawal right ends with the plan: a statement run after the commit has nothing to withdraw.
+    await expect(recordWithdrawal(subscriptionDeps(database.pool, { billing }), {
+      ownerRef: account.ownerRef, withdrewAt: new Date(), source: "OWNER", authorize: async () => undefined
+    })).rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+  });
+
+  it("W7: cancelling the deletion keeps the paid month and does not renew unless the person undoes the cancel", async () => {
+    const account = await createBillingTestAccount(database.pool, "w7-cancel");
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: account.ownerRef, planId: "MAX", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "DE"
+    });
+    const billing = new BillingRepository(database.pool);
+    const deps = subscriptionDeps(database.pool, { billing });
+    const hook = hookOn(billing);
+    expect(await hook.stop(account.ownerRef)).toBe("RENEWAL_STOPPED");
+    // While the deletion is pending, the renewal cannot be switched back on.
+    await expect(revokeCancelForOwner(deps, account.ownerRef)).rejects.toMatchObject({ code: "ACCOUNT_ERASURE_PENDING" });
+
+    await cancelDeletion(account.erasureId);
+    expect(await billing.ownerErasurePending(account.ownerRef)).toBe(false);
+    expect(await billing.pendingErasureOwnerRefs(null, 1_000)).not.toContain(account.ownerRef);
+    expect(await hook.stop(account.ownerRef)).toBe("NOTHING");
+    // The plan runs to the end of the month it was paid for, and no renewal is announced.
+    const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
+    expect(state).toMatchObject({ status: "ACTIVE", planId: "MAX", cancelRequested: true, currentPeriodEnd: seeded.periodEnd });
+    expect(await new EntitlementRepository(database.pool).current(account.ownerRef, new Date()))
+      .toMatchObject({ planId: "MAX" });
+    expect(await readSubscriptionView(deps, account.ownerRef, new Date())).toMatchObject({
+      status: "ACTIVE", cancel_requested: true, renews_on: null, current_period_end: seeded.periodEnd.toISOString()
+    });
+    // The person chooses to renew: the cancel is undone like any other.
+    await revokeCancelForOwner(deps, account.ownerRef);
+    expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId))).toMatchObject({
+      status: "ACTIVE", cancelRequested: false
+    });
+  });
+
+  it("W7: a past-due plan ends at scheduling (its next charge is a retry); a suspended one keeps the stop for a resume", async () => {
+    const billing = new BillingRepository(database.pool);
+    const seedIn = async (label: string, kind: "PAST_DUE" | "SUSPENDED") => {
+      const account = await createBillingTestAccount(database.pool, label);
+      const seeded = await seedActiveSubscription(database.pool, {
+        ownerRef: account.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "RO"
+      });
+      const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
+      await billing.withTransaction((client) => billing.appendSubscriptionEvent(client, subscriptionEvent(state, kind, new Date(), {})));
+      return { account, seeded };
+    };
+    const pastDue = await seedIn("w7-past-due", "PAST_DUE");
+    expect(await hookOn(billing).stop(pastDue.account.ownerRef)).toBe("RENEWAL_STOPPED");
+    // As the person's own cancel while past due: no dunning retry can charge the card again.
+    expect(foldSubscription(await billing.subscriptionEvents(pastDue.seeded.subscriptionId)))
+      .toMatchObject({ status: "ENDED", endedCause: "CANCEL" });
+    expect(await new EntitlementRepository(database.pool).current(pastDue.account.ownerRef, new Date()))
+      .toMatchObject({ planId: "FREE", cause: "ENDED_CANCEL" });
+
+    const suspended = await seedIn("w7-suspended", "SUSPENDED");
+    expect(await hookOn(billing).stop(suspended.account.ownerRef)).toBe("RENEWAL_STOPPED");
+    expect(foldSubscription(await billing.subscriptionEvents(suspended.seeded.subscriptionId)))
+      .toMatchObject({ status: "SUSPENDED", cancelRequested: true });
+    expect(await hookOn(billing).stop(suspended.account.ownerRef)).toBe("NOTHING");
+  });
+
+  it("W7: a withdrawal while the deletion is scheduled is still offered in Settings and is carried out until the commit", async () => {
+    const account = await createBillingTestAccount(database.pool, "w7-withdraw");
+    const now = new Date();
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: account.ownerRef, planId: "PLUS", activatedAt: new Date(now.getTime() - 3 * 86_400_000), taxCountry: "RO"
+    });
+    const billing = new BillingRepository(database.pool);
+    const deps = subscriptionDeps(database.pool, { billing, clock: () => now });
+    expect(await hookOn(billing).stop(account.ownerRef)).toBe("RENEWAL_STOPPED");
+    // Settings still offers it: the window is open while the deletion is pending.
+    const view = await readSubscriptionView(deps, account.ownerRef, now);
+    expect(view?.withdrawal_open_until).not.toBeNull();
+    const outcome = await recordWithdrawal(deps, {
+      ownerRef: account.ownerRef, withdrewAt: now, source: "OWNER", authorize: async () => undefined
+    });
+    expect(outcome.refundMicros).toBeGreaterThan(0);
+    const withdrawn = await billing.subscriptionEvents(seeded.subscriptionId);
+    expect(withdrawn.at(-1)).toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: outcome.refundMicros } });
+    expect(await new EntitlementRepository(database.pool).current(account.ownerRef, new Date()))
+      .toMatchObject({ planId: "FREE", cause: "ENDED_WITHDRAWAL" });
+    const requested = (await billing.charge(seeded.initialChargeId))!.events
+      .filter((event) => event.kind === "REFUND_REQUESTED" && event.errorCode === "WITHDRAWAL")
+      .map((event) => event.amountMicros);
+    expect(requested).toEqual([outcome.refundMicros]);
+    // The commit later finds nothing live: the withdrawal stands as the plan's end.
+    expect(await eraseBillingTestAccount(database.pool, account)).toBe("COMMITTED");
+    expect(await billing.pendingErasureOwnerRefs(null, 1_000)).not.toContain(account.ownerRef);
+    expect(await hookOn(billing).stop(account.ownerRef)).toBe("NOTHING");
+    expect((await billing.subscriptionEvents(seeded.subscriptionId)).at(-1)?.kind).toBe("WITHDRAWN");
   });
 
   it("ends a live plan left behind after finalize: the guard still blocks it and the sweep ends it", async () => {
@@ -131,7 +262,7 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
     });
   });
 
-  it("sweeps every owner with an erasure and a live plan, page after page, and no one else", async () => {
+  it("sweeps every owner with an erasure and a live plan, page after page, and no one else (W7: pending stops the renewal)", async () => {
     const billing = new BillingRepository(database.pool);
     const live: Array<Awaited<ReturnType<typeof seedActiveSubscription>>> = [];
     const free: string[] = [];
@@ -149,12 +280,15 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
     const listed = await billing.pendingErasureOwnerRefs(null, 1_000);
     expect(listed).toEqual(expect.arrayContaining(live.map((seeded) => seeded.ownerRef)));
     expect(listed.filter((ownerRef) => free.includes(ownerRef))).toEqual([]);
-    // One owner per page: the sweep must walk the pages to reach all three.
+    // One owner per page: the sweep must walk the pages to reach all three. Their deletions are pending, not run, so
+    // the sweep repeats the scheduling's renewal stop (W7) and the paid plans go on.
     expect(await hookOn(billing).sweep(1)).toBeGreaterThanOrEqual(3);
     for (const seeded of live) {
-      expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId)).status).toBe("ENDED");
+      expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId)))
+        .toMatchObject({ status: "ACTIVE", cancelRequested: true });
     }
-    expect(foldSubscription(await billing.subscriptionEvents(bystander.subscriptionId)).status).toBe("ACTIVE");
+    expect(foldSubscription(await billing.subscriptionEvents(bystander.subscriptionId)))
+      .toMatchObject({ status: "ACTIVE", cancelRequested: false });
   });
 
   it("ends the live plan of an account the age gate froze, never as an erasure, and names no other state (R3-2)", async () => {
@@ -195,7 +329,7 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
     // Its audit line is its own: every other stop of this sweep, if any, is an erasure's.
     const lines = audit.events.map((line) => line.event);
     expect(lines.filter((event) => event === "billing.age_frozen.stopped")).toHaveLength(1);
-    expect(lines.filter((event) => event === "billing.erasure.stopped")).toHaveLength(swept - 1);
+    expect(lines.filter((event) => event !== "billing.age_frozen.stopped")).toHaveLength(swept - 1);
     // Nothing live is left, so it is no longer listed; P11a's guard still refuses a rebill while the account is frozen.
     expect(await billing.pendingErasureOwnerRefs(null, 1_000)).not.toContain(paying.ownerRef);
     expect(await erasurePendingOf(billing)(paying.ownerRef)).toBe(true);
@@ -223,9 +357,9 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
       .toEqual(expect.arrayContaining([brokenAccount.ownerRef, healthyAccount.ownerRef]));
     // The loop goes on past the failing owner, whichever comes first, and throws only at the end.
     await expect(hookOn(billing).sweep(1)).rejects.toMatchObject({ code: "BILLING_SUBSCRIPTION_EVENTS_INVALID" });
+    // W7: the healthy owner's deletion is pending, so its renewal stop is written; the commit ends the plan later.
     expect(foldSubscription(await billing.subscriptionEvents(healthy.subscriptionId))).toMatchObject({
-      status: "ENDED", endedCause: "ERASURE"
+      status: "ACTIVE", cancelRequested: true
     });
-    expect(await billing.pendingErasureOwnerRefs(null, 1_000)).not.toContain(healthyAccount.ownerRef);
   });
 });

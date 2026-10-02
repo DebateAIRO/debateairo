@@ -45,6 +45,7 @@
   "settings.erasure.title": "Usuń konto",
   "settings.erasure.hint": "Usuwanie rozpocznie się po upływie pełnych siedmiu dni. Do tego czasu można je anulować. Powiadomienia o zaplanowaniu, anulowaniu i zakończeniu są wysyłane na każdy powiązany główny lub pomocniczy adres e-mail; wymagany jest co najmniej jeden zweryfikowany kanał.",
   "settings.erasure.dataWarning": "Po zniszczeniu kluczy zaszyfrowana prywatna treść staje się trwale nieczytelna. Obecne publiczne zapisy pozostają publiczne pod wycofanym pseudonimem, a pobrane, zacytowane, zapisane w pamięci podręcznej, zindeksowane lub zachowane przez dostawcę kopie mogą nadal istnieć. Przejęty starszy tekst jawny jest wykazywany jako zachowana pozostałość, a nie jako w pełni wyczyszczona treść.",
+  "settings.erasure.paidPlan": "Zaplanowanie usunięcia wstrzymuje odnawianie płatnego planu, ale plan działa do czasu wykonania usunięcia lub końca opłaconego miesiąca; po anulowaniu usunięcia plan trwa do końca tego miesiąca i odnawia się tylko wtedy, gdy cofniesz rezygnację, a jeśli nadal możesz odstąpić od umowy w ciągu 14 dni od zakupu, możesz to zrobić do czasu wykonania usunięcia.",
   "settings.erasure.checking": "Sprawdzanie stanu usuwania konta…",
   "settings.erasure.status": "Stan: {status}. Zaplanowany czas usunięcia: {time}.",
   "settings.erasure.processing": "Trwa nieodwracalne usuwanie. Nie można już zmienić terminu ani anulować operacji.",

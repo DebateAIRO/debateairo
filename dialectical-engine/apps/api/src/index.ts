@@ -1496,8 +1496,9 @@ export interface ApiOptions {
    */
   readonly billing?: BillingRouteOptions;
   /**
-   * P15: scheduling an erasure stops the owner's billing at once. Present only when hosted with billing on; the
-   * reconciler's sweep repeats a stop that failed here.
+   * P15, W7 (P2-I10): scheduling an erasure stops the owner's renewal at once; the paid plan runs until the erasure
+   * commits, when the reconciler's sweep ends it. Present only when hosted with billing on; the sweep also repeats a
+   * renewal stop that failed here.
    */
   readonly billingErasure?: Pick<BillingErasureHook, "stop">;
   readonly support?: SupportApplication;
@@ -2286,7 +2287,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       try {
         await options.billingErasure.stop(authenticated.ownerRef);
       } catch {
-        // The erasure is scheduled either way; the billing sweep repeats this stop within minutes.
+        // The erasure is scheduled either way; the billing sweep repeats this renewal stop within minutes.
         console.error("[BILLING_ERASURE_STOP_PENDING]");
       }
     }

@@ -235,6 +235,19 @@ describe("P2 — subscription fold: the legal paths", () => {
     expect(fold(created(), activated(), event("SUSPENDED"), event("ERASURE_STOPPED")))
       .toMatchObject({ status: "ENDED", endedCause: "ERASURE" });
   });
+
+  it("W7 (P2-I10): a deletion scheduled while SUSPENDED stops the renewal too, and a resumed plan keeps that stop", () => {
+    const stopped = fold(created(), activated(), event("SUSPENDED"), event("CANCEL_REQUESTED", { data: { source: "ACCOUNT_ERASURE" } }));
+    expect(stopped).toMatchObject({ status: "SUSPENDED", cancelRequested: true });
+    // Won after the deletion was cancelled: the plan resumes, runs to its period end, and is not renewed.
+    const resumed = fold(created(), activated(), event("SUSPENDED"), event("CANCEL_REQUESTED"), event("RESUMED"));
+    expect(resumed).toMatchObject({ status: "ACTIVE", cancelRequested: true });
+    expect(fold(created(), activated(), event("SUSPENDED"), event("CANCEL_REQUESTED"), ended("DISPUTE")))
+      .toMatchObject({ status: "ENDED", endedCause: "DISPUTE" });
+    // The erasure's commit still ends it.
+    expect(fold(created(), activated(), event("SUSPENDED"), event("CANCEL_REQUESTED"), event("ERASURE_STOPPED")))
+      .toMatchObject({ status: "ENDED", endedCause: "ERASURE" });
+  });
 });
 
 describe("P2 — subscription fold: illegal histories are refused", () => {

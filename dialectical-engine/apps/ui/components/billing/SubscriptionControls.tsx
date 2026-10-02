@@ -36,6 +36,8 @@ const STILL_CONFIRMING: FailureWords = Object.freeze({ key: "billing.subscriptio
  * the updated Terms come first. The route refuses before any read or quote, so nothing moved: the checkout's sentence.
  */
 const REACCEPT_REQUIRED: FailureWords = Object.freeze({ key: "billing.checkout.reacceptRequired", reload: false });
+/** P15 (409 ACCOUNT_ERASURE_PENDING): an account deletion is pending; cancelling it in Settings comes first. */
+const ERASURE_PENDING: FailureWords = Object.freeze({ key: "billing.checkout.erasurePending", reload: false });
 
 /**
  * P12c's and P15's refusals of an upgrade quote or an upgrade, each with its own sentence (P18). `reload`: read the
@@ -47,7 +49,7 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   UPGRADE_NOT_HIGHER: Object.freeze({ key: "billing.subscription.upgradeNotHigher", reload: true }),
   UPGRADE_NOT_AVAILABLE_NOW: Object.freeze({ key: "billing.subscription.upgradeNotAvailableNow", reload: false }),
   UPGRADE_IN_PROGRESS: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
-  ACCOUNT_ERASURE_PENDING: Object.freeze({ key: "billing.checkout.erasurePending", reload: false }),
+  ACCOUNT_ERASURE_PENDING: ERASURE_PENDING,
   LEGAL_REACCEPTANCE_REQUIRED: REACCEPT_REQUIRED
 });
 
@@ -89,9 +91,14 @@ function downgradeFailureWords(failure: unknown): FailureWords {
     : ACTION_FAILED;
 }
 
-/** P12b's undo of a cancel: gated on the Terms (D6b); any other refusal keeps the plain "try again". */
+/**
+ * P12b's undo of a cancel: gated on the Terms (D6b), and (W7, P2-I10) refused while an account deletion is pending,
+ * whose renewal stop it would undo; any other refusal keeps the plain "try again".
+ */
 function revokeFailureWords(failure: unknown): FailureWords {
-  return refusalOf(failure) === "LEGAL_REACCEPTANCE_REQUIRED" ? REACCEPT_REQUIRED : ACTION_FAILED;
+  const code = refusalOf(failure);
+  if (code === "LEGAL_REACCEPTANCE_REQUIRED") return REACCEPT_REQUIRED;
+  return code === "ACCOUNT_ERASURE_PENDING" ? ERASURE_PENDING : ACTION_FAILED;
 }
 
 /** Ruling Q-7: the confirm needs the lower plan's price; without the plans list it offers no confirm at all. */

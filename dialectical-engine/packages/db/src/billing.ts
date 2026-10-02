@@ -329,6 +329,17 @@ export class BillingRepository {
     return result.rows.map((row) => row.owner_ref);
   }
 
+  /**
+   * W7 (P2-I10): whether this owner's account erasure has committed (0091: a `legal.account_closure` row, written in
+   * the finalize's own transaction). A pending deletion answers false: it stops only the renewal, never the plan.
+   */
+  async ownerErasureCommitted(ownerRef: string, executor: BillingReadExecutor = this.pool): Promise<boolean> {
+    const result = await executor.query<{ committed: boolean }>(
+      "SELECT billing.owner_erasure_committed($1) AS committed", [ownerRef]
+    );
+    return result.rows[0]?.committed === true;
+  }
+
   /** P15 (R3-2): whether this owner's account is age_frozen; the stop reads it under the owner lock (`executor`). */
   async ownerAgeFrozen(ownerRef: string, executor: BillingReadExecutor = this.pool): Promise<boolean> {
     const result = await executor.query<{ frozen: boolean }>(

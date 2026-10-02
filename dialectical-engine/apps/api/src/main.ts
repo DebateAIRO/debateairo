@@ -1150,7 +1150,8 @@ const api = buildApi({
   ...(askRoom === undefined ? {} : { askRoom }),
   ...(askBilling === undefined ? {} : { askBilling }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
-  // P15: scheduling an account erasure stops the owner's billing at once (the reconciler's sweep repeats it).
+  // P15, W7: scheduling an account erasure stops the owner's renewal at once (the reconciler's sweep repeats it, and
+  // ends the plan once the erasure commits).
   ...(billingRuntime === undefined ? {} : { billingErasure: billingRuntime.erasure }),
   ...(countryGate === undefined ? {} : { countryGate }),
   support: {

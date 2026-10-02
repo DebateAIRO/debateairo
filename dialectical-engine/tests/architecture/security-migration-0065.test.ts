@@ -467,7 +467,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // Paid plans P15 (ruling R-31; number by R3-1): billing learns that an owner's
         // account is being erased, or was frozen by the age gate (R3-2), as three
         // content-free lookups. The next free prefix, no pair.
-        "0089_billing_erasure_hook.sql"
+        "0089_billing_erasure_hook.sql",
+        // Paid plans Part 2b W7 (P2-I10): billing tells a committed erasure from a pending one (the plan now ends
+        // at the commit). 0090 is held for Part 3's scorecard; the next free prefix, no pair.
+        "0091_billing_erasure_commit.sql"
       ]);
   });
 });

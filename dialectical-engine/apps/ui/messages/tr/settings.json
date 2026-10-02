@@ -45,6 +45,7 @@
   "settings.erasure.title": "Hesabı sil",
   "settings.erasure.hint": "Silme işlemi yedi tam gün sonra başlar. Başlamadan önce iptal edebilirsiniz. Planlama, iptal ve tamamlanma bildirimleri bağlı tüm e-posta veya kurtarma e-postası adreslerine gönderilir; doğrulanmış en az bir kanal gereklidir.",
   "settings.erasure.dataWarning": "Anahtarları yok edildiğinde şifrelenmiş özel içerik kalıcı olarak okunamaz hâle gelir. Mevcut herkese açık anlık görüntüler, kullanımdan kaldırılmış bir takma ad altında herkese açık kalır; indirilmiş, alıntılanmış, önbelleğe alınmış, dizine eklenmiş veya sağlayıcı tarafından saklanan kopyalar varlığını sürdürebilir. Mevcut olduğu beyan edilen eski düz metin, tümüyle temizlenmiş içerik olarak değil, saklanan kalıntı olarak bildirilir.",
+  "settings.erasure.paidPlan": "Silme işlemini planlamak ücretli planınızın yenilenmesini durdurur, ancak plan silme gerçekleşene ya da ödediğiniz ay bitene kadar çalışmaya devam eder; silmeyi iptal ederseniz plan o ayın sonuna kadar sürer ve yalnızca iptali geri alırsanız yenilenir; satın almadan sonraki 14 gün içinde hâlâ cayma hakkınız varsa bunu silme gerçekleşene kadar kullanabilirsiniz.",
   "settings.erasure.checking": "Hesap silme durumu kontrol ediliyor…",
   "settings.erasure.status": "Durum: {status}. Planlanan silme zamanı: {time}.",
   "settings.erasure.processing": "Geri alınamaz silme işlemi sürüyor. Artık planlama veya iptal yapılamaz.",

@@ -89,8 +89,9 @@ export type BillingRuntime = Readonly<{
    */
   maintenance: BillingMaintenance;
   /**
-   * P15: stops an owner's billing when an account erasure is scheduled (the route's hook) and, on the reconciler's
-   * 10-minute tick, sweeps every owner whose erasure is pending or finished, or whose account the age gate froze.
+   * P15, W7: stops an owner's renewal when an account erasure is scheduled (the route's hook) and, on the reconciler's
+   * 10-minute tick, sweeps every owner whose erasure is pending (the renewal stop again) or finished (the plan ends),
+   * or whose account the age gate froze (the plan ends).
    */
   erasure: BillingErasureHook;
   kick(): void;

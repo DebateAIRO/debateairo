@@ -455,6 +455,17 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).not.toContain("That didn't work.");
   });
 
+  it("W7: an undo refused while the account deletion is pending says so, never 'try again'", async () => {
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })
+    });
+    client.revokeSubscriptionCancel.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"));
+    await render();
+    await click("Undo cancellation");
+    expect(text()).toContain(billingEnglish["billing.checkout.erasurePending"]);
+    expect(text()).not.toContain("That didn't work.");
+  });
+
   it("words a closed window, a spent confirmation and an unknown refund outcome, instead of blaming the password", async () => {
     client.stepUp.mockResolvedValue({
       status: "step_up_complete", csrf_token: "c".repeat(43),
