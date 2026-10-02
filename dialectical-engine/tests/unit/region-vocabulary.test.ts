@@ -6,7 +6,7 @@ import {
   regionCountryName, regionCountriesOf
 } from "@debateai/kernel";
 
-const design = readFileSync("/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/docs/missions/region-picker/design/S01/turn-8a-region-logic.js", "utf8");
+const design = readFileSync(new URL("../fixtures/region-picker/turn-8a-region-logic.js", import.meta.url), "utf8");
 const continents = ["Africa", "Asia", "Europe", "Middle East", "North America", "South America", "Oceania"] as const;
 const triples = continents.flatMap((continent) => {
   const escaped = continent.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
