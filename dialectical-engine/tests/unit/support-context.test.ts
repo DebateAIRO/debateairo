@@ -110,7 +110,7 @@ describe("Support knowledge context", () => {
     // 2026-09-24: the owner signed the /ai-transparency article pair and the catalogue
     // (OWNER records in the review manifest; the version binds the session, dates and evidence).
     // 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
-    expect(corpus.kbVersion).toBe("3ba3bdb5bf4359a412b50054dfd50ae0ed816f492e29656e9bd39ef7726ef881");
+    expect(corpus.kbVersion).toBe("fba0fe65686d32d739e3bfd282b285ce2167b1b7470d8f8bb61e04f179febbd6");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 
@@ -502,9 +502,9 @@ describe("Support knowledge context", () => {
     expect(result.requestedActionIds).toEqual(expectedActionIds);
     if (expectedActionIds.includes("help")) {
       const [action] = resolveSupportActions(result.requestedActionIds,{ signedIn:false,language });
-      // Scope audit B6: en/ro keep dev's reviewed catalog labels.
-      expect(action?.label).toBe(language === "ro" ? "Centrul de ajutor" : "Help desk");
-      expect(result.text).toContain(language === "ro" ? "Centrul de ajutor" : "Help desk");
+      // en/ro catalog labels equal the label the screen renders (chrome.help; cookie-compliance S02 FIX, V-17).
+      expect(action?.label).toBe(language === "ro" ? "Ajutor" : "Help");
+      expect(result.text).toContain(language === "ro" ? "Ajutor" : "Help");
     }
   });
 

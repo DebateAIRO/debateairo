@@ -95,13 +95,13 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
-        <Link className="btn" href="/settings">
+        <Link className="btn topBarWide" href="/settings">
           {t(catalog, "chrome.account")}
         </Link>
         <Link className="btn btnDark" href="/new">
-          + {t(catalog, "chrome.newDebate")}
+          <span className="topBarNewLabel">+ {t(catalog, "chrome.newDebate")}</span>
         </Link>
-        <span className="roleChip" title={t(catalog, "chrome.askerRolePlaceholder")}>{t(catalog, "chrome.asker")}</span>
+        <span className="roleChip topBarWide" title={t(catalog, "chrome.askerRolePlaceholder")}>{t(catalog, "chrome.asker")}</span>
         <LanguageSwitcher />
         <ModeToggle />
         <Link className="iconBtn" href="/settings" aria-label={t(catalog, "chrome.settings")} title={t(catalog, "chrome.settings")}>

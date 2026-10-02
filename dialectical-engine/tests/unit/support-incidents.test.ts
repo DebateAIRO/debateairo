@@ -128,7 +128,7 @@ describe("SUP-05 deterministic incident answers", () => {
     });
     expect(formatIncidentAnswer([ACTIVE],"ro",model)).toEqual({
       outcome: "ANSWER_INCIDENT",
-      text: "Incident cunoscut din 2026-09-07T08:30:00.000Z: Dezbaterile se generează lent. (publicat de echipă). Dacă problema ta se potrivește, nu e nevoie să o raportezi; altfel alege „Vorbește cu o persoană”."
+      text: "Incident cunoscut din 2026-09-07T08:30:00.000Z: Dezbaterile se generează lent. (publicat de echipă). Dacă problema ta se potrivește, nu e nevoie să o raportezi; altfel alege „Vorbiți cu o persoană”."
     });
     expect(model).not.toHaveBeenCalled();
   });
@@ -137,7 +137,7 @@ describe("SUP-05 deterministic incident answers", () => {
     expect(formatIncidentAnswer([],"en").outcome).toBe("NO_INCIDENT");
     expect(formatIncidentAnswer([{ ...ACTIVE,endedAt: new Date() }],"ro")).toEqual({
       outcome: "NO_INCIDENT",
-      text: "Nu am nicio înregistrare a unui incident cunoscut în acest moment. Asta nu exclude unul — dacă ceva pare stricat, alege „Vorbește cu o persoană” și descrie problema."
+      text: "Nu am nicio înregistrare a unui incident cunoscut în acest moment. Asta nu exclude unul — dacă ceva pare stricat, alege „Vorbiți cu o persoană” și descrie problema."
     });
   });
 

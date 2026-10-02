@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Nous déposons deux cookies, tous deux strictement nécessaires : l'un vous maintient connecté, l'autre protège les formulaires contre la falsification. Nous ne déposons aucun cookie d'analyse, de publicité ou de suivi. La Politique relative aux cookies disponible à l'adresse [dezbatere.ro/cookies] les énumère avec leur durée, explique comment votre choix est enregistré et sera modifiée avant l'ajout de tout autre cookie. Lorsque la loi de votre région traite certains cookies différemment — par exemple la règle de refus applicable aux données d'analyse au Royaume-Uni — la Politique relative aux cookies le précise." }
+      { kind: "p", text: "DebateAI utilise huit éléments, tous strictement nécessaires au service que vous avez demandé et tous déposés uniquement par DebateAI : quatre cookies et quatre entrées dans le stockage de votre navigateur. Nous ne déposons aucun cookie d'analyse, de publicité ou de suivi. La Politique relative aux cookies disponible à l'adresse [dezbatere.ro/cookies] les énumère en indiquant le rôle de chacun et qui le reçoit, et sera modifiée avant tout autre ajout." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Fichier cookie (HttpOnly) — Vous maintient connecté. Il est renouvelé tant que vous utilisez le service. — 14 jours",
+        "__Host-debateai-csrf — Fichier cookie — Empêche d’autres sites web de soumettre des formulaires en votre nom. — 14 jours",
+        "__Host-debateai-age-refusal — Fichier cookie (HttpOnly) — Après le refus d’une vérification d’âge, empêche ce navigateur de réessayer pendant 30 jours. Il ne contient que le mot « refusé », aucune donnée personnelle. — 30 jours",
+        "debateai.locale — Fichier cookie — Mémorise la langue d’interface que vous avez choisie. — 1 an",
+        "debateai.consent — Stockage local — Retient que vous avez vu l’avis sur les cookies, afin qu’il ne s’affiche qu’une fois. — Jusqu’à ce que vous l’effaciez",
+        "debateai.mode — Stockage local — Votre choix entre le mode clair et le mode sombre. — Jusqu’à ce que vous l’effaciez",
+        "debateai.languageOffer.dismissed — Stockage de session — Retient, pour cet onglet, que vous avez décliné la proposition d’afficher un débat dans une autre langue. — Jusqu’à la fermeture de l’onglet",
+        "debateai.support.conversation.v2 — Stockage de session — Garde votre conversation avec l’aide à l’écran tant que l’onglet reste ouvert. Elle est effacée quand quelqu’un se connecte ou se déconnecte dans cet onglet. — Jusqu’à la fermeture de l’onglet"
+        ]
+      },
+      { kind: "p", text: "Aucun autre tiers ne collecte, par l'intermédiaire de DebateAI, d'informations sur vos activités en ligne au fil du temps et sur différents sites web." },
+      { kind: "p", text: "Les navigateurs peuvent envoyer un signal « Do Not Track » ou un signal similaire. DebateAI ne vous suit pas : un tel signal n'a donc rien à désactiver, et le service fonctionne de la même manière avec ou sans lui." },
+      { kind: "p", text: "Pour refuser ces éléments, bloquez ou supprimez les cookies et les données de ce site dans les paramètres de votre navigateur. Ce qui cesse alors de fonctionner : la connexion, ainsi que la mémorisation de vos choix de langue et d'affichage ; le bandeau d'information sur les cookies s'affichera aussi de nouveau." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "4f0c3bab5c2259f3fbc6e32db72e75b064474ee0dd6a0a7d6e944d3525654981",
+  sha256: "68ed55634861dca46a36dea94c3a08ae247f7201a636fa7e143da3b5036be80e",
   eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.0 · EN VIGUEUR LE [DATE]",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",

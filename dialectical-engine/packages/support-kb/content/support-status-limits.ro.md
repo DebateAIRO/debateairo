@@ -11,6 +11,6 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Blocul Service status din Ajutor publică trei indicatori limitați: Debate engine, Scoring queue și Model fleet. Debate engine reflectă disponibilitatea cererii publice de stare, Scoring queue îndrumă vizitatorul către starea din aplicație, iar Model fleet arată starea releului Asistenței sau faptul că verificarea este încă în curs.
+Blocul Starea serviciului din Ajutor publică trei indicatori limitați: Motorul de dezbatere, Coada de punctare și Flota de modele. Motorul de dezbatere reflectă disponibilitatea cererii publice de stare, Coada de punctare îndrumă vizitatorul către starea din aplicație, iar Flota de modele arată starea releului Asistenței sau faptul că verificarea este încă în curs.
 
 Aceste etichete pot fi indisponibile, incomplete sau învechite. Ele nu dovedesc starea fiecărei dezbateri, sarcini de evaluare, model, furnizor sau implementare. Asistența poate explica indicatorii publici și poate naviga la ei, dar nu poate inspecta dezbaterea, sarcina din coadă, contul, înregistrarea furnizorului sau altă stare privată a vizitatorului.

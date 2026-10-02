@@ -2,20 +2,16 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as consentModule from "../../apps/ui/lib/consent.js";
 import {
   CONSENT_KEY,
-  CONSENT_VERSION,
-  COOKIE_CATEGORIES,
-  decisionFor,
-  readConsent,
   requestPreferences,
-  subscribeToPreferenceRequests,
-  writeConsent,
-  type ConsentDecision
+  subscribeToPreferenceRequests
 } from "../../apps/ui/lib/consent.js";
-import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
-import { t } from "../../apps/ui/lib/i18n/translate.js";
+import { CookieConsent } from "../../apps/ui/components/consent/CookieConsent.js";
 
 // The acceptance command is pinned to the lane root, so source fixtures resolve
 // from process.cwd(); `import.meta.url` can carry a non-file scheme under vitest
@@ -24,341 +20,182 @@ const MODULE_PATH = resolve(process.cwd(), "apps/ui/lib/consent.ts");
 const moduleSource = (): string => readFileSync(MODULE_PATH, "utf8");
 
 const ISO_UTC_MS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-const DECISION_MEMBERS = ["analytics", "decidedAt", "essential", "quality", "v"];
 
-function stored(): Record<string, unknown> {
-  const raw = localStorage.getItem(CONSENT_KEY);
-  expect(raw, `${CONSENT_KEY} is present`).not.toBeNull();
-  return JSON.parse(raw!) as Record<string, unknown>;
+/**
+ * SPEC-v2 R06's seventeen fixtures, verbatim: each is a stored `raw` (null = the key is absent)
+ * and the surface R06 expects. Only the last two are ACK.
+ */
+const R06_FIXTURES: [label: string, raw: string | null, expected: "bar" | "no bar"][] = [
+  ["absent key", null, "bar"],
+  [
+    "the old three-choice record",
+    '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-09-01T00:00:00.000Z"}',
+    "bar"
+  ],
+  ["a v1 record without toggles", '{"v":1,"essential":true,"decidedAt":"2026-09-01T00:00:00.000Z"}', "bar"],
+  ["v1 with acknowledgedAt", '{"v":1,"acknowledgedAt":"2026-09-29T00:00:00.000Z"}', "bar"],
+  ["v2 with no acknowledgedAt", '{"v":2}', "bar"],
+  ["v2 with a date-only acknowledgedAt", '{"v":2,"acknowledgedAt":"2026-09-29"}', "bar"],
+  [
+    "v2 with a third member",
+    '{"v":2,"acknowledgedAt":"2026-09-29T00:00:00.000Z","quality":false}',
+    "bar"
+  ],
+  ["v as the string \"2\"", '{"v":"2","acknowledgedAt":"2026-09-29T00:00:00.000Z"}', "bar"],
+  ["v2 with decidedAt instead", '{"v":2,"decidedAt":"2026-09-29T00:00:00.000Z"}', "bar"],
+  ["an acknowledged flag", '{"acknowledged":true}', "bar"],
+  ["an array", "[]", "bar"],
+  ["the null literal", "null", "bar"],
+  ["a JSON string", '"ok"', "bar"],
+  ["not JSON", "ok", "bar"],
+  ["the true literal", "true", "bar"],
+  ["the v2 acknowledgement", '{"v":2,"acknowledgedAt":"2026-09-29T00:00:00.000Z"}', "no bar"],
+  [
+    "the v2 acknowledgement, keys reversed",
+    '{"acknowledgedAt":"2026-09-29T00:00:00.000Z","v":2}',
+    "no bar"
+  ]
+];
+
+let root: Root | null = null;
+let container: HTMLDivElement | null = null;
+
+function freshRoot(): void {
+  if (root !== null) act(() => root!.unmount());
+  container?.remove();
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
 }
 
 // vitest.config.ts:19 sets fileParallelism:false and there is no shared setup
 // file, so a leaked key survives into later test files in the same worker.
-// Precedent: tests/render/t1-canvas.test.tsx:105,133.
 beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   localStorage.clear();
+  freshRoot();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  if (root !== null) act(() => root!.unmount());
+  root = null;
+  container = null;
+  document.body.replaceChildren();
+  vi.unstubAllGlobals();
   localStorage.clear();
 });
 
-describe("S01-C2 consent storage contract", () => {
-  it("round-trips one decision under debateai.consent with exactly the five members of R01", () => {
-    // PROPERTY (S01-R01): a written decision round-trips as an object with
-    // exactly the five members R01 names and no others, its `v` is the integer
-    // schema version, and its `decidedAt` survives the codec byte-for-byte as an
-    // ISO-8601 UTC instant with milliseconds.
-    const decidedAt = new Date().toISOString();
-    const decision: ConsentDecision = {
-      v: CONSENT_VERSION,
-      essential: true,
-      quality: true,
-      analytics: false,
-      decidedAt
-    };
+const bar = (): HTMLElement | null => document.querySelector<HTMLElement>('.consentBar[role="region"]');
 
-    writeConsent(decision);
-
-    expect(CONSENT_KEY).toBe("debateai.consent");
-    expect(CONSENT_VERSION).toBe(1);
-    expect(stored(), "the stored object").toEqual({
-      v: 1,
-      essential: true,
-      quality: true,
-      analytics: false,
-      decidedAt
-    });
-    expect(Object.keys(stored()).sort(), "the stored member set").toEqual(DECISION_MEMBERS);
-    expect(String(stored().decidedAt), "decidedAt is an ISO-8601 UTC instant").toMatch(ISO_UTC_MS);
-    expect(readConsent(), "readConsent round-trips its own write").toEqual(decision);
+function mountConsent(): void {
+  act(() => {
+    root!.render(<CookieConsent />);
   });
+}
 
-  it("treats a stored value whose v is not 1 as no decision, and carries no migration code", () => {
-    // PROPERTY (S01-R02): a stored value whose `v` is not the integer 1 is
-    // indistinguishable from no decision, so the caller re-asks; and no branch
-    // exists for any other version, because migration code for a case that
-    // cannot occur would be untested code.
-    localStorage.setItem(
-      CONSENT_KEY,
-      '{"v":0,"essential":true,"quality":true,"analytics":true,"decidedAt":"2026-01-01T00:00:00.000Z"}'
-    );
-    expect(readConsent(), "a v:0 value is no decision").toBeNull();
+/** The bar's primary control: the acknowledgement (DONE.md 10a: the dark pill, last). */
+function acknowledge(): void {
+  const primary = document.querySelector<HTMLButtonElement>(".consentBar button.consentPrimary");
+  expect(primary, "the bar renders its primary control").not.toBeNull();
+  act(() => primary!.click());
+}
 
-    localStorage.setItem(
-      CONSENT_KEY,
-      '{"v":2,"essential":true,"quality":true,"analytics":true,"decidedAt":"2026-01-01T00:00:00.000Z"}'
-    );
-    expect(readConsent(), "a v:2 value is no decision").toBeNull();
+const stored = (): Record<string, unknown> =>
+  JSON.parse(localStorage.getItem(CONSENT_KEY) ?? "null") as Record<string, unknown>;
 
-    localStorage.setItem(
-      CONSENT_KEY,
-      '{"v":"1","essential":true,"quality":true,"analytics":true,"decidedAt":"2026-01-01T00:00:00.000Z"}'
-    );
-    expect(readConsent(), "the string \"1\" is not the integer 1").toBeNull();
+// Non-comment lines, with the comment rule of SPEC-v2 R03(a): a line whose stripped text starts
+// with a line-comment, a block-comment opener, or an asterisk is a comment line.
+const codeLines = (source: string): string[] =>
+  source.split("\n").filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line));
 
-    const source = moduleSource();
-    expect(source, "no branch on a version other than 1").not.toMatch(/\bv\s*===\s*(?!1\b)\d/);
-    expect(source.toLowerCase(), "no migration code").not.toContain("migrat");
-  });
+describe("S01 consent storage: one acknowledgement record, one predicate (SPEC-v2 R06)", () => {
+  it.each(R06_FIXTURES)(
+    "shows the bar exactly when the stored value is not ACK: %s",
+    (_label, raw, expected) => {
+      // PROPERTY (R06): the mount shows the bar iff ACK(raw) is false, and reading is not
+      // writing — the stored value is left exactly as it was found.
+      if (raw !== null) localStorage.setItem(CONSENT_KEY, raw);
+      mountConsent();
 
-  it("re-asks for an absent, unparseable, non-object or short value, and never throws on any access", () => {
-    // PROPERTY (S01-R03, S01-R05): every localStorage access is inside try/catch
-    // (house precedent apps/ui/components/ModeToggle.tsx:23-27,
-    // apps/ui/app/layout.tsx:39-42), so a read failure is reported as "no
-    // decision" and a write failure is swallowed; neither propagates to a caller.
-    expect(readConsent(), "absent key").toBeNull();
-
-    for (const [label, raw] of [
-      ["unparseable", "not json"],
-      ["an array, not an object", "[]"],
-      ["null literal", "null"],
-      ["missing four of the five members", '{"v":1}'],
-      ["missing decidedAt", '{"v":1,"essential":true,"quality":true,"analytics":false}'],
-      ["essential omitted", '{"v":1,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00.000Z"}'],
-      // R01 declares `essential` always true; a record saying otherwise was not
-      // written by this module, so it is no decision — the conservative reading.
-      [
-        "essential not true",
-        '{"v":1,"essential":false,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00.000Z"}'
-      ],
-      // R01 says "exactly these five members and no others" (row V-19, default
-      // (a)): a SIXTH member was not written by this module, and accepting it
-      // hands an unaudited value to the caller inside a `ConsentDecision`.
-      [
-        "a sixth member beyond R01's five",
-        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00.000Z","rogue":"injected"}'
-      ],
-      // R01 says `decidedAt` is "the UTC ISO-8601 string produced by
-      // `new Date().toISOString()`". On a consent record the timestamp is the
-      // evidentiary member: a record whose stamp cannot be parsed cannot answer
-      // "when was consent given", so it is no decision and the visitor re-asks.
-      [
-        "decidedAt is not an instant at all",
-        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"yesterday"}'
-      ],
-      [
-        "decidedAt is empty",
-        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":""}'
-      ],
-      [
-        "decidedAt is epoch milliseconds as a string",
-        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"1788723500905"}'
-      ],
-      [
-        "decidedAt is an impossible instant",
-        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-13-45T99:99:99Z"}'
-      ],
-      // `toISOString()` always emits the millisecond field, so a second-precision
-      // stamp is the near-miss most likely to arrive from a hand edit.
-      [
-        "decidedAt carries no milliseconds",
-        '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-01-01T00:00:00Z"}'
-      ]
-    ] as const) {
-      localStorage.setItem(CONSENT_KEY, raw);
-      expect(readConsent(), label).toBeNull();
+      if (expected === "bar") expect(bar(), "ACK is false: the bar shows").not.toBeNull();
+      else expect(bar(), "ACK is true: no bar").toBeNull();
+      expect(localStorage.getItem(CONSENT_KEY), "the stored value is left as found").toBe(raw);
     }
+  );
 
-    localStorage.clear();
-    expect(readConsent(), "clearing site data restores the first-visit state").toBeNull();
-
-    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+  it("shows the bar when reading storage throws", () => {
+    // PROPERTY (R06): a read that throws is ACK false.
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new DOMException("refused", "SecurityError");
     });
-    expect(() => readConsent(), "a refused read raises nothing").not.toThrow();
-    expect(readConsent(), "a refused read is no decision").toBeNull();
-    getItem.mockRestore();
+    mountConsent();
+    expect(bar(), "a refused read shows the bar").not.toBeNull();
+  });
 
+  it("closes the bar for the page's life when the write throws, and shows it again on the next mount", () => {
+    // PROPERTY (R06, last bullet): a refused write is swallowed and still closes the bar; the
+    // bar returns on the next full load because nothing was stored.
+    mountConsent();
+    expect(bar(), "first visit").not.toBeNull();
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("quota", "QuotaExceededError");
     });
-    expect(
-      () =>
-        writeConsent({
-          v: CONSENT_VERSION,
-          essential: true,
-          quality: false,
-          analytics: false,
-          decidedAt: new Date().toISOString()
-        }),
-      "a refused write raises nothing"
-    ).not.toThrow();
+    expect(() => acknowledge(), "a refused write raises nothing").not.toThrow();
+    expect(bar(), "the bar closes for this page's life").toBeNull();
     setItem.mockRestore();
+
+    freshRoot();
+    mountConsent();
+    expect(localStorage.getItem(CONSENT_KEY), "nothing was stored").toBeNull();
+    expect(bar(), "the next mount shows the bar again").not.toBeNull();
   });
 
-  it("writes exactly the four control rows of R04, stamping v and the moment of the call", () => {
-    // PROPERTY (S01-R04): `Accept all` writes true/true/true; both `Essential
-    // only` entry points write the byte-identical object true/false/false
-    // whatever the card's toggles currently say; `Save choices` writes true plus
-    // the two current toggle values; and every one sets `v` to 1 and `decidedAt`
-    // to the moment of the call, never a value cached earlier.
+  it("writes exactly {v:2, acknowledgedAt} on the acknowledgement, and the next mount shows no bar", () => {
+    // PROPERTY (R06, the value): the press writes an object with exactly the two own members
+    // `v` (the number 2) and `acknowledgedAt` (ISO_UTC_MS), taken at the moment of the press.
+    mountConsent();
     const before = Date.now();
-
-    // R04 row 1 — `Accept all`, from the bar.
-    const acceptAll = decisionFor("accept-all");
-    // R04 row 2 — `Essential only`, from the bar, which carries no toggles.
-    const essentialFromBar = decisionFor("essential-only");
-    // R04 row 3 — `Essential only`, from the card, which does carry toggles and
-    // must ignore them: the entry point is never a discriminator of behaviour.
-    const essentialFromCard = decisionFor("essential-only", { quality: true, analytics: true });
-    // R04 row 4 — `Save choices`, from the card, at the current toggles.
-    const saveChoices = decisionFor("save-choices", { quality: false, analytics: true });
-
+    acknowledge();
     const after = Date.now();
 
-    expect(acceptAll, "R04 row 1 — Accept all (bar)").toMatchObject({
-      v: 1,
-      essential: true,
-      quality: true,
-      analytics: true
-    });
-    expect(essentialFromBar, "R04 row 2 — Essential only (bar)").toMatchObject({
-      v: 1,
-      essential: true,
-      quality: false,
-      analytics: false
-    });
-    expect(essentialFromCard, "R04 row 3 — Essential only (card)").toMatchObject({
-      v: 1,
-      essential: true,
-      quality: false,
-      analytics: false
-    });
-    expect(saveChoices, "R04 row 4 — Save choices (card)").toMatchObject({
-      v: 1,
-      essential: true,
-      quality: false,
-      analytics: true
-    });
+    expect(bar(), "the acknowledgement closes the bar").toBeNull();
+    const value = stored();
+    expect(Object.keys(value).sort(), "own keys exactly v and acknowledgedAt").toEqual(["acknowledgedAt", "v"]);
+    expect(value.v, "v is the number 2").toBe(2);
+    expect(String(value.acknowledgedAt), "acknowledgedAt is ISO_UTC_MS").toMatch(ISO_UTC_MS);
+    const taken = Date.parse(String(value.acknowledgedAt));
+    expect(taken, "stamped at the press, not cached").toBeGreaterThanOrEqual(before);
+    expect(taken, "stamped at the press, not cached").toBeLessThanOrEqual(after);
 
-    const withoutStamp = ({ decidedAt: _stamp, ...rest }: ConsentDecision): unknown => rest;
-    expect(
-      withoutStamp(essentialFromBar),
-      "Essential only is one object, whichever control produced it"
-    ).toEqual(withoutStamp(essentialFromCard));
-
-    for (const decision of [acceptAll, essentialFromBar, essentialFromCard, saveChoices]) {
-      expect(Object.keys(decision).sort(), "the member set of every row").toEqual(DECISION_MEMBERS);
-      expect(decision.decidedAt, "decidedAt is an ISO-8601 UTC instant").toMatch(ISO_UTC_MS);
-      const taken = Date.parse(decision.decidedAt);
-      expect(taken, "decidedAt is read at the moment of the call, not cached").toBeGreaterThanOrEqual(
-        before
-      );
-      expect(taken, "decidedAt is read at the moment of the call, not cached").toBeLessThanOrEqual(
-        after
-      );
-    }
-
-    writeConsent(saveChoices);
-    expect(readConsent(), "the written row round-trips").toEqual(saveChoices);
-    expect(String(stored().decidedAt)).toMatch(ISO_UTC_MS);
+    freshRoot();
+    mountConsent();
+    expect(bar(), "the next mount shows no bar").toBeNull();
   });
 
-  it("carries the three category records with the twelve strings byte-exact, in the design's order", () => {
-    // PROPERTY (S01-R28, S01-R16): the three category records carry the twelve
-    // strings of SPEC §Copy verbatim, in `cookieCats` order, and they live in
-    // exactly one place — so the contested cookie-name ruling (row Q7-01) is a
-    // one-line data edit rather than a component change.
-    expect(COOKIE_CATEGORIES, "the three records, in the design's order").toEqual([
-      {
-        id: "essential",
-        nameKey: "consent.category.essential.name",
-        tagKey: "consent.category.alwaysOn",
-        descriptionKey: "consent.category.essential.description",
-        detailKey: "consent.category.essential.detail",
-        detailVars: { cookies: "de_session · de_mfa · de_device" },
-        locked: true,
-        defaultOn: true
-      },
-      {
-        id: "quality",
-        nameKey: "consent.category.quality.name",
-        tagKey: "consent.category.optional",
-        descriptionKey: "consent.category.quality.description",
-        detailKey: "consent.category.optional.detail",
-        detailVars: { cookie: "de_quality" },
-        locked: false,
-        defaultOn: true
-      },
-      {
-        id: "analytics",
-        nameKey: "consent.category.analytics.name",
-        tagKey: "consent.category.optional",
-        descriptionKey: "consent.category.analytics.description",
-        detailKey: "consent.category.optional.detail",
-        detailVars: { cookie: "de_analytics" },
-        locked: false,
-        defaultOn: false
-      }
-    ]);
-
-    const strings = COOKIE_CATEGORIES.flatMap((category) => [
-      t(consentEnglish, category.nameKey),
-      t(consentEnglish, category.tagKey),
-      t(consentEnglish, category.descriptionKey),
-      t(consentEnglish, category.detailKey, category.detailVars)
-    ]);
-    // Dev's twelve English strings, byte for byte: localization moved them into
-    // `messages/en/consent.json` and must not have changed one of them.
-    expect(strings, "the twelve English catalogue strings in record order").toEqual([
-      "Essential",
-      "ALWAYS ON",
-      "Session, MFA state and the device record that lets you spot a login you do not recognise.",
-      "de_session · de_mfa · de_device — 30 days",
-      "Model quality telemetry",
-      "OPTIONAL",
-      "Which arguments you challenge or flag, used to tune judge panels. Never tied to your debates’ text.",
-      "de_quality — 90 days · first-party",
-      "Product analytics",
-      "OPTIONAL",
-      "Aggregate page and feature usage. No cross-site tracking, no advertising, never sold.",
-      "de_analytics — 90 days · first-party"
-    ]);
-
-    // The extract at design-data.js:89 holds the six-character ASCII escape
-    // ’ where the reader must see ’. Copying that escape into a TypeScript
-    // literal is correct (the language decodes it); copying it into JSON, a raw
-    // template literal or JSX text ships six visible characters. These two
-    // assertions fail either way round.
-    expect(strings[6], "the apostrophe is decoded").toContain(
-      "debates’ text"
+  it("overwrites the old three-choice record with the v2 value on the acknowledgement", () => {
+    // PROPERTY (R06, browser step 9): the old record is not ACK, so the bar shows, and the
+    // press overwrites the key with the v2 value.
+    localStorage.setItem(
+      CONSENT_KEY,
+      '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-09-01T00:00:00.000Z"}'
     );
-    for (const value of strings) {
-      expect(value, "no undecoded escape reaches the reader").not.toMatch(/\\u[0-9a-fA-F]{4}/);
-    }
+    mountConsent();
+    expect(bar(), "the old record shows the bar").not.toBeNull();
+    acknowledge();
+    expect(Object.keys(stored()).sort(), "the key now holds the v2 value").toEqual(["acknowledgedAt", "v"]);
+    expect(stored().v).toBe(2);
+  });
 
-    // The three ids are the three decision members, so a category and the
-    // boolean it governs cannot drift apart.
-    expect(COOKIE_CATEGORIES.map((category) => category.id), "ids are the decision members").toEqual([
-      "essential",
-      "quality",
-      "analytics"
-    ]);
-    expect(COOKIE_CATEGORIES[0]!.locked, "Essential is the one locked category").toBe(true);
-    expect(
-      COOKIE_CATEGORIES.filter((category) => category.locked).length,
-      "exactly one locked category"
-    ).toBe(1);
-
-    // Containment: every one of the twelve strings occurs in the module exactly
-    // as many times as the records use it — once each, except `OPTIONAL`, which
-    // two categories share. That is what makes a V ruling on the cookie names a
-    // one-line data edit rather than a component change.
-    const source = moduleSource();
-    const keys = COOKIE_CATEGORIES.flatMap((category) => [
-      category.nameKey,
-      category.tagKey,
-      category.descriptionKey,
-      category.detailKey
-    ]);
-    expect(strings, "twelve strings").toHaveLength(12);
-    for (const key of new Set(keys)) {
-      const used = keys.filter((candidate) => candidate === key).length;
-      const quoted = `"${key}"`;
-      expect(source.split(quoted).length - 1, `${quoted} occurs ${used}x in consent.ts`).toBe(used);
-    }
+  it("exports no category data and no quality or analytics member", () => {
+    // PROPERTY (R03 c): the module carries no category records, no control mapper, the v2
+    // schema version, and no code line naming quality or analytics.
+    const namespace = consentModule as Record<string, unknown>;
+    expect("COOKIE_CATEGORIES" in namespace, "COOKIE_CATEGORIES is exported").toBe(false);
+    expect("decisionFor" in namespace, "decisionFor is exported").toBe(false);
+    expect(namespace.CONSENT_VERSION, "CONSENT_VERSION").toBe(2);
+    const hits = codeLines(moduleSource()).filter((line) => /\b(quality|analytics)\b/.test(line));
+    expect(hits, "code lines of lib/consent.ts naming quality or analytics").toEqual([]);
   });
 
   it("delivers a preference request to its subscriber with the opener, and stops on unsubscribe", () => {
