@@ -8,7 +8,7 @@ type ConnectionPurpose = Readonly<{
   purpose: string;
   binding: "WIRED" | "WIRED_WHEN_ENABLED" | "DEVELOPMENT_ONLY"
     | "DEVELOPMENT_ONLY_UNBOUND" | "REQUIRED_NOT_WIRED"
-    | "EXTERNAL_COMPONENT" | "JIT_HUMAN";
+    | "EXTERNAL_COMPONENT" | "JIT_HUMAN" | "CLOSED_JIT";
   condition?: string;
   unboundReason?: string;
 }>;
@@ -17,7 +17,7 @@ type Principal = Readonly<{
   id: string;
   roleName: string;
   kind: "PERSISTENT_MIGRATION_OWNER" | "SERVICE" | "HUMAN_READ_ONLY"
-    | "HUMAN_EXECUTE_ONLY";
+    | "HUMAN_EXECUTE_ONLY" | "JIT_RECOVERY";
   database: "debateai" | "hatchet";
   login: boolean;
   inherit: boolean;
@@ -116,6 +116,7 @@ const capabilityRoles = [
   "debateai_replay",
   "debateai_runtime",
   "debateai_settlement_watch",
+  "debateai_staff_recovery",
   "debateai_support",
   "debateai_support_config_operator"
 ] as const;
@@ -125,7 +126,8 @@ const ownershipRoles = [
   // V-29: owns obs.postgres_capacity(...), the observation agent's statistics window.
   "debateai_obs_stats_owner",
   "debateai_obs_view_owner",
-  "debateai_register_publication_owner"
+  "debateai_register_publication_owner",
+  "debateai_staff_security_owner"
 ] as const;
 
 // V-29 removed the one exception (the observation agent's pg_monitor login): no
@@ -152,7 +154,7 @@ describe("P3-01 production database-principal manifest", () => {
   it("defines the exact capability, ownership, service, and connection-purpose inventory", async () => {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
 
-    expect(manifest.format).toBe("debateai.production-database-principals.v3");
+    expect(manifest.format).toBe("debateai.production-database-principals.v4");
     expect(manifest.status).toBe("MIXED_PROVISIONING_STATE");
     expect(manifest.capabilityRoles.map(({ roleName }) => roleName)).toEqual(capabilityRoles);
     expect(manifest.capabilityRoles.every(({ login }) => login === false)).toBe(true);
@@ -170,6 +172,7 @@ describe("P3-01 production database-principal manifest", () => {
       { roleName: "debateai_replay", inherit: true, directMemberships: [] },
       { roleName: "debateai_runtime", inherit: true, directMemberships: [] },
       { roleName: "debateai_settlement_watch", inherit: true, directMemberships: [] },
+      { roleName: "debateai_staff_recovery", inherit: false, directMemberships: [] },
       { roleName: "debateai_support", inherit: false, directMemberships: [] },
       { roleName: "debateai_support_config_operator", inherit: false, directMemberships: [] }
     ]);
@@ -210,6 +213,7 @@ describe("P3-01 production database-principal manifest", () => {
         ownsRelations: [],
         ownsFunctions: []
       }
+      ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"], ownsRelations: [], ownsFunctions: [] }
     ]);
 
     expect(manifest.principals.map(({ id, roleName, kind }) => ({ id, roleName, kind })))
@@ -249,6 +253,7 @@ describe("P3-01 production database-principal manifest", () => {
           roleName: "debateai_prod_support_config_operator",
           kind: "HUMAN_EXECUTE_ONLY"
         },
+        { id: "staff-recovery", roleName: "debateai_prod_staff_recovery", kind: "JIT_RECOVERY" },
         { id: "hatchet", roleName: "debateai_prod_hatchet", kind: "SERVICE" }
       ]);
     expect(manifest.principalProvisioning.map(({ principalId, state, source }) => ({
@@ -258,13 +263,13 @@ describe("P3-01 production database-principal manifest", () => {
       state: id === "observation-agent" || id === "observation-threshold-operator"
         || id.startsWith("obs-")
         ? "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL"
-        : id === "hatchet" ? "EXTERNAL_COMPONENT" : "SPECIFIED_NOT_PROVISIONED",
+        : id === "staff-recovery" ? "CLOSED_MIGRATION_PROVISIONED" : id === "hatchet" ? "EXTERNAL_COMPONENT" : "SPECIFIED_NOT_PROVISIONED",
       source: id === "observation-agent"
         ? "migrations/0057_observation_foundation.sql"
         : id === "observation-threshold-operator"
           ? "migrations/0071_observation_threshold_operator.sql"
         : id.startsWith("obs-") ? "migrations/0034_obs_foundation.sql"
-        : id === "hatchet" ? "compose.dev.yaml" : null
+        : id === "staff-recovery" ? "migrations/0085_staff_access_foundation.sql" : id === "hatchet" ? "compose.dev.yaml" : null
     })));
     expect(manifest.principals.map(({
       id, database, inherit, directMemberships, effectiveMemberships
@@ -291,6 +296,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "observation-agent", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "observation-threshold-operator", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "support-config-operator", database: "debateai", inherit: true, directMemberships: ["debateai_support_config_operator"], effectiveMemberships: ["debateai_support_config_operator"] },
+        { id: "staff-recovery", database: "debateai", inherit: true, directMemberships: ["debateai_staff_recovery"], effectiveMemberships: ["debateai_staff_recovery"] },
         { id: "hatchet", database: "hatchet", inherit: true, directMemberships: [], effectiveMemberships: [] }
       ]);
 
@@ -444,6 +450,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "operator:oactl-thresholds-apply", environmentKey: null, purpose: "OBSERVATION_THRESHOLD_RATIFICATION", binding: "WIRED" },
         { component: "operator:support-config", environmentKey: null, purpose: "JIT_SUPPORT_CONFIGURATION", binding: "JIT_HUMAN" },
         { component: "operator:support-status", environmentKey: null, purpose: "SUPPORT_STATUS_DATA", binding: "WIRED" },
+        { component: "operator:staff-recovery", environmentKey: null, purpose: "JIT_OWNER_COMMAND_PREPARE", binding: "CLOSED_JIT" },
         { component: "hatchet", environmentKey: "HATCHET_DATABASE_URL", purpose: "HATCHET_INTERNAL_DATABASE", binding: "EXTERNAL_COMPONENT" }
       ].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))));
     expect(manifest.developmentOnlyPrincipalBindings).toEqual([{
@@ -615,7 +622,7 @@ describe("P3-01 production database-principal manifest", () => {
       ...manifest.ownershipRoles.map(({ roleName }) => roleName),
       ...manifest.principals
         .map(({ roleName }) => roleName)
-        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator)$/u.test(roleName))
+        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator|debateai_prod_staff_recovery)$/u.test(roleName))
     ].sort();
     expect(sourceCreatedRoles).toEqual(manifestMigrationRoles);
 
@@ -723,7 +730,7 @@ describe("P3-01 production database-principal manifest", () => {
     expect(runtimeEnvironment).not.toContain("OBS_LISTENER_DATABASE_URL");
     expect(runtimeEnvironment).not.toContain("OBS_WATCHDOG_DATABASE_URL");
     const sourceSchemas = [...new Set([...migrations.matchAll(
-      /\bCREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+([a-z_]+)/giu
+      /\bCREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_]+)/giu
     )].map(([, schema]) => schema!))].sort();
     const manifestSchemas = [...new Set([
       ...manifest.principals.flatMap(({ ownsSchemas }) => ownsSchemas),

@@ -1895,3 +1895,5 @@ export {
   type AuthenticationRiskSummary,
   type DecryptedAuthenticationRiskSignal
 } from "./auth-risk.js";
+
+export { PostgresStaffRepository, type StaffRepository, type StaffAlertIntent, type StaffInvitationDeliveryIntent, type StaffMutation, type InvitationAcceptCommand } from "./staff-access.js";

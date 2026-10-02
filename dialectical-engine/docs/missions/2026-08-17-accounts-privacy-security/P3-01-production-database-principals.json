@@ -1,5 +1,5 @@
 {
-  "format": "debateai.production-database-principals.v3",
+  "format": "debateai.production-database-principals.v4",
   "status": "MIXED_PROVISIONING_STATE",
   "provisioner": {
     "command": "pnpm db:provision-principals",
@@ -26,6 +26,9 @@
       "obs-watchdog",
       "obs-human",
       "support-config-operator"
+    ],
+    "closedPrincipalIds": [
+      "staff-recovery"
     ]
   },
   "principalProvisioning": [
@@ -135,6 +138,11 @@
       "source": null
     },
     {
+      "principalId": "staff-recovery",
+      "state": "CLOSED_MIGRATION_PROVISIONED",
+      "source": "migrations/0085_staff_access_foundation.sql"
+    },
+    {
       "principalId": "hatchet",
       "state": "EXTERNAL_COMPONENT",
       "source": "compose.dev.yaml"
@@ -204,6 +212,12 @@
       "directMemberships": []
     },
     {
+      "roleName": "debateai_staff_recovery",
+      "login": false,
+      "inherit": false,
+      "directMemberships": []
+    },
+    {
       "roleName": "debateai_support",
       "login": false,
       "inherit": false,
@@ -258,6 +272,17 @@
       "inherit": false,
       "directMemberships": [],
       "ownsSchemas": [],
+      "ownsRelations": [],
+      "ownsFunctions": []
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "login": false,
+      "inherit": false,
+      "directMemberships": [],
+      "ownsSchemas": [
+        "staff"
+      ],
       "ownsRelations": [],
       "ownsFunctions": []
     }
@@ -389,6 +414,8 @@
         "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -445,6 +472,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -501,6 +530,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -550,6 +581,8 @@
         "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -599,6 +632,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -650,6 +685,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support_config_operator",
         "pg_*"
       ],
@@ -712,6 +749,8 @@
         "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -769,6 +808,8 @@
         "debateai_register_publication_owner",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -818,6 +859,8 @@
         "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -867,6 +910,8 @@
         "debateai_register_publication_owner",
         "debateai_replay",
         "debateai_runtime",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -916,6 +961,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -964,6 +1011,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1012,6 +1061,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1057,6 +1108,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1102,6 +1155,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1147,6 +1202,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1192,6 +1249,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1237,6 +1296,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1283,6 +1344,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1333,6 +1396,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "pg_*"
       ],
@@ -1345,6 +1410,56 @@
           "environmentKey": null,
           "purpose": "JIT_SUPPORT_CONFIGURATION",
           "binding": "JIT_HUMAN"
+        }
+      ]
+    },
+    {
+      "id": "staff-recovery",
+      "roleName": "debateai_prod_staff_recovery",
+      "kind": "JIT_RECOVERY",
+      "database": "debateai",
+      "login": true,
+      "inherit": true,
+      "superuser": false,
+      "createDatabase": false,
+      "createRole": false,
+      "replication": false,
+      "bypassRls": false,
+      "directMemberships": [
+        "debateai_staff_recovery"
+      ],
+      "effectiveMemberships": [
+        "debateai_staff_recovery"
+      ],
+      "forbiddenMemberships": [
+        "debateai_authorization_runtime",
+        "debateai_content_provision",
+        "debateai_erasure_runtime",
+        "debateai_evaluator_api",
+        "debateai_evaluator_ddl",
+        "debateai_evaluator_reader",
+        "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
+        "debateai_obs_view_owner",
+        "debateai_prod_*",
+        "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
+        "debateai_replay",
+        "debateai_runtime",
+        "debateai_settlement_watch",
+        "debateai_staff_security_owner",
+        "debateai_support",
+        "debateai_support_config_operator",
+        "pg_*"
+      ],
+      "ownsDatabases": [],
+      "ownsSchemas": [],
+      "connectionPurposes": [
+        {
+          "component": "operator:staff-recovery",
+          "environmentKey": null,
+          "purpose": "JIT_OWNER_COMMAND_PREPARE",
+          "binding": "CLOSED_JIT"
         }
       ]
     },
@@ -1378,6 +1493,8 @@
         "debateai_replay",
         "debateai_runtime",
         "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
         "debateai_support",
         "debateai_support_config_operator",
         "pg_*"
@@ -1515,6 +1632,13 @@
       "adminOption": false,
       "inheritOption": true,
       "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_staff_recovery",
+      "grantedRole": "debateai_staff_recovery",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
     }
   ],
   "credentialRequirements": [
@@ -1647,6 +1771,14 @@
       "principalId": "support-config-operator",
       "credentialId": "credential:support-config-operator-jit",
       "lifecycle": "JIT_SHORT_LIVED",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "staff-recovery",
+      "credentialId": "credential:staff-recovery-jit",
+      "lifecycle": "CLOSED_JIT_5_MINUTES",
+      "maximumLifetimeSeconds": 300,
+      "exportReusableUrl": false,
       "ownerTicket": "P3-02"
     },
     {

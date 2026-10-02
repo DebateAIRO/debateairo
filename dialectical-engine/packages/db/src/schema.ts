@@ -1167,3 +1167,35 @@ export const evaluatorConsumerOutput = evaluator.table("consumer_output", {
 });
 
 void [scorecard, memory, evaluator, identity];
+
+/** Staff authority is accessed through enumerated SQL capabilities. */
+export const staff = pgSchema("staff");
+export const accountSecurityHold = identity.table("account_security_hold", {
+  userId: uuid("user_id").primaryKey().references(() => identityUser.userId, { onDelete: "cascade" }),
+  held: boolean("held").notNull().default(false),
+  securityEpoch: bigint("security_epoch", { mode: "number" }).notNull().default(0),
+  changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow()
+});
+export const staffSubject = staff.table("subject", {
+  staffId: uuid("staff_id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => identityUser.userId, { onDelete: "set null" }),
+  state: text("state").notNull().default("ACTIVE"),
+  securityEpoch: bigint("security_epoch", { mode: "number" }).notNull().default(0),
+  grantRevision: bigint("grant_revision", { mode: "number" }).notNull().default(0),
+  capabilities: text("capabilities").array().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const STAFF_ACCESS_SCHEMA_MANIFEST = Object.freeze({
+  migration: "0085_staff_access_foundation.sql",
+  ownershipRole: "debateai_staff_security_owner",
+  recoveryCapabilityRole: "debateai_staff_recovery",
+  recoveryLoginRole: "debateai_prod_staff_recovery",
+  accountGuardRelation: "identity.account_security_hold",
+  relations: Object.freeze([
+    "subject", "owner_designation", "bootstrap_marker", "grant_event", "invitation",
+    "privilege_session", "action_proof", "invitation_proof", "owner_command",
+    "password_totp_rotation_receipt", "prerequisite_receipt", "webauthn_challenge",
+    "owner_possession_receipt", "audit_event", "alert_outbox", "alert_delivery_receipt"
+  ])
+});

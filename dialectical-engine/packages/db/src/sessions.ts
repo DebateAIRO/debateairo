@@ -72,6 +72,13 @@ function versionedAuditDigest(value: string): string {
 }
 
 export class PostgresSessionRepository {
+  async readAccountSecurityHold(userId: string): Promise<boolean> {
+    const result = await this.pool.query<{ held: boolean }>(
+      'SELECT identity.read_account_security_hold($1) AS held', [userId]
+    );
+    return result.rows[0]?.held !== false;
+  }
+
   constructor(
     private readonly pool: Pool,
     private readonly auditContext: AuditContextHasher

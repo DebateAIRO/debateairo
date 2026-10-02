@@ -3266,3 +3266,15 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     expect(outcome.stdout).toBe("PRODUCTION_DATABASE_PRINCIPALS_READY=18\n");
   }, 120_000);
 });
+
+it('repairs recovery to PASSWORD NULL and expired while refusing reusable recovery credentials',async()=>{
+ await adminPool.query("ALTER ROLE debateai_prod_staff_recovery PASSWORD 'fixture-only-recovery-drift' VALID UNTIL 'infinity'; GRANT debateai_runtime TO debateai_prod_staff_recovery");
+ const envelope=credentialEnvelope();await provisionProductionDatabasePrincipals({adminPool,adminDatabaseUrl,manifest,credentialEnvelope:envelope,supportConfigCredentialFilePath});
+ const state=(await adminPool.query(`SELECT rolpassword IS NULL AS password_null,rolvaliduntil::text AS expiry FROM pg_authid WHERE rolname='debateai_prod_staff_recovery'`)).rows[0];expect(state).toEqual({password_null:true,expiry:'-infinity'});
+ const memberships=(await adminPool.query(`SELECT parent.rolname,member.admin_option FROM pg_auth_members member JOIN pg_roles parent ON parent.oid=member.roleid JOIN pg_roles child ON child.oid=member.member WHERE child.rolname='debateai_prod_staff_recovery' ORDER BY parent.rolname`)).rows;
+ expect(memberships).toEqual([{rolname:'debateai_staff_recovery',admin_option:false}]);
+ const url=new URL(adminDatabaseUrl);url.username='debateai_prod_staff_recovery';url.password='fixture-extra-recovery-password-32-bytes';
+ await expect(provisionProductionDatabasePrincipals({adminPool,adminDatabaseUrl,manifest,credentialEnvelope:{...envelope,credentials:[...envelope.credentials,{principalId:'staff-recovery',databaseUrl:url.toString()}]},supportConfigCredentialFilePath})).rejects.toThrow('PRODUCTION_DATABASE_PRINCIPAL_CREDENTIALS_INVALID');
+ const corrupt=JSON.parse(JSON.stringify(manifest));corrupt.credentialRequirements.find((r:{principalId:string})=>r.principalId==='staff-recovery').maximumLifetimeSeconds=600;
+ await expect(provisionProductionDatabasePrincipals({adminPool,adminDatabaseUrl,manifest:corrupt,credentialEnvelope:envelope,supportConfigCredentialFilePath})).rejects.toThrow('PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID');
+});

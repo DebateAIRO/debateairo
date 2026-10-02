@@ -13,7 +13,7 @@ import {
 export const PRODUCTION_DATABASE_PRINCIPAL_CREDENTIAL_FORMAT =
   "debateai.production-database-principal-credentials.v1" as const;
 
-const MANIFEST_FORMAT = "debateai.production-database-principals.v3";
+const MANIFEST_FORMAT = "debateai.production-database-principals.v4";
 const ROLE_NAME_PATTERN = /^[a-z][a-z0-9_]*$/u;
 const MINIMUM_PASSWORD_BYTES = 32;
 const MAXIMUM_PASSWORD_BYTES = 1_024;
@@ -72,8 +72,10 @@ type ProductionPrincipalManifest = Readonly<{
   credentialRequirements: readonly Readonly<{
     principalId: string;
     lifecycle: string;
+    maximumLifetimeSeconds?: number;
+    exportReusableUrl?: boolean;
   }>[];
-  provisioner?: Readonly<{ managedPrincipalIds?: readonly string[] }>;
+  provisioner?: Readonly<{ managedPrincipalIds?: readonly string[]; closedPrincipalIds?: readonly string[] }>;
 }>;
 
 export type ProductionDatabasePrincipalCredentialEnvelope = Readonly<{
@@ -343,7 +345,23 @@ function parseManifest(value: unknown): ProductionPrincipalManifest {
     || !Array.isArray(value.credentialRequirements)) {
     fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
   }
-  return value as unknown as ProductionPrincipalManifest;
+  const manifest = value as unknown as ProductionPrincipalManifest;
+  const recovery = manifest.principals.find(({ id }) => id === "staff-recovery");
+  const requirement = manifest.credentialRequirements.find(({ principalId }) => principalId === "staff-recovery");
+  if (JSON.stringify(manifest.provisioner?.closedPrincipalIds) !== JSON.stringify(["staff-recovery"])
+    || manifest.provisioner?.managedPrincipalIds?.includes("staff-recovery")
+    || recovery === undefined || recovery.roleName !== "debateai_prod_staff_recovery"
+    || recovery.kind !== "JIT_RECOVERY" || recovery.database !== "debateai"
+    || !recovery.login || !recovery.inherit || recovery.superuser || recovery.createDatabase
+    || recovery.createRole || recovery.replication || recovery.bypassRls
+    || JSON.stringify(recovery.directMemberships) !== JSON.stringify(["debateai_staff_recovery"])
+    || JSON.stringify(recovery.effectiveMemberships) !== JSON.stringify(["debateai_staff_recovery"])
+    || recovery.ownsDatabases.length !== 0 || recovery.ownsSchemas.length !== 0
+    || requirement?.lifecycle !== "CLOSED_JIT_5_MINUTES"
+    || requirement.maximumLifetimeSeconds !== 300 || requirement.exportReusableUrl !== false) {
+    fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
+  }
+  return manifest;
 }
 
 function managedPrincipals(manifest: ProductionPrincipalManifest): readonly ManagedPrincipal[] {
@@ -1620,6 +1638,7 @@ export async function provisionProductionDatabasePrincipals(input: Readonly<{
             createdCount += 1;
           }
         }
+        await closeStaffRecoveryPrincipal(client);
         await assertExactPrincipalState(client, manifest, principals, credentials);
         commitAttempted = true;
         await client.query("COMMIT");
@@ -1653,6 +1672,7 @@ export async function provisionProductionDatabasePrincipals(input: Readonly<{
           supportConfigCredential,
           publicationJournal
         );
+        await closeStaffRecoveryPrincipal(client);
         await assertExactPrincipalState(client, manifest, principals, credentials);
         const published = await validateProductionSupportConfigCredentialFileForCleanup(
           supportConfigCredentialFilePath
@@ -1796,4 +1816,26 @@ export async function cleanupProductionSupportConfigOperator(input: Readonly<{
       client.release(workFailed);
     }
   });
+}
+
+/** Default provisioning never accepts or exports a recovery credential. Task6 operates JIT separately. */
+async function closeStaffRecoveryPrincipal(client: PoolClient): Promise<void> {
+  const recovery: ManagedPrincipal = Object.freeze({
+    id: "staff-recovery", roleName: "debateai_prod_staff_recovery", inherit: true,
+    human: false, unwired: true, directMemberships: ["debateai_staff_recovery"],
+    effectiveMemberships: ["debateai_staff_recovery"]
+  });
+  await assertNoOwnership(client, [recovery.roleName]);
+  await revokeAllDirectMemberships(client, recovery);
+  await revokeAllRoleMembers(client, recovery);
+  await resetAllDatabaseRoleSettings(client, recovery);
+  await revokeAllDirectObjectPrivileges(client, recovery);
+  await client.query("SELECT pg_temp.reconcile_production_login($1,NULL,true,'-infinity')", [recovery.roleName]);
+  await client.query('GRANT debateai_staff_recovery TO debateai_prod_staff_recovery WITH ADMIN FALSE, INHERIT TRUE, SET TRUE');
+  const state = (await client.query<{ closed: boolean }>(`
+    SELECT NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls
+      AND rolpassword IS NULL AND rolvaliduntil='-infinity'::timestamptz AS closed
+    FROM pg_catalog.pg_authid WHERE rolname='debateai_prod_staff_recovery'
+  `)).rows[0];
+  if (state?.closed !== true) fail("PRODUCTION_STAFF_RECOVERY_NOT_CLOSED");
 }

@@ -714,10 +714,12 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
         writer.assertSucceeded(await writer.invoke(first,writerFirst));
         await second.query("BEGIN");
         await second.query("SET LOCAL ROLE debateai_erasure_runtime");
-        const resuming = resumePrivate(second,writerFirst);
-        await expectStillPending(resuming);
+        expect((await resumePrivate(second,writerFirst)).outcome).toBe("CONTENDED");
+        await second.query("COMMIT");
         await first.query("COMMIT");
-        expect((await resuming).outcome).toBe(writer.resumeAfterWriter);
+        await second.query("BEGIN");
+        await second.query("SET LOCAL ROLE debateai_erasure_runtime");
+        expect((await resumePrivate(second,writerFirst)).outcome).toBe(writer.resumeAfterWriter);
         await second.query("COMMIT");
       } finally {
         await first.query("ROLLBACK").catch(() => undefined);
@@ -1021,10 +1023,12 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
         writer.assertSucceeded(await writer.invoke(first,writerFirst));
         await second.query("BEGIN");
         await second.query("SET LOCAL ROLE debateai_erasure_runtime");
-        const finalizing = finalizePrivate(second,writerFirst);
-        await expectStillPending(finalizing);
+        expect(await finalizePrivate(second,writerFirst)).toBe("CONTENDED");
+        await second.query("COMMIT");
         await first.query("COMMIT");
-        expect(await finalizing).toBe("COMMITTED");
+        await second.query("BEGIN");
+        await second.query("SET LOCAL ROLE debateai_erasure_runtime");
+        expect(await finalizePrivate(second,writerFirst)).toBe("COMMITTED");
         await second.query("COMMIT");
       } finally {
         await first.query("ROLLBACK").catch(() => undefined);
