@@ -341,10 +341,10 @@ describe("the cookie policy describes the cookies the product really sets", () =
     // one the code runs. The stored value carries no person id (conversation.ts), so the row names the two events in
     // this tab that clear it: a sign-in (LoginFlow, once completeLogin succeeds) and a sign-out (SessionControls).
     expect(english["legal.cookies.supportConversation.purpose"]).toMatch(/erased when someone signs in or signs out in this tab/);
-    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/await client\.completeLogin\(challengeToken, code\);(?:[ \t]*\n[ \t]*\/\/[^\n]*)*\s*clearStoredSupportConversation\(\);/);
+    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/await client\.completeLogin\(challengeToken, code\);(?:\n[ \t]*\/\/[^\n]*)*\n[ \t]*clearStoredSupportConversation\(\);/);
     // REV-S01 p2 SD-N2: a completeLogin that throws after the server set the cookie is a sign-in too; only a 4xx refusal
     // keeps the transcript (behaviour: auth-flow-integration.test.tsx, "erases the help transcript whenever …").
-    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/catch \(failure\) \{(?:[ \t]*\n[ \t]*\/\/[^\n]*)*\s*if \(!isRefusal\(failure\)\) clearStoredSupportConversation\(\);/);
+    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/catch \(failure\) \{(?:\n[ \t]*\/\/[^\n]*)*\n[ \t]*if \(!isRefusal\(failure\)\) clearStoredSupportConversation\(\);/);
     expect(source("apps/ui/components/SessionControls.tsx")).toMatch(/clearStoredSupportConversation\(\);/);
   });
 

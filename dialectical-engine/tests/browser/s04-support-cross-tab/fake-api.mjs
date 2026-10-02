@@ -140,7 +140,10 @@ export function createFakeApi({ log = (line) => process.stdout.write(`${line}\n`
       });
     }
     if (path === "/__fake/hold" && method === "POST") {
-      holdNextReplyMs = Math.min(30_000, Math.max(0, Number(url.searchParams.get("delay") ?? 0) || 0));   // capped: a test-only hold, never a long timer
+      const delay = Number(url.searchParams.get("delay") ?? 0);
+      // a test-only hold: anything outside 0..30 000 ms is refused, so no long timer can be asked for
+      if (!Number.isFinite(delay) || delay < 0 || delay > 30_000) return send(res, 400, { error: "DELAY_OUT_OF_RANGE" });
+      holdNextReplyMs = delay;
       return send(res, 200, { holdNextReplyMs });
     }
 
@@ -270,7 +273,7 @@ export function createFakeApi({ log = (line) => process.stdout.write(`${line}\n`
         return send(res, 404, { error: "NOT_FOUND" });
       }
       const hold = holdNextReplyMs; holdNextReplyMs = 0;
-      if (hold > 0) await new Promise((r) => setTimeout(r, Math.min(hold, 30_000)));
+      if (hold > 0 && hold <= 30_000) await new Promise((r) => setTimeout(r, hold));
       messageRequests.push({ sessionId: id, status: 200, text, at: Date.now(), heldMs: hold });
       return send(res, 200, {
         message_id: randomUUID(), outcome: "ANSWER_GROUNDED", text: `reply to: ${text}`,
