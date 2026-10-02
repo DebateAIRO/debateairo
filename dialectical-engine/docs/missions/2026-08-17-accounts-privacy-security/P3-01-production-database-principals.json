@@ -425,6 +425,22 @@
           "purpose": "BILLING_WITHDRAW_OPERATOR_COMMAND",
           "binding": "WIRED",
           "condition": "package script billing:withdraw"
+        },
+        {
+          "component": "apps/api:billing-tax-summary-cli",
+          "sourceFile": "apps/api/src/billing/tax-summary-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_TAX_SUMMARY_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:tax-summary"
+        },
+        {
+          "component": "apps/api:billing-efactura-status-cli",
+          "sourceFile": "apps/api/src/billing/efactura-status-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_EFACTURA_STATUS_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:efactura-status"
         }
       ]
     },

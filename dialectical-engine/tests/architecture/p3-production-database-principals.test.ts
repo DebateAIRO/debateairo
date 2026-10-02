@@ -424,6 +424,15 @@ describe("P3-01 production database-principal manifest", () => {
         // billing.outbox, and billing.withdrawal_owner_settlement, on which 0088 grants
         // SELECT, INSERT to debateai_runtime); no privilege is added.
         { component: "apps/api:billing-withdraw-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_WITHDRAW_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:withdraw" },
+        // Paid plans, Task P16b: the owner's tax summary (`pnpm billing:tax-summary`)
+        // runs as the API under systemd-run on a READ-ONLY one-connection pool
+        // (billing rows and the register's taxAuthorities row); it writes nothing.
+        { component: "apps/api:billing-tax-summary-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_TAX_SUMMARY_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:tax-summary" },
+        // Paid plans, Task P16b: the owner's e-Factura status command
+        // (`pnpm billing:efactura-status`) runs as the API under systemd-run and
+        // appends one billing.invoice_status_event, on which 0086 grants SELECT,
+        // INSERT to debateai_runtime; no privilege is added.
+        { component: "apps/api:billing-efactura-status-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_EFACTURA_STATUS_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:efactura-status" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
