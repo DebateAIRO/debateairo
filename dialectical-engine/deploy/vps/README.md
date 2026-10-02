@@ -2217,6 +2217,15 @@ two values at the prompt:
 read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --received "$RECEIVED_AT"
 ```
 
+**If the person has scheduled their account deletion.** Scheduling a deletion only stops the renewal. The plan stays
+live until the deletion runs (at the earliest seven full days after it was scheduled, unless they cancel it), and so
+does the 14-day withdrawal. Settings still shows Withdraw, and the command above takes the statement as usual, so run
+it the same day the statement arrives. Once the deletion has run, billing has ended the plan: the command prints
+`NOT_SUBSCRIBED` and writes nothing. If a statement arrived in time but was not recorded before that, settle it by
+hand: work out what is due exactly as described below, refund it in the xMoney dashboard, and keep the statement with
+the payment records. The site sends no confirmation (M8) and issues no credit note for it, so confirm it in your reply
+to the person's statement and ask the accountant about the credit note.
+
 If it prints that a refund made in the xMoney dashboard already touched one of the payments, nothing is refunded
 automatically. Work out what is still due, then settle it within 14 days of the withdrawal, in this order. Until you
 do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`. What is due is worked out per payment, exactly
