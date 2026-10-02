@@ -524,7 +524,7 @@ export async function resolve(specifier, context, nextResolve) {
       // \`readStoryPolicyFromRegister\`, the optional story rows' boot read.
       // Paid plans B9b added \`EntitlementRepository\` (@debateai/db, above),
       // \`costEnvelopeBand\` and \`readBillingPlans\`; B9d added \`costEnvelopeCeilings\`.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {}",
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function readEngineVersion() {} export function readModelScorecard() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {
