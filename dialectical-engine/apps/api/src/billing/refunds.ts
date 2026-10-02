@@ -177,7 +177,7 @@ export class RefundDesk {
   constructor(private readonly deps: Readonly<{
     repository: Pick<BillingRepository,
       "withTransaction" | "appendChargeEvent" | "enqueue" | "charge" | "quote" | "customerByOwner"
-      | "subscriptionEvents" | "chargesForSubscription">;
+      | "subscriptionEvents" | "chargesForSubscription" | "withdrawalOwnerSettlement">;
     /** The per-transaction lease around the refund call (defense in depth beside P7's claim re-assert), the job's
      * call stage, and the owner lock P12d's WITHDRAWAL follow-up takes before it decides on M8. */
     jobs: Pick<BillingJobQueries, "withLease" | "markJobStage" | "jobStage" | "lockOwner">;
@@ -439,7 +439,8 @@ export class RefundDesk {
    * no WITHDRAWAL request may be added after M8 has gone out (P14c settles only unsettled `refund_by_owner`
    * withdrawals, and those never get one).
    * The amount is the sum of the withdrawal's own requests (reason WITHDRAWAL): `refund_micros` when P12d computed
-   * it, the owner's amount when P14c settled a withdrawal handed to the owner (whose `refund_micros` is null).
+   * it, the owner's amount when P14c settled a withdrawal handed to the owner (whose `refund_micros` is null), plus
+   * what the owner recorded as refunded in the xMoney dashboard for it (P12a's `billing.withdrawal_owner_settlement`).
    */
   private async withdrawalFollowUp(intent: RefundIntent): Promise<FollowUp> {
     const creditNote = await this.creditNote(intent);
@@ -470,6 +471,9 @@ export class RefundDesk {
           refundMicros += event.amountMicros ?? 0;
         }
       }
+      // P14c: what the owner refunded in the xMoney dashboard for this withdrawal is part of the refund M8 names.
+      refundMicros += (await this.deps.repository.withdrawalOwnerSettlement(charge.subscriptionId, client))
+        ?.dashboardRefundMicros ?? 0;
       await enqueueEmail(this.deps.repository, client, {
         template: "M8", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
         dedupeRef: charge.subscriptionId,

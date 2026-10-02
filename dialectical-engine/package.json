@@ -52,6 +52,7 @@
     "support:eval": "tsx tests/support-eval/run.ts",
     "ops:serve-disclosure": "tsx apps/runner/src/serve-disclosure-cli.ts",
     "billing:dispute": "tsx apps/api/src/billing/dispute-cli.ts",
+    "billing:withdraw": "tsx apps/api/src/billing/withdraw-cli.ts",
     "compose:env": "tsx packages/register/src/compose-env.ts",
     "job:replay-self-test": "tsx apps/scheduler/src/cli.ts replay-self-test",
     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",

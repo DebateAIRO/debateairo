@@ -58,6 +58,7 @@ apps/api/src/billing/subscription-view.ts
 apps/api/src/billing/upgrade.ts
 apps/api/src/billing/usage.ts
 apps/api/src/billing/verify-payment.ts
+apps/api/src/billing/withdraw-cli.ts
 apps/api/src/billing/withdrawal.ts
 apps/api/src/boot-custody.ts
 apps/api/src/client-ip.ts

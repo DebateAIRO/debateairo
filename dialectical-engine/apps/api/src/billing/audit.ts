@@ -84,6 +84,11 @@ export type BillingAuditEvent =
    * touched a payment, or a transaction already held a refund request); the field is its source.
    */
   | "billing.withdrawal.owner_review"
+  /**
+   * P14c (R2 Q-9): the owner settled a withdrawal handed to the owner (`pnpm billing:withdraw --refund`); the field
+   * is the number of refund intents written through RefundDesk.
+   */
+  | "billing.withdrawal.settled"
   /** P12e (A12): a card change's CARD_CHECK charge was written and its order signed; the field is the plan status. */
   | "billing.card.change.started"
   /** P12e: a new card from an always-blocked country was refused; the field is its ISO country code. */

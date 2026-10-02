@@ -307,6 +307,59 @@ export class BillingRepository {
   }
 
   /**
+   * P14c/P16b: withdrawals handed to the owner (P12d: a dashboard refund touched a payment) that the owner has not
+   * settled yet — `WITHDRAWN.data.refund_by_owner` and no row in P12a's `billing.withdrawal_owner_settlement` (the one
+   * mark of a settlement, written with its refund intents). One owner's (under the owner lock, `executor`) or
+   * everyone's (`ownerRef` null).
+   */
+  async withdrawalsAwaitingOwner(
+    ownerRef: string | null = null, executor: BillingReadExecutor = this.pool
+  ): Promise<Array<{ ownerRef: string; subscriptionId: string; planId: PlanId; since: Date }>> {
+    const result = await executor.query<{ owner_ref: string; subscription_id: string; plan_id: PlanId; since: Date }>(`
+      SELECT withdrawn.owner_ref::text AS owner_ref, withdrawn.subscription_id::text AS subscription_id,
+        withdrawn.plan_id, withdrawn.at AS since
+      FROM billing.subscription_event AS withdrawn
+      WHERE withdrawn.kind = 'WITHDRAWN'
+        AND withdrawn.data ->> 'refund_by_owner' = 'true'
+        AND ($1::uuid IS NULL OR withdrawn.owner_ref = $1::uuid)
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.withdrawal_owner_settlement AS settled
+          WHERE settled.subscription_id = withdrawn.subscription_id
+        )
+      ORDER BY withdrawn.at, withdrawn.subscription_id
+    `, [ownerRef]);
+    return result.rows.map((row) => ({
+      ownerRef: row.owner_ref, subscriptionId: row.subscription_id, planId: row.plan_id, since: row.since
+    }));
+  }
+
+  /**
+   * P14c: the owner's settlement of a withdrawal handed to the owner, in the caller's transaction (with the refund
+   * intents): what the owner refunded in the xMoney dashboard for it. Once per withdrawal (P12a's primary key).
+   */
+  async recordWithdrawalOwnerSettlement(client: PoolClient, input: Readonly<{
+    subscriptionId: string; withdrawnEventId: string; ownerRef: string; dashboardRefundMicros: number; settledAt: Date;
+  }>): Promise<void> {
+    // P12a's CHECK refuses a negative amount (23514); the command's parser admits only whole cents.
+    await client.query(`
+      INSERT INTO billing.withdrawal_owner_settlement
+        (subscription_id, withdrawn_event_id, owner_ref, dashboard_refund_micros, settled_at)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [input.subscriptionId, input.withdrawnEventId, input.ownerRef, input.dashboardRefundMicros, input.settledAt]);
+  }
+
+  /** P14c: the settlement of this withdrawal, or null; RefundDesk's WITHDRAWAL follow-up reads it on its own client. */
+  async withdrawalOwnerSettlement(
+    subscriptionId: string, executor: BillingReadExecutor = this.pool
+  ): Promise<{ dashboardRefundMicros: number; settledAt: Date } | null> {
+    const row = (await executor.query<{ dashboard: string; settled_at: Date }>(`
+      SELECT dashboard_refund_micros::text AS dashboard, settled_at
+      FROM billing.withdrawal_owner_settlement WHERE subscription_id = $1
+    `, [subscriptionId])).rows[0];
+    return row === undefined ? null : { dashboardRefundMicros: micros(row.dashboard), settledAt: row.settled_at };
+  }
+
+  /**
    * The one customer row per owner, and the xMoney customer linked in `environment` — `null` when that environment
    * has none yet (a fresh start, or the first live checkout after stage), so the caller creates one there (R-14).
    */
