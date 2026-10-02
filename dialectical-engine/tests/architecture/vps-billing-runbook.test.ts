@@ -200,4 +200,23 @@ describe("P22 the Billing runbook", () => {
       expect(table, needle).toContain(needle);
     }
   });
+
+  it("§14.9 gives the owner the sandbox run: the test cards, the stage clock and the fake-stack proof", () => {
+    for (const needle of [
+      "### 14.9 The sandbox run, end to end (OWNER-RUN)", "4111 1111 1111 1111", "5168 4948 9505 5780",
+      "BILLING_STAGE_CLOCK_OFFSET_DAYS=31", "BILLING_STAGE_CLOCK_LIVE_REFUSED",
+      "pnpm exec vitest run tests/integration/billing-whole-flow.test.ts",
+      // No stage payment reaches a live invoicer, and no sandbox purchase takes the Romanian route.
+      "BILLING_STAGE_LIVE_INVOICER_REFUSED", "SMARTBILL_API_BASE_URL=https://smartbill.invalid",
+      "made as a buyer outside Romania",
+      // D5's R3-A: a stage boot builds the SmartBill connection from COMPANY too, so the CUI comes first.
+      "Fill in the company's CUI first (§14.7)", "BILLING_COMPANY_FACTS_UNVERIFIED:cui",
+      // The offset only goes up, and leaves only with the stage data.
+      "The stage clock only ever goes up", "A host must never go live holding rows written on a"
+    ]) {
+      expect(billing, needle).toContain(needle);
+    }
+    // Lowering the offset mid-run would stall jobs scheduled on the moved clock for a month.
+    expect(billing).not.toContain("Remove the line and restart the API again");
+  });
 });

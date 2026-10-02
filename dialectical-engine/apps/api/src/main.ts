@@ -84,6 +84,7 @@ import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { consoleBillingAudit } from "./billing/audit.js";
 import { createBillingRuntime } from "./billing/runtime.js";
+import { StageShiftedXMoneyClient, assertStageInvoicersAreSandboxes, billingClock } from "./billing/stage-clock.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import {
   assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
@@ -1057,8 +1058,25 @@ const billingRuntime = billingConnectors === null
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingCancelLink admission scope");
     }
+    // A stage payment never reaches a live invoicing service (SmartBill has no sandbox), offset or not.
+    assertStageInvoicersAreSandboxes({
+      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
+      smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
+    });
+    const stageClock = billingClock({
+      apiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      offsetDays: environment.BILLING_STAGE_CLOCK_OFFSET_DAYS ?? null
+    });
+    // One moved clock for everything the runtime records and decides; real time wherever it talks to xMoney.
+    const runtimeConnectors = stageClock.offsetMs === 0
+      ? billingConnectors
+      : Object.freeze({
+        ...billingConnectors,
+        xmoney: new StageShiftedXMoneyClient(billingConnectors.xmoney, () => stageClock.offsetMs)
+      });
     return createBillingRuntime({
-      pool, connectors: billingConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
+      pool, connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore,
       // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
       mail: {
@@ -1076,7 +1094,7 @@ const billingRuntime = billingConnectors === null
       identities: identityRepository,
       // P16c (R-35): the owner's quarterly tax summary (email O1) names where and when each tax is paid.
       taxAuthorities,
-      audit: consoleBillingAudit, clock: () => new Date(),
+      audit: consoleBillingAudit, clock: stageClock.clock,
       reportPending: (code) => console.error(`[${code}]`)
     });
   });

@@ -2242,3 +2242,81 @@ read -r INVOICE && read -r STATUS && systemd-run --pipe --wait --collect --uid=d
 
 It prints one line naming the document it recorded. A document the site never issued is refused
 (`EFACTURA_DOCUMENT_UNKNOWN`) and nothing is written.
+
+### 14.9 The sandbox run, end to end (OWNER-RUN)
+
+Do this on a **stage** host before switching billing on for real, with billing data you will throw away afterwards.
+In `api.env` set:
+
+- `XMONEY_API_BASE_URL` to `https://api-stage.xmoney.com`;
+- `QUADERNO_API_BASE_URL` to your Quaderno account's sandbox address (its host ends in `.sandbox-quadernoapp.com`);
+- `SMARTBILL_API_BASE_URL=https://smartbill.invalid`. SmartBill has no sandbox: every invoice it issues is a real,
+  numbered fiscal document, and e-Factura sends it to ANAF. The `.invalid` name is reserved and never resolves, so an
+  accidental Romanian purchase fails harmlessly and issues nothing.
+
+The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if the stage API sits beside a live Quaderno or a
+SmartBill address. Fill in the company's CUI first (§14.7): a stage host builds the SmartBill connection too, so it
+also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the CUI is still in square brackets. In
+`ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Publish `billingPolicy`
+with `enabled: true` on that host only. Write down what you see at each step; go-live row 15 needs your notes.
+
+**Every purchase in steps 1–5 is made as a buyer outside Romania.** Choose a country whose `pay` is on, for example
+Germany (DE), and answer the "Do you live in …" question with yes. The tax then goes to Germany and the invoice to
+Quaderno's sandbox. The Romanian path (SmartBill, the attached PDF) is proven only by the fake stack in step 6 and by
+the SmartBill contract tests, never in this run.
+
+**The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
+steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
+set, the billing jobs record moved times, the API asks xMoney in real time (it translates both ways), Quaderno's
+sandbox invoices carry the moved dates (harmless in a sandbox), and debates are still admitted on the real clock, so
+the new plan's debate limits are not part of this run. The line comes out only when the stage billing data is thrown
+away at the end: rebuild the stage host, then remove the line. A host must never go live holding rows written on a
+moved clock.
+
+1. **Pay.** Sign up from the pricing page, choose Plus, pick Germany as your country, confirm it, and pay with
+   xMoney's test card 4111 1111 1111 1111 (expiry 12/26, any CVV).
+   - Expect: the plan is active within seconds, and the confirmation (M1) and receipt (M2) emails arrive.
+   - Also try the 3-D Secure card 5555 5555 5555 5599 (12/34, CVV 123, code 00000) and note whether the bank's check
+     opened a pop-up window (§14.5).
+2. **Renew.** Move the billing clock forward by a month.
+   - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
+   - Within two minutes, a renewal charge appears in the xMoney stage dashboard and a second receipt email arrives.
+   - The API refuses to start with `BILLING_STAGE_CLOCK_LIVE_REFUSED` if the offset is set while
+     `XMONEY_API_BASE_URL` is not the stage API.
+
+```sh
+sudoedit /etc/debateai/api.env
+```
+
+```sh
+systemctl restart debateai-api
+```
+
+3. **A failing card, at the card check.** In Settings, use Update card with the failing test card
+   5168 4948 9505 5780.
+   - Expect xMoney to refuse it at the card check itself: the page says the card couldn't be checked, and the old
+     card stays saved. Write down what you saw (an X0 finding).
+   - A saved card therefore never fails at a renewal in the sandbox. The three "we couldn't take the payment" emails
+     (M5a–c) and the move to Free (M6) are proven by the fake stack in step 6, not here.
+4. **Withdraw.** On a fresh test account (Germany again), pay for Plus, then in Settings press Withdraw within 14 days
+   and confirm with your password and authenticator code.
+   - Expect a partial refund in the xMoney stage dashboard, the refund email (M8), and the Free plan.
+5. **Cancel through the emailed link.** On another test account, open `/cancel` signed out and enter the account's
+   email.
+   - Open the link in the email (M9) and press the button.
+   - Expect the cancellation email (M7), and Settings saying when the plan ends.
+6. **What the sandbox cannot show.** The fake stack proves the rest: a failing card through the retries to Free, a
+   card from a blocked country refunded, a rebill whose answer was lost adopted without a second charge, and the
+   Romanian invoice. Run it from the repository's `dialectical-engine` folder on your own computer, not on the host (it
+   starts its own database and fakes, and never touches the stage keys):
+
+```sh
+pnpm exec vitest run tests/integration/billing-whole-flow.test.ts
+```
+
+After the run, count what the stage database recorded. You should see one `SUCCEEDED` per paid charge and one
+`REFUNDED` per refund, and no `SUBMIT_UNKNOWN` left without a `SUCCEEDED` or `FAILED` after it:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT kind, count(*) FROM billing.charge_event GROUP BY kind ORDER BY kind"
+```

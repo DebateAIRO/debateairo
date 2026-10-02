@@ -411,6 +411,11 @@ const apiEnvironmentShape = {
     XMONEY_PUBLIC_KEY: z.string().min(1).optional(),
     XMONEY_SITE_ID: z.string().min(1).optional(),
     XMONEY_API_BASE_URL: z.string().url().optional(),
+    /**
+     * OWNER-RUN sandbox only (spec 2026-09-29 §2.8, README §14.9): whole days added to the billing jobs' clock.
+     * Absent in every real deployment; `billingClock` refuses it unless XMONEY_API_BASE_URL is xMoney's stage API.
+     */
+    BILLING_STAGE_CLOCK_OFFSET_DAYS: z.coerce.number().int().min(1).max(400).optional(),
     QUADERNO_API_KEY_PATH: z.string().min(1).optional(),
     QUADERNO_API_BASE_URL: z.string().url().optional(),
     SMARTBILL_CREDENTIALS_PATH: z.string().min(1).optional(),
