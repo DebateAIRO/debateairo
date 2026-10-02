@@ -1,7 +1,7 @@
 import type { BillingJobQueries, BillingRepository } from "@debateai/db";
 import type { TaxAuthorities } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
-import { enqueueEmail } from "./email-job.js";
+import { emailJob } from "./email-job.js";
 import { DONE, enqueueOnce, type OutboxHandler } from "./outbox.js";
 import {
   buildTaxSummary,
@@ -67,11 +67,15 @@ export class OwnerJobs {
       paymentsToCheck: await paymentsToCheckFrom(this.deps.billing, now),
       authorities: this.deps.taxAuthorities
     }));
-    await this.deps.billing.withTransaction((client) => enqueueEmail(this.deps.billing, client, {
-      template: "O1", recipient: { kind: "OWNER" }, dedupeRef: quarter.label,
-      params: { quarter: quarter.label, summaryText: text }, notBefore: now
-    }));
-    this.deps.audit("billing.tax_summary.queued", { quarter: quarter.label });
+    // O1 is queued at most once per quarter, whatever state an earlier O1 is in (a re-run after it was sent mails nobody).
+    const queued = await this.deps.billing.withTransaction((client) => enqueueOnce(
+      { repository: this.deps.billing, jobs: this.deps.jobs }, client,
+      emailJob({
+        template: "O1", recipient: { kind: "OWNER" }, dedupeRef: quarter.label,
+        params: { quarter: quarter.label, summaryText: text }, notBefore: now
+      })
+    ));
+    if (queued) this.deps.audit("billing.tax_summary.queued", { quarter: quarter.label });
     return DONE;
   };
 }

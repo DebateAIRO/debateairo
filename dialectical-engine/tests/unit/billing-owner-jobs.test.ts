@@ -77,4 +77,19 @@ describe("P16c the owner's tax-summary job", () => {
     expect(await owner.taxSummary(job("OWNER_TAX_SUMMARY", "tax-summary:not-a-quarter"), new Date()))
       .toEqual({ kind: "DEAD", code: "BILLING_TAX_SUMMARY_USAGE" });
   });
+
+  it("queues O1 at most once per quarter: a re-run after the quarter's O1 exists mails nobody and audits nothing", async () => {
+    const { enqueued, billing, jobs } = fakes();
+    const outboxJobExists = vi.fn(async (_client: unknown, kind: string, ref: string) => kind === "EMAIL" && ref === "O1:2026-Q4");
+    const audit = recordingAudit();
+    const owner = new OwnerJobs({
+      billing: billing as never, jobs: { ...jobs, outboxJobExists },
+      taxAuthorities: authorities, audit, clock: () => new Date("2027-01-05T06:00:00.000Z")
+    });
+    expect(await owner.taxSummary(job("OWNER_TAX_SUMMARY", "tax-summary:2026-Q4"), new Date("2027-01-05T06:00:00.000Z")))
+      .toEqual({ kind: "DONE" });
+    expect(outboxJobExists).toHaveBeenCalledWith(expect.anything(), "EMAIL", "O1:2026-Q4");
+    expect(enqueued.filter((entry) => entry.kind === "EMAIL")).toEqual([]);
+    expect(audit.events).toEqual([]);
+  });
 });
