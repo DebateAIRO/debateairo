@@ -10,6 +10,7 @@ import type {
 } from "@debateai/db";
 import type { XMoneyClient, XMoneyStatus, XMoneyTransaction, XMoneyTransactionListQuery } from "@debateai/payments-xmoney";
 import { credentialsRefused, type BillingAudit } from "./audit.js";
+import { failureCode } from "./renewal.js";
 import { ordersHoldingCharge } from "./renewal-rules.js";
 import { chargeEvent } from "./rows.js";
 
@@ -47,6 +48,9 @@ export type ReconcileReport = Readonly<{
  * waiting charge. Each keeps its own cursor between passes.
  */
 export type AdoptionScope = "FREQUENT" | "DAILY";
+
+/** The per-charge errors of one loop: how many charges threw, and their distinct codes (`failureCode`). */
+type ChargeErrors = { count: number; codes: Set<string> };
 
 /** A refund that is its own xMoney transaction (D5 5g): only REFUNDED can settle it, and only once it is final. */
 function refundTransactionKinds(status: XMoneyStatus): readonly ChargeEventKind[] | null {
@@ -206,6 +210,27 @@ export class BillingReconciler {
     if (rejected.count > 0) this.deps.audit("billing.reconcile.rows_rejected", { count: rejected.count, pass });
   }
 
+  /**
+   * One charge's step, isolated: a charge that throws (a history that does not fold, D5 5d; an owner lock that timed
+   * out) is counted and skipped, so it never stops the pass for every other customer. Undefined when it threw.
+   */
+  private async isolated<T>(errors: ChargeErrors, step: () => Promise<T>): Promise<T | undefined> {
+    try {
+      return await step();
+    } catch (error) {
+      errors.count += 1;
+      errors.codes.add(failureCode(error));
+      return undefined;
+    }
+  }
+
+  /** Content-free (R-25): one line per loop whose charges threw; the count and the distinct codes, never an id. */
+  private reportErrors(errors: ChargeErrors, pass: AdoptionScope | "CHECKOUT"): void {
+    if (errors.count > 0) {
+      this.deps.audit("billing.reconcile.errors", { pass, count: errors.count, codes: [...errors.codes].sort().join(",") });
+    }
+  }
+
   /** The order's merchant id for a listed transaction: its own, else GET /order; "UNKNOWN" when the lookup failed. */
   private async externalOrderOf(transaction: XMoneyTransaction): Promise<string | null | "UNKNOWN"> {
     if (transaction.externalOrderId !== null) return transaction.externalOrderId;
@@ -258,10 +283,12 @@ export class BillingReconciler {
     const adoption = await this.runAdoption(now, "DAILY");
     let failed = adoption.failed;
     if (!uncertain) {
+      const errors: ChargeErrors = { count: 0, codes: new Set() };
       for (const charge of stale) {
         if (touched.has(charge.chargeId) || charge.events.some((event) => event.xmoneyTransactionId !== null)) continue;
-        if (await this.failWithoutTransaction(charge, now)) failed += 1;
+        if (await this.isolated(errors, () => this.failWithoutTransaction(charge, now)) === true) failed += 1;
       }
+      this.reportErrors(errors, "CHECKOUT");
     }
     // For the owner, content-free: counts only; P16b's summary lists the charges.
     const deadRefunds = (await this.deps.billing.deadRefunds()).length;
@@ -282,7 +309,9 @@ export class BillingReconciler {
    * whose rebill never left, P12c). The candidates come from SQL (this xMoney system only, never a SUBMITTED charge,
    * never older than 30 days) one page after this scope's cursor; a short page wraps the cursor, so every candidate
    * is visited within ceil(N / 200) passes. Each charge is handled under P7's subscription lease, the one P11a's
-   * recovery takes, so the two never both act on it; a busy subscription is simply looked at on a later pass.
+   * recovery takes, so the two never both act on it; a busy subscription is simply looked at on a later pass. A
+   * charge that throws is counted into one `billing.reconcile.errors` line and skipped, never rethrown: it would stop
+   * every candidate after it, on every pass, until it left the 30-day horizon.
    */
   async runAdoption(
     now: Date, scope: AdoptionScope = "FREQUENT"
@@ -299,17 +328,20 @@ export class BillingReconciler {
     let adopted = 0;
     let failed = 0;
     const rejected = { count: 0 };
+    const errors: ChargeErrors = { count: 0, codes: new Set() };
     for (const charge of page) {
       const submits = charge.events.filter((event) => event.kind === "SUBMITTED" || event.kind === "SUBMIT_UNKNOWN");
       const latest = submits.at(-1);
       if (latest?.kind === "SUBMITTED") continue;
       if (now.getTime() - (latest?.at ?? charge.createdAt).getTime() < ADOPTION_WAIT_MS) continue;
-      const leased = await this.deps.jobs.withSubscriptionLease(charge.subscriptionId, () => this.adoptOne(charge, now, rejected));
-      if (leased.kind === "BUSY") continue;
+      const leased = await this.isolated(errors, () =>
+        this.deps.jobs.withSubscriptionLease(charge.subscriptionId, () => this.adoptOne(charge, now, rejected)));
+      if (leased === undefined || leased.kind === "BUSY") continue;
       if (leased.value === "ADOPTED") adopted += 1;
       if (leased.value === "FAILED") failed += 1;
     }
     this.reportRejected(rejected, "ADOPTION");
+    this.reportErrors(errors, scope);
     return Object.freeze({ adopted, failed, rejected: rejected.count });
   }
 

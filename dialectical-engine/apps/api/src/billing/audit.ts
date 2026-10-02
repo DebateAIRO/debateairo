@@ -100,6 +100,12 @@ export type BillingAuditEvent =
   | "billing.reconcile.expired"
   /** P14a (D5 5i): listed rows the parser refused in one pass; the count and the pass (LISTING or ADOPTION) only. */
   | "billing.reconcile.rows_rejected"
+  /**
+   * P14a: charges one reconcile loop could not handle (a history that does not fold, an owner lock that timed out),
+   * skipped so the pass goes on for every other charge. The pass (FREQUENT, DAILY or CHECKOUT), the count and the
+   * distinct codes only.
+   */
+  | "billing.reconcile.errors"
   /** P14a: refunds xMoney refused (dead XMONEY_REFUND jobs) with no REFUNDED since: money still owed. The count only. */
   | "billing.refund.dead";
 

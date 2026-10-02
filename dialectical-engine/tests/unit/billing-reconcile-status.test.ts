@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ChargeEventKind } from "@debateai/db";
-import type { XMoneyStatus } from "@debateai/payments-xmoney";
+import type { SubscriptionEvent } from "@debateai/billing-core";
+import type { ChargeEventInput, ChargeEventKind, ChargeEventRow, ChargeRow } from "@debateai/db";
+import type { XMoneyStatus, XMoneyTransactionListQuery } from "@debateai/payments-xmoney";
+import type { BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
 import { BillingReconciler, expectedChargeEventKinds, transactionSettled } from "../../apps/api/src/billing/reconcile.js";
 
 describe("P14a what a listed transaction should already have left in our rows", () => {
@@ -99,5 +101,125 @@ describe("P14a what a listed transaction should already have left in our rows", 
     await reconciler.tick();
     expect(daily).toHaveBeenCalledTimes(3);
     expect(adoption).toHaveBeenCalledTimes(4);
+  });
+});
+
+type AuditLine = { event: BillingAuditEvent; fields: Readonly<Record<string, BillingAuditField>> };
+
+function subscriptionEventAt(
+  subscriptionId: string, kind: SubscriptionEvent["kind"], at: Date, xmoneyOrderId: string | null
+): SubscriptionEvent {
+  return Object.freeze({
+    eventId: `${subscriptionId}-${kind}`, subscriptionId, ownerRef: `owner-${subscriptionId}`, kind, at, planId: "PLUS",
+    periodAnchorAt: null, xmoneyOrderId, xmoneyCustomerId: null, cardRef: null,
+    data: Object.freeze({ xmoney_environment: "stage" })
+  }) as SubscriptionEvent;
+}
+
+/** An open charge (UPGRADE unless named) with only its REQUESTED event. */
+function openUpgrade(
+  chargeId: string, subscriptionId: string, createdAt: Date, kind: ChargeRow["kind"] = "UPGRADE"
+): ChargeRow & { events: ChargeEventRow[] } {
+  return Object.freeze({
+    chargeId, ownerRef: `owner-${subscriptionId}`, subscriptionId, kind, attempt: 1,
+    periodStart: createdAt, periodEnd: new Date(createdAt.getTime() + 30 * 86_400_000), quoteId: "q",
+    netMicros: 7_000_000, taxMicros: 0, totalMicros: 7_000_000, currency: "USD", createdAt, xmoneyEnvironment: "stage",
+    events: [Object.freeze({
+      eventId: `${chargeId}-requested`, chargeId, kind: "REQUESTED", at: createdAt, xmoneyTransactionId: null,
+      amountMicros: 7_000_000, errorCode: null, xmoneyEnvironment: "stage", refundsTransactionId: null
+    })] as ChargeEventRow[]
+  }) as ChargeRow & { events: ChargeEventRow[] };
+}
+
+/**
+ * The reconciler over stubbed repositories: `charges` are both the adoption candidates and what `charge()` reads back,
+ * `histories` each subscription's events (a function may throw), `list` the fake xMoney listing.
+ */
+function stubbedReconciler(input: Readonly<{
+  now: Date;
+  charges?: ReadonlyArray<ChargeRow & { events: ChargeEventRow[] }>;
+  stale?: ReadonlyArray<ChargeRow & { events: ChargeEventRow[] }>;
+  histories?: ReadonlyMap<string, () => Promise<SubscriptionEvent[]>>;
+  list?: (query: XMoneyTransactionListQuery) => Promise<never[]>;
+  lockOwner?: (ownerRef: string) => Promise<void>;
+}>) {
+  const audit: AuditLine[] = [];
+  const appended: ChargeEventInput[] = [];
+  const charges = input.charges ?? [];
+  const billing = {
+    adoptionCandidates: async () => [...charges],
+    unsettledCharges: async () => [...(input.stale ?? [])],
+    subscriptionEvents: async (subscriptionId: string) => {
+      const history = input.histories?.get(subscriptionId);
+      return history === undefined ? [] : history();
+    },
+    chargeEventKindsByTransaction: async () => new Map(),
+    withTransaction: async <T>(use: (client: never) => Promise<T>) => use({} as never),
+    charge: async (chargeId: string) =>
+      [...charges, ...(input.stale ?? [])].find((charge) => charge.chargeId === chargeId) ?? null,
+    appendChargeEvent: async (_client: unknown, row: ChargeEventInput) => { appended.push(row); return "INSERTED" as const; },
+    enqueue: async () => undefined,
+    deadRefunds: async () => [],
+    longUnsettledCharges: async () => []
+  };
+  const jobs = {
+    withSubscriptionLease: async <T>(_subscriptionId: string, use: (client: never) => Promise<T>) =>
+      ({ kind: "RAN" as const, value: await use({} as never) }),
+    lockOwner: async (_client: unknown, ownerRef: string) => input.lockOwner?.(ownerRef)
+  };
+  const xmoney = {
+    listTransactions: input.list ?? (async () => []),
+    getOrder: async (orderId: string) => ({ orderId, externalOrderId: null })
+  };
+  const reconciler = new BillingReconciler({
+    billing: billing as never, jobs: jobs as never, xmoney: xmoney as never, environment: "stage",
+    audit: (event, fields) => { audit.push({ event, fields }); }, clock: () => input.now, kick: () => undefined
+  });
+  return { reconciler, audit, appended };
+}
+
+describe("P14a one charge that throws never stops the pass for the others", () => {
+  it("skips a charge whose history does not fold, still settles the next one, and writes one content-free errors line", async () => {
+    const now = new Date("2026-10-10T12:00:00.000Z");
+    // The older candidate: its subscription's history is a lone ACTIVATED dated before the charge (D5 5d), which
+    // P11a's ordersHoldingCharge folds and foldSubscription refuses (BILLING_SUBSCRIPTION_EVENTS_INVALID).
+    const older = openUpgrade("a".repeat(32), "sub-old", new Date(now.getTime() - 50 * 60_000));
+    // The younger one: REQUESTED 40 minutes ago, nothing on its order.
+    const younger = openUpgrade("b".repeat(32), "sub-young", new Date(now.getTime() - 40 * 60_000));
+    const histories = new Map<string, () => Promise<SubscriptionEvent[]>>([
+      ["sub-old", async () => [subscriptionEventAt("sub-old", "ACTIVATED", new Date(now.getTime() - 2 * 86_400_000), "501")]],
+      ["sub-young", async () => [subscriptionEventAt("sub-young", "CREATED", new Date(now.getTime() - 5 * 86_400_000), "502")]]
+    ]);
+    const { reconciler, audit, appended } = stubbedReconciler({ now, charges: [older, younger], histories });
+    await expect(reconciler.runAdoption(now, "FREQUENT")).resolves.toEqual({ adopted: 0, failed: 1, rejected: 0 });
+    expect(appended.map((row) => [row.chargeId, row.kind, row.errorCode])).toEqual([[younger.chargeId, "FAILED", "NO_TRANSACTION"]]);
+    expect(audit).toContainEqual({
+      event: "billing.reconcile.errors", fields: { pass: "FREQUENT", count: 1, codes: "BILLING_SUBSCRIPTION_EVENTS_INVALID" }
+    });
+    // Content-free: no id of the charge that threw reaches any line.
+    expect(JSON.stringify(audit)).not.toContain(older.chargeId);
+    expect(JSON.stringify(audit)).not.toContain("sub-old");
+  });
+
+  it("skips a stale checkout charge whose owner lock fails, still fails the others, and completes the daily pass", async () => {
+    const now = new Date("2026-10-10T12:00:00.000Z");
+    const locked = openUpgrade("c".repeat(32), "sub-locked", new Date(now.getTime() - 26 * 3_600_000), "INITIAL");
+    const free = openUpgrade("d".repeat(32), "sub-free", new Date(now.getTime() - 25 * 3_600_000), "INITIAL");
+    const created = (subscriptionId: string) => async () =>
+      [subscriptionEventAt(subscriptionId, "CREATED", new Date(now.getTime() - 5 * 86_400_000), "503")];
+    const histories = new Map<string, () => Promise<SubscriptionEvent[]>>([
+      ["sub-locked", created("sub-locked")], ["sub-free", created("sub-free")]
+    ]);
+    const { reconciler, audit, appended } = stubbedReconciler({
+      now, stale: [locked, free], histories,
+      // The owner lock's 10 s lock_timeout, as PostgreSQL raises it (SQLSTATE 55P03), for the first owner only.
+      lockOwner: async (ownerRef) => {
+        if (ownerRef === locked.ownerRef) throw Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" });
+      }
+    });
+    const report = await reconciler.runDaily(now);
+    expect(report.failed).toBe(1);
+    expect(appended.map((row) => [row.chargeId, row.kind])).toEqual([[free.chargeId, "FAILED"]]);
+    expect(audit).toContainEqual({ event: "billing.reconcile.errors", fields: { pass: "CHECKOUT", count: 1, codes: "55P03" } });
   });
 });
