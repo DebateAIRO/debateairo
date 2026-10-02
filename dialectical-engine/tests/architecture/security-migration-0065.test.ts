@@ -463,7 +463,11 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // Paid plans P12a (amendments R1 A18, ruling R-31; number by R3-1): the
         // WITHDRAW_SUBSCRIPTION step-up purpose and its one-shot consume function.
         // The next free prefix after the billing tables, no pair.
-        "0088_billing_withdrawal_step_up.sql"
+        "0088_billing_withdrawal_step_up.sql",
+        // Paid plans P15 (ruling R-31; number by R3-1): billing learns that an owner's
+        // account is being erased, or was frozen by the age gate (R3-2), as three
+        // content-free lookups. The next free prefix, no pair.
+        "0089_billing_erasure_hook.sql"
       ]);
   });
 });

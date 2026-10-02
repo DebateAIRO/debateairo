@@ -9,7 +9,7 @@ import { APPLIED, type ChargeSettlement, type SettlementPrepared, type Settlemen
 
 /** INITIAL: the checkout's first payment activates the plan; the month is anchored at the payment (spec §1.2). */
 export function createInitialSettlement(deps: Readonly<{
-  repository: Pick<BillingRepository, "appendSubscriptionEvent" | "subscriptionsForOwner" | "enqueue">;
+  repository: Pick<BillingRepository, "appendSubscriptionEvent" | "subscriptionsForOwner" | "enqueue" | "ownerErasurePending">;
   entitlements: Pick<EntitlementRepository, "append">;
   /**
    * L3a's widened `latest` (D7 #14, ruling Q-3): the Terms acceptance M1 attaches (spec §2.5.10: "the Terms of the
@@ -38,6 +38,11 @@ export function createInitialSettlement(deps: Readonly<{
     async succeeded(context): Promise<SettlementResult> {
       const { subscription, transaction, client, now, quote } = context;
       if (transaction === null || quote === null) throw new TypeError("BILLING_INITIAL_WITHOUT_TRANSACTION_OR_QUOTE");
+      // P15: the one choke point for a payment that arrives during an erasure's grace (a checkout opened before it
+      // was scheduled, while the hook failed): nothing is activated and the money goes back in full (RefundDesk).
+      if (await deps.repository.ownerErasurePending(context.ownerRef, client)) {
+        return Object.freeze({ kind: "REFUND", reason: "SUBSCRIPTION_ENDED" });
+      }
       const reactivating = subscription.status === "ENDED" && subscription.endedCause === "ABANDONED";
       if (subscription.status !== "CREATED" && !reactivating) return Object.freeze({ kind: "REFUND", reason: "SUBSCRIPTION_ENDED" });
       // A8c and Review Focus 2, on BOTH paths: one live plan per owner. Read on this transaction's client, after the

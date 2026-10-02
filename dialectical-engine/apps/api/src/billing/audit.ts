@@ -112,7 +112,14 @@ export type BillingAuditEvent =
    */
   | "billing.reconcile.errors"
   /** P14a: refunds xMoney refused (dead XMONEY_REFUND jobs) with no REFUNDED since: money still owed. The count only. */
-  | "billing.refund.dead";
+  | "billing.refund.dead"
+  /** P15: an account erasure stopped the owner's plan (ERASURE_STOPPED and the FREE entitlement). No field. */
+  | "billing.erasure.stopped"
+  /**
+   * P15 (R3-2): the stop sweep ended the plan of an account the age gate froze (ERASURE_STOPPED marked
+   * `stopped_for: "AGE_FROZEN"`). No field, so it is never read as an erasure.
+   */
+  | "billing.age_frozen.stopped";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

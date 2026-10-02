@@ -107,6 +107,8 @@ export async function quoteUpgrade(deps: SubscriptionRouteDeps, input: Readonly<
   if (state === null || state.status !== "ACTIVE" || state.currentPeriodStart === null || state.currentPeriodEnd === null) {
     refuse(409, "NOT_SUBSCRIBED");
   }
+  // P15: an account being erased takes no new money (the person stays signed in for the 7-day grace).
+  if (await deps.billing.ownerErasurePending(input.ownerRef)) refuse(409, "ACCOUNT_ERASURE_PENDING");
   const current = planById(deps.plans, state.planId);
   const target = planById(deps.plans, input.planId);
   if (target.netPriceMicros <= current.netPriceMicros) refuse(422, "UPGRADE_NOT_HIGHER");
@@ -256,6 +258,8 @@ async function prepareUpgrade(
   const quote = await deps.billing.quote(input.quoteRef, input.ownerRef, client);
   if (quote === null || quote.kind !== "UPGRADE" || quote.planId !== input.planId) refuse(409, "QUOTE_EXPIRED");
   if (locked === null || locked.state.subscriptionId !== subscriptionId) refuse(409, "NOT_SUBSCRIBED");
+  // P15: an erasure scheduled after the quote refuses the upgrade itself, under the owner lock.
+  if (await deps.billing.ownerErasurePending(input.ownerRef, client)) refuse(409, "ACCOUNT_ERASURE_PENDING");
   const { state } = locked;
   const charges = await deps.billing.chargesForSubscription(state.subscriptionId, client);
   const earlier = charges.find((charge) => charge.quoteId === quote.quoteId);
@@ -387,7 +391,8 @@ const PAYMENT_GOES_BACK: SettlementResult = Object.freeze({ kind: "REFUND" as co
  * it is). A declined upgrade changes nothing (spec §2.5.6). Every read runs on the settlement's own connection.
  */
 export function createUpgradeSettlement(deps: Readonly<{
-  repository: Pick<BillingRepository, "appendSubscriptionEvent" | "chargesForSubscription" | "periodCreditOverride">;
+  repository: Pick<BillingRepository,
+    "appendSubscriptionEvent" | "chargesForSubscription" | "periodCreditOverride" | "ownerErasurePending">;
   entitlements: Pick<EntitlementRepository, "append">;
   plans: BillingPlans;
 }>): ChargeSettlement {
@@ -397,6 +402,9 @@ export function createUpgradeSettlement(deps: Readonly<{
       if (quote === null || quote.kind !== "UPGRADE") {
         throw new TypedDomainError("BILLING_QUOTE_MISSING", "An upgrade charge without its UPGRADE quote");
       }
+      // P15: an upgrade paid during an erasure's grace (or after the age gate froze the account) buys nothing and
+      // goes back in full.
+      if (await deps.repository.ownerErasurePending(context.ownerRef, client)) return PAYMENT_GOES_BACK;
       if (subscription.status !== "ACTIVE" || subscription.currentPeriodStart === null
         || planById(deps.plans, quote.planId).netPriceMicros <= planById(deps.plans, subscription.planId).netPriceMicros
         || !chargeInCurrentPeriod(charge, subscription)) {

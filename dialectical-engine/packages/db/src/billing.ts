@@ -307,6 +307,37 @@ export class BillingRepository {
   }
 
   /**
+   * P15: whether billing must stop for this owner: an erasure scheduled and not yet cancelled, or already finished
+   * (the owner is in legal.account_closure), or an account the age gate froze (0077's age_frozen, R3-2). A settlement
+   * or a checkout asks it on its own connection (`executor`).
+   */
+  async ownerErasurePending(ownerRef: string, executor: BillingReadExecutor = this.pool): Promise<boolean> {
+    const result = await executor.query<{ pending: boolean }>(
+      "SELECT billing.owner_erasure_pending($1) AS pending", [ownerRef]
+    );
+    return result.rows[0]?.pending === true;
+  }
+
+  /**
+   * P15: one page of owners whose erasure is pending or finished, or whose account is age_frozen, and who still have
+   * a live plan (at most 1000).
+   */
+  async pendingErasureOwnerRefs(after: string | null, limit: number): Promise<string[]> {
+    const result = await this.pool.query<{ owner_ref: string }>(
+      "SELECT owner_ref::text AS owner_ref FROM billing.pending_erasure_owner_refs($1,$2)", [after, limit]
+    );
+    return result.rows.map((row) => row.owner_ref);
+  }
+
+  /** P15 (R3-2): whether this owner's account is age_frozen; the stop reads it under the owner lock (`executor`). */
+  async ownerAgeFrozen(ownerRef: string, executor: BillingReadExecutor = this.pool): Promise<boolean> {
+    const result = await executor.query<{ frozen: boolean }>(
+      "SELECT billing.owner_age_frozen($1) AS frozen", [ownerRef]
+    );
+    return result.rows[0]?.frozen === true;
+  }
+
+  /**
    * P14c/P16b: withdrawals handed to the owner (P12d: a dashboard refund touched a payment) that the owner has not
    * settled yet — `WITHDRAWN.data.refund_by_owner` and no row in P12a's `billing.withdrawal_owner_settlement` (the one
    * mark of a settlement, written with its refund intents). One owner's (under the owner lock, `executor`) or

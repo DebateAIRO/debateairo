@@ -16,6 +16,7 @@ import { ChargeStatusReader } from "./charge-status.js";
 import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
+import { BillingErasureHook, erasurePendingOf, reconcileWork } from "./erasure-hook.js";
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoice-quaderno.js";
 import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillPdfResolver } from "./invoice-smartbill.js";
@@ -84,6 +85,11 @@ export type BillingRuntime = Readonly<{
    * harness drives it directly.
    */
   maintenance: BillingMaintenance;
+  /**
+   * P15: stops an owner's billing when an account erasure is scheduled (the route's hook) and, on the reconciler's
+   * 10-minute tick, sweeps every owner whose erasure is pending or finished, or whose account the age gate froze.
+   */
+  erasure: BillingErasureHook;
   kick(): void;
   start(): void;
   stop(): void;
@@ -129,13 +135,14 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   verify.registerSettlement("CARD_CHECK", createCardCheckSettlement({
     repository, recordsKey: deps.connectors.recordsKey, countryPolicy: deps.countryPolicy, audit: deps.audit
   }));
-  // P11a: `drain` is declared below; the kick only runs once a tick does. P15 adds
-  // `erasurePending: erasurePendingOf(repository)` here, over `billing.owner_erasure_pending` (which P15 makes answer
-  // true for an `age_frozen` owner as well, R3-2).
+  // P11a: `drain` is declared below; the kick only runs once a tick does. P15 (R-34): `erasurePending` over
+  // `billing.owner_erasure_pending`, which answers true for a pending or finished erasure and for an `age_frozen`
+  // owner (R3-2); P11b's maintenance reuses this `renewal` and its `erasureBlocks`.
   const renewal = new RenewalService({
     repository, jobs, entitlements, xmoney: deps.connectors.xmoney, tax: deps.connectors.tax, settlement: renewalSettlement,
     policy: deps.policy, plans: deps.plans, recordsKey: deps.connectors.recordsKey,
     publicAppUrl: deps.connectors.publicAppUrl, audit: deps.audit, clock: deps.clock, kick: () => drain(),
+    erasurePending: erasurePendingOf(repository),
     xmoneyEnvironment: deps.connectors.xmoneyEnvironment
   });
   const maintenance = new BillingMaintenance({
@@ -248,8 +255,15 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     billing: repository, jobs, xmoney: deps.connectors.xmoney, environment: deps.connectors.xmoneyEnvironment,
     audit: deps.audit, clock: deps.clock, kick: drain
   });
+  // P15: the erasure stop sweep runs in front of the money check, isolated from it (`reconcileWork`): a failed sweep
+  // reports BILLING_ERASURE_SWEEP_PENDING and the reconciler runs anyway; BILLING_RECONCILIATION_PENDING means only
+  // that the reconciler failed. Both are tried again on the next 10-minute tick.
+  const erasure = new BillingErasureHook({
+    billing: repository, jobs, entitlements, audit: deps.audit, clock: deps.clock
+  });
   const reconcile = createCoalescingSingleFlight(
-    () => reconciler.tick(), () => deps.reportPending("BILLING_RECONCILIATION_PENDING")
+    reconcileWork({ erasure, reconciler, reportPending: deps.reportPending }),
+    () => deps.reportPending("BILLING_RECONCILIATION_PENDING")
   );
   const timers: Array<ReturnType<typeof setInterval>> = [];
   return Object.freeze({
@@ -260,6 +274,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     refunds,
     renewal,
     maintenance,
+    erasure,
     kick: drain,
     start() {
       if (timers.length > 0) return;

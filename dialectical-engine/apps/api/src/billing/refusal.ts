@@ -50,7 +50,11 @@ export type BillingRefusalCode =
   /** P12e (A2): a renewal's rebill may have reached xMoney; the card can change once its outcome is recorded. */
   | "CARD_CHANGE_NOT_AVAILABLE_NOW"
   /** P13 (A25): the emailed cancel link's token is unknown, already spent or past its 24 hours (404). */
-  | "CANCEL_LINK_INVALID";
+  | "CANCEL_LINK_INVALID"
+  /**
+   * P15: an account erasure is pending (the person stays signed in for the 7-day grace): no new money is taken (409).
+   */
+  | "ACCOUNT_ERASURE_PENDING";
 
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 

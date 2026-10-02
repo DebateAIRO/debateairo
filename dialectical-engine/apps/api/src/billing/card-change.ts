@@ -69,6 +69,8 @@ export async function startCardChange(
       || (locked.state.status !== "ACTIVE" && locked.state.status !== "PAST_DUE")) {
       refuse(409, "NOT_SUBSCRIBED");
     }
+    // P15: an account being erased takes no new money, not even a card check's hold.
+    if (await deps.billing.ownerErasurePending(input.ownerRef, client)) refuse(409, "ACCOUNT_ERASURE_PENDING");
     // A2, defense in depth: never move the order under a renewal whose rebill may have reached xMoney.
     if (await renewalOutcomeOpen(deps.billing, client, before.subscriptionId)) refuse(409, "CARD_CHANGE_NOT_AVAILABLE_NOW");
     await deps.billing.insertCharge(client, Object.freeze({

@@ -73,7 +73,7 @@ export type CheckoutDeps = Readonly<{
   repository: Pick<BillingRepository,
     | "withTransaction" | "quote" | "subscriptionForOwner" | "subscriptionEvents" | "chargesForSubscription" | "charge"
     | "appendSubscriptionEvent" | "useQuote" | "ensureCustomer" | "setXMoneyCustomerId" | "appendProfile"
-    | "insertCharge" | "appendChargeEvent" | "customerByOwner">;
+    | "insertCharge" | "appendChargeEvent" | "customerByOwner" | "ownerErasurePending">;
   jobs: Pick<BillingJobQueries, "lockOwner" | "checkoutPaymentSignals">;
   acceptances: Pick<AcceptanceRepository, "record">;
   /** `listTransactions`: whether the open checkout's charge already has a payment on its way (D7 #5). */
@@ -167,6 +167,10 @@ export class CheckoutService implements CheckoutServicePort {
 
     const prepared = await this.deps.repository.withTransaction(async (client): Promise<Prepared> => {
       await this.deps.jobs.lockOwner(client, input.ownerRef);
+      // P15: an erasure scheduled while the quote was open refuses the checkout itself, under the owner lock.
+      if (await this.deps.repository.ownerErasurePending(input.ownerRef, client)) {
+        throw new BillingRefusal(409, "ACCOUNT_ERASURE_PENDING");
+      }
       // Every read under the lock runs on this transaction's connection (P1b's trailing executor): a read on the pool
       // would wait for a second connection while this one is held.
       const existing = await this.deps.repository.subscriptionForOwner(input.ownerRef, client);

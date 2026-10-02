@@ -67,7 +67,7 @@ export function addressRequired(location: QuoteLocation, taxCountry: string, pol
 
 export class QuoteService implements QuoteServicePort {
   constructor(private readonly deps: Readonly<{
-    repository: Pick<BillingRepository, "withTransaction" | "insertQuote" | "subscriptionForOwner">;
+    repository: Pick<BillingRepository, "withTransaction" | "insertQuote" | "subscriptionForOwner" | "ownerErasurePending">;
     tax: Pick<TaxEngine, "quote" | "validateTaxId">;
     geo: GeoLookup;
     countryPolicy: CountryPolicy;
@@ -90,6 +90,10 @@ export class QuoteService implements QuoteServicePort {
   }
 
   async create(input: QuoteInput): Promise<QuoteResult> {
+    // P15: an account being erased takes no new money (the person stays signed in for the 7-day grace).
+    if (await this.deps.repository.ownerErasurePending(input.ownerRef)) {
+      throw this.refused(new BillingRefusal(409, "ACCOUNT_ERASURE_PENDING"));
+    }
     const existing = await this.deps.repository.subscriptionForOwner(input.ownerRef);
     if (existing !== null && LIVE_SUBSCRIPTION_STATUSES.has(existing.status)) {
       throw this.refused(new BillingRefusal(409, "ALREADY_SUBSCRIBED"));

@@ -170,6 +170,7 @@ import {
   type BillingRouteOptions,
   type BillingRoutePath
 } from "./billing/index.js";
+import type { BillingErasureHook } from "./billing/erasure-hook.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator";
 type RouteOriginPolicy = "trusted";
@@ -1494,6 +1495,11 @@ export interface ApiOptions {
    * absent answers the house 404, which is local mode and billing off alike.
    */
   readonly billing?: BillingRouteOptions;
+  /**
+   * P15: scheduling an erasure stops the owner's billing at once. Present only when hosted with billing on; the
+   * reconciler's sweep repeats a stop that failed here.
+   */
+  readonly billingErasure?: Pick<BillingErasureHook, "stop">;
   readonly support?: SupportApplication;
   /**
    * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
@@ -2275,6 +2281,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     if (scheduled===null || scheduled.status==="NONE" || scheduled.executeAt===undefined) {
       return reply.status(404).send({ error:"NOT_FOUND" });
+    }
+    if (options.billingErasure!==undefined) {
+      try {
+        await options.billingErasure.stop(authenticated.ownerRef);
+      } catch {
+        // The erasure is scheduled either way; the billing sweep repeats this stop within minutes.
+        console.error("[BILLING_ERASURE_STOP_PENDING]");
+      }
     }
     return reply.status(202).send(AccountErasureStatusSchema.parse({
       status:scheduled.status,execute_at:scheduled.executeAt.toISOString(),

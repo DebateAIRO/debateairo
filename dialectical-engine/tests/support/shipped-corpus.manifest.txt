@@ -24,6 +24,7 @@ apps/api/src/billing/codes.ts
 apps/api/src/billing/connectors.ts
 apps/api/src/billing/dispute-cli.ts
 apps/api/src/billing/email-job.ts
+apps/api/src/billing/erasure-hook.ts
 apps/api/src/billing/index.ts
 apps/api/src/billing/invoice-common.ts
 apps/api/src/billing/invoice-quaderno.ts
