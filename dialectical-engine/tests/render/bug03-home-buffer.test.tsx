@@ -29,7 +29,7 @@ const mixedIndex: AnswerIndex = {
       run_ref: "run:failed",
       question_line: "The failed debate",
       state: "FAILED",
-      terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED",
+      terminal_reason: "RUN_SETUP_FAILED:WORK_QUEUE",
       created_at_sequence: 25
     },
     {
@@ -59,7 +59,10 @@ describe("BUG-03 home debates buffer", () => {
     expect(html).toContain("The generating debate");
     expect(html).toContain("Generating");
     expect(html).toContain('href="/debate/run:failed"');
-    expect(html).toContain("Debate generation failed: TOTAL_REVIEW_COVERAGE_UNSATISFIED");
+    // The row says what happened in plain words; the stored code is for operators only.
+    expect(html).toContain("Something went wrong on our side before this debate began. Please ask again.");
+    expect(html).not.toContain("RUN_SETUP_FAILED");
+    expect(html).not.toContain("WORK_QUEUE");
     const failedDebate = debates.find((debate) => debate.id === "run:failed");
     expect(failedDebate).toMatchObject({ status: "failed" });
     const failedCardHtml = renderToStaticMarkup(<DebatesBuffer debates={[failedDebate!]} />);
