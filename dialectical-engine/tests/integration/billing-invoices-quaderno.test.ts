@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadPaidCharge, saleRecordOf } from "../../apps/api/src/billing/invoice-common.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "../../apps/api/src/billing/invoice-quaderno.js";
 import { englishOrderText, invoiceDate, type BillingOrderText } from "../../apps/api/src/billing/order-text.js";
-import { testBillingPolicy } from "../support/billingFixtures.js";
+import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
 import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
 
 let h: BillingHarness;
 beforeAll(async () => {
   h = await startBillingHarness();
-  const deps = { repository: h.repository, tax: h.tax, recordsKey: h.recordsKey, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const };
+  const deps = { repository: h.repository, tax: h.tax, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const };
   h.worker.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler(deps));
   h.worker.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler(deps));
 });
@@ -125,7 +125,7 @@ describe("P10a Quaderno invoices", () => {
     const refund = h.tax.refunds.find((recorded) => recorded.chargeId === paid.chargeId);
     // `invoices` sorts by kind, so once the credit note exists it comes first: pick the INVOICE row itself.
     const original = (await invoices(paid.chargeId)).find((row) => row.kind === "INVOICE");
-    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey }, paid.chargeId))!;
+    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY }, paid.chargeId))!;
     expect(refund).toMatchObject({
       transactionId: paid.transaction.transactionId, refundTotalMicros: 23_800_000,
       original: { documentId: original!.external_ref, number: original!.number },
@@ -175,7 +175,7 @@ describe("P10a Quaderno invoices", () => {
     h.clock.advance(3 * 86_400_000);
     const paying = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "DE" });
     await h.settle(paying.transactionId);
-    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey }, bought.chargeId))!;
+    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY }, bought.chargeId))!;
     expect(loaded.period.start).toEqual(paying.createdAt);
     expect(loaded.period.start.getTime()).toBeGreaterThan(loaded.charge.periodStart.getTime());
     const romanian: BillingOrderText = (kind, locale, params) => kind === "INVOICE_LINE" && locale === "ro"

@@ -7,7 +7,7 @@ import {
 } from "../../apps/api/src/billing/invoice-smartbill.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { enqueueCreditNote } from "../../apps/api/src/billing/settlement.js";
-import { testBillingPolicy } from "../support/billingFixtures.js";
+import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
 import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
 
 type Document = { series: string; number: string; externalRef: string };
@@ -68,7 +68,8 @@ beforeAll(async () => {
   h = await startBillingHarness();
   smartbill = new RecordingSmartBill();
   const deps = () => ({
-    repository: h.repository, jobs: h.jobs, issuer: smartbill.port(), recordsKey: h.recordsKey, policy: testBillingPolicy,
+    repository: h.repository, jobs: h.jobs, issuer: smartbill.port(), recordsKey: h.recordsKey,
+    recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy,
     publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const
   });
   h.worker.register("SMARTBILL_INVOICE", async (job, now) => createSmartBillInvoiceHandler(deps())(job, now));

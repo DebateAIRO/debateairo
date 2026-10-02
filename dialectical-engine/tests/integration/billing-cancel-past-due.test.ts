@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldSubscription } from "@debateai/billing-core";
+import { PROFILE_ADDRESS_ONLY } from "../support/billingFixtures.js";
 import { startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
 import { testHttpIdentity } from "../support/httpSession.js";
 import { mountSubscriptionRoutes, subscriptionDeps, TEST_PUBLIC_APP_URL } from "../support/billingSubscriptionFixtures.js";
@@ -108,7 +109,8 @@ describe("P12b a cancel while PAST_DUE ends the plan and every retry", () => {
     const links = new CancelLinkService({
       billing: h.repository, jobs: h.jobs, entitlements: h.entitlements,
       identities: { ownerRefByEmailBlindIndex: async () => null }, blindIndexKey: Buffer.alloc(32, 3),
-      recordsKey: h.recordsKey, mail: undefined, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, clock: h.clock.read
+      recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY, mail: undefined, publicAppUrl: TEST_PUBLIC_APP_URL,
+      audit: h.audit, clock: h.clock.read
     });
     expect(await links.cancelByToken(token)).toBe("CANCELLED");
     expect((await h.repository.subscriptionEvents(paid.subscriptionId)).slice(-2).map((event) => event.kind))

@@ -113,6 +113,7 @@ describe("P2-I4 a job of the other xMoney system never reaches a vendor", () => 
     const deps = (audit: ReturnType<typeof recorder>["audit"]) => ({
       repository: only<never>({ charge: async () => stageCharge() }, "repository"),
       jobs: only<never>({}, "jobs"), issuer: only<never>({}, "issuer"), tax: only<never>({}, "tax"),
+      recipients: only<never>({}, "recipients"),
       recordsKey: Buffer.alloc(32), policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", audit,
       xmoneyEnvironment: "live" as const
     });

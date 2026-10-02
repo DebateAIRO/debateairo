@@ -8,7 +8,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import { decryptNotice } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy, TaxAuthorities } from "@debateai/register";
 import { createSingleFlightErasureReconciler } from "../account-erasure.js";
-import { DekAccountEmailReader } from "./account-email.js";
+import { DekAccountEmailReader, DekBillingRecipientReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
 import { CancelLinkService } from "./cancel-link.js";
 import { createCardCheckSettlement } from "./card-change.js";
@@ -172,8 +172,12 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). P17 (D6a F29): the invoice line in the buyer's
   // locale, from the catalogue, as for the checkout below.
   // P2-I4 (D5 5h): no document is issued for a charge paid in the other xMoney system.
+  // W8 (P2-I12, the owner's ruling of 2 October 2026): every billing email, the cancel link's M9 and every invoice go
+  // to the account's CURRENT address at the time of sending; the billing profile's only after the account is erased.
+  const recipients = new DekBillingRecipientReader(deps.pool, deps.dekStore);
   const invoiceDeps = {
-    repository, recordsKey: deps.connectors.recordsKey, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
+    repository, recordsKey: deps.connectors.recordsKey, recipients, policy: deps.policy,
+    publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit,
     orderText: catalogueOrderText,
     xmoneyEnvironment: deps.connectors.xmoneyEnvironment
@@ -189,7 +193,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   attachments.set("SMARTBILL_INVOICE_PDF", smartBillPdfResolver({ issuer: smartbill.issuer }));
   if (deps.mail !== undefined) {
     outbox.register("EMAIL", createEmailJobHandler({
-      repository, recordsKey: deps.connectors.recordsKey, ownerReportEmail: deps.connectors.ownerReportEmail,
+      repository, recipients, recordsKey: deps.connectors.recordsKey, ownerReportEmail: deps.connectors.ownerReportEmail,
       mail: deps.mail.sender, attachments
     }));
   }
@@ -208,7 +212,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     billing: repository, jobs, entitlements,
     identities: required(deps.identities, "identities"),
     blindIndexKey: required(deps.blindIndexKey, "blindIndexKey"),
-    recordsKey: deps.connectors.recordsKey, mail: deps.mail?.sender,
+    recordsKey: deps.connectors.recordsKey, recipients, mail: deps.mail?.sender,
     // R-7/A22: the one origin, P6a's `BillingConnectors.publicAppUrl`.
     publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit, clock: deps.clock

@@ -1,14 +1,18 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createEmailBlindIndex } from "@debateai/crypto";
+import {
+  createEmailBlindIndex, encrypt, generateDek, normalizeEmailForBlindIndex, type KeyDestroyResult, type ReadableUserDekStore
+} from "@debateai/crypto";
 import {
   BillingJobQueries, BillingRepository, createPool, EntitlementRepository, PostgresIdentityRepository, migrate, type Pool
 } from "@debateai/db";
 import { foldSubscription } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { recordingAudit, seedActiveSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
+import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
+import { DekBillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
 import { CancelLinkService, cancelTokenSha256 } from "../../apps/api/src/billing/cancel-link.js";
-import type { BillingMail } from "../../apps/api/src/billing/email-job.js";
+import { createEmailJobHandler, emailJob, type BillingMail } from "../../apps/api/src/billing/email-job.js";
 
 let database: TestDatabase;
 beforeAll(async () => {
@@ -20,16 +24,38 @@ afterAll(async () => database?.stop());
 const BLIND_INDEX_KEY = Buffer.alloc(32, 3);
 const DAY = 86_400_000;
 
-/** An account in `state` (0077's user_state_check admits `age_frozen`, R3-2). */
+/** The users' DEKs in memory, as the API's key store holds them. `load` hands out a copy: the reader zeroes it. */
+const deks = new Map<string, Buffer>();
+const dekStore: ReadableUserDekStore = Object.freeze({
+  async store(userId: string, dek: Uint8Array) { deks.set(userId, Buffer.from(dek)); },
+  async load(userId: string) {
+    const dek = deks.get(userId);
+    if (dek === undefined) throw new Error("USER_DEK_UNRESOLVED");
+    return Buffer.from(dek);
+  },
+  async exists(userId: string) { return deks.has(userId); },
+  async destroy(userId: string): Promise<KeyDestroyResult> { return deks.delete(userId) ? "DESTROYED" : "ALREADY_ABSENT"; }
+});
+
+/**
+ * An account in `state` (0077's user_state_check admits `age_frozen`, R3-2), its address under its DEK with
+ * registration's AAD and its blind index over the normalised address, as registration stores them.
+ */
 async function account(email: string, state: "active" | "age_frozen" = "active"): Promise<string> {
   const ownerRef = randomUUID();
+  const userId = randomUUID();
+  const dek = generateDek();
+  const sealed = encrypt(dek, Buffer.from(email, "utf8"), [
+    "identity", "user.email_ciphertext", userId, "run:none", userId, `user-dek:${userId}`, "1"
+  ]);
+  await dekStore.store(userId, dek);
   await database.pool.query(`
     INSERT INTO identity."user"(
       user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,password_hash,
       pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at
-    ) VALUES ($1,$2,'{}','{}',NULL,$3,$4,$5,$6,$7,clock_timestamp(),clock_timestamp())
-  `, [randomUUID(), createEmailBlindIndex(BLIND_INDEX_KEY, email), "$argon2id$v=19$m=65536,t=3,p=1$c2FsdA$AAAA",
-    `p13-${randomUUID()}`, randomUUID(), ownerRef, state]);
+    ) VALUES ($1,$2,$3::jsonb,'{}',NULL,$4,$5,$6,$7,$8,clock_timestamp(),clock_timestamp())
+  `, [userId, createEmailBlindIndex(BLIND_INDEX_KEY, normalizeEmailForBlindIndex(email)), JSON.stringify(sealed),
+    "$argon2id$v=19$m=65536,t=3,p=1$c2FsdA$AAAA", `p13-${randomUUID()}`, randomUUID(), ownerRef, state]);
   return ownerRef;
 }
 
@@ -43,6 +69,7 @@ function service(clock: { now: Date }, pool: Pool = database.pool) {
     identities: new PostgresIdentityRepository(pool, { hash: async () => randomBytes(32) } as never),
     blindIndexKey: BLIND_INDEX_KEY,
     recordsKey: TEST_RECORDS_KEY,
+    recipients: new DekBillingRecipientReader(pool, dekStore),
     mail: { sendTemplated: async (mail) => { mails.push(mail); } },
     publicAppUrl: TEST_PUBLIC_APP_URL,
     audit,
@@ -54,16 +81,18 @@ function service(clock: { now: Date }, pool: Pool = database.pool) {
 const tokenOf = (mail: BillingMail): string => new URL(mail.params.cancelLinkUrl!).hash.slice("#token=".length);
 
 describe("P13 the cancel link on real PostgreSQL", () => {
-  it("sends one link to the billing address, stores only its hash, and cancels once through it", async () => {
+  it("sends one link to the account's current address, stores only its hash, and cancels once through it", async () => {
     const clock = { now: new Date() };
     const { links, mails, audit } = service(clock);
-    const ownerRef = await account("Subscriber@Example.test");
+    const ownerRef = await account("subscriber@example.test");
+    // W8 (P2-I12): the profile still holds the address of the checkout; the account's address is the one that
+    // matched, and M9 goes there.
     const seeded = await seedActiveSubscription(database.pool, {
       ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "RO", email: "billing@example.test"
     });
     expect(await links.request("  subscriber@example.TEST ")).toBe("SENT");
     expect(mails).toHaveLength(1);
-    expect(mails[0]).toMatchObject({ to: "billing@example.test", templateId: "M9", locale: "en", attachments: [] });
+    expect(mails[0]).toMatchObject({ to: "subscriber@example.test", templateId: "M9", locale: "en", attachments: [] });
     expect(mails[0]!.params.cancelLinkUrl).toMatch(new RegExp(`^${TEST_PUBLIC_APP_URL}/cancel#token=[A-Za-z0-9_-]{43}$`));
     const token = tokenOf(mails[0]!);
     const stored = await database.pool.query<{ token_sha256: string }>(
@@ -141,4 +170,65 @@ describe("P13 the cancel link on real PostgreSQL", () => {
       await small.end();
     }
   }, 10_000);
+});
+
+describe("W8 (P2-I12) after the account is erased, the billing profile's address", () => {
+  /** An account whose erasure has committed (P1b's helper: prepare, acknowledge, finalize), with a plan still live. */
+  async function erasedWithLivePlan(label: string, profileEmail: string) {
+    const erased = await createBillingTestAccount(database.pool, label);
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: erased.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO", email: profileEmail
+    });
+    expect(await eraseBillingTestAccount(database.pool, erased)).toBe("COMMITTED");
+    return { erased, seeded };
+  }
+
+  it("matches the address kept with the billing profile on /cancel while the erased owner's plan is still live", async () => {
+    const { links, mails } = service({ now: new Date() });
+    const { erased } = await erasedWithLivePlan("w8-cancel", "kept@example.test");
+    // Another owner's erased account and an address nobody holds stay silent.
+    await erasedWithLivePlan("w8-cancel-other", "someone-else@example.test");
+    expect(await links.request("nobody-at-all@example.test")).toBe("SILENT");
+    expect(mails).toEqual([]);
+    expect(await links.request(" Kept@Example.TEST ")).toBe("SENT");
+    expect(mails).toEqual([expect.objectContaining({ to: "kept@example.test", templateId: "M9", locale: "en" })]);
+    expect(await links.cancelByToken(tokenOf(mails[0]!))).toBe("CANCELLED");
+    expect(foldSubscription(await new BillingRepository(database.pool).subscriptionEvents(
+      (await new BillingRepository(database.pool).subscriptionForOwner(erased.ownerRef))!.subscriptionId
+    )).cancelRequested).toBe(true);
+  });
+
+  it("never matches a live account's own address against an erased owner's profile", async () => {
+    const { links, mails } = service({ now: new Date() });
+    // The erased owner's profile holds the address a live account now has, and that live account has no plan.
+    await erasedWithLivePlan("w8-reused", "reused@example.test");
+    await account("reused@example.test");
+    expect(await links.request("reused@example.test")).toBe("SILENT");
+    expect(mails).toEqual([]);
+  });
+
+  it("sends an EMAIL job to the account's current address, and to the profile's once the account is erased", async () => {
+    const billing = new BillingRepository(database.pool);
+    const sent: BillingMail[] = [];
+    const handler = createEmailJobHandler({
+      repository: billing, recipients: new DekBillingRecipientReader(database.pool, dekStore), recordsKey: TEST_RECORDS_KEY,
+      ownerReportEmail: "owner@example.test", mail: { sendTemplated: async (mail) => { sent.push(mail); } },
+      attachments: new Map()
+    });
+    const job = (customerId: string) => {
+      const request = emailJob({
+        template: "M4", recipient: { kind: "CUSTOMER", customerId }, dedupeRef: randomUUID(), params: { plan: "PLUS" },
+        notBefore: new Date()
+      });
+      return { jobId: randomUUID(), kind: "EMAIL", ref: request.ref, notBefore: request.notBefore, attempts: 1, payload: request.payload } as never;
+    };
+    const live = await account("lives-here-now@example.test");
+    const liveSeeded = await seedActiveSubscription(database.pool, {
+      ownerRef: live, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO", email: "checkout-time@example.test"
+    });
+    const { seeded } = await erasedWithLivePlan("w8-email-job", "kept-for-invoices@example.test");
+    expect(await handler(job(liveSeeded.customerId), new Date())).toEqual({ kind: "DONE" });
+    expect(await handler(job(seeded.customerId), new Date())).toEqual({ kind: "DONE" });
+    expect(sent.map((mail) => mail.to)).toEqual(["lives-here-now@example.test", "kept-for-invoices@example.test"]);
+  });
 });

@@ -4,6 +4,7 @@ import type {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { BillingPolicy, PlanId } from "@debateai/register";
+import type { BillingRecipientReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
 import { englishOrderText, invoiceDate, planName, type BillingOrderText } from "./order-text.js";
 import { DONE, failureRetryAt, otherXMoneySystem, type OutboxOutcome } from "./outbox.js";
@@ -15,6 +16,11 @@ export type InvoiceJobDeps = Readonly<{
     | "charge" | "quote" | "customerByOwner" | "latestProfile" | "invoicesForOwner" | "subscriptionEvents"
     | "insertInvoice" | "insertInvoiceIntent" | "enqueue" | "withTransaction">;
   recordsKey: Buffer;
+  /**
+   * W8 (P2-I12): the address an invoice is issued to (and Quaderno or SmartBill deliver it to) is the account's current
+   * one when the document is issued; the profile's only after the account is erased.
+   */
+  recipients: BillingRecipientReader;
   policy: BillingPolicy;
   /** R-7: `BillingConnectors.publicAppUrl`. */
   publicAppUrl: string;
@@ -47,6 +53,7 @@ export type PaidCharge = Readonly<{
   customerId: string;
   quote: QuoteRow;
   location: QuoteLocation;
+  /** The latest billing profile, its `email` replaced by the account's current address (W8) while the account exists. */
   profile: BillingProfile;
   /** The service period the payment bought: the invoice prints it (see "What the invoice says"). */
   period: Readonly<{ start: Date; end: Date }>;
@@ -72,7 +79,9 @@ async function paidPeriod(
 }
 
 /** Everything an invoice needs, read at the moment it is issued. `null` = the charge has not succeeded. */
-export async function loadPaidCharge(deps: Pick<InvoiceJobDeps, "repository" | "recordsKey">, chargeId: string): Promise<PaidCharge | null> {
+export async function loadPaidCharge(
+  deps: Pick<InvoiceJobDeps, "repository" | "recordsKey" | "recipients">, chargeId: string
+): Promise<PaidCharge | null> {
   const charge = await deps.repository.charge(chargeId);
   const paid = charge?.events.find((event) => event.kind === "SUCCEEDED");
   if (charge === null || paid === undefined || paid.xmoneyTransactionId === null) return null;
@@ -82,10 +91,14 @@ export async function loadPaidCharge(deps: Pick<InvoiceJobDeps, "repository" | "
   if (quote === null || customer === null || latest === null) {
     throw new TypedDomainError("BILLING_INVOICE_DATA_MISSING", "a paid charge without its quote or profile");
   }
+  const profile = openBillingProfile(deps.recordsKey, customer.customerId, latest.profileCiphertext);
+  // W8 (P2-I12, the owner's ruling): the invoice goes to the address the account has now; the one kept with the
+  // profile only once the account is erased. A failed read throws, and the worker retries the document.
+  const email = (await deps.recipients.currentAddress(customer.customerId)) ?? profile.email;
   return Object.freeze({
     charge, paid, ownerRef: charge.ownerRef, customerId: customer.customerId, quote,
     location: openQuoteLocation(deps.recordsKey, quote.quoteId, quote.locationCiphertext),
-    profile: openBillingProfile(deps.recordsKey, customer.customerId, latest.profileCiphertext),
+    profile: Object.freeze({ ...profile, email }),
     period: await paidPeriod(deps.repository, charge)
   });
 }

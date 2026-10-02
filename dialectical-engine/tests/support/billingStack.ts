@@ -10,10 +10,14 @@ import {
   hashToken,
   normalizeEmailForBlindIndex,
   sealRecord,
+  type AuditContextHasher,
   type KeyDestroyResult,
   type ReadableUserDekStore
 } from "@debateai/crypto";
-import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, RunRepository, migrate } from "@debateai/db";
+import {
+  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, PostgresEmailChangeRepository,
+  RunRepository, migrate
+} from "@debateai/db";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { currentDocument } from "@debateai/legal-manifest";
 import { XMoneyClient } from "@debateai/payments-xmoney";
@@ -25,7 +29,8 @@ import { createBillingRuntime, type BillingRuntime, type BillingRuntimeDeps } fr
 import { StageShiftedXMoneyClient } from "../../apps/api/src/billing/stage-clock.js";
 import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
 import { billingMailAttachmentResolvers } from "../../apps/api/src/mail-attachments.js";
-import { MemoryTemplatedMailSender, type TemplatedMail } from "../../apps/api/src/mail-channel.js";
+import { EmailChangeService } from "../../apps/api/src/email-change.js";
+import { MemoryEmailChangeMailSender, MemoryTemplatedMailSender, type TemplatedMail } from "../../apps/api/src/mail-channel.js";
 import type { SessionApplication } from "../../apps/api/src/sessions.js";
 import { testBillingPlans, testBillingPolicy, testCountryPolicy, unusedAskApplication } from "./billingFixtures.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "./discoveredPanel.js";
@@ -78,6 +83,12 @@ export interface BillingStack {
    * enrolment. `age: "OWED"` leaves out the age record, as for an account made before the age gate.
    */
   signUp(email: string, ipCountry: keyof typeof TEST_IPS, terms?: AcceptedTerms, age?: AgeRecord): Promise<BillingPerson>;
+  /**
+   * W8 (P2-I12): the account's email change exactly as Settings runs it (turn 14's EmailChangeService over its real
+   * repository): a CHANGE_EMAIL step-up grant as the real rotation mints it, the request, then the link opened from the
+   * new address. Billing is told nothing; it must follow the account by itself.
+   */
+  changeEmail(person: BillingPerson, newEmail: string): Promise<void>;
   /** The xMoney order the person's subscription rebills (A1). */
   xmoneyOrderOf(ownerRef: string): Promise<string | null>;
   get(person: BillingPerson | null, url: string, ip?: string): Promise<HttpAnswer>;
@@ -206,6 +217,19 @@ export async function startBillingStack(): Promise<BillingStack> {
   let advancedMs = 0;
   const now = (): Date => new Date(Date.now() + advancedMs);
   const acceptances = new AcceptanceRepository(database.pool);
+
+  // Turn 14's change-email service on the stack's own database, DEKs and blind-index key. Its mail is kept apart from
+  // billing's, so a test reads the confirmation link from here.
+  const emailChangeMail = new MemoryEmailChangeMailSender();
+  const emailChanges = new EmailChangeService({
+    repository: new PostgresEmailChangeRepository(database.pool, Object.freeze({
+      hashSourceIp: async () => "33".repeat(32),
+      hashUserAgent: async () => "44".repeat(32)
+    }) as unknown as AuditContextHasher),
+    // Real time, not the stack's: the database bounds a link's expiry by its own clock.
+    users: deks, blindIndexKey, mail: emailChangeMail, tokenTtlMs: 24 * 3_600_000, resendCooldownMs: 60_000
+  });
+  const emailChangeSource = Object.freeze({ ip: TEST_IPS.RO, userAgent: "billing-stack", requestId: "request:w8" });
 
   const identities: TestHttpIdentity[] = [];
   const byToken = (presented: string) => identities.find((identity) => identity.rawSessionToken === presented);
@@ -357,6 +381,20 @@ export async function startBillingStack(): Promise<BillingStack> {
       const identity = identityFor(account.userId, account.ownerRef, account.sessionId, email);
       identities.push(identity);
       return Object.freeze({ email, userId: account.userId, ownerRef: account.ownerRef, ip: TEST_IPS[ipCountry], identity });
+    },
+    async changeEmail(person, newEmail) {
+      const grantToken = randomBytes(32).toString("base64url");
+      await database.pool.query(`
+        INSERT INTO identity.step_up_grant(
+          step_up_grant_id,token_hash,session_id,user_id,action,target_run_id,target_account_id,issued_at,expires_at
+        ) VALUES ($1,$2,$3,$4,'CHANGE_EMAIL',NULL,$4,clock_timestamp()-interval '1 second',
+          clock_timestamp()+interval '2 minutes')
+      `, [randomUUID(), hashToken("step-up-grant", grantToken), person.identity.authenticated.session.session_id, person.userId]);
+      const session = { userId: person.userId, sessionId: person.identity.authenticated.session.session_id };
+      await emailChanges.request(session, { newEmail, grantToken }, emailChangeSource);
+      const link = [...emailChangeMail.messages].reverse().find((message) => message.kind === "confirmation");
+      if (link === undefined || link.kind !== "confirmation") throw new Error("BILLING_STACK_EMAIL_CHANGE_NOT_SENT");
+      await emailChanges.confirm(link.token, emailChangeSource);
     },
     async xmoneyOrderOf(ownerRef) {
       return (await billingRepository.subscriptionForOwner(ownerRef))?.xmoneyOrderId ?? null;

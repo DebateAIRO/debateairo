@@ -1,5 +1,6 @@
 import type { BillingRepository, OutboxJob } from "@debateai/db";
 import type { PoolClient } from "pg";
+import type { BillingRecipientReader } from "./account-email.js";
 import type { OutboxHandler, OutboxOutcome } from "./outbox.js";
 import { DONE, failureRetryAt } from "./outbox.js";
 import { openBillingProfile, type BillingProfile } from "./records.js";
@@ -69,9 +70,9 @@ type EmailOutboxJob = Readonly<{
 }>;
 
 /**
- * The queue never holds an address (spec: "the EMAIL job resolves the address from the billing profile at send
- * time"). It holds the template, the customer id and the params; params are amounts, dates, plan ids and our own
- * URLs, never personal text.
+ * The queue never holds an address: the EMAIL job resolves it at send time (W8, P2-I12: the account's current address,
+ * the billing profile's only after the account is erased). It holds the template, the customer id and the params;
+ * params are amounts, dates, plan ids and our own URLs, never personal text.
  */
 export function emailJob(request: BillingEmailRequest): EmailOutboxJob {
   const payload: Record<string, string | number | boolean | null> = {
@@ -110,6 +111,8 @@ function fieldsWithPrefix(payload: OutboxJob["payload"], prefix: string): Record
 
 export function createEmailJobHandler(deps: Readonly<{
   repository: Pick<BillingRepository, "latestProfile">;
+  /** W8 (P2-I12): the account's current address at send time; the profile's once the account is erased. */
+  recipients: BillingRecipientReader;
   recordsKey: Buffer;
   ownerReportEmail: string;
   mail: BillingMailPort;
@@ -132,7 +135,10 @@ export function createEmailJobHandler(deps: Readonly<{
       } catch {
         return dead("BILLING_PROFILE_UNREADABLE");
       }
-      to = profile.email;
+      // W8 (P2-I12, the owner's ruling): the account's CURRENT address, so a change in Settings reaches every billing
+      // email; the address kept with the profile only once the account is erased. A failed read throws: the worker
+      // retries rather than send to an address the account may no longer have.
+      to = (await deps.recipients.currentAddress(customerId)) ?? profile.email;
       locale = profile.locale;
     } else {
       return dead("EMAIL_PAYLOAD_INVALID");

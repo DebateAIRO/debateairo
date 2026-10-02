@@ -265,6 +265,7 @@ function invoiceDeps(recorded: ChargeRow & { events: ChargeEventRow[] }, taxCoun
         subscriptionEvents: async () => []
       }, "repository"),
       jobs: only<never>({}, "jobs"), issuer: only<never>({}, "issuer"), tax: only<never>({}, "tax"),
+      recipients: { currentAddress: async () => PROFILE.email },
       recordsKey: RECORDS_KEY, policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", audit,
       xmoneyEnvironment: "live" as const
     }
