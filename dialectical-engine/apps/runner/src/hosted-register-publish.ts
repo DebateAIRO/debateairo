@@ -20,7 +20,9 @@
  *    when the file carries the member, the `countryPolicy` (paid plans G2, checked by
  *    the register's own schema and sealed under the file's `sourceRef`). Without the
  *    member the seeder's code-owned `countryPolicy` row is dropped, so that version has
- *    no country gate (A14).
+ *    no country gate (A14). Likewise optional, the `taxAuthorities` (paid plans P16a,
+ *    checked by the register's own parser); without the member the seeder's code-owned
+ *    `taxAuthorities` row is sealed as it is.
  * The historical bootstrap is imported first, exactly as the seeder imports it,
  * and stays the sealed base: these rows are DEPLOYMENT rows, never bootstrap rows.
  *
@@ -66,6 +68,7 @@ import {
   COST_ENVELOPE_POLICY_ROW_KEY,
   COUNTRY_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
+  TAX_AUTHORITIES_ROW_KEY,
   admissionPolicyFromValue,
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
@@ -101,6 +104,7 @@ import {
   readStoryPolicy,
   readStructuralCeilingPolicyInputs,
   registerVersionToSafeLegacyNumber,
+  taxAuthoritiesFromValue,
   warnOnIdenticalSynthesisRoleRefs,
   type BillingPlans,
   type BillingPolicy,
@@ -145,7 +149,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   "providerTargets", "synthesisRoles",
   // Paid plans (spec 2026-09-29 §2.5.1): OPTIONAL. Left out, the engine's own
   // rows are sealed (billing OFF); supplied, they supersede them.
-  "billingPlans", "billingPolicy"
+  "billingPlans", "billingPolicy",
+  // Paid plans P16a: OPTIONAL. Left out, the code-owned taxAuthorities row is sealed as it is.
+  "taxAuthorities"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -308,6 +314,8 @@ export type HostedRegisterFile = Readonly<{
   /** Paid plans: OPTIONAL operator rows, checked in the plan by the register's own parsers. */
   billingPlans: Readonly<{ value: unknown }> | null;
   billingPolicy: Readonly<{ value: unknown }> | null;
+  /** Optional (P16a): the operator's own where-and-when text; absent = the code-owned row. */
+  taxAuthorities?: unknown;
 }>;
 
 /**
@@ -364,7 +372,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     providerTargets: record.providerTargets,
     synthesisRoles,
     billingPlans: Object.hasOwn(record, BILLING_PLANS_ROW_KEY) ? Object.freeze({ value: record.billingPlans }) : null,
-    billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null
+    billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null,
+    ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {})
   });
 }
 
@@ -513,6 +522,9 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
+  // Paid plans P16a: the operator's where-and-when text, by the register's own parser
+  // (TAX_AUTHORITIES_INVALID). Absent member = the code-owned row, sealed as it is.
+  if (file.taxAuthorities !== undefined) taxAuthoritiesFromValue(file.taxAuthorities, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -580,6 +592,13 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
         rowKey, valueJsonText: canonicalRowValue(supplied.value), sourceRef: file.sourceRef
       }));
     }
+  }
+  if (file.taxAuthorities !== undefined) {
+    operatorRows.set(TAX_AUTHORITIES_ROW_KEY, Object.freeze({
+      rowKey: TAX_AUTHORITIES_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.taxAuthorities),
+      sourceRef: file.sourceRef
+    }));
   }
   const replaced = codeOwnedRows.filter((row) => operatorRows.has(row.rowKey));
   if (replaced.length !== operatorRows.size) refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
@@ -804,16 +823,24 @@ export async function verifyHostedRegisterBootReadiness(
   await readRecoveryPolicy(pool, version);
   const admission = await readAdmissionPolicy(pool, version);
   // Paid plans G3a: main.ts's country-policy and country-gate-admission stages, in their order.
-  if (await readCountryPolicy(pool, version) !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
+  const countryPolicy = await readCountryPolicy(pool, version);
+  if (countryPolicy !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
   assertHostedSupportAdmissionSealed("hosted", admission);
   const envelope = await readCostEnvelopePolicy(pool, version);
   // Paid plans (R1 A22, R-5): the readiness question the API asks at boot (B6b's
   // ask-room step, P6a). The runner never asks it: it reads no billingPolicy (A20).
+  const billingPolicy = await readBillingPolicy(pool, version);
   assertBillingReady({
-    policy: await readBillingPolicy(pool, version),
+    policy: billingPolicy,
     plans: await readBillingPlans(pool, version),
     envelope
   });
+  // Paid plans P7/P8b/P8c/P9a/P13: main.ts's billing-runtime stage, in its order (country policy first, then the admission scopes).
+  if (billingPolicy?.enabled === true && countryPolicy === null) refuse("BILLING_CONFIGURATION_INCOMPLETE");
+  if (billingPolicy?.enabled === true && admission.billingQuote === null) refuse("BILLING_ADMISSION_UNSEALED");
+  if (billingPolicy?.enabled === true && admission.billingCheckout === null) refuse("BILLING_ADMISSION_UNSEALED");
+  if (billingPolicy?.enabled === true && admission.billingNotify === null) refuse("BILLING_ADMISSION_UNSEALED");
+  if (billingPolicy?.enabled === true && admission.billingCancelLink === null) refuse("BILLING_ADMISSION_UNSEALED");
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);
   if (!makers.deploymentMakerCapability) refuse("HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT");

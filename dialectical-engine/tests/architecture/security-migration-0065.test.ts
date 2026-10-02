@@ -454,7 +454,20 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // prefix after dev's 0077 (age gate), the colleague's 0078
         // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
         // (publication check record) and B3's 0083. No pair.
-        "0084_billing_entitlement.sql"
+        "0084_billing_entitlement.sql",
+        // Paid plans, Part 2 (spec 2026-09-29 §2.5.2; R1 A3, A15, A17, A19, A21): customers, quotes and the
+        // subscription log; charges, invoices and notices; the outbox and the cancel tokens. No pair.
+        "0085_billing_customers_subscriptions.sql",
+        "0086_billing_charges_invoices.sql",
+        "0087_billing_outbox_cancel.sql",
+        // Paid plans P12a (amendments R1 A18, ruling R-31; number by R3-1): the
+        // WITHDRAW_SUBSCRIPTION step-up purpose and its one-shot consume function.
+        // The next free prefix after the billing tables, no pair.
+        "0088_billing_withdrawal_step_up.sql",
+        // Paid plans P15 (ruling R-31; number by R3-1): billing learns that an owner's
+        // account is being erased, or was frozen by the age gate (R3-2), as three
+        // content-free lookups. The next free prefix, no pair.
+        "0089_billing_erasure_hook.sql"
       ]);
   });
 });

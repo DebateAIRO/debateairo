@@ -283,6 +283,18 @@ export class PostgresIdentityRepository {
     });
   }
 
+  /**
+   * P13: the owner of an ACTIVE account whose sign-up address has this blind index. Used only by the public cancel
+   * link, whose route has already answered; the result never reaches the caller. Every other state
+   * (pending_verification, pending_mfa, suspended, deleted, and 0077's age_frozen) answers null.
+   */
+  async ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> {
+    const result = await this.pool.query<{ owner_ref: string }>(
+      `SELECT owner_ref FROM identity."user" WHERE email_blind_index=$1 AND state='active'`, [emailBlindIndex]
+    );
+    return result.rows[0]?.owner_ref ?? null;
+  }
+
   async findAuditIdentityByVerificationHash(tokenHash: string): Promise<{
     readonly auditToken: string;
     readonly addressKey: string;

@@ -464,3 +464,9 @@
   .appShell:has(.debateView) > .siteFooterLine { display: none; }
   .appShell:has(.debateView) .debateView { height: 100vh; height: 100dvh; }
 }
+
+/* ---------- Paid plans (P21, R3-4): the card marks, the DB-IP credit, one archived text ---------- */
+.siteFooterMarks { display: flex; gap: 10px; align-items: center; max-width: 1180px; margin: 22px auto 0; }
+.siteFooterMarks img { width: auto; height: 24px; }
+.siteFooterBase .siteFooterCredit { font-size: 11px; color: var(--muted); }
+.legalArchiveText { margin-top: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

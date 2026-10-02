@@ -2,10 +2,16 @@ import type { SupportCapability } from "./catalog.js";
 import type { SupportLanguage } from "./locale.js";
 import { SUPPORT_CAPABILITY_KEY_NAMES } from "./ui-labels.js";
 
-/** cookie-compliance S05 (SPEC-v5 R13, V-22): the 10 capability ids no screen element names (TRANSLATE rows). */
+/**
+ * cookie-compliance S05 (SPEC-v5 R13, V-22): the 10 capability ids no screen element names (TRANSLATE rows). Paid plans
+ * (P24, merge with #62) add the four paid-plan pages no screen link names: the checkout (reached only by the pricing
+ * cards' per-plan "Choose {plan}"), its return page (reached from the bank) and the two archived texts (reached by the
+ * versions lists' generic "Read").
+ */
 export const SUPPORT_TRANSLATED_CAPABILITY_IDS = Object.freeze([
   "product-identity", "home-library", "new-debate", "owner-debate", "public-debate",
   "help-desk", "sign-in", "verify-email", "enroll-mfa", "operator-workers",
+  "billing-checkout", "billing-checkout-return", "legal-terms-version-text", "legal-privacy-version-text",
 ] as const);
 export type SupportTranslatedCapabilityId = (typeof SUPPORT_TRANSLATED_CAPABILITY_IDS)[number];
 type OtherLanguage = Exclude<SupportLanguage, "en" | "ro">;
@@ -13,8 +19,9 @@ type OtherLanguage = Exclude<SupportLanguage, "en" | "ro">;
 /**
  * The name of each TRANSLATE-row product area in each of the 33 locales without their own help texts, written by hand
  * (V-22: never a mechanical swap of control labels; not in catalog.ts, S02's signed bytes; not in apps/ui/messages, the
- * oracle). One entry per locale, each with all 10 ids; checked by S05's checker (CAPABILITY ENGLISH / MECHANICAL /
- * SCRIPT, FOREIGN) and by tests/unit/support-capability-names.test.ts.
+ * oracle). One entry per locale, each with all 14 ids; checked by S05's checker (CAPABILITY ENGLISH / MECHANICAL /
+ * SCRIPT, FOREIGN) and by tests/unit/support-capability-names.test.ts. The four paid-plan names (P24) use the words the
+ * locale's own billing and legal screens use for subscription, card, terms and privacy policy.
  */
 export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLanguage, Readonly<Record<SupportTranslatedCapabilityId, string>>>>> = Object.freeze({
   ar: Object.freeze({
@@ -28,6 +35,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "حالة التحقق من البريد الإلكتروني",
     "enroll-mfa": "حالة التسجيل في MFA",
     "operator-workers": "عرض العمليات للمشغّلين فقط",
+    "billing-checkout": "نموذج البطاقة للاشتراك",
+    "billing-checkout-return": "تأكيد الاشتراك",
+    "legal-terms-version-text": "نسخة سابقة من الشروط",
+    "legal-privacy-version-text": "نسخة سابقة من سياسة الخصوصية",
   }),
   bg: Object.freeze({
     "product-identity": "За Dialectical Engine",
@@ -40,6 +51,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Състояние на потвърждението на имейла",
     "enroll-mfa": "Състояние на регистрацията за MFA",
     "operator-workers": "Изглед на процесите само за оператори",
+    "billing-checkout": "Формуляр на картата за абонамента",
+    "billing-checkout-return": "Потвърждение на абонамента",
+    "legal-terms-version-text": "Предишна версия на условията",
+    "legal-privacy-version-text": "Предишна версия на политиката за поверителност",
   }),
   cs: Object.freeze({
     "product-identity": "O Dialectical Engine",
@@ -52,6 +67,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Stav ověření e-mailu",
     "enroll-mfa": "Stav registrace MFA",
     "operator-workers": "Přehled procesů pouze pro operátory",
+    "billing-checkout": "Formulář karty pro předplatné",
+    "billing-checkout-return": "Potvrzení předplatného",
+    "legal-terms-version-text": "Dřívější verze podmínek",
+    "legal-privacy-version-text": "Dřívější verze zásad ochrany osobních údajů",
   }),
   da: Object.freeze({
     "product-identity": "Om Dialectical Engine",
@@ -64,6 +83,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Status for e-mailbekræftelse",
     "enroll-mfa": "Status for MFA-tilmelding",
     "operator-workers": "Visning af baggrundsprocesser kun for operatører",
+    "billing-checkout": "Kortformular til abonnementet",
+    "billing-checkout-return": "Bekræftelse af abonnementet",
+    "legal-terms-version-text": "En tidligere version af vilkårene",
+    "legal-privacy-version-text": "En tidligere version af privatlivspolitikken",
   }),
   de: Object.freeze({
     "product-identity": "Über Dialectical Engine",
@@ -76,6 +99,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Status der E-Mail-Bestätigung",
     "enroll-mfa": "Status der MFA-Einrichtung",
     "operator-workers": "Prozessansicht nur für Betreiber",
+    "billing-checkout": "Kartenformular für das Abonnement",
+    "billing-checkout-return": "Bestätigung des Abonnements",
+    "legal-terms-version-text": "Eine frühere Fassung der Nutzungsbedingungen",
+    "legal-privacy-version-text": "Eine frühere Fassung der Datenschutzerklärung",
   }),
   el: Object.freeze({
     "product-identity": "Σχετικά με το Dialectical Engine",
@@ -88,6 +115,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Κατάσταση επαλήθευσης ηλεκτρονικού ταχυδρομείου",
     "enroll-mfa": "Κατάσταση εγγραφής MFA",
     "operator-workers": "Προβολή διεργασιών μόνο για διαχειριστές",
+    "billing-checkout": "Φόρμα κάρτας για τη συνδρομή",
+    "billing-checkout-return": "Επιβεβαίωση της συνδρομής",
+    "legal-terms-version-text": "Μια παλαιότερη έκδοση των όρων",
+    "legal-privacy-version-text": "Μια παλαιότερη έκδοση της πολιτικής απορρήτου",
   }),
   es: Object.freeze({
     "product-identity": "Acerca de Dialectical Engine",
@@ -100,6 +131,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Estado de verificación del correo electrónico",
     "enroll-mfa": "Estado de inscripción en MFA",
     "operator-workers": "Vista de procesos solo para operadores",
+    "billing-checkout": "Formulario de tarjeta para la suscripción",
+    "billing-checkout-return": "Confirmación de la suscripción",
+    "legal-terms-version-text": "Una versión anterior de los términos",
+    "legal-privacy-version-text": "Una versión anterior de la política de privacidad",
   }),
   et: Object.freeze({
     "product-identity": "Teave Dialectical Engine'i kohta",
@@ -112,6 +147,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "E-posti kinnitamise olek",
     "enroll-mfa": "MFA registreerimise olek",
     "operator-workers": "Ainult operaatoritele mõeldud protsesside vaade",
+    "billing-checkout": "Tellimuse kaardivorm",
+    "billing-checkout-return": "Tellimuse kinnitus",
+    "legal-terms-version-text": "Tingimuste varasem versioon",
+    "legal-privacy-version-text": "Privaatsuspoliitika varasem versioon",
   }),
   fi: Object.freeze({
     "product-identity": "Tietoa Dialectical Enginestä",
@@ -124,6 +163,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Sähköpostin vahvistuksen tila",
     "enroll-mfa": "MFA-käyttöönoton tila",
     "operator-workers": "Vain ylläpitäjille tarkoitettu prosessinäkymä",
+    "billing-checkout": "Tilauksen korttilomake",
+    "billing-checkout-return": "Tilauksen vahvistus",
+    "legal-terms-version-text": "Käyttöehtojen aiempi versio",
+    "legal-privacy-version-text": "Tietosuojakäytännön aiempi versio",
   }),
   fr: Object.freeze({
     "product-identity": "À propos de Dialectical Engine",
@@ -136,6 +179,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "État de la vérification de l’e-mail",
     "enroll-mfa": "État de l’inscription MFA",
     "operator-workers": "Vue des processus réservée aux opérateurs",
+    "billing-checkout": "Formulaire de carte pour l’abonnement",
+    "billing-checkout-return": "Confirmation de l’abonnement",
+    "legal-terms-version-text": "Une version antérieure des conditions d’utilisation",
+    "legal-privacy-version-text": "Une version antérieure de la politique de confidentialité",
   }),
   ga: Object.freeze({
     "product-identity": "Faoi Dialectical Engine",
@@ -148,6 +195,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Staid fhíorú an ríomhphoist",
     "enroll-mfa": "Staid chlárú MFA",
     "operator-workers": "Amharc próiseas d’oibreoirí amháin",
+    "billing-checkout": "Foirm an chárta chun liostáil le plean",
+    "billing-checkout-return": "Deimhniú an tsíntiúis",
+    "legal-terms-version-text": "Leagan níos luaithe de na téarmaí",
+    "legal-privacy-version-text": "Leagan níos luaithe den bheartas príobháideachais",
   }),
   he: Object.freeze({
     "product-identity": "אודות Dialectical Engine",
@@ -160,6 +211,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "מצב אימות הדוא״ל",
     "enroll-mfa": "מצב ההרשמה ל-MFA",
     "operator-workers": "תצוגת תהליכים למפעילים בלבד",
+    "billing-checkout": "טופס הכרטיס למינוי",
+    "billing-checkout-return": "אישור המינוי",
+    "legal-terms-version-text": "גרסה קודמת של התנאים",
+    "legal-privacy-version-text": "גרסה קודמת של מדיניות הפרטיות",
   }),
   hi: Object.freeze({
     "product-identity": "Dialectical Engine के बारे में",
@@ -172,6 +227,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "ईमेल सत्यापन की स्थिति",
     "enroll-mfa": "MFA नामांकन की स्थिति",
     "operator-workers": "केवल ऑपरेटरों के लिए प्रक्रिया दृश्य",
+    "billing-checkout": "सदस्यता के लिए कार्ड फ़ॉर्म",
+    "billing-checkout-return": "सदस्यता की पुष्टि",
+    "legal-terms-version-text": "शर्तों का एक पिछला संस्करण",
+    "legal-privacy-version-text": "गोपनीयता नीति का एक पिछला संस्करण",
   }),
   hr: Object.freeze({
     "product-identity": "O proizvodu Dialectical Engine",
@@ -184,6 +243,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Stanje potvrde e-pošte",
     "enroll-mfa": "Stanje upisa u MFA",
     "operator-workers": "Prikaz procesa samo za operatere",
+    "billing-checkout": "Obrazac kartice za pretplatu",
+    "billing-checkout-return": "Potvrda pretplate",
+    "legal-terms-version-text": "Ranija verzija uvjeta",
+    "legal-privacy-version-text": "Ranija verzija pravila o privatnosti",
   }),
   hu: Object.freeze({
     "product-identity": "A Dialectical Engine névjegye",
@@ -196,6 +259,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "E-mail-cím megerősítésének állapota",
     "enroll-mfa": "MFA-regisztráció állapota",
     "operator-workers": "Csak üzemeltetőknek szóló folyamatnézet",
+    "billing-checkout": "Kártyaűrlap az előfizetéshez",
+    "billing-checkout-return": "Az előfizetés visszaigazolása",
+    "legal-terms-version-text": "A feltételek egy korábbi változata",
+    "legal-privacy-version-text": "Az adatvédelmi szabályzat egy korábbi változata",
   }),
   id: Object.freeze({
     "product-identity": "Tentang Dialectical Engine",
@@ -208,6 +275,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Status verifikasi email",
     "enroll-mfa": "Status pendaftaran MFA",
     "operator-workers": "Tampilan proses khusus operator",
+    "billing-checkout": "Formulir kartu untuk langganan",
+    "billing-checkout-return": "Konfirmasi langganan",
+    "legal-terms-version-text": "Versi terdahulu ketentuan layanan",
+    "legal-privacy-version-text": "Versi terdahulu kebijakan privasi",
   }),
   it: Object.freeze({
     "product-identity": "Informazioni su Dialectical Engine",
@@ -220,6 +291,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Stato della verifica dell’email",
     "enroll-mfa": "Stato della registrazione MFA",
     "operator-workers": "Vista dei processi riservata agli operatori",
+    "billing-checkout": "Modulo della carta per l’abbonamento",
+    "billing-checkout-return": "Conferma dell’abbonamento",
+    "legal-terms-version-text": "Una versione precedente delle condizioni di servizio",
+    "legal-privacy-version-text": "Una versione precedente dell’informativa sulla privacy",
   }),
   ja: Object.freeze({
     "product-identity": "Dialectical Engine について",
@@ -232,6 +307,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "メール確認の状態",
     "enroll-mfa": "MFA 登録の状態",
     "operator-workers": "オペレーター専用の処理状況ビュー",
+    "billing-checkout": "サブスクリプションのカード入力フォーム",
+    "billing-checkout-return": "サブスクリプションの登録確認",
+    "legal-terms-version-text": "利用規約の過去の版",
+    "legal-privacy-version-text": "プライバシーポリシーの過去の版",
   }),
   ko: Object.freeze({
     "product-identity": "Dialectical Engine 소개",
@@ -244,6 +323,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "이메일 인증 상태",
     "enroll-mfa": "MFA 등록 상태",
     "operator-workers": "운영자 전용 처리 현황 보기",
+    "billing-checkout": "구독 카드 입력 양식",
+    "billing-checkout-return": "구독 확인",
+    "legal-terms-version-text": "이용약관의 이전 버전",
+    "legal-privacy-version-text": "개인정보 처리방침의 이전 버전",
   }),
   lt: Object.freeze({
     "product-identity": "Apie Dialectical Engine",
@@ -256,6 +339,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "El. pašto patvirtinimo būsena",
     "enroll-mfa": "MFA registracijos būsena",
     "operator-workers": "Tik operatoriams skirtas procesų rodinys",
+    "billing-checkout": "Prenumeratos kortelės forma",
+    "billing-checkout-return": "Prenumeratos patvirtinimas",
+    "legal-terms-version-text": "Ankstesnė sąlygų versija",
+    "legal-privacy-version-text": "Ankstesnė privatumo politikos versija",
   }),
   lv: Object.freeze({
     "product-identity": "Par Dialectical Engine",
@@ -268,6 +355,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "E-pasta verifikācijas statuss",
     "enroll-mfa": "MFA reģistrācijas statuss",
     "operator-workers": "Procesu skats tikai operatoriem",
+    "billing-checkout": "Abonementa kartes veidlapa",
+    "billing-checkout-return": "Abonementa apstiprinājums",
+    "legal-terms-version-text": "Agrāka noteikumu versija",
+    "legal-privacy-version-text": "Agrāka privātuma politikas versija",
   }),
   mt: Object.freeze({
     "product-identity": "Dwar Dialectical Engine",
@@ -280,6 +371,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Stat tal-verifika tal-email",
     "enroll-mfa": "Stat tar-reġistrazzjoni MFA",
     "operator-workers": "Veduta tal-proċessi għall-operaturi biss",
+    "billing-checkout": "Formola tal-karta għall-abbonament",
+    "billing-checkout-return": "Konferma tal-abbonament",
+    "legal-terms-version-text": "Verżjoni preċedenti tat-termini",
+    "legal-privacy-version-text": "Verżjoni preċedenti tal-politika dwar il-privatezza",
   }),
   nl: Object.freeze({
     "product-identity": "Over Dialectical Engine",
@@ -292,6 +387,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Status van de e-mailverificatie",
     "enroll-mfa": "Status van de MFA-registratie",
     "operator-workers": "Procesweergave alleen voor beheerders",
+    "billing-checkout": "Kaartformulier voor het abonnement",
+    "billing-checkout-return": "Bevestiging van het abonnement",
+    "legal-terms-version-text": "Een eerdere versie van de voorwaarden",
+    "legal-privacy-version-text": "Een eerdere versie van het privacybeleid",
   }),
   pl: Object.freeze({
     "product-identity": "Informacje o Dialectical Engine",
@@ -304,6 +403,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Stan weryfikacji adresu e-mail",
     "enroll-mfa": "Stan rejestracji MFA",
     "operator-workers": "Widok procesów tylko dla operatorów",
+    "billing-checkout": "Formularz karty do subskrypcji",
+    "billing-checkout-return": "Potwierdzenie subskrypcji",
+    "legal-terms-version-text": "Wcześniejsza wersja warunków",
+    "legal-privacy-version-text": "Wcześniejsza wersja polityki prywatności",
   }),
   pt: Object.freeze({
     "product-identity": "Sobre o Dialectical Engine",
@@ -316,6 +419,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Estado da verificação do e-mail",
     "enroll-mfa": "Estado da inscrição MFA",
     "operator-workers": "Vista de processos apenas para operadores",
+    "billing-checkout": "Formulário do cartão para a subscrição",
+    "billing-checkout-return": "Confirmação da subscrição",
+    "legal-terms-version-text": "Uma versão anterior dos Termos de Serviço",
+    "legal-privacy-version-text": "Uma versão anterior da Política de Privacidade",
   }),
   ru: Object.freeze({
     "product-identity": "О Dialectical Engine",
@@ -328,6 +435,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Статус подтверждения электронной почты",
     "enroll-mfa": "Статус подключения MFA",
     "operator-workers": "Просмотр процессов только для операторов",
+    "billing-checkout": "Форма карты для подписки",
+    "billing-checkout-return": "Подтверждение подписки",
+    "legal-terms-version-text": "Одна из прежних версий условий",
+    "legal-privacy-version-text": "Одна из прежних версий политики конфиденциальности",
   }),
   sk: Object.freeze({
     "product-identity": "O Dialectical Engine",
@@ -340,6 +451,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Stav overenia e-mailu",
     "enroll-mfa": "Stav registrácie MFA",
     "operator-workers": "Prehľad procesov len pre operátorov",
+    "billing-checkout": "Formulár karty pre predplatné",
+    "billing-checkout-return": "Potvrdenie predplatného",
+    "legal-terms-version-text": "Staršia verzia podmienok",
+    "legal-privacy-version-text": "Staršia verzia zásad ochrany osobných údajov",
   }),
   sl: Object.freeze({
     "product-identity": "O Dialectical Engine",
@@ -352,6 +467,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Stanje potrditve e-pošte",
     "enroll-mfa": "Stanje včlanitve v MFA",
     "operator-workers": "Pogled procesov samo za operaterje",
+    "billing-checkout": "Obrazec kartice za naročnino",
+    "billing-checkout-return": "Potrditev naročnine",
+    "legal-terms-version-text": "Starejša različica pogojev",
+    "legal-privacy-version-text": "Starejša različica pravilnika o zasebnosti",
   }),
   sv: Object.freeze({
     "product-identity": "Om Dialectical Engine",
@@ -364,6 +483,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Status för e-postverifiering",
     "enroll-mfa": "Status för MFA-registrering",
     "operator-workers": "Processvy endast för operatörer",
+    "billing-checkout": "Kortformulär för abonnemanget",
+    "billing-checkout-return": "Bekräftelse av abonnemanget",
+    "legal-terms-version-text": "En tidigare version av villkoren",
+    "legal-privacy-version-text": "En tidigare version av integritetspolicyn",
   }),
   tr: Object.freeze({
     "product-identity": "Dialectical Engine hakkında",
@@ -376,6 +499,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "E-posta doğrulama durumu",
     "enroll-mfa": "MFA kayıt durumu",
     "operator-workers": "Yalnızca operatörlere özel işlem görünümü",
+    "billing-checkout": "Abonelik için kart formu",
+    "billing-checkout-return": "Abonelik onayı",
+    "legal-terms-version-text": "Koşulların önceki bir sürümü",
+    "legal-privacy-version-text": "Gizlilik politikasının önceki bir sürümü",
   }),
   uk: Object.freeze({
     "product-identity": "Про Dialectical Engine",
@@ -388,6 +515,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Стан підтвердження електронної пошти",
     "enroll-mfa": "Стан підключення MFA",
     "operator-workers": "Перегляд процесів лише для операторів",
+    "billing-checkout": "Форма картки для підписки",
+    "billing-checkout-return": "Підтвердження підписки",
+    "legal-terms-version-text": "Одна з попередніх версій умов",
+    "legal-privacy-version-text": "Одна з попередніх версій політики конфіденційності",
   }),
   vi: Object.freeze({
     "product-identity": "Giới thiệu về Dialectical Engine",
@@ -400,6 +531,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "Trạng thái xác minh email",
     "enroll-mfa": "Trạng thái đăng ký MFA",
     "operator-workers": "Chế độ xem tiến trình chỉ dành cho người vận hành",
+    "billing-checkout": "Biểu mẫu thẻ cho gói đăng ký",
+    "billing-checkout-return": "Xác nhận gói đăng ký",
+    "legal-terms-version-text": "Một phiên bản trước của điều khoản",
+    "legal-privacy-version-text": "Một phiên bản trước của chính sách quyền riêng tư",
   }),
   zh: Object.freeze({
     "product-identity": "关于 Dialectical Engine",
@@ -412,6 +547,10 @@ export const SUPPORT_CAPABILITY_TRANSLATIONS: Readonly<Partial<Record<OtherLangu
     "verify-email": "电子邮件验证状态",
     "enroll-mfa": "MFA 注册状态",
     "operator-workers": "仅限运营人员的处理进程视图",
+    "billing-checkout": "订阅的银行卡填写表单",
+    "billing-checkout-return": "订阅确认",
+    "legal-terms-version-text": "服务条款的一个旧版本",
+    "legal-privacy-version-text": "隐私政策的一个旧版本",
   }),
 });
 

@@ -69,6 +69,17 @@ const OWNER_REVIEW = Object.freeze({
   ratifiedOn: "2026-09-24",
 });
 
+// The merged catalogue (paid plans P24, 2026-10-02): #62's signed catalogue plus the nine paid-plan pages under #62's
+// per-locale names. The owner read the nine entries (EN + RO labels) and the merged fingerprint in chat and signed it
+// (docs/missions/paid-plans/OWNER-SIGNOFF-billing-pages-catalog.md, "Merge with origin/dev"); #62's articles and recovery rows keep S02's and S05's signatures below.
+const CATALOG_REVIEW = Object.freeze({
+  reviewedBy: "OWNER",
+  reviewerSession: "b06da770-1b32-42dc-a45d-cbc280fccbe5 (paid-plans session; the owner read the merged catalogue's nine billing-page entries and its fingerprint in chat and answered 'signed')",
+  reviewedOn: "2026-10-02",
+  evidence: "docs/missions/paid-plans/OWNER-SIGNOFF-billing-pages-catalog.md",
+  ratifiedBy: "V",
+  ratifiedOn: "2026-10-02",
+});
 // cookie-compliance S02 (SPEC-v2 R10): the owner's V0 signature of the catalogue, the 8 rewritten articles and
 // their 8 recovery rows. The orchestrator writes reviewerSession, reviewedOn and ratifiedOn at V0
 // (probes/ARCH-CC-S02/s02-sign.py); until then this case is RED on the branch by design. The session is
@@ -217,8 +228,8 @@ describe("production Support recovery attestation", () => {
       schemaVersion: 2,
       catalog: {
         sha256:
-          "83e5d6c08d5d23f7b2ec2cf82bd82f0a37e3b808086fd407a3260ac08894bec6",
-        ...S02_OWNER_REVIEW,
+          "55133fc55bf08f45d0cb674c8e89416ae749249eaef4291e985af82a270bb52a",
+        ...CATALOG_REVIEW,
       },
       recovery: {
         componentFileSha256:

@@ -846,6 +846,7 @@ export {
   type DeploymentMode,
   type SealedCostEnvelopeStatus,
   loadApiEnvironment,
+  loadBillingOperatorEnvironment,
   loadDevelopmentCommandEnvironment,
   loadKeyRotationEnvironment,
   loadLivenessEnvironment,
@@ -855,13 +856,19 @@ export {
   loadServeDisclosureReportEnvironment,
   loadSettlementEnvironment,
   parseApiEnvironment,
+  parseBillingOperatorEnvironment,
   parseKeyRotationEnvironment,
   parseLivenessEnvironment,
   parseMigrationEnvironment,
   parseReplaySelfTestEnvironment,
   parseRunnerEnvironment,
   parseServeDisclosureReportEnvironment,
-  parseSettlementEnvironment
+  parseSettlementEnvironment,
+  // P6a (paid plans): the billing group of the API environment, validated late (A22).
+  BILLING_ENVIRONMENT_KEYS,
+  readBillingEnvironmentGroup,
+  type BillingEnvironmentGroup,
+  type BillingEnvironmentKey
 } from "./runtime-environment.js";
 
 export {
@@ -926,6 +933,20 @@ export {
   type BillingPolicy,
   type BillingReadinessEnvelope
 } from "./billing-policy.js";
+// Paid plans P16a: where and when each tax is paid, as data (spec 2026-09-29 §2.5.9).
+export {
+  TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW,
+  TAX_AUTHORITIES_ROW_KEY,
+  readTaxAuthorities,
+  taxAuthoritiesFromValue,
+  taxAuthorityFor,
+  type TaxAuthorities,
+  type TaxAuthoritiesValue,
+  type TaxAuthorityEntry,
+  type TaxAuthorityRegistration,
+  type TaxAuthorityStatus,
+  type TaxDueRule
+} from "./tax-authorities.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,

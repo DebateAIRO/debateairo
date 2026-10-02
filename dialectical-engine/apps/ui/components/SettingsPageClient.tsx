@@ -14,6 +14,7 @@ import {
 import { EvaluatorDevMenu, type SettingsI18nProps } from "@/components/EvaluatorDevMenu";
 import { LegacyRunClaimControls } from "@/components/LegacyRunClaimControls";
 import { SessionControls } from "@/components/SessionControls";
+import { SubscriptionControls } from "@/components/billing/SubscriptionControls";
 import { UsageBars } from "@/components/billing/UsageBars";
 import { ConsentSettingsPanel } from "@/components/consent/ConsentSettingsPanel";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -113,6 +114,7 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog }: Required<Set
               ))}
             </div>
           </div>
+          <SubscriptionControls catalog={billingCatalog} locale={locale} />
           <UsageBars catalog={billingCatalog} locale={locale} />
 
           <EmailSettingsCard

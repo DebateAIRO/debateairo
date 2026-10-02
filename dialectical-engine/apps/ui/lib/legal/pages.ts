@@ -78,7 +78,8 @@ export const COMPANY: Company = Object.freeze({
   registeredOffice: "[…], București, România",
   tradeRegisterNo: "[J40/…/…]",
   cui: "[…]",
-  vat: Object.freeze({ kind: "unconfirmed" }),
+  // The company is VAT-registered (owner, 29 September 2026); the RO VAT code stays bracketed until the owner fills it.
+  vat: Object.freeze({ kind: "registered", number: "[RO…]" }),
   shareCapital: "[RON …]",
   representative: "[…]",
   phone: "[+40 …]",

@@ -60,5 +60,12 @@
   "chrome.footer.location": "Букурещ, Румъния",
   "chrome.footer.product": "Продукт",
   "chrome.footer.home": "Начало",
-  "chrome.footer.cookiePreferences": "Бисквитките, които съхраняваме"
+  "chrome.footer.cookiePreferences": "Бисквитките, които съхраняваме",
+  "chrome.footer.pricing": "Цени",
+  "chrome.footer.cancel": "Прекратяване на план",
+  "chrome.footer.withdraw": "Отказ от план",
+  "chrome.footer.paymentMarks": "Карти, които приемаме",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }
