@@ -187,3 +187,41 @@ fingerprint:
 Then, in the same commit: `CATALOG_REVIEW` (the six fields after `sha256`) and the expected `sha256` in
 `tests/unit/support-recovery-attestation.test.ts`, and `corpus.kbVersion` in `tests/unit/support-context.test.ts`,
 recomputed after the record is written (it binds the record).
+
+## Merge with origin/dev (2 October 2026)
+
+Before Part 2's pull request, `origin/dev` brought in PR #62 (cookie compliance). It changed the catalogue too: its
+S02 rewrote the existing entries' labels to the labels the screens show, and its S05 named every capability in the 33
+locales without their own help texts (a KEY row takes the name of the screen link that opens the page, a TRANSLATE row
+is written by hand). The owner signed #62's catalogue on 1 October 2026:
+`83e5d6c08d5d23f7b2ec2cf82bd82f0a37e3b808086fd407a3260ac08894bec6`
+(`docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md`). #62 added no capability.
+
+The merged catalogue keeps #62's entries byte for byte and appends the nine entries above, which now follow #62's
+naming. Five of them are KEY rows, so their English and Romanian labels became their links' own text:
+
+| id | route | English label (was) | Romanian label | the link |
+|---|---|---|---|---|
+| billing-pricing | /pricing | Pricing (Plans and prices) | Prețuri | the footer's `chrome.footer.pricing` |
+| billing-card-change | /settings/card | Update card (Change the subscription card) | Actualizați cardul | Settings' `billing.subscription.updateCard` |
+| billing-cancel | /cancel | Cancel a plan (Cancel a subscription by email link) | Anularea unui abonament | the footer's `chrome.footer.cancel` |
+| billing-withdraw | /withdraw | Withdraw from a plan (Withdrawal from a subscription) | Retragerea dintr-un abonament | the footer's `chrome.footer.withdraw` |
+| legal-privacy-versions | /privacy/versions | All versions of this policy (Earlier versions of the privacy policy) | Toate versiunile acestei politici | /privacy's `legal.privacyVersions.link` |
+
+The other four (`billing-checkout`, `billing-checkout-return`, `legal-terms-version-text`,
+`legal-privacy-version-text`) are TRANSLATE rows: their labels are unchanged, and their names in the 33 locales are
+written by hand in `packages/support-kb/src/capability-names.ts` (a native check is go-live row 36). No search term,
+audience, availability, disposition, action or article changed.
+
+| Record | sha256 |
+|---|---|
+| #62's catalogue (signed 2026-10-01) | `83e5d6c08d5d23f7b2ec2cf82bd82f0a37e3b808086fd407a3260ac08894bec6` |
+| The merged catalogue (signed 2026-10-02) | `55133fc55bf08f45d0cb674c8e89416ae749249eaef4291e985af82a270bb52a` |
+
+With the merged fingerprint in place, every `tests/unit/support-*.test.ts`, the injection corpus and the
+route-coverage test pass (37 files, 2,106 tests), and the boot-time corpus load admits all 46 entries.
+
+**Who / when:** V (OWNER), 2026-10-02, in session `b06da770-1b32-42dc-a45d-cbc280fccbe5` (the paid-plans session),
+answering "signed" to the message listing the nine entries and the merged fingerprint, before Part 2's pull request.
+The manifest's `catalog` record now carries the merged fingerprint and this signature.
+

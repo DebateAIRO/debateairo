@@ -1,13 +1,13 @@
 {
   "schemaVersion": 2,
   "catalog": {
-    "sha256": "83e5d6c08d5d23f7b2ec2cf82bd82f0a37e3b808086fd407a3260ac08894bec6",
+    "sha256": "55133fc55bf08f45d0cb674c8e89416ae749249eaef4291e985af82a270bb52a",
     "reviewedBy": "OWNER",
-    "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-    "reviewedOn": "2026-10-01",
-    "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
+    "reviewerSession": "b06da770-1b32-42dc-a45d-cbc280fccbe5 (paid-plans session; the owner read the merged catalogue's nine billing-page entries and its fingerprint in chat and answered 'signed')",
+    "reviewedOn": "2026-10-02",
+    "evidence": "docs/missions/paid-plans/OWNER-SIGNOFF-billing-pages-catalog.md",
     "ratifiedBy": "V",
-    "ratifiedOn": "2026-10-01"
+    "ratifiedOn": "2026-10-02"
   },
   "articles": [
     {
