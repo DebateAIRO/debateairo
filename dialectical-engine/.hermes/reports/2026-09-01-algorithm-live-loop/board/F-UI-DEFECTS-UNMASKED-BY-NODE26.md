@@ -4,7 +4,7 @@
 state:
   ticket: F-UI-DEFECTS-UNMASKED-BY-NODE26
   risk_tier: medium
-  status: queued
+  status: done # 2026-09-28 all four closed: bezel radius + hub ring on 2026-09-20 (e1c7f5ba), both review-mark rows on fix/2026-09-28-render-reds (6fb10a02); closes on merge into dev
   owner: { agent: claude, session: tbd }
   contract: { allowed: [], readonly: [], forbidden: all_others, human_review: yes }
   authority_epoch: 1
@@ -44,3 +44,7 @@ record, then build the surface or re-point the assertion on the record. Do not "
 the tests. **Not in this ticket:** `t1-canvas.test.tsx:615` (the public challenge lock) and the four
 `t3-library.test.tsx > lists` rows — the seat measured that those already failed on their own causes at
 the baseline and were never masked.
+
+**Closed 2026-09-28.** Rows 1 and 4 were restored on 2026-09-20 (e1c7f5ba). Rows 2 and 3 are the review mark,
+built 2026-09-28 under F-T4-UI-8-REVIEW-VOCABULARY-CARD. `tests/render` joined the CI gate the same day, so these
+rows can no longer go red unseen.
