@@ -167,10 +167,10 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–38 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–39 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
-    expect(rows).toEqual(Array.from({ length: 38 }, (_unused, index) => index + 1));
+    expect(rows).toEqual(Array.from({ length: 39 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
@@ -199,7 +199,9 @@ describe("P22 the Billing runbook", () => {
       // Row 23 (P23 fix G1): going live moves the invoicers' addresses too, not only xMoney's.
       "SMARTBILL_API_BASE_URL",
       // P24 (2026-10-02): billing stays off until every item of Part 2's final review is closed.
-      "PART2-FINAL-REVIEW-OPEN-ITEMS.md"
+      "PART2-FINAL-REVIEW-OPEN-ITEMS.md",
+      // Part 3's final review (2026-10-03): billing stays off until every item of Part 3's final review is closed.
+      "PART3-FINAL-REVIEW-OPEN-ITEMS.md"
     ]) {
       expect(table, needle).toContain(needle);
     }
