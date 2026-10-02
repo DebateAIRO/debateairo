@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Bu tartışmadaki her şey — argümanlar, değerlendirmeler, puanlar ve hüküm — yapay zekâ modelleri tarafından üretilir, makinece okunabilir biçimde işaretlenir ve hatalı olabilir.",
+  "debateChrome.status.waiting": "Başlamayı bekliyor. Tartışmanız {time} itibarıyla kendiliğinden başlayacak.",
+  "debateChrome.status.waitingOwnDebates": "Diğer tartışmalarınız şimdilik sınırınızın kalanını kullanıyor. Bu tartışma, bunlardan biri biter bitmez kendiliğinden başlayacak.",
   "debateChrome.backToLibrary": "← Kütüphaneye dön",
   "debateChrome.loading": "Yükleniyor…",
   "debateChrome.error.claimGenerationFailed": "İddia oluşturulamadı",
@@ -207,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "Oluşturma bütçesi içinde özet hazırlanamadı",
   "debateChrome.condition.protectedCoreGuardRetired": "Yürütme bütçe nedeniyle durdu; yeniden ifade denetimi artık engel oluşturmadı",
   "debateChrome.condition.hiddenUnjudgeable": "Gizli: değerlendirilemedi — okumak için gizli öğeleri gösterin",
-  "debateChrome.condition.derivedStandingUnreviewed": "Değerlendirilmiş argümanlarına dayanıyor — kendi çapraz model incelemesi eksik",
+  "debateChrome.condition.derivedStandingUnreviewed": "Değerlendirilmiş argümanlarına dayanıyor — başka bir üreticinin modeli tarafından yapılan kendi incelemesi eksik",
   "debateChrome.condition.hiddenLowScore": "Gizli: gösterilen eşiğin altında puanlandı",
   "debateChrome.condition.unauthoredBranchHalted": "Genişletme burada durdu — gizlenecek veya gösterilecek bir metin yazılmadı",
   "debateChrome.condition.labelBasisIncomplete": "Hükmün dayanağı eksik — karşıt görüş veya karşılaştırma yapacak ikinci hakem yok",
@@ -281,5 +283,6 @@
   "requestFailure.kind.UNREADABLE": "Koordinatörün yanıtı okunamadığı için sonuç bilinmiyor.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatör plan seçimini reddetti. Ücretsiz veya Premium planı seçip yeniden deneyin.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatör isteği reddetti: Bu planın gerektirdiği bir model şu anda kullanılamıyor. Daha sonra yeniden deneyin veya diğer planı seçin.",
+  "requestFailure.kind.ALREADY_WAITING": "Aynı anda yalnızca bir soru bekleyebilir. Bekleyen tartışmanız başladıktan sonra bu soruyu sorun.",
   "requestFailure.kind.UNCLASSIFIED": "Herhangi bir yanıt gelmeden önce işlem başarısız olduğundan sonuç bilinmiyor. Bu, koordinatörün verdiği bir karar değil."
 }

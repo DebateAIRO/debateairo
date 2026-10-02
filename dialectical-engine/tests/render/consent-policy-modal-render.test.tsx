@@ -128,19 +128,19 @@ describe("privacy policy modal — rendered", () => {
   // S02-S37 — every section of the v3.0 draft, in order: the summary, fourteen numbered
   // sections, the annex and its nine parts, each with number, title, paragraphs, bullets and
   // accent.
-  it("renders the twenty-five sections in order, with their paragraphs, bullets and accent tokens", async () => {
+  it("renders the twenty-seven sections in order, with their paragraphs, bullets and accent tokens", async () => {
     await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     const sections = [...dialog.querySelectorAll<HTMLElement>('[id^="policy-section-"]')];
-    expect(POLICY_SECTIONS.length).toBe(25);
+    expect(POLICY_SECTIONS.length).toBe(27);
     expect(sections.map((section) => section.id)).toEqual(
       POLICY_SECTIONS.map((section) => `policy-section-${section.no}`)
     );
     expect(sections[0]!.id).toBe("policy-section-00");
     expect(sections[1]!.id).toBe("policy-section-01");
     expect(sections[15]!.id).toBe("policy-section-B");
-    expect(sections[24]!.id).toBe("policy-section-B.9");
+    expect(sections[26]!.id).toBe("policy-section-B.11");
 
     expect(sections.map((section) => section.querySelector(".policySectionTitle")!.textContent)).toEqual(
       POLICY_SECTIONS.map((section) => section.title)
@@ -180,8 +180,8 @@ describe("privacy policy modal — rendered", () => {
         ),
       0
     );
-    expect(expectedParagraphs).toBe(45);
-    expect(expectedBullets).toBe(38);
+    expect(expectedParagraphs).toBe(50);
+    expect(expectedBullets).toBe(46);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 

@@ -7,7 +7,8 @@ import type { AdmissionPolicy } from "@debateai/register";
  * refusal, it is an absence, and the caller must be able to tell them apart.
  */
 export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
-  | "supportReads" | "supportSessions" | "supportModelCalls";
+  | "supportReads" | "supportSessions" | "supportModelCalls" | "geoAvailability" | "billingQuote"
+  | "billingCheckout" | "billingNotify" | "billingCancelLink";
 
 export type AdmissionDecision =
   | Readonly<{ allowed: true }>
@@ -27,7 +28,10 @@ interface AdmissionEntry {
 interface AdmissionBucket {
   readonly policy: NonNullable<AdmissionPolicy["asks"] | AdmissionPolicy["publicReads"]
     | AdmissionPolicy["recoveryStart"] | AdmissionPolicy["supportReads"]
-    | AdmissionPolicy["supportSessions"] | AdmissionPolicy["supportModelCalls"]>;
+    | AdmissionPolicy["supportSessions"] | AdmissionPolicy["supportModelCalls"]
+    | AdmissionPolicy["geoAvailability"] | AdmissionPolicy["billingQuote"]
+    | AdmissionPolicy["billingCheckout"] | AdmissionPolicy["billingNotify"]
+    | AdmissionPolicy["billingCancelLink"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -62,6 +66,26 @@ export class AdmissionLimiter {
       ] as const]),
       ...(policy.supportModelCalls === null ? [] : [[
         "supportModelCalls", { policy: policy.supportModelCalls, entries: new Map() }
+      ] as const]),
+      // Paid plans G3a: present only when the resolved register version carries it.
+      ...(policy.geoAvailability === null ? [] : [[
+        "geoAvailability", { policy: policy.geoAvailability, entries: new Map() }
+      ] as const]),
+      // Paid plans P8b: present only when the resolved register version carries it.
+      ...(policy.billingQuote === null ? [] : [[
+        "billingQuote", { policy: policy.billingQuote, entries: new Map() }
+      ] as const]),
+      // Paid plans P8c: present only when the resolved register version carries it.
+      ...(policy.billingCheckout === null ? [] : [[
+        "billingCheckout", { policy: policy.billingCheckout, entries: new Map() }
+      ] as const]),
+      // Paid plans P9a: present only when the resolved register version carries it.
+      ...(policy.billingNotify === null ? [] : [[
+        "billingNotify", { policy: policy.billingNotify, entries: new Map() }
+      ] as const]),
+      // Paid plans P13: present only when the resolved register version carries it.
+      ...(policy.billingCancelLink === null ? [] : [[
+        "billingCancelLink", { policy: policy.billingCancelLink, entries: new Map() }
       ] as const])
     ]);
   }

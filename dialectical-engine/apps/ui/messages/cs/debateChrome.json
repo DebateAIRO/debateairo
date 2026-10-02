@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Vše v této debatě – argumenty, kontroly, skóre i verdikt – je generováno modely AI, strojově čitelně označeno a může být nepřesné.",
+  "debateChrome.status.waiting": "Čeká na spuštění. Vaše debata se spustí sama v {time}.",
+  "debateChrome.status.waitingOwnDebates": "Vaše ostatní debaty zatím využívají zbytek vašeho limitu. Tato debata se spustí sama, jakmile některá z nich skončí.",
   "debateChrome.backToLibrary": "← Zpět do knihovny",
   "debateChrome.loading": "Načítání…",
   "debateChrome.error.claimGenerationFailed": "Generování tvrzení selhalo",
@@ -207,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "V rámci rozpočtu kompozice nebylo možné vytvořit souhrn",
   "debateChrome.condition.protectedCoreGuardRetired": "Běh se zastavil na rozpočtu; kontrola přeformulování jej již neomezovala",
   "debateChrome.condition.hiddenUnjudgeable": "Skryto: nebylo možné posoudit — obsah zobrazíte zapnutím skrytých položek",
-  "debateChrome.condition.derivedStandingUnreviewed": "Stojí na posouzených argumentech — chybí vlastní kontrola napříč poskytovateli modelů",
+  "debateChrome.condition.derivedStandingUnreviewed": "Stojí na posouzených argumentech — chybí vlastní kontrola modelem jiného tvůrce",
   "debateChrome.condition.hiddenLowScore": "Skryto: skóre je pod zobrazenou prahovou hodnotou",
   "debateChrome.condition.unauthoredBranchHalted": "Rozšiřování zde skončilo — nebylo napsáno nic, co by šlo skrýt nebo zobrazit",
   "debateChrome.condition.labelBasisIncomplete": "Základ verdiktu není úplný — chybí konkurenční postoj nebo druhý hodnotitel ke srovnání",
@@ -295,5 +297,6 @@
   "requestFailure.kind.UNREADABLE": "Odpověď koordinátoru se nepodařilo přečíst, takže výsledek není znám.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinátor odmítl zvolený plán. Vyberte Zdarma nebo Premium a poté akci zopakujte.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinátor požadavek odmítl: model, který tento plán vyžaduje, momentálně není k dispozici. Zkuste to znovu později nebo zvolte jiný plán.",
+  "requestFailure.kind.ALREADY_WAITING": "Čekat může vždy jen jedna otázka. Tuto položte, až začne vaše čekající debata.",
   "requestFailure.kind.UNCLASSIFIED": "K selhání došlo ještě před doručením jakékoli odpovědi, takže výsledek není znám. Nejde o rozhodnutí koordinátoru."
 }

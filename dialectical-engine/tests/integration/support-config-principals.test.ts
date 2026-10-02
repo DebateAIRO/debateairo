@@ -113,6 +113,7 @@ async function prepareCustodyRoot(): Promise<void> {
     writeFile(join(custodyRoot, "secrets", "corpus-kek.bin"), Buffer.alloc(32, 2), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "blind-index-key.bin"), Buffer.alloc(32, 3), { mode: 0o600 }),
     writeFile(join(custodyRoot, "secrets", "audit-source-ip-salt.bin"), Buffer.alloc(32, 4), { mode: 0o600 }),
+    writeFile(join(custodyRoot, "secrets", "records-key.bin"), Buffer.alloc(32, 9), { mode: 0o600 }),
     writeFile(join(custodyRoot, "hatchet.env"),
       "HATCHET_CLIENT_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEiLCJzZXJ2ZXJfdXJsIjoiaHR0cDovL2xvY2FsaG9zdDo4ODg4IiwiZ3JwY19icm9hZGNhc3RfYWRkcmVzcyI6ImxvY2FsaG9zdDo3MDc3In0.test-signature\n",
       { mode: 0o600 })

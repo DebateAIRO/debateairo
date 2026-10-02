@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Kaikki tässä väittelyssä — argumentit, arviot, pisteet ja ratkaisu — on tekoälymallien tuottamaa, koneellisesti luettavasti merkittyä ja mahdollisesti virheellistä.",
+  "debateChrome.status.waiting": "Odottaa alkamista. Väittelysi alkaa itsestään {time}.",
+  "debateChrome.status.waitingOwnDebates": "Muut väittelysi käyttävät toistaiseksi loput rajastasi. Tämä väittely alkaa itsestään heti, kun yksi niistä päättyy.",
   "debateChrome.backToLibrary": "← Takaisin kirjastoon",
   "debateChrome.loading": "Ladataan…",
   "debateChrome.error.claimGenerationFailed": "Väitteen luonti epäonnistui",
@@ -194,7 +196,7 @@
   "debateChrome.condition.unpriced": "Pidättymissolua ei pisteytetty",
   "debateChrome.condition.unadjudicated": "Vastakkaista näyttöä ei löytynyt",
   "debateChrome.condition.uncoveredScope": "Käyttöaluetta ei katettu kokonaan",
-  "debateChrome.condition.unservedMakerPosition": "Toisen laatijan kantaa ei käsitelty",
+  "debateChrome.condition.unservedMakerPosition": "Toisen kehittäjän mallin kantaa ei esitetty",
   "debateChrome.condition.nonComparable": "Tuloksia ei ole laskettu vertailukelpoisesti",
   "debateChrome.condition.notSampled": "Ei otettu näytteeseen",
   "debateChrome.condition.offSubjectDowngrade": "Aiheeseen kuulumattoman näytön arvoa alennettiin",
@@ -207,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "Koostetta ei voitu muodostaa koontibudjetin rajoissa",
   "debateChrome.condition.protectedCoreGuardRetired": "Suoritus pysähtyi budjettiin; uudelleenmuotoilun tarkistus ei enää estänyt sitä",
   "debateChrome.condition.hiddenUnjudgeable": "Piilotettu: ei voitu arvioida — lue näyttämällä piilotetut",
-  "debateChrome.condition.derivedStandingUnreviewed": "Perustuu arvioituihin argumentteihinsa — sen oma osapuolten välinen arvio puuttuu",
+  "debateChrome.condition.derivedStandingUnreviewed": "Perustuu arvioituihin argumentteihinsa — toisen kehittäjän mallin arvio siitä itsestään puuttuu",
   "debateChrome.condition.hiddenLowScore": "Piilotettu: pisteet alittivat näytettävän kynnyksen",
   "debateChrome.condition.unauthoredBranchHalted": "Laajennus päättyi tähän — mitään piilotettavaa tai näytettävää ei kirjoitettu",
   "debateChrome.condition.labelBasisIncomplete": "Tuomion peruste on puutteellinen — vertailuun ei ole kilpailevaa kantaa tai toista tuomaria",
@@ -281,5 +283,6 @@
   "requestFailure.kind.UNREADABLE": "Koordinaattorin vastausta ei voitu lukea, joten lopputulos ei ole tiedossa.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinaattori hylkäsi tilaustason valinnan. Valitse Maksuton tai Premium ja yritä sitten uudelleen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinaattori hylkäsi pyynnön: tämän tilaustason tarvitsema malli ei ole juuri nyt saatavilla. Yritä myöhemmin uudelleen tai valitse toinen tilaustaso.",
+  "requestFailure.kind.ALREADY_WAITING": "Vain yksi kysymys voi odottaa kerrallaan. Esitä tämä, kun odottava väittelysi on alkanut.",
   "requestFailure.kind.UNCLASSIFIED": "Pyyntö epäonnistui ennen vastauksen saapumista, joten lopputulos ei ole tiedossa. Tämä ei ole koordinaattorin tekemä päätös."
 }

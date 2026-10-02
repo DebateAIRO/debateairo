@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hvor vi tilbyder DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi tilbyder DebateAI til personer, der bor i [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
+      { kind: "p", text: "Vi tilbyder DebateAI til personer, der bor i [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
     ]
   },
   {
@@ -113,7 +113,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Disse regler gælder for det, du indsender, den måde, du bruger tjenesten på, og det, du offentliggør." },
       { kind: "p", text: "Indsend ikke personoplysninger om andre personer. Spørg om emner, argumenter og offentlige spørgsmål frem for om identificerbare privatpersoner. Medtag ikke navne, kontaktoplysninger, identifikationsnumre, billeder, helbredsoplysninger, finansielle oplysninger eller andre oplysninger, der identificerer en person, og brug ikke DebateAI til at opbygge en sag, en profil eller et dossier om en person. Spørgsmål om offentlige personer, der handler i deres offentlige rolle, er acceptable; spørgsmål rettet mod en privatperson er ikke. Hvis du alligevel indsender sådanne oplysninger, er du ansvarlig for dem, og vi kan fjerne indholdet." },
-      { kind: "p", text: "Dine egne følsomme oplysninger. De spørgsmål, du stiller, kan vedrøre dit eget helbred, din overbevisning, dine politiske holdninger eller andre følsomme forhold. Du gav samtykke til dette, da du registrerede dig. Hvis du bor et sted med særlige regler om helbredsoplysninger, kan bilag A henvise dig til en særskilt meddelelse." },
+      { kind: "p", text: "Dine egne følsomme oplysninger. De spørgsmål, du stiller, kan vedrøre dit eget helbred, din overbevisning, dine politiske holdninger eller andre følsomme forhold. Du giver samtykke til dette på en særskilt skærm før din første debat. Hvis du bor et sted med særlige regler om helbredsoplysninger, kan bilag A henvise dig til en særskilt meddelelse." },
       { kind: "p", text: "Indsend eller offentliggør ikke ulovligt indhold, herunder indhold, der er ærekrænkende, tilskynder til vold eller had, chikanerer eller truer, udgør intime billeder delt uden samtykke, krænker immaterielle rettigheder eller fortrolighed, afslører forretningshemmeligheder, udgør materiale med seksuelt misbrug af børn eller overtræder sanktioner eller eksportkontrol." },
       { kind: "p", text: "Brug ikke DebateAI til at vildlede. Præsenter ikke genereret output som menneskeskrevet, hvis det ville være vildledende, fjern ikke mærkningen som AI-genereret, og brug det ikke til at fremstille en tilsyneladende enighed, falske beviser eller identitetsefterligning." },
       { kind: "p", text: "Angrib ikke tjenesten. Ingen automatiseret adgang, scraping, crawling eller masseudtræk af offentliggjorte debatter ud over det, vores robots-fil tillader; ingen omgåelse af hastighedsbegrænsninger, godkendelses- eller offentliggørelseskontroller; ingen forsøg på at udtrække prompts eller systeminstruktioner; ingen promptinjektion med henblik på at få motoren til at tilsidesætte sine begrænsninger; ingen sondering eller belastningstest uden vores skriftlige tilladelse." },
@@ -131,6 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Dit indhold forbliver dit. Du beholder alle de rettigheder, du måtte have til de spørgsmål, påstande, bemærkninger og indsigelser, du indsender. Du giver os en ikke-eksklusiv, verdensomspændende, royaltyfri licens til at hoste, opbevare, reproducere, tilpasse og behandle dette indhold med henblik på at drive tjenesten: gennemføre debatten, opbevare den, så du kan genåbne og afspille den igen, yde support, opfylde vores retlige forpligtelser og — kun hvis du vælger at offentliggøre — formålene i afsnit 9. Denne licens ophører, når indholdet slettes, medmindre andet følger af afsnit 9 eller lovgivningen." },
       { kind: "p", text: "Vi træner ikke på dit indhold. Vi træner ikke modeller på dit indhold, og vores aftaler med AI-udbydere udelukker, at de bruger dit indhold til at træne eller forbedre deres modeller. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Sådan når dit indhold frem til AI-udbydere. For at gennemføre en debat sender vi tekst til en eller flere eksterne modeludbydere. En udbyder modtager dit spørgsmål, de styrende bemærkninger, du angiver, og udsagn, som motoren sammensætter under debatten — udbyderen ser således tekst, der er afledt af og opbygget omkring det, du skrev, og ikke kun dine oprindelige ord. Udbyderen modtager aldrig din e-mailadresse, dine kontoidentifikatorer, dine sessionsregistreringer eller dine betalingsoplysninger." },
+      { kind: "p", text: "Hvad supportchatten sender. Supportassistenten er også en AI-model. Når du skriver til den, sender vi din besked til en ekstern modeludbyder, så modellen kan svare, sammen med de hjælpeartikler, den baserer sit svar på. Før afsendelsen maskerer vi alt, der ligner en adgangskode, en engangskode eller en nøgle. Hvis du beder om at tale med en person, sender vi også samtalen, maskeret på samme måde, til modellen, så den kan skrive et kort resumé til det medlem af vores team, der overtager din sag. Vi vedhæfter ikke din e-mailadresse, dine kontoidentifikatorer eller dine betalingsoplysninger, men modellen modtager alt andet, du skriver i chatten, så skriv ikke noget der, som du ikke ønsker, at den skal læse." },
       { kind: "p", text: "Hvilke udbydere og hvor. Vores register over AI-udbydere på [dezbatere.ro/providers] er en del af disse vilkår. Det angiver for hver udbyder, vi kan bruge: dennes juridiske enhed og land; hvad udbyderen modtager og hvorfor; hvor behandlingen finder sted; opbevaringsvilkår; om nulopbevaring af data er aktiveret for det slutpunkt, vi bruger; om udbyderen i henhold til vores aftale må bruge input til træning; den overførselsmekanisme, vi baserer os på; og datoen, hvor vi senest kontrollerede hver registrering. Udbydere kan befinde sig uden for dit land og uden for Det Europæiske Økonomiske Samarbejdsområde. Vores privatlivspolitik forklarer beskyttelsesforanstaltningerne." },
       { kind: "p", text: "Tre forskellige ting. \"Ikke brugt til at træne modeller\", \"opbevaret i en begrænset periode af hensyn til sikkerhed, forebyggelse af misbrug eller retlige grunde\" og \"nulopbevaring af data — ikke lagret efter behandling\" er forskellige ting. Hvis en udbyder opbevarer prompts i en begrænset periode, angiver registeret hvor længe og hvorfor. Hvis nulopbevaring af data er aktiveret, angiver registeret dette og for hvilke funktioner. Vi oplyser ikke, at indhold ikke opbevares, når det faktisk opbevares." },
       { kind: "p", text: "Output. I forholdet mellem dig og os må du bruge outputtet fra dine egne debatter til ethvert lovligt formål, og vi gør ikke ejendomsret gældende til genereret tekst. Vær opmærksom på, at genereret output i mange jurisdiktioner muligvis ikke kan beskyttes af ophavsret; at lignende output kan blive genereret til andre brugere; at output kan gengive eller ligne tredjepartsmateriale; og at visse kildematerialer, som en AI-udbyder henter, kan være underlagt begrænsninger i genbrug. Du er ansvarlig for at kontrollere dette, før du støtter dig på eller genudgiver output." }
@@ -298,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Storbritannien (kun hvis anført i afsnit 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Vores britiske repræsentant i henhold til artikel 27 i den britiske GDPR er [name, address, email]. Consumer Rights Act 2015 gælder for dig, og intet i disse vilkår begrænser dine rettigheder efter denne lov; fra [January 2027] gælder abonnementsreglerne i Digital Markets, Competition and Consumers Act 2024 for betalingsabonnementer, herunder en betænkningstid efter fornyelser og gratis prøveperioder. Sådan beskytter vi brugere mod ulovligt indhold: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktiv teknologi, vi bruger: [describe, or \"none\"]. Alderskontrol: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Klageproceduren i afsnit 10 modtager klager over ulovligt indhold, fejlagtig fjernelse af dit indhold, begrænsninger af din konto, brugen af automatiserede værktøjer, der påvirker dit indhold, og enhver aldersvurdering, der fejlagtigt blokerer dig. Den er åben for personer, der påvirkes af indhold, og som ikke er brugere." }
+      { kind: "p", text: "Vores britiske repræsentant i henhold til artikel 27 i den britiske GDPR er [name, address, email]. Consumer Rights Act 2015 gælder for dig, og intet i disse vilkår begrænser dine rettigheder efter denne lov; når abonnementsreglerne i Digital Markets, Competition and Consumers Act 2024 træder i kraft (forventet i 2027), gælder de for betalingsabonnementer, herunder en betænkningstid efter fornyelser og gratis prøveperioder. Sådan beskytter vi brugere mod ulovligt indhold: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktiv teknologi, vi bruger: [describe, or \"none\"]. Alderskontrol: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Klageproceduren i afsnit 10 modtager klager over ulovligt indhold, fejlagtig fjernelse af dit indhold, begrænsninger af din konto, brugen af automatiserede værktøjer, der påvirker dit indhold, og enhver aldersvurdering, der fejlagtigt blokerer dig. Den er åben for personer, der påvirkes af indhold, og som ikke er brugere. Vores privatlivspolitik, bilag B.2, dækker dine data." }
     ]
   },
   {
@@ -308,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Voldgiftsaftale og afkald på gruppesøgsmål. Hvis du bor i USA, aftaler du og DebateAIRO at afgøre enhver tvist, der udspringer af disse vilkår eller tjenesten, ved bindende individuel voldgift administreret af [the American Arbitration Association / JAMS] efter organisationens forbrugerregler i stedet for ved domstolene, dog således at hver af os kan fremsætte et individuelt krav ved en domstol for mindre krav. Du kan fravælge aftalen ved at sende en e-mail til [address] senest 30 dage efter, at du første gang accepterede disse vilkår. Aftalen er underlagt Federal Arbitration Act. Vi betaler gebyrerne for indledning af voldgiftssagen. Der gives afkald på gruppe-, kollektive og repræsentative søgsmål i det omfang, lovgivningen tillader det. Dette afsnit gælder kun fremadrettet og ikke for krav, der opstod, før du accepterede det." },
       { kind: "p", text: "Meddelelser og fjernelse. Intime billeder uden samtykke kan anmeldes på [URL] uden en konto og fjernes inden for 48 timer efter en gyldig anmodning. Klager over ophavsret sendes til vores udpegede repræsentant, som er anført i afsnit 16." },
-      { kind: "p", text: "Delstatsspecifikt. Californien: Vilkårene om automatisk fornyelse i afsnit 12 gælder; du kan til enhver tid opsige online; vi opbevarer dit samtykke til fornyelsesvilkårene i mindst tre år. New York: Du kan opsige inden for 14 dage efter enhver debitering til en forhøjet pris og modtage en forholdsmæssig tilbagebetaling. Texas og Nebraska: Vi sælger ikke følsomme personoplysninger; hvis dette ændres, indhenter vi først dit samtykke [statutory notice language]. Washington: Vores meddelelse om beskyttelse af forbrugersundhedsdata på [URL] gælder for helbredsrelaterede oplysninger. Colorado: Intet i tjenesten træffer afgørelser om dig med væsentlige konsekvenser." }
+      { kind: "p", text: "Delstatsspecifikt. Californien: Vilkårene om automatisk fornyelse i afsnit 12 gælder; du kan til enhver tid opsige online; vi opbevarer dit samtykke til fornyelsesvilkårene i mindst tre år. New York: Du kan opsige inden for 14 dage efter enhver debitering til en forhøjet pris og modtage en forholdsmæssig tilbagebetaling. Texas og Nebraska: Vi sælger ikke følsomme personoplysninger. Washington: Vores meddelelse om beskyttelse af forbrugersundhedsdata på [URL] gælder for helbredsrelaterede oplysninger. Colorado: Intet i tjenesten træffer afgørelser om dig med væsentlige konsekvenser. Vores privatlivspolitik, bilag B.3, dækker dine data og dine rettigheder efter delstaternes privatlivslove." }
     ]
   },
   {
@@ -316,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada og Quebec (kun hvis anført)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vores privatlivsansvarlige er [name, email]. Quebec: Disse vilkår findes på fransk på [URL], og den franske version blev forelagt dig først; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig." }
+      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er [name], privacy@dezbatere.ro. Vores privatlivspolitik, bilag B.4, dækker dine data. Quebec: Disse vilkår findes på fransk; vælg fransk med sprogvælgeren; de indstillinger, der holder dine debatter private, er slået til som standard; du kan anmode om afindeksering af personoplysninger om dig; ingen voldgiftsaftale eller afkald på gruppesøgsmål gælder for dig." }
     ]
   },
   {
@@ -329,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latinamerika (spansksproget bilag; kun hvis anført)",
+    title: "Schweiz (kun hvis anført)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Samtykke er behandlingsgrundlaget, hvis behandling ikke er nødvendig for opfyldelse af en aftale; ved tilmelding giver du udtrykkeligt samtykke til eventuelle følsomme oplysninger, du vælger at medtage. Dine ARCO-rettigheder kan udøves på [address] med svar inden for [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexico: Den fulde aviso de privacidad findes på [URL]; fortrydelse inden for [5] dage. Argentina: [AAIP legend]; brug botón de arrepentimiento på [URL] inden for 10 dage. Colombia: política de tratamiento findes på [URL]; fortrydelse inden for 5 dage. Chile (fra 1. december 2026): Agenturets kontaktoplysninger er […]; du kan opsige på samme måde, som du tegnede abonnementet; der gælder ingen fortrydelsesret for digitale tjenester." }
+      { kind: "p", text: "Den schweiziske forbundslov om databeskyttelse gælder for dine data (privatlivspolitikken, bilag B.6). Du kan anlægge sag ved domstolene på det sted i Schweiz, hvor du bor. Der gælder ingen lovbestemt fortrydelsesret for betalingsabonnementet; vores tilbagebetalingspolitik er […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Golfen — De Forenede Arabiske Emirater og Saudi-Arabien (kun hvis anført)",
+    title: "Moldova (kun hvis anført)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Hvis vi behandler dine oplysninger til andre formål end at levere tjenesten, gør vi det med dit samtykke, som du kan trække tilbage. Dine oplysninger behandles uden for [UAE / Kingdom of Saudi Arabia], herunder i Den Europæiske Union og USA, i henhold til [SDAIA standard contractual clauses / the mechanism in the Register]. Du er ansvarlig for at sikre, at alt, hvad du offentliggør, overholder lovgivningen i det land, du befinder dig i, herunder lovgivning om religion, offentlig orden og moral; vi kan begrænse offentliggørelsen af debatter om sådanne emner i din region." }
+      { kind: "p", text: "Du har de samme rettigheder efter disse vilkår som en forbruger i Den Europæiske Union, herunder fortrydelsesretten på 14 dage i afsnit 13. Du kan anlægge sag ved domstolene i Moldova. Moldovas lov nr. 195/2024 om beskyttelse af personoplysninger gælder for dine data (privatlivspolitikken, bilag B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Asien og Stillehavsområdet (kun linjerne for anførte regioner)",
+    title: "Ukraine (kun hvis anført)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapore: Vores databeskyttelsesansvarlige er [name, email]; overførsler er baseret på kontraktmæssig beskyttelse, der kan sammenlignes med PDPA; der gælder ingen lovbestemt betænkningstid for betalingsabonnementet, og vores tilbagebetalingspolitik er […]. Japan: Den lovpligtige meddelelse i henhold til Specified Commercial Transactions Act findes på [URL]; der gælder ingen generel betænkningstid for onlineabonnementer, og vores tilbagebetalingspolitik er […]; dit indhold kan overføres til udbydere i [named countries], og du accepterer dette gennem samtykkerne ved tilmelding. Sydkorea: Samtykker til valgfri behandling og markedsføring indhentes særskilt fra de punkter, der er nødvendige for at drive tjenesten; vores privatlivsansvarlige er [name]; du kan fortryde et betalingsabonnement senest 7 dage efter tegningen med forbehold af E-Commerce Act; vi indhenter dit nye samtykke før enhver tilbagevendende prisstigning eller overgang fra gratis til betalt; hvis AI Basic Act kræver det, underretter vi dig på forhånd om, at tjenesten er AI-baseret, og mærker output. Indien (når DPDP-reglerne finder anvendelse): Samtykkemeddelelsen på [URL] gælder; brugere under 18 år kræver verificerbart forældresamtykke. Thailand: Vores repræsentant i Thailand er [name] [if appointed]. Filippinerne: Vores virksomhedsidentifikation og klagemekanisme i henhold til Internet Transactions Act findes på [URL]; klager kan indgives til National Privacy Commission." }
+      { kind: "p", text: "Vi tilbyder DebateAI i Ukraine undtagen i de områder, der ikke kontrolleres af den ukrainske regering. Produktet og disse vilkår findes på ukrainsk. Ukraines lov \"Om beskyttelse af personoplysninger\" gælder for dine data (privatlivspolitikken, bilag B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Reserveret",
+    title: "Israel (kun hvis anført)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Du kan opsige et betalingsabonnement, som Consumer Protection Law, 5741-1981, tillader [state the cancellation terms]. Disse vilkår og vores privatlivspolitik findes på hebraisk. Israels Protection of Privacy Law gælder for dine data (privatlivspolitikken, bilag B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Asien og Stillehavsområdet (kun linjerne for anførte regioner)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapore: Vores databeskyttelsesansvarlige er [name, email]; overførsler er baseret på kontraktmæssig beskyttelse, der kan sammenlignes med PDPA; der gælder ingen lovbestemt betænkningstid for betalingsabonnementet, og vores tilbagebetalingspolitik er […]. Japan: Den lovpligtige meddelelse i henhold til Specified Commercial Transactions Act findes på [URL]; der gælder ingen generel betænkningstid for onlineabonnementer, og vores tilbagebetalingspolitik er […]; vi sender dit indhold til AI-udbydere i USA og Den Europæiske Union, hver i henhold til en kontrakt, der kræver en beskyttelse svarende til Japans Act on the Protection of Personal Information, og på anmodning fortæller vi dig, hvilke foranstaltninger der er tale om. Sydkorea: Samtykker til valgfri behandling og markedsføring indhentes særskilt fra de punkter, der er nødvendige for at drive tjenesten; vores privatlivsansvarlige er [name], privacy@dezbatere.ro; du kan fortryde et betalingsabonnement senest 7 dage efter tegningen med forbehold af E-Commerce Act; vi indhenter dit nye samtykke før enhver tilbagevendende prisstigning eller overgang fra gratis til betalt; tjenesten bruger generativ AI, det fortæller vi dig, før du bruger den, og vi mærker AI-genereret output. Taiwan: Du kan fortryde et betalingsabonnement senest 7 dage efter tegningen i henhold til Consumer Protection Act; Taiwans Personal Data Protection Act gælder for dine data (privatlivspolitikken, bilag B.10). Thailand: Vores repræsentant i Thailand er [name] [if appointed]. Filippinerne: Vores virksomhedsidentifikation og klagemekanisme i henhold til Internet Transactions Act findes på [URL]; klager kan indgives til National Privacy Commission." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Reserveret",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Tyrkiet, Brasilien og Indonesien kræver hver især et bilag på det lokale sprog, en repræsentant eller registrering samt indberetninger. De er ikke udarbejdet her og er ikke omfattet af afsnit 2, før de medtages bevidst. Tjenesten tilbydes ikke i Kina, Vietnam og Rusland." }
     ]
@@ -363,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "e6e08277c4bee0687ec3453f57a119ad6a1121c7fd56d862383bf9baf0bc451b",
   eyebrow: "TJENESTEVILKÅR · v2.0 · GÆLDENDE FRA [DATE]",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DebateAIRO S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",

@@ -6,9 +6,10 @@ import { loadNamespace } from "@/lib/i18n/server";
 export default async function SettingsPage() {
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
-  const [catalog, newDebateCatalog] = await Promise.all([
+  const [catalog, newDebateCatalog, billingCatalog] = await Promise.all([
     loadNamespace(locale, "settings"),
-    loadNamespace(locale, "newDebate")
+    loadNamespace(locale, "newDebate"),
+    loadNamespace(locale, "billing")
   ]);
-  return <SettingsPageClient catalog={catalog} locale={locale} newDebateCatalog={newDebateCatalog} />;
+  return <SettingsPageClient catalog={catalog} locale={locale} newDebateCatalog={newDebateCatalog} billingCatalog={billingCatalog} />;
 }

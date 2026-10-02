@@ -82,7 +82,7 @@
   "misc.answerHonesty.weights": "משקלים {source}",
   "misc.answerHonesty.weightsBy": "משקלים {source} לפי {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "מה עשוי להפוך את המסקנה",
-  "misc.model.houseUnavailable": "יוצר המודל אינו זמין",
+  "misc.model.houseUnavailable": "יוצר המודל לא תועד",
   "misc.model.noRecordedHouse": "לא תועד יוצר מודל עבור טיעון זה.",
   "misc.scoring.unavailable": "ממשק הציונים אינו זמין.",
   "misc.answerHonesty.allGraphItems.two": "כל {count} פריטי התרשים: {state}",

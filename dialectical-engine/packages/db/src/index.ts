@@ -11,6 +11,8 @@ import type {
 } from "@debateai/crypto";
 import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
 
+export * from "./publication-check.js";
+
 export {
   PostgresSessionRepository,
   type LoginChallengeRecord,
@@ -18,6 +20,16 @@ export {
   type SessionAuthenticationRecord,
   type SessionListRecord
 } from "./sessions.js";
+
+export {
+  PostgresEmailChangeRepository,
+  type EmailChangeCancelOutcome,
+  type EmailChangeConfirmOutcome,
+  type EmailChangePendingRecord,
+  type EmailChangeRequestOutcome,
+  type EmailChangeResendOutcome,
+  type EmailSettingsRecord
+} from "./email-change.js";
 
 export {
   PostgresLegacyRunClaimRepository,
@@ -42,6 +54,66 @@ export {
   type StoredServeDisclosure,
   type StoredServeFloor
 } from "./serve-disclosure.js";
+
+// Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): who has which plan and
+// which person a run counts against (migration 0084).
+export {
+  ENTITLEMENT_CAUSES,
+  ENTITLEMENT_PLAN_IDS,
+  EntitlementRepository,
+  type Entitlement,
+  type EntitlementAppend,
+  type EntitlementCause,
+  type EntitlementPlanId
+} from "./billing-entitlement.js";
+
+// Paid plans (spec 2026-09-29 §2.5.2): every billing.* statement except the entitlement (migrations 0085–0087).
+export {
+  BillingRepository,
+  type BillingReadExecutor,
+  type ChargeEventInput,
+  type ChargeEventKind,
+  type ChargeEventRow,
+  type ChargeKind,
+  type ChargeRow,
+  type CustomerXMoneyEnvironment,
+  type DueRenewalCursor,
+  type DueRenewalsOptions,
+  type InvoiceIntentRow,
+  type InvoiceIssuerName,
+  type InvoiceKind,
+  type InvoiceRow,
+  type LocationEvidenceRow,
+  type LocationVerdict,
+  type NoticeRow,
+  type OutboxClaimFence,
+  type OutboxJob,
+  type OutboxKind,
+  type OutboxPayload,
+  type QuoteKind,
+  type QuoteRow,
+  type TaxSummaryRow
+} from "./billing.js";
+
+// Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0083).
+// B8 records the interim roster swap; B9c the runner's cheaper-model calls.
+export {
+  RUN_COST_SUBSTITUTION_REASONS,
+  RunCostSubstitutionRepository,
+  type RunCostSubstitution,
+  type RunCostSubstitutionInput,
+  type RunCostSubstitutionReason
+} from "./run-cost-substitution.js";
+
+// Budget spec 2026-09-28 §2.7 (migration 0083): the waiting line, read through
+// core.run_waiting_v so no owner is stored beside a wait.
+export {
+  RunWaitRepository,
+  type WaitReason,
+  type WaitingRun,
+  type WaitingRunCursor,
+  type WaitingRunRef
+} from "./run-wait.js";
 
 export {
   assertSupportKeyCoverage,
@@ -408,6 +480,14 @@ export async function acquireRunContentLease(
   }
 }
 
+/**
+ * FIX-HS2-p1 sd-B1: true while the calling async context holds a run content lease (a pooled client). A caller
+ * that is about to await an external service asserts it is false, so no pooled client waits on that service.
+ */
+export function isRunContentLeaseHeld(): boolean {
+  return contentLeaseScope.getStore() !== undefined;
+}
+
 export async function withRunContentLease<T>(
   pool: Pool,
   runIds: readonly string[],
@@ -688,6 +768,22 @@ async function argumentLanguageColumnsAreApplied(
   );
   return result.rows[0]?.applied === true;
 }
+
+/**
+ * Budget spec §2.7 (migration 0083). Written against information_schema.columns
+ * on purpose: the projection's unit stubs answer every such probe "not applied".
+ */
+async function runWaitingLineIsApplied(
+  executor: Pick<Pool, "query"> | PoolClient
+): Promise<boolean> {
+  const result = await executor.query<{ applied: boolean }>(
+    `SELECT count(*)=2 AS applied
+     FROM information_schema.columns
+     WHERE table_schema='core' AND table_name IN ('run_wait','run_wait_start')
+       AND column_name='run_id'`
+  );
+  return result.rows[0]?.applied === true;
+}
 type UntypedMethod = (...args: unknown[]) => unknown;
 
 function typedPoolFailure(error: unknown): TypedDomainError {
@@ -743,11 +839,16 @@ function wrapClientQueries(client: PoolClient): PoolClient {
 
 export function createPool(
   connectionString: string,
-  options: Readonly<{ max?: number }> = {}
+  options: Readonly<{ max?: number; connectionTimeoutMillis?: number }> = {}
 ): Pool {
   if (options.max !== undefined
     && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
     throw new TypeError("DATABASE_POOL_MAX_INVALID");
+  }
+  if (options.connectionTimeoutMillis !== undefined
+    && (!Number.isSafeInteger(options.connectionTimeoutMillis)
+      || options.connectionTimeoutMillis < 1 || options.connectionTimeoutMillis > 600_000)) {
+    throw new TypeError("DATABASE_POOL_CONNECTION_TIMEOUT_INVALID");
   }
   const pool = new PgPool({ connectionString,...options });
   let terminalFailure: TypedDomainError | undefined;
@@ -866,6 +967,27 @@ export async function withWriteTransaction<T>(
     throw error;
   } finally {
     client.release();
+  }
+}
+
+/**
+ * `withWriteTransaction` on a connection the caller already holds (a session lease's): BEGIN, the operation, COMMIT,
+ * or ROLLBACK on failure, under the same write-transaction marker, so `assertNoOpenWriteTransaction` refuses a
+ * provider call inside it exactly as it does inside `withWriteTransaction`. The connection is NOT released here: its
+ * owner (the lease) releases it after its own last use.
+ */
+export async function withWriteTransactionOn<T>(
+  client: PoolClient,
+  operation: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  try {
+    await client.query("BEGIN");
+    const result = await writeTransaction.run(true, () => operation(client));
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
   }
 }
 
@@ -1100,7 +1222,7 @@ export interface CurrentRunState {
 export interface RunLoadingProjection {
   readonly runRef: string;
   readonly questionLine: string;
-  readonly state: "QUEUED" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
+  readonly state: "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
   readonly terminalReason: string | null;
   readonly holdUntil: Date | null;
   /**
@@ -1552,6 +1674,15 @@ export class RunRepository {
     const argumentLanguageProjection = await argumentLanguageColumnsAreApplied(this.pool)
       ? ", run.argument_language_tag, run.argument_language_name"
       : "";
+    // Budget spec §2.7: a run with a wait row, no start row and no job yet is
+    // WAITING, not QUEUED — it has no job for anyone to claim until the waker.
+    const waitingProjection = await runWaitingLineIsApplied(this.pool)
+      ? `WHEN count(work.work_item_id) = 0 AND EXISTS (
+             SELECT 1 FROM core.run_wait AS wait
+             WHERE wait.run_id = run.run_id
+               AND NOT EXISTS (SELECT 1 FROM core.run_wait_start AS started WHERE started.run_id = wait.run_id)
+           ) THEN 'WAITING'`
+      : "";
     const result = await this.pool.query<{
       run_id: string;
       question_line: string;
@@ -1565,6 +1696,7 @@ export class RunRepository {
     }>(
       `SELECT run.run_id, run.question_line${contentCiphertextProjection}${argumentLanguageProjection},
          CASE
+           ${waitingProjection}
            WHEN count(work.work_item_id) = 0 THEN 'QUEUED'
            WHEN bool_or(work.state = 'FAILED') THEN 'FAILED'
            WHEN bool_or(work.state = 'CLAIMED') AND COALESCE((
@@ -1789,12 +1921,21 @@ export {
   PostgresIdentityRepository,
   type AuthSourceContext,
   type PendingAccountInput,
+  type RegistrationAgeCheck,
   type PendingAccountResult,
   type RecoveryCodeRecord,
   type ResendPreparation,
   type TotpEnrollmentRecord
 } from "./identity.js";
+export {
+  AcceptanceRepository,
+  type AcceptanceInput,
+  type AcceptanceKind,
+  type AcceptanceSurface,
+  type SignUpAcceptanceRow
+} from "./legal-acceptance.js";
 export * from "./obs-schema.js";
+export { BillingJobQueries } from "./billing-jobs.js";
 export {
   accountRecoveryChannelRefsAad,
   PostgresRecoveryStartRepository

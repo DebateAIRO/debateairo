@@ -18,6 +18,7 @@ import {
   type AcceptanceEnvironment
 } from "./main.js";
 import { startModelShim, type ModelShimHandle } from "./model-shim.js";
+import { assertRelayRuntime } from "./relay-deployment-guard.js";
 import { readAcceptanceRuntimePolicy } from "./runtime-policy.js";
 import { seedAcceptanceRegister } from "./seed-register.js";
 import { startStandingDatabase, type StandingDatabase } from "./standing-db.js";
@@ -248,11 +249,17 @@ async function closeAll(
   await database?.stop().catch(() => undefined);
 }
 
+/**
+ * V-9(c): the ceremony starts the local mode's relays, so it refuses the hosted
+ * deployment (relay-deployment-guard.ts) before it reads its settings, starts the
+ * database or starts a CLI.
+ */
 export async function runAcceptanceCeremony(
   parsed: AcceptanceArguments,
   source: NodeJS.ProcessEnv = process.env,
   options: AcceptanceCeremonyOptions = {}
 ): Promise<LiveAcceptanceCeremony> {
+  assertRelayRuntime(source);
   const ceremony = loadAcceptanceCeremonyEnvironment(source);
   let database: StandingDatabase | null = null;
   let shim: ModelShimHandle | null = null;

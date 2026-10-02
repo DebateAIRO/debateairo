@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { PublicDebateSummary } from "@debateai/contract";
 import { modelMeta } from "@/lib/models";
 import { isComplete, relativeTime, statusLabel } from "@/lib/format";
@@ -7,6 +7,7 @@ import type { DebateSummary } from "@/lib/types";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import composeEnglish from "@/messages/en/compose.json";
+import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
 
 /* The published verdict, in the reader's locale (it used to be the enum title-cased in English). */
 const VERDICT_KEYS: Readonly<Record<NonNullable<PublicDebateSummary["verdict"]>, string>> = {
@@ -37,7 +38,7 @@ function LibraryRow({
   href: string;
   claim: string;
   by?: string;
-  meta: string;
+  meta: ReactNode;
   models: readonly string[];
   status: string;
   state: "complete" | "generating" | "failed" | "contested" | "unsupported";
@@ -97,14 +98,23 @@ export function DebatesBuffer({
   }
   return debates.map((debate) => {
     const failed = debate.status === "failed";
+    const waitsUntil = debate.status === "waiting" ? debate.waits_until ?? null : null;
+    // Budget spec §2.11: a waiting debate says when it will start (C). The time
+    // is formatted in the reader's browser, in their own zone. Final review
+    // Part 1b, Important 1: one that waits only for its person's own running
+    // debates says so in C's place, with no time.
     // A failed row says what happened in the reader's words; its terminal
     // reason code is for operators and never reaches the page.
-    const meta = failed
-      ? runFailureMessage(debate.terminal_reason, catalog)
-      : joinMeta([relativeTime(debate.created_at, timeCatalog, locale),
-         debate.models.length > 0
-           ? tPlural(catalog, "home.models", debate.models.length, locale)
-           : null]);
+    const meta: ReactNode = waitsUntil !== null && debate.waits_for === "OWN_DEBATES"
+      ? t(catalog, "home.status.waitingOwnDebates")
+      : waitsUntil !== null
+      ? <ResetSentence text={t(catalog, "home.status.waiting", { time: RESET_TIME_MARK })} at={waitsUntil} locale={locale} />
+      : failed
+        ? runFailureMessage(debate.terminal_reason, catalog)
+        : joinMeta([relativeTime(debate.created_at, timeCatalog, locale),
+           debate.models.length > 0
+             ? tPlural(catalog, "home.models", debate.models.length, locale)
+             : null]);
     return (
       <LibraryRow
         key={debate.id}

@@ -49,6 +49,16 @@ const hooks = vi.hoisted(() => {
       if (!(index in slots)) slots[index] = { current: initial };
       return slots[index] as { current: T };
     },
+    // B10a's room read (lib/billing/room.ts) and the page's decided plan hold
+    // memoised callbacks. A callback is one slot that keeps its function while
+    // its dependencies are unchanged, with the same cursor discipline.
+    useCallback<T>(callback: T, dependencies?: readonly unknown[]) {
+      const index = cursor++;
+      const previous = slots[index] as { callback: T; dependencies: readonly unknown[] | undefined } | undefined;
+      if (previous !== undefined && sameDependencies(previous.dependencies, dependencies)) return previous.callback;
+      slots[index] = { callback, dependencies };
+      return callback;
+    },
     useEffect(effect: () => void | (() => void), dependencies?: readonly unknown[]) {
       const index = cursor++;
       const previous = slots[index] as readonly unknown[] | undefined;
@@ -68,6 +78,7 @@ const hooks = vi.hoisted(() => {
 
 vi.mock("react", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react")>()),
+  useCallback: hooks.useCallback,
   useEffect: hooks.useEffect,
   useRef: hooks.useRef,
   useState: hooks.useState
@@ -81,7 +92,9 @@ vi.mock("@/components/AuthGate", () => ({
 }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/api.js")>()),
-  contractClient: { readDeployment: pageMocks.readDeployment, readSession: pageMocks.readSession },
+  // This account already gave its one-time sensitive-data consent (V, 2026-09-29).
+  contractClient: { readDeployment: pageMocks.readDeployment, readSession: pageMocks.readSession,
+    readSensitiveDataConsent: async () => ({ status: "given" as const }) },
   createDebate: pageMocks.createDebate
 }));
 

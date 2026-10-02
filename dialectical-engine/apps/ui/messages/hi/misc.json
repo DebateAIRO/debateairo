@@ -82,7 +82,7 @@
   "misc.answerHonesty.weights": "भार {source}",
   "misc.answerHonesty.weightsBy": "{owner} द्वारा {source} के भार",
   "misc.answerHonesty.whatWouldReverseThis": "इसे क्या उलट सकता है",
-  "misc.model.houseUnavailable": "समूह उपलब्ध नहीं है",
-  "misc.model.noRecordedHouse": "इस तर्क के लिए कोई दर्ज समूह उपलब्ध नहीं है।",
+  "misc.model.houseUnavailable": "मॉडल निर्माता दर्ज नहीं है",
+  "misc.model.noRecordedHouse": "इस तर्क के लिए मॉडल निर्माता दर्ज नहीं है।",
   "misc.scoring.unavailable": "अंकन का उपयोगकर्ता इंटरफ़ेस उपलब्ध नहीं है।"
 }

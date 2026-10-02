@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "इस वाद-विवाद की हर चीज़ — तर्क, समीक्षाएँ, अंक और निर्णय — AI मॉडलों द्वारा जनरेट की गई है, मशीन-पठनीय रूप में चिह्नित है और गलत हो सकती है।",
+  "debateChrome.status.waiting": "शुरू होने की प्रतीक्षा में। आपका वाद-विवाद {time} पर अपने-आप शुरू होगा।",
+  "debateChrome.status.waitingOwnDebates": "आपके अन्य वाद-विवाद अभी आपकी बची हुई सीमा का उपयोग कर रहे हैं। यह वाद-विवाद उनमें से किसी एक के समाप्त होते ही अपने-आप शुरू हो जाएगा।",
   "debateChrome.backToLibrary": "← संग्रह पर वापस जाएँ",
   "debateChrome.loading": "लोड हो रहा है…",
   "debateChrome.error.claimGenerationFailed": "दावा तैयार नहीं हो सका",
@@ -207,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "रचना-बजट में कोई सार-संकलन नहीं बन सका",
   "debateChrome.condition.protectedCoreGuardRetired": "बजट पर संचालन रुका; पुनर्कथन जाँच अब इसे नियंत्रित नहीं करती",
   "debateChrome.condition.hiddenUnjudgeable": "छिपा हुआ: निर्णय नहीं किया जा सका — पढ़ने के लिए छिपी सामग्री दिखाएँ",
-  "debateChrome.condition.derivedStandingUnreviewed": "अपने निर्णीत तर्कों पर कायम — इसकी अपनी अंतर-समूह समीक्षा उपलब्ध नहीं है",
+  "debateChrome.condition.derivedStandingUnreviewed": "अपने निर्णीत तर्कों पर कायम — दूसरे निर्माता के मॉडल द्वारा इसकी अपनी समीक्षा नहीं हुई है",
   "debateChrome.condition.hiddenLowScore": "छिपा हुआ: दिखायी गई सीमा से कम अंक",
   "debateChrome.condition.unauthoredBranchHalted": "विस्तार यहाँ रुका — छिपाने या दिखाने के लिए कुछ लिखा नहीं गया",
   "debateChrome.condition.labelBasisIncomplete": "निर्णय का आधार अधूरा — तुलना के लिए कोई प्रतिद्वंद्वी पक्ष या दूसरा निर्णायक नहीं",
@@ -281,5 +283,6 @@
   "requestFailure.kind.UNREADABLE": "समन्वयक का उत्तर पढ़ा नहीं जा सका, इसलिए परिणाम अज्ञात है।",
   "requestFailure.kind.PLAN_TIER_INVALID": "समन्वयक ने योजना का चयन अस्वीकार कर दिया। निःशुल्क या प्रीमियम चुनें, फिर प्रयास करें।",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "समन्वयक ने अनुरोध अस्वीकार कर दिया: इस योजना के लिए आवश्यक मॉडल अभी उपलब्ध नहीं है। बाद में फिर प्रयास करें या दूसरी योजना चुनें।",
+  "requestFailure.kind.ALREADY_WAITING": "एक समय में केवल एक प्रश्न प्रतीक्षा कर सकता है। अपना प्रतीक्षारत वाद-विवाद शुरू होने के बाद यह प्रश्न पूछें।",
   "requestFailure.kind.UNCLASSIFIED": "कोई उत्तर आने से पहले ही अनुरोध विफल हो गया, इसलिए परिणाम अज्ञात है। यह समन्वयक द्वारा लिया गया निर्णय नहीं है।"
 }

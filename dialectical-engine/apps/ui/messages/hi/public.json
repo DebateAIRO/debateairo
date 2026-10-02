@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "यह रिपोर्ट उपलब्ध नहीं है।",
   "public.report.error.tryAgain": "रिपोर्ट अभी तैयार नहीं की जा सकी। कृपया थोड़ी देर बाद फिर से प्रयास करें।",
   "public.story.morePaths.one": "और {count} मत",
-  "public.story.morePaths.other": "और {count} मत"
+  "public.story.morePaths.other": "और {count} मत",
+  "public.publication.contentCheck.refusedHeading": "हमने यह बहस प्रकाशित नहीं की",
+  "public.publication.contentCheck.refusedWhatBlock": "स्वचालित जाँच में इस बहस में ऐसा पाठ मिला जो हमारे नियमों का उल्लंघन करता है, इसलिए बहस प्रकाशित नहीं की गई।",
+  "public.publication.contentCheck.refusedWhatUnsure": "स्वचालित जाँच यह पुष्टि नहीं कर सकी कि यह बहस हमारे नियमों का पालन करती है, इसलिए बहस प्रकाशित नहीं की गई।",
+  "public.publication.contentCheck.partsIntro": "जाँच में पाठ यहाँ मिला:",
+  "public.publication.contentCheck.part.question": "सवाल",
+  "public.publication.contentCheck.part.summary": "सारांश, निष्कर्ष संबंधी टिप्पणियाँ और शेष आपत्तियाँ",
+  "public.publication.contentCheck.part.arguments": "तर्क",
+  "public.publication.contentCheck.part.reviews": "समीक्षकों की टिप्पणियाँ",
+  "public.publication.contentCheck.part.story": "निष्कर्ष की कहानी",
+  "public.publication.contentCheck.groundTerms": "आधार: हमारी सेवा की शर्तें, खंड 7 (हिंसा या घृणा भड़काने वाली सामग्री की अनुमति नहीं है)।",
+  "public.publication.contentCheck.groundIllegal": "यह पाठ गैरकानूनी भी हो सकता है।",
+  "public.publication.contentCheck.automated": "यह निर्णय एक स्वचालित उपकरण ने लिया है। अभी तक किसी व्यक्ति ने इसकी समीक्षा नहीं की है।",
+  "public.publication.contentCheck.stillPrivate": "आपकी बहस निजी और अपरिवर्तित रहती है। केवल आप इसे देख सकते हैं।",
+  "public.publication.contentCheck.appeal": "किसी व्यक्ति से इस निर्णय की समीक्षा करवाने के लिए छह महीने के भीतर [appeals@dezbatere.ro] पर लिखें।",
+  "public.publication.contentCheck.unavailable": "सामग्री की जाँच अभी उपलब्ध नहीं है, इसलिए कुछ भी प्रकाशित नहीं हुआ। आपकी बहस निजी रहती है। कुछ मिनट बाद फिर कोशिश करें।"
 }

@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Khoảng trống",
   "debateDrawers.node.honestyAriaLabel": "Tính trung thực của nút V3",
   "debateDrawers.node.noArgumentText": "Chưa có nội dung lập luận.",
-  "debateDrawers.node.noCompletedReview": "Chưa ghi nhận đánh giá hoàn tất của bên tạo thứ hai cho nút này.",
+  "debateDrawers.node.noCompletedReview": "Chưa ghi nhận đánh giá hoàn tất do mô hình của một nhà phát triển khác thực hiện cho nút này.",
   "debateDrawers.node.noPreviousGenerations": "Không có lần tạo trước.",
   "debateDrawers.node.noScoringRecommendation": "Không có đề xuất chấm điểm cho lập luận này.",
   "debateDrawers.node.notUseful": "không hữu ích",

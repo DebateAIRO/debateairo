@@ -34,15 +34,31 @@ describe("Support catalog route coverage", () => {
       "/",
       "/admin/workers",
       "/ai-transparency",
+      "/cancel",
+      "/checkout",
+      "/checkout/return",
+      "/cookies",
       "/debate/[id]",
       "/enroll-mfa",
       "/help",
+      "/legal",
       "/login",
       "/new",
+      "/pricing",
+      "/privacy",
+      "/privacy/us-health-data",
+      "/privacy/versions",
+      "/privacy/versions/[sha256]",
+      "/providers",
       "/public/debate/[id]",
       "/settings",
+      "/settings/card",
       "/sign-up",
+      "/terms",
+      "/terms/versions",
+      "/terms/versions/[sha256]",
       "/verify-email",
+      "/withdraw",
     ]);
   });
 
@@ -56,6 +72,36 @@ describe("Support catalog route coverage", () => {
     expect(disposition.get("/debate/[id]")).toBe("trusted-context-only");
     expect(disposition.get("/public/debate/[id]")).toBe("trusted-context-only");
     expect(SUPPORT_PROXY_ROUTES).toEqual(["/api/[...path]"]);
+  });
+
+  it("keeps the Turn 15 legal pages public, actionless, and backed by the privacy article", () => {
+    // Property: a legal page is reference reading — the assistant may name it, never act through it.
+    for (const route of ["/legal", "/terms", "/terms/versions", "/privacy", "/privacy/us-health-data", "/cookies", "/providers"]) {
+      expect(SUPPORT_CAPABILITIES.find((capability) => capability.route === route), route).toMatchObject({
+        audience: "any", availability: "public", actionIds: [], articleIds: ["privacy-consent"]
+      });
+    }
+  });
+
+  it("keeps the paid-plan pages actionless, and the card pages out of Support", () => {
+    // Property: the assistant may name a paid-plan page but never act through one, and it never names the pages
+    // that carry xMoney's card form (A11).
+    const byRoute = new Map(SUPPORT_CAPABILITIES.map((capability) => [capability.route, capability]));
+    const publicPages = ["/cancel", "/pricing", "/withdraw", "/privacy/versions", "/terms/versions/[sha256]", "/privacy/versions/[sha256]"];
+    for (const route of publicPages) {
+      expect(byRoute.get(route), route).toMatchObject({
+        audience: "any", availability: "public", disposition: "action", actionIds: []
+      });
+    }
+    const cardPages = ["/checkout", "/checkout/return", "/settings/card"];
+    for (const route of cardPages) {
+      expect(byRoute.get(route), route).toMatchObject({
+        audience: "member", availability: "excluded", disposition: "excluded", actionIds: []
+      });
+    }
+    for (const route of ["/privacy/versions", "/terms/versions/[sha256]", "/privacy/versions/[sha256]"]) {
+      expect(byRoute.get(route)?.articleIds, route).toEqual(["privacy-consent"]);
+    }
   });
 
   it("maps every capability article id to a complete bilingual pair", () => {

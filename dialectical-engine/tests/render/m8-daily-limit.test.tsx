@@ -37,7 +37,8 @@ vi.mock("@/lib/api", () => ({
   COOKIE_SESSION_MARKER: "cookie-session",
   createDebate: mocks.createDebate,
   validateSession: mocks.validateSession,
-  contractClient: { readSession: mocks.readSession }
+  // This account already gave its one-time sensitive-data consent (V, 2026-09-29).
+  contractClient: { readSession: mocks.readSession, readSensitiveDataConsent: async () => ({ status: "given" as const }) }
 }));
 vi.mock("@/components/AuthGate", () => ({
   AuthGate: ({ children }: { children: (token: string) => ReactNode }) => children("test-token")
@@ -114,7 +115,7 @@ async function type(field: HTMLTextAreaElement, value: string): Promise<void> {
 
 function composer(locale: "en" | "ro"): ReactElement {
   const catalog = Object.freeze({ ...catalogue(locale, "home"), ...catalogue(locale, "chrome") });
-  return <LibraryComposer catalog={catalog} newDebateCatalog={catalogue(locale, "newDebate")} />;
+  return <LibraryComposer catalog={catalog} newDebateCatalog={catalogue(locale, "newDebate")} locale={locale} />;
 }
 
 async function startFromHome(locale: "en" | "ro"): Promise<HTMLElement> {

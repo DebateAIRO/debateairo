@@ -14,6 +14,7 @@
   "time.status.claimed": "Otettu käsittelyyn",
   "time.status.running": "Käynnissä",
   "time.status.holding": "Odottaa palveluntarjoajan palautumista",
+  "time.status.waiting": "Odottaa",
   "time.status.settled": "Ratkaistu",
   "time.status.generating": "Luodaan",
   "time.status.failed": "Epäonnistui",

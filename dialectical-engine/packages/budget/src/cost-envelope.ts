@@ -22,6 +22,7 @@
  * ceiling must fail in.
  */
 import { TypedDomainError } from "@debateai/kernel";
+import type { SpendScope } from "./person-allowance.js";
 
 /** The fixed small unit: 1 USD = 1 000 000 micro-units. */
 export const COST_MICROS_PER_USD = 1_000_000 as const;
@@ -466,6 +467,35 @@ export function dailyCostEnvelopeReached(
     `The application has spent ${decision.spentMicrosToday} of ${decision.ceilingMicros}`
       + ` ${COST_ENVELOPE_CURRENCY} micro-units today; new runs resume on the next UTC day`
   );
+}
+
+/**
+ * B9 (budget spec §2.9, paid-plans spec §2.4.1) — THE REFUSAL A CALL WHILE
+ * ARGUING GETS FROM ONE OF THE RUN OWNER'S ALLOWANCE WINDOWS.
+ *
+ * Raised by the RUN seam's shared wall before anything is sent, exactly like
+ * the run's own money refusal, so a refused try costs nothing. It stops the
+ * arguing (stop kind ALLOWANCE in the runner) and never fails a run: the first
+ * position's own call and every answer-writing call are exempt from the wall.
+ */
+export const PERSON_ALLOWANCE_REACHED = "PERSON_ALLOWANCE_REACHED" as const;
+
+/**
+ * B9 — the shared wall's refusal for one scope. The site's day keeps the code
+ * the day has always had (DAILY_COST_ENVELOPE_REACHED); a person's window has
+ * its own. FIGURE-FREE on purpose: a person's spend is theirs, and a refusal's
+ * message can travel into a failure reason, so only the scope is named.
+ */
+export function sharedWallReached(scope: SpendScope): TypedDomainError {
+  return scope === "SITE_DAY"
+    ? new TypedDomainError(
+        DAILY_COST_ENVELOPE_REACHED,
+        "A call while arguing would take the application's day past its finish edge"
+      )
+    : new TypedDomainError(
+        PERSON_ALLOWANCE_REACHED,
+        `A call while arguing would take the run owner's ${scope} allowance past its finish edge`
+      );
 }
 
 /** The refusal a hosted answer gets when its vendor reported no usage figures. */

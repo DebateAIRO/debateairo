@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Alt i denne debat — argumenter, gennemgange, bedømmelser og konklusionen — er genereret af AI-modeller, maskinlæsbart markeret og kan være unøjagtigt.",
+  "debateChrome.status.waiting": "Venter på at starte. Din debat starter af sig selv {time}.",
+  "debateChrome.status.waitingOwnDebates": "Dine andre debatter bruger resten af din grænse lige nu. Denne debat starter af sig selv, så snart en af dem er færdig.",
   "debateChrome.backToLibrary": "← Tilbage til biblioteket",
   "debateChrome.loading": "Indlæser…",
   "debateChrome.error.claimGenerationFailed": "Generering af påstand mislykkedes",
@@ -194,7 +196,7 @@
   "debateChrome.condition.unpriced": "Afståelsescelle ikke prissat",
   "debateChrome.condition.unadjudicated": "Ingen modstridende evidens fundet",
   "debateChrome.condition.uncoveredScope": "Omfanget er ikke fuldt dækket",
-  "debateChrome.condition.unservedMakerPosition": "En anden ophavspersons position blev ikke forelagt",
+  "debateChrome.condition.unservedMakerPosition": "En anden modeludviklers position blev ikke forelagt",
   "debateChrome.condition.nonComparable": "Resultaternes beregningsgrundlag er ikke sammenligneligt",
   "debateChrome.condition.notSampled": "Ikke udtaget",
   "debateChrome.condition.offSubjectDowngrade": "Evidens uden for emnet nedgraderet",
@@ -207,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "Der kunne ikke udarbejdes et sammendrag inden for kompositionsbudgettet",
   "debateChrome.condition.protectedCoreGuardRetired": "Kørslen stoppede på grund af budgettet; kontrollen af omformuleringen blokerede den ikke længere",
   "debateChrome.condition.hiddenUnjudgeable": "Skjult: kunne ikke bedømmes — vis skjulte elementer for at læse det",
-  "debateChrome.condition.derivedStandingUnreviewed": "Baseret på de bedømte argumenter — mangler egen tværgående gennemgang",
+  "debateChrome.condition.derivedStandingUnreviewed": "Baseret på de bedømte argumenter — mangler egen gennemgang fra en anden modeludvikler",
   "debateChrome.condition.hiddenLowScore": "Skjult: bedømt under den viste tærskel",
   "debateChrome.condition.unauthoredBranchHalted": "Udvidelsen stoppede her — der blev ikke skrevet noget, som kunne skjules eller vises",
   "debateChrome.condition.labelBasisIncomplete": "Grundlaget for konklusionen er ufuldstændigt — ingen rivaliserende position eller ingen anden dommer at sammenligne med",
@@ -281,5 +283,6 @@
   "requestFailure.kind.UNREADABLE": "Koordinatorens svar kunne ikke læses, så udfaldet er ukendt.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatoren afviste planvalget. Vælg Free eller Premium, og prøv derefter igen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatoren afviste anmodningen, fordi en model, som denne plan kræver, ikke er tilgængelig lige nu. Prøv igen senere, eller vælg den anden plan.",
+  "requestFailure.kind.ALREADY_WAITING": "Kun ét spørgsmål kan vente ad gangen. Stil dette, når din ventende debat er startet.",
   "requestFailure.kind.UNCLASSIFIED": "Anmodningen mislykkedes, før der kom et svar, så udfaldet er ukendt. Det er ikke en afgørelse, som koordinatoren har truffet."
 }

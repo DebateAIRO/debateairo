@@ -45,7 +45,8 @@ function recorder(holds: number) {
 describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
   it("RESIL-01 rev2 H1/H2/H7 pins both maker roots to the cooldown seam and the effective preflight bound", async () => {
     const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
-    expect(source).toMatch(/const primaryAttempt = await cooldownAttempt\(\{\s*callSiteKey: "JUDGE",[\s\S]*?failureScope: "MAKER_POSITION"/);
+    expect(source).toMatch(/const primaryAttempt = await cooldownAttempt\(\{\s*callSiteKey: FIRST_POSITION_CALL_SITE_KEY,[\s\S]*?failureScope: "MAKER_POSITION"/);
+    expect(source).toContain('export const FIRST_POSITION_CALL_SITE_KEY = "JUDGE" as const;');
     // V-28 (task 11) changed the DECLARATION, not the routing: the secondary
     // root is authored inside a try/catch that turns a spend refusal into a
     // clean stop instead of discarding an already-minted root 0, so `secondary`

@@ -190,5 +190,20 @@
   "public.report.error.tryAgain": "Izvješće trenutačno nije bilo moguće pripremiti. Pokušajte ponovno za nekoliko trenutaka.",
   "public.story.morePaths.one": "i još {count} stajalište",
   "public.story.morePaths.few": "i još {count} stajališta",
-  "public.story.morePaths.other": "i još {count} stajališta"
+  "public.story.morePaths.other": "i još {count} stajališta",
+  "public.publication.contentCheck.refusedHeading": "Nismo objavili ovu raspravu",
+  "public.publication.contentCheck.refusedWhatBlock": "Automatska provjera pronašla je u ovoj raspravi tekst koji krši naša pravila, pa rasprava nije objavljena.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Automatska provjera nije mogla potvrditi da ova rasprava slijedi naša pravila, pa rasprava nije objavljena.",
+  "public.publication.contentCheck.partsIntro": "Gdje je provjera pronašla tekst:",
+  "public.publication.contentCheck.part.question": "Pitanje",
+  "public.publication.contentCheck.part.summary": "Sažetak, bilješke o zaključku i preostali prigovori",
+  "public.publication.contentCheck.part.arguments": "Argumenti",
+  "public.publication.contentCheck.part.reviews": "Komentari ocjenjivača",
+  "public.publication.contentCheck.part.story": "Priča o zaključku",
+  "public.publication.contentCheck.groundTerms": "Osnova: naši Uvjeti korištenja, odjeljak 7 (nije dopušten sadržaj koji potiče nasilje ili mržnju).",
+  "public.publication.contentCheck.groundIllegal": "Tekst može biti i nezakonit.",
+  "public.publication.contentCheck.automated": "Ovu je odluku donio automatizirani alat. Nijedna je osoba još nije pregledala.",
+  "public.publication.contentCheck.stillPrivate": "Vaša rasprava ostaje privatna i nepromijenjena. Samo je vi možete vidjeti.",
+  "public.publication.contentCheck.appeal": "Da biste zatražili da osoba preispita ovu odluku, pišite na [appeals@dezbatere.ro] u roku od šest mjeseci.",
+  "public.publication.contentCheck.unavailable": "Provjera sadržaja trenutačno nije dostupna, pa ništa nije objavljeno. Vaša rasprava ostaje privatna. Pokušajte ponovno za nekoliko minuta."
 }

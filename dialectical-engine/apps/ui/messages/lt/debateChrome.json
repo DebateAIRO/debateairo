@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Viską šiuose debatuose — argumentus, peržiūras, įverčius ir verdiktą — generuoja DI modeliai; turinys pažymėtas kompiuterio skaitoma žyma ir gali būti netikslus.",
+  "debateChrome.status.waiting": "Laukiama pradžios. Jūsų debatai prasidės patys {time}.",
+  "debateChrome.status.waitingOwnDebates": "Kiti jūsų debatai kol kas naudoja likusią jūsų ribos dalį. Šie debatai prasidės patys, kai tik vieni iš jų baigsis.",
   "debateChrome.backToLibrary": "← Grįžti į biblioteką",
   "debateChrome.loading": "Įkeliama…",
   "debateChrome.error.claimGenerationFailed": "Nepavyko sugeneruoti teiginio",
@@ -295,5 +297,6 @@
   "requestFailure.kind.UNREADABLE": "Koordinatoriaus atsakymo perskaityti nepavyko, todėl užklausos baigtis nežinoma.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatorius atmetė plano pasirinkimą. Pasirinkite „Nemokamas“ arba „Premium“ ir bandykite dar kartą.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatorius atmetė užklausą: šiam planui reikalingas modelis šiuo metu nepasiekiamas. Bandykite vėliau arba pasirinkite kitą planą.",
+  "requestFailure.kind.ALREADY_WAITING": "Vienu metu laukti gali tik vienas klausimas. Šį klausimą užduokite, kai prasidės jūsų laukiantys debatai.",
   "requestFailure.kind.UNCLASSIFIED": "Užklausos įvykdyti nepavyko dar negavus jokio atsakymo, todėl jos baigtis nežinoma. Tai ne koordinatoriaus sprendimas."
 }

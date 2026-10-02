@@ -4,6 +4,7 @@ import {
   type DevelopmentRunnerChild,
   type DevelopmentRunnerProcessOperations
 } from "../../apps/runner/src/dev-runner-process.js";
+import { DEVELOPMENT_CLI_CALL_TIMEOUT_MS } from "../../apps/runner/src/dev-provider-panel.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
 
 function deferred<T>() {
@@ -19,6 +20,8 @@ function deferred<T>() {
 function apiEnvironment(): Readonly<Record<string, string>> {
   return Object.freeze({
     PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
+    // The dev API's own value (dev-api-environment.ts): the CLI call timeout.
+    PROVIDER_PROBE_TIMEOUT_MS: String(DEVELOPMENT_CLI_CALL_TIMEOUT_MS),
     REGISTER_VERSION: "424242",
     REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
     REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
@@ -141,5 +144,61 @@ describe("development runner process lifecycle", () => {
       repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
     })).rejects.toThrow("DEV_RUNNER_PROCESS_START_FAILED");
     expect(runtime.environment).toEqual([]);
+  });
+  /**
+   * FIX-HS1-probe-timeout (hate-speech TEST rehearsal 2, runs 20acc13d and
+   * d85fb35d): the runner re-probes each panel member at claim time with
+   * PROVIDER_PROBE_TIMEOUT_MS, but this builder never forwarded it, so the
+   * schema default (5 s) applied while the API probed with 180 s. The CLIs
+   * answered after the runner had given up: RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM.
+   * The CLASS: a value the dev API and the dev runner both read, where the
+   * runner's copy is not forwarded and falls back to a different default.
+   */
+  it("forwards the API's provider probe timeout, so the claim-time probe waits as long as the API's", async () => {
+    const runtime = operations();
+    const runner = await startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+    });
+    expect(runtime.environment[0]?.PROVIDER_PROBE_TIMEOUT_MS).toBe(apiEnvironment().PROVIDER_PROBE_TIMEOUT_MS);
+    expect(runtime.environment[0]?.PROVIDER_PROBE_TIMEOUT_MS).toBe("180000");
+    await runner.stop();
+  });
+
+  it("the API's value wins over a probe timeout the command environment carries", async () => {
+    const runtime = operations();
+    const runner = await startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: { PROVIDER_PROBE_TIMEOUT_MS: "5000" }, operations: runtime
+    });
+    expect(runtime.environment[0]?.PROVIDER_PROBE_TIMEOUT_MS).toBe("180000");
+    await runner.stop();
+  });
+
+  it("when the API carries no probe timeout, the runner carries none either: both read the same schema default", async () => {
+    const { PROVIDER_PROBE_TIMEOUT_MS: _dropped, ...withoutTimeout } = apiEnvironment();
+    const runtime = operations({ apiEnvironment: withoutTimeout });
+    const runner = await startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+    });
+    expect(runtime.environment[0]).not.toHaveProperty("PROVIDER_PROBE_TIMEOUT_MS");
+    await runner.stop();
+  });
+
+  it("the class sweep: every value the API and the runner both read reaches the runner equal to the API's", async () => {
+    const runtime = operations();
+    const runner = await startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
+    });
+    const forwarded = runtime.environment[0]!;
+    const api = apiEnvironment();
+    for (const key of [
+      "KEK_PATH", "DATABASE_URL", "REGISTER_VERSION", "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
+      "REGISTER_DEPLOYMENT_RECEIPT_FILE", "CONTENT_ENCRYPTION_ENABLED", "USER_DEK_STORE_PATH",
+      "PROVIDER_DISCOVERY_TARGETS_JSON", "PROVIDER_PROBE_TIMEOUT_MS",
+      "HATCHET_CLIENT_TOKEN", "HATCHET_HOST_PORT", "HATCHET_API_URL", "HATCHET_TENANT_ID",
+      "HATCHET_WORKFLOW_NAME", "HATCHET_TLS_STRATEGY"
+    ]) {
+      expect(forwarded[key], key).toBe(api[key]);
+    }
+    await runner.stop();
   });
 });

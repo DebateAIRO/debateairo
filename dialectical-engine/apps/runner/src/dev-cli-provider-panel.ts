@@ -1,7 +1,9 @@
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+import { loadDeploymentModeSource } from "@debateai/register";
 import { startClaudeRelay } from "../../../acceptance/claude-relay.js";
 import { startGrokRelay } from "../../../acceptance/grok-relay.js";
 import { startModelShim } from "../../../acceptance/model-shim.js";
+import { assertRelayRuntime } from "../../../acceptance/relay-deployment-guard.js";
 import {
   buildDevelopmentProviderPanel,
   developmentCliProviderRoster,
@@ -51,10 +53,16 @@ async function closeRelays(relays: readonly DevelopmentCliRelay[]): Promise<void
   if (rejected?.status === "rejected") throw rejected.reason;
 }
 
+/**
+ * V-9(c): the panel is the local mode's relays, so it refuses the hosted
+ * deployment (acceptance/relay-deployment-guard.ts) before it starts any of them.
+ */
 export async function startDevelopmentCliProviderPanel(
   operations: DevelopmentCliProviderPanelOperations = createDevelopmentCliProviderPanelOperations(),
-  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
+  environment: Readonly<Record<string, string | undefined>> = loadDeploymentModeSource()
 ): Promise<DevelopmentCliProviderPanelHandle> {
+  assertRelayRuntime(environment);
   const roster = developmentCliProviderRoster(profile);
   const settled = await Promise.allSettled(operations.starts.map((start, index) =>
     start(roster[index]!.port)

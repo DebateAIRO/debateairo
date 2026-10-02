@@ -8,7 +8,8 @@ const lock = readFileSync(resolve(root, "pnpm-lock.yaml"), "utf8");
 
 function resolvedVersions(name: string): string[] {
   const escaped = name.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
-  const pattern = new RegExp(`^  ${escaped}@(\\d+\\.\\d+\\.\\d+)`, "gm");
+  // Scoped names are quoted in the lockfile ('@scope/name@1.2.3'), so an optional quote leads.
+  const pattern = new RegExp(`^  '?${escaped}@(\\d+\\.\\d+\\.\\d+)`, "gm");
   return [...new Set([...lock.matchAll(pattern)].map((match) => match[1]!))];
 }
 
@@ -31,12 +32,33 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // pnpm audit went red again on paths nothing in this repo reaches with attacker input
   // (fastify's own ajv/fast-json-stringify compilers; qs under the Hatchet SDK; vitest).
   // Floors, not exclusions: every version below cleared the 7-day cooldown on its own.
-  fastify: (v) => compare(v, "5.12.1") < 0,
-  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.6") < 0)
-    || (v.startsWith("4.") && compare(v, "4.1.3") < 0),
+  // 2026-10-01: GHSA advisories on fastify < 5.12.2 (request body replacement, authentication,
+  // request and header validation bypasses) and < 5.12.5 (an unhandled-error denial of service)
+  // turned pnpm audit red; 5.12.5 was published 2026-09-16, so it clears the cooldown.
+  fastify: (v) => compare(v, "5.12.5") < 0,
+  // 2026-10-01: the axios advisories of 1.x < 1.20.0 (ReDoS, prototype-pollution gadgets, header
+  // injection, proxy and redirect bypasses), reached through the Hatchet SDK; 1.20.0 was
+  // published 2026-08-26.
+  axios: (v) => v.startsWith("1.") && compare(v, "1.20.0") < 0,
+  // 2026-10-01: the @grpc/grpc-js advisory of >=1.14.0 <1.14.5, reached through testcontainers >
+  // dockerode (test tooling only); 1.14.5 was published 2026-09-17.
+  "@grpc/grpc-js": (v) => v.startsWith("1.14.") && compare(v, "1.14.5") < 0,
+  // 2026-09-29: GHSA-qw65-cvwx-89v3 (all of 3.x < 3.1.7 and 4.x < 4.1.4) and GHSA-58mr-gqgx-xq4g
+  // (exactly the 3.1.6 / 4.1.3 the floors above used to pin) turned pnpm audit red; 3.1.7 and
+  // 4.1.4 were published 2026-09-02, so they clear the 7-day cooldown on their own.
+  // 2026-09-30: GHSA-hrr3-gc8f-f4qj (3.x < 3.1.8, 4.x < 4.1.5) and GHSA-jvvf-x445-j334;
+  // 3.1.8 and 4.1.5 were published 2026-09-15.
+  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.8") < 0)
+    || (v.startsWith("4.") && compare(v, "4.1.5") < 0),
+  // 2026-09-30: GHSA-6j4f-fj2g-mc7p / GHSA-qhr7-859c-m2p7 / GHSA-q2hr-2g5m-vwhr (2.x < 2.1.7),
+  // reached through testcontainers > archiver > minimatch (test tooling only); 2.1.7 was
+  // published 2026-09-14.
+  "brace-expansion": (v) => v.startsWith("2.") && compare(v, "2.1.7") < 0,
+  // 2026-09-29: GHSA-3wwx-pv8p-q78v (>=8.1.0 <8.10.2), reached through jsdom and testcontainers
+  // (test tooling only); 8.10.2 was published 2026-09-04.
+  undici: (v) => v.startsWith("8.") && compare(v, "8.10.2") < 0,
   qs: (v) => compare(v, "6.16.0") < 0,
-  // @vitest/mocker ships in lockstep with vitest and is quoted in the lockfile (scoped
-  // names do not match this file's unquoted resolver), so the vitest floor covers it.
+  // @vitest/mocker ships in lockstep with vitest, so the vitest floor covers it.
   vitest: (v) => compare(v, "4.1.11") < 0
 };
 

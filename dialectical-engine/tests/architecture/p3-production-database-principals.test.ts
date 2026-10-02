@@ -311,7 +311,7 @@ describe("P3-01 production database-principal manifest", () => {
           effectiveMemberships: [],
           ownsDatabases: ["debateai"],
           ownsSchemas: [
-            "audit_crypto_internal", "core", "evidence", "identity", "ledger",
+            "audit_crypto_internal", "billing", "core", "evidence", "identity", "ledger", "legal",
             "memory", "obs", "observation", "register", "scorecard", "serve", "support"
           ]
         });
@@ -411,6 +411,28 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/runner:hosted-register-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_REGISTER_PUBLICATION", binding: "WIRED", condition: "package script register:publish-hosted" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },
+        // Paid plans, Task P14b: the owner's dispute command (`pnpm billing:dispute`)
+        // runs as the API, with the API's own EnvironmentFile, under systemd-run,
+        // and writes only billing rows that principal already writes
+        // (billing.charge_event, billing.subscription_event, billing.entitlement_event);
+        // no privilege is added.
+        { component: "apps/api:billing-dispute-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_DISPUTE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:dispute" },
+        // Paid plans, Task P14c: the owner's withdrawal command (`pnpm billing:withdraw`)
+        // runs as the API, with the API's own EnvironmentFile, under systemd-run,
+        // and writes only billing rows that principal already writes
+        // (billing.subscription_event, billing.entitlement_event, billing.charge_event,
+        // billing.outbox, and billing.withdrawal_owner_settlement, on which 0088 grants
+        // SELECT, INSERT to debateai_runtime); no privilege is added.
+        { component: "apps/api:billing-withdraw-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_WITHDRAW_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:withdraw" },
+        // Paid plans, Task P16b: the owner's tax summary (`pnpm billing:tax-summary`)
+        // runs as the API under systemd-run on a READ-ONLY one-connection pool
+        // (billing rows and the register's taxAuthorities row); it writes nothing.
+        { component: "apps/api:billing-tax-summary-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_TAX_SUMMARY_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:tax-summary" },
+        // Paid plans, Task P16b: the owner's e-Factura status command
+        // (`pnpm billing:efactura-status`) runs as the API under systemd-run and
+        // appends one billing.invoice_status_event, on which 0086 grants SELECT,
+        // INSERT to debateai_runtime; no privilege is added.
+        { component: "apps/api:billing-efactura-status-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_EFACTURA_STATUS_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:efactura-status" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
@@ -651,7 +673,10 @@ describe("P3-01 production database-principal manifest", () => {
     const sourceConnectionPairs: string[] = [];
     for (const sourceFile of appSourcePaths) {
       const source = await readFile(sourceFile, "utf8");
-      if (!source.includes("createPool") && !source.includes("new pg.Pool")) continue;
+      // `openBillingOperatorPool(` (apps/api/src/billing/operator-connection.ts) wraps createPool for
+      // the owner's billing commands, which pass it the URL they name.
+      if (!source.includes("createPool") && !source.includes("new pg.Pool")
+        && !source.includes("openBillingOperatorPool(")) continue;
       for (const [environmentKey] of source.matchAll(
         /\b(?:[A-Z][A-Z0-9_]*_)?DATABASE_URL\b/gu
       )) sourceConnectionPairs.push(`${sourceFile}::${environmentKey}`);

@@ -1,5 +1,5 @@
 import type { ActivationState } from "@debateai/kernel";
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
 
 export {
@@ -275,19 +275,64 @@ export class WorkItemRepository {
     })));
   }
 
+  /**
+   * Final review Part 1b, Important 4 — STARTED RUNS NOBODY HANDED TO A RUNNER.
+   * A run the room started carries a hold (`ledger.model_spend_hold`), written
+   * in the same transaction as its first job, so the hold's `opened_at` is when
+   * that job became READY. A job still READY — never claimed: nothing turns a
+   * job back to READY — more than `olderThanSeconds` later was never claimed:
+   * either never dispatched (the API stopped between the decision's commit and
+   * the dispatch, or the dispatch failed and so did its FAILED write) or
+   * dispatched but still queued, or its task expired; its hold counts on every
+   * later day and window until a runner claims it. Oldest first, by the
+   * database's clock, the one `opened_at` was written by. A run without a hold
+   * (no room composed) is not listed: nothing of it counts.
+   */
+  async listStalledStarts(input: Readonly<{ olderThanSeconds: number; limit: number }>): Promise<readonly DispatchableWorkItem[]> {
+    if (!Number.isSafeInteger(input?.olderThanSeconds) || input.olderThanSeconds < 1) {
+      throw new TypeError("Stalled start bound must be a positive whole number of seconds");
+    }
+    if (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 1_000) {
+      throw new TypeError("Stalled start limit must be an integer between 1 and 1000");
+    }
+    const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
+      `SELECT work.work_item_id, work.run_id
+       FROM core.work_item AS work
+       JOIN ledger.model_spend_hold AS hold ON hold.run_id = work.run_id
+       WHERE work.state = 'READY'
+         AND hold.opened_at <= clock_timestamp() - make_interval(secs => $1)
+       ORDER BY work.created_at_seq, work.work_item_id
+       LIMIT $2`,
+      [input.olderThanSeconds, input.limit]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      runId: row.run_id,
+      workItemId: row.work_item_id
+    })));
+  }
+
+  /**
+   * Queues a job on a transaction the caller owns and will commit — the room's
+   * locked decision (budget spec §2.6, B6b/B7b): the job then commits with the
+   * run's hold, its charge scope and its start mark, or not at all, so no READY
+   * job can exist without what counts it. `allocateSequence` locks the one shared
+   * sequence row until that COMMIT, so the caller runs this as its LAST statement.
+   */
+  async enqueueOn(client: PoolClient, input: EnqueueWorkInput): Promise<string> {
+    const sequence = await allocateSequence(client);
+    const result = await client.query<{ work_item_id: string }>(
+      `INSERT INTO core.work_item (
+        run_id, battery_row_id, node_set, command_key, state, created_at_seq
+      ) VALUES ($1,$2,$3::jsonb,$4,'READY',$5)
+      ON CONFLICT (command_key) DO UPDATE SET command_key = EXCLUDED.command_key
+      RETURNING work_item_id`,
+      [input.runId, input.batteryRowId, JSON.stringify(input.nodeSet), input.commandKey, sequence]
+    );
+    return result.rows[0]!.work_item_id;
+  }
+
   async enqueue(input: EnqueueWorkInput): Promise<string> {
-    return withWriteTransaction(this.pool, async (client) => {
-      const sequence = await allocateSequence(client);
-      const result = await client.query<{ work_item_id: string }>(
-        `INSERT INTO core.work_item (
-          run_id, battery_row_id, node_set, command_key, state, created_at_seq
-        ) VALUES ($1,$2,$3::jsonb,$4,'READY',$5)
-        ON CONFLICT (command_key) DO UPDATE SET command_key = EXCLUDED.command_key
-        RETURNING work_item_id`,
-        [input.runId, input.batteryRowId, JSON.stringify(input.nodeSet), input.commandKey, sequence]
-      );
-      return result.rows[0]!.work_item_id;
-    });
+    return withWriteTransaction(this.pool, (client) => this.enqueueOn(client, input));
   }
 
   async claimNext(input: { readonly workerId: string; readonly claimSeconds: number }): Promise<ClaimedWorkItem | null> {

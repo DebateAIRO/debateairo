@@ -11,6 +11,10 @@ import { CLAIM_TYPES } from "@debateai/kernel";
 import {
   ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
   COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+  BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
+  TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
@@ -699,6 +703,19 @@ function developmentRows(
     // itself; the owner seals the real ones as a NEW version after the first
     // measured paid run, never as an edit of this one (constraint 5).
     COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
+    // Paid plans G2 (A14): the country switches. Published for local mode too, where no gate reads
+    // it; a hosted version carries it only when the operator's file has the member (its own copy,
+    // from deploy/vps/register/country-policy.example.json — the kit's hosted-register.example.json
+    // leaves it out, so no gate by default) — planHostedRegisterPublication drops it otherwise.
+    COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+    // Paid plans (spec 2026-09-29 §2.5.1): the plans row and the billing
+    // switch, OFF. Billing runs only in hosted mode AND when a published
+    // billingPolicy says enabled: true; a hosted operator file may supersede
+    // either row (B11a). Changing a value here is a new register version.
+    BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+    BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
+    // Paid plans P16a: code-owned, so every hosted publication carries it; a hosted file may override it.
+    TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
     ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs),
     // Verdict story (spec 2026-09-26 §9): OPTIONAL rows. Every reader treats

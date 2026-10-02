@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { MailTemplateError, mailAttachmentFactsOf, renderMail, type MailTemplateId } from "@debateai/mail-templates";
+import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
 
 // With `sendmail -t` the MTA reads every recipient out of the header block on
 // stdin, so no address reaches argv, which any local user can read with `ps`
@@ -9,7 +12,7 @@ import { spawn } from "node:child_process";
 // ever widened.
 const RECIPIENT_SHAPE = /^[^\s@]+@[^\s@]+$/;
 
-function isSingleDeliverableRecipient(recipient: string): boolean {
+export function isSingleDeliverableRecipient(recipient: string): boolean {
   return RECIPIENT_SHAPE.test(recipient)
     && !/[\r\n]/.test(recipient)
     && !/\s/.test(recipient)
@@ -200,5 +203,232 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
       child.stdin.once("error",()=>fail("SENDMAIL_STDIN_FAILED"));
       child.stdin.end(message,"utf8");
     });
+  }
+}
+
+// Turn 14 — change email. Three messages, all plain text through `sendmail -t`:
+// the confirmation link to the NEW address, a notice with a cancel link to the
+// CURRENT address, and, when the new address already belongs to an account, a
+// note to that address instead of a link (the requester is never told). Both
+// bearers ride the URL fragment of the Settings page, like the verify link.
+export type EmailChangeMail =
+  | Readonly<{ kind: "confirmation"; recipient: string; token: string; expiresAt: Date }>
+  | Readonly<{ kind: "notice"; recipient: string; newEmail: string; cancelToken: string; expiresAt: Date }>
+  | Readonly<{ kind: "address-unavailable"; recipient: string }>;
+
+export interface EmailChangeMailSender {
+  sendEmailChange(mail: EmailChangeMail): Promise<void>;
+}
+
+export class MemoryEmailChangeMailSender implements EmailChangeMailSender {
+  readonly messages: EmailChangeMail[] = [];
+
+  async sendEmailChange(mail: EmailChangeMail): Promise<void> {
+    this.messages.push(Object.freeze({ ...mail }));
+  }
+}
+
+const EMAIL_CHANGE_BEARER = /^[A-Za-z0-9_-]{43}$/;
+
+export function emailChangeLink(publicAppUrl: string, action: "confirm" | "cancel", token: string): string {
+  if (!EMAIL_CHANGE_BEARER.test(token)) throw new MailDeliveryError("MAIL_INPUT_INVALID");
+  const url = new URL("/settings", publicAppUrl);
+  url.hash = `email-change=${action}&token=${token}`;
+  return url.toString();
+}
+
+export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
+  constructor(private readonly options: {
+    readonly executable: string;
+    readonly from: string;
+    readonly publicAppUrl: string;
+    readonly timeoutMs: number;
+  }) {
+    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
+      || options.executable.trim() === ""
+      || !/^https:\/\//.test(options.publicAppUrl)
+      || !Number.isInteger(options.timeoutMs)
+      || options.timeoutMs <= 0) {
+      throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
+    }
+  }
+
+  async sendEmailChange(mail: EmailChangeMail): Promise<void> {
+    if (!isSingleDeliverableRecipient(mail.recipient)
+      || (mail.kind === "notice" && !isSingleDeliverableRecipient(mail.newEmail))) {
+      throw new MailDeliveryError("MAIL_INPUT_INVALID");
+    }
+    const [subject, body] = this.render(mail);
+    const message = [
+      `From: ${this.options.from}`,
+      `To: ${mail.recipient}`,
+      `Subject: ${subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=UTF-8",
+      "",
+      ...body,
+      ""
+    ].join("\r\n");
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
+        stdio: ["pipe", "ignore", "ignore"]
+      });
+      let settled = false;
+      const fail = (code: string): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(new MailDeliveryError(code));
+      };
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        fail("SENDMAIL_TIMEOUT");
+      }, this.options.timeoutMs);
+      child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
+      child.once("exit", (code, signal) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (code === 0) resolve();
+        else reject(new MailDeliveryError(
+          signal === null ? `SENDMAIL_EXIT_${String(code ?? "UNKNOWN")}` : `SENDMAIL_SIGNAL_${signal}`
+        ));
+      });
+      child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
+      child.stdin.end(message, "utf8");
+    });
+  }
+
+  private render(mail: EmailChangeMail): readonly [string, readonly string[]] {
+    if (mail.kind === "confirmation") {
+      return ["Confirm your new DebateAI email", [
+        "Confirm this address for your DebateAI account by opening this link:",
+        emailChangeLink(this.options.publicAppUrl, "confirm", mail.token),
+        "",
+        `This link expires at ${mail.expiresAt.toISOString()}.`,
+        "If you did not ask for this, ignore this message. Nothing changes until the link is opened."
+      ]];
+    }
+    if (mail.kind === "notice") {
+      return ["Your DebateAI email is being changed", [
+        `Someone signed in to your DebateAI account asked to change its email to ${mail.newEmail}.`,
+        "Your current address keeps working until the new one is confirmed.",
+        "",
+        "If this wasn't you, cancel the change by opening this link:",
+        emailChangeLink(this.options.publicAppUrl, "cancel", mail.cancelToken),
+        "",
+        "Then sign in and review your active sessions in Settings."
+      ]];
+    }
+    return ["DebateAI email change", [
+      "Someone asked to use this address for a DebateAI account, but it already belongs to one.",
+      "Nothing was changed. If this was you, sign in with this address instead."
+    ]];
+  }
+}
+
+/** Spec 2026-09-29 §2.5.10: one templated email over the same `sendmail -i -t -f` path as the mail above. */
+export interface TemplatedMail {
+  readonly to: string;
+  readonly templateId: MailTemplateId;
+  readonly locale: string;
+  readonly params: Readonly<Record<string, string>>;
+  readonly attachments?: ReadonlyArray<MailAttachment>;
+  /** A uuid v4 the caller persists (its outbox job id), so a retried send carries the same Message-ID. */
+  readonly messageId?: string;
+}
+
+export interface TemplatedMailChannel {
+  sendTemplated(mail: TemplatedMail): Promise<void>;
+}
+
+const TEMPLATED_MESSAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function composeTemplatedMessage(from: string, mail: TemplatedMail, boundary: string): string {
+  if (!isSingleDeliverableRecipient(mail.to)
+    || (mail.messageId !== undefined && !TEMPLATED_MESSAGE_ID.test(mail.messageId))) {
+    throw new MailDeliveryError("MAIL_INPUT_INVALID");
+  }
+  const attachments = mail.attachments ?? [];
+  const attachmentBytes = attachments.reduce((sum, attachment) => sum + attachment.content.byteLength, 0);
+  if (attachments.length > 4 || attachmentBytes > 8 * 1024 * 1024) {
+    throw new MailDeliveryError("MAIL_ATTACHMENTS_TOO_LARGE");
+  }
+  let rendered: ReturnType<typeof renderMail>;
+  try {
+    // The wording follows what this message REALLY carries: P7's EMAIL job drops a resolver's null, so a Terms
+    // version the archive does not hold, or a PDF SmartBill could not give, is simply absent here, and the sentence
+    // says so.
+    rendered = renderMail(mail.templateId, mail.locale, mail.params, { attached: mailAttachmentFactsOf(attachments) });
+  } catch (error) {
+    if (error instanceof MailTemplateError) throw new MailDeliveryError(error.code);
+    throw error;
+  }
+  try {
+    return buildTemplatedMessage({
+      from, to: mail.to, messageId: mail.messageId ?? null, ...rendered, attachments, boundary
+    });
+  } catch {
+    throw new MailDeliveryError("MAIL_INPUT_INVALID");
+  }
+}
+
+export class TemplatedMailSender implements TemplatedMailChannel {
+  constructor(private readonly options: {
+    readonly executable: string;
+    readonly from: string;
+    readonly timeoutMs: number;
+  }) {
+    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
+      || options.executable.trim() === ""
+      || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0) {
+      throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
+    }
+  }
+
+  async sendTemplated(mail: TemplatedMail): Promise<void> {
+    const message = composeTemplatedMessage(this.options.from, mail, randomUUID().replaceAll("-", ""));
+    // The same spawn as the two senders above, argv literal for argv literal: the recipient rides in the header
+    // block (-t), never on argv (L7-F7; pinned by tests/architecture/dev-mail-capture.test.ts).
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
+        stdio: ["pipe", "ignore", "ignore"]
+      });
+      let settled = false;
+      const fail = (code: string): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(new MailDeliveryError(code));
+      };
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        fail("SENDMAIL_TIMEOUT");
+      }, this.options.timeoutMs);
+      child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
+      child.once("exit", (code, signal) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (code === 0) resolve();
+        else reject(new MailDeliveryError(
+          signal === null ? `SENDMAIL_EXIT_${String(code ?? "UNKNOWN")}` : `SENDMAIL_SIGNAL_${signal}`
+        ));
+      });
+      child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
+      child.stdin.end(message, "utf8");
+    });
+  }
+}
+
+/** Tests and the development stack: renders exactly what sendmail would receive, and keeps it. */
+export class MemoryTemplatedMailSender implements TemplatedMailChannel {
+  readonly messages: Array<Readonly<{ mail: TemplatedMail; raw: string }>> = [];
+
+  constructor(private readonly from: string = "noreply@debateai.test") {}
+
+  async sendTemplated(mail: TemplatedMail): Promise<void> {
+    const raw = composeTemplatedMessage(this.from, mail, "memory0000000000");
+    this.messages.push(Object.freeze({ mail, raw }));
   }
 }

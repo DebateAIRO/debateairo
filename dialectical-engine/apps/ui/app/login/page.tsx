@@ -3,9 +3,14 @@ import { redirect } from "next/navigation";
 import { LoginFlow } from "@/components/LoginFlow";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
+import { safeReturnPath } from "@/lib/returnPath";
 import { createServerContractClient, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams = Promise.resolve({})
+}: {
+  searchParams?: Promise<{ next?: string | string[] }>;
+}) {
   const cookieStore = await cookies();
   const token = readSessionCookie(cookieStore);
   const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
@@ -22,6 +27,9 @@ export default async function LoginPage() {
       // A stale or invalid cookie must not prevent a fresh login attempt.
     }
   }
-  if (sessionConfirmed) redirect("/#start-a-debate");
+  if (sessionConfirmed) {
+    const requested = (await searchParams).next;
+    redirect(safeReturnPath(typeof requested === "string" ? requested : null));
+  }
   return <LoginFlow catalog={catalog} />;
 }

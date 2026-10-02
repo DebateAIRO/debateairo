@@ -73,9 +73,10 @@ export const PES_S02_REFUSAL_CASES: readonly RefusalCase[] = Object.freeze([
 export type HostedAcceptanceDeps = {
   emit(line: string): void;
   lookup: LookupFunction;
-  opensslExecutable: string;
+  /** Where `openssl` and `lsof` are deduced from (pes-s02-fake-vendor.ts); never a fixed path. */
+  environment: NodeJS.ProcessEnv;
   portCandidates: readonly number[];
-  isPortListening(port: number): boolean;
+  isPortListening(port: number): Promise<boolean>;
   credentialLiteral: string;
   refusalCases: readonly RefusalCase[];
 };
@@ -125,12 +126,13 @@ function errorCode(error: unknown): string {
 export async function runHostedAcceptance(
   overrides: Partial<HostedAcceptanceDeps> = {}
 ): Promise<HostedAcceptanceResult> {
+  const environment = overrides.environment ?? process.env;
   const deps: HostedAcceptanceDeps = {
     emit: () => undefined,
     lookup,
-    opensslExecutable: "/usr/bin/openssl",
+    environment,
     portCandidates: FAKE_VENDOR_PORT_CANDIDATES,
-    isPortListening,
+    isPortListening: (candidate) => isPortListening(candidate, environment),
     credentialLiteral: FAKE_VENDOR_AUTHORIZATION,
     refusalCases: PES_S02_REFUSAL_CASES,
     ...overrides
@@ -164,9 +166,9 @@ export async function runHostedAcceptance(
 
     const tlsDirectory = join(scratchRoot, "tls");
     await mkdir(tlsDirectory, { mode: 0o700 });
-    let certificate: ReturnType<typeof createFixtureCertificate>;
+    let certificate: Awaited<ReturnType<typeof createFixtureCertificate>>;
     try {
-      certificate = createFixtureCertificate(tlsDirectory, deps.opensslExecutable);
+      certificate = await createFixtureCertificate(tlsDirectory, deps.environment);
     } catch (error) {
       if (error instanceof Error && error.message === "PES_S02_OPENSSL_UNAVAILABLE") {
         stop("UNVERIFIED", "tls-material openssl-unavailable");
@@ -190,7 +192,7 @@ export async function runHostedAcceptance(
 
     let evidence: string;
     try {
-      ({ port, evidence } = pickFreePort(deps.portCandidates, deps.isPortListening));
+      ({ port, evidence } = await pickFreePort(deps.portCandidates, deps.isPortListening));
     } catch (error) {
       if (error instanceof Error && error.message === "PES_S02_LSOF_UNAVAILABLE") stop("UNVERIFIED", "port lsof-unavailable");
       if (error instanceof Error && error.message === "PES_S02_NO_FREE_PORT") stop("UNVERIFIED", "port none-free");

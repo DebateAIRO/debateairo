@@ -26,16 +26,22 @@ import {
   parseProviderDiscoveryTargets
 } from "../../packages/providers/src/index.js";
 import {
+  BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
   assertHostedSupportAdmissionSealed,
   loadBootstrapRegister,
+  parseCanonicalRegisterJson,
   readAdmissionPolicy,
   readAuthPolicy,
+  readBillingPlans,
+  readBillingPolicy,
   readCostEnvelopePolicy,
   readDeploymentRiskTier,
   readEnvelopeFormulaInputs,
   readMfaPolicy,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
+  readCountryPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -273,5 +279,127 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     const refused = await runCli(["--file", `${path}.absent`], environment);
     expect(refused.exitCode).not.toBe(0);
     expect(refused.stderr).toBe("HOSTED_REGISTER_FILE_ABSENT\n");
+  }, 120_000);
+
+  it("seals the operator's countryPolicy with the geoAvailability scope, and a version without the member has no country gate", async () => {
+    const operations = createPostgresHostedRegisterOperations(database.pool);
+    // Paid plans G3a: the command's own boot check now reads the country row, as the API boot does.
+    const gated = await publishHostedRegister({
+      plan: await planOf({ ...hostedFile(), countryPolicy: COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value }),
+      operations
+    });
+    expect(gated.outcome).toBe("CREATED");
+    const gatedVersion = registerVersionToSafeLegacyNumber(gated.registerVersion);
+    await expect(readCountryPolicy(database.pool, gatedVersion)).resolves.toMatchObject({
+      unknownIp: "REFUSE", tor: "REFUSE", sourceRef: "task-14b integration: first hosted register"
+    });
+    expect((await readAdmissionPolicy(database.pool, gatedVersion)).geoAvailability).toEqual({
+      key: "source", limit: 60, windowMs: 60_000, capacity: 65_536
+    });
+
+    // Without the member (A14): no country row in that version.
+    const ungated = await publishHostedRegister({ plan: await planOf(hostedFile()), operations });
+    expect(ungated.outcome).toBe("CREATED");
+    await expect(readCountryPolicy(
+      database.pool, registerVersionToSafeLegacyNumber(ungated.registerVersion)
+    )).resolves.toBeNull();
+  }, 120_000);
+
+  it("refuses, after publishing, a countryPolicy version whose admission row lacks the geoAvailability scope", async () => {
+    const plan = await planOf({ ...hostedFile(), countryPolicy: COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value });
+    const rows = plan.rows.map((row) => {
+      if (row.rowKey !== "admissionPolicy") return row;
+      const value = JSON.parse(row.valueJsonText) as Record<string, unknown>;
+      expect(Object.hasOwn(value, "geo_availability")).toBe(true);
+      delete value.geo_availability;
+      return {
+        rowKey: row.rowKey,
+        valueJsonText: parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value), "utf8")),
+        sourceRef: row.sourceRef
+      };
+    });
+    await expect(publishHostedRegister({
+      plan: { ...plan, rows },
+      operations: createPostgresHostedRegisterOperations(database.pool)
+    })).rejects.toMatchObject({
+      code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:GEO_AVAILABILITY_ADMISSION_UNSEALED"
+    });
+  }, 120_000);
+
+  // Paid plans P8b: a billing-on hosted file (the band members, billing enabled, the operator's countryPolicy).
+  function billingOnFile(): Record<string, unknown> {
+    const file = hostedFile();
+    return {
+      ...file,
+      costEnvelopePolicy: {
+        ...(file.costEnvelopePolicy as Record<string, unknown>),
+        admission_close_basis_points: 9_500,
+        finish_up_to_basis_points: 11_500,
+        waiting_line_per_person: 1
+      },
+      billingPolicy: { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true },
+      countryPolicy: COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value
+    };
+  }
+
+  it("publishes a billing-on version whose code-owned admission row seals the billingQuote, billingCheckout, billingNotify and billingCancelLink scopes", async () => {
+    const result = await publishHostedRegister({
+      plan: await planOf(billingOnFile()),
+      operations: createPostgresHostedRegisterOperations(database.pool)
+    });
+    expect(result.outcome).toBe("CREATED");
+    const version = registerVersionToSafeLegacyNumber(result.registerVersion);
+    const admission = await readAdmissionPolicy(database.pool, version);
+    expect(admission.billingQuote).toEqual({ key: "owner", limit: 10, windowMs: 3_600_000, capacity: 65_536 });
+    expect(admission.billingCheckout).toEqual({ key: "owner", limit: 10, windowMs: 3_600_000, capacity: 65_536 });
+    expect(admission.billingNotify).toEqual({ key: "source", limit: 120, windowMs: 60_000, capacity: 65_536 });
+    expect(admission.billingCancelLink).toEqual({ key: "source", limit: 5, windowMs: 3_600_000, capacity: 65_536 });
+  }, 120_000);
+
+  // One row per admission member a billing-on boot requires (P8c, P9a and P13 each add theirs).
+  it.each([
+    ["billing_quote"],
+    ["billing_checkout"],
+    ["billing_notify"],
+    ["billing_cancel_link"]
+  ])("refuses, after publishing, a billing-on version whose admission row lacks %s", async (member) => {
+    const plan = await planOf(billingOnFile());
+    const rows = plan.rows.map((row) => {
+      if (row.rowKey !== "admissionPolicy") return row;
+      const value = JSON.parse(row.valueJsonText) as Record<string, unknown>;
+      expect(Object.hasOwn(value, member)).toBe(true);
+      delete value[member];
+      return {
+        rowKey: row.rowKey,
+        valueJsonText: parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value), "utf8")),
+        sourceRef: row.sourceRef
+      };
+    });
+    await expect(publishHostedRegister({
+      plan: { ...plan, rows },
+      operations: createPostgresHostedRegisterOperations(database.pool)
+    })).rejects.toMatchObject({
+      code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_ADMISSION_UNSEALED"
+    });
+  }, 120_000);
+
+  it("refuses, after publishing, a billing-on version that publishes no countryPolicy row", async () => {
+    const file = billingOnFile();
+    delete file.countryPolicy;
+    await expect(publishHostedRegister({
+      plan: await planOf(file),
+      operations: createPostgresHostedRegisterOperations(database.pool)
+    })).rejects.toMatchObject({
+      code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE"
+    });
+  }, 120_000);
+
+  it("seals the billing rows both boots read, billing off (B11a)", async () => {
+    const plan = await planOf(hostedFile());
+    const result = await publishHostedRegister({ plan, operations: createPostgresHostedRegisterOperations(database.pool) });
+    const version = registerVersionToSafeLegacyNumber(result.registerVersion);
+    await expect(readBillingPolicy(database.pool, version)).resolves.toMatchObject({ enabled: false });
+    expect((await readBillingPlans(database.pool, version))?.plans.map((plan) => plan.planId))
+      .toEqual(["FREE", "PLUS", "PRO", "MAX"]);
   }, 120_000);
 });

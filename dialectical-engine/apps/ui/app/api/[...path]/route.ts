@@ -1,3 +1,8 @@
+import {
+  AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
+  AGE_REFUSAL_COOKIE_NAME,
+  AGE_REFUSAL_COOKIE_VALUE
+} from "@debateai/contract";
 import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../../../trusted-client-ip.mjs";
 
 type ProxyContext = Readonly<{
@@ -40,6 +45,14 @@ const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
 const MAX_PROXY_BODY_BYTES = 1_048_576;
 /** L3-F12: ceiling for a non-stream upstream request; event streams are open-ended by design. */
 const UPSTREAM_TIMEOUT_MS = 30_000;
+/**
+ * hate-speech S02 (ruling R-D, V-13): `POST /v1/runs/{id}/publish` runs the content check, whose deadline D is
+ * 60 000 ms (`PUBLICATION_CHECK_DEADLINE_MS`, apps/api/src/publication-check/check.ts; ruling R-D2), before the
+ * publish itself. Its ceiling is D plus 25 s for the rest of the attempt (preflight, three lease phases, the record,
+ * encryption and the transition); every other route keeps UPSTREAM_TIMEOUT_MS.
+ */
+const PUBLISH_UPSTREAM_TIMEOUT_MS = 85_000;
+const RUN_PUBLISH_PATH = /^v1\/runs\/[^/]+\/publish$/u;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
@@ -112,12 +125,17 @@ function filteredSessionCookies(raw: string | null): string | null {
     const index = member.indexOf("=");
     if (index < 1) continue;
     const name = member.slice(0, index).trim();
-    if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) continue;
     const value = member.slice(index + 1).trim();
+    // Age gate (8j): the lockout travels only in its one constant value.
+    if (name === AGE_REFUSAL_COOKIE_NAME) {
+      if (value === AGE_REFUSAL_COOKIE_VALUE) selected.set(name, value);
+      continue;
+    }
+    if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) continue;
     if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
     selected.set(name, value);
   }
-  const pairs = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME].flatMap((name) => {
+  const pairs = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, AGE_REFUSAL_COOKIE_NAME].flatMap((name) => {
     const value = selected.get(name);
     return value === undefined ? [] : [`${name}=${value}`];
   });
@@ -131,6 +149,11 @@ function lawfulSetCookie(value: string): boolean {
   const pairSeparator = pair.indexOf("=");
   if (pairSeparator < 1) return false;
   const name = pair.slice(0, pairSeparator);
+  if (name === AGE_REFUSAL_COOKIE_NAME) {
+    // Age gate (8j): exactly the API's lockout, nothing else under this name.
+    return value === `${AGE_REFUSAL_COOKIE_NAME}=${AGE_REFUSAL_COOKIE_VALUE}; Path=/; `
+      + `Max-Age=${AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax`;
+  }
   if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) return false;
   const cookieValue = pair.slice(pairSeparator + 1);
   const attributes = members.slice(1).map((member) => member.toLowerCase());
@@ -211,9 +234,11 @@ async function readBoundedBody(request: Request): Promise<BufferSource | null> {
 function upstreamSignal(request: Request, path: readonly string[]): AbortSignal {
   const streaming = (request.headers.get("accept") ?? "").includes("text/event-stream")
     || path[path.length - 1] === "events";
+  const ceiling = request.method === "POST" && RUN_PUBLISH_PATH.test(path.join("/"))
+    ? PUBLISH_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS;
   return streaming
     ? request.signal
-    : AbortSignal.any([request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
+    : AbortSignal.any([request.signal, AbortSignal.timeout(ceiling)]);
 }
 
 async function proxyApi(request: Request, context: ProxyContext): Promise<Response> {

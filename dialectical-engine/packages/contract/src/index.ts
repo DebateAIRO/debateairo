@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
-import { MakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
+import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
+export * from "./crisis.js";
+export * from "./romania-address.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -119,6 +121,16 @@ export const ExpansionDepthSchema = z.number().int().min(EXPANSION_DEPTH_MIN).ma
 export type ExpansionDepth = z.infer<typeof ExpansionDepthSchema>;
 
 /**
+ * The largest question an ask may carry, in UTF-8 bytes: the API refuses a
+ * larger one, and the boot check (B9, budget spec §2.10) prices the first
+ * position's own call at it. A function, not an exported number: numbers live
+ * in register rows or inside functions.
+ */
+export function askQuestionMaxBytes(): number {
+  return 8_192;
+}
+
+/**
  * The ruled domain, DERIVED from the bound above. Selectors and option lists
  * import this instead of enumerating the values by hand, so widening the bound
  * widens every chooser without touching a consumer.
@@ -149,11 +161,333 @@ export const AskRequestSchema = z.object({
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
+/**
+ * Budget spec 2026-09-28 §2.2 / paid-plans spec §2.4.1 — the limit a question
+ * waits for or is close to: the site's day, or one of the person's windows.
+ * The same four words as `SpendScope` in @debateai/budget (the contract cannot
+ * import it); tests/unit/b6a-waiting-projection.test.ts reads both.
+ */
+export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+
+/**
+ * Final review Part 1b, Important 1 — WHY A QUESTION WAITS when no reset is
+ * what it waits for: OWN_DEBATES, every limit that is full is one of the
+ * person's windows, full only because of their own running debates. The
+ * question starts by itself as soon as one of them finishes, so its expected
+ * start is the waker's next tick and the UI says so instead of naming a reset
+ * or offering an upgrade. Never the site's day (budget spec §2.7). The same
+ * word as `WaitsFor` in @debateai/budget (the contract cannot import it);
+ * tests/unit/b6a-waiting-projection.test.ts reads both.
+ */
+export const WaitsForSchema = z.enum(["OWN_DEBATES"]);
+const PERSON_SCOPES: ReadonlySet<string> = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+
+/**
+ * Paid plans (spec 2026-09-29 §2.3.4): the gauges the SERVER decided for an
+ * ask from the person's plan, present only when billing decided them (hosted,
+ * billing on): the plan's tier, and the risk tier, composition and depth the
+ * run is asked with (for Free, its sealed fixed gauges, which is why a Free
+ * person's controls stay disabled in the UI). It reports the PLAN's tier, not
+ * the roster that runs: when the interim coarse fit moves a paid question that
+ * STARTs to the Free roster (spec §2.6 item 7, A5), `plan_tier` still says
+ * "premium" while the Free roster's models argue. That move is recorded for the
+ * owner only (`core.run_cost_substitution`); whether a paying person is told is
+ * an owner decision (final review Part 1b, Owner item 4).
+ */
+export const AskAppliedSchema = z.object({
+  plan_tier: PlanTierSchema,
+  risk_tier: RiskTierSchema,
+  composition_budget_tier: CompositionBudgetTierSchema,
+  depth: ExpansionDepthSchema
+}).strict();
+export type AskApplied = z.infer<typeof AskAppliedSchema>;
+
 export const AskAcceptedSchema = z.object({
   run_ref: z.string().min(1),
-  status: z.literal("QUEUED")
-}).strict();
+  status: z.enum(["QUEUED", "WAITING"]),
+  // Budget spec §2.7 and AMENDMENTS-R1 A16: a question that waits in line says
+  // when it is expected to start and which limit it waits for. Present iff WAITING.
+  waits_until: z.iso.datetime().optional(),
+  waiting_scope: SpendScopeSchema.optional(),
+  // Final review Part 1b, Important 1: only on a WAITING answer whose person's
+  // own running debates are all that fill their windows (a person scope).
+  waits_for: WaitsForSchema.optional(),
+  applied: AskAppliedSchema.optional()
+}).strict().superRefine((accepted, context) => {
+  const waiting = accepted.status === "WAITING";
+  if (waiting !== (accepted.waits_until !== undefined) || waiting !== (accepted.waiting_scope !== undefined)) {
+    context.addIssue({
+      code: "custom",
+      message: "WAITING requires waits_until and waiting_scope, and QUEUED forbids both"
+    });
+  }
+  if (accepted.waits_for !== undefined && (!waiting || !PERSON_SCOPES.has(accepted.waiting_scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "waits_for names a WAITING answer's person scope only" });
+  }
+});
 export type AskAccepted = z.infer<typeof AskAcceptedSchema>;
+
+/**
+ * Budget spec §2.7 — the 422 body of ASK_ALREADY_WAITING: the waiting run and its
+ * expected start, and nothing else (no figure, no limit, no count). `waits_for`
+ * (final review Part 1b, Important 1) when that start waits on the person's own
+ * running debates rather than a reset.
+ */
+export const AskAlreadyWaitingSchema = z.object({
+  error: z.literal("ASK_ALREADY_WAITING"),
+  message: z.literal("ASK_ALREADY_WAITING"),
+  run_ref: z.string().min(1),
+  waits_until: z.iso.datetime(),
+  waits_for: WaitsForSchema.optional()
+}).strict();
+export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
+
+/** Paid-plans spec §1.2: the four plans, as billingPlans names them (`PlanId` in @debateai/register). */
+export const PlanIdSchema = z.enum(["FREE", "PLUS", "PRO", "MAX"]);
+
+/** Budget spec §2.7: GET /v1/asks/room — the ask's settings class, as query parameters. */
+export const AskRoomQuerySchema = z.object({
+  plan_tier: PlanTierSchema,
+  composition_budget_tier: CompositionBudgetTierSchema,
+  depth: z.string().regex(/^[0-9]{1,2}$/u).transform(Number).pipe(ExpansionDepthSchema)
+}).strict();
+
+/**
+ * Budget spec §2.7 / AMENDMENTS-R1 A16 — THE ROOM READ: a word, the limit it is
+ * about, when that limit resets or the waiting question starts, the person's own
+ * waiting run, and their plan. Never a figure (I6: figures are a capacity oracle).
+ */
+export const AskRoomResponseSchema = z.object({
+  room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
+  scope: SpendScopeSchema.nullable(),
+  resets_at: z.iso.datetime().nullable(),
+  waiting_run_ref: z.string().min(1).nullable(),
+  plan_id: PlanIdSchema.nullable(),
+  // Final review Part 1b, Important 1: a question that would wait (or the one
+  // waiting) waits only for the person's own running debates; `resets_at` is
+  // then the waker's next tick, not a reset.
+  waits_for: WaitsForSchema.optional()
+}).strict().superRefine((answer, context) => {
+  if (answer.waits_for !== undefined
+    && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "waits_for names a person scope of a question that would wait" });
+  }
+  const fits = answer.room === "FITS";
+  if (fits !== (answer.scope === null) || (fits && answer.resets_at !== null)) {
+    context.addIssue({ code: "custom", message: "FITS names no scope and no reset; every other room names its scope" });
+  }
+  if ((answer.room === "ALREADY_WAITING") !== (answer.waiting_run_ref !== null)) {
+    context.addIssue({ code: "custom", message: "only ALREADY_WAITING names the waiting run" });
+  }
+  if ((answer.room === "FULL" || answer.room === "ALREADY_WAITING") && answer.resets_at === null) {
+    context.addIssue({ code: "custom", message: "a question that would wait says when it would start" });
+  }
+});
+export type AskRoomResponse = z.infer<typeof AskRoomResponseSchema>;
+
+/** Paid-plans spec §1.2 (U1): GET /v1/billing/usage — whole percentages per window, never an amount. */
+export const BillingUsageResponseSchema = z.object({
+  plan_id: PlanIdSchema,
+  windows: z.array(z.object({
+    scope: z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]),
+    percent: z.number().int().min(0).max(110),
+    resets_at: z.iso.datetime()
+  }).strict()).max(3)
+}).strict();
+export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
+
+/** Paid-plans spec §2.5.3: money crosses the wire as a decimal string with exactly two places, "20.00". */
+export const BillingDecimalMoneySchema = z.string().regex(/^(?:0|[1-9]\d{0,8})\.\d{2}$/);
+
+/** GET /v1/billing/plans (public). Credit is never shown in dollars: "4" reads "4× the Plus allowance". */
+export const BillingPlansResponseSchema = z.object({
+  currency: z.literal("USD"),
+  plans: z.array(z.object({
+    plan_id: PlanIdSchema,
+    net_price: BillingDecimalMoneySchema,
+    allowance_vs_plus: z.string().regex(/^\d+(?:\.\d+)?$/)
+  }).strict()).min(1)
+}).strict();
+export type BillingPlansResponse = z.infer<typeof BillingPlansResponseSchema>;
+
+const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
+
+/** POST /v1/billing/quote (paid-plans spec §2.5.3; P19's pre-fill makes `country` optional; R-15 adds `name`). */
+export const BillingQuoteRequestSchema = z.object({
+  plan_id: PlanIdSchema.exclude(["FREE"]),
+  /** Absent: the country of the caller's address is used, and answered back as `country`. */
+  country: BillingIso2Schema.optional(),
+  /** The buyer's own name; a Romanian invoice needs it (or the company's). */
+  name: z.string().trim().min(1).max(256).optional(),
+  /** The county (RO) or state (US/CA). */
+  region: z.string().trim().min(1).max(64).optional(),
+  postal_code: z.string().trim().min(1).max(16).optional(),
+  city: z.string().trim().min(1).max(128).optional(),
+  company: z.object({
+    name: z.string().trim().min(1).max(256),
+    vat_id: z.string().trim().min(2).max(32),
+    address: z.string().trim().min(1).max(512)
+  }).strict().optional()
+}).strict();
+export type BillingQuoteRequest = z.infer<typeof BillingQuoteRequestSchema>;
+
+/** The page builds "VAT 21% (Romania)" itself (spec §2.5.3) from tax_name, the rate and the country. */
+export const BillingQuoteResponseSchema = z.object({
+  quote_ref: z.uuid(),
+  plan_id: PlanIdSchema.exclude(["FREE"]),
+  net: BillingDecimalMoneySchema,
+  tax: BillingDecimalMoneySchema,
+  total: BillingDecimalMoneySchema,
+  tax_name: z.string().min(1).max(64),
+  /** Basis points; a US rate may be fractional (8.875 % = 887.5). */
+  tax_rate_bp: z.number().min(0).max(10_000),
+  tax_country: BillingIso2Schema,
+  tax_region: z.string().max(64).nullable(),
+  tax_status: z.enum(["TAXABLE", "NON_TAXABLE", "NOT_REGISTERED", "REVERSE_CHARGE"]),
+  /** The country the quote was made for: the one sent, or the connection's. */
+  country: BillingIso2Schema,
+  /** The connection's country; sentence G3 names it when `country_confirm_needed`. */
+  ip_country: z.string().regex(/^[A-Z]{2}$/),
+  country_confirm_needed: z.boolean(),
+  /** R-15: the invoice issuer needs the buyer's name, city and county before the checkout can start. */
+  address_required: z.boolean(),
+  renews_on: z.iso.datetime(),
+  /** Null where no withdrawal right applies (outside `withdrawalCountries`). */
+  withdrawal_days: z.number().int().positive().nullable(),
+  expires_at: z.iso.datetime()
+}).strict();
+export type BillingQuoteResponse = z.infer<typeof BillingQuoteResponseSchema>;
+
+const BillingDocumentPairSchema = z.object({
+  version: z.string().min(1).max(64),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/)
+}).strict();
+
+export const BillingCheckoutRequestSchema = z.object({
+  quote_ref: z.uuid(),
+  /** The interface locale the consents were shown in; it is also the locale of every billing email. */
+  locale: z.string().regex(/^[a-z]{2}$/),
+  consents: z.object({ renewal_terms: BillingDocumentPairSchema, immediate_start: BillingDocumentPairSchema }).strict(),
+  country_confirmed: z.literal(true).optional()
+}).strict();
+export type BillingCheckoutRequest = z.infer<typeof BillingCheckoutRequestSchema>;
+
+export const BillingCheckoutResponseSchema = z.object({
+  public_key: z.string().min(1).max(256),
+  order_payload: z.string().min(1).max(16_384),
+  order_checksum: z.string().min(1).max(512),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/),
+  sdk_environment: z.enum(["stage", "live"])
+}).strict();
+export type BillingCheckoutResponse = z.infer<typeof BillingCheckoutResponseSchema>;
+
+/**
+ * The 409 body the checkout answers while a payment for the person's open checkout is already on its way (a stored
+ * notice, an open check or an xMoney transaction for that charge): the page waits on `charge_ref` instead of
+ * mounting a second card form (D7 #5).
+ */
+export const BillingCheckoutPendingErrorSchema = z.object({
+  error: z.literal("CHECKOUT_PENDING"),
+  message: z.literal("CHECKOUT_PENDING"),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/)
+}).strict();
+/** What `startBillingCheckout` resolves to for that 409, beside the signed order. */
+export type BillingCheckoutPendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
+
+/** NEEDS_ACTION: the bank declined and the person can try again; FAILED: refused or voided, final. */
+export const BillingChargeStatusResponseSchema = z.object({
+  state: z.enum(["PENDING", "SUCCEEDED", "FAILED", "NEEDS_ACTION"]),
+  reason_code: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/).nullable()
+}).strict();
+export type BillingChargeStatusResponse = z.infer<typeof BillingChargeStatusResponseSchema>;
+
+/**
+ * The paid subset of B7a's `PlanIdSchema`: a subscription is never on Free (0085 CHECKs plan_id IN PLUS/PRO/MAX).
+ * tests/unit/billing-subscription-view.test.ts pins every member to `PlanIdSchema`.
+ */
+export const SubscribedPlanIdSchema = z.enum(["PLUS", "PRO", "MAX"]);
+
+export const BillingSubscriptionResponseSchema = z.object({
+  subscription: z.object({
+    plan_id: SubscribedPlanIdSchema,
+    status: z.enum(["CREATED", "ACTIVE", "PAST_DUE", "SUSPENDED", "ENDED", "WITHDRAWN"]),
+    cancel_requested: z.boolean(),
+    current_period_end: z.iso.datetime().nullable(),
+    renews_on: z.iso.datetime().nullable(),
+    renewal_total: BillingDecimalMoneySchema.nullable(),
+    scheduled_downgrade_plan_id: SubscribedPlanIdSchema.nullable(),
+    withdrawal_open_until: z.iso.datetime().nullable(),
+    /** The window's last day in the consumer's own calendar (the UI's "withdraw until {date}"); null with no window. */
+    withdrawal_last_day: z.iso.date().nullable(),
+    can_upgrade: z.boolean(),
+    can_change_card: z.boolean()
+  }).strict().nullable()
+}).strict();
+export type BillingSubscriptionResponse = z.infer<typeof BillingSubscriptionResponseSchema>;
+
+/** A downgrade target is a paid plan below Max; Free is reached by cancelling. */
+export const BillingDowngradeRequestSchema = z.object({ plan_id: z.enum(["PLUS", "PRO"]) }).strict();
+
+export const BillingInvoicesResponseSchema = z.object({
+  invoices: z.array(z.object({
+    number: z.string().min(1).max(64),
+    issued_on: z.iso.date(),
+    total: BillingDecimalMoneySchema,
+    kind: z.enum(["INVOICE", "CREDIT_NOTE"]),
+    url: z.url().nullable()
+  }).strict())
+}).strict();
+export type BillingInvoicesResponse = z.infer<typeof BillingInvoicesResponseSchema>;
+
+/** P12c: an upgrade goes to a dearer paid plan; Plus is never an upgrade target. */
+export const BillingUpgradeQuoteRequestSchema = z.object({ plan_id: z.enum(["PRO", "MAX"]) }).strict();
+/**
+ * P12c (A7): the prorated difference with its tax, and the new plan's full recurring total the next renewal charges.
+ * `tax_rate_basis_points` is not required to be whole: a US combined rate such as 8.875 % is 887.5 basis points
+ * (0085's `numeric(8,2)`).
+ */
+export const BillingUpgradeQuoteResponseSchema = z.object({
+  quote_ref: z.uuid(),
+  plan_id: z.enum(["PRO", "MAX"]),
+  net: BillingDecimalMoneySchema,
+  tax: BillingDecimalMoneySchema,
+  total: BillingDecimalMoneySchema,
+  tax_name: z.string().min(1).max(64),
+  tax_rate_basis_points: z.number().nonnegative().max(10_000),
+  tax_country: z.string().regex(/^[A-Z]{2}$/u),
+  recurring_total: BillingDecimalMoneySchema,
+  renews_on: z.iso.datetime(),
+  expires_at: z.iso.datetime()
+}).strict();
+export type BillingUpgradeQuoteResponse = z.infer<typeof BillingUpgradeQuoteResponseSchema>;
+export const BillingUpgradeRequestSchema = z.object({ plan_id: z.enum(["PRO", "MAX"]), quote_ref: z.uuid() }).strict();
+/** P12c: the upgrade charge's state; the plan changes only once VERIFY_PAYMENT confirms the payment. */
+export const BillingUpgradeResponseSchema = z.object({
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u),
+  state: z.enum(["PENDING", "SUCCEEDED", "FAILED"]),
+  reason_code: z.enum(["PAYMENT_DECLINED", "VOIDED", "REBILL_REFUSED", "NO_TRANSACTION"]).nullable()
+}).strict();
+export type BillingUpgradeResponse = z.infer<typeof BillingUpgradeResponseSchema>;
+/** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
+export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
+/**
+ * `refund`: what goes back to the card. Null when a refund made in the xMoney dashboard already touched a payment:
+ * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).
+ */
+export const BillingWithdrawResponseSchema = z.object({ refund: BillingDecimalMoneySchema.nullable() }).strict();
+export type BillingWithdrawResponse = z.infer<typeof BillingWithdrawResponseSchema>;
+/**
+ * P12e (A12): the card form's signed order, as checkout's, plus the hold the server signed — the amount the page
+ * names before "Save card" ("1.00" today, "0.00" if X0 shows `auth` takes a zero amount).
+ */
+export const BillingCardChangeResponseSchema = BillingCheckoutResponseSchema.extend({
+  hold_amount: BillingDecimalMoneySchema
+}).strict();
+export type BillingCardChangeResponse = z.infer<typeof BillingCardChangeResponseSchema>;
+/** Any string shaped like an address; whether it belongs to anyone is never answered. */
+export const BillingCancelLinkRequestSchema = z.object({ email: z.string().min(3).max(320) }).strict();
+export const BillingCancelLinkAcceptedSchema = z.object({ status: z.literal("ACCEPTED") }).strict();
+export const BillingCancelByTokenRequestSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
 
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
@@ -171,13 +505,22 @@ export type ArgumentLanguage = z.infer<typeof ArgumentLanguageSchema>;
 export const RunProjectionSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
-  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
+  state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
   hold_until: z.iso.datetime().nullable(),
   // R2 (spec 2026-09-26 §14.3): null on a database without dev's migration
   // 0072; optional, so a reader built before the field still parses.
-  argument_language: ArgumentLanguageSchema.nullable().optional()
+  argument_language: ArgumentLanguageSchema.nullable().optional(),
+  // Budget spec §2.7: when a WAITING run is expected to start (recomputed on
+  // every read). Optional, so a reader built before the field still parses.
+  waits_until: z.iso.datetime().nullable().optional(),
+  // Final review Part 1b, Important 1: a WAITING run that waits only for its
+  // person's own running debates (`waits_until` is then the next tick).
+  waits_for: WaitsForSchema.nullable().optional()
 }).strict().superRefine((run, context) => {
+  if (run.waits_for !== undefined && run.waits_for !== null && run.state !== "WAITING") {
+    context.addIssue({ code: "custom", message: "only a WAITING run waits for anything" });
+  }
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
       code: "custom",
@@ -186,6 +529,9 @@ export const RunProjectionSchema = z.object({
   }
   if ((run.state === "HOLDING") !== (run.hold_until !== null)) {
     context.addIssue({ code: "custom", message: "HOLDING requires hold_until and other states forbid it" });
+  }
+  if ((run.state === "WAITING") !== (run.waits_until !== undefined && run.waits_until !== null)) {
+    context.addIssue({ code: "custom", message: "WAITING requires waits_until and other states forbid it" });
   }
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
@@ -218,6 +564,66 @@ export const SessionListSchema = z.object({
 export type SessionList = z.infer<typeof SessionListSchema>;
 
 export const RevokeAllSessionsSchema = z.object({ revoked: z.number().int().nonnegative() }).strict();
+
+/**
+ * Age gate (design document Turn 8 · 8d/8j/8k). The date of birth crosses the wire
+ * only to be checked; it is never stored. `refused` sets the 30-day lockout cookie.
+ */
+export const AGE_REFUSAL_COOKIE_NAME = "__Host-debateai-age-refusal" as const;
+export const AGE_REFUSAL_COOKIE_VALUE = "refused" as const;
+export const AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+export const DateOfBirthSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const AgeCheckRequestSchema = z.object({ date_of_birth: DateOfBirthSchema }).strict();
+export const AgeCheckResultSchema = z.object({ outcome: z.enum(["allowed", "refused"]) }).strict();
+export type AgeCheckResult = z.infer<typeof AgeCheckResultSchema>;
+export const AgeConfirmationStatusSchema = z.object({ status: z.enum(["required", "confirmed"]) }).strict();
+export type AgeConfirmationStatus = z.infer<typeof AgeConfirmationStatusSchema>;
+/** Paid plans L2/L3b: a legal document as the manifest names it — `Version N.M` and the draft's sha256. */
+export const LegalDocumentPairSchema = z.object({
+  version: z.string().regex(/^[0-9]{1,4}\.[0-9]{1,4}$/u),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/u)
+}).strict();
+export type LegalDocumentPairWire = z.infer<typeof LegalDocumentPairSchema>;
+
+/** What sign-up sends for the two documents it displayed, and the locale it displayed them in. */
+export const RegisterLegalDocumentsSchema = z.object({
+  terms: LegalDocumentPairSchema,
+  privacy: LegalDocumentPairSchema,
+  locale: z.string().regex(/^[a-z]{2}$/u)
+}).strict();
+export type RegisterLegalDocuments = z.infer<typeof RegisterLegalDocumentsSchema>;
+
+/** Paid plans L4. Only the Terms and the Privacy Policy are ever re-accepted. */
+export const LegalReacceptableKindSchema = z.enum(["TERMS", "PRIVACY"]);
+export const LegalStatusDocumentSchema = LegalDocumentPairSchema.extend({ kind: LegalReacceptableKindSchema }).strict();
+export const LegalStatusResponseSchema = z.object({
+  must_accept: z.array(LegalStatusDocumentSchema).max(2)
+}).strict();
+export type LegalStatusResponse = z.infer<typeof LegalStatusResponseSchema>;
+export const LegalAcceptRequestSchema = z.object({
+  documents: z.array(LegalStatusDocumentSchema).min(1).max(2)
+    .refine((documents) => new Set(documents.map((document) => document.kind)).size === documents.length),
+  locale: z.string().regex(/^[a-z]{2}$/u)
+}).strict();
+export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
+/** Paid plans G3a: two booleans — never the country the server saw. */
+export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean() }).strict();
+export type GeoAvailabilityResponse = z.infer<typeof GeoAvailabilityResponseSchema>;
+
+/**
+ * Sensitive-data consent (V's ruling of 2026-09-29). Before the first debate an account
+ * agrees, once, to the processing of sensitive information (politics, religion, health,
+ * sexuality) in its own questions. Without it `POST /v1/asks` answers 403 with
+ * `SENSITIVE_DATA_CONSENT_REQUIRED`. The version names the wording agreed to.
+ */
+export const SENSITIVE_DATA_NOTICE_VERSION = "2026-09-29" as const;
+export const SENSITIVE_DATA_CONSENT_REQUIRED = "SENSITIVE_DATA_CONSENT_REQUIRED" as const;
+export const SensitiveDataConsentRequestSchema = z.object({
+  notice_version: z.literal(SENSITIVE_DATA_NOTICE_VERSION),
+  locale: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/)
+}).strict();
+export const SensitiveDataConsentStatusSchema = z.object({ status: z.enum(["required", "given"]) }).strict();
+export type SensitiveDataConsentStatus = z.infer<typeof SensitiveDataConsentStatusSchema>;
 export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
   "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
@@ -227,7 +633,10 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
     action: RunTargetedGrantActionSchema,
     target_run_id: z.uuid()
   }).strict(),
-  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict()
+  z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
+  z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
+  // A18: withdrawing from a paid plan is account-scoped like account deletion.
+  z.object({ action: z.literal("WITHDRAW_SUBSCRIPTION") }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
@@ -240,12 +649,49 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     action: z.literal("DELETE_ACCOUNT"),
     expires_at: z.iso.datetime()
+  }).strict(),
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: z.literal("CHANGE_EMAIL"),
+    expires_at: z.iso.datetime()
+  }).strict(),
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: z.literal("WITHDRAW_SUBSCRIPTION"),
+    expires_at: z.iso.datetime()
   }).strict()
 ]);
 export const StepUpResponseSchema = z.object({
   status: z.literal("step_up_complete"),
   csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   step_up_grant: StepUpGrantResponseSchema.optional()
+}).strict();
+
+export const PUBLICATION_PART_KINDS = ["QUESTION", "SUMMARY", "ARGUMENTS", "REVIEWS", "STORY"] as const;
+export const PublicationPartKindSchema = z.enum(PUBLICATION_PART_KINDS);
+export type PublicationPartKind = z.infer<typeof PublicationPartKindSchema>;
+export const PublicationRefusalGroundSchema = z.enum(["TERMS", "TERMS_AND_POSSIBLY_ILLEGAL"]);
+export const PublicationRefusalStatementSchema = z.object({
+  outcome: z.enum(["BLOCK", "UNSURE"]),
+  parts: z.array(PublicationPartKindSchema).min(1),
+  ground: PublicationRefusalGroundSchema,
+  automated: z.literal(true),
+  visibility: z.literal("PRIVATE")
+}).strict().superRefine((statement, context) => {
+  if (!statement.parts.every((part, index, parts) => index === 0
+    || PUBLICATION_PART_KINDS.indexOf(parts[index - 1]!) < PUBLICATION_PART_KINDS.indexOf(part))) {
+    context.addIssue({ code: "custom", path: ["parts"], message: "Parts must be unique and in publication order" });
+  }
+  if (statement.outcome === "UNSURE" && statement.ground !== "TERMS") {
+    context.addIssue({ code: "custom", path: ["ground"], message: "An uncertain refusal must use the Terms ground" });
+  }
+});
+export type PublicationRefusalStatement = z.infer<typeof PublicationRefusalStatementSchema>;
+export const PUBLICATION_CONTENT_REFUSED_MESSAGE = "The content check refused to publish this debate. It stays private.";
+export const PublicationContentRefusalSchema = z.object({
+  error: z.literal("PUBLICATION_CONTENT_REFUSED"),
+  message: z.literal(PUBLICATION_CONTENT_REFUSED_MESSAGE),
+  statement: PublicationRefusalStatementSchema
 }).strict();
 
 export const PublishDebateRequestSchema = z.object({
@@ -277,6 +723,35 @@ export const AccountErasureCancelRequestSchema = z.object({
 export const AccountErasureCancelledSchema = z.object({
   status:z.literal("CANCELLED")
 }).strict();
+// Turn 14 — change email. The request needs a CHANGE_EMAIL step-up grant; the
+// two link routes carry only the bearer mailed to the new (confirm) or the
+// current (cancel) address.
+const EmailAddressSchema = z.string().min(3).max(254);
+export const AccountEmailSchema = z.object({
+  email: EmailAddressSchema,
+  recovery_email: EmailAddressSchema,
+  pending: z.object({
+    new_email: EmailAddressSchema,
+    expires_at: z.iso.datetime()
+  }).strict().nullable()
+}).strict();
+export type AccountEmail = z.infer<typeof AccountEmailSchema>;
+export const EmailChangeRequestSchema = z.object({
+  new_email: EmailAddressSchema,
+  step_up_grant: StepUpGrantTokenSchema
+}).strict();
+export const EmailChangePendingSchema = z.object({
+  status: z.literal("PENDING"),
+  new_email: EmailAddressSchema,
+  expires_at: z.iso.datetime()
+}).strict();
+export type EmailChangePending = z.infer<typeof EmailChangePendingSchema>;
+export const EmailChangeLinkRequestSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+}).strict();
+export const EmailChangeConfirmedSchema = z.object({ status: z.literal("CONFIRMED") }).strict();
+export const EmailChangeCancelledSchema = z.object({ status: z.literal("CANCELLED") }).strict();
+
 export const PrivateDebateErasureRequestSchema = z.object({
   step_up_grant:StepUpGrantTokenSchema
 }).strict();
@@ -444,7 +919,7 @@ export const AnswerSummarySchema = z.object({
 export const OpenRunSummarySchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
-  state: z.enum(["QUEUED", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
+  state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
   created_at_sequence: z.number().int().positive()
 }).strict().superRefine((run, context) => {
@@ -493,8 +968,15 @@ export const NodeSchema = z.object({
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
 
+export const PublicNodeReviewSchema = NodeReviewSchema.extend({
+  reviewer_lineage: PublicMakerLineageSchema
+});
+export type PublicNodeReview = z.infer<typeof PublicNodeReviewSchema>;
+
 export const PublicNodeSchema = NodeSchema.omit({ disagreement: true }).extend({
-  disagreement: z.null()
+  disagreement: z.null(),
+  maker_lineage: PublicMakerLineageSchema.nullable(),
+  review: PublicNodeReviewSchema.nullable()
 });
 export type PublicNode = z.infer<typeof PublicNodeSchema>;
 
@@ -733,6 +1215,7 @@ export type RunEvent = z.infer<typeof RunEventSchema>;
 
 export const contractInventory = Object.freeze({
   routes: Object.freeze([
+    "POST /v1/auth/age-check",
     "POST /v1/auth/register",
     "POST /v1/auth/verify-email",
     "POST /v1/auth/resend-verification",
@@ -747,13 +1230,26 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/auth/sessions/{id}",
     "DELETE /v1/auth/sessions",
     "POST /v1/auth/step-up",
+    "GET /v1/auth/age-confirmation",
+    "POST /v1/auth/age-confirmation",
+    "GET /v1/account/sensitive-data-consent",
+    "POST /v1/account/sensitive-data-consent",
     "DELETE /v1/account",
     "GET /v1/account/erasure",
     "POST /v1/account/erasure/cancel",
+    "GET /v1/account/legal-status",
+    "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
+    "GET /v1/account/email",
+    "POST /v1/account/email/change",
+    "POST /v1/account/email/change/resend",
+    "DELETE /v1/account/email/change",
+    "POST /v1/account/email/change/confirm",
+    "POST /v1/account/email/change/cancel",
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
+    "GET /v1/geo/availability",
     "POST /v1/support/sessions",
     "GET /v1/support/sessions/{id}",
     "POST /v1/support/sessions/{id}/messages",
@@ -765,6 +1261,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/support/case/messages",
     "GET /v1/support/status",
     "POST /v1/asks",
+    "GET /v1/asks/room",
     "GET /v1/session",
     "GET /v1/deployment",
     "GET /v1/dev/evaluator",
@@ -783,23 +1280,53 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/events",
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
-    "POST /v1/runs/{id}/unpublish"
+    "POST /v1/runs/{id}/unpublish",
+    "GET /v1/billing/usage",
+    "GET /v1/billing/plans",
+    "POST /v1/billing/quote",
+    "POST /v1/billing/checkout",
+    "GET /v1/billing/charges/{chargeRef}",
+    "POST /v1/billing/xmoney/notify",
+    "GET /v1/billing/subscription",
+    "GET /v1/billing/invoices",
+    "POST /v1/billing/subscription/downgrade",
+    "POST /v1/billing/subscription/cancel",
+    "POST /v1/billing/subscription/cancel-revoke",
+    "POST /v1/billing/subscription/upgrade-quote",
+    "POST /v1/billing/subscription/upgrade",
+    "POST /v1/billing/subscription/withdraw",
+    "POST /v1/billing/subscription/card",
+    "POST /v1/billing/cancel-link",
+    "POST /v1/billing/cancel-by-token"
   ]),
   resources: Object.freeze({
-    AskRequestSchema, AskAcceptedSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
+    AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
+    BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
+    AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
+    LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
+    SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
     StepUpAuthorizationRequestSchema, StepUpResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
+    AccountEmailSchema,EmailChangeRequestSchema,EmailChangePendingSchema,EmailChangeLinkRequestSchema,
+    EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
-    AnswerStorySchema, AnswerDisclosureSchema
+    AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema,
+    BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
+    BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
+    BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
+    BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
+    BillingUpgradeResponseSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
+    BillingCardChangeResponseSchema, BillingCancelLinkRequestSchema, BillingCancelLinkAcceptedSchema,
+    BillingCancelByTokenRequestSchema
   })
 });

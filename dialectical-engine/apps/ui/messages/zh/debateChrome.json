@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "本场辩论中的一切内容 — 论证、评审、评分和裁决 — 均由 AI 模型生成，带有机器可读标记，并且可能不准确。",
+  "debateChrome.status.waiting": "等待开始。您的辩论将于{time}自动开始。",
+  "debateChrome.status.waitingOwnDebates": "您的其他辩论目前正在使用剩余的上限。其中任意一场结束后，本场辩论就会自动开始。",
   "debateChrome.backToLibrary": "← 返回辩论库",
   "debateChrome.loading": "正在加载…",
   "debateChrome.error.claimGenerationFailed": "主张生成失败",
@@ -193,7 +195,7 @@
   "debateChrome.condition.unpriced": "弃权单元未定价",
   "debateChrome.condition.unadjudicated": "未发现不利证据",
   "debateChrome.condition.uncoveredScope": "范围未完全覆盖",
-  "debateChrome.condition.unservedMakerPosition": "另一生成者的立场未提供",
+  "debateChrome.condition.unservedMakerPosition": "另一开发方模型的立场未提供",
   "debateChrome.condition.nonComparable": "结果的计算条件不匹配",
   "debateChrome.condition.notSampled": "未抽样",
   "debateChrome.condition.offSubjectDowngrade": "偏离主题的证据已降级",
@@ -206,7 +208,7 @@
   "debateChrome.condition.digestCannotExist": "无法在合成预算内生成摘要",
   "debateChrome.condition.protectedCoreGuardRetired": "运行因预算而停止；复述检查不再构成门槛",
   "debateChrome.condition.hiddenUnjudgeable": "已隐藏：无法评审 — 显示隐藏内容后即可阅读",
-  "debateChrome.condition.derivedStandingUnreviewed": "凭借已评审的论点成立 — 缺少其自身的跨阵营评审",
+  "debateChrome.condition.derivedStandingUnreviewed": "凭借已评审的论点成立 — 缺少其他开发方模型对此要点本身的评审",
   "debateChrome.condition.hiddenLowScore": "已隐藏：分数低于显示阈值",
   "debateChrome.condition.unauthoredBranchHalted": "扩展在此停止 — 没有生成可隐藏或显示的内容",
   "debateChrome.condition.labelBasisIncomplete": "裁决依据不完整 — 没有对立立场，或没有第二位评审可供比较",
@@ -274,5 +276,6 @@
   "requestFailure.kind.UNREADABLE": "无法读取协调器的响应，因此结果未知。",
   "requestFailure.kind.PLAN_TIER_INVALID": "协调器拒绝了所选方案。请选择免费版或高级版，然后重试。",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "协调器拒绝了该请求：此方案所需的某个模型目前不可用。请稍后重试，或选择另一方案。",
+  "requestFailure.kind.ALREADY_WAITING": "同一时间只能有一个问题等待。请在等待中的辩论开始后再提这个问题。",
   "requestFailure.kind.UNCLASSIFIED": "在收到任何响应之前请求便已失败，因此结果未知。这并非协调器作出的决定。"
 }

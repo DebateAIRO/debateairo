@@ -40,9 +40,29 @@ function createAccountButton(): HTMLButtonElement {
   return button!;
 }
 
+/** Type into a controlled text input the way React sees it (prototype setter + `input`). */
+async function type(name: string, value: string): Promise<void> {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field(name), value);
+    field(name).dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+/* Age gate replaced the 18+ box (Turn 8): an adult date of birth, entered as typed. */
+async function fillAdultDateOfBirth(): Promise<void> {
+  await type("dob-d", "01");
+  await type("dob-m", "01");
+  await type("dob-y", "1990");
+}
+
 async function mount(): Promise<void> {
+  /* A fresh fake per mount (mount runs in beforeEach), so `checkAge` is reset like `register`. */
+  const client = {
+    register: vi.fn(),
+    checkAge: vi.fn().mockResolvedValue({ outcome: "allowed" })
+  };
   await act(async () =>
-    root!.render(<SignUpFlow client={{ register: vi.fn() }} />)
+    root!.render(<SignUpFlow client={client} />)
   );
 }
 
@@ -67,31 +87,35 @@ describe("create-account gate on both consent boxes", () => {
     expect(createAccountButton().disabled).toBe(true);
   });
 
-  /* S02-S26 — R17 case 2. */
-  it("keeps Create account disabled with only the 18+ box ticked", async () => {
-    await act(async () => { field("adult-affirmed").click(); });
+  /* S02-S26 — R17 case 2. Rewritten: the age gate replaced the 18+ box (Turn 8), so the
+     button's gate is privacy + terms only, and a valid date of birth does not stand in for it. */
+  it("keeps Create account disabled with only a valid adult date of birth filled", async () => {
+    await fillAdultDateOfBirth();
 
-    expect(field("adult-affirmed").checked).toBe(true);
+    expect(document.querySelector('input[name="adult-affirmed"]'), "the 18+ box is gone").toBeNull();
+    expect(field("dob-y").value).toBe("1990");
     expect(createAccountButton().disabled).toBe(true);
   });
 
-  /* S02-S27 — R17 case 3. */
+  /* S02-S27 — R17 case 3. The untouched-sibling check moved from the 18+ box (replaced by the
+     age gate, Turn 8) to the terms box. */
   it("keeps Create account disabled with only the privacy box ticked", async () => {
     await act(async () => { field("privacy-accepted").click(); });
 
-    expect(field("adult-affirmed").checked).toBe(false);
+    expect(field("terms-accepted").checked).toBe(false);
     expect(createAccountButton().disabled).toBe(true);
   });
 
   /* S02-S30 — R17 case 6: the pin that goes RED if a seat makes the inputs
      controlled. The click on the OTHER box is what forces a React re-render;
-     the surviving `.checked` is the discriminating assertion. */
+     the surviving `.checked` is the discriminating assertion. The assigned box is now the
+     terms box: the age gate replaced the 18+ box (Turn 8). */
   it("keeps an assigned box ticked across a re-render and the button disabled", async () => {
-    field("adult-affirmed").checked = true;
+    field("terms-accepted").checked = true;
 
     await act(async () => { field("privacy-accepted").click(); });
 
     expect(createAccountButton().disabled).toBe(true);
-    expect(field("adult-affirmed").checked).toBe(true);
+    expect(field("terms-accepted").checked).toBe(true);
   });
 });

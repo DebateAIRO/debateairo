@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Vse v tej razpravi — argumente, preglede, ocene in razsodbo — ustvarjajo modeli UI; vsebina je strojno berljivo označena in je lahko netočna.",
+  "debateChrome.status.waiting": "Čaka na začetek. Vaša razprava se bo začela sama ob {time}.",
+  "debateChrome.status.waitingOwnDebates": "Vaše druge razprave zaenkrat porabljajo preostanek vaše omejitve. Ta razprava se bo začela sama, takoj ko se ena od njih konča.",
   "debateChrome.backToLibrary": "← Nazaj v knjižnico",
   "debateChrome.loading": "Nalaganje …",
   "debateChrome.error.claimGenerationFailed": "Ustvarjanje trditve ni uspelo",
@@ -194,7 +196,7 @@
   "debateChrome.condition.unpriced": "Celica vzdržanja ni ovrednotena",
   "debateChrome.condition.unadjudicated": "Nasprotni dokazi niso bili najdeni",
   "debateChrome.condition.uncoveredScope": "Obseg ni v celoti zajet",
-  "debateChrome.condition.unservedMakerPosition": "Stališče drugega avtorja ni bilo predstavljeno",
+  "debateChrome.condition.unservedMakerPosition": "Stališče modela drugega razvijalca ni bilo predstavljeno",
   "debateChrome.condition.nonComparable": "Rezultati nimajo primerljive računske podlage",
   "debateChrome.condition.notSampled": "Ni vzorčeno",
   "debateChrome.condition.offSubjectDowngrade": "Dokazom zunaj teme je bila znižana ocena",
@@ -207,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "Povzetka ni bilo mogoče ustvariti znotraj proračuna sestavljanja",
   "debateChrome.condition.protectedCoreGuardRetired": "Izvajanje se je ustavilo zaradi proračuna; preverjanje preoblikovanja ga ni več zadrževalo",
   "debateChrome.condition.hiddenUnjudgeable": "Skrito: ocena ni bila mogoča — za branje prikažite skrite elemente",
-  "debateChrome.condition.derivedStandingUnreviewed": "Velja na podlagi ocenjenih argumentov — manjka njen lastni navzkrižni pregled avtorjev",
+  "debateChrome.condition.derivedStandingUnreviewed": "Velja na podlagi ocenjenih argumentov — manjka njen lastni pregled, ki bi ga opravil model drugega razvijalca",
   "debateChrome.condition.hiddenLowScore": "Skrito: ocena je pod prikazanim pragom",
   "debateChrome.condition.unauthoredBranchHalted": "Razširjanje se je tu ustavilo — nič ni bilo napisano, zato ni ničesar za prikaz ali skrivanje",
   "debateChrome.condition.labelBasisIncomplete": "Podlaga razsodbe ni popolna — za primerjavo manjka nasprotno stališče ali drugi ocenjevalec",
@@ -295,5 +297,6 @@
   "requestFailure.kind.UNREADABLE": "Odgovora koordinatorja ni bilo mogoče prebrati, zato izid ni znan.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator je zavrnil izbiro paketa. Izberite Brezplačno ali Premium in nato poskusite znova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator je zahtevo zavrnil: model, ki ga ta paket potrebuje, trenutno ni na voljo. Poskusite pozneje ali izberite drug paket.",
+  "requestFailure.kind.ALREADY_WAITING": "Hkrati lahko čaka le eno vprašanje. To vprašanje zastavite, ko se vaša čakajoča razprava začne.",
   "requestFailure.kind.UNCLASSIFIED": "Postopek ni uspel, še preden je prispel odgovor, zato izid ni znan. Te odločitve ni sprejel koordinator."
 }

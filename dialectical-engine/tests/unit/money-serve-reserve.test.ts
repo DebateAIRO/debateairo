@@ -553,9 +553,9 @@ describe("M1 the review catch-up measures what is left against the BODY ceiling"
 });
 
 describe("M1 the runner's hosted composition passes the phase to the guard", () => {
-  it("builds the per-call run seam from the run id AND the phase", async () => {
+  it("builds the per-call run seam from the run id, the phase and the wall (B9)", async () => {
     const source = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    expect(source).toContain("buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase) =>");
-    expect(source).toMatch(/providerSeam\(\{\s*runId, price, requireReportedUsage: true, phase\s*\}\)/u);
+    expect(source).toContain("buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) =>");
+    expect(source).toMatch(/providerSeam\(\{\s*runId, price, requireReportedUsage: true, phase, sharedWall\s*\}\)/u);
   });
 });

@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "כל תוכן הדיון — הטיעונים, הביקורות, הציונים וההכרעה — נוצר בידי מודלים של בינה מלאכותית, מסומן באופן קריא למכונה ועלול להיות שגוי.",
+  "debateChrome.status.waiting": "ממתין להתחלה. הדיון שלכם יתחיל מעצמו ב־{time}.",
+  "debateChrome.status.waitingOwnDebates": "הדיונים האחרים שלכם משתמשים כרגע ביתרת המגבלה שלכם. הדיון הזה יתחיל מעצמו ברגע שאחד מהם יסתיים.",
   "debateChrome.backToLibrary": "→ חזרה לספרייה",
   "debateChrome.loading": "בטעינה…",
   "debateChrome.error.claimGenerationFailed": "יצירת הטענה נכשלה",
@@ -207,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "לא ניתן היה לבנות תקציר במסגרת תקציב הניסוח",
   "debateChrome.condition.protectedCoreGuardRetired": "ההרצה נעצרה עקב מגבלת התקציב; בדיקת הניסוח מחדש כבר לא הייתה תנאי להמשך",
   "debateChrome.condition.hiddenUnjudgeable": "מוסתר: לא ניתן היה לשפוט אותו — הציגו פריטים מוסתרים כדי לקרוא אותו",
-  "debateChrome.condition.derivedStandingUnreviewed": "מעמדו נשען על הטיעונים שקיבלו ציון — חסרה לו ביקורת משלו בידי יוצר אחר",
+  "debateChrome.condition.derivedStandingUnreviewed": "מעמדו נשען על הטיעונים שנשפטו — חסרה לו ביקורת משלו בידי יוצר אחר",
   "debateChrome.condition.hiddenLowScore": "מוסתר: קיבל ציון נמוך מהסף המוצג",
   "debateChrome.condition.unauthoredBranchHalted": "ההרחבה נעצרה כאן — לא נכתב דבר שאפשר להסתיר או להציג",
   "debateChrome.condition.labelBasisIncomplete": "בסיס ההכרעה אינו מלא — אין עמדה מתחרה או שופט שני להשוואה",
@@ -288,5 +290,6 @@
   "requestFailure.kind.UNREADABLE": "לא ניתן היה לקרוא את תשובת המתאם, ולכן התוצאה אינה ידועה.",
   "requestFailure.kind.PLAN_TIER_INVALID": "המתאם דחה את הבחירה ברמת התוכנית. יש לבחור בתוכנית ״חינם״ או בתוכנית ״פרימיום״ ולאחר מכן לנסות שוב.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "המתאם דחה את הבקשה: מודל הנדרש לתוכנית הזו אינו זמין כעת. יש לנסות שוב מאוחר יותר או לבחור בתוכנית האחרת.",
+  "requestFailure.kind.ALREADY_WAITING": "רק שאלה אחת יכולה להמתין בכל פעם. שאלו את השאלה הזו אחרי שהדיון הממתין שלכם יתחיל.",
   "requestFailure.kind.UNCLASSIFIED": "הבקשה נכשלה לפני שהתקבלה תשובה כלשהי, ולכן התוצאה אינה ידועה. זו אינה החלטה שקיבל המתאם."
 }

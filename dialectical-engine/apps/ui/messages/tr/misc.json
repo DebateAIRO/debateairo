@@ -82,7 +82,7 @@
   "misc.answerHonesty.weights": "ağırlıklar {source}",
   "misc.answerHonesty.weightsBy": "ağırlıklar {source}, sorumlu: {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "Bunu ne tersine çevirirdi?",
-  "misc.model.houseUnavailable": "Model grubu kullanılamıyor",
-  "misc.model.noRecordedHouse": "Bu argüman için kaydedilmiş bir model grubu bulunmuyor.",
+  "misc.model.houseUnavailable": "Model üreticisi kaydedilmemiş",
+  "misc.model.noRecordedHouse": "Bu argüman için model üreticisi kaydedilmemiş.",
   "misc.scoring.unavailable": "Puanlama arayüzü kullanılamıyor."
 }

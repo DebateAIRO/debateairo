@@ -8,6 +8,8 @@ export type DevelopmentAuthStackProfile = Readonly<{
   apiPort: number;
   providerPorts: readonly [number, number, number, number, number];
   supportModelPort: number;
+  /** Paid plans (P6b): fake xMoney, Quaderno and SmartBill, started only with DEBATEAI_BILLING_FAKES=1. */
+  billingFakePorts: readonly [number, number, number];
   postgresPort: number;
   hatchetGrpcPort: number;
   hatchetApiPort: number;
@@ -22,6 +24,7 @@ export const DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE: DevelopmentAuthStackProfile
   apiPort: 8790,
   providerPorts: Object.freeze([8791, 8795, 8792, 8796, 8793] as const),
   supportModelPort: 8794,
+  billingFakePorts: Object.freeze([8797, 8798, 8799] as const),
   postgresPort: 55432,
   hatchetGrpcPort: 7077,
   hatchetApiPort: 8888,
@@ -37,6 +40,7 @@ export const SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE: DevelopmentAuthStac
     apiPort: 8890,
     providerPorts: Object.freeze([8891, 8895, 8892, 8896, 8893] as const),
     supportModelPort: 8894,
+    billingFakePorts: Object.freeze([8897, 8898, 8899] as const),
     postgresPort: 55433,
     hatchetGrpcPort: 7177,
     hatchetApiPort: 8988,

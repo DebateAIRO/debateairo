@@ -1195,7 +1195,7 @@ setTimeout(() => undefined, 500);
     expect(registered.response.message).toMatch(/spam/i);
     expect(registered.user).toMatchObject({ state: "pending_verification" });
     expect(registered.user.audit_token).not.toBe(registered.user.user_id);
-    expect(registered.user.pseudonym).toMatch(/^[a-z]+-[a-z]+-[0-9a-f]{6}$/);
+    expect(registered.user.pseudonym).toMatch(/^[A-Z][a-z]{2,8}[A-Z][a-z]{2,8}[1-9][0-9]$/);
     expect(registered.user.pseudonym).not.toContain("happy");
     expect(registered.user.password_hash).toMatch(/^\$argon2id\$v=19\$m=65536,t=3,p=1\$/);
     expect((flow.mail as MemoryMailSender).messages).toHaveLength(1);
@@ -5302,6 +5302,7 @@ setTimeout(() => undefined, 500);
         passwordHash: "s3b-f3-password-hash",
         pseudonym: `s3b-f3-${userId}`,
         adultAffirmedAt: new Date("2026-08-20T00:00:00.000Z"),
+        ageCheck: { minAgeApplied: 18, countryCode: null, ruleVersion: "age-gate/v2-single-min-age-18" },
         verificationTokenHash: createHash("sha256").update(generateVerificationToken()).digest("hex"),
         verificationExpiresAt: new Date("2026-08-21T00:00:00.000Z"),
         occurredAt: new Date("2026-08-20T00:00:00.000Z"),
@@ -5697,7 +5698,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           email,
           password: "correct horse battery staple",
           recovery_email: recoveryEmail,
-          adult_affirmed: true
+          date_of_birth: "1990-01-01"
         },
         remoteAddress: ip,
         headers: { "user-agent": "vitest-t9" }

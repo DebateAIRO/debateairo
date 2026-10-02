@@ -22,6 +22,7 @@
   "time.status.claimed": "Przydzielone",
   "time.status.running": "W toku",
   "time.status.holding": "Wstrzymane na czas przywracania dostawcy",
+  "time.status.waiting": "Czeka",
   "time.status.settled": "Rozliczone",
   "time.status.generating": "Generowanie",
   "time.status.failed": "Niepowodzenie",
