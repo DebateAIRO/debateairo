@@ -160,7 +160,15 @@ pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json 
 - **Every publication is a complete register version.**
   - Publishing again *without* `--scorecard` seals a version with **no** scorecard, and asks then use the plan rosters.
   - To keep the scorecard while you change something else, pass the same `--scorecard` again.
-  - To go back to an earlier scorecard, pin the earlier `REGISTER_VERSION`. No sealed version is ever edited.
+  - To go back to an earlier scorecard, publish again from your current file with the earlier scorecard file
+    (`--scorecard` and the earlier file's path): that gives a version with the earlier scorecard and everything else
+    as it is now. Pin the version it prints in both `EnvironmentFile`s and restart both units. Keep a copy of every
+    scorecard file you publish, so the earlier one is there when you need it.
+  - Do not pin an older version instead: every version is a complete register, so an older one also rolls back the
+    vendors, ceilings, support rows, billing settings and country gate sealed since. A changed vendor list refuses
+    the boot (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`), and once billing is on, an older version sealed with billing
+    off switches it off for every live subscription, without the checks the kit's main README asks for first
+    (§14.8, "Stopping sales, and switching billing off"). No sealed version is ever edited.
   - Publishing a scorecard, like publishing any release that changes `packages/serve/src/index.ts`, seals a new
     version; the older versions stay sealed as they are.
 - When the API starts, it prints one line saying which scorecard it runs: `MODEL_SCORECARD state=VALID|ABSENT|REFUSED …`.

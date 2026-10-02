@@ -782,25 +782,51 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created
 
 ### Upgrading to the model-scorecard release
 
-This release adds the per-role model picker (spec 2026-09-26 "model scorecard"). Nothing about it acts until a
-model scorecard is sealed into the hosted register with `--scorecard`, but four things change at once. Do them in
-this order:
+This release adds the per-role model picker (spec 2026-09-26 "model scorecard"). The picker chooses no model until a
+model scorecard is sealed into the hosted register with `--scorecard`, but two things act from the first restart on
+this code, with or without a scorecard and with billing off: every model call's prompt is kept ("The prompt record"
+below), and the Premium plan's roster names `grok-4.7-build` instead of `grok-4.6-build`, for every Premium ask.
+Five things change at once. Do them in this order:
 
-- **Before upgrading the API, publish a provider-set version whose xAI target serves `grok-4.7-build`** (§11
-  "Adding a vendor"). The Premium plan's roster names that id, and with billing on every paying plan (Plus, Pro,
-  Max) asks as Premium, on the roster path until a scorecard is sealed. Skip this step and a provider set that
-  still serves `grok-4.6-build` refuses every paying customer's ask with `ASK_PLAN_TIER_MODEL_UNAVAILABLE` until
-  the target is updated.
+- **Install and migrate first.** Put the new checkout in place with its dependencies installed (`pnpm install
+  --frozen-lockfile`; this release adds the workspace package `@debateai/scorecard`). Open the migrator window (§4
+  step 2), run `pnpm db:migrate` — it applies `migrations/0090_model_scorecard.sql` and any other pending migration
+  — then `hardening.sql` (§4 step 3), and close the window (§4 step 5). The API and runner already running keep
+  working on the migrated database, because every new column is nullable. So do this before either service is
+  updated; neither may start on this code without it. A runner started on this code without it records every debate
+  it picks up as failed, for good, and an API started without it fails to open every answer page, older debates
+  included, until the migration runs.
+- **Change the xAI target to `grok-4.7-build` in the same restart that brings the API onto this release.** The id is
+  the `model` of the xAI entry in `PROVIDER_DISCOVERY_TARGETS_JSON`, in both `runner.env` and `api.env` (§11 "Adding a
+  vendor", step 3), and in the `providerTargets` of `/etc/debateai/register/hosted-register.json`, which must stay
+  equal to them. The sealed provider-set row names no model, so no new provider-set version is needed. The older
+  API's Premium roster names `grok-4.6-build` and this release's names `grok-4.7-build`, so an API whose target
+  serves the other id refuses every Premium ask with `ASK_PLAN_TIER_MODEL_UNAVAILABLE`: with billing on, every paying
+  customer's, because every paying plan (Plus, Pro, Max) asks as Premium, on the roster path until a scorecard is
+  sealed. Edit the three places before the restart of the next bullet, which reads them.
 - **Publish a new hosted register version.** The release edits `packages/serve/src/index.ts`, whose digest is the
   code-owned row `serveContractHash`. Publish the same `/etc/debateai/register/hosted-register.json` again with
   `pnpm register:publish-hosted` (§11): the command rebuilds the code-owned rows from this checkout and seals a
   new version. Pin it in both `EnvironmentFile`s and restart both units. Until then, answer-writing calls are
   recorded under the old fingerprint.
 - **The runner is never older than the API.** Debates admitted with a runner-up carry a `DR-184-v5` cost receipt
-  and a pinned model assignment; an older runner refuses the receipt (`RUN_COST_ENVELOPE_UNRESOLVED`). Update the
-  runner first, or both together; roll the API back first.
+  and a pinned model assignment; an older runner fails such a debate with `RUN_ENVELOPE_BASIS_INVALID`. Update the
+  runner first, or both together. To roll back, roll the API back first, and the runner only once no debate the
+  newer API admitted is still queued or running: right after the API goes back, run the command in the
+  verdict-story section above and note `newest`, then roll the runner back once `unfinished` is 0, or `oldest` is
+  above the number you noted.
 - **The website ships with, or before, the API.** The session answer gains `model_scorecard_in_force`, which an
-  older website's strict reader refuses.
+  older website's strict reader refuses. To roll back, the website goes back after the API, never before.
+
+**Rolling the API back past this release** makes every answer a backup model helped write fail to open. Such an
+answer carries the mark `BACKUP-MODEL-USED` (possible only while a scorecard is in force), which the older API does
+not know, so it cannot read the answer until you roll forward again. Nothing is deleted. Put the xAI target back to
+`grok-4.6-build` in the same restart that rolls the API back, for the reason in the second bullet.
+
+**The prompt record.** From the first restart on this code, the runner writes the whole prompt of every model call
+(up to 256 KiB) to `ledger.call_prompt` before it sends the call: one row per attempt sent, a failed one included,
+never changed and never purged (an encrypted debate's prompts are stored encrypted). The database and every nightly
+backup grow by roughly the size of every prompt sent; plan disk and backup space by it (§9).
 
 ### Upgrading an existing host (paid plans Part 1a)
 
@@ -1074,6 +1100,11 @@ privacy notice must not promise more than that (`DL2-F5`).
 Retention 14 daily / 8 weekly, then an off-host copy (`rclone copy`, or `scp` — configure exactly
 one in `backup.conf`). Encrypted before it leaves the box, so the remote is untrusted by
 construction. Receipt: `BACKUP_OK <sha256> <bytes> <utc>`.
+
+**The prompt record makes every backup grow.** Since the model-scorecard release (§5), the database
+keeps the whole prompt of every model call a debate makes (`ledger.call_prompt`: one row per call
+attempt sent, up to 256 KiB each, never changed or purged), so the dump, every nightly artefact and
+the off-host copy grow by roughly the size of every prompt sent: plan disk and remote space by it.
 
 ### Restore drill — **quarterly**, and it is not optional
 
