@@ -18,6 +18,7 @@ import {
   XMONEY_OPTIONAL_FIXTURE_KINDS,
   XMONEY_REQUIRED_FIXTURE_KINDS
 } from "../../tools/billing/scrub-xmoney-fixture.js";
+import { transactionRoute } from "../../apps/api/src/billing/rows.js";
 import { startFakeXMoney } from "../support/fake-xmoney.js";
 
 const DIRECTORY = resolve(import.meta.dirname, "../fixtures/xmoney");
@@ -101,6 +102,11 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
     expect(decryptNotice(fixture("notice-success").testKeyOpensslResult!, TEST_KEY).externalOrderId).not.toBeNull();
   });
 
+  // W2 (P2-I2) also depends on these reads: only `deposit` (or no type) routes as a payment, `refund` and
+  // `representment` keep their own paths, and every other type is a dispute of the payment it names. A real payment
+  // that xMoney typed anything else would never activate or renew. Every single-transaction kind and the optional
+  // second payment and declined rebill are GET /transaction reads of a payment (also after its refunds and its
+  // release); the optional refund is the refund itself. If this fails, `transactionRoute` changes before billing is on.
   it("parse as transactions through the real client", async () => {
     const optional = XMONEY_OPTIONAL_FIXTURE_KINDS.filter((kind) => kind.startsWith("transaction-")
       && fixtures.some((candidate) => candidate.kind === kind));
@@ -108,6 +114,7 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
       const parsed = await answeredWith(fixture(kind).body, { method: "GET", path: /^\/transaction\/[0-9]+$/u },
         (client) => client.getTransaction("1"));
       expect((XMONEY_STATUSES as ReadonlyArray<string>).includes(parsed.status), kind).toBe(true);
+      expect(transactionRoute(parsed.transactionType), kind).toBe(kind === "transaction-refund" ? "REFUND" : "PAYMENT");
     }
   });
 
