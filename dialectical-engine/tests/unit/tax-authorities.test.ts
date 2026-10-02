@@ -108,4 +108,15 @@ describe("P16a taxAuthorities v1", () => {
     expect(JSON.stringify(withNull)).toContain("\"taxAuthorities\":null");
     expect(await refusalOf(withNull)).toBe("TAX_AUTHORITIES_INVALID");
   });
+
+  it("is read and confirmed by the accountant, as published, before billing goes on (go-live row 16)", async () => {
+    const checklist = await readFile(
+      new URL("../../docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md", import.meta.url), "utf8");
+    // The text is code-owned research "for the accountant to confirm"; the go-live checklist must say who confirms it,
+    // on which published version, and before which switch.
+    expect(checklist).toMatch(/^\*Note added 2026-10-02 \(paid plans P16a\), binding on row 16[^\n]*`taxAuthorities`/mu);
+    expect(checklist).toContain("the accountant has read the `taxAuthorities` text of the register version to be pinned");
+    expect(checklist).toContain("before `billingPolicy.enabled` is set to `true`");
+    expect(checklist).toContain("the accountant's written confirmation names that register version");
+  });
 });
