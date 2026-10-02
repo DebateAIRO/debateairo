@@ -839,11 +839,16 @@ function wrapClientQueries(client: PoolClient): PoolClient {
 
 export function createPool(
   connectionString: string,
-  options: Readonly<{ max?: number }> = {}
+  options: Readonly<{ max?: number; connectionTimeoutMillis?: number }> = {}
 ): Pool {
   if (options.max !== undefined
     && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
     throw new TypeError("DATABASE_POOL_MAX_INVALID");
+  }
+  if (options.connectionTimeoutMillis !== undefined
+    && (!Number.isSafeInteger(options.connectionTimeoutMillis)
+      || options.connectionTimeoutMillis < 1 || options.connectionTimeoutMillis > 600_000)) {
+    throw new TypeError("DATABASE_POOL_CONNECTION_TIMEOUT_INVALID");
   }
   const pool = new PgPool({ connectionString,...options });
   let terminalFailure: TypedDomainError | undefined;

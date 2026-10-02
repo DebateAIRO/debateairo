@@ -304,6 +304,23 @@ const boundedRate = z.coerce.number().min(0).max(1);
 const legacyRegisterVersion = z.string().regex(/^[1-9][0-9]*$/u).transform((value) => (
   registerVersionToSafeLegacyNumber(parseRegisterVersionText(value))
 ));
+
+/**
+ * Paid plans P14b/P14c/P16b: the owner's billing commands (`pnpm billing:dispute`, `pnpm billing:withdraw`,
+ * `pnpm billing:tax-summary`, `pnpm billing:efactura-status`). They run
+ * on the host under `systemd-run` with the API's EnvironmentFile (deploy/vps/README.md "Billing") and read only
+ * the API's own database URL, the register version and the mode; the production floors hold here too.
+ */
+export function parseBillingOperatorEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({
+    DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment, REGISTER_VERSION: legacyRegisterVersion
+  }, source));
+}
+
+export function loadBillingOperatorEnvironment() {
+  return parseBillingOperatorEnvironment(process.env);
+}
+
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),

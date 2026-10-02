@@ -255,7 +255,8 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     ]) expect(statusBlock).toContain(`${field}:`);
     expect(statusBlock).not.toMatch(/(?:password|connection[_ ]?url|token|transcript|ip_address|identity|raw_response)/iu);
 
-    expect(runtimeEnvironment.match(/REGISTER_VERSION: legacyRegisterVersion/gu)).toHaveLength(2);
+    // The API, the runner and (paid plans P14b) the owner's billing commands each read an explicit REGISTER_VERSION.
+    expect(runtimeEnvironment.match(/REGISTER_VERSION: legacyRegisterVersion/gu)).toHaveLength(3);
     expect(runtimeEnvironment).not.toMatch(
       /REGISTER_VERSION:\s*legacyRegisterVersion\s*[.]\s*(?:default|optional|catch)/u
     );
