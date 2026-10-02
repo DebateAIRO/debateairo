@@ -14,7 +14,7 @@ export default async function CardChangePage({
   searchParams = Promise.resolve({})
 }: {
   searchParams?: Promise<{ charge?: string | string[] }>;
-} = {}) {
+}) {
   const cookieStore = await cookies();
   // P12e's backUrl is /settings/card?charge=<ref>: after a bank check that left the page, poll that charge. It is
   // read BEFORE the sign-in redirect, so a person who comes back signed out still lands on the waiting screen, never
