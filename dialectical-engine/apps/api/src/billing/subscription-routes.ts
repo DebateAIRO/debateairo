@@ -145,7 +145,8 @@ export function installSubscriptionRoutes(
     if (deps === undefined) return notFound(reply);
     const authenticated = request.authenticatedSession;
     if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
-    // A card change signs an order and writes a charge row, like checkout: the same per-owner budget.
+    // A card change signs an order and writes a charge row. It spends the owner's billingQuote budget, shared with
+    // quotes, downgrades and cancel-revoke; checkout has its own scope (billingCheckout).
     if (!admit.gate(reply, "billingQuote", "POST /v1/billing/subscription/card", authenticated.ownerRef)) return reply;
     return answer(reply, async () => reply.send(BillingCardChangeResponseSchema.parse(await startCardChange(deps, {
       ownerRef: authenticated.ownerRef, userId: authenticated.userId, ip: source(request).ip, now: deps.clock()
