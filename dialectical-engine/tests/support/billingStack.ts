@@ -13,13 +13,14 @@ import {
   type KeyDestroyResult,
   type ReadableUserDekStore
 } from "@debateai/crypto";
-import { AcceptanceRepository, BillingRepository, EntitlementRepository, RunRepository, migrate } from "@debateai/db";
+import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, RunRepository, migrate } from "@debateai/db";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { currentDocument } from "@debateai/legal-manifest";
 import { XMoneyClient } from "@debateai/payments-xmoney";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue, type PlanId } from "@debateai/register";
 import { buildApi } from "../../apps/api/src/index.js";
 import type { BillingConnectors } from "../../apps/api/src/billing/connectors.js";
+import { BillingReconciler, type ReconcileReport } from "../../apps/api/src/billing/reconcile.js";
 import { createBillingRuntime, type BillingRuntime, type BillingRuntimeDeps } from "../../apps/api/src/billing/runtime.js";
 import { StageShiftedXMoneyClient } from "../../apps/api/src/billing/stage-clock.js";
 import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
@@ -94,6 +95,11 @@ export interface BillingStack {
   runJobs(): Promise<number>;
   /** P11a's renewal pass, then P11b's maintenance (the period-end sweep), then every job they queued. */
   runRenewals(): Promise<void>;
+  /**
+   * P14a's daily money check (A10's listings and A2's adoption) over the stack's xMoney, built from the same members as
+   * runtime.ts builds its own (which the runtime does not expose), then every job it queued.
+   */
+  reconcileDaily(): Promise<ReconcileReport>;
   subscriptionStatus(ownerRef: string): Promise<string | null>;
   cancelRequested(ownerRef: string): Promise<boolean>;
   entitlementPlan(ownerRef: string): Promise<PlanId>;
@@ -267,6 +273,10 @@ export async function startBillingStack(): Promise<BillingStack> {
   const spendStore = new PostgresModelSpendStore(database.pool);
   const billingRepository = new BillingRepository(database.pool);
   const entitlements = new EntitlementRepository(database.pool);
+  const reconciler = new BillingReconciler({
+    billing: billingRepository, jobs: new BillingJobQueries(database.pool), xmoney: connectors.xmoney,
+    environment: connectors.xmoneyEnvironment, audit: () => undefined, clock: now, kick: () => undefined
+  });
   const runtime = createBillingRuntime({
     pool: database.pool,
     connectors,
@@ -420,6 +430,14 @@ export async function startBillingStack(): Promise<BillingStack> {
       await runtime.renewal.runOnce();
       await runtime.maintenance.runOnce();
       await stack.runJobs();
+    },
+    async reconcileDaily() {
+      // The client sends the listing window to whole seconds (P3b), so a transaction xMoney made in this very second is
+      // listed only from the next one: the stack lets that second end first, as a daily pass always has.
+      await new Promise((resolve) => setTimeout(resolve, 1_000 - (Date.now() % 1_000) + 5));
+      const report = await reconciler.runDaily(now());
+      await stack.runJobs();
+      return report;
     },
 
     async subscriptionStatus(ownerRef) {

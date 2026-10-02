@@ -15,7 +15,7 @@ import { locationVerdict } from "./location-verdict.js";
 import { DONE, notFinalRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
 import { covers, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk } from "./refunds.js";
-import { chargeEvent, refundTarget, subscriptionEvent } from "./rows.js";
+import { chargeEvent, refundTarget, subscriptionEvent, transactionRoute } from "./rows.js";
 import { enqueueCreditNote, enqueueInvoice, type ChargeSettlement, type SettlementContext, type SettlementPrepared } from "./settlement.js";
 
 type ChargeWithEvents = ChargeRow & { events: ChargeEventRow[] };
@@ -107,9 +107,21 @@ export class VerifyPaymentHandler {
     const noticeId = typeof job.payload.notice_id === "string" ? job.payload.notice_id : null;
     // A9: a representment finds its own target (the charged-back charge) and is never a payment, so it is dispatched
     // before A1's matching, which would read it as a second success on the order. D5 5g: a refund that is its own
-    // transaction belongs to the charge of the payment it names, never to its order's merchant id.
-    if (transaction.transactionType === "representment") return this.represented(job, transaction, noticeId, now);
-    if (transaction.transactionType === "refund") return this.refundTransaction(job, transaction, noticeId, now);
+    // transaction belongs to the charge of the payment it names, never to its order's merchant id. P2-I2: so does a
+    // dispute that is its own transaction (every type that is neither a payment, a refund nor a representment).
+    const route = transactionRoute(transaction.transactionType);
+    switch (route) {
+      case "REPRESENTMENT":
+        return this.represented(job, transaction, noticeId, now);
+      case "REFUND":
+        return this.refundTransaction(job, transaction, noticeId, now);
+      case "DISPUTE":
+        return this.disputeTransaction(job, transaction, noticeId, now);
+      case "PAYMENT":
+        break;
+      default:
+        return exhaustive(route);
+    }
     const resolved = await this.resolveCharge(transaction, job.payload);
     if (resolved === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
     if (resolved.kind === "MISMATCH") return this.mismatch(resolved, noticeId, now);
@@ -155,7 +167,7 @@ export class VerifyPaymentHandler {
       case "cancel-ok":
         return this.voided(charge, transaction, noticeId, now);
       case "charge-back":
-        return this.chargedBack(charge, transaction, noticeId, now);
+        return this.chargedBack(charge, transaction.transactionId, transaction, noticeId, now);
       default:
         return exhaustive(transaction.status);
     }
@@ -371,21 +383,33 @@ export class VerifyPaymentHandler {
         return DONE;
       }
     }
-    if (transaction.status === "charge-back"
-      && !charge.events.some((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId === transaction.transactionId)) {
-      // The duplicate's own amount (an unmatched rebill's is not the charge total).
-      const recorded = charge.events.find((event) => event.kind === "DUPLICATE_PAYMENT" && event.xmoneyTransactionId === transaction.transactionId);
-      await this.deps.repository.withTransaction(async (client) => {
-        await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
-          xmoneyTransactionId: transaction.transactionId, amountMicros: recorded?.amountMicros ?? charge.totalMicros,
-          errorCode: "DUPLICATE_PAYMENT"
-        }));
-        await this.outcome(noticeId, now, "CHARGEBACK", client);
-      });
-      this.deps.audit("billing.chargeback", { chargeKind: charge.kind, code: "DUPLICATE_PAYMENT" });
+    if (transaction.status === "charge-back") return this.duplicateChargedBack(charge, transaction.transactionId, noticeId, now);
+    await this.outcome(noticeId, now, "DUPLICATE");
+    return DONE;
+  }
+
+  /**
+   * A charge-back of a second payment recorded as a DUPLICATE_PAYMENT (`paymentId`): its CHARGEBACK, keyed by that
+   * payment, at the duplicate's own amount (an unmatched rebill's is not the charge total). The plan never changes for
+   * it. Reached by the payment's own `charge-back` status and by a dispute transaction naming it (P2-I2): the second
+   * report of one dispute is a replay.
+   */
+  private async duplicateChargedBack(
+    charge: ChargeWithEvents, paymentId: string, noticeId: string | null, now: Date
+  ): Promise<OutboxOutcome> {
+    if (charge.events.some((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId === paymentId)) {
+      await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
     }
-    await this.outcome(noticeId, now, "DUPLICATE");
+    const recorded = charge.events.find((event) => event.kind === "DUPLICATE_PAYMENT" && event.xmoneyTransactionId === paymentId);
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
+        xmoneyTransactionId: paymentId, amountMicros: recorded?.amountMicros ?? charge.totalMicros,
+        errorCode: "DUPLICATE_PAYMENT"
+      }));
+      await this.outcome(noticeId, now, "CHARGEBACK", client);
+    });
+    this.deps.audit("billing.chargeback", { chargeKind: charge.kind, code: "DUPLICATE_PAYMENT" });
     return DONE;
   }
 
@@ -571,7 +595,10 @@ export class VerifyPaymentHandler {
     return this.providerRefund(charge, transaction, noticeId, now, "PROVIDER_REFUND");
   }
 
-  /** D5 5g: the charge that recorded the payment a `refund` transaction names (as SUCCEEDED or DUPLICATE_PAYMENT). */
+  /**
+   * D5 5g: the charge that recorded the payment a `refund` transaction (P2-I2: or a dispute transaction) names, as
+   * SUCCEEDED or DUPLICATE_PAYMENT.
+   */
   private async paymentOf(refund: XMoneyTransaction): Promise<Readonly<{ charge: ChargeWithEvents; paymentId: string }> | null> {
     for (const paymentId of refund.relatedTransactionIds) {
       const chargeId = await this.deps.jobs.chargeIdForTransaction(paymentId, "SUCCEEDED", this.deps.xmoneyEnvironment)
@@ -614,6 +641,47 @@ export class VerifyPaymentHandler {
       return DONE;
     }
     return this.providerRefundTransaction(charge, paymentId, transaction, noticeId, now);
+  }
+
+  /**
+   * P2-I2: a dispute xMoney reports as its own transaction (`chargeback`, or any type that is neither a payment, a
+   * refund nor a representment) belongs to the payment it names (`relatedTransactionIds`), never to its order's
+   * merchant id, and is never matched as a payment, whatever its status. Once final and happened (`charge-back`,
+   * `complete-ok`, `refund-ok`), it records that payment's charge-back on the payment's own charge, keyed by the
+   * payment's id, so the payment's own `charge-back` status and this transaction are one dispute (0086's key). Still
+   * in flight it waits; failed or withdrawn, it moved nothing. A payment we hold no record of yet is waited for on the
+   * not-final schedule. X0 follow-up: how real xMoney reports a dispute is the owner's question to xMoney.
+   */
+  private async disputeTransaction(job: OutboxJob, transaction: XMoneyTransaction, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
+    if (NOT_FINAL_STATUSES.has(transaction.status)) return notFinal(job, now, "PAYMENT_NOT_FINAL");
+    if (transaction.status === "complete-failed" || transaction.status === "void-ok" || transaction.status === "cancel-ok") {
+      await this.outcome(noticeId, now, "DUPLICATE");
+      return DONE;
+    }
+    const found = await this.disputedPaymentOf(transaction);
+    if (found === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
+    if (found === "RECORDED") {
+      await this.outcome(noticeId, now, "DUPLICATE");
+      return DONE;
+    }
+    const { charge, paymentId } = found;
+    return charge.events.some((event) => event.kind === "DUPLICATE_PAYMENT" && event.xmoneyTransactionId === paymentId)
+      ? this.duplicateChargedBack(charge, paymentId, noticeId, now)
+      : this.chargedBack(charge, paymentId, transaction, noticeId, now);
+  }
+
+  /**
+   * The payment a dispute transaction names, and the charge that recorded it (D5 5g's `paymentOf`). `RECORDED`: a
+   * payment it names already holds its CHARGEBACK (on whichever charge, even one never seen paid), so this report is a
+   * replay of that dispute.
+   */
+  private async disputedPaymentOf(
+    dispute: XMoneyTransaction
+  ): Promise<Readonly<{ charge: ChargeWithEvents; paymentId: string }> | "RECORDED" | null> {
+    for (const paymentId of dispute.relatedTransactionIds) {
+      if (await this.deps.jobs.chargeIdForTransaction(paymentId, "CHARGEBACK", this.deps.xmoneyEnvironment) !== null) return "RECORDED";
+    }
+    return this.paymentOf(dispute);
   }
 
   private async voided(charge: ChargeWithEvents, transaction: XMoneyTransaction, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
@@ -742,8 +810,16 @@ export class VerifyPaymentHandler {
     return DONE;
   }
 
-  private async chargedBack(charge: ChargeWithEvents, transaction: XMoneyTransaction, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
-    if (charge.events.some((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId === transaction.transactionId)) {
+  /**
+   * A9: a charge-back of the payment `paymentId` of this charge: its one CHARGEBACK, keyed by that payment, then
+   * SUSPENDED + FREE + M10 for a live plan. `transaction` is what reported it: the payment's own `charge-back` status,
+   * or a dispute transaction naming the payment (P2-I2). Either report of one dispute after the other is a replay:
+   * 0086's (system, transaction, kind) key holds one CHARGEBACK per payment.
+   */
+  private async chargedBack(
+    charge: ChargeWithEvents, paymentId: string, transaction: XMoneyTransaction, noticeId: string | null, now: Date
+  ): Promise<OutboxOutcome> {
+    if (charge.events.some((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId === paymentId)) {
       await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
     }
@@ -751,7 +827,7 @@ export class VerifyPaymentHandler {
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
-        xmoneyTransactionId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode: null
+        xmoneyTransactionId: paymentId, amountMicros: charge.totalMicros, errorCode: null
       }));
       if (inserted === "DUPLICATE") return;
       const { subscription } = await this.context(client, charge, transaction, owner, now);

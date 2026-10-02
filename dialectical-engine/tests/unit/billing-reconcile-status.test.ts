@@ -48,6 +48,42 @@ describe("P14a what a listed transaction should already have left in our rows", 
     expect(transactionSettled({ ...payment, transactionId: "79", relatedTransactionIds: ["72"] }, recorded)).toBe(false);
   });
 
+  it("settles a dispute reported as its own transaction by the CHARGEBACK of the payment it names (P2-I2)", () => {
+    const recorded = new Map<string, ReadonlySet<ChargeEventKind>>([
+      ["81", new Set<ChargeEventKind>(["SUCCEEDED", "CHARGEBACK"])],
+      ["82", new Set<ChargeEventKind>(["SUCCEEDED"])],
+      ["83", new Set<ChargeEventKind>(["SUCCEEDED", "CHARGEBACK", "CHARGEBACK_RESOLVED"])]
+    ]);
+    const dispute = { transactionId: "90", status: "charge-back" as const, transactionType: "chargeback", relatedTransactionIds: ["81"] };
+    expect(transactionSettled(dispute, recorded)).toBe(true);
+    // A dispute already won stays settled: its payment's CHARGEBACK is still there.
+    expect(transactionSettled({ ...dispute, relatedTransactionIds: ["83"] }, recorded)).toBe(true);
+    // The payment it names holds no CHARGEBACK yet: VERIFY_PAYMENT records it.
+    expect(transactionSettled({ ...dispute, relatedTransactionIds: ["82"] }, recorded)).toBe(false);
+    expect(transactionSettled({ ...dispute, relatedTransactionIds: [] }, recorded)).toBe(false);
+    // Reported `complete-ok`, a dispute is still never a payment: no SUCCEEDED settles it, only its payment's CHARGEBACK.
+    const complete = { ...dispute, status: "complete-ok" as const, relatedTransactionIds: ["82"] };
+    expect(transactionSettled(complete, new Map([["90", new Set<ChargeEventKind>(["SUCCEEDED"])], ...recorded]))).toBe(false);
+    expect(transactionSettled({ ...complete, relatedTransactionIds: ["81"] }, recorded)).toBe(true);
+    // Every type that is neither a payment, a refund nor a representment takes the same route (`credit`, an unknown one).
+    for (const transactionType of ["credit", "something-new"]) {
+      expect(transactionSettled({ ...dispute, transactionType }, recorded), transactionType).toBe(true);
+      expect(transactionSettled({ ...dispute, transactionType, relatedTransactionIds: ["82"] }, recorded), transactionType).toBe(false);
+    }
+  });
+
+  it("expects a CHARGEBACK for a dispute transaction only once it is final and happened (P2-I2)", () => {
+    const dispute = (status: XMoneyStatus, transactionType = "chargeback") => expectedChargeEventKinds({ status, transactionType });
+    for (const status of ["charge-back", "complete-ok", "refund-ok"] as const) expect(dispute(status), status).toEqual(["CHARGEBACK"]);
+    // Still in flight, or a dispute that failed or was withdrawn: nothing of ours is expected.
+    for (const status of ["start", "in-progress", "3d-pending", "complete-failed", "void-ok", "cancel-ok"] as const) {
+      expect(dispute(status), status).toBeNull();
+    }
+    expect(dispute("complete-ok", "credit")).toEqual(["CHARGEBACK"]);
+    // A payment is a deposit, or a transaction xMoney gives no type.
+    expect(expectedChargeEventKinds({ status: "complete-ok", transactionType: null })).toEqual(["SUCCEEDED", "DUPLICATE_PAYMENT"]);
+  });
+
   it("runs the full pass once a day and the frequent adoption pass on the ticks between", async () => {
     let now = new Date("2026-10-10T00:00:00.000Z");
     const reconciler = new BillingReconciler({

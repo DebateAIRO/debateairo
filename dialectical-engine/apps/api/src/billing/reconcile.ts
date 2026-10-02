@@ -12,7 +12,7 @@ import type { XMoneyClient, XMoneyStatus, XMoneyTransaction, XMoneyTransactionLi
 import { credentialsRefused, type BillingAudit } from "./audit.js";
 import { failureCode } from "./renewal.js";
 import { ordersHoldingCharge } from "./renewal-rules.js";
-import { chargeEvent } from "./rows.js";
+import { chargeEvent, transactionRoute } from "./rows.js";
 
 type OpenCharge = ChargeRow & { events: ChargeEventRow[] };
 
@@ -74,16 +74,50 @@ function refundTransactionKinds(status: XMoneyStatus): readonly ChargeEventKind[
 }
 
 /**
+ * A dispute that is its own xMoney transaction (P2-I2): only the CHARGEBACK of the payment it names can settle it,
+ * once it is final and happened. A dispute still in flight, or one that failed or was withdrawn, records nothing.
+ */
+function disputeTransactionKinds(status: XMoneyStatus): readonly ChargeEventKind[] | null {
+  switch (status) {
+    case "charge-back":
+    case "complete-ok":
+    case "refund-ok":
+      return ["CHARGEBACK"];
+    case "start":
+    case "in-progress":
+    case "3d-pending":
+    case "complete-failed":
+    case "void-ok":
+    case "cancel-ok":
+      return null;
+    default:
+      return exhaustive(status);
+  }
+}
+
+/**
  * The event kinds of ours that already settle a listed transaction (A9's status table, which VERIFY_PAYMENT
- * applies). `null`: nothing of ours is expected (yet): the payment is not final, or the refund did not happen.
+ * applies). `null`: nothing of ours is expected (yet): the payment is not final, or the refund or the dispute did not
+ * happen.
  */
 export function expectedChargeEventKinds(
   transaction: Pick<XMoneyTransaction, "status" | "transactionType">
 ): readonly ChargeEventKind[] | null {
-  if (transaction.transactionType === "representment") return ["CHARGEBACK_REPRESENTED"];
-  if (transaction.transactionType === "chargeback") return ["CHARGEBACK"];
-  // D5 5g: never SUCCEEDED for a refund, whatever status xMoney reports it with.
-  if (transaction.transactionType === "refund") return refundTransactionKinds(transaction.status);
+  const route = transactionRoute(transaction.transactionType);
+  switch (route) {
+    case "REPRESENTMENT":
+      return ["CHARGEBACK_REPRESENTED"];
+    // P2-I2: never SUCCEEDED for a dispute, whatever status xMoney reports it with.
+    case "DISPUTE":
+      return disputeTransactionKinds(transaction.status);
+    // D5 5g: never SUCCEEDED for a refund, whatever status xMoney reports it with.
+    case "REFUND":
+      return refundTransactionKinds(transaction.status);
+    case "PAYMENT":
+      break;
+    default:
+      return exhaustive(route);
+  }
   switch (transaction.status) {
     case "start":
     case "in-progress":
@@ -109,7 +143,9 @@ export function expectedChargeEventKinds(
 /**
  * Whether our rows already hold this transaction's final outcome. A refund that is its own transaction is also
  * settled by the REFUNDED on a payment it names (`relatedTransactionIds`, D5 5g): RefundDesk records our own refund
- * on the payment it refunded. `recorded` holds the kinds by transaction id, the related payments' included.
+ * on the payment it refunded. A dispute that is its own transaction is settled by the CHARGEBACK of a payment it names
+ * (P2-I2): VERIFY_PAYMENT records one dispute once, under the payment's id. `recorded` holds the kinds by transaction
+ * id, the related payments' included.
  */
 export function transactionSettled(
   transaction: Pick<XMoneyTransaction, "transactionId" | "status" | "transactionType" | "relatedTransactionIds">,
@@ -119,13 +155,15 @@ export function transactionSettled(
   if (expected === null) return false;
   const own = recorded.get(transaction.transactionId);
   if (own !== undefined && expected.some((kind) => own.has(kind))) return true;
-  return transaction.transactionType === "refund"
-    && transaction.relatedTransactionIds.some((paymentId) => recorded.get(paymentId)?.has("REFUNDED") ?? false);
+  const route = transactionRoute(transaction.transactionType);
+  const settledBy: ChargeEventKind | null = route === "REFUND" ? "REFUNDED" : route === "DISPUTE" ? "CHARGEBACK" : null;
+  return settledBy !== null
+    && transaction.relatedTransactionIds.some((paymentId) => recorded.get(paymentId)?.has(settledBy) ?? false);
 }
 
-/** A payment that can be a rebill's: never a refund, a charge-back or a representment (D5 5g). */
+/** A payment that can be a rebill's: never a refund, a dispute or a representment (D5 5g, P2-I2). */
 function isPayment(transaction: XMoneyTransaction): boolean {
-  return transaction.transactionType === null || transaction.transactionType === "deposit";
+  return transactionRoute(transaction.transactionType) === "PAYMENT";
 }
 
 function amountOf(transaction: XMoneyTransaction): number | null {

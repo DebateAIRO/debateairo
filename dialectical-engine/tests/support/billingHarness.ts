@@ -265,6 +265,20 @@ export class StubXMoney {
     });
   }
 
+  /**
+   * A dispute xMoney reports as its own `chargeback` transaction naming the payment (P3b's fake's model, P2-I2), on
+   * the payment's order, customer and card, for its amount. Only the new transaction: the payment's own status is
+   * left as it is (`setStatus` it to `charge-back` for the case where xMoney reports both).
+   */
+  dispute(paymentId: string, status: XMoneyStatus = "charge-back", transactionType = "chargeback"): XMoneyTransaction {
+    const payment = this.transactions.get(paymentId);
+    if (payment === undefined) throw new Error("STUB_TRANSACTION_UNKNOWN");
+    return this.add({
+      orderId: payment.orderId, externalOrderId: null, customerId: payment.customerId, cardId: payment.cardId, status,
+      amountDecimal: payment.amountDecimal, transactionType, relatedTransactionIds: Object.freeze([paymentId])
+    });
+  }
+
   setStatus(transactionId: string, status: XMoneyStatus): void {
     const found = this.transactions.get(transactionId);
     if (found === undefined) throw new Error("STUB_TRANSACTION_UNKNOWN");
