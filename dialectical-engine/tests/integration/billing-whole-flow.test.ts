@@ -113,9 +113,15 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(await stack.subscriptionStatus(person.ownerRef)).toBe("WITHDRAWN");
     expect(await stack.entitlementPlan(person.ownerRef)).toBe("FREE");
     expect(ids(stack.mailsTo(person.email))).toContain("M8");
-    // The grant is spent by billing.consume_withdrawal_grant (P12a): a replay is refused.
+    // The plan is already withdrawn, so a replay is refused before its grant is read. The grant itself was spent
+    // inside the withdrawal's own transaction by billing.consume_withdrawal_grant (P12a).
     const replay = await stack.post(person, "/v1/billing/subscription/withdraw", { step_up_grant: grant });
-    expect(replay.status).toBeGreaterThanOrEqual(400);
+    expect([replay.status, replay.body.error]).toEqual([409, "NOT_SUBSCRIBED"]);
+    const spent = await stack.database.pool.query<{ spent: boolean }>(
+      "SELECT consumed_at IS NOT NULL AS spent FROM identity.step_up_grant WHERE session_id = $1 AND action = 'WITHDRAW_SUBSCRIPTION'",
+      [person.identity.authenticated.session.session_id]
+    );
+    expect(spent.rows.map((row) => row.spent)).toEqual([true]);
   });
 
   it("the emailed cancel link cancels only on its button, once, and the plan ends at the period end", async () => {

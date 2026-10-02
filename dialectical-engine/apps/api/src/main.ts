@@ -84,7 +84,12 @@ import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { consoleBillingAudit } from "./billing/audit.js";
 import { createBillingRuntime } from "./billing/runtime.js";
-import { StageShiftedXMoneyClient, assertStageInvoicersAreSandboxes, billingClock } from "./billing/stage-clock.js";
+import {
+  StageShiftedXMoneyClient,
+  assertLiveInvoicersAreLive,
+  assertStageInvoicersAreSandboxes,
+  billingClock
+} from "./billing/stage-clock.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import {
   assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
@@ -1060,6 +1065,12 @@ const billingRuntime = billingConnectors === null
     }
     // A stage payment never reaches a live invoicing service (SmartBill has no sandbox), offset or not.
     assertStageInvoicersAreSandboxes({
+      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
+      smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
+    });
+    // ... and a live payment never meets a sandbox invoicer (exactly one legal invoice per charge).
+    assertLiveInvoicersAreLive({
       xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
       quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
       smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null

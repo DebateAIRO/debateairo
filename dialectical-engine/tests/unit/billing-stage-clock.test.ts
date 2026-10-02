@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import { XMoneyClient } from "@debateai/payments-xmoney";
 import {
   StageShiftedXMoneyClient,
+  assertLiveInvoicersAreLive,
   assertStageInvoicersAreSandboxes,
   billingClock
 } from "../../apps/api/src/billing/stage-clock.js";
@@ -101,12 +104,56 @@ describe("P23 the stage clock (spec §2.8: renew by advancing the clock)", () =>
       .toBe("BILLING_STAGE_LIVE_INVOICER_REFUSED");
     expect(codeOf(() => assertStageInvoicersAreSandboxes({ ...sandboxes, quadernoApiBaseUrl: null })))
       .toBe("BILLING_STAGE_LIVE_INVOICER_REFUSED");
+    // Fail closed: only a `.invalid` SmartBill passes on stage. A trailing-dot spelling of the live host, a bare IP
+    // address and an unset address are all refused.
+    for (const smartbillApiBaseUrl of ["https://ws.smartbill.ro./SBORO/api", "https://203.0.113.5/SBORO/api", null]) {
+      expect(codeOf(() => assertStageInvoicersAreSandboxes({ ...sandboxes, smartbillApiBaseUrl })), String(smartbillApiBaseUrl))
+        .toBe("BILLING_STAGE_LIVE_INVOICER_REFUSED");
+    }
     // Live payments with live invoicing is the ordinary production setting.
     expect(() => assertStageInvoicersAreSandboxes({
       xmoneyApiBaseUrl: "https://api.xmoney.com",
       quadernoApiBaseUrl: "https://debateai.quadernoapp.com/api",
       smartbillApiBaseUrl: "https://ws.smartbill.ro/SBORO/api"
     })).not.toThrow();
+  });
+
+  it("never lets a live payment meet a sandbox invoicer (exactly one legal invoice per charge)", () => {
+    const live = {
+      xmoneyApiBaseUrl: "https://api.xmoney.com",
+      quadernoApiBaseUrl: "https://debateai.quadernoapp.com/api",
+      smartbillApiBaseUrl: "https://ws.smartbill.ro/SBORO/api"
+    };
+    expect(() => assertLiveInvoicersAreLive(live)).not.toThrow();
+    expect(codeOf(() => assertLiveInvoicersAreLive({ ...live, quadernoApiBaseUrl: "https://debateai.sandbox-quadernoapp.com/api" })))
+      .toBe("BILLING_LIVE_SANDBOX_INVOICER_REFUSED");
+    expect(codeOf(() => assertLiveInvoicersAreLive({ ...live, smartbillApiBaseUrl: "https://smartbill.invalid" })))
+      .toBe("BILLING_LIVE_SANDBOX_INVOICER_REFUSED");
+    // The stage sandboxes of §14.9 are the stage API's own business, not this rule's.
+    expect(() => assertLiveInvoicersAreLive({
+      xmoneyApiBaseUrl: STAGE,
+      quadernoApiBaseUrl: "https://debateai.sandbox-quadernoapp.com/api",
+      smartbillApiBaseUrl: "https://smartbill.invalid"
+    })).not.toThrow();
+  });
+
+  it("main.ts checks both invoicer rules and hands the runtime the stage clock and the translated connectors", () => {
+    const main = readFileSync(resolve("apps/api/src/main.ts"), "utf8");
+    const start = main.indexOf('boot.runSync("billing-runtime"');
+    const create = main.indexOf("createBillingRuntime({", start);
+    const end = main.indexOf("reportPending", create);
+    expect(start).toBeGreaterThan(-1);
+    expect(create).toBeGreaterThan(start);
+    expect(end).toBeGreaterThan(create);
+    const step = main.slice(start, end);
+    expect(step).toContain("assertStageInvoicersAreSandboxes({");
+    expect(step).toContain("assertLiveInvoicersAreLive({");
+    expect(step).toContain("billingClock({");
+    expect(step).toContain("connectors: runtimeConnectors");
+    expect(step).toContain("clock: stageClock.clock");
+    const runtime = main.slice(create, end);
+    expect(runtime).not.toContain("connectors: billingConnectors,");
+    expect(runtime).not.toContain("clock: () => new Date()");
   });
 
   it("refuses to move the clock against live money, or by a senseless amount", () => {

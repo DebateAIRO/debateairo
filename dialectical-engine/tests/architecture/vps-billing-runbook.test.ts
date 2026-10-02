@@ -195,7 +195,9 @@ describe("P22 the Billing runbook", () => {
       // P21's judge, ruling (a)2 (2026-10-02): the machine-written customer texts.
       "native or legal reader",
       // The owner's answer to P18 Step 0a, question 3 (2026-10-02): the two help articles reworded for paid plans.
-      "app-navigation", "budget-tier-choice"
+      "app-navigation", "budget-tier-choice",
+      // Row 23 (P23 fix G1): going live moves the invoicers' addresses too, not only xMoney's.
+      "SMARTBILL_API_BASE_URL"
     ]) {
       expect(table, needle).toContain(needle);
     }
@@ -212,7 +214,16 @@ describe("P22 the Billing runbook", () => {
       // D5's R3-A: a stage boot builds the SmartBill connection from COMPANY too, so the CUI comes first.
       "Fill in the company's CUI first (§14.7)", "BILLING_COMPANY_FACTS_UNVERIFIED:cui",
       // The offset only goes up, and leaves only with the stage data.
-      "The stage clock only ever goes up", "A host must never go live holding rows written on a"
+      "The stage clock only ever goes up", "A host must never go live holding rows written on a",
+      // P23 fix G1: a live payment never meets a sandbox invoicer (§14.8 step 4; this case searches all of §14).
+      "BILLING_LIVE_SANDBOX_INVOICER_REFUSED",
+      // P23 fix G2: the 3-D Secure try is a second purchase, so it needs a second account.
+      "on a second test account (Germany again", "ALREADY_SUBSCRIBED",
+      // P23 fix F1: the stage rule fails closed.
+      "beside anything but", "Quaderno's sandbox and a `.invalid` SmartBill address",
+      // P23 fix F2: what the moved clock does not reach.
+      "its usage bars and a withdrawal's credit-used share", "the fake stack in step 6 proves the bars and the share",
+      "`billing:efactura-status`) also run on the real clock", "so do not run them on this host while the line is set"
     ]) {
       expect(billing, needle).toContain(needle);
     }

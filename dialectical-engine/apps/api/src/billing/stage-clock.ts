@@ -11,7 +11,7 @@ const STAGE_API_HOST = "api-stage.xmoney.com";
 function hostOf(url: string | null): string {
   if (url === null) return "";
   try {
-    return new URL(url).hostname;
+    return new URL(url).hostname.replace(/\.$/u, "");
   } catch {
     return "";
   }
@@ -121,22 +121,48 @@ export class StageShiftedXMoneyClient extends XMoneyClient {
   }
 }
 
-/**
- * A stage payment never reaches a live invoicing service. SmartBill has no sandbox (X1): its invoices are real,
- * numbered fiscal documents that e-Factura sends to ANAF, and a replayed call makes a second one. Quaderno's sandbox is
- * `<account>.sandbox-quadernoapp.com`. Checked on the environment as a whole, offset or not.
- */
-export function assertStageInvoicersAreSandboxes(input: Readonly<{
+type BillingInvoicerEnvironment = Readonly<{
   xmoneyApiBaseUrl: string | null;
   quadernoApiBaseUrl: string | null;
   smartbillApiBaseUrl: string | null;
-}>): void {
+}>;
+
+/**
+ * A stage payment never reaches a live invoicing service. SmartBill has no sandbox (X1): its invoices are real,
+ * numbered fiscal documents that e-Factura sends to ANAF, and a replayed call makes a second one. Quaderno's sandbox is
+ * `<account>.sandbox-quadernoapp.com`. Checked on the environment as a whole, offset or not. The rule fails closed: on
+ * the stage API it passes only when the Quaderno host ends in `.sandbox-quadernoapp.com` AND the SmartBill host ends
+ * in `.invalid` (a reserved name that never resolves); anything else (a live host, a trailing-dot spelling of one, a
+ * bare IP address, an unset or unparsable address) is refused. Hosts are compared without one trailing dot.
+ */
+export function assertStageInvoicersAreSandboxes(input: BillingInvoicerEnvironment): void {
   if (hostOf(input.xmoneyApiBaseUrl) !== STAGE_API_HOST) return;
   const quaderno = hostOf(input.quadernoApiBaseUrl);
   const smartbill = hostOf(input.smartbillApiBaseUrl);
-  if (!quaderno.endsWith(".sandbox-quadernoapp.com") || smartbill === "smartbill.ro" || smartbill.endsWith(".smartbill.ro")) {
+  if (!quaderno.endsWith(".sandbox-quadernoapp.com") || !smartbill.endsWith(".invalid")) {
     throw new TypedDomainError(
-      "BILLING_STAGE_LIVE_INVOICER_REFUSED", "xMoney's stage API may only run beside Quaderno's sandbox and no live SmartBill"
+      "BILLING_STAGE_LIVE_INVOICER_REFUSED",
+      "xMoney's stage API may only run beside Quaderno's sandbox and a .invalid SmartBill address"
+    );
+  }
+}
+
+/**
+ * A live payment never meets a sandbox invoicer (spec 2026-09-29: exactly one legal invoice per charge). A live
+ * charge invoiced by Quaderno's sandbox, or sent to a `.invalid` SmartBill address, gets no legal invoice at all, so
+ * when the API talks to anything but xMoney's stage API it refuses a Quaderno host ending in
+ * `.sandbox-quadernoapp.com` and a SmartBill host ending in `.invalid`. This is the other half of
+ * assertStageInvoicersAreSandboxes: going live on a host that ran the sandbox run (§14.9) must move all three
+ * addresses, not only xMoney's.
+ */
+export function assertLiveInvoicersAreLive(input: BillingInvoicerEnvironment): void {
+  if (hostOf(input.xmoneyApiBaseUrl) === STAGE_API_HOST) return;
+  const quaderno = hostOf(input.quadernoApiBaseUrl);
+  const smartbill = hostOf(input.smartbillApiBaseUrl);
+  if (quaderno.endsWith(".sandbox-quadernoapp.com") || smartbill.endsWith(".invalid")) {
+    throw new TypedDomainError(
+      "BILLING_LIVE_SANDBOX_INVOICER_REFUSED",
+      "xMoney's live API may not run beside Quaderno's sandbox or a .invalid SmartBill address"
     );
   }
 }

@@ -2052,7 +2052,10 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FR
 ```
 
 4. Only then change `XMONEY_API_BASE_URL` to `https://api.xmoney.com` and `XMONEY_SDK_ORIGIN` to
-   `https://secure.xmoney.com`, and restart both services.
+   `https://secure.xmoney.com`, and, in the same edit, `QUADERNO_API_BASE_URL` to your Quaderno account's live address
+   and `SMARTBILL_API_BASE_URL` to SmartBill's own address (§14.2; §14.9 set it to `https://smartbill.invalid`). Then
+   restart both services. Pointed at live beside Quaderno's sandbox or a `.invalid` SmartBill address, the API refuses
+   to start with `BILLING_LIVE_SANDBOX_INVOICER_REFUSED`.
 
 The API checks this itself at start-up: pointed at live while a sandbox plan or charge is still open, it refuses to
 start and prints `BILLING_STAGE_RECORDS_OPEN` with the two counts. The first query can count a cancelled plan that
@@ -2254,11 +2257,11 @@ In `api.env` set:
   numbered fiscal document, and e-Factura sends it to ANAF. The `.invalid` name is reserved and never resolves, so an
   accidental Romanian purchase fails harmlessly and issues nothing.
 
-The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if the stage API sits beside a live Quaderno or a
-SmartBill address. Fill in the company's CUI first (§14.7): a stage host builds the SmartBill connection too, so it
-also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the CUI is still in square brackets. In
-`ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Publish `billingPolicy`
-with `enabled: true` on that host only. Write down what you see at each step; go-live row 15 needs your notes.
+The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if the stage API sits beside anything but
+Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): a stage host builds
+the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the CUI is
+still in square brackets. In `ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Publish
+`billingPolicy` with `enabled: true` on that host only. Write down what you see at each step; go-live row 15 needs your notes.
 
 **Every purchase in steps 1–5 is made as a buyer outside Romania.** Choose a country whose `pay` is on, for example
 Germany (DE), and answer the "Do you live in …" question with yes. The tax then goes to Germany and the invoice to
@@ -2268,16 +2271,20 @@ the SmartBill contract tests, never in this run.
 **The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
 steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
 set, the billing jobs record moved times, the API asks xMoney in real time (it translates both ways), Quaderno's
-sandbox invoices carry the moved dates (harmless in a sandbox), and debates are still admitted on the real clock, so
-the new plan's debate limits are not part of this run. The line comes out only when the stage billing data is thrown
+sandbox invoices carry the moved dates (harmless in a sandbox), and debates are still admitted, and their spend
+recorded, on the real clock, so the new plan's debate limits, its usage bars and a withdrawal's credit-used share are
+not part of this run (the fake stack in step 6 proves the bars and the share). The owner commands
+(`billing:withdraw`, `billing:dispute`, `billing:tax-summary`, `billing:efactura-status`) also run on the real clock,
+so do not run them on this host while the line is set. The line comes out only when the stage billing data is thrown
 away at the end: rebuild the stage host, then remove the line. A host must never go live holding rows written on a
 moved clock.
 
 1. **Pay.** Sign up from the pricing page, choose Plus, pick Germany as your country, confirm it, and pay with
    xMoney's test card 4111 1111 1111 1111 (expiry 12/26, any CVV).
    - Expect: the plan is active within seconds, and the confirmation (M1) and receipt (M2) emails arrive.
-   - Also try the 3-D Secure card 5555 5555 5555 5599 (12/34, CVV 123, code 00000) and note whether the bank's check
-     opened a pop-up window (§14.5).
+   - Then, on a second test account (Germany again: this account already has Plus, so a second checkout on it is
+     refused with `ALREADY_SUBSCRIBED`), pay for Plus with the 3-D Secure card 5555 5555 5555 5599 (12/34, CVV 123,
+     code 00000) and note whether the bank's check opened a pop-up window (§14.5).
 2. **Renew.** Move the billing clock forward by a month.
    - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
    - Within two minutes, a renewal charge appears in the xMoney stage dashboard and a second receipt email arrives.
