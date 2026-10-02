@@ -7,6 +7,7 @@ import { createSmartBillInvoiceHandler, createSmartBillStornoHandler } from "../
 import type { OutboxHandler } from "../../apps/api/src/billing/outbox.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { subscriptionView, withdrawalOpenUntil } from "../../apps/api/src/billing/subscription-view.js";
+import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { recordWithdrawal, type WithdrawalDeps } from "../../apps/api/src/billing/withdrawal.js";
 import { testBillingPolicy } from "../support/billingFixtures.js";
 
@@ -78,6 +79,34 @@ describe("P2-I4 a job of the other xMoney system never reaches a vendor", () => 
     expect(enqueued).toHaveLength(1);
     expect(enqueued[0]).toMatchObject({ kind: "EMAIL", payload: expect.objectContaining({ template: "O2", "param.reasonCode": "OTHER_XMONEY_SYSTEM" }) });
     expect(lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "XMONEY_REFUND", code: "OTHER_XMONEY_SYSTEM" } }]);
+  });
+
+  it("ends RefundDesk's job DONE quietly when the other system's refund is already recorded", async () => {
+    // The job crashed between its REFUNDED row and its completion: nothing is left to do, so no O2 and no audit line.
+    const { lines, audit } = recorder();
+    const desk = new RefundDesk({
+      repository: only({ charge: async () => stageCharge() }, "repository"),
+      jobs: only({ withLease: async (_key: string, work: () => Promise<unknown>) => ({ kind: "RAN", value: await work() }) }, "jobs"),
+      xmoney: only({}, "xmoney"), policy: testBillingPolicy, audit, clock: () => NOW, xmoneyEnvironment: "live"
+    });
+    const refund = { ...job("XMONEY_REFUND", `${CHARGE_ID}:61001`, {
+      charge_id: CHARGE_ID, transaction_id: "61001", amount_micros: 24_200_000, whole: true,
+      owner_ref: stageCharge().ownerRef, reason: "WITHDRAWAL"
+    }), attempts: 2 };
+    expect(await desk.handle(refund, NOW)).toEqual({ kind: "DONE" });
+    expect(lines).toEqual([]);
+  });
+
+  it("ends a payment check that names the other system's charge DEAD with one audit line, before any xMoney call", async () => {
+    const { lines, audit } = recorder();
+    const handler = new VerifyPaymentHandler(only<ConstructorParameters<typeof VerifyPaymentHandler>[0]>({
+      repository: only({ charge: async () => stageCharge() }, "repository"),
+      jobs: only({}, "jobs"), xmoney: only({}, "xmoney"), refunds: only({}, "refunds"), entitlements: only({}, "entitlements"),
+      audit, xmoneyEnvironment: "live"
+    }, "deps"));
+    const verify = job("VERIFY_PAYMENT", "61003", { charge_id: CHARGE_ID });
+    expect(await handler.handle(verify, NOW)).toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
+    expect(lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "VERIFY_PAYMENT", code: "OTHER_XMONEY_SYSTEM" } }]);
   });
 
   it("ends each of the four invoice and credit-note jobs DEAD with one audit line, before Quaderno or SmartBill", async () => {

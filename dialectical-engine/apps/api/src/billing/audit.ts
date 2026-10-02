@@ -22,9 +22,9 @@ export type BillingAuditEvent =
   | "billing.notice.undecryptable"
   | "billing.outbox.dead"
   /**
-   * P2-I4 (D5 5h): a refund, invoice or credit-note job whose charge was paid in the other xMoney system (a sandbox
-   * record after the same-host switch to live, README §14.8) ended DEAD before any vendor call. The job kind and the
-   * code OTHER_XMONEY_SYSTEM only.
+   * P2-I4 (D5 5h): a refund, invoice or credit-note job, or a payment check naming its own charge, whose charge was
+   * paid in the other xMoney system (a sandbox record after the same-host switch to live, README §14.8) ended DEAD
+   * before any vendor call. The job kind and the code OTHER_XMONEY_SYSTEM only.
    */
   | "billing.outbox.other_system"
   /**

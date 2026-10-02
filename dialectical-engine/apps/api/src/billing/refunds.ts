@@ -245,10 +245,12 @@ export class RefundDesk {
   private async moveMoney(job: OutboxJob, intent: RefundIntent, now: Date): Promise<OutboxOutcome> {
     const charge = await this.deps.repository.charge(intent.chargeId);
     if (charge === null) return this.deadLetter(intent, "REFUND_CHARGE_MISSING", now);
+    // A refund already recorded has nothing left to do in either system (a job that died between its REFUNDED row and
+    // its completion): it ends DONE quietly. Any other job of the other system ends here, before any lookup or call.
+    if (refundedAlready(charge, intent.transactionId)) return DONE;
     if (charge.xmoneyEnvironment !== this.deps.xmoneyEnvironment) {
       return this.deadLetter(intent, otherXMoneySystem(this.deps.audit, job.kind).code, now);
     }
-    if (refundedAlready(charge, intent.transactionId)) return DONE;
     if (job.attempts > 1) {
       // The stage the last CALL left, read once, inside the lease: XMONEY_UNAVAILABLE / XMONEY_CREDENTIALS_REFUSED
       // prove it sent nothing; REFUND_CALL_STARTED (a process died during it) or any other code proves nothing.

@@ -12,7 +12,7 @@ import { credentialsRefused, type BillingAudit } from "./audit.js";
 import type { NoticeOutcome, RequestedRefundReason } from "./codes.js";
 import { enqueueEmail } from "./email-job.js";
 import { locationVerdict } from "./location-verdict.js";
-import { DONE, notFinalRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
+import { DONE, notFinalRetryAt, otherXMoneySystem, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
 import { covers, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk } from "./refunds.js";
 import { chargeEvent, refundTarget, subscriptionEvent, transactionRoute } from "./rows.js";
@@ -94,12 +94,25 @@ export class VerifyPaymentHandler {
   /** A credentials refusal (D5 5i) raises the operator alarm; the worker's failure schedule retries the check. */
   readonly handle: OutboxHandler = async (job, now) => {
     try {
+      if (await this.namesOtherSystemCharge(job)) return otherXMoneySystem(this.deps.audit, job.kind);
       return await this.run(job, now);
     } catch (error) {
       credentialsRefused(this.deps.audit, error, "verify");
       throw error;
     }
   };
+
+  /**
+   * P2-I4 (D5 5h): a check whose job names its own charge (a rebill's, A1) is matched within this API's xMoney system
+   * only. A charge paid in the other system (a sandbox record after README §14.8's same-host switch) ends the job DEAD
+   * OTHER_XMONEY_SYSTEM before any xMoney call or write; the two systems number their transactions separately, so the
+   * job's transaction id means nothing here. A charge id that names no charge keeps A1's path (CHARGE_NOT_FOUND).
+   */
+  private async namesOtherSystemCharge(job: OutboxJob): Promise<boolean> {
+    if (typeof job.payload.charge_id !== "string") return false;
+    const charge = await this.deps.repository.charge(job.payload.charge_id);
+    return charge !== null && charge.xmoneyEnvironment !== this.deps.xmoneyEnvironment;
+  }
 
   /** `linked`: this run follows the unmatched-rebill path's own SUBMITTED link, so it never links a second time. */
   private async run(job: OutboxJob, now: Date, linked = false): Promise<OutboxOutcome> {

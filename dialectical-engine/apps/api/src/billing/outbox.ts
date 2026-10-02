@@ -21,9 +21,10 @@ const DECLARED_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 
 /**
  * P2-I4 (D5 5h): the two xMoney systems number their transactions separately, and the database keeps the sandbox's
- * records across README §14.8's same-host switch. A refund, invoice or credit-note job whose charge was paid in the
- * other system ends here, DEAD before any vendor call, with this one content-free code and one audit line (the kind
- * and the code). The caller compares `charge.xmoneyEnvironment` with the connectors' system.
+ * records across README §14.8's same-host switch. A refund, invoice or credit-note job, or a payment check
+ * (VERIFY_PAYMENT) that names its own charge, whose charge was paid in the other system ends here, DEAD before any
+ * vendor call, with this one content-free code and one audit line (the kind and the code). The caller compares
+ * `charge.xmoneyEnvironment` with the connectors' system.
  */
 export function otherXMoneySystem(
   audit: BillingAudit, kind: OutboxKind

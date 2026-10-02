@@ -52,6 +52,19 @@ describe("P22 the Billing runbook", () => {
       "open_sandbox_subscriptions", "open_sandbox_charges",
       // §14.8 (P2-I4): and no sandbox refund, invoice or credit-note job still queued (the start-up check counts them).
       "open_sandbox_jobs",
+      // §14.8 (W3 fix round 1): a sandbox withdrawal handed to the owner is settled before the switch, which refuses it.
+      "If a sandbox withdrawal was handed to you", "while the host still points at the sandbox, with `pnpm billing:withdraw --owner",
+      "After the switch the command refuses a sandbox plan (`NOT_SUBSCRIBED`), and the summary would list it for ever.",
+      // §14.8 (W3 fix round 1): what closes by itself, and when; the refund that never closes without the sandbox key.
+      "An invoice or credit note that keeps failing is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, and then given up.",
+      "A payment check is given up after at most about 31 hours.",
+      "A refund that xMoney's sandbox could not be reached for, or that it refused the sandbox key for, is never given up: it is tried again every 12 hours.",
+      "The API's journal shows the line `billing.xmoney.credentials_refused` each time the key is refused.",
+      "Such a refund closes only once the sandbox key and xMoney's sandbox work, so leave the sandbox key in place until the switch is done.",
+      // §14.8 (W3 fix round 1): the third query counts the payment checks that name a sandbox charge, which the site
+      // refuses beside a refund, invoice or credit note of the other system.
+      "payment checks that name a sandbox charge",
+      "(the site refuses a refund, invoice, credit note or payment check of the other xMoney system)",
       // §14.8: sandbox records stay but are never sales (P1b's quarter summary reads live charges only).
       "they never count as sales", "the quarterly tax summary and its email read only live charges",
       // §14.5 (ruling Q-2): the notice address's two non-200 answers, and the card pages' Payment Request policy.

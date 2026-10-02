@@ -2040,10 +2040,18 @@ points at the sandbox:
 
 1. Sign in as each sandbox test account and cancel its plan in Settings (or withdraw it, within 14 days). A cancelled
    plan whose month has not ended yet is fine: it is never renewed.
+   If a sandbox withdrawal was handed to you (the quarterly summary lists it as `WITHDRAWAL_BY_OWNER`), settle it now,
+   while the host still points at the sandbox, with `pnpm billing:withdraw --owner ... --refund ... --dashboard ...`
+   (see "A withdrawal sent by email or on the model form" below).
+   After the switch the command refuses a sandbox plan (`NOT_SUBSCRIBED`), and the summary would list it for ever.
 2. Wait until every sandbox charge has an outcome, and every refund, invoice and credit note a sandbox charge queued
    has run. The payment checks run every few minutes; a charge still waiting the next day is settled by the daily
-   reconciliation. A queued job that keeps failing is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours and
-   12 hours and then given up, so this can take a day.
+   reconciliation.
+   An invoice or credit note that keeps failing is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, and then given up.
+   A payment check is given up after at most about 31 hours.
+   A refund that xMoney's sandbox could not be reached for, or that it refused the sandbox key for, is never given up: it is tried again every 12 hours.
+   The API's journal shows the line `billing.xmoney.credentials_refused` each time the key is refused.
+   Such a refund closes only once the sandbox key and xMoney's sandbox work, so leave the sandbox key in place until the switch is done.
 3. Check that all three of these print 0:
 
 ```sh
@@ -2058,10 +2066,12 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FR
 sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_jobs FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR (j.kind IN ('QUADERNO_RECORD_SALE', 'SMARTBILL_INVOICE') AND c.charge_id = j.ref)))"
 ```
 
-The third counts the sandbox jobs still queued: the refunds, invoices, credit notes and payment checks of sandbox
-charges. Once the host points at live, the live site would take such a job. It would end it without calling any
-service (the site refuses a refund, invoice or credit note of the other xMoney system), but the start-up check below
-still refuses to start while any is left, so the switch is never made with sandbox work waiting.
+The third counts the sandbox jobs still queued: the refunds, invoices and credit notes of sandbox charges, and the
+payment checks that name a sandbox charge. Once the host points at live, the live site would take such a job. It
+would end it without calling any service
+(the site refuses a refund, invoice, credit note or payment check of the other xMoney system),
+but the start-up check below still refuses to start while any is left, so the switch is never made with sandbox work
+waiting.
 
 4. Only then change `XMONEY_API_BASE_URL` to `https://api.xmoney.com` and `XMONEY_SDK_ORIGIN` to
    `https://secure.xmoney.com`, and, in the same edit, `QUADERNO_API_BASE_URL` to your Quaderno account's live address
