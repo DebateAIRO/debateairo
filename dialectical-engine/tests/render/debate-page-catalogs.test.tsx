@@ -93,7 +93,11 @@ function synthesisStrings(locale: string): string[] {
   });
 }
 
-/** The English page as fc3cb865a rendered it (see the byte-identical row). */
+/** The English page as fc3cb865a rendered it (see the byte-identical row), plus the
+ * deliberate later changes, each a hand edit of one element in both files: b68f82dae
+ * dropped the language-switcher flag span; PR #56 (eb7269e1) added the
+ * publicationControl class to the publication card. fc3cb865a is not in this
+ * repository, so a later deliberate change is applied the same way and listed here. */
 function headFixture(name: "queued" | "lens"): string {
   return readFileSync(resolve(process.cwd(), `tests/render/fixtures/debate-page-en.fc3cb865a.${name}.html`), "utf8");
 }
@@ -138,6 +142,7 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     // fixtures were rendered from `git archive fc3cb865a` (the pre-fix tree) with
     // this file's mocks and the same two debates; the recipe is in the handoff
     // (FIX-DEBATE-CATALOGS.md, Follow-up 4). Regenerate them only from that commit.
+    // Deliberate changes since are hand edits, listed on headFixture().
     // React's useId values depend on tree depth; they are not copy.
     const reactIds = (markup: string) => markup.replace(/_R_[0-9a-z]+_/g, "_R_id_");
     expect(reactIds(html)).toBe(reactIds(headFixture("queued")));
