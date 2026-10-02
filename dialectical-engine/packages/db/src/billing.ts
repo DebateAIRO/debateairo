@@ -859,4 +859,144 @@ export class BillingRepository {
       amountKnown: row.amount_known, locationVerdict: row.verdict
     }));
   }
+
+  /** P14a: the charge-event kinds already recorded for each xMoney transaction id of one xMoney system. */
+  async chargeEventKindsByTransaction(
+    transactionIds: readonly string[], environment: CustomerXMoneyEnvironment
+  ): Promise<ReadonlyMap<string, ReadonlySet<ChargeEventKind>>> {
+    const kinds = new Map<string, Set<ChargeEventKind>>();
+    if (transactionIds.length === 0) return kinds;
+    const result = await this.pool.query<{ transaction_id: string; kind: ChargeEventKind }>(`
+      SELECT DISTINCT xmoney_transaction_id::text AS transaction_id, kind
+      FROM billing.charge_event
+      WHERE xmoney_environment = $2 AND xmoney_transaction_id::text = ANY($1::text[])
+    `, [[...new Set(transactionIds)], environment]);
+    for (const row of result.rows) {
+      const seen = kinds.get(row.transaction_id) ?? new Set<ChargeEventKind>();
+      seen.add(row.kind);
+      kinds.set(row.transaction_id, seen);
+    }
+    return kinds;
+  }
+
+  /**
+   * P14a: charges of these kinds in one xMoney system with neither SUCCEEDED nor FAILED, created before
+   * `createdBefore`, oldest first.
+   */
+  async unsettledCharges(
+    kinds: readonly ChargeKind[], createdBefore: Date, limit: number, environment: CustomerXMoneyEnvironment
+  ): Promise<Array<ChargeRow & { events: ChargeEventRow[] }>> {
+    const result = await this.pool.query<{ charge_id: string }>(`
+      SELECT charge.charge_id
+      FROM billing.charge AS charge
+      WHERE charge.kind = ANY($1::text[])
+        AND charge.created_at < $2
+        AND charge.xmoney_environment = $4
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.charge_event AS event
+          WHERE event.charge_id = charge.charge_id AND event.kind IN ('SUCCEEDED','FAILED')
+        )
+      ORDER BY charge.created_at
+      LIMIT $3
+    `, [[...kinds], createdBefore, limit, environment]);
+    return this.chargesById(result.rows.map((row) => row.charge_id));
+  }
+
+  /**
+   * P14a (A2): the charges the adoption pass may look up, oldest first after a keyset cursor: no SUCCEEDED or FAILED,
+   * the latest SUBMITTED/SUBMIT_UNKNOWN is SUBMIT_UNKNOWN (or there is none), created in [createdFrom, createdBefore).
+   * `maxUnknowns` (null = any) leaves out charges with more SUBMIT_UNKNOWN events. A SUBMITTED charge is never one:
+   * it belongs to VERIFY_PAYMENT and the daily listing.
+   */
+  async adoptionCandidates(input: Readonly<{
+    kinds: readonly ChargeKind[]; environment: CustomerXMoneyEnvironment; createdFrom: Date; createdBefore: Date;
+    after: Readonly<{ createdAt: Date; chargeId: string }> | null; maxUnknowns: number | null; limit: number;
+  }>): Promise<Array<ChargeRow & { events: ChargeEventRow[] }>> {
+    const result = await this.pool.query<{ charge_id: string }>(`
+      SELECT charge.charge_id
+      FROM billing.charge AS charge
+      LEFT JOIN LATERAL (
+        SELECT submit.kind FROM billing.charge_event AS submit
+        WHERE submit.charge_id = charge.charge_id AND submit.kind IN ('SUBMITTED','SUBMIT_UNKNOWN')
+        ORDER BY submit.at DESC, submit.seq DESC
+        LIMIT 1
+      ) AS last_submit ON true
+      WHERE charge.kind = ANY($1::text[])
+        AND charge.xmoney_environment = $8
+        AND charge.created_at >= $2 AND charge.created_at < $3
+        AND ($4::timestamptz IS NULL OR (charge.created_at, charge.charge_id) > ($4::timestamptz, $5::text))
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.charge_event AS settled
+          WHERE settled.charge_id = charge.charge_id AND settled.kind IN ('SUCCEEDED','FAILED')
+        )
+        AND (last_submit.kind IS NULL OR last_submit.kind = 'SUBMIT_UNKNOWN')
+        AND ($6::integer IS NULL OR (
+          SELECT count(*) FROM billing.charge_event AS unknown
+          WHERE unknown.charge_id = charge.charge_id AND unknown.kind = 'SUBMIT_UNKNOWN'
+        ) <= $6::integer)
+      ORDER BY charge.created_at, charge.charge_id
+      LIMIT $7
+    `, [[...input.kinds], input.createdFrom, input.createdBefore, input.after?.createdAt ?? null,
+      input.after?.chargeId ?? null, input.maxUnknowns, input.limit, input.environment]);
+    return this.chargesById(result.rows.map((row) => row.charge_id));
+  }
+
+  /**
+   * P14a/P16b: charges of these kinds with no SUCCEEDED or FAILED, created before `createdBefore` — in one xMoney
+   * system for the reconciler's count, in every system (`null`) for the owner's summary.
+   */
+  async longUnsettledCharges(
+    kinds: readonly ChargeKind[], createdBefore: Date, environment: CustomerXMoneyEnvironment | null = null
+  ): Promise<Array<{ chargeId: string; kind: ChargeKind; createdAt: Date }>> {
+    const result = await this.pool.query<{ charge_id: string; kind: ChargeKind; created_at: Date }>(`
+      SELECT charge.charge_id, charge.kind, charge.created_at
+      FROM billing.charge AS charge
+      WHERE charge.kind = ANY($1::text[]) AND charge.created_at < $2
+        AND ($3::text IS NULL OR charge.xmoney_environment = $3::text)
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.charge_event AS settled
+          WHERE settled.charge_id = charge.charge_id AND settled.kind IN ('SUCCEEDED','FAILED')
+        )
+      ORDER BY charge.created_at, charge.charge_id
+    `, [[...kinds], createdBefore, environment]);
+    return result.rows.map((row) => ({ chargeId: row.charge_id, kind: row.kind, createdAt: row.created_at }));
+  }
+
+  /**
+   * P14a/P16b: refunds of ours that xMoney refused — dead `XMONEY_REFUND` jobs (ref `${chargeId}:${transactionId}`,
+   * P9b) whatever their code, while no REFUNDED exists for that charge and paid transaction (read as P8c's
+   * `refundTarget`: a REFUNDED on xMoney's own refund transaction names the payment in `refunds_transaction_id`,
+   * D5 5g). The money is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once; this
+   * list is the daily and quarterly reminder.)
+   */
+  async deadRefunds(): Promise<Array<{
+    chargeId: string; transactionId: string; reason: string | null; code: string | null; since: Date;
+  }>> {
+    const result = await this.pool.query<{
+      charge_id: string; transaction_id: string; reason: string | null; code: string | null; since: Date;
+    }>(`
+      SELECT split_part(outbox.ref, ':', 1) AS charge_id, split_part(outbox.ref, ':', 2) AS transaction_id,
+        outbox.payload ->> 'reason' AS reason, outbox.last_error_code AS code, outbox.dead_at AS since
+      FROM billing.outbox AS outbox
+      WHERE outbox.kind = 'XMONEY_REFUND' AND outbox.dead_at IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.charge_event AS refunded
+          WHERE refunded.charge_id = split_part(outbox.ref, ':', 1) AND refunded.kind = 'REFUNDED'
+            AND COALESCE(refunded.refunds_transaction_id, refunded.xmoney_transaction_id) = split_part(outbox.ref, ':', 2)
+        )
+      ORDER BY outbox.dead_at, outbox.ref
+    `);
+    return result.rows.map((row) => ({
+      chargeId: row.charge_id, transactionId: row.transaction_id, reason: row.reason, code: row.code, since: row.since
+    }));
+  }
+
+  private async chargesById(chargeIds: readonly string[]): Promise<Array<ChargeRow & { events: ChargeEventRow[] }>> {
+    const charges: Array<ChargeRow & { events: ChargeEventRow[] }> = [];
+    for (const chargeId of chargeIds) {
+      const charge = await this.charge(chargeId);
+      if (charge !== null) charges.push(charge);
+    }
+    return charges;
+  }
 }

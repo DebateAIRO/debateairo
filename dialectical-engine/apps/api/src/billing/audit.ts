@@ -91,7 +91,17 @@ export type BillingAuditEvent =
   /** P12e (A2): a card change's hold was paid while a renewal's outcome was unknown; nothing changed. No field. */
   | "billing.card.change.deferred"
   /** P13 (A25): an emailed one-time cancel link (M9) was sent. No field: never the address, the owner or the token. */
-  | "billing.cancel_link.sent";
+  | "billing.cancel_link.sent"
+  /** P14a (A2): the reconciler adopted the transaction of an unknown submit; the field is the charge kind. */
+  | "billing.reconcile.adopted"
+  /** P14a: a charge that never reached xMoney was settled FAILED(NO_TRANSACTION); the field is the charge kind. */
+  | "billing.reconcile.no_transaction"
+  /** P14a: UPGRADE/RENEWAL charges still without an outcome after 30 days, no longer looked up; the count only. */
+  | "billing.reconcile.expired"
+  /** P14a (D5 5i): listed rows the parser refused in one pass; the count and the pass (LISTING or ADOPTION) only. */
+  | "billing.reconcile.rows_rejected"
+  /** P14a: refunds xMoney refused (dead XMONEY_REFUND jobs) with no REFUNDED since: money still owed. The count only. */
+  | "billing.refund.dead";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

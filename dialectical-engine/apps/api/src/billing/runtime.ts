@@ -23,6 +23,7 @@ import { BillingMaintenance } from "./maintenance.js";
 import { NoticeIntake } from "./notice-intake.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { QuoteService } from "./quote.js";
+import { BillingReconciler } from "./reconcile.js";
 import { RefundDesk } from "./refunds.js";
 import { RenewalService } from "./renewal.js";
 import { createRenewalNoticeHandler } from "./renewal-notice-job.js";
@@ -242,6 +243,14 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     subscription
   });
   const drain = createCoalescingSingleFlight(() => outbox.drain(10), () => deps.reportPending("BILLING_OUTBOX_PENDING"));
+  // P14a: the money check against xMoney (A10's daily listings, A2's adoption) in this connectors' xMoney system.
+  const reconciler = new BillingReconciler({
+    billing: repository, jobs, xmoney: deps.connectors.xmoney, environment: deps.connectors.xmoneyEnvironment,
+    audit: deps.audit, clock: deps.clock, kick: drain
+  });
+  const reconcile = createCoalescingSingleFlight(
+    () => reconciler.tick(), () => deps.reportPending("BILLING_RECONCILIATION_PENDING")
+  );
   const timers: Array<ReturnType<typeof setInterval>> = [];
   return Object.freeze({
     outbox,
@@ -262,6 +271,11 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       renewalTimer.unref();
       timers.push(renewalTimer);
       renewTick();
+      // P14a: every 10 minutes; the reconciler itself runs the full pass once a day.
+      const reconcileTimer = setInterval(reconcile, 600_000);
+      reconcileTimer.unref();
+      timers.push(reconcileTimer);
+      reconcile();
     },
     stop() {
       for (const timer of timers.splice(0)) clearInterval(timer);
