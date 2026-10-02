@@ -145,4 +145,13 @@ describe("P17 mail catalogues", () => {
     // The emails read P6a's SELLER_COMPANY; a JSON file beside the locale directories would be a second mirror.
     expect(readdirSync(MESSAGES).filter((name) => name.endsWith(".json"))).toEqual([]);
   });
+
+  it("names the Free plan with the UI's word in every locale (B10a's newDebate.plan.current.FREE)", () => {
+    for (const locale of MAIL_LOCALES) {
+      const ui = JSON.parse(readFileSync(resolve("apps/ui/messages", locale, "newDebate.json"), "utf8")) as Record<string, string>;
+      const shown = ui["newDebate.plan.current.FREE"];
+      expect(shown, `${locale}: newDebate.plan.current.FREE`).toBeDefined();
+      expect(shown, `${locale}: mail.plan.FREE`).toContain(read(`${locale}/mail.json`)["mail.plan.FREE"]);
+    }
+  });
 });
