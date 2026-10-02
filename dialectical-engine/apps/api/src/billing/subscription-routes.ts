@@ -6,14 +6,18 @@ import {
   BillingUpgradeQuoteRequestSchema,
   BillingUpgradeQuoteResponseSchema,
   BillingUpgradeRequestSchema,
-  BillingUpgradeResponseSchema
+  BillingUpgradeResponseSchema,
+  BillingWithdrawRequestSchema,
+  BillingWithdrawResponseSchema
 } from "@debateai/contract";
+import { microsToDecimal } from "@debateai/billing-core";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
 import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
 import { cancelForOwner, revokeCancelForOwner, scheduleDowngrade } from "./subscription-actions.js";
 import { listInvoices, readSubscriptionView } from "./subscription-view.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 import { quoteUpgrade, startUpgrade } from "./upgrade.js";
+import { withdraw } from "./withdrawal.js";
 
 /** The subscriber's routes; B7a's `BILLING_ROUTE_PATHS` spreads this list, so the two never drift. */
 export const SUBSCRIPTION_ROUTE_PATHS = Object.freeze([
@@ -23,7 +27,8 @@ export const SUBSCRIPTION_ROUTE_PATHS = Object.freeze([
   "POST /v1/billing/subscription/cancel",
   "POST /v1/billing/subscription/cancel-revoke",
   "POST /v1/billing/subscription/upgrade-quote",
-  "POST /v1/billing/subscription/upgrade"
+  "POST /v1/billing/subscription/upgrade",
+  "POST /v1/billing/subscription/withdraw"
 ] as const);
 export type SubscriptionRoutePath = typeof SUBSCRIPTION_ROUTE_PATHS[number];
 
@@ -117,5 +122,19 @@ export function installSubscriptionRoutes(
     return answer(reply, async () => reply.send(BillingUpgradeResponseSchema.parse(await startUpgrade(deps, {
       ownerRef, planId: parsed.data.plan_id, quoteRef: parsed.data.quote_ref
     }))));
+  });
+  // P12d: the step-up grant (WITHDRAW_SUBSCRIPTION) rides in the body and is spent under the owner lock.
+  api.post("/v1/billing/subscription/withdraw", policy("POST /v1/billing/subscription/withdraw"), async (request, reply) => {
+    if (deps === undefined) return notFound(reply);
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+    const parsed = BillingWithdrawRequestSchema.safeParse(request.body);
+    if (!parsed.success) return malformed(reply);
+    return answer(reply, async () => {
+      const result = await withdraw(deps, { authenticated, grantToken: parsed.data.step_up_grant });
+      return reply.send(BillingWithdrawResponseSchema.parse({
+        refund: result.refundMicros === null ? null : microsToDecimal(result.refundMicros)
+      }));
+    });
   });
 }

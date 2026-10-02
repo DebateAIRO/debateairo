@@ -4,6 +4,7 @@ import type { ReadableUserDekStore } from "@debateai/crypto";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
 import { currentDocument } from "@debateai/legal-manifest";
+import { TypedDomainError } from "@debateai/kernel";
 import { decryptNotice } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/register";
 import { createSingleFlightErasureReconciler } from "../account-erasure.js";
@@ -84,6 +85,14 @@ export type BillingRuntime = Readonly<{
   start(): void;
   stop(): void;
 }>;
+
+/** A runtime input main.ts must supply once billing is on; billing never runs half-composed. */
+function required<T>(value: T | undefined, member: string): T {
+  if (value === undefined) {
+    throw new TypedDomainError("BILLING_CONFIGURATION_INCOMPLETE", `createBillingRuntime needs ${member}`);
+  }
+  return value;
+}
 
 export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   const repository = new BillingRepository(deps.pool);
@@ -191,7 +200,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
     countryPolicy: deps.countryPolicy,
     geo: deps.geo,
-    kick: () => drain()
+    kick: () => drain(),
+    // P12d: the credit-used share of a withdrawal, and its refunds through the one executor (R-32).
+    ownerSpend: required(deps.ownerSpend, "ownerSpend"),
+    refunds
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({

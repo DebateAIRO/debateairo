@@ -1245,7 +1245,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/subscription/cancel-revoke", auth: "user", resource: "billing", action: "cancel-revoke" },
   // P12c: the upgrade's quote (prorated, taxed, with the new plan's recurring total) and the charge that spends it.
   { route: "POST /v1/billing/subscription/upgrade-quote", auth: "user", resource: "billing", action: "quote-upgrade" },
-  { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" }
+  { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
+  // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
+  { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;

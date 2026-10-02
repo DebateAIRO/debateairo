@@ -467,6 +467,14 @@ export const BillingUpgradeResponseSchema = z.object({
   reason_code: z.enum(["PAYMENT_DECLINED", "VOIDED", "REBILL_REFUSED", "NO_TRANSACTION"]).nullable()
 }).strict();
 export type BillingUpgradeResponse = z.infer<typeof BillingUpgradeResponseSchema>;
+/** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
+export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
+/**
+ * `refund`: what goes back to the card. Null when a refund made in the xMoney dashboard already touched a payment:
+ * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).
+ */
+export const BillingWithdrawResponseSchema = z.object({ refund: BillingDecimalMoneySchema.nullable() }).strict();
+export type BillingWithdrawResponse = z.infer<typeof BillingWithdrawResponseSchema>;
 
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
@@ -1272,7 +1280,8 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/subscription/cancel",
     "POST /v1/billing/subscription/cancel-revoke",
     "POST /v1/billing/subscription/upgrade-quote",
-    "POST /v1/billing/subscription/upgrade"
+    "POST /v1/billing/subscription/upgrade",
+    "POST /v1/billing/subscription/withdraw"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
@@ -1300,6 +1309,6 @@ export const contractInventory = Object.freeze({
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
     BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
-    BillingUpgradeResponseSchema
+    BillingUpgradeResponseSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema
   })
 });

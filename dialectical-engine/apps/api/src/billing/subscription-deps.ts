@@ -5,6 +5,7 @@ import type { XMoneyClient } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import type { BillingLegalGate } from "./index.js";
+import type { RefundDesk } from "./refunds.js";
 
 /**
  * What the subscription routes are composed with (P7's `createBillingRuntime`). It exists only when hosted with
@@ -39,4 +40,8 @@ export type SubscriptionRouteDeps = Readonly<{
   geo: GeoLookup;
   /** P7's outbox kick: a queued VERIFY_PAYMENT (or refund) runs now, not at the next 5-second tick. */
   kick: () => void;
+  /** B6a's model spend store: the owner's RUN + STORY spend between two instants (the credit-used share). */
+  ownerSpend: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> }>;
+  /** P9b's single refund executor (R-32). */
+  refunds: Pick<RefundDesk, "requestAll">;
 }>;

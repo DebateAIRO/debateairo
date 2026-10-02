@@ -1033,6 +1033,8 @@ const billingRuntime = billingConnectors === null
     return createBillingRuntime({
       pool, connectors: billingConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore, mail: undefined,
+      // P12d: the owner's model spend, the credit-used share of a withdrawal (the same reader as B6a's room).
+      ownerSpend: new PostgresModelSpendStore(pool),
       audit: consoleBillingAudit, clock: () => new Date(),
       reportPending: (code) => console.error(`[${code}]`)
     });

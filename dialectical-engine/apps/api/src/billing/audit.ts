@@ -76,7 +76,14 @@ export type BillingAuditEvent =
   /** P12b: a downgrade to a lower plan was scheduled for the next renewal; the field is the plan id. */
   | "billing.downgrade.scheduled"
   /** P12c: an upgrade charge was written and its rebill is about to be sent; the field is the plan id. */
-  | "billing.upgrade.requested";
+  | "billing.upgrade.requested"
+  /** P12d: a withdrawal was recorded; the fields are the number of refund intents written and its source. */
+  | "billing.withdrawal"
+  /**
+   * P12d (D6a F20(c)): a withdrawal whose refund the owner settles by hand (a refund made in the xMoney dashboard
+   * touched a payment, or a transaction already held a refund request); the field is its source.
+   */
+  | "billing.withdrawal.owner_review";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

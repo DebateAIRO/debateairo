@@ -175,10 +175,12 @@ function intentOfJob(job: OutboxJob): RefundIntent | null {
  */
 export class RefundDesk {
   constructor(private readonly deps: Readonly<{
-    repository: Pick<BillingRepository, "withTransaction" | "appendChargeEvent" | "enqueue" | "charge" | "quote" | "customerByOwner">;
-    /** The per-transaction lease around the refund call (defense in depth beside P7's claim re-assert) and the job's
-     * call stage. */
-    jobs: Pick<BillingJobQueries, "withLease" | "markJobStage" | "jobStage">;
+    repository: Pick<BillingRepository,
+      "withTransaction" | "appendChargeEvent" | "enqueue" | "charge" | "quote" | "customerByOwner"
+      | "subscriptionEvents" | "chargesForSubscription">;
+    /** The per-transaction lease around the refund call (defense in depth beside P7's claim re-assert), the job's
+     * call stage, and the owner lock P12d's WITHDRAWAL follow-up takes before it decides on M8. */
+    jobs: Pick<BillingJobQueries, "withLease" | "markJobStage" | "jobStage" | "lockOwner">;
     /** `listTransactions`: A4(c)'s look for a refund that is its own transaction (D5 5g). */
     xmoney: Pick<XMoneyClient, "refund" | "getTransaction" | "listTransactions">;
     policy: BillingPolicy;
@@ -388,7 +390,7 @@ export class RefundDesk {
         // One charge can take more than one duplicate: each refunded transaction gets its own email.
         return this.mail(intent, "M11_DUPLICATE", `${intent.chargeId}:${intent.transactionId}`);
       case "WITHDRAWAL":
-        return this.creditNote(intent);
+        return this.withdrawalFollowUp(intent);
       case "CARD_CHECK_RELEASE":
         return async () => undefined;
       case "CARD_CHECK_REFUSED":
@@ -416,6 +418,51 @@ export class RefundDesk {
     return async (client, at) => {
       await enqueueCreditNote(this.deps.repository, client, {
         charge, quote, policy: this.deps.policy, transactionId: intent.transactionId, refundMicros: intent.amountMicros, now: at
+      });
+    };
+  }
+
+  /**
+   * P12d (spec §2.5.6): the credit note for this transaction, and M8 "we refunded {refundAmount}" once the LAST
+   * refund of the withdrawal is recorded — never before the money moved, and never for a refund xMoney refused
+   * (that job dies and P14a/P16b list it for the owner). The owner lock serializes the refund jobs of one withdrawal,
+   * so exactly one of them sees every refund recorded; M8's ref `M8:<subscriptionId>` makes a second copy impossible.
+   * The amount is the sum of the withdrawal's own requests (reason WITHDRAWAL): `refund_micros` when P12d computed
+   * it, the owner's amount when P14c settled a withdrawal handed to the owner (whose `refund_micros` is null).
+   */
+  private async withdrawalFollowUp(intent: RefundIntent): Promise<FollowUp> {
+    const creditNote = await this.creditNote(intent);
+    const charge = await this.deps.repository.charge(intent.chargeId);
+    const customer = await this.deps.repository.customerByOwner(intent.ownerRef);
+    if (charge === null || customer === null) {
+      throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a withdrawal refund without its charge or customer");
+    }
+    return async (client, at) => {
+      await creditNote(client, at);
+      await this.deps.jobs.lockOwner(client, intent.ownerRef);
+      const events = await this.deps.repository.subscriptionEvents(charge.subscriptionId, client);
+      const withdrawn = events.find((event) => event.kind === "WITHDRAWN");
+      if (withdrawn === undefined) return;
+      let refundMicros = 0;
+      for (const row of await this.deps.repository.chargesForSubscription(charge.subscriptionId, client)) {
+        const read = await this.deps.repository.charge(row.chargeId, client);
+        const recorded = read?.events ?? [];
+        for (const event of recorded) {
+          const target = refundTarget(event);
+          if (event.kind !== "REFUND_REQUESTED" || event.errorCode !== "WITHDRAWAL" || target === null) continue;
+          // This transaction's REFUNDED is the row this very transaction has just written.
+          const isThisRefund = row.chargeId === intent.chargeId && target === intent.transactionId;
+          // D5 5g: a REFUNDED may sit on xMoney's own refund transaction, naming the payment in
+          // `refundsTransactionId`; `refundTarget` reads both shapes, never the transaction id alone.
+          const refunded = isThisRefund || recorded.some((other) => other.kind === "REFUNDED" && refundTarget(other) === target);
+          if (!refunded) return;
+          refundMicros += event.amountMicros ?? 0;
+        }
+      }
+      await enqueueEmail(this.deps.repository, client, {
+        template: "M8", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
+        dedupeRef: charge.subscriptionId,
+        params: { plan: withdrawn.planId, refundAmount: microsToDecimal(refundMicros) }, notBefore: at
       });
     };
   }

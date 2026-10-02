@@ -40,6 +40,7 @@ import {
   BillingUpgradeQuoteResponseSchema,
   BillingUpgradeResponseSchema,
   BillingUsageResponseSchema,
+  BillingWithdrawResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
   InspectionSchema,
@@ -79,6 +80,7 @@ import {
   type BillingUpgradeQuoteResponse,
   type BillingUpgradeResponse,
   type BillingUsageResponse,
+  type BillingWithdrawResponse,
   type Deployment,
   type EmailChangePending,
   type ExecutionLedgerDigest,
@@ -425,6 +427,8 @@ export interface ContractClient {
   /** P12c: the prorated upgrade price with tax and the new plan's recurring total; spend it with `upgradeSubscription`. */
   quoteSubscriptionUpgrade(planId: "PRO" | "MAX"): Promise<BillingUpgradeQuoteResponse>;
   upgradeSubscription(planId: "PRO" | "MAX", quoteRef: string): Promise<BillingUpgradeResponse>;
+  /** P12d: withdraw within the 14 days with a WITHDRAW_SUBSCRIPTION step-up grant; `refund` null = the owner settles it. */
+  withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -746,6 +750,10 @@ export function createContractClient(
     upgradeSubscription: (planId: "PRO" | "MAX", quoteRef: string) => request(
       "/v1/billing/subscription/upgrade", BillingUpgradeResponseSchema,
       { method: "POST", body: JSON.stringify({ plan_id: planId, quote_ref: quoteRef }) }
+    ),
+    withdrawSubscription: (stepUpGrant: string) => request(
+      "/v1/billing/subscription/withdraw", BillingWithdrawResponseSchema,
+      { method: "POST", body: JSON.stringify({ step_up_grant: stepUpGrant }) }
     ),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),

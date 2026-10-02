@@ -39,7 +39,14 @@ export type BillingRefusalCode =
   /** P12c: an earlier upgrade has no outcome yet, or another process holds the subscription's lease (409). */
   | "UPGRADE_IN_PROGRESS"
   /** P12c: the renewal of this period is due, postponed or already charging; upgrade in the new period (409). */
-  | "UPGRADE_NOT_AVAILABLE_NOW";
+  | "UPGRADE_NOT_AVAILABLE_NOW"
+  /**
+   * P12d: the withdrawal right is not open: past the 14 calendar days from the first activation, or a tax country
+   * outside `withdrawalCountries` (409).
+   */
+  | "WITHDRAWAL_WINDOW_CLOSED"
+  /** P12d: no live WITHDRAW_SUBSCRIPTION step-up grant for this session (403); nothing was written. */
+  | "STEP_UP_REQUIRED";
 
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 

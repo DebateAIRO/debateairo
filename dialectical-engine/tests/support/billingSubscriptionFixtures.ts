@@ -1,13 +1,16 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, type CustomerXMoneyEnvironment } from "@debateai/db";
-import { computeWindows } from "@debateai/billing-core";
+import { computeWindows, foldSubscription } from "@debateai/billing-core";
+import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
+import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { planById, type PlanId } from "@debateai/register";
 import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
 import { sealBillingProfile, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
-import { chargeEvent } from "../../apps/api/src/billing/rows.js";
+import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
+import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { installSubscriptionRoutes } from "../../apps/api/src/billing/subscription-routes.js";
 import type { SubscriptionRouteDeps } from "../../apps/api/src/billing/subscription-deps.js";
 import { AdjustableTaxEngine, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy } from "./billingFixtures.js";
@@ -132,28 +135,116 @@ export async function seedActiveSubscription(pool: Pool, input: Readonly<{
   });
 }
 
+const TEST_PASSWORD_HASH =
+  "$argon2id$v=19$m=65536,t=3,p=1$c2FsdHNhbHRzYWx0c2FsdA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+/** The identity rows a real session would have, and one live WITHDRAW_SUBSCRIPTION grant on it (P12a's CHECK). */
+export async function seedWithdrawalGrant(pool: Pool, identity: TestHttpIdentity, grantToken: string): Promise<void> {
+  const { userId, ownerRef } = identity.authenticated;
+  const sessionId = identity.authenticated.session.session_id;
+  await pool.query(`
+    INSERT INTO identity."user"(
+      user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,password_hash,
+      pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at
+    ) VALUES ($1,$2,'{}','{}',NULL,$3,$4,$5,$6,'active',clock_timestamp(),clock_timestamp())
+    ON CONFLICT (user_id) DO NOTHING
+  `, [userId, randomBytes(32), TEST_PASSWORD_HASH, `p12-${randomUUID()}`, randomUUID(), ownerRef]);
+  await pool.query(`
+    INSERT INTO identity.session(
+      session_id,user_id,token_hash,csrf_token_hash,binding_context,created_at,
+      last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at,revoked_at
+    ) VALUES ($1,$2,$3,$4,'{"user_agent_hash":"p12"}'::jsonb,clock_timestamp(),clock_timestamp(),
+      clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours',clock_timestamp(),NULL)
+    ON CONFLICT (session_id) DO NOTHING
+  `, [sessionId, userId, identity.authenticated.tokenHash, identity.authenticated.csrfTokenHash]);
+  await pool.query(`
+    INSERT INTO identity.step_up_grant(
+      step_up_grant_id,token_hash,session_id,user_id,action,target_run_id,target_account_id,issued_at,expires_at
+    ) VALUES ($1,$2,$3,$4,'WITHDRAW_SUBSCRIPTION',NULL,$4,clock_timestamp()-interval '1 second',
+      clock_timestamp()+interval '5 minutes')
+  `, [randomUUID(), hashToken("step-up-grant", grantToken), sessionId, userId]);
+}
+
+/** A paid UPGRADE on a seeded subscription, as P12c + the UPGRADE settlement leave it (quote, charge, UPGRADED, entitlement). */
+export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, input: Readonly<{
+  at: Date; netMicros: number; taxMicros: number; transactionId: string; monthCreditOverrideMicros: number;
+}>): Promise<Readonly<{ chargeId: string; quoteId: string }>> {
+  const billing = new BillingRepository(pool);
+  const quoteId = randomUUID();
+  const chargeId = randomUUID().replaceAll("-", "");
+  const totalMicros = input.netMicros + input.taxMicros;
+  const quotedAt = new Date(input.at.getTime() - 60_000);
+  const location = sealQuoteLocation(TEST_RECORDS_KEY, quoteId, {
+    name: null, country: "RO", region: null, postalCode: null, city: null, street: null, ip: "192.0.2.10", ipCountry: "RO", company: null
+  });
+  await billing.withTransaction(async (client) => {
+    await billing.insertQuote(client, {
+      quoteId, ownerRef: seeded.ownerRef, planId: "PRO", kind: "UPGRADE", netMicros: input.netMicros,
+      taxMicros: input.taxMicros, totalMicros, taxCountry: "RO", taxRegion: null, taxRateBasisPoints: 2_100,
+      taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null, createdAt: quotedAt,
+      expiresAt: new Date(quotedAt.getTime() + 1_800_000), locationCiphertext: location.ciphertext, keyId: location.keyId,
+      recurringTotalMicros: 60_500_000
+    });
+    await billing.insertCharge(client, {
+      chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "UPGRADE", attempt: 1,
+      periodStart: seeded.periodStart, periodEnd: seeded.periodEnd, quoteId, netMicros: input.netMicros,
+      taxMicros: input.taxMicros, totalMicros, currency: "USD", createdAt: new Date(input.at.getTime() - 30_000),
+      xmoneyEnvironment: seeded.xmoneyEnvironment
+    });
+    await billing.useQuote(client, { quoteId, usedAt: new Date(input.at.getTime() - 30_000), chargeId });
+    for (const [kind, transactionId] of [["REQUESTED", null], ["SUBMITTED", input.transactionId], ["SUCCEEDED", input.transactionId]] as const) {
+      await billing.appendChargeEvent(client, chargeEvent(chargeId, kind, input.at, {
+        xmoneyTransactionId: transactionId, amountMicros: totalMicros, errorCode: null
+      }));
+    }
+    const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
+    await billing.appendSubscriptionEvent(client, subscriptionEvent(state, "UPGRADED", input.at,
+      { announced_total_micros: 60_500_000, quote_ref: quoteId, recurring_net_micros: 50_000_000 }, { planId: "PRO" }));
+    await new EntitlementRepository(pool).append(client, {
+      ownerRef: seeded.ownerRef, planId: "PRO", periodAnchorAt: seeded.periodStart, cause: "UPGRADED",
+      effectiveAt: input.at, subscriptionId: seeded.subscriptionId, paidThrough: seeded.periodEnd,
+      monthCreditOverrideMicros: input.monthCreditOverrideMicros
+    });
+  });
+  return Object.freeze({ chargeId, quoteId });
+}
+
+/** Every xMoney method a consumer of these deps picks, unconfigured: a test that needs one passes its own fake. */
+const unconfigured = async (): Promise<never> => {
+  throw new TypedDomainError("XMONEY_UNAVAILABLE", "no fake configured");
+};
+const UNCONFIGURED_XMONEY: Pick<XMoneyClient, "rebill" | "refund" | "getTransaction" | "listTransactions"> = Object.freeze({
+  rebill: unconfigured, refund: unconfigured, getTransaction: unconfigured, listTransactions: unconfigured
+});
+
 /** The routes' dependencies over a real database, with fakes for every vendor. */
 export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRouteDeps> = {}): SubscriptionRouteDeps {
+  const billing = overrides.billing ?? new BillingRepository(pool);
+  const entitlements = overrides.entitlements ?? new EntitlementRepository(pool);
+  const audit = overrides.audit ?? recordingAudit();
+  const jobs = new BillingJobQueries(pool);
   return Object.freeze({
-    billing: new BillingRepository(pool),
-    jobs: new BillingJobQueries(pool),
-    entitlements: new EntitlementRepository(pool),
+    billing,
+    jobs,
+    entitlements,
     plans: testBillingPlans,
     policy: testBillingPolicy,
     tax: new AdjustableTaxEngine(),
     recordsKey: TEST_RECORDS_KEY,
     publicAppUrl: TEST_PUBLIC_APP_URL,
     legal: { requiresReacceptance: async () => false },
-    audit: recordingAudit(),
+    audit,
     clock: () => new Date(),
-    xmoney: {
-      rebill: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "no fake configured"); }
-    },
+    xmoney: UNCONFIGURED_XMONEY,
     // The connectors' xMoney system in these tests, as P6a's fakes and `seedActiveSubscription`'s default.
     xmoneyEnvironment: "stage",
     countryPolicy: testCountryPolicy,
     geo: new StubGeo(),
     kick: () => undefined,
+    ownerSpend: { readOwnerSpentMicros: async () => 0 },
+    refunds: new RefundDesk({
+      repository: billing, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date()
+    }),
     ...overrides
   });
 }
