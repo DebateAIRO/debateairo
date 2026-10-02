@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   locale: "en",
   billingOn: true,
   ageOwed: false,
+  sessionLive: true,
+  sessionCheckedWith: [] as string[],
   ageAskedWith: [] as string[],
   consentMissingFor: null as string | null,
   flowProps: [] as Record<string, unknown>[],
@@ -29,6 +31,7 @@ vi.mock("next/headers", async () => {
 });
 vi.mock("@/lib/billing/serverBilling", () => ({
   billingIsOn: async () => mocks.billingOn,
+  sessionConfirmed: async (sessionToken: string) => { mocks.sessionCheckedWith.push(sessionToken); return mocks.sessionLive; },
   ageConfirmationOwed: async (sessionToken: string) => { mocks.ageAskedWith.push(sessionToken); return mocks.ageOwed; }
 }));
 vi.mock("@/components/billing/CheckoutFlow", () => ({
@@ -53,6 +56,8 @@ beforeEach(() => {
   mocks.locale = "en";
   mocks.billingOn = true;
   mocks.ageOwed = false;
+  mocks.sessionLive = true;
+  mocks.sessionCheckedWith = [];
   mocks.ageAskedWith = [];
   mocks.consentMissingFor = null;
   mocks.flowProps = [];
@@ -133,6 +138,38 @@ describe("P19 /checkout and /checkout/return", () => {
     delete process.env.XMONEY_SDK_ORIGIN;
     renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "MAX" }) }));
     expect(mocks.flowProps[0]).toMatchObject({ sdkOrigin: null });
+  });
+
+  it("sends an expired or revoked session to sign in, from the checkout and its return page alike (spec §2.10)", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.sessionLive = false;
+    await expect(CheckoutPage({ searchParams: Promise.resolve({ plan: "PRO" }) })).rejects.toThrow("NEXT_REDIRECT");
+    const ref = "0123456789abcdef0123456789abcdef";
+    await expect(CheckoutReturnPage({ searchParams: Promise.resolve({ charge: ref }) })).rejects.toThrow("NEXT_REDIRECT");
+    expect(readRedirects()).toEqual([
+      "/login?next=%2Fcheckout%3Fplan%3DPRO",
+      `/login?next=%2Fcheckout%2Freturn%3Fcharge%3D${ref}`
+    ]);
+    expect(mocks.sessionCheckedWith).toEqual(["t".repeat(43), "t".repeat(43)]);
+    expect(mocks.ageAskedWith).toHaveLength(0);
+    expect(mocks.flowProps).toHaveLength(0);
+    expect(mocks.pollerProps).toHaveLength(0);
+  });
+
+  it("is not found while billing is off for a signed-out visitor too, with no sign-in redirect (like /pricing)", async () => {
+    mocks.billingOn = false;
+    await expect(CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) })).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(CheckoutReturnPage({ searchParams: Promise.resolve({ charge: "0".repeat(32) }) })).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(readNotFoundCalls()).toBe(2);
+    expect(readRedirects()).toEqual([]);
+  });
+
+  it("brings a signed-out visitor with an unknown plan back to plain /checkout, never to a plan they did not pick", async () => {
+    for (const plan of ["GOLD", "pro"]) {
+      resetRedirects();
+      await expect(CheckoutPage({ searchParams: Promise.resolve({ plan }) })).rejects.toThrow("NEXT_REDIRECT");
+      expect(readRedirects(), plan).toEqual(["/login?next=%2Fcheckout"]);
+    }
   });
 
   it("the return page polls the server for the charge it names, and only for a well-formed one", async () => {

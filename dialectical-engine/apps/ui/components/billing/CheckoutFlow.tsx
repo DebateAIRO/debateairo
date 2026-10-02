@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ContractHttpError, type ContractClient } from "@debateai/contract";
+import {
+  BUCHAREST_COUNTY, BUCHAREST_SECTORS, ContractHttpError, isRomanianInvoiceLocality, ROMANIA_COUNTIES,
+  type ContractClient
+} from "@debateai/contract";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
 import { contractClient } from "@/lib/api";
 import { checkoutFailureKey } from "@/lib/billing/checkoutFailure";
@@ -22,7 +25,11 @@ type Checkout = Exclude<CheckoutAnswer, Readonly<{ state: "PENDING" }>>;
 export type ConsentPair = Readonly<{ version: string; sha256: string }>;
 export type CheckoutConsents = Readonly<{ renewal: ConsentPair; immediateStart: ConsentPair }>;
 
-/** Quaderno prices the US and Canada by postal code (spec §1.3 "Paying" step 1). */
+/**
+ * Quaderno prices the US and Canada by postal code (spec §1.3 "Paying" step 1). For them P8b's `address_required`
+ * means the state or postal code, which the postal block already asks for (outside Romania the name is optional,
+ * R-15), so it never opens the invoice-address block there.
+ */
 const POSTAL_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);
 /**
  * R-15: SmartBill refuses a Romanian invoice without the buyer's name, city and county, so Romania asks at once.
@@ -32,6 +39,9 @@ const INVOICE_ADDRESS_COUNTRIES: ReadonlySet<string> = new Set(["RO"]);
 
 /** Leaves for the age gate's interstitial the way AuthGate does (no history entry back to a page that cannot pay). */
 const leaveFor = (href: string): void => { window.location.replace(href); };
+
+/** The API's SESSION_REQUIRED: the session ended while the page was open (expired, revoked, signed out elsewhere). */
+const sessionEnded = (failure: unknown): boolean => failure instanceof ContractHttpError && failure.status === 401;
 
 export function CheckoutFlow({
   planId,
@@ -79,6 +89,10 @@ export function CheckoutFlow({
   const name = planName(catalog, planId);
   const needsPostal = POSTAL_COUNTRIES.has(country);
   const needsInvoiceAddress = INVOICE_ADDRESS_COUNTRIES.has(country) || (country !== "" && addressAskedFor === country);
+  // SmartBill's e-Factura (smartbill-api-facts.md row 3): a Romanian county from the fixed list, and in Bucharest a
+  // sector for the city. Only listed values count, so nothing typed for another country reaches a Romanian quote.
+  const romanian = country === "RO";
+  const bucharest = romanian && region === BUCHAREST_COUNTY;
   const countries = useMemo(
     () => COUNTRY_CODES.map((code) => ({ code, label: countryName(locale, code) }))
       .sort((left, right) => left.label.localeCompare(right.label, locale)),
@@ -86,7 +100,9 @@ export function CheckoutFlow({
   );
   const addressComplete = country !== ""
     && (!needsPostal || postalCode.trim() !== "")
-    && (!needsInvoiceAddress || (fullName.trim() !== "" && city.trim() !== "" && region.trim() !== ""));
+    && (!needsInvoiceAddress || (fullName.trim() !== "" && (romanian
+      ? isRomanianInvoiceLocality(region, city)
+      : city.trim() !== "" && region.trim() !== "")));
   // A company block that is open and started must be whole: half of it would quote a business as a consumer.
   const companyFields = [companyName, vatId, companyAddress].map((value) => value.trim());
   const companyStarted = companyOpen && companyFields.some((value) => value !== "");
@@ -119,9 +135,15 @@ export function CheckoutFlow({
         ...(company === null ? {} : { company })
       });
       setCountry(answer.country);
-      if (answer.address_required) setAddressAskedFor(answer.country);
+      if (answer.address_required && !POSTAL_COUNTRIES.has(answer.country)) setAddressAskedFor(answer.country);
       setQuote(answer);
     } catch (failure) {
+      // Spec §2.10: the page requires sign-in. A session that ended goes back to sign-in and then to this plan,
+      // with no error sentence and no card form, the way the age guard below leaves.
+      if (sessionEnded(failure)) {
+        navigate(`/login?next=${encodeURIComponent(`/checkout?plan=${planId}`)}`);
+        return;
+      }
       setMessageKey(checkoutFailureKey(failure));
     } finally {
       setBusy(false);
@@ -162,7 +184,12 @@ export function CheckoutFlow({
         navigate(ageConfirmationHref(`/checkout?plan=${planId}`));
         return;
       }
-      if (failure instanceof ContractHttpError && failure.serverCode === "BILLING_ADDRESS_REQUIRED") {
+      if (sessionEnded(failure)) {
+        navigate(`/login?next=${encodeURIComponent(`/checkout?plan=${planId}`)}`);
+        return;
+      }
+      if (failure instanceof ContractHttpError && failure.serverCode === "BILLING_ADDRESS_REQUIRED"
+        && !POSTAL_COUNTRIES.has(country)) {
         setAddressAskedFor(country);
       }
       setMessageKey(checkoutFailureKey(failure));
@@ -253,7 +280,9 @@ export function CheckoutFlow({
       <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (canQuote) void requestQuote(); }}>
         <div className="billingField">
           <label htmlFor="checkout-country">{t(catalog, "billing.checkout.country")}</label>
-          <select id="checkout-country" value={country} onChange={(event) => { setCountry(event.target.value); setQuote(null); setAddressAskedFor(null); }} required>
+          <select id="checkout-country" value={country} onChange={(event) => {
+            setCountry(event.target.value); setQuote(null); setAddressAskedFor(null); setRegion(""); setCity("");
+          }} required>
             <option value="" disabled>{t(catalog, "billing.checkout.country")}</option>
             {countries.map((entry) => <option key={entry.code} value={entry.code}>{entry.label}</option>)}
           </select>
@@ -266,20 +295,39 @@ export function CheckoutFlow({
               <input id="checkout-name" value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" required />
             </div>
             <div className="billingField">
-              <label htmlFor="checkout-city">{t(catalog, "billing.checkout.city")}</label>
-              <input id="checkout-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required />
+              <label htmlFor="checkout-region">{t(catalog, "billing.checkout.county")}</label>
+              {romanian ? (
+                <select id="checkout-region" value={region} onChange={(event) => {
+                  const next = event.target.value;
+                  // A sector is no city outside Bucharest, and a city is no sector inside it.
+                  if ((next === BUCHAREST_COUNTY) !== (region === BUCHAREST_COUNTY)) setCity("");
+                  setRegion(next);
+                }} autoComplete="address-level1" required>
+                  <option value="" disabled>{t(catalog, "billing.checkout.county")}</option>
+                  {ROMANIA_COUNTIES.map((county) => <option key={county} value={county}>{county}</option>)}
+                </select>
+              ) : (
+                <input id="checkout-region" value={region} onChange={(event) => setRegion(event.target.value)} autoComplete="address-level1" required />
+              )}
             </div>
             <div className="billingField">
-              <label htmlFor="checkout-region">{t(catalog, "billing.checkout.county")}</label>
-              <input id="checkout-region" value={region} onChange={(event) => setRegion(event.target.value)} autoComplete="address-level1" required />
+              <label htmlFor="checkout-city">{t(catalog, "billing.checkout.city")}</label>
+              {bucharest ? (
+                <select id="checkout-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required>
+                  <option value="">{t(catalog, "billing.checkout.city")}</option>
+                  {BUCHAREST_SECTORS.map((sector) => <option key={sector} value={sector}>{sector}</option>)}
+                </select>
+              ) : (
+                <input id="checkout-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required />
+              )}
             </div>
           </>
         ) : null}
         {needsPostal ? (
           <>
             <div className="billingField">
-              <label htmlFor="checkout-region">{t(catalog, "billing.checkout.region")}</label>
-              <input id="checkout-region" value={region} onChange={(event) => setRegion(event.target.value)} autoComplete="address-level1" />
+              <label htmlFor="checkout-state">{t(catalog, "billing.checkout.region")}</label>
+              <input id="checkout-state" value={region} onChange={(event) => setRegion(event.target.value)} autoComplete="address-level1" />
             </div>
             <div className="billingField">
               <label htmlFor="checkout-postal">{t(catalog, "billing.checkout.postalCode")}</label>

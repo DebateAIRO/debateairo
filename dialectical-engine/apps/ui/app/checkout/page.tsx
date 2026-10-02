@@ -4,7 +4,7 @@ import { currentDocument } from "@debateai/legal-manifest";
 import { CheckoutFlow, type CheckoutConsents } from "@/components/billing/CheckoutFlow";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
 import { isPaidPlanId } from "@/lib/billing/plans";
-import { ageConfirmationOwed, billingIsOn } from "@/lib/billing/serverBilling";
+import { ageConfirmationOwed, billingIsOn, sessionConfirmed } from "@/lib/billing/serverBilling";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
@@ -32,10 +32,16 @@ export default async function CheckoutPage({
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const requestedPlan = (await searchParams).plan;
   const planId = isPaidPlanId(requestedPlan) ? requestedPlan : null;
-  const sessionToken = readSessionCookie(cookieStore);
-  const here = `/checkout?plan=${planId ?? "PLUS"}`;
-  if (sessionToken === null) redirect(`/login?next=${encodeURIComponent(here)}`);
+  // Like /pricing: billing off (or local mode) is "not found" for everyone, signed in or not, before any redirect.
   if (!(await billingIsOn())) notFound();
+  const sessionToken = readSessionCookie(cookieStore);
+  // An unknown or absent plan comes back to plain /checkout, so sign-in and the age gate lead to the same
+  // "That plan doesn't exist" sentence the signed-in path shows, never to a plan the person did not pick.
+  const here = planId === null ? "/checkout" : `/checkout?plan=${planId}`;
+  const signIn = `/login?next=${encodeURIComponent(here)}`;
+  if (sessionToken === null) redirect(signIn);
+  // Spec §2.10: an expired or revoked session is no sign-in either (only the API's 401 says so).
+  if (!(await sessionConfirmed(sessionToken))) redirect(signIn);
   // R3-2: the age gate's interstitial comes first, and its own return path brings the person back to this plan.
   if (await ageConfirmationOwed(sessionToken)) redirect(ageConfirmationHref(here));
   const billingCatalog = await loadNamespace(locale, "billing");

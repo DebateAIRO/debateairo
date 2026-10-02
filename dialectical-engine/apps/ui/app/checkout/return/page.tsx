@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { ChargeStatusPoller } from "@/components/billing/ChargeStatusPoller";
-import { billingIsOn } from "@/lib/billing/serverBilling";
+import { billingIsOn, sessionConfirmed } from "@/lib/billing/serverBilling";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
@@ -20,10 +20,13 @@ export default async function CheckoutReturnPage({
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const charge = (await searchParams).charge;
   const chargeRef = typeof charge === "string" && CHARGE_REF.test(charge) ? charge : null;
-  if (readSessionCookie(cookieStore) === null) {
-    redirect(`/login?next=${encodeURIComponent(chargeRef === null ? "/settings" : `/checkout/return?charge=${chargeRef}`)}`);
-  }
+  // Like /pricing: billing off (or local mode) is "not found" for everyone, signed in or not, before any redirect.
   if (!(await billingIsOn())) notFound();
+  const sessionToken = readSessionCookie(cookieStore);
+  const signIn = `/login?next=${encodeURIComponent(chargeRef === null ? "/settings" : `/checkout/return?charge=${chargeRef}`)}`;
+  if (sessionToken === null) redirect(signIn);
+  // Spec §2.10: an expired or revoked session is no sign-in either (only the API's 401 says so).
+  if (!(await sessionConfirmed(sessionToken))) redirect(signIn);
   const billingCatalog = await loadNamespace(locale, "billing");
   return (
     <main className="screen scroll billingPage">

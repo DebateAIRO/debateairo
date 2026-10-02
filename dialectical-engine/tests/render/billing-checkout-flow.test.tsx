@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ContractHttpError } from "@debateai/contract";
+import { BUCHAREST_SECTORS, ContractHttpError, ROMANIA_COUNTIES } from "@debateai/contract";
 import { CheckoutFlow, type CheckoutClient } from "../../apps/ui/components/billing/CheckoutFlow.js";
 import type { XMoneyGlobal, XMoneyPaymentFormOptions } from "../../apps/ui/lib/billing/xmoneySdk.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
@@ -70,6 +70,8 @@ async function choose(select: HTMLSelectElement, value: string): Promise<void> {
   });
 }
 const text = (): string => container.textContent ?? "";
+const select = (id: string): HTMLSelectElement => container.querySelector<HTMLSelectElement>(`select#${id}`)!;
+const optionValues = (element: HTMLSelectElement): string[] => [...element.options].map((option) => option.value);
 const button = (label: string): HTMLButtonElement =>
   [...container.querySelectorAll("button")].find((candidate) => candidate.textContent === label)!;
 const checkbox = (index: number): HTMLInputElement => container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[index]!;
@@ -173,9 +175,16 @@ describe("P19 CheckoutFlow", () => {
     const showPrice = button("Show the full price");
     expect(showPrice.disabled).toBe(true);
     await fill(container.querySelector<HTMLInputElement>("#checkout-name")!, " Ana Pop ");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-city")!, "Cluj-Napoca");
+    // The county is SmartBill's fixed list (smartbill-api-facts.md row 3), chosen before the city.
+    const county = select("checkout-region");
+    expect(county.compareDocumentPosition(container.querySelector("#checkout-city")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(optionValues(county)).toEqual(["", ...ROMANIA_COUNTIES]);
+    expect(county.options[0]!.disabled).toBe(true);
+    expect(county.options[0]!.textContent).toBe("County");
+    await choose(county, "Cluj");
     expect(showPrice.disabled).toBe(true);
-    await fill(container.querySelector<HTMLInputElement>("#checkout-region")!, "Cluj");
+    // Outside Bucharest the city stays free text.
+    await fill(container.querySelector<HTMLInputElement>("input#checkout-city")!, "Cluj-Napoca");
     expect(showPrice.disabled).toBe(false);
     await click(showPrice);
     expect(client.createBillingQuote).toHaveBeenLastCalledWith({
@@ -186,6 +195,99 @@ describe("P19 CheckoutFlow", () => {
     expect(button("Continue to card details").disabled).toBe(false);
     await click(button("Continue to card details"));
     expect(client.startBillingCheckout).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks a Bucharest buyer for the sector as the city, the only city SmartBill's e-Factura accepts there", async () => {
+    const romania = {
+      net: "20.00", tax: "4.20", total: "24.20", tax_name: "TVA", tax_rate_bp: 2100, tax_country: "RO",
+      country: "RO", ip_country: "RO"
+    };
+    client.createBillingQuote
+      .mockResolvedValueOnce(quote({ ...romania, address_required: true }))
+      .mockResolvedValueOnce(quote(romania));
+    await render();
+    const showPrice = button("Show the full price");
+    await fill(container.querySelector<HTMLInputElement>("#checkout-name")!, "Ana Pop");
+    await fill(container.querySelector<HTMLInputElement>("input#checkout-city")!, "Bucuresti");
+    await choose(select("checkout-region"), "Bucuresti");
+    // Moving the county to Bucuresti clears the city, and the city becomes the six sectors.
+    const sector = select("checkout-city");
+    expect(sector.value).toBe("");
+    expect(optionValues(sector)).toEqual(["", ...BUCHAREST_SECTORS]);
+    expect(sector.options[0]!.textContent).toBe("City");
+    expect(showPrice.disabled).toBe(true);
+    await choose(sector, "Sector 3");
+    expect(showPrice.disabled).toBe(false);
+    await click(showPrice);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith({
+      plan_id: "PLUS", country: "RO", region: "Bucuresti", city: "Sector 3", name: "Ana Pop"
+    });
+    // Moving the county away from Bucuresti clears the sector, so "Sector 3" never names a city elsewhere.
+    await choose(select("checkout-region"), "Ilfov");
+    expect(container.querySelector<HTMLInputElement>("input#checkout-city")!.value).toBe("");
+    expect(button("Show the full price").disabled).toBe(true);
+  });
+
+  it("never counts a county typed for another country as a Romanian one", async () => {
+    client.createBillingQuote.mockResolvedValueOnce(quote({ address_required: true }));
+    await render();
+    await fill(container.querySelector<HTMLInputElement>("#checkout-name")!, "Ana Pop");
+    await fill(container.querySelector<HTMLInputElement>("#checkout-region")!, "Berlin");
+    await fill(container.querySelector<HTMLInputElement>("#checkout-city")!, "Berlin");
+    expect(button("Show the full price").disabled).toBe(false);
+    await choose(countrySelect(), "RO");
+    expect(select("checkout-region").value).toBe("");
+    expect(button("Show the full price").disabled).toBe(true);
+  });
+
+  it("asks a US connection only for the postal code its address_required means, never the Romanian block", async () => {
+    const unitedStates = { country: "US", ip_country: "US", tax_country: "US" };
+    client.createBillingQuote
+      .mockResolvedValueOnce(quote({ ...unitedStates, address_required: true }))
+      .mockResolvedValueOnce(quote(unitedStates));
+    await render();
+    expect(client.createBillingQuote).toHaveBeenCalledWith({ plan_id: "PLUS" });
+    expect(countrySelect().value).toBe("US");
+    expect(container.querySelector("#checkout-postal")).not.toBeNull();
+    expect(container.querySelector("#checkout-state")).not.toBeNull();
+    expect(container.querySelector("#checkout-name")).toBeNull();
+    expect(container.querySelector("#checkout-city")).toBeNull();
+    expect(text()).not.toContain("A Romanian invoice");
+    const ids = [...container.querySelectorAll("[id]")].map((element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    await click(checkbox(0));
+    await click(checkbox(1));
+    expect(button("Continue to card details").disabled).toBe(true);
+    await fill(container.querySelector<HTMLInputElement>("#checkout-postal")!, "10001");
+    await click(button("Show the full price"));
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith({ plan_id: "PLUS", country: "US", postal_code: "10001" });
+    const next = button("Continue to card details");
+    expect(next.disabled).toBe(true);
+    await click(checkbox(0));
+    expect(next.disabled).toBe(true);
+    await click(checkbox(1));
+    expect(next.disabled).toBe(false);
+  });
+
+  it("sends a session that ended while the page was open back to sign in and to this plan, from the quote or the checkout", async () => {
+    client.createBillingQuote.mockRejectedValueOnce(new ContractHttpError("SESSION_REQUIRED", 401, "Session required"));
+    const fromQuote = vi.fn();
+    await render(fromQuote);
+    expect(fromQuote.mock.calls).toEqual([["/login?next=%2Fcheckout%3Fplan%3DPLUS"]]);
+    expect(text()).not.toContain("Something went wrong");
+
+    client.createBillingQuote.mockResolvedValue(quote());
+    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SESSION_REQUIRED", 401, "Session required"));
+    const fromCheckout = vi.fn();
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render(fromCheckout);
+    await click(checkbox(0));
+    await click(checkbox(1));
+    await click(button("Continue to card details"));
+    expect(fromCheckout.mock.calls).toEqual([["/login?next=%2Fcheckout%3Fplan%3DPLUS"]]);
+    expect(mounted).toHaveLength(0);
+    expect(text()).not.toContain("Something went wrong");
   });
 
   it("lets the person pick another country, and asks the US and Canada for a postal code", async () => {
