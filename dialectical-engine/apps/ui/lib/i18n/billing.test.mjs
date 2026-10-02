@@ -10,7 +10,11 @@ import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContra
 // The billing namespace (paid-plans spec §2.10; contract §10). B10c creates it
 // with the usage bars; P18 adds its pages' keys and its files to `ownedFiles`.
 const root = process.cwd();
-const ownedFiles = ["components/billing/UsageBars.tsx", "components/billing/PricingCards.tsx", "app/pricing/page.tsx"];
+const ownedFiles = [
+  "components/billing/UsageBars.tsx", "components/billing/PricingCards.tsx", "app/pricing/page.tsx",
+  "components/billing/ChargeStatusPoller.tsx", "components/billing/XMoneyCardForm.tsx",
+  "components/billing/CheckoutFlow.tsx", "app/checkout/page.tsx", "app/checkout/return/page.tsx"
+];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const englishPath = join(root, "messages/en/billing.json");
 const visibleAttributes = new Set(["alt", "aria-label", "placeholder", "title"]);

@@ -1,4 +1,4 @@
-export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/settings"] as const;
+export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/settings", "/checkout", "/checkout/return", "/settings/card"] as const;
 
 export const DEFAULT_RETURN_PATH = "/#start-a-debate";
 
