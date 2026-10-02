@@ -9,6 +9,7 @@ import { AgeConfirmationFlow } from "../../apps/ui/components/AgeConfirmationFlo
 import { resolveDobLocale } from "../../apps/ui/lib/dob/dobLocale.js";
 import english from "../../apps/ui/messages/en/auth.json";
 import german from "../../apps/ui/messages/de/auth.json";
+import { pickRegion } from "../support/signupRegion.js";
 
 /* Age gate — the sign-up flow (8a → 8j) and the existing-account interstitial (8k). */
 
@@ -50,6 +51,7 @@ async function fillForm(dateOfBirth: readonly [string, string, string] | null): 
     await setValue("dob-m", dateOfBirth[1]);
     await setValue("dob-y", dateOfBirth[2]);
   }
+  await pickRegion("RO");
   field("privacy-accepted").checked = true;
   field("terms-accepted").checked = true;
 }

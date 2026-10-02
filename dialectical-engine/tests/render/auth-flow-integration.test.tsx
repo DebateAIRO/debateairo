@@ -10,6 +10,7 @@ import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { TopBar } from "../../apps/ui/components/TopBar.js";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 const REGISTRATION_MESSAGE =
   "If this address can be registered, verification instructions will arrive. Check your spam folder.";
@@ -337,6 +338,7 @@ describe("rendered auth flow integration", () => {
     await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} />));
 
     await fillAdultDateOfBirth();
+    await pickRegion("RO");
     field("email").value = " person@example.test ";
     field("confirm-email").value = " person@example.test ";
     field("recovery-email").value = " recovery@example.test ";
@@ -352,7 +354,8 @@ describe("rendered auth flow integration", () => {
       "correct horse battery staple",
       "recovery@example.test",
       "1990-01-01",
-      DISPLAYED_LEGAL_EN
+      DISPLAYED_LEGAL_EN,
+      { country: "RO", usState: null }
     );
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
     expect(document.body.textContent).toContain("No account status is revealed here.");
@@ -463,6 +466,7 @@ describe("rendered auth flow integration", () => {
     expect(field("email").autocomplete).toBe("section-primary-email email");
     expect(field("recovery-email").autocomplete).toBe("section-recovery-email email");
     await fillAdultDateOfBirth();
+    await pickRegion("RO");
     field("email").value = "person@example.test";
     field("confirm-email").value = "person@example.test";
     field("recovery-email").value = "recovery@example.test";
