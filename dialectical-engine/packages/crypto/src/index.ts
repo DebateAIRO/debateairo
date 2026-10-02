@@ -5,7 +5,6 @@ import {
   createHmac,
   randomBytes,
   randomFillSync,
-  randomInt,
   timingSafeEqual
 } from "node:crypto";
 import {
@@ -52,6 +51,21 @@ export {
   type Argon2WorkerHandle,
   type Argon2WorkerPoolOptions
 } from "./argon2-worker-pool.js";
+
+// Paid plans L1: the records-key AEAD helpers. records.ts imports node:crypto only, so this
+// re-export cannot form an import cycle with this module.
+export {
+  openRecord,
+  RecordCryptoError,
+  recordsKeyId,
+  sealRecord,
+  type RecordAad,
+  type RecordCryptoErrorCode
+} from "./records.js";
+
+// Account handles: two pool words and a two-digit number. pseudonym.ts imports node:crypto
+// only, so this re-export cannot form an import cycle with this module.
+export { generatePseudonym, PSEUDONYM_ADJECTIVES, PSEUDONYM_NOUNS } from "./pseudonym.js";
 
 const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
@@ -180,6 +194,18 @@ export class ProviderCredentialAbsentError extends CryptoError {
   constructor() {
     super("PROVIDER_CREDENTIAL_FILE_ABSENT", "PROVIDER_CREDENTIAL_FILE_ABSENT");
     this.name = "ProviderCredentialAbsentError";
+  }
+}
+
+/**
+ * A23 — a custody-checked TEXT secret (one printable line) whose contents are not one printable
+ * line: a second line, a control byte, nothing but blanks, or over the bound. Its own class so the
+ * shared reader's catch below can keep the code instead of widening it to SECRET_CUSTODY_INVALID.
+ */
+export class TextSecretInvalidError extends CryptoError {
+  constructor() {
+    super("SECRET_TEXT_INVALID", "SECRET_TEXT_INVALID");
+    this.name = "TextSecretInvalidError";
   }
 }
 
@@ -805,6 +831,8 @@ function readCustodyFile(
     if (error instanceof CryptoCustodyError || error instanceof KekUnresolvedError) throw error;
     // V-9(2): a bounded credential file's own content refusal keeps its name too.
     if (error instanceof ProviderCredentialInvalidError) throw error;
+    // A23: a bounded text secret's own content refusal keeps its name too.
+    if (error instanceof TextSecretInvalidError) throw error;
     throw new CryptoCustodyError(code);
   } finally {
     try {
@@ -905,6 +933,48 @@ export function readCustodyAuthorizationHeader(path: string): string {
     if (!PRINTABLE_HEADER_LINE.test(value) || value !== value.trim()) {
       throw new ProviderCredentialInvalidError();
     }
+    return value;
+  } finally {
+    material.fill(0);
+  }
+}
+
+/** A23: four kilobytes, the same ceiling as a provider credential. */
+const MAX_TEXT_SECRET_BYTES = 4_096;
+
+/**
+ * A23 (paid plans) — a TEXT secret read as BYTES. The xMoney private key is both the HMAC key and
+ * the source of the AES key, so it must be a zeroable Buffer, never a JavaScript string. Same
+ * custody contract as every key file (O_NOFOLLOW, facts from the descriptor, custodyAccepts,
+ * exactly-sized allocUnsafeSlow buffers). One printable line: an optional trailing LF, CRLF or lone
+ * CR is dropped, surrounding spaces and tabs are trimmed, and anything else outside 0x20-0x7e refuses.
+ * The caller owns the returned buffer and zeroes it (boot.hold).
+ */
+export function readCustodyTextSecretBytes(path: string): Buffer {
+  let material: Buffer;
+  try {
+    material = readCustodyFile(path, "SECRET_CUSTODY_INVALID", {
+      maximum: MAX_TEXT_SECRET_BYTES,
+      refuseOversize: () => new TextSecretInvalidError()
+    });
+  } catch (error) {
+    if (error instanceof KekUnresolvedError) throw new CryptoError("SECRET_TEXT_ABSENT", "SECRET_TEXT_ABSENT");
+    throw error;
+  }
+  try {
+    let start = 0;
+    let end = material.byteLength;
+    if (end > 0 && material[end - 1] === 0x0a) end -= 1;
+    if (end > 0 && material[end - 1] === 0x0d) end -= 1;
+    while (start < end && (material[start] === 0x20 || material[start] === 0x09)) start += 1;
+    while (end > start && (material[end - 1] === 0x20 || material[end - 1] === 0x09)) end -= 1;
+    if (end <= start) throw new TextSecretInvalidError();
+    for (let index = start; index < end; index += 1) {
+      const byte = material[index]!;
+      if (byte < 0x20 || byte > 0x7e) throw new TextSecretInvalidError();
+    }
+    const value = Buffer.allocUnsafeSlow(end - start);
+    material.copy(value, 0, start, end);
     return value;
   } finally {
     material.fill(0);
@@ -1631,11 +1701,12 @@ export function generateVerificationToken(): string {
  * pins its bytes to `hashToken`'s, so the two constructions cannot drift.
  */
 export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant"
-  | "verification" | "support-session" | "support-case";
+  | "verification" | "support-session" | "support-case"
+  | "email-change-confirm" | "email-change-cancel";
 
 const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
   "session", "csrf", "login-challenge", "step-up-grant", "verification",
-  "support-session", "support-case"
+  "support-session", "support-case", "email-change-confirm", "email-change-cancel"
 ]);
 
 /**
@@ -1668,23 +1739,6 @@ export function hashVerificationToken(token: string): string {
     throw new CryptoInputError("CRYPTO_KEY_INVALID");
   }
   return `sha256:${createHash("sha256").update(token, "utf8").digest("hex")}`;
-}
-
-const PSEUDONYM_ADJECTIVES = Object.freeze([
-  "amber", "brisk", "calm", "clear", "cobalt", "coral", "crisp", "daring",
-  "ember", "gentle", "golden", "honest", "indigo", "lucid", "mellow", "nimble",
-  "open", "patient", "quiet", "rapid", "silver", "steady", "verdant", "vivid"
-]);
-const PSEUDONYM_NOUNS = Object.freeze([
-  "badger", "cedar", "comet", "dolphin", "falcon", "forest", "harbor", "heron",
-  "island", "lantern", "maple", "meadow", "otter", "pebble", "quartz", "raven",
-  "river", "sparrow", "summit", "thistle", "tiger", "willow", "wren", "zephyr"
-]);
-
-export function generatePseudonym(): string {
-  const adjective = PSEUDONYM_ADJECTIVES[randomInt(PSEUDONYM_ADJECTIVES.length)]!;
-  const noun = PSEUDONYM_NOUNS[randomInt(PSEUDONYM_NOUNS.length)]!;
-  return `${adjective}-${noun}-${randomBytes(3).toString("hex")}`;
 }
 
 export interface UserDekStore {

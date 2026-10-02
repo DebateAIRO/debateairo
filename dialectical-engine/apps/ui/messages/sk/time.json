@@ -22,6 +22,7 @@
   "time.status.claimed": "Prevzaté",
   "time.status.running": "Prebieha",
   "time.status.holding": "Čaká sa na obnovenie poskytovateľa",
+  "time.status.waiting": "Čaká",
   "time.status.settled": "Ustálené",
   "time.status.generating": "Generuje sa",
   "time.status.failed": "Zlyhalo",

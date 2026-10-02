@@ -27,7 +27,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // compared with this list, so a new schema fails the test rather than silently
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
-  "core", "evaluator", "evidence", "identity", "ledger", "memory",
+  "billing", "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
   "obs", "observation", "register", "scorecard", "serve", "support"
 ] as const;
 
@@ -63,6 +63,8 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.authentication_risk_signal": "risk window rows are pruned",
   "identity.runtime_audit_attempt": "attempt rows are retried and pruned",
   "identity.account_recovery_binding": "recovery binding is rotated in place",
+  "identity.age_check": "0077 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
+  "identity.sensitive_data_consent": "0078 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.account_erasure_request": "erasure request state machine",
   "identity.account_erasure_notification_outbox": "outbox rows are sent then cleared",
   "identity.private_erasure_audit_binding": "erasure binding is cleared by the sweep",
@@ -417,7 +419,55 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // Engine money rule, Task M3 (spec 2026-09-26 §14.4.5): serve.serve_disclosure,
         // the owner-side, content-free record beside each served answer. The next
         // free prefix, no pair.
-        "0076_serve_disclosure.sql"
+        "0076_serve_disclosure.sql",
+        // Age gate (Turn 8 implementation prompt): identity.age_check, the result-only
+        // age record, and the 'age_frozen' account state. The next free prefix, no pair.
+        "0077_age_gate.sql",
+        // Sensitive-data consent (V's ruling of 2026-09-29): identity.sensitive_data_consent,
+        // the one-time Article 9 consent before the first debate. The next free prefix, no pair.
+        "0078_sensitive_data_consent.sql",
+        // Turn 14 change email: identity.email_change_request, the CHANGE_EMAIL
+        // step-up grant and its six definer capabilities. The next free prefix, no pair.
+        "0079_email_change.sql",
+        // Paid plans L3a (spec 2026-09-29 §2.3.2 and §2.16, amendments R1 A14/A15, RULINGS-R3 R3-1):
+        // legal.acceptance, the retention purge, the sign-up consent wrapper (with the age record)
+        // and the G3a country-gate audit capability. 0078 and 0079 are the colleague's consent and
+        // change-email files, so R3-1 moves this to 0080; no pair.
+        "0080_legal_acceptance.sql",
+        // Hate-speech S02 R10: append-only, content-free publication check record.
+        // Written as 0078 on the slice branch; renamed to the next free prefix after
+        // dev's 0078/0079/0080 when origin/dev merged in (INTEG-HS-dev). Idempotent
+        // statement by statement, so a database that applied it as 0078 re-applies it
+        // harmlessly under this name (the runner tracks migrations by full file name). No pair.
+        "0081_publication_check_record.sql",
+        // Hate-speech S02 FIX p1 (sd-N1, sd-N2): identifier grammar, call count and distinct members on the record.
+        // Written as 0079; renamed with its table's file (DROP CONSTRAINT IF EXISTS before each ADD). No pair.
+        "0082_publication_check_record_identifiers.sql",
+        // Budget spec 2026-09-28 (B3): the holds, the waiting line, the owner record of
+        // cheaper models, and the ALLOWANCE stop kind on serve.serve_disclosure. The
+        // spec named it 0077; dev's age gate took 0077, the sensitive-data consent holds
+        // 0078, the change-email turn 0079, legal acceptance is 0080 and dev's publication check
+        // record holds 0081 and 0082 (RULINGS-R3 R3-1). A new prefix, no pair.
+        "0083_budget_holds_waiting_line.sql",
+        // Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): the entitlement,
+        // the run's charge scope and the runner's windows view. The next free
+        // prefix after dev's 0077 (age gate), the colleague's 0078
+        // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
+        // (publication check record) and B3's 0083. No pair.
+        "0084_billing_entitlement.sql",
+        // Paid plans, Part 2 (spec 2026-09-29 §2.5.2; R1 A3, A15, A17, A19, A21): customers, quotes and the
+        // subscription log; charges, invoices and notices; the outbox and the cancel tokens. No pair.
+        "0085_billing_customers_subscriptions.sql",
+        "0086_billing_charges_invoices.sql",
+        "0087_billing_outbox_cancel.sql",
+        // Paid plans P12a (amendments R1 A18, ruling R-31; number by R3-1): the
+        // WITHDRAW_SUBSCRIPTION step-up purpose and its one-shot consume function.
+        // The next free prefix after the billing tables, no pair.
+        "0088_billing_withdrawal_step_up.sql",
+        // Paid plans P15 (ruling R-31; number by R3-1): billing learns that an owner's
+        // account is being erased, or was frozen by the age gate (R3-2), as three
+        // content-free lookups. The next free prefix, no pair.
+        "0089_billing_erasure_hook.sql"
       ]);
   });
 });

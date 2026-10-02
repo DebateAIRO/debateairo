@@ -73,6 +73,27 @@ export interface SessionApplication {
   listSessions(session: AuthenticatedSession): Promise<readonly SessionSummary[]>;
   revokeSession(session: AuthenticatedSession, sessionId: string, source: AuthSourceContext): Promise<boolean>;
   revokeAllSessions(session: AuthenticatedSession, source: AuthSourceContext): Promise<number>;
+  /** Age gate (8k): "required" until an existing account answers its one-time check. */
+  readAgeConfirmation?(session: AuthenticatedSession): Promise<"required" | "confirmed">;
+  /**
+   * Age gate (8k): records the one-time check. `refused` has already revoked every session
+   * of the account and frozen it; `SESSION_NOT_FOUND` means this session was not live.
+   */
+  confirmAccountAge?(
+    session: AuthenticatedSession,
+    input: Readonly<{ passed: boolean; minAgeApplied: number; countryCode: string | null; ruleVersion: string }>,
+    source: AuthSourceContext
+  ): Promise<"passed" | "refused" | "SESSION_NOT_FOUND">;
+  /**
+   * Sensitive-data consent (V, 2026-09-29): "required" until the account agrees, once, to
+   * the processing of sensitive information in its own questions. No debate starts before.
+   */
+  readSensitiveDataConsent?(session: AuthenticatedSession): Promise<"required" | "given">;
+  /** Records that agreement; `SESSION_NOT_FOUND` means this session was not live. */
+  recordSensitiveDataConsent?(
+    session: AuthenticatedSession,
+    input: Readonly<{ noticeVersion: string; locale: string }>
+  ): Promise<"given" | "SESSION_NOT_FOUND">;
   stepUp(input: Readonly<{
     session: AuthenticatedSession;
     password: string;
@@ -82,7 +103,7 @@ export interface SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -94,6 +115,10 @@ export interface SessionApplication {
 type SessionRepository = Pick<PostgresSessionRepository,
   | "authenticateSession"
   | "authenticateAccountErasureStatusSession"
+  | "confirmAccountAge"
+  | "readAgeCheckOutcome"
+  | "readSensitiveDataConsent"
+  | "recordSensitiveDataConsent"
   | "completeRecoveryLogin"
   | "completeTotpLogin"
   | "createLoginChallenge"
@@ -533,6 +558,41 @@ export class SessionService implements SessionApplication {
     });
   }
 
+  async readAgeConfirmation(session: AuthenticatedSession): Promise<"required" | "confirmed"> {
+    const outcome = await this.dependencies.repository.readAgeCheckOutcome(session.userId);
+    return outcome === "required" ? "required" : "confirmed";
+  }
+
+  confirmAccountAge(
+    session: AuthenticatedSession,
+    input: Readonly<{ passed: boolean; minAgeApplied: number; countryCode: string | null; ruleVersion: string }>,
+    source: AuthSourceContext
+  ): Promise<"passed" | "refused" | "SESSION_NOT_FOUND"> {
+    return this.dependencies.repository.confirmAccountAge({
+      userId: session.userId,
+      sessionId: session.session.session_id,
+      ...input,
+      occurredAt: this.now(),
+      source
+    });
+  }
+
+  async readSensitiveDataConsent(session: AuthenticatedSession): Promise<"required" | "given"> {
+    return await this.dependencies.repository.readSensitiveDataConsent(session.userId) ? "given" : "required";
+  }
+
+  recordSensitiveDataConsent(
+    session: AuthenticatedSession,
+    input: Readonly<{ noticeVersion: string; locale: string }>
+  ): Promise<"given" | "SESSION_NOT_FOUND"> {
+    return this.dependencies.repository.recordSensitiveDataConsent({
+      userId: session.userId,
+      sessionId: session.session.session_id,
+      ...input,
+      occurredAt: this.now()
+    });
+  }
+
   async stepUp(input: Readonly<{
     session: AuthenticatedSession;
     password: string;
@@ -542,7 +602,7 @@ export class SessionService implements SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -613,7 +673,7 @@ export class SessionService implements SessionApplication {
         source,
         ...(input.authorization === undefined || grantToken === undefined || grantExpiresAt === undefined
           ? {}
-          : { grant: input.authorization.action === "DELETE_ACCOUNT"
+          : { grant: !("targetRunId" in input.authorization)
               ? {
                   grantId: randomUUID(),
                   grantTokenHash: hashToken("step-up-grant", grantToken),

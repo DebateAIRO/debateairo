@@ -1,0 +1,5 @@
+{
+  "order.planDescription": "DebateAI {plan} havi csomag",
+  "order.cardCheck": "DebateAI kártyaellenőrzés",
+  "invoice.line": "DebateAI {plan} csomag, {from} – {to}"
+}

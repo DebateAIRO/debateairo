@@ -1,0 +1,1952 @@
+{
+  "researched_at": "2026-09-30",
+  "countries": {
+    "RO": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Alianța Română de Prevenție a Suicidului – TelVerde Antisuicid",
+          "name_en": "Romanian Alliance for Suicide Prevention – suicide crisis line",
+          "phone": "0800 801 200",
+          "tel": "0800801200",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.antisuicid.ro/",
+          "hours": "Friday, Saturday, Sunday 19:00–07:00 (email sos@antisuicid.ro 24/7)",
+          "free": true,
+          "languages": [
+            "ro"
+          ],
+          "source_url": "https://www.antisuicid.ro/contact/",
+          "source_quote": "0800 801 200 ... Vineri-Sâmbătă-Duminică – 19.00-07.00",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "depreHUB – Helpline Anti Anxietate",
+          "name_en": "depreHUB depression and anxiety helpline",
+          "phone": "0374.456.420",
+          "tel": "0374456420",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://amf-b.ro/desprehub/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "ro"
+          ],
+          "source_url": "https://amf-b.ro/desprehub/",
+          "source_quote": "0374.456.420 ... deschis 24/7 ... Helpline Anti Anxietate gratuit",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "MD": {
+      "emergency": "112",
+      "emergency_source": "https://112.md/",
+      "lines": [
+        {
+          "name": "Linia de încredere Youth Klinik Support Line (CNR Neovita)",
+          "name_en": "YK Support Line (youth crisis line, up to age 24)",
+          "phone": "080080022",
+          "tel": "080080022",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://ms.gov.md/comunicare/10-septembrie-ziua-mondiala-de-prevenire-a-suicidului/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "ro"
+          ],
+          "source_url": "https://anpcv.gov.md/ro/asistenta.html",
+          "source_quote": "Linia de încredere Youth Klinik Support Line ... 080080022 - apel gratuit",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Pentru Viață – Linia Verde Prevenire Suicid (chat)",
+          "name_en": "For Life – suicide prevention chat/email service",
+          "phone": null,
+          "tel": null,
+          "sms": null,
+          "chat_url": "https://pentruviata.md/",
+          "website": "https://pentruviata.md/",
+          "hours": "24/7 (\"la orice oră de zi sau noapte\")",
+          "free": true,
+          "languages": [
+            "ro",
+            "en",
+            "ru"
+          ],
+          "source_url": "https://pentruviata.md/",
+          "source_quote": "Scrie-ne prin site ... AJUTOR@PENTRUVIATA.MD ... la orice oră de zi sau noapte",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "GB": {
+      "emergency": "999",
+      "emergency_source": "https://www.gov.uk/guidance/999-and-112-the-uks-national-emergency-numbers",
+      "lines": [
+        {
+          "name": "Samaritans",
+          "name_en": "Samaritans",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.samaritans.org/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www.samaritans.org/how-we-can-help/contact-samaritan/",
+          "source_quote": "Call 116 123 ... free to call from both landlines and mobiles",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Shout",
+          "name_en": "Shout crisis text line",
+          "phone": null,
+          "tel": null,
+          "sms": "85258",
+          "chat_url": null,
+          "website": "https://giveusashout.org/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://giveusashout.org/get-help/",
+          "source_quote": "85258 ... free, confidential and 24/7 text messaging service",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "IE": {
+      "emergency": "112",
+      "emergency_source": "https://www2.hse.ie/mental-health/services-support/get-urgent-help/",
+      "lines": [
+        {
+          "name": "Samaritans Ireland",
+          "name_en": "Samaritans Ireland",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.samaritans.org/ireland/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www2.hse.ie/mental-health/services-support/get-urgent-help/",
+          "source_quote": "Freephone: 116 123 ... available 24 hours a day",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Text About It (50808)",
+          "name_en": "Text About It – crisis text line",
+          "phone": null,
+          "tel": null,
+          "sms": "50808",
+          "chat_url": null,
+          "website": "https://text50808.ie/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www2.hse.ie/mental-health/services-support/get-urgent-help/",
+          "source_quote": "Free-text: HELLO to 50808 for an anonymous chat with a trained volunteer, any time",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "US": {
+      "emergency": "911",
+      "emergency_source": "https://www.usa.gov/features/the-988-lifeline-and-other-mental-health-services",
+      "lines": [
+        {
+          "name": "988 Suicide & Crisis Lifeline",
+          "name_en": "988 Suicide & Crisis Lifeline",
+          "phone": "988",
+          "tel": "988",
+          "sms": "988",
+          "chat_url": "https://chat.988lifeline.org/",
+          "website": "https://988lifeline.org/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en",
+            "es"
+          ],
+          "source_url": "https://988lifeline.org/",
+          "source_quote": "The 988 Lifeline is available 24/7/365 ... Call ... Text 988",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Crisis Text Line",
+          "name_en": "Crisis Text Line",
+          "phone": null,
+          "tel": null,
+          "sms": "741741",
+          "chat_url": null,
+          "website": "https://www.crisistextline.org/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en",
+            "es"
+          ],
+          "source_url": "https://www.crisistextline.org/",
+          "source_quote": "Text HOME to 741741",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "CA": {
+      "emergency": "911",
+      "emergency_source": "https://www.canada.ca/en/public-health/services/mental-health-services/mental-health-get-help.html",
+      "lines": [
+        {
+          "name": "9-8-8 : Ligne d'aide en cas de crise de suicide / 9-8-8: Suicide Crisis Helpline",
+          "name_en": "9-8-8 Suicide Crisis Helpline",
+          "phone": "9-8-8",
+          "tel": "988",
+          "sms": "988",
+          "chat_url": null,
+          "website": "https://988.ca/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en",
+            "fr"
+          ],
+          "source_url": "https://www.canada.ca/en/public-health/services/mental-health-services/mental-health-get-help.html",
+          "source_quote": "call or text 9-8-8. Support is available 24 hours a day, 7 days a week",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Kids Help Phone / Jeunesse, J'écoute",
+          "name_en": "Kids Help Phone (ages 5–29)",
+          "phone": "1-800-668-6868",
+          "tel": "18006686868",
+          "sms": "686868",
+          "chat_url": null,
+          "website": "https://kidshelpphone.ca/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en",
+            "fr"
+          ],
+          "source_url": "https://www.canada.ca/en/public-health/services/mental-health-services/mental-health-get-help.html",
+          "source_quote": "Call 1-800-668-6868 (toll-free) or text CONNECT to 686868",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "AU": {
+      "emergency": "000",
+      "emergency_source": "https://www.healthdirect.gov.au/suicide-prevention",
+      "lines": [
+        {
+          "name": "Lifeline",
+          "name_en": "Lifeline Australia",
+          "phone": "13 11 14",
+          "tel": "131114",
+          "sms": "0477131114",
+          "chat_url": "https://www.lifeline.org.au/get-help/services/chat",
+          "website": "https://www.lifeline.org.au/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www.healthdirect.gov.au/suicide-prevention",
+          "source_quote": "Call Lifeline for 24-hour crisis support on 13 11 14",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Suicide Call Back Service",
+          "name_en": "Suicide Call Back Service",
+          "phone": "1300 659 467",
+          "tel": "1300659467",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.suicidecallbackservice.org.au/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www.suicidecallbackservice.org.au/",
+          "source_quote": "1300 659 467 ... 24/7 phone and online counselling ... free nationwide service",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "NZ": {
+      "emergency": "111",
+      "emergency_source": "https://www.govt.nz/browse/law-crime-and-justice/crimes-and-emergencies/111-emergency-service/",
+      "lines": [
+        {
+          "name": "1737, Need to talk?",
+          "name_en": "1737 Need to talk? (national mental health line)",
+          "phone": "1737",
+          "tel": "1737",
+          "sms": "1737",
+          "chat_url": null,
+          "website": "https://1737.org.nz/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://1737.org.nz/",
+          "source_quote": "Free, confidential support – 24/7. Call or text 1737",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Suicide Crisis Helpline (Lifeline Aotearoa)",
+          "name_en": "Suicide Crisis Helpline (0508 TAUTOKO)",
+          "phone": "0508 828 865",
+          "tel": "0508828865",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.lifeline.org.nz/",
+          "hours": "07:00–midnight daily (no service midnight–07:00 since Nov 2025)",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www.lifeline.org.nz/",
+          "source_quote": "Suicide Crisis Helpline: 0508 828 865 ... Calls to our helplines are free",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "DE": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "TelefonSeelsorge",
+          "name_en": "TelefonSeelsorge (telephone counselling)",
+          "phone": "0800 1110111",
+          "tel": "08001110111",
+          "sms": null,
+          "chat_url": "https://www.telefonseelsorge.de/chat/",
+          "website": "https://www.telefonseelsorge.de/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "de"
+          ],
+          "source_url": "https://www.telefonseelsorge.de/",
+          "source_quote": "0800 1110111 · 0800 1110222 · 116 123 ... Ihr Anruf ist kostenfrei",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "TelefonSeelsorge",
+          "name_en": "TelefonSeelsorge (alternative number)",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.telefonseelsorge.de/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "de"
+          ],
+          "source_url": "https://www.telefonseelsorge.de/",
+          "source_quote": "0800 1110111 · 0800 1110222 · 116 123 ... Tag und Nacht erreichbar",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "AT": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "TelefonSeelsorge Österreich",
+          "name_en": "TelefonSeelsorge Austria",
+          "phone": "142",
+          "tel": "142",
+          "sms": null,
+          "chat_url": "https://chat.onlineberatung-telefonseelsorge.at/hc/de/p/chat",
+          "website": "https://www.telefonseelsorge.at/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "de"
+          ],
+          "source_url": "https://www.telefonseelsorge.at/",
+          "source_quote": "142 ... 0–24 Uhr ... Kostenlos",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "CH": {
+      "emergency": "112",
+      "emergency_source": "https://www.ch.ch/en/safety-and-justice/emergencies-and-danger/",
+      "lines": [
+        {
+          "name": "Die Dargebotene Hand / La Main Tendue / Telefono Amico",
+          "name_en": "Helping Hand (Tel 143)",
+          "phone": "143",
+          "tel": "143",
+          "sms": null,
+          "chat_url": "https://www.143.ch/chat-deutschschweiz/",
+          "website": "https://www.143.ch/",
+          "hours": "24/7",
+          "free": false,
+          "languages": [
+            "de",
+            "fr",
+            "it",
+            "en"
+          ],
+          "source_url": "https://www.143.ch/de/",
+          "source_quote": "143 ... Wir sind immer für Sie da. Persönlich, anonym und vertraulich.",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Pro Juventute Beratung + Hilfe 147",
+          "name_en": "Pro Juventute 147 (children and young people)",
+          "phone": "147",
+          "tel": "147",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.147.ch/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "de",
+            "fr",
+            "it"
+          ],
+          "source_url": "https://www.147.ch/de/",
+          "source_quote": "147 ... rund um die Uhr ... Dein Anruf ist kostenlos",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "FR": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "3114 – Numéro national de prévention du suicide",
+          "name_en": "3114 national suicide prevention line",
+          "phone": "3114",
+          "tel": "3114",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://3114.fr/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "fr"
+          ],
+          "source_url": "https://3114.fr/",
+          "source_quote": "3114 ... Numéro national de prévention du suicide ... 24h/24 et 7j/7",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "SOS Amitié",
+          "name_en": "SOS Amitié (listening line)",
+          "phone": "09 72 39 40 50",
+          "tel": "0972394050",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.sos-amitie.com/",
+          "hours": "24/7",
+          "free": false,
+          "languages": [
+            "fr"
+          ],
+          "source_url": "https://www.sosamitie.org/besoin-aide/telephone",
+          "source_quote": "09 72 39 40 50 ... 24h/24 ... au prix d'un appel local",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "BE": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Zelfmoordlijn 1813",
+          "name_en": "Suicide Line 1813 (Dutch-speaking)",
+          "phone": "1813",
+          "tel": "1813",
+          "sms": null,
+          "chat_url": "https://www.zelfmoord1813.be/",
+          "website": "https://www.zelfmoord1813.be/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "nl"
+          ],
+          "source_url": "https://www.zelfmoord1813.be/",
+          "source_quote": "1813 ... 24/7 bereikbaar ... anoniem en gratis",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Centre de Prévention du Suicide – ligne d'écoute",
+          "name_en": "Suicide Prevention Centre listening line (French-speaking)",
+          "phone": "0800 32 123",
+          "tel": "080032123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.preventionsuicide.be/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "fr"
+          ],
+          "source_url": "https://www.preventionsuicide.be/la-ligne-decoute-0800-32-123",
+          "source_quote": "0800 32 123 ... 24h/24 et 7j/7 ... anonyme, gratuite",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "NL": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "113 Zelfmoordpreventie",
+          "name_en": "113 Suicide Prevention",
+          "phone": "113",
+          "tel": "113",
+          "sms": null,
+          "chat_url": "https://www.113.nl/",
+          "website": "https://www.113.nl/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "nl"
+          ],
+          "source_url": "https://www.113.nl/actueel/telefoonnummer-113-vanaf-nu-gratis",
+          "source_quote": "vanaf nu gratis bellen met 113 ... Dag en nacht anoniem kunnen bellen of chatten",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "113 Zelfmoordpreventie (gratis nummer)",
+          "name_en": "113 Suicide Prevention (free 0800 number)",
+          "phone": "0800-0113",
+          "tel": "08000113",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.113.nl/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "nl"
+          ],
+          "source_url": "https://www.113.nl/actueel/telefoonnummer-113-vanaf-nu-gratis",
+          "source_quote": "Sinds 1 juli 2020 is de hulplijn bereikbaar via het gratis nummer 0800-0113",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "LU": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "SOS Détresse – Mir hëllefen iwwer Telefon an online",
+          "name_en": "SOS Distress helpline",
+          "phone": "45 45 45",
+          "tel": "454545",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://454545.lu/",
+          "hours": "Daily 11:00–23:00, Fri & Sat until 03:00; English line Wed/Sat/Sun 11:00–23:00",
+          "free": null,
+          "languages": [
+            "lb",
+            "de",
+            "fr",
+            "en"
+          ],
+          "source_url": "https://454545.lu/notre-offre/telephone/",
+          "source_quote": "+352 45 45 45 ... tous les jours de 11h à 23h ... vendredis et samedis jusqu'à 3h",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Kanner-Jugendtelefon",
+          "name_en": "Children and Youth Phone",
+          "phone": "116 111",
+          "tel": "116111",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://santesecu.public.lu/fr/espace-citoyen/dossiers-thematiques/s/sante-mentale/services-psy/aide-telephone-en-ligne.html",
+          "hours": null,
+          "free": null,
+          "languages": [
+            "lb",
+            "de",
+            "fr"
+          ],
+          "source_url": "https://santesecu.public.lu/fr/espace-citoyen/dossiers-thematiques/s/sante-mentale/services-psy/aide-telephone-en-ligne.html",
+          "source_quote": "Kanner-Jugendtelefon - Tel.: 11 61 11",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "ES": {
+      "emergency": "112",
+      "emergency_source": "https://www.sanidad.gob.es/linea024/home.htm",
+      "lines": [
+        {
+          "name": "Línea 024 de atención a la conducta suicida",
+          "name_en": "024 Suicidal Behaviour Helpline (Ministry of Health)",
+          "phone": "024",
+          "tel": "024",
+          "sms": null,
+          "chat_url": "https://www2.cruzroja.es/web/cruzroja/chat-linea024",
+          "website": "https://www.sanidad.gob.es/linea024/home.htm",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "es",
+            "ca",
+            "eu",
+            "gl",
+            "en",
+            "fr"
+          ],
+          "source_url": "https://www.sanidad.gob.es/linea024/home.htm",
+          "source_quote": "024 ... disponible las 24 horas del día, los 365 días del año ... gratuito",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Teléfono de la Esperanza",
+          "name_en": "Telephone of Hope",
+          "phone": "717 003 717",
+          "tel": "717003717",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://telefonodelaesperanza.org/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "es"
+          ],
+          "source_url": "https://www.madrid.es/portales/munimadrid/es/AyuntamientodeMadrid/Telefono-de-la-Esperanza/?vgnextfmt=default&vgnextoid=ca6c9cd2554b2610VgnVCM2000001f4a900aRCRD&vgnextchannel=2af809f68134b010VgnVCM1000000b205a0aRCRD",
+          "source_quote": "717 003 717 / 914 590 055 / 914 590 050 ... 24 horas",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "PT": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Linha 1411 – Linha Nacional de Prevenção do Suicídio",
+          "name_en": "1411 National Suicide Prevention Line (launched 10 Sep 2025, within SNS 24)",
+          "phone": "1411",
+          "tel": "1411",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.sns24.gov.pt/servico/linha-nacional-de-prevencao-do-suicidio",
+          "hours": "24/7 (per launch reporting; hours not shown on the government page fetched)",
+          "free": null,
+          "languages": [
+            "pt"
+          ],
+          "source_url": "https://portugal.gov.pt/pt/gc25/comunicacao/noticias/nova-linha-de-prevencao-do-suicidio-entra-em-funcionamento",
+          "source_quote": "1411 ... psicólogos e enfermeiros especialistas em saúde mental e psiquiatria",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "SNS 24 – Linha de Aconselhamento Psicológico",
+          "name_en": "SNS 24 psychological support line (option 4)",
+          "phone": "808 24 24 24 (opção 4)",
+          "tel": "808242424",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.sns24.gov.pt/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "pt"
+          ],
+          "source_url": "https://portugal.gov.pt/gc23/comunicacao/noticias/linha-de-apoio-psicologico-do-sns-24-ja-atendeu-mais-de-240-mil-chamadas",
+          "source_quote": "basta ligar 808 24 24 24 e escolher a opção 4",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "IT": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Telefono Amico Italia",
+          "name_en": "Telefono Amico Italia (listening line)",
+          "phone": "02 2327 2327",
+          "tel": "0223272327",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.telefonoamico.it/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "it"
+          ],
+          "source_url": "https://www.telefonoamico.it/",
+          "source_quote": "Chiamaci al numero 02 2327 2327, tutti i giorni 24 ore su 24",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "MT": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Mental Health Helpline 1579",
+          "name_en": "National Mental Health Helpline",
+          "phone": "1579",
+          "tel": "1579",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://hpdp.gov.mt/hpu/mental_health_and_wellbeing",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "mt",
+            "en"
+          ],
+          "source_url": "https://hpdp.gov.mt/hpu/mental_health_and_wellbeing",
+          "source_quote": "call the National Helpline on 1579",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Richmond Foundation Helpline",
+          "name_en": "Richmond Foundation mental health helpline",
+          "phone": "1770",
+          "tel": "1770",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.richmond.org.mt/",
+          "hours": "Mon–Fri 08:00–20:00, Sat until 16:00 (after hours: 1579)",
+          "free": true,
+          "languages": [
+            "mt",
+            "en"
+          ],
+          "source_url": "https://www.richmond.org.mt/our-services/get-help-now/",
+          "source_quote": "1770 ... Monday to Friday from 8 AM to 8 PM, and on Saturdays until 4 PM",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "GR": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Γραμμή Παρέμβασης για την Αυτοκτονία 1018 (ΚΛΙΜΑΚΑ)",
+          "name_en": "Suicide Intervention Line 1018 (Klimaka)",
+          "phone": "1018",
+          "tel": "1018",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.klimaka.org.gr/",
+          "hours": "24/7",
+          "free": false,
+          "languages": [
+            "el"
+          ],
+          "source_url": "https://www.klimaka.org.gr/19-xronia-grammis-paremvasis-gia-tin-aytoktonia-1018-klimaka-org/",
+          "source_quote": "Η Γραμμή λειτουργεί σε εικοσιτετράωρη βάση ... με αστική χρέωση",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "CY": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Cyprus Samaritans",
+          "name_en": "Cyprus Samaritans",
+          "phone": "8000 7773",
+          "tel": "80007773",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://cyprussamaritans.org/",
+          "hours": "Daily 16:00–00:00",
+          "free": true,
+          "languages": [
+            "el",
+            "en"
+          ],
+          "source_url": "https://cyprussamaritans.org/contact-us/",
+          "source_quote": "80007773 ... 7 days a week 16:00-00:00",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "BG": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Национална телефонна линия за деца 116 111",
+          "name_en": "National Children's Helpline (children and concerned adults)",
+          "phone": "116 111",
+          "tel": "116111",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.116111.bg/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "bg"
+          ],
+          "source_url": "https://www.mlsp.government.bg/nay-brziyat-nachin-za-podavane-na-signal-za-dete-v-risk-e-na-telefon-116-111",
+          "source_quote": "116 111 ... Тя работи денонощно, без почивен ден и е безплатна.",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "HR": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Centar za krizna stanja i prevenciju suicida KBC Zagreb – „tele apel“ linija",
+          "name_en": "Centre for Crisis States and Suicide Prevention, University Hospital Centre Zagreb (phone line)",
+          "phone": "01 2376 470",
+          "tel": "012376470",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://mentalnozdravlje.zagreb.hr/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "hr"
+          ],
+          "source_url": "https://mentalnozdravlje.zagreb.hr/centar-za-krizna-stanja-i-prevenciju-suicida-kbc-a-zagreb-obavijest-o-izmjenama/",
+          "source_quote": "telefonska „tele apel\" linija ( 01 2376 470 ) na kojoj tijekom 24 sata, svaki dan u godini",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Hrabri telefon",
+          "name_en": "Brave Phone (children's line)",
+          "phone": "116 111",
+          "tel": "116111",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://mentalnozdravlje.zagreb.hr/projekti/knjiga-volja/aktualnosti/1497-2/",
+          "hours": "Weekdays 09:00–20:00",
+          "free": true,
+          "languages": [
+            "hr"
+          ],
+          "source_url": "https://mentalnozdravlje.zagreb.hr/projekti/knjiga-volja/aktualnosti/1497-2/",
+          "source_quote": "116 111 (Hrabri telefon)",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "CZ": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Linka první psychické pomoci",
+          "name_en": "First Psychological Aid Line (adults)",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": "https://www.linkapsychickepomoci.cz/chat/",
+          "website": "https://www.linkapsychickepomoci.cz/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "cs"
+          ],
+          "source_url": "https://www.linkapsychickepomoci.cz/",
+          "source_quote": "116 123 ... nonstop ... Zdarma",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Linka bezpečí",
+          "name_en": "Safety Line (children and students up to 26)",
+          "phone": "116 111",
+          "tel": "116111",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.linkabezpeci.cz/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "cs"
+          ],
+          "source_url": "https://www.linkabezpeci.cz/",
+          "source_quote": "116 111 ... Nonstop ... Služba je zdarma",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "SK": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Linka dôvery Nezábudka",
+          "name_en": "Forget-Me-Not Trust Line (League for Mental Health)",
+          "phone": "0800 800 566",
+          "tel": "0800800566",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.bratislava.sk/socialne-sluzby-a-byvanie/pomoc-a-podpora/linky-pomoci",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "sk"
+          ],
+          "source_url": "https://www.bratislava.sk/socialne-sluzby-a-byvanie/pomoc-a-podpora/linky-pomoci",
+          "source_quote": "0800 800 566 (nonstop, bezplatne, anonymne)",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Krízová linka pomoci IPčko",
+          "name_en": "IPčko Crisis Help Line",
+          "phone": "0800 500 333",
+          "tel": "0800500333",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.bratislava.sk/socialne-sluzby-a-byvanie/pomoc-a-podpora/linky-pomoci",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "sk"
+          ],
+          "source_url": "https://www.bratislava.sk/socialne-sluzby-a-byvanie/pomoc-a-podpora/linky-pomoci",
+          "source_quote": "0800 500 333 (nonstop, anonymne, bezplatne)",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "SI": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Zaupni telefon Samarijan in Sopotnik",
+          "name_en": "Samaritan and Companion confidential phone",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://zivziv.si/sos/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "sl"
+          ],
+          "source_url": "https://zivziv.si/sos/",
+          "source_quote": "116 123 – Zaupni telefon Samarijan in Sopotnik (24h/dan)",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Klic v duševni stiski",
+          "name_en": "Call in Mental Distress",
+          "phone": "01 520 99 00",
+          "tel": "015209900",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://zivziv.si/sos/",
+          "hours": "Daily 19:00–07:00",
+          "free": null,
+          "languages": [
+            "sl"
+          ],
+          "source_url": "https://nijz.si/obmocna-enota-kranj/10-september-2024-svetovni-dan-preprecevanja-samomora-2/",
+          "source_quote": "01 520 99 00 ... vsak dan med 19. in 7. uro zjutraj",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "HU": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Lelki Elsősegély Telefonszolgálat",
+          "name_en": "Emotional First Aid Telephone Service (LESZ)",
+          "phone": "116-123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://sos116-123.hu/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "hu"
+          ],
+          "source_url": "https://sos116-123.hu/",
+          "source_quote": "116-123 ... A nap 24 órájában",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "PL": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Centrum Wsparcia dla osób dorosłych w kryzysie psychicznym",
+          "name_en": "Support Centre for adults in mental crisis (Itaka Foundation)",
+          "phone": "800 70 2222",
+          "tel": "800702222",
+          "sms": null,
+          "chat_url": "https://centrumwsparcia.pl/",
+          "website": "https://centrumwsparcia.pl/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "pl"
+          ],
+          "source_url": "https://centrumwsparcia.pl/",
+          "source_quote": "800 70 2222 ... Całodobowo ... 7 dni w tygodniu ... Bezpłatnie",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Kryzysowy Telefon Zaufania 116 123",
+          "name_en": "Crisis Trust Line 116 123 (adults)",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": "https://116sos.pl/",
+          "website": "https://116sos.pl/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "pl"
+          ],
+          "source_url": "https://116sos.pl/",
+          "source_quote": "116 123 ... dostępny 24/7 ... Bezpłatne",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "LT": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Vilties linija",
+          "name_en": "Hope Line",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://pagalbasau.lt/gauk-pagalba/pagalbos-linijos/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "lt"
+          ],
+          "source_url": "https://pagalbasau.lt/gauk-pagalba/pagalbos-linijos/",
+          "source_quote": "Vilties linija ... 116 123 ... I-VII visą parą",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Jaunimo linija",
+          "name_en": "Youth Line",
+          "phone": "8 800 28888",
+          "tel": "880028888",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://pagalbasau.lt/gauk-pagalba/pagalbos-linijos/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "lt"
+          ],
+          "source_url": "https://pagalbasau.lt/gauk-pagalba/pagalbos-linijos/",
+          "source_quote": "Jaunimo linija ... +370 800 28888 ... I-VII visą parą",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "LV": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Krīzes tālrunis „Skalbes“",
+          "name_en": "Skalbes crisis line (state-funded first psychological aid)",
+          "phone": "116123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.skalbes.lv/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "lv"
+          ],
+          "source_url": "https://www.skalbes.lv/",
+          "source_quote": "116123 ... bezmaksas",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "EE": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Emotsionaalse toe ja hingehoiu telefon",
+          "name_en": "Emotional Support and Pastoral Care Line",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://peaasi.ee/en/help/",
+          "hours": "Daily 10:00–24:00",
+          "free": null,
+          "languages": [
+            "et",
+            "ru",
+            "en"
+          ],
+          "source_url": "https://peaasi.ee/en/help/",
+          "source_quote": "Emotsionaalse toe ja hingehoiu telefon: 116 123 (igapäevaselt kell 10-24)",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Eluliin – emotsionaalse toe telefon",
+          "name_en": "Eluliin emotional support line (Estonian)",
+          "phone": "655 8088",
+          "tel": "6558088",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://eluliin.ee/",
+          "hours": "Daily 19:00–07:00",
+          "free": null,
+          "languages": [
+            "et"
+          ],
+          "source_url": "https://eluliin.ee/node/15",
+          "source_quote": "655 8088 ... Avatud õhtuti alates 19.00 kuni 7.00 hommikuni",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "FI": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "MIELI Kriisipuhelin",
+          "name_en": "MIELI Crisis Helpline",
+          "phone": "09 2525 0111",
+          "tel": "0925250111",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://mieli.fi/tukea-ja-apua/kriisipuhelin/",
+          "hours": "24/7",
+          "free": false,
+          "languages": [
+            "fi",
+            "sv"
+          ],
+          "source_url": "https://mieli.fi/tukea-ja-apua/kriisipuhelin/",
+          "source_quote": "09 2525 0111 ... joka päivä 24 tuntia vuorokaudessa",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "SE": {
+      "emergency": "112",
+      "emergency_source": "https://www.1177.se/sjukdomar--besvar/psykiska-sjukdomar-och-besvar/sjalvmordstankar/till-dig-som-har-sjalvmordstankar/",
+      "lines": [
+        {
+          "name": "Mind Självmordslinjen",
+          "name_en": "Mind Suicide Line",
+          "phone": "901 01",
+          "tel": "90101",
+          "sms": null,
+          "chat_url": "https://mind.se/stod-kunskap/prata-eller-chatta-med-volontar/sjalvmordslinjen/chatt/",
+          "website": "https://mind.se/",
+          "hours": "not stated on the confirming page (mind.se blocked fetching)",
+          "free": true,
+          "languages": [
+            "sv"
+          ],
+          "source_url": "https://www.1177.se/stodlinjer",
+          "source_quote": "Självmordslinjen drivs av föreningen Mind ... kan ringa eller chatta ... 901 01",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "DK": {
+      "emergency": "112",
+      "emergency_source": "https://digital-strategy.ec.europa.eu/en/policies/112",
+      "lines": [
+        {
+          "name": "Livslinien",
+          "name_en": "Lifeline Denmark (suicide prevention line)",
+          "phone": "70 201 201",
+          "tel": "70201201",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.livslinien.dk/",
+          "hours": "Daily 09:00–05:00",
+          "free": null,
+          "languages": [
+            "da"
+          ],
+          "source_url": "https://www.livslinien.dk/",
+          "source_quote": "70 201 201 ... alle årets dage fra kl. 09-05",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "NO": {
+      "emergency": "113",
+      "emergency_source": "https://www.helsenorge.no/forstehjelp",
+      "lines": [
+        {
+          "name": "Mental Helse Hjelpetelefonen",
+          "name_en": "Mental Health Norway helpline",
+          "phone": "116 123",
+          "tel": "116123",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.mentalhelse.no/fa-hjelp/hjelpetelefonen",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "no"
+          ],
+          "source_url": "https://www.mentalhelse.no/fa-hjelp/hjelpetelefonen",
+          "source_quote": "116 123 ... døgnåpen ... alle dager, året rundt ... gratis",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Kirkens SOS",
+          "name_en": "Church SOS crisis line",
+          "phone": "22 40 00 40",
+          "tel": "22400040",
+          "sms": null,
+          "chat_url": "https://www.soschat.no/",
+          "website": "https://www.kirkens-sos.no/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "no"
+          ],
+          "source_url": "https://www.kirkens-sos.no/",
+          "source_quote": "22 40 00 40 ... døgnet rundt",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "IS": {
+      "emergency": "112",
+      "emergency_source": "https://www.112.is/",
+      "lines": [
+        {
+          "name": "Hjálparsíminn 1717",
+          "name_en": "Red Cross Helpline 1717",
+          "phone": "1717",
+          "tel": "1717",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.raudikrossinn.is/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "is"
+          ],
+          "source_url": "https://www.raudikrossinn.is/verkefni/innanlandsverkefni/heilbrigdi-og-velferd/hjalparsiminn-1717-og-netspjallid/",
+          "source_quote": "1717 ... Það er opið alla daga ársins, allan sólarhringinn",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "UA": {
+      "emergency": "112",
+      "emergency_source": "https://mvs.gov.ua/en/news/112",
+      "lines": [
+        {
+          "name": "Гаряча лінія психологічної підтримки Національної психологічної асоціації",
+          "name_en": "National Psychological Association psychological support hotline",
+          "phone": "0 800 100 102",
+          "tel": "0800100102",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://help.npa-ua.org/",
+          "hours": "Daily 09:00–05:00 (Kyiv time)",
+          "free": true,
+          "languages": [
+            "uk"
+          ],
+          "source_url": "https://help.npa-ua.org/",
+          "source_quote": "0 800 100 102 ... every day from 09:00 AM to 05:00 AM",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "TR": {
+      "emergency": "112",
+      "emergency_source": "https://www.112.gov.tr/acil-durumda-tek-numara-112",
+      "lines": []
+    },
+    "IL": {
+      "emergency": "101",
+      "emergency_source": "https://www.mdais.org/en/101",
+      "lines": [
+        {
+          "name": "ער\"ן – עזרה ראשונה נפשית",
+          "name_en": "ERAN – Emotional First Aid",
+          "phone": "1201",
+          "tel": "1201",
+          "sms": "0529993544",
+          "chat_url": "https://www.eran.org.il/online-emotional-help/",
+          "website": "https://www.eran.org.il/",
+          "hours": null,
+          "free": null,
+          "languages": [
+            "he",
+            "ar",
+            "en",
+            "ru",
+            "am",
+            "fr",
+            "es"
+          ],
+          "source_url": "https://www.eran.org.il/",
+          "source_quote": "1201 ... עזרה ראשונה נפשית",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "IN": {
+      "emergency": "112",
+      "emergency_source": "https://www.mha.gov.in/en/commoncontent/emergency-response-support-system-erss",
+      "lines": [
+        {
+          "name": "Tele-MANAS (Tele Mental Health Assistance and Networking Across States)",
+          "name_en": "Tele-MANAS national tele-mental-health helpline (Ministry of Health)",
+          "phone": "14416",
+          "tel": "14416",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://telemanas.mohfw.gov.in/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en",
+            "hi"
+          ],
+          "source_url": "https://dhubri-mch.assam.gov.in/services/tele-manas-call-14416-24%C3%977-mental-health-helpline",
+          "source_quote": "toll-free helpline number 14416 or 1-800-891-4416 ... 24×7 mental health support",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Tele-MANAS (alternative toll-free number)",
+          "name_en": "Tele-MANAS alternative number",
+          "phone": "1-800-891-4416",
+          "tel": "18008914416",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://telemanas.mohfw.gov.in/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en",
+            "hi"
+          ],
+          "source_url": "https://dhubri-mch.assam.gov.in/services/tele-manas-call-14416-24%C3%977-mental-health-helpline",
+          "source_quote": "toll-free helpline number 14416 or 1-800-891-4416",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "ID": {
+      "emergency": "112",
+      "emergency_source": "https://layanan112.komdigi.go.id/tentang",
+      "lines": [
+        {
+          "name": "Healing119.id (Kemenkes)",
+          "name_en": "Healing119.id – Ministry of Health mental health support line",
+          "phone": "119 ekstensi 8",
+          "tel": "119",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.healing119.id/",
+          "hours": "Morning to night (dari pagi hingga malam hari); exact hours not published",
+          "free": true,
+          "languages": [
+            "id"
+          ],
+          "source_url": "https://kesprimkom.kemkes.go.id/konten/158/151/0/cegah-bunuh-diri-dukung-kesehatan-jiwa-kenali-layanan-healing119-id",
+          "source_quote": "Hubungi 119 ekstensi 8 dari ponsel Anda lalu ikuti panduan untuk berbicara dengan konselor",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "JP": {
+      "emergency": "119",
+      "emergency_source": "https://www.fdma.go.jp/mission/enrichment/kyukyumusen_kinkyutuhou/119.html",
+      "lines": [
+        {
+          "name": "#いのちSOS",
+          "name_en": "#Inochi SOS (life SOS line)",
+          "phone": "0120-061-338",
+          "tel": "0120061338",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.mhlw.go.jp/mamorouyokokoro/soudan/tel/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "ja"
+          ],
+          "source_url": "https://www.mhlw.go.jp/mamorouyokokoro/soudan/tel/",
+          "source_quote": "#いのちSOS 0120-061-338 ... フリーダイヤル・無料",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "よりそいホットライン",
+          "name_en": "Yorisoi Hotline",
+          "phone": "0120-279-338",
+          "tel": "0120279338",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.since2011.net/yorisoi/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "ja"
+          ],
+          "source_url": "https://www.mhlw.go.jp/mamorouyokokoro/soudan/tel/",
+          "source_quote": "よりそいホットライン 0120-279-338 ... フリーダイヤル・無料",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "KR": {
+      "emergency": "119",
+      "emergency_source": "https://www.korea.kr/news/policyNewsView.do?newsId=148954797",
+      "lines": [
+        {
+          "name": "자살예방상담전화 109",
+          "name_en": "Suicide Prevention Hotline 109 (Ministry of Health and Welfare)",
+          "phone": "109",
+          "tel": "109",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.129.go.kr/109",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "ko"
+          ],
+          "source_url": "https://www.129.go.kr/109",
+          "source_quote": "24시간 자살예방상담전화 109",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "VN": {
+      "emergency": "115",
+      "emergency_source": "https://congan.dienbien.gov.vn/Danh-muc-tin-tuc/tong-hop-cac-so-dien-thoai-khan-cap-quoc-gia-ghi-nho-de-bao-ve-minh-va-ho-tro-nguoi-khac-13182.html",
+      "lines": [
+        {
+          "name": "Đường dây nóng Ngày Mai",
+          "name_en": "Ngày Mai (Tomorrow) Hotline",
+          "phone": "096 306 1414",
+          "tel": "0963061414",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://duongdaynongngaymai.vn/",
+          "hours": "Wed–Sun 13:00–20:30",
+          "free": null,
+          "languages": [
+            "vi"
+          ],
+          "source_url": "https://duongdaynongngaymai.vn/hotline/",
+          "source_quote": "096 306 1414 ... 13:00 - 20:30 ... Thứ 4, Thứ 5, Thứ 6, Thứ 7 & Chủ Nhật",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "TW": {
+      "emergency": "119",
+      "emergency_source": "https://www.tyfd.gov.tw/en/index.php?code=list&ids=1228",
+      "lines": [
+        {
+          "name": "1925 安心專線（依舊愛我）",
+          "name_en": "1925 Mental Health Support Line (Ministry of Health and Welfare)",
+          "phone": "1925",
+          "tel": "1925",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://dep.mohw.gov.tw/DOMHAOH/cp-4906-54077-107.html",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "zh"
+          ],
+          "source_url": "https://dep.mohw.gov.tw/DOMHAOH/cp-4906-54077-107.html",
+          "source_quote": "1925 ... 24小時全年無休 ... 免費",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "生命線 1995",
+          "name_en": "Lifeline Taiwan",
+          "phone": "1995",
+          "tel": "1995",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.life1995.org.tw/",
+          "hours": null,
+          "free": null,
+          "languages": [
+            "zh"
+          ],
+          "source_url": "https://www.life1995.org.tw/",
+          "source_quote": "1995",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "HK": {
+      "emergency": "999",
+      "emergency_source": "https://www.gov.hk/en/nonresidents/visitinghk/usefulinfo/emergency.htm",
+      "lines": [
+        {
+          "name": "18111 精神健康支援熱線",
+          "name_en": "18111 Mental Health Support Hotline (HKSAR Government)",
+          "phone": "18111",
+          "tel": "18111",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.info.gov.hk/gia/general/202312/27/P2023122700238.htm",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "yue",
+            "zh",
+            "en",
+            "hi",
+            "ne",
+            "ur",
+            "pa",
+            "id",
+            "tl",
+            "vi",
+            "bn",
+            "th"
+          ],
+          "source_url": "https://www.info.gov.hk/gia/general/202312/27/P2023122700238.htm",
+          "source_quote": "18111 - Mental Health Support Hotline ... dedicated personnel answering the phone 24 hours a day",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "香港撒瑪利亞防止自殺會",
+          "name_en": "Samaritan Befrienders Hong Kong",
+          "phone": "2389 2222",
+          "tel": "23892222",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.sbhk.org.hk/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "yue"
+          ],
+          "source_url": "https://www.sbhk.org.hk/",
+          "source_quote": "24小時情緒支援熱線 2389 2222",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "SG": {
+      "emergency": "995",
+      "emergency_source": "https://www.scdf.gov.sg/home/about-scdf/emergency-medical-services",
+      "lines": [
+        {
+          "name": "Samaritans of Singapore (SOS)",
+          "name_en": "Samaritans of Singapore",
+          "phone": "1767",
+          "tel": "1767",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.sos.org.sg/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www.sos.org.sg/",
+          "source_quote": "1767 (24-hour) ... CareText 9151 1767 (via WhatsApp)",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "national mindline 1771",
+          "name_en": "national mindline 1771 (Ministry of Health)",
+          "phone": "1771",
+          "tel": "1771",
+          "sms": null,
+          "chat_url": "https://www.mindline.sg/1771",
+          "website": "https://www.mindline.sg/1771",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www.moh.gov.sg/newsroom/national-mindline-1771-to-provide--round-the-clock-support-for-mental-health/",
+          "source_quote": "Dial 1771 ... WhatsApp: Text +65-6669-1771 ... round-the-clock support for mental health",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "MX": {
+      "emergency": "911",
+      "emergency_source": "https://www.gob.mx/911/articulos/numero-unico-de-emergencias-9-1-1",
+      "lines": [
+        {
+          "name": "Línea de la Vida",
+          "name_en": "Line of Life (CONASAMA, Ministry of Health)",
+          "phone": "800-911-2000",
+          "tel": "8009112000",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.gob.mx/lineadelavida",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "es"
+          ],
+          "source_url": "https://www.gob.mx/conasama/articulos/linea-de-la-vida-800-911-2000",
+          "source_quote": "800-911-2000 ... las 24 horas del día, los 365 días del año ... servicio gratuito",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "BR": {
+      "emergency": "192",
+      "emergency_source": "https://www.gov.br/saude/pt-br/composicao/saes/samu-192",
+      "lines": [
+        {
+          "name": "CVV – Centro de Valorização da Vida",
+          "name_en": "Centre for the Valuing of Life",
+          "phone": "188",
+          "tel": "188",
+          "sms": null,
+          "chat_url": "https://cvv.org.br/",
+          "website": "https://cvv.org.br/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "pt"
+          ],
+          "source_url": "https://cvv.org.br/",
+          "source_quote": "LIGUE 188 ... 24 horas por dia",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "AR": {
+      "emergency": "911",
+      "emergency_source": "https://www.argentina.gob.ar/tema/emergencias",
+      "lines": [
+        {
+          "name": "Centro de Asistencia al Suicida – línea nacional",
+          "name_en": "Suicide Assistance Centre (national number)",
+          "phone": "0800 345 1435",
+          "tel": "08003451435",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.asistenciaalsuicida.org.ar/",
+          "hours": "Daily 08:00–00:00",
+          "free": true,
+          "languages": [
+            "es"
+          ],
+          "source_url": "https://www.asistenciaalsuicida.org.ar/horarios-de-atencion",
+          "source_quote": "0800 345 1435 ... de 8:00 a 0:00",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Centro de Asistencia al Suicida – línea 135 (CABA y GBA)",
+          "name_en": "Suicide Assistance Centre, 135 (Buenos Aires City and Greater Buenos Aires only)",
+          "phone": "135",
+          "tel": "135",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.asistenciaalsuicida.org.ar/",
+          "hours": "Daily 08:00–00:00",
+          "free": true,
+          "languages": [
+            "es"
+          ],
+          "source_url": "https://www.asistenciaalsuicida.org.ar/horarios-de-atencion",
+          "source_quote": "135 ... de 8:00 a 0:00",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "CO": {
+      "emergency": "123",
+      "emergency_source": "https://bogota.gov.co/mi-ciudad/salud/cuales-son-las-lineas-de-atencion-en-salud-mental-en-bogota",
+      "lines": [
+        {
+          "name": "Línea 106 „El poder de ser escuchado“ (Bogotá)",
+          "name_en": "Line 106 (Bogotá only)",
+          "phone": "106",
+          "tel": "106",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://bogota.gov.co/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "es"
+          ],
+          "source_url": "https://bogota.gov.co/mi-ciudad/salud/cuales-son-las-lineas-de-atencion-en-salud-mental-en-bogota",
+          "source_quote": "Línea 106 ... chat 300 754 8933",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "CL": {
+      "emergency": "131",
+      "emergency_source": "https://www.minsal.cl/samu-instala-base-en-alto-hospicio-y-llama-a-utilizar-responsablemente-el-131/",
+      "lines": [
+        {
+          "name": "*4141 No estás solo, no estás sola – Línea de Prevención del Suicidio",
+          "name_en": "*4141 Suicide Prevention Line (Ministry of Health)",
+          "phone": "*4141",
+          "tel": "*4141",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.minsal.cl/linea-de-atencion-4141-no-estas-solo-no-estas-sola/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "es"
+          ],
+          "source_url": "https://www.crececontigo.gob.cl/noticias/no-estas-solo-no-estas-sola-ministerio-de-salud-tiene-disponible-el-fono-4141-linea-prevencion-del-suicidio/",
+          "source_quote": "*4141 ... de lunes a domingo, las 24 horas del día ... completamente gratuita",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "PE": {
+      "emergency": "106",
+      "emergency_source": "https://www.gob.pe/1013-solicitar-atencion-medica-en-caso-de-emergencia-samu",
+      "lines": []
+    },
+    "ZA": {
+      "emergency": "112",
+      "emergency_source": "https://www.westerncape.gov.za/know-who-you-can-call-emergency",
+      "lines": [
+        {
+          "name": "SADAG Suicide Crisis Helpline",
+          "name_en": "South African Depression and Anxiety Group – Suicide Crisis Helpline",
+          "phone": "0800 567 567",
+          "tel": "0800567567",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.sadag.org/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www.sadag.org/",
+          "source_quote": "0800 567 567",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "LifeLine South Africa – National Counselling Line",
+          "name_en": "LifeLine South Africa",
+          "phone": "0861 322 322",
+          "tel": "0861322322",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.lifeline.org.za/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "en"
+          ],
+          "source_url": "https://www.lifeline.org.za/",
+          "source_quote": "0861-322-322 ... 24 hours / 7 days per week",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "AE": {
+      "emergency": "998",
+      "emergency_source": "https://u.ae/en/information-and-services/justice-safety-and-the-law/Safety/handling-emergencies",
+      "lines": [
+        {
+          "name": "800 سكينة – خط دعم الصحة النفسية (دائرة الصحة – أبوظبي)",
+          "name_en": "800-SAKINA mental health support hotline (Department of Health – Abu Dhabi)",
+          "phone": "800 - 725462",
+          "tel": "800725462",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.doh.gov.ae/",
+          "hours": "24/7",
+          "free": null,
+          "languages": [
+            "ar",
+            "en"
+          ],
+          "source_url": "https://www.doh.gov.ae/en/news/doh-activates-247-mental-health-support-hotline-800-sakina-(725462)",
+          "source_quote": "800-SAKINA or 800 - 725462 ... 24/7 mental health support hotline",
+          "confidence": "confirmed"
+        }
+      ]
+    },
+    "MY": {
+      "emergency": "999",
+      "emergency_source": "https://www.malaysia.gov.my/en/my-initiative/cyber-security-and-disaster-response-and-recovery/tindak-balas-serta-pemulihan-bencana/malaysia-emergency-response-services-mers-999",
+      "lines": [
+        {
+          "name": "Befrienders Kuala Lumpur",
+          "name_en": "Befrienders KL",
+          "phone": "03-7627 2929",
+          "tel": "0376272929",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://www.befrienders.org.my/",
+          "hours": "24/7",
+          "free": true,
+          "languages": [
+            "en",
+            "ms",
+            "zh",
+            "ta"
+          ],
+          "source_url": "https://www.befrienders.org.my/",
+          "source_quote": "03-7627 2929 ... 24 hours a day, every day",
+          "confidence": "confirmed"
+        },
+        {
+          "name": "Talian HEAL 15555 (KKM)",
+          "name_en": "HEAL 15555 national mental health crisis line (Ministry of Health)",
+          "phone": "15555",
+          "tel": "15555",
+          "sms": null,
+          "chat_url": null,
+          "website": "https://sites.google.com/moh.gov.my/ncemh/talian-sokongan-psikososial",
+          "hours": "Daily 08:00–24:00 incl. public holidays (per 2022 launch report; not stated on the MOH page)",
+          "free": null,
+          "languages": [
+            "ms",
+            "en"
+          ],
+          "source_url": "https://sites.google.com/moh.gov.my/ncemh/talian-sokongan-psikososial",
+          "source_quote": "Talian HEAL 15555 (KKM)",
+          "confidence": "confirmed"
+        }
+      ]
+    }
+  },
+  "omitted": [
+    {
+      "country": "RO",
+      "candidate": "116 123 (EU emotional-support number)",
+      "reason": "No Romanian operator or live service for 116 123 could be confirmed on any official page; do not show it for RO."
+    },
+    {
+      "country": "CY",
+      "candidate": "SPAVO 116 123 emotional support line (Mon–Fri 08:30–16:00 per search snippet)",
+      "reason": "Operator page (domviolence.org.cy) failed TLS (expired certificate); not fetched."
+    },
+    {
+      "country": "IT",
+      "candidate": "Samaritans Onlus 06 77208977",
+      "reason": "Official site failed TLS (self-signed certificate); not fetched."
+    },
+    {
+      "country": "BG",
+      "candidate": "Any adult suicide/crisis line",
+      "reason": "No national adult suicide or emotional-crisis line found on an official page. The 24/7 lines found (Demetra 0700 40 150, Animus 0800 1 8676, 0800 11 977) are domestic-violence lines. Only the children's line 116 111 is included."
+    },
+    {
+      "country": "HR",
+      "candidate": "Plavi telefon 01 4833 888",
+      "reason": "Not confirmed on an official page in this task."
+    },
+    {
+      "country": "UA",
+      "candidate": "Lifeline Ukraine 7333",
+      "reason": "PAUSED. Its own site says 'Робота гарячої лінії на паузі. Короткий номер і чати тимчасово не приймають звернення.' Do not show until it resumes."
+    },
+    {
+      "country": "UA",
+      "candidate": "La Strada 116 123 / 0 800 500 335",
+      "reason": "Confirmed live, but it is the national line for gender-based violence and human trafficking, not a suicide/crisis line."
+    },
+    {
+      "country": "TR",
+      "candidate": "'182 ALO Yaşam Hattı' / '183 ALO Sosyal Destek'",
+      "reason": "Only blogs claim 182 is a suicide line (182 is the Health Ministry's MHRS appointment line). No national suicide/crisis line confirmed on an official page. Emergency 112 only."
+    },
+    {
+      "country": "PE",
+      "candidate": "Línea 113, opción 5 (MINSA mental health line)",
+      "reason": "gob.pe refused the fetch (HTTP 418) and the state-media pages returned 403. It shows up widely in search results but could not be confirmed live. Emergency 106 only."
+    },
+    {
+      "country": "CO",
+      "candidate": "Línea 192 opción 4 (MinSalud mental health)",
+      "reason": "The MinSalud page returns 404. This was a COVID-era service and its current status is unknown. Only Bogotá's Línea 106 is included."
+    },
+    {
+      "country": "EG",
+      "candidate": "General Secretariat of Mental Health hotline 08008880700 / 0220816831 / 16328",
+      "reason": "mohp.gov.eg failed TLS and 100millionseha.eg refused the connection; not confirmed. Emergency number was also not confirmed on an official page, so EG is left out entirely."
+    },
+    {
+      "country": "MA",
+      "candidate": "Any national crisis line",
+      "reason": "No national suicide or crisis line found. Emergency numbers conflict across sources (15/19/150/141/177), so MA is left out entirely."
+    },
+    {
+      "country": "PH",
+      "candidate": "NCMH Crisis Hotline 1553 / 1800-1888-1553",
+      "reason": "Every gov.ph page (doh.gov.ph, ncmh.gov.ph, pia.gov.ph, pna.gov.ph) returned 403, so it could not be confirmed. Emergency 911 was not confirmed either, so PH is left out entirely."
+    },
+    {
+      "country": "AE",
+      "candidate": "800 HOPE (800 4673), the national mental support line",
+      "reason": "hope.hw.gov.ae reset the connection; not confirmed. Its hours are also reported as 08:00–20:00 and COVID-era. Only Abu Dhabi's 800-SAKINA is included."
+    },
+    {
+      "country": "GR",
+      "candidate": "10306 psychosocial support line",
+      "reason": "Not checked on an official page in this task."
+    },
+    {
+      "country": "SE",
+      "candidate": "Hours of Mind Självmordslinjen 90101",
+      "reason": "mind.se blocked fetching (403). The number was confirmed on 1177.se but the hours were not, so hours are left unstated."
+    }
+  ],
+  "notes": "How to read the file: the dataset covers 56 countries. TR and PE have lines: [] (emergency number only, no crisis line confirmed). EG, MA and PH are left out entirely (see omitted). Where free is null, the source did not say, or the number is charged at a normal or shared-cost rate. Where hours is not 24/7, show the hours in the UI. Several lines are not 24/7: RO ARPS (Fri–Sun 19:00–07:00 only), LU, SI Klic v duševni stiski, EE, DK, MT Richmond, CY, NZ Suicide Crisis Helpline, AR, VN, UA, MY HEAL 15555 and ID.\nRecent changes: PT launched the 1411 National Suicide Prevention Line on 10 Sep 2025 (within SNS 24). NL: calling 113 became free in Oct 2025, and 0800-0113 still works. NZ Lifeline (0800 543 354 / 0508 828 865 / text 4357) has run only 07:00–midnight since Nov 2025. US and CA: 988 (call or text). KR: 109 replaced the old dispersed lines (incl. 1393) from Jan 2024. SG: national mindline 1771 launched 18 Jun 2025. HK: 18111 launched 27 Dec 2023. UA: Lifeline Ukraine 7333 is currently PAUSED (see omitted).\n116 123 is the EU-harmonised emotional-support number, but it is not a guaranteed 24/7 crisis line everywhere. It is included only where the operator was confirmed: GB/IE Samaritans, DE, CZ, SI, HU, PL, LT, LV, EE (10:00–24:00), NO. It is NOT confirmed for RO.\nDialing caveats: CL *4141 contains '*' (tel:*4141 works on mobiles, but it breaks the digits-only rule). ID 119 needs extension 8 after connecting. PT 808 24 24 24 needs menu option 4. AR 135 works only from Buenos Aires City and Greater Buenos Aires; use 0800 345 1435 elsewhere. CO Línea 106 is Bogotá only. AE 800-SAKINA is Abu Dhabi's DoH line. Text-only lines (GB Shout, IE 50808, US Crisis Text Line) have phone/tel null and the number in sms. For SG, SOS CareText is WhatsApp 9151 1767 and mindline is WhatsApp +65 6669 1771 (not SMS).\nEmergency: one dialable number per country. GB 999 (112 also works). NO 113 = ambulance (112 = police). ZA 112 = mobile (10177 ambulance, 10111 police). AE 998 = ambulance (999 police). VN 115 = ambulance. IL 101 = MDA. CH 112 (144 ambulance). BR 192 = SAMU. CL 131 = SAMU. PE 106 = SAMU. For EU countries the source is the EC 112 page. MT 1579 is described as a 24hr free national line in the health.gov.mt search snippet, but that page returned 403; the number itself was confirmed on hpdp.gov.mt. Lifeline Taiwan 1995 hours are not stated on its site. ERAN (IL) hours were not confirmed on the page fetched."
+}

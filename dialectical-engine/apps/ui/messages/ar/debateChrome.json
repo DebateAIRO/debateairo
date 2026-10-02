@@ -1,9 +1,15 @@
 {
   "debateChrome.aiNotice": "كل ما في هذه المناظرة — الحجج والمراجعات والدرجات والحكم — مولّد بنماذج الذكاء الاصطناعي وموسوم بما يمكن للآلة قراءته، وقد يكون غير دقيق.",
+  "debateChrome.status.waiting": "بانتظار البدء. ستبدأ مناظرتك تلقائيًا في {time}.",
+  "debateChrome.status.waitingOwnDebates": "مناظراتك الأخرى تستخدم ما تبقّى من حدّك في الوقت الحالي. ستبدأ هذه المناظرة تلقائيًا فور انتهاء إحداها.",
   "debateChrome.backToLibrary": "← العودة إلى المكتبة",
   "debateChrome.loading": "جارٍ التحميل…",
   "debateChrome.error.claimGenerationFailed": "فشل إنشاء الادعاء",
-  "debateChrome.error.debateGenerationFailed": "فشل إنشاء المناظرة: {reason}",
+  "runFailure.NOT_STARTED": "حدث خطأ من جهتنا قبل أن تبدأ هذه المناظرة. يُرجى إعادة طرح سؤالك.",
+  "runFailure.MODELS_UNAVAILABLE": "تعذّر بدء هذه المناظرة لأن نماذج الذكاء الاصطناعي التي تحتاج إليها لم تكن متاحة. يُرجى المحاولة مرة أخرى بعد قليل.",
+  "runFailure.RUN_LIMIT_REACHED": "بلغت هذه المناظرة حدّها قبل أن تتمكن من تقديم إجابة.",
+  "runFailure.DAILY_LIMIT_REACHED": "نفد حدّ اليوم للمناظرات في أثناء بدء هذه المناظرة. يُرجى طرح سؤالك مرة أخرى غدًا.",
+  "runFailure.STOPPED": "توقفت هذه المناظرة في منتصفها بسبب مشكلة من جهتنا. يُرجى طرح سؤالك مرة أخرى.",
   "debateChrome.error.unableToLoadDebate": "تعذّر تحميل المناظرة",
   "debateChrome.error.unableToLoadScoring": "تعذّر تحميل التقييم",
   "debateChrome.error.unableToLoadAdaptiveDepth": "تعذّر تحميل محاكاة العمق التكيفي",
@@ -203,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "تعذّر إنشاء ملخص ضمن ميزانية التركيب",
   "debateChrome.condition.protectedCoreGuardRetired": "توقف التشغيل بسبب الميزانية؛ ولم يعد فحص إعادة الصياغة شرطًا لاستمراره",
   "debateChrome.condition.hiddenUnjudgeable": "مخفي: تعذّر تحكيمه — اعرض العناصر المخفية لقراءته",
-  "debateChrome.condition.derivedStandingUnreviewed": "قائم استنادًا إلى حججه المحكَّمة — تنقصه مراجعته الخاصة عبر مجموعات النماذج",
+  "debateChrome.condition.derivedStandingUnreviewed": "قائم استنادًا إلى حججه المحكَّمة — تنقصه مراجعته الخاصة من قِبل نموذج لمُنشئ آخر",
   "debateChrome.condition.hiddenLowScore": "مخفي: درجته أدنى من العتبة المعروضة",
   "debateChrome.condition.unauthoredBranchHalted": "توقف التوسّع هنا — لم يُكتب شيء لإخفائه أو عرضه",
   "debateChrome.condition.labelBasisIncomplete": "أساس الحكم غير مكتمل — لا يوجد موقف منافس أو حَكَم ثانٍ للمقارنة",
@@ -305,5 +311,6 @@
   "requestFailure.kind.UNREADABLE": "تعذّرت قراءة رد المنسّق، ولذلك تظل نتيجة الطلب مجهولة.",
   "requestFailure.kind.PLAN_TIER_INVALID": "رفض المنسّق اختيار الخطة. اختر الخطة المجانية أو المميزة، ثم أعد المحاولة.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "رفض المنسّق الطلب: أحد النماذج التي تحتاج إليها هذه الخطة غير متاح حاليًا. أعد المحاولة لاحقًا، أو اختر الخطة الأخرى.",
+  "requestFailure.kind.ALREADY_WAITING": "يمكن لسؤال واحد فقط أن ينتظر في كل مرة. اطرح هذا السؤال بعد أن تبدأ مناظرتك المنتظِرة.",
   "requestFailure.kind.UNCLASSIFIED": "فشل الطلب قبل ورود أي رد، ولذلك تظل نتيجته مجهولة. لم يكن ذلك قرارًا اتخذه المنسّق."
 }

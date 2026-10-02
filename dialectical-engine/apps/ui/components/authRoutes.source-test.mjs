@@ -22,6 +22,7 @@ const styles = read("../app/globals.css");
 const home = read("../app/page.tsx");
 const verifyEmail = read("../app/verify-email/page.tsx");
 const enrollMfa = read("../app/enroll-mfa/page.tsx");
+const returnPath = read("../lib/returnPath.ts");
 const packageJson = read("../package.json");
 const authMessages = JSON.parse(read("../messages/en/auth.json"));
 
@@ -42,7 +43,8 @@ test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
   assert.equal(authMessages["auth.login.backToSignIn"], "Back to sign in");
   assert.match(login, /replacement_recovery_code/);
   assert.match(login, /role="alert"/);
-  assert.match(login, /window\.location\.assign\(safeReturnPath\(next\)\)/);
+  // Age gate (8k): an account that still owes its one-time check goes to the interstitial first.
+  assert.match(login, /window\.location\.assign\(await ageConfirmationRequired\(\) \? ageConfirmationHref\(next\) : safeReturnPath\(next\)\)/);
   assert.doesNotMatch(login, /localStorage|sessionStorage|Bearer|keep me signed|forgot/i);
 });
 
@@ -51,7 +53,18 @@ test("sign-up exposes only fields backed by the registration contract", () => {
   assert.doesNotMatch(signUp, /client\.resendVerification/);
   assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
   assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
-  assert.match(signUp, /name="adult-affirmed"[\s\S]*?required/);
+  // Age gate (Turn 8): the date of birth replaced the 18+ tick box, and the separate age
+  // check runs before register — a refusal never reaches it.
+  assert.doesNotMatch(signUp, /adult-affirmed/);
+  assert.match(signUp, /<DateOfBirthField/);
+  // V 2026-09-29: a date under 18 is refused on the form — named under the field, and the
+  // Create account button stays disabled.
+  assert.match(signUp, /minimumAgeMessage=\{t\(catalog, "auth\.dob\.underAge"\)\}/);
+  // ...and so is any other complete date that is not a real one (before 1900, future, impossible).
+  assert.match(signUp, /const dateRefused = checkDob\(dateOfBirth\)\.code !== "incomplete" && !meetsMinimumAge\(dateOfBirth\);/);
+  assert.match(signUp, /disabled=\{busy \|\| sent \|\| !privacyAccepted \|\| !termsAccepted \|\| dateRefused\}/);
+  assert.ok(signUp.indexOf("await client.checkAge") > 0);
+  assert.ok(signUp.indexOf("await client.checkAge") < signUp.indexOf("await client.register"));
   assert.match(signUp, /await client\.register/);
   assert.match(signUp, /successMessage\(catalog, messageKey\)/);
   assert.equal(
@@ -62,7 +75,7 @@ test("sign-up exposes only fields backed by the registration contract", () => {
   assert.match(signUp, /name="terms-accepted"[\s\S]*?required/);
   assert.match(signUp, /role="status"/);
   // `terms` left this list when the Terms of Service became a document in the product
-  // (`apps/ui/legal/terms-of-service.md` → `TermsOfServiceModal`); the sign-up card may
+  // (`apps/ui/legal/en/terms-of-service.md` → `TermsOfServiceModal`); the sign-up card may
   // now name it because it can show it.
   assert.doesNotMatch(signUp, /localStorage|sessionStorage|Bearer|Google|Model API|privacy notice/i);
 });
@@ -86,8 +99,10 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(topBar, /href="\/settings"[\s\S]*?>\s*\{t\(catalog, "chrome\.account"\)\}\s*</);
   // Review F2 (REV-FIX-CATALOGS): the gate now receives the served newDebate
   // catalogue; the route (settings behind the AuthGate) is unchanged.
-  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} \/>/);
-  assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\}>/);
+  // L4: the settings page is never covered by the accept screen.
+  // B10c: the page also serves the billing catalogue, for the usage bars.
+  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\} \/>/);
+  assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\} legalGate=\{false\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
   assert.match(login, /useState\("\/sign-up"\)/);
@@ -105,11 +120,13 @@ test("the project home confirms a real session before exposing its debate compos
   assert.match(home, /sessionConfirmed = true/);
   // Task M8 (spec 2026-09-26 §14.4.7): the composer also reads the newDebate
   // catalogue, to say today's limit for new debates where the person typed.
-  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>/);
+  // Sensitive-data consent (V, 2026-09-29): it also records the interface locale with the consent.
+  // Crisis check (V, 2026-09-30): and the edge's country, for the help-numbers screen.
+  assert.match(home, /sessionConfirmed \? \([\s\S]*?<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} roomCatalog=\{roomCatalog\} locale=\{locale\} crisisCountryHint=\{crisisCountryHint\} \/>/);
   // Task 16 (M8 review): only the two values the daily-limit message prints ship to the browser.
   assert.match(home, /const newDebateCatalog = dailyLimitMessageCatalog\(await loadNamespace\(locale, "newDebate"\)\);/);
   assert.match(home, /id="start-a-debate"/);
-  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} \/>[\s\S]*?\{error \?/);
+  assert.doesNotMatch(home, /<LibraryComposer catalog=\{catalog\} newDebateCatalog=\{newDebateCatalog\} roomCatalog=\{roomCatalog\} locale=\{locale\} crisisCountryHint=\{crisisCountryHint\} \/>[\s\S]*?\{error \?/);
 });
 
 test("the login route sends an already-authenticated browser back to its debate workspace", () => {
@@ -118,7 +135,8 @@ test("the login route sends an already-authenticated browser back to its debate 
   assert.match(loginPage, /const cookieStore = await cookies\(\);[\s\S]*?readSessionCookie\(cookieStore\)/);
   assert.match(loginPage, /createServerContractClient/);
   assert.match(loginPage, /\.readSession\(\)/);
-  assert.match(loginPage, /redirect\("\/#start-a-debate"\)/);
+  assert.match(loginPage, /redirect\(safeReturnPath\(typeof requested === "string" \? requested : null\)\)/);
+  assert.match(returnPath, /export const DEFAULT_RETURN_PATH = "\/#start-a-debate";/);
   assert.match(loginPage, /catch \{/);
   assert.match(loginPage, /return <LoginFlow catalog=\{catalog\} \/>/);
 });

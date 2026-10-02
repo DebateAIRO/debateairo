@@ -22,6 +22,9 @@
   --con-bg: #F6E8E0; --con-border: #E4B9A8;
   --gold: #A8823E; --gold-text: #826530; --gold-line: #A5803D;
   --gold-bg: #F3ECE0; --gold-border: #D9C8A9;
+  /* Turn 14 change-email pending pill: tint(gold, .10/.45); the Email card pill hover */
+  --eml-pending-bg: rgba(168,130,62,.1); --eml-pending-border: rgba(168,130,62,.45);
+  --eml-pill-hover: rgba(128,120,104,.12);
   --reasoning: #3D5A80; --reasoning-text: #3D5A80; --reasoning-line: #3D5A80;
   --reasoning-bg: #E6E8E8; --reasoning-border: #ACB7C4;
 
@@ -48,6 +51,7 @@
 
   /* brand and elevation */
   --accent: #C15F3C; --link: #3D5A80; --focus: #C15F3C;
+  --focus-halo: rgba(193,95,60,.2);
   --shadow-card: 0 18px 40px -20px rgba(41,38,31,.24);
   --shadow-pop: 0 30px 60px -26px rgba(41,38,31,.32);
   --shadow-drawer: -22px 0 54px -22px rgba(41,38,31,.32);
@@ -130,6 +134,9 @@ html[data-mode="chamber"] {
   --con-bg: #34261A; --con-border: #704C30;
   --gold: #C8A055; --gold-text: #C8A055; --gold-line: #C8A055;
   --gold-bg: #342A1B; --gold-border: #705A33;
+  /* Turn 14 change-email pending pill: tint(gold, .13/.50) */
+  --eml-pending-bg: rgba(200,160,85,.13); --eml-pending-border: rgba(200,160,85,.5);
+  --eml-pill-hover: rgba(128,120,104,.12);
   --reasoning: #C8A055; --reasoning-text: #C8A055; --reasoning-line: #C8A055;
   --reasoning-bg: #342A1B; --reasoning-border: #705A33;
 
@@ -153,6 +160,7 @@ html[data-mode="chamber"] {
   --m-default-bg: #2A2723; --m-default-border: #504E4C;
 
   --accent: #C8834F; --link: #C8A055; --focus: #C8834F;
+  --focus-halo: rgba(200,131,79,.32);
   --shadow-card: 0 22px 48px -22px rgba(0,0,0,.8);
   --shadow-pop: 0 36px 70px -30px rgba(0,0,0,.9);
   --shadow-drawer: -26px 0 62px -26px rgba(0,0,0,.9);
@@ -1447,7 +1455,7 @@ html.theme-transition-fallback body *::after {
   align-items: center;
   gap: 14px;
   flex: 1;
-  min-width: 0;
+  min-width: auto;
 }
 
 .topBarDivider {
@@ -1460,6 +1468,12 @@ html.theme-transition-fallback body *::after {
   font-size: 13.5px;
   font-weight: 600;
   color: var(--text-2);
+  flex: 1 1 auto;
+  contain: inline-size;
+  min-width: 1em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topBarActions {
@@ -1467,6 +1481,12 @@ html.theme-transition-fallback body *::after {
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
+}
+.topBarNewLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 769.98px) {
+  .topBarActions > .topBarWide { display: none; }
+  .topBarActions { flex: 0 1 auto; min-width: 0; }
+  .topBarActions > .btnDark { flex: 0 1 auto; min-width: 0; }
 }
 
 /* ============================================================
@@ -1948,6 +1968,179 @@ a:focus-visible {
 .authRule[data-met="true"] { color: var(--ok-text); }
 .authRule[data-met="false"] { color: var(--dispute-text); }
 
+/* Date of birth — design document Turn 8 · 8d/8f/8g/8l. Typed + select: three
+   inputs, each with a ▾ grid picker at its inline end. Order and direction come
+   from the locale; digits stay left to right inside every input. */
+.dobFieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.dobFieldset .dobLegend {
+  padding: 0;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+}
+.dobFieldset .dobRow { display: flex; flex-wrap: wrap; gap: 8px; }
+.dobFieldset .dobPart { display: flex; flex-direction: column; gap: 4px; }
+.dobFieldset .dobPartLabel {
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+}
+.dobFieldset .dobControl { position: relative; }
+.dobFieldset .dobInput {
+  display: block;
+  min-height: 0;
+  width: 72px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  outline: none;
+  background: var(--shell);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.dobFieldset .dobPart[data-part="y"] .dobInput { width: 96px; }
+.dobFieldset .dobInput[aria-invalid="true"] { border-color: var(--dispute); }
+.dobFieldset .dobInput:focus, 
+.dobFieldset .dobInput[aria-invalid="true"]:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.dobFieldset .dobPickerToggle {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  inset-inline-end: 4px;
+  width: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+.dobFieldset .dobPickerToggle:hover { background: var(--surface-2); }
+.dobFieldset .dobPickerToggle:focus-visible, 
+.dobFieldset .dobDecadeButton:focus-visible, 
+.dobFieldset .dobCell:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.dobFieldset .dobPopover {
+  position: absolute;
+  top: 46px;
+  inset-inline-start: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--core);
+  box-shadow: var(--shadow-pop);
+}
+.dobFieldset .dobPopover[data-anchor="end"] { inset-inline-start: auto; inset-inline-end: 0; }
+.dobFieldset .dobPopover[data-part="d"] { width: 244px; }
+.dobFieldset .dobPopover[data-part="m"] { width: 222px; }
+.dobFieldset .dobPopover[data-part="y"] { width: 262px; }
+.dobFieldset .dobDecade { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.dobFieldset .dobDecadeButton {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  cursor: pointer;
+}
+.dobFieldset .dobDecadeButton:disabled { opacity: 0.3; cursor: default; }
+.dobFieldset .dobDecadeLabel {
+  flex: 1;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.dobFieldset .dobGrid { display: grid; gap: 3px; }
+.dobFieldset .dobCell {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+}
+.dobFieldset .dobCell:hover { background: var(--surface-sunken); }
+.dobFieldset .dobCell[data-selected="true"] { background: var(--ink); color: var(--bg); }
+.dobFieldset .dobCell[aria-disabled="true"] { opacity: 0.3; cursor: default; }
+.dobFieldset .dobCell[aria-disabled="true"]:hover { background: transparent; }
+.dobFieldset .dobMessage { min-height: 13px; text-wrap: pretty; }
+.dobFieldset .dobMessage[data-state="ok"] { color: var(--agree); }
+.dobFieldset .dobMessage[data-state="bad"] { color: var(--dispute); }
+
+/* Age-gate refusal — 8j. The panel follows the brand directly; one heading, one link. */
+.authBrand + .authPanel { margin-top: 0; }
+.authPanelCore.ageRefusal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 36px 26px 32px;
+}
+.ageRefusalMark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+.ageRefusalMark > span {
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border: 1.5px solid var(--muted);
+}
+.ageRefusalTitle {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+.ageRefusalHome {
+  align-self: flex-start;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ageRefusalHome:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 3px; }
+
 .authFieldHint {
   display: block;
   margin: 5px 0 0;
@@ -2011,6 +2204,24 @@ a:focus-visible {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* Paid plans L4: the blocking accept screen's document rows and its two ways out
+   (the account link and Sign out). Layout only. */
+.legalGateList {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legalGateExits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-top: 16px;
 }
 
 .authMfaForm {
@@ -4578,7 +4789,7 @@ a:focus-visible {
   .topBarActions {
     min-width: 0;
     gap: 6px;
-    margin-left: auto;
+    margin-inline-start: auto;
   }
   .topBarActions .btn {
     padding-inline: 10px;
@@ -4611,6 +4822,20 @@ a:focus-visible {
   .authPrimary {
     min-height: 58px;
   }
+  /* 8h: 84/84/120 × 52. Inside the auth card's bezel a 375px screen leaves ~226px, so the
+     three keep that ratio and shrink together instead of wrapping the year onto a new line. */
+  .dobFieldset .dobRow { gap: 10px; flex-wrap: nowrap; }
+  .dobFieldset .dobPart { gap: 5px; flex: 0 1 84px; min-width: 0; }
+  .dobFieldset .dobPart[data-part="y"] { flex: 0 1 120px; }
+  .dobFieldset .dobPartLabel { font-size: 11px; }
+  .dobFieldset .dobInput,
+  .dobFieldset .dobPart[data-part="y"] .dobInput {
+    width: 100%; height: 52px; min-height: 0; padding: 0 26px 0 6px; border-radius: 10px; font-size: 18px;
+  }
+  .dobFieldset[dir="rtl"] .dobInput,
+  .dobFieldset[dir="rtl"] .dobPart[data-part="y"] .dobInput { padding: 0 6px 0 26px; }
+  .dobFieldset .dobPickerToggle { inset-inline-end: 6px; font-size: 11px; }
+  .dobFieldset .dobPopover { top: 58px; }
   .authCheckEmail,
   .authSuccessWarning {
     padding: 22px;
@@ -5504,6 +5729,7 @@ a:focus-visible {
   transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .lpCtaNav { gap: 10px; padding: 8px 8px 8px 20px; font-size: 13.5px; }
+.lpCtaLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lpCtaHero { gap: 14px; padding: 12px 12px 12px 30px; font-size: 15.5px; box-shadow: var(--lp-btn-shadow); }
 .lpCtaClosing { gap: 14px; padding: 14px 14px 14px 34px; font-size: 16.5px; box-shadow: var(--lp-btn-shadow); }
 .lpCtaNav:hover { transform: scale(1.04); }
@@ -5558,6 +5784,12 @@ a:focus-visible {
   font-size: 13.5px;
   font-weight: 500;
   color: var(--muted);
+}
+@media (max-width: 753.98px) {
+  .lpNav { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 10px; row-gap: 6px; padding-left: 14px; max-width: calc(100% - 24px); }
+  .lpNavLinks { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
+  .lpCtaNav { min-width: 0; }
+  .lpCtaNav .lpArrow { display: none; }
 }
 
 /* Hero stat bar */
@@ -5968,6 +6200,194 @@ a:focus-visible {
   background: var(--dispute-bg);
   color: var(--dispute);
   font-size: 11.5px;
+}
+
+/* ============================================================
+   Change email — the design document's Turn 14: 14a Email card,
+   14b change form, 14c pending state. Values are the artboards'
+   own; tA.* maps onto the token contract (page → --bg, hint →
+   --text-2, mute → --muted, hair → --line, hairStrong →
+   --line-strong, vOk → --ok-dot, vBad → --dispute). The pending
+   pill is the document's tint(gold, .10/.45) and, in Chamber,
+   tint(gold, .13/.50).
+   ============================================================ */
+
+/* 14a — Email card */
+.emlCardRow { display: flex; align-items: center; gap: 16px; }
+.emlCardMain { flex: 1; min-width: 0; }
+.emlCardHead { display: flex; align-items: center; gap: 10px; }
+.emlCardTitle { margin: 0; font-size: 13.5px; font-weight: 700; }
+.emlVerified { font-size: 10.5px; font-weight: 600; color: var(--ok-dot); }
+.emlAddress { margin: 4px 0 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.emlRecovery { margin: 2px 0 0; font-size: 11px; color: var(--text-2); overflow-wrap: anywhere; }
+.emlPill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.emlPill:hover { background: var(--eml-pill-hover); }
+.emlPill:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlPill:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 14c — pending state of the same card */
+.emlCard[data-state="pending"] { position: relative; overflow: hidden; padding: 18px 18px 16px; }
+.emlPendingTab {
+  position: absolute;
+  top: 0;
+  left: 18px;
+  width: 52px;
+  height: 4px;
+  border-radius: 0 0 5px 5px;
+  background: var(--gold);
+}
+.emlPendingBadge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--eml-pending-border);
+  background: var(--eml-pending-bg);
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 700;
+}
+.emlPendingGrid {
+  margin: 10px 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 12px;
+}
+.emlPendingGrid dt {
+  padding-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.emlPendingGrid dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.emlPendingHint { margin: 10px 0 0; font-size: 11px; line-height: 1.55; color: var(--text-2); text-wrap: pretty; }
+.emlPendingActions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.emlPillSmall { padding: 7px 15px; }
+.emlPillQuiet { color: var(--muted); }
+
+/* 14b — change form, and the screen a mailed link opens */
+.emlScreen {
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+.emlScreenBody { padding: clamp(28px, 4.4vw, 44px) clamp(16px, 4.8vw, 48px) 48px; }
+.emlScreenInner { max-width: 444px; margin: 0 auto; }
+.emlBack {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.emlBack:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlEyebrow {
+  margin: 22px 0 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--gold);
+}
+.emlTitle {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.emlLede { margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--text-2); text-wrap: pretty; }
+.emlShell {
+  margin-top: 22px;
+  background: var(--shell);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  padding: 7px;
+  box-shadow: var(--shadow-card);
+}
+.emlCore {
+  background: var(--core);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.emlLabel { display: block; margin: 0 0 6px; padding: 0; font-size: 11px; font-weight: 700; color: var(--ink); }
+.emlCurrent {
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px dashed var(--line-strong);
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.emlInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--shell);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink);
+}
+.emlInput::placeholder { color: var(--muted); }
+.emlInput:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.emlInput[data-check="invalid"],
+.emlInput[data-check="same"],
+.emlInput[data-check="mismatch"] { border-color: var(--dispute); }
+.emlCheck { margin: 5px 0 0; font-size: 10.5px; font-weight: 600; color: var(--dispute); }
+.emlCheck[data-check="valid"] { color: var(--ok-dot); }
+.emlRule { height: 1px; background: var(--line); }
+.emlVerify { margin: 0; padding: 0; border: 0; min-width: 0; }
+.emlVerify > .emlLabel { margin: 0; }
+.emlVerifyHint { margin: 3px 0 0; font-size: 10.5px; color: var(--text-2); }
+.emlVerifyRow { display: flex; gap: 10px; margin-top: 9px; }
+.emlPassword { flex: 1; min-width: 0; }
+.emlPassword:not(:placeholder-shown) { letter-spacing: 0.2em; }
+.emlCode { flex: 0 0 130px; font-family: var(--font-mono); }
+/* The artboard draws "6-digit code" as a span; in a 130px input its .24em tracking
+   clips the placeholder, so the tracking applies to the typed digits only. */
+.emlCode:not(:placeholder-shown) { letter-spacing: 0.24em; }
+.emlSubmit {
+  width: 100%;
+  padding: 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+}
+.emlSubmit:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.emlSubmit:disabled { opacity: 0.5; cursor: not-allowed; }
+.emlNote { margin: 0; font-size: 10.5px; line-height: 1.55; color: var(--text-2); text-align: center; text-wrap: pretty; }
+.emlContinue { width: auto; margin-top: 22px; padding: 11px 22px; }
+
+@media (max-width: 480px) {
+  .emlCardRow { flex-wrap: wrap; }
+  .emlVerifyRow { flex-direction: column; }
+  .emlCode { flex-basis: auto; }
 }
 
 /* ============================================================
@@ -6556,6 +6976,7 @@ a:focus-visible {
   cursor: pointer;
 }
 .mfaPrimary:disabled { opacity: 0.45; cursor: not-allowed; }
+.mfaDoneLink { display: inline-block; margin-top: 18px; text-decoration: none; }
 
 .mfaCodes {
   display: grid;
@@ -8802,11 +9223,598 @@ a:focus-visible {
 }
 /* === end verdict-story === */
 
+/* hate-speech S02: the owner's Visibility card on the debate page (D-S02-24)
+   V-19: the debate column is 100dvh with overflow:hidden, and the story strip, language offer and AI notice above the
+   card do not shrink. The card therefore shrinks first (flex 0 1 auto, down to min-height) and, when the siblings alone
+   still leave it no room (a landscape phone), sticks to the column's bottom edge (`bottom: 0`: the column's effective
+   bottom padding is 0: the later .debateView rule sets padding-bottom to 0), so the whole card stays inside the column and
+   every control is reachable by scrolling the card. In portrait and desktop the shrink alone fits and nothing moves.
+   min-height 6rem: on a 390 px-tall landscape phone the worst locale leaves 106 px under the story strip's summary, so
+   the stuck card never covers the strip's Show/Hide control (measured, 35 locales). */
+.debateView > section.card.publicationControl {
+  position: sticky !important;
+  bottom: 0;
+  z-index: 1;
+  width: auto !important;
+  height: auto !important;
+  overflow: auto !important;
+  clip: auto !important;
+  clip-path: none !important;
+  white-space: normal !important;
+  flex: 0 1 auto;
+  min-height: min(6rem, 25dvh);
+  max-height: 45dvh;
+  box-sizing: border-box;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+}
+/* The card's controls paint their own background from the same token pair as their text (ui-N1): the global rule gives
+   every control `color: inherit` and leaves the user agent's white/grey background, which in dark mode sat under the
+   theme's near-white text (1.04–1.20 : 1). Scoped to this card only; the checkbox keeps its native rendering. */
+.debateView > section.card.publicationControl button,
+.debateView > section.card.publicationControl input:not([type="checkbox"]) {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+/* ui-p3 N1: a typed field's boundary must reach 3 : 1 against the card (WCAG 1.4.11); --line-strong measured 1.47 / 1.63. */
+.debateView > section.card.publicationControl input:not([type="checkbox"]) {
+  border-color: var(--muted);
+}
+.debateView > section.card.publicationControl button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* === sensitive-data consent (V, 2026-09-29) ===
+   The one-time screen before the first debate. It wears the legal-document modal's
+   frame (.policyScrim/.policyBezel/.policyCore/.policyHead/.policyFoot/.policyPrimary)
+   and adds only its body, its decline button and the line shown after a decline. */
+.sensitiveConsent {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.sensitiveConsentBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 24px 18px;
+}
+
+.sensitiveConsentPoints {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.sensitiveConsentStatement {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  background: var(--shell);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.sensitiveConsentLink {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sensitiveConsentBody .authAlert {
+  margin-top: 14px;
+}
+
+.sensitiveConsentDecline {
+  padding: 10px 18px;
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sensitiveConsentDecline:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+.sensitiveConsentDecline:focus-visible,
+.sensitiveConsentLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.sensitiveConsentDeclined {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+@media (max-width: 480px) {
+  .sensitiveConsent .policyFoot {
+    flex-wrap: wrap;
+  }
+  .sensitiveConsent .policyFoot .policyFootSpacer {
+    display: none;
+  }
+  .sensitiveConsent .policyFoot button {
+    flex: 1 1 100%;
+  }
+}
+/* === end sensitive-data consent === */
+
+/* Budget and paid plans (budget spec §2.11; paid-plans spec §2.10): the room
+   notice beside the ask. It uses the calm "generating" family; it is not an error. */
+.roomNotice {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px;
+  margin-top: 14px; padding: 10px 13px;
+  border: 1px solid var(--gen-border); border-radius: var(--r-btn);
+  background: var(--gen-bg); color: var(--gen-text); font-size: 13.5px;
+}
+.roomNoticeLink { color: var(--link); text-decoration: underline; }
+/* Paid plans (spec 2026-09-29 §2.3.4; ruling Q-8): the person's plan, where the chooser was. */
+.ndPlanCurrent { margin: 18px 0 0; font-size: 14px; font-weight: 600; color: var(--text-2); }
+/* Budget spec §2.11: sentence C on the debate page, a full-width line below the
+   top bar. It wraps at every width and is never clamped, so its start time shows. */
+.debateWaitingNotice {
+  flex: 0 0 auto; padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--gen-bg); color: var(--gen-text); font-size: 13.5px; line-height: 1.45;
+}
+@media (max-width: 600px) { .debateWaitingNotice { padding: 8px 12px; } }
+/* Paid plans (spec 2026-09-29 §1.2, §2.10): usage bars, in percent, never money. */
+.usageBars { display: grid; gap: 10px; margin-top: 14px; }
+.usageLine { margin: 0; font-size: 13.5px; color: var(--text-2); }
+.usageBar { display: grid; gap: 4px; }
+.usageTrack { height: 6px; border-radius: 3px; background: var(--muted-bg); overflow: hidden; }
+.usageFill { display: block; height: 100%; background: var(--reasoning); }
+.usageReset { font-size: 12px; color: var(--text-2); }
+/* === crisis support (V, 2026-09-30) ===
+   Help numbers instead of a debate when a question reads as a person in crisis. It wears the
+   legal-document modal's frame, like the consent screen, and keeps to calm ink: nothing on it
+   is red or alarming, and the call buttons are the largest things on it. */
+.crisisSupport {
+  width: min(600px, calc(100vw - 32px));
+}
+
+.crisisSupportLede {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.crisisSupportBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 24px 18px;
+}
+
+.crisisSupportCountry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.crisisSupportCountry select {
+  flex: 1;
+  min-width: 0;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-btn);
+  background: var(--shell);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.crisisSupportLines {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crisisSupportLine {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  background: var(--shell);
+}
+
+.crisisSupportLineHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.crisisSupportLineName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.crisisSupportLineTags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  color: var(--text-2);
+}
+
+.crisisSupportLineTags span {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+}
+
+.crisisSupportLineActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 12px;
+}
+
+.crisisSupportCall {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.crisisSupportEmergencyCall {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.crisisSupportAction,
+.crisisSupportElsewhere {
+  font-size: 12px;
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.crisisSupportNote {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.crisisSupportEmergency {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  background: var(--shell);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.crisisSupportElsewhere {
+  display: inline-block;
+  margin-top: 12px;
+}
+
+.crisisSupportFine {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.crisisSupportBack {
+  padding: 10px 18px;
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.crisisSupport .policyTitle:focus {
+  outline: none;
+}
+
+.crisisSupportCountry select:focus-visible,
+.crisisSupportCall:focus-visible,
+.crisisSupportEmergencyCall:focus-visible,
+.crisisSupportAction:focus-visible,
+.crisisSupportElsewhere:focus-visible,
+.crisisSupportBack:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .crisisSupportBody {
+    padding: 14px 16px 16px;
+  }
+  .crisisSupportCountry {
+    flex-wrap: wrap;
+  }
+  .crisisSupportCountry select {
+    max-width: none;
+  }
+  .crisisSupportCall {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+  .crisisSupport .policyFoot .policyFootSpacer {
+    display: none;
+  }
+  .crisisSupport .policyFoot button {
+    flex: 1 1 100%;
+  }
+}
+/* === end crisis support === */
+
+/* ============================================================
+   Phone layout — 2026-09-30 responsiveness pass.
+   Placed after every layout rule (only the delimited consent-ui blocks,
+   which must end the file, follow it): each rule here corrects a
+   phone-width overflow measured at 320–414px and must win over the
+   earlier breakpoints it adjusts.
+   ============================================================ */
+
+@media (max-width: 640px) {
+  /* The app bar held six actions in one unwrapped row (431px on a 375px
+     phone), which widened every page. Account and ⚙ both open /settings,
+     so the phone keeps the labelled icon and drops the duplicate; the
+     asker chip is a role placeholder the settings page already states. */
+  .topBar {
+    min-width: 0;
+  }
+  .topBarActions > .btn:not(.btnDark),
+  .topBarActions > .roleChip {
+    display: none;
+  }
+
+  /* Debate header: four controls sat in a three-column grid, so the
+     fourth wrapped and pushed the row above the bar. Two rows instead —
+     brand and utilities on top, the full view switch underneath — and
+     every view stays reachable on a phone. */
+  .debateTopBar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
+    column-gap: 8px;
+    row-gap: 6px;
+    padding: 6px 12px 8px;
+  }
+  .debateTopControlRow {
+    display: contents;
+  }
+
+  /* The debate column was one 100dvh box: on a 320×640 phone the header,
+     AI notice, language offer and story panel took 634px and left the
+     reading views 6px. On a phone the column scrolls as a page instead —
+     the header stays pinned, the notices scroll away, and the reading
+     views keep a full screen under the header. */
+  .debateView {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .debateTopBar {
+    position: sticky;
+    top: 0;
+  }
+  .debateMain {
+    flex: 0 0 auto;
+    height: calc(100dvh - 100px);
+  }
+  /* The pinned header's 80% tint let scrolled text show through it. */
+  .debateTopBar {
+    background: var(--bg);
+  }
+
+  /* Thread: each nesting level cost a 16px rail plus a 12px gap, so at
+     320px a reply's text was 140px wide (~15 characters a line). Narrower
+     rails and paddings keep a second-level reply near 200px. */
+  .threadInner,
+  .splitInner {
+    padding-inline: 10px;
+  }
+  .threadRow {
+    gap: 6px;
+  }
+  .threadLane,
+  .threadElbow {
+    flex-basis: 10px;
+    width: 10px;
+  }
+  .threadLaneLine {
+    left: 5px;
+  }
+  .threadElbowShape {
+    width: 10px;
+  }
+  .threadRootShell,
+  .threadCardShell {
+    padding: 4px;
+  }
+  .threadRoot {
+    padding: 16px 14px 12px;
+  }
+  .threadCard {
+    padding: 14px 12px 10px;
+  }
+  .debateTopBar .languageSwitcher {
+    margin-left: auto;
+  }
+  .debateTopBar .segment {
+    order: 10;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .debateTopBar .segment button,
+  .debateTopBar .segment button:not([aria-pressed="true"]) {
+    display: block;
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 4px;
+  }
+  /* The overflow menu's ? and ⚙ rows carry only an aria-label; show it. */
+  .debateOverflowMenu .iconBtn.debateOverflowAction::after {
+    content: attr(aria-label);
+    margin-left: 8px;
+    font-size: 13px;
+  }
+  .debateOverflowMenu .iconBtn.debateOverflowAction {
+    width: auto;
+    justify-content: flex-start;
+    padding-inline: 12px;
+  }
+
+  /* Model pills were cut mid-name inside unwrapped meta rows. */
+  .nodeArgHeader,
+  .threadMetaRow,
+  .nodeReviewLine,
+  .splitCardMeta,
+  .splitFocusHead {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .modelPill {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Split: the case-for / case-against meter was 410px wide and made the
+     whole view scroll sideways. */
+  .splitMeter {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .splitMeterSide {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* The challenge menu is anchored to the clicked card and was not kept
+     on screen; on a phone it opens as a bottom sheet. */
+  .popAnchor {
+    left: 12px !important;
+    right: 12px;
+    top: auto !important;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    transform: none;
+  }
+  .popCard {
+    width: auto;
+    margin-bottom: 0;
+  }
+
+  /* MFA setup: the stacked column kept align-items:flex-start, so the
+     setup text sized to its content (418px in a 341px card) and hid the
+     verify button. */
+  .mfaSetup {
+    align-items: stretch;
+  }
+  .mfaSecret {
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+  .mfaCodeRow {
+    flex-wrap: wrap;
+  }
+  .mfaCodeRow .mfaCodeInput {
+    flex: 1 1 100%;
+  }
+  .mfaCodeRow > button {
+    flex: 1 1 100%;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 380px) {
+  /* The 39-character setup key is typed by hand into an authenticator, so it
+     has to show whole; at 320px that needs the card's inner padding back. */
+  .mfaBody,
+  .mfaStep {
+    padding-inline: 12px;
+  }
+  .mfaSecret {
+    padding-inline: 6px;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 720px) {
+  /* New-debate gauge rows wrapped only once the label had shrunk to
+     nothing (53px at 375px); give the label a real basis so the control
+     drops below it instead. Slider rows already take a full-width label
+     at this width, and their track must keep the rest of the row. */
+  .ndRow:not(.ndRowSlider) .ndRowText {
+    flex: 1 1 220px;
+  }
+}
+
+/* A keyboard shortcut and a hover instruction mean nothing on a
+   touch-only device. */
+@media (hover: none) and (pointer: coarse) {
+  .ndKeyHint,
+  .mapReadoutFooter > span:first-child {
+    display: none;
+  }
+}
+
 /* === consent-ui S01 === */
-/* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
-   The ONE delimited block this slice may append, at the very end of the file
-   (S01-R25). Every colour here is a var(--token) reference; the ten tokens the
-   slice adds live in the two token blocks at the top, which S01 also owns. */
+/* Slice S01 — the cookie notice: the bar (10a) and the storage card (10b), a
+   read-only list of the eight items DebateAI stores (mission cookie-compliance,
+   DONE.md artboards S01-01..S01-18). The ONE delimited block this slice may
+   append, at the very end of the file (S01-R25). Every colour here is a
+   var(--token) reference; the tokens it uses live in the two token blocks at
+   the top. */
 
 .consentBar {
   position: fixed;
@@ -8900,9 +9908,11 @@ a:focus-visible {
 
 .consentGhostStrong { color: var(--ink); }
 
-/* Borderless, because the design is: 10a's `Accept all` and 10b's `Save
-   choices` are drawn with padding and no border (turn-10-cookie-consent.html:39,
-   :130). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
+/* The bar's `Cookie policy` link keeps its label on one line (DONE.md 10a). */
+.consentActions .consentLink { white-space: nowrap; }
+
+/* Borderless, because the design is: 10a's `OK` and 10b's `Close` are drawn
+   with padding and no border (turn-10-cookie-consent.html:39, :130; DONE.md). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
    used size is content + padding + border, so a 1px edge the artboard omits
    ships the primary 2px taller and 2px wider — and breaks the equality the
    design builds on, where a ghost pill's `9px 15px` + 1px border and a
@@ -8929,7 +9939,7 @@ a:focus-visible {
 
 /* 10a's own spring, transcribed from the artboard
    (turn-10-cookie-consent.html:39) and scoped to the BAR's primary: 10b draws
-   `Save choices` with no transition, and one class serving two artboards must
+   `Close` with no transition, and one class serving two artboards must
    take each artboard's values (CODE-REV-S01-C3C4 r1 N1's class, N4's ruling).
    Its reduced-motion counterpart is the block at the end of this file. */
 .consentBar .consentPrimary {
@@ -8938,9 +9948,8 @@ a:focus-visible {
 
 .consentBar .consentPrimary:hover { transform: scale(1.04); }
 
-/* --- 10b: the preferences card. One presentation serves both entry points
-   (the bar's "Choose what to store" and Settings -> Privacy), because there is
-   no bar in Settings to replace or to grow from (S01-R14). --- */
+/* --- 10b: the storage card. One presentation serves every door (the bar's
+   "What we store", both footers, Settings -> Privacy and /cookies). --- */
 
 .consentScrim {
   position: fixed;
@@ -9015,13 +10024,22 @@ a:focus-visible {
 
 .consentCatMain { flex: 1; min-width: 0; }
 
-.consentCatHead { align-items: center; display: flex; gap: 8px; }
+.consentCatHead {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 4px;
+}
 
-.consentCatName {
+/* The item's stored name, never translated; a long name breaks rather than
+   widening the card (DONE.md 10b, S01-05 at 375). */
+.consentItemName {
   color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .consentTag {
@@ -9033,22 +10051,12 @@ a:focus-visible {
   padding: 2px 8px;
 }
 
-.consentTag-essential {
-  background: var(--ok-bg);
-  border: 1px solid var(--ok-border);
-  color: var(--ok-dot);
-}
-
-.consentTag-quality {
-  background: var(--gold-bg);
-  border: 1px solid var(--gold-border);
-  color: var(--gold);
-}
-
-.consentTag-analytics {
+/* The kind pill, in the item's exact case (DONE.md default 5). */
+.consentTag-kind {
   background: var(--muted-bg);
   border: 1px solid var(--muted-border);
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .consentCatDesc {
@@ -9066,46 +10074,6 @@ a:focus-visible {
   margin-top: 5px;
 }
 
-.consentSwitch {
-  align-items: center;
-  background: var(--shell);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-pill);
-  box-sizing: border-box;
-  cursor: pointer;
-  display: flex;
-  flex: 0 0 auto;
-  height: 22px;
-  justify-content: flex-start;
-  margin-top: 2px;
-  padding: 2px;
-  width: 38px;
-}
-
-.consentSwitch[aria-checked="true"] {
-  background: var(--ok-dot);
-  border-color: var(--ok-edge);
-  justify-content: flex-end;
-}
-
-/* The locked track keeps the design's softer fill so "on and not yours to
-   change" reads differently from "on because you chose it" (design-data.js:44). */
-.consentSwitch[aria-checked="true"][aria-disabled="true"] { background: var(--ok-soft); }
-
-.consentSwitch[aria-disabled="true"] { cursor: not-allowed; }
-
-.consentSwitch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-
-.consentKnob {
-  background: var(--muted);
-  border-radius: var(--r-dot);
-  box-shadow: var(--shadow-knob);
-  height: 16px;
-  width: 16px;
-}
-
-.consentSwitch[aria-checked="true"] .consentKnob { background: var(--core); }
-
 .consentCardFooter {
   align-items: center;
   display: flex;
@@ -9113,9 +10081,9 @@ a:focus-visible {
   margin-top: 18px;
 }
 
-/* 10b draws `Save choices` one pixel tighter each side than 10a draws `Accept
-   all` (`padding:10px 18px` at turn-10-cookie-consent.html:130, against
-   `10px 19px` at :39). One class serves both surfaces, so the second artboard
+/* 10b draws `Close` one pixel tighter each side than 10a draws `OK`
+   (`padding:10px 18px` at turn-10-cookie-consent.html:130, against `10px 19px`
+   at :39; DONE.md S01-04). One class serves both surfaces, so the second artboard
    states its own value here rather than inheriting the first's
    (CODE-REV-S01-C3C4 r1 N1). */
 .consentCardFooter .consentPrimary { padding: 10px 18px; }
@@ -9155,6 +10123,8 @@ a:focus-visible {
   }
 
   .consentActions { flex-wrap: wrap; }
+
+  .consentActions .consentLink { flex: 0 0 auto; }
 
   .consentGhost,
   .consentPrimary {

@@ -39,6 +39,7 @@ function environment(
     BLIND_INDEX_KEY_PATH: join(custodyRoot, "secrets", "blind-index-key.bin"),
     AUDIT_KEY_STORE_PATH: join(custodyRoot, "audit-keys"),
     AUDIT_SOURCE_IP_SALT_PATH: join(custodyRoot, "secrets", "audit-source-ip-salt.bin"),
+    RECORDS_KEY_PATH: join(custodyRoot, "secrets", "records-key.bin"),
     USER_DEK_STORE_PATH: join(custodyRoot, "user-deks"),
     CORPUS_KEK_PATH: join(custodyRoot, "secrets", "corpus-kek.bin"),
     PUBLICATION_KEY_STORE_PATH: join(custodyRoot, "publication-keys"),

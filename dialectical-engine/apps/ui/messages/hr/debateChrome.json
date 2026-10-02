@@ -1,9 +1,15 @@
 {
   "debateChrome.aiNotice": "Sve u ovoj raspravi — argumente, preglede, rezultate i presudu — generiraju modeli umjetne inteligencije; sav je taj sadržaj strojno čitljivo označen i može biti netočan.",
+  "debateChrome.status.waiting": "Čeka na početak. Vaša će rasprava započeti sama u {time}.",
+  "debateChrome.status.waitingOwnDebates": "Vaše ostale rasprave zasad koriste ostatak vašeg ograničenja. Ova će rasprava započeti sama čim jedna od njih završi.",
   "debateChrome.backToLibrary": "← Natrag u knjižnicu",
   "debateChrome.loading": "Učitavanje…",
   "debateChrome.error.claimGenerationFailed": "Stvaranje tvrdnje nije uspjelo",
-  "debateChrome.error.debateGenerationFailed": "Stvaranje rasprave nije uspjelo: {reason}",
+  "runFailure.NOT_STARTED": "Nešto je pošlo po zlu na našoj strani prije nego što je ova rasprava počela. Molimo, pitajte ponovno.",
+  "runFailure.MODELS_UNAVAILABLE": "Ova rasprava nije mogla započeti jer modeli umjetne inteligencije koji su joj potrebni nisu bili dostupni. Molimo, pokušajte ponovno malo kasnije.",
+  "runFailure.RUN_LIMIT_REACHED": "Ova je rasprava dosegnula svoje ograničenje prije nego što je mogla dati odgovor.",
+  "runFailure.DAILY_LIMIT_REACHED": "Današnje ograničenje za rasprave iskorišteno je dok je ova rasprava započinjala. Molimo, pitajte ponovno sutra.",
+  "runFailure.STOPPED": "Ova je rasprava prekinuta na pola puta zbog problema na našoj strani. Molimo, ponovno postavite svoje pitanje.",
   "debateChrome.error.unableToLoadDebate": "Nije moguće učitati raspravu",
   "debateChrome.error.unableToLoadScoring": "Nije moguće učitati bodovanje",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Nije moguće učitati probni rad prilagodljive dubine",
@@ -203,7 +209,7 @@
   "debateChrome.condition.digestCannotExist": "Sažetak nije bilo moguće izraditi unutar proračuna sastavljanja",
   "debateChrome.condition.protectedCoreGuardRetired": "Izvođenje je zaustavljeno zbog proračuna; provjera preoblikovanja više ga nije uvjetovala",
   "debateChrome.condition.hiddenUnjudgeable": "Skriveno: nije se moglo ocijeniti — prikažite skriveno da biste ga pročitali",
-  "debateChrome.condition.derivedStandingUnreviewed": "Počiva na ocijenjenim argumentima — nedostaje vlastiti unakrsni pregled modela drugog proizvođača",
+  "debateChrome.condition.derivedStandingUnreviewed": "Počiva na ocijenjenim argumentima — nedostaje vlastiti unakrsni pregled koji bi obavio model drugog proizvođača",
   "debateChrome.condition.hiddenLowScore": "Skriveno: rezultat ispod prikazanog praga",
   "debateChrome.condition.unauthoredBranchHalted": "Proširenje je ovdje zaustavljeno — nema napisanog sadržaja koji bi se mogao sakriti ili prikazati",
   "debateChrome.condition.labelBasisIncomplete": "Osnova presude nije potpuna — nema suparničkog stajališta ili drugog suca za usporedbu",
@@ -284,5 +290,6 @@
   "requestFailure.kind.UNREADABLE": "Odgovor koordinatora nije bilo moguće pročitati, pa je ishod nepoznat.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator je odbio odabir plana. Odaberite „Besplatno” ili „Premium”, a zatim pokušajte ponovno.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator je odbio zahtjev: model potreban za ovaj plan trenutačno nije dostupan. Pokušajte ponovno kasnije ili odaberite drugi plan.",
+  "requestFailure.kind.ALREADY_WAITING": "Samo jedno pitanje može čekati u isto vrijeme. Ovo postavite nakon što započne vaša rasprava na čekanju.",
   "requestFailure.kind.UNCLASSIFIED": "Došlo je do pogreške prije nego što je stigao odgovor, pa je ishod nepoznat. To nije odluka koordinatora."
 }

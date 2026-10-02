@@ -1,9 +1,15 @@
 {
   "debateChrome.aiNotice": "Allt i den här debatten — argument, granskningar, poäng och utslag — genereras av AI-modeller, är maskinläsbart märkt och kan vara felaktigt.",
+  "debateChrome.status.waiting": "Väntar på att starta. Din debatt startar av sig själv {time}.",
+  "debateChrome.status.waitingOwnDebates": "Dina andra debatter använder resten av din gräns just nu. Den här debatten startar av sig själv så snart en av dem är klar.",
   "debateChrome.backToLibrary": "← Tillbaka till biblioteket",
   "debateChrome.loading": "Läser in…",
   "debateChrome.error.claimGenerationFailed": "Det gick inte att generera påståendet",
-  "debateChrome.error.debateGenerationFailed": "Det gick inte att generera debatten: {reason}",
+  "runFailure.NOT_STARTED": "Något gick fel hos oss innan den här debatten började. Ställ gärna frågan igen.",
+  "runFailure.MODELS_UNAVAILABLE": "Den här debatten kunde inte starta eftersom de AI-modeller den behöver inte var tillgängliga. Försök gärna igen om en stund.",
+  "runFailure.RUN_LIMIT_REACHED": "Den här debatten nådde sin gräns innan den hann ge ett svar.",
+  "runFailure.DAILY_LIMIT_REACHED": "Dagens gräns för debatter tog slut medan den här debatten startade. Ställ gärna frågan igen i morgon.",
+  "runFailure.STOPPED": "Den här debatten avbröts halvvägs på grund av ett problem hos oss. Ställ gärna din fråga igen.",
   "debateChrome.error.unableToLoadDebate": "Det gick inte att läsa in debatten",
   "debateChrome.error.unableToLoadScoring": "Det gick inte att läsa in poängsättningen",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Det gick inte att läsa in provkörningen av adaptivt djup",
@@ -277,5 +283,6 @@
   "requestFailure.kind.UNREADABLE": "Koordinatorns svar kunde inte läsas, så resultatet är okänt.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatorn avvisade valet av abonnemang. Välj ”Kostnadsfri” eller ”Premium” och försök sedan igen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatorn avvisade begäran: en modell som krävs för det här abonnemanget är inte tillgänglig just nu. Försök igen senare eller välj det andra abonnemanget.",
+  "requestFailure.kind.ALREADY_WAITING": "Bara en fråga kan vänta åt gången. Ställ den här frågan när din väntande debatt har startat.",
   "requestFailure.kind.UNCLASSIFIED": "Begäran misslyckades innan något svar kom, så resultatet är okänt. Det här är inte ett beslut som koordinatorn har fattat."
 }

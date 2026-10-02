@@ -804,7 +804,7 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
     const pseudonyms = new Set(Array.from({ length: 200 }, () => generatePseudonym()));
     expect(pseudonyms.size).toBe(200);
     for (const pseudonym of pseudonyms) {
-      expect(pseudonym).toMatch(/^[a-z]+-[a-z]+-[0-9a-f]{6}$/);
+      expect(pseudonym).toMatch(/^[A-Z][a-z]{2,8}[A-Z][a-z]{2,8}[1-9][0-9]$/);
       for (const fragment of forbidden) expect(pseudonym).not.toContain(fragment);
     }
   });
@@ -984,7 +984,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
         method: "POST", url: "/v1/auth/register",
         payload: {
           email: "alice@example.test", password: "password-123",
-          recovery_email: "recovery@example.test", adult_affirmed: true
+          recovery_email: "recovery@example.test", date_of_birth: "1990-01-01"
         }
       });
       const verify = await api.inject({
@@ -1438,7 +1438,7 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
     url: "/v1/auth/register",
     payload: {
       email: "alice@example.test", password: "correct horse battery staple",
-      recovery_email: "recovery@example.test", adult_affirmed: true
+      recovery_email: "recovery@example.test", date_of_birth: "1990-01-01"
     }
   }),
   Object.freeze({

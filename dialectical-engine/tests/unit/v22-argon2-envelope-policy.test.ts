@@ -317,9 +317,9 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
     expect(sites.map((site) => `${site.path}:${site.line}`)).toEqual([
       "apps/api/src/mfa.ts:375",
       "apps/api/src/mfa.ts:418",
-      "apps/api/src/sessions.ts:325",
-      "apps/api/src/sessions.ts:450",
-      "apps/api/src/sessions.ts:578"
+      "apps/api/src/sessions.ts:350",
+      "apps/api/src/sessions.ts:475",
+      "apps/api/src/sessions.ts:638"
     ]);
     for (const site of sites) {
       // Structural, not "somewhere in the preceding 400 characters": the guard

@@ -13,6 +13,7 @@ export function validApiEnvironmentFixture(): Record<string, string> {
     KEK_PATH: "/run/secrets/kek",
     SUPPORT_KEK_PATH: "/run/secrets/support-kek",
     BLIND_INDEX_KEY_PATH: "/run/secrets/email-blind-index",
+    RECORDS_KEY_PATH: "/run/secrets/records-key",
     AUDIT_KEY_STORE_PATH: "/run/secrets/audit-users",
     AUDIT_SOURCE_IP_SALT_PATH: "/run/secrets/audit-source-ip",
     USER_DEK_STORE_PATH: "/run/secrets/user-deks",

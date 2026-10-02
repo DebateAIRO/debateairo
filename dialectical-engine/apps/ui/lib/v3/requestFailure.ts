@@ -55,6 +55,14 @@ export type RequestFailureKind =
   | "PLAN_TIER_INVALID"
   /** SYNC3: the coordinator refused the ask: a model its plan needs is not available (422). */
   | "PLAN_TIER_UNAVAILABLE"
+  /**
+   * Budget spec §2.7/§2.11: the coordinator answered 422 ASK_ALREADY_WAITING.
+   * This person already has a question waiting, and one may wait at a time.
+   * The page shows sentence D with its start time, from the room re-read or
+   * from the refusal's body (`ContractHttpError.waiting`); this clause is the
+   * banner only when neither carries a time.
+   */
+  | "ALREADY_WAITING"
   /** Something failed that this seam cannot classify; say exactly that. */
   | "UNCLASSIFIED";
 
@@ -84,6 +92,7 @@ const KIND_CLAUSE: Readonly<Record<RequestFailureKind, string>> = Object.freeze(
   PLAN_TIER_UNAVAILABLE:
     "The coordinator refused it: a model this plan needs is not available right now. "
     + "Retry later, or choose the other plan.",
+  ALREADY_WAITING: "One question can wait at a time. Ask this one after your waiting debate has started.",
   UNCLASSIFIED:
     "It failed before any answer arrived, so the outcome is unknown. "
     + "This is not a decision the coordinator made."
@@ -114,11 +123,20 @@ const PLAN_TIER_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.
   ASK_PLAN_TIER_MODEL_UNAVAILABLE: "PLAN_TIER_UNAVAILABLE"
 });
 
+/** Budget spec §2.7: the one room refusal an ask can get (422). */
+const ROOM_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.freeze({
+  ASK_ALREADY_WAITING: "ALREADY_WAITING"
+});
+
 function kindOf(error: unknown): RequestFailureKind {
   if (!(error instanceof ContractHttpError)) return "UNCLASSIFIED";
   if (error.status === 422 && error.serverCode !== null
     && Object.hasOwn(PLAN_TIER_REFUSALS, error.serverCode)) {
     return PLAN_TIER_REFUSALS[error.serverCode]!;
+  }
+  if (error.status === 422 && error.serverCode !== null
+    && Object.hasOwn(ROOM_REFUSALS, error.serverCode)) {
+    return ROOM_REFUSALS[error.serverCode]!;
   }
   if (error.code === "RATE_LIMITED" && error.serverCode === DAILY_LIMIT_SERVER_CODE) {
     return "DAILY_LIMIT_REACHED";
@@ -157,12 +175,30 @@ export function classifyRequestFailure(
   });
 }
 
+/**
+ * Paid plans G3b (sentence G4). POST /v1/asks answers 403 COUNTRY_ASK_BLOCKED from an always-blocked
+ * place. It is an observed refusal with its own plain sentence — never the coordinator clause, never
+ * the code — and the person's debates stay readable, which the sentence says.
+ */
+const LOCATION_BLOCKED_SERVER_CODE = "COUNTRY_ASK_BLOCKED";
+const LOCATION_BLOCKED_KEY = "newDebate.room.locationBlocked";
+const LOCATION_BLOCKED_ENGLISH =
+  "New debates can't be started from your current location. Your debates stay available to read.";
+
+export function isCountryAskBlocked(error: unknown): boolean {
+  return error instanceof ContractHttpError && error.status === 403
+    && error.serverCode === LOCATION_BLOCKED_SERVER_CODE;
+}
+
 /** The user-facing line for a banner. Never a sentence a server wrote. */
 export function requestFailureMessage(
   subject: RequestFailureSubject,
   error: unknown,
   catalog?: MessageCatalog
 ): string {
+  if (subject === "DEBATE_CREATE" && isCountryAskBlocked(error)) {
+    return catalog === undefined ? LOCATION_BLOCKED_ENGLISH : t(catalog, LOCATION_BLOCKED_KEY);
+  }
   const classified = classifyRequestFailure(subject,error);
   if (catalog === undefined) return classified.message;
   return `${t(catalog,`requestFailure.subject.${classified.subject}`)} ${
@@ -187,7 +223,43 @@ const DAILY_LIMIT_MESSAGE_KEYS = Object.freeze([
  * catalogue.
  */
 export function dailyLimitMessageCatalog(catalog: MessageCatalog): MessageCatalog {
+  return pickMessages(catalog, DAILY_LIMIT_MESSAGE_KEYS);
+}
+
+/**
+ * The only keys of the `newDebate` catalogue the blocking accept screen prints
+ * (paid plans L4, spec 2026-09-29 §2.3.2): its "checking" line and its own
+ * thirteen sentences.
+ */
+const LEGAL_GATE_MESSAGE_KEYS = Object.freeze([
+  "newDebate.checkingSession",
+  "newDebate.legalGate.eyebrow",
+  "newDebate.legalGate.title",
+  "newDebate.legalGate.body",
+  "newDebate.legalGate.readTerms",
+  "newDebate.legalGate.readPrivacy",
+  "newDebate.legalGate.done",
+  "newDebate.legalGate.accept",
+  "newDebate.legalGate.accepting",
+  "newDebate.legalGate.failed",
+  "newDebate.legalGate.stale",
+  "newDebate.legalGate.reload",
+  "newDebate.legalGate.manageAccount",
+  "newDebate.legalGate.signOut",
+  "newDebate.legalGate.signOutFailed"
+] as const);
+
+/**
+ * The part of a `newDebate` catalogue the home page hands the accept screen, a
+ * client component, when documents are owed: these values, as M8's rule wants,
+ * not the whole catalogue.
+ */
+export function legalGateMessageCatalog(catalog: MessageCatalog): MessageCatalog {
+  return pickMessages(catalog, LEGAL_GATE_MESSAGE_KEYS);
+}
+
+function pickMessages(catalog: MessageCatalog, keys: readonly string[]): MessageCatalog {
   return Object.freeze(Object.fromEntries(
-    DAILY_LIMIT_MESSAGE_KEYS.flatMap((key) => (Object.hasOwn(catalog, key) ? [[key, catalog[key]!]] : []))
+    keys.flatMap((key) => (Object.hasOwn(catalog, key) ? [[key, catalog[key]!]] : []))
   ));
 }

@@ -15,6 +15,7 @@ const ownedFiles = [
   "app/ai-transparency/page.tsx",
   "app/admin/workers/page.tsx",
   "components/SettingsPageClient.tsx",
+  "components/EmailSettings.tsx",
   "components/EvaluatorDevMenu.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
@@ -143,7 +144,7 @@ test("server settings routes load settings while client controls receive their c
   // Review F2 (REV-FIX-CATALOGS): the page also serves the newDebate catalogue
   // so the AuthGate's "Checking session…" paints in the reader's language.
   assert.match(page, /loadNamespace\(locale, "newDebate"\)/);
-  assert.match(page, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} \/>/);
+  assert.match(page, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\} \/>/);
 
   for (const path of ["app/ai-transparency/page.tsx", "app/admin/workers/page.tsx"]) {
     assert.match(sources.get(path), /loadNamespace\(locale, "settings"\)/, path);

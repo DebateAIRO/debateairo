@@ -161,7 +161,7 @@ describe("SUP-01 /help assistant", () => {
     expect(parsed.querySelector('[aria-label="Conversation details"]')?.textContent)
       .toContain("This conversation");
     expect(parsed.querySelector('[aria-label="Support shortcuts"]')?.textContent)
-      .toContain("Cookie preferences");
+      .toContain("Cookies we store");
     // Dev's help-desk English, byte for byte (FIX-PORT-UI A9/C5).
     expect(parsed.querySelector('[aria-label="Support shortcuts"]')?.textContent)
       .toContain("Model fleet status");
@@ -191,21 +191,22 @@ describe("SUP-01 /help assistant", () => {
     expect(signedOutShortcuts.querySelector('a[href="/settings#consent-privacy-heading"]'))
       .toBeNull();
     expect([...signedOutShortcuts.querySelectorAll("button")].map((button) => button.textContent?.trim()))
-      .toContain("Cookie preferences ↗");
+      .toContain("Cookies we store ↗");
 
     await render(<Assistant fullPage signedIn client={client({
       messageId: "signed-in-shortcuts",outcome: "NO_SOURCE",text: "No source."
     })} />);
     const shortcuts = document.querySelector('[aria-label="Support shortcuts"]')!;
+    expect(shortcuts.textContent).not.toMatch(/preferences/iu);
     const privacy = shortcuts.querySelector<HTMLAnchorElement>(
       'a[href="/settings#consent-privacy-heading"]'
     );
-    expect(privacy?.textContent?.trim()).toBe("Privacy preferences ↗");
+    expect(privacy?.textContent?.trim()).toBe("Privacy ↗");
     expect([...shortcuts.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")))
       .not.toContain("/settings#cookies");
 
     const cookie = [...shortcuts.querySelectorAll<HTMLButtonElement>("button")]
-      .find((button) => button.textContent?.includes("Cookie preferences"))!;
+      .find((button) => button.textContent?.includes("Cookies we store"))!;
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
@@ -216,8 +217,8 @@ describe("SUP-01 /help assistant", () => {
     }
 
     expect(document.querySelector('[aria-label="Language override"]')).toBeNull();
-    expect(privacy?.textContent?.trim()).toBe("Privacy preferences ↗");
-    expect(cookie.textContent?.trim()).toBe("Cookie preferences ↗");
+    expect(privacy?.textContent?.trim()).toBe("Privacy ↗");
+    expect(cookie.textContent?.trim()).toBe("Cookies we store ↗");
   });
 
   it("submits a Turn 11 suggestion immediately without priming the composer", async () => {

@@ -42,11 +42,11 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
     readFile(new URL("../packages/serve/src/index.ts", import.meta.url), "utf8")
   ]);
   return {
-    judgeContractHash: "3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69",
-    composerContractHash: "9482cbb7bc9251d121f26cccf7141022caab4521b08b2a67f09ac07381443888",
+    judgeContractHash: "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365",
+    composerContractHash: "d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866",
     // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints
     // the EVALUATOR prompt alone; its own words are still the 2026-09-04 text.
-    conformanceContractHash: "80753d1a25f5c771a2fecb7f80c4f6f687dfa78f2ca410f572fb1acf39d8b447",
+    conformanceContractHash: "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc",
     propagationContractHash: sha256(propagation),
     serveContractHash: sha256(serve)
   };

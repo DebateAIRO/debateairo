@@ -149,9 +149,10 @@ describe("R2 — an unbillable vendor ends the run cleanly, under its own name",
  * travel untouched through both.
  */
 describe("C2(b) — a run-level spend stop is never a panel member failure", () => {
-  it("names the four run-level stops, the attempt ceiling included (Task M2), and nothing else", () => {
+  it("names the five run-level stops, the attempt ceiling (Task M2) and a person's allowance (B9) included, and nothing else", () => {
     expect([...RUN_LEVEL_SPEND_STOP_CODES].sort()).toEqual([
       "DAILY_COST_ENVELOPE_REACHED",
+      "PERSON_ALLOWANCE_REACHED",
       "PROVIDER_USAGE_UNREPORTED",
       "RUN_COST_ENVELOPE_EXHAUSTED",
       "RUN_COST_ENVELOPE_MONEY_REACHED"

@@ -190,5 +190,20 @@
   "public.report.error.tryAgain": "לא ניתן היה להכין את הדוח כרגע. אפשר לנסות שוב בעוד רגע.",
   "public.story.morePaths.one": "ועוד {count} עמדה",
   "public.story.morePaths.two": "ועוד {count} עמדות",
-  "public.story.morePaths.other": "ועוד {count} עמדות"
+  "public.story.morePaths.other": "ועוד {count} עמדות",
+  "public.publication.contentCheck.refusedHeading": "לא פרסמנו את הדיון הזה",
+  "public.publication.contentCheck.refusedWhatBlock": "בדיקה אוטומטית מצאה בדיון הזה טקסט שמפר את הכללים שלנו, ולכן הדיון לא פורסם.",
+  "public.publication.contentCheck.refusedWhatUnsure": "בדיקה אוטומטית לא הצליחה לאשר שהדיון הזה עומד בכללים שלנו, ולכן הדיון לא פורסם.",
+  "public.publication.contentCheck.partsIntro": "המקומות שבהם הבדיקה מצאה את הטקסט:",
+  "public.publication.contentCheck.part.question": "השאלה",
+  "public.publication.contentCheck.part.summary": "הסיכום, ההערות על ההכרעה וההתנגדויות שנותרו",
+  "public.publication.contentCheck.part.arguments": "הטיעונים",
+  "public.publication.contentCheck.part.reviews": "הערות הבודקים",
+  "public.publication.contentCheck.part.story": "סיפור ההכרעה",
+  "public.publication.contentCheck.groundTerms": "הבסיס: תנאי השירות שלנו, סעיף 7 (אסור תוכן שמסית לאלימות או לשנאה).",
+  "public.publication.contentCheck.groundIllegal": "ייתכן שהטקסט גם אינו חוקי.",
+  "public.publication.contentCheck.automated": "ההחלטה הזו התקבלה באמצעות כלי אוטומטי. אף אדם עדיין לא בחן אותה.",
+  "public.publication.contentCheck.stillPrivate": "הדיון שלכם נשאר פרטי וללא שינוי. רק אתם יכולים לראות אותו.",
+  "public.publication.contentCheck.appeal": "כדי לבקש מאדם לבחון את ההחלטה הזו, כתבו אל [appeals@dezbatere.ro] בתוך שישה חודשים.",
+  "public.publication.contentCheck.unavailable": "בדיקת התוכן אינה זמינה כרגע, ולכן דבר לא פורסם. הדיון שלכם נשאר פרטי. נסו שוב בעוד כמה דקות."
 }

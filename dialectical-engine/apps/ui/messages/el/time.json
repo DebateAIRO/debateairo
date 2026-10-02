@@ -14,6 +14,7 @@
   "time.status.claimed": "Αναλήφθηκε",
   "time.status.running": "Εκτελείται",
   "time.status.holding": "Αναμονή ανάκαμψης παρόχου",
+  "time.status.waiting": "Σε αναμονή",
   "time.status.settled": "Διευθετήθηκε",
   "time.status.generating": "Δημιουργείται",
   "time.status.failed": "Απέτυχε",

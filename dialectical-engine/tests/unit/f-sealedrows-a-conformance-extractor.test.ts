@@ -72,7 +72,7 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
       .toBe("2364b1b548c0e5a4f758ef325ed0234764aec9f88bc340a1f8c958bd3cc69b73");
     expect((EVALUATOR_PROMPT_CONTRACT as PromptContract).answerForm).toBe(EVALUATOR_CONTRACT_TEXT);
     expect(sha256(promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT as PromptContract)))
-      .toBe("80753d1a25f5c771a2fecb7f80c4f6f687dfa78f2ca410f572fb1acf39d8b447");
+      .toBe("f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc");
   });
 
   /**
@@ -93,9 +93,9 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     const acceptance = Object.fromEntries((await buildAcceptanceRegisterRows()).map((r) => [r.rowKey, r.value]));
     const development = Object.fromEntries((await buildDevelopmentRunnerRegisterRows()).map((r) => [r.rowKey, r.value]));
     expect(acceptance.judgeContractHash)
-      .toBe("3c9c32a61a510ef6a27d5c1fcd9797e669cacc475a15d6072e8f9c5efb450a69");
+      .toBe("e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365");
     expect(acceptance.composerContractHash)
-      .toBe("9482cbb7bc9251d121f26cccf7141022caab4521b08b2a67f09ac07381443888");
+      .toBe("d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866");
     // Both deployments seal the same values, or one of them is seeding a prompt
     // the other never sends.
     expect(development.judgeContractHash).toBe(acceptance.judgeContractHash);

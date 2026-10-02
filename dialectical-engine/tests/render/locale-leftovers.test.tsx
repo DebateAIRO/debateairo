@@ -160,7 +160,7 @@ describe("consent copy paints in the reader's locale on its first render", () =>
     const bar = container!.querySelector(".consentBar");
     expect(bar, "the bar opens for a visitor with no stored decision").not.toBeNull();
     const text = bar!.textContent ?? "";
-    for (const key of ["consent.bar.title", "consent.bar.body", "consent.action.essentialOnly"]) {
+    for (const key of ["consent.bar.title", "consent.bar.body", "consent.bar.acknowledge"]) {
       expect(text).toContain(catalogValue("he", "consent", key));
       // MUT: seed the hook's first state with consentEnglish again -> RED.
       expect(text).not.toContain(catalogValue("en", "consent", key));

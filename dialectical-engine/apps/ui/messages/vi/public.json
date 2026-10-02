@@ -188,5 +188,20 @@
   "public.report.error.signIn": "Đăng nhập để tải xuống báo cáo này.",
   "public.report.error.notAvailable": "Báo cáo này không có sẵn.",
   "public.report.error.tryAgain": "Hiện chưa thể tạo báo cáo. Vui lòng thử lại sau giây lát.",
-  "public.story.morePaths.other": "và {count} quan điểm khác"
+  "public.story.morePaths.other": "và {count} quan điểm khác",
+  "public.publication.contentCheck.refusedHeading": "Chúng tôi chưa xuất bản cuộc tranh luận này",
+  "public.publication.contentCheck.refusedWhatBlock": "Quá trình kiểm tra tự động phát hiện văn bản trong cuộc tranh luận này vi phạm quy tắc của chúng tôi, nên cuộc tranh luận không được xuất bản.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Quá trình kiểm tra tự động không thể xác nhận cuộc tranh luận này tuân thủ quy tắc của chúng tôi, nên cuộc tranh luận không được xuất bản.",
+  "public.publication.contentCheck.partsIntro": "Những phần mà quá trình kiểm tra tìm thấy văn bản:",
+  "public.publication.contentCheck.part.question": "Câu hỏi",
+  "public.publication.contentCheck.part.summary": "Bản tóm tắt, ghi chú về kết luận và các phản đối còn lại",
+  "public.publication.contentCheck.part.arguments": "Các lập luận",
+  "public.publication.contentCheck.part.reviews": "Nhận xét của người đánh giá",
+  "public.publication.contentCheck.part.story": "Câu chuyện về kết luận",
+  "public.publication.contentCheck.groundTerms": "Căn cứ: Điều khoản dịch vụ của chúng tôi, mục 7 (không cho phép nội dung kích động bạo lực hoặc thù hận).",
+  "public.publication.contentCheck.groundIllegal": "Văn bản cũng có thể vi phạm pháp luật.",
+  "public.publication.contentCheck.automated": "Quyết định này do một công cụ tự động đưa ra. Chưa có người nào xem xét quyết định này.",
+  "public.publication.contentCheck.stillPrivate": "Cuộc tranh luận của bạn vẫn ở chế độ riêng tư và không thay đổi. Chỉ bạn mới có thể xem.",
+  "public.publication.contentCheck.appeal": "Để yêu cầu một người xem xét lại quyết định này, hãy viết đến [appeals@dezbatere.ro] trong vòng sáu tháng.",
+  "public.publication.contentCheck.unavailable": "Hiện không thể kiểm tra nội dung, nên chưa có gì được xuất bản. Cuộc tranh luận của bạn vẫn ở chế độ riêng tư. Hãy thử lại sau vài phút."
 }

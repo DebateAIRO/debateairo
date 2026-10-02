@@ -85,7 +85,7 @@
   "misc.answerHonesty.weights": "ponderi {source}",
   "misc.answerHonesty.weightsBy": "ponderi {source} stabilite de {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "Ce ar schimba această concluzie",
-  "misc.model.houseUnavailable": "Familia de modele nu este disponibilă",
-  "misc.model.noRecordedHouse": "Pentru acest argument nu este disponibilă nicio familie de modele înregistrată.",
+  "misc.model.houseUnavailable": "Dezvoltatorul modelului nu este înregistrat",
+  "misc.model.noRecordedHouse": "Pentru acest argument nu este înregistrat dezvoltatorul modelului.",
   "misc.scoring.unavailable": "Interfața de punctare nu este disponibilă."
 }

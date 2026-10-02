@@ -1,5 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createNonce, NONCE_REQUEST_HEADER, nonceContentSecurityPolicy } from "./content-security-policy.mjs";
+import {
+  cardFormContentSecurityPolicy,
+  cardFormOrigins,
+  createNonce,
+  isCardFormPath,
+  NONCE_REQUEST_HEADER,
+  nonceContentSecurityPolicy
+} from "./content-security-policy.mjs";
 
 /**
  * F-08 / L3-F3: every document gets a per-request nonce policy.
@@ -13,7 +20,13 @@ import { createNonce, NONCE_REQUEST_HEADER, nonceContentSecurityPolicy } from ".
  */
 export function middleware(request: NextRequest) {
   const nonce = createNonce();
-  const policy = nonceContentSecurityPolicy(nonce, process.env.NODE_ENV === "development");
+  const development = process.env.NODE_ENV === "development";
+  // AMENDMENTS-R1 A11: only the three card-form documents read XMONEY_SDK_ORIGIN; every other page keeps
+  // exactly the policy it had.
+  const cardForm = isCardFormPath(request.nextUrl.pathname) ? cardFormOrigins(process.env.XMONEY_SDK_ORIGIN) : null;
+  const policy = cardForm === null
+    ? nonceContentSecurityPolicy(nonce, development)
+    : cardFormContentSecurityPolicy(nonce, development, cardForm);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(NONCE_REQUEST_HEADER, nonce);
   requestHeaders.set("content-security-policy", policy);

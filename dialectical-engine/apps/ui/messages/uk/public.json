@@ -191,5 +191,20 @@
   "public.story.morePaths.one": "і ще {count} позиція",
   "public.story.morePaths.few": "і ще {count} позиції",
   "public.story.morePaths.many": "і ще {count} позицій",
-  "public.story.morePaths.other": "і ще {count} позиції"
+  "public.story.morePaths.other": "і ще {count} позиції",
+  "public.publication.contentCheck.refusedHeading": "Ми не оприлюднили цю дискусію",
+  "public.publication.contentCheck.refusedWhatBlock": "Автоматична перевірка знайшла в цій дискусії текст, який порушує наші правила, тому дискусію не було оприлюднено.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Автоматична перевірка не змогла підтвердити, що ця дискусія відповідає нашим правилам, тому дискусію не було оприлюднено.",
+  "public.publication.contentCheck.partsIntro": "Де перевірка знайшла текст:",
+  "public.publication.contentCheck.part.question": "Запитання",
+  "public.publication.contentCheck.part.summary": "Підсумок, примітки до вердикту та решта заперечень",
+  "public.publication.contentCheck.part.arguments": "Аргументи",
+  "public.publication.contentCheck.part.reviews": "Коментарі рецензентів",
+  "public.publication.contentCheck.part.story": "Історія вердикту",
+  "public.publication.contentCheck.groundTerms": "Підстава: наші Умови надання послуг, розділ 7 (заборона вмісту, що підбурює до насильства або ненависті).",
+  "public.publication.contentCheck.groundIllegal": "Текст також може бути незаконним.",
+  "public.publication.contentCheck.automated": "Це рішення ухвалив автоматизований інструмент. Людина його ще не переглядала.",
+  "public.publication.contentCheck.stillPrivate": "Ваша дискусія залишається приватною та незмінною. Тільки ви можете її бачити.",
+  "public.publication.contentCheck.appeal": "Щоб попросити людину переглянути це рішення, напишіть на [appeals@dezbatere.ro] протягом шести місяців.",
+  "public.publication.contentCheck.unavailable": "Перевірка вмісту зараз недоступна, тому нічого не було оприлюднено. Ваша дискусія залишається приватною. Спробуйте ще раз за кілька хвилин."
 }

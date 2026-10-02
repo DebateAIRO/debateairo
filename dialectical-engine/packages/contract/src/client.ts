@@ -1,5 +1,24 @@
 import {
+  AccountEmailSchema,
   AccountErasureCancelRequestSchema,
+  AgeCheckResultSchema,
+  AgeConfirmationStatusSchema,
+  SENSITIVE_DATA_NOTICE_VERSION,
+  SensitiveDataConsentStatusSchema,
+  type SensitiveDataConsentStatus,
+  type AgeCheckResult,
+  type AgeConfirmationStatus,
+  type RegisterLegalDocuments,
+  LegalStatusResponseSchema,
+  type LegalAcceptRequest,
+  type LegalStatusResponse,
+  GeoAvailabilityResponseSchema,
+  type GeoAvailabilityResponse,
+  EmailChangeCancelledSchema,
+  EmailChangeConfirmedSchema,
+  EmailChangeLinkRequestSchema,
+  EmailChangePendingSchema,
+  EmailChangeRequestSchema,
   AccountErasureCancelledSchema,
   AccountErasureStatusSchema,
   AnswerSchema,
@@ -7,6 +26,23 @@ import {
   AnswerStorySchema,
   AnswerDisclosureSchema,
   AskAcceptedSchema,
+  AskAlreadyWaitingSchema,
+  AskRoomResponseSchema,
+  BillingCancelLinkAcceptedSchema,
+  BillingCardChangeResponseSchema,
+  BillingPlansResponseSchema,
+  BillingQuoteRequestSchema,
+  BillingQuoteResponseSchema,
+  BillingCheckoutPendingErrorSchema,
+  BillingCheckoutRequestSchema,
+  BillingCheckoutResponseSchema,
+  BillingChargeStatusResponseSchema,
+  BillingInvoicesResponseSchema,
+  BillingSubscriptionResponseSchema,
+  BillingUpgradeQuoteResponseSchema,
+  BillingUpgradeResponseSchema,
+  BillingUsageResponseSchema,
+  BillingWithdrawResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
   InspectionSchema,
@@ -16,6 +52,8 @@ import {
   NodeSchema,
   PrivateDebateErasureStatusSchema,
   PublicationTransitionSchema,
+  PublicationContentRefusalSchema,
+  type PublicationRefusalStatement,
   PublicDebateListSchema,
   PublicDebateSchema,
   RunEventSchema,
@@ -27,15 +65,33 @@ import {
   type Answer,
   type AnswerIndex,
   type AnswerStory,
+  type AccountEmail,
   type AnswerDisclosure,
   type AskAccepted,
   type AskRequest,
+  type AskRoomResponse,
+  type BillingCardChangeResponse,
+  type BillingPlansResponse,
+  type BillingQuoteRequest,
+  type BillingQuoteResponse,
+  type BillingCheckoutPendingResponse,
+  type BillingCheckoutRequest,
+  type BillingCheckoutResponse,
+  type BillingChargeStatusResponse,
+  type BillingInvoicesResponse,
+  type BillingSubscriptionResponse,
+  type BillingUpgradeQuoteResponse,
+  type BillingUpgradeResponse,
+  type BillingUsageResponse,
+  type BillingWithdrawResponse,
   type Deployment,
+  type EmailChangePending,
   type ExecutionLedgerDigest,
   type Inspection,
   type InvestigationAccepted,
   type InvestigationRequest,
   type Node,
+  type PlanTier,
   type PublicDebate,
   type RunEvent,
   type RunProjection,
@@ -54,12 +110,24 @@ export type ContractErrorCode =
   | "NETWORK_FAILURE"
   | "INVALID_RESPONSE";
 
+/** What a 422 ASK_ALREADY_WAITING says about the person's waiting run. */
+export type ContractWaitingRefusal = Readonly<{ runRef: string; waitsUntil: string; waitsFor?: "OWN_DEBATES" }>;
+
 export class ContractHttpError extends Error {
   constructor(
     readonly code: ContractErrorCode,
     readonly status: number,
     message: string,
-    readonly serverCode: string | null = null
+    readonly serverCode: string | null = null,
+    readonly statement: PublicationRefusalStatement | null = null,
+    /**
+     * Budget spec §2.7: set only for 422 ASK_ALREADY_WAITING whose body parses
+     * as `AskAlreadyWaitingSchema`: the waiting run and its expected start (no
+     * figure), and `waitsFor` when that start waits on the person's own running
+     * debates rather than a reset (final review Part 1b, Important 1). The ask
+     * page shows sentence D with that time when its room re-read fails.
+     */
+    readonly waiting: ContractWaitingRefusal | null = null
   ) {
     super(message);
     this.name = "ContractHttpError";
@@ -79,12 +147,26 @@ function codeForStatus(status: number): ContractErrorCode {
 async function contractErrorForResponse(response: Response): Promise<ContractHttpError> {
   let serverCode: string | null = null;
   let serverMessage: string | null = null;
+  let statement: PublicationRefusalStatement | null = null;
+  let waiting: ContractWaitingRefusal | null = null;
   try {
     const candidate: unknown = await response.json();
+    if (response.status === 409) {
+      const refusal = PublicationContentRefusalSchema.safeParse(candidate);
+      if (refusal.success) statement = refusal.data.statement;
+    }
     if (typeof candidate === "object" && candidate !== null) {
       const body = candidate as Record<string, unknown>;
       serverCode = typeof body.error === "string" && body.error.trim().length > 0 ? body.error : null;
       serverMessage = typeof body.message === "string" && body.message.trim().length > 0 ? body.message : null;
+      const refusal = response.status === 422 ? AskAlreadyWaitingSchema.safeParse(body) : null;
+      if (refusal?.success === true) {
+        waiting = Object.freeze({
+          runRef: refusal.data.run_ref,
+          waitsUntil: refusal.data.waits_until,
+          ...(refusal.data.waits_for === undefined ? {} : { waitsFor: refusal.data.waits_for })
+        });
+      }
     }
   } catch {
     // A non-JSON failure still retains its transport status below.
@@ -92,7 +174,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   const detail = serverCode !== null && serverMessage !== null
     ? `${serverCode}: ${serverMessage}`
     : serverCode ?? serverMessage ?? `Contract request failed with ${response.status}`;
-  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode);
+  return new ContractHttpError(codeForStatus(response.status), response.status, detail, serverCode, statement, waiting);
 }
 
 async function requestJson<T>(
@@ -102,7 +184,9 @@ async function requestJson<T>(
   schema: { parse(value: unknown): T },
   init: RequestInit = {},
   auth: ContractClientAuth,
-  expectedStatus?: number
+  expectedStatus?: number,
+  /** A documented refusal the caller reads as data (P8c: 409 CHECKOUT_PENDING); `null` keeps the error. */
+  recover?: (status: number, body: unknown) => T | null
 ): Promise<T> {
   let response: Response;
   try {
@@ -124,7 +208,15 @@ async function requestJson<T>(
   } catch (error) {
     throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
   }
-  if (!response.ok) throw await contractErrorForResponse(response);
+  if (!response.ok) {
+    if (recover !== undefined) {
+      // A clone, so the error path below still reads the body when the hook declines.
+      const body: unknown = await response.clone().json().catch(() => null);
+      const recovered = recover(response.status, body);
+      if (recovered !== null) return recovered;
+    }
+    throw await contractErrorForResponse(response);
+  }
   if (expectedStatus !== undefined && response.status !== expectedStatus) {
     throw new ContractHttpError(
       "INVALID_RESPONSE",
@@ -154,6 +246,7 @@ async function requestNoContent(
     if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
     const csrf = auth.csrfToken?.() ?? browserCsrfToken();
     if (csrf !== null) headers.set("x-csrf-token", csrf);
+    if (init.body !== undefined) headers.set("content-type", "application/json");
     response = await fetchImplementation(new URL(path, baseUrl), {
       ...init,
       headers,
@@ -221,11 +314,14 @@ const ResendVerificationPublicResponseSchema = exactPublicMessageSchema(RESEND_V
 const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
 
 export interface ContractClient {
+  /** Age gate: answers `refused` (and sets the lockout cookie) for anyone under the minimum age. */
+  checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
   register(
     email: string,
     password: string,
     recoveryEmail: string,
-    adultAffirmed: boolean
+    dateOfBirth: string,
+    legal: RegisterLegalDocuments
   ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
   resendVerification(email: string): Promise<Readonly<{
     message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
@@ -244,12 +340,20 @@ export interface ContractClient {
   listSessions(): Promise<SessionList>;
   revokeSession(sessionId: string): Promise<void>;
   revokeAllSessions(): Promise<{ revoked: number }>;
+  /** Existing accounts without an age record answer `required` (the one-time 8k interstitial). */
+  readAgeConfirmation(): Promise<AgeConfirmationStatus>;
+  /** `refused` freezes the account, ends its sessions and sets the lockout cookie. */
+  confirmAge(dateOfBirth: string): Promise<AgeCheckResult>;
+  /** `required` until the account agrees, once, before its first debate. */
+  readSensitiveDataConsent(): Promise<SensitiveDataConsentStatus>;
+  /** Agrees to the current sensitive-data notice, shown in `locale`. */
+  giveSensitiveDataConsent(locale: string): Promise<SensitiveDataConsentStatus>;
   stepUp(password: string, code: string, authorization?:
     | Readonly<{
       action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
       target_run_id: string;
     }>
-    | Readonly<{ action: "DELETE_ACCOUNT" }>): Promise<{
+    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>): Promise<{
     status: "step_up_complete";
     csrf_token: string;
     step_up_grant?: ({
@@ -259,7 +363,7 @@ export interface ContractClient {
       expires_at: string;
     } | {
       token: string;
-      action: "DELETE_ACCOUNT";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION";
       expires_at: string;
     }) | undefined;
   }>;
@@ -292,7 +396,48 @@ export interface ContractClient {
   claimLegacyRuns(legacyToken:string):Promise<{
     status:"CLAIMED"|"NO_MATCH";claimed_count:number;
   }>;
+  /** Paid plans L4: the documents this person must accept again before the page shows. */
+  getLegalStatus(locale: string): Promise<LegalStatusResponse>;
+  acceptLegal(input: LegalAcceptRequest): Promise<void>;
+  /** Paid plans G3a: whether this address may sign up and pay — two booleans, never the country. */
+  getGeoAvailability(): Promise<GeoAvailabilityResponse>;
+  readAccountEmail(): Promise<AccountEmail>;
+  requestEmailChange(newEmail: string, stepUpGrant: string): Promise<EmailChangePending>;
+  resendEmailChange(): Promise<EmailChangePending>;
+  cancelEmailChange(): Promise<void>;
+  confirmEmailChange(token: string): Promise<{ status: "CONFIRMED" }>;
+  cancelEmailChangeByLink(token: string): Promise<{ status: "CANCELLED" }>;
   submitAsk(input: AskRequest): Promise<AskAccepted>;
+  /** Budget spec §2.7: the room this ask would find — a word, never a figure. */
+  getAskRoom(input: Readonly<{
+    plan_tier: PlanTier;
+    composition_budget_tier: "low" | "medium" | "high";
+    depth: number;
+  }>): Promise<AskRoomResponse>;
+  /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
+  getBillingUsage(): Promise<BillingUsageResponse>;
+  /** Paid-plans spec §2.5.3: the public plans list; 404 when billing is off. */
+  getBillingPlans(): Promise<BillingPlansResponse>;
+  createBillingQuote(input: BillingQuoteRequest): Promise<BillingQuoteResponse>;
+  /** A payment already on its way for the open checkout resolves as `{state: "PENDING", charge_ref}` (409 CHECKOUT_PENDING). */
+  startBillingCheckout(input: BillingCheckoutRequest): Promise<BillingCheckoutResponse | BillingCheckoutPendingResponse>;
+  getBillingCharge(chargeRef: string): Promise<BillingChargeStatusResponse>;
+  getBillingSubscription(): Promise<BillingSubscriptionResponse>;
+  getBillingInvoices(): Promise<BillingInvoicesResponse>;
+  downgradeSubscription(planId: "PLUS" | "PRO"): Promise<void>;
+  cancelSubscription(): Promise<void>;
+  revokeSubscriptionCancel(): Promise<void>;
+  /** P12c: the prorated upgrade price with tax and the new plan's recurring total; spend it with `upgradeSubscription`. */
+  quoteSubscriptionUpgrade(planId: "PRO" | "MAX"): Promise<BillingUpgradeQuoteResponse>;
+  upgradeSubscription(planId: "PRO" | "MAX", quoteRef: string): Promise<BillingUpgradeResponse>;
+  /** P12d: withdraw within the 14 days with a WITHDRAW_SUBSCRIPTION step-up grant; `refund` null = the owner settles it. */
+  withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
+  /** P12e: the card form's signed 1.00 USD authorization order, released once the new card is seen. */
+  startCardChange(): Promise<BillingCardChangeResponse>;
+  /** P13 (A25): always `{status: "ACCEPTED"}`; a link reaches the billing address only if there is a plan to cancel. */
+  requestCancelLink(email: string): Promise<{ status: "ACCEPTED" }>;
+  /** P13: spends the emailed link's token once; 404 CANCEL_LINK_INVALID when it is unknown, spent or expired. */
+  cancelByToken(token: string): Promise<void>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -363,11 +508,17 @@ export function createContractClient(
     }
   };
   return Object.freeze({
+    checkAge: (dateOfBirth: string) => request(
+      "/v1/auth/age-check",
+      AgeCheckResultSchema,
+      { method: "POST", body: JSON.stringify({ date_of_birth: dateOfBirth }) }
+    ),
     register: (
       email: string,
       password: string,
       recoveryEmail: string,
-      adultAffirmed: boolean
+      dateOfBirth: string,
+      legal: RegisterLegalDocuments
     ) => request(
       "/v1/auth/register",
       RegistrationPublicResponseSchema,
@@ -375,9 +526,25 @@ export function createContractClient(
           email,
           password,
           recovery_email: recoveryEmail,
-          adult_affirmed: adultAffirmed
+          date_of_birth: dateOfBirth,
+          // Paid plans L3b (R3-2): the displayed documents, beside the age gate's date.
+          terms: legal.terms,
+          privacy: legal.privacy,
+          locale: legal.locale
         }) },
       202
+    ),
+    readAgeConfirmation: () => request("/v1/auth/age-confirmation", AgeConfirmationStatusSchema),
+    confirmAge: (dateOfBirth: string) => request(
+      "/v1/auth/age-confirmation",
+      AgeCheckResultSchema,
+      { method: "POST", body: JSON.stringify({ date_of_birth: dateOfBirth }) }
+    ),
+    readSensitiveDataConsent: () => request("/v1/account/sensitive-data-consent", SensitiveDataConsentStatusSchema),
+    giveSensitiveDataConsent: (locale: string) => request(
+      "/v1/account/sensitive-data-consent",
+      SensitiveDataConsentStatusSchema,
+      { method: "POST", body: JSON.stringify({ notice_version: SENSITIVE_DATA_NOTICE_VERSION, locale }) }
     ),
     resendVerification: (email: string) => request(
       "/v1/auth/resend-verification",
@@ -448,7 +615,7 @@ export function createContractClient(
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         target_run_id: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" }>) => request(
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>) => request(
       "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,
@@ -498,6 +665,27 @@ export function createContractClient(
     readAccountErasure:()=>request(
       "/v1/account/erasure",AccountErasureStatusSchema
     ),
+    readAccountEmail: () => request("/v1/account/email", AccountEmailSchema),
+    requestEmailChange: (newEmail: string, stepUpGrant: string) => request(
+      "/v1/account/email/change", EmailChangePendingSchema,
+      { method: "POST", body: JSON.stringify(EmailChangeRequestSchema.parse({
+          new_email: newEmail, step_up_grant: stepUpGrant
+        })) }
+    ),
+    resendEmailChange: () => request(
+      "/v1/account/email/change/resend", EmailChangePendingSchema, { method: "POST", body: "{}" }
+    ),
+    cancelEmailChange: () => requestNoContent(
+      root.href, fetchImplementation, "/v1/account/email/change", { method: "DELETE" }, auth
+    ),
+    confirmEmailChange: (token: string) => request(
+      "/v1/account/email/change/confirm", EmailChangeConfirmedSchema,
+      { method: "POST", body: JSON.stringify(EmailChangeLinkRequestSchema.parse({ token })) }
+    ),
+    cancelEmailChangeByLink: (token: string) => request(
+      "/v1/account/email/change/cancel", EmailChangeCancelledSchema,
+      { method: "POST", body: JSON.stringify(EmailChangeLinkRequestSchema.parse({ token })) }
+    ),
     cancelAccountErasure:(cancellationRef:string)=>request(
       "/v1/account/erasure/cancel",AccountErasureCancelledSchema,
       { method:"POST",body:JSON.stringify(AccountErasureCancelRequestSchema.parse({
@@ -514,7 +702,77 @@ export function createContractClient(
           legacy_token:legacyToken
         })) }
     ),
+    getLegalStatus: (locale: string) => request(
+      `/v1/account/legal-status?locale=${encodeURIComponent(locale)}`,
+      LegalStatusResponseSchema
+    ),
+    acceptLegal: (input: LegalAcceptRequest) => requestNoContent(
+      root.href, fetchImplementation, "/v1/account/legal-accept",
+      { method: "POST", body: JSON.stringify(input) }, auth
+    ),
+    getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    getAskRoom: (input: Readonly<{
+      plan_tier: PlanTier;
+      composition_budget_tier: "low" | "medium" | "high";
+      depth: number;
+    }>) => request(`/v1/asks/room?${new URLSearchParams({
+      plan_tier: input.plan_tier,
+      composition_budget_tier: input.composition_budget_tier,
+      depth: String(input.depth)
+    }).toString()}`, AskRoomResponseSchema),
+    getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
+    getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),
+    createBillingQuote: (input: BillingQuoteRequest) => request(
+      "/v1/billing/quote", BillingQuoteResponseSchema,
+      { method: "POST", body: JSON.stringify(BillingQuoteRequestSchema.parse(input)) }
+    ),
+    startBillingCheckout: (input: BillingCheckoutRequest) => requestJson<BillingCheckoutResponse | BillingCheckoutPendingResponse>(
+      root.href, fetchImplementation, "/v1/billing/checkout", BillingCheckoutResponseSchema,
+      { method: "POST", body: JSON.stringify(BillingCheckoutRequestSchema.parse(input)) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const pending = BillingCheckoutPendingErrorSchema.safeParse(body);
+        return pending.success ? Object.freeze({ state: "PENDING" as const, charge_ref: pending.data.charge_ref }) : null;
+      }
+    ),
+    getBillingCharge: (chargeRef: string) => request(
+      `/v1/billing/charges/${encodeURIComponent(chargeRef)}`, BillingChargeStatusResponseSchema
+    ),
+    getBillingSubscription: () => request("/v1/billing/subscription", BillingSubscriptionResponseSchema),
+    getBillingInvoices: () => request("/v1/billing/invoices", BillingInvoicesResponseSchema),
+    downgradeSubscription: (planId: "PLUS" | "PRO") => requestNoContent(
+      root.href, fetchImplementation, "/v1/billing/subscription/downgrade",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan_id: planId }) },
+      auth
+    ),
+    cancelSubscription: () => requestNoContent(
+      root.href, fetchImplementation, "/v1/billing/subscription/cancel", { method: "POST" }, auth
+    ),
+    revokeSubscriptionCancel: () => requestNoContent(
+      root.href, fetchImplementation, "/v1/billing/subscription/cancel-revoke", { method: "POST" }, auth
+    ),
+    quoteSubscriptionUpgrade: (planId: "PRO" | "MAX") => request(
+      "/v1/billing/subscription/upgrade-quote", BillingUpgradeQuoteResponseSchema,
+      { method: "POST", body: JSON.stringify({ plan_id: planId }) }
+    ),
+    upgradeSubscription: (planId: "PRO" | "MAX", quoteRef: string) => request(
+      "/v1/billing/subscription/upgrade", BillingUpgradeResponseSchema,
+      { method: "POST", body: JSON.stringify({ plan_id: planId, quote_ref: quoteRef }) }
+    ),
+    withdrawSubscription: (stepUpGrant: string) => request(
+      "/v1/billing/subscription/withdraw", BillingWithdrawResponseSchema,
+      { method: "POST", body: JSON.stringify({ step_up_grant: stepUpGrant }) }
+    ),
+    startCardChange: () => request("/v1/billing/subscription/card", BillingCardChangeResponseSchema, { method: "POST" }),
+    requestCancelLink: (email: string) => request(
+      "/v1/billing/cancel-link", BillingCancelLinkAcceptedSchema,
+      { method: "POST", body: JSON.stringify({ email }) }, 202
+    ),
+    cancelByToken: (token: string) => requestNoContent(
+      root.href, fetchImplementation, "/v1/billing/cancel-by-token",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) }, auth
+    ),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),

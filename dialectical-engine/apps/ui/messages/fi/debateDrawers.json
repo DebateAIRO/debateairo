@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "Puutteet",
   "debateDrawers.node.honestyAriaLabel": "V3-solmun rehellisyystiedot",
   "debateDrawers.node.noArgumentText": "Argumenttitekstiä ei vielä ole.",
-  "debateDrawers.node.noCompletedReview": "Tälle solmulle ei ole kirjattu toisen laatijan valmistunutta arviota.",
+  "debateDrawers.node.noCompletedReview": "Tälle solmulle ei ole kirjattu toisen kehittäjän mallin valmistunutta arviota.",
   "debateDrawers.node.noPreviousGenerations": "Aiempia luonteja ei ole.",
   "debateDrawers.node.noScoringRecommendation": "Tälle argumentille ei ole saatavilla pisteytyssuositusta.",
   "debateDrawers.node.notUseful": "ei hyödyllinen",

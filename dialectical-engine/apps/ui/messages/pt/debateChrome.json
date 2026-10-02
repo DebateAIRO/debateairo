@@ -1,9 +1,15 @@
 {
   "debateChrome.aiNotice": "Tudo neste debate — argumentos, revisões, pontuações e o veredito — é gerado por modelos de IA, marcado de forma legível por máquina e pode conter imprecisões.",
+  "debateChrome.status.waiting": "A aguardar o início. O seu debate começará sozinho às {time}.",
+  "debateChrome.status.waitingOwnDebates": "Os seus outros debates estão a usar, por agora, o resto do seu limite. Este debate começará sozinho assim que um deles terminar.",
   "debateChrome.backToLibrary": "← Voltar à biblioteca",
   "debateChrome.loading": "A carregar…",
   "debateChrome.error.claimGenerationFailed": "Falha ao gerar a alegação",
-  "debateChrome.error.debateGenerationFailed": "Falha na geração do debate: {reason}",
+  "runFailure.NOT_STARTED": "Algo correu mal do nosso lado antes de este debate começar. Por favor, pergunte novamente.",
+  "runFailure.MODELS_UNAVAILABLE": "Não foi possível iniciar este debate porque os modelos de IA necessários não estavam disponíveis. Por favor, tente novamente daqui a algum tempo.",
+  "runFailure.RUN_LIMIT_REACHED": "Este debate atingiu o seu limite antes de conseguir chegar a uma resposta.",
+  "runFailure.DAILY_LIMIT_REACHED": "O limite de hoje para debates esgotou-se enquanto este debate estava a começar. Por favor, pergunte novamente amanhã.",
+  "runFailure.STOPPED": "Este debate parou a meio devido a um problema do nosso lado. Por favor, volte a fazer a sua pergunta.",
   "debateChrome.error.unableToLoadDebate": "Não foi possível carregar o debate",
   "debateChrome.error.unableToLoadScoring": "Não foi possível carregar a pontuação",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Não foi possível carregar a simulação de profundidade adaptativa",
@@ -284,5 +290,6 @@
   "requestFailure.kind.UNREADABLE": "Não foi possível ler a resposta do coordenador, pelo que se desconhece o resultado.",
   "requestFailure.kind.PLAN_TIER_INVALID": "O coordenador recusou a escolha do plano. Escolha Gratuito ou Premium e tente novamente.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "O coordenador recusou o pedido: um modelo necessário para este plano não está disponível neste momento. Tente novamente mais tarde ou escolha o outro plano.",
+  "requestFailure.kind.ALREADY_WAITING": "Só uma pergunta pode aguardar de cada vez. Faça esta depois de o seu debate em espera ter começado.",
   "requestFailure.kind.UNCLASSIFIED": "A falha ocorreu antes de ser recebida qualquer resposta, pelo que se desconhece o resultado. Não se trata de uma decisão tomada pelo coordenador."
 }

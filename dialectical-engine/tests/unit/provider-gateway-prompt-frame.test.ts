@@ -145,3 +145,38 @@ describe("V-11 layer 5 — the tripwire signals are recorded on the run, never g
     expect(artifacts[0]!.metadata).not.toHaveProperty("prompt_tripwires");
   });
 });
+
+describe("S01 R4 — the content rule is part of the door", () => {
+  // Property: every shape in which the in-frame rule is altered or missing is refused
+  // before the fetch boundary, even when a verbatim copy sits elsewhere (REV-S01 p1 ct N1 + sd N1).
+  const MUTATIONS: Readonly<Record<string, (system: string, rule: string) => string>> = {
+    "deleted": (system, rule) => system.replace(rule, ""),
+    "one character changed": (system) => system.replace("dehumanises", "dehumanizes"),
+    "one character changed after rule 3": (system) => system.replace("someone else to post.", "someone else to post!"),
+    "changed only in case": (system) => system.replace("Never deny", "never deny"),
+    "altered, verbatim copy after the end marker": (system, rule) => `${system.replace("Never produce", "Always produce")}\n${rule}`,
+    "altered, verbatim copy under a second banner": (system, rule) => `--- SAFETY FRAME\n${rule}\n\n${system.replace("Never produce", "Always produce")}`
+  };
+  it.each(Object.keys(MUTATIONS))("refuses a rule %s without posting", async (mutation) => {
+    const { CONTENT_RULE_TEXT } = await import("@debateai/providers");
+    const { vi } = await import("vitest");
+    const fetchImplementation = vi.fn(async () => new Response(JSON.stringify({
+      id: "cmpl-1", model: "m1", choices: [{ message: { content: '{"verdict":"yes"}' }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+    }), { status: 200 }));
+    const gateway = new OpenAICompatibleProviderGateway({
+      endpoint: "http://127.0.0.1:1/v1", model: "m1", maker: "maker-1",
+      assertNoOpenWriteTransaction: () => undefined, persistRawArtifact: async () => "artifact:1",
+      appendLedgerEntry: async () => "ledger:1", fetchImplementation
+    });
+    const built = buildFramedPrompt({ contract: CONTRACT, material: [] }).packet;
+    const packet = { messages: built.messages.map((message, i) => i === 0 ? {
+      ...message, content: MUTATIONS[mutation]!(message.content, CONTENT_RULE_TEXT)
+    } : message) };
+    expect(packet.messages[0]!.content).not.toBe(built.messages[0]!.content);
+    await expect(gateway.call({ ...REQUEST, packet })).rejects.toMatchObject({
+      code: "PROMPT_FRAME_ABSENT", message: "The safety frame carries no content rule"
+    });
+    expect(fetchImplementation).toHaveBeenCalledTimes(0);
+  });
+});

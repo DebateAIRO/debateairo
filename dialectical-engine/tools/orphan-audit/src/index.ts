@@ -10,11 +10,13 @@ const rows: readonly Row[] = [
   ["kernel", "packages/kernel", []],
   ["crypto", "packages/crypto", []],
   ["published-arithmetic", "packages/published-arithmetic", []],
+  ["legal-manifest", "packages/legal-manifest", []],
   ["propagation", "packages/propagation", ["kernel", "published-arithmetic"]],
   ["battery-decision", "packages/battery/decision", ["kernel"]],
   ["contract", "packages/contract", ["kernel"]],
-  ["db", "packages/db", ["kernel", "crypto"]],
+  ["db", "packages/db", ["kernel", "crypto", "billing-core"]],
   ["register", "packages/register", ["kernel", "db", "contract"]],
+  ["geo", "packages/geo", ["kernel", "register"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
   ["providers", "packages/providers", ["kernel", "register", "ledger"]],
   ["graph", "packages/graph", ["kernel", "db", "ledger", "register"]],
@@ -26,20 +28,35 @@ const rows: readonly Row[] = [
   ["settlement", "packages/settlement", ["kernel", "db", "ledger", "providers", "register", "graph"]],
   ["valuation", "packages/valuation", ["kernel", "db", "ledger", "register", "graph", "propagation"]],
   ["budget", "packages/budget", ["kernel", "db", "ledger", "register", "contract"]],
+  // Paid plans (spec 2026-09-29 §2.4, R1 A26(a), ruling R-1): pure billing rules.
+  // The manifest lists kernel alone: the plan rows (register) and the person-window
+  // types (budget) are TYPE imports, so db and the connector packages may depend
+  // on billing-core without a cycle (register already depends on db).
+  ["billing-core", "packages/billing-core", ["kernel"]],
+  // Paid plans (A26(a)): xMoney order signing, notice decryption and (P3b) the HTTP client.
+  ["payments-xmoney", "packages/payments-xmoney", ["kernel"]],
+  // Paid plans (A26(a)): the Quaderno tax connector over plain fetch (P4).
+  ["tax-quaderno", "packages/tax-quaderno", ["kernel", "billing-core"]],
+  // Paid plans (A26(a)): the SmartBill invoice connector over plain fetch (P5).
+  ["invoice-smartbill", "packages/invoice-smartbill", ["kernel", "billing-core"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
   ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
   // Verdict story (2026-09-26): the story package. The edges its later tasks need
   // (register for the policy rows, db/crypto/ledger for the repository and the
   // enrichment reader) are declared with it, so the row is written once.
   ["story", "packages/story", ["kernel", "contract", "providers", "budget", "register", "db", "crypto", "ledger"]],
+  // Paid plans (spec 2026-09-29 §2.5.10, AMENDMENTS-R1 A26(a)): the email catalogues and renderer. Pure data plus
+  // node:fs reads of its own catalogues; its one workspace edge is billing-core, for SELLER_COMPANY (P6a's mirror of
+  // the legal notice's company facts, ruling R3-4). billing-core depends on kernel alone, so there is no cycle.
+  ["mail-templates", "packages/mail-templates", ["billing-core"]],
   // `support-kb` is DECLARED, not a violation: V's support program depends on
   // the package in shipped code. `@debateai/support-kb` entered apps/api's and
   // apps/runner's manifests on the second merge parent at 9c68ceb3 ("feat(support):
   // SUP-01 C1 — schema, role grants, kill switch, reservation, status"); the table
   // lagged the product only because this audit was crashing on the retired `web`
   // manifest read and had never reported a verdict. Both rows are the same commit.
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "providers", "support-kb", "story"]],
-  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "contract", "support-kb", "story"]],
+  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-xmoney", "tax-quaderno", "invoice-smartbill", "mail-templates"]],
+  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
   // The `web` row retired with its surface: `web/` is retired in favour of

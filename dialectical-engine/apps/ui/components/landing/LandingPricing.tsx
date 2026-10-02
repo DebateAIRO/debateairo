@@ -4,7 +4,10 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /* The document's closing CTA: centred, with the pro/rule/con motif above it.
    The pricing line carries the id the nav points at. */
-export function LandingPricing({ catalog }: { catalog: MessageCatalog }): JSX.Element {
+export function LandingPricing({
+  catalog,
+  lowestPaidPrice
+}: { catalog: MessageCatalog; lowestPaidPrice: string | null }): JSX.Element {
   return (
     <section
       id="start"
@@ -32,7 +35,12 @@ export function LandingPricing({ catalog }: { catalog: MessageCatalog }): JSX.El
         </a>
       </div>
       <p id="pricing" className="lpPricing">
-        {t(catalog, "home.pricingCopy")}
+        {lowestPaidPrice === null ? t(catalog, "home.pricingCopyFree") : (
+          <>
+            {t(catalog, "home.pricingCopy", { price: lowestPaidPrice })}{" "}
+            <a href="/pricing">{t(catalog, "home.pricingLink")}</a>
+          </>
+        )}
       </p>
       <footer id="ai-transparency" className="lpAiTransparency">
         <AiNotice catalog={catalog} variant="block" body={t(catalog, "home.aiLandingBlock")} />
