@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { addBusinessDays, foldSubscription } from "@debateai/billing-core";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { addYearsClamped } from "../../apps/api/src/billing/renewal-rules.js";
@@ -238,9 +238,10 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "ENDED", data: { cause: "CANCEL" } });
   });
 
-  it("prices each retry afresh after a dunning that began with no charge, and recovers when the tax service answers (Q-1)", async () => {
+  it("prices a retry afresh after a dunning that began with no charge, charges the announced total and recovers (Q-1, A7)", async () => {
     const { paid, end, failedAt } = await unpricedDunning();
-    // A day on the tax service answers: the retry is quoted now, charged as attempt 2, and VERIFY_PAYMENT recovers.
+    // A day on the tax service answers: the retry is quoted now and, its total being the announced one (A7), charged
+    // as attempt 2; VERIFY_PAYMENT recovers.
     h.tax.unavailableCountries.delete("DE");
     h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
     await h.maintenance.runOnce();
@@ -255,6 +256,53 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     h.clock.advance(11 * MINUTE);
     await h.maintenance.runOnce();
     expect(await renewals(paid.subscriptionId)).toHaveLength(1);
+  });
+
+  it("charges a retry exactly the failed attempt's total after a VAT-rate change, never re-priced (P2-M10)", async () => {
+    const { paid, failedAt } = await firstFailure();
+    const [failed] = await renewals(paid.subscriptionId);
+    expect(failed).toMatchObject({ attempt: 1, totalMicros: 24_200_000 });
+    const failedQuote = (await h.repository.quote(failed!.quoteId!, paid.ownerRef))!;
+    // Romania's VAT rate changes while the plan is past due: a fresh quote would now be 23.80.
+    h.tax.rateOverride.set("RO", 1_900);
+    const quotes = vi.spyOn(h.tax, "quote");
+    h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
+    await h.maintenance.runOnce();
+    const retry = (await renewals(paid.subscriptionId)).at(-1)!;
+    expect(retry).toMatchObject({
+      attempt: 2, netMicros: failed!.netMicros, taxMicros: failed!.taxMicros, totalMicros: 24_200_000
+    });
+    // Its own quote row, a copy of the failed attempt's prices; the tax service was not asked again.
+    expect(retry.quoteId).not.toBe(failed!.quoteId);
+    expect(await h.repository.quote(retry.quoteId!, paid.ownerRef)).toMatchObject({
+      kind: "RENEWAL", planId: failedQuote.planId, netMicros: failedQuote.netMicros, taxMicros: failedQuote.taxMicros,
+      totalMicros: failedQuote.totalMicros, taxRateBasisPoints: failedQuote.taxRateBasisPoints, taxCountry: "RO",
+      createdAt: h.clock.now
+    });
+    expect(quotes).not.toHaveBeenCalled();
+    quotes.mockRestore();
+    await h.worker.drain(10);
+    expect((await kinds(paid.subscriptionId)).at(-1)).toBe("RECOVERED");
+  });
+
+  it("never charges a changed total after a dunning that began with no charge: the attempt fails with no charge (P2-M10, A7)", async () => {
+    const { paid, end, failedAt } = await unpricedDunning();
+    const rebills = h.xmoney.rebillsFor(paid.transaction.orderId);
+    // The tax service answers again, but at a rate the person was never told (19 % then, 20 % now).
+    h.tax.unavailableCountries.delete("DE");
+    h.tax.rateOverride.set("DE", 2_000);
+    h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
+    await h.maintenance.runOnce();
+    expect(await renewals(paid.subscriptionId)).toEqual([]);
+    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(rebills);
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({
+      kind: "PAST_DUE", data: { attempt: 2, reason: "RETRY_TOTAL_CHANGED", first_failed_at: failedAt.toISOString() }
+    });
+    expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`M5B:${paid.subscriptionId}:${end.toISOString()}:2`);
+    // A second pass the same day records nothing more.
+    h.clock.advance(11 * MINUTE);
+    await h.maintenance.runOnce();
+    expect((await kinds(paid.subscriptionId)).filter((kind) => kind === "PAST_DUE")).toHaveLength(2);
   });
 
   it("ends the plan with M6 when the tax service stays down through every retry (Q-1)", async () => {

@@ -12,7 +12,7 @@ import { XMoneyPaymentFailedError, type XMoneyClient } from "@debateai/payments-
 import type { BillingPlans, BillingPolicy, PlanId } from "@debateai/register";
 import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
-import { sealQuoteLocation, type QuoteLocation } from "./records.js";
+import { openQuoteLocation, sealQuoteLocation, type QuoteLocation } from "./records.js";
 import {
   dunningProgress, ordersHoldingCharge, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingMs,
   renewalPendingUntil, unverifiedLookBackMs
@@ -54,6 +54,12 @@ export type RenewalDeps = Readonly<{
 }>;
 
 export type PricedRenewal = Readonly<{ planId: PlanId; location: QuoteLocation; tax: TaxQuote }>;
+/**
+ * P2-M10: what a dunning retry may charge. `PRICED`: the failed attempt's own priced total (or, with no priced attempt,
+ * a fresh total A7 needs no notice for). `CHANGED`: only a total the person was never told about is left, so nothing
+ * is charged.
+ */
+export type RetryPrice = Readonly<{ kind: "PRICED"; priced: PricedRenewal }> | Readonly<{ kind: "CHANGED" }>;
 /**
  * `invalid`: subscriptions whose history does not fold, left out by P1b's due list this tick (D5 5d). `dunning`:
  * renewals whose tax service stayed down past Q-1's window, dunned with no charge. `held`: sent renewals kept on
@@ -330,7 +336,7 @@ export class RenewalService {
     }
     const created = await this.createCharge(state, priced, periodStart, now);
     if (created === null) return "skipped";
-    await this.submit(created.charge, created.state, now);
+    await this.submit(created.charge, created.state);
     return "charged";
   }
 
@@ -361,6 +367,46 @@ export class RenewalService {
     // P4's error as it is: TAX_SERVICE_UNAVAILABLE (an outage) and TAX_SERVICE_REFUSED (permanent until fixed) differ.
     const tax = await quoteTaxAt(this.deps.tax, this.deps.policy, context, netMicros, now);
     return Object.freeze({ planId, location: context.quoteLocation, tax });
+  }
+
+  /**
+   * P2-M10 (controller ruling, 2026-10-02): a dunning retry charges EXACTLY the priced total of the period's latest
+   * failed attempt that had a charge, never a fresh quote: the retry's quote row is a copy of that attempt's (the same
+   * plan, location, net, tax, rate and total), so a tax change during the dunning never changes what the card is
+   * asked for, and the tax service is not called. That total cannot be reused when no attempt of the period was ever
+   * priced (Q-1: the renewal and every retry so far found the tax service down) or when the plan to charge is no longer
+   * the one that attempt priced. Then A7 decides on a fresh quote: one equal to the announced total is charged (the
+   * person was told that amount), any other is `CHANGED` and is never charged; a changed amount waits for an A7 notice
+   * (spec §2.5.5), which only a later period gives. A fresh quote's tax errors go back to the caller as they are (Q-1).
+   */
+  async retryPrice(state: SubscriptionState, periodStart: Date, attempt: number, now: Date): Promise<RetryPrice> {
+    const planId = state.scheduledDowngradePlanId ?? state.planId;
+    const failed = (await this.deps.repository.chargesForSubscription(state.subscriptionId))
+      .filter((charge) => charge.kind === "RENEWAL" && charge.periodStart.getTime() === periodStart.getTime()
+        && charge.attempt < attempt && charge.quoteId !== null)
+      .sort((left, right) => right.attempt - left.attempt)[0];
+    if (failed !== undefined) {
+      const quote = await this.deps.repository.quote(failed.quoteId!, state.ownerRef);
+      if (quote === null || quote.totalMicros !== failed.totalMicros) {
+        throw new TypedDomainError("BILLING_RETRY_QUOTE_MISSING", "a failed renewal attempt without its own quote");
+      }
+      if (quote.planId === planId) {
+        return Object.freeze({ kind: "PRICED", priced: Object.freeze({
+          planId,
+          location: openQuoteLocation(this.deps.recordsKey, quote.quoteId, quote.locationCiphertext),
+          tax: Object.freeze({
+            netMicros: quote.netMicros, taxMicros: quote.taxMicros, totalMicros: quote.totalMicros,
+            taxRateBasisPoints: quote.taxRateBasisPoints, taxName: quote.taxName, taxCountry: quote.taxCountry,
+            taxRegion: quote.taxRegion, status: quote.taxStatus, reference: quote.quadernoRef
+          })
+        }) });
+      }
+    }
+    const fresh = await this.freshQuote(state, now);
+    if (state.announcedTotalMicros !== null && fresh.tax.totalMicros === state.announcedTotalMicros) {
+      return Object.freeze({ kind: "PRICED", priced: fresh });
+    }
+    return Object.freeze({ kind: "CHANGED" });
   }
 
   /**
@@ -488,8 +534,8 @@ export class RenewalService {
   }
 
   /**
-   * A2: a dunning retry is a NEW charge row for the same period with the next attempt number, priced afresh (Q-1: no
-   * charge without a fresh quote): its own RENEWAL quote row, never a copy of an earlier attempt. Written under the
+   * A2: a dunning retry is a NEW charge row for the same period with the next attempt number, at the price
+   * `retryPrice` chose (P2-M10: the failed attempt's own total): its own RENEWAL quote row. Written under the
    * owner lock only while the subscription, folded again inside it, is still PAST_DUE on this period with no cancel
    * requested, and no charge of this attempt or a later one exists (spec §2.5.6: cancel means no renewal); a pending
    * erasure is asked right before the lock. `null`: nothing was written.
@@ -550,15 +596,20 @@ export class RenewalService {
 
   /**
    * Called only under the subscription lease, after the call's marker (the charge's REQUESTED, or a later
-   * `RESUBMIT_STARTED`) is committed. Never retries a call whose outcome it could not see.
+   * `RESUBMIT_STARTED`) is committed. Never retries a call whose outcome it could not see. P2-I7: every row the
+   * call's answer writes (SUBMITTED, SUBMIT_UNKNOWN, the not-sent REQUESTED, a refusal's FAILED, the hold and the
+   * check) is dated by the clock read when the call returned, never by the caller's `now`: A2's waits (the minute
+   * before the first look, the 30 quiet minutes before the one resubmission, the not-sent backoff) start when the
+   * call really ended, however long the pass that made it had already run.
    */
-  async submit(charge: ChargeRow, state: SubscriptionState, now: Date): Promise<void> {
+  async submit(charge: ChargeRow, state: SubscriptionState): Promise<void> {
     let submitted: { transactionId: string };
     try {
       submitted = await this.deps.xmoney.rebill({
         orderId: state.xmoneyOrderId!, customerId: state.xmoneyCustomerId!, amountDecimal: microsToDecimal(charge.totalMicros)
       });
     } catch (error) {
+      const now = this.deps.clock();
       const code = error instanceof TypedDomainError ? error.code : null;
       if (code === "XMONEY_PAYMENT_FAILED" || code === "XMONEY_REFUSED") {
         const declinedTransaction = error instanceof XMoneyPaymentFailedError ? error.transactionId : null;
@@ -578,7 +629,7 @@ export class RenewalService {
       if (charge.attempt === 1) await this.holdPending(state, charge.periodStart, now, recorded);
       return;
     }
-    await this.linkTransaction(charge, submitted.transactionId, now);
+    await this.linkTransaction(charge, submitted.transactionId, this.deps.clock());
   }
 
   private async linkTransaction(charge: ChargeRow, transactionId: string, now: Date): Promise<void> {
@@ -685,7 +736,7 @@ export class RenewalService {
     // becomes SUBMIT_INTERRUPTED 10 minutes on, so it is never submitted blind a third time.
     await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
       chargeEvent(charge.chargeId, "REQUESTED", now, { xmoneyTransactionId: null, amountMicros: charge.totalMicros, errorCode: RESUBMIT_STARTED })));
-    await this.submit(charge, fresh, now);
+    await this.submit(charge, fresh);
     return true;
   }
 
