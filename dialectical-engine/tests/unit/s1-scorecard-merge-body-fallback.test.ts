@@ -8,19 +8,28 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { Judge } from "@debateai/judgement";
-import type { ProviderCallRequest, ProviderCallResult, ProviderGateway } from "@debateai/providers";
+import { TypedDomainError } from "@debateai/kernel";
+import {
+  ProviderCallFailedError,
+  type ProviderCallRequest,
+  type ProviderCallResult,
+  type ProviderGateway
+} from "@debateai/providers";
 import type { RoleAssignment, RoleSeat, SeatCandidate } from "@debateai/scorecard";
 import {
   FIRST_POSITION_CALL_SITE_KEY,
   PANEL_DEGRADED_SINGLE_VOICE_MARK,
   PANEL_PARTIAL_MARK,
   buildAssignedRunSeatBook,
+  callBodyRoleWithFallback,
   panelDegradationOf,
   providerCallSharedWall,
   substitutionReason,
   type ConfiguredSeatMaker,
-  type RouteHealth
+  type RouteHealth,
+  type ServeRoleMaker
 } from "@debateai/runner";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 /** A gateway that records every request it is handed, and answers "{}" (a judge refuses that AFTER the call). */
 function gateway(label: string, log: ProviderCallRequest[] = []): ProviderGateway {
@@ -87,6 +96,28 @@ describe("S1a · B9's first-call rules read the key without its seat marker", ()
     expect(substitutionReason("MONEY", "JUDGE:seat:runnerUp")).toBe("RUN_FIRST_CALL");
     expect(substitutionReason("MONEY", "JUDGE:root:secondary:seat:main")).toBe("RUN_ARGUING");
     expect(substitutionReason("ALLOWANCE", "JUDGE:seat:main")).toBe("PERSON");
+  });
+
+  // Budget spec §2.9 ("The first call"), B9c: on the first position's own call a cheaper maker whose transport died
+  // did not refuse, so its ProviderCallFailedError travels and root 0's cooldown holds and retries. On an assigned run
+  // that call reaches the gateway under the seat caller's key, so the rule must read the key without its seat marker.
+  it("hands back a cheaper maker's dead transport on the first call under either seat marker, and nowhere else", async () => {
+    const answering = (providerRef: string, failure: Error): ServeRoleMaker => Object.freeze({
+      providerRef, provider: { call: async (): Promise<ProviderCallResult> => { throw failure; } }
+    });
+    const firstCall = (callSiteKey: string): ProviderCallRequest => Object.freeze({
+      runId: "run:s1a", subjectItemId: "work:s1a", callSiteKey, role: "JUDGE" as const, lane: "served" as const,
+      bound: Object.freeze({ maxAttempts: 3, tokenCeiling: 2_048, deadlineMs: 180_000 }),
+      contractHash: "c".repeat(64), providerRef: "provider:planned", packet: framedFixturePacket("Judge the question")
+    });
+    for (const key of ["JUDGE:seat:main", "JUDGE:seat:runnerUp", "JUDGE:root:secondary:seat:main"]) {
+      const refusal = new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "test-layer: does not fit");
+      const died = new ProviderCallFailedError(new Error("test-layer transport down"), 1, "FAILED", "ledger:s1a:dead");
+      const planned = answering("provider:planned", refusal);
+      const broken = answering("provider:broken", died);
+      const outcome = callBodyRoleWithFallback({ planned, eligible: [planned, broken], prices: new Map(), request: firstCall(key) });
+      await expect(outcome, key).rejects.toBe(key === "JUDGE:root:secondary:seat:main" ? refusal : died);
+    }
   });
 });
 

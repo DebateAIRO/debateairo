@@ -2658,9 +2658,10 @@ export interface BodyCallOutcome<T extends ServeRoleMaker> {
  *    ends the search (J24: a sealed identity is substituted for cost only).
  * Nobody serves → the PLANNED refusal travels, as it always has: a clean MONEY,
  * DAILY or ALLOWANCE stop while arguing, and the answer is still written (budget
- * spec §1.1, §2.9). On the first position's own call, a cheaper maker whose
- * transport died hands its ProviderCallFailedError back, so the cooldown holds
- * and retries; RUN_CEILING_BELOW_FIRST_CALL is raised only when every maker
+ * spec §1.1, §2.9). On the first position's own call (the bare key or either
+ * seat marker), a cheaper maker whose transport died hands its
+ * ProviderCallFailedError back, so the cooldown holds and retries;
+ * RUN_CEILING_BELOW_FIRST_CALL is raised only when every maker
  * refused (budget spec §2.9, "The first call"). There a money stop is not clean
  * — root 0 fails it as a ceiling below one call — and a maker whose transport
  * died did not refuse: after the hold, root 0's final attempt asks the planned
@@ -2722,7 +2723,10 @@ export async function callBodyRoleWithFallback<T extends ServeRoleMaker>(input: 
     }
     // Budget spec §2.9: on the first position's own call a maker whose
     // transport died did not refuse, so its failure goes to root 0's cooldown.
-    if (transportDeath !== null && input.request.callSiteKey === FIRST_POSITION_CALL_SITE_KEY) throw transportDeath;
+    // Paid plans S1a: an assigned run's first call carries its seat marker.
+    if (transportDeath !== null && seatBaseCallSiteKey(input.request.callSiteKey) === FIRST_POSITION_CALL_SITE_KEY) {
+      throw transportDeath;
+    }
     throw refusal;
   }
 }
