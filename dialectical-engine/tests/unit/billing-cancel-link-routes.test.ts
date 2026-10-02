@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TypedDomainError } from "@debateai/kernel";
 import { mountSubscriptionRoutes } from "../support/billingSubscriptionFixtures.js";
 import type { SubscriptionRouteDeps } from "../../apps/api/src/billing/subscription-deps.js";
 import { cancelLinkUrl, cancelTokenSha256 } from "../../apps/api/src/billing/cancel-link.js";
@@ -61,7 +62,9 @@ describe("P13 the public cancel routes", () => {
     const used = new Map<string, number>();
     const keys: string[] = [];
     // One request per key: the second request of a bucket is refused, as the sealed 5-an-hour budget would be.
-    const admitted = (_scope: string, key: string) => {
+    const scopes: string[] = [];
+    const admitted = (scope: string, key: string) => {
+      scopes.push(scope);
       keys.push(key);
       const count = (used.get(key) ?? 0) + 1;
       used.set(key, count);
@@ -87,7 +90,32 @@ describe("P13 the public cancel routes", () => {
     // An IPv4 source is its own key.
     expect((await ask("192.0.2.44")).statusCode).toBe(202);
     expect(keys.at(-1)).toBe("192.0.2.44");
+    // Both public routes charge A25's sealed per-IP budget: four link asks and the one token press.
+    expect(scopes).toEqual(Array(5).fill("billingCancelLink"));
     await api.close();
+  });
+
+  it("logs a failed send with a content-free code only: a declared code passes, free text becomes UNKNOWN", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const request = vi.fn()
+        .mockRejectedValueOnce(new TypedDomainError("SOME_CODE", "person@example.test"))
+        .mockRejectedValueOnce(new Error("person@example.test"));
+      const api = await mountSubscriptionRoutes(withLinks({ request, cancelByToken: vi.fn() }), null);
+      const ask = () => api.inject({ method: "POST", url: "/v1/billing/cancel-link", payload: { email: "a@example.test" } });
+      expect((await ask()).statusCode).toBe(202);
+      expect((await ask()).statusCode).toBe(202);
+      await new Promise((resolve) => setImmediate(resolve));
+      await api.close();
+      const lines = errorSpy.mock.calls.map((args) => args.join(" "));
+      expect(lines).toEqual([
+        '{"event":"billing.cancel_link.failed","code":"SOME_CODE"}',
+        '{"event":"billing.cancel_link.failed","code":"UNKNOWN"}'
+      ]);
+      for (const line of lines) expect(line).not.toContain("@");
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("hashes the token with its own purpose label and links through the URL fragment", () => {

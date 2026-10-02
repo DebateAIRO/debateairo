@@ -35,6 +35,7 @@ async function account(email: string, state: "active" | "age_frozen" = "active")
 
 function service(clock: { now: Date }, pool: Pool = database.pool) {
   const mails: BillingMail[] = [];
+  const audit = recordingAudit();
   const links = new CancelLinkService({
     billing: new BillingRepository(pool),
     jobs: new BillingJobQueries(pool),
@@ -44,10 +45,10 @@ function service(clock: { now: Date }, pool: Pool = database.pool) {
     recordsKey: TEST_RECORDS_KEY,
     mail: { sendTemplated: async (mail) => { mails.push(mail); } },
     publicAppUrl: TEST_PUBLIC_APP_URL,
-    audit: recordingAudit(),
+    audit,
     clock: () => clock.now
   });
-  return { links, mails };
+  return { links, mails, audit };
 }
 
 const tokenOf = (mail: BillingMail): string => new URL(mail.params.cancelLinkUrl!).hash.slice("#token=".length);
@@ -55,7 +56,7 @@ const tokenOf = (mail: BillingMail): string => new URL(mail.params.cancelLinkUrl
 describe("P13 the cancel link on real PostgreSQL", () => {
   it("sends one link to the billing address, stores only its hash, and cancels once through it", async () => {
     const clock = { now: new Date() };
-    const { links, mails } = service(clock);
+    const { links, mails, audit } = service(clock);
     const ownerRef = await account("Subscriber@Example.test");
     const seeded = await seedActiveSubscription(database.pool, {
       ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "RO", email: "billing@example.test"
@@ -77,10 +78,15 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     expect(await links.cancelByToken(token)).toBe("INVALID");
     expect(await links.request("subscriber@example.test")).toBe("SILENT");
     expect(mails).toHaveLength(1);
+    // One sent link and one cancel; the refused second press and the silent ask record nothing.
+    expect(audit.events).toEqual([
+      { event: "billing.cancel_link.sent", fields: {} },
+      { event: "billing.cancel", fields: { source: "EMAIL_LINK" } }
+    ]);
   });
 
   it("stays silent for an unknown address, an address without a live plan, a frozen account and a malformed one", async () => {
-    const { links, mails } = service({ now: new Date() });
+    const { links, mails, audit } = service({ now: new Date() });
     await account("free-only@example.test");
     // R3-2: an account the age gate froze gets no link, even with a live plan (open question 18); the same seeded
     // plan on an active account is sent one, which the first test proves.
@@ -92,6 +98,7 @@ describe("P13 the cancel link on real PostgreSQL", () => {
       expect(await links.request(email), email).toBe("SILENT");
     }
     expect(mails).toEqual([]);
+    expect(audit.events).toEqual([]);
   });
 
   it("sends at most three links per account in 24 hours, then again the next day (A25)", async () => {

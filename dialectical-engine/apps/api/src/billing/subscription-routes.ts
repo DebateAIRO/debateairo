@@ -19,6 +19,7 @@ import { clientIpNetworkScope } from "../client-ip.js";
 import { startCardChange } from "./card-change.js";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
 import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
+import { failureCode } from "./renewal.js";
 import { cancelForOwner, revokeCancelForOwner, scheduleDowngrade } from "./subscription-actions.js";
 import { refuse } from "./subscription-core.js";
 import { listInvoices, readSubscriptionView } from "./subscription-view.js";
@@ -173,7 +174,8 @@ export function installSubscriptionRoutes(
     const links = deps.cancelLinks;
     // Answer first. Nothing below can change what this caller is told, or when (spec §2.7).
     setImmediate(() => {
-      links.request(email).catch(() => console.error(JSON.stringify({ event: "billing.cancel_link.failed" })));
+      links.request(email).catch((error: unknown) =>
+        console.error(JSON.stringify({ event: "billing.cancel_link.failed", code: failureCode(error) })));
     });
     return reply.status(202).send(accepted);
   });
