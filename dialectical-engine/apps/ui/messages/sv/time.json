@@ -14,6 +14,7 @@
   "time.status.claimed": "Tilldelad",
   "time.status.running": "Körs",
   "time.status.holding": "Väntar på att leverantören återställs",
+  "time.status.waiting": "Väntar",
   "time.status.settled": "Avgjord",
   "time.status.generating": "Genereras",
   "time.status.failed": "Misslyckad",

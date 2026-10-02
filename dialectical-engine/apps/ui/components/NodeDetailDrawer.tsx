@@ -23,7 +23,8 @@ import {
 } from "@/lib/recommendation";
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
-import type { Answer, Node as ContractNode } from "@debateai/contract";
+import type { Answer } from "@debateai/contract";
+import type { ContractNode } from "@/lib/v3/adapter";
 import { v3NodeHonestyRows, wayOfKnowingLabel } from "@/lib/v3/adapter";
 import { abstentionKindLabel, markLabelFromRecords } from "@/lib/v3/labels";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";

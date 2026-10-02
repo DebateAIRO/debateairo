@@ -4,13 +4,13 @@ import type { SupportLanguage } from "./locale.js";
 
 export const SUPPORT_UI_LABELS = {
   "ar": {
-    "home": "Dialectical Engine — الصفحة الرئيسية",
+    "home": "الرئيسية",
     "start-debate": "بدء مناظرة",
-    "sign-in": "الحساب",
-    "sign-up": "أنشئ حسابًا",
+    "sign-in": "تسجيل الدخول",
+    "sign-up": "إنشاء حساب",
     "help": "المساعدة",
     "support-status": "حالة الخدمة",
-    "method": "آلية العمل",
+    "method": "المنهج",
     "sample-transcript": "السجلات",
     "settings": "الإعدادات",
     "active-sessions": "الجلسات النشطة",
@@ -23,13 +23,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "فتح المناظرة العامة"
   },
   "bg": {
-    "home": "Dialectical Engine — начална страница",
+    "home": "Начало",
     "start-debate": "Започнете дебат",
-    "sign-in": "Профил",
+    "sign-in": "Влезте",
     "sign-up": "Създайте профил",
     "help": "Помощ",
     "support-status": "Състояние на услугата",
-    "method": "Как работи",
+    "method": "Метод",
     "sample-transcript": "Стенограми",
     "settings": "Настройки",
     "active-sessions": "Активни сесии",
@@ -42,13 +42,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Отворете публичен дебат"
   },
   "cs": {
-    "home": "Dialectical Engine — domů",
+    "home": "Domů",
     "start-debate": "Začněte debatu",
-    "sign-in": "Účet",
+    "sign-in": "Přihlásit se",
     "sign-up": "Vytvořit účet",
     "help": "Nápověda",
     "support-status": "Stav služby",
-    "method": "Jak to funguje",
+    "method": "Metoda",
     "sample-transcript": "Přepisy",
     "settings": "Nastavení",
     "active-sessions": "Aktivní relace",
@@ -61,13 +61,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Otevřít veřejnou debatu"
   },
   "da": {
-    "home": "Dialectical Engine — hjem",
+    "home": "Forside",
     "start-debate": "Start en debat",
-    "sign-in": "Konto",
-    "sign-up": "Opret en",
+    "sign-in": "Log ind",
+    "sign-up": "Opret konto",
     "help": "Hjælp",
     "support-status": "Tjenestestatus",
-    "method": "Hvordan det virker",
+    "method": "Metode",
     "sample-transcript": "Afskrifter",
     "settings": "Indstillinger",
     "active-sessions": "Aktive sessioner",
@@ -80,13 +80,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Åbn offentlig debat"
   },
   "de": {
-    "home": "Dialectical Engine – Startseite",
+    "home": "Startseite",
     "start-debate": "Debatte beginnen",
-    "sign-in": "Konto",
+    "sign-in": "Anmelden",
     "sign-up": "Konto erstellen",
     "help": "Hilfe",
     "support-status": "Dienststatus",
-    "method": "Funktionsweise",
+    "method": "Methode",
     "sample-transcript": "Transkripte",
     "settings": "Einstellungen",
     "active-sessions": "Aktive Sitzungen",
@@ -99,13 +99,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Öffentliche Debatte öffnen"
   },
   "el": {
-    "home": "Dialectical Engine — αρχική σελίδα",
+    "home": "Αρχική",
     "start-debate": "Έναρξη αντιπαράθεσης",
-    "sign-in": "Λογαριασμός",
-    "sign-up": "Δημιουργήστε έναν",
+    "sign-in": "Σύνδεση",
+    "sign-up": "Δημιουργία λογαριασμού",
     "help": "Βοήθεια",
     "support-status": "Κατάσταση υπηρεσίας",
-    "method": "Πώς λειτουργεί",
+    "method": "Μέθοδος",
     "sample-transcript": "Καταγραφές",
     "settings": "Ρυθμίσεις",
     "active-sessions": "Ενεργές συνεδρίες",
@@ -118,13 +118,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Άνοιγμα δημόσιας αντιπαράθεσης"
   },
   "en": {
-    "home": "Dialectical Engine — home",
+    "home": "Home",
     "start-debate": "Start a debate",
-    "sign-in": "Account",
-    "sign-up": "Create one",
+    "sign-in": "Log in",
+    "sign-up": "Create account",
     "help": "Help",
     "support-status": "Service status",
-    "method": "How it works",
+    "method": "Method",
     "sample-transcript": "Transcripts",
     "settings": "Settings",
     "active-sessions": "Active sessions",
@@ -137,13 +137,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Open public debate"
   },
   "es": {
-    "home": "Dialectical Engine — inicio",
+    "home": "Inicio",
     "start-debate": "Iniciar un debate",
-    "sign-in": "Cuenta",
-    "sign-up": "Crear una",
+    "sign-in": "Iniciar sesión",
+    "sign-up": "Crear cuenta",
     "help": "Ayuda",
     "support-status": "Estado del servicio",
-    "method": "Cómo funciona",
+    "method": "Método",
     "sample-transcript": "Transcripciones",
     "settings": "Configuración",
     "active-sessions": "Sesiones activas",
@@ -156,13 +156,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Abrir el debate público"
   },
   "et": {
-    "home": "Dialectical Engine — avaleht",
+    "home": "Avaleht",
     "start-debate": "Alustage väitlust",
-    "sign-in": "Konto",
+    "sign-in": "Logige sisse",
     "sign-up": "Looge konto",
     "help": "Abi",
     "support-status": "Teenuse olek",
-    "method": "Kuidas see toimib",
+    "method": "Meetod",
     "sample-transcript": "Ärakirjad",
     "settings": "Seaded",
     "active-sessions": "Aktiivsed seansid",
@@ -175,13 +175,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Avage avalik väitlus"
   },
   "fi": {
-    "home": "Dialectical Engine — etusivu",
+    "home": "Etusivu",
     "start-debate": "Aloita väittely",
-    "sign-in": "Tili",
+    "sign-in": "Kirjaudu sisään",
     "sign-up": "Luo tili",
     "help": "Ohje",
     "support-status": "Palvelun tila",
-    "method": "Näin se toimii",
+    "method": "Menetelmä",
     "sample-transcript": "Litteroinnit",
     "settings": "Asetukset",
     "active-sessions": "Aktiiviset istunnot",
@@ -194,13 +194,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Avaa julkinen väittely"
   },
   "fr": {
-    "home": "Dialectical Engine — accueil",
+    "home": "Accueil",
     "start-debate": "Lancer un débat",
-    "sign-in": "Compte",
+    "sign-in": "Se connecter",
     "sign-up": "Créer un compte",
     "help": "Aide",
     "support-status": "État du service",
-    "method": "Fonctionnement",
+    "method": "Méthode",
     "sample-transcript": "Transcriptions",
     "settings": "Paramètres",
     "active-sessions": "Sessions actives",
@@ -213,13 +213,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Ouvrir le débat publié"
   },
   "ga": {
-    "home": "Dialectical Engine — baile",
+    "home": "Baile",
     "start-debate": "Tosaigh díospóireacht",
-    "sign-in": "Cuntas",
-    "sign-up": "Cruthaigh ceann",
+    "sign-in": "Sínigh isteach",
+    "sign-up": "Cruthaigh cuntas",
     "help": "Cabhair",
     "support-status": "Stádas seirbhíse",
-    "method": "Conas a oibríonn sé",
+    "method": "Modh",
     "sample-transcript": "Tras-scríbhinní",
     "settings": "Socruithe",
     "active-sessions": "Seisiúin ghníomhacha",
@@ -232,13 +232,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Oscail díospóireacht phoiblí"
   },
   "he": {
-    "home": "Dialectical Engine — דף הבית",
+    "home": "דף הבית",
     "start-debate": "התחלת דיון",
-    "sign-in": "חשבון",
+    "sign-in": "התחברות",
     "sign-up": "יצירת חשבון",
     "help": "עזרה",
     "support-status": "מצב השירות",
-    "method": "איך זה עובד",
+    "method": "שיטה",
     "sample-transcript": "תמלילים",
     "settings": "הגדרות",
     "active-sessions": "הפעלות פעילות",
@@ -251,13 +251,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "פתיחת דיון ציבורי"
   },
   "hi": {
-    "home": "Dialectical Engine — मुख्य पृष्ठ",
+    "home": "मुख्य पृष्ठ",
     "start-debate": "वाद-विवाद शुरू करें",
-    "sign-in": "खाता",
+    "sign-in": "लॉग इन करें",
     "sign-up": "खाता बनाएँ",
     "help": "सहायता",
     "support-status": "सेवा की स्थिति",
-    "method": "यह कैसे काम करता है",
+    "method": "विधि",
     "sample-transcript": "प्रतिलिपियाँ",
     "settings": "सेटिंग्स",
     "active-sessions": "सक्रिय सत्र",
@@ -270,13 +270,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "सार्वजनिक वाद-विवाद खोलें"
   },
   "hr": {
-    "home": "Dialectical Engine — početna stranica",
+    "home": "Početna",
     "start-debate": "Započnite raspravu",
-    "sign-in": "Račun",
-    "sign-up": "Izradite ga",
+    "sign-in": "Prijavite se",
+    "sign-up": "Izradite račun",
     "help": "Pomoć",
     "support-status": "Stanje usluge",
-    "method": "Kako radi",
+    "method": "Metoda",
     "sample-transcript": "Prijepisi",
     "settings": "Postavke",
     "active-sessions": "Aktivne sesije",
@@ -289,13 +289,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Otvorite javnu raspravu"
   },
   "hu": {
-    "home": "Dialectical Engine — kezdőlap",
+    "home": "Kezdőlap",
     "start-debate": "Vita indítása",
-    "sign-in": "Fiók",
-    "sign-up": "Hozzon létre egyet",
+    "sign-in": "Bejelentkezés",
+    "sign-up": "Fiók létrehozása",
     "help": "Súgó",
     "support-status": "Szolgáltatás állapota",
-    "method": "Hogyan működik?",
+    "method": "Módszer",
     "sample-transcript": "Átiratok",
     "settings": "Beállítások",
     "active-sessions": "Aktív munkamenetek",
@@ -308,13 +308,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Nyilvános vita megnyitása"
   },
   "id": {
-    "home": "Dialectical Engine — beranda",
+    "home": "Beranda",
     "start-debate": "Mulai debat",
-    "sign-in": "Akun",
+    "sign-in": "Masuk",
     "sign-up": "Buat akun",
     "help": "Bantuan",
     "support-status": "Status layanan",
-    "method": "Cara kerjanya",
+    "method": "Metode",
     "sample-transcript": "Transkrip",
     "settings": "Pengaturan",
     "active-sessions": "Sesi aktif",
@@ -327,13 +327,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Buka debat publik"
   },
   "it": {
-    "home": "Dialectical Engine — pagina iniziale",
+    "home": "Pagina iniziale",
     "start-debate": "Avvia un dibattito",
-    "sign-in": "Account",
-    "sign-up": "Creane uno",
+    "sign-in": "Accedi",
+    "sign-up": "Crea account",
     "help": "Aiuto",
     "support-status": "Stato del servizio",
-    "method": "Come funziona",
+    "method": "Metodo",
     "sample-transcript": "Trascrizioni",
     "settings": "Impostazioni",
     "active-sessions": "Sessioni attive",
@@ -346,13 +346,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Apri dibattito pubblico"
   },
   "ja": {
-    "home": "Dialectical Engine — ホーム",
+    "home": "ホーム",
     "start-debate": "ディベートを開始",
-    "sign-in": "アカウント",
+    "sign-in": "ログイン",
     "sign-up": "アカウントを作成",
     "help": "ヘルプ",
     "support-status": "サービス状況",
-    "method": "仕組み",
+    "method": "方式",
     "sample-transcript": "記録",
     "settings": "設定",
     "active-sessions": "有効なセッション",
@@ -365,13 +365,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "公開ディベートを開く"
   },
   "ko": {
-    "home": "Dialectical Engine — 홈",
+    "home": "홈",
     "start-debate": "토론 시작",
-    "sign-in": "계정",
+    "sign-in": "로그인",
     "sign-up": "계정 만들기",
     "help": "도움말",
     "support-status": "서비스 상태",
-    "method": "작동 방식",
+    "method": "방식",
     "sample-transcript": "기록",
     "settings": "설정",
     "active-sessions": "활성 세션",
@@ -384,13 +384,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "공개 토론 열기"
   },
   "lt": {
-    "home": "Dialectical Engine — pradžia",
+    "home": "Pradžia",
     "start-debate": "Pradėti debatus",
-    "sign-in": "Paskyra",
+    "sign-in": "Prisijungti",
     "sign-up": "Sukurti paskyrą",
     "help": "Pagalba",
     "support-status": "Paslaugos būsena",
-    "method": "Kaip tai veikia",
+    "method": "Metodas",
     "sample-transcript": "Stenogramos",
     "settings": "Nustatymai",
     "active-sessions": "Aktyvūs seansai",
@@ -403,13 +403,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Atverti viešus debatus"
   },
   "lv": {
-    "home": "Dialectical Engine — sākums",
+    "home": "Sākums",
     "start-debate": "Sākt debates",
-    "sign-in": "Konts",
+    "sign-in": "Pierakstīties",
     "sign-up": "Izveidot kontu",
     "help": "Palīdzība",
     "support-status": "Pakalpojuma statuss",
-    "method": "Kā tas darbojas",
+    "method": "Metode",
     "sample-transcript": "Transkripti",
     "settings": "Iestatījumi",
     "active-sessions": "Aktīvās sesijas",
@@ -422,13 +422,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Atvērt publiskās debates"
   },
   "mt": {
-    "home": "Dialectical Engine — paġna ewlenija",
+    "home": "Paġna ewlenija",
     "start-debate": "Ibda dibattitu",
-    "sign-in": "Kont",
-    "sign-up": "Oħloq wieħed",
+    "sign-in": "Idħol fil-kont",
+    "sign-up": "Oħloq kont",
     "help": "Għajnuna",
     "support-status": "Stat tas-servizz",
-    "method": "Kif jaħdem",
+    "method": "Metodu",
     "sample-transcript": "Traskrizzjonijiet",
     "settings": "Issettjar",
     "active-sessions": "Sessjonijiet attivi",
@@ -441,13 +441,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Iftaħ dibattitu pubbliku"
   },
   "nl": {
-    "home": "Dialectical Engine — startpagina",
+    "home": "Startpagina",
     "start-debate": "Een debat starten",
-    "sign-in": "Account",
+    "sign-in": "Aanmelden",
     "sign-up": "Account aanmaken",
     "help": "Hulp",
     "support-status": "Servicestatus",
-    "method": "Hoe het werkt",
+    "method": "Methode",
     "sample-transcript": "Transcripten",
     "settings": "Instellingen",
     "active-sessions": "Actieve sessies",
@@ -460,13 +460,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Openbaar debat openen"
   },
   "pl": {
-    "home": "Dialectical Engine — strona główna",
+    "home": "Strona główna",
     "start-debate": "Rozpocznij debatę",
-    "sign-in": "Konto",
+    "sign-in": "Zaloguj się",
     "sign-up": "Utwórz konto",
     "help": "Pomoc",
     "support-status": "Stan usługi",
-    "method": "Jak to działa",
+    "method": "Metoda",
     "sample-transcript": "Transkrypcje",
     "settings": "Ustawienia",
     "active-sessions": "Aktywne sesje",
@@ -479,13 +479,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Otwórz debatę publiczną"
   },
   "pt": {
-    "home": "Dialectical Engine — início",
+    "home": "Início",
     "start-debate": "Iniciar um debate",
-    "sign-in": "Conta",
-    "sign-up": "Criar uma",
+    "sign-in": "Iniciar sessão",
+    "sign-up": "Criar conta",
     "help": "Ajuda",
     "support-status": "Estado do serviço",
-    "method": "Como funciona",
+    "method": "Método",
     "sample-transcript": "Transcrições",
     "settings": "Definições",
     "active-sessions": "Sessões ativas",
@@ -498,13 +498,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Abrir debate público"
   },
   "ro": {
-    "home": "Dialectical Engine — pagina principală",
+    "home": "Acasă",
     "start-debate": "Începeți o dezbatere",
-    "sign-in": "Cont",
-    "sign-up": "Creați unul",
+    "sign-in": "Autentificați-vă",
+    "sign-up": "Creați un cont",
     "help": "Ajutor",
     "support-status": "Starea serviciului",
-    "method": "Cum funcționează",
+    "method": "Metodă",
     "sample-transcript": "Transcrieri",
     "settings": "Setări",
     "active-sessions": "Sesiuni active",
@@ -517,13 +517,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Deschideți dezbaterea publică"
   },
   "ru": {
-    "home": "Dialectical Engine — главная",
+    "home": "Главная",
     "start-debate": "Начать дебаты",
-    "sign-in": "Учётная запись",
-    "sign-up": "Создать",
+    "sign-in": "Войти",
+    "sign-up": "Создать учётную запись",
     "help": "Помощь",
     "support-status": "Состояние сервиса",
-    "method": "Как это работает",
+    "method": "Метод",
     "sample-transcript": "Стенограммы",
     "settings": "Настройки",
     "active-sessions": "Активные сеансы",
@@ -536,13 +536,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Открыть общедоступные дебаты"
   },
   "sk": {
-    "home": "Dialectical Engine — domovská stránka",
+    "home": "Domov",
     "start-debate": "Začať debatu",
-    "sign-in": "Účet",
-    "sign-up": "Vytvorte si ho",
+    "sign-in": "Prihlásiť sa",
+    "sign-up": "Vytvoriť účet",
     "help": "Pomoc",
     "support-status": "Stav služby",
-    "method": "Ako to funguje",
+    "method": "Metóda",
     "sample-transcript": "Prepisy",
     "settings": "Nastavenia",
     "active-sessions": "Aktívne relácie",
@@ -555,13 +555,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Otvoriť verejnú debatu"
   },
   "sl": {
-    "home": "Dialectical Engine — domača stran",
+    "home": "Domov",
     "start-debate": "Začni razpravo",
-    "sign-in": "Račun",
-    "sign-up": "Ustvari ga",
+    "sign-in": "Prijava",
+    "sign-up": "Ustvari račun",
     "help": "Pomoč",
     "support-status": "Stanje storitve",
-    "method": "Kako deluje",
+    "method": "Metoda",
     "sample-transcript": "Prepisi",
     "settings": "Nastavitve",
     "active-sessions": "Aktivne seje",
@@ -574,13 +574,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Odpri javno razpravo"
   },
   "sv": {
-    "home": "Dialectical Engine — startsida",
+    "home": "Startsida",
     "start-debate": "Starta en debatt",
-    "sign-in": "Konto",
-    "sign-up": "Skapa ett",
+    "sign-in": "Logga in",
+    "sign-up": "Skapa konto",
     "help": "Hjälp",
     "support-status": "Tjänstestatus",
-    "method": "Så fungerar det",
+    "method": "Metod",
     "sample-transcript": "Transkriptioner",
     "settings": "Inställningar",
     "active-sessions": "Aktiva sessioner",
@@ -593,13 +593,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Öppna offentlig debatt"
   },
   "tr": {
-    "home": "Dialectical Engine — ana sayfa",
+    "home": "Ana sayfa",
     "start-debate": "Tartışma başlat",
-    "sign-in": "Hesap",
-    "sign-up": "Hesap oluşturun",
+    "sign-in": "Oturum aç",
+    "sign-up": "Hesap oluştur",
     "help": "Yardım",
     "support-status": "Hizmet durumu",
-    "method": "Nasıl çalışır",
+    "method": "Yöntem",
     "sample-transcript": "Tutanaklar",
     "settings": "Ayarlar",
     "active-sessions": "Etkin oturumlar",
@@ -612,13 +612,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Herkese açık tartışmayı aç"
   },
   "uk": {
-    "home": "Dialectical Engine — головна",
+    "home": "Головна",
     "start-debate": "Почати дебати",
-    "sign-in": "Обліковий запис",
-    "sign-up": "Створити",
+    "sign-in": "Увійти",
+    "sign-up": "Створити обліковий запис",
     "help": "Довідка",
     "support-status": "Стан сервісу",
-    "method": "Як це працює",
+    "method": "Метод",
     "sample-transcript": "Стенограми",
     "settings": "Налаштування",
     "active-sessions": "Активні сеанси",
@@ -631,13 +631,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Відкрити загальнодоступні дебати"
   },
   "vi": {
-    "home": "Dialectical Engine — trang chủ",
+    "home": "Trang chủ",
     "start-debate": "Bắt đầu một cuộc tranh luận",
-    "sign-in": "Tài khoản",
+    "sign-in": "Đăng nhập",
     "sign-up": "Tạo tài khoản",
     "help": "Trợ giúp",
     "support-status": "Trạng thái dịch vụ",
-    "method": "Cách hoạt động",
+    "method": "Phương pháp",
     "sample-transcript": "Bản ghi",
     "settings": "Cài đặt",
     "active-sessions": "Phiên đang hoạt động",
@@ -650,13 +650,13 @@ export const SUPPORT_UI_LABELS = {
     "public-debate": "Mở cuộc tranh luận công khai"
   },
   "zh": {
-    "home": "Dialectical Engine — 首页",
+    "home": "首页",
     "start-debate": "开始辩论",
-    "sign-in": "账户",
+    "sign-in": "登录",
     "sign-up": "创建账户",
     "help": "帮助",
     "support-status": "服务状态",
-    "method": "运作方式",
+    "method": "方法",
     "sample-transcript": "文字记录",
     "settings": "设置",
     "active-sessions": "活跃会话",
@@ -4140,3 +4140,7343 @@ export const SUPPORT_TOPIC_PROMPTS = {
     }
   ]
 } as const satisfies Readonly<Record<SupportLanguage, readonly Readonly<{ prompt: string; sourceIds: readonly string[] }>[]>>;
+
+export const SUPPORT_CONTROL_NAMES = {
+  "ar": [
+    [
+      "How we label AI content",
+      "كيف نوسم محتوى الذكاء الاصطناعي"
+    ],
+    [
+      "Claim legacy debates",
+      "المطالبة بالمناظرات القديمة"
+    ],
+    [
+      "Escalate to a human",
+      "التصعيد إلى شخص"
+    ],
+    [
+      "Use a recovery code",
+      "استخدام رمز استرداد"
+    ],
+    [
+      "Open public debate",
+      "فتح المناظرة العامة"
+    ],
+    [
+      "Cookies we store",
+      "ملفات تعريف الارتباط التي نخزّنها"
+    ],
+    [
+      "Open your debate",
+      "فتح مناظرتك"
+    ],
+    [
+      "Active sessions",
+      "الجلسات النشطة"
+    ],
+    [
+      "Talk to a human",
+      "التحدث إلى شخص"
+    ],
+    [
+      "Create account",
+      "إنشاء حساب"
+    ],
+    [
+      "Delete account",
+      "حذف الحساب"
+    ],
+    [
+      "Public debates",
+      "المناظرات العامة"
+    ],
+    [
+      "Service status",
+      "حالة الخدمة"
+    ],
+    [
+      "Start a debate",
+      "بدء مناظرة"
+    ],
+    [
+      "Debate engine",
+      "محرك المناظرات"
+    ],
+    [
+      "Scoring queue",
+      "قائمة انتظار التقييم"
+    ],
+    [
+      "Start a round",
+      "بدء جولة"
+    ],
+    [
+      "What we store",
+      "ما نخزّنه"
+    ],
+    [
+      "How it works",
+      "آلية العمل"
+    ],
+    [
+      "Report a bug",
+      "الإبلاغ عن خلل"
+    ],
+    [
+      "Your debates",
+      "مناظراتك"
+    ],
+    [
+      "High stakes",
+      "عالية الأهمية"
+    ],
+    [
+      "Model fleet",
+      "مجموعة النماذج"
+    ],
+    [
+      "Transcripts",
+      "السجلات"
+    ],
+    [
+      "New debate",
+      "مناظرة جديدة"
+    ],
+    [
+      "Challenge",
+      "اعتراض"
+    ],
+    [
+      "Risk tier",
+      "فئة المخاطر"
+    ],
+    [
+      "Start run",
+      "بدء التشغيل"
+    ],
+    [
+      "Workspace",
+      "مساحة العمل"
+    ],
+    [
+      "Settings",
+      "الإعدادات"
+    ],
+    [
+      "Standard",
+      "قياسية"
+    ],
+    [
+      "Account",
+      "الحساب"
+    ],
+    [
+      "Honesty",
+      "النزاهة"
+    ],
+    [
+      "Library",
+      "المكتبة"
+    ],
+    [
+      "Premium",
+      "مميزة"
+    ],
+    [
+      "Pricing",
+      "الأسعار"
+    ],
+    [
+      "Privacy",
+      "الخصوصية"
+    ],
+    [
+      "Casual",
+      "عادية"
+    ],
+    [
+      "Export",
+      "تصدير"
+    ],
+    [
+      "Log in",
+      "تسجيل الدخول"
+    ],
+    [
+      "Medium",
+      "متوسطة"
+    ],
+    [
+      "Method",
+      "المنهج"
+    ],
+    [
+      "Replay",
+      "إعادة التشغيل"
+    ],
+    [
+      "Thread",
+      "التسلسل"
+    ],
+    [
+      "Split",
+      "منقسم"
+    ],
+    [
+      "Topic",
+      "الموضوع"
+    ],
+    [
+      "Free",
+      "مجانية"
+    ],
+    [
+      "Help",
+      "المساعدة"
+    ],
+    [
+      "High",
+      "مرتفعة"
+    ],
+    [
+      "Home",
+      "الرئيسية"
+    ],
+    [
+      "Tree",
+      "الشجرة"
+    ],
+    [
+      "Low",
+      "منخفضة"
+    ],
+    [
+      "Map",
+      "الخريطة"
+    ]
+  ],
+  "bg": [
+    [
+      "How we label AI content",
+      "Как обозначаваме съдържанието от ИИ"
+    ],
+    [
+      "Claim legacy debates",
+      "Заявяване на наследени дебати"
+    ],
+    [
+      "Escalate to a human",
+      "Ескалиране към човек"
+    ],
+    [
+      "Use a recovery code",
+      "Използвайте код за възстановяване"
+    ],
+    [
+      "Open public debate",
+      "Отворете публичен дебат"
+    ],
+    [
+      "Cookies we store",
+      "Бисквитките, които съхраняваме"
+    ],
+    [
+      "Open your debate",
+      "Отворете дебата си"
+    ],
+    [
+      "Active sessions",
+      "Активни сесии"
+    ],
+    [
+      "Talk to a human",
+      "Разговор с човек"
+    ],
+    [
+      "Create account",
+      "Създайте профил"
+    ],
+    [
+      "Delete account",
+      "Изтриване на профила"
+    ],
+    [
+      "Public debates",
+      "Публични дебати"
+    ],
+    [
+      "Service status",
+      "Състояние на услугата"
+    ],
+    [
+      "Start a debate",
+      "Започнете дебат"
+    ],
+    [
+      "Debate engine",
+      "Механизъм за дебати"
+    ],
+    [
+      "Scoring queue",
+      "Опашка за оценяване"
+    ],
+    [
+      "Start a round",
+      "Започнете кръг"
+    ],
+    [
+      "What we store",
+      "Какво съхраняваме"
+    ],
+    [
+      "How it works",
+      "Как работи"
+    ],
+    [
+      "Report a bug",
+      "Съобщете за грешка"
+    ],
+    [
+      "Your debates",
+      "Вашите дебати"
+    ],
+    [
+      "High stakes",
+      "С високи залози"
+    ],
+    [
+      "Model fleet",
+      "Набор от модели"
+    ],
+    [
+      "Transcripts",
+      "Стенограми"
+    ],
+    [
+      "New debate",
+      "Нов дебат"
+    ],
+    [
+      "Challenge",
+      "Оспорване"
+    ],
+    [
+      "Risk tier",
+      "Ниво на риск"
+    ],
+    [
+      "Start run",
+      "Стартиране"
+    ],
+    [
+      "Workspace",
+      "Работно пространство"
+    ],
+    [
+      "Settings",
+      "Настройки"
+    ],
+    [
+      "Standard",
+      "Стандартно"
+    ],
+    [
+      "Account",
+      "Профил"
+    ],
+    [
+      "Honesty",
+      "Добросъвестност"
+    ],
+    [
+      "Library",
+      "Библиотека"
+    ],
+    [
+      "Premium",
+      "Премиум"
+    ],
+    [
+      "Pricing",
+      "Цени"
+    ],
+    [
+      "Privacy",
+      "Поверителност"
+    ],
+    [
+      "Casual",
+      "С ниски залози"
+    ],
+    [
+      "Export",
+      "Експортиране"
+    ],
+    [
+      "Log in",
+      "Влезте"
+    ],
+    [
+      "Medium",
+      "Средно"
+    ],
+    [
+      "Method",
+      "Метод"
+    ],
+    [
+      "Replay",
+      "Възпроизвеждане"
+    ],
+    [
+      "Thread",
+      "Нишка"
+    ],
+    [
+      "Split",
+      "Разделен изглед"
+    ],
+    [
+      "Topic",
+      "Тема"
+    ],
+    [
+      "Free",
+      "Безплатен"
+    ],
+    [
+      "Help",
+      "Помощ"
+    ],
+    [
+      "High",
+      "Високо"
+    ],
+    [
+      "Home",
+      "Начало"
+    ],
+    [
+      "Tree",
+      "Дърво"
+    ],
+    [
+      "Low",
+      "Ниско"
+    ],
+    [
+      "Map",
+      "Карта"
+    ]
+  ],
+  "cs": [
+    [
+      "How we label AI content",
+      "Jak označujeme obsah AI"
+    ],
+    [
+      "Claim legacy debates",
+      "Převzít starší debaty"
+    ],
+    [
+      "Escalate to a human",
+      "Předat člověku"
+    ],
+    [
+      "Use a recovery code",
+      "Použít kód pro obnovení"
+    ],
+    [
+      "Open public debate",
+      "Otevřít veřejnou debatu"
+    ],
+    [
+      "Cookies we store",
+      "Soubory cookie, které ukládáme"
+    ],
+    [
+      "Open your debate",
+      "Otevřít vaši debatu"
+    ],
+    [
+      "Active sessions",
+      "Aktivní relace"
+    ],
+    [
+      "Talk to a human",
+      "Promluvit si s člověkem"
+    ],
+    [
+      "Create account",
+      "Vytvořit účet"
+    ],
+    [
+      "Delete account",
+      "Smazat účet"
+    ],
+    [
+      "Public debates",
+      "Veřejné debaty"
+    ],
+    [
+      "Service status",
+      "Stav služby"
+    ],
+    [
+      "Start a debate",
+      "Začněte debatu"
+    ],
+    [
+      "Debate engine",
+      "Mechanismus debat"
+    ],
+    [
+      "Scoring queue",
+      "Fronta hodnocení"
+    ],
+    [
+      "Start a round",
+      "Začněte kolo"
+    ],
+    [
+      "What we store",
+      "Co ukládáme"
+    ],
+    [
+      "How it works",
+      "Jak to funguje"
+    ],
+    [
+      "Report a bug",
+      "Nahlásit chybu"
+    ],
+    [
+      "Your debates",
+      "Vaše debaty"
+    ],
+    [
+      "High stakes",
+      "Vysoké sázky"
+    ],
+    [
+      "Model fleet",
+      "Sada modelů"
+    ],
+    [
+      "Transcripts",
+      "Přepisy"
+    ],
+    [
+      "New debate",
+      "Nová debata"
+    ],
+    [
+      "Challenge",
+      "Zpochybnit"
+    ],
+    [
+      "Risk tier",
+      "Úroveň rizika"
+    ],
+    [
+      "Start run",
+      "Spustit"
+    ],
+    [
+      "Workspace",
+      "Pracovní prostor"
+    ],
+    [
+      "Settings",
+      "Nastavení"
+    ],
+    [
+      "Standard",
+      "Standardní"
+    ],
+    [
+      "Account",
+      "Účet"
+    ],
+    [
+      "Honesty",
+      "Poctivost"
+    ],
+    [
+      "Library",
+      "Knihovna"
+    ],
+    [
+      "Pricing",
+      "Ceny"
+    ],
+    [
+      "Privacy",
+      "Ochrana soukromí"
+    ],
+    [
+      "Casual",
+      "Neformální"
+    ],
+    [
+      "Export",
+      "Exportovat"
+    ],
+    [
+      "Log in",
+      "Přihlásit se"
+    ],
+    [
+      "Medium",
+      "Střední"
+    ],
+    [
+      "Method",
+      "Metoda"
+    ],
+    [
+      "Replay",
+      "Přehrát znovu"
+    ],
+    [
+      "Thread",
+      "Vlákno"
+    ],
+    [
+      "Split",
+      "Rozdělit"
+    ],
+    [
+      "Topic",
+      "Téma"
+    ],
+    [
+      "Free",
+      "Zdarma"
+    ],
+    [
+      "Help",
+      "Nápověda"
+    ],
+    [
+      "High",
+      "Vysoký"
+    ],
+    [
+      "Home",
+      "Domů"
+    ],
+    [
+      "Tree",
+      "Strom"
+    ],
+    [
+      "Low",
+      "Nízký"
+    ],
+    [
+      "Map",
+      "Mapa"
+    ]
+  ],
+  "da": [
+    [
+      "How we label AI content",
+      "Sådan mærker vi AI-indhold"
+    ],
+    [
+      "Claim legacy debates",
+      "Gør krav på ældre debatter"
+    ],
+    [
+      "Escalate to a human",
+      "Eskaler til et menneske"
+    ],
+    [
+      "Use a recovery code",
+      "Brug en gendannelseskode"
+    ],
+    [
+      "Open public debate",
+      "Åbn offentlig debat"
+    ],
+    [
+      "Cookies we store",
+      "Cookies, vi gemmer"
+    ],
+    [
+      "Open your debate",
+      "Åbn din debat"
+    ],
+    [
+      "Active sessions",
+      "Aktive sessioner"
+    ],
+    [
+      "Talk to a human",
+      "Tal med et menneske"
+    ],
+    [
+      "Create account",
+      "Opret konto"
+    ],
+    [
+      "Delete account",
+      "Slet konto"
+    ],
+    [
+      "Public debates",
+      "Offentlige debatter"
+    ],
+    [
+      "Service status",
+      "Tjenestestatus"
+    ],
+    [
+      "Start a debate",
+      "Start en debat"
+    ],
+    [
+      "Debate engine",
+      "Debatmotor"
+    ],
+    [
+      "Scoring queue",
+      "Kø til bedømmelse"
+    ],
+    [
+      "Start a round",
+      "Start en runde"
+    ],
+    [
+      "What we store",
+      "Det gemmer vi"
+    ],
+    [
+      "How it works",
+      "Hvordan det virker"
+    ],
+    [
+      "Report a bug",
+      "Rapportér en fejl"
+    ],
+    [
+      "Your debates",
+      "Dine debatter"
+    ],
+    [
+      "High stakes",
+      "Høj indsats"
+    ],
+    [
+      "Model fleet",
+      "Modelpulje"
+    ],
+    [
+      "Transcripts",
+      "Afskrifter"
+    ],
+    [
+      "New debate",
+      "Ny debat"
+    ],
+    [
+      "Challenge",
+      "Udfordr"
+    ],
+    [
+      "Risk tier",
+      "Risikoniveau"
+    ],
+    [
+      "Start run",
+      "Start kørsel"
+    ],
+    [
+      "Workspace",
+      "Arbejdsområde"
+    ],
+    [
+      "Settings",
+      "Indstillinger"
+    ],
+    [
+      "Account",
+      "Konto"
+    ],
+    [
+      "Honesty",
+      "Ærlighed"
+    ],
+    [
+      "Library",
+      "Bibliotek"
+    ],
+    [
+      "Pricing",
+      "Prissætning"
+    ],
+    [
+      "Privacy",
+      "Privatliv"
+    ],
+    [
+      "Casual",
+      "Afslappet"
+    ],
+    [
+      "Export",
+      "Eksportér"
+    ],
+    [
+      "Log in",
+      "Log ind"
+    ],
+    [
+      "Medium",
+      "Middel"
+    ],
+    [
+      "Method",
+      "Metode"
+    ],
+    [
+      "Replay",
+      "Genafspilning"
+    ],
+    [
+      "Thread",
+      "Tråd"
+    ],
+    [
+      "Split",
+      "Dele"
+    ],
+    [
+      "Topic",
+      "Emne"
+    ],
+    [
+      "Free",
+      "Gratis"
+    ],
+    [
+      "Help",
+      "Hjælp"
+    ],
+    [
+      "High",
+      "Højt"
+    ],
+    [
+      "Home",
+      "Forside"
+    ],
+    [
+      "Tree",
+      "Træ"
+    ],
+    [
+      "Low",
+      "Lavt"
+    ],
+    [
+      "Map",
+      "Kort"
+    ]
+  ],
+  "de": [
+    [
+      "How we label AI content",
+      "So kennzeichnen wir KI-Inhalte"
+    ],
+    [
+      "Claim legacy debates",
+      "Ältere Debatten übernehmen"
+    ],
+    [
+      "Escalate to a human",
+      "An einen Menschen weiterleiten"
+    ],
+    [
+      "Use a recovery code",
+      "Wiederherstellungscode verwenden"
+    ],
+    [
+      "Open public debate",
+      "Öffentliche Debatte öffnen"
+    ],
+    [
+      "Cookies we store",
+      "Gespeicherte Cookies"
+    ],
+    [
+      "Open your debate",
+      "Ihre Debatte öffnen"
+    ],
+    [
+      "Active sessions",
+      "Aktive Sitzungen"
+    ],
+    [
+      "Talk to a human",
+      "Mit einem Menschen sprechen"
+    ],
+    [
+      "Create account",
+      "Konto erstellen"
+    ],
+    [
+      "Delete account",
+      "Konto löschen"
+    ],
+    [
+      "Public debates",
+      "Öffentliche Debatten"
+    ],
+    [
+      "Service status",
+      "Dienststatus"
+    ],
+    [
+      "Start a debate",
+      "Debatte beginnen"
+    ],
+    [
+      "Debate engine",
+      "Debattensystem"
+    ],
+    [
+      "Scoring queue",
+      "Bewertungswarteschlange"
+    ],
+    [
+      "Start a round",
+      "Runde beginnen"
+    ],
+    [
+      "What we store",
+      "Was wir speichern"
+    ],
+    [
+      "How it works",
+      "Funktionsweise"
+    ],
+    [
+      "Report a bug",
+      "Fehler melden"
+    ],
+    [
+      "Your debates",
+      "Ihre Debatten"
+    ],
+    [
+      "High stakes",
+      "Hohe Tragweite"
+    ],
+    [
+      "Model fleet",
+      "Modellverbund"
+    ],
+    [
+      "Transcripts",
+      "Transkripte"
+    ],
+    [
+      "New debate",
+      "Neue Debatte"
+    ],
+    [
+      "Challenge",
+      "Anfechten"
+    ],
+    [
+      "Risk tier",
+      "Risikostufe"
+    ],
+    [
+      "Start run",
+      "Durchlauf starten"
+    ],
+    [
+      "Workspace",
+      "Arbeitsbereich"
+    ],
+    [
+      "Settings",
+      "Einstellungen"
+    ],
+    [
+      "Account",
+      "Konto"
+    ],
+    [
+      "Honesty",
+      "Redlichkeit"
+    ],
+    [
+      "Library",
+      "Bibliothek"
+    ],
+    [
+      "Pricing",
+      "Preise"
+    ],
+    [
+      "Privacy",
+      "Datenschutz"
+    ],
+    [
+      "Casual",
+      "Geringe Tragweite"
+    ],
+    [
+      "Export",
+      "Exportieren"
+    ],
+    [
+      "Log in",
+      "Anmelden"
+    ],
+    [
+      "Medium",
+      "Mittel"
+    ],
+    [
+      "Method",
+      "Methode"
+    ],
+    [
+      "Replay",
+      "Wiedergabe"
+    ],
+    [
+      "Thread",
+      "Diskussionsverlauf"
+    ],
+    [
+      "Split",
+      "Geteilt"
+    ],
+    [
+      "Topic",
+      "Thema"
+    ],
+    [
+      "Free",
+      "Kostenlos"
+    ],
+    [
+      "Help",
+      "Hilfe"
+    ],
+    [
+      "High",
+      "Hoch"
+    ],
+    [
+      "Home",
+      "Startseite"
+    ],
+    [
+      "Tree",
+      "Baum"
+    ],
+    [
+      "Low",
+      "Niedrig"
+    ],
+    [
+      "Map",
+      "Karte"
+    ]
+  ],
+  "el": [
+    [
+      "How we label AI content",
+      "Πώς επισημαίνουμε το περιεχόμενο ΤΝ"
+    ],
+    [
+      "Claim legacy debates",
+      "Διεκδίκηση παλαιότερων αντιπαραθέσεων"
+    ],
+    [
+      "Escalate to a human",
+      "Κλιμάκωση σε άνθρωπο"
+    ],
+    [
+      "Use a recovery code",
+      "Χρήση κωδικού ανάκτησης"
+    ],
+    [
+      "Open public debate",
+      "Άνοιγμα δημόσιας αντιπαράθεσης"
+    ],
+    [
+      "Cookies we store",
+      "Τα cookies που αποθηκεύουμε"
+    ],
+    [
+      "Open your debate",
+      "Άνοιγμα της αντιπαράθεσής σας"
+    ],
+    [
+      "Active sessions",
+      "Ενεργές συνεδρίες"
+    ],
+    [
+      "Talk to a human",
+      "Συνομιλία με άνθρωπο"
+    ],
+    [
+      "Create account",
+      "Δημιουργία λογαριασμού"
+    ],
+    [
+      "Delete account",
+      "Διαγραφή λογαριασμού"
+    ],
+    [
+      "Public debates",
+      "Δημόσιες αντιπαραθέσεις"
+    ],
+    [
+      "Service status",
+      "Κατάσταση υπηρεσίας"
+    ],
+    [
+      "Start a debate",
+      "Έναρξη αντιπαράθεσης"
+    ],
+    [
+      "Debate engine",
+      "Μηχανή αντιπαράθεσης"
+    ],
+    [
+      "Scoring queue",
+      "Ουρά βαθμολόγησης"
+    ],
+    [
+      "Start a round",
+      "Έναρξη γύρου"
+    ],
+    [
+      "What we store",
+      "Τι αποθηκεύουμε"
+    ],
+    [
+      "How it works",
+      "Πώς λειτουργεί"
+    ],
+    [
+      "Report a bug",
+      "Αναφορά σφάλματος"
+    ],
+    [
+      "Your debates",
+      "Οι αντιπαραθέσεις σας"
+    ],
+    [
+      "High stakes",
+      "Υψηλή"
+    ],
+    [
+      "Model fleet",
+      "Στόλος μοντέλων"
+    ],
+    [
+      "Transcripts",
+      "Καταγραφές"
+    ],
+    [
+      "New debate",
+      "Νέα αντιπαράθεση"
+    ],
+    [
+      "Challenge",
+      "Αμφισβήτηση"
+    ],
+    [
+      "Risk tier",
+      "Βαθμίδα κινδύνου"
+    ],
+    [
+      "Start run",
+      "Έναρξη εκτέλεσης"
+    ],
+    [
+      "Workspace",
+      "Χώρος εργασίας"
+    ],
+    [
+      "Settings",
+      "Ρυθμίσεις"
+    ],
+    [
+      "Standard",
+      "Τυπική"
+    ],
+    [
+      "Account",
+      "Λογαριασμός"
+    ],
+    [
+      "Honesty",
+      "Ειλικρίνεια"
+    ],
+    [
+      "Library",
+      "Βιβλιοθήκη"
+    ],
+    [
+      "Pricing",
+      "Τιμολόγηση"
+    ],
+    [
+      "Privacy",
+      "Απόρρητο"
+    ],
+    [
+      "Casual",
+      "Χαλαρή"
+    ],
+    [
+      "Export",
+      "Εξαγωγή"
+    ],
+    [
+      "Log in",
+      "Σύνδεση"
+    ],
+    [
+      "Medium",
+      "Μεσαία"
+    ],
+    [
+      "Method",
+      "Μέθοδος"
+    ],
+    [
+      "Replay",
+      "Επανάληψη"
+    ],
+    [
+      "Thread",
+      "Νήμα"
+    ],
+    [
+      "Split",
+      "Διαιρεμένη προβολή"
+    ],
+    [
+      "Topic",
+      "Θέμα"
+    ],
+    [
+      "Free",
+      "Δωρεάν"
+    ],
+    [
+      "Help",
+      "Βοήθεια"
+    ],
+    [
+      "High",
+      "Υψηλή"
+    ],
+    [
+      "Home",
+      "Αρχική"
+    ],
+    [
+      "Tree",
+      "Δέντρο"
+    ],
+    [
+      "Low",
+      "Χαμηλή"
+    ],
+    [
+      "Map",
+      "Χάρτης"
+    ]
+  ],
+  "en": [],
+  "es": [
+    [
+      "How we label AI content",
+      "Cómo etiquetamos el contenido generado por IA"
+    ],
+    [
+      "Claim legacy debates",
+      "Reclamar debates heredados"
+    ],
+    [
+      "Escalate to a human",
+      "Derivar a una persona"
+    ],
+    [
+      "Use a recovery code",
+      "Usar un código de recuperación"
+    ],
+    [
+      "Open public debate",
+      "Abrir el debate público"
+    ],
+    [
+      "Cookies we store",
+      "Cookies que guardamos"
+    ],
+    [
+      "Open your debate",
+      "Abrir su debate"
+    ],
+    [
+      "Active sessions",
+      "Sesiones activas"
+    ],
+    [
+      "Talk to a human",
+      "Hablar con una persona"
+    ],
+    [
+      "Create account",
+      "Crear cuenta"
+    ],
+    [
+      "Delete account",
+      "Eliminar cuenta"
+    ],
+    [
+      "Public debates",
+      "Debates públicos"
+    ],
+    [
+      "Service status",
+      "Estado del servicio"
+    ],
+    [
+      "Start a debate",
+      "Iniciar un debate"
+    ],
+    [
+      "Debate engine",
+      "Motor de debate"
+    ],
+    [
+      "Scoring queue",
+      "Cola de puntuación"
+    ],
+    [
+      "Start a round",
+      "Iniciar una ronda"
+    ],
+    [
+      "What we store",
+      "Qué guardamos"
+    ],
+    [
+      "How it works",
+      "Cómo funciona"
+    ],
+    [
+      "Report a bug",
+      "Informar de un error"
+    ],
+    [
+      "Your debates",
+      "Sus debates"
+    ],
+    [
+      "High stakes",
+      "Riesgo alto"
+    ],
+    [
+      "Model fleet",
+      "Flota de modelos"
+    ],
+    [
+      "Transcripts",
+      "Transcripciones"
+    ],
+    [
+      "New debate",
+      "Nuevo debate"
+    ],
+    [
+      "Challenge",
+      "Cuestionar"
+    ],
+    [
+      "Risk tier",
+      "Nivel de riesgo"
+    ],
+    [
+      "Start run",
+      "Iniciar ejecución"
+    ],
+    [
+      "Workspace",
+      "Espacio de trabajo"
+    ],
+    [
+      "Settings",
+      "Configuración"
+    ],
+    [
+      "Standard",
+      "Estándar"
+    ],
+    [
+      "Account",
+      "Cuenta"
+    ],
+    [
+      "Honesty",
+      "Honestidad"
+    ],
+    [
+      "Library",
+      "Biblioteca"
+    ],
+    [
+      "Pricing",
+      "Precios"
+    ],
+    [
+      "Privacy",
+      "Privacidad"
+    ],
+    [
+      "Casual",
+      "Informal"
+    ],
+    [
+      "Export",
+      "Exportar"
+    ],
+    [
+      "Log in",
+      "Iniciar sesión"
+    ],
+    [
+      "Medium",
+      "Medio"
+    ],
+    [
+      "Method",
+      "Método"
+    ],
+    [
+      "Replay",
+      "Reproducir"
+    ],
+    [
+      "Thread",
+      "Hilo"
+    ],
+    [
+      "Split",
+      "Dividida"
+    ],
+    [
+      "Topic",
+      "Tema"
+    ],
+    [
+      "Free",
+      "Gratuito"
+    ],
+    [
+      "Help",
+      "Ayuda"
+    ],
+    [
+      "High",
+      "Alto"
+    ],
+    [
+      "Home",
+      "Inicio"
+    ],
+    [
+      "Tree",
+      "Árbol"
+    ],
+    [
+      "Low",
+      "Bajo"
+    ],
+    [
+      "Map",
+      "Mapa"
+    ]
+  ],
+  "et": [
+    [
+      "How we label AI content",
+      "Kuidas märgistame tehisintellekti loodud sisu"
+    ],
+    [
+      "Claim legacy debates",
+      "Omandage pärandväitlused"
+    ],
+    [
+      "Escalate to a human",
+      "Edastage inimesele"
+    ],
+    [
+      "Use a recovery code",
+      "Kasutage taastekoodi"
+    ],
+    [
+      "Open public debate",
+      "Avage avalik väitlus"
+    ],
+    [
+      "Cookies we store",
+      "Küpsised, mida salvestame"
+    ],
+    [
+      "Open your debate",
+      "Avage oma väitlus"
+    ],
+    [
+      "Active sessions",
+      "Aktiivsed seansid"
+    ],
+    [
+      "Talk to a human",
+      "Rääkige inimesega"
+    ],
+    [
+      "Create account",
+      "Looge konto"
+    ],
+    [
+      "Delete account",
+      "Konto kustutamine"
+    ],
+    [
+      "Public debates",
+      "Avalikud väitlused"
+    ],
+    [
+      "Service status",
+      "Teenuse olek"
+    ],
+    [
+      "Start a debate",
+      "Alustage väitlust"
+    ],
+    [
+      "Debate engine",
+      "Väitlusmootor"
+    ],
+    [
+      "Scoring queue",
+      "Hindamisjärjekord"
+    ],
+    [
+      "Start a round",
+      "Alustage vooru"
+    ],
+    [
+      "What we store",
+      "Mida me salvestame"
+    ],
+    [
+      "How it works",
+      "Kuidas see toimib"
+    ],
+    [
+      "Report a bug",
+      "Teatage veast"
+    ],
+    [
+      "Your debates",
+      "Teie väitlused"
+    ],
+    [
+      "High stakes",
+      "Kaalukas"
+    ],
+    [
+      "Model fleet",
+      "Mudelikogum"
+    ],
+    [
+      "Transcripts",
+      "Ärakirjad"
+    ],
+    [
+      "New debate",
+      "Uus väitlus"
+    ],
+    [
+      "Challenge",
+      "Vaidlustage"
+    ],
+    [
+      "Risk tier",
+      "Riskitase"
+    ],
+    [
+      "Start run",
+      "Käivitage"
+    ],
+    [
+      "Workspace",
+      "Tööruum"
+    ],
+    [
+      "Settings",
+      "Seaded"
+    ],
+    [
+      "Standard",
+      "Standardne"
+    ],
+    [
+      "Account",
+      "Konto"
+    ],
+    [
+      "Honesty",
+      "Ausus"
+    ],
+    [
+      "Library",
+      "Raamatukogu"
+    ],
+    [
+      "Pricing",
+      "Hinnad"
+    ],
+    [
+      "Privacy",
+      "Privaatsus"
+    ],
+    [
+      "Casual",
+      "Mitteametlik"
+    ],
+    [
+      "Export",
+      "Eksportige"
+    ],
+    [
+      "Log in",
+      "Logige sisse"
+    ],
+    [
+      "Medium",
+      "Keskmine"
+    ],
+    [
+      "Method",
+      "Meetod"
+    ],
+    [
+      "Replay",
+      "Taasesitus"
+    ],
+    [
+      "Thread",
+      "Väitluslõim"
+    ],
+    [
+      "Split",
+      "Jaotus"
+    ],
+    [
+      "Topic",
+      "Teema"
+    ],
+    [
+      "Free",
+      "Tasuta"
+    ],
+    [
+      "Help",
+      "Abi"
+    ],
+    [
+      "High",
+      "Kõrge"
+    ],
+    [
+      "Home",
+      "Avaleht"
+    ],
+    [
+      "Tree",
+      "Puu"
+    ],
+    [
+      "Low",
+      "Madal"
+    ],
+    [
+      "Map",
+      "Kaart"
+    ]
+  ],
+  "fi": [
+    [
+      "How we label AI content",
+      "Näin merkitsemme tekoälyn tuottaman sisällön"
+    ],
+    [
+      "Claim legacy debates",
+      "Liitä vanhat väittelyt tiliin"
+    ],
+    [
+      "Escalate to a human",
+      "Siirrä henkilölle"
+    ],
+    [
+      "Use a recovery code",
+      "Käytä palautuskoodia"
+    ],
+    [
+      "Open public debate",
+      "Avaa julkinen väittely"
+    ],
+    [
+      "Cookies we store",
+      "Tallentamamme evästeet"
+    ],
+    [
+      "Open your debate",
+      "Avaa väittelysi"
+    ],
+    [
+      "Active sessions",
+      "Aktiiviset istunnot"
+    ],
+    [
+      "Talk to a human",
+      "Keskustele henkilön kanssa"
+    ],
+    [
+      "Create account",
+      "Luo tili"
+    ],
+    [
+      "Delete account",
+      "Poista tili"
+    ],
+    [
+      "Public debates",
+      "Julkiset väittelyt"
+    ],
+    [
+      "Service status",
+      "Palvelun tila"
+    ],
+    [
+      "Start a debate",
+      "Aloita väittely"
+    ],
+    [
+      "Debate engine",
+      "Väittelymoottori"
+    ],
+    [
+      "Scoring queue",
+      "Pisteytysjono"
+    ],
+    [
+      "Start a round",
+      "Aloita kierros"
+    ],
+    [
+      "What we store",
+      "Mitä tallennamme"
+    ],
+    [
+      "How it works",
+      "Näin se toimii"
+    ],
+    [
+      "Report a bug",
+      "Ilmoita virheestä"
+    ],
+    [
+      "Your debates",
+      "Omat väittelysi"
+    ],
+    [
+      "High stakes",
+      "Suuret panokset"
+    ],
+    [
+      "Model fleet",
+      "Mallikanta"
+    ],
+    [
+      "Transcripts",
+      "Litteroinnit"
+    ],
+    [
+      "New debate",
+      "Uusi väittely"
+    ],
+    [
+      "Challenge",
+      "Haasta"
+    ],
+    [
+      "Risk tier",
+      "Riskitaso"
+    ],
+    [
+      "Start run",
+      "Aloita suoritus"
+    ],
+    [
+      "Workspace",
+      "Työtila"
+    ],
+    [
+      "Settings",
+      "Asetukset"
+    ],
+    [
+      "Standard",
+      "Tavanomainen"
+    ],
+    [
+      "Account",
+      "Tili"
+    ],
+    [
+      "Honesty",
+      "Rehellisyys"
+    ],
+    [
+      "Library",
+      "Kirjasto"
+    ],
+    [
+      "Pricing",
+      "Hinnoittelu"
+    ],
+    [
+      "Privacy",
+      "Tietosuoja"
+    ],
+    [
+      "Casual",
+      "Rento"
+    ],
+    [
+      "Export",
+      "Vie"
+    ],
+    [
+      "Log in",
+      "Kirjaudu sisään"
+    ],
+    [
+      "Medium",
+      "Keskitasoinen"
+    ],
+    [
+      "Method",
+      "Menetelmä"
+    ],
+    [
+      "Replay",
+      "Toisto"
+    ],
+    [
+      "Thread",
+      "Ketju"
+    ],
+    [
+      "Split",
+      "Jaettu"
+    ],
+    [
+      "Topic",
+      "Aihe"
+    ],
+    [
+      "Free",
+      "Maksuton"
+    ],
+    [
+      "Help",
+      "Ohje"
+    ],
+    [
+      "High",
+      "Korkea"
+    ],
+    [
+      "Home",
+      "Etusivu"
+    ],
+    [
+      "Tree",
+      "Puu"
+    ],
+    [
+      "Low",
+      "Matala"
+    ],
+    [
+      "Map",
+      "Kartta"
+    ]
+  ],
+  "fr": [
+    [
+      "How we label AI content",
+      "Comment nous signalons le contenu généré par l’IA"
+    ],
+    [
+      "Claim legacy debates",
+      "Rattacher des débats anciens"
+    ],
+    [
+      "Escalate to a human",
+      "Transmettre à une personne"
+    ],
+    [
+      "Use a recovery code",
+      "Utiliser un code de récupération"
+    ],
+    [
+      "Open public debate",
+      "Ouvrir le débat publié"
+    ],
+    [
+      "Cookies we store",
+      "Les cookies que nous stockons"
+    ],
+    [
+      "Open your debate",
+      "Ouvrir votre débat"
+    ],
+    [
+      "Active sessions",
+      "Sessions actives"
+    ],
+    [
+      "Talk to a human",
+      "Parler à une personne"
+    ],
+    [
+      "Create account",
+      "Créer un compte"
+    ],
+    [
+      "Delete account",
+      "Supprimer le compte"
+    ],
+    [
+      "Public debates",
+      "Débats publics"
+    ],
+    [
+      "Service status",
+      "État du service"
+    ],
+    [
+      "Start a debate",
+      "Lancer un débat"
+    ],
+    [
+      "Debate engine",
+      "Moteur de débat"
+    ],
+    [
+      "Scoring queue",
+      "File d’attente de notation"
+    ],
+    [
+      "Start a round",
+      "Lancer une manche"
+    ],
+    [
+      "What we store",
+      "Ce que nous stockons"
+    ],
+    [
+      "How it works",
+      "Fonctionnement"
+    ],
+    [
+      "Report a bug",
+      "Signaler un dysfonctionnement"
+    ],
+    [
+      "Your debates",
+      "Vos débats"
+    ],
+    [
+      "High stakes",
+      "Enjeu élevé"
+    ],
+    [
+      "Model fleet",
+      "Parc de modèles"
+    ],
+    [
+      "Transcripts",
+      "Transcriptions"
+    ],
+    [
+      "New debate",
+      "Nouveau débat"
+    ],
+    [
+      "Challenge",
+      "Contester"
+    ],
+    [
+      "Risk tier",
+      "Niveau de risque"
+    ],
+    [
+      "Start run",
+      "Lancer l’exécution"
+    ],
+    [
+      "Workspace",
+      "Espace de travail"
+    ],
+    [
+      "Settings",
+      "Paramètres"
+    ],
+    [
+      "Account",
+      "Compte"
+    ],
+    [
+      "Honesty",
+      "Honnêteté"
+    ],
+    [
+      "Library",
+      "Bibliothèque"
+    ],
+    [
+      "Pricing",
+      "Tarifs"
+    ],
+    [
+      "Privacy",
+      "Confidentialité"
+    ],
+    [
+      "Casual",
+      "Enjeu faible"
+    ],
+    [
+      "Export",
+      "Exporter"
+    ],
+    [
+      "Log in",
+      "Se connecter"
+    ],
+    [
+      "Medium",
+      "Moyen"
+    ],
+    [
+      "Method",
+      "Méthode"
+    ],
+    [
+      "Replay",
+      "Rejouer"
+    ],
+    [
+      "Thread",
+      "Fil"
+    ],
+    [
+      "Split",
+      "Vue fractionnée"
+    ],
+    [
+      "Topic",
+      "Sujet"
+    ],
+    [
+      "Free",
+      "Gratuite"
+    ],
+    [
+      "Help",
+      "Aide"
+    ],
+    [
+      "High",
+      "Élevé"
+    ],
+    [
+      "Home",
+      "Accueil"
+    ],
+    [
+      "Tree",
+      "Arbre"
+    ],
+    [
+      "Low",
+      "Faible"
+    ],
+    [
+      "Map",
+      "Carte"
+    ]
+  ],
+  "ga": [
+    [
+      "How we label AI content",
+      "An chaoi a lipéadaímid ábhar IS"
+    ],
+    [
+      "Claim legacy debates",
+      "Éiligh díospóireachtaí oidhreachta"
+    ],
+    [
+      "Escalate to a human",
+      "Ardaigh chuig duine"
+    ],
+    [
+      "Use a recovery code",
+      "Úsáid cód athshlánaithe"
+    ],
+    [
+      "Open public debate",
+      "Oscail díospóireacht phoiblí"
+    ],
+    [
+      "Cookies we store",
+      "Na fianáin a stórálaimid"
+    ],
+    [
+      "Open your debate",
+      "Oscail do dhíospóireacht"
+    ],
+    [
+      "Active sessions",
+      "Seisiúin ghníomhacha"
+    ],
+    [
+      "Talk to a human",
+      "Labhair le duine"
+    ],
+    [
+      "Create account",
+      "Cruthaigh cuntas"
+    ],
+    [
+      "Delete account",
+      "Scrios an cuntas"
+    ],
+    [
+      "Public debates",
+      "Díospóireachtaí poiblí"
+    ],
+    [
+      "Service status",
+      "Stádas seirbhíse"
+    ],
+    [
+      "Start a debate",
+      "Tosaigh díospóireacht"
+    ],
+    [
+      "Debate engine",
+      "Inneall díospóireachta"
+    ],
+    [
+      "Scoring queue",
+      "Scuaine scórála"
+    ],
+    [
+      "Start a round",
+      "Tosaigh babhta"
+    ],
+    [
+      "What we store",
+      "Cad a stórálaimid"
+    ],
+    [
+      "How it works",
+      "Conas a oibríonn sé"
+    ],
+    [
+      "Report a bug",
+      "Tuairiscigh fabht"
+    ],
+    [
+      "Your debates",
+      "Do chuid díospóireachtaí"
+    ],
+    [
+      "High stakes",
+      "Geallta arda"
+    ],
+    [
+      "Model fleet",
+      "Foireann samhlacha"
+    ],
+    [
+      "Transcripts",
+      "Tras-scríbhinní"
+    ],
+    [
+      "New debate",
+      "Díospóireacht nua"
+    ],
+    [
+      "Challenge",
+      "Dúshlán"
+    ],
+    [
+      "Risk tier",
+      "Leibhéal riosca"
+    ],
+    [
+      "Start run",
+      "Tosaigh rith"
+    ],
+    [
+      "Workspace",
+      "Spás oibre"
+    ],
+    [
+      "Settings",
+      "Socruithe"
+    ],
+    [
+      "Standard",
+      "Caighdeánach"
+    ],
+    [
+      "Account",
+      "Cuntas"
+    ],
+    [
+      "Honesty",
+      "Macántacht"
+    ],
+    [
+      "Library",
+      "Leabharlann"
+    ],
+    [
+      "Premium",
+      "Préimh"
+    ],
+    [
+      "Pricing",
+      "Praghsáil"
+    ],
+    [
+      "Privacy",
+      "Príobháideachas"
+    ],
+    [
+      "Casual",
+      "Neamhfhoirmiúil"
+    ],
+    [
+      "Export",
+      "Easpórtáil"
+    ],
+    [
+      "Log in",
+      "Sínigh isteach"
+    ],
+    [
+      "Medium",
+      "Meánach"
+    ],
+    [
+      "Method",
+      "Modh"
+    ],
+    [
+      "Replay",
+      "Athsheinm"
+    ],
+    [
+      "Thread",
+      "Snáithe"
+    ],
+    [
+      "Split",
+      "Scoilt"
+    ],
+    [
+      "Topic",
+      "Ábhar"
+    ],
+    [
+      "Free",
+      "Saor in aisce"
+    ],
+    [
+      "Help",
+      "Cabhair"
+    ],
+    [
+      "High",
+      "Ard"
+    ],
+    [
+      "Home",
+      "Baile"
+    ],
+    [
+      "Tree",
+      "Crann"
+    ],
+    [
+      "Low",
+      "Íseal"
+    ],
+    [
+      "Map",
+      "Léarscáil"
+    ]
+  ],
+  "he": [
+    [
+      "How we label AI content",
+      "כיצד אנו מסמנים תוכן שנוצר בידי בינה מלאכותית"
+    ],
+    [
+      "Claim legacy debates",
+      "שיוך דיונים ישנים"
+    ],
+    [
+      "Escalate to a human",
+      "העברה לנציג אנושי"
+    ],
+    [
+      "Use a recovery code",
+      "שימוש בקוד שחזור"
+    ],
+    [
+      "Open public debate",
+      "פתיחת דיון ציבורי"
+    ],
+    [
+      "Cookies we store",
+      "העוגיות שאנחנו שומרים"
+    ],
+    [
+      "Open your debate",
+      "פתיחת הדיון שלכם"
+    ],
+    [
+      "Active sessions",
+      "הפעלות פעילות"
+    ],
+    [
+      "Talk to a human",
+      "שיחה עם נציג אנושי"
+    ],
+    [
+      "Create account",
+      "יצירת חשבון"
+    ],
+    [
+      "Delete account",
+      "מחיקת החשבון"
+    ],
+    [
+      "Public debates",
+      "דיונים ציבוריים"
+    ],
+    [
+      "Service status",
+      "מצב השירות"
+    ],
+    [
+      "Start a debate",
+      "התחלת דיון"
+    ],
+    [
+      "Debate engine",
+      "מנוע הדיונים"
+    ],
+    [
+      "Scoring queue",
+      "תור מתן הציונים"
+    ],
+    [
+      "Start a round",
+      "התחלת סבב"
+    ],
+    [
+      "What we store",
+      "מה אנחנו שומרים"
+    ],
+    [
+      "How it works",
+      "איך זה עובד"
+    ],
+    [
+      "Report a bug",
+      "דיווח על תקלה"
+    ],
+    [
+      "Your debates",
+      "הדיונים שלכם"
+    ],
+    [
+      "High stakes",
+      "חשיבות גבוהה"
+    ],
+    [
+      "Model fleet",
+      "מערך המודלים"
+    ],
+    [
+      "Transcripts",
+      "תמלילים"
+    ],
+    [
+      "New debate",
+      "דיון חדש"
+    ],
+    [
+      "Challenge",
+      "ערעור"
+    ],
+    [
+      "Risk tier",
+      "רמת סיכון"
+    ],
+    [
+      "Start run",
+      "התחלת הרצה"
+    ],
+    [
+      "Workspace",
+      "סביבת עבודה"
+    ],
+    [
+      "Settings",
+      "הגדרות"
+    ],
+    [
+      "Standard",
+      "רגילה"
+    ],
+    [
+      "Account",
+      "חשבון"
+    ],
+    [
+      "Honesty",
+      "כנות"
+    ],
+    [
+      "Library",
+      "ספרייה"
+    ],
+    [
+      "Premium",
+      "פרימיום"
+    ],
+    [
+      "Pricing",
+      "תמחור"
+    ],
+    [
+      "Privacy",
+      "פרטיות"
+    ],
+    [
+      "Casual",
+      "חשיבות נמוכה"
+    ],
+    [
+      "Export",
+      "ייצוא"
+    ],
+    [
+      "Log in",
+      "התחברות"
+    ],
+    [
+      "Medium",
+      "בינונית"
+    ],
+    [
+      "Method",
+      "שיטה"
+    ],
+    [
+      "Replay",
+      "הפעלה חוזרת"
+    ],
+    [
+      "Thread",
+      "שרשור"
+    ],
+    [
+      "Split",
+      "תצוגה מפוצלת"
+    ],
+    [
+      "Topic",
+      "נושא"
+    ],
+    [
+      "Free",
+      "חינם"
+    ],
+    [
+      "Help",
+      "עזרה"
+    ],
+    [
+      "High",
+      "גבוהה"
+    ],
+    [
+      "Home",
+      "דף הבית"
+    ],
+    [
+      "Tree",
+      "עץ"
+    ],
+    [
+      "Low",
+      "נמוכה"
+    ],
+    [
+      "Map",
+      "מפה"
+    ]
+  ],
+  "hi": [
+    [
+      "How we label AI content",
+      "हम AI सामग्री को कैसे चिह्नित करते हैं"
+    ],
+    [
+      "Claim legacy debates",
+      "पुराने वाद-विवाद अपने खाते से जोड़ें"
+    ],
+    [
+      "Escalate to a human",
+      "किसी व्यक्ति को भेजें"
+    ],
+    [
+      "Use a recovery code",
+      "पुनर्प्राप्ति कोड का उपयोग करें"
+    ],
+    [
+      "Open public debate",
+      "सार्वजनिक वाद-विवाद खोलें"
+    ],
+    [
+      "Cookies we store",
+      "हमारे द्वारा संग्रहीत कुकी"
+    ],
+    [
+      "Open your debate",
+      "अपना वाद-विवाद खोलें"
+    ],
+    [
+      "Active sessions",
+      "सक्रिय सत्र"
+    ],
+    [
+      "Talk to a human",
+      "किसी व्यक्ति से बात करें"
+    ],
+    [
+      "Create account",
+      "खाता बनाएँ"
+    ],
+    [
+      "Delete account",
+      "खाता मिटाएँ"
+    ],
+    [
+      "Public debates",
+      "सार्वजनिक वाद-विवाद"
+    ],
+    [
+      "Service status",
+      "सेवा की स्थिति"
+    ],
+    [
+      "Start a debate",
+      "वाद-विवाद शुरू करें"
+    ],
+    [
+      "Debate engine",
+      "वाद-विवाद इंजन"
+    ],
+    [
+      "Scoring queue",
+      "अंकन कतार"
+    ],
+    [
+      "Start a round",
+      "दौर शुरू करें"
+    ],
+    [
+      "What we store",
+      "हम क्या संग्रहीत करते हैं"
+    ],
+    [
+      "How it works",
+      "यह कैसे काम करता है"
+    ],
+    [
+      "Report a bug",
+      "त्रुटि की रिपोर्ट करें"
+    ],
+    [
+      "Your debates",
+      "आपके वाद-विवाद"
+    ],
+    [
+      "High stakes",
+      "ऊँचा दाँव"
+    ],
+    [
+      "Model fleet",
+      "मॉडल समूह"
+    ],
+    [
+      "Transcripts",
+      "प्रतिलिपियाँ"
+    ],
+    [
+      "New debate",
+      "नया वाद-विवाद"
+    ],
+    [
+      "Challenge",
+      "चुनौती दें"
+    ],
+    [
+      "Risk tier",
+      "जोखिम स्तर"
+    ],
+    [
+      "Start run",
+      "रन शुरू करें"
+    ],
+    [
+      "Workspace",
+      "कार्यक्षेत्र"
+    ],
+    [
+      "Settings",
+      "सेटिंग्स"
+    ],
+    [
+      "Standard",
+      "मानक"
+    ],
+    [
+      "Account",
+      "खाता"
+    ],
+    [
+      "Honesty",
+      "ईमानदारी"
+    ],
+    [
+      "Library",
+      "संग्रह"
+    ],
+    [
+      "Premium",
+      "प्रीमियम"
+    ],
+    [
+      "Pricing",
+      "मूल्य"
+    ],
+    [
+      "Privacy",
+      "गोपनीयता"
+    ],
+    [
+      "Casual",
+      "सामान्य"
+    ],
+    [
+      "Export",
+      "निर्यात"
+    ],
+    [
+      "Log in",
+      "लॉग इन करें"
+    ],
+    [
+      "Medium",
+      "मध्यम"
+    ],
+    [
+      "Method",
+      "विधि"
+    ],
+    [
+      "Replay",
+      "फिर चलाएँ"
+    ],
+    [
+      "Thread",
+      "क्रम"
+    ],
+    [
+      "Split",
+      "विभाजित"
+    ],
+    [
+      "Topic",
+      "विषय"
+    ],
+    [
+      "Free",
+      "निःशुल्क"
+    ],
+    [
+      "Help",
+      "सहायता"
+    ],
+    [
+      "High",
+      "उच्च"
+    ],
+    [
+      "Home",
+      "मुख्य पृष्ठ"
+    ],
+    [
+      "Tree",
+      "वृक्ष"
+    ],
+    [
+      "Low",
+      "निम्न"
+    ],
+    [
+      "Map",
+      "मानचित्र"
+    ]
+  ],
+  "hr": [
+    [
+      "How we label AI content",
+      "Kako označavamo sadržaj umjetne inteligencije"
+    ],
+    [
+      "Claim legacy debates",
+      "Pridružite naslijeđene rasprave"
+    ],
+    [
+      "Escalate to a human",
+      "Proslijedite osobi"
+    ],
+    [
+      "Use a recovery code",
+      "Upotrijebite kod za oporavak"
+    ],
+    [
+      "Open public debate",
+      "Otvorite javnu raspravu"
+    ],
+    [
+      "Cookies we store",
+      "Kolačići koje pohranjujemo"
+    ],
+    [
+      "Open your debate",
+      "Otvorite svoju raspravu"
+    ],
+    [
+      "Active sessions",
+      "Aktivne sesije"
+    ],
+    [
+      "Talk to a human",
+      "Razgovor s osobom"
+    ],
+    [
+      "Create account",
+      "Izradite račun"
+    ],
+    [
+      "Delete account",
+      "Izbrišite račun"
+    ],
+    [
+      "Public debates",
+      "Javne rasprave"
+    ],
+    [
+      "Service status",
+      "Stanje usluge"
+    ],
+    [
+      "Start a debate",
+      "Započnite raspravu"
+    ],
+    [
+      "Debate engine",
+      "Mehanizam za rasprave"
+    ],
+    [
+      "Scoring queue",
+      "Red za bodovanje"
+    ],
+    [
+      "Start a round",
+      "Započnite rundu"
+    ],
+    [
+      "What we store",
+      "Što pohranjujemo"
+    ],
+    [
+      "How it works",
+      "Kako radi"
+    ],
+    [
+      "Report a bug",
+      "Prijavite pogrešku"
+    ],
+    [
+      "Your debates",
+      "Vaše rasprave"
+    ],
+    [
+      "High stakes",
+      "Visoki ulozi"
+    ],
+    [
+      "Model fleet",
+      "Flota modela"
+    ],
+    [
+      "Transcripts",
+      "Prijepisi"
+    ],
+    [
+      "New debate",
+      "Nova rasprava"
+    ],
+    [
+      "Challenge",
+      "Osporite"
+    ],
+    [
+      "Risk tier",
+      "Razina rizika"
+    ],
+    [
+      "Start run",
+      "Pokrenite"
+    ],
+    [
+      "Workspace",
+      "Radni prostor"
+    ],
+    [
+      "Settings",
+      "Postavke"
+    ],
+    [
+      "Standard",
+      "Uobičajeni ulozi"
+    ],
+    [
+      "Account",
+      "Račun"
+    ],
+    [
+      "Honesty",
+      "Poštenje"
+    ],
+    [
+      "Library",
+      "Knjižnica"
+    ],
+    [
+      "Pricing",
+      "Cijene"
+    ],
+    [
+      "Privacy",
+      "Privatnost"
+    ],
+    [
+      "Casual",
+      "Niski ulozi"
+    ],
+    [
+      "Export",
+      "Izvoz"
+    ],
+    [
+      "Log in",
+      "Prijavite se"
+    ],
+    [
+      "Medium",
+      "Srednja"
+    ],
+    [
+      "Method",
+      "Metoda"
+    ],
+    [
+      "Replay",
+      "Ponovno reproducirajte"
+    ],
+    [
+      "Thread",
+      "Nit"
+    ],
+    [
+      "Split",
+      "Podijeljeni prikaz"
+    ],
+    [
+      "Topic",
+      "Tema"
+    ],
+    [
+      "Free",
+      "Besplatno"
+    ],
+    [
+      "Help",
+      "Pomoć"
+    ],
+    [
+      "High",
+      "Visoka"
+    ],
+    [
+      "Home",
+      "Početna"
+    ],
+    [
+      "Tree",
+      "Stablo"
+    ],
+    [
+      "Low",
+      "Niska"
+    ],
+    [
+      "Map",
+      "Karta"
+    ]
+  ],
+  "hu": [
+    [
+      "How we label AI content",
+      "Hogyan jelöljük az MI-tartalmat"
+    ],
+    [
+      "Claim legacy debates",
+      "Régi viták átvétele"
+    ],
+    [
+      "Escalate to a human",
+      "Továbbítás munkatárshoz"
+    ],
+    [
+      "Use a recovery code",
+      "Helyreállítási kód használata"
+    ],
+    [
+      "Open public debate",
+      "Nyilvános vita megnyitása"
+    ],
+    [
+      "Cookies we store",
+      "Az általunk tárolt sütik"
+    ],
+    [
+      "Open your debate",
+      "Vita megnyitása"
+    ],
+    [
+      "Active sessions",
+      "Aktív munkamenetek"
+    ],
+    [
+      "Talk to a human",
+      "Beszélgetés munkatárssal"
+    ],
+    [
+      "Create account",
+      "Fiók létrehozása"
+    ],
+    [
+      "Delete account",
+      "Fiók törlése"
+    ],
+    [
+      "Public debates",
+      "Nyilvános viták"
+    ],
+    [
+      "Service status",
+      "Szolgáltatás állapota"
+    ],
+    [
+      "Start a debate",
+      "Vita indítása"
+    ],
+    [
+      "Debate engine",
+      "Vitamotor"
+    ],
+    [
+      "Scoring queue",
+      "Pontozási várólista"
+    ],
+    [
+      "Start a round",
+      "Forduló indítása"
+    ],
+    [
+      "What we store",
+      "Mit tárolunk"
+    ],
+    [
+      "How it works",
+      "Hogyan működik?"
+    ],
+    [
+      "Report a bug",
+      "Hiba jelentése"
+    ],
+    [
+      "Your debates",
+      "Saját viták"
+    ],
+    [
+      "High stakes",
+      "Nagy tét"
+    ],
+    [
+      "Model fleet",
+      "Modellállomány"
+    ],
+    [
+      "Transcripts",
+      "Átiratok"
+    ],
+    [
+      "New debate",
+      "Új vita"
+    ],
+    [
+      "Challenge",
+      "Kifogásolás"
+    ],
+    [
+      "Risk tier",
+      "Kockázati szint"
+    ],
+    [
+      "Start run",
+      "Futtatás indítása"
+    ],
+    [
+      "Workspace",
+      "Munkaterület"
+    ],
+    [
+      "Settings",
+      "Beállítások"
+    ],
+    [
+      "Standard",
+      "Normál"
+    ],
+    [
+      "Account",
+      "Fiók"
+    ],
+    [
+      "Honesty",
+      "Őszinteség"
+    ],
+    [
+      "Library",
+      "Könyvtár"
+    ],
+    [
+      "Premium",
+      "Prémium"
+    ],
+    [
+      "Pricing",
+      "Árazás"
+    ],
+    [
+      "Privacy",
+      "Adatvédelem"
+    ],
+    [
+      "Casual",
+      "Kötetlen"
+    ],
+    [
+      "Export",
+      "Exportálás"
+    ],
+    [
+      "Log in",
+      "Bejelentkezés"
+    ],
+    [
+      "Medium",
+      "Közepes"
+    ],
+    [
+      "Method",
+      "Módszer"
+    ],
+    [
+      "Replay",
+      "Visszajátszás"
+    ],
+    [
+      "Thread",
+      "Szál"
+    ],
+    [
+      "Split",
+      "Osztott"
+    ],
+    [
+      "Topic",
+      "Téma"
+    ],
+    [
+      "Free",
+      "Ingyenes"
+    ],
+    [
+      "Help",
+      "Súgó"
+    ],
+    [
+      "High",
+      "Magas"
+    ],
+    [
+      "Home",
+      "Kezdőlap"
+    ],
+    [
+      "Tree",
+      "Fa"
+    ],
+    [
+      "Low",
+      "Alacsony"
+    ],
+    [
+      "Map",
+      "Térkép"
+    ]
+  ],
+  "id": [
+    [
+      "How we label AI content",
+      "Cara kami memberi label pada konten AI"
+    ],
+    [
+      "Claim legacy debates",
+      "Klaim debat lama"
+    ],
+    [
+      "Escalate to a human",
+      "Teruskan ke petugas"
+    ],
+    [
+      "Use a recovery code",
+      "Gunakan kode pemulihan"
+    ],
+    [
+      "Open public debate",
+      "Buka debat publik"
+    ],
+    [
+      "Cookies we store",
+      "Kuki yang kami simpan"
+    ],
+    [
+      "Open your debate",
+      "Buka debat Anda"
+    ],
+    [
+      "Active sessions",
+      "Sesi aktif"
+    ],
+    [
+      "Talk to a human",
+      "Bicara dengan petugas"
+    ],
+    [
+      "Create account",
+      "Buat akun"
+    ],
+    [
+      "Delete account",
+      "Hapus akun"
+    ],
+    [
+      "Public debates",
+      "Debat publik"
+    ],
+    [
+      "Service status",
+      "Status layanan"
+    ],
+    [
+      "Start a debate",
+      "Mulai debat"
+    ],
+    [
+      "Debate engine",
+      "Mesin debat"
+    ],
+    [
+      "Scoring queue",
+      "Antrean penilaian"
+    ],
+    [
+      "Start a round",
+      "Mulai ronde"
+    ],
+    [
+      "What we store",
+      "Yang kami simpan"
+    ],
+    [
+      "How it works",
+      "Cara kerjanya"
+    ],
+    [
+      "Report a bug",
+      "Laporkan bug"
+    ],
+    [
+      "Your debates",
+      "Debat Anda"
+    ],
+    [
+      "High stakes",
+      "Berdampak besar"
+    ],
+    [
+      "Model fleet",
+      "Kumpulan model"
+    ],
+    [
+      "Transcripts",
+      "Transkrip"
+    ],
+    [
+      "New debate",
+      "Debat baru"
+    ],
+    [
+      "Challenge",
+      "Tantang"
+    ],
+    [
+      "Risk tier",
+      "Tingkat risiko"
+    ],
+    [
+      "Start run",
+      "Mulai proses"
+    ],
+    [
+      "Workspace",
+      "Ruang kerja"
+    ],
+    [
+      "Settings",
+      "Pengaturan"
+    ],
+    [
+      "Standard",
+      "Standar"
+    ],
+    [
+      "Account",
+      "Akun"
+    ],
+    [
+      "Honesty",
+      "Kejujuran"
+    ],
+    [
+      "Library",
+      "Pustaka"
+    ],
+    [
+      "Pricing",
+      "Harga"
+    ],
+    [
+      "Privacy",
+      "Privasi"
+    ],
+    [
+      "Casual",
+      "Santai"
+    ],
+    [
+      "Export",
+      "Ekspor"
+    ],
+    [
+      "Log in",
+      "Masuk"
+    ],
+    [
+      "Medium",
+      "Sedang"
+    ],
+    [
+      "Method",
+      "Metode"
+    ],
+    [
+      "Replay",
+      "Putar ulang"
+    ],
+    [
+      "Thread",
+      "Utas"
+    ],
+    [
+      "Split",
+      "Terpisah"
+    ],
+    [
+      "Topic",
+      "Topik"
+    ],
+    [
+      "Free",
+      "Gratis"
+    ],
+    [
+      "Help",
+      "Bantuan"
+    ],
+    [
+      "High",
+      "Tinggi"
+    ],
+    [
+      "Home",
+      "Beranda"
+    ],
+    [
+      "Tree",
+      "Pohon argumen"
+    ],
+    [
+      "Low",
+      "Rendah"
+    ],
+    [
+      "Map",
+      "Peta"
+    ]
+  ],
+  "it": [
+    [
+      "How we label AI content",
+      "Come etichettiamo i contenuti generati dall’IA"
+    ],
+    [
+      "Claim legacy debates",
+      "Rivendica i dibattiti preesistenti"
+    ],
+    [
+      "Escalate to a human",
+      "Richiedi l’intervento di una persona"
+    ],
+    [
+      "Use a recovery code",
+      "Usa un codice di recupero"
+    ],
+    [
+      "Open public debate",
+      "Apri dibattito pubblico"
+    ],
+    [
+      "Cookies we store",
+      "I cookie che conserviamo"
+    ],
+    [
+      "Open your debate",
+      "Apri il tuo dibattito"
+    ],
+    [
+      "Active sessions",
+      "Sessioni attive"
+    ],
+    [
+      "Talk to a human",
+      "Parla con una persona"
+    ],
+    [
+      "Create account",
+      "Crea account"
+    ],
+    [
+      "Delete account",
+      "Elimina account"
+    ],
+    [
+      "Public debates",
+      "Dibattiti pubblici"
+    ],
+    [
+      "Service status",
+      "Stato del servizio"
+    ],
+    [
+      "Start a debate",
+      "Avvia un dibattito"
+    ],
+    [
+      "Debate engine",
+      "Motore di dibattito"
+    ],
+    [
+      "Scoring queue",
+      "Coda di valutazione"
+    ],
+    [
+      "Start a round",
+      "Inizia un round"
+    ],
+    [
+      "What we store",
+      "Cosa conserviamo"
+    ],
+    [
+      "How it works",
+      "Come funziona"
+    ],
+    [
+      "Report a bug",
+      "Segnala un errore"
+    ],
+    [
+      "Your debates",
+      "I tuoi dibattiti"
+    ],
+    [
+      "High stakes",
+      "Posta elevata"
+    ],
+    [
+      "Model fleet",
+      "Parco modelli"
+    ],
+    [
+      "Transcripts",
+      "Trascrizioni"
+    ],
+    [
+      "New debate",
+      "Nuovo dibattito"
+    ],
+    [
+      "Challenge",
+      "Contesta"
+    ],
+    [
+      "Risk tier",
+      "Livello di rischio"
+    ],
+    [
+      "Start run",
+      "Avvia esecuzione"
+    ],
+    [
+      "Workspace",
+      "Area di lavoro"
+    ],
+    [
+      "Settings",
+      "Impostazioni"
+    ],
+    [
+      "Honesty",
+      "Onestà"
+    ],
+    [
+      "Library",
+      "Raccolta"
+    ],
+    [
+      "Pricing",
+      "Prezzi"
+    ],
+    [
+      "Casual",
+      "Informale"
+    ],
+    [
+      "Export",
+      "Esporta"
+    ],
+    [
+      "Log in",
+      "Accedi"
+    ],
+    [
+      "Medium",
+      "Medio"
+    ],
+    [
+      "Method",
+      "Metodo"
+    ],
+    [
+      "Replay",
+      "Riproduci"
+    ],
+    [
+      "Thread",
+      "Discussione"
+    ],
+    [
+      "Split",
+      "Divisa"
+    ],
+    [
+      "Topic",
+      "Tema"
+    ],
+    [
+      "Free",
+      "Gratuito"
+    ],
+    [
+      "Help",
+      "Aiuto"
+    ],
+    [
+      "High",
+      "Alto"
+    ],
+    [
+      "Home",
+      "Pagina iniziale"
+    ],
+    [
+      "Tree",
+      "Albero"
+    ],
+    [
+      "Low",
+      "Basso"
+    ],
+    [
+      "Map",
+      "Mappa"
+    ]
+  ],
+  "ja": [
+    [
+      "How we label AI content",
+      "AI生成コンテンツの表示方法"
+    ],
+    [
+      "Claim legacy debates",
+      "以前のディベートを紐付ける"
+    ],
+    [
+      "Escalate to a human",
+      "担当者に引き継ぐ"
+    ],
+    [
+      "Use a recovery code",
+      "リカバリーコードを使用"
+    ],
+    [
+      "Open public debate",
+      "公開ディベートを開く"
+    ],
+    [
+      "Cookies we store",
+      "保存しているクッキー"
+    ],
+    [
+      "Open your debate",
+      "自分のディベートを開く"
+    ],
+    [
+      "Active sessions",
+      "有効なセッション"
+    ],
+    [
+      "Talk to a human",
+      "担当者と話す"
+    ],
+    [
+      "Create account",
+      "アカウントを作成"
+    ],
+    [
+      "Delete account",
+      "アカウントを削除"
+    ],
+    [
+      "Public debates",
+      "公開ディベート"
+    ],
+    [
+      "Service status",
+      "サービス状況"
+    ],
+    [
+      "Start a debate",
+      "ディベートを開始"
+    ],
+    [
+      "Debate engine",
+      "ディベートエンジン"
+    ],
+    [
+      "Scoring queue",
+      "採点キュー"
+    ],
+    [
+      "Start a round",
+      "ラウンドを開始"
+    ],
+    [
+      "What we store",
+      "保存している情報"
+    ],
+    [
+      "How it works",
+      "仕組み"
+    ],
+    [
+      "Report a bug",
+      "不具合を報告"
+    ],
+    [
+      "Your debates",
+      "自分のディベート"
+    ],
+    [
+      "High stakes",
+      "重大"
+    ],
+    [
+      "Model fleet",
+      "モデル群"
+    ],
+    [
+      "Transcripts",
+      "記録"
+    ],
+    [
+      "New debate",
+      "新しいディベート"
+    ],
+    [
+      "Challenge",
+      "異議を申し立てる"
+    ],
+    [
+      "Risk tier",
+      "リスク階層"
+    ],
+    [
+      "Start run",
+      "実行を開始"
+    ],
+    [
+      "Workspace",
+      "ワークスペース"
+    ],
+    [
+      "Settings",
+      "設定"
+    ],
+    [
+      "Standard",
+      "標準"
+    ],
+    [
+      "Account",
+      "アカウント"
+    ],
+    [
+      "Honesty",
+      "誠実さ"
+    ],
+    [
+      "Library",
+      "ライブラリ"
+    ],
+    [
+      "Premium",
+      "プレミアム"
+    ],
+    [
+      "Pricing",
+      "料金"
+    ],
+    [
+      "Privacy",
+      "プライバシー"
+    ],
+    [
+      "Casual",
+      "気軽"
+    ],
+    [
+      "Export",
+      "エクスポート"
+    ],
+    [
+      "Log in",
+      "ログイン"
+    ],
+    [
+      "Medium",
+      "中"
+    ],
+    [
+      "Method",
+      "方式"
+    ],
+    [
+      "Replay",
+      "再現"
+    ],
+    [
+      "Thread",
+      "スレッド"
+    ],
+    [
+      "Split",
+      "分割"
+    ],
+    [
+      "Topic",
+      "トピック"
+    ],
+    [
+      "Free",
+      "無料"
+    ],
+    [
+      "Help",
+      "ヘルプ"
+    ],
+    [
+      "High",
+      "高"
+    ],
+    [
+      "Home",
+      "ホーム"
+    ],
+    [
+      "Tree",
+      "ツリー"
+    ],
+    [
+      "Low",
+      "低"
+    ],
+    [
+      "Map",
+      "マップ"
+    ]
+  ],
+  "ko": [
+    [
+      "How we label AI content",
+      "AI 콘텐츠 표시 방식"
+    ],
+    [
+      "Claim legacy debates",
+      "기존 토론 소유권 확인"
+    ],
+    [
+      "Escalate to a human",
+      "상담원에게 전달"
+    ],
+    [
+      "Use a recovery code",
+      "복구 코드 사용"
+    ],
+    [
+      "Open public debate",
+      "공개 토론 열기"
+    ],
+    [
+      "Cookies we store",
+      "저장하는 쿠키"
+    ],
+    [
+      "Open your debate",
+      "내 토론 열기"
+    ],
+    [
+      "Active sessions",
+      "활성 세션"
+    ],
+    [
+      "Talk to a human",
+      "상담원과 대화하기"
+    ],
+    [
+      "Create account",
+      "계정 만들기"
+    ],
+    [
+      "Delete account",
+      "계정 삭제"
+    ],
+    [
+      "Public debates",
+      "공개 토론"
+    ],
+    [
+      "Service status",
+      "서비스 상태"
+    ],
+    [
+      "Start a debate",
+      "토론 시작"
+    ],
+    [
+      "Debate engine",
+      "토론 엔진"
+    ],
+    [
+      "Scoring queue",
+      "채점 대기열"
+    ],
+    [
+      "Start a round",
+      "라운드 시작"
+    ],
+    [
+      "What we store",
+      "저장하는 항목"
+    ],
+    [
+      "How it works",
+      "작동 방식"
+    ],
+    [
+      "Report a bug",
+      "버그 신고"
+    ],
+    [
+      "Your debates",
+      "내 토론"
+    ],
+    [
+      "High stakes",
+      "중대함"
+    ],
+    [
+      "Model fleet",
+      "모델군"
+    ],
+    [
+      "Transcripts",
+      "기록"
+    ],
+    [
+      "New debate",
+      "새 토론"
+    ],
+    [
+      "Challenge",
+      "이의 제기"
+    ],
+    [
+      "Risk tier",
+      "위험 등급"
+    ],
+    [
+      "Start run",
+      "실행 시작"
+    ],
+    [
+      "Workspace",
+      "작업 공간"
+    ],
+    [
+      "Settings",
+      "설정"
+    ],
+    [
+      "Standard",
+      "표준"
+    ],
+    [
+      "Account",
+      "계정"
+    ],
+    [
+      "Honesty",
+      "정직성"
+    ],
+    [
+      "Library",
+      "라이브러리"
+    ],
+    [
+      "Premium",
+      "프리미엄"
+    ],
+    [
+      "Pricing",
+      "요금"
+    ],
+    [
+      "Privacy",
+      "개인정보"
+    ],
+    [
+      "Casual",
+      "가벼움"
+    ],
+    [
+      "Export",
+      "내보내기"
+    ],
+    [
+      "Log in",
+      "로그인"
+    ],
+    [
+      "Medium",
+      "중간"
+    ],
+    [
+      "Method",
+      "방식"
+    ],
+    [
+      "Replay",
+      "재생"
+    ],
+    [
+      "Thread",
+      "스레드"
+    ],
+    [
+      "Split",
+      "분할"
+    ],
+    [
+      "Topic",
+      "주제"
+    ],
+    [
+      "Free",
+      "무료"
+    ],
+    [
+      "Help",
+      "도움말"
+    ],
+    [
+      "High",
+      "높음"
+    ],
+    [
+      "Home",
+      "홈"
+    ],
+    [
+      "Tree",
+      "트리"
+    ],
+    [
+      "Low",
+      "낮음"
+    ],
+    [
+      "Map",
+      "맵"
+    ]
+  ],
+  "lt": [
+    [
+      "How we label AI content",
+      "Kaip žymime DI sukurtą turinį"
+    ],
+    [
+      "Claim legacy debates",
+      "Perimti senus debatus"
+    ],
+    [
+      "Escalate to a human",
+      "Perduoti pokalbį žmogui"
+    ],
+    [
+      "Use a recovery code",
+      "Naudoti atkūrimo kodą"
+    ],
+    [
+      "Open public debate",
+      "Atverti viešus debatus"
+    ],
+    [
+      "Cookies we store",
+      "Mūsų saugomi slapukai"
+    ],
+    [
+      "Open your debate",
+      "Atverti savo debatus"
+    ],
+    [
+      "Active sessions",
+      "Aktyvūs seansai"
+    ],
+    [
+      "Talk to a human",
+      "Kalbėtis su žmogumi"
+    ],
+    [
+      "Create account",
+      "Sukurti paskyrą"
+    ],
+    [
+      "Delete account",
+      "Ištrinti paskyrą"
+    ],
+    [
+      "Public debates",
+      "Vieši debatai"
+    ],
+    [
+      "Service status",
+      "Paslaugos būsena"
+    ],
+    [
+      "Start a debate",
+      "Pradėti debatus"
+    ],
+    [
+      "Debate engine",
+      "Debatų variklis"
+    ],
+    [
+      "Scoring queue",
+      "Vertinimo eilė"
+    ],
+    [
+      "Start a round",
+      "Pradėti raundą"
+    ],
+    [
+      "What we store",
+      "Ką saugome"
+    ],
+    [
+      "How it works",
+      "Kaip tai veikia"
+    ],
+    [
+      "Report a bug",
+      "Pranešti apie klaidą"
+    ],
+    [
+      "Your debates",
+      "Jūsų debatai"
+    ],
+    [
+      "High stakes",
+      "Didelė rizika"
+    ],
+    [
+      "Model fleet",
+      "Modelių grupė"
+    ],
+    [
+      "Transcripts",
+      "Stenogramos"
+    ],
+    [
+      "New debate",
+      "Nauji debatai"
+    ],
+    [
+      "Challenge",
+      "Ginčyti"
+    ],
+    [
+      "Risk tier",
+      "Rizikos lygis"
+    ],
+    [
+      "Start run",
+      "Pradėti vykdymą"
+    ],
+    [
+      "Workspace",
+      "Darbo sritis"
+    ],
+    [
+      "Settings",
+      "Nustatymai"
+    ],
+    [
+      "Standard",
+      "Standartinis"
+    ],
+    [
+      "Account",
+      "Paskyra"
+    ],
+    [
+      "Honesty",
+      "Atvirumas"
+    ],
+    [
+      "Library",
+      "Biblioteka"
+    ],
+    [
+      "Pricing",
+      "Kainos"
+    ],
+    [
+      "Privacy",
+      "Privatumas"
+    ],
+    [
+      "Casual",
+      "Maža rizika"
+    ],
+    [
+      "Export",
+      "Eksportuoti"
+    ],
+    [
+      "Log in",
+      "Prisijungti"
+    ],
+    [
+      "Medium",
+      "Vidutinis"
+    ],
+    [
+      "Method",
+      "Metodas"
+    ],
+    [
+      "Replay",
+      "Pakartojimas"
+    ],
+    [
+      "Thread",
+      "Gija"
+    ],
+    [
+      "Split",
+      "Padalytas rodinys"
+    ],
+    [
+      "Topic",
+      "Tema"
+    ],
+    [
+      "Free",
+      "Nemokamas"
+    ],
+    [
+      "Help",
+      "Pagalba"
+    ],
+    [
+      "High",
+      "Didelis"
+    ],
+    [
+      "Home",
+      "Pradžia"
+    ],
+    [
+      "Tree",
+      "Medis"
+    ],
+    [
+      "Low",
+      "Mažas"
+    ],
+    [
+      "Map",
+      "Žemėlapis"
+    ]
+  ],
+  "lv": [
+    [
+      "How we label AI content",
+      "Kā mēs marķējam MI saturu"
+    ],
+    [
+      "Claim legacy debates",
+      "Pieprasīt mantotās debates"
+    ],
+    [
+      "Escalate to a human",
+      "Nodot sarunu cilvēkam"
+    ],
+    [
+      "Use a recovery code",
+      "Izmantot atkopšanas kodu"
+    ],
+    [
+      "Open public debate",
+      "Atvērt publiskās debates"
+    ],
+    [
+      "Cookies we store",
+      "Mūsu glabātās sīkdatnes"
+    ],
+    [
+      "Open your debate",
+      "Atvērt savas debates"
+    ],
+    [
+      "Active sessions",
+      "Aktīvās sesijas"
+    ],
+    [
+      "Talk to a human",
+      "Runāt ar cilvēku"
+    ],
+    [
+      "Create account",
+      "Izveidot kontu"
+    ],
+    [
+      "Delete account",
+      "Dzēst kontu"
+    ],
+    [
+      "Public debates",
+      "Publiskās debates"
+    ],
+    [
+      "Service status",
+      "Pakalpojuma statuss"
+    ],
+    [
+      "Start a debate",
+      "Sākt debates"
+    ],
+    [
+      "Debate engine",
+      "Debašu dzinējs"
+    ],
+    [
+      "Scoring queue",
+      "Vērtēšanas rinda"
+    ],
+    [
+      "Start a round",
+      "Sākt raundu"
+    ],
+    [
+      "What we store",
+      "Ko mēs glabājam"
+    ],
+    [
+      "How it works",
+      "Kā tas darbojas"
+    ],
+    [
+      "Report a bug",
+      "Ziņot par kļūdu"
+    ],
+    [
+      "Your debates",
+      "Jūsu debates"
+    ],
+    [
+      "High stakes",
+      "Augstas likmes"
+    ],
+    [
+      "Model fleet",
+      "Modeļu parks"
+    ],
+    [
+      "Transcripts",
+      "Transkripti"
+    ],
+    [
+      "New debate",
+      "Jaunas debates"
+    ],
+    [
+      "Challenge",
+      "Apstrīdēt"
+    ],
+    [
+      "Risk tier",
+      "Riska līmenis"
+    ],
+    [
+      "Start run",
+      "Sākt izpildi"
+    ],
+    [
+      "Workspace",
+      "Darbvieta"
+    ],
+    [
+      "Settings",
+      "Iestatījumi"
+    ],
+    [
+      "Standard",
+      "Standarta"
+    ],
+    [
+      "Account",
+      "Konts"
+    ],
+    [
+      "Honesty",
+      "Godīgums"
+    ],
+    [
+      "Library",
+      "Bibliotēka"
+    ],
+    [
+      "Pricing",
+      "Cenas"
+    ],
+    [
+      "Privacy",
+      "Privātums"
+    ],
+    [
+      "Casual",
+      "Zemas likmes"
+    ],
+    [
+      "Export",
+      "Eksportēt"
+    ],
+    [
+      "Log in",
+      "Pierakstīties"
+    ],
+    [
+      "Medium",
+      "Vidējs"
+    ],
+    [
+      "Method",
+      "Metode"
+    ],
+    [
+      "Replay",
+      "Atskaņot"
+    ],
+    [
+      "Thread",
+      "Diskusija"
+    ],
+    [
+      "Split",
+      "Dalītais skats"
+    ],
+    [
+      "Topic",
+      "Tēma"
+    ],
+    [
+      "Free",
+      "Bezmaksas"
+    ],
+    [
+      "Help",
+      "Palīdzība"
+    ],
+    [
+      "High",
+      "Augsts"
+    ],
+    [
+      "Home",
+      "Sākums"
+    ],
+    [
+      "Tree",
+      "Koks"
+    ],
+    [
+      "Low",
+      "Zems"
+    ],
+    [
+      "Map",
+      "Karte"
+    ]
+  ],
+  "mt": [
+    [
+      "How we label AI content",
+      "Kif nimmarkaw il-kontenut tal-IA"
+    ],
+    [
+      "Claim legacy debates",
+      "Itlob id-dibattiti storiċi"
+    ],
+    [
+      "Escalate to a human",
+      "Għaddi l-każ lil persuna"
+    ],
+    [
+      "Use a recovery code",
+      "Uża kodiċi ta’ rkupru"
+    ],
+    [
+      "Open public debate",
+      "Iftaħ dibattitu pubbliku"
+    ],
+    [
+      "Cookies we store",
+      "Il-cookies li naħżnu"
+    ],
+    [
+      "Open your debate",
+      "Iftaħ id-dibattitu tiegħek"
+    ],
+    [
+      "Active sessions",
+      "Sessjonijiet attivi"
+    ],
+    [
+      "Talk to a human",
+      "Tkellem ma’ persuna"
+    ],
+    [
+      "Create account",
+      "Oħloq kont"
+    ],
+    [
+      "Delete account",
+      "Ħassar il-kont"
+    ],
+    [
+      "Public debates",
+      "Dibattiti pubbliċi"
+    ],
+    [
+      "Service status",
+      "Stat tas-servizz"
+    ],
+    [
+      "Start a debate",
+      "Ibda dibattitu"
+    ],
+    [
+      "Debate engine",
+      "Magna tad-dibattitu"
+    ],
+    [
+      "Scoring queue",
+      "Kju tal-punteġġi"
+    ],
+    [
+      "Start a round",
+      "Ibda rawnd"
+    ],
+    [
+      "What we store",
+      "X’naħżnu"
+    ],
+    [
+      "How it works",
+      "Kif jaħdem"
+    ],
+    [
+      "Report a bug",
+      "Irrapporta żball"
+    ],
+    [
+      "Your debates",
+      "Id-dibattiti tiegħek"
+    ],
+    [
+      "High stakes",
+      "Riskju għoli"
+    ],
+    [
+      "Model fleet",
+      "Ġabra ta’ mudelli"
+    ],
+    [
+      "Transcripts",
+      "Traskrizzjonijiet"
+    ],
+    [
+      "New debate",
+      "Dibattitu ġdid"
+    ],
+    [
+      "Challenge",
+      "Sfida"
+    ],
+    [
+      "Risk tier",
+      "Livell tar-riskju"
+    ],
+    [
+      "Start run",
+      "Ibda l-eżekuzzjoni"
+    ],
+    [
+      "Workspace",
+      "Spazju tax-xogħol"
+    ],
+    [
+      "Settings",
+      "Issettjar"
+    ],
+    [
+      "Account",
+      "Kont"
+    ],
+    [
+      "Honesty",
+      "Onestà"
+    ],
+    [
+      "Library",
+      "Librerija"
+    ],
+    [
+      "Pricing",
+      "Prezzijiet"
+    ],
+    [
+      "Privacy",
+      "Privatezza"
+    ],
+    [
+      "Casual",
+      "Informali"
+    ],
+    [
+      "Export",
+      "Esporta"
+    ],
+    [
+      "Log in",
+      "Idħol fil-kont"
+    ],
+    [
+      "Medium",
+      "Medju"
+    ],
+    [
+      "Method",
+      "Metodu"
+    ],
+    [
+      "Replay",
+      "Irriproduċi"
+    ],
+    [
+      "Thread",
+      "Diskussjoni"
+    ],
+    [
+      "Split",
+      "Maqsuma"
+    ],
+    [
+      "Topic",
+      "Suġġett"
+    ],
+    [
+      "Free",
+      "B’xejn"
+    ],
+    [
+      "Help",
+      "Għajnuna"
+    ],
+    [
+      "High",
+      "Għoli"
+    ],
+    [
+      "Home",
+      "Paġna ewlenija"
+    ],
+    [
+      "Tree",
+      "Siġra"
+    ],
+    [
+      "Low",
+      "Baxx"
+    ],
+    [
+      "Map",
+      "Mappa"
+    ]
+  ],
+  "nl": [
+    [
+      "How we label AI content",
+      "Hoe wij AI-inhoud aanduiden"
+    ],
+    [
+      "Claim legacy debates",
+      "Eerdere debatten koppelen"
+    ],
+    [
+      "Escalate to a human",
+      "Doorzetten naar een medewerker"
+    ],
+    [
+      "Use a recovery code",
+      "Een herstelcode gebruiken"
+    ],
+    [
+      "Open public debate",
+      "Openbaar debat openen"
+    ],
+    [
+      "Cookies we store",
+      "Cookies die we opslaan"
+    ],
+    [
+      "Open your debate",
+      "Uw debat openen"
+    ],
+    [
+      "Active sessions",
+      "Actieve sessies"
+    ],
+    [
+      "Talk to a human",
+      "Met een medewerker praten"
+    ],
+    [
+      "Create account",
+      "Account aanmaken"
+    ],
+    [
+      "Delete account",
+      "Account verwijderen"
+    ],
+    [
+      "Public debates",
+      "Openbare debatten"
+    ],
+    [
+      "Service status",
+      "Servicestatus"
+    ],
+    [
+      "Start a debate",
+      "Een debat starten"
+    ],
+    [
+      "Debate engine",
+      "Debatengine"
+    ],
+    [
+      "Scoring queue",
+      "Scorewachtrij"
+    ],
+    [
+      "Start a round",
+      "Ronde starten"
+    ],
+    [
+      "What we store",
+      "Wat we opslaan"
+    ],
+    [
+      "How it works",
+      "Hoe het werkt"
+    ],
+    [
+      "Report a bug",
+      "Een fout melden"
+    ],
+    [
+      "Your debates",
+      "Uw debatten"
+    ],
+    [
+      "High stakes",
+      "Hoge inzet"
+    ],
+    [
+      "Model fleet",
+      "Modelpark"
+    ],
+    [
+      "Transcripts",
+      "Transcripten"
+    ],
+    [
+      "New debate",
+      "Nieuw debat"
+    ],
+    [
+      "Challenge",
+      "Betwisten"
+    ],
+    [
+      "Risk tier",
+      "Risiconiveau"
+    ],
+    [
+      "Start run",
+      "Uitvoering starten"
+    ],
+    [
+      "Workspace",
+      "Werkruimte"
+    ],
+    [
+      "Settings",
+      "Instellingen"
+    ],
+    [
+      "Standard",
+      "Standaard"
+    ],
+    [
+      "Honesty",
+      "Eerlijkheid"
+    ],
+    [
+      "Library",
+      "Bibliotheek"
+    ],
+    [
+      "Pricing",
+      "Prijzen"
+    ],
+    [
+      "Casual",
+      "Alledaags"
+    ],
+    [
+      "Export",
+      "Exporteren"
+    ],
+    [
+      "Log in",
+      "Aanmelden"
+    ],
+    [
+      "Medium",
+      "Gemiddeld"
+    ],
+    [
+      "Method",
+      "Methode"
+    ],
+    [
+      "Replay",
+      "Opnieuw afspelen"
+    ],
+    [
+      "Thread",
+      "Discussielijn"
+    ],
+    [
+      "Split",
+      "Gesplitste weergave"
+    ],
+    [
+      "Topic",
+      "Onderwerp"
+    ],
+    [
+      "Free",
+      "Gratis"
+    ],
+    [
+      "Help",
+      "Hulp"
+    ],
+    [
+      "High",
+      "Hoog"
+    ],
+    [
+      "Home",
+      "Startpagina"
+    ],
+    [
+      "Tree",
+      "Boom"
+    ],
+    [
+      "Low",
+      "Laag"
+    ],
+    [
+      "Map",
+      "Kaart"
+    ]
+  ],
+  "pl": [
+    [
+      "How we label AI content",
+      "Jak oznaczamy treści AI"
+    ],
+    [
+      "Claim legacy debates",
+      "Przejmij starsze debaty"
+    ],
+    [
+      "Escalate to a human",
+      "Przekaż sprawę człowiekowi"
+    ],
+    [
+      "Use a recovery code",
+      "Użyj kodu odzyskiwania"
+    ],
+    [
+      "Open public debate",
+      "Otwórz debatę publiczną"
+    ],
+    [
+      "Cookies we store",
+      "Przechowywane pliki cookie"
+    ],
+    [
+      "Open your debate",
+      "Otwórz swoją debatę"
+    ],
+    [
+      "Active sessions",
+      "Aktywne sesje"
+    ],
+    [
+      "Talk to a human",
+      "Porozmawiaj z człowiekiem"
+    ],
+    [
+      "Create account",
+      "Utwórz konto"
+    ],
+    [
+      "Delete account",
+      "Usuń konto"
+    ],
+    [
+      "Public debates",
+      "Debaty publiczne"
+    ],
+    [
+      "Service status",
+      "Stan usługi"
+    ],
+    [
+      "Start a debate",
+      "Rozpocznij debatę"
+    ],
+    [
+      "Debate engine",
+      "Mechanizm debaty"
+    ],
+    [
+      "Scoring queue",
+      "Kolejka oceniania"
+    ],
+    [
+      "Start a round",
+      "Rozpocznij rundę"
+    ],
+    [
+      "What we store",
+      "Co przechowujemy"
+    ],
+    [
+      "How it works",
+      "Jak to działa"
+    ],
+    [
+      "Report a bug",
+      "Zgłoś błąd"
+    ],
+    [
+      "Your debates",
+      "Twoje debaty"
+    ],
+    [
+      "High stakes",
+      "Wysoka stawka"
+    ],
+    [
+      "Model fleet",
+      "Zestaw modeli"
+    ],
+    [
+      "Transcripts",
+      "Transkrypcje"
+    ],
+    [
+      "New debate",
+      "Nowa debata"
+    ],
+    [
+      "Challenge",
+      "Podważ"
+    ],
+    [
+      "Risk tier",
+      "Poziom ryzyka"
+    ],
+    [
+      "Start run",
+      "Uruchom przebieg"
+    ],
+    [
+      "Workspace",
+      "Obszar roboczy"
+    ],
+    [
+      "Settings",
+      "Ustawienia"
+    ],
+    [
+      "Standard",
+      "Standardowy"
+    ],
+    [
+      "Account",
+      "Konto"
+    ],
+    [
+      "Honesty",
+      "Rzetelność"
+    ],
+    [
+      "Library",
+      "Biblioteka"
+    ],
+    [
+      "Pricing",
+      "Cennik"
+    ],
+    [
+      "Privacy",
+      "Prywatność"
+    ],
+    [
+      "Casual",
+      "Swobodny"
+    ],
+    [
+      "Export",
+      "Eksportuj"
+    ],
+    [
+      "Log in",
+      "Zaloguj się"
+    ],
+    [
+      "Medium",
+      "Średni"
+    ],
+    [
+      "Method",
+      "Metoda"
+    ],
+    [
+      "Replay",
+      "Powtórka"
+    ],
+    [
+      "Thread",
+      "Wątek"
+    ],
+    [
+      "Split",
+      "Podział"
+    ],
+    [
+      "Topic",
+      "Temat"
+    ],
+    [
+      "Free",
+      "Bezpłatny"
+    ],
+    [
+      "Help",
+      "Pomoc"
+    ],
+    [
+      "High",
+      "Wysoki"
+    ],
+    [
+      "Home",
+      "Strona główna"
+    ],
+    [
+      "Tree",
+      "Drzewo"
+    ],
+    [
+      "Low",
+      "Niski"
+    ],
+    [
+      "Map",
+      "Mapa"
+    ]
+  ],
+  "pt": [
+    [
+      "How we label AI content",
+      "Como identificamos o conteúdo de IA"
+    ],
+    [
+      "Claim legacy debates",
+      "Reivindicar debates antigos"
+    ],
+    [
+      "Escalate to a human",
+      "Encaminhar para uma pessoa"
+    ],
+    [
+      "Use a recovery code",
+      "Utilizar um código de recuperação"
+    ],
+    [
+      "Open public debate",
+      "Abrir debate público"
+    ],
+    [
+      "Cookies we store",
+      "Cookies que guardamos"
+    ],
+    [
+      "Open your debate",
+      "Abrir o seu debate"
+    ],
+    [
+      "Active sessions",
+      "Sessões ativas"
+    ],
+    [
+      "Talk to a human",
+      "Falar com uma pessoa"
+    ],
+    [
+      "Create account",
+      "Criar conta"
+    ],
+    [
+      "Delete account",
+      "Eliminar conta"
+    ],
+    [
+      "Public debates",
+      "Debates públicos"
+    ],
+    [
+      "Service status",
+      "Estado do serviço"
+    ],
+    [
+      "Start a debate",
+      "Iniciar um debate"
+    ],
+    [
+      "Debate engine",
+      "Motor de debate"
+    ],
+    [
+      "Scoring queue",
+      "Fila de pontuação"
+    ],
+    [
+      "Start a round",
+      "Iniciar uma ronda"
+    ],
+    [
+      "What we store",
+      "O que guardamos"
+    ],
+    [
+      "How it works",
+      "Como funciona"
+    ],
+    [
+      "Report a bug",
+      "Comunicar um erro"
+    ],
+    [
+      "Your debates",
+      "Os seus debates"
+    ],
+    [
+      "High stakes",
+      "Risco elevado"
+    ],
+    [
+      "Model fleet",
+      "Conjunto de modelos"
+    ],
+    [
+      "Transcripts",
+      "Transcrições"
+    ],
+    [
+      "New debate",
+      "Novo debate"
+    ],
+    [
+      "Challenge",
+      "Contestar"
+    ],
+    [
+      "Risk tier",
+      "Nível de risco"
+    ],
+    [
+      "Start run",
+      "Iniciar execução"
+    ],
+    [
+      "Workspace",
+      "Área de trabalho"
+    ],
+    [
+      "Settings",
+      "Definições"
+    ],
+    [
+      "Standard",
+      "Normal"
+    ],
+    [
+      "Account",
+      "Conta"
+    ],
+    [
+      "Honesty",
+      "Honestidade"
+    ],
+    [
+      "Library",
+      "Biblioteca"
+    ],
+    [
+      "Pricing",
+      "Preços"
+    ],
+    [
+      "Privacy",
+      "Privacidade"
+    ],
+    [
+      "Casual",
+      "Informal"
+    ],
+    [
+      "Export",
+      "Exportar"
+    ],
+    [
+      "Log in",
+      "Iniciar sessão"
+    ],
+    [
+      "Medium",
+      "Médio"
+    ],
+    [
+      "Method",
+      "Método"
+    ],
+    [
+      "Replay",
+      "Reprodução"
+    ],
+    [
+      "Thread",
+      "Discussão"
+    ],
+    [
+      "Split",
+      "Dividida"
+    ],
+    [
+      "Topic",
+      "Tema"
+    ],
+    [
+      "Free",
+      "Gratuito"
+    ],
+    [
+      "Help",
+      "Ajuda"
+    ],
+    [
+      "High",
+      "Alto"
+    ],
+    [
+      "Home",
+      "Início"
+    ],
+    [
+      "Tree",
+      "Árvore"
+    ],
+    [
+      "Low",
+      "Baixo"
+    ],
+    [
+      "Map",
+      "Mapa"
+    ]
+  ],
+  "ro": [],
+  "ru": [
+    [
+      "How we label AI content",
+      "Как мы маркируем контент ИИ"
+    ],
+    [
+      "Claim legacy debates",
+      "Привязать прежние дебаты"
+    ],
+    [
+      "Escalate to a human",
+      "Передать человеку"
+    ],
+    [
+      "Use a recovery code",
+      "Использовать код восстановления"
+    ],
+    [
+      "Open public debate",
+      "Открыть общедоступные дебаты"
+    ],
+    [
+      "Cookies we store",
+      "Файлы cookie, которые мы храним"
+    ],
+    [
+      "Open your debate",
+      "Открыть ваши дебаты"
+    ],
+    [
+      "Active sessions",
+      "Активные сеансы"
+    ],
+    [
+      "Talk to a human",
+      "Поговорить с человеком"
+    ],
+    [
+      "Create account",
+      "Создать учётную запись"
+    ],
+    [
+      "Delete account",
+      "Удалить учётную запись"
+    ],
+    [
+      "Public debates",
+      "Публичные дебаты"
+    ],
+    [
+      "Service status",
+      "Состояние сервиса"
+    ],
+    [
+      "Start a debate",
+      "Начать дебаты"
+    ],
+    [
+      "Debate engine",
+      "Система дебатов"
+    ],
+    [
+      "Scoring queue",
+      "Очередь оценки"
+    ],
+    [
+      "Start a round",
+      "Начать раунд"
+    ],
+    [
+      "What we store",
+      "Что мы храним"
+    ],
+    [
+      "How it works",
+      "Как это работает"
+    ],
+    [
+      "Report a bug",
+      "Сообщить об ошибке"
+    ],
+    [
+      "Your debates",
+      "Ваши дебаты"
+    ],
+    [
+      "High stakes",
+      "Высокие ставки"
+    ],
+    [
+      "Model fleet",
+      "Парк моделей"
+    ],
+    [
+      "Transcripts",
+      "Стенограммы"
+    ],
+    [
+      "New debate",
+      "Новые дебаты"
+    ],
+    [
+      "Challenge",
+      "Оспорить"
+    ],
+    [
+      "Risk tier",
+      "Уровень риска"
+    ],
+    [
+      "Start run",
+      "Запустить"
+    ],
+    [
+      "Workspace",
+      "Рабочая область"
+    ],
+    [
+      "Settings",
+      "Настройки"
+    ],
+    [
+      "Standard",
+      "Обычные ставки"
+    ],
+    [
+      "Account",
+      "Учётная запись"
+    ],
+    [
+      "Honesty",
+      "Добросовестность"
+    ],
+    [
+      "Library",
+      "Библиотека"
+    ],
+    [
+      "Premium",
+      "Премиум"
+    ],
+    [
+      "Pricing",
+      "Тарифы"
+    ],
+    [
+      "Privacy",
+      "Конфиденциальность"
+    ],
+    [
+      "Casual",
+      "Невысокие ставки"
+    ],
+    [
+      "Export",
+      "Экспорт"
+    ],
+    [
+      "Log in",
+      "Войти"
+    ],
+    [
+      "Medium",
+      "Средний"
+    ],
+    [
+      "Method",
+      "Метод"
+    ],
+    [
+      "Replay",
+      "Воспроизвести"
+    ],
+    [
+      "Thread",
+      "Ветка"
+    ],
+    [
+      "Split",
+      "Раздельный вид"
+    ],
+    [
+      "Topic",
+      "Тема"
+    ],
+    [
+      "Free",
+      "Бесплатный"
+    ],
+    [
+      "Help",
+      "Помощь"
+    ],
+    [
+      "High",
+      "Высокий"
+    ],
+    [
+      "Home",
+      "Главная"
+    ],
+    [
+      "Tree",
+      "Дерево"
+    ],
+    [
+      "Low",
+      "Низкий"
+    ],
+    [
+      "Map",
+      "Карта"
+    ]
+  ],
+  "sk": [
+    [
+      "How we label AI content",
+      "Ako označujeme obsah vytvorený AI"
+    ],
+    [
+      "Claim legacy debates",
+      "Prevziať staršie debaty"
+    ],
+    [
+      "Escalate to a human",
+      "Postúpiť človeku"
+    ],
+    [
+      "Use a recovery code",
+      "Použiť obnovovací kód"
+    ],
+    [
+      "Open public debate",
+      "Otvoriť verejnú debatu"
+    ],
+    [
+      "Cookies we store",
+      "Súbory cookie, ktoré ukladáme"
+    ],
+    [
+      "Open your debate",
+      "Otvoriť vašu debatu"
+    ],
+    [
+      "Active sessions",
+      "Aktívne relácie"
+    ],
+    [
+      "Talk to a human",
+      "Porozprávať sa s človekom"
+    ],
+    [
+      "Create account",
+      "Vytvoriť účet"
+    ],
+    [
+      "Delete account",
+      "Odstrániť účet"
+    ],
+    [
+      "Public debates",
+      "Verejné debaty"
+    ],
+    [
+      "Service status",
+      "Stav služby"
+    ],
+    [
+      "Start a debate",
+      "Začať debatu"
+    ],
+    [
+      "Debate engine",
+      "Modul debát"
+    ],
+    [
+      "Scoring queue",
+      "Front hodnotenia"
+    ],
+    [
+      "Start a round",
+      "Začať kolo"
+    ],
+    [
+      "What we store",
+      "Čo ukladáme"
+    ],
+    [
+      "How it works",
+      "Ako to funguje"
+    ],
+    [
+      "Report a bug",
+      "Nahlásiť chybu"
+    ],
+    [
+      "Your debates",
+      "Vaše debaty"
+    ],
+    [
+      "High stakes",
+      "Vysoká"
+    ],
+    [
+      "Model fleet",
+      "Súbor modelov"
+    ],
+    [
+      "Transcripts",
+      "Prepisy"
+    ],
+    [
+      "New debate",
+      "Nová debata"
+    ],
+    [
+      "Challenge",
+      "Spochybniť"
+    ],
+    [
+      "Risk tier",
+      "Úroveň rizika"
+    ],
+    [
+      "Start run",
+      "Spustiť"
+    ],
+    [
+      "Workspace",
+      "Pracovný priestor"
+    ],
+    [
+      "Settings",
+      "Nastavenia"
+    ],
+    [
+      "Standard",
+      "Štandardná"
+    ],
+    [
+      "Account",
+      "Účet"
+    ],
+    [
+      "Honesty",
+      "Poctivosť"
+    ],
+    [
+      "Library",
+      "Knižnica"
+    ],
+    [
+      "Pricing",
+      "Cenník"
+    ],
+    [
+      "Privacy",
+      "Súkromie"
+    ],
+    [
+      "Casual",
+      "Nízka"
+    ],
+    [
+      "Log in",
+      "Prihlásiť sa"
+    ],
+    [
+      "Medium",
+      "Stredná"
+    ],
+    [
+      "Method",
+      "Metóda"
+    ],
+    [
+      "Replay",
+      "Prehrať"
+    ],
+    [
+      "Thread",
+      "Vlákno"
+    ],
+    [
+      "Split",
+      "Rozdelené"
+    ],
+    [
+      "Topic",
+      "Téma"
+    ],
+    [
+      "Free",
+      "Bezplatný"
+    ],
+    [
+      "Help",
+      "Pomoc"
+    ],
+    [
+      "High",
+      "Vysoká"
+    ],
+    [
+      "Home",
+      "Domov"
+    ],
+    [
+      "Tree",
+      "Strom"
+    ],
+    [
+      "Low",
+      "Nízka"
+    ],
+    [
+      "Map",
+      "Mapa"
+    ]
+  ],
+  "sl": [
+    [
+      "How we label AI content",
+      "Kako označujemo vsebino UI"
+    ],
+    [
+      "Claim legacy debates",
+      "Prevzem podedovanih razprav"
+    ],
+    [
+      "Escalate to a human",
+      "Predaj osebi"
+    ],
+    [
+      "Use a recovery code",
+      "Uporabi obnovitveno kodo"
+    ],
+    [
+      "Open public debate",
+      "Odpri javno razpravo"
+    ],
+    [
+      "Cookies we store",
+      "Piškotki, ki jih shranjujemo"
+    ],
+    [
+      "Open your debate",
+      "Odpri svojo razpravo"
+    ],
+    [
+      "Active sessions",
+      "Aktivne seje"
+    ],
+    [
+      "Talk to a human",
+      "Pogovori se z osebo"
+    ],
+    [
+      "Create account",
+      "Ustvari račun"
+    ],
+    [
+      "Delete account",
+      "Izbris računa"
+    ],
+    [
+      "Public debates",
+      "Javne razprave"
+    ],
+    [
+      "Service status",
+      "Stanje storitve"
+    ],
+    [
+      "Start a debate",
+      "Začni razpravo"
+    ],
+    [
+      "Debate engine",
+      "Mehanizem za razprave"
+    ],
+    [
+      "Scoring queue",
+      "Čakalna vrsta za ocenjevanje"
+    ],
+    [
+      "Start a round",
+      "Začni krog"
+    ],
+    [
+      "What we store",
+      "Kaj shranjujemo"
+    ],
+    [
+      "How it works",
+      "Kako deluje"
+    ],
+    [
+      "Report a bug",
+      "Prijavi napako"
+    ],
+    [
+      "Your debates",
+      "Vaše razprave"
+    ],
+    [
+      "High stakes",
+      "Veliko tveganje"
+    ],
+    [
+      "Model fleet",
+      "Nabor modelov"
+    ],
+    [
+      "Transcripts",
+      "Prepisi"
+    ],
+    [
+      "New debate",
+      "Nova razprava"
+    ],
+    [
+      "Challenge",
+      "Izpodbij"
+    ],
+    [
+      "Risk tier",
+      "Raven tveganja"
+    ],
+    [
+      "Start run",
+      "Začni izvajanje"
+    ],
+    [
+      "Workspace",
+      "Delovni prostor"
+    ],
+    [
+      "Settings",
+      "Nastavitve"
+    ],
+    [
+      "Standard",
+      "Običajno"
+    ],
+    [
+      "Account",
+      "Račun"
+    ],
+    [
+      "Honesty",
+      "Iskrenost"
+    ],
+    [
+      "Library",
+      "Knjižnica"
+    ],
+    [
+      "Pricing",
+      "Cenik"
+    ],
+    [
+      "Privacy",
+      "Zasebnost"
+    ],
+    [
+      "Casual",
+      "Nizko tveganje"
+    ],
+    [
+      "Export",
+      "Izvoz"
+    ],
+    [
+      "Log in",
+      "Prijava"
+    ],
+    [
+      "Medium",
+      "Srednja"
+    ],
+    [
+      "Method",
+      "Metoda"
+    ],
+    [
+      "Replay",
+      "Ponovitev"
+    ],
+    [
+      "Thread",
+      "Nit"
+    ],
+    [
+      "Split",
+      "Deljeni pogled"
+    ],
+    [
+      "Topic",
+      "Tema"
+    ],
+    [
+      "Free",
+      "Brezplačno"
+    ],
+    [
+      "Help",
+      "Pomoč"
+    ],
+    [
+      "High",
+      "Visoka"
+    ],
+    [
+      "Home",
+      "Domov"
+    ],
+    [
+      "Tree",
+      "Drevo"
+    ],
+    [
+      "Low",
+      "Nizka"
+    ],
+    [
+      "Map",
+      "Zemljevid"
+    ]
+  ],
+  "sv": [
+    [
+      "How we label AI content",
+      "Så märker vi AI-innehåll"
+    ],
+    [
+      "Claim legacy debates",
+      "Ta över äldre debatter"
+    ],
+    [
+      "Escalate to a human",
+      "Eskalera till en person"
+    ],
+    [
+      "Use a recovery code",
+      "Använd en återställningskod"
+    ],
+    [
+      "Open public debate",
+      "Öppna offentlig debatt"
+    ],
+    [
+      "Cookies we store",
+      "Cookies vi sparar"
+    ],
+    [
+      "Open your debate",
+      "Öppna din debatt"
+    ],
+    [
+      "Active sessions",
+      "Aktiva sessioner"
+    ],
+    [
+      "Talk to a human",
+      "Prata med en person"
+    ],
+    [
+      "Create account",
+      "Skapa konto"
+    ],
+    [
+      "Delete account",
+      "Radera konto"
+    ],
+    [
+      "Public debates",
+      "Offentliga debatter"
+    ],
+    [
+      "Service status",
+      "Tjänstestatus"
+    ],
+    [
+      "Start a debate",
+      "Starta en debatt"
+    ],
+    [
+      "Debate engine",
+      "Debattmotor"
+    ],
+    [
+      "Scoring queue",
+      "Poängsättningskö"
+    ],
+    [
+      "Start a round",
+      "Starta en omgång"
+    ],
+    [
+      "What we store",
+      "Det här sparar vi"
+    ],
+    [
+      "How it works",
+      "Så fungerar det"
+    ],
+    [
+      "Report a bug",
+      "Rapportera ett fel"
+    ],
+    [
+      "Your debates",
+      "Dina debatter"
+    ],
+    [
+      "High stakes",
+      "Höga insatser"
+    ],
+    [
+      "Model fleet",
+      "Modellflotta"
+    ],
+    [
+      "Transcripts",
+      "Transkriptioner"
+    ],
+    [
+      "New debate",
+      "Ny debatt"
+    ],
+    [
+      "Challenge",
+      "Ifrågasätt"
+    ],
+    [
+      "Risk tier",
+      "Risknivå"
+    ],
+    [
+      "Start run",
+      "Starta körning"
+    ],
+    [
+      "Workspace",
+      "Arbetsyta"
+    ],
+    [
+      "Settings",
+      "Inställningar"
+    ],
+    [
+      "Account",
+      "Konto"
+    ],
+    [
+      "Honesty",
+      "Redlighet"
+    ],
+    [
+      "Library",
+      "Bibliotek"
+    ],
+    [
+      "Pricing",
+      "Priser"
+    ],
+    [
+      "Privacy",
+      "Integritet"
+    ],
+    [
+      "Casual",
+      "Vardaglig"
+    ],
+    [
+      "Export",
+      "Exportera"
+    ],
+    [
+      "Log in",
+      "Logga in"
+    ],
+    [
+      "Medium",
+      "Medel"
+    ],
+    [
+      "Method",
+      "Metod"
+    ],
+    [
+      "Replay",
+      "Spela upp igen"
+    ],
+    [
+      "Thread",
+      "Tråd"
+    ],
+    [
+      "Split",
+      "Delad"
+    ],
+    [
+      "Topic",
+      "Ämne"
+    ],
+    [
+      "Free",
+      "Kostnadsfri"
+    ],
+    [
+      "Help",
+      "Hjälp"
+    ],
+    [
+      "High",
+      "Hög"
+    ],
+    [
+      "Home",
+      "Startsida"
+    ],
+    [
+      "Tree",
+      "Träd"
+    ],
+    [
+      "Low",
+      "Låg"
+    ],
+    [
+      "Map",
+      "Karta"
+    ]
+  ],
+  "tr": [
+    [
+      "How we label AI content",
+      "Yapay zekâ içeriğini nasıl etiketliyoruz"
+    ],
+    [
+      "Claim legacy debates",
+      "Eski tartışmaları sahiplen"
+    ],
+    [
+      "Escalate to a human",
+      "Bir yetkiliye aktar"
+    ],
+    [
+      "Use a recovery code",
+      "Kurtarma kodu kullan"
+    ],
+    [
+      "Open public debate",
+      "Herkese açık tartışmayı aç"
+    ],
+    [
+      "Cookies we store",
+      "Sakladığımız çerezler"
+    ],
+    [
+      "Open your debate",
+      "Tartışmanızı aç"
+    ],
+    [
+      "Active sessions",
+      "Etkin oturumlar"
+    ],
+    [
+      "Talk to a human",
+      "Bir yetkiliyle görüş"
+    ],
+    [
+      "Create account",
+      "Hesap oluştur"
+    ],
+    [
+      "Delete account",
+      "Hesabı sil"
+    ],
+    [
+      "Public debates",
+      "Herkese açık tartışmalar"
+    ],
+    [
+      "Service status",
+      "Hizmet durumu"
+    ],
+    [
+      "Start a debate",
+      "Tartışma başlat"
+    ],
+    [
+      "Debate engine",
+      "Tartışma motoru"
+    ],
+    [
+      "Scoring queue",
+      "Puanlama kuyruğu"
+    ],
+    [
+      "Start a round",
+      "Tur başlat"
+    ],
+    [
+      "What we store",
+      "Neleri saklıyoruz"
+    ],
+    [
+      "How it works",
+      "Nasıl çalışır"
+    ],
+    [
+      "Report a bug",
+      "Hata bildir"
+    ],
+    [
+      "Your debates",
+      "Tartışmalarınız"
+    ],
+    [
+      "High stakes",
+      "Yüksek önem"
+    ],
+    [
+      "Model fleet",
+      "Model filosu"
+    ],
+    [
+      "Transcripts",
+      "Tutanaklar"
+    ],
+    [
+      "New debate",
+      "Yeni tartışma"
+    ],
+    [
+      "Challenge",
+      "İtiraz et"
+    ],
+    [
+      "Risk tier",
+      "Risk kademesi"
+    ],
+    [
+      "Start run",
+      "Çalıştırmayı başlat"
+    ],
+    [
+      "Workspace",
+      "Çalışma alanı"
+    ],
+    [
+      "Settings",
+      "Ayarlar"
+    ],
+    [
+      "Standard",
+      "Standart"
+    ],
+    [
+      "Account",
+      "Hesap"
+    ],
+    [
+      "Honesty",
+      "Dürüstlük"
+    ],
+    [
+      "Library",
+      "Kütüphane"
+    ],
+    [
+      "Pricing",
+      "Fiyatlandırma"
+    ],
+    [
+      "Privacy",
+      "Gizlilik"
+    ],
+    [
+      "Casual",
+      "Gündelik"
+    ],
+    [
+      "Export",
+      "Dışa aktar"
+    ],
+    [
+      "Log in",
+      "Oturum aç"
+    ],
+    [
+      "Medium",
+      "Orta"
+    ],
+    [
+      "Method",
+      "Yöntem"
+    ],
+    [
+      "Replay",
+      "Yeniden oynat"
+    ],
+    [
+      "Thread",
+      "Akış"
+    ],
+    [
+      "Split",
+      "Bölünmüş"
+    ],
+    [
+      "Topic",
+      "Konu"
+    ],
+    [
+      "Free",
+      "Ücretsiz"
+    ],
+    [
+      "Help",
+      "Yardım"
+    ],
+    [
+      "High",
+      "Yüksek"
+    ],
+    [
+      "Home",
+      "Ana sayfa"
+    ],
+    [
+      "Tree",
+      "Ağaç"
+    ],
+    [
+      "Low",
+      "Düşük"
+    ],
+    [
+      "Map",
+      "Harita"
+    ]
+  ],
+  "uk": [
+    [
+      "How we label AI content",
+      "Як ми позначаємо вміст ШІ"
+    ],
+    [
+      "Claim legacy debates",
+      "Заявити права на попередні дебати"
+    ],
+    [
+      "Escalate to a human",
+      "Передати людині"
+    ],
+    [
+      "Use a recovery code",
+      "Скористатися кодом відновлення"
+    ],
+    [
+      "Open public debate",
+      "Відкрити загальнодоступні дебати"
+    ],
+    [
+      "Cookies we store",
+      "Файли cookie, які ми зберігаємо"
+    ],
+    [
+      "Open your debate",
+      "Відкрити ваші дебати"
+    ],
+    [
+      "Active sessions",
+      "Активні сеанси"
+    ],
+    [
+      "Talk to a human",
+      "Поговорити з людиною"
+    ],
+    [
+      "Create account",
+      "Створити обліковий запис"
+    ],
+    [
+      "Delete account",
+      "Видалити обліковий запис"
+    ],
+    [
+      "Public debates",
+      "Оприлюднені дебати"
+    ],
+    [
+      "Service status",
+      "Стан сервісу"
+    ],
+    [
+      "Start a debate",
+      "Почати дебати"
+    ],
+    [
+      "Debate engine",
+      "Модуль дебатів"
+    ],
+    [
+      "Scoring queue",
+      "Черга оцінювання"
+    ],
+    [
+      "Start a round",
+      "Почати раунд"
+    ],
+    [
+      "What we store",
+      "Що ми зберігаємо"
+    ],
+    [
+      "How it works",
+      "Як це працює"
+    ],
+    [
+      "Report a bug",
+      "Повідомити про помилку"
+    ],
+    [
+      "Your debates",
+      "Ваші дебати"
+    ],
+    [
+      "High stakes",
+      "Високі ставки"
+    ],
+    [
+      "Model fleet",
+      "Набір моделей"
+    ],
+    [
+      "Transcripts",
+      "Стенограми"
+    ],
+    [
+      "New debate",
+      "Нові дебати"
+    ],
+    [
+      "Challenge",
+      "Оскаржити"
+    ],
+    [
+      "Risk tier",
+      "Рівень ризику"
+    ],
+    [
+      "Start run",
+      "Почати запуск"
+    ],
+    [
+      "Workspace",
+      "Робоча область"
+    ],
+    [
+      "Settings",
+      "Налаштування"
+    ],
+    [
+      "Standard",
+      "Стандартний"
+    ],
+    [
+      "Account",
+      "Обліковий запис"
+    ],
+    [
+      "Honesty",
+      "Доброчесність"
+    ],
+    [
+      "Library",
+      "Бібліотека"
+    ],
+    [
+      "Premium",
+      "Преміум"
+    ],
+    [
+      "Pricing",
+      "Тарифи"
+    ],
+    [
+      "Privacy",
+      "Конфіденційність"
+    ],
+    [
+      "Casual",
+      "Невимушений"
+    ],
+    [
+      "Export",
+      "Експорт"
+    ],
+    [
+      "Log in",
+      "Увійти"
+    ],
+    [
+      "Medium",
+      "Середній"
+    ],
+    [
+      "Method",
+      "Метод"
+    ],
+    [
+      "Replay",
+      "Повтор"
+    ],
+    [
+      "Thread",
+      "Гілка"
+    ],
+    [
+      "Split",
+      "Розділене"
+    ],
+    [
+      "Topic",
+      "Тема"
+    ],
+    [
+      "Free",
+      "Безкоштовний"
+    ],
+    [
+      "Help",
+      "Довідка"
+    ],
+    [
+      "High",
+      "Високий"
+    ],
+    [
+      "Home",
+      "Головна"
+    ],
+    [
+      "Tree",
+      "Дерево"
+    ],
+    [
+      "Low",
+      "Низький"
+    ],
+    [
+      "Map",
+      "Мапа"
+    ]
+  ],
+  "vi": [
+    [
+      "How we label AI content",
+      "Cách chúng tôi gắn nhãn nội dung AI"
+    ],
+    [
+      "Claim legacy debates",
+      "Nhận quyền sở hữu cuộc tranh luận cũ"
+    ],
+    [
+      "Escalate to a human",
+      "Chuyển cho nhân viên hỗ trợ"
+    ],
+    [
+      "Use a recovery code",
+      "Dùng mã khôi phục"
+    ],
+    [
+      "Open public debate",
+      "Mở cuộc tranh luận công khai"
+    ],
+    [
+      "Cookies we store",
+      "Các cookie chúng tôi lưu"
+    ],
+    [
+      "Open your debate",
+      "Mở cuộc tranh luận của bạn"
+    ],
+    [
+      "Active sessions",
+      "Phiên đang hoạt động"
+    ],
+    [
+      "Talk to a human",
+      "Trò chuyện với nhân viên hỗ trợ"
+    ],
+    [
+      "Create account",
+      "Tạo tài khoản"
+    ],
+    [
+      "Delete account",
+      "Xóa tài khoản"
+    ],
+    [
+      "Public debates",
+      "Các cuộc tranh luận công khai"
+    ],
+    [
+      "Service status",
+      "Trạng thái dịch vụ"
+    ],
+    [
+      "Start a debate",
+      "Bắt đầu một cuộc tranh luận"
+    ],
+    [
+      "Debate engine",
+      "Công cụ tranh luận"
+    ],
+    [
+      "Scoring queue",
+      "Hàng đợi chấm điểm"
+    ],
+    [
+      "Start a round",
+      "Bắt đầu một vòng"
+    ],
+    [
+      "What we store",
+      "Những gì chúng tôi lưu"
+    ],
+    [
+      "How it works",
+      "Cách hoạt động"
+    ],
+    [
+      "Report a bug",
+      "Báo lỗi"
+    ],
+    [
+      "Your debates",
+      "Các cuộc tranh luận của bạn"
+    ],
+    [
+      "High stakes",
+      "Hệ trọng cao"
+    ],
+    [
+      "Model fleet",
+      "Nhóm mô hình"
+    ],
+    [
+      "Transcripts",
+      "Bản ghi"
+    ],
+    [
+      "New debate",
+      "Cuộc tranh luận mới"
+    ],
+    [
+      "Challenge",
+      "Phản biện"
+    ],
+    [
+      "Risk tier",
+      "Mức rủi ro"
+    ],
+    [
+      "Start run",
+      "Bắt đầu chạy"
+    ],
+    [
+      "Workspace",
+      "Không gian làm việc"
+    ],
+    [
+      "Settings",
+      "Cài đặt"
+    ],
+    [
+      "Standard",
+      "Tiêu chuẩn"
+    ],
+    [
+      "Account",
+      "Tài khoản"
+    ],
+    [
+      "Honesty",
+      "Tính trung thực"
+    ],
+    [
+      "Library",
+      "Thư viện"
+    ],
+    [
+      "Premium",
+      "Cao cấp"
+    ],
+    [
+      "Pricing",
+      "Bảng giá"
+    ],
+    [
+      "Privacy",
+      "Quyền riêng tư"
+    ],
+    [
+      "Casual",
+      "Thông thường"
+    ],
+    [
+      "Export",
+      "Xuất"
+    ],
+    [
+      "Log in",
+      "Đăng nhập"
+    ],
+    [
+      "Medium",
+      "Trung bình"
+    ],
+    [
+      "Method",
+      "Phương pháp"
+    ],
+    [
+      "Replay",
+      "Phát lại"
+    ],
+    [
+      "Thread",
+      "Luồng"
+    ],
+    [
+      "Split",
+      "Chia đôi"
+    ],
+    [
+      "Topic",
+      "Chủ đề"
+    ],
+    [
+      "Free",
+      "Miễn phí"
+    ],
+    [
+      "Help",
+      "Trợ giúp"
+    ],
+    [
+      "High",
+      "Cao"
+    ],
+    [
+      "Home",
+      "Trang chủ"
+    ],
+    [
+      "Tree",
+      "Cây"
+    ],
+    [
+      "Low",
+      "Thấp"
+    ],
+    [
+      "Map",
+      "Bản đồ"
+    ]
+  ],
+  "zh": [
+    [
+      "How we label AI content",
+      "我们如何标识 AI 内容"
+    ],
+    [
+      "Claim legacy debates",
+      "认领旧版辩论"
+    ],
+    [
+      "Escalate to a human",
+      "转交人工客服"
+    ],
+    [
+      "Use a recovery code",
+      "使用恢复代码"
+    ],
+    [
+      "Open public debate",
+      "打开公开辩论"
+    ],
+    [
+      "Cookies we store",
+      "我们存储的 Cookie"
+    ],
+    [
+      "Open your debate",
+      "打开您的辩论"
+    ],
+    [
+      "Active sessions",
+      "活跃会话"
+    ],
+    [
+      "Talk to a human",
+      "与人工客服交谈"
+    ],
+    [
+      "Create account",
+      "创建账户"
+    ],
+    [
+      "Delete account",
+      "删除账户"
+    ],
+    [
+      "Public debates",
+      "公开辩论"
+    ],
+    [
+      "Service status",
+      "服务状态"
+    ],
+    [
+      "Start a debate",
+      "开始辩论"
+    ],
+    [
+      "Debate engine",
+      "辩论引擎"
+    ],
+    [
+      "Scoring queue",
+      "评分队列"
+    ],
+    [
+      "Start a round",
+      "开始一轮"
+    ],
+    [
+      "What we store",
+      "我们存储的内容"
+    ],
+    [
+      "How it works",
+      "运作方式"
+    ],
+    [
+      "Report a bug",
+      "报告错误"
+    ],
+    [
+      "Your debates",
+      "您的辩论"
+    ],
+    [
+      "High stakes",
+      "高风险"
+    ],
+    [
+      "Model fleet",
+      "模型集群"
+    ],
+    [
+      "Transcripts",
+      "文字记录"
+    ],
+    [
+      "New debate",
+      "新辩论"
+    ],
+    [
+      "Challenge",
+      "质询"
+    ],
+    [
+      "Risk tier",
+      "风险等级"
+    ],
+    [
+      "Start run",
+      "开始运行"
+    ],
+    [
+      "Workspace",
+      "工作区"
+    ],
+    [
+      "Settings",
+      "设置"
+    ],
+    [
+      "Standard",
+      "标准"
+    ],
+    [
+      "Account",
+      "账户"
+    ],
+    [
+      "Honesty",
+      "诚实度"
+    ],
+    [
+      "Library",
+      "资料库"
+    ],
+    [
+      "Premium",
+      "高级版"
+    ],
+    [
+      "Pricing",
+      "定价"
+    ],
+    [
+      "Privacy",
+      "隐私"
+    ],
+    [
+      "Casual",
+      "轻量"
+    ],
+    [
+      "Export",
+      "导出"
+    ],
+    [
+      "Log in",
+      "登录"
+    ],
+    [
+      "Medium",
+      "中"
+    ],
+    [
+      "Method",
+      "方法"
+    ],
+    [
+      "Replay",
+      "重放"
+    ],
+    [
+      "Thread",
+      "脉络"
+    ],
+    [
+      "Split",
+      "分栏"
+    ],
+    [
+      "Topic",
+      "主题"
+    ],
+    [
+      "Free",
+      "免费"
+    ],
+    [
+      "Help",
+      "帮助"
+    ],
+    [
+      "High",
+      "高"
+    ],
+    [
+      "Home",
+      "首页"
+    ],
+    [
+      "Tree",
+      "树状图"
+    ],
+    [
+      "Low",
+      "低"
+    ],
+    [
+      "Map",
+      "图谱"
+    ]
+  ]
+} as const satisfies Readonly<Record<SupportLanguage, readonly (readonly [string, string])[]>>;
+
+export const SUPPORT_CAPABILITY_KEY_NAMES = {
+  "ar": {
+    "ai-transparency": "الشفافية بشأن الذكاء الاصطناعي",
+    "legal-notice": "المعلومات القانونية",
+    "legal-terms": "شروط الخدمة",
+    "legal-terms-versions": "نسخ الشروط",
+    "legal-privacy": "سياسة الخصوصية",
+    "legal-health-data": "خصوصية البيانات الصحية في الولايات المتحدة",
+    "legal-cookies": "سياسة ملفات تعريف الارتباط",
+    "legal-providers": "مزودو النماذج",
+    "sign-up": "إنشاء حساب",
+    "settings": "الإعدادات"
+  },
+  "bg": {
+    "ai-transparency": "Прозрачност за ИИ",
+    "legal-notice": "Информация за дружеството",
+    "legal-terms": "Условия за ползване",
+    "legal-terms-versions": "Версии на условията",
+    "legal-privacy": "Политика за поверителност",
+    "legal-health-data": "Поверителност на здравните данни (САЩ)",
+    "legal-cookies": "Политика за бисквитките",
+    "legal-providers": "Доставчици на модели",
+    "sign-up": "Създайте профил",
+    "settings": "Настройки"
+  },
+  "cs": {
+    "ai-transparency": "Transparentnost AI",
+    "legal-notice": "Informace o provozovateli",
+    "legal-terms": "Podmínky poskytování služby",
+    "legal-terms-versions": "Verze podmínek",
+    "legal-privacy": "Zásady ochrany osobních údajů",
+    "legal-health-data": "Ochrana údajů o zdraví v USA",
+    "legal-cookies": "Zásady používání souborů cookie",
+    "legal-providers": "Poskytovatelé modelů",
+    "sign-up": "Vytvořit účet",
+    "settings": "Nastavení"
+  },
+  "da": {
+    "ai-transparency": "AI-gennemsigtighed",
+    "legal-notice": "Juridiske oplysninger",
+    "legal-terms": "Tjenestevilkår",
+    "legal-terms-versions": "Versioner af vilkårene",
+    "legal-privacy": "Privatlivspolitik",
+    "legal-health-data": "Helbredsoplysninger i USA",
+    "legal-cookies": "Cookiepolitik",
+    "legal-providers": "Modeludbydere",
+    "sign-up": "Opret konto",
+    "settings": "Indstillinger"
+  },
+  "de": {
+    "ai-transparency": "KI-Transparenz",
+    "legal-notice": "Impressum",
+    "legal-terms": "Nutzungsbedingungen",
+    "legal-terms-versions": "Fassungen der Nutzungsbedingungen",
+    "legal-privacy": "Datenschutzerklärung",
+    "legal-health-data": "Gesundheitsdaten (USA)",
+    "legal-cookies": "Cookie-Richtlinie",
+    "legal-providers": "Modellanbieter",
+    "sign-up": "Konto erstellen",
+    "settings": "Einstellungen"
+  },
+  "el": {
+    "ai-transparency": "Διαφάνεια ΤΝ",
+    "legal-notice": "Νομικές πληροφορίες",
+    "legal-terms": "Όροι παροχής υπηρεσιών",
+    "legal-terms-versions": "Εκδόσεις των όρων",
+    "legal-privacy": "Πολιτική απορρήτου",
+    "legal-health-data": "Απόρρητο δεδομένων υγείας (ΗΠΑ)",
+    "legal-cookies": "Πολιτική cookies",
+    "legal-providers": "Πάροχοι μοντέλων",
+    "sign-up": "Δημιουργία λογαριασμού",
+    "settings": "Ρυθμίσεις"
+  },
+  "en": {},
+  "es": {
+    "ai-transparency": "Transparencia sobre IA",
+    "legal-notice": "Aviso legal",
+    "legal-terms": "Términos de servicio",
+    "legal-terms-versions": "Versiones de los términos",
+    "legal-privacy": "Política de privacidad",
+    "legal-health-data": "Privacidad de datos de salud en EE. UU.",
+    "legal-cookies": "Política de cookies",
+    "legal-providers": "Proveedores de modelos",
+    "sign-up": "Crear cuenta",
+    "settings": "Configuración"
+  },
+  "et": {
+    "ai-transparency": "Tehisintellekti läbipaistvus",
+    "legal-notice": "Teenusepakkuja andmed",
+    "legal-terms": "Teenusetingimused",
+    "legal-terms-versions": "Tingimuste versioonid",
+    "legal-privacy": "Privaatsuspoliitika",
+    "legal-health-data": "USA terviseandmete privaatsus",
+    "legal-cookies": "Küpsisepoliitika",
+    "legal-providers": "Mudelipakkujad",
+    "sign-up": "Looge konto",
+    "settings": "Seaded"
+  },
+  "fi": {
+    "ai-transparency": "Tekoälyn läpinäkyvyys",
+    "legal-notice": "Palveluntarjoajan tiedot",
+    "legal-terms": "Käyttöehdot",
+    "legal-terms-versions": "Käyttöehtojen versiot",
+    "legal-privacy": "Tietosuojakäytäntö",
+    "legal-health-data": "Terveystietojen suoja (Yhdysvallat)",
+    "legal-cookies": "Evästekäytäntö",
+    "legal-providers": "Mallien tarjoajat",
+    "sign-up": "Luo tili",
+    "settings": "Asetukset"
+  },
+  "fr": {
+    "ai-transparency": "Transparence de l’IA",
+    "legal-notice": "Mentions légales",
+    "legal-terms": "Conditions d’utilisation",
+    "legal-terms-versions": "Versions des conditions",
+    "legal-privacy": "Politique de confidentialité",
+    "legal-health-data": "Données de santé (États-Unis)",
+    "legal-cookies": "Politique relative aux cookies",
+    "legal-providers": "Fournisseurs de modèles",
+    "sign-up": "Créer un compte",
+    "settings": "Paramètres"
+  },
+  "ga": {
+    "ai-transparency": "Trédhearcacht IS",
+    "legal-notice": "Fógra dlíthiúil",
+    "legal-terms": "Téarmaí seirbhíse",
+    "legal-terms-versions": "Leaganacha na dtéarmaí",
+    "legal-privacy": "Beartas príobháideachais",
+    "legal-health-data": "Príobháideachas sonraí sláinte (SAM)",
+    "legal-cookies": "Beartas fianán",
+    "legal-providers": "Soláthraithe samhlacha",
+    "sign-up": "Cruthaigh cuntas",
+    "settings": "Socruithe"
+  },
+  "he": {
+    "ai-transparency": "שקיפות בינה מלאכותית",
+    "legal-notice": "הודעה משפטית",
+    "legal-terms": "תנאי השירות",
+    "legal-terms-versions": "גרסאות התנאים",
+    "legal-privacy": "מדיניות הפרטיות",
+    "legal-health-data": "פרטיות נתוני בריאות בארה״ב",
+    "legal-cookies": "מדיניות העוגיות",
+    "legal-providers": "ספקי מודלים",
+    "sign-up": "יצירת חשבון",
+    "settings": "הגדרות"
+  },
+  "hi": {
+    "ai-transparency": "AI पारदर्शिता",
+    "legal-notice": "विधिक सूचना",
+    "legal-terms": "सेवा की शर्तें",
+    "legal-terms-versions": "शर्तों के संस्करण",
+    "legal-privacy": "गोपनीयता नीति",
+    "legal-health-data": "अमेरिकी स्वास्थ्य डेटा गोपनीयता",
+    "legal-cookies": "कुकी नीति",
+    "legal-providers": "मॉडल प्रदाता",
+    "sign-up": "खाता बनाएँ",
+    "settings": "सेटिंग्स"
+  },
+  "hr": {
+    "ai-transparency": "Transparentnost umjetne inteligencije",
+    "legal-notice": "Impresum",
+    "legal-terms": "Uvjeti korištenja",
+    "legal-terms-versions": "Verzije uvjeta",
+    "legal-privacy": "Pravila o privatnosti",
+    "legal-health-data": "Privatnost zdravstvenih podataka (SAD)",
+    "legal-cookies": "Pravila o kolačićima",
+    "legal-providers": "Pružatelji modela",
+    "sign-up": "Izradite račun",
+    "settings": "Postavke"
+  },
+  "hu": {
+    "ai-transparency": "MI-átláthatóság",
+    "legal-notice": "Impresszum",
+    "legal-terms": "Szolgáltatási feltételek",
+    "legal-terms-versions": "A feltételek változatai",
+    "legal-privacy": "Adatvédelmi szabályzat",
+    "legal-health-data": "Amerikai egészségügyi adatok védelme",
+    "legal-cookies": "Sütiszabályzat",
+    "legal-providers": "Modellszolgáltatók",
+    "sign-up": "Fiók létrehozása",
+    "settings": "Beállítások"
+  },
+  "id": {
+    "ai-transparency": "Transparansi AI",
+    "legal-notice": "Informasi hukum",
+    "legal-terms": "Ketentuan layanan",
+    "legal-terms-versions": "Versi ketentuan",
+    "legal-privacy": "Kebijakan privasi",
+    "legal-health-data": "Privasi data kesehatan AS",
+    "legal-cookies": "Kebijakan kuki",
+    "legal-providers": "Penyedia model",
+    "sign-up": "Buat akun",
+    "settings": "Pengaturan"
+  },
+  "it": {
+    "ai-transparency": "Trasparenza dell’IA",
+    "legal-notice": "Dati societari",
+    "legal-terms": "Condizioni di servizio",
+    "legal-terms-versions": "Versioni delle condizioni",
+    "legal-privacy": "Informativa sulla privacy",
+    "legal-health-data": "Privacy dei dati sanitari (USA)",
+    "legal-cookies": "Informativa sui cookie",
+    "legal-providers": "Fornitori di modelli",
+    "sign-up": "Crea account",
+    "settings": "Impostazioni"
+  },
+  "ja": {
+    "ai-transparency": "AIの透明性",
+    "legal-notice": "特定商取引法に基づく表記",
+    "legal-terms": "利用規約",
+    "legal-terms-versions": "利用規約の版履歴",
+    "legal-privacy": "プライバシーポリシー",
+    "legal-health-data": "米国の健康データ・プライバシー",
+    "legal-cookies": "クッキーポリシー",
+    "legal-providers": "モデルプロバイダー",
+    "sign-up": "アカウントを作成",
+    "settings": "設定"
+  },
+  "ko": {
+    "ai-transparency": "AI 투명성",
+    "legal-notice": "사업자 정보",
+    "legal-terms": "서비스 이용약관",
+    "legal-terms-versions": "이용약관 버전 기록",
+    "legal-privacy": "개인정보 처리방침",
+    "legal-health-data": "미국 건강 데이터 개인정보 보호",
+    "legal-cookies": "쿠키 정책",
+    "legal-providers": "모델 제공업체",
+    "sign-up": "계정 만들기",
+    "settings": "설정"
+  },
+  "lt": {
+    "ai-transparency": "DI skaidrumas",
+    "legal-notice": "Rekvizitai",
+    "legal-terms": "Paslaugų teikimo sąlygos",
+    "legal-terms-versions": "Sąlygų versijos",
+    "legal-privacy": "Privatumo politika",
+    "legal-health-data": "JAV sveikatos duomenų privatumas",
+    "legal-cookies": "Slapukų politika",
+    "legal-providers": "Modelių teikėjai",
+    "sign-up": "Sukurti paskyrą",
+    "settings": "Nustatymai"
+  },
+  "lv": {
+    "ai-transparency": "MI pārredzamība",
+    "legal-notice": "Rekvizīti",
+    "legal-terms": "Pakalpojuma noteikumi",
+    "legal-terms-versions": "Noteikumu versijas",
+    "legal-privacy": "Privātuma politika",
+    "legal-health-data": "ASV veselības datu privātums",
+    "legal-cookies": "Sīkdatņu politika",
+    "legal-providers": "Modeļu pakalpojumu sniedzēji",
+    "sign-up": "Izveidot kontu",
+    "settings": "Iestatījumi"
+  },
+  "mt": {
+    "ai-transparency": "Trasparenza tal-IA",
+    "legal-notice": "Informazzjoni dwar il-kumpanija",
+    "legal-terms": "Termini tas-servizz",
+    "legal-terms-versions": "Verżjonijiet tat-termini",
+    "legal-privacy": "Politika dwar il-privatezza",
+    "legal-health-data": "Privatezza tad-data tas-saħħa fl-Istati Uniti",
+    "legal-cookies": "Politika dwar il-cookies",
+    "legal-providers": "Fornituri tal-mudelli",
+    "sign-up": "Oħloq kont",
+    "settings": "Issettjar"
+  },
+  "nl": {
+    "ai-transparency": "AI-transparantie",
+    "legal-notice": "Wettelijke informatie",
+    "legal-terms": "Servicevoorwaarden",
+    "legal-terms-versions": "Versies van de voorwaarden",
+    "legal-privacy": "Privacybeleid",
+    "legal-health-data": "Gezondheidsgegevens (VS)",
+    "legal-cookies": "Cookiebeleid",
+    "legal-providers": "Modelaanbieders",
+    "sign-up": "Account aanmaken",
+    "settings": "Instellingen"
+  },
+  "pl": {
+    "ai-transparency": "Przejrzystość AI",
+    "legal-notice": "Nota prawna",
+    "legal-terms": "Warunki świadczenia usług",
+    "legal-terms-versions": "Wersje warunków",
+    "legal-privacy": "Polityka prywatności",
+    "legal-health-data": "Prywatność danych dotyczących zdrowia (USA)",
+    "legal-cookies": "Polityka plików cookie",
+    "legal-providers": "Dostawcy modeli",
+    "sign-up": "Utwórz konto",
+    "settings": "Ustawienia"
+  },
+  "pt": {
+    "ai-transparency": "Transparência da IA",
+    "legal-notice": "Aviso legal",
+    "legal-terms": "Termos de Serviço",
+    "legal-terms-versions": "Versões dos Termos",
+    "legal-privacy": "Política de Privacidade",
+    "legal-health-data": "Privacidade de dados de saúde (EUA)",
+    "legal-cookies": "Política de Cookies",
+    "legal-providers": "Fornecedores de modelos",
+    "sign-up": "Criar conta",
+    "settings": "Definições"
+  },
+  "ro": {},
+  "ru": {
+    "ai-transparency": "Прозрачность ИИ",
+    "legal-notice": "Информация о компании",
+    "legal-terms": "Условия использования",
+    "legal-terms-versions": "Версии условий",
+    "legal-privacy": "Политика конфиденциальности",
+    "legal-health-data": "Конфиденциальность данных о здоровье (США)",
+    "legal-cookies": "Политика использования файлов cookie",
+    "legal-providers": "Поставщики моделей",
+    "sign-up": "Создать учётную запись",
+    "settings": "Настройки"
+  },
+  "sk": {
+    "ai-transparency": "Transparentnosť AI",
+    "legal-notice": "Informácie o prevádzkovateľovi",
+    "legal-terms": "Podmienky poskytovania služby",
+    "legal-terms-versions": "Verzie podmienok",
+    "legal-privacy": "Zásady ochrany osobných údajov",
+    "legal-health-data": "Ochrana údajov o zdraví v USA",
+    "legal-cookies": "Zásady používania súborov cookie",
+    "legal-providers": "Poskytovatelia modelov",
+    "sign-up": "Vytvoriť účet",
+    "settings": "Nastavenia"
+  },
+  "sl": {
+    "ai-transparency": "Preglednost UI",
+    "legal-notice": "Impresum",
+    "legal-terms": "Pogoji uporabe",
+    "legal-terms-versions": "Različice pogojev",
+    "legal-privacy": "Pravilnik o zasebnosti",
+    "legal-health-data": "Zasebnost zdravstvenih podatkov (ZDA)",
+    "legal-cookies": "Pravilnik o piškotkih",
+    "legal-providers": "Ponudniki modelov",
+    "sign-up": "Ustvari račun",
+    "settings": "Nastavitve"
+  },
+  "sv": {
+    "ai-transparency": "AI-transparens",
+    "legal-notice": "Juridisk information",
+    "legal-terms": "Användarvillkor",
+    "legal-terms-versions": "Versioner av villkoren",
+    "legal-privacy": "Integritetspolicy",
+    "legal-health-data": "Hälsouppgifter i USA",
+    "legal-cookies": "Cookiepolicy",
+    "legal-providers": "Modelleverantörer",
+    "sign-up": "Skapa konto",
+    "settings": "Inställningar"
+  },
+  "tr": {
+    "ai-transparency": "Yapay zekâ şeffaflığı",
+    "legal-notice": "Yasal Bilgiler",
+    "legal-terms": "Hizmet Koşulları",
+    "legal-terms-versions": "Koşulların sürümleri",
+    "legal-privacy": "Gizlilik Politikası",
+    "legal-health-data": "ABD sağlık verileri gizliliği",
+    "legal-cookies": "Çerez Politikası",
+    "legal-providers": "Model sağlayıcıları",
+    "sign-up": "Hesap oluştur",
+    "settings": "Ayarlar"
+  },
+  "uk": {
+    "ai-transparency": "Прозорість ШІ",
+    "legal-notice": "Інформація про компанію",
+    "legal-terms": "Умови надання послуг",
+    "legal-terms-versions": "Версії умов",
+    "legal-privacy": "Політика конфіденційності",
+    "legal-health-data": "Конфіденційність даних про здоров’я (США)",
+    "legal-cookies": "Політика щодо файлів cookie",
+    "legal-providers": "Постачальники моделей",
+    "sign-up": "Створити обліковий запис",
+    "settings": "Налаштування"
+  },
+  "vi": {
+    "ai-transparency": "Minh bạch về AI",
+    "legal-notice": "Thông tin pháp lý",
+    "legal-terms": "Điều khoản dịch vụ",
+    "legal-terms-versions": "Các phiên bản điều khoản",
+    "legal-privacy": "Chính sách quyền riêng tư",
+    "legal-health-data": "Quyền riêng tư dữ liệu sức khỏe (Hoa Kỳ)",
+    "legal-cookies": "Chính sách cookie",
+    "legal-providers": "Nhà cung cấp mô hình",
+    "sign-up": "Tạo tài khoản",
+    "settings": "Cài đặt"
+  },
+  "zh": {
+    "ai-transparency": "AI 透明度",
+    "legal-notice": "法律声明",
+    "legal-terms": "服务条款",
+    "legal-terms-versions": "服务条款历史版本",
+    "legal-privacy": "隐私政策",
+    "legal-health-data": "美国健康数据隐私",
+    "legal-cookies": "Cookie 政策",
+    "legal-providers": "模型提供商",
+    "sign-up": "创建账户",
+    "settings": "设置"
+  }
+} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<string, string>>>>;

@@ -300,7 +300,7 @@ export function reduceAssessment(input: { readonly claimType: ClaimType; readonl
  * alphabet over that array's CURRENT CONTENTS, and a caller who pushes into the export
  * widens the reason alphabet (codex r1b F1 remainder). `CANONICAL_MEMBER_FAILURE_KINDS`
  * below is this helper's own copy, built from its own object literal, unreachable from
- * any exported binding. The seven public spellings are unchanged, and drift between the
+ * any exported binding. The eight public spellings (B9 added SPEND_REFUSED) are unchanged, and drift between the
  * two is a COMPILE error rather than a silent divergence: the literal carries
  * `satisfies Record<PanelMemberFailureKind, 0>`, which errors in BOTH directions —
  * TS2741 when a kind is missing, TS2353 when one is not in the union. (Measured on
@@ -326,7 +326,8 @@ const CANONICAL_MEMBER_FAILURE_KINDS: ReadonlySet<string> = new Set(Object.keys(
   PARSE_FAILURE: 0,
   SCHEMA_FAILURE: 0,
   UNCONFIGURED_FAMILY: 0,
-  PRODUCER_GRADING_FORBIDDEN: 0
+  PRODUCER_GRADING_FORBIDDEN: 0,
+  SPEND_REFUSED: 0
 } satisfies Record<PanelMemberFailureKind, 0>));
 
 const MEMBER_FAILURE_CODES: ReadonlyMap<string, string> = new Map([
@@ -353,6 +354,17 @@ function boundedMemberFailureReason(error: unknown): string {
 }
 
 /**
+ * B9 (budget spec §2.9) — the codes of a seat left out for money, and the
+ * reason its note carries. Like MEMBER_FAILURE_CODES above, the value RETURNED
+ * is this module's own literal, never the string that was read.
+ */
+const LEFT_OUT_SEAT_SPEND_CODES: ReadonlyMap<string, string> = new Map([
+  ["RUN_COST_ENVELOPE_MONEY_REACHED", "RUN_COST_ENVELOPE_MONEY_REACHED"],
+  ["DAILY_COST_ENVELOPE_REACHED", "DAILY_COST_ENVELOPE_REACHED"],
+  ["PERSON_ALLOWANCE_REACHED", "PERSON_ALLOWANCE_REACHED"]
+]);
+
+/**
  * Engine money rule (spec §14.4.1), Task M2 — what the panel does when a
  * run-level spend stop arrives. Either way no further member is asked: every
  * further member is another call for a run that has just been told it cannot
@@ -365,6 +377,13 @@ function boundedMemberFailureReason(error: unknown): string {
  *    gathered — the author, every member voice already heard (paid for) and
  *    every note — with the stop as `stoppedBy`, so the caller can keep those
  *    voices. The runner asks for it on the first root's panel only.
+ *
+ * B9 (budget spec §2.9, the Panel seats row): `leaveOutMoneyRefusedSeats`
+ * changes this for MONEY alone — the run's ceiling for arguing, the site's day
+ * and a person's window. Such a seat is noted (MEMBER_FAILED, SPEND_REFUSED,
+ * the stop's code as the reason) and the next member is asked, exactly as a
+ * failed member is. The attempt ceiling and a vendor with no usage still follow
+ * the rule above. The runner asks for it only with cheaper models on.
  */
 export type PanelRunLevelSpendStopRule = "RETHROW" | "RETURN_HEARD";
 
@@ -373,6 +392,7 @@ export async function runJudgePanel(input: {
   readonly primary: { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string };
   readonly members: readonly { readonly memberRole: string; readonly actorRef: string; readonly contractHash: string; readonly judge: () => Promise<{ readonly judgementRef: string; readonly assessment: JudgeAssessment }> }[];
   readonly onRunLevelSpendStop?: PanelRunLevelSpendStopRule;
+  readonly leaveOutMoneyRefusedSeats?: boolean;
 }): Promise<{ readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly contractHash: string | null }[]; readonly notes: readonly { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }[]; readonly stoppedBy?: unknown }> {
   let stoppedBy: { readonly error: unknown } | null = null;
   const judgements = [{ ...input.primary, contractHash: null as string | null }];
@@ -393,6 +413,23 @@ export async function runJudgePanel(input: {
       // Task M2: or, when the caller asks, the panel ends here and returns the
       // voices it already heard, with the stop beside them.
       if (isRunLevelSpendStop(error)) {
+        // B9: with the setting, a seat refused for MONEY is left out, as a failed
+        // seat is, and the panel carries on. `code` is read once; the reason is
+        // this module's own literal.
+        const code: unknown = (error as { readonly code?: unknown }).code;
+        const leftOut = input.leaveOutMoneyRefusedSeats === true && typeof code === "string"
+          ? LEFT_OUT_SEAT_SPEND_CODES.get(code)
+          : undefined;
+        if (leftOut !== undefined) {
+          notes.push({
+            memberRole: member.memberRole,
+            contractHash: member.contractHash,
+            kind: "MEMBER_FAILED",
+            failureKind: "SPEND_REFUSED",
+            reason: leftOut
+          });
+          continue;
+        }
         if (input.onRunLevelSpendStop !== "RETURN_HEARD") throw error;
         stoppedBy = { error };
         break;
@@ -415,12 +452,16 @@ export async function runJudgePanel(input: {
 
 export const PANEL_MEMBER_FAILURE_KINDS = [
   "CONSTRUCTION_ERROR", "TIMEOUT", "PROVIDER_ERROR", "PARSE_FAILURE",
-  "SCHEMA_FAILURE", "UNCONFIGURED_FAMILY", "PRODUCER_GRADING_FORBIDDEN"
+  "SCHEMA_FAILURE", "UNCONFIGURED_FAMILY", "PRODUCER_GRADING_FORBIDDEN",
+  // B9 (budget spec §2.9): a seat the run could not pay for, left out as a
+  // failed seat is. Never PROVIDER_ERROR, which would bring back V-28's
+  // misattribution of a money ceiling as a transport fault.
+  "SPEND_REFUSED"
 ] as const;
 export type PanelMemberFailureKind = typeof PANEL_MEMBER_FAILURE_KINDS[number];
 
 export class PanelMemberFailure extends Error {
-  constructor(readonly failureKind: Exclude<PanelMemberFailureKind, "PRODUCER_GRADING_FORBIDDEN">, message: string) {
+  constructor(readonly failureKind: Exclude<PanelMemberFailureKind, "PRODUCER_GRADING_FORBIDDEN" | "SPEND_REFUSED">, message: string) {
     super(message);
     this.name = "PanelMemberFailure";
   }

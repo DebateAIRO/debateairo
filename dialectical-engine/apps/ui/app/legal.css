@@ -1,0 +1,466 @@
+/* ============================================================
+   Turn 15 — legal pages and footer (design 15a / 15b / 15c)
+   Tokens only: the design's page/railBg/hair/hairStrong/mute/hint/gold/shell/ink
+   are --bg/--surface-2/--line/--line-strong/--muted/--text-2/--gold/--shell/--ink.
+   ============================================================ */
+
+/* The layout draws the one-line footer after every page; a page that renders the
+   full footer (legal pages, the landing) hides it, so no page has to know. */
+.appShell:has(.siteFooterFull) > .siteFooterLine { display: none; }
+
+/* ---------- 15a legal page ---------- */
+
+.legalPage {
+  display: flex;
+  flex-direction: column;
+  /* The document scrolls, not this element, so the side navigation can stick. */
+  overflow: visible;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.legalGrid {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 56px;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 52px 48px 72px;
+  box-sizing: border-box;
+  flex: 1 0 auto;
+}
+
+.legalNav {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+}
+.legalNavHead {
+  padding: 0 12px 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.legalNav ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.legalNavLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-2);
+  text-decoration: none;
+}
+.legalNavLink::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: transparent;
+}
+.legalNavLink:hover { background: var(--muted-bg); color: var(--ink); }
+.legalNavLink[aria-current="page"] {
+  background: var(--shell);
+  color: var(--ink);
+  font-weight: 700;
+}
+.legalNavLink[aria-current="page"]::before { background: var(--gold); }
+.legalNavLink:focus-visible,
+.siteFooterLink:focus-visible,
+.legalVersionAction:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.legalMain { max-width: 680px; min-width: 0; }
+.legalEyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+}
+.legalTitle {
+  margin: 12px 0 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 40px;
+  line-height: 1.08;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+.legalMeta {
+  margin: 12px 0 28px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.legalSection {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 6px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 24px;
+}
+.legalSectionNo {
+  padding-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gold-text);
+}
+.legalSection h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+.legalSection p,
+.legalIntro,
+.legalVersionsNone {
+  margin: 7px 0 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+.legalSection ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.legalSection li {
+  display: flex;
+  gap: 9px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.legalSection li::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  margin-top: 8px;
+  transform: rotate(45deg);
+  background: var(--line-strong);
+}
+
+.legalIntro { margin: 0 0 18px; }
+.legalSubhead {
+  margin: 36px 0 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+.legalSubhead + .legalIntro { margin-top: 7px; }
+
+/* Terms versions */
+.legalVersions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+.legalVersionRow {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.legalVersionNo { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+.legalVersionHead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.legalVersionDate { font-size: 12.5px; font-weight: 700; }
+.legalVersionTag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ok-text);
+}
+.legalVersionRow p { margin: 4px 0 0; font-size: 12px; line-height: 1.55; color: var(--text-2); }
+.legalVersionAction {
+  padding-top: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.legalVersionsNone { margin-top: 16px; }
+
+/* Cookie and provider tables */
+.legalTable {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  text-align: start;
+}
+.legalTable th,
+.legalTable td {
+  padding: 11px 14px 11px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: baseline;
+  text-align: start;
+  color: var(--text-2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.legalTable thead th {
+  padding-block: 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.legalTable tbody th { font-weight: 700; color: var(--ink); }
+.legalTable code { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--ink); }
+.legalCookieTable th:first-child { width: 190px; }
+.legalCookieTable td:nth-child(2) { width: 86px; }
+.legalCookieTable td:last-child { width: 90px; }
+.legalTagEssential { font-size: 11px; font-weight: 700; color: var(--ok-text) !important; }
+.legalTagPreference { font-size: 11px; font-weight: 700; color: var(--gold-text) !important; }
+.legalCookieTable td:nth-child(4) { width: 104px; }
+/* A stored item's name breaks only after a dot (DONE.md default 8): each dot-ended part is one unbreakable run. */
+.legalNamePart { white-space: nowrap; }
+/* cookie-compliance S01 (/cookies artboards S01-14): the kind cell, and the two refusal sentences under the tables. */
+.legalKindCell { font-size: 11px; font-weight: 700; color: var(--ink) !important; }
+.legalRefuse { margin: 18px 0 0; }
+.legalRefuse + .legalRefuse { margin-top: 7px; }
+/* V-10 (REV-S01 p2 PT2-N3): the four fixed columns take 192.2+86+104+90 = 472.2px (the name column is 192.2, V-9) of a
+   .legalMain that is the viewport minus 372px, so below 995px the Purpose column gets under 150px (25px at 800). Up to
+   999px the cookie tables stack one card per row, exactly as the 760px block below stacks every legal table at 375. */
+@media (max-width: 999px) {
+  .legalCookieTable thead { display: none; }
+  .legalCookieTable,
+  .legalCookieTable tbody,
+  .legalCookieTable tr,
+  .legalCookieTable th,
+  .legalCookieTable td { display: block; width: auto !important; }
+  .legalCookieTable tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .legalCookieTable th,
+  .legalCookieTable td { padding: 2px 0; border: 0; }
+}
+.legalProviderEntry { margin-top: 28px; }
+.legalProviderEntry h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--ink); }
+.legalProviderEntry .legalTable { margin-top: 10px; }
+.legalProviderPurposes ul { margin: 0; padding-inline-start: 16px; }
+.legalAction { margin-top: 20px; }
+
+/* Legal notice: label/value fact tables and inline links */
+.legalSection .legalTable { margin-top: 14px; }
+.legalFactTable th:first-child { width: 42%; font-weight: 600; }
+.legalFactNote { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+.legalSection a,
+.legalFactTable a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.legalSection a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- 15a full footer ---------- */
+
+.siteFooterFull {
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  padding: 36px 48px 22px;
+  font-family: var(--font-sans);
+  text-align: start;
+}
+.siteFooterColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, .8fr) minmax(0, 1.6fr);
+  gap: 32px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.siteFooterCompany {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.siteFooterBrand { display: flex; align-items: center; gap: 10px; }
+.siteFooterBrandName { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.siteFooterColumn { display: flex; flex-direction: column; gap: 9px; }
+.siteFooterHead {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.siteFooterColumn ul,
+.siteFooterLineLinks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.siteFooterColumn ul { display: flex; flex-direction: column; gap: 9px; }
+.siteFooterColumn ul.siteFooterLegalGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 20px; }
+.siteFooterLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.siteFooterLink:hover { color: var(--ink); }
+.siteFooterBase {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 1180px;
+  margin: 30px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.siteFooterCopyright { font-size: 11px; color: var(--muted); }
+.siteFooterLang { margin-inline-start: auto; }
+/* The switcher opens UP from the footer; the header copy opens down. */
+.siteFooterLang .languageSwitcherPanel {
+  inset-block-start: auto;
+  inset-block-end: 38px;
+}
+
+/* ---------- 15b in-app footer: one line ---------- */
+
+.siteFooterLine {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  min-height: var(--site-footer-line-h);
+  padding: 10px 22px;
+  box-sizing: border-box;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  font-family: var(--font-sans);
+}
+.siteFooterLine .siteFooterCopyright { font-size: 10.5px; }
+.siteFooterLine nav { margin-inline-start: auto; }
+.siteFooterLineLinks { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; }
+.siteFooterLine .siteFooterLink { font-size: 10.5px; font-weight: 600; }
+
+/* 15b on the debate canvas: the canvas is exactly one viewport tall, so it gives
+   the footer its line instead of pushing the footer below the fold. */
+.appShell { --site-footer-line-h: 41px; }
+.appShell:has(.debateView) .debateView {
+  height: calc(100vh - var(--site-footer-line-h));
+  height: calc(100dvh - var(--site-footer-line-h));
+}
+.appShell:has(.debateView) > .siteFooterLine {
+  height: var(--site-footer-line-h);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+.appShell:has(.debateView) > .siteFooterLine .siteFooterLineLinks { flex-wrap: nowrap; }
+
+/* The same for the full-page support desk (Turn 11), which is one viewport tall. */
+.appShell:has([data-help-page]) .supportPage { min-height: calc(100vh - var(--site-footer-line-h)); }
+.appShell:has([data-help-page]) .supportDesk { height: calc(100vh - 32px - var(--site-footer-line-h)); }
+
+/* The support widget and the token dock are pinned to the viewport's bottom-right
+   corner (physical right, in every direction), so the footer keeps that corner empty. */
+.appShell:has(.supportWidget) > .siteFooterLine,
+.appShell:has(.tokenDock) > .siteFooterLine {
+  padding-right: calc(var(--dock-offset-b) + 150px);
+}
+
+/* ---------- 15c phone ---------- */
+
+@media (max-width: 760px) {
+  .legalGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding: 28px 16px 48px;
+  }
+  .legalNav { position: static; }
+  .legalNav ul { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .legalNavLink { padding: 8px 10px; }
+  .legalNavLink::before { display: none; }
+  .legalTitle { font-size: 30px; }
+
+  .legalVersionRow { grid-template-columns: 40px minmax(0, 1fr); }
+  .legalVersionAction { grid-column: 2; padding-top: 0; }
+
+  /* Tables become one card per row: the header row hides and each cell stacks. */
+  .legalTable thead { display: none; }
+  .legalTable,
+  .legalTable tbody,
+  .legalTable tr,
+  .legalTable th,
+  .legalTable td { display: block; width: auto !important; }
+  .legalTable tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .legalTable th,
+  .legalTable td { padding: 2px 0; border: 0; }
+
+  .siteFooterFull { padding: 26px 24px 36px; }
+  .siteFooterColumns { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .siteFooterColumn:not(:has(.siteFooterLegalGrid)),
+  .siteFooterCompany > :not(.siteFooterBrand) { display: none; }
+  .siteFooterColumn ul.siteFooterLegalGrid { gap: 0 16px; margin-top: 4px; }
+  .siteFooterLegalGrid .siteFooterLink {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .siteFooterBase { margin-top: 20px; padding-top: 14px; }
+
+  .siteFooterLine { padding: 10px 16px; gap: 8px 18px; }
+  .siteFooterLine nav { margin-inline-start: 0; }
+  .appShell:has(.supportWidget) > .siteFooterLine,
+  .appShell:has(.tokenDock) > .siteFooterLine { padding-right: 16px; padding-bottom: 72px; }
+
+  /* On a phone the canvas keeps the whole screen; its links live on every other screen. */
+  .appShell:has(.debateView) > .siteFooterLine { display: none; }
+  .appShell:has(.debateView) .debateView { height: 100vh; height: 100dvh; }
+}

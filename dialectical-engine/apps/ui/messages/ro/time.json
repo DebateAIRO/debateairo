@@ -18,6 +18,7 @@
   "time.status.claimed": "Preluat",
   "time.status.running": "În curs",
   "time.status.holding": "În așteptarea restabilirii furnizorului",
+  "time.status.waiting": "În așteptare",
   "time.status.settled": "Stabilizat",
   "time.status.generating": "În generare",
   "time.status.failed": "Eșuat",

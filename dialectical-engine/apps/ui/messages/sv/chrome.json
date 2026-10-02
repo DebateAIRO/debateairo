@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "Den här debatten är på {language} ({nativeName}). Vill du visa sidan på {language}?",
   "chrome.languageOffer.textNative": "Den här debatten är på {language}. Vill du visa sidan på {language}?",
   "chrome.languageOffer.switch": "Byt till {language}",
-  "chrome.languageOffer.dismiss": "Nej tack"
+  "chrome.languageOffer.dismiss": "Nej tack",
+  "chrome.legalPages": "Juridiskt",
+  "chrome.legal.notice": "Juridisk information",
+  "chrome.legal.terms": "Användarvillkor",
+  "chrome.legal.versions": "Versioner av villkoren",
+  "chrome.legal.privacy": "Integritetspolicy",
+  "chrome.legal.cookies": "Cookiepolicy",
+  "chrome.legal.providers": "Modelleverantörer",
+  "chrome.legal.health": "Hälsouppgifter i USA",
+  "chrome.footer.label": "Sidfot",
+  "chrome.footer.location": "Bukarest, Rumänien",
+  "chrome.footer.product": "Produkt",
+  "chrome.footer.home": "Startsida",
+  "chrome.footer.cookiePreferences": "Cookies vi sparar"
 }

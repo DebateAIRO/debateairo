@@ -82,7 +82,7 @@
   "misc.answerHonesty.weights": "kaalud {source}",
   "misc.answerHonesty.weightsBy": "kaalud {source}, omanik {owner}",
   "misc.answerHonesty.whatWouldReverseThis": "Mis pööraks selle ümber",
-  "misc.model.houseUnavailable": "Koostaja pole salvestatud",
-  "misc.model.noRecordedHouse": "Selle argumendi kohta pole koostajat salvestatud.",
+  "misc.model.houseUnavailable": "Mudeli arendajat pole märgitud",
+  "misc.model.noRecordedHouse": "Selle argumendi kohta pole mudeli arendajat märgitud.",
   "misc.scoring.unavailable": "Hindamisliides pole saadaval."
 }

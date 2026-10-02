@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "이 토론은 {language}({nativeName})로 작성되었습니다. 페이지를 {language}로 표시할까요?",
   "chrome.languageOffer.textNative": "이 토론은 {language}로 작성되었습니다. 페이지를 {language}로 표시할까요?",
   "chrome.languageOffer.switch": "{language}로 전환",
-  "chrome.languageOffer.dismiss": "아니요, 괜찮습니다"
+  "chrome.languageOffer.dismiss": "아니요, 괜찮습니다",
+  "chrome.legalPages": "법적 고지",
+  "chrome.legal.notice": "사업자 정보",
+  "chrome.legal.terms": "서비스 이용약관",
+  "chrome.legal.versions": "이용약관 버전 기록",
+  "chrome.legal.privacy": "개인정보 처리방침",
+  "chrome.legal.cookies": "쿠키 정책",
+  "chrome.legal.providers": "모델 제공업체",
+  "chrome.legal.health": "미국 건강 데이터 개인정보 보호",
+  "chrome.footer.label": "사이트 바닥글",
+  "chrome.footer.location": "루마니아 부쿠레슈티",
+  "chrome.footer.product": "제품",
+  "chrome.footer.home": "홈",
+  "chrome.footer.cookiePreferences": "저장하는 쿠키"
 }

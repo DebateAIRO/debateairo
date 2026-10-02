@@ -26,6 +26,7 @@
   "time.status.claimed": "Assenjat",
   "time.status.running": "Għaddej",
   "time.status.holding": "Miżmum għall-irkupru tal-fornitur",
+  "time.status.waiting": "Qed jistenna",
   "time.status.settled": "Magħluq",
   "time.status.generating": "Qed jiġi ġġenerat",
   "time.status.failed": "Falla",

@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "요금제 사용량",
+  "billing.usage.line": "오늘 {dayPct}% · 이번 주 {weekPct}% · 이번 달 {monthPct}%",
+  "billing.usage.lineFree": "이번 달 {monthPct}%",
+  "billing.usage.day": "오늘",
+  "billing.usage.week": "이번 주",
+  "billing.usage.month": "이번 달",
+  "billing.usage.resets": "초기화: {time}"
+}

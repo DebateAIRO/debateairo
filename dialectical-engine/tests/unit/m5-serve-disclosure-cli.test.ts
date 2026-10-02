@@ -251,3 +251,35 @@ describe("M5 · the command", () => {
     expect(money).toContain("--property=EnvironmentFile=/etc/debateai/runner.env");
   });
 });
+
+describe("B9 · the report lists the models chosen for cost (the owner's record)", () => {
+  it("prints each moved call and why, after the row's own facts, and names B8's roster swap as the question's", () => {
+    const text = renderServeDisclosure({
+      ...SERVED,
+      substitutions: [
+        Object.freeze({
+          substitutionId: "33333333-3333-4333-8333-333333333333", runId: RUN_ID,
+          callSiteKey: "ASK:roster", plannedProviderRef: "roster:premium", usedProviderRef: "roster:free",
+          reason: "PERSON" as const, recordedAt: new Date("2026-09-29T09:59:00.000Z")
+        }),
+        Object.freeze({
+          substitutionId: "44444444-4444-4444-8444-444444444444", runId: RUN_ID,
+          callSiteKey: "JUDGE:root:secondary", plannedProviderRef: "provider:a", usedProviderRef: "provider:c",
+          reason: "SITE_DAY" as const, recordedAt: new Date("2026-09-29T10:00:00.000Z")
+        })
+      ]
+    });
+    expect(text.endsWith([
+      "models chosen for cost: 2",
+      "  the question's roster: roster:premium -> roster:free, because of the person's allowance",
+      "  JUDGE:root:secondary: provider:a -> provider:c, because of the daily ceiling",
+      ""
+    ].join("\n"))).toBe(true);
+  });
+
+  it("says none when nothing moved, and prints exactly what it always did when the read carries no list", () => {
+    expect(renderServeDisclosure({ ...SERVED, substitutions: [] }))
+      .toContain("models chosen for cost: none\n");
+    expect(renderServeDisclosure(SERVED)).not.toContain("models chosen for cost");
+  });
+});

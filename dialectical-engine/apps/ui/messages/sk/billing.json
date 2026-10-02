@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Využitie vášho programu",
+  "billing.usage.line": "Dnes {dayPct} % · Tento týždeň {weekPct} % · Tento mesiac {monthPct} %",
+  "billing.usage.lineFree": "Tento mesiac {monthPct} %",
+  "billing.usage.day": "Dnes",
+  "billing.usage.week": "Tento týždeň",
+  "billing.usage.month": "Tento mesiac",
+  "billing.usage.resets": "Obnoví sa: {time}"
+}

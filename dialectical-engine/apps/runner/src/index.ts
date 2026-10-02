@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import {
   ProviderProbeRepository,
+  RunCostSubstitutionRepository,
   RunRepository,
   ServeDisclosureRepository,
   assertNoOpenWriteTransaction,
@@ -10,6 +11,7 @@ import {
   withWriteTransaction,
   type CompletionActivationResolution,
   type DiscoveredPanelMember,
+  type RunCostSubstitutionReason,
   type ServeDisclosureRecord
 } from "@debateai/db";
 import {
@@ -28,6 +30,7 @@ import {
   bindWayOfKnowingDowngrade,
   createUnmeasuredDisagreement,
   measureDispersion,
+  parseStructuredArtifact,
   reduceAssessment,
   runJudgePanel,
   selectReducedJudgement,
@@ -55,9 +58,12 @@ import {
   attemptCeilingForPhase,
   parseCostEnvelopeBasis,
   projectedCallCeilingMicros,
+  sharedWallReached,
   type BudgetPressureDecision,
   type CostEnvelopePhase,
-  type ProviderTargetPrice
+  type PersonAllowanceSource,
+  type ProviderTargetPrice,
+  type SharedWallApplication
 } from "@debateai/budget";
 import {
   countMeasuredEdges,
@@ -200,18 +206,26 @@ export const ENVELOPE_STOP_CODES = Object.freeze({
    */
   PROVIDER_USAGE_UNREPORTED: "USAGE",
   /**
-   * SMALL (round 3): a dead path today — the daily envelope is asked only when a
-   * NEW run is admitted, never mid-run — and listed anyway, for consistency with
-   * `RUN_LEVEL_SPEND_STOP_CODES` in the kernel. If it is ever raised while a run
-   * is under way, the difference between being listed and not is the difference
-   * between the run keeping its work and failing outright.
+   * B9 (budget spec §2.9): under the new costEnvelopePolicy members the seam's
+   * shared wall raises it mid-run, at the site day's finish edge; under the old
+   * ones it is still asked only when a NEW run is admitted. It is listed for
+   * consistency with `RUN_LEVEL_SPEND_STOP_CODES` in the kernel. Raised while a
+   * run is under way, the difference between being listed and not is the
+   * difference between the run keeping its work and failing outright.
    *
    * ROUND 4, RULING R-C: its OWN kind. Round 3 filed it under `MONEY`, so the
    * record it would have minted carried the per-run reason and sent the
    * operator to raise the wrong ceiling. A spent day is lifted by waiting for
    * the next one, not by re-sealing the per-run envelope.
    */
-  DAILY_COST_ENVELOPE_REACHED: "DAILY"
+  DAILY_COST_ENVELOPE_REACHED: "DAILY",
+  /**
+   * B9 (budget spec §2.9, paid-plans spec §2.4.1): one of the run owner's
+   * allowance windows would be crossed at its finish edge (110%). Its OWN
+   * kind, for ruling R-C's reason: it is lifted by the person's window
+   * resetting or a larger plan, not by the site's day or the run's ceiling.
+   */
+  PERSON_ALLOWANCE_REACHED: "ALLOWANCE"
 } as const);
 
 export type EnvelopeStopKind = typeof ENVELOPE_STOP_CODES[keyof typeof ENVELOPE_STOP_CODES];
@@ -226,7 +240,8 @@ export const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> =
   ATTEMPTS: "RUN_COST_ENVELOPE_EXHAUSTED",
   MONEY: "RUN_COST_ENVELOPE_MONEY_REACHED",
   USAGE: "PROVIDER_USAGE_UNREPORTED",
-  DAILY: "DAILY_COST_ENVELOPE_REACHED"
+  DAILY: "DAILY_COST_ENVELOPE_REACHED",
+  ALLOWANCE: "PERSON_ALLOWANCE_REACHED"
 });
 
 /**
@@ -237,12 +252,18 @@ export const ENVELOPE_STOP_REASONS: Readonly<Record<EnvelopeStopKind, string>> =
  * The ATTEMPT ceiling was listed only for completeness of the record while it
  * failed the run instead of stopping it; since Task M2 it is a run-body stop
  * (`RUN_BODY_STOP_KINDS`) and its lift is used like the others.
+ *
+ * B9: the ALLOWANCE lift is the OPERATOR's. It stays on the record, and the
+ * reader's honesty drawer never prints it (`liftPathIsOperatorOnly`,
+ * apps/ui/lib/v3/labels.ts), because it is English and names engine words and
+ * the run owner in the third person.
  */
 const SINGLE_LINEAGE_SPEND_STOP_LIFT_PATHS: Readonly<Record<EnvelopeStopKind, string>> = Object.freeze({
   ATTEMPTS: "Re-ask under a larger attempt ceiling so the other maker positions can be authored",
   MONEY: "Re-ask under a larger per-run cost envelope so the other maker positions can be afforded",
   USAGE: "Restore a vendor that reports usage, then re-ask so the other maker positions can be billed",
-  DAILY: "Re-ask after the daily cost envelope resets so the other maker positions can be afforded"
+  DAILY: "Re-ask after the daily cost envelope resets so the other maker positions can be afforded",
+  ALLOWANCE: "Re-ask after the run owner's allowance window resets, or on a larger plan, so the other maker positions can be afforded"
 });
 
 /**
@@ -306,10 +327,11 @@ export function envelopeStopPendingAttempts(stop: EnvelopeStopKind): Readonly<{
 /**
  * The kinds that stop a run-body phase, enumerated POSITIVELY: a fifth kind
  * added tomorrow does not become a phase stop by omission, it has to be listed
- * and reasoned about. Since Task M2 that is all four of today's: `ATTEMPTS` was
- * deliberately absent until the engine money rule (see above).
+ * and reasoned about. Since Task M2 that is every kind: `ATTEMPTS` was
+ * deliberately absent until the engine money rule (see above), and B9 added
+ * `ALLOWANCE`, the run owner's window.
  */
-const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["ATTEMPTS", "MONEY", "USAGE", "DAILY"]);
+const RUN_BODY_STOP_KINDS: readonly EnvelopeStopKind[] = Object.freeze(["ATTEMPTS", "MONEY", "USAGE", "DAILY", "ALLOWANCE"]);
 
 export function expansionPhaseStop(error: unknown): EnvelopeStopKind | null {
   const stop = envelopeStopKind(error);
@@ -1760,6 +1782,35 @@ export interface WalkingSkeletonSettings {
     store?: Pick<ServeDisclosureRepository, "insert">;
     log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
   }>;
+  /**
+   * B9 (budget spec §2.9): a call made while arguing that is refused for money —
+   * the run's own ceiling, the site's day or the owner's window at a finish
+   * edge — is retried at the same call site with the same framed prompt on the
+   * run's other claim-eligible makers, cheapest first (`providerPrices`); the
+   * first position's own call gets the same try. A cheaper maker that cannot
+   * serve (a dead transport, content refused after its repairs) hands the
+   * search on, and when nobody serves the planned refusal travels: while
+   * arguing, a clean stop, never a failed run. On the first position's own
+   * call a cheaper maker whose transport died hands its ProviderCallFailedError
+   * back, so the cooldown holds and retries; RUN_CEILING_BELOW_FIRST_CALL is
+   * raised only when every maker refused. Panel seats never move; a seat
+   * refused for money is left out, as a failed seat is today, on every panel.
+   * `true` only in hosted mode with the costEnvelopePolicy row's three band
+   * members (the shipped main.ts: `envelopeBand !== null`); absent is today's
+   * behaviour: no call while arguing ever moves, and a money-refused seat
+   * stops the arguing as M2 rules.
+   */
+  readonly bodyCostFallback?: boolean;
+  /**
+   * B9: where each moved call's owner record goes (default:
+   * `RunCostSubstitutionRepository` on the runner's pool) and where the moved
+   * call and a failed write are logged (default: `logBodyCostFallback`). The
+   * record can never change the debate: its writer never throws.
+   */
+  readonly costSubstitutions?: Readonly<{
+    store?: Pick<RunCostSubstitutionRepository, "record">;
+    log?: (event: string, detail: Readonly<Record<string, unknown>>) => void;
+  }>;
   readonly critique?: RunnerCritiqueSettings;
   readonly additionalMakers?: readonly RunnerCritiqueSettings[];
   /** DR-182 VROW-5: one immediate, no-hold health check at work-item claim. */
@@ -1812,22 +1863,79 @@ function hash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T {
+/**
+ * FIX-HS1-eval-fence (hate-speech TEST rehearsal, 2026-09-30): a model reply
+ * read as a structured value. The evaluator and the composer used to read it
+ * with a strict `JSON.parse`, so a schema-valid verdict inside a ```json fence
+ * ended live runs `EVALUATOR_CONTRACT_ERROR`, while the judge and panel paths
+ * already read theirs with `parseStructuredArtifact` (raw, one fence, the first
+ * balanced object). Every runner reader decodes here, the judge path's way, so
+ * a call's classifier and its parser accept the same replies. A reply no
+ * strategy decodes is refused exactly as before: the raw parse's own message.
+ *
+ * FIX-HS1-eval-fence-r1 (re-check B1, ruling V-24): the judge path's fallback
+ * takes the FIRST balanced object, so "PASS, then FAIL" read as PASS and the
+ * synthesis loop stopped without the objection the final verdict asked for.
+ * A reply that is not raw JSON and opens two or more top-level objects is
+ * refused before any strategy runs — the pre-fix refusal, re-asked as before.
+ */
+type DecodedReply =
+  | { readonly decoded: true; readonly value: unknown }
+  | { readonly decoded: false; readonly message: string };
+
+/**
+ * How many top-level `{` a reply opens, counting at most two. Outside an
+ * object every character is prose, so a stray quote cannot hide a brace;
+ * inside one, JSON strings are skipped, so a brace an objection quotes is not
+ * a second object. An object left open (a cut reply) still counts. One linear
+ * pass: model text is untrusted (CI-1b).
+ */
+function topLevelObjectsOpened(content: string): number {
+  let opened = 0;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (const character of content) {
+    if (depth > 0 && inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === "\"") inString = false;
+      continue;
+    }
+    if (character === "{") {
+      if (depth === 0 && ++opened > 1) return opened;
+      depth += 1;
+    } else if (depth > 0 && character === "}") depth -= 1;
+    else if (depth > 0 && character === "\"") inString = true;
+  }
+  return opened;
+}
+
+function decodeStructuredReply(content: string): DecodedReply {
   try {
-    return schema.parse(JSON.parse(content));
+    return { decoded: true, value: JSON.parse(content) };
+  } catch (error) {
+    const refused: DecodedReply = { decoded: false, message: error instanceof Error ? error.message : String(error) };
+    if (topLevelObjectsOpened(content) > 1) return refused;
+    const tolerant = parseStructuredArtifact(content, z.unknown());
+    return tolerant.kind === "PARSED" ? { decoded: true, value: tolerant.value } : refused;
+  }
+}
+
+function parseContent<T>(content: string, schema: z.ZodType<T>, code: string): T {
+  const reply = decodeStructuredReply(content);
+  if (!reply.decoded) throw new TypedDomainError(code, reply.message);
+  try {
+    return schema.parse(reply.value);
   } catch (error) {
     throw new TypedDomainError(code, error instanceof Error ? error.message : String(error));
   }
 }
 
 function classifyStructuredContent<T>(content: string, schema: z.ZodType<T>): ContentClassification {
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(content);
-  } catch (error) {
-    return { parseStatus: "PARSE_FAILED", parseError: error instanceof Error ? error.message : String(error) };
-  }
-  const parsed = schema.safeParse(decoded);
+  const reply = decodeStructuredReply(content);
+  if (!reply.decoded) return { parseStatus: "PARSE_FAILED", parseError: reply.message };
+  const parsed = schema.safeParse(reply.value);
   return parsed.success
     ? { parseStatus: "PARSED", parseError: null }
     : { parseStatus: "SCHEMA_FAILED", parseError: parsed.error.message };
@@ -1904,7 +2012,7 @@ interface ComposedCitationContext {
 export function classifyComposedContent(content: string, citation: ComposedCitationContext): ContentClassification {
   const structured = classifyStructuredContent(content, compositionSchema);
   if (structured.parseStatus !== "PARSED") return structured;
-  const composed = compositionSchema.parse(JSON.parse(content));
+  const composed = parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
   const issues: ComposedCitationIssue[] = [];
   for (const [segmentIndex, segment] of composed.segments.entries()) {
     if (nodeIdsNamedInText(citation.digest, segment.text, citation.exemptTokens).length > 0) {
@@ -2251,6 +2359,205 @@ export function storyCostFallback(
 }
 
 /**
+ * B9 (budget spec §2.9) — CHEAPER MODELS WHILE ARGUING: the body's twin of
+ * `servePhaseFallbackOrder` and `callServeRoleWithFallback`.
+ *
+ * WHICH REFUSALS MOVE A CALL. Money only: the run's own ceiling for arguing
+ * (MONEY), the site's day at its finish edge (DAILY) and the run owner's
+ * window at its finish edge (ALLOWANCE) — each raised by the seam before
+ * anything is sent, so every refused try is free. The attempt ceiling and a
+ * vendor that reports no usage never move a call: another model changes neither.
+ */
+export type BodyFallbackStop = Extract<EnvelopeStopKind, "MONEY" | "DAILY" | "ALLOWANCE">;
+
+const BODY_FALLBACK_STOPS: readonly EnvelopeStopKind[] = Object.freeze(["MONEY", "DAILY", "ALLOWANCE"]);
+
+export function bodyRefusedForMoney(error: unknown): BodyFallbackStop | null {
+  const stop = envelopeStopKind(error);
+  return stop !== null && BODY_FALLBACK_STOPS.includes(stop) ? stop as BodyFallbackStop : null;
+}
+
+/**
+ * WHICH CALLS MAY MOVE: the authoring legs — the first position's own call
+ * included — the defender, critic and cross-root legs, and the reviews. NEVER a
+ * panel seat (`PANEL:`): every run model already sits on the panel, so a swap
+ * would give one model two votes. Under the same setting a seat refused for
+ * money is LEFT OUT, as a failed seat is today (`runJudgePanel`'s
+ * `leaveOutMoneyRefusedSeats`, budget spec §2.9's Panel seats row), and the
+ * panel carries on. Answer-writing calls keep their own fallback (M3).
+ */
+export function bodyCallMayMove(request: Pick<ProviderCallRequest, "role" | "lane" | "callSiteKey">): boolean {
+  return request.role === "JUDGE"
+    && request.lane === "served"
+    && providerCallCostEnvelopePhase(request) === "BODY"
+    && (request.callSiteKey === FIRST_POSITION_CALL_SITE_KEY
+      || request.callSiteKey.startsWith(`${FIRST_POSITION_CALL_SITE_KEY}:`));
+}
+
+/** Why the planned maker could not be paid, as the owner's record names it. */
+export function substitutionReason(stop: BodyFallbackStop, callSiteKey: string): RunCostSubstitutionReason {
+  switch (stop) {
+    case "MONEY":
+      return callSiteKey === FIRST_POSITION_CALL_SITE_KEY ? "RUN_FIRST_CALL" : "RUN_ARGUING";
+    case "DAILY":
+      return "SITE_DAY";
+    case "ALLOWANCE":
+      return "PERSON";
+    default:
+      return exhaustive(stop);
+  }
+}
+
+export interface BodyCallOutcome<T extends ServeRoleMaker> {
+  readonly result: ProviderCallResult;
+  /** The maker that actually wrote the answer to this call: the node's author, or its reviewer. */
+  readonly servedBy: T;
+  readonly substitution: Readonly<{ plannedProviderRef: string; reason: RunCostSubstitutionReason }> | null;
+}
+
+/**
+ * ONE CALL WHILE ARGUING, WITH THE COST FALLBACK. The planned maker is always
+ * asked first. Only a money refusal moves the SAME request — the same call
+ * site, the same framed prompt object, the same bound and contract — to the
+ * next maker in `servePhaseFallbackOrder` (cheapest first by this request's own
+ * projection at each maker's price; every other eligible maker once). The
+ * seam decides what fits.
+ *
+ * WHAT A CHEAPER MAKER'S OWN FAILURE DOES — the body's version of the serve
+ * twin's FINAL REVIEW, Important 1 (`fallbackContentRefusal`). A cheaper maker
+ * is asked only because the planned one could not be paid, so:
+ *  · refused for money too → the next maker;
+ *  · it could not serve — its transport died after its attempts
+ *    (`ProviderCallFailedError`) or its content was refused after its repairs
+ *    (`ProviderContentUnacceptedError`) → the next maker. While arguing,
+ *    nothing it did can turn the planned money stop into a failure: never a
+ *    cooldown hold (`withCooldownRetry` holds only on a transport failure it
+ *    is handed), never JUDGE_SCHEMA_FAILURE or NODE_REVIEW_UNAVAILABLE;
+ *  · anything else — an untyped error, a database or ledger error, the attempt
+ *    ceiling, a vendor with no usage, PRODUCER_GRADING_FORBIDDEN,
+ *    PROVIDER_PACKET_TOO_LARGE, any other typed code — travels unchanged and
+ *    ends the search (J24: a sealed identity is substituted for cost only).
+ * Nobody serves → the PLANNED refusal travels, as it always has: a clean MONEY,
+ * DAILY or ALLOWANCE stop while arguing, and the answer is still written (budget
+ * spec §1.1, §2.9). On the first position's own call, a cheaper maker whose
+ * transport died hands its ProviderCallFailedError back, so the cooldown holds
+ * and retries; RUN_CEILING_BELOW_FIRST_CALL is raised only when every maker
+ * refused (budget spec §2.9, "The first call"). There a money stop is not clean
+ * — root 0 fails it as a ceiling below one call — and a maker whose transport
+ * died did not refuse: after the hold, root 0's final attempt asks the planned
+ * maker first again (refused before sending, free) and then the cheaper makers
+ * with the larger attempt count; a second transport death halts the position
+ * (MAKER_POSITION_UNAVAILABLE), exactly as the planned maker's own would.
+ *
+ * Accepted gap, stated: the Judge's own checks after the gateway returned (its
+ * re-parse, `resolveClaimType`, a review's bearing count) are not seen here.
+ * None can fail for content the gateway's `classifyContent` accepted — the
+ * same schema, `claim_type` bound to the closed vocabulary, the bearings'
+ * length pinned by the review schema — so a cheaper maker that returned from the
+ * gateway has served.
+ */
+export async function callBodyRoleWithFallback<T extends ServeRoleMaker>(input: Readonly<{
+  planned: T;
+  eligible: readonly T[];
+  prices: ProviderPriceMap;
+  request: ProviderCallRequest;
+}>): Promise<BodyCallOutcome<T>> {
+  try {
+    return Object.freeze({
+      result: await input.planned.provider.call(input.request), servedBy: input.planned, substitution: null
+    });
+  } catch (refusal) {
+    const stop = bodyRefusedForMoney(refusal);
+    if (stop === null) throw refusal;
+    // The last cheaper maker whose transport died, handed back on the first
+    // position's own call (see above); ignored everywhere else.
+    let transportDeath: ProviderCallFailedError | null = null;
+    for (const maker of servePhaseFallbackOrder({
+      planned: input.planned.providerRef,
+      claimEligible: input.eligible,
+      prices: input.prices,
+      request: input.request,
+      preferNot: null
+    })) {
+      try {
+        const result = await maker.provider.call({ ...input.request, providerRef: maker.providerRef });
+        return Object.freeze({
+          result,
+          servedBy: maker as T,
+          substitution: Object.freeze({
+            plannedProviderRef: input.planned.providerRef,
+            reason: substitutionReason(stop, input.request.callSiteKey)
+          })
+        });
+      } catch (error) {
+        // Refused for money too, or it could not serve: the next maker.
+        if (bodyRefusedForMoney(error) !== null) continue;
+        if (error instanceof ProviderCallFailedError) {
+          transportDeath = error;
+          continue;
+        }
+        if (error instanceof ProviderContentUnacceptedError) continue;
+        // Anything else travels unchanged (J24).
+        throw error;
+      }
+    }
+    // Budget spec §2.9: on the first position's own call a maker whose
+    // transport died did not refuse, so its failure goes to root 0's cooldown.
+    if (transportDeath !== null && input.request.callSiteKey === FIRST_POSITION_CALL_SITE_KEY) throw transportDeath;
+    throw refusal;
+  }
+}
+
+/** One moved call, as the owner's record and the log line carry it: ids and a code, never text. */
+export type BodyCostSubstitutionEvent = Readonly<{
+  callSiteKey: string;
+  plannedProviderRef: string;
+  usedProviderRef: string;
+  reason: RunCostSubstitutionReason;
+}>;
+
+/**
+ * THE GATEWAY A MAKER'S JUDGE IS GIVEN FOR ONE RUN, under the new settings.
+ * A call that may move goes through `callBodyRoleWithFallback` over the makers
+ * `eligibleFor` names (for a review, every claim-eligible maker but the node's
+ * ACTUAL author); every other call — panel seats, anything not arguing — goes
+ * to the planned maker alone, exactly as before. `onServed` tells the runner
+ * who actually wrote each movable call, so a node's author is the model that
+ * wrote it; `onMoved` records a substitution.
+ */
+export function bodyCostFallbackGateway<T extends ServeRoleMaker>(input: Readonly<{
+  planned: T;
+  eligibleFor: (request: ProviderCallRequest) => readonly T[];
+  prices: ProviderPriceMap;
+  onServed: (callSiteKey: string, servedBy: T) => void;
+  onMoved: (event: BodyCostSubstitutionEvent) => Promise<void>;
+}>): ProviderGateway {
+  return Object.freeze({
+    call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
+      if (!bodyCallMayMove(request)) return input.planned.provider.call(request);
+      const outcome = await callBodyRoleWithFallback({
+        planned: input.planned, eligible: input.eligibleFor(request), prices: input.prices, request
+      });
+      input.onServed(request.callSiteKey, outcome.servedBy);
+      if (outcome.substitution !== null) {
+        await input.onMoved(Object.freeze({
+          callSiteKey: request.callSiteKey,
+          plannedProviderRef: outcome.substitution.plannedProviderRef,
+          usedProviderRef: outcome.servedBy.providerRef,
+          reason: outcome.substitution.reason
+        }));
+      }
+      return outcome.result;
+    }
+  });
+}
+
+/** B9 (budget spec §2.12): the runner's content-free line for a moved call (`runner.body.cheaper_model`) and for a record it could not write. */
+export function logBodyCostFallback(event: string, detail: Readonly<Record<string, unknown>>): void {
+  console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_BODY_COST_FALLBACK", event }));
+}
+
+/**
  * ENGINE MONEY RULE (spec §14.4.2), TASK M3 — A ROUND KEPT AFTER A SPEND STOP
  * SAYS SO ON THE ANSWER.
  *
@@ -2527,6 +2834,16 @@ export function logServeDisclosure(event: string, detail: Readonly<Record<string
 
 export function parseComposerOutput(content: string): z.infer<typeof compositionSchema> {
   return parseContent(content, compositionSchema, "COMPOSITION_CONTRACT_ERROR");
+}
+
+/** The evaluator's verdict as the engine reads it (the parser of the EVALUATOR call). */
+export function parseEvaluatorOutput(content: string): z.infer<typeof evaluatorVerdictSchema> {
+  return parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+}
+
+/** The EVALUATOR call's content classifier: the same reading as `parseEvaluatorOutput`. */
+export function classifyEvaluatorContent(content: string): ContentClassification {
+  return classifyStructuredContent(content, evaluatorVerdictSchema);
 }
 
 export interface DebateExpansionLeg {
@@ -3409,6 +3726,7 @@ export class WalkingSkeletonRunner {
   readonly #memory: MemoryRepository;
   readonly #providerProbes: ProviderProbeRepository;
   readonly #serveDisclosure: Pick<ServeDisclosureRepository, "insert">;
+  readonly #costSubstitutions: Pick<RunCostSubstitutionRepository, "record">;
   readonly #configuredMakers: readonly {
     readonly judge: Judge;
     readonly provider: ProviderGateway;
@@ -3433,6 +3751,7 @@ export class WalkingSkeletonRunner {
     this.#memory = new MemoryRepository(pool);
     this.#providerProbes = new ProviderProbeRepository(pool);
     this.#serveDisclosure = settings.serveDisclosure?.store ?? new ServeDisclosureRepository(pool);
+    this.#costSubstitutions = settings.costSubstitutions?.store ?? new RunCostSubstitutionRepository(pool);
     this.#configuredMakers = Object.freeze([
       Object.freeze({ judge: this.#judge, provider, providerRef: settings.providerRef, maker: settings.maker }),
       ...(settings.critique === undefined ? [] : [Object.freeze({
@@ -3485,6 +3804,35 @@ export class WalkingSkeletonRunner {
         // A log line can never cost the answer either.
       }
       return false;
+    }
+  }
+
+  /**
+   * B9 — ONE MOVED CALL'S OWNER RECORD AND ITS LOG LINE. Never throws, like the
+   * serve disclosure row: the record can never change the debate. A failed
+   * write is logged with its code (or UNTYPED) and the ids, never text.
+   */
+  async #recordCostSubstitution(runId: string, moved: BodyCostSubstitutionEvent): Promise<void> {
+    const log = this.settings.costSubstitutions?.log ?? logBodyCostFallback;
+    try {
+      log("runner.body.cheaper_model", { runId, ...moved });
+    } catch {
+      // A log line can never cost the debate.
+    }
+    try {
+      await this.#costSubstitutions.record({ runId, ...moved, recordedAt: new Date() });
+    } catch (error) {
+      try {
+        log("RUN_COST_SUBSTITUTION_WRITE_FAILED", {
+          code: error instanceof TypedDomainError ? error.code
+            : error instanceof TypeError && /^[A-Z][A-Z0-9_]{2,95}$/u.test(error.message) ? error.message : "UNTYPED",
+          sqlState: databaseStateOf(error),
+          runId,
+          callSiteKey: moved.callSiteKey
+        });
+      } catch {
+        // Nor can its failure line.
+      }
     }
   }
 
@@ -3906,6 +4254,47 @@ export class WalkingSkeletonRunner {
         "Every provider pinned at ask time was absent when the runner claimed the work item"
       );
     }
+    /**
+     * B9 (budget spec §2.9) — CHEAPER MODELS WHILE ARGUING, under the new
+     * settings. Each claim-eligible maker's judge is given a gateway for this
+     * run (`bodyCostFallbackGateway`): a call while arguing refused for money
+     * moves to the cheapest other claim-eligible maker that fits, at the same
+     * call site with the same framed prompt. Two records make the rules hold:
+     *
+     *  · `bodyServedBy` — who actually wrote each movable call, so a node's
+     *    author (its `maker`, its panel's producer) is the model that wrote it;
+     *  · `reviewAuthorMakers` — the node a review call is about, so a review
+     *    never moves onto the node's ACTUAL author.
+     *
+     * Without the setting the judges are untouched, byte-for-byte today's run.
+     */
+    const bodyServedBy = new Map<string, string>();
+    const reviewAuthorMakers = new Map<string, string>();
+    if (this.settings.bodyCostFallback === true) {
+      const bodyMakers = Object.freeze([...configuredMakers]);
+      const bodyPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+      bodyMakers.forEach((planned, index) => {
+        configuredMakers[index] = Object.freeze({
+          ...planned,
+          judge: new Judge(bodyCostFallbackGateway({
+            planned,
+            prices: bodyPrices,
+            eligibleFor: (request) => {
+              const author = reviewAuthorMakers.get(request.callSiteKey);
+              return author === undefined ? bodyMakers : bodyMakers.filter((candidate) => candidate.maker !== author);
+            },
+            onServed: (callSiteKey, servedBy) => { bodyServedBy.set(callSiteKey, servedBy.providerRef); },
+            onMoved: (moved) => this.#recordCostSubstitution(run.runId, moved)
+          }))
+        });
+      });
+    }
+    /** B9: the maker that actually answered a movable call — the planned one unless the call moved. */
+    const actualAuthor = (callSiteKey: string, planned: typeof configuredMakers[number]): typeof configuredMakers[number] => {
+      const servedRef = bodyServedBy.get(callSiteKey);
+      if (servedRef === undefined || servedRef === planned.providerRef) return planned;
+      return configuredMakers.find((candidate) => candidate.providerRef === servedRef) ?? planned;
+    };
     const synthesisRolePolicy = this.settings.synthesisRolePolicy;
     if (synthesisRolePolicy === undefined) {
       // Unreachable: the pre-claim gate refuses first. Typed rather than
@@ -4124,7 +4513,14 @@ export class WalkingSkeletonRunner {
         })),
         // Task M2: only the first root's panel keeps the voices it heard when a
         // spend stop cuts it short; every other panel lets the stop travel.
-        onRunLevelSpendStop: input.onSpendStop === "AUTHOR_ONLY" ? "RETURN_HEARD" : "RETHROW"
+        onRunLevelSpendStop: input.onSpendStop === "AUTHOR_ONLY" ? "RETURN_HEARD" : "RETHROW",
+        // B9 (budget spec §2.9, the Panel seats row): with cheaper models on, a
+        // seat refused for money is left out as a failed seat is, on EVERY panel
+        // (root 0's included), and the panel carries on; the attempt ceiling and
+        // a vendor with no usage keep the rule above. It never sets
+        // runBodyBudgetStop: the next authoring call gets its own (free) fallback
+        // try, and the arguing stops only when a movable call fits no maker.
+        leaveOutMoneyRefusedSeats: this.settings.bodyCostFallback === true
       });
       /**
        * Task M2 — THE FIRST ROOT'S PANEL, CUT SHORT BY A SPEND STOP.
@@ -4221,7 +4617,12 @@ export class WalkingSkeletonRunner {
       // by a spend stop also names the stop, which is why the members after it never
       // spoke.
       const panelFailureReasons = [
-        ...memberFailures.map((note) => `${note.memberRole}: ${note.failureKind}`),
+        ...memberFailures.filter((note) => note.failureKind !== "SPEND_REFUSED")
+          .map((note) => `${note.memberRole}: ${note.failureKind}`),
+        // B9: a seat left out for money names the stop's own code, once, exactly
+        // as a stop on the first root's panel does (and the honesty drawer's
+        // `panelSpendStopKind` reads it the same way: the budget).
+        ...new Set(memberFailures.filter((note) => note.failureKind === "SPEND_REFUSED").map((note) => note.reason)),
         ...(spendStop === null ? [] : [ENVELOPE_STOP_REASONS[spendStop]])
       ];
       const panelFailureReason = panelFailureReasons.length === 0 ? null : panelFailureReasons.join("; ");
@@ -4368,14 +4769,14 @@ export class WalkingSkeletonRunner {
       finishedAt: new Date()
     });
     const primaryAttempt = await cooldownAttempt({
-      callSiteKey: "JUDGE",
+      callSiteKey: FIRST_POSITION_CALL_SITE_KEY,
       parentNodeId: null,
       plannedLegCount: 1,
       failureScope: "MAKER_POSITION",
       attempt: (maxAttempts) => primaryMaker.judge.judge({
         runId: run.runId,
         subjectItemId: claimed.workItemId,
-        callSiteKey: "JUDGE",
+        callSiteKey: FIRST_POSITION_CALL_SITE_KEY,
         // DL4-F4: the question travels as the question, in its own fenced
         // field; the leg's directive is code's and rides the system message.
         questionLine: run.questionLine,
@@ -4399,6 +4800,9 @@ export class WalkingSkeletonRunner {
       );
     }
     const judged = primaryAttempt.value;
+    // B9: the node's author is the model that actually wrote it — the planned
+    // primary, or the cheaper maker its refused first call moved to.
+    const rootAuthor = actualAuthor(FIRST_POSITION_CALL_SITE_KEY, primaryMaker);
     const reduced = reduceAssessment({
       claimType: judged.normalizedClaim.claimType,
       assessment: judged.assessment,
@@ -4409,8 +4813,8 @@ export class WalkingSkeletonRunner {
       throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${reduced.claimType}`);
     }
     const selection = await runNodePanel({
-      authorMaker: primaryMaker.maker,
-      authorProviderRef: primaryMaker.providerRef,
+      authorMaker: rootAuthor.maker,
+      authorProviderRef: rootAuthor.providerRef,
       authorJudgementRef: judged.provenanceRef,
       authorAssessment: judged.assessment,
       authorTau: reduced.tau,
@@ -4519,7 +4923,7 @@ export class WalkingSkeletonRunner {
       reversalPoint: judged.assessment.critic.summary,
       panelDispersion: selection.dispersion,
       authorIndex: 0,
-      maker: primaryMaker.maker
+      maker: rootAuthor.maker
     })]]);
     const haltedExpansionRecords: HaltedExpansionRecord[] = [];
     // S2-3 / J5: way-of-knowing downgrades are bound to the node the graph
@@ -4609,6 +5013,8 @@ export class WalkingSkeletonRunner {
       });
       if (childAttempt.kind === "HALTED") return childAttempt;
       const childJudged = childAttempt.value;
+      // B9: the author is the model that actually wrote this node (a moved call's cheaper maker).
+      const author = actualAuthor(input.callSiteKey, selectedMaker);
       const childReduced = reduceAssessment({
           claimType: childJudged.normalizedClaim.claimType,
           assessment: childJudged.assessment,
@@ -4619,8 +5025,8 @@ export class WalkingSkeletonRunner {
           throw new TypedDomainError("COMPOSITION_UNRESOLVED", `No ratified composition for ${childReduced.claimType}`);
         }
         const childSelection = await runNodePanel({
-          authorMaker: selectedMaker.maker,
-          authorProviderRef: selectedMaker.providerRef,
+          authorMaker: author.maker,
+          authorProviderRef: author.providerRef,
           authorJudgementRef: childJudged.provenanceRef,
           authorAssessment: childJudged.assessment,
           authorTau: childReduced.tau,
@@ -4718,7 +5124,7 @@ export class WalkingSkeletonRunner {
           reversalPoint: childJudged.assessment.critic.summary,
           panelDispersion: childSelection.dispersion,
           authorIndex: input.authorIndex,
-          maker: selectedMaker.maker
+          maker: author.maker
         }) };
     };
 
@@ -4806,6 +5212,8 @@ export class WalkingSkeletonRunner {
         const reviewer = selectDifferentMakerReviewer(authoredNode.maker, configuredMakers, latestReviewerMaker);
         try {
           const callSiteKey = `JUDGE:review:${authoredNode.nodeId}`;
+          // B9: a review that has to move never moves onto the node's ACTUAL author.
+          reviewAuthorMakers.set(callSiteKey, authoredNode.maker);
           const reviewAttempt = await cooldownAttempt({
             callSiteKey,
             parentNodeId: authoredNode.nodeId,
@@ -6024,7 +6432,7 @@ export class WalkingSkeletonRunner {
          * verdict this reading refuses has left nothing to serve.
          */
         const evaluatorVerdictOf = (content: string): EvaluatorVerdict => {
-          const parsed = parseContent(content, evaluatorVerdictSchema, "EVALUATOR_CONTRACT_ERROR");
+          const parsed = parseEvaluatorOutput(content);
           return assertEvaluatorVerdict(Object.freeze({
             satisfied: parsed.satisfied,
             objection: parsed.objection,
@@ -6065,7 +6473,7 @@ export class WalkingSkeletonRunner {
           contractHash: this.settings.conformanceContractHash,
           providerRef: role.providerRef,
           packet,
-          classifyContent: (content) => classifyStructuredContent(content, evaluatorVerdictSchema),
+          classifyContent: classifyEvaluatorContent,
           buildRepairPacket: (rejected) => buildSchemaRepairPacket(framed, rejected)
           }
         }));
@@ -6612,6 +7020,9 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "ANSWER_MEMORY_OBSERVATION_FAILED",
   "ANSWER_PERSIST_FAILED",
   "ARROW_ENDPOINT_ABSENT",
+  "ASK_ALREADY_WAITING",
+  "ASK_COARSE_FIT_INPUT_INVALID",
+  "ASK_ROOM_DAY_UNSETTLED",
   "ATTEMPT_ACCESS_DEPTH_MISSING",
   "AUTH_POLICY_INVALID",
   "AUTH_POLICY_UNRESOLVED",
@@ -6633,6 +7044,11 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "BAND_LABEL_INVALID",
   "BAND_LABEL_UNKNOWN",
   "BAND_ORDER_INVALID",
+  "BILLING_ENTITLEMENT_ROW_INVALID",
+  "BILLING_OWNER_REF_INVALID",
+  "BILLING_OWNER_UNKNOWN",
+  "BILLING_PLAN_GAUGES_MISSING",
+  "BILLING_PLAN_UNKNOWN",
   "BLANK_QUERY_REFUSED",
   "BLOCKED_TERMINAL_RETIRED",
   "BRANCH_FREEZE_EPSILON_PROVENANCE_MISSING",
@@ -6849,6 +7265,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PANEL_WEIGHTING_CONTROLS_UNRESOLVED",
   "PANEL_WEIGHTING_UNRESOLVED",
   "PARTIAL_SCORE_RUN_IDENTITY",
+  "PERSON_ALLOWANCE_REACHED",
   "POSITIVE_CAPTURE_REQUIRED",
   "PRESENT_SIGNAL_FRESHNESS_UNKNOWN",
   "PRIVATE_CONTENT_ERASED",
@@ -6912,6 +7329,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUNNER_DISCLOSURE_PIPELINE_FAILED",
   "RUNNER_FAILURE_STATE_NOT_RECORDED",
   "RUN_CEILING_BELOW_FIRST_CALL",
+  "RUN_CEILING_BELOW_ONE_CALL",
   "RUN_CONTENT_ENCRYPTION_REQUIRED",
   "RUN_CONTENT_ROLLBACK_INCOMPLETE",
   "RUN_COST_ENVELOPE_EXHAUSTED",
@@ -7034,6 +7452,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "VERDICT_LABEL_CONTROLS_PROVENANCE_MISSING",
   "VERDICT_LABEL_CONTROLS_UNRESOLVED",
   "VERDICT_LABEL_INPUT_INVALID",
+  "WAITING_LINE_REQUIRES_BAND",
   "WAIT_RESOLUTION_INCOMPLETE",
   "WAIT_RESOLUTION_NOT_CURRENT",
   "WAY_OF_KNOWING_DOWNGRADE_NODE_UNRESOLVED",
@@ -7672,6 +8091,46 @@ export function providerCallCostEnvelopePhase(
     : "BODY";
 }
 
+/**
+ * B9 (budget spec §2.9) — THE FIRST POSITION'S OWN CALL SITE. The primary
+ * root author's judgement is asked at exactly this key; every other authoring
+ * leg is `JUDGE:<leg>…`, every panel seat `PANEL:…`.
+ */
+export const FIRST_POSITION_CALL_SITE_KEY = "JUDGE" as const;
+
+/**
+ * B9 (budget spec §2.9) — WHICH CALLS THE SHARED WALL MEASURES. A debate call
+ * made while arguing (BODY, on the served lane) is walled. Exempt: the first
+ * position's own call — a started debate always gets its first position — and
+ * every answer-writing call (the seam never walls SERVE either), the story's
+ * calls and the evaluator add-on's, none of which is the debate's arguing.
+ */
+export function providerCallSharedWall(
+  request: Pick<ProviderCallRequest, "role" | "lane" | "callSiteKey">
+): SharedWallApplication {
+  if (request.lane !== "served" || providerCallCostEnvelopePhase(request) !== "BODY") return "EXEMPT";
+  return request.callSiteKey === FIRST_POSITION_CALL_SITE_KEY ? "EXEMPT" : "APPLY";
+}
+
+/**
+ * B9 (budget spec §2.9, ruling R-19) — THE PERSON WALL WHEN THE RUNNER'S
+ * REGISTER VERSION SEALED NO billingPlans. B6 writes a run's charge scope only
+ * when hosted billing is on, so a run that HAS one was admitted, and is charged,
+ * against a person's windows this runner cannot read (the API and the runner
+ * are on different register versions: a mismatched REGISTER_VERSION, or a
+ * staggered restart). It fails CLOSED: every walled call of such a run is
+ * refused as the person's month (PERSON_ALLOWANCE_REACHED), so the arguing
+ * stops and the answer is still written. A run with no charge scope never
+ * reaches it: the wall asks for windows only for a pinned owner.
+ */
+export function plansUnresolvedPersonAllowance(): PersonAllowanceSource {
+  return Object.freeze({
+    read: async () => {
+      throw sharedWallReached("PERSON_MONTH");
+    }
+  });
+}
+
 export function createPostgresProviderGateway(
   pool: Pool,
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction">
@@ -7686,8 +8145,14 @@ export function createPostgresProviderGateway(
        * Task M1: and from the call's PHASE (`providerCallCostEnvelopePhase`),
        * because an answer-writing call and a call made while the debate is
        * argued are held to different ceilings over the same run total.
+       * B9: and whether the call is measured against the shared wall
+       * (`providerCallSharedWall`).
        */
-      readonly buildCostEnvelopeSeam?: (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam;
+      readonly buildCostEnvelopeSeam?: (
+        runId: string,
+        phase: CostEnvelopePhase,
+        sharedWall: SharedWallApplication
+      ) => ProviderCostEnvelopeSeam;
       /**
        * Verdict story (spec §8): the STORY's own money bound, built per call
        * from the leased run exactly as the run's is. A story call on a metered
@@ -7823,7 +8288,7 @@ export function createPostgresProviderGateway(
               costEnvelope: buildStoryCostEnvelopeSeam(leasedRunId)
             })
             : (buildCostEnvelopeSeam === undefined ? {} : {
-              costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase)
+              costEnvelope: buildCostEnvelopeSeam(leasedRunId, costEnvelopePhase, providerCallSharedWall(request))
             }))
         });
       } catch (error) {

@@ -14,6 +14,7 @@
   "time.status.claimed": "ग्रहण किया गया",
   "time.status.running": "चल रहा है",
   "time.status.holding": "प्रदाता बहाली के लिए रोका गया",
+  "time.status.waiting": "प्रतीक्षा में",
   "time.status.settled": "निपटाया गया",
   "time.status.generating": "जनरेट हो रहा है",
   "time.status.failed": "विफल",

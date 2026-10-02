@@ -1,0 +1,51 @@
+# deploy/vps/systemd/debateai-geoip-refresh.service — paid plans G4.
+# Downloads PUBLIC data (DB-IP Lite country file, Tor exit list) into its own state directory. Its
+# own OS user, owning nothing else: a compromised downloader reads no key, no env file and no
+# custody tree. The API reads the two files (0644); nothing else on the host writes them.
+[Unit]
+Description=DebateAI country data refresh (DB-IP Lite country database, Tor exit list)
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=debateai-geoip
+Group=debateai-geoip
+ExecStart=/opt/debateai/dialectical-engine/deploy/vps/geoip-refresh.sh
+# /var/lib/debateai-geoip, created by systemd, owned by debateai-geoip, traversable by the API user.
+StateDirectory=debateai-geoip
+StateDirectoryMode=0755
+UMask=0022
+TimeoutStartSec=1800
+Nice=10
+StandardOutput=journal
+StandardError=journal
+
+# --- filesystem ---
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+# --- process and kernel ---
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+# AF_UNIX for the resolver, INET/INET6 for the two https downloads.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

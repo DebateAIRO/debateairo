@@ -151,6 +151,7 @@ async function storiedRun(
 
 async function publish(runId: string, answerId: string, answerVersion = 1): Promise<string> {
   const transition = await application.publish({
+    contentCheck: { check: async () => ({ outcome: "ALLOW" }) },
     runId,
     answer: buildFairShapedAnswer({
       run_ref: runId, answer_id: answerId, answer_version: answerVersion, question_line: "story publication question"
@@ -160,7 +161,8 @@ async function publish(runId: string, answerId: string, answerVersion = 1): Prom
     source
   });
   expect(transition?.state).toBe("PUBLISHED");
-  return transition!.public_ref;
+  if (transition?.state !== "PUBLISHED") throw new TypeError("STORY_TEST_PUBLICATION_FAILED");
+  return transition.public_ref;
 }
 
 beforeAll(async () => {
@@ -247,6 +249,7 @@ async function publishComponentsOnly(runId: string, answerId: string, leadingNod
     run_ref: runId, answer_id: answerId, answer_version: answerVersion, question_line: "story publication question"
   });
   const transition = await application.publish({
+    contentCheck: { check: async () => ({ outcome: "ALLOW" }) },
     runId,
     answer: {
       ...served,
@@ -260,7 +263,8 @@ async function publishComponentsOnly(runId: string, answerId: string, leadingNod
     source
   });
   expect(transition?.state).toBe("PUBLISHED");
-  return transition!.public_ref;
+  if (transition?.state !== "PUBLISHED") throw new TypeError("STORY_TEST_PUBLICATION_FAILED");
+  return transition.public_ref;
 }
 
 describe("publishing copies the floor from the owner's record over the real database (engine money rule, Task M5)", () => {

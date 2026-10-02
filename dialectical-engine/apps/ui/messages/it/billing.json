@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Utilizzo del tuo piano",
+  "billing.usage.line": "Oggi {dayPct}% · Questa settimana {weekPct}% · Questo mese {monthPct}%",
+  "billing.usage.lineFree": "Questo mese {monthPct}%",
+  "billing.usage.day": "Oggi",
+  "billing.usage.week": "Questa settimana",
+  "billing.usage.month": "Questo mese",
+  "billing.usage.resets": "Si azzera: {time}"
+}

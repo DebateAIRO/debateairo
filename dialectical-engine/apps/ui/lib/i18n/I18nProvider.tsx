@@ -18,7 +18,9 @@ export type I18nNamespace =
   | "consent"
   | "support"
   | "compose"
-  | "misc";
+  | "misc"
+  | "legal"
+  | "billing";
 
 type I18nContextValue = Readonly<{
   locale: LocaleCode;

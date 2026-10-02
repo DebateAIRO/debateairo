@@ -4,15 +4,24 @@ import { useEffect, useState } from "react";
 import { getSettingsView } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
 import { AccountErasureControls } from "@/components/AccountErasureControls";
+import {
+  ChangeEmailScreen,
+  EmailChangeLinkScreen,
+  EmailSettingsCard,
+  takeEmailChangeLink,
+  type EmailChangeLink
+} from "@/components/EmailSettings";
 import { EvaluatorDevMenu, type SettingsI18nProps } from "@/components/EvaluatorDevMenu";
 import { LegacyRunClaimControls } from "@/components/LegacyRunClaimControls";
 import { SessionControls } from "@/components/SessionControls";
+import { UsageBars } from "@/components/billing/UsageBars";
 import { ConsentSettingsPanel } from "@/components/consent/ConsentSettingsPanel";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { modelDot } from "@/lib/models";
 import type { SettingsView } from "@/lib/v3/adapter";
 import settingsEnglish from "@/messages/en/settings.json";
 import newDebateEnglish from "@/messages/en/newDebate.json";
+import billingEnglish from "@/messages/en/billing.json";
 
 const EVALUATOR_DEV_MENU_ENABLED = process.env.NODE_ENV !== "production"
   && process.env.NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED === "true";
@@ -20,19 +29,35 @@ const EVALUATOR_DEV_MENU_ENABLED = process.env.NODE_ENV !== "production"
 export function SettingsPageClient({
   catalog = settingsEnglish,
   locale = "en",
-  newDebateCatalog = newDebateEnglish
+  newDebateCatalog = newDebateEnglish,
+  billingCatalog = billingEnglish
 }: SettingsI18nProps & {
   /** The locale's `newDebate` catalogue: the session gate's copy (review F2). */
   newDebateCatalog?: MessageCatalog;
+  /** The locale's `billing` catalogue: the usage bars (paid-plans spec §2.10). */
+  billingCatalog?: MessageCatalog;
 }) {
+  // Turn 14: a link mailed by the change-email flow opens Settings with its
+  // bearer in the fragment. It is spent without a session (the bearer is the
+  // proof), so its screen stands in for the sign-in gate.
+  const [emailLink, setEmailLink] = useState<EmailChangeLink | null>(null);
+  useEffect(() => {
+    const link = takeEmailChangeLink(window);
+    if (link !== null) setEmailLink(link);
+  }, []);
+  if (emailLink !== null) {
+    return <EmailChangeLinkScreen catalog={catalog} link={emailLink} onDone={() => setEmailLink(null)} />;
+  }
   return (
-    <AuthGate catalog={newDebateCatalog}>
-      {() => <AccountSettingsScreen catalog={catalog} locale={locale} />}
+    <AuthGate catalog={newDebateCatalog} legalGate={false}>
+      {() => <AccountSettingsScreen catalog={catalog} locale={locale} billingCatalog={billingCatalog} />}
     </AuthGate>
   );
 }
 
-function AccountSettingsScreen({ catalog, locale }: Required<SettingsI18nProps>) {
+function AccountSettingsScreen({ catalog, locale, billingCatalog }: Required<SettingsI18nProps> & { billingCatalog: MessageCatalog }) {
+  const [changingFrom, setChangingFrom] = useState<string | null>(null);
+  const [emailNotice, setEmailNotice] = useState<string | null>(null);
   const identityRows = [
     {
       key: "asker",
@@ -54,6 +79,20 @@ function AccountSettingsScreen({ catalog, locale }: Required<SettingsI18nProps>)
     }
   ] as const;
 
+  if (changingFrom !== null) {
+    return (
+      <ChangeEmailScreen
+        catalog={catalog}
+        currentEmail={changingFrom}
+        onBack={() => setChangingFrom(null)}
+        onRequested={() => {
+          setEmailNotice(t(catalog, "settings.email.requested"));
+          setChangingFrom(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="screen scroll setScreen">
       <div className="setBody">
@@ -74,7 +113,16 @@ function AccountSettingsScreen({ catalog, locale }: Required<SettingsI18nProps>)
               ))}
             </div>
           </div>
+          <UsageBars catalog={billingCatalog} locale={locale} />
 
+          <EmailSettingsCard
+            catalog={catalog}
+            notice={emailNotice}
+            onChange={(currentEmail) => {
+              setEmailNotice(null);
+              setChangingFrom(currentEmail);
+            }}
+          />
           <SessionControls catalog={catalog} locale={locale} />
           <ConsentSettingsPanel />
           <LegacyRunClaimControls catalog={catalog} locale={locale} />

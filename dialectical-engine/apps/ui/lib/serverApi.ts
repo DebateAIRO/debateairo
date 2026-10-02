@@ -107,10 +107,34 @@ export async function listDebatesPageServer(
   // derived by the query from projections it had already read.
   const index = await resolvedClient.readAnswerIndex(HOME_PAGE_SIZE, 0);
   return {
-    summaries: debateSummariesFromIndex(index),
+    summaries: await withWaitingStarts(debateSummariesFromIndex(index), resolvedClient),
     shown: index.items.length,
     total: index.total
   };
+}
+
+/**
+ * Budget spec §2.11: a WAITING row shows sentence C with its expected start.
+ * The index row cannot carry that time: the index projection lives in the
+ * fingerprinted packages/serve/src/index.ts (R1 A13), which Parts 1-2 do not
+ * touch. So each WAITING row's own run read supplies it. The count is bounded
+ * by `waiting_line_per_person` (1 by the owner's value, 10 at most), and no
+ * ANSWER is read (DL3-F2). A failed read keeps the row, with no time.
+ */
+async function withWaitingStarts(summaries: DebateSummary[], client: ContractClient): Promise<DebateSummary[]> {
+  return Promise.all(summaries.map(async (summary) => {
+    if (summary.status !== "waiting") return summary;
+    try {
+      const run = await client.readRun(summary.id);
+      return {
+        ...summary,
+        waits_until: run.state === "WAITING" ? run.waits_until ?? null : null,
+        waits_for: run.state === "WAITING" ? run.waits_for ?? null : null
+      };
+    } catch {
+      return { ...summary, waits_until: null, waits_for: null };
+    }
+  }));
 }
 
 export type GetDebateServerResult =

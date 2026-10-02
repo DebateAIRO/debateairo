@@ -55,7 +55,7 @@
   "debateDrawers.node.holes": "欠落",
   "debateDrawers.node.honestyAriaLabel": "V3ノードの誠実性",
   "debateDrawers.node.noArgumentText": "論拠の本文はまだありません。",
-  "debateDrawers.node.noCompletedReview": "このノードには、別の生成者による完了済みレビューが記録されていません。",
+  "debateDrawers.node.noCompletedReview": "このノードには、別の開発元のモデルによる完了済みレビューが記録されていません。",
   "debateDrawers.node.noPreviousGenerations": "以前の生成履歴はありません。",
   "debateDrawers.node.noScoringRecommendation": "この論拠に対する採点上の推奨事項はありません。",
   "debateDrawers.node.notUseful": "役に立たない",

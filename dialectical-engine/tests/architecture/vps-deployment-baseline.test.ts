@@ -2,6 +2,7 @@
 // Pins the VPS deployment baseline (PLAN §8 C3, §9.1 C3 amendments, audit corrections
 // L2-F3, L5-F6/F7/F8/F11, L7-F2/F3/F7). Every assertion is a floor on a file under
 // deploy/; the files are configuration, so the pins are textual and deliberately exact.
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -74,7 +75,9 @@ const EDGE_FILES = [
   "deploy/vps/systemd/debateai-ui.service",
   "deploy/vps/systemd/debateai-runner.service",
   "deploy/vps/systemd/debateai-hatchet.service",
-  "deploy/vps/systemd/debateai-observation-agent.service"
+  "deploy/vps/systemd/debateai-observation-agent.service",
+  "deploy/vps/systemd/debateai-geoip-refresh.service",
+  "deploy/vps/systemd/debateai-geoip-refresh.timer"
 ] as const;
 const BACKUP_FILES = [
   "deploy/vps/backup.sh",
@@ -300,7 +303,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(unit).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/observation-agent/src/main.ts");
     expect(unit).toMatch(/^After=.*\bpostgresql\.service\b/m);
     const readme = read("deploy/vps/README.md");
-    const enable = /systemctl enable --now ([^\n]*(?:\\\n[^\n]*)*)/u.exec(readme)?.[1] ?? "";
+    const enable = /systemctl enable --now ([^\n\\]*(?:\\\n[^\n\\]*)*)/u.exec(readme)?.[1] ?? "";
     expect(enable).toContain("debateai-api");
     expect(enable).not.toContain("debateai-observation-agent");
   });
@@ -365,21 +368,35 @@ describe("VPS baseline: encrypted DB + custody backups with separate escrow, res
   it("backup.sh escrows the support KEK as the fifth secret, and the drill proves it came back (DL2-F5)", () => {
     const script = read("deploy/vps/backup.sh");
     expect(script).toContain(': "${SUPPORT_KEK_PATH:?}"');
+    // Paid plans L1 (ruling Q-12): the records key is the sixth escrowed secret.
+    expect(script).toContain(': "${RECORDS_KEY_PATH:?}"');
     const escrow = script.slice(script.indexOf('tar -cf "$WORK/keys.tar"'), script.indexOf("KEY_DIGEST="));
-    for (const key of ["KEK_PATH", "CORPUS_KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_SOURCE_IP_SALT_PATH", "SUPPORT_KEK_PATH"]) {
+    for (const key of ["KEK_PATH", "CORPUS_KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_SOURCE_IP_SALT_PATH", "SUPPORT_KEK_PATH", "RECORDS_KEY_PATH"]) {
       expect(escrow, key).toContain(`"$(basename "$${key}")"`);
     }
     // The support KEK never rides in the data envelope with the dump it unlocks.
     const dataEnvelope = script.slice(script.indexOf("# --- 3. the custody tree"), script.indexOf("# --- 5."));
     expect(dataEnvelope).not.toContain("SUPPORT_KEK_PATH");
+    // The records key never rides with the dump it unlocks either.
+    expect(dataEnvelope).not.toContain("RECORDS_KEY_PATH");
     const conf = envKeys(read("deploy/vps/backup.conf.example"));
     expect(conf.get("SUPPORT_KEK_PATH")).toBe("/etc/debateai/api/support-kek.bin");
     expect(envKeys(read("deploy/vps/env/api.env.example")).get("SUPPORT_KEK_PATH")).toBe(conf.get("SUPPORT_KEK_PATH"));
+    expect(conf.get("RECORDS_KEY_PATH")).toBe("/etc/debateai/api/records-key.bin");
+    expect(envKeys(read("deploy/vps/env/api.env.example")).get("RECORDS_KEY_PATH")).toBe(conf.get("RECORDS_KEY_PATH"));
     const drill = read("deploy/vps/restore-drill.sh");
     expect(drill).toContain(': "${SUPPORT_KEK_PATH:?}"');
     expect(drill).toContain("RESTORE_DRILL_REFUSED no restored support KEK");
     expect(drill.indexOf("RESTORE_DRILL_REFUSED no restored support KEK"))
       .toBeLessThan(drill.indexOf("RESTORE_DRILL_OK"));
+    expect(drill).toContain("RESTORE_DRILL_REFUSED no restored records key");
+    expect(drill.indexOf("RESTORE_DRILL_REFUSED no restored records key"))
+      .toBeLessThan(drill.indexOf("RESTORE_DRILL_OK"));
+    for (const needle of [
+      "the six raw 32-byte secrets",
+      "RESTORE_DRILL_RECORDS_KEY bytes=32",
+      "Owner confirmation — the records key in escrow (paid plans ruling Q-12)"
+    ]) expect(read("deploy/vps/README.md"), needle).toContain(needle);
   });
 
   it("restore-drill.sh: scratch DB + scratch custody, core.run count, chain SQL, sample decrypt, RESTORE_DRILL_OK, cleanup", () => {
@@ -491,7 +508,9 @@ describe("VPS baseline: runbook and environment templates", () => {
       // own shape, and both were absent — an api.env built from this example
       // refused at boot with KEK_UNRESOLVED, and the runbook's rotation command
       // (which loads this same file) refused before touching a record.
-      "SUPPORT_KEK_PATH", "SUPPORT_DATABASE_URL"
+      "SUPPORT_KEK_PATH", "SUPPORT_DATABASE_URL",
+      // Paid plans L1: required in every mode (apiEnvironmentShape).
+      "RECORDS_KEY_PATH"
     ]) expect(env.has(key), key).toBe(true);
     expect(env.get("NODE_ENV")).toBe("production");
     // V-9(c): both services answer the same question with the same word, or the
@@ -837,3 +856,109 @@ describe("VPS baseline: runbook and environment templates", () => {
   });
 });
 
+describe("VPS baseline: the country data refresh (paid plans G4)", () => {
+  it("ships the script, the unit and the timer", () => {
+    for (const file of ["deploy/vps/geoip-refresh.sh", "deploy/vps/systemd/debateai-geoip-refresh.service",
+      "deploy/vps/systemd/debateai-geoip-refresh.timer"]) expect(exists(file), file).toBe(true);
+    // The unit runs the file directly (ExecStart=), so git must keep its executable bit; the
+    // behaviour tests run it through bash and would stay green without it.
+    expect(execFileSync("git", ["ls-files", "-s", "--", "deploy/vps/geoip-refresh.sh"],
+      { cwd: engineRoot, encoding: "utf8" })).toMatch(/^100755 /u);
+  });
+
+  it("geoip-refresh.sh: strict bash, its own state directory, https only, checked before an atomic rename", () => {
+    const script = read("deploy/vps/geoip-refresh.sh");
+    expect(script.startsWith("#!/usr/bin/env bash\n")).toBe(true);
+    for (const needle of [
+      "set -euo pipefail", "umask 022", ': "${STATE_DIRECTORY:?',
+      "https://download.db-ip.com/free/dbip-country-lite-", "https://check.torproject.org/torbulkexitlist",
+      "--proto '=https'", "--tlsv1.2", "MaxMind.com", 'mktemp -d "$DIR/.refresh.XXXXXXXX"', "mv -f",
+      "GEOIP_REFRESH_OK", "GEOIP_REFRESH_SKIPPED", "GEOIP_REFRESH_REFUSED"
+    ]) expect(script, needle).toContain(needle);
+    expect(script).not.toMatch(/\bsudo\b|\bchmod\b|\bchown\b|\/etc\/debateai/u);
+  });
+
+  it("debateai-geoip-refresh.service: its own user, no custody, hardened, writes only its state directory", () => {
+    const unit = read("deploy/vps/systemd/debateai-geoip-refresh.service");
+    for (const needle of [
+      "Type=oneshot", "User=debateai-geoip", "Group=debateai-geoip", "StateDirectory=debateai-geoip",
+      "StateDirectoryMode=0755", "UMask=0022", "ExecStart=/opt/debateai/dialectical-engine/deploy/vps/geoip-refresh.sh",
+      "NoNewPrivileges=true", "ProtectSystem=strict", "ProtectHome=true", "PrivateTmp=true", "PrivateDevices=true",
+      "CapabilityBoundingSet=", "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6", "SystemCallFilter=@system-service"
+    ]) expect(unit, needle).toContain(needle);
+    for (const forbidden of ["EnvironmentFile=", "ReadWritePaths=", "debateai-custody", "DynamicUser=yes"]) {
+      expect(unit, forbidden).not.toContain(forbidden);
+    }
+    const timer = read("deploy/vps/systemd/debateai-geoip-refresh.timer");
+    expect(timer).toMatch(/^OnCalendar=\*-\*-\* \d{2}:\d{2}:\d{2}$/mu);
+    expect(timer).toContain("Persistent=true");
+    expect(timer).toContain("Unit=debateai-geoip-refresh.service");
+  });
+
+  it("the API reads the files the timer writes, and the runbook starts it before the API", () => {
+    const env = envKeys(read("deploy/vps/env/api.env.example"));
+    expect(env.get("GEOIP_COUNTRY_DB_PATH")).toBe("/var/lib/debateai-geoip/dbip-country-lite.mmdb");
+    expect(env.get("TOR_EXIT_LIST_PATH")).toBe("/var/lib/debateai-geoip/tor-exit-list.txt");
+    const readme = read("deploy/vps/README.md");
+    for (const needle of [
+      "### Country data — the GeoIP and Tor refresh", "adduser --system --group --no-create-home --home /nonexistent debateai-geoip",
+      "IP Geolocation by DB-IP", "https://db-ip.com", "CC BY 4.0", "GEOIP_PATHS_REQUIRED", "GEOIP_COUNTRY_DB_UNAVAILABLE",
+      "journalctl -u debateai-geoip-refresh.service"
+    ]) expect(readme, needle).toContain(needle);
+    const enable = /systemctl enable --now ([^\n\\]*(?:\\\n[^\n\\]*)*)/u.exec(readme)?.[1] ?? "";
+    expect(enable).toContain("debateai-geoip-refresh.timer");
+    expect(readme.indexOf("systemctl start debateai-geoip-refresh.service"))
+      .toBeLessThan(readme.indexOf("systemctl enable --now debateai-hatchet debateai-api"));
+    expect(readme.indexOf("systemctl start debateai-geoip-refresh.service")).toBeGreaterThan(-1);
+  });
+});
+
+/**
+ * Found while judging paid plans G4: backup.sh and restore-drill.sh were committed 100644 from
+ * d38b7511 on. systemd runs a unit's Exec*= program directly, a shell runs a path the same way, and
+ * Linux refuses a file without the execute bit even to root — the nightly backup failed 203/EXEC
+ * before it wrote anything, and the drill with "Permission denied". The pins above read the
+ * scripts' text and no test runs them, so only the mode git commits catches this. It is read for
+ * every kit file the units or the runbook run by its path, not for a fixed list.
+ */
+describe("VPS baseline: every kit file run by its path is committed executable", () => {
+  const ENGINE_ON_HOST = "/opt/debateai/dialectical-engine/";
+
+  /** The engine-relative paths (`deploy/…`) of the programs that name a file in the kit. */
+  function kitFiles(programs: ReadonlyArray<string>): string[] {
+    return [...new Set(programs.filter((program) => program.startsWith(`${ENGINE_ON_HOST}deploy/`))
+      .map((program) => program.slice(ENGINE_ON_HOST.length)))].sort();
+  }
+
+  /** `<git mode> <path>` for each path not committed 100755; a path git does not track reads `untracked`. */
+  function notExecutable(paths: ReadonlyArray<string>): string[] {
+    return paths.map((path) => {
+      const mode = execFileSync("git", ["ls-files", "-s", "--", path], { cwd: engineRoot, encoding: "utf8" }).split(" ")[0];
+      return `${mode || "untracked"} ${path}`;
+    }).filter((line) => !line.startsWith("100755 "));
+  }
+
+  it("a unit's Exec*= program in the kit is committed 100755", () => {
+    const units = readdirSync(resolve(engineRoot, "deploy/vps/systemd")).filter((name) => name.endsWith(".service"));
+    // The program is the first word of the command line, after systemd's prefixes (-, @, :, +, !).
+    const programs = kitFiles(units.flatMap((unit) => [...read(`deploy/vps/systemd/${unit}`)
+      .matchAll(/^\s*Exec[A-Za-z]*\s*=\s*[-@:+!]*(\S+)/gmu)].map((match) => match[1] ?? "")));
+    for (const known of ["deploy/vps/backup.sh", "deploy/vps/geoip-refresh.sh"]) expect(programs).toContain(known);
+    expect(notExecutable(programs)).toEqual([]);
+  });
+
+  it("a script the README runs by its /opt path is committed 100755", () => {
+    const programs: string[] = [];
+    for (const block of read("deploy/vps/README.md").matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      const lines = (block[1] ?? "").replace(/\\\n\s*/gu, " ").split("\n").filter((line) => !line.trim().startsWith("#"));
+      for (const command of lines.flatMap((line) => line.split(/&&|\|\||[;|]/u))) {
+        // The program is the first word after any leading NAME=value assignments.
+        const program = /^[\s(]*(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s"'])*\s+)*(\S+)/u.exec(command)?.[1];
+        if (program !== undefined) programs.push(program);
+      }
+    }
+    const scripts = kitFiles(programs);
+    expect(scripts).toContain("deploy/vps/restore-drill.sh");
+    expect(notExecutable(scripts)).toEqual([]);
+  });
+});

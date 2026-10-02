@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Forbrug på din plan",
+  "billing.usage.line": "I dag {dayPct} % · Denne uge {weekPct} % · Denne måned {monthPct} %",
+  "billing.usage.lineFree": "Denne måned {monthPct} %",
+  "billing.usage.day": "I dag",
+  "billing.usage.week": "Denne uge",
+  "billing.usage.month": "Denne måned",
+  "billing.usage.resets": "Nulstilles: {time}"
+}

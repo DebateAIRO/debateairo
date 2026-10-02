@@ -192,5 +192,20 @@
   "public.story.morePaths.two": "agus {count} sheasamh eile",
   "public.story.morePaths.few": "agus {count} sheasamh eile",
   "public.story.morePaths.many": "agus {count} seasamh eile",
-  "public.story.morePaths.other": "agus {count} seasamh eile"
+  "public.story.morePaths.other": "agus {count} seasamh eile",
+  "public.publication.contentCheck.refusedHeading": "Níor fhoilsíomar an díospóireacht seo",
+  "public.publication.contentCheck.refusedWhatBlock": "D’aimsigh seiceáil uathoibríoch téacs sa díospóireacht seo a sháraíonn ár rialacha, mar sin níor foilsíodh an díospóireacht.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Níorbh fhéidir le seiceáil uathoibríoch a dheimhniú go gcomhlíonann an díospóireacht seo ár rialacha, mar sin níor foilsíodh an díospóireacht.",
+  "public.publication.contentCheck.partsIntro": "An áit ar aimsigh an tseiceáil an téacs:",
+  "public.publication.contentCheck.part.question": "An cheist",
+  "public.publication.contentCheck.part.summary": "An achoimre, na nótaí faoin mbreithiúnas agus na hagóidí atá fágtha",
+  "public.publication.contentCheck.part.arguments": "Na hargóintí",
+  "public.publication.contentCheck.part.reviews": "Tuairimí na n-athbhreithneoirí",
+  "public.publication.contentCheck.part.story": "Scéal an bhreithiúnais",
+  "public.publication.contentCheck.groundTerms": "Bunús: ár dTéarmaí Seirbhíse, alt 7 (ní cheadaítear ábhar a ghríosaíonn foréigean nó fuath).",
+  "public.publication.contentCheck.groundIllegal": "D’fhéadfadh an téacs a bheith mídhleathach freisin.",
+  "public.publication.contentCheck.automated": "Rinne uirlis uathoibríoch an cinneadh seo. Níl athbhreithniú déanta ag duine ar bith air fós.",
+  "public.publication.contentCheck.stillPrivate": "Fanann do dhíospóireacht príobháideach agus gan athrú. Is tusa amháin atá in ann í a fheiceáil.",
+  "public.publication.contentCheck.appeal": "Chun iarraidh ar dhuine an cinneadh seo a athbhreithniú, scríobh chuig [appeals@dezbatere.ro] laistigh de shé mhí.",
+  "public.publication.contentCheck.unavailable": "Níl an tseiceáil ábhair ar fáil faoi láthair, mar sin níor foilsíodh aon rud. Fanann do dhíospóireacht príobháideach. Bain triail eile as i gceann cúpla nóiméad."
 }

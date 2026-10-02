@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "Αυτή η αντιπαράθεση είναι στα {language} ({nativeName}). Να εμφανιστεί η σελίδα στα {language};",
   "chrome.languageOffer.textNative": "Αυτή η αντιπαράθεση είναι στη γλώσσα {language}. Να εμφανιστεί η σελίδα στη γλώσσα {language};",
   "chrome.languageOffer.switch": "Μετάβαση στα {language}",
-  "chrome.languageOffer.dismiss": "Όχι, ευχαριστώ"
+  "chrome.languageOffer.dismiss": "Όχι, ευχαριστώ",
+  "chrome.legalPages": "Νομικά",
+  "chrome.legal.notice": "Νομικές πληροφορίες",
+  "chrome.legal.terms": "Όροι παροχής υπηρεσιών",
+  "chrome.legal.versions": "Εκδόσεις των όρων",
+  "chrome.legal.privacy": "Πολιτική απορρήτου",
+  "chrome.legal.cookies": "Πολιτική cookies",
+  "chrome.legal.providers": "Πάροχοι μοντέλων",
+  "chrome.legal.health": "Απόρρητο δεδομένων υγείας (ΗΠΑ)",
+  "chrome.footer.label": "Υποσέλιδο ιστοτόπου",
+  "chrome.footer.location": "Βουκουρέστι, Ρουμανία",
+  "chrome.footer.product": "Προϊόν",
+  "chrome.footer.home": "Αρχική",
+  "chrome.footer.cookiePreferences": "Τα cookies που αποθηκεύουμε"
 }

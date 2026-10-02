@@ -14,6 +14,7 @@
   "time.status.claimed": "Átvéve",
   "time.status.running": "Fut",
   "time.status.holding": "Szolgáltatói helyreállításra vár",
+  "time.status.waiting": "Várakozik",
   "time.status.settled": "Lezárva",
   "time.status.generating": "Létrehozás",
   "time.status.failed": "Sikertelen",

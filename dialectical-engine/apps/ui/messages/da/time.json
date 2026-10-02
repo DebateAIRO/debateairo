@@ -14,6 +14,7 @@
   "time.status.claimed": "Overtaget",
   "time.status.running": "Kører",
   "time.status.holding": "Afventer genoprettelse hos udbyderen",
+  "time.status.waiting": "Venter",
   "time.status.settled": "Afgjort",
   "time.status.generating": "Genererer",
   "time.status.failed": "Mislykkedes",

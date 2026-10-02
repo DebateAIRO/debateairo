@@ -22,6 +22,7 @@
   "time.status.claimed": "Priskirta",
   "time.status.running": "Vykdoma",
   "time.status.holding": "Sustabdyta teikėjo atkūrimui",
+  "time.status.waiting": "Laukia",
   "time.status.settled": "Galutinai įvertinta",
   "time.status.generating": "Generuojama",
   "time.status.failed": "Nepavyko",

@@ -412,11 +412,24 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     // publication. They are DEPLOYMENT rows, so `historicalRows` stays 14 and
     // the legacy hash below is untouched: 57 with no duplicate keys, and 51
     // with exactly the six story keys removed.
+    //
+    // PAID PLANS G2: 57 -> 58. The development deployment now also seals
+    // `countryPolicy` (packages/register/src/country-policy.ts). A DEPLOYMENT
+    // row, so `historicalRows` stays 14: 58 with no duplicate keys, 57 with it
+    // removed.
+    //
+    // PAID PLANS (spec 2026-09-29 §2.5.1, Task B4a): 58 -> 60. The deployment now
+    // also seals `billingPlans` and `billingPolicy` (billing OFF). They are
+    // DEPLOYMENT rows, so `historicalRows` stays 14 and the legacy hash is
+    // untouched. MEASURED: the port emits 60 with no duplicate keys, and 58 with
+    // exactly the two billing keys removed.
     const storyKeys: readonly string[] = STORY_ROW_KEYS;
-    expect(developmentRows).toHaveLength(57);
-    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(51);
-    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(56);
-    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(56);
+    expect(developmentRows).toHaveLength(60);
+    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(54);
+    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(59);
+    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(59);
+    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(59);
+    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(58);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
 

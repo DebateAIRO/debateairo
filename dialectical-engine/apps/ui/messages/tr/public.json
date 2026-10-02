@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Bu rapor mevcut değil.",
   "public.report.error.tryAgain": "Rapor şu anda hazırlanamadı. Lütfen biraz sonra tekrar deneyin.",
   "public.story.morePaths.one": "ve {count} görüş daha",
-  "public.story.morePaths.other": "ve {count} görüş daha"
+  "public.story.morePaths.other": "ve {count} görüş daha",
+  "public.publication.contentCheck.refusedHeading": "Bu tartışmayı yayımlamadık",
+  "public.publication.contentCheck.refusedWhatBlock": "Otomatik denetim bu tartışmada kurallarımızı ihlal eden metin buldu, bu nedenle tartışma yayımlanmadı.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Otomatik denetim bu tartışmanın kurallarımıza uyduğunu doğrulayamadı, bu nedenle tartışma yayımlanmadı.",
+  "public.publication.contentCheck.partsIntro": "Denetimin metni bulduğu bölümler:",
+  "public.publication.contentCheck.part.question": "Soru",
+  "public.publication.contentCheck.part.summary": "Özet, sonuç notları ve kalan itirazlar",
+  "public.publication.contentCheck.part.arguments": "Argümanlar",
+  "public.publication.contentCheck.part.reviews": "Değerlendiricilerin yorumları",
+  "public.publication.contentCheck.part.story": "Sonucun öyküsü",
+  "public.publication.contentCheck.groundTerms": "Dayanak: Hizmet Koşullarımızın 7. bölümü (şiddete veya nefrete teşvik eden içeriğe izin verilmez).",
+  "public.publication.contentCheck.groundIllegal": "Metin ayrıca yasa dışı da olabilir.",
+  "public.publication.contentCheck.automated": "Bu karar otomatik bir araç tarafından verildi. Henüz bir insan tarafından incelenmedi.",
+  "public.publication.contentCheck.stillPrivate": "Tartışmanız gizli ve değişmeden kalır. Yalnızca siz görebilirsiniz.",
+  "public.publication.contentCheck.appeal": "Bu kararın bir insan tarafından incelenmesini istemek için altı ay içinde [appeals@dezbatere.ro] adresine yazın.",
+  "public.publication.contentCheck.unavailable": "İçerik denetimi şu anda kullanılamıyor, bu nedenle hiçbir şey yayımlanmadı. Tartışmanız gizli kalır. Birkaç dakika sonra tekrar deneyin."
 }

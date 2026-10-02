@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Усе в цих дебатах — аргументи, рецензії, оцінки й вердикт — створюють моделі ШІ; вміст має машинозчитуване маркування й може бути неточним.",
+  "debateChrome.status.waiting": "Очікує початку. Ваші дебати почнуться самі о {time}.",
+  "debateChrome.status.waitingOwnDebates": "Ваші інші дебати поки що використовують залишок вашого ліміту. Ці дебати почнуться самі, щойно одні з них завершаться.",
   "debateChrome.backToLibrary": "← Повернутися до бібліотеки",
   "debateChrome.loading": "Завантаження…",
   "debateChrome.error.claimGenerationFailed": "Не вдалося створити твердження",
@@ -190,7 +192,7 @@
   "debateChrome.condition.unpriced": "Клітинку утримання від оцінки не оцінено",
   "debateChrome.condition.unadjudicated": "Несприятливих доказів не знайдено",
   "debateChrome.condition.uncoveredScope": "Охоплення неповне",
-  "debateChrome.condition.unservedMakerPosition": "Позицію іншого автора не надано",
+  "debateChrome.condition.unservedMakerPosition": "Позицію моделі іншого розробника не надано",
   "debateChrome.condition.nonComparable": "Результати отримано за різних обчислювальних умов",
   "debateChrome.condition.notSampled": "Не перевірялося",
   "debateChrome.condition.offSubjectDowngrade": "Статус доказів не за темою знижено",
@@ -203,7 +205,7 @@
   "debateChrome.condition.digestCannotExist": "У межах бюджету компонування не вдалося створити зведення",
   "debateChrome.condition.protectedCoreGuardRetired": "Запуск зупинено через бюджет; перевірка переформулювання більше не блокувала його",
   "debateChrome.condition.hiddenUnjudgeable": "Приховано: оцінити не вдалося — увімкніть показ прихованого, щоб прочитати",
-  "debateChrome.condition.derivedStandingUnreviewed": "Зберігається завдяки оціненим аргументам — власної перехресної перевірки іншою групою немає",
+  "debateChrome.condition.derivedStandingUnreviewed": "Зберігається завдяки оціненим аргументам — власної перехресної перевірки моделлю іншого розробника немає",
   "debateChrome.condition.hiddenLowScore": "Приховано: оцінка нижча за показаний поріг",
   "debateChrome.condition.unauthoredBranchHalted": "Розгортання зупинено тут — немає написаного вмісту, який можна показати чи приховати",
   "debateChrome.condition.labelBasisIncomplete": "Підстава вердикту неповна — немає позиції суперника або другого судді для порівняння",
@@ -291,5 +293,6 @@
   "requestFailure.kind.UNREADABLE": "Не вдалося прочитати відповідь координатора, тому результат невідомий.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Координатор відхилив вибір плану. Виберіть «Безкоштовний» або «Преміум» і повторіть спробу.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Координатор відхилив запит: модель, потрібна для цього плану, зараз недоступна. Повторіть спробу пізніше або виберіть інший план.",
+  "requestFailure.kind.ALREADY_WAITING": "Одночасно може чекати лише одне запитання. Поставте це запитання, коли почнуться ваші дебати в очікуванні.",
   "requestFailure.kind.UNCLASSIFIED": "Помилка сталася ще до отримання відповіді, тому результат невідомий. Це не рішення координатора."
 }

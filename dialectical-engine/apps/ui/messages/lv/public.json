@@ -190,5 +190,20 @@
   "public.report.error.tryAgain": "Pašlaik pārskatu neizdevās sagatavot. Lūdzu, mēģiniet vēlreiz pēc brīža.",
   "public.story.morePaths.zero": "un vēl {count} nostājas",
   "public.story.morePaths.one": "un vēl {count} nostāja",
-  "public.story.morePaths.other": "un vēl {count} nostājas"
+  "public.story.morePaths.other": "un vēl {count} nostājas",
+  "public.publication.contentCheck.refusedHeading": "Mēs nepublicējām šo diskusiju",
+  "public.publication.contentCheck.refusedWhatBlock": "Automātiskā pārbaude šajā diskusijā atrada tekstu, kas pārkāpj mūsu noteikumus, tāpēc diskusija netika publicēta.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Automātiskā pārbaude nevarēja apstiprināt, ka šī diskusija atbilst mūsu noteikumiem, tāpēc diskusija netika publicēta.",
+  "public.publication.contentCheck.partsIntro": "Kur pārbaude atrada tekstu:",
+  "public.publication.contentCheck.part.question": "Jautājums",
+  "public.publication.contentCheck.part.summary": "Kopsavilkums, piezīmes par spriedumu un atlikušie iebildumi",
+  "public.publication.contentCheck.part.arguments": "Argumenti",
+  "public.publication.contentCheck.part.reviews": "Vērtētāju komentāri",
+  "public.publication.contentCheck.part.story": "Sprieduma stāsts",
+  "public.publication.contentCheck.groundTerms": "Pamats: mūsu Pakalpojuma noteikumi, 7. sadaļa (aizliegts saturs, kas mudina uz vardarbību vai naidu).",
+  "public.publication.contentCheck.groundIllegal": "Teksts var būt arī nelikumīgs.",
+  "public.publication.contentCheck.automated": "Šo lēmumu pieņēma automātisks rīks. Neviens cilvēks to vēl nav pārskatījis.",
+  "public.publication.contentCheck.stillPrivate": "Jūsu diskusija paliek privāta un nemainīta. To varat redzēt tikai jūs.",
+  "public.publication.contentCheck.appeal": "Lai lūgtu cilvēkam pārskatīt šo lēmumu, sešu mēnešu laikā rakstiet uz [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.unavailable": "Satura pārbaude pašlaik nav pieejama, tāpēc nekas netika publicēts. Jūsu diskusija paliek privāta. Mēģiniet vēlreiz pēc dažām minūtēm."
 }

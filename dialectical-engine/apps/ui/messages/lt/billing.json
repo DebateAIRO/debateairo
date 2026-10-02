@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Jūsų plano naudojimas",
+  "billing.usage.line": "Šiandien {dayPct} % · Šią savaitę {weekPct} % · Šį mėnesį {monthPct} %",
+  "billing.usage.lineFree": "Šį mėnesį {monthPct} %",
+  "billing.usage.day": "Šiandien",
+  "billing.usage.week": "Šią savaitę",
+  "billing.usage.month": "Šį mėnesį",
+  "billing.usage.resets": "Atsinaujina: {time}"
+}

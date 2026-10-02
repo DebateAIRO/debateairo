@@ -47,5 +47,18 @@
   "chrome.languageOffer.text": "Този дебат е на {language} ({nativeName}). Да се покаже ли страницата на {language}?",
   "chrome.languageOffer.textNative": "Този дебат е на {language}. Да се покаже ли страницата на {language}?",
   "chrome.languageOffer.switch": "Превключване към {language}",
-  "chrome.languageOffer.dismiss": "Не, благодаря"
+  "chrome.languageOffer.dismiss": "Не, благодаря",
+  "chrome.legalPages": "Правна информация",
+  "chrome.legal.notice": "Информация за дружеството",
+  "chrome.legal.terms": "Условия за ползване",
+  "chrome.legal.versions": "Версии на условията",
+  "chrome.legal.privacy": "Политика за поверителност",
+  "chrome.legal.cookies": "Политика за бисквитките",
+  "chrome.legal.providers": "Доставчици на модели",
+  "chrome.legal.health": "Поверителност на здравните данни (САЩ)",
+  "chrome.footer.label": "Долен колонтитул на сайта",
+  "chrome.footer.location": "Букурещ, Румъния",
+  "chrome.footer.product": "Продукт",
+  "chrome.footer.home": "Начало",
+  "chrome.footer.cookiePreferences": "Бисквитките, които съхраняваме"
 }

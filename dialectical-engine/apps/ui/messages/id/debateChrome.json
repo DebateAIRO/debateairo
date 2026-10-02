@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Semua isi debat ini — argumen, tinjauan, skor, dan putusan — dihasilkan oleh model AI, diberi penanda yang dapat dibaca mesin, dan mungkin tidak akurat.",
+  "debateChrome.status.waiting": "Menunggu untuk dimulai. Debat Anda akan dimulai dengan sendirinya pada {time}.",
+  "debateChrome.status.waitingOwnDebates": "Debat Anda yang lain sedang memakai sisa batas Anda untuk saat ini. Debat ini akan dimulai dengan sendirinya begitu salah satunya selesai.",
   "debateChrome.backToLibrary": "← Kembali ke pustaka",
   "debateChrome.loading": "Memuat…",
   "debateChrome.error.claimGenerationFailed": "Pembuatan klaim gagal",
@@ -202,7 +204,7 @@
   "debateChrome.condition.digestCannotExist": "Ringkasan tidak dapat dibuat dalam anggaran penyusunan",
   "debateChrome.condition.protectedCoreGuardRetired": "Proses dihentikan karena anggaran; pemeriksaan pernyataan ulang tidak lagi menjadi syarat",
   "debateChrome.condition.hiddenUnjudgeable": "Disembunyikan: tidak dapat dinilai — tampilkan bagian tersembunyi untuk membacanya",
-  "debateChrome.condition.derivedStandingUnreviewed": "Bertumpu pada argumen yang telah dinilai — tinjauan lintas kubunya sendiri belum tersedia",
+  "debateChrome.condition.derivedStandingUnreviewed": "Bertumpu pada argumen yang telah dinilai — tinjauannya sendiri oleh model dari pembuat lain tidak ada",
   "debateChrome.condition.hiddenLowScore": "Disembunyikan: skornya di bawah ambang yang ditampilkan",
   "debateChrome.condition.unauthoredBranchHalted": "Pengembangan berhenti di sini — tidak ada tulisan untuk disembunyikan atau ditampilkan",
   "debateChrome.condition.labelBasisIncomplete": "Dasar putusan tidak lengkap — tidak ada posisi tandingan atau penilai kedua untuk dibandingkan",
@@ -270,5 +272,6 @@
   "requestFailure.kind.UNREADABLE": "Balasan koordinator tidak dapat dibaca sehingga hasilnya tidak diketahui.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator menolak pilihan paket. Pilih Gratis atau Premium, lalu coba lagi.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator menolak permintaan tersebut: model yang diperlukan paket ini sedang tidak tersedia. Coba lagi nanti, atau pilih paket lain.",
+  "requestFailure.kind.ALREADY_WAITING": "Hanya satu pertanyaan yang dapat menunggu dalam satu waktu. Ajukan pertanyaan ini setelah debat Anda yang menunggu dimulai.",
   "requestFailure.kind.UNCLASSIFIED": "Permintaan gagal sebelum balasan diterima sehingga hasilnya tidak diketahui. Ini bukan keputusan yang dibuat oleh koordinator."
 }

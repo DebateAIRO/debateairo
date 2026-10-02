@@ -74,7 +74,7 @@ async function observedAuthSource(input: Readonly<{
         email: "alice@example.test",
         password: "correct horse battery staple",
         recovery_email: "recovery@example.test",
-        adult_affirmed: true
+        date_of_birth: "1990-01-01"
       }
     });
     expect(response.statusCode).toBe(202);

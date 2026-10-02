@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Planınızın kullanımı",
+  "billing.usage.line": "Bugün %{dayPct} · Bu hafta %{weekPct} · Bu ay %{monthPct}",
+  "billing.usage.lineFree": "Bu ay %{monthPct}",
+  "billing.usage.day": "Bugün",
+  "billing.usage.week": "Bu hafta",
+  "billing.usage.month": "Bu ay",
+  "billing.usage.resets": "Sıfırlanma: {time}"
+}

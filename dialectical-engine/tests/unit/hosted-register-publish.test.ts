@@ -25,10 +25,14 @@ import {
   type HostedRegisterOperations
 } from "../../apps/runner/src/hosted-register-publish.js";
 import { runHostedRegisterPublishCli } from "../../apps/runner/src/hosted-register-publish-cli.js";
+import { PLAN_TIER_ROSTERS } from "../../packages/contract/src/index.js";
 import {
   ALGORITHM_REGISTER_ROW_KEYS,
+  BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
   COST_ENVELOPE_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
+  COUNTRY_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   loadBootstrapRegister,
   parseRegisterVersionText,
@@ -179,6 +183,19 @@ describe("Task 14b · the operator's hosted register file", () => {
     expect(plan.vendorRefs.length).toBeGreaterThanOrEqual(2);
     // Every example vendor sits under a reserved example name, so the plan says so.
     expect(plan.exampleTargetRefs).toEqual(plan.vendorRefs);
+  });
+
+  /**
+   * Final review I-3. Bring-up step 4b copies this example into the live hosted file, so what it
+   * carries is the kit's default: NO countryPolicy member, so the first publication has no country
+   * gate (A14). The switches live in country-policy.example.json, merged in only once the gate's
+   * preconditions hold (the DB-IP credit on the site among them; README "Country data").
+   */
+  it("ships the example WITHOUT countryPolicy, so a hosted file built from it has no country gate", async () => {
+    const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
+    expect(Object.hasOwn(example, "countryPolicy")).toBe(false);
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
+    expect(plan.rows.some((row) => row.rowKey === COUNTRY_POLICY_ROW_KEY)).toBe(false);
   });
 
   /**
@@ -351,7 +368,11 @@ describe("Task 14b · the operator's hosted register file", () => {
       expect(sealed, row.rowKey).not.toMatch(/https?:\/\//u);
       expect(sealed, row.rowKey).not.toContain("authorization");
       expect(sealed, row.rowKey).not.toContain("fixture-path");
-      expect(sealed, row.rowKey).not.toContain("price");
+      // The provider targets' own price members (`input_/output_price_micros_per_million`).
+      // Paid plans B4a: the code-owned `billingPlans` row legitimately seals the PLANS' prices
+      // (`net_price_micros`), which come from no provider target, so the guard names the
+      // provider-target members instead of every "price".
+      expect(sealed, row.rowKey).not.toContain("_price_micros_per_million");
     }
   });
 
@@ -621,5 +642,127 @@ describe("Task 14b · a published version the boot readers refuse", () => {
     expect({ exitCode, stderr, closed }).toEqual({ exitCode: 0, stderr: "", closed: true });
     expect(stdout).toMatch(/^HOSTED_REGISTER_BOOT_READY register_version=5$/mu);
     expect(stdout).toMatch(/^REGISTER_VERSION=5$/mu);
+  });
+});
+
+/**
+ * PAID PLANS (spec 2026-09-29 §2.5.1; R1 A22) and the budget rule (spec
+ * 2026-09-28 §2.4). The billing rows are code-owned (billing OFF) unless the
+ * operator's file supplies them. Billing can be switched on only with the
+ * three budget members; a plan window below one debate's ceiling WARNS, it
+ * never refuses.
+ */
+describe("Paid plans · the billing rows and the budget band in the hosted register (B11a)", () => {
+  it("ships an example with the three budget members and both billing rows, billing off", async () => {
+    const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
+    expect(example.costEnvelopePolicy).toMatchObject({
+      admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
+    });
+    expect(example.billingPlans).toEqual(JSON.parse(JSON.stringify(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value)));
+    expect(example.billingPolicy).toEqual(JSON.parse(JSON.stringify(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value)));
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
+    const rendered = renderHostedRegisterPlan(plan);
+    expect(rendered).toContain(
+      "cost_envelope_band admission_close_basis_points=9500 finish_up_to_basis_points=11500 waiting_line_per_person=1\n"
+    );
+    expect(rendered).toContain("billing_policy enabled=false\n");
+    expect(rendered).toContain("billing_plans plan_ids=FREE,PLUS,PRO,MAX\n");
+    // §2.5.1: Free's whole month (0.20 USD) is below 0.25 USD per debate. A warning, never a refusal.
+    expect(rendered).toContain("warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:FREE\n");
+    expect(rendered).not.toContain("BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:PLUS");
+    // The existing cost_envelope line keeps its shape (the M1 regex above still matches it).
+    expect(rendered).toMatch(/^cost_envelope .* serve_overrun_basis_points=2000$/mu);
+  });
+
+  it("seals the engine's own billing rows, billing off, when a v1 file names neither", async () => {
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    const policy = plan.rows.find((row) => row.rowKey === "billingPolicy");
+    expect(policy?.sourceRef).toBe(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef);
+    expect(JSON.parse(policy!.valueJsonText)).toMatchObject({ enabled: false });
+    expect(plan.rows.some((row) => row.rowKey === "billingPlans")).toBe(true);
+    expect(renderHostedRegisterPlan(plan)).toContain("cost_envelope_band absent\n");
+  });
+
+  it("seals the operator's billing row verbatim under the file's sourceRef", async () => {
+    const file = validFile();
+    file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, quote_ttl_seconds: 900 };
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)));
+    const policy = plan.rows.find((row) => row.rowKey === "billingPolicy")!;
+    expect(JSON.parse(policy.valueJsonText)).toMatchObject({ quote_ttl_seconds: 900 });
+    expect(policy.sourceRef).toBe(file.sourceRef);
+  });
+
+  it("refuses billing switched on without the three budget members (A22)", async () => {
+    const file = validFile();
+    file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
+    expect(await planCode(file)).toBe("BILLING_REQUIRES_ENVELOPE_MEMBERS");
+  });
+
+  it("accepts billing switched on with the members, and says so in the plan", async () => {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
+    });
+    file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)));
+    expect(plan.billingPolicy?.enabled).toBe(true);
+    expect(renderHostedRegisterPlan(plan)).toContain("billing_policy enabled=true\n");
+  });
+
+  it.each([
+    ["a malformed plans row", "billingPlans", { kind: "BILLING_PLANS" }, "BILLING_PLANS_INVALID"],
+    ["a policy still naming the xMoney environment (A22)", "billingPolicy",
+      { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, xmoney_environment: "stage" }, "BILLING_POLICY_INVALID"]
+  ])("refuses %s by the register's own code", async (_name, key, value, code) => {
+    const file = validFile();
+    file[key] = value;
+    expect(await planCode(file)).toBe(code);
+  });
+});
+
+/**
+ * Final review Part 1b, Important 3 (budget spec §2.10, B9d). The file's
+ * `providerTargets` carry the prices both units read at boot (they must equal
+ * PROVIDER_DISCOVERY_TARGETS_JSON) and the composed register carries the sealed
+ * JUDGE bound, so the boot's RUN_CEILING_BELOW_ONE_CALL check is asked of the
+ * plan: a dry run refuses a version both services would refuse to start on.
+ * As at boot, only with the band published.
+ */
+describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BELOW_ONE_CALL)", () => {
+  /** Both vendors serve the Free plan's whole roster at `prices`, with a 30% answer reserve: arguing gets 175 000 micros. */
+  function freeRosterFile(prices: Readonly<{ input: number; output: number }>, band: boolean): Record<string, unknown> {
+    const file = validFile();
+    (file.providerTargets as Array<Record<string, unknown>>).forEach((target, index) => {
+      target.model = PLAN_TIER_ROSTERS.free[index];
+      target.input_price_micros_per_million = prices.input;
+      target.output_price_micros_per_million = prices.output;
+    });
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      serve_reserve_basis_points: 3_000,
+      ...(band ? { admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1 } : {})
+    });
+    return file;
+  }
+
+  it("refuses at plan time, before anything is sealed, a band whose cheapest model cannot pay for one first call", async () => {
+    expect(await planCode(freeRosterFile({ input: 5_000_000, output: 25_000_000 }, true))).toBe("RUN_CEILING_BELOW_ONE_CALL");
+  });
+
+  it("lets the same prices through without the band (the boot asks only with it), and cheaper ones with it", async () => {
+    expect(await planCode(freeRosterFile({ input: 5_000_000, output: 25_000_000 }, false))).toBe("NO_REFUSAL");
+    expect(await planCode(freeRosterFile({ input: 1_000_000, output: 4_000_000 }, true))).toBe("NO_REFUSAL");
+  });
+
+  it("has nothing to ask while no plan's whole roster is configured, as at boot", async () => {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      serve_reserve_basis_points: 3_000, admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500,
+      waiting_line_per_person: 1
+    });
+    for (const target of file.providerTargets as Array<Record<string, unknown>>) {
+      target.input_price_micros_per_million = 5_000_000;
+      target.output_price_micros_per_million = 25_000_000;
+    }
+    expect(await planCode(file)).toBe("NO_REFUSAL");
   });
 });

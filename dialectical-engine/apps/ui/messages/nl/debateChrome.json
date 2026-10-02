@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Alles in dit debat — argumenten, beoordelingen, scores en het oordeel — is door AI-modellen gegenereerd, machineleesbaar gemarkeerd en kan onnauwkeurig zijn.",
+  "debateChrome.status.waiting": "Wacht op de start. Uw debat start vanzelf om {time}.",
+  "debateChrome.status.waitingOwnDebates": "Uw andere debatten gebruiken voorlopig de rest van uw limiet. Dit debat start vanzelf zodra er een klaar is.",
   "debateChrome.backToLibrary": "← Terug naar bibliotheek",
   "debateChrome.loading": "Laden…",
   "debateChrome.error.claimGenerationFailed": "Genereren van stelling mislukt",
@@ -203,7 +205,7 @@
   "debateChrome.condition.digestCannotExist": "Binnen het samenstellingsbudget kon geen samenvatting worden gemaakt",
   "debateChrome.condition.protectedCoreGuardRetired": "Uitvoering gestopt wegens budget; de controle van de herformulering hield deze niet langer tegen",
   "debateChrome.condition.hiddenUnjudgeable": "Verborgen: kon niet worden beoordeeld — toon verborgen items om dit te lezen",
-  "debateChrome.condition.derivedStandingUnreviewed": "Blijft staan op basis van de beoordeelde argumenten — de eigen modeloverschrijdende beoordeling ontbreekt",
+  "debateChrome.condition.derivedStandingUnreviewed": "Blijft staan op basis van de beoordeelde argumenten — de eigen beoordeling door een model van een andere maker ontbreekt",
   "debateChrome.condition.hiddenLowScore": "Verborgen: scoorde onder de getoonde drempel",
   "debateChrome.condition.unauthoredBranchHalted": "De uitbreiding is hier gestopt — er is niets geschreven om te verbergen of te tonen",
   "debateChrome.condition.labelBasisIncomplete": "Grondslag van oordeel onvolledig — geen concurrerend standpunt of geen tweede beoordelaar ter vergelijking",
@@ -277,5 +279,6 @@
   "requestFailure.kind.UNREADABLE": "Het antwoord van de coördinator kon niet worden gelezen, waardoor de uitkomst onbekend is.",
   "requestFailure.kind.PLAN_TIER_INVALID": "De coördinator heeft de abonnementskeuze afgewezen. Kies Gratis of Premium en probeer het opnieuw.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "De coördinator heeft het verzoek afgewezen: een model dat voor dit abonnement nodig is, is momenteel niet beschikbaar. Probeer het later opnieuw of kies het andere abonnement.",
+  "requestFailure.kind.ALREADY_WAITING": "Er kan maar één vraag tegelijk wachten. Stel deze vraag zodra uw wachtende debat is gestart.",
   "requestFailure.kind.UNCLASSIFIED": "Het verzoek is mislukt voordat er een antwoord is ontvangen, waardoor de uitkomst onbekend is. De coördinator heeft hierover geen beslissing genomen."
 }

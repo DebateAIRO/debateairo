@@ -32,6 +32,10 @@ export type LegalDocumentKey = "privacy" | "terms";
 
 export type LegalDocument = Readonly<{
   key: LegalDocumentKey;
+  /** The draft's `Version N.M` (paid plans L2). Sent back at sign-up and re-acceptance. */
+  version: string;
+  /** sha256 of the draft's exact Markdown bytes, hex — the manifest's value for this locale. */
+  sha256: string;
   /** The mono eyebrow, e.g. `PRIVACY POLICY · v3.0 · EFFECTIVE [DATE]`. */
   eyebrow: string;
   title: string;

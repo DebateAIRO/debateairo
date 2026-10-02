@@ -22,6 +22,8 @@
   "lib/i18n/support.test.mjs",
   "lib/i18n/compose.test.mjs",
   "lib/i18n/misc.test.mjs",
+  "lib/i18n/legal.test.mjs",
+  "lib/i18n/billing.test.mjs",
   "lib/i18n/catalogThreading.test.mjs",
   "lib/i18n/catalogNamespaces.test.mjs",
   "components/support/caseLink.test.mjs",

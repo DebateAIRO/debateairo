@@ -22,6 +22,7 @@
   "time.status.claimed": "Призначено",
   "time.status.running": "Виконується",
   "time.status.holding": "Призупинено для відновлення постачальника",
+  "time.status.waiting": "Очікує",
   "time.status.settled": "Узгоджено",
   "time.status.generating": "Генерується",
   "time.status.failed": "Помилка",

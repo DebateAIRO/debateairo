@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "आपकी योजना का उपयोग",
+  "billing.usage.line": "आज {dayPct}% · इस सप्ताह {weekPct}% · इस महीने {monthPct}%",
+  "billing.usage.lineFree": "इस महीने {monthPct}%",
+  "billing.usage.day": "आज",
+  "billing.usage.week": "इस सप्ताह",
+  "billing.usage.month": "इस महीने",
+  "billing.usage.resets": "रीसेट: {time}"
+}

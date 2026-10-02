@@ -14,9 +14,13 @@
  *    (`readDevelopmentRunnerPolicy`) refuses runner rows whose provenance is not
  *    exactly those builders' source refs, so any other composition would publish
  *    a register the hosted runner cannot start on;
- *  - the two OPERATOR-OWNED rows, read from the operator's file: the vetted
- *    `configuredProviderSet` (V-9(4), built by `buildConfiguredProviderSetDeploymentRow`)
- *    and the `costEnvelopePolicy` (V-28, validated by the register's own schema).
+ *  - the OPERATOR-OWNED rows, read from the operator's file: the vetted
+ *    `configuredProviderSet` (V-9(4), built by `buildConfiguredProviderSetDeploymentRow`),
+ *    the `costEnvelopePolicy` (V-28, validated by the register's own schema) and, only
+ *    when the file carries the member, the `countryPolicy` (paid plans G2, checked by
+ *    the register's own schema and sealed under the file's `sourceRef`). Without the
+ *    member the seeder's code-owned `countryPolicy` row is dropped, so that version has
+ *    no country gate (A14).
  * The historical bootstrap is imported first, exactly as the seeder imports it,
  * and stays the sealed base: these rows are DEPLOYMENT rows, never bootstrap rows.
  *
@@ -43,9 +47,11 @@ import { open, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Pool } from "pg";
 import { z } from "zod";
-import { costEnvelopeGuardPolicy } from "@debateai/budget";
+import { assertRunCeilingCoversOneCall, costEnvelopeGuardPolicy } from "@debateai/budget";
+import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
+import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
@@ -54,23 +60,37 @@ import {
 } from "@debateai/providers";
 import {
   ALGORITHM_REGISTER_ROW_KEYS,
+  BILLING_PLANS_ROW_KEY,
+  BILLING_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
+  COUNTRY_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   admissionPolicyFromValue,
+  assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
+  billingPlansFromValue,
+  billingPolicyFromValue,
   buildConfiguredProviderSetDeploymentRow,
   computeRegisterSnapshotSha256,
+  costEnvelopeBand,
+  costEnvelopeCeilings,
   costEnvelopePolicyFromValue,
+  countryPolicyFromValue,
   createPostgresRegisterPublicationPort,
+  judgeTokenCeilingFromValue,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   persistBootstrapRegister,
+  planCapMicros,
   readAdmissionPolicy,
   readAuthPolicy,
+  readBillingPlans,
+  readBillingPolicy,
   readCostEnvelopePolicy,
+  readCountryPolicy,
   readDeploymentRiskTier,
   readEnvelopeFormulaInputs,
   readMfaPolicy,
@@ -82,6 +102,8 @@ import {
   readStructuralCeilingPolicyInputs,
   registerVersionToSafeLegacyNumber,
   warnOnIdenticalSynthesisRoleRefs,
+  type BillingPlans,
+  type BillingPolicy,
   type BootstrapRegister,
   type CostEnvelopePolicy,
   type GeneralRegisterPublication,
@@ -119,8 +141,11 @@ const EXAMPLE_MAKER_PREFIX = "Example";
 const MAX_FILE_BYTES = 64 * 1_024;
 const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
-  "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy",
-  "providerTargets", "synthesisRoles"
+  "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy", "countryPolicy",
+  "providerTargets", "synthesisRoles",
+  // Paid plans (spec 2026-09-29 §2.5.1): OPTIONAL. Left out, the engine's own
+  // rows are sealed (billing OFF); supplied, they supersede them.
+  "billingPlans", "billingPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -270,9 +295,19 @@ export type HostedRegisterFile = Readonly<{
   configuredProviderSet: z.infer<typeof configuredProviderSetSchema>;
   /** Validated in the plan by the register's own strict schema, so the refusal keeps its own code. */
   costEnvelopePolicy: unknown;
+  /**
+   * Paid plans G2: the operator's countryPolicy (the member's raw value), validated in the plan by its
+   * own schema. null = the member is absent: no countryPolicy row is published, so the version has no
+   * country gate (A14). A member that is present with the JSON value null is refused by the parser
+   * (COUNTRY_POLICY_INVALID); it never means "no gate".
+   */
+  countryPolicy: unknown;
   /** Validated in the plan by the boot's own parser and hosted checks. NEVER published and never printed. */
   providerTargets: unknown;
   synthesisRoles: z.infer<typeof synthesisRolesSchema> | null;
+  /** Paid plans: OPTIONAL operator rows, checked in the plan by the register's own parsers. */
+  billingPlans: Readonly<{ value: unknown }> | null;
+  billingPolicy: Readonly<{ value: unknown }> | null;
 }>;
 
 /**
@@ -315,13 +350,21 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     if (!roles.success) refuse("HOSTED_REGISTER_FILE_INVALID");
     synthesisRoles = roles.data;
   }
+  // Paid plans G2: an explicit null is not "left out". It is refused by the register's own check,
+  // with its own code, so only a file WITHOUT the member publishes no countryPolicy row (A14).
+  if (Object.hasOwn(record, "countryPolicy") && record.countryPolicy === null) {
+    countryPolicyFromValue(null, sourceRef);
+  }
   return Object.freeze({
     format: HOSTED_REGISTER_FILE_FORMAT,
     sourceRef,
     configuredProviderSet: providerSet.data,
     costEnvelopePolicy: record.costEnvelopePolicy,
+    countryPolicy: Object.hasOwn(record, "countryPolicy") ? record.countryPolicy : null,
     providerTargets: record.providerTargets,
-    synthesisRoles
+    synthesisRoles,
+    billingPlans: Object.hasOwn(record, BILLING_PLANS_ROW_KEY) ? Object.freeze({ value: record.billingPlans }) : null,
+    billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null
   });
 }
 
@@ -408,6 +451,11 @@ export type HostedRegisterPlan = Readonly<{
   exampleSourceRef: boolean;
   /** The canonical targets JSON the boot readiness check re-parses. Never printed: it names credential files. */
   providerTargetsJson: string;
+  /** The billing rows as sealed: the operator's, or the engine's own (billing OFF). */
+  billingPlans: BillingPlans | null;
+  billingPolicy: BillingPolicy | null;
+  /** Things to know, never refusals: `BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` (spec §2.5.1). */
+  warnings: readonly string[];
 }>;
 
 function canonicalRowValue(value: unknown): RegisterPublicationRow["valueJsonText"] {
@@ -465,6 +513,13 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
+  // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
+  // the register's own parser, so its refusal keeps its own code.
+  if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
+  if (file.billingPolicy !== null) billingPolicyFromValue(file.billingPolicy.value, file.sourceRef);
+  // Paid plans G2: the operator's country switches, by the register's own schema
+  // (COUNTRY_POLICY_INVALID). Absent member = no row, no gate (A14).
+  if (file.countryPolicy !== null) countryPolicyFromValue(file.countryPolicy, file.sourceRef);
   const configured: readonly DevelopmentConfiguredProvider[] = Object.freeze(
     file.configuredProviderSet.providers.map((provider) => Object.freeze({
       providerRef: provider.providerRef, adapterKind: provider.adapterKind, maker: provider.maker
@@ -485,13 +540,18 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
 
   const bootstrap = await loadBootstrapRegister();
   // The seeder's builders take a panel; only its two provider-set members are read.
-  const codeOwnedRows = await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, {
+  const seededRows = await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, {
     configuredProviders: configured,
     requiredDistinctMakers: file.configuredProviderSet.requiredDistinctMakers,
     healthyProviderRefs: Object.freeze([]),
     targets,
     targetsJson
   }, synthesisRoles, "hosted");
+  // A14: a hosted file without countryPolicy publishes no countryPolicy row (no gate), exactly as
+  // before this member existed. The development seeder always publishes it (local mode reads none).
+  const codeOwnedRows = file.countryPolicy === null
+    ? seededRows.filter((row) => row.rowKey !== COUNTRY_POLICY_ROW_KEY)
+    : seededRows;
   const operatorRows = new Map<string, RegisterPublicationRow>([
     [CONFIGURED_PROVIDER_SET_ROW_KEY, Object.freeze({
       rowKey: CONFIGURED_PROVIDER_SET_ROW_KEY,
@@ -504,6 +564,23 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
       sourceRef: file.sourceRef
     })]
   ]);
+  if (file.countryPolicy !== null) {
+    operatorRows.set(COUNTRY_POLICY_ROW_KEY, Object.freeze({
+      rowKey: COUNTRY_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.countryPolicy),
+      sourceRef: file.sourceRef
+    }));
+  }
+  for (const [rowKey, supplied] of [
+    [BILLING_PLANS_ROW_KEY, file.billingPlans],
+    [BILLING_POLICY_ROW_KEY, file.billingPolicy]
+  ] as const) {
+    if (supplied !== null) {
+      operatorRows.set(rowKey, Object.freeze({
+        rowKey, valueJsonText: canonicalRowValue(supplied.value), sourceRef: file.sourceRef
+      }));
+    }
+  }
   const replaced = codeOwnedRows.filter((row) => operatorRows.has(row.rowKey));
   if (replaced.length !== operatorRows.size) refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
   const rows = Object.freeze(codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row));
@@ -529,6 +606,43 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     })),
     bootstrap.registerVersion
   ));
+  // The rows as they will be sealed, read back from the composed set.
+  const sealed = (rowKey: string): Readonly<{ value: unknown; sourceRef: string }> | null => {
+    const row = rows.find((candidate) => candidate.rowKey === rowKey);
+    return row === undefined ? null : Object.freeze({ value: JSON.parse(row.valueJsonText) as unknown, sourceRef: row.sourceRef });
+  };
+  // B9d (budget spec §2.10), final review Part 1b, Important 3: the check BOTH
+  // boots run (RUN_CEILING_BELOW_ONE_CALL), asked of the version about to be
+  // sealed, by the same functions over the same inputs: the file's priced
+  // targets (they must equal PROVIDER_DISCOVERY_TARGETS_JSON, which the units
+  // read), the composed JUDGE bound, the ask's largest question and each plan's
+  // roster. Only with the band, as at boot. The boots keep asking: the
+  // environment can still differ from the file.
+  if (costEnvelopeBand(costEnvelope) !== null) {
+    assertRunCeilingCoversOneCall({
+      bodyCeilingMicros: costEnvelopeCeilings(costEnvelope).bodyMicros,
+      firstCallsByRoster: firstCallsByPlanRoster({
+        projections: firstPositionCallProjections({
+          targets,
+          judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
+          questionMaxBytes: askQuestionMaxBytes()
+        }),
+        rosters: PLAN_TIER_ROSTERS
+      })
+    });
+  }
+  const plansRow = sealed(BILLING_PLANS_ROW_KEY);
+  const policyRow = sealed(BILLING_POLICY_ROW_KEY);
+  const billingPlans = plansRow === null ? null : billingPlansFromValue(plansRow.value, plansRow.sourceRef);
+  const billingPolicy = policyRow === null ? null : billingPolicyFromValue(policyRow.value, policyRow.sourceRef);
+  // R1 A22: billing may be switched on only with its plans and the three budget
+  // members, asked here of the version about to be sealed, so a dry run says so.
+  assertBillingReady({ policy: billingPolicy, plans: billingPlans, envelope: costEnvelope });
+  // §2.5.1: WARN, never refuse, when a plan's smallest window (the day cap, or
+  // Free's whole month) is below what one debate may spend.
+  const warnings = Object.freeze(billingPlans === null ? [] : billingPlans.plans
+    .filter((plan) => (planCapMicros(plan, "DAY") ?? plan.monthlyCreditMicros) < costEnvelope.perRunCeilingMicros)
+    .map((plan) => `BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:${plan.planId}`));
 
   const exampleLiteralVendors = new Set(file.configuredProviderSet.providers
     .filter((provider) => provider.providerRef.startsWith(EXAMPLE_PROVIDER_REF_PREFIX)
@@ -555,7 +669,10 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
           && isReservedExampleHost(new URL(target.baseUrl).hostname)))
       .map((provider) => provider.providerRef)),
     exampleSourceRef: file.sourceRef === HOSTED_REGISTER_EXAMPLE_SOURCE_REF,
-    providerTargetsJson: targetsJson
+    providerTargetsJson: targetsJson,
+    billingPlans,
+    billingPolicy,
+    warnings
   });
 }
 
@@ -581,6 +698,16 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
       // Task M1: the answer's reserve and overrun, 0 when the file leaves them out.
       + ` serve_reserve_basis_points=${plan.costEnvelope.serveReserveBasisPoints}`
       + ` serve_overrun_basis_points=${plan.costEnvelope.serveOverrunBasisPoints}`,
+    // Budget rule (spec 2026-09-28 §2.4): the band and the waiting line, or
+    // "absent", which is today's behaviour exactly.
+    plan.costEnvelope.closeBasisPoints === null
+      ? "cost_envelope_band absent"
+      : `cost_envelope_band admission_close_basis_points=${plan.costEnvelope.closeBasisPoints}`
+        + ` finish_up_to_basis_points=${String(plan.costEnvelope.finishBasisPoints)}`
+        + ` waiting_line_per_person=${String(plan.costEnvelope.waitingLinePerPerson)}`,
+    `billing_policy ${plan.billingPolicy === null ? "absent" : `enabled=${String(plan.billingPolicy.enabled)}`}`,
+    `billing_plans ${plan.billingPlans === null ? "absent" : `plan_ids=${plan.billingPlans.plans.map((entry) => entry.planId).join(",")}`}`,
+    ...plan.warnings.map((warning) => `warning=${warning}`),
     `synthesis_roles synthesizer=${plan.synthesisRoles.synthesizerRoleRef}`
       + ` evaluator=${plan.synthesisRoles.evaluatorRoleRef}`,
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`
@@ -675,8 +802,18 @@ export async function verifyHostedRegisterBootReadiness(
   await readMfaPolicy(pool, version);
   await readSessionPolicy(pool, version);
   await readRecoveryPolicy(pool, version);
-  assertHostedSupportAdmissionSealed("hosted", await readAdmissionPolicy(pool, version));
-  await readCostEnvelopePolicy(pool, version);
+  const admission = await readAdmissionPolicy(pool, version);
+  // Paid plans G3a: main.ts's country-policy and country-gate-admission stages, in their order.
+  if (await readCountryPolicy(pool, version) !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
+  assertHostedSupportAdmissionSealed("hosted", admission);
+  const envelope = await readCostEnvelopePolicy(pool, version);
+  // Paid plans (R1 A22, R-5): the readiness question the API asks at boot (B6b's
+  // ask-room step, P6a). The runner never asks it: it reads no billingPolicy (A20).
+  assertBillingReady({
+    policy: await readBillingPolicy(pool, version),
+    plans: await readBillingPlans(pool, version),
+    envelope
+  });
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);
   if (!makers.deploymentMakerCapability) refuse("HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT");

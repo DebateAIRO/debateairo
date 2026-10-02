@@ -14,6 +14,7 @@
   "time.status.claimed": "Üle võetud",
   "time.status.running": "Käimas",
   "time.status.holding": "Pakkuja taastamise ootel",
+  "time.status.waiting": "Ootel",
   "time.status.settled": "Lahendatud",
   "time.status.generating": "Genereerimine",
   "time.status.failed": "Ebaõnnestunud",

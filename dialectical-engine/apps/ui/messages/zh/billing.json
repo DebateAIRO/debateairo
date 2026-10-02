@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "您的方案用量",
+  "billing.usage.line": "今天 {dayPct}% · 本周 {weekPct}% · 本月 {monthPct}%",
+  "billing.usage.lineFree": "本月 {monthPct}%",
+  "billing.usage.day": "今天",
+  "billing.usage.week": "本周",
+  "billing.usage.month": "本月",
+  "billing.usage.resets": "重置时间：{time}"
+}
