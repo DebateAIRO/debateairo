@@ -23,6 +23,7 @@ apps/api/src/billing/checkout.ts
 apps/api/src/billing/codes.ts
 apps/api/src/billing/connectors.ts
 apps/api/src/billing/dispute-cli.ts
+apps/api/src/billing/efactura-status-cli.ts
 apps/api/src/billing/email-job.ts
 apps/api/src/billing/erasure-hook.ts
 apps/api/src/billing/index.ts
@@ -56,6 +57,8 @@ apps/api/src/billing/subscription-core.ts
 apps/api/src/billing/subscription-deps.ts
 apps/api/src/billing/subscription-routes.ts
 apps/api/src/billing/subscription-view.ts
+apps/api/src/billing/tax-summary-cli.ts
+apps/api/src/billing/tax-summary.ts
 apps/api/src/billing/upgrade.ts
 apps/api/src/billing/usage.ts
 apps/api/src/billing/verify-payment.ts

@@ -1078,6 +1078,184 @@ export class BillingRepository {
     }));
   }
 
+  /**
+   * P16b (A17b, D5 5j, P9c): the documents to check by hand, while no invoice row of that kind exists for the charge —
+   * invoice jobs P10 gave up on (INVOICE_UNKNOWN: the issuer's answer never came and no lookup could settle it;
+   * CREDIT_NOTE_MANUAL: a partial credit note the issuer cannot make; and for SmartBill, the Romanian legal document,
+   * INVOICE_SERVICE_REFUSED / INVOICE_SERVICE_UNAVAILABLE: never issued), and every refund made in the xMoney
+   * dashboard (P9c's PROVIDER_REFUND REFUNDED, job kind DASHBOARD_REFUND) whose charge has no credit note: its amount
+   * is unknown, so P9c issues none automatically.
+   */
+  async invoiceUnknownItems(): Promise<Array<{
+    chargeId: string; jobKind: string;
+    code: "INVOICE_UNKNOWN" | "CREDIT_NOTE_MANUAL" | "INVOICE_SERVICE_REFUSED" | "INVOICE_SERVICE_UNAVAILABLE";
+    since: Date;
+  }>> {
+    const result = await this.pool.query<{
+      charge_id: string; kind: string;
+      code: "INVOICE_UNKNOWN" | "CREDIT_NOTE_MANUAL" | "INVOICE_SERVICE_REFUSED" | "INVOICE_SERVICE_UNAVAILABLE";
+      since: Date;
+    }>(`
+      SELECT split_part(outbox.ref, ':', 1) AS charge_id, outbox.kind, outbox.last_error_code AS code,
+        COALESCE(outbox.claimed_at, outbox.not_before) AS since
+      FROM billing.outbox AS outbox
+      WHERE outbox.kind IN ('SMARTBILL_INVOICE','SMARTBILL_STORNO','QUADERNO_RECORD_SALE','QUADERNO_RECORD_REFUND')
+        AND outbox.dead_at IS NOT NULL
+        AND (outbox.last_error_code IN ('INVOICE_UNKNOWN','CREDIT_NOTE_MANUAL')
+          OR (outbox.kind IN ('SMARTBILL_INVOICE','SMARTBILL_STORNO')
+            AND outbox.last_error_code IN ('INVOICE_SERVICE_REFUSED','INVOICE_SERVICE_UNAVAILABLE')))
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.invoice AS invoice
+          WHERE invoice.charge_id = split_part(outbox.ref, ':', 1)
+            AND invoice.kind = CASE WHEN outbox.kind IN ('SMARTBILL_INVOICE','QUADERNO_RECORD_SALE')
+              THEN 'INVOICE' ELSE 'CREDIT_NOTE' END
+        )
+      UNION ALL
+      SELECT refunded.charge_id, 'DASHBOARD_REFUND' AS kind, 'CREDIT_NOTE_MANUAL' AS code, refunded.at AS since
+      FROM billing.charge_event AS refunded
+      WHERE refunded.kind = 'REFUNDED' AND refunded.error_code = 'PROVIDER_REFUND'
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.invoice AS invoice
+          WHERE invoice.charge_id = refunded.charge_id AND invoice.kind = 'CREDIT_NOTE'
+        )
+      ORDER BY since
+    `);
+    return result.rows.map((row) => ({ chargeId: row.charge_id, jobKind: row.kind, code: row.code, since: row.since }));
+  }
+
+  /**
+   * P16b (D5 5d, D6a's request): subscriptions whose event history does not fold (P2 refuses it), with the time of
+   * their latest event. Every renewal pass leaves them out (P11a's `billing.renewal.history_invalid` count) and a
+   * read for their owner fails closed, so the owner looks at each. The same tolerant fold as `dueRenewals`
+   * (`foldEach`), over every subscription, whatever its state: an ended one that does not fold still blocks its owner.
+   * Content-free: ids and times only.
+   */
+  async unfoldableSubscriptions(): Promise<Array<{ subscriptionId: string; since: Date }>> {
+    const rows = (await this.pool.query<SubscriptionEventRaw>(`
+      SELECT ${SUBSCRIPTION_EVENT_COLUMNS} FROM billing.subscription_event AS event
+      ORDER BY event.subscription_id, event.seq
+    `)).rows;
+    const invalid = new Set<string>();
+    foldEach(rows, (subscriptionId) => { invalid.add(subscriptionId); });
+    const latest = new Map<string, Date>();
+    // Rows come in `seq` order per subscription, so the last one seen is the latest event.
+    for (const row of rows) if (invalid.has(row.subscription_id)) latest.set(row.subscription_id, row.at);
+    return [...latest].map(([subscriptionId, since]) => ({ subscriptionId, since }));
+  }
+
+  /**
+   * P16b (R2 Q-1, D6a's 4b): subscriptions whose dunning runs, or ended, with no charge. P11a's `failUnpricedAttempt`
+   * writes an attempt the tax service could not price through `writeDunningAttempt`, whose PAST_DUE / ENDED data
+   * then name a `reason` (`TAX_SERVICE_UNAVAILABLE`) where a charged attempt names its `charge_id`. The latest
+   * status event of each subscription decides: a PAST_DUE still in force, or an ENDED(DUNNING) since `since`.
+   * Nothing was charged; the person got M5A–C (and M6 at the end). Content-free: ids, codes and times.
+   */
+  async chargelessDunning(since: Date): Promise<Array<{
+    subscriptionId: string; ended: boolean; reason: string; since: Date;
+  }>> {
+    const result = await this.pool.query<{ subscription_id: string; kind: "PAST_DUE" | "ENDED"; reason: string; at: Date }>(`
+      SELECT latest.subscription_id, latest.kind, latest.data ->> 'reason' AS reason, latest.at
+      FROM (
+        SELECT DISTINCT ON (event.subscription_id) event.subscription_id, event.kind, event.at, event.data
+        FROM billing.subscription_event AS event
+        WHERE event.kind IN ('ACTIVATED','RENEWED','PAST_DUE','RECOVERED','ENDED','WITHDRAWN','SUSPENDED','RESUMED',
+          'ERASURE_STOPPED')
+        ORDER BY event.subscription_id, event.seq DESC
+      ) AS latest
+      WHERE (latest.data ->> 'reason') IS NOT NULL AND (latest.data ->> 'charge_id') IS NULL
+        AND (latest.kind = 'PAST_DUE'
+          OR (latest.kind = 'ENDED' AND latest.data ->> 'cause' = 'DUNNING' AND latest.at >= $1))
+      ORDER BY latest.at, latest.subscription_id
+    `, [since]);
+    return result.rows.map((row) => ({
+      subscriptionId: row.subscription_id, ended: row.kind === "ENDED", reason: row.reason, since: row.at
+    }));
+  }
+
+  /**
+   * P16b (R2 Q-1, D6a's 4b): ACTIVE subscriptions whose renewal is blocked with no charge — the owner's entitlement in
+   * force (B5's order: effective_at, then recorded_at, then event_id, newest first) is a RENEWAL_PENDING of that
+   * subscription whose `paid_through` has passed, and no RENEWAL charge exists for the period it held (the folded
+   * period end). That is P11a's `taxRefused` hold after a tax REFUSAL (a revoked Quaderno key, a refused request),
+   * which never starts dunning, or any hold that outlived its 72 hours with nothing written. The person is on Free
+   * until the renewal is priced again. A hold over a charge that was sent (PAYMENT_NOT_VERIFIED, a not-sent rebill)
+   * has its RENEWAL charge, and P14a's lists own it. `since` is when paid access lapsed.
+   */
+  async blockedRenewals(now: Date): Promise<Array<{ subscriptionId: string; since: Date }>> {
+    const held = (await this.pool.query<{ subscription_id: string; paid_through: Date }>(`
+      SELECT latest.subscription_id, latest.paid_through
+      FROM (
+        SELECT DISTINCT ON (event.owner_ref) event.subscription_id, event.cause, event.paid_through
+        FROM billing.entitlement_event AS event
+        WHERE event.effective_at <= $1
+        ORDER BY event.owner_ref, event.effective_at DESC, event.recorded_at DESC, event.event_id DESC
+      ) AS latest
+      WHERE latest.cause = 'RENEWAL_PENDING' AND latest.paid_through < $1 AND latest.subscription_id IS NOT NULL
+      ORDER BY latest.paid_through, latest.subscription_id
+    `, [now])).rows;
+    if (held.length === 0) return [];
+    const ids = held.map((row) => row.subscription_id);
+    const events = (await this.pool.query<SubscriptionEventRaw>(`
+      SELECT ${SUBSCRIPTION_EVENT_COLUMNS} FROM billing.subscription_event AS event
+      WHERE event.subscription_id = ANY($1::uuid[])
+      ORDER BY event.subscription_id, event.seq
+    `, [ids])).rows;
+    // A history that does not fold is left out here; `unfoldableSubscriptions` lists it.
+    const states = new Map(foldEach(events, () => undefined).map((state) => [state.subscriptionId, state]));
+    const renewals = (await this.pool.query<{ subscription_id: string; period_start: Date }>(`
+      SELECT charge.subscription_id, charge.period_start FROM billing.charge AS charge
+      WHERE charge.kind = 'RENEWAL' AND charge.subscription_id = ANY($1::uuid[])
+    `, [ids])).rows;
+    return held.filter((row) => {
+      const state = states.get(row.subscription_id);
+      if (state === undefined || state.status !== "ACTIVE" || state.currentPeriodEnd === null) return false;
+      const periodStart = state.currentPeriodEnd.getTime();
+      return !renewals.some((charge) => charge.subscription_id === row.subscription_id
+        && charge.period_start.getTime() === periodStart);
+    }).map((row) => ({ subscriptionId: row.subscription_id, since: row.paid_through }));
+  }
+
+  /**
+   * P16b (D6a, P11a): renewals closed FAILED(NO_TRANSACTION) after a submit whose outcome stayed unknown, closed since
+   * `since`. xMoney may still have charged the card, so the owner checks each in the dashboard.
+   */
+  async stuckRenewals(since: Date): Promise<Array<{ chargeId: string; since: Date }>> {
+    const result = await this.pool.query<{ charge_id: string; since: Date }>(`
+      SELECT charge.charge_id, failed.at AS since
+      FROM billing.charge AS charge
+      JOIN billing.charge_event AS failed
+        ON failed.charge_id = charge.charge_id AND failed.kind = 'FAILED' AND failed.error_code = 'NO_TRANSACTION'
+      WHERE charge.kind = 'RENEWAL' AND failed.at >= $1
+        AND EXISTS (
+          SELECT 1 FROM billing.charge_event AS unknown
+          WHERE unknown.charge_id = charge.charge_id AND unknown.kind = 'SUBMIT_UNKNOWN'
+        )
+      ORDER BY failed.at, charge.charge_id
+    `, [since]);
+    return result.rows.map((row) => ({ chargeId: row.charge_id, since: row.since }));
+  }
+
+  /**
+   * P16b (P9c's durable mark, D6a): second refunds made elsewhere on a payment that already holds a refund record,
+   * which P1a's one-request-per-transaction key cannot hold. P9c ends that refund transaction's VERIFY_PAYMENT job
+   * DEAD with REFUND_UNRECORDED (ref = the refund transaction's id), whether a notice or P14a's listing brought it; a
+   * notice xMoney sends again makes a new job that dies the same way, so the jobs are grouped by ref, each listed from
+   * its first death if that is since `since`. The owner opens the transaction in the xMoney dashboard: its amount is
+   * known only there. Content-free: xMoney transaction ids and times.
+   */
+  async unrecordedRefunds(since: Date): Promise<Array<{ transactionId: string; since: Date }>> {
+    const result = await this.pool.query<{ transaction_id: string; since: Date }>(`
+      SELECT outbox.ref AS transaction_id, min(outbox.dead_at) AS since
+      FROM billing.outbox AS outbox
+      WHERE outbox.kind = 'VERIFY_PAYMENT' AND outbox.dead_at IS NOT NULL
+        AND outbox.last_error_code = 'REFUND_UNRECORDED'
+      GROUP BY outbox.ref
+      HAVING min(outbox.dead_at) >= $1
+      ORDER BY since, transaction_id
+    `, [since]);
+    return result.rows.map((row) => ({ transactionId: row.transaction_id, since: row.since }));
+  }
+
   private async chargesById(chargeIds: readonly string[]): Promise<Array<ChargeRow & { events: ChargeEventRow[] }>> {
     const charges: Array<ChargeRow & { events: ChargeEventRow[] }> = [];
     for (const chargeId of chargeIds) {
