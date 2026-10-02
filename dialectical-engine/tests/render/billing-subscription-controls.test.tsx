@@ -503,4 +503,47 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(container.querySelector('a[href="/pricing"]')?.textContent).toBe("Choose a plan");
     expect(text()).toContain("No invoices yet.");
   });
+
+  it("words no plan from a failed first read: a 5xx, a network failure, a 401 or a 429 shows nothing and asks for no invoices", async () => {
+    for (const failure of [
+      new ContractHttpError("SERVER_FAILURE", 503, "x"),
+      new ContractHttpError("NETWORK_FAILURE", 0, "x"),
+      // Local mode: a dead session's 401 comes before billing-off's 404, so not even a billing heading may show.
+      new ContractHttpError("SESSION_REQUIRED", 401, "x"),
+      new ContractHttpError("RATE_LIMITED", 429, "x")
+    ]) {
+      const label = String(failure.status);
+      act(() => root.unmount());
+      root = createRoot(container);
+      client.getBillingSubscription.mockReset();
+      client.getBillingInvoices.mockClear();
+      client.getBillingSubscription.mockRejectedValue(failure);
+      await render();
+      expect(container.innerHTML, label).toBe("");
+      expect(client.getBillingInvoices, label).not.toHaveBeenCalled();
+    }
+  });
+
+  it("keeps the plan just read when only the invoices fail, and never says 'No invoices yet.' or 'Free' for it", async () => {
+    client.getBillingInvoices.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 503, "x"));
+    await render();
+    expect(text()).toContain("Plan: Plus");
+    expect(text()).toContain("That didn't work. Please try again.");
+    for (const label of ["Change plan", "Cancel", "Withdraw"]) expect(button(label), label).toBeDefined();
+    expect(text()).not.toContain("You're on the Free plan.");
+    expect(text()).not.toContain("No invoices yet.");
+    expect(container.querySelector('a[href="/pricing"]')).toBeNull();
+  });
+
+  it("keeps the last plan and invoices the server named when a later read fails", async () => {
+    await render();
+    client.getBillingSubscription.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 503, "x"));
+    await click("Cancel");
+    await click("Yes, cancel");
+    expect(client.cancelSubscription).toHaveBeenCalledTimes(1);
+    expect(text()).toContain("Plan: Plus");
+    expect(text()).toContain("That didn't work. Please try again.");
+    expect(text()).toContain("DBAI 0042 · October 1, 2026 · $24.20");
+    expect(text()).not.toContain("You're on the Free plan.");
+  });
 });

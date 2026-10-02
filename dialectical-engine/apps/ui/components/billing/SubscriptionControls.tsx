@@ -142,7 +142,8 @@ export function SubscriptionControls({
 }>) {
   const [loaded, setLoaded] = useState<"LOADING" | "ABSENT" | "READY">("LOADING");
   const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [invoices, setInvoices] = useState<readonly Invoice[]>([]);
+  // null = not read yet: the invoices block shows only once a list has come back (never "No invoices yet." on a failure).
+  const [invoices, setInvoices] = useState<readonly Invoice[] | null>(null);
   const [panel, setPanel] = useState<"NONE" | "CHANGE" | "CANCEL" | "WITHDRAW">("NONE");
   const [upgrade, setUpgrade] = useState<Readonly<{ planId: UpgradeTarget; quote: UpgradeQuote }> | null>(null);
   const [upgradeCharge, setUpgradeCharge] = useState<Readonly<{ planId: UpgradeTarget; chargeRef: string }> | null>(null);
@@ -156,24 +157,33 @@ export function SubscriptionControls({
    * Reads the subscription, then the invoices. One after the other on purpose: with billing off (local mode, or
    * hosted before the switch) the first answer is a 404 and the invoices are never asked for. Returns the fresh
    * subscription, so an action can word its result from what the server now says.
+   *
+   * A plan is never worded from a failed read. A failed subscription read (a 401, a 429, a 5xx, a network failure, an
+   * invalid answer) only says "try again" and keeps what the card showed: on the first load that is nothing at all
+   * (in local mode a dead session's 401 comes before billing-off's 404, so no billing heading may appear on it), and
+   * later it is the last plan the server named. A failed invoices read keeps the plan just read and the last list.
    */
   const reload = useCallback(async (): Promise<Subscription | null> => {
+    let current: Awaited<ReturnType<SubscriptionClient["getBillingSubscription"]>>;
     try {
-      const current = await client.getBillingSubscription();
-      const listed = await client.getBillingInvoices();
-      setSubscription(current.subscription);
-      setInvoices(listed.invoices);
-      setLoaded("READY");
-      return current.subscription;
+      current = await client.getBillingSubscription();
     } catch (failure) {
       if (failure instanceof ContractHttpError && failure.status === 404) {
         setLoaded("ABSENT");
         return null;
       }
-      setLoaded("READY");
       setMessage(t(catalog, "billing.subscription.actionFailed"));
       return null;
     }
+    setSubscription(current.subscription);
+    setLoaded("READY");
+    try {
+      const listed = await client.getBillingInvoices();
+      setInvoices(listed.invoices);
+    } catch {
+      setMessage(t(catalog, "billing.subscription.actionFailed"));
+    }
+    return current.subscription;
   }, [catalog, client]);
 
   useEffect(() => { void reload(); }, [reload]);
@@ -430,22 +440,24 @@ export function SubscriptionControls({
         </>
       ) : null}
       {message !== null ? <p className="setStatus" role="status">{message}</p> : null}
-      <div>
-        <h3 className="setCardTitle">{t(catalog, "billing.subscription.invoices")}</h3>
-        {invoices.length === 0 ? <p className="setCardHint">{t(catalog, "billing.subscription.noInvoices")}</p> : (
-          <ul className="setInvoiceList">
-            {invoices.map((invoice) => (
-              <li key={`${invoice.kind}:${invoice.number}`}>
-                {t(catalog, "billing.subscription.invoiceRow", {
-                  number: invoice.number, date: formatLongDate(locale, invoice.issued_on), total: formatUsd(locale, invoice.total)
-                })}
-                {invoice.kind === "CREDIT_NOTE" ? <> · {t(catalog, "billing.subscription.creditNote")}</> : null}
-                {invoice.url !== null ? <> · <a href={invoice.url} rel="noopener noreferrer" target="_blank">{t(catalog, "billing.subscription.openInvoice")}</a></> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {invoices !== null ? (
+        <div>
+          <h3 className="setCardTitle">{t(catalog, "billing.subscription.invoices")}</h3>
+          {invoices.length === 0 ? <p className="setCardHint">{t(catalog, "billing.subscription.noInvoices")}</p> : (
+            <ul className="setInvoiceList">
+              {invoices.map((invoice) => (
+                <li key={`${invoice.kind}:${invoice.number}`}>
+                  {t(catalog, "billing.subscription.invoiceRow", {
+                    number: invoice.number, date: formatLongDate(locale, invoice.issued_on), total: formatUsd(locale, invoice.total)
+                  })}
+                  {invoice.kind === "CREDIT_NOTE" ? <> · {t(catalog, "billing.subscription.creditNote")}</> : null}
+                  {invoice.url !== null ? <> · <a href={invoice.url} rel="noopener noreferrer" target="_blank">{t(catalog, "billing.subscription.openInvoice")}</a></> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }
