@@ -273,6 +273,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator menolak pilihan paket. Pilih Gratis atau Premium, lalu coba lagi.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator menolak permintaan tersebut: model yang diperlukan paket ini sedang tidak tersedia. Coba lagi nanti, atau pilih paket lain.",
   "requestFailure.kind.ALREADY_WAITING": "Hanya satu pertanyaan yang dapat menunggu dalam satu waktu. Ajukan pertanyaan ini setelah debat Anda yang menunggu dimulai.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Debat ini akan memakan biaya lebih besar daripada yang diizinkan situs ini untuk satu debat.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinator menolak permintaan tersebut: salah satu tugas debat tidak memiliki model AI yang dapat dijangkau saat ini. Coba lagi nanti.",
   "requestFailure.kind.UNCLASSIFIED": "Permintaan gagal sebelum balasan diterima sehingga hasilnya tidak diketahui. Ini bukan keputusan yang dibuat oleh koordinator.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "Jika model AI yang direncanakan tidak dapat digunakan, model lain menggantikannya"
 }

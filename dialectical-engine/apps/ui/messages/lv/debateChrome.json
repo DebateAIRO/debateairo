@@ -287,6 +287,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinators noraidīja plāna izvēli. Izvēlieties Bezmaksas vai Premium un pēc tam mēģiniet vēlreiz.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinators pieprasījumu noraidīja: kāds no šim plānam nepieciešamajiem modeļiem pašlaik nav pieejams. Mēģiniet vēlreiz vēlāk vai izvēlieties otru plānu.",
   "requestFailure.kind.ALREADY_WAITING": "Vienlaikus gaidīt var tikai viens jautājums. Uzdodiet šo jautājumu, kad būs sākušās jūsu gaidošās debates.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Šīs debates izmaksātu vairāk, nekā šī vietne atļauj vienām debatēm.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinators pieprasījumu noraidīja: kādam no debašu uzdevumiem pašlaik nav sasniedzams neviens MI modelis. Mēģiniet vēlreiz vēlāk.",
   "requestFailure.kind.UNCLASSIFIED": "Darbība neizdevās, pirms tika saņemta atbilde, tāpēc iznākums nav zināms. Koordinators šādu lēmumu nepieņēma.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "Ja plānoto MI modeli nevarēja izmantot, tā vietā stājās cits"
 }

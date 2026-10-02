@@ -308,6 +308,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "رفض المنسّق اختيار الخطة. اختر الخطة المجانية أو المميزة، ثم أعد المحاولة.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "رفض المنسّق الطلب: أحد النماذج التي تحتاج إليها هذه الخطة غير متاح حاليًا. أعد المحاولة لاحقًا، أو اختر الخطة الأخرى.",
   "requestFailure.kind.ALREADY_WAITING": "يمكن لسؤال واحد فقط أن ينتظر في كل مرة. اطرح هذا السؤال بعد أن تبدأ مناظرتك المنتظِرة.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "ستكلّف هذه المناظرة أكثر مما يسمح به هذا الموقع لمناظرة واحدة.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "رفض المنسّق الطلب: إحدى مهام المناظرة ليس لها حاليًا أي نموذج ذكاء اصطناعي يمكن الوصول إليه. أعد المحاولة لاحقًا.",
   "requestFailure.kind.UNCLASSIFIED": "فشل الطلب قبل ورود أي رد، ولذلك تظل نتيجته مجهولة. لم يكن ذلك قرارًا اتخذه المنسّق.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "حيثما تعذّر استخدام نموذج ذكاء اصطناعي مخطط له، حلّ محله نموذج آخر"
 }

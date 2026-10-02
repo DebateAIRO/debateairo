@@ -1,23 +1,30 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 import { DEBATE_ROLES, MODEL_STRENGTHS } from "@debateai/kernel";
+import { t } from "./i18n/translate.ts";
 import {
-  MODEL_ASSIGNMENT_COPY,
-  MODEL_STRENGTH_COPY,
+  MODEL_ASSIGNMENT_KEYS,
+  MODEL_STRENGTH_KEYS,
   MODEL_STRENGTH_OPTIONS,
-  PLAN_CARD_COPY,
-  debateRoleLabel,
+  PLAN_CARD_KEYS,
   isModelStrength,
   modelAssignmentJobs,
   modelStrengthControl,
-  modelStrengthLabel,
   planCardNamesRoster
 } from "./modelStrength.ts";
 
+// S1b (owner decision O2): the scorecard's copy tables are catalogue keys now, in
+// 35 locales; the English sentences these rows compare are the `en` catalogues'.
+const english = (namespace) => JSON.parse(readFileSync(join(process.cwd(), "messages", "en", `${namespace}.json`), "utf8"));
+const newDebate = english("newDebate");
+const misc = english("misc");
+
 test("A21: offers the kernel's three strengths, in its order, with plain labels", () => {
   assert.deepEqual(MODEL_STRENGTH_OPTIONS.map((option) => option.value), [...MODEL_STRENGTHS]);
-  assert.deepEqual(MODEL_STRENGTH_OPTIONS.map((option) => option.label), ["Economy", "Balanced", "Best"]);
-  assert.deepEqual(MODEL_STRENGTHS.map((strength) => modelStrengthLabel(strength)), ["Economy", "Balanced", "Best"]);
+  assert.deepEqual(MODEL_STRENGTH_OPTIONS.map((option) => t(newDebate, option.labelKey)), ["Economy", "Balanced", "Best"]);
+  assert.deepEqual(MODEL_STRENGTHS.map((strength) => t(newDebate, MODEL_STRENGTH_KEYS.options[strength])), ["Economy", "Balanced", "Best"]);
 });
 
 test("A21: recognises exactly the three strengths", () => {
@@ -26,14 +33,9 @@ test("A21: recognises exactly the three strengths", () => {
 });
 
 test("A21: no option carries a price or a figure the API never sent", () => {
-  for (const option of MODEL_STRENGTH_OPTIONS) assert.doesNotMatch(option.label, /[$€\d]|USD/u);
+  for (const option of MODEL_STRENGTH_OPTIONS) assert.doesNotMatch(t(newDebate, option.labelKey), /[$€\d]|USD/u);
 });
 
-// A21 · owner decision O4: shown, but greyed out and marked "not in effect" while no
-// scored model list is in force — on either plan. The Free lock applies only once it is.
-// A21.3 carry 14 (A21.2 review Minor 2): when the session read FAILED, the page does not know,
-// so the note claims no reason. Fix round 1 (review Minor 3): while the read is still PENDING the
-// note is the plain description alone — nothing is said until the session answers.
 test("A21 O4: not in effect outranks the plan; Free locks; Premium chooses; a failed or pending read claims no reason", () => {
   assert.deepEqual(
     [
@@ -47,71 +49,49 @@ test("A21 O4: not in effect outranks the plan; Free locks; Premium chooses; a fa
       modelStrengthControl({ scorecard: "PENDING", planTier: "premium" })
     ],
     [
-      { locked: true, hint: MODEL_STRENGTH_COPY.hint.notInEffect },
-      { locked: true, hint: MODEL_STRENGTH_COPY.hint.notInEffect },
-      { locked: true, hint: MODEL_STRENGTH_COPY.hint.fixedByFree },
-      { locked: false, hint: MODEL_STRENGTH_COPY.hint.yoursToChoose },
-      { locked: true, hint: MODEL_STRENGTH_COPY.hint.notAvailable },
-      { locked: true, hint: MODEL_STRENGTH_COPY.hint.notAvailable },
-      { locked: true, hint: MODEL_STRENGTH_COPY.hint.pending },
-      { locked: true, hint: MODEL_STRENGTH_COPY.hint.pending }
+      { locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.notInEffect },
+      { locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.notInEffect },
+      { locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.fixedByFree },
+      { locked: false, hintKey: MODEL_STRENGTH_KEYS.hint.yoursToChoose },
+      { locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.notAvailable },
+      { locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.notAvailable },
+      { locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.pending },
+      { locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.pending }
     ]
   );
-  assert.match(MODEL_STRENGTH_COPY.hint.notInEffect, /not in effect/u);
-  assert.match(MODEL_STRENGTH_COPY.hint.notAvailable, / · not available right now$/u);
-  assert.doesNotMatch(MODEL_STRENGTH_COPY.hint.notAvailable, /scored|Free|plan|choose/u);
+  const hint = (name) => t(newDebate, MODEL_STRENGTH_KEYS.hint[name]);
+  assert.match(hint("notInEffect"), /not in effect/u);
+  assert.match(hint("notAvailable"), / · not available right now$/u);
+  assert.doesNotMatch(hint("notAvailable"), /scored|Free|plan|choose/u);
   // Pending: the shared description every other hint starts with, and no note after it.
-  assert.doesNotMatch(MODEL_STRENGTH_COPY.hint.pending, /·/u);
-  for (const [name, hint] of Object.entries(MODEL_STRENGTH_COPY.hint)) {
-    if (name !== "pending") assert.ok(hint.startsWith(`${MODEL_STRENGTH_COPY.hint.pending} · `), name);
+  assert.doesNotMatch(hint("pending"), /·/u);
+  for (const name of Object.keys(MODEL_STRENGTH_KEYS.hint)) {
+    if (name !== "pending") assert.ok(hint(name).startsWith(`${hint("pending")} · `), name);
   }
 });
 
-// Owner rules: plain words, no internals, no prices. O2: every new string lives in
-// MODEL_STRENGTH_COPY, so the port to the site's language catalogs has one place to read.
-test("A21 O2: every visitor-facing string is in one place and names no figure or internal term", () => {
-  const strings = [
-    MODEL_STRENGTH_COPY.label,
-    ...Object.values(MODEL_STRENGTH_COPY.options),
-    ...Object.values(MODEL_STRENGTH_COPY.hint)
-  ];
-  // 7 from A21.2, plus A21.3's "not available right now" (carry 14) and the bare description
-  // shown while the session read is pending (fix round 1).
-  assert.equal(strings.length, 9);
-  for (const text of strings) {
-    assert.doesNotMatch(text, /[$€\d]|USD/u);
-    assert.doesNotMatch(text, /scorecard|deployment|tier|picker|roster|seat/iu);
+test("A21 O2: every visitor-facing string is a newDebate key and names no figure or internal term", () => {
+  const keys = [MODEL_STRENGTH_KEYS.label, ...Object.values(MODEL_STRENGTH_KEYS.options), ...Object.values(MODEL_STRENGTH_KEYS.hint)];
+  assert.equal(keys.length, 9);
+  for (const key of keys) {
+    assert.ok(Object.hasOwn(newDebate, key), key);
+    assert.doesNotMatch(newDebate[key], /[$€\d]|USD/u);
+    assert.doesNotMatch(newDebate[key], /scorecard|deployment|tier|picker|roster|seat/iu);
   }
-  assert.deepEqual(MODEL_STRENGTH_OPTIONS.map((option) => option.label), MODEL_STRENGTHS.map((strength) =>
-    MODEL_STRENGTH_COPY.options[strength]));
 });
 
-/*
- * Final review C1 — the /new plan cards name the plan's usual models only in the one state in
- * which that list is what a debate is seated with: the session says no scored model list is in
- * force. In force, pending or failed, each card carries one plain line instead. O2: the line
- * lives beside MODEL_STRENGTH_COPY, in one place, for the port to the site's language catalogs.
- */
 test("C1: a plan card names the plan's models only when the session says no scored model list is in force", () => {
   assert.deepEqual(
     ["IN_FORCE", "NOT_IN_FORCE", "PENDING", "READ_FAILED"].map((scorecard) => planCardNamesRoster(scorecard)),
     [false, true, false, false]
   );
-  assert.deepEqual(Object.keys(PLAN_CARD_COPY), ["modelsChosenPerPart"]);
-  assert.equal(PLAN_CARD_COPY.modelsChosenPerPart, "The AI models are chosen for each part of the debate.");
-  assert.doesNotMatch(PLAN_CARD_COPY.modelsChosenPerPart, /[$€\d]|USD/u);
-  assert.doesNotMatch(
-    PLAN_CARD_COPY.modelsChosenPerPart,
-    /scorecard|scored|deployment|tier|picker|roster|seat|strength|plan|free|premium|role/iu
-  );
+  assert.deepEqual(Object.keys(PLAN_CARD_KEYS), ["modelsChosenPerPart"]);
+  const line = t(newDebate, PLAN_CARD_KEYS.modelsChosenPerPart);
+  assert.equal(line, "The AI models are chosen for each part of the debate.");
+  assert.doesNotMatch(line, /[$€\d]|USD/u);
+  assert.doesNotMatch(line, /scorecard|scored|deployment|tier|picker|roster|seat|strength|plan|free|premium|role/iu);
 });
 
-/*
- * A21.3 — the finished debate's honesty drawer names the models chosen for each debate job.
- * Owner decision O1: a PLAIN list — per job, the model names, and one sentence that another
- * model may have stepped in. No seat, thinking level, backup share, strength, step-down or
- * scorecard version (O3); that detail stays in the JSON export.
- */
 const ALPHA = { maker: "Alpha", model_id: "alpha-large", thinking_level: "high" };
 const ALPHA_LOW = { maker: "Alpha", model_id: "alpha-large", thinking_level: "low" };
 const BETA = { maker: "Beta", model_id: "beta-large", thinking_level: "DEFAULT_ONLY" };
@@ -137,7 +117,7 @@ const ASSIGNMENT = Object.freeze({
 });
 
 test("A21: every debate role has its own plain label", () => {
-  const labels = DEBATE_ROLES.map((role) => debateRoleLabel(role));
+  const labels = DEBATE_ROLES.map((role) => t(misc, MODEL_ASSIGNMENT_KEYS.jobs[role]));
   assert.equal(new Set(labels).size, DEBATE_ROLES.length);
   for (const label of labels) assert.match(label, /^[A-Z][A-Za-z -]+$/u);
   // O1 / O-11: plain words, never the engine's own names for its jobs.
@@ -146,33 +126,30 @@ test("A21: every debate role has its own plain label", () => {
 
 test("A21 O1: each job lists the distinct models chosen for it, by maker and model id only", () => {
   const jobs = modelAssignmentJobs(ASSIGNMENT);
-  // A job with no seats in this debate is not listed; the kernel's order is kept.
   assert.deepEqual(jobs.map((job) => job.role), ["POSITION", "CROSS_EXCHANGE", "JUDGE", "ANSWER_WRITER", "ANSWER_CHECKER"]);
   assert.deepEqual(jobs[0], {
     role: "POSITION",
-    label: debateRoleLabel("POSITION"),
-    // Mains and backups alike, each model once (alpha-large at two thinking levels is one model).
+    labelKey: MODEL_ASSIGNMENT_KEYS.jobs.POSITION,
     models: [
       { maker: "Alpha", modelId: "alpha-large" },
       { maker: "Beta", modelId: "beta-large" },
       { maker: "Gamma", modelId: "gamma-small" }
     ],
-    note: null
+    noteKey: null
   });
-  // A FALLBACK seat of a debate job is still sat by its model, so it is named.
   assert.deepEqual(jobs[2].models, [{ maker: "Beta", modelId: "beta-large" }]);
   assert.deepEqual(jobs[3].models, [{ maker: "Alpha", modelId: "alpha-large" }, { maker: "Gamma", modelId: "gamma-small" }]);
   for (const job of jobs) for (const model of job.models) assert.deepEqual(Object.keys(model), ["maker", "modelId"]);
-  assert.doesNotMatch(JSON.stringify(jobs), /seat|thinking|DEFAULT_ONLY|"high"|"low"|share|0\.2|scorecard|BALANCED|stepped/u);
+  assert.doesNotMatch(JSON.stringify(jobs.map((job) => job.models)), /seat|thinking|DEFAULT_ONLY|"high"|"low"|share|0\.2|scorecard|BALANCED|stepped/u);
 });
 
 test("A21 carries 4 and 5: a FALLBACK answer seat and the cross-exchange get one fixed line, never a model name", () => {
   const byRole = new Map(modelAssignmentJobs(ASSIGNMENT).map((job) => [job.role, job]));
   assert.deepEqual(byRole.get("CROSS_EXCHANGE"), {
-    role: "CROSS_EXCHANGE", label: debateRoleLabel("CROSS_EXCHANGE"), models: [], note: MODEL_ASSIGNMENT_COPY.crossExchange
+    role: "CROSS_EXCHANGE", labelKey: MODEL_ASSIGNMENT_KEYS.jobs.CROSS_EXCHANGE, models: [], noteKey: MODEL_ASSIGNMENT_KEYS.crossExchange
   });
   assert.deepEqual(byRole.get("ANSWER_CHECKER"), {
-    role: "ANSWER_CHECKER", label: debateRoleLabel("ANSWER_CHECKER"), models: [], note: MODEL_ASSIGNMENT_COPY.siteSetting
+    role: "ANSWER_CHECKER", labelKey: MODEL_ASSIGNMENT_KEYS.jobs.ANSWER_CHECKER, models: [], noteKey: MODEL_ASSIGNMENT_KEYS.siteSetting
   });
   const flipped = {
     ...ASSIGNMENT,
@@ -181,8 +158,8 @@ test("A21 carries 4 and 5: a FALLBACK answer seat and the cross-exchange get one
       { role: "ANSWER_CHECKER", seats: [seat(0, "SCORECARD", BETA)] }
     ]
   };
-  assert.deepEqual(modelAssignmentJobs(flipped).map((job) => [job.role, job.models, job.note]), [
-    ["ANSWER_WRITER", [], MODEL_ASSIGNMENT_COPY.siteSetting],
+  assert.deepEqual(modelAssignmentJobs(flipped).map((job) => [job.role, job.models, job.noteKey]), [
+    ["ANSWER_WRITER", [], MODEL_ASSIGNMENT_KEYS.siteSetting],
     ["ANSWER_CHECKER", [{ maker: "Beta", modelId: "beta-large" }], null]
   ]);
 });
@@ -194,25 +171,24 @@ test("A21 O3: the list is the same whatever the strength, the step-down or the s
   );
 });
 
-test("A21 O2: the drawer's strings live in one place and name no figure or internal term", () => {
-  const strings = [
-    MODEL_ASSIGNMENT_COPY.title,
-    MODEL_ASSIGNMENT_COPY.standIn,
-    MODEL_ASSIGNMENT_COPY.siteSetting,
-    MODEL_ASSIGNMENT_COPY.crossExchange,
-    ...Object.values(MODEL_ASSIGNMENT_COPY.jobs)
+test("A21 O2: the drawer's strings are misc keys and name no figure or internal term", () => {
+  assert.deepEqual(Object.keys(MODEL_ASSIGNMENT_KEYS), ["title", "standIn", "siteSetting", "crossExchange", "jobs"]);
+  const keys = [
+    MODEL_ASSIGNMENT_KEYS.title,
+    MODEL_ASSIGNMENT_KEYS.standIn,
+    MODEL_ASSIGNMENT_KEYS.siteSetting,
+    MODEL_ASSIGNMENT_KEYS.crossExchange,
+    ...Object.values(MODEL_ASSIGNMENT_KEYS.jobs)
   ];
-  // Final review I4: the absent-field sentence is gone — an answer with no assignment shows no section.
-  assert.deepEqual(Object.keys(MODEL_ASSIGNMENT_COPY), ["title", "standIn", "siteSetting", "crossExchange", "jobs"]);
-  assert.equal(strings.length, 11);
-  for (const text of strings) {
-    assert.doesNotMatch(text, /[$€%\d]|USD/u);
+  assert.equal(keys.length, 11);
+  for (const key of keys) {
+    assert.ok(Object.hasOwn(misc, key), key);
+    assert.doesNotMatch(misc[key], /[$€%\d]|USD/u);
     assert.doesNotMatch(
-      text,
+      misc[key],
       /scorecard|deployment|tier|picker|roster|seat|thinking|plan list|backup|runner|fallback|stepped down|step-down|lower|strength/iu
     );
   }
-  assert.deepEqual(DEBATE_ROLES.map((role) => debateRoleLabel(role)), DEBATE_ROLES.map((role) => MODEL_ASSIGNMENT_COPY.jobs[role]));
   // Carry 6: the title claims a choice, never use.
-  assert.doesNotMatch(MODEL_ASSIGNMENT_COPY.title, /used/iu);
+  assert.doesNotMatch(misc[MODEL_ASSIGNMENT_KEYS.title], /used/iu);
 });

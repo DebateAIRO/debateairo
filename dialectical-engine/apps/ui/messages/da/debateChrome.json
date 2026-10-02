@@ -280,6 +280,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatoren afviste planvalget. Vælg Free eller Premium, og prøv derefter igen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatoren afviste anmodningen, fordi en model, som denne plan kræver, ikke er tilgængelig lige nu. Prøv igen senere, eller vælg den anden plan.",
   "requestFailure.kind.ALREADY_WAITING": "Kun ét spørgsmål kan vente ad gangen. Stil dette, når din ventende debat er startet.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Denne debat ville koste mere, end dette websted tillader for én debat.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatoren afviste anmodningen: en af debattens opgaver har ingen AI-model, den kan nå lige nu. Prøv igen senere.",
   "requestFailure.kind.UNCLASSIFIED": "Anmodningen mislykkedes, før der kom et svar, så udfaldet er ukendt. Det er ikke en afgørelse, som koordinatoren har truffet.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "Hvor en planlagt AI-model ikke kunne bruges, trådte en anden til"
 }

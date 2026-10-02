@@ -280,6 +280,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Координаторът отхвърли избора на план. Изберете „Безплатен“ или „Премиум“, след което опитайте отново.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Координаторът отказа заявката: модел, необходим за този план, не е наличен в момента. Опитайте отново по-късно или изберете другия план.",
   "requestFailure.kind.ALREADY_WAITING": "Само един въпрос може да чака наведнъж. Задайте този, след като чакащият ви дебат започне.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Този дебат би струвал повече, отколкото този сайт позволява за един дебат.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Координаторът отказа заявката: за една от задачите в дебата в момента няма достъпен модел с ИИ. Опитайте отново по-късно.",
   "requestFailure.kind.UNCLASSIFIED": "Заявката се провали, преди да пристигне отговор, затова резултатът е неизвестен. Това не е решение на координатора.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "Където планиран модел с ИИ не можа да бъде използван, го замести друг"
 }

@@ -273,6 +273,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "コーディネーターがプランの選択を拒否しました。無料またはプレミアムを選択してから、再試行してください。",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "コーディネーターがリクエストを拒否しました。このプランに必要なモデルが現在利用できません。後でもう一度試すか、別のプランを選択してください。",
   "requestFailure.kind.ALREADY_WAITING": "待機できる質問は一度に一つだけです。待機中のディベートが始まってから、この質問を送ってください。",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "このディベートは、このサイトが一つのディベートに認める費用を超えてしまいます。",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "コーディネーターがリクエストを拒否しました。ディベートの工程の一つに、現在利用できるAIモデルがありません。後でもう一度試してください。",
   "requestFailure.kind.UNCLASSIFIED": "応答を受信する前に失敗したため、結果は不明です。これはコーディネーターによる判断ではありません。",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "予定していたAIモデルを使用できなかった箇所では、別のモデルが代わりに担当しました"
 }

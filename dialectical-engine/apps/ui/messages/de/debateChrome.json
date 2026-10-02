@@ -280,6 +280,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Der Koordinator hat die Tarifwahl abgelehnt. Wählen Sie „Kostenlos“ oder „Premium“ und versuchen Sie es dann erneut.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Der Koordinator hat die Anfrage abgelehnt: Ein für diesen Tarif benötigtes Modell ist derzeit nicht verfügbar. Versuchen Sie es später erneut oder wählen Sie den anderen Tarif.",
   "requestFailure.kind.ALREADY_WAITING": "Es kann immer nur eine Frage warten. Stellen Sie diese, sobald Ihre wartende Debatte gestartet ist.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Diese Debatte würde mehr kosten, als diese Website für eine Debatte erlaubt.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Der Koordinator hat die Anfrage abgelehnt: Für eine der Aufgaben der Debatte ist derzeit kein KI-Modell erreichbar. Versuchen Sie es später erneut.",
   "requestFailure.kind.UNCLASSIFIED": "Der Fehler trat auf, bevor eine Antwort einging; daher ist das Ergebnis unbekannt. Dies war keine Entscheidung des Koordinators.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "Wo ein geplantes KI-Modell nicht verwendet werden konnte, ist ein anderes eingesprungen"
 }

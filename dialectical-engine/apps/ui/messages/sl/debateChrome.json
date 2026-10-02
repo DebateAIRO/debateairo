@@ -294,6 +294,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator je zavrnil izbiro paketa. Izberite Brezplačno ali Premium in nato poskusite znova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator je zahtevo zavrnil: model, ki ga ta paket potrebuje, trenutno ni na voljo. Poskusite pozneje ali izberite drug paket.",
   "requestFailure.kind.ALREADY_WAITING": "Hkrati lahko čaka le eno vprašanje. To vprašanje zastavite, ko se vaša čakajoča razprava začne.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ta razprava bi stala več, kot to spletno mesto dovoli za eno razpravo.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinator je zahtevo zavrnil: za eno od nalog razprave trenutno ni dosegljiv noben model UI. Poskusite pozneje.",
   "requestFailure.kind.UNCLASSIFIED": "Postopek ni uspel, še preden je prispel odgovor, zato izid ni znan. Te odločitve ni sprejel koordinator.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "Kjer načrtovanega modela UI ni bilo mogoče uporabiti, ga je nadomestil drug"
 }

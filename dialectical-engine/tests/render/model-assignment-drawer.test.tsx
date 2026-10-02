@@ -7,6 +7,9 @@ import { buildAnswerExport } from "../../apps/ui/lib/v3/answerExport.js";
 import { conditionMarkLabel } from "../../apps/ui/lib/v3/labels.js";
 import { createLiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import miscRomanian from "../../apps/ui/messages/ro/misc.json" with { type: "json" };
+import debateChromeRomanian from "../../apps/ui/messages/ro/debateChrome.json" with { type: "json" };
+import composeRomanian from "../../apps/ui/messages/ro/compose.json" with { type: "json" };
 
 /*
  * A21.3 — the finished debate's honesty drawer names the models chosen for each debate job.
@@ -214,5 +217,74 @@ describe("A21.3 · the honesty drawer names the models chosen for each debate jo
       answer: Answer;
     };
     expect(payload.answer.model_assignment).toEqual(ASSIGNMENT);
+  });
+});
+
+/** S1b: the runner's two BACKUP-MODEL-USED records, exactly as it writes them (English, BACKUP_MODEL_USED_WORDING). */
+const BACKUP_RECORDS = [
+  {
+    mark: "BACKUP-MODEL-USED", scope: "answer", subject_ref: "Planned AI models",
+    reason: "One or more AI models planned for this debate could not be used, so other AI models answered in their place.",
+    lift_path: "Ask again later to give the planned AI models another chance.", served_root_rule: null
+  },
+  {
+    mark: "BACKUP-MODEL-USED", scope: "answer", subject_ref: "Extra AI model",
+    reason: "An AI model chosen to add variety to this debate could not be used, so the usual AI model answered in its place.",
+    lift_path: "Ask again later if you want that extra variety.", served_root_rule: null
+  }
+] as const;
+
+function romanianDrawerHtml(overrides: Partial<Answer>): string {
+  return renderToStaticMarkup(
+    <AnswerHonestyDrawer
+      answer={buildFairShapedAnswer(overrides)}
+      live={createLiveRunState()}
+      ledgerDigest={null}
+      ledgerError={null}
+      inspection={null}
+      inspectionError={null}
+      onShowInspection={noop}
+      onUnlinkMemory={noop}
+      actionState={null}
+      investigationInput={{}}
+      onInvestigationInput={noop}
+      onRecordInvestigation={noop}
+      answerExport={{ available: false, reason: "LEDGER_DIGEST_PENDING", message: "Test-layer export pending." }}
+      token={null}
+      onClose={noop}
+      catalog={miscRomanian}
+      debateChromeCatalog={debateChromeRomanian}
+      composeCatalog={composeRomanian}
+    />
+  );
+}
+
+describe("S1b · the drawer speaks the page's language: the stand-in records and the chosen models", () => {
+  it("prints both BACKUP-MODEL-USED records in Romanian, and every other record as the runner wrote it", () => {
+    const base = buildFairShapedAnswer();
+    const html = romanianDrawerHtml({
+      condition_marks: [...base.condition_marks, "BACKUP-MODEL-USED"],
+      condition_mark_records: [...base.condition_mark_records, ...BACKUP_RECORDS]
+    });
+    for (const kind of ["standIn", "usual"] as const) {
+      const subject = miscRomanian[`misc.answerHonesty.backupRecord.${kind}.subject`];
+      const reason = miscRomanian[`misc.answerHonesty.backupRecord.${kind}.reason`];
+      const liftPath = miscRomanian[`misc.answerHonesty.backupRecord.${kind}.liftPath`];
+      expect(html, kind).toContain(`<span>${escaped(subject)}</span>`);
+      expect(html, kind).toContain(`<div class="drawerFindingText">${escaped(reason)}</div>`);
+      expect(html, kind).toContain(escaped(miscRomanian["misc.answerHonesty.liftPath"].replace("{liftPath}", liftPath)));
+    }
+    // Not the runner's English: none of the two records' three sentences is printed as it came.
+    for (const record of BACKUP_RECORDS) {
+      for (const english of [record.subject_ref, record.reason, record.lift_path]) expect(html).not.toContain(escaped(english));
+    }
+    // Another mark's record keeps its own text, as today.
+    expect(html).toContain(escaped("The owed consistency check has no recorded execution at terminal."));
+  });
+
+  it("titles the models section in Romanian, never in English", () => {
+    const html = romanianDrawerHtml({ model_assignment: ASSIGNMENT });
+    expect(html).toContain(`<div class="drawerSectionTitle">${escaped(miscRomanian["misc.answerHonesty.modelsChosen.title"])}</div>`);
+    expect(html).not.toContain(TITLE);
   });
 });

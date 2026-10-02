@@ -2,33 +2,31 @@ import type { AnswerModelAssignment, PlanTier } from "@debateai/contract";
 import { MODEL_STRENGTHS, type DebateRole, type ModelStrength } from "@debateai/kernel";
 
 /**
- * A21 — the model-strength control as the asker reads it. The values are the
- * kernel's (`MODEL_STRENGTHS`); only the words are the UI's. No price appears
- * here or beside the control: no contract field carries a price estimate, and
- * the UI invents none.
- *
- * Owner decision O2 (2026-09-28): English for now, and EVERY visitor-facing
- * string of this control lives in `MODEL_STRENGTH_COPY` below, so the port to
- * the site's language catalogs at the merge with dev has one place to read.
+ * A21 — the model-strength control as the asker reads it, now in the site's
+ * language (owner decision O2; paid plans S1b): each visitor-facing sentence is a
+ * catalogue key in `newDebate.json` (35 locales), read with `t(catalog, key)`.
+ * The values are the kernel's (`MODEL_STRENGTHS`); only the words are the UI's.
+ * No price appears here or beside the control: no contract field carries a price
+ * estimate, and the UI invents none.
  * Owner decision O3: nothing here speaks of a strength being lowered.
  */
-export const MODEL_STRENGTH_COPY = Object.freeze({
-  label: "Model strength",
+export const MODEL_STRENGTH_KEYS = Object.freeze({
+  label: "newDebate.modelStrength",
   options: Object.freeze({
-    ECONOMY: "Economy",
-    BALANCED: "Balanced",
-    BEST: "Best"
+    ECONOMY: "newDebate.modelStrengthEconomy",
+    BALANCED: "newDebate.modelStrengthBalanced",
+    BEST: "newDebate.modelStrengthBest"
   } satisfies Record<ModelStrength, string>),
   hint: Object.freeze({
     // O4: shown on either plan while no scored model list is in force.
-    notInEffect: "How strong the models doing each debate job are · not in effect until the models have been scored",
-    fixedByFree: "How strong the models doing each debate job are · fixed by the Free plan",
-    yoursToChoose: "How strong the models doing each debate job are · this site's usual setting applies until you choose",
+    notInEffect: "newDebate.modelStrengthNotInEffectHint",
+    fixedByFree: "newDebate.modelStrengthFreeHint",
+    yoursToChoose: "newDebate.modelStrengthPremiumHint",
     // A21.3 carry 14 (A21.2 review Minor 2): the session read FAILED, so the page does not know
     // whether a scored model list is in force, and claims no reason.
-    notAvailable: "How strong the models doing each debate job are · not available right now",
+    notAvailable: "newDebate.modelStrengthUnavailableHint",
     // A21.3 fix round 1 (review Minor 3): while the session read is PENDING, the description alone.
-    pending: "How strong the models doing each debate job are"
+    pending: "newDebate.modelStrengthPendingHint"
   })
 });
 
@@ -46,29 +44,20 @@ export type ScorecardSignal = "IN_FORCE" | "NOT_IN_FORCE" | "PENDING" | "READ_FA
  * job, from every reachable scored model, and the plan only caps the strength —
  * so the list would be untrue; while the session read is pending or has failed,
  * the page cannot vouch for it either. In those three states each card carries
- * this one plain line instead.
- *
- * Owner decision O2: English for now, kept here beside the control's copy so
- * the port to the site's language catalogs has one place to read.
+ * this one plain line instead (a `newDebate.json` key, 35 locales).
  */
-export const PLAN_CARD_COPY = Object.freeze({
-  modelsChosenPerPart: "The AI models are chosen for each part of the debate."
-});
+export const PLAN_CARD_KEYS = Object.freeze({ modelsChosenPerPart: "newDebate.planModelsChosenPerPart" });
 
-/** C1: whether a plan card lists its plan's usual models, or shows `PLAN_CARD_COPY` instead. */
+/** C1: whether a plan card lists its plan's usual models, or shows `PLAN_CARD_KEYS`' line instead. */
 export function planCardNamesRoster(scorecard: ScorecardSignal): boolean {
   return scorecard === "NOT_IN_FORCE";
 }
 
-export const MODEL_STRENGTH_OPTIONS: ReadonlyArray<{ readonly value: ModelStrength; readonly label: string }> =
-  Object.freeze(MODEL_STRENGTHS.map((value) => Object.freeze({ value, label: MODEL_STRENGTH_COPY.options[value] })));
+export const MODEL_STRENGTH_OPTIONS: ReadonlyArray<{ readonly value: ModelStrength; readonly labelKey: string }> =
+  Object.freeze(MODEL_STRENGTHS.map((value) => Object.freeze({ value, labelKey: MODEL_STRENGTH_KEYS.options[value] })));
 
 export function isModelStrength(value: unknown): value is ModelStrength {
   return typeof value === "string" && (MODEL_STRENGTHS as readonly string[]).includes(value);
-}
-
-export function modelStrengthLabel(strength: ModelStrength): string {
-  return MODEL_STRENGTH_COPY.options[strength];
 }
 
 /**
@@ -85,19 +74,17 @@ export function modelStrengthLabel(strength: ModelStrength): string {
 export function modelStrengthControl(input: Readonly<{
   scorecard: ScorecardSignal;
   planTier: PlanTier;
-}>): Readonly<{ locked: boolean; hint: string }> {
-  if (input.scorecard === "PENDING") return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.pending });
-  if (input.scorecard === "READ_FAILED") return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.notAvailable });
-  if (input.scorecard === "NOT_IN_FORCE") return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.notInEffect });
-  if (input.planTier === "free") return Object.freeze({ locked: true, hint: MODEL_STRENGTH_COPY.hint.fixedByFree });
-  return Object.freeze({ locked: false, hint: MODEL_STRENGTH_COPY.hint.yoursToChoose });
+}>): Readonly<{ locked: boolean; hintKey: string }> {
+  if (input.scorecard === "PENDING") return Object.freeze({ locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.pending });
+  if (input.scorecard === "READ_FAILED") return Object.freeze({ locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.notAvailable });
+  if (input.scorecard === "NOT_IN_FORCE") return Object.freeze({ locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.notInEffect });
+  if (input.planTier === "free") return Object.freeze({ locked: true, hintKey: MODEL_STRENGTH_KEYS.hint.fixedByFree });
+  return Object.freeze({ locked: false, hintKey: MODEL_STRENGTH_KEYS.hint.yoursToChoose });
 }
 
 /**
  * A21.3 — the finished debate's honesty drawer: which models were chosen for
- * each debate job. Owner decision O2: English for now, and EVERY visitor-facing
- * string of that section lives in `MODEL_ASSIGNMENT_COPY`, beside the control's
- * copy, so the port to the site's language catalogs has one place to read.
+ * each debate job, in `misc.json` (35 locales; owner decision O2, paid plans S1b).
  *
  * Owner decision O1: a PLAIN list — per job, the names of the models chosen, and
  * one sentence that another model may have stepped in. No seat number, thinking
@@ -110,44 +97,40 @@ export function modelStrengthControl(input: Readonly<{
  * `pickRoleAssignment` — so that flag could not tell of a cap either way. Both
  * stay pinned and in the export, for audit.)
  */
-export const MODEL_ASSIGNMENT_COPY = Object.freeze({
+export const MODEL_ASSIGNMENT_KEYS = Object.freeze({
   // Carry 6: the drawer shows the PINNED choice, not a record of use (a backup may answer some calls).
   // Final review I4: an answer with no assignment (no scorecard was in force, or its pin is
   // unreadable) shows NO section at all, so there is no absent-field sentence to hold here.
-  title: "Models chosen for this debate",
+  title: "misc.answerHonesty.modelsChosen.title",
   // O1: the one sentence about stand-ins, worded like the committed backup-mark label (final review m1:
   // "could not be used" is true even when a model is handed over after only OK answers).
-  standIn: "Where a chosen model could not be used, another AI model may have stepped in.",
+  standIn: "misc.answerHonesty.modelsChosen.standIn",
   // Carry 4: a FALLBACK answer-writer or answer-checker seat is never sat; the site's configured model answers.
-  siteSetting: "This site's usual setting chooses the model for this job.",
+  siteSetting: "misc.answerHonesty.modelsChosen.siteSetting",
   // Carry 5: a cross-exchange defends a root, so the root's writer writes it; it has no backup of its own.
-  crossExchange: "The model that wrote each opening position also writes its replies to the other positions.",
+  crossExchange: "misc.answerHonesty.modelsChosen.crossExchange",
   // O1 / O-11: the seven debate jobs in plain words.
   jobs: Object.freeze({
-    POSITION: "Writing the opening positions",
-    SUPPORT_ATTACK: "Writing supporting and opposing arguments",
-    CROSS_EXCHANGE: "Replying to the other positions",
-    JUDGE: "Judging the arguments",
-    REVIEWER: "Reviewing the arguments",
-    ANSWER_WRITER: "Writing the answer",
-    ANSWER_CHECKER: "Checking the answer"
+    POSITION: "misc.answerHonesty.modelsChosen.job.position",
+    SUPPORT_ATTACK: "misc.answerHonesty.modelsChosen.job.supportAttack",
+    CROSS_EXCHANGE: "misc.answerHonesty.modelsChosen.job.crossExchange",
+    JUDGE: "misc.answerHonesty.modelsChosen.job.judge",
+    REVIEWER: "misc.answerHonesty.modelsChosen.job.reviewer",
+    ANSWER_WRITER: "misc.answerHonesty.modelsChosen.job.answerWriter",
+    ANSWER_CHECKER: "misc.answerHonesty.modelsChosen.job.answerChecker"
   } satisfies Record<DebateRole, string>)
 });
-
-export function debateRoleLabel(role: DebateRole): string {
-  return MODEL_ASSIGNMENT_COPY.jobs[role];
-}
 
 /** One model as the node badges present it (`makerIdentityLabel`): its maker and its model id, nothing else. */
 export type ChosenModel = Readonly<{ maker: string; modelId: string }>;
 
-/** One debate job in the drawer: its plain name, and EITHER the models chosen for it OR one fixed line. */
+/** One debate job in the drawer: its plain name's key, and EITHER the models chosen for it OR one fixed line's key. */
 export type ModelAssignmentJob = Readonly<{
   role: DebateRole;
-  label: string;
+  labelKey: string;
   models: readonly ChosenModel[];
   /** The fixed line shown INSTEAD of model names (carries 4 and 5); null when models are named. */
-  note: string | null;
+  noteKey: string | null;
 }>;
 
 /**
@@ -163,15 +146,15 @@ export function modelAssignmentJobs(assignment: AnswerModelAssignment): readonly
   const jobs: ModelAssignmentJob[] = [];
   for (const entry of assignment.roles) {
     if (entry.seats.length === 0) continue;
-    const job = (models: readonly ChosenModel[], note: string | null): ModelAssignmentJob =>
-      Object.freeze({ role: entry.role, label: debateRoleLabel(entry.role), models: Object.freeze(models), note });
+    const job = (models: readonly ChosenModel[], noteKey: string | null): ModelAssignmentJob =>
+      Object.freeze({ role: entry.role, labelKey: MODEL_ASSIGNMENT_KEYS.jobs[entry.role], models: Object.freeze(models), noteKey });
     if (entry.role === "CROSS_EXCHANGE") {
-      jobs.push(job([], MODEL_ASSIGNMENT_COPY.crossExchange));
+      jobs.push(job([], MODEL_ASSIGNMENT_KEYS.crossExchange));
       continue;
     }
     if ((entry.role === "ANSWER_WRITER" || entry.role === "ANSWER_CHECKER")
       && entry.seats.some((seat) => seat.source === "FALLBACK")) {
-      jobs.push(job([], MODEL_ASSIGNMENT_COPY.siteSetting));
+      jobs.push(job([], MODEL_ASSIGNMENT_KEYS.siteSetting));
       continue;
     }
     const seen = new Set<string>();

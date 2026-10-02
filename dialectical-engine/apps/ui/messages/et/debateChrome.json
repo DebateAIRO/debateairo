@@ -280,6 +280,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinaator lükkas paketi valiku tagasi. Valige Tasuta või Premium ja proovige seejärel uuesti.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinaator lükkas taotluse tagasi: üks selle paketi jaoks vajalik mudel pole praegu saadaval. Proovige hiljem uuesti või valige teine pakett.",
   "requestFailure.kind.ALREADY_WAITING": "Korraga saab oodata ainult üks küsimus. Esitage see küsimus, kui teie ootel väitlus on alanud.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "See väitlus maksaks rohkem, kui see sait ühe väitluse jaoks lubab.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinaator lükkas taotluse tagasi: ühe väitluse ülesande jaoks pole praegu ühtegi kättesaadavat tehisintellektimudelit. Proovige hiljem uuesti.",
   "requestFailure.kind.UNCLASSIFIED": "Taotlus nurjus enne vastuse saabumist, mistõttu tulemus pole teada. Koordinaator ei teinud seda otsust.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "Kui kavandatud tehisintellektimudelit ei saanud kasutada, asendas selle teine"
 }

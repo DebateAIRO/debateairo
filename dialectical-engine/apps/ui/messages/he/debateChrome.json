@@ -287,6 +287,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "המתאם דחה את הבחירה ברמת התוכנית. יש לבחור בתוכנית ״חינם״ או בתוכנית ״פרימיום״ ולאחר מכן לנסות שוב.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "המתאם דחה את הבקשה: מודל הנדרש לתוכנית הזו אינו זמין כעת. יש לנסות שוב מאוחר יותר או לבחור בתוכנית האחרת.",
   "requestFailure.kind.ALREADY_WAITING": "רק שאלה אחת יכולה להמתין בכל פעם. שאלו את השאלה הזו אחרי שהדיון הממתין שלכם יתחיל.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "הדיון הזה יעלה יותר ממה שהאתר הזה מתיר לדיון אחד.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "המתאם דחה את הבקשה: לאחת מהמשימות בדיון אין כרגע מודל בינה מלאכותית זמין. יש לנסות שוב מאוחר יותר.",
   "requestFailure.kind.UNCLASSIFIED": "הבקשה נכשלה לפני שהתקבלה תשובה כלשהי, ולכן התוצאה אינה ידועה. זו אינה החלטה שקיבל המתאם.",
-  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
+  "debateChrome.condition.backupModelUsed": "במקום שבו לא ניתן היה להשתמש במודל בינה מלאכותית מתוכנן, מודל אחר נכנס במקומו"
 }

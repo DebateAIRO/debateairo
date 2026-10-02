@@ -135,6 +135,67 @@ describe("DL3-F7 page banners carry classified copy, never contract error text",
   });
 
   /**
+   * A21.3 (carry 12 of task-A19-A20-carries.md). The model picker's two ask
+   * refusals arrive as a 422 with their own typed code, and each gets a constant
+   * clause the page owns: never the server's error text (whose detail can carry
+   * a figure). Fix rounds 1-2 (review Important 1, re-review N1-N2): the budget
+   * clause states only what the picker established — the estimate is over this
+   * site's limit — with no remedy, no internal word and no claim about the
+   * cheapest models. The server's constant is a SEPARATE text (an English API
+   * sentence); the two coincide today by choice, and only this clause is ported.
+   * Paid plans S1b (owner decision O2): the clauses are catalogue keys now, read
+   * through the page's `newDebate` catalogue in every locale.
+   */
+  it("A21 maps the model-strength refusals to the page's own constant copy, never the server's error text", () => {
+    const tooSmallRefusal = new ContractHttpError(
+      "UNPROCESSABLE", 422, "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL: estimate 912345 over 250000",
+      "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL"
+    );
+    const unavailableRefusal = new ContractHttpError(
+      "UNPROCESSABLE", 422, "ASK_MODEL_CANDIDATE_UNAVAILABLE: glm-5.3-flash is down", "ASK_MODEL_CANDIDATE_UNAVAILABLE"
+    );
+    expect(classifyRequestFailure("DEBATE_CREATE", tooSmallRefusal).kind).toBe("MODEL_BUDGET_TOO_SMALL");
+    expect(classifyRequestFailure("DEBATE_CREATE", unavailableRefusal).kind).toBe("MODEL_UNAVAILABLE");
+    const english = catalogue("en", "newDebate");
+    const tooSmall = requestFailureMessage("DEBATE_CREATE", tooSmallRefusal, english);
+    const unavailable = requestFailureMessage("DEBATE_CREATE", unavailableRefusal, english);
+    for (const message of [tooSmall, unavailable]) {
+      expect(message).not.toMatch(/unknown|912345|250000|glm/u);
+      expect(message).not.toContain("ASK_MODEL");
+      // Owner rules: no figure, no internal term.
+      expect(message).not.toMatch(/\d|scorecard|picker|ceiling|deployment/iu);
+      // Fix round 1: never a remedy the asker may be unable to act on (Free fixes the tree depth).
+      expect(message).not.toMatch(/tree depth/iu);
+      // Fix round 2 (re-review N1): Economy is the best model under a cost cap, not the cheapest.
+      expect(message).not.toMatch(/most economical|least costly|whichever/iu);
+    }
+    expect(tooSmall).not.toBe(unavailable);
+    // Fix rounds 1-2: neutral, no internal word; pinned exactly here, and not tied to the server text.
+    expect(tooSmall).toBe(
+      "Starting this debate did not complete. This debate would cost more than this site allows for one debate."
+    );
+    expect(tooSmall).not.toMatch(/coordinator/iu);
+    expect(unavailable).toMatch(/refused/u);
+    // Carry 12: the unavailable clause is not the server's sentence word for word.
+    expect(unavailable.toLowerCase())
+      .not.toContain(ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE.message.toLowerCase());
+    // The code's English fallback says exactly what the English catalogue says.
+    expect(requestFailureMessage("DEBATE_CREATE", tooSmallRefusal)).toBe(tooSmall);
+    expect(requestFailureMessage("DEBATE_CREATE", unavailableRefusal)).toBe(unavailable);
+    // S1b: the page's language, never the English clause, in Romanian.
+    const romanian = catalogue("ro", "newDebate");
+    expect(requestFailureMessage("DEBATE_CREATE", tooSmallRefusal, romanian)).toBe(
+      `${romanian["requestFailure.subject.DEBATE_CREATE"]} ${romanian["requestFailure.kind.MODEL_BUDGET_TOO_SMALL"]}`
+    );
+    expect(romanian["requestFailure.kind.MODEL_BUDGET_TOO_SMALL"]).not.toBe(english["requestFailure.kind.MODEL_BUDGET_TOO_SMALL"]);
+    expect(romanian["requestFailure.kind.MODEL_UNAVAILABLE"]).not.toBe(english["requestFailure.kind.MODEL_UNAVAILABLE"]);
+    // Only the 422 that carries the code is a refusal; the same code on another status is not.
+    expect(classifyRequestFailure("DEBATE_CREATE", new ContractHttpError(
+      "SERVER_FAILURE", 500, "x", "ASK_MODEL_CANDIDATE_UNAVAILABLE"
+    )).kind).toBe("SERVER_FAILED");
+  });
+
+  /**
    * Task M8 (spec 2026-09-26 §14.4.7). The daily limit for NEW debates stays;
    * the person is told, in plain calm words, to try again tomorrow. It used to
    * share BUSY with every 429 and read "The coordinator is rate-limiting
