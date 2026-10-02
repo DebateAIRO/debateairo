@@ -145,9 +145,23 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     // Deliberate changes since are hand edits, listed on headFixture().
     // React's useId values depend on tree depth; they are not copy.
     const reactIds = (markup: string) => markup.replace(/_R_[0-9a-z]+_/g, "_R_id_");
-    expect(reactIds(html)).toBe(reactIds(headFixture("queued")));
+    // V's rulings of 2026-09-20 and 2026-09-28 put the compact review mark on
+    // every argument card; fc3cb865a did not render it. The reference stays the
+    // pre-fix tree (F7). The ruled addition is lifted out whole — only its exact
+    // flat three-span shape, counted per page — and every other byte must still
+    // match, so the catalogue fix still changes nothing else in English.
+    const REVIEW_MARK = /<span class="nodeReviewBadges"[^>]*>(?:<span[^>]*>[^<]*<\/span>){3}<\/span>/g;
+    const liftReviewMarks = (markup: string) => ({
+      marks: markup.match(REVIEW_MARK)?.length ?? 0,
+      rest: markup.replace(REVIEW_MARK, "")
+    });
+    const queued = liftReviewMarks(html);
+    expect(queued.marks).toBe(0);
+    expect(reactIds(queued.rest)).toBe(reactIds(headFixture("queued")));
     mocks.getDebateServer.mockResolvedValue({ ok: true, debate: debateWithLensBranch(), answer: null });
-    expect(reactIds(await renderPage("en"))).toBe(reactIds(headFixture("lens")));
+    const lens = liftReviewMarks(await renderPage("en"));
+    expect(lens.marks).toBe(1);
+    expect(reactIds(lens.rest)).toBe(reactIds(headFixture("lens")));
   });
 
   // Follow-up 4, review F1: the workspace's AI notice reads home.* keys, which the
