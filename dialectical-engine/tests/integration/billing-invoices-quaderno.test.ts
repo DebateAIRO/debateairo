@@ -135,6 +135,28 @@ describe("P10a Quaderno invoices", () => {
     expect((await invoices(paid.chargeId)).map((row) => row.kind)).toEqual(["CREDIT_NOTE", "INVOICE"]);
   });
 
+  it("issues no credit note for a forged QUADERNO_RECORD_REFUND row of a payment never refunded (P2-I5)", async () => {
+    const paid = await activateInGermany();
+    const ref = `${paid.chargeId}:${paid.transaction.transactionId}`;
+    // What a process holding the runtime role could insert: a credit note for the whole sale, with no refund behind it.
+    await h.repository.withTransaction((client) => h.repository.enqueue(client, {
+      kind: "QUADERNO_RECORD_REFUND", ref, notBefore: h.clock.now,
+      payload: { charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, refund_micros: 23_800_000 }
+    }));
+    await h.worker.drain(5);
+    const forged = async () => (await h.outboxRows(ref)).find((row) => row.kind === "QUADERNO_RECORD_REFUND");
+    expect(await forged()).toMatchObject({ done: false, dead: false, lastErrorCode: "CREDIT_NOTE_REFUND_MISSING" });
+    // It waits through the failure schedule (1m, 5m, 30m, 2h, 12h), then dies, and nothing is ever issued.
+    for (const delayMs of [60_000, 300_000, 1_800_000, 7_200_000, 43_200_000]) {
+      h.clock.advance(delayMs + 1_000);
+      await h.worker.drain(5);
+    }
+    expect(await forged()).toMatchObject({ dead: true, lastErrorCode: "CREDIT_NOTE_REFUND_MISSING" });
+    expect(h.tax.refunds.filter((recorded) => recorded.chargeId === paid.chargeId)).toEqual([]);
+    expect((await invoices(paid.chargeId)).map((row) => row.kind)).toEqual(["INVOICE"]);
+    expect(await intents(paid.chargeId)).toEqual([{ kind: "INVOICE", issuer: "QUADERNO" }]);
+  });
+
   it("invoices a company under its own name and address; a person's street stays their own", async () => {
     h.geo.country = "DE";
     const company = { name: "Test GmbH", vatId: "DE123VALID", address: "Teststr. 1, 10115 Berlin" };

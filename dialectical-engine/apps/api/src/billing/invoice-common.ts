@@ -131,7 +131,10 @@ export function saleRecordOf(
   });
 }
 
-/** The refund a credit-note job names (`enqueueCreditNote`, P9c). */
+/**
+ * The refund a credit-note job names (`enqueueCreditNote`, P9c). Only a pointer: `creditNoteContext` credits the
+ * amount of the charge's own REFUNDED row (P2-I5 (2)), so `refundMicros` is read here only to refuse a malformed row.
+ */
 export function refundJobOf(job: OutboxJob): Readonly<{ chargeId: string; transactionId: string; refundMicros: number }> | null {
   const { charge_id: chargeId, transaction_id: transactionId, refund_micros: refundMicros } = job.payload;
   return typeof chargeId === "string" && typeof transactionId === "string" && typeof refundMicros === "number" && refundMicros > 0
@@ -167,13 +170,21 @@ export async function creditNoteContext(
   if (original === undefined) {
     return Object.freeze({ kind: "RETRY" as const, code: "INVOICE_ORIGINAL_MISSING", retryAt: failureRetryAt(job.attempts, now) });
   }
-  // The refund of this paid transaction, on its own row or on a refund transaction naming it (D5 5g).
-  const refunded = paid.charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === refund.transactionId);
+  // P2-I5 (2): the credit note credits what the charge records, never what the job says. The refund of the SALE's
+  // paid transaction, on its own row or on a refund transaction naming it (D5 5g), gives the amount and the date; a
+  // job naming any other transaction (a duplicate payment's refund was never a sale) or one with no REFUNDED row yet
+  // (every real job is queued in the REFUNDED row's own transaction) waits, and dies when the schedule is spent.
+  const refunded = refund.transactionId === paid.paid.xmoneyTransactionId
+    ? paid.charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === refund.transactionId)
+    : undefined;
+  if (refunded === undefined || refunded.amountMicros === null || refunded.amountMicros <= 0) {
+    return Object.freeze({ kind: "RETRY" as const, code: "CREDIT_NOTE_REFUND_MISSING", retryAt: failureRetryAt(job.attempts, now) });
+  }
   return Object.freeze({
     paid, original,
     refund: Object.freeze({
-      chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: refunded?.at ?? now,
-      refundTotalMicros: refund.refundMicros, original: { documentId: original.externalRef, number: original.number },
+      chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: refunded.at,
+      refundTotalMicros: refunded.amountMicros, original: { documentId: original.externalRef, number: original.number },
       // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language, the same sentence
       // the invoice carried for the period it credits (SmartBill's P5 still names its negative line itself).
       description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period)

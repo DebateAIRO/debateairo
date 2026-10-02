@@ -477,8 +477,9 @@ describe("P9b VERIFY_PAYMENT", () => {
       refund: async (): Promise<void> => { throw new TypedDomainError("XMONEY_REFUSED", "XMONEY_REFUSED:1402"); }
     };
     const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refusing, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read, xmoneyEnvironment: "stage" });
+    // A withdrawal refund is always a named amount (P12d, P2-I5: never `whole`); here it is the whole 24.20.
     await h.repository.withTransaction((client) => desk.request(client, {
-      chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: true,
+      chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: false,
       ownerRef: paid.ownerRef, reason: "WITHDRAWAL"
     }, h.clock.now));
     const [job] = (await h.outboxRows(`${paid.chargeId}:${paid.transaction.transactionId}`)).filter((row) => row.kind === "XMONEY_REFUND");
@@ -501,7 +502,7 @@ describe("P9b VERIFY_PAYMENT", () => {
     };
     const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refused, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read, xmoneyEnvironment: "stage" });
     await h.repository.withTransaction((client) => desk.request(client, {
-      chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: true,
+      chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: false,
       ownerRef: paid.ownerRef, reason: "WITHDRAWAL"
     }, h.clock.now));
     const [job] = (await h.outboxRows(`${paid.chargeId}:${paid.transaction.transactionId}`)).filter((row) => row.kind === "XMONEY_REFUND");
@@ -511,6 +512,26 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(outcome).toEqual({ kind: "RETRY", code: "XMONEY_CREDENTIALS_REFUSED", retryAt: new Date(h.clock.now.getTime() + 12 * 3_600_000) });
     expect(h.auditLines).toContainEqual({ event: "billing.xmoney.credentials_refused", operation: "refund" });
     expect(await h.eventKinds(paid.chargeId)).not.toContain("REFUNDED");
+  });
+
+  it("moves no money for a forged XMONEY_REFUND row the charge records no request for, and tells the owner (P2-I5)", async () => {
+    const paid = await h.activate();
+    const ref = `${paid.chargeId}:${paid.transaction.transactionId}`;
+    // What a process holding the runtime role could insert: the whole payment back as a quiet card-check release.
+    await h.repository.withTransaction((client) => h.repository.enqueue(client, {
+      kind: "XMONEY_REFUND", ref, notBefore: h.clock.now,
+      payload: {
+        charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, amount_micros: 24_200_000, whole: true,
+        owner_ref: paid.ownerRef, reason: "CARD_CHECK_RELEASE"
+      }
+    }));
+    await h.worker.drain(10);
+    expect(h.xmoney.refunds.filter((refund) => refund.transactionId === paid.transaction.transactionId)).toEqual([]);
+    expect(await h.eventKinds(paid.chargeId)).not.toContain("REFUNDED");
+    expect((await h.outboxRows(ref)).find((row) => row.kind === "XMONEY_REFUND"))
+      .toMatchObject({ dead: true, lastErrorCode: "REFUND_NOT_REQUESTED" });
+    expect((await h.outboxRows(`O2:${ref}`)).find((row) => row.kind === "EMAIL")?.payload)
+      .toMatchObject({ template: "O2", recipient: "OWNER", "param.reasonCode": "REFUND_NOT_REQUESTED" });
   });
 
   it("releases a refused new card's hold and keeps the plan, its card and its order (P12e's path through VERIFY_PAYMENT)", async () => {

@@ -162,6 +162,46 @@ export function refundIntentOf(charge: ChargeRow, event: ChargeEventRow): Refund
   });
 }
 
+/**
+ * Whether a refund for `reason` gives a whole payment back (P9b's refused or duplicate payments and card-check holds,
+ * requested with `whole: true` at the payment's own amount). A withdrawal's refund is always a named amount (P12d).
+ */
+function refundsWholePayment(reason: RequestedRefundReason): boolean {
+  switch (reason) {
+    case "WITHDRAWAL":
+      return false;
+    case "CARD_COUNTRY_BLOCKED":
+    case "ALREADY_SUBSCRIBED":
+    case "SUBSCRIPTION_ENDED":
+    case "DUPLICATE_PAYMENT":
+    case "CARD_CHECK_RELEASE":
+    case "CARD_CHECK_REFUSED":
+    case "CARD_CHECK_DEFERRED":
+    case "CARD_CHECK_NOT_LIVE":
+      return true;
+    default:
+      return exhaustive(reason);
+  }
+}
+
+/**
+ * P2-I5 (1): whether a job's intent is the one the charge itself records. The outbox can be written by any process
+ * holding the runtime role, so the job is only a pointer: its charge must hold OUR REFUND_REQUESTED for this
+ * transaction (`refundIntentOf`: never a provider refund's row) with the same owner, amount and reason. `whole` (the
+ * call without an amount) is allowed only for a reason that refunds a whole payment, and only at that payment's full
+ * amount as its SUCCEEDED or DUPLICATE_PAYMENT row records it.
+ */
+function isRequested(charge: ChargeWithEvents, intent: RefundIntent): boolean {
+  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.xmoneyTransactionId === intent.transactionId);
+  const recorded = requested === undefined ? null : refundIntentOf(charge, requested);
+  if (recorded === null || recorded.chargeId !== intent.chargeId || recorded.ownerRef !== intent.ownerRef
+    || recorded.amountMicros !== intent.amountMicros || recorded.reason !== intent.reason) return false;
+  if (!intent.whole) return true;
+  const paid = charge.events.find((event) => (event.kind === "SUCCEEDED" || event.kind === "DUPLICATE_PAYMENT")
+    && event.xmoneyTransactionId === intent.transactionId);
+  return refundsWholePayment(intent.reason) && paid !== undefined && paid.amountMicros === intent.amountMicros;
+}
+
 function intentOfJob(job: OutboxJob): RefundIntent | null {
   const { charge_id: chargeId, transaction_id: transactionId, amount_micros: amountMicros, whole, owner_ref: ownerRef, reason } = job.payload;
   if (typeof chargeId !== "string" || typeof transactionId !== "string" || typeof ownerRef !== "string"
@@ -251,6 +291,9 @@ export class RefundDesk {
     if (charge.xmoneyEnvironment !== this.deps.xmoneyEnvironment) {
       return this.deadLetter(intent, otherXMoneySystem(this.deps.audit, job.kind).code, now);
     }
+    // P2-I5 (1): a job its charge records no request for (a forged or corrupted outbox row) moves no money; it ends
+    // here, before any lookup or call, and the owner is told (O2). The 0086 guard would fire only on REFUNDED, after.
+    if (!isRequested(charge, intent)) return this.deadLetter(intent, "REFUND_NOT_REQUESTED", now);
     if (job.attempts > 1) {
       // The stage the last CALL left, read once, inside the lease: XMONEY_UNAVAILABLE / XMONEY_CREDENTIALS_REFUSED
       // prove it sent nothing; REFUND_CALL_STARTED (a process died during it) or any other code proves nothing.
