@@ -1,13 +1,13 @@
 {
   "schemaVersion": 2,
   "catalog": {
-    "sha256": "ffd729867aa1ed250d142f1a82aee386f493a56a224193adf387c231da111854",
+    "sha256": "329c5c47cb4509bb5f259b26fe2a128698c8c3f80ed882cfb4e047faa918ae6d",
     "reviewedBy": "OWNER",
-    "reviewerSession": "d65424e5-27a7-40b7-8a4c-773e60cb404f (legal-notice session; the owner read the seven legal-page entries in chat and answered 'Signed')",
-    "reviewedOn": "2026-09-29",
-    "evidence": "docs/missions/legal-pages/OWNER-SIGNOFF-legal-pages-catalog.md",
+    "reviewerSession": "b06da770-1b32-42dc-a45d-cbc280fccbe5 (paid-plans session; the owner read the nine billing-page entries and the catalogue fingerprints in chat and answered 'Signed')",
+    "reviewedOn": "2026-10-02",
+    "evidence": "docs/missions/paid-plans/OWNER-SIGNOFF-billing-pages-catalog.md",
     "ratifiedBy": "V",
-    "ratifiedOn": "2026-09-29"
+    "ratifiedOn": "2026-10-02"
   },
   "articles": [
     {
