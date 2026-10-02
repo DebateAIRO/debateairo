@@ -59,7 +59,7 @@ export type BillingRuntimeDeps = Readonly<{
   /**
    * R-35: inputs later tasks need, declared here once and passed by main.ts in the task that uses them:
    * P12d the owner's spend (B3's `readOwnerSpentMicros`), P13 the sign-up blind-index key and the identity lookup,
-   * P16a the `taxAuthorities` row (P16a narrows `unknown` to its `TaxAuthorities` type).
+   * P16c the `taxAuthorities` row (P16a's `TaxAuthorities` type).
    */
   ownerSpend?: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> }>;
   blindIndexKey?: Uint8Array;
