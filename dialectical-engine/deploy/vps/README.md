@@ -2195,7 +2195,8 @@ It prints one line saying what it did. Two answers need a word:
 withdraw within 14 days by the model form attached to their confirmation email, or by any clear statement, sent to
 the company's address. You carry it out with `pnpm billing:withdraw`, the same day it arrives. It records the
 withdrawal as of the moment the statement arrived (a statement sent in time counts even if you run the command after
-the 14 days), ends the plan, queues the refund, and emails the person the confirmation (M8).
+the 14 days), ends the plan, queues the refund, and emails the person the confirmation (M8). When the 14th day is a
+Saturday or a Sunday, the person still has until the end of the next Monday; the command counts it the same way.
 
 First find the person's owner reference. If they wrote through the support chat while signed in, it is the
 `identity_owner_ref` of their case. `pnpm support:inbox` has no production credential on this host yet (§13), so
@@ -2218,7 +2219,11 @@ read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect 
 
 If it prints that a refund made in the xMoney dashboard already touched one of the payments, nothing is refunded
 automatically. Work out what is still due, then settle it within 14 days of the withdrawal, in this order. Until you
-do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`.
+do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`. What is due is worked out per payment, as
+the site does it: each payment gives back what it paid times (1 minus the larger of two shares). The first share is the
+part of that payment's own days already used: the first payment's days run from the start of the period, an
+upgrade's from the moment it was bought, both to the end of the period. The second share is the credit used. Add the
+payments' amounts and round down to the cent.
 
 1. **First, in the xMoney dashboard,** refund the part due on the payment the dashboard refund touched. The command
    cannot take money back from that payment: it refuses it and writes nothing.
