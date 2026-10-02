@@ -119,7 +119,9 @@ export type BillingAuditEvent =
    * P15 (R3-2): the stop sweep ended the plan of an account the age gate froze (ERASURE_STOPPED marked
    * `stopped_for: "AGE_FROZEN"`). No field, so it is never read as an erasure.
    */
-  | "billing.age_frozen.stopped";
+  | "billing.age_frozen.stopped"
+  /** P16c: the quarter's tax summary was queued as email O1 to the owner; the field is the quarter label only. */
+  | "billing.tax_summary.queued";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

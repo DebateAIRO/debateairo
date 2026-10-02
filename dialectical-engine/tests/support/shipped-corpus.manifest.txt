@@ -36,6 +36,7 @@ apps/api/src/billing/notice-intake.ts
 apps/api/src/billing/operator-connection.ts
 apps/api/src/billing/order-text.ts
 apps/api/src/billing/outbox.ts
+apps/api/src/billing/owner-jobs.ts
 apps/api/src/billing/place.ts
 apps/api/src/billing/quote.ts
 apps/api/src/billing/reconcile.ts
@@ -85,6 +86,7 @@ apps/api/src/publication-check/verdict.ts
 apps/api/src/publications.ts
 apps/api/src/recovery.ts
 apps/api/src/registration.ts
+apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
 apps/api/src/sessions.ts
 apps/api/src/startup-resource-owner.ts

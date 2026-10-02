@@ -47,6 +47,7 @@ import {
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
+  readTaxAuthorities,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
 // V-28 (DL4-F2): the application-wide daily spending ceiling, over the persisted
@@ -83,6 +84,7 @@ import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { consoleBillingAudit } from "./billing/audit.js";
 import { createBillingRuntime } from "./billing/runtime.js";
+import { createRetentionPurge } from "./retention-purge.js";
 import {
   assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
 } from "./billing/connectors.js";
@@ -806,6 +808,15 @@ const authenticationRiskCleanupTimer=setInterval(
   triggerAuthenticationRiskCleanup,60_000
 );
 authenticationRiskCleanupTimer.unref();
+// A15 (P16c): the retention purge runs wherever the API runs, whatever DEPLOYMENT_MODE and billingPolicy say —
+// acceptance records exist in every mode (A14). Asked daily; it purges once per UTC year, from 2 January.
+const retentionPurge = createRetentionPurge({ pool, clock: () => new Date(), log: (line) => console.error(line) });
+const triggerRetentionPurge=createSingleFlightErasureReconciler(
+  async ()=>{ await retentionPurge.runIfDue(); },
+  ()=>console.error("[RETENTION_PURGE_PENDING]")
+);
+const retentionPurgeTimer=setInterval(triggerRetentionPurge,86_400_000);
+retentionPurgeTimer.unref();
 /**
  * Budget spec 2026-09-28 §2.7 (B7b) — THE WAKER. Single-flight like every timer
  * here; once right after listen (a raised site limit arrives as a restart, and
@@ -1000,6 +1011,12 @@ const supportAnswers = createSupportAnswerService({
 });
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
 /**
+ * Paid plans P16c (R-35): where and when each tax is paid, read only while billing is on (the owner's O1 text);
+ * billing on with no taxAuthorities row at REGISTER_VERSION is refused below by name.
+ */
+const taxAuthorities = billingConnectors === null
+  ? null : await boot.run("tax-authorities", () => readTaxAuthorities(pool, environment.REGISTER_VERSION));
+/**
  * Paid plans P7: the billing runtime (the durable outbox worker and, later, every billing job and route), composed
  * only while billing is on (P6a built the connectors). Billing on with no plans row, country policy or country lookup
  * is a configuration error, refused at boot by name.
@@ -1008,9 +1025,13 @@ const billingRuntime = billingConnectors === null
   ? undefined
   : boot.runSync("billing-runtime", () => {
     const billingPlans = askBilling?.plans ?? null;
-    if (billingPolicy === null || billingPlans === null || countryPolicy === null || geoLookup === undefined) {
+    if (
+      billingPolicy === null || billingPlans === null || countryPolicy === null || geoLookup === undefined
+      || taxAuthorities === null
+    ) {
       throw new TypedDomainError(
-        "BILLING_CONFIGURATION_INCOMPLETE", "billing needs billingPlans, countryPolicy and the country lookup"
+        "BILLING_CONFIGURATION_INCOMPLETE",
+        "billing needs billingPlans, countryPolicy, the country lookup and taxAuthorities"
       );
     }
     // Paid plans P8b: the quote route charges the owner's billingQuote budget (contract §2), so billing on with an
@@ -1043,6 +1064,8 @@ const billingRuntime = billingConnectors === null
       // P13 (R-35): the sign-up blind-index key (held by boot.hold above) and the identity lookup of the cancel link.
       blindIndexKey,
       identities: identityRepository,
+      // P16c (R-35): the owner's quarterly tax summary (email O1) names where and when each tax is paid.
+      taxAuthorities,
       audit: consoleBillingAudit, clock: () => new Date(),
       reportPending: (code) => console.error(`[${code}]`)
     });
@@ -1136,6 +1159,7 @@ if (publicationCleanupTimer !== undefined) {
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => billingRuntime?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
+api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => askWaker?.stop());
 const startup = installStartupResourceOwner({
   api,
@@ -1210,6 +1234,7 @@ await startup.run("listen", async () => {
 // user-key destruction before completion delivery succeeds.
 triggerErasureReconciliation();
 triggerAuthenticationRiskCleanup();
+triggerRetentionPurge();
 billingRuntime?.start();
 if (askRoom !== undefined) {
   triggerAskWake();

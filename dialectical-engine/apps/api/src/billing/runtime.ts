@@ -6,7 +6,7 @@ import type { GeoLookup } from "@debateai/geo";
 import { currentDocument } from "@debateai/legal-manifest";
 import { TypedDomainError } from "@debateai/kernel";
 import { decryptNotice } from "@debateai/payments-xmoney";
-import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/register";
+import type { BillingPlans, BillingPolicy, CountryPolicy, TaxAuthorities } from "@debateai/register";
 import { createSingleFlightErasureReconciler } from "../account-erasure.js";
 import { DekAccountEmailReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
@@ -23,6 +23,7 @@ import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillP
 import { BillingMaintenance } from "./maintenance.js";
 import { NoticeIntake } from "./notice-intake.js";
 import { BillingOutboxWorker } from "./outbox.js";
+import { OwnerJobs } from "./owner-jobs.js";
 import { QuoteService } from "./quote.js";
 import { BillingReconciler } from "./reconcile.js";
 import { RefundDesk } from "./refunds.js";
@@ -64,7 +65,8 @@ export type BillingRuntimeDeps = Readonly<{
   ownerSpend?: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> }>;
   blindIndexKey?: Uint8Array;
   identities?: Readonly<{ ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> }>;
-  taxAuthorities?: unknown;
+  /** P16a/P16c (R-35): where and when each tax is paid (the O1 text). Billing does not start without it. */
+  taxAuthorities?: TaxAuthorities;
 }>;
 
 export type BillingRuntime = Readonly<{
@@ -265,6 +267,15 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     reconcileWork({ erasure, reconciler, reportPending: deps.reportPending }),
     () => deps.reportPending("BILLING_RECONCILIATION_PENDING")
   );
+  // P16c: the owner's quarterly tax summary (spec §2.5.9), queued once per quarter and sent as email O1.
+  const ownerJobs = new OwnerJobs({
+    billing: repository, jobs, taxAuthorities: required(deps.taxAuthorities, "taxAuthorities"),
+    audit: deps.audit, clock: deps.clock
+  });
+  outbox.register("OWNER_TAX_SUMMARY", ownerJobs.taxSummary);
+  const scheduleOwnerJobs = createCoalescingSingleFlight(
+    () => ownerJobs.schedule(), () => deps.reportPending("BILLING_OWNER_JOBS_PENDING")
+  );
   const timers: Array<ReturnType<typeof setInterval>> = [];
   return Object.freeze({
     outbox,
@@ -291,6 +302,11 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       reconcileTimer.unref();
       timers.push(reconcileTimer);
       reconcile();
+      // P16c: the quarter's tax summary is queued once; checking daily is enough.
+      const ownerTimer = setInterval(scheduleOwnerJobs, 86_400_000);
+      ownerTimer.unref();
+      timers.push(ownerTimer);
+      scheduleOwnerJobs();
     },
     stop() {
       for (const timer of timers.splice(0)) clearInterval(timer);

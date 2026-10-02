@@ -1,0 +1,77 @@
+import type { BillingJobQueries, BillingRepository } from "@debateai/db";
+import type { TaxAuthorities } from "@debateai/register";
+import type { BillingAudit } from "./audit.js";
+import { enqueueEmail } from "./email-job.js";
+import { DONE, enqueueOnce, type OutboxHandler } from "./outbox.js";
+import {
+  buildTaxSummary,
+  efacturaChecksFrom,
+  lastEndedQuarter,
+  liveQuarterSummaryRows,
+  parseTaxQuarter,
+  paymentsToCheckFrom,
+  renderTaxSummary,
+  type TaxQuarter
+} from "./tax-summary.js";
+
+const TAX_SUMMARY_REF = "tax-summary:";
+
+/** Spec §2.5.9: the summary of the quarter that ended last, due at 06:00 UTC on the 5th day after it ended. */
+export function taxSummaryJobFor(now: Date): Readonly<{
+  kind: "OWNER_TAX_SUMMARY"; ref: string; notBefore: Date; quarter: TaxQuarter;
+}> {
+  const quarter = lastEndedQuarter(now);
+  return Object.freeze({
+    kind: "OWNER_TAX_SUMMARY" as const, ref: `${TAX_SUMMARY_REF}${quarter.label}`, quarter,
+    notBefore: new Date(Date.UTC(quarter.to.getUTCFullYear(), quarter.to.getUTCMonth(), 5, 6))
+  });
+}
+
+export type OwnerJobsDeps = Readonly<{
+  billing: Pick<BillingRepository,
+    | "withTransaction" | "enqueue" | "quarterSummaryRows" | "invoiceUnknownItems" | "deadRefunds"
+    | "unrecordedRefunds" | "withdrawalsAwaitingOwner" | "unfoldableSubscriptions" | "stuckRenewals"
+    | "longUnsettledCharges" | "chargelessDunning" | "blockedRenewals">;
+  /** P7's queries: the job's once-only check, and P10b's e-Factura read. */
+  jobs: Pick<BillingJobQueries, "outboxJobExists" | "smartBillDocumentsNotAccepted">;
+  taxAuthorities: TaxAuthorities;
+  audit: BillingAudit;
+  clock: () => Date;
+}>;
+
+export class OwnerJobs {
+  constructor(private readonly deps: OwnerJobsDeps) {}
+
+  /** The daily tick: the quarter's job exists once, whatever state an earlier copy is in. */
+  async schedule(): Promise<number> {
+    const summary = taxSummaryJobFor(this.deps.clock());
+    const written = await this.deps.billing.withTransaction((client) => enqueueOnce(
+      { repository: this.deps.billing, jobs: this.deps.jobs }, client,
+      { kind: summary.kind, ref: summary.ref, notBefore: summary.notBefore, payload: { quarter: summary.quarter.label } }
+    ));
+    return written ? 1 : 0;
+  }
+
+  /** OWNER_TAX_SUMMARY: the summary text becomes email O1 to the owner (English; P7's EMAIL job sends it). */
+  readonly taxSummary: OutboxHandler = async (job, now) => {
+    let quarter: TaxQuarter;
+    try {
+      quarter = parseTaxQuarter(job.ref.startsWith(TAX_SUMMARY_REF) ? job.ref.slice(TAX_SUMMARY_REF.length) : "");
+    } catch {
+      return Object.freeze({ kind: "DEAD" as const, code: "BILLING_TAX_SUMMARY_USAGE" });
+    }
+    const text = renderTaxSummary(buildTaxSummary({
+      quarter, rows: await liveQuarterSummaryRows(this.deps.billing, quarter.from, quarter.to),
+      invoiceUnknown: await this.deps.billing.invoiceUnknownItems(),
+      efactura: await efacturaChecksFrom(this.deps.jobs, quarter.from, quarter.to),
+      paymentsToCheck: await paymentsToCheckFrom(this.deps.billing, now),
+      authorities: this.deps.taxAuthorities
+    }));
+    await this.deps.billing.withTransaction((client) => enqueueEmail(this.deps.billing, client, {
+      template: "O1", recipient: { kind: "OWNER" }, dedupeRef: quarter.label,
+      params: { quarter: quarter.label, summaryText: text }, notBefore: now
+    }));
+    this.deps.audit("billing.tax_summary.queued", { quarter: quarter.label });
+    return DONE;
+  };
+}
