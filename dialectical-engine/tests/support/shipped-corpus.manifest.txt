@@ -601,6 +601,8 @@ apps/ui/lib/v3/liveEvents.ts
 apps/ui/lib/v3/missingCapabilities.ts
 apps/ui/lib/v3/publicAnswerExport.ts
 apps/ui/lib/v3/requestFailure.ts
+apps/ui/lib/v3/runFailure.test.mjs
+apps/ui/lib/v3/runFailure.ts
 apps/ui/lib/v3/storyFixture.ts
 apps/ui/lib/v3/storyScriptSamples.ts
 apps/ui/lib/v3/storyView.ts

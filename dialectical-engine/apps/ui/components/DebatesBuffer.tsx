@@ -5,6 +5,7 @@ import { modelMeta } from "@/lib/models";
 import { isComplete, relativeTime, statusLabel } from "@/lib/format";
 import type { DebateSummary } from "@/lib/types";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { runFailureMessage } from "@/lib/v3/runFailure";
 import composeEnglish from "@/messages/en/compose.json";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
 
@@ -102,16 +103,18 @@ export function DebatesBuffer({
     // is formatted in the reader's browser, in their own zone. Final review
     // Part 1b, Important 1: one that waits only for its person's own running
     // debates says so in C's place, with no time.
+    // A failed row says what happened in the reader's words; its terminal
+    // reason code is for operators and never reaches the page.
     const meta: ReactNode = waitsUntil !== null && debate.waits_for === "OWN_DEBATES"
       ? t(catalog, "home.status.waitingOwnDebates")
       : waitsUntil !== null
       ? <ResetSentence text={t(catalog, "home.status.waiting", { time: RESET_TIME_MARK })} at={waitsUntil} locale={locale} />
-      : debate.terminal_reason === null || debate.terminal_reason === undefined
-        ? joinMeta([relativeTime(debate.created_at, timeCatalog, locale),
+      : failed
+        ? runFailureMessage(debate.terminal_reason, catalog)
+        : joinMeta([relativeTime(debate.created_at, timeCatalog, locale),
            debate.models.length > 0
              ? tPlural(catalog, "home.models", debate.models.length, locale)
-             : null])
-        : t(catalog, "home.generationFailed", { reason: debate.terminal_reason });
+             : null]);
     return (
       <LibraryRow
         key={debate.id}
