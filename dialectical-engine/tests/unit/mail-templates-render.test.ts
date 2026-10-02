@@ -34,6 +34,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   cancelLinkUrl: `https://dezbatere.ro/cancel#token=${"A".repeat(43)}`,
   withdrawalDays: "14",
   canUndo: "true",
+  notRequested: "true",
   invoiceNumber: "DBAI 0042",
   quarter: "2026-Q4",
   summaryText: "RO  net 100.00  tax 21.00\nDE  net 50.00  tax 9.50",
@@ -216,15 +217,51 @@ describe("P17 renderMail", () => {
   });
 
   it("tells the owner at once, in English, which refund could not be completed (ruling Q-5's O2)", () => {
-    const owner = renderMail("O2", "de", paramsFor("O2"));
+    const owner = renderMail("O2", "de", { ...paramsFor("O2"), notRequested: "false" });
     expect(owner.subject).toBe("A refund could not be completed and needs your attention");
     expect(owner.text).toContain("Charge reference: 0123456789abcdef0123456789abcdef");
     expect(owner.text).toContain("Amount to refund: $12.10");
     expect(owner.text).toContain("Reason code: XMONEY_REFUSED");
     expect(owner.html).toContain('<html lang="en" dir="ltr">');
-    // Owner-facing, never a customer's data: the charge id, the amount and the code are all it carries.
-    expect(Object.keys(MAIL_TEMPLATES.O2.params).sort()).toEqual(["chargeRef", "reasonCode", "refundAmount"]);
+    // Owner-facing, never a customer's data: the charge id, the amount and the code are all it carries, plus P2-I5's
+    // flag, which only picks the sentences and is never printed.
+    expect(Object.keys(MAIL_TEMPLATES.O2.params).sort()).toEqual(["chargeRef", "notRequested", "reasonCode", "refundAmount"]);
+    expect(MAIL_TEMPLATES.O2.params.notRequested).toBe("flag");
     expect(codeOf(() => renderMail("O2", "en", { ...paramsFor("O2"), reasonCode: "X\nY" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+  });
+
+  it("keeps O2 for a refund xMoney refused exactly as it was before P2-I5's flag", () => {
+    const refused = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false" });
+    // The five sentences of ruling Q-5's O2, in order and unchanged (compared with the render before the flag existed).
+    expect(refused.text.startsWith([
+      "Hello,",
+      "xMoney refused a refund we asked for, or its outcome stayed unknown after every retry. No more tries are made by themselves.",
+      "Charge reference: 0123456789abcdef0123456789abcdef",
+      "Amount to refund: $12.10",
+      "Reason code: XMONEY_REFUSED",
+      "Check this charge in the xMoney dashboard and settle the refund by hand there. The owner summary lists it until then.",
+      "The DebateAI team"
+    ].join("\n\n"))).toBe(true);
+    expect(refused.subject).toBe("A refund could not be completed and needs your attention");
+  });
+
+  it("never asks the owner to refund a job the charge records no request for (P2-I5's REFUND_NOT_REQUESTED)", () => {
+    const forged = renderMail("O2", "en", { ...paramsFor("O2"), reasonCode: "REFUND_NOT_REQUESTED", notRequested: "true" });
+    expect(forged.subject).toBe("A refund could not be completed and needs your attention");
+    for (const part of [forged.text, forged.html]) {
+      expect(part).not.toContain("xMoney refused");
+      expect(part).not.toContain("Amount to refund");
+      expect(part).not.toContain("settle the refund by hand");
+    }
+    expect(forged.text).toContain("Charge reference: 0123456789abcdef0123456789abcdef");
+    expect(forged.text).toContain("Reason code: REFUND_NOT_REQUESTED");
+    // The four things it must say: nothing was sent; it matches no request we hold; the amount is only the job's;
+    // something able to write to the billing database queued it, so whoever runs the server checks the requests.
+    expect(forged.text).toContain("stopped before anything was sent to xMoney");
+    expect(forged.text).toContain("it does not match any refund request our records hold for this payment");
+    expect(forged.text).toContain("Amount the job named: $12.10. This is only the job's own figure, not a refund to make.");
+    expect(forged.text).toContain("Something able to write to the billing database queued it, so tell whoever runs the server.");
+    expect(forged.text).toContain("They check this charge's own refund requests: a request that was never refunded is still owed.");
   });
 
   it("refuses missing, unknown, reserved and malformed params with a code and no value", () => {

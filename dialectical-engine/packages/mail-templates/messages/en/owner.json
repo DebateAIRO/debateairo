@@ -6,5 +6,8 @@
   "owner.O2.charge": "Charge reference: {chargeRef}",
   "owner.O2.amount": "Amount to refund: {refundAmount}",
   "owner.O2.reason": "Reason code: {reasonCode}",
-  "owner.O2.next": "Check this charge in the xMoney dashboard and settle the refund by hand there. The owner summary lists it until then."
+  "owner.O2.next": "Check this charge in the xMoney dashboard and settle the refund by hand there. The owner summary lists it until then.",
+  "owner.O2.notRequestedIntro": "A refund job was stopped before anything was sent to xMoney: it does not match any refund request our records hold for this payment. No money moved, and no more tries are made.",
+  "owner.O2.notRequestedAmount": "Amount the job named: {refundAmount}. This is only the job's own figure, not a refund to make.",
+  "owner.O2.notRequestedNext": "Do not refund anything for this job. Something able to write to the billing database queued it, so tell whoever runs the server. They check this charge's own refund requests: a request that was never refunded is still owed."
 }

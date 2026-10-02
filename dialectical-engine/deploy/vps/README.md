@@ -2237,6 +2237,11 @@ A withdrawal is settled once. Running the command a second time for the same wit
 unknown after every retry, you get an email at once (O2, "A refund could not be completed and needs your
 attention") with the charge reference, the amount and the reason code. No more tries are made by themselves: look
 the charge up in the xMoney dashboard and settle the refund there by hand. The owner summary lists it until then.
+The one exception is the reason code `REFUND_NOT_REQUESTED`: that refund job matches no refund request our records
+hold for the payment, and nothing was sent to xMoney. Do not refund it, and do not treat its amount as owed.
+Something able to write to the billing database queued it, so tell whoever runs the server; they check that charge's
+own refund requests (a request that was never refunded is still owed). The email says the same, and the owner
+summary lists it as `REFUND_NOT_REQUESTED`.
 
 **When xMoney or the tax service is down at a renewal.** The plan stays active,
 and the renewal is retried quietly for up to 3 days (72 hours from the end of the paid month). Nobody is charged

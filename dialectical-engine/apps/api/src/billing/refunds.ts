@@ -358,11 +358,19 @@ export class RefundDesk {
    * deadline, so the dead end queues O2 to the owner's custody address at once (English only; the charge, the amount
    * and the dead-letter code), beside the worker's `billing.outbox.dead` line and P16b's daily list. The ref is the
    * refund job's own, so while one O2 is still waiting a second dead end of the same refund queues no other.
+   * P2-I5: REFUND_NOT_REQUESTED is no refund to make (the job matches no request the charge records, and nothing was
+   * sent), so its O2 says so (`notRequested`) and has a ref of its own: it never absorbs, and is never absorbed by, a
+   * real refund's O2 for the same payment.
    */
   private async deadLetter(intent: RefundIntent, code: string, now: Date): Promise<OutboxOutcome> {
+    const notRequested = code === "REFUND_NOT_REQUESTED";
+    const ref = `${intent.chargeId}:${intent.transactionId}`;
     await this.deps.repository.withTransaction((client) => enqueueEmail(this.deps.repository, client, {
-      template: "O2", recipient: { kind: "OWNER" }, dedupeRef: `${intent.chargeId}:${intent.transactionId}`,
-      params: { chargeRef: intent.chargeId, refundAmount: microsToDecimal(intent.amountMicros), reasonCode: code },
+      template: "O2", recipient: { kind: "OWNER" }, dedupeRef: notRequested ? `${ref}:not-requested` : ref,
+      params: {
+        chargeRef: intent.chargeId, refundAmount: microsToDecimal(intent.amountMicros), reasonCode: code,
+        notRequested: notRequested ? "true" : "false"
+      },
       notBefore: now
     }));
     return dead(code);

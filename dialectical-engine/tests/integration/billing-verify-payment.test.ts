@@ -487,8 +487,10 @@ describe("P9b VERIFY_PAYMENT", () => {
       notBefore: h.clock.now, createdAt: h.clock.now, claimedBy: "test", claimedAt: h.clock.now } as unknown as Parameters<typeof desk.handle>[0];
     expect(await desk.handle(claimed, h.clock.now)).toEqual({ kind: "DEAD", code: "XMONEY_REFUSED" });
     const ownerMail = (await h.outboxRows(`O2:${paid.chargeId}:${paid.transaction.transactionId}`)).find((row) => row.kind === "EMAIL");
+    expect(ownerMail?.ref).toBe(`O2:${paid.chargeId}:${paid.transaction.transactionId}`);
     expect(ownerMail?.payload).toMatchObject({
-      template: "O2", recipient: "OWNER", "param.refundAmount": "24.20", "param.reasonCode": "XMONEY_REFUSED"
+      template: "O2", recipient: "OWNER", "param.refundAmount": "24.20", "param.reasonCode": "XMONEY_REFUSED",
+      "param.notRequested": "false"
     });
     expect(await h.eventKinds(paid.chargeId)).not.toContain("REFUNDED");
   });
@@ -530,8 +532,10 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(await h.eventKinds(paid.chargeId)).not.toContain("REFUNDED");
     expect((await h.outboxRows(ref)).find((row) => row.kind === "XMONEY_REFUND"))
       .toMatchObject({ dead: true, lastErrorCode: "REFUND_NOT_REQUESTED" });
-    expect((await h.outboxRows(`O2:${ref}`)).find((row) => row.kind === "EMAIL")?.payload)
-      .toMatchObject({ template: "O2", recipient: "OWNER", "param.reasonCode": "REFUND_NOT_REQUESTED" });
+    // Its own O2 (P2-I5): the "no refund to make" sentences, under a ref no real refund's O2 for this payment uses.
+    expect((await h.outboxRows(`O2:${ref}:not-requested`)).find((row) => row.kind === "EMAIL" && row.ref === `O2:${ref}:not-requested`)?.payload)
+      .toMatchObject({ template: "O2", recipient: "OWNER", "param.reasonCode": "REFUND_NOT_REQUESTED", "param.notRequested": "true" });
+    expect((await h.outboxRows(`O2:${ref}`)).filter((row) => row.ref === `O2:${ref}`)).toEqual([]);
   });
 
   it("releases a refused new card's hold and keeps the plan, its card and its order (P12e's path through VERIFY_PAYMENT)", async () => {

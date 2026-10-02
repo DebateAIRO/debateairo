@@ -69,14 +69,20 @@ describe("P7 the EMAIL job", () => {
     // Q-5: the refund that could not be completed reaches the owner the same way (RefundDesk queues it, P9b).
     const deadRefund = emailJob({
       template: "O2", recipient: { kind: "OWNER" }, dedupeRef: "0123456789abcdef0123456789abcdef:7700001",
-      params: { chargeRef: "0123456789abcdef0123456789abcdef", refundAmount: "12.10", reasonCode: "REFUND_OUTCOME_UNKNOWN" },
+      params: {
+        chargeRef: "0123456789abcdef0123456789abcdef", refundAmount: "12.10", reasonCode: "REFUND_OUTCOME_UNKNOWN",
+        notRequested: "false"
+      },
       notBefore: NOW
     });
     expect(deadRefund.ref).toBe("O2:0123456789abcdef0123456789abcdef:7700001");
     await handler(asJob(deadRefund), NOW);
     expect(sent[1]).toMatchObject({
       to: "owner@example.test", locale: "en", templateId: "O2",
-      params: { chargeRef: "0123456789abcdef0123456789abcdef", refundAmount: "12.10", reasonCode: "REFUND_OUTCOME_UNKNOWN" }
+      params: {
+        chargeRef: "0123456789abcdef0123456789abcdef", refundAmount: "12.10", reasonCode: "REFUND_OUTCOME_UNKNOWN",
+        notRequested: "false"
+      }
     });
   });
 

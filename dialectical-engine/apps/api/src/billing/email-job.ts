@@ -7,8 +7,8 @@ import { openBillingProfile, type BillingProfile } from "./records.js";
 /**
  * The same ids as P17's `MailTemplateId` (packages/mail-templates/src/templates.ts); P17 is built later and pins the
  * two lists equal. R-8's sixteen, plus Q-5's owner template `O2` ("A refund could not be completed and needs your
- * attention", English only, params `chargeRef`, `refundAmount`, `reasonCode`), which RefundDesk's dead-letter path
- * queues (P9b).
+ * attention", English only, params `chargeRef`, `refundAmount`, `reasonCode` and the flag `notRequested`, P2-I5),
+ * which RefundDesk's dead-letter path queues (P9b).
  */
 export type BillingMailTemplateId =
   | "M1" | "M2_INVOICE_LINK" | "M2_INVOICE_ATTACHED" | "M3" | "M4" | "M5A" | "M5B" | "M5C"

@@ -164,10 +164,18 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     params: { quarter: "text", summaryText: "block" }
   }),
   // Ruling Q-5: RefundDesk's dead-letter path (P9b) sends this to the owner at once. Our charge id, the amount and
-  // the dead job's code; never a customer's name, email or card.
+  // the dead job's code; never a customer's name, email or card. P2-I5: a job the charge records no request for
+  // (REFUND_NOT_REQUESTED, notRequested "true") moved no money and is no refund to make, so it says that instead:
+  // nothing went to xMoney, the amount is only the job's, and whoever runs the server checks the charge's requests.
   O2: define({
     catalogue: "owner", subject: "owner.O2.subject",
-    paragraphs: ["owner.O2.intro", "owner.O2.charge", "owner.O2.amount", "owner.O2.reason", "owner.O2.next"],
-    params: { chargeRef: "text", refundAmount: "amount", reasonCode: "text" }
+    paragraphs: [
+      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedIntro", otherwise: "owner.O2.intro" },
+      "owner.O2.charge",
+      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedAmount", otherwise: "owner.O2.amount" },
+      "owner.O2.reason",
+      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedNext", otherwise: "owner.O2.next" }
+    ],
+    params: { chargeRef: "text", refundAmount: "amount", reasonCode: "text", notRequested: "flag" }
   })
 });

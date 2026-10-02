@@ -75,6 +75,7 @@ describe("P16b the summary", () => {
     paymentsToCheck: [
       { what: "REFUND_REFUSED", ref: "7".repeat(32), reason: null, since: new Date("2026-11-06T00:00:00.000Z") },
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: new Date("2026-11-09T00:00:00.000Z") },
+      { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: new Date("2026-11-17T00:00:00.000Z") },
       { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: new Date("2026-11-11T00:00:00.000Z") },
       { what: "WITHDRAWAL_BY_OWNER", ref: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", reason: null, since: new Date("2026-11-10T00:00:00.000Z") },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: new Date("2026-11-12T00:00:00.000Z") },
@@ -122,6 +123,16 @@ describe("P16b the summary", () => {
     expect(text).toContain(`charge ${"e".repeat(32)}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since 2026-11-08`);
     expect(text).toContain(`charge ${"7".repeat(32)}: REFUND_REFUSED, since 2026-11-06`);
     expect(text).toContain(`charge ${"6".repeat(32)}: REFUND_OUTCOME_UNKNOWN (WITHDRAWAL), since 2026-11-09`);
+    // P2-I5: a refund job the charge records no request for moved no money; the help text says it is no refund to make.
+    expect(text).toContain(`charge ${"4".repeat(32)}: REFUND_NOT_REQUESTED, since 2026-11-17`);
+    expect(text).toContain("REFUND_NOT_REQUESTED: a refund job that matches no refund request our records hold for this"
+      + " payment, so nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to"
+      + " the billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
+      + " (one never refunded is still owed);");
+    // The two real dead ends keep their own words.
+    expect(text).toContain("(REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund it from the dashboard;"
+      + " REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the dashboard before refunding again;"
+      + " a WITHDRAWAL refund is due within 14 days of the withdrawal; REFUND_NOT_REQUESTED:");
     // P9c's second refund made elsewhere: named by the xMoney transaction the owner opens in the dashboard.
     expect(text).toContain("xMoney transaction 9912345: REFUND_UNRECORDED, since 2026-11-11");
     expect(text).toContain("REFUND_UNRECORDED: a second refund made in the xMoney dashboard");
@@ -191,7 +202,9 @@ describe("P16b the summary", () => {
     const items = await paymentsToCheckFrom({
       deadRefunds: async () => [
         { chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED", since: now },
-        { chargeId: "6".repeat(32), transactionId: "2", reason: "WITHDRAWAL", code: "REFUND_OUTCOME_UNKNOWN", since: now }
+        { chargeId: "6".repeat(32), transactionId: "2", reason: "WITHDRAWAL", code: "REFUND_OUTCOME_UNKNOWN", since: now },
+        // P2-I5: a forged job's payload reason is only its claim, so the line carries none.
+        { chargeId: "4".repeat(32), transactionId: "3", reason: "CARD_CHECK_RELEASE", code: "REFUND_NOT_REQUESTED", since: now }
       ],
       unrecordedRefunds: async (since) => {
         // P9c's second refunds made elsewhere, as far back as A10's refund listing reaches.
@@ -226,6 +239,7 @@ describe("P16b the summary", () => {
     expect(items).toEqual([
       { what: "REFUND_REFUSED", ref: "7".repeat(32), reason: "WITHDRAWAL", since: now },
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: now },
+      { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: now },
       { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: now },
       { what: "WITHDRAWAL_BY_OWNER", ref: owner, reason: null, since: now },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: now },

@@ -70,7 +70,8 @@ describe("P17 mail catalogues", () => {
   });
 
   it("reads an optional param only where it is present, and tests each param as its kind allows", () => {
-    const english = read("en/mail.json");
+    // The owner templates too: O2 has param conditions of its own (P2-I5's notRequested flag).
+    const english = { ...read("en/mail.json"), ...read("en/owner.json") };
     for (const [id, template] of Object.entries(MAIL_TEMPLATES)) {
       const optional = new Set(Object.keys(template.optional ?? {}));
       const declared: Record<string, string> = { ...template.params, ...(template.optional ?? {}) };

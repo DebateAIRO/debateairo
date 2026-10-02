@@ -180,6 +180,14 @@ export async function creditNoteContext(
   if (refunded === undefined || refunded.amountMicros === null || refunded.amountMicros <= 0) {
     return Object.freeze({ kind: "RETRY" as const, code: "CREDIT_NOTE_REFUND_MISSING", retryAt: failureRetryAt(job.attempts, now) });
   }
+  // P9c's dashboard refund recorded on the payment itself (PROVIDER_REFUND, no refund transaction) holds only an upper
+  // bound: xMoney's read named no amount (`quarterSummaryRows` marks it amountKnown=false). P9c queues no credit note
+  // for it, and a job that names it issues none at that figure: it goes to the owner (P16b lists the charge). A D5 5g
+  // PROVIDER_REFUND on its own refund transaction, and a PROVIDER_VOID, carry their true amount and stay automatic.
+  if (refunded.errorCode === "PROVIDER_REFUND" && refunded.refundsTransactionId === null) {
+    deps.audit("billing.invoice.unknown", { issuer, kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
+    return Object.freeze({ kind: "DEAD" as const, code: "CREDIT_NOTE_MANUAL" });
+  }
   return Object.freeze({
     paid, original,
     refund: Object.freeze({

@@ -19,15 +19,17 @@ export type EFacturaCheckItem = Readonly<{
 }>;
 /**
  * What the owner checks in xMoney or at the tax service: a refund xMoney refused (still owed) or one whose outcome is
- * unknown; a second refund made elsewhere on one payment, which our records cannot hold (P9c's REFUND_UNRECORDED:
- * its amount is in no line of the summary); a withdrawal handed to the owner; a renewal closed with its outcome
- * unknown; a charge with no outcome after 30 days; R2 Q-1's renewals with no charge (a dunning the tax service could
- * not price, a plan such a dunning ended, a renewal a tax refusal blocks); a subscription whose history does not fold
- * (renewals skip it: what was its subscriber charged?).
+ * unknown; a refund job the charge records no request for (P2-I5's REFUND_NOT_REQUESTED: nothing was sent, it is no
+ * refund to make, and whoever runs the server checks who queued it); a second refund made elsewhere on one payment,
+ * which our records cannot hold (P9c's REFUND_UNRECORDED: its amount is in no line of the summary); a withdrawal
+ * handed to the owner; a renewal closed with its outcome unknown; a charge with no outcome after 30 days; R2 Q-1's
+ * renewals with no charge (a dunning the tax service could not price, a plan such a dunning ended, a renewal a tax
+ * refusal blocks); a subscription whose history does not fold (renewals skip it: what was its subscriber charged?).
  */
 export type PaymentCheck =
-  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_UNRECORDED" | "WITHDRAWAL_BY_OWNER" | "RENEWAL_STUCK"
-  | "PAYMENT_UNSETTLED" | "DUNNING_UNPRICED" | "ENDED_UNPRICED" | "RENEWAL_BLOCKED" | "SUBSCRIPTION_HISTORY_INVALID";
+  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_UNRECORDED" | "WITHDRAWAL_BY_OWNER"
+  | "RENEWAL_STUCK" | "PAYMENT_UNSETTLED" | "DUNNING_UNPRICED" | "ENDED_UNPRICED" | "RENEWAL_BLOCKED"
+  | "SUBSCRIPTION_HISTORY_INVALID";
 export type PaymentToCheckItem = Readonly<{
   what: PaymentCheck;
   /**
@@ -38,7 +40,8 @@ export type PaymentToCheckItem = Readonly<{
   ref: string;
   /**
    * A dead refund's reason (a WITHDRAWAL refund is due within 14 days of the withdrawal), or the code a charge-less
-   * attempt names (TAX_SERVICE_UNAVAILABLE); else null.
+   * attempt names (TAX_SERVICE_UNAVAILABLE); else null. Null for REFUND_NOT_REQUESTED: its payload's reason is only
+   * what the job claimed.
    */
   reason: string | null;
   since: Date;
@@ -156,10 +159,10 @@ export async function paymentsToCheckFrom(
 ): Promise<PaymentToCheckItem[]> {
   const dayMs = 86_400_000;
   const lookBack = new Date(now.getTime() - 120 * dayMs);
-  const refunds = (await billing.deadRefunds()).map((item): PaymentToCheckItem => Object.freeze({
-    what: item.code === "REFUND_OUTCOME_UNKNOWN" ? "REFUND_OUTCOME_UNKNOWN" : "REFUND_REFUSED",
-    ref: item.chargeId, reason: item.reason, since: item.since
-  }));
+  const refunds = (await billing.deadRefunds()).map((item): PaymentToCheckItem => {
+    const what = deadRefundCheck(item.code);
+    return Object.freeze({ what, ref: item.chargeId, reason: what === "REFUND_NOT_REQUESTED" ? null : item.reason, since: item.since });
+  });
   const unrecorded = (await billing.unrecordedRefunds(lookBack)).map((item): PaymentToCheckItem => Object.freeze({
     what: "REFUND_UNRECORDED", ref: item.transactionId, reason: null, since: item.since
   }));
@@ -185,6 +188,21 @@ export async function paymentsToCheckFrom(
   return [...refunds, ...unrecorded, ...withdrawals, ...stuck, ...unsettled, ...chargeless, ...blocked, ...unfoldable];
 }
 
+/**
+ * Which list a dead XMONEY_REFUND job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
+ * (P2-I5) moved no money and is no refund to make; every other dead end leaves the money owed.
+ */
+function deadRefundCheck(code: string | null): "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" {
+  switch (code) {
+    case "REFUND_OUTCOME_UNKNOWN":
+      return "REFUND_OUTCOME_UNKNOWN";
+    case "REFUND_NOT_REQUESTED":
+      return "REFUND_NOT_REQUESTED";
+    default:
+      return "REFUND_REFUSED";
+  }
+}
+
 /** How a payment line names what the owner looks up. */
 function subjectOf(item: PaymentToCheckItem): string {
   switch (item.what) {
@@ -199,6 +217,7 @@ function subjectOf(item: PaymentToCheckItem): string {
       return `subscription ${item.ref}`;
     case "REFUND_REFUSED":
     case "REFUND_OUTCOME_UNKNOWN":
+    case "REFUND_NOT_REQUESTED":
     case "RENEWAL_STUCK":
     case "PAYMENT_UNSETTLED":
       return `charge ${item.ref}`;
@@ -386,6 +405,10 @@ export function renderTaxSummary(summary: TaxSummary): string {
     "Payments to check by hand in xMoney (REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund"
       + " it from the dashboard; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the"
       + " dashboard before refunding again; a WITHDRAWAL refund is due within 14 days of the withdrawal;"
+      + " REFUND_NOT_REQUESTED: a refund job that matches no refund request our records hold for this payment, so"
+      + " nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to the"
+      + " billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
+      + " (one never refunded is still owed);"
       + " REFUND_UNRECORDED: a second refund made in the xMoney dashboard on a payment that already had one, which our"
       + " records cannot hold, so it is in no figure above: read its amount on that transaction in the dashboard and"
       + " take it off that country's net sales and tax by hand;"
