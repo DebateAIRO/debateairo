@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kus me DebateAI-d pakume",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Pakume DebateAI-d inimestele, kes elavad [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
+      { kind: "p", text: "Pakume DebateAI-d inimestele, kes elavad [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "8618e67065768038f743b8385806976fb65112e40c8eec4652749bf725993a9c",
+  sha256: "c6320f98ce1c5f662a432a1637b8b9a5bfab9afea938088684bc0bf0d2711690",
   eyebrow: "TEENUSETINGIMUSED · v2.0 · KEHTIB ALATES [DATE]",
   title: "Millega te nõustute",
   lede: "Teie ja DebateAIRO S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",

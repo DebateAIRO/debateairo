@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "हम DebateAI कहाँ उपलब्ध कराते हैं",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "हम DebateAI उन लोगों को उपलब्ध कराते हैं जो [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] में रहते हैं। हम इसे अन्यत्र उपलब्ध नहीं कराते। यदि आप इन देशों से बाहर रहते हैं, तो संभव है कि आप साइट तक पहुँच सकें, किंतु हम सेवा को आपके लिए लक्षित नहीं करते, आपसे भुगतान स्वीकार नहीं करते, और ये शर्तें तथा हमारी गोपनीयता नीति आपके देश के कानून के अनुरूप नहीं बनाई गई हैं। परिशिष्ट A बताता है कि हमारे द्वारा सेवित प्रत्येक क्षेत्र में क्या लागू होता है।" }
+      { kind: "p", text: "हम DebateAI उन लोगों को उपलब्ध कराते हैं जो [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] में रहते हैं। हम इसे अन्यत्र उपलब्ध नहीं कराते। यदि आप इन देशों से बाहर रहते हैं, तो संभव है कि आप साइट तक पहुँच सकें, किंतु हम सेवा को आपके लिए लक्षित नहीं करते, आपसे भुगतान स्वीकार नहीं करते, और ये शर्तें तथा हमारी गोपनीयता नीति आपके देश के कानून के अनुरूप नहीं बनाई गई हैं। परिशिष्ट A बताता है कि हमारे द्वारा सेवित प्रत्येक क्षेत्र में क्या लागू होता है।" }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "36796ff8c2c68c104631aabdfcc4f3f7d2617b117caa04fd10e96f695ca5a655",
+  sha256: "e662ea74d0729b2c5605c8abcbe1039d02243838c231faa6976c5118273c8048",
   eyebrow: "सेवा की शर्तें · v2.0 · प्रभावी [DATE]",
   title: "आप किन बातों से सहमत होते हैं",
   lede: "आपके और DebateAIRO S.R.L. के बीच अनुबंध, सरल भाषा में। उन्नीस धाराएँ और परिशिष्ट A — अंत तक स्क्रॉल करें।",

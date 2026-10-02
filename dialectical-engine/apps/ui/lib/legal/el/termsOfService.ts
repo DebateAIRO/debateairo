@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Πού προσφέρουμε το DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Προσφέρουμε το DebateAI σε πρόσωπα που ζουν στην [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Δεν το προσφέρουμε αλλού. Αν ζείτε εκτός αυτών των χωρών, ενδέχεται να μπορείτε να αποκτήσετε πρόσβαση στον ιστότοπο, αλλά δεν απευθύνουμε την υπηρεσία σε εσάς, δεν δεχόμαστε πληρωμή από εσάς και οι παρόντες Όροι και η Πολιτική Απορρήτου μας δεν έχουν προσαρμοστεί στο δίκαιο της χώρας σας. Το Παράρτημα Α ορίζει τι εφαρμόζεται σε κάθε περιοχή που εξυπηρετούμε." }
+      { kind: "p", text: "Προσφέρουμε το DebateAI σε πρόσωπα που ζουν στην [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Δεν το προσφέρουμε αλλού. Αν ζείτε εκτός αυτών των χωρών, ενδέχεται να μπορείτε να αποκτήσετε πρόσβαση στον ιστότοπο, αλλά δεν απευθύνουμε την υπηρεσία σε εσάς, δεν δεχόμαστε πληρωμή από εσάς και οι παρόντες Όροι και η Πολιτική Απορρήτου μας δεν έχουν προσαρμοστεί στο δίκαιο της χώρας σας. Το Παράρτημα Α ορίζει τι εφαρμόζεται σε κάθε περιοχή που εξυπηρετούμε." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "d4b7a3b6cdfc7bc8dada6b840fa8d105a08e7532b1e6464a0477c1e26ac248b3",
+  sha256: "0d38755b710d4a91704a68705feca13d91480a7eb1be507ae2fb5b8a3aa212df",
   eyebrow: "ΟΡΟΙ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ · v2.0 · ΙΣΧΥΟΥΝ ΑΠΟ [DATE]",
   title: "Τι αποδέχεστε",
   lede: "Η σύμβαση μεταξύ εσάς και της DebateAIRO S.R.L., σε απλή γλώσσα. Δεκαεννέα ενότητες και Παράρτημα Α — μετακινηθείτε έως το τέλος.",
