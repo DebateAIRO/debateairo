@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 let root: Root;
 let host: HTMLDivElement;
@@ -38,6 +39,7 @@ async function fillAdultDateOfBirth(): Promise<void> {
 async function fillOtherFields(): Promise<void> {
   // First: its re-renders would reset the controlled fields assigned directly below.
   await fillAdultDateOfBirth();
+  await pickRegion("RO");
   field("email").value = "person@example.test";
   field("confirm-email").value = "person@example.test";
   field("recovery-email").value = "recovery@example.test";
@@ -88,7 +90,9 @@ describe("register-form F3 confirm password", () => {
     expect(Array.from(host.querySelectorAll<HTMLInputElement>('input[name]:not([type="checkbox"])'), (input) => input.name))
       .toEqual(["email", "confirm-email", "recovery-email", "password", "confirm-password", "dob-d", "dob-m", "dob-y"]);
     expect(host.querySelector(".authRules")!.parentElement!.nextElementSibling === confirmation.parentElement).toBe(true);
-    const dateOfBirth = confirmation.parentElement!.nextElementSibling;
+    const region = confirmation.parentElement!.nextElementSibling;
+    expect(region?.className).toBe("authField regionField");
+    const dateOfBirth = region?.nextElementSibling;
     expect(dateOfBirth?.className).toBe("authField");
     expect(dateOfBirth?.querySelector("fieldset")?.contains(field("dob-d"))).toBe(true);
     expect(dateOfBirth?.nextElementSibling?.className).toBe("consentGroup");
@@ -151,7 +155,8 @@ describe("register-form F3 confirm password", () => {
     // A bare submit isolates the exact-match rule from the primary field's HTML minLength.
     await submit();
     expect(register.mock.calls).toEqual([[
-      "person@example.test", "   ", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
+      "person@example.test", "   ", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN,
+      { country: "RO", usState: null }
     ]]);
   });
 
@@ -166,7 +171,8 @@ describe("register-form F3 confirm password", () => {
     expect(validity().textContent).toBe("✓ Passwords match");
     await submit(false);
     expect(register.mock.calls).toEqual([[
-      "person@example.test", "Passw0rd!", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
+      "person@example.test", "Passw0rd!", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN,
+      { country: "RO", usState: null }
     ]]);
   });
 
@@ -202,7 +208,8 @@ describe("register-form F3 confirm password", () => {
     field("confirm-password").value = " Passw0rd! ";
     await submit();
     expect(register.mock.calls).toEqual([[
-      "person@example.test", " Passw0rd! ", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN
+      "person@example.test", " Passw0rd! ", "recovery@example.test", "1990-01-01", DISPLAYED_LEGAL_EN,
+      { country: "RO", usState: null }
     ]]);
   });
 

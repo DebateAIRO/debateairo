@@ -149,7 +149,7 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
     // The age gate's hook needs an adult date before register runs at all (apps/api/src/index.ts:1711-1729).
     const body = {
       email: "alice@example.test", password: "correct horse battery staple",
-      recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01"
+      recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01", country: "RO"
     };
     const stale = await api.inject({ method: "POST", url: "/v1/auth/register", payload: body });
     expect(stale.statusCode).toBe(409);

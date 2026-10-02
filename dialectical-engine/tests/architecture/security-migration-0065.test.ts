@@ -65,6 +65,7 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.account_recovery_binding": "recovery binding is rotated in place",
   "identity.age_check": "0077 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.sensitive_data_consent": "0078 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
+  "identity.registration_region": "0090 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.account_erasure_request": "erasure request state machine",
   "identity.account_erasure_notification_outbox": "outbox rows are sent then cleared",
   "identity.private_erasure_audit_binding": "erasure binding is cleared by the sweep",
@@ -467,7 +468,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // Paid plans P15 (ruling R-31; number by R3-1): billing learns that an owner's
         // account is being erased, or was frozen by the age gate (R3-2), as three
         // content-free lookups. The next free prefix, no pair.
-        "0089_billing_erasure_hook.sql"
+        "0089_billing_erasure_hook.sql",
+        // Region picker S01: identity.registration_region and its definer writer. Next free prefix after dev's 0089; no pair.
+        "0090_registration_region.sql"
       ]);
   });
 });

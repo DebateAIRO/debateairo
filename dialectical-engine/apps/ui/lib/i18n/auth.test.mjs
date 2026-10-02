@@ -10,6 +10,7 @@ const ownedFiles = [
   "components/SignUpFlow.tsx",
   "components/AuthShell.tsx",
   "components/DateOfBirthField.tsx",
+  "components/RegionField.tsx",
   "components/AgeRefusal.tsx",
   "components/AgeConfirmationFlow.tsx",
   "lib/dob/dobLocale.ts",

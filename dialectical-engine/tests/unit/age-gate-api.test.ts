@@ -104,7 +104,7 @@ describe("POST /v1/auth/age-check", () => {
 describe("POST /v1/auth/register behind the age gate", () => {
   const body = (dateOfBirth: string) => ({
     email: "alice@example.test", password: "password-123",
-    recovery_email: "recovery@example.test", date_of_birth: dateOfBirth
+    recovery_email: "recovery@example.test", date_of_birth: dateOfBirth, country: "RO"
   });
 
   it("passes an adult through with the byte-identical public response", async () => {

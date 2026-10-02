@@ -362,6 +362,7 @@ apps/ui/components/PublicationControl.tsx
 apps/ui/components/QuestionLanguageOffer.tsx
 apps/ui/components/RecommendedInvestigations.tsx
 apps/ui/components/ReferenceNodeMeta.tsx
+apps/ui/components/RegionField.tsx
 apps/ui/components/ScoringErrorBoundary.tsx
 apps/ui/components/SensitiveDataConsent.tsx
 apps/ui/components/SessionControls.tsx
@@ -742,6 +743,7 @@ packages/judgement/src/s04.ts
 packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/index.ts
+packages/kernel/src/region.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts
 packages/ledger/src/index.ts

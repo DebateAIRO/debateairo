@@ -6814,6 +6814,55 @@ a:focus-visible {
 /* Sign-up stacks its password rules; sign-in wraps them on one line. */
 .authRules[data-stack="true"] { flex-direction: column; gap: 3px; }
 
+/* === region-picker S01 === */
+/* Turn 8 · 8a Region field (docs/missions/region-picker/slices/S01/DONE.md §2-§3). Tokens only. */
+.regionField { position: relative; z-index: 30; }
+.regionPicker { position: relative; z-index: 30; container-type: inline-size; }
+.regionTrigger { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 13px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--shell); color: var(--ink); font-family: var(--font-sans); font-size: 12px; text-align: start; cursor: pointer; }
+.regionTrigger[aria-expanded="true"] { border-color: var(--con); }
+.regionTrigger:disabled { cursor: default; }
+.regionFlag { flex: none; font-size: 15px; line-height: 1; }
+.regionName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.regionPath { flex: 0 1 auto; min-width: 0; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; color: var(--muted); }
+.regionChevron { flex: none; font-size: 9px; color: var(--muted); }
+.regionPopover { position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 30; max-height: 300px; overflow: auto; padding: 8px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--core); box-shadow: var(--shadow-pop); }
+.regionHeader, .regionContinentTitle { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .16em; color: var(--muted); }
+.regionHeader { padding: 4px 8px 8px; }
+.regionContinent { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-sans); text-align: start; cursor: pointer; }
+.regionContinentName { flex: 1; font-size: 12px; font-weight: 500; }
+.regionCount { font-size: 10.5px; color: var(--muted); }
+.regionChevronRight { font-size: 11px; color: var(--muted); }
+.regionTop { display: flex; align-items: center; gap: 8px; padding: 2px 4px 8px; }
+.regionBack { padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-family: var(--font-sans); font-size: 11px; font-weight: 600; cursor: pointer; }
+.regionGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+@container (max-width: 299px) {
+  .regionGrid { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 299px) {
+  .regionTrigger:has(.regionFlag) { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; }
+  .regionTrigger:has(.regionFlag) .regionFlag { grid-column: 1; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionName { grid-column: 2; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionChevron { grid-column: 3; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionPath { grid-column: 2 / 4; grid-row: 2; max-width: none; }
+}
+.regionCountry { min-width: 0; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-sans); text-align: start; cursor: pointer; }
+.regionCountry[data-picked="true"] { background: var(--shell); }
+.regionCellFlag { font-size: 14px; line-height: 1; }
+.regionCellCode { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--muted); }
+.regionCellName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 500; }
+.regionCountry[data-picked="true"] .regionCellName { font-weight: 700; }
+@container (max-width: 299px) {
+  .regionCellName { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+}
+.regionDiamond { flex: 0 0 auto; width: 7px; height: 7px; transform: rotate(45deg); background: var(--gold); opacity: 0; }
+.regionCountry[data-picked="true"] .regionDiamond { opacity: 1; }
+.regionContinent:hover, .regionCountry:hover { background: color-mix(in oklch, var(--muted) 12%, transparent); }
+.regionTrigger:focus-visible, .regionContinent:focus-visible, .regionBack:focus-visible, .regionCountry:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.regionState { margin-top: 10px; }
+.regionStateSelect { width: 100%; height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--shell); color: var(--ink); font-family: var(--font-sans); font-size: 12px; font-weight: 600; cursor: pointer; }
+.regionStateSelect[data-state="bad"] { border-color: var(--dispute-text); }
+/* === end region-picker S01 === */
+
 /* 8b — the enrolment card is wider than the auth card and carries
    three numbered steps whose state is the real enrolment state. */
 .mfaScreen {

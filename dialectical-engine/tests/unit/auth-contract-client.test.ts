@@ -42,7 +42,8 @@ describe("auth registration contract client", () => {
       "correct horse battery staple",
       "recovery@example.test",
       "1990-01-01",
-      { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en" }
+      { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en" },
+      { country: "RO", usState: null }
     )).resolves.toEqual({ message: REGISTRATION_MESSAGE });
     await expect(client.resendVerification("person@example.test"))
       .resolves.toEqual({ message: RESEND_MESSAGE });
@@ -60,10 +61,12 @@ describe("auth registration contract client", () => {
         date_of_birth: "1990-01-01",
         terms: { version: "2.0", sha256: "a".repeat(64) },
         privacy: { version: "3.0", sha256: "b".repeat(64) },
-        locale: "en"
+        locale: "en",
+        country: "RO"
       },
       credentials: "same-origin"
     });
+    expect("us_state" in (calls[0]!.body as Record<string, unknown>)).toBe(false);
     expect(calls[1]).toMatchObject({
       path: "/v1/auth/resend-verification",
       method: "POST",
@@ -82,6 +85,32 @@ describe("auth registration contract client", () => {
     }
   });
 
+  it("sends the exact US region members in the registration body", async () => {
+    let body: unknown;
+    const client = createContractClient("https://api.debateai.test", (async (_input, init) => {
+      body = JSON.parse(String(init?.body));
+      return Response.json({ message: REGISTRATION_MESSAGE }, { status: 202 });
+    }) as typeof fetch);
+
+    await client.register(
+      "person@example.test", "correct horse battery staple", "recovery@example.test", "1990-01-01",
+      { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en" },
+      { country: "US", usState: "TX" }
+    );
+
+    expect(body).toEqual({
+      email: "person@example.test",
+      password: "correct horse battery staple",
+      recovery_email: "recovery@example.test",
+      date_of_birth: "1990-01-01",
+      terms: { version: "2.0", sha256: "a".repeat(64) },
+      privacy: { version: "3.0", sha256: "b".repeat(64) },
+      locale: "en",
+      country: "US",
+      us_state: "TX"
+    });
+  });
+
   it("rejects success-shaped enumeration leaks instead of widening the public contract", async () => {
     const client = createContractClient(
       "https://api.debateai.test",
@@ -90,7 +119,8 @@ describe("auth registration contract client", () => {
 
     await expect(client.register(
       "person@example.test", "password", "recovery@example.test", "1990-01-01",
-      { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en" }
+      { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en" },
+      { country: "RO", usState: null }
     ))
       .rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 202 });
   });

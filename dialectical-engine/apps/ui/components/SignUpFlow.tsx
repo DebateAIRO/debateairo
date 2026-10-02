@@ -10,10 +10,11 @@ import {
   useState
 } from "react";
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
-import { checkDob, dobToIso, meetsMinimumAge, type DobErrorCode, type DobParts } from "@debateai/kernel";
+import { checkDob, declaredRegionFromPick, dobToIso, meetsMinimumAge, type DobErrorCode, type DobParts } from "@debateai/kernel";
 import { AgeRefusal } from "@/components/AgeRefusal";
 import { AuthShell } from "@/components/AuthShell";
 import { DateOfBirthField, EMPTY_DOB } from "@/components/DateOfBirthField";
+import { RegionField, EMPTY_REGION_PICK, type RegionPick } from "@/components/RegionField";
 import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
 import { TermsOfServiceModal } from "@/components/consent/TermsOfServiceModal";
 import { useLegalDocument } from "@/components/consent/useLegalDocument";
@@ -169,6 +170,8 @@ export function SignUpFlow({
      before 1900, in the future or impossible (V 2026-09-29). The field says which; Create
      account stays disabled. A date still being typed does not disable it. */
   const dateRefused = checkDob(dateOfBirth).code !== "incomplete" && !meetsMinimumAge(dateOfBirth);
+  const [region, setRegion] = useState<RegionPick>(EMPTY_REGION_PICK);
+  const declaredRegion = declaredRegionFromPick(region.country, region.usState);
   const [dateOfBirthError, setDateOfBirthError] = useState<DobErrorCode | null>(null);
   const [refused, setRefused] = useState(refusedOnArrival);
   /* The two consent boxes stay UNCONTROLLED. These mirrors exist for ONE purpose:
@@ -210,6 +213,7 @@ export function SignUpFlow({
        validation, so `required` alone gates nothing against a scripted submit.
        Consent and confirmation are read from FormData, never the mirrors above. */
     if (
+      declaredRegion === null ||
       data.get("privacy-accepted") !== "on" ||
       data.get("terms-accepted") !== "on" ||
       confirmEmailValidity(
@@ -247,7 +251,8 @@ export function SignUpFlow({
           terms: { version: termsDocument.version, sha256: termsDocument.sha256 },
           privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 },
           locale
-        }
+        },
+        declaredRegion
       );
       setSubmittedEmail(submitted);
       setMessageKey("auth.signUp.registrationSent");
@@ -437,6 +442,8 @@ export function SignUpFlow({
           <p className="authValidity" data-state={confirmPasswordState.state}>{confirmPasswordState.text}</p>
         </div>
 
+        <RegionField catalog={catalog} locale={locale} value={region} onChange={setRegion} disabled={busy || sent} />
+
         {/* Date of birth — design document Turn 8 · 8a/8d: after Password, before the consent
             group. It replaces the "I am 18 or over" tick box. V 2026-09-29: a date under 18 is
             refused right here — the minimum age is named under the field and Create account
@@ -523,7 +530,7 @@ export function SignUpFlow({
         <button
           className="authPrimary"
           type="submit"
-          disabled={busy || sent || !privacyAccepted || !termsAccepted || dateRefused}
+          disabled={busy || sent || !privacyAccepted || !termsAccepted || dateRefused || declaredRegion === null}
         >
           {busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}
         </button>
