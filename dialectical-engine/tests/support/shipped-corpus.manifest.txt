@@ -310,6 +310,7 @@ apps/ui/app/privacy/us-health-data/page.tsx
 apps/ui/app/providers/page.tsx
 apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx
 apps/ui/app/public/debate/[id]/page.tsx
+apps/ui/app/settings/card/page.tsx
 apps/ui/app/settings/page.tsx
 apps/ui/app/sign-up/page.tsx
 apps/ui/app/terms/page.tsx
@@ -368,12 +369,14 @@ apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
 apps/ui/components/authRoutes.source-test.mjs
+apps/ui/components/billing/CardChangeFlow.tsx
 apps/ui/components/billing/ChargeStatusPoller.tsx
 apps/ui/components/billing/CheckoutFlow.tsx
 apps/ui/components/billing/LegalAcceptGate.tsx
 apps/ui/components/billing/PricingCards.tsx
 apps/ui/components/billing/ResetSentence.tsx
 apps/ui/components/billing/RoomNotice.tsx
+apps/ui/components/billing/SubscriptionControls.tsx
 apps/ui/components/billing/UsageBars.tsx
 apps/ui/components/billing/XMoneyCardForm.tsx
 apps/ui/components/consent/ConsentSettingsPanel.tsx
