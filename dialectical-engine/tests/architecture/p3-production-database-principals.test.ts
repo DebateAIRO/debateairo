@@ -417,6 +417,13 @@ describe("P3-01 production database-principal manifest", () => {
         // (billing.charge_event, billing.subscription_event, billing.entitlement_event);
         // no privilege is added.
         { component: "apps/api:billing-dispute-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_DISPUTE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:dispute" },
+        // Paid plans, Task P14c: the owner's withdrawal command (`pnpm billing:withdraw`)
+        // runs as the API, with the API's own EnvironmentFile, under systemd-run,
+        // and writes only billing rows that principal already writes
+        // (billing.subscription_event, billing.entitlement_event, billing.charge_event,
+        // billing.outbox, and billing.withdrawal_owner_settlement, on which 0088 grants
+        // SELECT, INSERT to debateai_runtime); no privilege is added.
+        { component: "apps/api:billing-withdraw-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_WITHDRAW_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:withdraw" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },

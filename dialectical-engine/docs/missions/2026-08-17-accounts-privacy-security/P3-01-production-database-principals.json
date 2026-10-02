@@ -417,6 +417,14 @@
           "purpose": "BILLING_DISPUTE_OPERATOR_COMMAND",
           "binding": "WIRED",
           "condition": "package script billing:dispute"
+        },
+        {
+          "component": "apps/api:billing-withdraw-cli",
+          "sourceFile": "apps/api/src/billing/withdraw-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_WITHDRAW_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:withdraw"
         }
       ]
     },
