@@ -855,6 +855,7 @@ export {
   loadServeDisclosureReportEnvironment,
   loadSettlementEnvironment,
   parseApiEnvironment,
+  parseStaffAccessEnvironment,
   parseKeyRotationEnvironment,
   parseLivenessEnvironment,
   parseMigrationEnvironment,
@@ -974,9 +975,15 @@ export {
 export {
   PRODUCT_ROLE_IDS,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
+  PRODUCT_ROLE_POLICY_V2_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_ROW_KEY,
   productRolePolicyFromRegisterRows,
   readProductRolePolicy,
+  readVersionedProductRolePolicy,
+  versionedProductRolePolicyFromRegisterRows,
+  type VersionedProductRolePolicy,
+  type ProductRolePolicyV2,
+  type ProductRoleV2,
   type ProductRole,
   type ProductRoleId,
   type ProductRolePolicy,
@@ -1024,3 +1031,11 @@ export {
   type SupportConfigurationState,
   type SupportConfigurationValues
 } from "./support-config.js";
+
+export {
+  STAFF_ACCESS_POLICY_ROW_KEY, STAFF_ACCESS_POLICY_REGISTER_ROW,
+  INTERNAL_ALLOWANCE_POLICY_ROW_KEY, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW,
+  staffAccessPolicyFromValue, internalAllowancePolicyFromValue,
+  readStaffAccessPolicy, readInternalAllowancePolicy,
+  composeStaffPolicyRegisterPublicationRows
+} from "./staff-access-policy.js";

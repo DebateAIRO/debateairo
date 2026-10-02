@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path";
+import type { StaffAccessEnvironment } from "@debateai/kernel";
 import { z } from "zod";
 import {
   parseRegisterVersionText,
@@ -547,7 +549,8 @@ function validateApiEnvironment(
 export function parseApiEnvironment(
   source: Readonly<Record<string, string | undefined>>
 ) {
-  return validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
+  const staffAccess = parseStaffAccessEnvironment(source);
+  return { ...validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source)), STAFF_ACCESS: staffAccess };
 }
 
 /**
@@ -598,7 +601,7 @@ export function loadKeyRotationEnvironment() {
 }
 
 export function loadApiEnvironment() {
-  return validateApiEnvironment(parseEnvironment(apiEnvironmentShape));
+  return parseApiEnvironment(process.env);
 }
 
 export function loadRunnerEnvironment() {
@@ -745,3 +748,28 @@ export const API_ENVIRONMENT_KEYS = environmentKeyInventory(apiEnvironmentShape)
 export const RUNNER_ENVIRONMENT_KEYS = environmentKeyInventory(runnerEnvironmentShape);
 export const OBSERVATION_AGENT_ENVIRONMENT_KEYS =
   environmentKeyInventory(observationAgentEnvironmentShape);
+
+/** Configuration shape only: custody, implementation and independent alert readiness are later activation gates. */
+export function parseStaffAccessEnvironment(source: EnvironmentSource): StaffAccessEnvironment {
+  const version = source.STAFF_ACCESS_POLICY_VERSION;
+  if (version === undefined || version === "1") return Object.freeze({ policyVersion: 1 });
+  if (version !== "2") throw new TypeError("STAFF_ACCESS_POLICY_VERSION_INVALID");
+  const publicUrl = source.PUBLIC_APP_URL;
+  const origin = source.STAFF_WEBAUTHN_ORIGIN;
+  const rpId = source.STAFF_WEBAUTHN_RP_ID;
+  const configPath = source.STAFF_INDEPENDENT_ALERT_CONFIG_PATH;
+  if (!publicUrl || !origin || !rpId || !configPath) throw new TypeError("STAFF_ACCESS_CONFIGURATION_REQUIRED");
+  let app: URL;
+  let ceremony: URL;
+  try { app = new URL(publicUrl); ceremony = new URL(origin); }
+  catch { throw new TypeError("STAFF_ACCESS_ORIGIN_INVALID"); }
+  if (app.protocol !== "https:" || app.username || app.password || app.pathname !== "/" || app.search || app.hash
+    || ceremony.protocol !== "https:" || origin !== ceremony.origin || origin !== app.origin
+    || rpId !== app.hostname || rpId !== ceremony.hostname) {
+    throw new TypeError("STAFF_ACCESS_ORIGIN_RP_MISMATCH");
+  }
+  if (configPath !== configPath.trim() || !isAbsolute(configPath) || /[\u0000-\u001f\u007f]/u.test(configPath)) {
+    throw new TypeError("STAFF_INDEPENDENT_ALERT_CONFIG_PATH_INVALID");
+  }
+  return Object.freeze({ policyVersion: 2, origin, rpId, independentAlertConfigPath: configPath });
+}

@@ -2,6 +2,7 @@ import { analyzeSupportCredentialText } from "./support-credentials.js";
 
 export * from "./argument-language.js";
 export * from "./date-of-birth.js";
+export type * from "./staff-access.js";
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 

@@ -31,6 +31,7 @@ import {
   computeRegisterSnapshotSha256,
   canonicalDecimal,
   canonicalRegisterJson,
+  composeStaffPolicyRegisterPublicationRows,
   createPostgresRegisterPublicationPort,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
@@ -1000,4 +1001,16 @@ export async function seedDevelopmentDeploymentRegister(
   });
   await writeDevelopmentDeploymentRegisterReceipt(resolve(input.repositoryRoot), receipt);
   return receipt;
+}
+
+/** Future-release proposal only; default development seeding and historical bootstrap retain v1. */
+export async function buildDevelopmentStaffV2DeploymentRegisterPublicationRows(
+  bootstrap: BootstrapRegister,
+  providerPanel: DevelopmentProviderPanel,
+  roleRefs: DevelopmentSynthesisRoleRefs = deriveSynthesisRoleRefs(providerPanel.configuredProviders),
+  deployment: "local" | "hosted" = "local"
+): Promise<readonly RegisterPublicationRow[]> {
+  return composeStaffPolicyRegisterPublicationRows(
+    await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, providerPanel, roleRefs, deployment), { policyVersion: 2 }
+  );
 }

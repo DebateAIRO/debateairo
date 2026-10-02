@@ -320,3 +320,102 @@ export async function readProductRolePolicy(
     sourceRef: row.source_ref
   })));
 }
+
+/** V2 is an explicit new-version path; the historical v1 row/parser above are unchanged. */
+const ownerGrantsSchema = z.tuple([
+  z.literal("TEAM_READ"), z.literal("TEAM_INVITE"), z.literal("TEAM_GRANT"),
+  z.literal("TEAM_DISABLE"), z.literal("AUDIT_READ"), z.literal("EMERGENCY_DISABLE")
+]);
+const productRolePolicyV2ValueSchema = productRolePolicyValueSchema.extend({
+  policy_version: z.literal(2),
+  staff_roles: z.tuple([
+    z.object({ id: z.literal("owner"), class: z.literal("LAUNCH"), implementation: z.literal("ACTIVE"),
+      authentication: z.literal("PRIVILEGED_WEBAUTHN"), grants: ownerGrantsSchema }).strict(),
+    z.object({ id: z.literal("delegated_staff"), class: z.literal("LAUNCH"), implementation: z.literal("ACTIVE"),
+      authentication: z.literal("PRIVILEGED_WEBAUTHN"), grants: emptyGrantsSchema }).strict(),
+    z.object({ id: z.literal("business_administrator"), class: z.literal("GROWTH"), implementation: z.literal("RESERVED_UNASSIGNABLE"),
+      authentication: z.literal("UNRATIFIED"), grants: emptyGrantsSchema }).strict(),
+    z.object({ id: z.literal("technical_administrator"), class: z.literal("GROWTH"), implementation: z.literal("RESERVED_UNASSIGNABLE"),
+      authentication: z.literal("UNRATIFIED"), grants: emptyGrantsSchema }).strict(),
+    z.object({ id: z.literal("support_agent"), class: z.literal("GROWTH"), implementation: z.literal("RESERVED_UNASSIGNABLE"),
+      authentication: z.literal("UNRATIFIED"), grants: emptyGrantsSchema }).strict()
+  ])
+}).strict();
+type ProductRolePolicyV2Value = z.infer<typeof productRolePolicyV2ValueSchema>;
+type ProductRoleV2Value = ProductRolePolicyV2Value["roles"][number] | ProductRolePolicyV2Value["staff_roles"][number];
+export type ProductRoleV2 = Readonly<Omit<ProductRoleV2Value, "grants"> & { grants: readonly string[] }>;
+export type ProductRolePolicyV2 = Readonly<Omit<ProductRolePolicy, "policyVersion" | "roles"> & {
+  policyVersion: 2;
+  roles: readonly ProductRoleV2[];
+}>;
+export type VersionedProductRolePolicy = ProductRolePolicy | ProductRolePolicyV2;
+const PRODUCT_ROLE_POLICY_V2_PUBLICATION_VALUE = Object.freeze({
+  ...PRODUCT_ROLE_POLICY_PUBLICATION_ROW.value,
+  policy_version: canonicalDecimal("2"),
+  staff_roles: Object.freeze([
+    Object.freeze({ id: "owner", class: "LAUNCH", implementation: "ACTIVE", authentication: "PRIVILEGED_WEBAUTHN",
+      grants: Object.freeze(["TEAM_READ", "TEAM_INVITE", "TEAM_GRANT", "TEAM_DISABLE", "AUDIT_READ", "EMERGENCY_DISABLE"]) }),
+    Object.freeze({ id: "delegated_staff", class: "LAUNCH", implementation: "ACTIVE", authentication: "PRIVILEGED_WEBAUTHN", grants: Object.freeze([]) }),
+    ...(["business_administrator", "technical_administrator", "support_agent"] as const).map((id) => Object.freeze({
+      id, class: "GROWTH", implementation: "RESERVED_UNASSIGNABLE", authentication: "UNRATIFIED", grants: Object.freeze([])
+    }))
+  ])
+});
+export const PRODUCT_ROLE_POLICY_V2_REGISTER_ROW = Object.freeze({
+  rowKey: PRODUCT_ROLE_POLICY_ROW_KEY,
+  valueAst: PRODUCT_ROLE_POLICY_V2_PUBLICATION_VALUE,
+  value: JSON.parse(canonicalRegisterJson(PRODUCT_ROLE_POLICY_V2_PUBLICATION_VALUE)) as unknown,
+  sourceRef: "2026-10-02-v3-owner-and-team-access.md#authority-model"
+});
+export function versionedProductRolePolicyFromRegisterRows(
+  rows: readonly ProductRolePolicyRegisterRow[], policyVersion: 1 | 2
+): VersionedProductRolePolicy {
+  if (policyVersion === 1) return productRolePolicyFromRegisterRows(rows);
+  if (policyVersion !== 2) throw new TypeError("PRODUCT_ROLE_POLICY_VERSION_INVALID");
+  if (rows.length === 0) throw new TypedDomainError("PRODUCT_ROLE_POLICY_UNRESOLVED", "The sealed product-role policy is absent");
+  if (rows.length !== 1) throw new TypedDomainError("PRODUCT_ROLE_POLICY_DUPLICATE", "The sealed product-role policy is duplicated");
+  const row = rows[0]!;
+  const parsed = productRolePolicyV2ValueSchema.safeParse(row.value);
+  if (row.rowKey !== PRODUCT_ROLE_POLICY_ROW_KEY || !parsed.success) {
+    throw new TypedDomainError("PRODUCT_ROLE_POLICY_INVALID", "The sealed v2 product-role policy is malformed");
+  }
+  if (row.sourceRef.trim() === "") throw new TypedDomainError("PRODUCT_ROLE_POLICY_PROVENANCE_MISSING", "The sealed product-role policy has no source_ref");
+  return Object.freeze({
+    policyVersion: parsed.data.policy_version,
+    assignmentAuthority: parsed.data.assignment_authority,
+    callerSuppliedRole: parsed.data.caller_supplied_role,
+    roles: Object.freeze([...parsed.data.roles, ...parsed.data.staff_roles].map((role) => Object.freeze({
+      ...role, grants: Object.freeze([...role.grants])
+    }))),
+    transitions: Object.freeze(parsed.data.transitions.map((transition) => Object.freeze({
+      fromRole: transition.from_role, toRole: transition.to_role,
+      implementation: transition.implementation, authority: transition.authority
+    }))),
+    sourceRef: row.sourceRef
+  });
+}
+export async function readVersionedProductRolePolicy(
+  pool: Pool, registerVersion: number, policyVersion: 1 | 2
+): Promise<VersionedProductRolePolicy> {
+  if (policyVersion === 1) return readProductRolePolicy(pool, registerVersion);
+  if (policyVersion !== 2 || !Number.isSafeInteger(registerVersion) || registerVersion < 1) {
+    throw new TypeError("PRODUCT_ROLE_POLICY_VERSION_INVALID");
+  }
+  const result = await pool.query<{
+    row_key: string; value_json: unknown; source_ref: string; sealed: boolean; declared_row_count: number; actual_row_count: string;
+  }>(`SELECT row.row_key,row.value_json,row.source_ref,version.sealed,
+      version.row_count AS declared_row_count,
+      (SELECT count(*)::text FROM register.register_row AS counted WHERE counted.register_version=row.register_version) AS actual_row_count
+      FROM register.register_row AS row JOIN register.register_version AS version USING (register_version)
+      WHERE row.register_version=$1 AND row.row_key=$2`, [registerVersion, PRODUCT_ROLE_POLICY_ROW_KEY]);
+  if (result.rows.some((row) => row.sealed !== true)) {
+    throw new TypedDomainError("PRODUCT_ROLE_POLICY_REGISTER_UNSEALED", "The product-role register is unsealed");
+  }
+  if (result.rows.some((row) => !Number.isSafeInteger(row.declared_row_count) || row.declared_row_count < 1
+    || !/^[1-9][0-9]*$/u.test(row.actual_row_count) || BigInt(row.declared_row_count) !== BigInt(row.actual_row_count))) {
+    throw new TypedDomainError("PRODUCT_ROLE_POLICY_REGISTER_COUNT_MISMATCH", "The product-role register count does not match its seal");
+  }
+  return versionedProductRolePolicyFromRegisterRows(result.rows.map((row) => ({
+    rowKey: row.row_key as typeof PRODUCT_ROLE_POLICY_ROW_KEY, value: row.value_json, sourceRef: row.source_ref
+  })), policyVersion);
+}

@@ -1,11 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { contractInventory } from "./index.js";
+import { contractInventory, staffContractInventory } from "./index.js";
 
 const generatedDirectory = fileURLToPath(new URL("../generated", import.meta.url));
 await mkdir(generatedDirectory, { recursive: true });
 const fieldInventory = {
   contractVersion: "v1",
+  staffPolicyVersion: staffContractInventory.policyVersion,
   routes: contractInventory.routes,
   resources: Object.fromEntries(Object.entries(contractInventory.resources).map(([name, schema]) => [
     name,
@@ -26,7 +27,10 @@ await writeFile(
       const separator = route.indexOf(" ");
       const method = route.slice(0, separator).toLowerCase();
       const path = route.slice(separator + 1);
-      return [path, { [method]: { operationId: route.replaceAll(/[^A-Za-z0-9]+/g, "_") } }];
+      return [path, { [method]: {
+        operationId: route.replaceAll(/[^A-Za-z0-9]+/g, "_"),
+        ...(staffContractInventory.routes.includes(route) ? { "x-required-product-role-policy-version": staffContractInventory.policyVersion } : {})
+      } }];
     }))
   }, null, 2)}\n`,
   "utf8"

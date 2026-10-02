@@ -1,3 +1,5 @@
+import { staffContractInventory } from "./staff-access.js";
+export * from "./staff-access.js";
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
@@ -1014,6 +1016,7 @@ export type RunEvent = z.infer<typeof RunEventSchema>;
 
 export const contractInventory = Object.freeze({
   routes: Object.freeze([
+    ...staffContractInventory.routes,
     "POST /v1/auth/age-check",
     "POST /v1/auth/register",
     "POST /v1/auth/verify-email",
@@ -1083,6 +1086,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/billing/usage"
   ]),
   resources: Object.freeze({
+    ...staffContractInventory.resources,
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
     BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
