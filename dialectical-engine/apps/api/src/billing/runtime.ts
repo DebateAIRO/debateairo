@@ -22,6 +22,7 @@ import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoic
 import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillPdfResolver } from "./invoice-smartbill.js";
 import { BillingMaintenance } from "./maintenance.js";
 import { NoticeIntake } from "./notice-intake.js";
+import { catalogueOrderText } from "./order-text-catalogue.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { OwnerJobs } from "./owner-jobs.js";
 import { QuoteService } from "./quote.js";
@@ -165,11 +166,12 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     () => deps.reportPending("BILLING_RENEWAL_PENDING")
   );
   outbox.register("VERIFY_PAYMENT", verify.handle);
-  // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). No `orderText` yet: the task that adds the
-  // catalogue sentences passes its resolver here, as it does to the checkout below.
+  // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). P17 (D6a F29): the invoice line in the buyer's
+  // locale, from the catalogue, as for the checkout below.
   const invoiceDeps = {
     repository, recordsKey: deps.connectors.recordsKey, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
-    audit: deps.audit
+    audit: deps.audit,
+    orderText: catalogueOrderText
   };
   outbox.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
   outbox.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
@@ -186,15 +188,15 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       mail: deps.mail.sender, attachments
     }));
   }
-  // No `orderText` yet: until P17/P18 add the catalogue sentences the checkout signs `englishOrderText`'s line. The
-  // task that adds the sentences passes its resolver here and to P10's invoice deps.
   const checkout = new CheckoutService({
     repository, jobs, acceptances, xmoney: deps.connectors.xmoney,
     accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore), geo: deps.geo, countryPolicy: deps.countryPolicy,
     policy: deps.policy, consentDocuments: (kind, locale) => currentDocument(kind, locale),
     recordsKey: deps.connectors.recordsKey, xmoneyPrivateKey: deps.connectors.xmoneyPrivateKey,
     xmoneyPublicKey: deps.connectors.xmoneyPublicKey, siteId: deps.connectors.siteId,
-    publicAppUrl: deps.connectors.publicAppUrl, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit
+    publicAppUrl: deps.connectors.publicAppUrl, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit,
+    // P17 (D6a F29): the order line in the buyer's locale, from the catalogue (englishOrderText until this task).
+    orderText: catalogueOrderText
   });
   // P13 (A25): the emailed one-time cancel link. P12d's `required` refuses a composition without either input.
   const cancelLinks = new CancelLinkService({

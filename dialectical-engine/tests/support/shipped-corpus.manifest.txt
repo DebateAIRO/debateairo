@@ -34,6 +34,7 @@ apps/api/src/billing/location-verdict.ts
 apps/api/src/billing/maintenance.ts
 apps/api/src/billing/notice-intake.ts
 apps/api/src/billing/operator-connection.ts
+apps/api/src/billing/order-text-catalogue.ts
 apps/api/src/billing/order-text.ts
 apps/api/src/billing/outbox.ts
 apps/api/src/billing/owner-jobs.ts
@@ -74,7 +75,9 @@ apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
 apps/api/src/legacy-claim.ts
 apps/api/src/legal.ts
+apps/api/src/mail-attachments.ts
 apps/api/src/mail-channel.ts
+apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
 apps/api/src/provider-discovery.ts
@@ -713,6 +716,11 @@ packages/kernel/src/support-text-views.ts
 packages/ledger/src/index.ts
 packages/legal-manifest/src/index.ts
 packages/liveness/src/index.ts
+packages/mail-templates/src/index.ts
+packages/mail-templates/src/locales.ts
+packages/mail-templates/src/order-text.ts
+packages/mail-templates/src/render.ts
+packages/mail-templates/src/templates.ts
 packages/memory/src/index.ts
 packages/obs-capture/install/api.ts
 packages/obs-capture/install/evaluator-lib.ts

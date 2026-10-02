@@ -121,7 +121,12 @@ export type BillingAuditEvent =
    */
   | "billing.age_frozen.stopped"
   /** P16c: the quarter's tax summary was queued as email O1 to the owner; the field is the quarter label only. */
-  | "billing.tax_summary.queued";
+  | "billing.tax_summary.queued"
+  /**
+   * P17 (Q-3): M1's accepted-Terms attachment was not attached. The fields are the attachment kind and a code
+   * (MAIL_TERMS_NOT_RECORDED or MAIL_TERMS_NOT_ARCHIVED) only, never a hash, a locale or an address.
+   */
+  | "billing.mail.attachment_missing";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

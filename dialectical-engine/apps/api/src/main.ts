@@ -98,7 +98,8 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
-import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
+import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
+import { billingMailAttachmentResolvers } from "./mail-attachments.js";
 import { EMAIL_CHANGE_LINK_TTL_MS, EMAIL_CHANGE_RESEND_COOLDOWN_MS, EmailChangeService } from "./email-change.js";
 import {
   AccountErasureNotificationReconciler,
@@ -1058,7 +1059,16 @@ const billingRuntime = billingConnectors === null
     }
     return createBillingRuntime({
       pool, connectors: billingConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
-      geo: geoLookup, legal, dekStore, mail: undefined,
+      geo: geoLookup, legal, dekStore,
+      // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
+      mail: {
+        sender: new TemplatedMailSender({
+          executable: environment.MAIL_SENDMAIL_PATH,
+          from: environment.MAIL_FROM,
+          timeoutMs: authPolicy.channel.transportTimeoutMs
+        }),
+        attachments: billingMailAttachmentResolvers({ audit: consoleBillingAudit })
+      },
       // P12d: the owner's model spend, the credit-used share of a withdrawal (the same reader as B6a's room).
       ownerSpend: new PostgresModelSpendStore(pool),
       // P13 (R-35): the sign-up blind-index key (held by boot.hold above) and the identity lookup of the cancel link.

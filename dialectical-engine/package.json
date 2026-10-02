@@ -90,6 +90,7 @@
     "@debateai/ledger": "workspace:*",
     "@debateai/legal-manifest": "workspace:*",
     "@debateai/liveness": "workspace:*",
+    "@debateai/mail-templates": "workspace:*",
     "@debateai/memory": "workspace:*",
     "@debateai/obs-capture": "workspace:*",
     "@debateai/payments-xmoney": "workspace:*",
