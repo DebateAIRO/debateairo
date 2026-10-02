@@ -134,6 +134,13 @@ export function parseXMoneyTransaction(value: unknown): XMoneyTransaction {
 
 type Outcome = "READ" | "WRITE";
 
+/** Drops every trailing "/" in one backward pass (CodeQL js/polynomial-redos: `/\/+$/` is quadratic on many "/"). */
+export function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === 47) end -= 1;
+  return url.slice(0, end);
+}
+
 export class XMoneyClient {
   readonly #baseUrl: string;
   readonly #privateKey: Buffer;
@@ -142,7 +149,7 @@ export class XMoneyClient {
   readonly #timeoutMs: number;
 
   constructor(o: Readonly<{ baseUrl: string; privateKey: Buffer; siteId: string; fetch?: typeof fetch; timeoutMs?: number }>) {
-    this.#baseUrl = o.baseUrl.replace(/\/+$/u, "");
+    this.#baseUrl = trimTrailingSlashes(o.baseUrl);
     this.#privateKey = o.privateKey;
     this.#siteId = o.siteId;
     this.#fetch = o.fetch ?? fetch;
