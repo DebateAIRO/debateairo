@@ -1,0 +1,55 @@
+{
+  "name": "@simplewebauthn/browser",
+  "version": "14.0.0",
+  "exports": "./src/index.ts",
+  "tasks": {
+    "build": {
+      "command": "deno run -A build_npm.ts",
+      "dependencies": [
+        "test"
+      ]
+    },
+    "test": "deno test -A src/",
+    "test:watch": "deno test -A --watch src/",
+    "docs:serve": {
+      "command": "deno run -A jsr:@std/http/file-server --host 127.0.0.1 docs/",
+      "dependencies": [
+        "docs:html"
+      ]
+    },
+    "docs:html": "deno doc --html src/index.ts",
+    "docs:lint": "deno doc --lint src/index.ts",
+    "publish": {
+      "command": "deno task publish:jsr && deno task publish:npm",
+      "dependencies": [
+        "build"
+      ]
+    },
+    "publish:jsr": "deno publish",
+    "publish:npm": "(cd npm; npm publish)"
+  },
+  "fmt": {
+    "singleQuote": true,
+    "lineWidth": 100
+  },
+  "imports": {},
+  "publish": {
+    "include": [
+      "README.md",
+      "LICENSE.md",
+      "./src/**/*.ts"
+    ],
+    "exclude": [
+      "./src/**/*.test.ts",
+      "./src/**/__jest__",
+      "./npm"
+    ]
+  },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "require-await"
+      ]
+    }
+  }
+}

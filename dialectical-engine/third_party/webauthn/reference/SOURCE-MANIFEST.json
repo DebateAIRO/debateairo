@@ -1,0 +1,894 @@
+{
+  "format": "debateai.webauthn-owned-source-intake.v1",
+  "at_utc": "2026-10-02T20:11:41.873397+00:00",
+  "status": "ACQUIRED_REFERENCE_NOT_RUNTIME_ACCEPTED",
+  "purpose": "Owner-approved local source custody/provenance and minimal-closure review before maintained implementation",
+  "sources": [
+    {
+      "name": "simplewebauthn-server",
+      "version": "14.0.2",
+      "repository": "https://github.com/MasterKale/SimpleWebAuthn",
+      "commit": "545d566cfd521b11287d67a03ea9592dc6e3acec",
+      "source_url": "https://codeload.github.com/MasterKale/SimpleWebAuthn/tar.gz/545d566cfd521b11287d67a03ea9592dc6e3acec",
+      "source_final_url": "https://codeload.github.com/MasterKale/SimpleWebAuthn/tar.gz/545d566cfd521b11287d67a03ea9592dc6e3acec",
+      "source_archive": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/simplewebauthn-server-545d566cfd521b11287d67a03ea9592dc6e3acec.tar.gz",
+      "source_archive_sha256": "b158be004c09b8726457ae4a36124162228a73fb4df43b9183ce6568622a141f",
+      "source_bytes": 1059708,
+      "selected_files": 79,
+      "license_files": 2,
+      "declared_license": "MIT",
+      "published_url": "https://registry.npmjs.org/@simplewebauthn/server/-/server-14.0.2.tgz",
+      "published_final_url": "https://registry.npmjs.org/@simplewebauthn/server/-/server-14.0.2.tgz",
+      "published_archive_sha256": "9c3911699eebe8c3309790aa746b6c3c7e2fb3b5626f9f7ba1d5a94da9506ebb",
+      "published_integrity": "sha512-g+m/xv9/8FRWsDY22CwsTYRzt3WwS9fJrR3P7eY3Ti01FXH5FQ36Xn55v6D+5tb6VajlqOj4hywP/Vxsb6a3Sg==",
+      "published_integrity_verified": true,
+      "metadata_file": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/simplewebauthn__server-14.0.2-version.json",
+      "metadata_sha256": "b60850b5a50cc6a1196f2800259cd6cbaab34e31b92d7357b0a413684c92380c"
+    },
+    {
+      "name": "simplewebauthn-browser",
+      "version": "14.0.0",
+      "repository": "https://github.com/MasterKale/SimpleWebAuthn",
+      "commit": "83f87addc67b652ff5b84e681669451648216ef6",
+      "source_url": "https://codeload.github.com/MasterKale/SimpleWebAuthn/tar.gz/83f87addc67b652ff5b84e681669451648216ef6",
+      "source_final_url": "https://codeload.github.com/MasterKale/SimpleWebAuthn/tar.gz/83f87addc67b652ff5b84e681669451648216ef6",
+      "source_archive": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/simplewebauthn-browser-83f87addc67b652ff5b84e681669451648216ef6.tar.gz",
+      "source_archive_sha256": "a40ec1cc2ec47a678d1108252e2ea7a63bbc43f89e3f8907497f4ac7432a7b52",
+      "source_bytes": 1050347,
+      "selected_files": 27,
+      "license_files": 2,
+      "declared_license": "MIT",
+      "published_url": "https://registry.npmjs.org/@simplewebauthn/browser/-/browser-14.0.0.tgz",
+      "published_final_url": "https://registry.npmjs.org/@simplewebauthn/browser/-/browser-14.0.0.tgz",
+      "published_archive_sha256": "4b811631f0a377ca7fd9363e65e5e8b747657108a47cffcf881dcfc1c06cd9c4",
+      "published_integrity": "sha512-1odWVqeEBTl7lJ9zMKLEsmTlnyrDO5iRcTvfMKKk1WThUnp/i8JJdffdj2icP+tty159s4PgwE3BiMoEW9NFow==",
+      "published_integrity_verified": true,
+      "metadata_file": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/simplewebauthn__browser-14.0.0-version.json",
+      "metadata_sha256": "7d1f13d595ca1a8a0b3d34f902f5a0d4ec5f0a5e1d4862ff7b6729fdc0c75186"
+    },
+    {
+      "name": "tiny-cbor",
+      "version": "0.2.11",
+      "repository": "https://github.com/levischuck/tiny-cbor",
+      "commit": "3dfd6c890abf450966fc0349dd2ebb94a30144bb",
+      "source_url": "https://codeload.github.com/levischuck/tiny-cbor/tar.gz/3dfd6c890abf450966fc0349dd2ebb94a30144bb",
+      "source_final_url": "https://codeload.github.com/levischuck/tiny-cbor/tar.gz/3dfd6c890abf450966fc0349dd2ebb94a30144bb",
+      "source_archive": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/tiny-cbor-3dfd6c890abf450966fc0349dd2ebb94a30144bb.tar.gz",
+      "source_archive_sha256": "f1ad007b6cdc3a543110f3ac55812775fd7b32eb9f5dc0c7a9854c2fa60f86f0",
+      "source_bytes": 23143,
+      "selected_files": 11,
+      "license_files": 1,
+      "declared_license": "MIT",
+      "published_url": "https://registry.npmjs.org/@levischuck/tiny-cbor/-/tiny-cbor-0.2.11.tgz",
+      "published_final_url": "https://registry.npmjs.org/@levischuck/tiny-cbor/-/tiny-cbor-0.2.11.tgz",
+      "published_archive_sha256": "03a92256a3fc14f7b5b8203933224d7777c962f6922b2780248fd72aff8369e6",
+      "published_integrity": "sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow==",
+      "published_integrity_verified": true,
+      "metadata_file": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/levischuck__tiny-cbor-0.2.11-version.json",
+      "metadata_sha256": "cd5930cbf37136b5c568de9649798561dfd7ebeff1bb489c2430ad2093f291f6"
+    }
+  ],
+  "files": [
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "LICENSE.md",
+      "local_path": "simplewebauthn-server-14.0.2/LICENSE.md",
+      "sha256": "bd9e3f45696472076c7160c7f66e54b2d62d38bc2646c812d19be83ee4400c63",
+      "bytes": 1071
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "deno.json",
+      "local_path": "simplewebauthn-server-14.0.2/deno.json",
+      "sha256": "31550e5e81cbc1633f0387d8fb5c3c62c1ee59a77c669ae7104ddbbdca0f960a",
+      "bytes": 2430
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/LICENSE.md",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/LICENSE.md",
+      "sha256": "bd9e3f45696472076c7160c7f66e54b2d62d38bc2646c812d19be83ee4400c63",
+      "bytes": 1071
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/README.md",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/README.md",
+      "sha256": "d01b03e782d6625315ae90b4f39fd2ebb6d7c4cfb2dc081da2f0a8108edfd7e3",
+      "bytes": 1849
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/deno.json",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/deno.json",
+      "sha256": "0672d5cda50fcc7c04341bc8240c4c510546a96f77064afae0a96b45e5efde16",
+      "bytes": 1775
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/authentication/generateAuthenticationOptions.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/authentication/generateAuthenticationOptions.ts",
+      "sha256": "8a3010cbada7e592d70dba4c0c98b3991a39d40cbe465c54a38cff02f69d40f6",
+      "bytes": 2605
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/authentication/verifyAuthenticationResponse.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/authentication/verifyAuthenticationResponse.ts",
+      "sha256": "0c04ea06f7d24d5216f283227785ed92db0ed862da2e5f7a708589f43793c95f",
+      "bytes": 13530
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/errors/index.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/errors/index.ts",
+      "sha256": "28233f2bdc6e9b4720ba1b71584f196ec7c6acfcaa2e93775a43375adbc88e4f",
+      "bytes": 1003
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/convertAAGUIDToString.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/convertAAGUIDToString.ts",
+      "sha256": "9264c8add566b9822efa720a07835e7e7537fdc86dcbe22641117461107dae27",
+      "bytes": 589
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/convertCOSEtoPKCS.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/convertCOSEtoPKCS.ts",
+      "sha256": "5361c824d028d7c13449cbd44191a80c2276964e065b5a5bbab78d42d8754964",
+      "bytes": 942
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/convertCertBufferToPEM.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/convertCertBufferToPEM.ts",
+      "sha256": "d958cf7f2d2c231f245da431c83c22a61676f0ed5065609d9a4f3a8fa2915085",
+      "bytes": 1025
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/convertPEMToBytes.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/convertPEMToBytes.ts",
+      "sha256": "2a0ef7f84708a36769b21da907a1f4cc76fb3676349c834941780b1665a6f7b4",
+      "bytes": 436
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/convertX509PublicKeyToCOSE.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/convertX509PublicKeyToCOSE.ts",
+      "sha256": "b5cb93b68c12932d447f825eb37e16b6a61bb3485afd41906bf58f131b659490",
+      "bytes": 4258
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/cose.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/cose.ts",
+      "sha256": "857cd4c79037a2ffbcd56e333bceaa6afcb0650bd4465ffc3a2edc801d02ef04",
+      "bytes": 4808
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/decodeAttestationObject.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/decodeAttestationObject.ts",
+      "sha256": "cf3e06d83e9b7ec274b083c6b1dbb01dd978a00494fb016e92319bc3d31a1b0e",
+      "bytes": 1499
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/decodeAuthenticatorExtensions.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/decodeAuthenticatorExtensions.ts",
+      "sha256": "ee6842f19c1679ff4e15a1b289f1e86ad7f48397b5a5a0ec98b229911f44a39b",
+      "bytes": 1349
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/decodeClientDataJSON.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/decodeClientDataJSON.ts",
+      "sha256": "5d1e27cf0f269a7f7a63269ff8de4a06a52c324d0ea505678908f679e8f6bebd",
+      "bytes": 882
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/decodeCredentialPublicKey.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/decodeCredentialPublicKey.ts",
+      "sha256": "27600ee3424def80b113587261e3d1655a9b81f41c60e97b0ba0862379312f94",
+      "bytes": 561
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/fetch.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/fetch.ts",
+      "sha256": "ba8c9cff80133cd56e32173f0b1471c3e96df2cd270ce3e7d002c1b59e5665d0",
+      "bytes": 410
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/generateChallenge.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/generateChallenge.ts",
+      "sha256": "bccd7a4ec354827bfd85160e320cef5e745d5f33caf377cca8ca90401d23439c",
+      "bytes": 908
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/generateUserID.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/generateUserID.ts",
+      "sha256": "caff6ab4e521e6baf7bf038e6e58c4e2d7deabfbbd81cb1305eeca485963a2b8",
+      "bytes": 758
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/getCertificateInfo.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/getCertificateInfo.ts",
+      "sha256": "0585f18f1bd98f11fbb755efe4ecd10ad6eb27202e10b2d932710be40d5bccb4",
+      "bytes": 2780
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/index.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/index.ts",
+      "sha256": "bac8d1be132fe6064b77c6becd6fe279be677c3f23bd644b60760b18b97e4138",
+      "bytes": 869
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/isCertRevoked.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/isCertRevoked.ts",
+      "sha256": "a73ad481b3d1e828896252b4df86b7cbf9f1d97d92673ceb59764032a6da2387",
+      "bytes": 5668
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/index.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/index.ts",
+      "sha256": "3784b094dbe78301b04a6c1748fd96d1ad1f1e0aa5a9e305178c6dd90f42e9df",
+      "bytes": 535
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoBase64URL.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoBase64URL.ts",
+      "sha256": "6c3a9df2fd6aa9a434eb51725bdee588bca33cd8305a0db5db7d02b8808d56a9",
+      "bytes": 2690
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCBOR.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCBOR.ts",
+      "sha256": "f83771b2b438a00c2f30299761bed7aebd2af5f854c34c6f7d86c94c07dd6ffe",
+      "bytes": 1395
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/digest.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/digest.ts",
+      "sha256": "109b68fc7e8570c0abf3b2e34b7c1437c58255af567a5e2628e9949b22529447",
+      "bytes": 747
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/getRandomValues.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/getRandomValues.ts",
+      "sha256": "4a639c0b84bb7571a0b4ea8a07de59624c99acb8a82427abf5ccd50c5e4271a7",
+      "bytes": 433
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/getWebCrypto.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/getWebCrypto.ts",
+      "sha256": "5e8ad5d87b9d36e2057ef1c5864a07546787a0918d6722eaee79b4c759b1dbac",
+      "bytes": 2645
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/importJWKKey.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/importJWKKey.ts",
+      "sha256": "8597a9b85848d771eebd7262129125845dbb6fb46fc2ebdbe05b220837418521",
+      "bytes": 508
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/index.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/index.ts",
+      "sha256": "26bd992ccb2f1e109b155e233be538bee0d0c2d6b0d89662fcb3cbfe8b0062cb",
+      "bytes": 230
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/mapCoseAlgToWebCryptoHashAlgName.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/mapCoseAlgToWebCryptoHashAlgName.ts",
+      "sha256": "0cf3bb4878944a6426aeff86d5747e14f0f5e4f3848ac3c1df021618cf547753",
+      "bytes": 895
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/mapCoseAlgToWebCryptoKeyAlgName.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/mapCoseAlgToWebCryptoKeyAlgName.ts",
+      "sha256": "10b483447b19e275d07280378297fb88c8b8ddb5c52d3d852efd29d839d35c5c",
+      "bytes": 1388
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/runtimeSupportsWebCryptoKeyAlg.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/runtimeSupportsWebCryptoKeyAlg.ts",
+      "sha256": "8d6ddb4fcf3917244e7751fb2945dbc79bda064ef8acc7fc8118428f25afa940",
+      "bytes": 587
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/structs.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/structs.ts",
+      "sha256": "cfcef60ceada1ea4b077ab0078071f5f9a3b80f1bf033ba79cd9356074eb5ac7",
+      "bytes": 296
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/unwrapEC2Signature.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/unwrapEC2Signature.ts",
+      "sha256": "c50fc9a85c321c43e249c07aa76bc35b5ee8c78d90a796a76e6f59cff4dd8f10",
+      "bytes": 3210
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/verify.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/verify.ts",
+      "sha256": "0a1567c77f8b37d6c617531919cd8fea36ac9149ddebadf09087fe14458c2181",
+      "bytes": 1679
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/verifyAKP.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/verifyAKP.ts",
+      "sha256": "3b525890a12dc5b697e5a22c13575e2ad6c1241529a5a76389950453e6a6ef6f",
+      "bytes": 2072
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/verifyEC2.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/verifyEC2.ts",
+      "sha256": "92ab3c7e74155c4cef457c5c75b465e5dcc83a8cb9dc98a4fb8fea65930ab3af",
+      "bytes": 2590
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/verifyOKP.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/verifyOKP.ts",
+      "sha256": "3031d6ff00c2b321c195c0d0249305de5907fef59b62559112e98a398e924119",
+      "bytes": 1765
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoCrypto/verifyRSA.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoCrypto/verifyRSA.ts",
+      "sha256": "27f5ee60ed6430be30d46d164e39aea2dcd841328577808fe13b06bbeffe73c8",
+      "bytes": 3358
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/iso/isoUint8Array.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/iso/isoUint8Array.ts",
+      "sha256": "f63fdac34c9710d31ed9c1e1e46cca1fb9cee14af795c0df166005adcda08b15",
+      "bytes": 2420
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/logging.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/logging.ts",
+      "sha256": "2961c0836be8739c421a531601cf4cd9444a393f8adbfe9075dc8f24c627756a",
+      "bytes": 1949
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/mapJWSAlgToCOSEAlg.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/mapJWSAlgToCOSEAlg.ts",
+      "sha256": "0a7251e0ba2aca3e71c64257d6c2c6da7e9f813c946ffb9ea171409de4fd837e",
+      "bytes": 736
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/mapX509SignatureAlgToCOSEAlg.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/mapX509SignatureAlgToCOSEAlg.ts",
+      "sha256": "771a958b49837ddedef929aa6e7f61d76e1466b75d7b2023ba728fbebf51cde0",
+      "bytes": 1558
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/matchExpectedRPID.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/matchExpectedRPID.ts",
+      "sha256": "63764e4f684b05a86791e2970e3f5ce300f35dfb94da2d8f5f69d057d6adfe85",
+      "bytes": 1370
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/parseAuthenticatorData.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/parseAuthenticatorData.ts",
+      "sha256": "8aa7daca4d4934e37386f53953e41db8c42024ae95c5e4007bcec38e53149531",
+      "bytes": 5929
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/parseBackupFlags.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/parseBackupFlags.ts",
+      "sha256": "c7492271dd9eb076b98263b451df5610a9e84df7cad8f895d09196eb949f3fe5",
+      "bytes": 1027
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/toHash.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/toHash.ts",
+      "sha256": "b09d9c1f393f1fd66afb2059d16837219842e4ea7603091786320aac264f06ad",
+      "bytes": 566
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/validateCertificatePath.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/validateCertificatePath.ts",
+      "sha256": "211da7fb40c49803d65c8a871ac785900d2f589f03b2766067a993602f8aa0b2",
+      "bytes": 7866
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/validateExtFIDOGenCEAAGUID.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/validateExtFIDOGenCEAAGUID.ts",
+      "sha256": "973dc508e49a3335bb25a4a9d531eb6655f480a4e1773da7967a998c4191d4ba",
+      "bytes": 1787
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/helpers/verifySignature.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/helpers/verifySignature.ts",
+      "sha256": "0203beb8a0c88de2d96f564122390a79a87c7c35d39d96aa7db6d6c2e94b24c1",
+      "bytes": 1583
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/index.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/index.ts",
+      "sha256": "9f6a8b04aa41aba5434f56739300e4c4381cafa7645707d0b862634b0f057c88",
+      "bytes": 461
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/metadata/mdsTypes.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/metadata/mdsTypes.ts",
+      "sha256": "55cf3e9167b0e2fb2c9398ae12227bbd611b0fb0acc4876e1ad1659a363c229a",
+      "bytes": 7879
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/metadata/parseJWT.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/metadata/parseJWT.ts",
+      "sha256": "b449eecd8f4f3c7a258f1475c4105ed949205dbfb173c87f0066e28ecd201865",
+      "bytes": 371
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/metadata/verifyAttestationWithMetadata.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/metadata/verifyAttestationWithMetadata.ts",
+      "sha256": "ecdee32fe0cfd7c781bfa2c2fc05e8e0d0f55af7facfd76dd47b3651ec6ed41c",
+      "bytes": 6888
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/metadata/verifyJWT.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/metadata/verifyJWT.ts",
+      "sha256": "a6fed39ff3f447a2e6980299ab4348d384c80ed5e496683fee83cbe7ab027614",
+      "bytes": 1925
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/metadata/verifyMDSBlob.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/metadata/verifyMDSBlob.ts",
+      "sha256": "8985764376ac02337ad1649c5d8dedac8366cb9270e85809a84f51a53a0f198a",
+      "bytes": 2887
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/generateRegistrationOptions.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/generateRegistrationOptions.ts",
+      "sha256": "e14b6f16640496bccfc1452808f7cc8852fa97a2e997e73d57f719af8728b94a",
+      "bytes": 8115
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/tpm/constants.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/tpm/constants.ts",
+      "sha256": "2bf92aa4c3d83098d3e485f5ba369c18e3a447f7c4cae6ff4a39ac35d6a8f894",
+      "bytes": 5000
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/tpm/isValidTPMManufacturerID.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/tpm/isValidTPMManufacturerID.ts",
+      "sha256": "433d20d9522aca9e1e3b3a834e067a404479a6955ed0b5a5faf3e10ae88a01c0",
+      "bytes": 305
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/tpm/parseCertInfo.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/tpm/parseCertInfo.ts",
+      "sha256": "0bb46a65e83fa83a2d1973039e0fcc8e52a180c9bbecaa1bfa382a7416258a22",
+      "bytes": 2663
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/tpm/parsePubArea.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/tpm/parsePubArea.ts",
+      "sha256": "251182dec8d3ae0187e82544230937e4049019a8dfce823375d21a2495019580",
+      "bytes": 4437
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/tpm/verifyAttestationTPM.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/tpm/verifyAttestationTPM.ts",
+      "sha256": "8183b092ddbc0e0a81379be6d9d181e61dc189960677692bda202f083ef874c5",
+      "bytes": 14516
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/verifyAttestationAndroidKey.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/verifyAttestationAndroidKey.ts",
+      "sha256": "cb70eac462db5fef42c7975a450505b059d40f313c87e7e0e8d45bd800cad4c2",
+      "bytes": 5544
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/verifyAttestationAndroidSafetyNet.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/verifyAttestationAndroidSafetyNet.ts",
+      "sha256": "15d03252a5b87eaeb78026b7fe763e452eb97113b495a6b49902cb5df528f5a5",
+      "bytes": 4999
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/verifyAttestationApple.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/verifyAttestationApple.ts",
+      "sha256": "0123557e211b36e869dd442d1d9866b97138f5cc293236625faef7e23bac960c",
+      "bytes": 2812
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/verifyAttestationFIDOU2F.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/verifyAttestationFIDOU2F.ts",
+      "sha256": "ae088ac53b781855702c51d97f6c8346e9e0b1252adeab7731fa502f48fb80eb",
+      "bytes": 2097
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifications/verifyAttestationPacked.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifications/verifyAttestationPacked.ts",
+      "sha256": "08d5540d35e8acc84d589421161de6d13eaec59eafa99d862ffbafafc0e00ba0",
+      "bytes": 4779
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/registration/verifyRegistrationResponse.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/registration/verifyRegistrationResponse.ts",
+      "sha256": "7dffa2751cc014809eae590b14eb8ed4c63809d5faed752958065a61d3c7ba4f",
+      "bytes": 14462
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/services/defaultRootCerts/android-key.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/services/defaultRootCerts/android-key.ts",
+      "sha256": "a0716f92470ea8ff5e133a48b4065e871594307089eb992de3b275915f42d3f1",
+      "bytes": 9008
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/services/defaultRootCerts/android-safetynet.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/services/defaultRootCerts/android-safetynet.ts",
+      "sha256": "19979981d707f6b1507b87ffc0a5f37dfabcdd10cdb239f0a10c2afbf862099e",
+      "bytes": 1543
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/services/defaultRootCerts/apple.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/services/defaultRootCerts/apple.ts",
+      "sha256": "da104fff89ac80b264078ae2c669f28bf122ac68d2a108f731265e2767acabbe",
+      "bytes": 1111
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/services/defaultRootCerts/mds.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/services/defaultRootCerts/mds.ts",
+      "sha256": "d42d75f614120ed822f8e4a56e5eff51a7cb9438f275eb5803892a12a00e4837",
+      "bytes": 3745
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/services/metadataService.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/services/metadataService.ts",
+      "sha256": "0825b7f14eabb8038c89e6418b2cf4b3758a8774fc995564f6c475d74e4f11b0",
+      "bytes": 11651
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/services/settingsService.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/services/settingsService.ts",
+      "sha256": "bdd002797381e897b0ffcdbaf6acae465ba8fd9abee0a7a4c7b9e9894dfc2d73",
+      "bytes": 3906
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/types/dom.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/types/dom.ts",
+      "sha256": "7757d6fb0514599675788eecb16ec0685c20329cfe7c8a0ed0a1b296317a421c",
+      "bytes": 26134
+    },
+    {
+      "source": "simplewebauthn-server",
+      "origin_path": "packages/server/src/types/index.ts",
+      "local_path": "simplewebauthn-server-14.0.2/packages/server/src/types/index.ts",
+      "sha256": "94381c1d3a79161be08e2713c7e0c333884afe9839b577a229ea9331c42a36b0",
+      "bytes": 17635
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "LICENSE.md",
+      "local_path": "simplewebauthn-browser-14.0.0/LICENSE.md",
+      "sha256": "bd9e3f45696472076c7160c7f66e54b2d62d38bc2646c812d19be83ee4400c63",
+      "bytes": 1071
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "deno.json",
+      "local_path": "simplewebauthn-browser-14.0.0/deno.json",
+      "sha256": "12d52e1c7a5f13640f029f6723cf9a5f2fd37a4e729b10ffae47cce7e4bf13f5",
+      "bytes": 2390
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/LICENSE.md",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/LICENSE.md",
+      "sha256": "bd9e3f45696472076c7160c7f66e54b2d62d38bc2646c812d19be83ee4400c63",
+      "bytes": 1071
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/README.md",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/README.md",
+      "sha256": "a76575522ddf908154cfbfce03e23a4512e954cb0c4b8a89564ac5f7a70c61c9",
+      "bytes": 2754
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/deno.json",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/deno.json",
+      "sha256": "e2f2bc3afe161c448ad8823d09c82d6670645a5e8e7ba84510af19ff9fc162a2",
+      "bytes": 1146
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/__jest__/generateCustomError.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/__jest__/generateCustomError.ts",
+      "sha256": "9cb906b441b720f74605e71039119133c78bd892971bf0706148d112f5ed7056",
+      "bytes": 471
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/base64URLStringToBuffer.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/base64URLStringToBuffer.ts",
+      "sha256": "a72f3f3e9e8c4c61436548cc7fd21348d4842125f7fb850e09242d384193dbca",
+      "bytes": 1102
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/browserSupportsPasskeys.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/browserSupportsPasskeys.ts",
+      "sha256": "03503c079aa7bb77994dd3312f4629e54f800a111796b9a4374773160a532adf",
+      "bytes": 896
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/browserSupportsWebAuthn.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/browserSupportsWebAuthn.ts",
+      "sha256": "76bcd322cbcca9ef4b15c2508c691cf154507bc56d64fe8bdd08105437340215",
+      "bytes": 492
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/browserSupportsWebAuthnAutofill.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/browserSupportsWebAuthnAutofill.ts",
+      "sha256": "cf63bdd36af19dffbcd5f876a68d87efbce647270d58ff155489f9e6c6e5dc4f",
+      "bytes": 1494
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/bufferToBase64URLString.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/bufferToBase64URLString.ts",
+      "sha256": "9961d252964ab54fb6608896f7744ab4a3b5fe89557fd3088c7150c7db503b5b",
+      "bytes": 577
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/getBrowserCapabilities.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/getBrowserCapabilities.ts",
+      "sha256": "7065494dc2f361aec479c27d3c84f8e78f0479a5457bc7a20385d1ca568cb901",
+      "bytes": 6590
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/identifyAuthenticationError.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/identifyAuthenticationError.ts",
+      "sha256": "486775e31f257c948ef32f535bcf96138fb5ab79ad2078749905bc8a06ab7c57",
+      "bytes": 2461
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/identifyRegistrationError.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/identifyRegistrationError.ts",
+      "sha256": "1c999805ea9a4b1fa482b0f80316af6626fa20ca1eed74da401bf13190aa9e18",
+      "bytes": 5397
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/identifySignalError.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/identifySignalError.ts",
+      "sha256": "126fc14ce8c8ae5346eadc486bca2d5726599b65b0284407ba7798475743d1e2",
+      "bytes": 2875
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/isValidDomain.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/isValidDomain.ts",
+      "sha256": "13574fce576c9b2dfd8ea13359c01906a5b200b9cbf96bd156722e065ba340c7",
+      "bytes": 688
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/platformAuthenticatorIsAvailable.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/platformAuthenticatorIsAvailable.ts",
+      "sha256": "ed95d9133441e678b2e50ea079738f8dafb6c33ae8957d35b028d8e65564ede9",
+      "bytes": 560
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/toAuthenticatorAttachment.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/toAuthenticatorAttachment.ts",
+      "sha256": "e28819adc608fcf29fff20014d74b8ea87da36c5852042dc5ad6069747c3c0b7",
+      "bytes": 523
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/toPublicKeyCredentialDescriptor.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/toPublicKeyCredentialDescriptor.ts",
+      "sha256": "01d8e04bab87206a83da3c1e1548cf6dbba80c78859fec158710a18ed289367d",
+      "bytes": 596
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/webAuthnAbortService.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/webAuthnAbortService.ts",
+      "sha256": "a483747a5b1a1ac80e31264c9de796d3731437cd30d10e43ec72c9ef57d0933b",
+      "bytes": 1754
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/helpers/webAuthnError.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/helpers/webAuthnError.ts",
+      "sha256": "921c9085eed05a0cad613c2f6d694557343a8dda7e8953be84aab760b2ccda23",
+      "bytes": 1530
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/index.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/index.ts",
+      "sha256": "06a13922e99a675041848888b6e048c6ba089b9c7dcc85e0e37d24c51b2ab63d",
+      "bytes": 662
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/methods/sendSignal.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/methods/sendSignal.ts",
+      "sha256": "6300f1a325581608c47f331fab9a6bd795760fc0eefb731ceffe41a9052011f2",
+      "bytes": 4094
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/methods/startAuthentication.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/methods/startAuthentication.ts",
+      "sha256": "8c10331bac21736d329972128f07d256587b0101f235adc5ab9ec01097fe12d9",
+      "bytes": 5636
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/methods/startRegistration.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/methods/startRegistration.ts",
+      "sha256": "2f66eba677518a264514e74467d42e11567fb983071bb6d1bbb274f9d7de9cd0",
+      "bytes": 6363
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/types/dom.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/types/dom.ts",
+      "sha256": "7757d6fb0514599675788eecb16ec0685c20329cfe7c8a0ed0a1b296317a421c",
+      "bytes": 26134
+    },
+    {
+      "source": "simplewebauthn-browser",
+      "origin_path": "packages/browser/src/types/index.ts",
+      "local_path": "simplewebauthn-browser-14.0.0/packages/browser/src/types/index.ts",
+      "sha256": "94381c1d3a79161be08e2713c7e0c333884afe9839b577a229ea9331c42a36b0",
+      "bytes": 17635
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "LICENSE.txt",
+      "local_path": "tiny-cbor-0.2.11/LICENSE.txt",
+      "sha256": "5871de52772b5b8e6a7054616a4b59f3f7a7949adb588af7eddcf825c8db86b8",
+      "bytes": 1061
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "cbor/cbor.ts",
+      "local_path": "tiny-cbor-0.2.11/cbor/cbor.ts",
+      "sha256": "b10fc7cd694887111cbcb9da87f0235cc954ee377b7122af3bbaccd422460e72",
+      "bytes": 14665
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "cbor/cbor_bench.ts",
+      "local_path": "tiny-cbor-0.2.11/cbor/cbor_bench.ts",
+      "sha256": "ddd2215e16127534c7645d761830ae6a547c063d6a4859e7682fed2cd9536ce9",
+      "bytes": 451
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "cbor/cbor_internal.ts",
+      "local_path": "tiny-cbor-0.2.11/cbor/cbor_internal.ts",
+      "sha256": "0cde2b1d2cb08503b6f44c1789736376eac2f5d0ed10db9f73b16caa356c8bd7",
+      "bytes": 3432
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "cbor/cbor_internal_test.ts",
+      "local_path": "tiny-cbor-0.2.11/cbor/cbor_internal_test.ts",
+      "sha256": "ac03d1af38e846ee0ab9a85fc116bcd3dfbf769ae28ba78faca86636a8b0ec0c",
+      "bytes": 5658
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "cbor/cbor_test.ts",
+      "local_path": "tiny-cbor-0.2.11/cbor/cbor_test.ts",
+      "sha256": "e3547362eea9d03d2334328a6bc408a0dfd35ee36ffba37c95e764f9681e6b36",
+      "bytes": 17545
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "cbor/test_data.ts",
+      "local_path": "tiny-cbor-0.2.11/cbor/test_data.ts",
+      "sha256": "b06b5ca3a4018cd1a77575a221136ec681c1a3fd59adafc1373d7c75d0dbefbb",
+      "bytes": 6350
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "deno.json",
+      "local_path": "tiny-cbor-0.2.11/deno.json",
+      "sha256": "6a5c064aca3c02fcc509214079795f3cf1e39047b66700098e7defbad2671fdd",
+      "bytes": 491
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "index.ts",
+      "local_path": "tiny-cbor-0.2.11/index.ts",
+      "sha256": "a45c8abd3874ab05dea33af17b2da88376364d6966fcbf2c5da5520a0a9b9d98",
+      "bytes": 142
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "scripts/npm.ts",
+      "local_path": "tiny-cbor-0.2.11/scripts/npm.ts",
+      "sha256": "599f4fb5d75aa672b976f94f2c88f772a350af9f3a52f9db49e14b74a155adf3",
+      "bytes": 789
+    },
+    {
+      "source": "tiny-cbor",
+      "origin_path": "scripts/version.ts",
+      "local_path": "tiny-cbor-0.2.11/scripts/version.ts",
+      "sha256": "45ea7654e030a67680782ba7e608dea3fa6f8040cdf63f31db12bc94f23a7bf2",
+      "bytes": 309
+    }
+  ],
+  "execution": "No upstream scripts, builds, installs or downloaded code were executed; source is outside compiler includes and is not imported by the app.",
+  "acceptance_limit": "Archive integrity and source custody checks do not constitute a completed security audit. Production adoption requires root review and independent protocol/application tests."
+}
