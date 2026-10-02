@@ -11488,17 +11488,25 @@ describe("S1a · the answer's seats inside dev's money fallback and disclosure",
           fetchImplementation: refusing,
           sleepImplementation: async () => undefined
         });
-        // Fingerprints, never raw prompts: a framed prompt carries a random fence and canary.
+        const onWire = JSON.parse(wire[0] ?? "{}") as { readonly messages?: readonly { readonly role: string; readonly content: string }[] };
+        // Fingerprints, never raw prompts: a framed prompt carries a random fence and canary. The prompt is
+        // compared as it LEFT the gateway (one request, the relay's 502 is the FAILED), as the A18 row does.
         expect({
           key: moment.source.callSiteKey,
+          requests: wire.length,
+          onWire: canonicalPromptFingerprint(onWire.messages ?? []),
           offline: canonicalPromptFingerprint(offline.messages),
           sent: replayed.promptFingerprint,
-          same: replayed.fingerprintMatchesRecorded
+          same: replayed.fingerprintMatchesRecorded,
+          outcome: replayed.outcome
         }).toEqual({
           key: exportedMoment.source.callSiteKey,
+          requests: 1,
+          onWire: exportedMoment.recorded?.promptFingerprint,
           offline: exportedMoment.recorded?.promptFingerprint,
           sent: exportedMoment.recorded?.promptFingerprint,
-          same: true
+          same: true,
+          outcome: "FAILED"
         });
       }
     } finally {
