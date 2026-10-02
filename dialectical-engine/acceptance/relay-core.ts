@@ -11,6 +11,7 @@ import { delimiter, isAbsolute, join, resolve } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { z } from "zod";
 import { THINKING_LEVEL_DEFAULT_ONLY } from "@debateai/kernel";
+import { assertRelayRuntime } from "./relay-deployment-guard.js";
 
 /**
  * FAIR-02 shared CLI-relay core. One OpenAI-compatible HTTP front (P4 gateway
@@ -728,6 +729,9 @@ export async function invokeCli(
   timeoutMs: number,
   options: Readonly<{ thinkingLevel?: string; workspace?: RelayWorkspace }> = {}
 ): Promise<CliCompletion> {
+  // V-9(c) backstop: the one place a CLI is ever started. Whichever entry point
+  // got here, a hosted process never starts one (relay-deployment-guard.ts).
+  assertRelayRuntime(process.env);
   // Fix round 1: the handshake paths call invokeCli without startCliRelayServer,
   // so the adapter's own declarations are checked here too, before anything exists.
   assertAdapterDeclarations(adapter);
@@ -1113,6 +1117,8 @@ function assertAdapterDeclarations(adapter: CliRelayAdapter): void {
 }
 
 export async function startCliRelayServer(options: CliRelayServerOptions): Promise<CliRelayHandle> {
+  // V-9(c) backstop: the one place a relay ever starts listening.
+  assertRelayRuntime(process.env);
   if (!Number.isInteger(options.port) || options.port < 0 || options.port > 65_535) {
     throw new TypeError("CLI_RELAY_PORT_INVALID");
   }

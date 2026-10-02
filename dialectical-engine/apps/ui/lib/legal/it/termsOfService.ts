@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dove offriamo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Offriamo DebateAI alle persone che vivono [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Non lo offriamo altrove. Se vivi al di fuori di tali Paesi potresti riuscire ad accedere al sito, ma il servizio non è rivolto a te, non accettiamo pagamenti da te e le presenti Condizioni e la nostra Informativa sulla privacy non sono adeguate alla legge del tuo Paese. L'Allegato A stabilisce ciò che si applica in ciascuna regione in cui prestiamo il servizio." }
+      { kind: "p", text: "Offriamo DebateAI alle persone che vivono [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Non lo offriamo altrove. Se vivi al di fuori di tali Paesi potresti riuscire ad accedere al sito, ma il servizio non è rivolto a te, non accettiamo pagamenti da te e le presenti Condizioni e la nostra Informativa sulla privacy non sono adeguate alla legge del tuo Paese. L'Allegato A stabilisce ciò che si applica in ciascuna regione in cui prestiamo il servizio." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "d9a583d3b9aee07a3041b3f31f2add7ab6f7dd7e16dcbdfa24927ef0ad9cdfc2",
+  sha256: "91c7a45b68a81af3db284d9e95248dd789dc07105b6ea485d08e110df83aa5a7",
   eyebrow: "CONDIZIONI DI SERVIZIO · v2.0 · IN VIGORE DAL [DATE]",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DebateAIRO S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",

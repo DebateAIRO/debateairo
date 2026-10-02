@@ -2875,7 +2875,7 @@ describe("SUP-01 support routes", () => {
       recoveryComponents:await readFile(join(kbRoot,"recovery/components.json")),
       requireReviewedRecovery:true
     });
-    expect(snapshot.entries).toHaveLength(44);
+    expect(snapshot.entries).toHaveLength(46);
     const complete = vi.fn(async () => Object.freeze({
       text:JSON.stringify({
         kind:"answer",text:"Alege Creează un cont.",

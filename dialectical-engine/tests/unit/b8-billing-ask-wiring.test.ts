@@ -22,7 +22,9 @@ describe("the setup step B8 adds, beside B6b's and B7b's (budget spec §2.9)", (
   it("names it in the operator runbook's RUN_SETUP_FAILED row, after B7b's PLAN_CHANGED", () => {
     const row = runbook.split("\n").find((line) => line.startsWith("| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`"));
     expect(row).toBeDefined();
-    expect(row).toContain("`RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, shown the same way");
+    // The pages show a plain sentence, never the code (apps/ui/lib/v3/runFailure.ts), so the row says
+    // what the asker sees instead of the old "shown the same way" ("Debate generation failed: …").
+    expect(row).toContain("`RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees \"Something went wrong on our side before this debate began…\"");
     expect(row).toContain("`COST_RECORD` means a paid question that did not fit its owner's remaining allowance");
   });
 });

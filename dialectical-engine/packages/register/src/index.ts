@@ -991,6 +991,7 @@ export {
   type SealedCostEnvelopeStatus,
   loadApiEnvironment,
   loadBillingOperatorEnvironment,
+  loadDeploymentModeSource,
   loadDevelopmentCommandEnvironment,
   loadKeyRotationEnvironment,
   loadLivenessEnvironment,

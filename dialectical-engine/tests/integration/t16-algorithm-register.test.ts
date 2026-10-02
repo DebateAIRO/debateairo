@@ -165,8 +165,9 @@ const T16_EXPECTED_ROWS = [
     rulingRef: RULING_FAMILY_MAP,
     value: {
       kind: "PROVIDER_FAMILY_MAP",
-      // deriveProviderFamilies reads the configured provider set, first-appearance
-      // order: the five plan-tier slots, then the two §2.10 slots (agy, pi).
+      // deriveProviderFamilies reads the configured provider set by maker, in first-appearance order:
+      // the five plan-tier slots (6a05a0d0, V 2026-09-12: one premium slot per maker; grok has none),
+      // then the scorecard's two §2.10 slots (agy, pi).
       families: [
         { familyRef: "OpenAI", providerRefs: ["development:codex-cli", "development:codex-premium-cli"] },
         { familyRef: "Anthropic", providerRefs: ["development:claude-cli", "development:claude-premium-cli"] },

@@ -211,7 +211,7 @@ describe("P20 the card change page (A11, A12)", () => {
   });
 
   it("sends a signed-out person to sign in and back to /settings/card, and is not found while billing is off", async () => {
-    await expect(CardChangePage()).rejects.toThrow("NEXT_REDIRECT");
+    await expect(CardChangePage({})).rejects.toThrow("NEXT_REDIRECT");
     expect(readRedirects()).toEqual(["/login?next=%2Fsettings%2Fcard"]);
     // Back from the bank's check signed out: the charge survives the sign-in, so the page polls it instead of
     // offering a second hold.
@@ -223,9 +223,9 @@ describe("P20 the card change page (A11, A12)", () => {
     await expect(CardChangePage({ searchParams: Promise.resolve({ charge: "../x" }) })).rejects.toThrow("NEXT_REDIRECT");
     expect(readRedirects()).toEqual(["/login?next=%2Fsettings%2Fcard"]);
     mocks.session = "t".repeat(43);
-    expect(renderToStaticMarkup(await CardChangePage())).toContain("Update your card");
+    expect(renderToStaticMarkup(await CardChangePage({}))).toContain("Update your card");
     mocks.billingOn = false;
-    await expect(CardChangePage()).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(CardChangePage({})).rejects.toThrow("NEXT_NOT_FOUND");
   });
 
   it("is not found while billing is off even when signed out, and sends an expired session back to sign-in", async () => {
@@ -233,7 +233,7 @@ describe("P20 the card change page (A11, A12)", () => {
     mocks.session = null;
     mocks.billingOn = false;
     resetRedirects();
-    await expect(CardChangePage()).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(CardChangePage({})).rejects.toThrow("NEXT_NOT_FOUND");
     expect(readRedirects()).toEqual([]);
     // A cookie whose session expired or was revoked is no sign-in (spec §2.10); the charge still survives it.
     mocks.billingOn = true;
