@@ -51,7 +51,8 @@ describe("P22 the Billing runbook", () => {
       "they never count as sales", "the quarterly tax summary and its email read only live charges",
       // §14.5 (ruling Q-2): the notice address's two non-200 answers, and the card pages' Payment Request policy.
       "What the notice address answers", "once it has stored the notice", "`429`", "`500`", "payment=()",
-      // §14.5 (P19): the card pages' Payment Request policy is read at request time, never baked into the build.
+      // §14.5 (P19, X0 (e) item 6): today every page sends payment=() from apps/ui/next.config.mjs, and the middleware
+      // sets only the security policy; only X0 (e) item 6's code change would read XMONEY_SDK_ORIGIN on each request.
       "The website's middleware sets this on each request from `XMONEY_SDK_ORIGIN`", "No rebuild is needed",
       // §14.8 (ruling Q-9, D6b P14c): a withdrawal sent by email, carried out by the owner's command.
       "A withdrawal sent by email or on the model form", "pnpm billing:withdraw --owner", "--received", "--refund",
@@ -75,7 +76,10 @@ describe("P22 the Billing runbook", () => {
       "apps/ui/legal/archive/",
       // §14.4 (G5, final review Part 1a I-3): the switches come from their own example, and only once §5's
       // conditions hold; taxAuthorities is copied only to correct the code-owned text (P16a judge, carried).
-      "deploy/vps/register/country-policy.example.json", "only to correct the text"
+      "deploy/vps/register/country-policy.example.json", "only to correct the text",
+      // §14.8 (main.ts billing-runtime stage, the publish's boot check): billing on needs countryPolicy; a dry run does
+      // not catch it, the publish seals the version and refuses it by name.
+      "HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE"
     ]) {
       expect(billing, needle).toContain(needle);
     }

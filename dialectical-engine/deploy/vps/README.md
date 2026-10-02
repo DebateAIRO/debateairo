@@ -936,8 +936,10 @@ their ranges, that range can start debates until the file is replaced.
 **If the API refuses to boot with `GEOIP_COUNTRY_DB_INVALID` after a refresh:**
 
 1. Decide whether to stay down or to bring the site back without the gate; that is the owner's
-   call. Without the gate, until step 4, sign-up is open to every country, Tor included, and the
-   always-blocked countries (`"blocked": true` in `country-policy.example.json`) can start new
+   call. While billing is on, bringing the site back without the gate is not possible: a version
+   without `countryPolicy` is refused (§14.8), so fetch the file again instead (step 2). Without
+   the gate, until step 4, sign-up is open to every country, Tor included, and the always-blocked
+   countries (`"blocked": true` in `country-policy.example.json`) can start new
    debates. To bring it back: in a migrator window remove the `countryPolicy` member from
    `/etc/debateai/register/hosted-register.json`, publish (§11), pin the version it prints in both
    `api.env` and `runner.env`, and restart both units. With no row in force the API does not open
@@ -1877,7 +1879,8 @@ Billing needs no address setting of its own. xMoney's return link (`/checkout/re
 `api.env` already carries for the sign-up emails.
 
 When billing is on, the API refuses to start if any of the ten billing lines in the table is missing. It prints
-`BILLING_CONFIGURATION_INCOMPLETE` with the variable's name. It also refuses with
+`BILLING_CONFIGURATION_INCOMPLETE:` followed by the variable's name. The same code with no name means the published
+register version lacks `countryPolicy` (§14.8). It also refuses with
 `BILLING_REQUIRES_ENVELOPE_MEMBERS` if the published `costEnvelopePolicy` lacks the three budget members:
 `admission_close_basis_points`, `finish_up_to_basis_points` and `waiting_line_per_person`.
 
@@ -1909,7 +1912,8 @@ The hosted register file (§11) has four billing members:
 
 - `billingPlans`: the prices and monthly credits;
 - `billingPolicy`: `enabled`, the retry days and the withdrawal days;
-- `countryPolicy`: each country's two switches (left out, that version has no country gate at all);
+- `countryPolicy`: each country's two switches (left out, that version has no country gate at all, and billing
+  cannot be switched on);
 - `taxAuthorities`: where each tax is paid, for the summary.
 
 The kit's example (`deploy/vps/register/hosted-register.example.json`) carries `billingPlans` and `billingPolicy`
@@ -1957,8 +1961,9 @@ arrives is still found by the daily reconciliation.
 not, nothing changes. If it does, a code change (go-live line 20 and its note, item 6) makes the three card pages
 (`/checkout`, `/checkout/return`, `/settings/card`) send `payment=(self "https://secure.xmoney.com")` on live (the
 value of `XMONEY_SDK_ORIGIN`), and every other page keeps `payment=()`; that change ships like any other release.
-The website's middleware sets this on each request from `XMONEY_SDK_ORIGIN` in `ui.env`, so moving that setting from
-the sandbox to live takes a restart. No rebuild is needed for it, and there is nothing else to configure. Go-live
+The website's middleware sets this on each request from `XMONEY_SDK_ORIGIN` in `ui.env` once that change is in
+(today it sets only the security policy), so moving that setting from the sandbox to live then takes a restart.
+No rebuild is needed for it, and there is nothing else to configure. Go-live
 line 20 checks it.
 
 **The card pages and 3-D Secure pop-ups.** Caddy sends `Cross-Origin-Opener-Policy: same-origin` on every page.
@@ -2057,8 +2062,14 @@ address back, restart, close what is left, and try again.
 The sandbox plans and charges stay in the database, but they never count as sales:
 the quarterly tax summary and its email read only live charges.
 
-Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4. Also check that the published
-`costEnvelopePolicy` has real per-run and daily ceilings. The site's daily ceiling protects the company: it must be
+Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4. The version that switches billing
+on must also carry the `countryPolicy` member, from `deploy/vps/register/country-policy.example.json` with the
+switches the owner ruled under go-live line 28 (go-live lines 27–30 hold by then). A dry run does not catch a missing
+member: it opens no database. The publish then seals the version and refuses it: it prints
+`HOSTED_REGISTER_NOT_BOOT_READY`, and `HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE` on its
+error output. Pin nothing, add the member and publish again (§11). While billing is on, any version without
+`countryPolicy` is refused the same way, so the country gate cannot be removed while billing is on. Also check that
+the published `costEnvelopePolicy` has real per-run and daily ceilings. The site's daily ceiling protects the company: it must be
 at least the expected daily spend of all subscribers. A first estimate is subscribers × day cap × 0.3; better, use
 the figure measured after the first paid debates.
 
@@ -2161,7 +2172,9 @@ the 14 days), ends the plan, queues the refund, and emails the person the confir
 
 First find the person's owner reference. If they wrote through the support chat while signed in, it is the
 `identity_owner_ref` of their case. `pnpm support:inbox` has no production credential on this host yet (§13), so
-match the case by when they wrote:
+match the case by when they wrote. Never guess: run `pnpm billing:withdraw` only when exactly one case matches the
+time the person gives, because the command ends that owner's plan and queues the refund. If two cases are close
+together, ask the person for the exact time they wrote from the chat:
 
 ```sh
 sudo -u postgres psql -d debateai -c "SELECT case_id, identity_owner_ref, created_at, state FROM support.\"case\" WHERE identity_owner_ref IS NOT NULL ORDER BY created_at DESC LIMIT 20"
@@ -2209,7 +2222,7 @@ writes no report line while all is well. Two signals matter:
 | Signal | What it means | What to do |
 |---|---|---|
 | `"event":"billing.renewal.report"`, with `failed`, `taxRefused` and `codes` | One line for a minute's pass that had trouble. `failed` counts the renewals (or the pass's own steps) that failed, and `codes` lists their distinct codes, for example `TAX_SERVICE_UNAVAILABLE` while the tax service is down, which the 3 days above cover (an xMoney outage at the rebill is not counted here: it writes `"event":"billing.renewal.unknown"` instead). `taxRefused` counts renewals the tax service refused to price (a wrong or revoked Quaderno key, or a request it rejects): those are not an outage, so nobody is charged, no retry email goes out, and each such renewal also writes `"event":"billing.renewal.tax_refused"` once per period with Quaderno's code. | `failed` during a known outage: nothing. The same code minute after minute with no outage: read the API's other lines from the same minutes, and report the code. Any `taxRefused`: check the Quaderno key file and the Quaderno account at once; fix the key, restart `debateai-api`, and the next pass prices those renewals again. |
-| `[BILLING_RENEWAL_PENDING]` (a bare marker) | A whole minute's pass, or the billing upkeep it runs every 10 minutes, stopped with an error before it finished, most often because the database did not answer. It carries no diagnostic. The next minute tries again. | One: nothing. Every minute: renewals are not running. Check the database and the API's other lines from the same minutes; once the database answers, the next pass catches up by itself. |
+| `[BILLING_RENEWAL_PENDING]` (a bare marker) | The renewal pass catches each of its three steps and reports their failures in the `billing.renewal.report` line, so in practice this marker means the billing upkeep stopped before it finished, most often because the database did not answer. The upkeep is the period-end sweep, the payment retries and the reminders, which the renewal timer runs at most every 10 minutes. It carries no diagnostic. Its next try is the next upkeep, 10 minutes later. | One: nothing. Again at each upkeep, usually with a `billing.renewal.report` line every minute: the database is failing. Check it and the API's other lines from the same minutes; once the database answers, the next pass catches up by itself. |
 
 **e-Factura.** SmartBill sends each Romanian invoice to ANAF itself, through a setting in your SmartBill account. The
 site does not read the e-Factura status back, so check it in SmartBill or in ANAF's SPV, as your accountant advises.
