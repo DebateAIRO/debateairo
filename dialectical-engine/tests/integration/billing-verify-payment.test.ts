@@ -476,7 +476,7 @@ describe("P9b VERIFY_PAYMENT", () => {
       listTransactions: (query: Parameters<typeof h.xmoney.listTransactions>[0]) => h.xmoney.listTransactions(query),
       refund: async (): Promise<void> => { throw new TypedDomainError("XMONEY_REFUSED", "XMONEY_REFUSED:1402"); }
     };
-    const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refusing, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read });
+    const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refusing, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read, xmoneyEnvironment: "stage" });
     await h.repository.withTransaction((client) => desk.request(client, {
       chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: true,
       ownerRef: paid.ownerRef, reason: "WITHDRAWAL"
@@ -499,7 +499,7 @@ describe("P9b VERIFY_PAYMENT", () => {
       listTransactions: (query: Parameters<typeof h.xmoney.listTransactions>[0]) => h.xmoney.listTransactions(query),
       refund: async (): Promise<void> => { throw new TypedDomainError("XMONEY_CREDENTIALS_REFUSED", "XMONEY_CREDENTIALS_REFUSED:401"); }
     };
-    const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refused, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read });
+    const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refused, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read, xmoneyEnvironment: "stage" });
     await h.repository.withTransaction((client) => desk.request(client, {
       chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: true,
       ownerRef: paid.ownerRef, reason: "WITHDRAWAL"
@@ -795,7 +795,9 @@ describe("P9b VERIFY_PAYMENT", () => {
       const verifier = new VerifyPaymentHandler({
         repository, jobs, xmoney: h.xmoney, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
         recordsKey: h.recordsKey, audit: h.audit, xmoneyEnvironment: "stage",
-        refunds: new RefundDesk({ repository, jobs, xmoney: h.xmoney, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read })
+        refunds: new RefundDesk({
+          repository, jobs, xmoney: h.xmoney, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read, xmoneyEnvironment: "stage"
+        })
       });
       verifier.registerSettlement("INITIAL", createInitialSettlement({
         repository, entitlements, acceptances: new AcceptanceRepository(narrow), policy: testBillingPolicy,

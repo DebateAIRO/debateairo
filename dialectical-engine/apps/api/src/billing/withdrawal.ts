@@ -13,7 +13,8 @@ import { initialTaxCountry, withdrawalOpenUntil } from "./subscription-view.js";
 
 /** What a withdrawal needs: the route's composition, or the owner's command (P14c) over its operator pool. */
 export type WithdrawalDeps = Pick<SubscriptionRouteDeps,
-  "billing" | "jobs" | "entitlements" | "plans" | "policy" | "ownerSpend" | "refunds" | "audit" | "clock" | "kick">;
+  | "billing" | "jobs" | "entitlements" | "plans" | "policy" | "ownerSpend" | "refunds" | "audit" | "clock" | "kick"
+  | "xmoneyEnvironment">;
 
 export type WithdrawalRequest = Readonly<{
   ownerRef: string;
@@ -55,11 +56,15 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
   const before = await deps.billing.subscriptionForOwner(ownerRef);
   if (before === null || before.status !== "ACTIVE" || before.currentPeriodStart === null
     || before.currentPeriodEnd === null || before.activatedAt === null
-    || withdrewAt.getTime() < before.currentPeriodStart.getTime()) {
+    || withdrewAt.getTime() < before.currentPeriodStart.getTime()
+    // D5 5h (P2-I4): its payments live in the other xMoney system, where this API cannot refund them.
+    || before.xmoneyEnvironment !== deps.xmoneyEnvironment) {
     refuse(409, "NOT_SUBSCRIBED");
   }
   const taxCountry = await initialTaxCountry(deps.billing, before);
-  if (withdrawalOpenUntil({ state: before, taxCountry, policy: deps.policy, now: withdrewAt }) === null) {
+  if (withdrawalOpenUntil({
+    state: before, taxCountry, policy: deps.policy, now: withdrewAt, xmoneyEnvironment: deps.xmoneyEnvironment
+  }) === null) {
     refuse(409, "WITHDRAWAL_WINDOW_CLOSED");
   }
   const spentMicros = await deps.ownerSpend.readOwnerSpentMicros(ownerRef, before.currentPeriodStart, withdrewAt);

@@ -171,12 +171,15 @@ describe("P6a — BillingConnectors", () => {
     })).toThrow("BILLING_CONFIGURATION_INVALID:XMONEY_PUBLIC_KEY");
   });
 
-  it("refuses to go live while stage subscriptions or charges are still open", () => {
-    expect(() => assertStageRecordsClosed({ subscriptions: 0, charges: 0 })).not.toThrow();
-    expect(() => assertStageRecordsClosed({ subscriptions: 1, charges: 0 }))
-      .toThrow("BILLING_STAGE_RECORDS_OPEN:subscriptions=1:charges=0");
-    expect(() => assertStageRecordsClosed({ subscriptions: 0, charges: 2 }))
-      .toThrow("BILLING_STAGE_RECORDS_OPEN:subscriptions=0:charges=2");
+  it("refuses to go live while stage subscriptions, charges or their outbox jobs are still open", () => {
+    expect(() => assertStageRecordsClosed({ subscriptions: 0, charges: 0, jobs: 0 })).not.toThrow();
+    expect(() => assertStageRecordsClosed({ subscriptions: 1, charges: 0, jobs: 0 }))
+      .toThrow("BILLING_STAGE_RECORDS_OPEN:subscriptions=1:charges=0:jobs=0");
+    expect(() => assertStageRecordsClosed({ subscriptions: 0, charges: 2, jobs: 0 }))
+      .toThrow("BILLING_STAGE_RECORDS_OPEN:subscriptions=0:charges=2:jobs=0");
+    // P2-I4: a sandbox refund or invoice job still queued would otherwise run against the live services.
+    expect(() => assertStageRecordsClosed({ subscriptions: 0, charges: 0, jobs: 3 }))
+      .toThrow("BILLING_STAGE_RECORDS_OPEN:subscriptions=0:charges=0:jobs=3");
   });
 
   it("lists the billing custody paths that are configured, for the secret-domain check", () => {

@@ -5,7 +5,8 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { BillingAudit } from "./audit.js";
 import { enqueueEmail, type AttachmentResolver } from "./email-job.js";
 import {
-  creditNoteContext, invoicesOfCharge, loadPaidCharge, saleRecordOf, type InvoiceJobDeps, type PaidCharge
+  creditNoteContext, invoicesOfCharge, loadPaidCharge, otherSystemOutcome, saleRecordOf, type InvoiceJobDeps,
+  type PaidCharge
 } from "./invoice-common.js";
 import { DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 
@@ -117,6 +118,8 @@ async function issueOnce(
 
 export function createSmartBillInvoiceHandler(deps: SmartBillDeps): OutboxHandler {
   return async (job, now) => {
+    const other = await otherSystemOutcome(deps, job, job.ref);
+    if (other !== null) return other;
     const paid = await loadPaidCharge(deps, job.ref);
     if (paid === null) return dead("INVOICE_CHARGE_NOT_PAID");
     if ((await invoicesOfCharge(deps.repository, paid)).some((invoice) => invoice.kind === "INVOICE")) return DONE;

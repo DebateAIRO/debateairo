@@ -112,6 +112,29 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     await api.close();
   });
 
+  it("lets a plan of the other xMoney system be cancelled, but never revoked or offered a withdrawal (P2-I4)", async () => {
+    const identity = testHttpIdentity("p2i4-other-system");
+    const audit = recordingAudit();
+    // The fixture's connectors talk to stage; this plan was created in live (or the other way round after §14.8).
+    const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { audit }), identity);
+    const headers = { "x-test-session": identity.rawSessionToken };
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: identity.authenticated.ownerRef, planId: "PRO",
+      activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE", xmoneyEnvironment: "live"
+    });
+    const read = await api.inject({ method: "GET", url: "/v1/billing/subscription", headers });
+    expect(read.json().subscription).toMatchObject({ status: "ACTIVE", withdrawal_open_until: null, withdrawal_last_day: null });
+    expect((await api.inject({ method: "POST", url: "/v1/billing/subscription/cancel", headers })).statusCode).toBe(204);
+    const revoke = await api.inject({ method: "POST", url: "/v1/billing/subscription/cancel-revoke", headers });
+    expect(revoke.statusCode).toBe(409);
+    expect(revoke.json()).toEqual({ error: "NOT_SUBSCRIBED", message: "NOT_SUBSCRIBED" });
+    const after = await events(seeded.subscriptionId);
+    expect(after.at(-1)?.kind).toBe("CANCEL_REQUESTED");
+    expect(foldSubscription(after).cancelRequested).toBe(true);
+    expect(audit.events.map(({ event }) => event)).toEqual(["billing.cancel"]);
+    await api.close();
+  });
+
   it("refuses cancel and revoke with NOT_SUBSCRIBED when there is nothing to cancel", async () => {
     const identity = testHttpIdentity("p12b-none");
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool), identity);

@@ -38,8 +38,9 @@ afterAll(async () => {
 });
 
 const DAY = 86_400_000;
-const stores = (audit = recordingAudit()) => withdrawStoresFor(operator, {
-  policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => new Date()
+/** The command's stores; the API's xMoney system is stage, `seedActiveSubscription`'s default (P2-I4). */
+const stores = (audit = recordingAudit(), xmoneyEnvironment: "stage" | "live" = "stage") => withdrawStoresFor(operator, {
+  policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => new Date(), xmoneyEnvironment
 });
 const rows = () => new BillingRepository(database.pool);
 
@@ -72,7 +73,7 @@ async function moveRefunds(chargeId: string): Promise<void> {
       getTransaction: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "not read at attempt 1"); },
       listTransactions: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "not listed at attempt 1"); }
     },
-    policy: testBillingPolicy, audit: recordingAudit(), clock: () => new Date()
+    policy: testBillingPolicy, audit: recordingAudit(), clock: () => new Date(), xmoneyEnvironment: "stage"
   });
   const claimed = await rows().claim(["XMONEY_REFUND"], 50, "p14c-test", new Date());
   for (const job of claimed.filter((candidate) => candidate.ref.startsWith(`${chargeId}:`))) {
@@ -89,7 +90,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     const receivedAt = new Date(seeded.periodStart.getTime() + 12 * DAY);
     // Settings could no longer take it (the window has closed since), but it was open when the email arrived.
     const state = foldSubscription(await rows().subscriptionEvents(seeded.subscriptionId));
-    expect(withdrawalOpenUntil({ state, taxCountry: "RO", policy: testBillingPolicy, now })).toBeNull();
+    expect(withdrawalOpenUntil({ state, taxCountry: "RO", policy: testBillingPolicy, now, xmoneyEnvironment: "stage" })).toBeNull();
     const expected = withdrawalRefundMicros({
       paidTotalMicros: seeded.totalMicros, periodStart: seeded.periodStart, periodEnd: seeded.periodEnd,
       now: receivedAt, creditSpentMicros: 0, monthlyCreditMicros: planById(testBillingPlans, "PLUS").monthlyCreditMicros
@@ -118,7 +119,9 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(at.getTime() - 2 * DAY), taxCountry: "RO"
     });
     const audit = recordingAudit();
-    const clocked = withdrawStoresFor(operator, { policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => at });
+    const clocked = withdrawStoresFor(operator, {
+      policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => at, xmoneyEnvironment: "stage"
+    });
     expect(await runWithdrawCommand(clocked, parseWithdrawArguments(["--owner", seeded.ownerRef])))
       .toMatchObject({ kind: "REFUNDING" });
     expect((await rows().subscriptionEvents(seeded.subscriptionId)).at(-1)).toMatchObject({
@@ -186,6 +189,28 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     expect(await m8Of(seeded.subscriptionId)).toEqual([]);
     await moveRefunds(upgrade.chargeId);
     expect((await m8Of(seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "8.00", "param.plan": "PRO" });
+  }, 10_000);
+
+  it("refuses to record or settle the withdrawal of a plan paid in the other xMoney system (P2-I4)", async () => {
+    const now = new Date();
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 2 * DAY), taxCountry: "RO",
+      xmoneyEnvironment: "live"
+    });
+    await dashboardRefund(seeded, new Date(now.getTime() - DAY));
+    // The command on a host pointed at stage: the live plan is not its to end.
+    await expect(recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt: new Date(now.getTime() - 60_000) }))
+      .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+    expect((await rows().subscriptionEvents(seeded.subscriptionId)).map((event) => event.kind)).not.toContain("WITHDRAWN");
+    // Handed to the owner in its own system (live), then settled from a host pointed at stage: refused, nothing written.
+    expect(await recordOwnerWithdrawal(stores(recordingAudit(), "live"), {
+      ownerRef: seeded.ownerRef, receivedAt: new Date(now.getTime() - 60_000)
+    })).toEqual({ kind: "OWNER_REVIEW" });
+    await expect(runWithdrawCommand(stores(), parseWithdrawArguments(["--owner", seeded.ownerRef, "--refund", "1.00", "--dashboard", "2.00"])))
+      .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+    expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([]);
+    expect(await rows().withdrawalOwnerSettlement(seeded.subscriptionId)).toBeNull();
+    expect(await m8Of(seeded.subscriptionId)).toEqual([]);
   }, 10_000);
 
   it("settles a refund made wholly in the dashboard: M8 at once for that amount, and a second settlement is refused", async () => {

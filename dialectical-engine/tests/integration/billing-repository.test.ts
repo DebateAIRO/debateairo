@@ -384,7 +384,7 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     expect(liveDue.every((state) => state.xmoneyEnvironment === "live")).toBe(true);
     expect((await billing.dueRenewals(now, 0, 10_000, { environment: "stage" })).map((state) => state.subscriptionId))
       .not.toContain(live);
-    expect(await billing.openRecordCounts("live")).toEqual({ subscriptions: before.subscriptions + 1, charges: before.charges });
+    expect(await billing.openRecordCounts("live")).toEqual({ ...before, subscriptions: before.subscriptions + 1 });
     const charge = await quoteAndCharge(ownerRef, live, "INITIAL", anchor, "live");
     expect((await billing.openRecordCounts("live")).charges).toBe(before.charges + 1);
     await billing.withTransaction((c) => billing.appendChargeEvent(c, {
@@ -392,6 +392,38 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     }));
     await billing.withTransaction((c) => billing.appendSubscriptionEvent(c, subscriptionEvent(live, ownerRef, "CANCEL_REQUESTED")));
     expect(await billing.openRecordCounts("live")).toEqual(before);
+  });
+
+  it("counts the refund, invoice and credit-note jobs still open on each system's charges (P2-I4)", async () => {
+    const ownerRef = randomUUID();
+    const subscription = await activeSubscription(ownerRef, anchor, "live");
+    const charge = await quoteAndCharge(ownerRef, subscription, "INITIAL", anchor, "live");
+    await billing.withTransaction((c) => billing.appendChargeEvent(c, {
+      chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(), xmoneyTransactionId: "61002", amountMicros: 24_200_000, errorCode: null
+    }));
+    await billing.withTransaction((c) => billing.appendSubscriptionEvent(c, subscriptionEvent(subscription, ownerRef, "CANCEL_REQUESTED")));
+    const live = await billing.openRecordCounts("live");
+    const stage = await billing.openRecordCounts("stage");
+    // The plan (a cancel pending) and its paid charge count as closed; what they still queue does not.
+    const [invoice, refund] = await billing.withTransaction(async (c) => [
+      await billing.enqueue(c, { kind: "SMARTBILL_INVOICE", ref: charge.chargeId, notBefore: anchor, payload: { card_country: "RO" } }),
+      await billing.enqueue(c, {
+        kind: "XMONEY_REFUND", ref: `${charge.chargeId}:61002`, notBefore: new Date(anchor.getTime() + 30 * 86_400_000),
+        payload: { charge_id: charge.chargeId, transaction_id: "61002", amount_micros: 5_000_000, whole: false, owner_ref: ownerRef, reason: "WITHDRAWAL" }
+      }),
+      await billing.enqueue(c, {
+        kind: "QUADERNO_RECORD_REFUND", ref: `${charge.chargeId}:61002`, notBefore: anchor,
+        payload: { charge_id: charge.chargeId, transaction_id: "61002", refund_micros: 5_000_000 }
+      }),
+      // A job naming no charge (an owner email) is not this count's.
+      await billing.enqueue(c, { kind: "EMAIL", ref: `O2:${charge.chargeId}`, notBefore: anchor, payload: {} })
+    ]);
+    expect(await billing.openRecordCounts("live")).toEqual({ ...live, jobs: live.jobs + 3 });
+    expect(await billing.openRecordCounts("stage")).toEqual(stage);
+    // A job that is done or dead is closed.
+    await billing.complete(invoice!, new Date());
+    await billing.fail(refund!, "XMONEY_REFUSED", null, new Date());
+    expect((await billing.openRecordCounts("live")).jobs).toBe(live.jobs + 1);
   });
 });
 

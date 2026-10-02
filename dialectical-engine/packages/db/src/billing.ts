@@ -601,10 +601,15 @@ export class BillingRepository {
 
   /**
    * What is still open in one xMoney system: subscriptions not ENDED/WITHDRAWN and not ACTIVE with a cancel pending
-   * (one whose history does not fold counts as open), and charges with no SUCCEEDED/FAILED event whose subscription
-   * is not ENDED/WITHDRAWN. P6a refuses a live boot while anything stage is open.
+   * (one whose history does not fold counts as open), charges with no SUCCEEDED/FAILED event whose subscription
+   * is not ENDED/WITHDRAWN, and (P2-I4) outbox jobs neither done nor dead that name one of its charges: the refund,
+   * credit-note and payment-check jobs by their payload's `charge_id`, the two invoice jobs by their ref. P6a refuses
+   * a live boot while anything stage is open, so no sandbox job queued up to a month ahead (the stage clock) is ever
+   * claimed by the live outbox.
    */
-  async openRecordCounts(environment: CustomerXMoneyEnvironment): Promise<{ subscriptions: number; charges: number }> {
+  async openRecordCounts(
+    environment: CustomerXMoneyEnvironment
+  ): Promise<{ subscriptions: number; charges: number; jobs: number }> {
     const rows = (await this.pool.query<SubscriptionEventRaw>(`
       SELECT ${SUBSCRIPTION_EVENT_COLUMNS} FROM billing.subscription_event AS event
       WHERE event.subscription_id IN (
@@ -627,7 +632,19 @@ export class BillingRepository {
           WHERE final.charge_id = charge.charge_id AND final.kind IN ('SUCCEEDED','FAILED')
         )
     `, [environment])).rows;
-    return { subscriptions, charges: open.filter((row) => !settled.has(row.subscription_id)).length };
+    const jobs = (await this.pool.query<{ open_jobs: string }>(`
+      SELECT count(*) AS open_jobs FROM billing.outbox AS job
+      WHERE job.done_at IS NULL AND job.dead_at IS NULL
+        AND EXISTS (
+          SELECT 1 FROM billing.charge AS charge
+          WHERE charge.xmoney_environment = $1
+            AND (charge.charge_id = job.payload ->> 'charge_id'
+              OR (job.kind IN ('QUADERNO_RECORD_SALE','SMARTBILL_INVOICE') AND charge.charge_id = job.ref))
+        )
+    `, [environment])).rows[0]?.open_jobs ?? "0";
+    return {
+      subscriptions, charges: open.filter((row) => !settled.has(row.subscription_id)).length, jobs: Number(jobs)
+    };
   }
 
   async insertCharge(c: PoolClient, ch: ChargeRow): Promise<void> {

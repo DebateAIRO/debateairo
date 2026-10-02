@@ -69,7 +69,7 @@ beforeAll(async () => {
   smartbill = new RecordingSmartBill();
   const deps = () => ({
     repository: h.repository, jobs: h.jobs, issuer: smartbill.port(), recordsKey: h.recordsKey, policy: testBillingPolicy,
-    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit
+    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const
   });
   h.worker.register("SMARTBILL_INVOICE", async (job, now) => createSmartBillInvoiceHandler(deps())(job, now));
   h.worker.register("SMARTBILL_STORNO", async (job, now) => createSmartBillStornoHandler(deps())(job, now));

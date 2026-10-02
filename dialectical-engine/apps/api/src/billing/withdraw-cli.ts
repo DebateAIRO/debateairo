@@ -22,21 +22,23 @@ import {
   EntitlementRepository,
   type ChargeEventRow,
   type ChargeRow,
+  type CustomerXMoneyEnvironment,
   type Pool
 } from "@debateai/db";
 import {
-  loadBillingOperatorEnvironment,
+  loadBillingWithdrawEnvironment,
   readBillingPlans,
   readBillingPolicy,
   type BillingPlans,
   type BillingPolicy
 } from "@debateai/register";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
+import { xmoneyEnvironmentOf, type XMoneyClient } from "@debateai/payments-xmoney";
 import { consoleBillingAudit, type BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
 import { allocateRefund, paidTransactions, RefundDesk } from "./refunds.js";
 import { BillingRefusal } from "./refusal.js";
+import { refuse } from "./subscription-core.js";
 import { recordWithdrawal, type WithdrawalDeps } from "./withdrawal.js";
 
 export type WithdrawArguments =
@@ -110,9 +112,14 @@ const NO_XMONEY_HERE: Pick<XMoneyClient, "refund" | "getTransaction" | "listTran
   refund: notHere, getTransaction: notHere, listTransactions: notHere
 });
 
-/** The command's stores over its operator pool: the same classes the API composes, so the shipped setup is tested. */
+/**
+ * The command's stores over its operator pool: the same classes the API composes, so the shipped setup is tested.
+ * `xmoneyEnvironment` is the API's xMoney system, from the same EnvironmentFile (D5 5h, P2-I4): a plan of the other
+ * system is refused, since the API's outbox could never refund it.
+ */
 export function withdrawStoresFor(pool: Pool, input: Readonly<{
   policy: BillingPolicy; plans: BillingPlans; audit: BillingAudit; clock: () => Date;
+  xmoneyEnvironment: CustomerXMoneyEnvironment;
 }>): WithdrawStores {
   const billing = new BillingRepository(pool);
   const jobs = new BillingJobQueries(pool);
@@ -120,9 +127,10 @@ export function withdrawStoresFor(pool: Pool, input: Readonly<{
     billing, jobs, entitlements: new EntitlementRepository(pool), plans: input.plans, policy: input.policy,
     ownerSpend: new PostgresModelSpendStore(pool),
     refunds: new RefundDesk({
-      repository: billing, jobs, xmoney: NO_XMONEY_HERE, policy: input.policy, audit: input.audit, clock: input.clock
+      repository: billing, jobs, xmoney: NO_XMONEY_HERE, policy: input.policy, audit: input.audit, clock: input.clock,
+      xmoneyEnvironment: input.xmoneyEnvironment
     }),
-    audit: input.audit, clock: input.clock,
+    audit: input.audit, clock: input.clock, xmoneyEnvironment: input.xmoneyEnvironment,
     // No outbox runs in this process: the API's worker takes the XMONEY_REFUND jobs at its next tick.
     kick: () => undefined
   });
@@ -161,7 +169,10 @@ export async function settleOwnerWithdrawal(
     const waiting = (await stores.billing.withdrawalsAwaitingOwner(input.ownerRef, client))[0];
     if (waiting === undefined) throw new TypeError("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
     const events = await stores.billing.subscriptionEvents(waiting.subscriptionId, client);
-    const activatedAt = foldSubscription(events).activatedAt;
+    const folded = foldSubscription(events);
+    // D5 5h (P2-I4): its payments live in the other xMoney system, where the API's outbox cannot refund them.
+    if (folded.xmoneyEnvironment !== stores.xmoneyEnvironment) refuse(409, "NOT_SUBSCRIBED");
+    const activatedAt = folded.activatedAt;
     const withdrawn = events.find((event) => event.kind === "WITHDRAWN");
     if (activatedAt === null || withdrawn === undefined) throw new TypeError("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
     const charges: Array<ChargeRow & { events: ChargeEventRow[] }> = [];
@@ -271,7 +282,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     stdout: (text) => process.stdout.write(text),
     stderr: (text) => process.stderr.write(text)
   }, async () => {
-    const environment = loadBillingOperatorEnvironment();
+    const environment = loadBillingWithdrawEnvironment();
     const pool = await openBillingOperatorPool(environment.DATABASE_URL, {
       production: environment.NODE_ENV === "production", readOnly: false, max: 2
     });
@@ -279,7 +290,10 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       const policy = await readBillingPolicy(pool, environment.REGISTER_VERSION);
       const plans = await readBillingPlans(pool, environment.REGISTER_VERSION);
       if (policy === null || plans === null) throw new TypeError("BILLING_WITHDRAW_REGISTER_UNRESOLVED");
-      const stores = withdrawStoresFor(pool, { policy, plans, audit: consoleBillingAudit, clock: () => new Date() });
+      const stores = withdrawStoresFor(pool, {
+        policy, plans, audit: consoleBillingAudit, clock: () => new Date(),
+        xmoneyEnvironment: xmoneyEnvironmentOf(environment.XMONEY_API_BASE_URL)
+      });
       return Object.freeze({ run: (input: WithdrawArguments) => runWithdrawCommand(stores, input), close: () => pool.end() });
     } catch (error) {
       await pool.end().catch(() => undefined);

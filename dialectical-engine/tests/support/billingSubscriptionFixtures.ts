@@ -280,7 +280,8 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     checkout: cardCheckoutFor(pool),
     accountEmail: { read: async () => "p12@example.test" },
     refunds: new RefundDesk({
-      repository: billing, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date()
+      repository: billing, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date(),
+      xmoneyEnvironment: "stage"
     }),
     cancelLinks: { request: async () => "SILENT" as const, cancelByToken: async () => "INVALID" as const },
     ...overrides

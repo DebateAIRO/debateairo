@@ -1,7 +1,7 @@
 import { TypedDomainError } from "@debateai/kernel";
 import { microsToDecimal, withdrawalDeadline, type SubscriptionState, type WithdrawalDeadline } from "@debateai/billing-core";
 import type { BillingInvoicesResponse, BillingSubscriptionResponse } from "@debateai/contract";
-import type { BillingRepository } from "@debateai/db";
+import type { BillingRepository, CustomerXMoneyEnvironment } from "@debateai/db";
 import type { BillingPolicy, PlanId } from "@debateai/register";
 import { renewalLeadMs } from "./renewal-rules.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
@@ -27,12 +27,20 @@ export async function initialTaxCountry(
   return (await billing.quote(initial.quoteId, state.ownerRef))?.taxCountry ?? null;
 }
 
-type WindowInput = Readonly<{ state: SubscriptionState; taxCountry: string | null; policy: BillingPolicy; now: Date }>;
+type WindowInput = Readonly<{
+  state: SubscriptionState; taxCountry: string | null; policy: BillingPolicy; now: Date;
+  /** P2-I4 (D5 5h): the connectors' xMoney system; a plan created in the other one is never offered a withdrawal. */
+  xmoneyEnvironment: CustomerXMoneyEnvironment;
+}>;
 
-/** The withdrawal deadline while the right is still open (ACTIVE, a withdrawal country, before it closes); else null. */
+/**
+ * The withdrawal deadline while the right is still open (ACTIVE, a withdrawal country, before it closes, and the plan
+ * paid in this API's xMoney system: its refund could not be sent to the other one); else null.
+ */
 function openWithdrawal(input: WindowInput): WithdrawalDeadline | null {
   const { state, taxCountry, policy, now } = input;
   if (state.status !== "ACTIVE" || state.activatedAt === null || taxCountry === null) return null;
+  if (state.xmoneyEnvironment !== input.xmoneyEnvironment) return null;
   if (!policy.withdrawalCountries.includes(taxCountry)) return null;
   const deadline = withdrawalDeadline({ activatedAt: state.activatedAt, taxCountry, withdrawalDays: policy.withdrawalDays });
   return now.getTime() < deadline.closesAt.getTime() ? deadline : null;
@@ -85,11 +93,14 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
 }
 
 export async function readSubscriptionView(
-  deps: Pick<SubscriptionRouteDeps, "billing" | "policy">, ownerRef: string, now: Date
+  deps: Pick<SubscriptionRouteDeps, "billing" | "policy" | "xmoneyEnvironment">, ownerRef: string, now: Date
 ): Promise<SubscriptionView | null> {
   const state = await deps.billing.subscriptionForOwner(ownerRef);
   if (state === null) return null;
-  return subscriptionView({ state, taxCountry: await initialTaxCountry(deps.billing, state), policy: deps.policy, now });
+  return subscriptionView({
+    state, taxCountry: await initialTaxCountry(deps.billing, state), policy: deps.policy, now,
+    xmoneyEnvironment: deps.xmoneyEnvironment
+  });
 }
 
 export async function listInvoices(

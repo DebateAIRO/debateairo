@@ -19,6 +19,19 @@ export const DONE: OutboxOutcome = Object.freeze({ kind: "DONE" as const });
 
 const DECLARED_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 
+/**
+ * P2-I4 (D5 5h): the two xMoney systems number their transactions separately, and the database keeps the sandbox's
+ * records across README §14.8's same-host switch. A refund, invoice or credit-note job whose charge was paid in the
+ * other system ends here, DEAD before any vendor call, with this one content-free code and one audit line (the kind
+ * and the code). The caller compares `charge.xmoneyEnvironment` with the connectors' system.
+ */
+export function otherXMoneySystem(
+  audit: BillingAudit, kind: OutboxKind
+): Readonly<{ kind: "DEAD"; code: "OTHER_XMONEY_SYSTEM" }> {
+  audit("billing.outbox.other_system", { kind, code: "OTHER_XMONEY_SYSTEM" });
+  return Object.freeze({ kind: "DEAD" as const, code: "OTHER_XMONEY_SYSTEM" as const });
+}
+
 /** `attempts` counts the attempt that just failed (the claim increments it). 1m, 5m, 30m, 2h, 12h, then dead. */
 export function failureRetryAt(attempts: number, now: Date): Date | null {
   const delaysMs = [60_000, 300_000, 1_800_000, 7_200_000, 43_200_000];

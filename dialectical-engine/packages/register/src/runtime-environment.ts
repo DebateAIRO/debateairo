@@ -311,14 +311,31 @@ const legacyRegisterVersion = z.string().regex(/^[1-9][0-9]*$/u).transform((valu
  * on the host under `systemd-run` with the API's EnvironmentFile (deploy/vps/README.md "Billing") and read only
  * the API's own database URL, the register version and the mode; the production floors hold here too.
  */
+const billingOperatorShape = {
+  DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment, REGISTER_VERSION: legacyRegisterVersion
+} as const;
+
 export function parseBillingOperatorEnvironment(source: EnvironmentSource) {
-  return withProductionFloors(parseEnvironmentSource({
-    DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment, REGISTER_VERSION: legacyRegisterVersion
-  }, source));
+  return withProductionFloors(parseEnvironmentSource(billingOperatorShape, source));
 }
 
 export function loadBillingOperatorEnvironment() {
   return parseBillingOperatorEnvironment(process.env);
+}
+
+/**
+ * Paid plans P2-I4 (D5 5h): `pnpm billing:withdraw` also reads `XMONEY_API_BASE_URL` from the API's EnvironmentFile,
+ * the one source of the xMoney system the API's outbox refunds in (A22), so it refuses a plan of the other system.
+ * Required: without it the command cannot tell the systems apart and refuses to start.
+ */
+export function parseBillingWithdrawEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({
+    ...billingOperatorShape, XMONEY_API_BASE_URL: z.string().url()
+  }, source));
+}
+
+export function loadBillingWithdrawEnvironment() {
+  return parseBillingWithdrawEnvironment(process.env);
 }
 
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;

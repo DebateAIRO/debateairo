@@ -8,7 +8,7 @@ import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from ".
 let h: BillingHarness;
 beforeAll(async () => {
   h = await startBillingHarness();
-  const deps = { repository: h.repository, tax: h.tax, recordsKey: h.recordsKey, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit };
+  const deps = { repository: h.repository, tax: h.tax, recordsKey: h.recordsKey, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const };
   h.worker.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler(deps));
   h.worker.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler(deps));
 });

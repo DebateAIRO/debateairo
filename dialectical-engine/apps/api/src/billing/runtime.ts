@@ -116,8 +116,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     batchSize: 20
   });
   const entitlements = new EntitlementRepository(deps.pool);
+  // P2-I4 (D5 5h): a refund of a charge paid in the other xMoney system ends DEAD before any call.
   const refunds = new RefundDesk({
-    repository, jobs, xmoney: deps.connectors.xmoney, policy: deps.policy, audit: deps.audit, clock: deps.clock
+    repository, jobs, xmoney: deps.connectors.xmoney, policy: deps.policy, audit: deps.audit, clock: deps.clock,
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
   });
   outbox.register("XMONEY_REFUND", refunds.handle);
   const verify = new VerifyPaymentHandler({
@@ -168,10 +170,12 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   outbox.register("VERIFY_PAYMENT", verify.handle);
   // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). P17 (D6a F29): the invoice line in the buyer's
   // locale, from the catalogue, as for the checkout below.
+  // P2-I4 (D5 5h): no document is issued for a charge paid in the other xMoney system.
   const invoiceDeps = {
     repository, recordsKey: deps.connectors.recordsKey, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit,
-    orderText: catalogueOrderText
+    orderText: catalogueOrderText,
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
   };
   outbox.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
   outbox.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler({ ...invoiceDeps, tax: deps.connectors.tax }));

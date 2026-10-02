@@ -22,7 +22,7 @@ function state(overrides: Partial<SubscriptionState> = {}): SubscriptionState {
 }
 
 const view = (overrides: Partial<SubscriptionState> = {}, taxCountry: string | null = "RO", now = NOW) =>
-  subscriptionView({ state: state(overrides), taxCountry, policy: testBillingPolicy, now });
+  subscriptionView({ state: state(overrides), taxCountry, policy: testBillingPolicy, now, xmoneyEnvironment: "stage" });
 
 describe("P12b the subscription as the person sees it", () => {
   it("shows the renewal date, the announced total and the open withdrawal window", () => {
@@ -46,7 +46,7 @@ describe("P12b the subscription as the person sees it", () => {
 
   it("closes the withdrawal window at the end of the 14th calendar day, the consumer's time, with no weekend roll (R2 Q-6)", () => {
     const open = (overrides: Partial<SubscriptionState>, taxCountry: string | null, now: Date) =>
-      withdrawalOpenUntil({ state: state(overrides), taxCountry, policy: testBillingPolicy, now });
+      withdrawalOpenUntil({ state: state(overrides), taxCountry, policy: testBillingPolicy, now, xmoneyEnvironment: "stage" });
     // Romania, activated Thursday 1 October 09:00 UTC: the last day is Thursday 15 October.
     expect(open({}, "RO", new Date("2026-10-15T20:59:59.999Z"))).toEqual(new Date("2026-10-15T21:00:00.000Z"));
     expect(open({}, "RO", new Date("2026-10-15T21:00:00.000Z"))).toBeNull();

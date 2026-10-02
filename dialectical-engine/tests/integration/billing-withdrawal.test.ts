@@ -76,7 +76,7 @@ const deskWith = (refund: () => Promise<void>) => new RefundDesk({
     getTransaction: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "not read at attempt 1"); },
     listTransactions: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "not listed at attempt 1"); }
   },
-  policy: testBillingPolicy, audit: recordingAudit(), clock: () => new Date()
+  policy: testBillingPolicy, audit: recordingAudit(), clock: () => new Date(), xmoneyEnvironment: "stage"
 });
 
 describe("P12d withdrawal on real PostgreSQL", () => {

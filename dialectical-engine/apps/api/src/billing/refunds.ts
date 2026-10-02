@@ -1,13 +1,15 @@
 import type { PoolClient } from "pg";
 import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
-import type { BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, OutboxJob } from "@debateai/db";
+import type {
+  BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, CustomerXMoneyEnvironment, OutboxJob
+} from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import type { XMoneyClient, XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPolicy } from "@debateai/register";
 import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js";
 import type { RequestedRefundReason } from "./codes.js";
 import { enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
-import { DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
+import { DONE, failureRetryAt, otherXMoneySystem, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 import { chargeEvent, refundTarget } from "./rows.js";
 import { enqueueCreditNote } from "./settlement.js";
 
@@ -186,6 +188,12 @@ export class RefundDesk {
     policy: BillingPolicy;
     audit: BillingAudit;
     clock: () => Date;
+    /**
+     * P2-I4 (D5 5h): the xMoney system `xmoney` talks to (`connectors.xmoneyEnvironment`). A job whose charge was
+     * paid in the other one (a sandbox refund still queued after README §14.8's switch to live) ends DEAD before any
+     * call, with O2: a sandbox transaction id is never sent to live xMoney.
+     */
+    xmoneyEnvironment: CustomerXMoneyEnvironment;
   }>) {}
 
   /** A4(a), inside the caller's transaction: the intent is on record, and its job queued, before money moves. */
@@ -237,6 +245,9 @@ export class RefundDesk {
   private async moveMoney(job: OutboxJob, intent: RefundIntent, now: Date): Promise<OutboxOutcome> {
     const charge = await this.deps.repository.charge(intent.chargeId);
     if (charge === null) return this.deadLetter(intent, "REFUND_CHARGE_MISSING", now);
+    if (charge.xmoneyEnvironment !== this.deps.xmoneyEnvironment) {
+      return this.deadLetter(intent, otherXMoneySystem(this.deps.audit, job.kind).code, now);
+    }
     if (refundedAlready(charge, intent.transactionId)) return DONE;
     if (job.attempts > 1) {
       // The stage the last CALL left, read once, inside the lease: XMONEY_UNAVAILABLE / XMONEY_CREDENTIALS_REFUSED

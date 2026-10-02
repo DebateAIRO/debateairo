@@ -1,10 +1,12 @@
 import { computeWindows, type RefundRecord, type SaleRecord } from "@debateai/billing-core";
-import type { BillingRepository, ChargeEventRow, ChargeRow, InvoiceRow, OutboxJob, QuoteRow } from "@debateai/db";
+import type {
+  BillingRepository, ChargeEventRow, ChargeRow, CustomerXMoneyEnvironment, InvoiceRow, OutboxJob, QuoteRow
+} from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { BillingPolicy, PlanId } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import { englishOrderText, invoiceDate, planName, type BillingOrderText } from "./order-text.js";
-import { DONE, failureRetryAt, type OutboxOutcome } from "./outbox.js";
+import { DONE, failureRetryAt, otherXMoneySystem, type OutboxOutcome } from "./outbox.js";
 import { openBillingProfile, openQuoteLocation, type BillingProfile, type QuoteLocation } from "./records.js";
 import { refundTarget } from "./rows.js";
 
@@ -18,7 +20,25 @@ export type InvoiceJobDeps = Readonly<{
   publicAppUrl: string;
   /** P8c's order-text port for the invoice line; absent = `englishOrderText` until P17/P18's sentences exist. */
   orderText?: BillingOrderText;
+  /**
+   * P2-I4 (D5 5h): the connectors' xMoney system. The invoicers follow it (P23's rules), so a document is issued only
+   * for a charge paid in this system: a sandbox payment never becomes a live fiscal invoice or OSS record.
+   */
+  xmoneyEnvironment: CustomerXMoneyEnvironment;
 }>;
+
+/**
+ * P2-I4 (D5 5h): the outcome of a job whose charge was paid in the other xMoney system (DEAD, one audit line), read
+ * before anything else the job does; null when the charge is this system's, or missing (the job's own check answers).
+ */
+export async function otherSystemOutcome(
+  deps: Pick<InvoiceJobDeps, "repository" | "xmoneyEnvironment"> & Readonly<{ audit: BillingAudit }>, job: OutboxJob,
+  chargeId: string
+): Promise<OutboxOutcome | null> {
+  const charge = await deps.repository.charge(chargeId);
+  return charge !== null && charge.xmoneyEnvironment !== deps.xmoneyEnvironment
+    ? otherXMoneySystem(deps.audit, job.kind) : null;
+}
 
 export type PaidCharge = Readonly<{
   charge: ChargeRow & { events: ChargeEventRow[] };
@@ -130,6 +150,8 @@ export async function creditNoteContext(
 ): Promise<OutboxOutcome | CreditNoteContext> {
   const refund = refundJobOf(job);
   if (refund === null) return Object.freeze({ kind: "DEAD" as const, code: "CREDIT_NOTE_PAYLOAD_INVALID" });
+  const other = await otherSystemOutcome(deps, job, refund.chargeId);
+  if (other !== null) return other;
   const paid = await loadPaidCharge(deps, refund.chargeId);
   if (paid === null) return Object.freeze({ kind: "DEAD" as const, code: "INVOICE_CHARGE_NOT_PAID" });
   const issued = await invoicesOfCharge(deps.repository, paid);

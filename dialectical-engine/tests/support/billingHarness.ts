@@ -393,7 +393,9 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   const checkoutWith = (overrides: Partial<CheckoutDeps>): CheckoutService =>
     new HarnessCheckout({ ...checkoutDeps, ...overrides } as CheckoutDeps, xmoney);
   const checkout = checkoutWith({});
-  const refunds = new RefundDesk({ repository, jobs, xmoney, policy: testBillingPolicy, audit, clock: clock.read });
+  const refunds = new RefundDesk({
+    repository, jobs, xmoney, policy: testBillingPolicy, audit, clock: clock.read, xmoneyEnvironment: "stage"
+  });
   const verify = new VerifyPaymentHandler({
     repository, jobs, xmoney, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy, recordsKey, audit,
     xmoneyEnvironment: "stage"

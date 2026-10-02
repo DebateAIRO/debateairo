@@ -103,11 +103,17 @@ function refuseTheSecretAsPublic(publicKey: string, privateKey: Buffer): void {
 /**
  * Going from stage to live (P1b `openRecordCounts("stage")`): a live boot is refused while any stage subscription or
  * charge is still open — the live renewal pass never rebills a stage order, so such a subscription would otherwise
- * stay ACTIVE for ever. The runbook's switch-on step cancels or withdraws every sandbox subscription first.
+ * stay ACTIVE for ever — and (P2-I4) while any outbox job of a stage charge is still queued: the live outbox would
+ * claim it and run it against live xMoney, SmartBill or Quaderno (each handler also refuses it, DEAD
+ * OTHER_XMONEY_SYSTEM). The runbook's switch-on step cancels or withdraws every sandbox subscription first.
  */
-export function assertStageRecordsClosed(counts: Readonly<{ subscriptions: number; charges: number }>): void {
-  if (counts.subscriptions > 0 || counts.charges > 0) {
-    throw new TypeError(`BILLING_STAGE_RECORDS_OPEN:subscriptions=${counts.subscriptions}:charges=${counts.charges}`);
+export function assertStageRecordsClosed(
+  counts: Readonly<{ subscriptions: number; charges: number; jobs: number }>
+): void {
+  if (counts.subscriptions > 0 || counts.charges > 0 || counts.jobs > 0) {
+    throw new TypeError(
+      `BILLING_STAGE_RECORDS_OPEN:subscriptions=${counts.subscriptions}:charges=${counts.charges}:jobs=${counts.jobs}`
+    );
   }
 }
 

@@ -5,7 +5,9 @@ import { TypedDomainError } from "@debateai/kernel";
 import { mailLinkOf } from "@debateai/mail-templates";
 import type { BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
-import { creditNoteContext, invoicesOfCharge, loadPaidCharge, saleRecordOf, type InvoiceJobDeps } from "./invoice-common.js";
+import {
+  creditNoteContext, invoicesOfCharge, loadPaidCharge, otherSystemOutcome, saleRecordOf, type InvoiceJobDeps
+} from "./invoice-common.js";
 import { DONE, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 
 type QuadernoDeps = InvoiceJobDeps & Readonly<{ tax: Pick<TaxEngine, "recordSale" | "recordRefund">; audit: BillingAudit }>;
@@ -33,6 +35,8 @@ export function quadernoInvoiceLink(documentUrl: string | null, publicAppUrl: st
 
 export function createQuadernoSaleHandler(deps: QuadernoDeps): OutboxHandler {
   return async (job, now) => {
+    const other = await otherSystemOutcome(deps, job, job.ref);
+    if (other !== null) return other;
     const paid = await loadPaidCharge(deps, job.ref);
     if (paid === null) return dead("INVOICE_CHARGE_NOT_PAID");
     if ((await invoicesOfCharge(deps.repository, paid)).some((invoice) => invoice.kind === "INVOICE")) return DONE;
