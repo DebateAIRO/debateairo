@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import type { LegalDocument } from "../../lib/legalDocument";
+import { withNames } from "../legal/LegalBodies";
 import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
 import { t } from "@/lib/i18n/translate";
 import { useConsentCatalog } from "./useConsentCatalog";
@@ -188,7 +189,7 @@ export function LegalDocumentModal({
                 {section.blocks.map((block, blockIndex) =>
                   block.kind === "p" ? (
                     <p key={blockIndex} className="policyText">
-                      {block.text}
+                      {withNames(block.text)}
                     </p>
                   ) : (
                     <div key={blockIndex} className="policyItems">
@@ -201,7 +202,8 @@ export function LegalDocumentModal({
                               { [ACCENT_PROPERTY]: `var(${section.accent})` } as React.CSSProperties
                             }
                           />
-                          <span className="policyItemText">{item}</span>
+                          {/* Each stored-item name is its own left-to-right run, as on /privacy (REV-S01 p2 PT2-N2). */}
+                          <span className="policyItemText">{withNames(item)}</span>
                         </div>
                       ))}
                     </div>

@@ -8,6 +8,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { CookieConsent } from "../../apps/ui/components/consent/CookieConsent.js";
 import { openSurfaceCount } from "../../apps/ui/components/consent/modalSemantics.js";
+import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type: "json" };
+
+const EN = consentEnglish as Record<string, string>;
+const WHAT_WE_STORE = EN["consent.bar.whatWeStore"]!;
 
 /**
  * The CROSS-SLICE integration suite (`COMMON.md` §10.53): both slices' surfaces in ONE
@@ -85,7 +89,7 @@ const dialogs = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>(
 const card = (): HTMLElement | null => document.querySelector<HTMLElement>(".consentCard");
 const policy = (): HTMLElement | null => document.querySelector<HTMLElement>(".policyBezel");
 const bar = (): HTMLElement | null =>
-  document.querySelector<HTMLElement>('[role="region"][aria-label="Cookie consent"]');
+  document.querySelector<HTMLElement>(`[role="region"][aria-label="${EN["consent.bar.label"]}"]`);
 const privacyBox = (): HTMLInputElement =>
   document.querySelector<HTMLInputElement>('input[name="privacy-accepted"]')!;
 const press = (key: string): void => {
@@ -129,7 +133,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
 
   it("P2 · the Esc STACK: cookie card open + policy from `Privacy notice` -> Esc closes ONLY the policy", async () => {
     await mountBoth();
-    activate(labelled("Choose what to store"));
+    activate(labelled(WHAT_WE_STORE));
     expect(card(), "the cookie preferences card must be open").not.toBeNull();
     activate(labelled("Privacy notice"));
     expect(policy(), "the policy must be open over the card").not.toBeNull();
@@ -147,9 +151,12 @@ describe("cross-slice integration — both consent surfaces in one document", ()
 
   it("P3 · the S01 card asks for READ mode; the sign-up card asks for CONSENT mode", async () => {
     await mountBoth();
-    activate(labelled("Choose what to store"));
+    activate(labelled(WHAT_WE_STORE));
     activate(labelled("Privacy notice"));
-    const readButtons = [...document.querySelectorAll("button")].map((b) => b.textContent?.trim());
+    // Scoped to the policy dialog: the cookie card underneath renders a `Close` of its own
+    // (CT-N1, REV-S01-p1), so a document-wide collection would pass with the policy's missing.
+    expect(policy(), "the read-mode policy is open").not.toBeNull();
+    const readButtons = [...policy()!.querySelectorAll("button")].map((b) => b.textContent?.trim());
     expect(readButtons, "read mode: a Close, and NO `I have read it`").toContain("Close");
     expect(readButtons).not.toContain("I have read it");
     press("Escape");
@@ -158,7 +165,13 @@ describe("cross-slice integration — both consent surfaces in one document", ()
     await act(async () => {
       privacyBox().click();
     });
-    const consentButtons = [...document.querySelectorAll("button")].map((b) =>
+    expect(policy(), "the consent-mode policy is open").not.toBeNull();
+    // The policy's own root is `.policyScrim` (it wraps `.policyBezel`), and the cookie card is closed by now: a bare
+    // `Close` anywhere in the scrim fails, not only inside the dialog (CT2-N1, REV-S01-p2).
+    const scrims = [...document.querySelectorAll<HTMLElement>(".policyScrim")];
+    expect(scrims.length, "exactly one policy scrim: the consent-mode policy's").toBe(1);
+    expect(scrims[0]!.contains(policy()), "the dialog sits inside its scrim").toBe(true);
+    const consentButtons = [...scrims[0]!.querySelectorAll("button")].map((b) =>
       b.textContent?.trim()
     );
     expect(consentButtons, "consent mode: `I have read it` present").toContain("I have read it");
@@ -184,7 +197,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
     await mountBoth();
     expect(openSurfaceCount(), "nothing is open at rest").toBe(0);
 
-    activate(labelled("Choose what to store"));
+    activate(labelled(WHAT_WE_STORE));
     expect(card(), "the cookie preferences card is open").not.toBeNull();
     expect(openSurfaceCount(), "one surface on the stack").toBe(1);
 
@@ -256,7 +269,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
       privacyBox().click(); // the sign-up policy FIRST
     });
     expect(policy(), "the sign-up policy is open").not.toBeNull();
-    activate(labelled("Choose what to store")); // the cookie card SECOND
+    activate(labelled(WHAT_WE_STORE)); // the cookie card SECOND
     expect(card(), "the cookie card is open").not.toBeNull();
     expect(dialogs().length, "two surfaces open").toBe(2);
 
@@ -274,23 +287,16 @@ describe("cross-slice integration — both consent surfaces in one document", ()
    *
    * The reviewer's version recorded the DEFECT's aftermath (the bar back, the policy still
    * trapping focus). This one records the shipped outcome: the surface that closes is the one
-   * the visitor was last in, their unsaved category choices survive underneath, and focus
+   * the visitor was last in, the card underneath is still open with its eight rows, and focus
    * returns to the control that opened the policy — the privacy checkbox in the sign-up card,
    * which is still on the page.
    */
   it("P7 · the closed policy returns focus to its own opener and leaves the card's state alone", async () => {
-    const switches = (): HTMLElement[] => [
-      ...document.querySelectorAll<HTMLElement>('.consentCard [role="switch"]')
-    ];
-    const checked = (): string[] =>
-      switches().map((control) => control.getAttribute("aria-checked") ?? "");
+    const rows = (): number => document.querySelectorAll(".consentCard .consentCatRow").length;
 
     await mountBoth();
-    activate(labelled("Choose what to store"));
-    expect(switches().length, "the card's three category switches are present").toBe(3);
-    const [, quality] = switches() as [HTMLElement, HTMLElement, HTMLElement];
-    act(() => quality.click()); // an UNSAVED choice, which is what the defect discarded
-    const before = checked();
+    activate(labelled(WHAT_WE_STORE));
+    expect(rows(), "the card's eight rows are present").toBe(8);
 
     await act(async () => {
       privacyBox().click();
@@ -300,7 +306,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
     expect(policy(), "the policy closed").toBeNull();
     expect(card(), "the card is still there").not.toBeNull();
     expect(bar(), "the bar has not come back underneath it").toBeNull();
-    expect(checked(), "and the visitor's unsaved category choices are untouched").toEqual(before);
+    expect(rows(), "and the card still shows its eight rows").toBe(8);
     expect(document.activeElement, "focus returns to the control that opened the policy").toBe(
       privacyBox()
     );

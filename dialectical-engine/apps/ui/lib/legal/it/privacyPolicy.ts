@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Impostiamo due cookie, entrambi strettamente necessari: uno mantiene attivo il tuo accesso e l'altro protegge i moduli dalla falsificazione. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'Informativa sui cookie disponibile su [dezbatere.ro/cookies] li elenca con le rispettive durate, spiega come viene memorizzata la tua scelta e sarà modificata prima dell'aggiunta di qualsiasi altro cookie. Laddove la normativa della tua regione disciplini diversamente alcuni cookie — ad esempio la regola di opt-out del Regno Unito per i cookie analitici — l'Informativa sui cookie lo specifica." }
+      { kind: "p", text: "DebateAI utilizza otto elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da DebateAI: quattro cookie e quattro voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'Informativa sui cookie disponibile su [dezbatere.ro/cookies] li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — File cookie (HttpOnly) — Mantiene attivo il tuo accesso. Viene rinnovato mentre usi il servizio. — 14 giorni",
+        "__Host-debateai-csrf — File cookie — Impedisce ad altri siti web di inviare moduli a tuo nome. — 14 giorni",
+        "__Host-debateai-age-refusal — File cookie (HttpOnly) — Dopo una verifica dell’età rifiutata, impedisce a questo browser di riprovare per 30 giorni. Contiene solo la parola «rifiutato», nessun dato personale. — 30 giorni",
+        "debateai.locale — File cookie — Ricorda la lingua dell’interfaccia che hai scelto. — 1 anno",
+        "debateai.consent — Archiviazione locale — Ricorda che hai già visto l’avviso sui cookie, così viene mostrato una sola volta. — Finché non lo cancelli",
+        "debateai.mode — Archiviazione locale — Se usi la visualizzazione chiara o quella scura. — Finché non lo cancelli",
+        "debateai.languageOffer.dismissed — Archiviazione di sessione — Ricorda, per questa scheda, che hai rifiutato la proposta di mostrare un dibattito in un’altra lingua. — Finché non chiudi la scheda",
+        "debateai.support.conversation.v2 — Archiviazione di sessione — Mantiene sullo schermo la tua conversazione con la chat di assistenza finché la scheda resta aperta. Viene cancellata quando qualcuno accede o esce in questa scheda. — Finché non chiudi la scheda"
+        ]
+      },
+      { kind: "p", text: "Nessun'altra parte raccoglie, tramite DebateAI, informazioni sulle tue attività online nel tempo e su siti web diversi." },
+      { kind: "p", text: "I browser possono inviare un segnale «Do Not Track» o un segnale simile. DebateAI non ti traccia, quindi un tale segnale non ha nulla da disattivare: il servizio funziona allo stesso modo con o senza di esso." },
+      { kind: "p", text: "Per rifiutare questi elementi, blocca o elimina i cookie e i dati di questo sito nelle impostazioni del tuo browser. Cosa smette allora di funzionare: l'accesso e la memorizzazione delle tue scelte di lingua e di visualizzazione; anche l'avviso sui cookie verrà mostrato di nuovo." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "684c056ef8514c797386c5d23ddb037c62047fc040a9212f740f5f2142aa80e8",
+  sha256: "1a19eee54c6de1a9651d9d21fb40dfda4344ccc0cfa106bd1c16e5b1f89d6459",
   eyebrow: "INFORMATIVA SULLA PRIVACY · v3.0 · IN VIGORE DAL [DATE]",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",

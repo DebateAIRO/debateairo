@@ -122,21 +122,21 @@ function guideLabel(
 export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object.freeze([
   action({ id: "home", labels: labels("Home", "Acasă"), availability: "public", href: "/" }),
   action({ id: "start-debate", labels: labels("Start a debate", "Pornește o dezbatere"), availability: "public", href: null }),
-  action({ id: "sign-in", labels: labels("Sign in", "Autentificare"), availability: "signed-out", href: "/login" }),
-  action({ id: "sign-up", labels: labels("Create account", "Creează un cont"), availability: "signed-out", href: "/sign-up" }),
-  action({ id: "help", labels: labels("Help desk", "Centrul de ajutor"), availability: "public", href: "/help" }),
-  action({ id: "support-status", labels: labels("Support status", "Starea serviciului de asistență"), availability: "public", href: "/help#service-status" }),
-  action({ id: "method", labels: labels("How it works", "Cum funcționează"), availability: "signed-out", href: "/#method" }),
-  action({ id: "sample-transcript", labels: labels("Sample debate", "Exemplu de dezbatere"), availability: "signed-out", href: "/#transcripts" }),
+  action({ id: "sign-in", labels: labels("Log in", "Autentificați-vă"), availability: "signed-out", href: "/login" }),
+  action({ id: "sign-up", labels: labels("Create account", "Creați un cont"), availability: "signed-out", href: "/sign-up" }),
+  action({ id: "help", labels: labels("Help", "Ajutor"), availability: "public", href: "/help" }),
+  action({ id: "support-status", labels: labels("Service status", "Starea serviciului"), availability: "public", href: "/help#service-status" }),
+  action({ id: "method", labels: labels("Method", "Metodă"), availability: "signed-out", href: "/#method" }),
+  action({ id: "sample-transcript", labels: labels("Transcripts", "Transcrieri"), availability: "signed-out", href: "/#transcripts" }),
   action({ id: "settings", labels: labels("Settings", "Setări"), availability: "signed-in", href: "/settings" }),
   action({ id: "active-sessions", labels: labels("Active sessions", "Sesiuni active"), availability: "signed-in", href: "/settings#active-sessions-heading" }),
-  action({ id: "privacy-preferences", labels: labels("Privacy preferences", "Preferințe de confidențialitate"), availability: "signed-in", href: "/settings#consent-privacy-heading" }),
-  action({ id: "claim-legacy", labels: labels("Claim legacy debates", "Revendică dezbaterile vechi"), availability: "signed-in", href: "/settings#legacy-run-claim-heading" }),
-  action({ id: "delete-account", labels: labels("Delete account", "Șterge contul"), availability: "signed-in", href: "/settings#account-deletion-heading" }),
+  action({ id: "privacy-preferences", labels: labels("Privacy", "Confidențialitate"), availability: "signed-in", href: "/settings#consent-privacy-heading" }),
+  action({ id: "claim-legacy", labels: labels("Claim legacy debates", "Revendicați dezbaterile vechi"), availability: "signed-in", href: "/settings#legacy-run-claim-heading" }),
+  action({ id: "delete-account", labels: labels("Delete account", "Ștergeți contul"), availability: "signed-in", href: "/settings#account-deletion-heading" }),
   action({ id: "public-catalog", labels: labels("Public debates", "Dezbateri publice"), availability: "signed-in", href: "/?tab=public" }),
-  action({ id: "your-debates", labels: labels("Your debates", "Dezbaterile tale"), availability: "signed-in", href: "/?tab=yours" }),
-  action({ id: "owner-debate", labels: labels("Open your debate", "Deschide dezbaterea ta"), availability: "owner", href: null }),
-  action({ id: "public-debate", labels: labels("Open public debate", "Deschide dezbaterea publică"), availability: "public-reference", href: null }),
+  action({ id: "your-debates", labels: labels("Your debates", "Dezbaterile dvs."), availability: "signed-in", href: "/?tab=yours" }),
+  action({ id: "owner-debate", labels: labels("Open your debate", "Deschideți dezbaterea dumneavoastră"), availability: "owner", href: null }),
+  action({ id: "public-debate", labels: labels("Open public debate", "Deschideți dezbaterea publică"), availability: "public-reference", href: null }),
   action({ id: "forgot-password", labels: labels("Forgot password", "Am uitat parola"), availability: "unresolved", href: null }),
 ]);
 
@@ -208,7 +208,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "home-library",
     route: "/",
-    labels: labels("Home and debate library", "Pagina principală și biblioteca de dezbateri"),
+    labels: labels("Home and debate library", "Acasă și biblioteca de dezbateri"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -263,7 +263,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "ai-transparency",
     route: "/ai-transparency",
-    labels: labels("AI transparency", "Transparență AI"),
+    labels: labels("AI transparency", "Transparență privind IA"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -291,7 +291,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-terms",
     route: "/terms",
-    labels: labels("Terms of service", "Termeni și condiții"),
+    labels: labels("Terms of service", "Termenii serviciului"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -302,7 +302,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-terms-versions",
     route: "/terms/versions",
-    labels: labels("Earlier versions of the terms", "Versiunile anterioare ale termenilor"),
+    labels: labels("Terms versions", "Versiunile termenilor"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -324,7 +324,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-health-data",
     route: "/privacy/us-health-data",
-    labels: labels("US consumer health data privacy policy", "Politica privind datele de sănătate ale consumatorilor din SUA"),
+    labels: labels("US health data privacy", "Datele de sănătate (SUA)"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -335,7 +335,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-cookies",
     route: "/cookies",
-    labels: labels("Cookie policy", "Politica privind cookie-urile"),
+    labels: labels("Cookie policy", "Politica privind modulele cookie"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -346,7 +346,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-providers",
     route: "/providers",
-    labels: labels("AI model providers", "Furnizorii de modele AI"),
+    labels: labels("Model providers", "Furnizori de modele"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -357,7 +357,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "sign-in",
     route: "/login",
-    labels: labels("Sign in and saved MFA recovery", "Autentificare și recuperare MFA salvată"),
+    labels: labels("Log in and saved MFA recovery", "Autentificați-vă și recuperare MFA salvată"),
     audience: "anonymous",
     availability: "signed-out",
     disposition: "action",
@@ -368,7 +368,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "sign-up",
     route: "/sign-up",
-    labels: labels("Create an account", "Creează un cont"),
+    labels: labels("Create account", "Creați un cont"),
     audience: "anonymous",
     availability: "signed-out",
     disposition: "action",
@@ -379,7 +379,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "settings",
     route: "/settings",
-    labels: labels("Account settings", "Setările contului"),
+    labels: labels("Settings", "Setări"),
     audience: "member",
     availability: "signed-in",
     disposition: "action",

@@ -7,6 +7,8 @@ import { AuthShell } from "@/components/AuthShell";
 import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmation";
 import { contractClient } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
+import { clearStoredSupportConversation } from "@/components/support/conversation";
+import { announceSessionChange } from "@/components/support/sessionChange";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { safeReturnPath } from "@/lib/returnPath";
 import authEnglish from "@/messages/en/auth.json";
@@ -32,6 +34,11 @@ function emailValidity(value: string, catalog: MessageCatalog): { state: "idle" 
   return shaped
     ? { state: "ok", text: t(catalog, "auth.validAddress") }
     : { state: "bad", text: t(catalog, "auth.invalidEmail") };
+}
+
+/* A 4xx answer is the server refusing the attempt: nobody was signed in. */
+function isRefusal(failure: unknown): boolean {
+  return failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500;
 }
 
 /* After sign-in, before anything else: an account created before the date-of-birth field
@@ -93,6 +100,12 @@ export function LoginFlow({
     setError(null);
     try {
       const result = await client.completeLogin(challengeToken, code);
+      // A new sign-in in this tab: the previous person's help-chat transcript goes now. Its stored value carries no
+      // person id, so this is the moment the tab can tell a person changed (REV-S01 p1 SD-B1; /cookies row 8).
+      clearStoredSupportConversation();
+      // ...and every other tab of this browser drops its copy too (S04-R01). A failure below announces nothing: it is
+      // not a completed sign-in (D-S04-18).
+      announceSessionChange();
       setChallengeToken(null);
       if (result.replacement_recovery_code !== undefined) {
         setRecoveryAcknowledgementPending(true);
@@ -101,6 +114,10 @@ export function LoginFlow({
       }
       void onAuthenticated();
     } catch (failure) {
+      // Only a 4xx is the server refusing the code. Anything else (a 200 whose body the client rejects, a dropped body
+      // read, a 5xx) can follow a server that has already set the session cookie, so the transcript goes here too
+      // (REV-S01 p2 SD-N2).
+      if (!isRefusal(failure)) clearStoredSupportConversation();
       if (failure instanceof ContractHttpError && failure.status === 429) {
         setError(t(catalog, "auth.login.tooManyAttempts"));
       } else if (failure instanceof ContractHttpError && failure.status === 401

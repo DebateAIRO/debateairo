@@ -4,18 +4,18 @@ lang: en
 title: "Use Settings and human Help"
 status: shipped
 sources:
-  - apps/ui/components/TopBar.tsx:82
-  - apps/ui/components/SessionControls.tsx:165
-  - apps/ui/components/consent/ConsentSettingsPanel.tsx:35
-  - apps/ui/components/LegacyRunClaimControls.tsx:43
-  - apps/ui/components/AccountErasureControls.tsx:93
-  - apps/ui/components/support/Assistant.tsx:796
-verified_against: "714c7aa9"
+  - apps/ui/components/TopBar.tsx:98
+  - apps/ui/components/SessionControls.tsx:181
+  - apps/ui/components/consent/ConsentSettingsPanel.tsx:38
+  - apps/ui/components/LegacyRunClaimControls.tsx:53
+  - apps/ui/components/AccountErasureControls.tsx:137
+  - apps/ui/components/support/Assistant.tsx:869
+verified_against: "e089b63e9"
 ratified_by: ""
 ratified_on: ""
 ---
 
-Account or Settings opens the signed-in account settings page. Active sessions lets the visitor review devices, revoke one session, or sign out everywhere. Privacy opens the browser's cookie preferences. Claim legacy debates accepts an old debate access token to attach matching unclaimed debates. Delete account shows the deletion schedule and cancellation controls; deletion begins after seven full days and requires a verified email or recovery-email channel.
+Account or Settings opens the signed-in account settings page. Active sessions lets the visitor review devices, revoke one session, or sign out everywhere. Privacy opens a read-only list of the cookies and browser storage DebateAI keeps. Claim legacy debates accepts an old debate access token to attach matching unclaimed debates. Delete account shows the deletion schedule and cancellation controls; deletion begins after seven full days and requires a verified email or recovery-email channel.
 
 Support can navigate directly to these fixed Settings sections and explain their visible prerequisites. It cannot read the visitor's sessions, token, account, debate list, deletion state, or other private records. It never asks for, receives, repeats, validates, or submits a password, access token, authenticator code, or recovery code, and it cannot revoke sessions, claim debates, or schedule or cancel deletion for the visitor.
 

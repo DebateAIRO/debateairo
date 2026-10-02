@@ -88,6 +88,7 @@ rule.
 | [**0017**](ADR-0017-durable-execution-hatchet.md) | **Durable execution: Hatchet as dispatcher** — self-hosted, Postgres-first, dispatcher only | *not in the planned set* — minted by **DR-118** |
 | [**0018**](ADR-0018-deployment-topology.md) | **Deployment topology: Docker Compose on Hetzner behind Cloudflare, with vLLM as a provider adapter** | *not in the planned set* — minted by **DR-117** |
 | [**0021**](ADR-0021-consent-storage-contract.md) | **The browser-local consent record: one key, one versioned object, re-ask on anything else** | *not in the planned set* — minted by the **`consent-ui`** mission (slice S01) |
+| [**0032**](ADR-0032-cookie-notice-acknowledgement-and-storage-inventory.md) | **The cookie notice records an acknowledgement, not a consent; and every stored name is listed, by test** | *not in the planned set* — minted by the **`cookie-compliance`** mission (slice S01) |
 | [**0022**](ADR-0022-shared-modal-semantics.md) | **One shared modal-semantics module, and the Esc stack** | *not in the planned set* — minted by the **`consent-ui`** mission (slice S02) |
 
 ---

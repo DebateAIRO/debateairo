@@ -75,7 +75,7 @@ test("sign-up exposes only fields backed by the registration contract", () => {
   assert.match(signUp, /name="terms-accepted"[\s\S]*?required/);
   assert.match(signUp, /role="status"/);
   // `terms` left this list when the Terms of Service became a document in the product
-  // (`apps/ui/legal/terms-of-service.md` → `TermsOfServiceModal`); the sign-up card may
+  // (`apps/ui/legal/en/terms-of-service.md` → `TermsOfServiceModal`); the sign-up card may
   // now name it because it can show it.
   assert.doesNotMatch(signUp, /localStorage|sessionStorage|Bearer|Google|Model API|privacy notice/i);
 });
