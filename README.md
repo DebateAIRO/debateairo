@@ -14,3 +14,7 @@ This repository also contains imported applications under `apps/`.
   simplified single-Mac `dezbatere.ro` setup. Start with
   `apps/dialectical-engine/README.md` and
   `apps/dialectical-engine/deploy/local-single-computer-dezbatere.md`.
+
+## License
+
+The code in this repository is released under the Functional Source License, version 1.1, with the Apache 2.0 future license (FSL-1.1-ALv2). In plain words: anyone may read, change, run and self-host it, including for their own internal use, education and research; nobody may offer it as a product or service that competes with the software or with any service we offer using it, under whatever name or domain; and each version becomes Apache 2.0 two years after it is released. The full text is in the LICENSE file at the repository root.
