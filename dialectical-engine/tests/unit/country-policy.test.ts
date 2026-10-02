@@ -20,8 +20,8 @@ const GROUPS = [
   { codes: [...EU27, "NO", "IS"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
   { codes: ["US", "CA", "AU", "NZ", "SG", "JP"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
   { codes: ["LI"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
-  { codes: ["GB", "KR", "CH", "IL", "TW", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
-  { codes: ["UA"], rule: { signup: false, pay: false, reason: "NOT_OFFERED", blocked: false } },
+  { codes: ["KR", "CH", "IL", "TW", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
+  { codes: ["GB", "UA"], rule: { signup: false, pay: false, reason: "NOT_OFFERED", blocked: false } },
   { codes: ["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH"], rule: { signup: false, pay: false, reason: "TERMS_EXCLUDED", blocked: false } },
   { codes: ["RU", "BY", "KP"], rule: { signup: false, pay: false, reason: "SANCTIONS", blocked: true } },
   { codes: ["CN", "HK", "MO", "IR", "CU", "SY", "VE", "VN"], rule: { signup: false, pay: false, reason: "PROVIDER_UNSUPPORTED", blocked: true } }
@@ -105,14 +105,15 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
 
   it("decides sign-up: Tor, unknown, then the IP country's switch", () => {
     expect(decideSignup(policy, { ipCountry: "RO", tor: false })).toEqual({ kind: "ALLOW" });
-    expect(decideSignup(policy, { ipCountry: "GB", tor: false })).toEqual({ kind: "ALLOW" });
-    for (const country of ["UA", "TR", "RU", "ZW"]) {
+    for (const country of ["GB", "UA", "TR", "RU", "ZW"]) {
       expect(decideSignup(policy, { ipCountry: country, tor: false }), country)
         .toEqual({ kind: "REFUSE", code: "COUNTRY_SIGNUP_UNAVAILABLE" });
     }
     expect(decideSignup(policy, { ipCountry: "XX", tor: false })).toEqual({ kind: "REFUSE", code: "COUNTRY_UNKNOWN" });
+    // Owner's amendment of 2 October 2026: the UK ships after launch, not yet — not offered, not blocked.
+    expect(countryRule(policy, "GB")).toEqual({ signup: false, pay: false, reason: "NOT_OFFERED", blocked: false });
     // Owner's amendment of 1 October 2026: the nine countries the Terms do not list are closed as
-    // Terms-excluded, not blocked; the UK and South Korea, which the Terms list, stay open.
+    // Terms-excluded, not blocked; South Korea, which the Terms list, stays open.
     for (const country of ["SA", "IN", "PH"]) {
       expect(decideSignup(policy, { ipCountry: country, tor: false }), country)
         .toEqual({ kind: "REFUSE", code: "COUNTRY_SIGNUP_UNAVAILABLE" });
