@@ -1149,3 +1149,37 @@ describe("A19 fix round 2 · the refusal line admits `*` only as the unknown-fie
       .toBe("HOSTED_REGISTER_PUBLISH_FAILED");
   });
 });
+
+/**
+ * Paid plans S2 (spec §2.6 item 6): a scorecard sealed with billing on follows the owners' plan-cap
+ * rule, checked BEFORE anything is sealed — a sealed register row can never be edited.
+ */
+describe("Paid plans S2 · the plan caps of a scorecard published with billing on", () => {
+  const billingOn = (): Record<string, unknown> => {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
+    });
+    file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
+    return file;
+  };
+  const planCodeWith = async (file: Record<string, unknown>, planStrengthCaps: Readonly<Record<string, string>>) => {
+    const example = await compatibleExampleScorecard(8);
+    const scorecard = parseHostedScorecardFile(bytesOf({
+      ...example, pickerSettings: { ...(example.pickerSettings as Record<string, unknown>), planStrengthCaps }
+    }), await readEngineVersion());
+    return codeOfAsync(async () => planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)), scorecard));
+  };
+
+  it.each([[{ free: "BALANCED" }], [{}], [{ free: "ECONOMY", premium: "BALANCED" }]])("refuses %o", async (caps) => {
+    expect(await planCodeWith(billingOn(), caps)).toBe("SCORECARD_PLAN_CAPS_INVALID");
+  });
+
+  it.each([[{ free: "ECONOMY" }], [{ free: "ECONOMY", premium: "BEST" }]])("seals %o", async (caps) => {
+    expect(await planCodeWith(billingOn(), caps)).toBe("NO_REFUSAL");
+  });
+
+  it("keeps sealing the example's { free: BALANCED } with billing off, as today", async () => {
+    expect(await planCodeWith(validFile(), { free: "BALANCED" })).toBe("NO_REFUSAL");
+  });
+});

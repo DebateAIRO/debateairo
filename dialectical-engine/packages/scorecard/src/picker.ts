@@ -8,7 +8,7 @@ import {
   type ModelStrength
 } from "@debateai/kernel";
 import type { PickerSettings, Scorecard, ScorecardCandidate, ScorecardRoleEntry } from "./schema.js";
-import { estimateRunCost, typicalCallMicros } from "./estimate.js";
+import { estimateRunCost, estimateRunCostByPhase, typicalCallMicros, type PhaseCostEstimate } from "./estimate.js";
 
 /**
  * THE PER-ROLE PICKER (model-scorecard design §2.4-§2.6; owner rulings R2, R3, R5, R7).
@@ -28,6 +28,7 @@ import { estimateRunCost, typicalCallMicros } from "./estimate.js";
  *   ECONOMY_CAP_UNMET:<role>                  nothing was under the cap; the cheapest sits
  *   PRICE_UNUSABLE:<providerRef>              a hosted route without a usable price
  *   ESTIMATE_UNAVAILABLE                      a called seat has no typical call or no price
+ *   PERSON_ROOM_BELOW_ECONOMY                 nothing fitted the person's room; ECONOMY at the site's ceiling (paid plans A5)
  *   CROSS_EXCHANGE_INELIGIBLE:<candidateId>   a POSITION candidate could not also take its own cross-exchange call
  */
 
@@ -72,6 +73,31 @@ export type CostEstimate = Readonly<{
   seconds: number | null;
 }>;
 
+/**
+ * S2 (paid plans §2.6) — the HOSTED money an estimate must fit. `bodyMicros` and
+ * `serveMicros` are the two shares of ONE ceiling, min(site per-run ceiling, the
+ * person's room), cut as `costEnvelopeCeilings` cuts the site's: the arguing part
+ * must fit the body share, the whole run the serve share (both measure the run's
+ * one total). `unknownEstimateMicros` is the run maximum
+ * (`mostOneRunMaySpendMicros`): what an estimate the picker cannot make counts as
+ * against the person's room.
+ */
+export type PickerMoneyLimits = Readonly<{
+  bodyMicros: number;
+  serveMicros: number;
+  personRoomMicros: number | null;
+  unknownEstimateMicros: number;
+}>;
+
+export function fitsMoneyLimits(estimate: CostEstimate, phases: PhaseCostEstimate, limits: PickerMoneyLimits): boolean {
+  if (estimate.moneyMicros === null || phases.bodyMoneyMicros === null) {
+    // No figure: against the site alone the site's own per-run guard is the run
+    // maximum (today's ESTIMATE_UNAVAILABLE); against a person it is the maximum.
+    return limits.personRoomMicros === null || limits.unknownEstimateMicros <= limits.personRoomMicros;
+  }
+  return phases.bodyMoneyMicros <= limits.bodyMicros && estimate.moneyMicros <= limits.serveMicros;
+}
+
 export type PickerInput = Readonly<{
   scorecard: Scorecard | null;
   mode: "HOSTED" | "LOCAL";
@@ -82,6 +108,12 @@ export type PickerInput = Readonly<{
   seatDemand: Readonly<Record<DebateRole, number>>;
   expectedCallsByRole: Readonly<Record<DebateRole, number>>;
   perRunCeilingMicros: number | null;
+  /**
+   * S2: the phase-split limits. When present (HOSTED) they decide the fit and
+   * `perRunCeilingMicros` is ignored; when absent, `perRunCeilingMicros` is the
+   * whole-total ceiling it always was (body = serve = unknown = that ceiling).
+   */
+  moneyLimits?: PickerMoneyLimits | null;
   prices: ReadonlyMap<string, TargetPrice>;
   /**
    * Final review I3: the sealed per-call answer bound (`CallBound.tokenCeiling`) of the calls each
@@ -562,7 +594,14 @@ export function pickRoleAssignment(input: PickerInput): PickerOutcome {
     notes.push(`PLAN_CAP:${String(input.planTier)}:${strength}->${planCap}`);
     strength = planCap;
   }
-  const ceiling = input.mode === "HOSTED" ? input.perRunCeilingMicros : null;
+  const limits: PickerMoneyLimits | null = input.mode !== "HOSTED"
+    ? null
+    : input.moneyLimits ?? (input.perRunCeilingMicros === null ? null : Object.freeze({
+        bodyMicros: input.perRunCeilingMicros,
+        serveMicros: input.perRunCeilingMicros,
+        personRoomMicros: null,
+        unknownEstimateMicros: input.perRunCeilingMicros
+      }));
   let steppedDown = false;
   for (;;) {
     const attempt = assignAtStrength(input, strength);
@@ -570,14 +609,16 @@ export function pickRoleAssignment(input: PickerInput): PickerOutcome {
       && seatDemandOf(input, role) > 0
       && attempt.assignment.roles[role].length === 0);
     if (unfilled !== undefined) return refusePick("NO_REACHABLE_CANDIDATE", `no reachable model can take a ${unfilled} seat`);
-    const estimate = estimateRunCost({
+    const costInput = {
       assignment: attempt.assignment,
       expectedCallsByRole: input.expectedCallsByRole,
       scorecard: input.scorecard,
       prices: input.prices,
       mode: input.mode
-    });
-    if (ceiling === null || estimate.moneyMicros === null || estimate.moneyMicros <= ceiling) {
+    };
+    const estimate = estimateRunCost(costInput);
+    const phases = limits === null ? null : estimateRunCostByPhase(costInput);
+    if (limits === null || phases === null || fitsMoneyLimits(estimate, phases, limits)) {
       const primary = input.mode === "HOSTED" ? estimate.moneyMicros : estimate.seconds;
       return Object.freeze({
         state: "ASSIGNED" as const,
@@ -592,7 +633,10 @@ export function pickRoleAssignment(input: PickerInput): PickerOutcome {
     if (lower === undefined) {
       return refusePick(
         "BUDGET_TOO_SMALL",
-        `even ${strength} is estimated at ${String(estimate.moneyMicros)} micros, over the per-run ceiling of ${String(ceiling)} micros`
+        `even ${strength} is estimated at ${String(estimate.moneyMicros ?? limits.unknownEstimateMicros)} micros`
+          + ` (${String(phases.bodyMoneyMicros)} while arguing), over ${String(limits.bodyMicros)} micros while arguing`
+          + ` or ${String(limits.serveMicros)} micros for the whole run`
+          + (limits.personRoomMicros === null ? "" : ` (the person's room: ${String(limits.personRoomMicros)} micros)`)
       );
     }
     notes.push(`STEPPED_DOWN:${strength}->${lower}`);

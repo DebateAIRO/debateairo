@@ -1,4 +1,4 @@
-import { DEBATE_ROLES, type DebateRole } from "@debateai/kernel";
+import { DEBATE_ROLES, exhaustive, type DebateRole } from "@debateai/kernel";
 import type { Scorecard, ScorecardRoleEntry } from "./schema.js";
 import type { CostEstimate, RoleAssignment, SeatCandidate, TargetPrice } from "./picker.js";
 
@@ -93,5 +93,41 @@ export function estimateRunCost(input: Readonly<{
     mode: input.mode,
     moneyMicros: money === null ? null : Math.ceil(money),
     seconds: seconds === null ? null : Math.ceil(seconds)
+  });
+}
+
+/** Paid plans §2.6 (S2): which of the run's two money ceilings a role's calls are held to. */
+export type CostPhase = "BODY" | "ANSWER";
+
+export function costPhaseOfRole(role: DebateRole): CostPhase {
+  switch (role) {
+    case "POSITION":
+    case "SUPPORT_ATTACK":
+    case "CROSS_EXCHANGE":
+    case "JUDGE":
+    case "REVIEWER":
+      return "BODY";
+    case "ANSWER_WRITER":
+    case "ANSWER_CHECKER":
+      return "ANSWER";
+    default:
+      return exhaustive(role);
+  }
+}
+
+export type PhaseCostEstimate = Readonly<{ bodyMoneyMicros: number | null; answerMoneyMicros: number | null }>;
+
+/**
+ * S2 — the same estimate as `estimateRunCost`, split by phase: the arguing roles'
+ * calls, and the answer roles'. Each part is rounded UP on its own; a part with a
+ * seat it cannot price is null. The run total stays `estimateRunCost(...).moneyMicros`.
+ */
+export function estimateRunCostByPhase(input: Parameters<typeof estimateRunCost>[0]): PhaseCostEstimate {
+  const callsOf = (phase: CostPhase): Readonly<Record<DebateRole, number>> => Object.freeze(Object.fromEntries(
+    DEBATE_ROLES.map((role) => [role, costPhaseOfRole(role) === phase ? input.expectedCallsByRole[role] : 0])
+  ) as Record<DebateRole, number>);
+  return Object.freeze({
+    bodyMoneyMicros: estimateRunCost({ ...input, expectedCallsByRole: callsOf("BODY") }).moneyMicros,
+    answerMoneyMicros: estimateRunCost({ ...input, expectedCallsByRole: callsOf("ANSWER") }).moneyMicros
   });
 }

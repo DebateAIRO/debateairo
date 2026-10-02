@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { z } from "zod";
+import { mostOneRunMaySpendMicros } from "@debateai/budget";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError, type DebateRole, type ModelStrength } from "@debateai/kernel";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
@@ -10,7 +11,13 @@ import {
   readModelScorecard,
   type ModelScorecardReadResult
 } from "@debateai/register";
-import type { ReachableTarget, RoleAssignment, TargetPrice } from "@debateai/scorecard";
+import {
+  planCapsFollowPaidSiteRule,
+  SCORECARD_PLAN_CAPS_INVALID,
+  type ReachableTarget,
+  type RoleAssignment,
+  type TargetPrice
+} from "@debateai/scorecard";
 import type { BootCustody } from "./boot-custody.js";
 
 /**
@@ -105,6 +112,15 @@ export function answerTokenCeilingsByRole(ceilings: CallTokenCeilings): Readonly
   });
 }
 
+/** S2: the sealed money terms the picker's limits are cut from — the API's `CostEnvelopeGuard` policy. */
+export type AskMoneyPolicy = Readonly<{
+  perRunCeilingMicros: number;
+  serveReserveBasisPoints?: number;
+  serveOverrunBasisPoints?: number;
+  perStoryCeilingMicros?: number;
+  perStoryOverrunBasisPoints?: number;
+}>;
+
 export interface AskModelPickerSettings {
   /** Read once at boot: the sealed row (hosted) or the bundled file (local). */
   readonly scorecard: ModelScorecardReadResult;
@@ -113,6 +129,10 @@ export interface AskModelPickerSettings {
   readonly targetFacts: ReadonlyMap<string, AskTargetFacts>;
   /** Hosted only; local mode has no money ceiling. */
   readonly perRunCeilingMicros: number | null;
+  /** S2 (hosted): the money terms the picker's limits are cut from; absent = the per-run ceiling alone. */
+  readonly moneyPolicy?: AskMoneyPolicy | null;
+  /** S2 (hosted): the most one run may spend (`mostOneRunMaySpendMicros`), what an estimate the picker cannot make counts as. */
+  readonly runMaximumMicros?: number | null;
   /** Final review I3: each debate job's sealed answer bound, which the picker adds to a typical call's input. */
   readonly answerTokenCeilings: Readonly<Record<DebateRole, number>>;
   /** Operator lines (stderr in production): picker notes, estimates, refusal details. */
@@ -162,6 +182,10 @@ export function askModelPickerSettings(input: Readonly<{
   perRunCeilingMicros: number | null;
   /** Final review I3: read once at boot, in both modes — the picker runs in both. */
   callTokenCeilings: CallTokenCeilings;
+  /** S2 (hosted): the sealed money terms the picker's limits are cut from — B6b's `costEnvelopeRows.guardPolicy`. */
+  moneyPolicy?: AskMoneyPolicy | null;
+  /** S2 (hosted): billing is on — the site sells plans, so the scorecard must follow the owners' plan-cap rule. */
+  billingEnabled?: boolean;
   log?: (line: string) => void;
 }>): AskModelPickerSettings {
   const hosted = input.deploymentMode === "hosted";
@@ -171,12 +195,27 @@ export function askModelPickerSettings(input: Readonly<{
   if (hosted && !isUsablePerRunCeiling(input.perRunCeilingMicros)) {
     throw new TypeError("ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED");
   }
+  // Paid plans S2 (spec §2.6 item 6): the backstop of the publish-time check. A
+  // hosted site that sells plans never boots with a scorecard that caps Free above
+  // ECONOMY or a paid plan below BEST; refused, never overridden (the public
+  // scorecard must say what the site does). Local mode and billing off: no plans, no rule.
+  if (hosted && input.billingEnabled === true && input.scorecard.state === "VALID"
+    && !planCapsFollowPaidSiteRule(input.scorecard.scorecard.pickerSettings.planStrengthCaps)) {
+    throw new TypeError(SCORECARD_PLAN_CAPS_INVALID);
+  }
+  const moneyPolicy = !hosted ? null : input.moneyPolicy ?? Object.freeze({ perRunCeilingMicros: input.perRunCeilingMicros as number });
+  if (moneyPolicy !== null && moneyPolicy.perRunCeilingMicros !== input.perRunCeilingMicros) {
+    // One ceiling, two spellings: the boot passes the same policy both ways, so a mismatch is a composition defect.
+    throw new TypeError("ASK_MODEL_PICKER_MONEY_POLICY_MISMATCH");
+  }
   const answerTokenCeilings = answerTokenCeilingsByRole(input.callTokenCeilings);
   return Object.freeze({
     scorecard: input.scorecard,
     mode: hosted ? "HOSTED" : "LOCAL",
     targetFacts: askTargetFacts(input.targets),
     perRunCeilingMicros: hosted ? input.perRunCeilingMicros : null,
+    moneyPolicy,
+    runMaximumMicros: moneyPolicy === null ? null : mostOneRunMaySpendMicros(moneyPolicy),
     answerTokenCeilings,
     ...(input.log === undefined ? {} : { log: input.log })
   });
@@ -214,6 +253,10 @@ export async function composeAskModelPicker(input: Readonly<{
   targets: readonly ProviderDiscoveryTarget[];
   perRunCeilingMicros: number | null;
   callTokenCeilings: CallTokenCeilings;
+  /** S2 (hosted): the sealed money terms — passed to `askModelPickerSettings`. */
+  moneyPolicy?: AskMoneyPolicy | null;
+  /** S2 (hosted): billing is on — the plan-cap rule is checked at this stage. */
+  billingEnabled?: boolean;
   log: (line: string) => void;
   engineManifest?: URL;
   bundledScorecard?: URL;
@@ -230,6 +273,8 @@ export async function composeAskModelPicker(input: Readonly<{
     deploymentMode: input.deploymentMode,
     targets: input.targets,
     perRunCeilingMicros: input.perRunCeilingMicros,
+    ...(input.moneyPolicy === undefined ? {} : { moneyPolicy: input.moneyPolicy }),
+    ...(input.billingEnabled === undefined ? {} : { billingEnabled: input.billingEnabled }),
     callTokenCeilings: input.callTokenCeilings,
     log: input.log
   }));

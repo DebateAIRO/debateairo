@@ -82,6 +82,7 @@ apps/api/src/mail-channel.ts
 apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
+apps/api/src/person-room-picker.ts
 apps/api/src/provider-discovery.ts
 apps/api/src/publication-check/check.ts
 apps/api/src/publication-check/judge-transport.ts
@@ -811,11 +812,13 @@ packages/register/src/support-config.ts
 packages/register/src/tax-authorities.ts
 packages/scorecard/scripts/write-schema.ts
 packages/scorecard/src/estimate.ts
+packages/scorecard/src/first-call-plan-models.ts
 packages/scorecard/src/index.ts
 packages/scorecard/src/json-schema.ts
 packages/scorecard/src/moment.ts
 packages/scorecard/src/parse.ts
 packages/scorecard/src/picker.ts
+packages/scorecard/src/plan-caps.ts
 packages/scorecard/src/schema.ts
 packages/serve/src/index.ts
 packages/serve/src/model-assignment.ts

@@ -19,6 +19,8 @@ import {
   loadRunnerEnvironment,
   readBillingPlans,
   readCostEnvelopePolicy,
+  readEngineVersion,
+  readModelScorecard,
   readStoryPolicyFromRegister
 } from "@debateai/register";
 import {
@@ -31,6 +33,7 @@ import {
 } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
+import { firstCallPlanModels } from "@debateai/scorecard";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
@@ -255,17 +258,25 @@ const costEnvelopeGuard = costEnvelopePolicy === null
  * same `envelopeBand` that builds the shared wall's site-day half, B9b).
  * Priced per plan: the cheapest price among each plan's models, and every
  * plan's cheapest must fit.
+ * Paid plans S2: while the sealed model scorecard at this register version is
+ * VALID (the row the hosted API's picker reads), each plan's models are every
+ * configured model, because the picker seats from all of them.
  */
 if (costEnvelopePolicy !== null && envelopeBand !== null) {
+  const firstCalls = firstPositionCallProjections({
+    targets: declaredProviderTargets,
+    judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
+    questionMaxBytes: askQuestionMaxBytes()
+  });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,
     firstCallsByRoster: firstCallsByPlanRoster({
-      projections: firstPositionCallProjections({
-        targets: declaredProviderTargets,
-        judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
-        questionMaxBytes: askQuestionMaxBytes()
-      }),
-      rosters: PLAN_TIER_ROSTERS
+      projections: firstCalls,
+      rosters: firstCallPlanModels({
+        scorecardInForce: (await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID",
+        rosters: PLAN_TIER_ROSTERS,
+        models: firstCalls.map((call) => call.model)
+      })
     })
   });
 }

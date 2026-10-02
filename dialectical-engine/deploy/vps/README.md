@@ -1459,7 +1459,7 @@ Publish them only on a build that runs the whole rule. The waiting line, holds, 
 - the judge's output token ceiling (the runner policy's `JUDGE` bound);
 - the cheapest price among each plan's models; every plan's cheapest must fit (a plan takes part only when every model on its roster is configured).
 
-A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
+While a model scorecard is sealed into the register version both services run, every configured model counts for every plan (the model picker may choose any of them), so the check prices the cheapest configured model; without one, each plan is priced on its own models. A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
 
 The publish command asks the same question before anything is sealed, a dry run included: it prices the opening call on the file's `providerTargets` (which must equal `PROVIDER_DISCOVERY_TARGETS_JSON`) and on the judge bound it is about to seal, and refuses with the same `RUN_CEILING_BELOW_ONE_CALL`. Both units still ask at start-up, because the environment can differ from the file.
 

@@ -60,6 +60,7 @@ import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
+import { planCapsFollowPaidSiteRule, SCORECARD_PLAN_CAPS_INVALID, type PickerSettings } from "@debateai/scorecard";
 import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
@@ -498,6 +499,8 @@ export type HostedModelScorecard = Readonly<{
   scorecardVersion: number;
   candidateCount: number;
   apiCandidateCount: number;
+  /** Paid plans S2: the scorecard's plan caps, checked against the owners' rule when the sealed version sells plans. */
+  planStrengthCaps: PickerSettings["planStrengthCaps"];
   sha256: string;
   bytes: number;
 }>;
@@ -592,6 +595,7 @@ export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: strin
     // `eligiblePool`): a candidate is reachable hosted only through an API route.
     apiCandidateCount: read.scorecard.candidates
       .filter((candidate) => candidate.accessRoutes.some((route) => route.kind === "API")).length,
+    planStrengthCaps: read.scorecard.pickerSettings.planStrengthCaps,
     sha256: createHash("sha256").update(valueJsonText).digest("hex"),
     bytes: Buffer.byteLength(valueJsonText, "utf8")
   });
@@ -859,6 +863,11 @@ export async function planHostedRegisterPublication(
   // R1 A22: billing may be switched on only with its plans and the three budget
   // members, asked here of the version about to be sealed, so a dry run says so.
   assertBillingReady({ policy: billingPolicy, plans: billingPlans, envelope: costEnvelope });
+  // Paid plans S2 (spec §2.6 item 6): a version that sells plans seals only a
+  // scorecard that follows the owners' plan-cap rule — a sealed row is never edited.
+  if (billingPolicy?.enabled === true && scorecard !== null && !planCapsFollowPaidSiteRule(scorecard.planStrengthCaps)) {
+    refuse(SCORECARD_PLAN_CAPS_INVALID);
+  }
   // §2.5.1: WARN, never refuse, when a plan's smallest window (the day cap, or
   // Free's whole month) is below what one debate may spend.
   const warnings = Object.freeze(billingPlans === null ? [] : billingPlans.plans
