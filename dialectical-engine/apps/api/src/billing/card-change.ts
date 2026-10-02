@@ -98,19 +98,22 @@ export async function startCardChange(
   });
 }
 
-/** The hold is always released; RefundDesk makes the call after VERIFY_PAYMENT's commit (R-32). */
+/** The hold of a card change that took effect is released; RefundDesk makes the call after VERIFY_PAYMENT's commit (R-32). */
 const RELEASE: SettlementResult = Object.freeze({ kind: "REFUND" as const, reason: "CARD_CHECK_RELEASE" as const });
 
 /**
  * The CARD_CHECK charge kind's settlement on P9b's VerifyPaymentHandler, inside its one transaction under the owner
- * lock, with the new card's issuing country in `context.cardCountry`. The new order and card take over only for a
- * live subscription and a card whose country we can serve. A card from an always-blocked country is a refused card
- * check (`CARD_CHECK_REFUSED`: RefundDesk releases the hold and sends nothing; P9b never ends a subscription for a
- * refused CARD_CHECK), and the old card stays. A renewal whose rebill may have reached xMoney (it can go unknown
- * after `startCardChange` checked) defers the change: no CARD_CHANGED, the hold goes back as `CARD_CHECK_DEFERRED`
- * (the status reads FAILED with it: "try again shortly", never success), and the old order stays under P11a's
- * adoption (A2). A declined card check changes nothing. The stored location and the charges are read on the
- * settlement's own connection (`context.client`), never through a second pool connection.
+ * lock, with the new card's issuing country in `context.cardCountry`. Every hold is released, whatever the outcome.
+ * The new order and card take over only for a live subscription and a card whose country we can serve; only that
+ * hold goes back as `CARD_CHECK_RELEASE` (the status reads SUCCEEDED). A subscription that stopped being live (neither
+ * ACTIVE nor PAST_DUE) after `startCardChange` checked changes nothing: the hold goes back as `CARD_CHECK_NOT_LIVE`
+ * (the status reads FAILED with it: "you need an active plan", never "saved"), with no email (P20). A card from an
+ * always-blocked country is a refused card check (`CARD_CHECK_REFUSED`: RefundDesk releases the hold and sends
+ * nothing; P9b never ends a subscription for a refused CARD_CHECK), and the old card stays. A renewal whose rebill
+ * may have reached xMoney (it can go unknown after `startCardChange` checked) defers the change: no CARD_CHANGED, the
+ * hold goes back as `CARD_CHECK_DEFERRED` (the status reads FAILED with it: "try again shortly", never success), and
+ * the old order stays under P11a's adoption (A2). A declined card check changes nothing. The stored location and the
+ * charges are read on the settlement's own connection (`context.client`), never through a second pool connection.
  */
 export function createCardCheckSettlement(deps: Readonly<{
   repository: Pick<BillingRepository,
@@ -123,7 +126,9 @@ export function createCardCheckSettlement(deps: Readonly<{
     async succeeded(context: SettlementContext): Promise<SettlementResult> {
       const { subscription, transaction, client, now, cardCountry } = context;
       if (transaction === null) throw new TypeError("BILLING_CARD_CHECK_WITHOUT_TRANSACTION");
-      if (subscription.status !== "ACTIVE" && subscription.status !== "PAST_DUE") return RELEASE;
+      if (subscription.status !== "ACTIVE" && subscription.status !== "PAST_DUE") {
+        return Object.freeze({ kind: "REFUND" as const, reason: "CARD_CHECK_NOT_LIVE" as const });
+      }
       const repository = deps.repository;
       const throughClient = Object.freeze({
         chargesForSubscription: (subscriptionId: string) => repository.chargesForSubscription(subscriptionId, client),

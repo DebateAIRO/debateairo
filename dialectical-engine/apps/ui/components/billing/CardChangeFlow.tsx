@@ -92,6 +92,8 @@ export function CardChangeFlow({
           client={client}
           successText={t(catalog, "billing.card.saved")}
           failureText={t(catalog, "billing.card.failed")}
+          // No email follows a card check (RefundDesk sends none for its release), so the wait promises none.
+          timedOutText={t(catalog, "billing.subscription.stillConfirming")}
         />
       ) : checkout !== null ? (
         <XMoneyCardForm

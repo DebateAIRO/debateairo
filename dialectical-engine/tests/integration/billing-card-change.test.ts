@@ -135,11 +135,12 @@ describe("P12e the card change on real PostgreSQL", () => {
     await run.api.close();
   });
 
-  it("releases the hold without a change once the subscription is no longer live", async () => {
+  it("releases the hold without a change once the subscription is no longer live, as a card check that changed nothing", async () => {
     const run = await start("p12e-gone");
     const ref = (await run.card()).json().charge_ref as string;
     await append(run.seeded.subscriptionId, "SUSPENDED");
-    expect(await settle(run, ref, "RO")).toEqual({ kind: "REFUND", reason: "CARD_CHECK_RELEASE" });
+    // P20: never CARD_CHECK_RELEASE here, which reads SUCCEEDED ("Your new card is saved.") for a card that was not.
+    expect(await settle(run, ref, "RO")).toEqual({ kind: "REFUND", reason: "CARD_CHECK_NOT_LIVE" });
     expect((await new BillingRepository(database.pool).subscriptionEvents(run.seeded.subscriptionId)).at(-1)?.kind)
       .toBe("SUSPENDED");
     await run.api.close();

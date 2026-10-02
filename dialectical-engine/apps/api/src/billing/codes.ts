@@ -21,6 +21,11 @@ export type BillingRefundReason =
    */
   | "CARD_CHECK_DEFERRED"
   /**
+   * P12e/P20: a card change whose subscription stopped being live (neither ACTIVE nor PAST_DUE) before its hold was
+   * paid. The hold is released, nothing changes, and the card page says a card needs an active plan.
+   */
+  | "CARD_CHECK_NOT_LIVE"
+  /**
    * P9b (D5 5f): a second payment on a charge another transaction already paid (a reused checkout paid twice). It
    * bought nothing: refunded in full, M11_DUPLICATE, never a credit note (it was never a sale).
    */
@@ -38,7 +43,8 @@ export type RequestedRefundReason = Exclude<BillingRefundReason, "PROVIDER_REFUN
  * `DUPLICATE_PAYMENT`: the charge WAS paid (by its first transaction), and its status must read SUCCEEDED.
  */
 export const REFUND_REASONS_REFUSING_THE_PAYMENT: ReadonlySet<BillingRefundReason> = new Set<BillingRefundReason>([
-  "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED"
+  "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED",
+  "CARD_CHECK_NOT_LIVE"
 ]);
 
 export type ChargeFailureCode = "PAYMENT_DECLINED" | "VOIDED" | "REBILL_REFUSED" | "NO_TRANSACTION";

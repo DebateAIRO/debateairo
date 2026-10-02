@@ -185,6 +185,9 @@ describe("P8c GET /v1/billing/charges/{chargeRef}", () => {
       .toEqual({ state: "SUCCEEDED", reasonCode: null });
     expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("REFUND_REQUESTED", "CARD_CHECK_RELEASE")]))
       .toEqual({ state: "SUCCEEDED", reasonCode: null });
+    // P20: a card check whose plan stopped being live is released too, but it changed nothing: never "saved".
+    expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("REFUND_REQUESTED", "CARD_CHECK_NOT_LIVE")]))
+      .toEqual({ state: "FAILED", reasonCode: "CARD_CHECK_NOT_LIVE" });
     // A second payment refunded on a charge its first payment settled: the charge is still paid (D5 5f).
     expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("DUPLICATE_PAYMENT"), event("REFUND_REQUESTED", "DUPLICATE_PAYMENT")]))
       .toEqual({ state: "SUCCEEDED", reasonCode: null });

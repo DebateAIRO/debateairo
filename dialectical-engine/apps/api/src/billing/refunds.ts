@@ -43,7 +43,7 @@ type FollowUp = (client: PoolClient, at: Date) => Promise<void>;
 
 const REQUESTED_REASONS: ReadonlySet<string> = new Set<RequestedRefundReason>([
   "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "WITHDRAWAL", "CARD_CHECK_RELEASE",
-  "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "DUPLICATE_PAYMENT"
+  "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE", "DUPLICATE_PAYMENT"
 ]);
 const PROVIDER_REASONS: ReadonlySet<string> = new Set(["PROVIDER_REFUND", "PROVIDER_VOID"]);
 /** Refused by xMoney as fraud-related: a card from an always-blocked country (a payment, or P12e's new card). */
@@ -401,6 +401,9 @@ export class RefundDesk {
       case "CARD_CHECK_REFUSED":
         return async () => undefined;
       case "CARD_CHECK_DEFERRED":
+        return async () => undefined;
+      case "CARD_CHECK_NOT_LIVE":
+        // P20: the plan stopped being live during the card check; the hold goes back with no email and no credit note.
         return async () => undefined;
       default:
         return exhaustive(intent.reason);

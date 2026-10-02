@@ -5,6 +5,7 @@ import { testCountryPolicy } from "../support/billingFixtures.js";
 import { subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
 import { createCardCheckSettlement, startCardChange } from "../../apps/api/src/billing/card-change.js";
 import { chargeStatusOf } from "../../apps/api/src/billing/charge-status.js";
+import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 
 let h: BillingHarness;
 beforeAll(async () => {
@@ -48,6 +49,32 @@ describe("P12e the card change through VERIFY_PAYMENT", () => {
     expect(h.xmoney.refunds.map((refund) => refund.transactionId)).toContain(hold.transactionId);
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId))).toMatchObject({
       status: "ACTIVE", planId: before.planId, cardRef: before.cardRef, xmoneyOrderId: before.xmoneyOrderId
+    });
+  });
+
+  it("releases the hold with no email and reads FAILED(CARD_CHECK_NOT_LIVE) when the plan stopped being live before the hold was paid (P20)", async () => {
+    const paid = await h.activate();
+    const before = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));
+    const started = await startCardChange(cardDeps(), { ownerRef: paid.ownerRef, userId: paid.userId, ip: IP, now: h.clock.now });
+    // The plan is suspended while the person is at the bank's check.
+    await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client,
+      subscriptionEvent(before, "SUSPENDED", h.clock.now, { charge_id: "0".repeat(32) })));
+    h.clock.advance(MINUTE);
+    const hold = h.xmoney.pay({ externalOrderId: started.charge_ref, amountDecimal: "1.00", cardCountry: "RO" });
+    await h.settle(hold.transactionId);
+    // Never SUCCEEDED: the card page must not say "Your new card is saved." for a card that was not.
+    expect(chargeStatusOf((await h.repository.charge(started.charge_ref))!.events))
+      .toEqual({ state: "FAILED", reasonCode: "CARD_CHECK_NOT_LIVE" });
+    const rows = await h.outboxRows(started.charge_ref);
+    expect(rows.filter((row) => row.kind === "XMONEY_REFUND")).toEqual([
+      expect.objectContaining({ done: true, payload: expect.objectContaining({ reason: "CARD_CHECK_NOT_LIVE", whole: true }) })
+    ]);
+    expect(rows.filter((row) => row.kind === "EMAIL")).toEqual([]);
+    expect(h.xmoney.refunds.map((refund) => refund.transactionId)).toContain(hold.transactionId);
+    const events = await h.repository.subscriptionEvents(paid.subscriptionId);
+    expect(events.some((event) => event.kind === "CARD_CHANGED")).toBe(false);
+    expect(foldSubscription(events)).toMatchObject({
+      status: "SUSPENDED", cardRef: before.cardRef, xmoneyOrderId: before.xmoneyOrderId
     });
   });
 

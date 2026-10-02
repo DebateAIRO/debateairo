@@ -24,6 +24,9 @@ export function chargeOutcomeKey(state: "NEEDS_ACTION" | "FAILED", reasonCode: s
   if (state === "FAILED" && reasonCode === "CARD_CHECK_REFUSED") return "billing.card.countryRefused";
   // P12e (D6b's CARD_CHECK_DEFERRED): a payment on the plan was still open, so the card was not saved; try later.
   if (state === "FAILED" && reasonCode === "CARD_CHECK_DEFERRED") return "billing.card.tryAgainShortly";
+  // P20 (CARD_CHECK_NOT_LIVE): the plan stopped being live during the card check, so nothing changed and the hold was
+  // released: the start route's NOT_SUBSCRIBED sentence for the same condition, never "saved".
+  if (state === "FAILED" && reasonCode === "CARD_CHECK_NOT_LIVE") return "billing.card.notSubscribed";
   if (state === "FAILED" && reasonCode !== null && REFUNDED_REASONS.has(reasonCode)) return "billing.checkout.refunded";
   return null;
 }
@@ -31,6 +34,8 @@ export function chargeOutcomeKey(state: "NEEDS_ACTION" | "FAILED", reasonCode: s
 /**
  * B5 (spec 2026-09-29 §2.5.3): polls OUR server every 2 s for up to 2 minutes. The state shown is the server's;
  * the browser never decides a payment. P8c's NEEDS_ACTION is a bank decline the person may retry: settled, like FAILED.
+ * `timedOutText` replaces the "we'll email you" sentence after the 2 minutes, for a charge no email follows (P20's
+ * card check); without it, checkout's and the upgrade's sentence stays.
  */
 export function ChargeStatusPoller({
   chargeRef,
@@ -38,6 +43,7 @@ export function ChargeStatusPoller({
   client = contractClient,
   successText,
   failureText,
+  timedOutText,
   onSettled
 }: Readonly<{
   chargeRef: string;
@@ -45,6 +51,7 @@ export function ChargeStatusPoller({
   client?: Pick<ContractClient, "getBillingCharge">;
   successText: string;
   failureText: string;
+  timedOutText?: string;
   onSettled?: (state: "SUCCEEDED" | "FAILED" | "TIMED_OUT") => void;
 }>) {
   const [state, setState] = useState<ChargePollerState>("PENDING");
@@ -90,7 +97,7 @@ export function ChargeStatusPoller({
 
   const text = state === "SUCCEEDED" ? successText
     : state === "FAILED" ? (failureKey === null ? failureText : t(catalog, failureKey))
-      : state === "TIMED_OUT" ? t(catalog, "billing.checkout.willEmail")
+      : state === "TIMED_OUT" ? (timedOutText ?? t(catalog, "billing.checkout.willEmail"))
         : t(catalog, "billing.checkout.waitingForBank");
   return <p className="billingStatus" role="status" data-charge-state={state}>{text}</p>;
 }

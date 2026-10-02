@@ -35,6 +35,11 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   resetRedirects();
+  // A case that fails part-way must not leak its session or billing switch into the next one.
+  mocks.session = null;
+  mocks.billingOn = true;
+  mocks.sessionLive = true;
+  mocks.sessionCheckedWith = [];
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -168,6 +173,41 @@ describe("P20 the card change page (A11, A12)", () => {
     );
     expect(container.textContent).not.toContain("Your new card is saved.");
     expect(container.textContent).not.toContain("The card couldn't be checked.");
+  });
+
+  it("a plan that stopped being live during the check (CARD_CHECK_NOT_LIVE) says a card needs an active plan, never 'saved'", async () => {
+    const client = {
+      startCardChange: vi.fn(),
+      getBillingCharge: vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_CHECK_NOT_LIVE" }))
+    };
+    await act(async () => {
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
+        nonce={undefined} returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
+    });
+    await settle();
+    expect(container.textContent).toContain("You need an active plan to change the card.");
+    expect(container.textContent).not.toContain("Your new card is saved.");
+    expect(container.textContent).not.toContain("The card couldn't be checked.");
+  });
+
+  it("after two minutes of waiting on a card check, says it is still being confirmed and promises no email", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = {
+        startCardChange: vi.fn(),
+        getBillingCharge: vi.fn(async () => ({ state: "PENDING" as const, reason_code: null }))
+      };
+      await act(async () => {
+        root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
+          nonce={undefined} returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
+      });
+      await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+      expect(container.querySelector('[data-charge-state="TIMED_OUT"]')).not.toBeNull();
+      expect(container.textContent).toContain("We're still confirming this with the payment provider.");
+      expect(container.textContent).not.toMatch(/email/iu);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("sends a signed-out person to sign in and back to /settings/card, and is not found while billing is off", async () => {
