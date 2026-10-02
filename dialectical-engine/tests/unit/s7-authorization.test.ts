@@ -98,7 +98,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/billing/subscription/cancel-revoke", auth: "user", resource: "billing", action: "cancel-revoke" },
   { route: "POST /v1/billing/subscription/upgrade-quote", auth: "user", resource: "billing", action: "quote-upgrade" },
   { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
-  { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" }
+  { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
+  { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" }
 ] as const);
 
 const validAskPayload = () => ({

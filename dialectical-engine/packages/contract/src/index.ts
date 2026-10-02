@@ -475,6 +475,14 @@ export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string()
  */
 export const BillingWithdrawResponseSchema = z.object({ refund: BillingDecimalMoneySchema.nullable() }).strict();
 export type BillingWithdrawResponse = z.infer<typeof BillingWithdrawResponseSchema>;
+/**
+ * P12e (A12): the card form's signed order, as checkout's, plus the hold the server signed — the amount the page
+ * names before "Save card" ("1.00" today, "0.00" if X0 shows `auth` takes a zero amount).
+ */
+export const BillingCardChangeResponseSchema = BillingCheckoutResponseSchema.extend({
+  hold_amount: BillingDecimalMoneySchema
+}).strict();
+export type BillingCardChangeResponse = z.infer<typeof BillingCardChangeResponseSchema>;
 
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
@@ -1281,7 +1289,8 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/subscription/cancel-revoke",
     "POST /v1/billing/subscription/upgrade-quote",
     "POST /v1/billing/subscription/upgrade",
-    "POST /v1/billing/subscription/withdraw"
+    "POST /v1/billing/subscription/withdraw",
+    "POST /v1/billing/subscription/card"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
@@ -1309,6 +1318,7 @@ export const contractInventory = Object.freeze({
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
     BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
-    BillingUpgradeResponseSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema
+    BillingUpgradeResponseSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
+    BillingCardChangeResponseSchema
   })
 });

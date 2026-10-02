@@ -83,7 +83,13 @@ export type BillingAuditEvent =
    * P12d (D6a F20(c)): a withdrawal whose refund the owner settles by hand (a refund made in the xMoney dashboard
    * touched a payment, or a transaction already held a refund request); the field is its source.
    */
-  | "billing.withdrawal.owner_review";
+  | "billing.withdrawal.owner_review"
+  /** P12e (A12): a card change's CARD_CHECK charge was written and its order signed; the field is the plan status. */
+  | "billing.card.change.started"
+  /** P12e: a new card from an always-blocked country was refused; the field is its ISO country code. */
+  | "billing.card.refused"
+  /** P12e (A2): a card change's hold was paid while a renewal's outcome was unknown; nothing changed. No field. */
+  | "billing.card.change.deferred";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

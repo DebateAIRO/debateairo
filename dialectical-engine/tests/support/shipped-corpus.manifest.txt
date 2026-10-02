@@ -16,6 +16,7 @@ apps/api/src/ask-billing.ts
 apps/api/src/ask-room.ts
 apps/api/src/billing/account-email.ts
 apps/api/src/billing/audit.ts
+apps/api/src/billing/card-change.ts
 apps/api/src/billing/charge-status.ts
 apps/api/src/billing/checkout.ts
 apps/api/src/billing/codes.ts

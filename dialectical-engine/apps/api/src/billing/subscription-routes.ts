@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+  BillingCardChangeResponseSchema,
   BillingDowngradeRequestSchema,
   BillingInvoicesResponseSchema,
   BillingSubscriptionResponseSchema,
@@ -11,6 +12,7 @@ import {
   BillingWithdrawResponseSchema
 } from "@debateai/contract";
 import { microsToDecimal } from "@debateai/billing-core";
+import { startCardChange } from "./card-change.js";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
 import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
 import { cancelForOwner, revokeCancelForOwner, scheduleDowngrade } from "./subscription-actions.js";
@@ -28,7 +30,8 @@ export const SUBSCRIPTION_ROUTE_PATHS = Object.freeze([
   "POST /v1/billing/subscription/cancel-revoke",
   "POST /v1/billing/subscription/upgrade-quote",
   "POST /v1/billing/subscription/upgrade",
-  "POST /v1/billing/subscription/withdraw"
+  "POST /v1/billing/subscription/withdraw",
+  "POST /v1/billing/subscription/card"
 ] as const);
 export type SubscriptionRoutePath = typeof SUBSCRIPTION_ROUTE_PATHS[number];
 
@@ -136,5 +139,16 @@ export function installSubscriptionRoutes(
         refund: result.refundMicros === null ? null : microsToDecimal(result.refundMicros)
       }));
     });
+  });
+  // P12e (A12): the card change's signed 1.00 USD authorization for the dedicated /settings/card page.
+  api.post("/v1/billing/subscription/card", policy("POST /v1/billing/subscription/card"), async (request, reply) => {
+    if (deps === undefined) return notFound(reply);
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+    // A card change signs an order and writes a charge row, like checkout: the same per-owner budget.
+    if (!admit.gate(reply, "billingQuote", "POST /v1/billing/subscription/card", authenticated.ownerRef)) return reply;
+    return answer(reply, async () => reply.send(BillingCardChangeResponseSchema.parse(await startCardChange(deps, {
+      ownerRef: authenticated.ownerRef, userId: authenticated.userId, ip: source(request).ip, now: deps.clock()
+    }))));
   });
 }

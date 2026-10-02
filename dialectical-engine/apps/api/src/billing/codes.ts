@@ -16,6 +16,11 @@ export type BillingRefundReason =
   /** P12e: a new card from an always-blocked country; the hold is released and nothing changes. */
   | "CARD_CHECK_REFUSED"
   /**
+   * P12e (A2): a card change whose hold was paid while a renewal's outcome was unknown. The hold is released, nothing
+   * changes, and the card page says "try again shortly".
+   */
+  | "CARD_CHECK_DEFERRED"
+  /**
    * P9b (D5 5f): a second payment on a charge another transaction already paid (a reused checkout paid twice). It
    * bought nothing: refunded in full, M11_DUPLICATE, never a credit note (it was never a sale).
    */
@@ -33,7 +38,7 @@ export type RequestedRefundReason = Exclude<BillingRefundReason, "PROVIDER_REFUN
  * `DUPLICATE_PAYMENT`: the charge WAS paid (by its first transaction), and its status must read SUCCEEDED.
  */
 export const REFUND_REASONS_REFUSING_THE_PAYMENT: ReadonlySet<BillingRefundReason> = new Set<BillingRefundReason>([
-  "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "CARD_CHECK_REFUSED"
+  "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED"
 ]);
 
 export type ChargeFailureCode = "PAYMENT_DECLINED" | "VOIDED" | "REBILL_REFUSED" | "NO_TRANSACTION";

@@ -46,7 +46,9 @@ export type BillingRefusalCode =
    */
   | "WITHDRAWAL_WINDOW_CLOSED"
   /** P12d: no live WITHDRAW_SUBSCRIPTION step-up grant for this session (403); nothing was written. */
-  | "STEP_UP_REQUIRED";
+  | "STEP_UP_REQUIRED"
+  /** P12e (A2): a renewal's rebill may have reached xMoney; the card can change once its outcome is recorded. */
+  | "CARD_CHANGE_NOT_AVAILABLE_NOW";
 
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 

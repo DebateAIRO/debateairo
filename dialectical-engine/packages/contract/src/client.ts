@@ -28,6 +28,7 @@ import {
   AskAcceptedSchema,
   AskAlreadyWaitingSchema,
   AskRoomResponseSchema,
+  BillingCardChangeResponseSchema,
   BillingPlansResponseSchema,
   BillingQuoteRequestSchema,
   BillingQuoteResponseSchema,
@@ -68,6 +69,7 @@ import {
   type AskAccepted,
   type AskRequest,
   type AskRoomResponse,
+  type BillingCardChangeResponse,
   type BillingPlansResponse,
   type BillingQuoteRequest,
   type BillingQuoteResponse,
@@ -429,6 +431,8 @@ export interface ContractClient {
   upgradeSubscription(planId: "PRO" | "MAX", quoteRef: string): Promise<BillingUpgradeResponse>;
   /** P12d: withdraw within the 14 days with a WITHDRAW_SUBSCRIPTION step-up grant; `refund` null = the owner settles it. */
   withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
+  /** P12e: the card form's signed 1.00 USD authorization order, released once the new card is seen. */
+  startCardChange(): Promise<BillingCardChangeResponse>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -755,6 +759,7 @@ export function createContractClient(
       "/v1/billing/subscription/withdraw", BillingWithdrawResponseSchema,
       { method: "POST", body: JSON.stringify({ step_up_grant: stepUpGrant }) }
     ),
+    startCardChange: () => request("/v1/billing/subscription/card", BillingCardChangeResponseSchema, { method: "POST" }),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),
     readAnswerIndex: (limit: number, offset: number) => request(`/v1/answers?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`, AnswerIndexSchema),

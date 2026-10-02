@@ -94,6 +94,22 @@ function amountMatches(decimal: string, micros: number): boolean {
  */
 const RESUBMIT_STARTED = "RESUBMIT_STARTED";
 const NOT_SENT_CODES: ReadonlySet<string> = new Set(["REBILL_NOT_SENT", "REBILL_CREDENTIALS_REFUSED"]);
+
+/**
+ * Whether a RENEWAL charge's rebill may have reached xMoney with no outcome recorded yet: what `recoverOpenCharge`
+ * adopts, looking on every order that could hold the payment (`ordersHoldingCharge`), and after 30 quiet minutes
+ * resubmits on the subscription's current order (A2). A charge settled (SUCCEEDED, FAILED) or linked to its
+ * transaction (SUBMITTED) is not open, nor one whose last call was proven never sent; a SUBMIT_UNKNOWN, or a call
+ * marker with no outcome (a call in flight, or a process that died during it), is. P12e keeps a card change from
+ * moving the order while this holds (defense in depth).
+ */
+export function rebillOutcomeOpen(events: ReadonlyArray<Pick<ChargeEventRow, "kind" | "errorCode">>): boolean {
+  if (events.some((event) => event.kind === "SUCCEEDED" || event.kind === "FAILED" || event.kind === "SUBMITTED")) return false;
+  const trail = events.filter((event) => event.kind === "REQUESTED" || event.kind === "SUBMIT_UNKNOWN");
+  if (trail.some((event) => event.kind === "SUBMIT_UNKNOWN")) return true;
+  const last = trail.at(-1);
+  return last !== undefined && (last.errorCode === null || !NOT_SENT_CODES.has(last.errorCode));
+}
 /** Only payments are adopted, never a refund, credit or chargeback row of the order. */
 const ADOPTABLE_TYPES: ReadonlySet<string | null> = new Set([null, "deposit"]);
 

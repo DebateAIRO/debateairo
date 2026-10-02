@@ -1247,7 +1247,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/subscription/upgrade-quote", auth: "user", resource: "billing", action: "quote-upgrade" },
   { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
   // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
-  { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" }
+  { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
+  // P12e (A12): the card change's signed authorization order; the CSRF pair like any user mutation.
+  { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" }
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;

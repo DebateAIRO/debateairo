@@ -10,6 +10,7 @@ import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/regis
 import { createSingleFlightErasureReconciler } from "../account-erasure.js";
 import { DekAccountEmailReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
+import { createCardCheckSettlement } from "./card-change.js";
 import { ChargeStatusReader } from "./charge-status.js";
 import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
@@ -122,6 +123,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   verify.registerSettlement("RENEWAL", renewalSettlement);
   // P12c: a paid upgrade changes the plan only here, inside VERIFY_PAYMENT's one transaction (A3f).
   verify.registerSettlement("UPGRADE", createUpgradeSettlement({ repository, entitlements, plans: deps.plans }));
+  // P12e (A12): a card change's paid hold moves the order and the card only here, then RefundDesk releases it.
+  verify.registerSettlement("CARD_CHECK", createCardCheckSettlement({
+    repository, recordsKey: deps.connectors.recordsKey, countryPolicy: deps.countryPolicy, audit: deps.audit
+  }));
   // P11a: `drain` is declared below; the kick only runs once a tick does. P15 adds
   // `erasurePending: erasurePendingOf(repository)` here, over `billing.owner_erasure_pending` (which P15 makes answer
   // true for an `age_frozen` owner as well, R3-2).
@@ -203,7 +208,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     kick: () => drain(),
     // P12d: the credit-used share of a withdrawal, and its refunds through the one executor (R-32).
     ownerSpend: required(deps.ownerSpend, "ownerSpend"),
-    refunds
+    refunds,
+    // P12e (R-17): the card change's order is built and signed by the checkout, for the account's own address.
+    checkout,
+    accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore)
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
