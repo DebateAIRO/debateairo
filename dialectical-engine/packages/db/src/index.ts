@@ -67,6 +67,34 @@ export {
   type EntitlementPlanId
 } from "./billing-entitlement.js";
 
+// Paid plans (spec 2026-09-29 §2.5.2): every billing.* statement except the entitlement (migrations 0085–0087).
+export {
+  BillingRepository,
+  type BillingReadExecutor,
+  type ChargeEventInput,
+  type ChargeEventKind,
+  type ChargeEventRow,
+  type ChargeKind,
+  type ChargeRow,
+  type CustomerXMoneyEnvironment,
+  type DueRenewalCursor,
+  type DueRenewalsOptions,
+  type InvoiceIntentRow,
+  type InvoiceIssuerName,
+  type InvoiceKind,
+  type InvoiceRow,
+  type LocationEvidenceRow,
+  type LocationVerdict,
+  type NoticeRow,
+  type OutboxClaimFence,
+  type OutboxJob,
+  type OutboxKind,
+  type OutboxPayload,
+  type QuoteKind,
+  type QuoteRow,
+  type TaxSummaryRow
+} from "./billing.js";
+
 // Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0083).
 // B8 records the interim roster swap; B9c the runner's cheaper-model calls.
 export {
@@ -811,11 +839,16 @@ function wrapClientQueries(client: PoolClient): PoolClient {
 
 export function createPool(
   connectionString: string,
-  options: Readonly<{ max?: number }> = {}
+  options: Readonly<{ max?: number; connectionTimeoutMillis?: number }> = {}
 ): Pool {
   if (options.max !== undefined
     && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
     throw new TypeError("DATABASE_POOL_MAX_INVALID");
+  }
+  if (options.connectionTimeoutMillis !== undefined
+    && (!Number.isSafeInteger(options.connectionTimeoutMillis)
+      || options.connectionTimeoutMillis < 1 || options.connectionTimeoutMillis > 600_000)) {
+    throw new TypeError("DATABASE_POOL_CONNECTION_TIMEOUT_INVALID");
   }
   const pool = new PgPool({ connectionString,...options });
   let terminalFailure: TypedDomainError | undefined;
@@ -934,6 +967,27 @@ export async function withWriteTransaction<T>(
     throw error;
   } finally {
     client.release();
+  }
+}
+
+/**
+ * `withWriteTransaction` on a connection the caller already holds (a session lease's): BEGIN, the operation, COMMIT,
+ * or ROLLBACK on failure, under the same write-transaction marker, so `assertNoOpenWriteTransaction` refuses a
+ * provider call inside it exactly as it does inside `withWriteTransaction`. The connection is NOT released here: its
+ * owner (the lease) releases it after its own last use.
+ */
+export async function withWriteTransactionOn<T>(
+  client: PoolClient,
+  operation: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  try {
+    await client.query("BEGIN");
+    const result = await writeTransaction.run(true, () => operation(client));
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
   }
 }
 
@@ -1881,6 +1935,7 @@ export {
   type SignUpAcceptanceRow
 } from "./legal-acceptance.js";
 export * from "./obs-schema.js";
+export { BillingJobQueries } from "./billing-jobs.js";
 export {
   accountRecoveryChannelRefsAad,
   PostgresRecoveryStartRepository

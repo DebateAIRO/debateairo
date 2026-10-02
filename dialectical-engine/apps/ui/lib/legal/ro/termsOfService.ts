@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Unde oferim DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Oferim DebateAI persoanelor care locuiesc în [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
+      { kind: "p", text: "Oferim DebateAI persoanelor care locuiesc în [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "804928a6c70252c237b73421d39d23be49da21fde73c29bce1e0500390435624",
+  sha256: "722612797c664b83b1daa0d1ebffe4d9617c53286f41a3c117d2bc3858da6504",
   eyebrow: "TERMENII SERVICIULUI · v2.0 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DebateAIRO S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",

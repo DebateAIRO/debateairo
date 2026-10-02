@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI 的服务地域",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "我们向居住在 [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] 的人士提供 DebateAI。我们不在其他地方提供本服务。如果您居住在这些国家以外，可能仍能访问网站，但本服务并非面向您提供；我们不接受您的付款，且本条款及《隐私政策》并未针对您所在国家的法律作相应调整。附件 A 规定了我们所服务各区域的适用内容。" }
+      { kind: "p", text: "我们向居住在 [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] 的人士提供 DebateAI。我们不在其他地方提供本服务。如果您居住在这些国家以外，可能仍能访问网站，但本服务并非面向您提供；我们不接受您的付款，且本条款及《隐私政策》并未针对您所在国家的法律作相应调整。附件 A 规定了我们所服务各区域的适用内容。" }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "4a9595f6483cb47ad16b74a4e0f9a0841660501a68b886d8945301ad18cb94c4",
+  sha256: "0ccc6d4a0496de21c1f1ae7d956523b4deab51779e3cb5f79a8dc652469ed230",
   eyebrow: "服务条款 · v2.0 · 生效日期 [DATE]",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DebateAIRO S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",

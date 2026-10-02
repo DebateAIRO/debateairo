@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Waar wij DebateAI aanbieden",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wij bieden DebateAI aan personen die wonen in [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
+      { kind: "p", text: "Wij bieden DebateAI aan personen die wonen in [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "d009085e560ca793d3a2fa8c068aa8da8dc7ba54f3b2f06f1b9ca04094ded646",
+  sha256: "9a130262ff4b7a1498d7f0b565b2c575955c4aa7c52fe792edb0004af3279bf0",
   eyebrow: "SERVICEVOORWAARDEN · v2.0 · VAN KRACHT OP [DATE]",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DebateAIRO S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",

@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as runtimeEnvironment from "../../packages/register/src/runtime-environment.js";
+import { validApiEnvironmentFixture } from "../support/apiEnvironmentFixture.js";
 
 const engineRoot = resolve(import.meta.dirname, "../..");
 
@@ -66,5 +67,33 @@ describe("VPS env examples cover the strict environment shapes (Task 14 amendmen
     expect(inventory("RUNNER_ENVIRONMENT_KEYS").optional).toContain("VLLM_BASE_URL");
     expect(inventory("OBSERVATION_AGENT_ENVIRONMENT_KEYS").required)
       .toEqual(["OBSERVATION_DATABASE_URL", "OBSERVATION_STATE_DIR", "OBSERVATION_TARGETS_PATH"]);
+  });
+
+  it("keeps the paid-plans group optional in the API shape and present in the API example (P6a)", () => {
+    const shape = inventory("API_ENVIRONMENT_KEYS");
+    const present = exampleKeys("deploy/vps/env/api.env.example");
+    const billing = (runtimeEnvironment as Readonly<Record<string, unknown>>).BILLING_ENVIRONMENT_KEYS as readonly string[];
+    expect(billing).toHaveLength(10);
+    for (const key of billing) {
+      expect(shape.optional, key).toContain(key);
+      expect(present.has(key), key).toBe(true);
+    }
+    expect(present.has("PUBLIC_SITE_ORIGIN")).toBe(false);
+    // RULINGS-R3 R3-4: the company's CIF comes from COMPANY, never an api.env line an operator could fill differently.
+    expect(present.has("SMARTBILL_COMPANY_CIF")).toBe(false);
+  });
+
+  it("ships billing values in the API example that the API shape accepts, so leaving them for later is harmless (P6a)", () => {
+    const billing = (runtimeEnvironment as Readonly<Record<string, unknown>>).BILLING_ENVIRONMENT_KEYS as readonly string[];
+    const example = new Map<string, string>();
+    for (const line of readFileSync(resolve(engineRoot, "deploy/vps/env/api.env.example"), "utf8").split("\n")) {
+      const match = /^([A-Z][A-Z0-9_]*)=(.*)$/u.exec(line.trim());
+      if (match?.[1] !== undefined && billing.includes(match[1])) example.set(match[1], match[2] ?? "");
+    }
+    expect(example.size).toBe(10);
+    // Every billing key is parsed at EVERY boot, billing on or off: a placeholder that is not a web address would
+    // stop the API from starting even with billing off.
+    expect(() => runtimeEnvironment.parseApiEnvironment({ ...validApiEnvironmentFixture(), ...Object.fromEntries(example) }))
+      .not.toThrow();
   });
 });

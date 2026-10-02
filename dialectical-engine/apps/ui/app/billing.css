@@ -1,0 +1,26 @@
+/* Paid plans (spec 2026-09-29 §2.10): pricing, checkout, the subscription card, cancel and withdraw.
+   Design tokens only; no colour literal. The legal pages and the site footer are styled by the colleague's
+   app/legal.css (PR #42, R3-4); no class of it is redefined here. */
+.pricingPage,
+.billingPage { padding: 48px 22px 64px; }
+.pricingInner,
+.billingInner { max-width: 1040px; margin: 0 auto; }
+.billingInner.narrow { max-width: 680px; }
+.pricingGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 28px; }
+.pricingCard { display: flex; flex-direction: column; gap: 10px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--core); }
+.pricingCard h2 { margin: 0; font-family: var(--font-display); font-size: 24px; }
+.pricingPrice { margin: 0; font-size: 20px; font-weight: 600; }
+.pricingNote,
+.billingNote { margin: 0; color: var(--muted); font-size: 13px; }
+.pricingCard .btn { margin-top: auto; text-align: center; }
+.pricingFaq { margin-top: 40px; }
+.pricingFaq h3 { margin: 18px 0 4px; font-size: 16px; }
+.billingField { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.billingField input,
+.billingField select { padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); color: var(--ink); }
+.billingTotal { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--gold-bg); }
+.billingConsent { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; }
+.billingError { margin-top: 14px; color: var(--dispute-text); }
+.billingStatus { margin-top: 18px; }
+.billingCardFrame { min-height: 180px; margin-top: 12px; }
+.billingActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }

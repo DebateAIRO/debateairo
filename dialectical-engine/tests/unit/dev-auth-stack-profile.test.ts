@@ -12,6 +12,7 @@ function ports(profile: typeof DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE): readonly
     profile.apiPort,
     ...profile.providerPorts,
     profile.supportModelPort,
+    ...profile.billingFakePorts,
     profile.postgresPort,
     profile.hatchetGrpcPort,
     profile.hatchetApiPort
@@ -33,6 +34,7 @@ describe("development auth stack profiles", () => {
       apiPort: 8790,
       providerPorts: [8791, 8795, 8792, 8796, 8793],
       supportModelPort: 8794,
+      billingFakePorts: [8797, 8798, 8799],
       postgresPort: 55432,
       hatchetGrpcPort: 7077,
       hatchetApiPort: 8888,
@@ -52,13 +54,14 @@ describe("development auth stack profiles", () => {
       apiPort: 8890,
       providerPorts: [8891, 8895, 8892, 8896, 8893],
       supportModelPort: 8894,
+      billingFakePorts: [8897, 8898, 8899],
       postgresPort: 55433,
       hatchetGrpcPort: 7177,
       hatchetApiPort: 8988,
       composeProjectName: "debateai-v3-support-preview"
     });
     expect(new Set(ports(SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE)).size)
-      .toBe(12);
+      .toBe(15);
     expect(ports(SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE)
       .some((port) => ports(DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE).includes(port)))
       .toBe(false);

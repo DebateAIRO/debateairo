@@ -184,7 +184,10 @@ describe("the legal notice states the company and seller details from one consta
     const view = renderNotice("en");
     expect(COMPANY.tradeRegisterNo).toBe("[J40/…/…]");
     expect(factCell(view, "legal.notice.company.register")?.textContent).toBe("[J40/…/…]");
-    expect(factCell(view, "legal.notice.company.vat")?.textContent).toBe(legalEnglish["legal.notice.company.vatUnconfirmed"]);
+    // Paid plans (P21, R3-4): the owner confirmed on 29 September 2026 that the company is VAT-registered; the number
+    // itself stays bracketed (R4) until the owner fills it.
+    expect(COMPANY.vat).toEqual({ kind: "registered", number: "[RO…]" });
+    expect(factCell(view, "legal.notice.company.vat")?.textContent).toBe("[RO…]");
     expect(factCell(view, "legal.notice.company.vat")?.textContent).toMatch(/^\[.+\]$/);
     const mailto = [...view.querySelectorAll("a[href^='mailto:']")].map((link) => link.getAttribute("href"));
     expect(mailto).toEqual(
@@ -574,6 +577,6 @@ describe("the footers (15a full, 15b one line)", () => {
   });
 
   it("the landing renders the full footer", () => {
-    expect(source("apps/ui/components/landing/LandingPage.tsx")).toMatch(/<SiteFooter variant="full" \/>/);
+    expect(source("apps/ui/components/landing/LandingPage.tsx")).toMatch(/<SiteFooter variant="full" billing=\{footerBilling\} \/>/);
   });
 });

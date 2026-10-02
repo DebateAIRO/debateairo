@@ -60,5 +60,12 @@
   "chrome.footer.location": "Bukareštas, Rumunija",
   "chrome.footer.product": "Produktas",
   "chrome.footer.home": "Pradžia",
-  "chrome.footer.cookiePreferences": "Mūsų saugomi slapukai"
+  "chrome.footer.cookiePreferences": "Mūsų saugomi slapukai",
+  "chrome.footer.pricing": "Kainos",
+  "chrome.footer.cancel": "Atšaukti planą",
+  "chrome.footer.withdraw": "Atsisakyti plano",
+  "chrome.footer.paymentMarks": "Priimamos kortelės",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

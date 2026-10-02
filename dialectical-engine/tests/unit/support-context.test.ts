@@ -110,7 +110,8 @@ describe("Support knowledge context", () => {
     // 2026-09-24: the owner signed the /ai-transparency article pair and the catalogue
     // (OWNER records in the review manifest; the version binds the session, dates and evidence).
     // 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
-    expect(corpus.kbVersion).toBe("fba0fe65686d32d739e3bfd282b285ce2167b1b7470d8f8bb61e04f179febbd6");
+    // 2026-10-02: the owner signed the merged catalogue (#62's and the nine paid-plan pages, P24).
+    expect(corpus.kbVersion).toBe("5d088dcf72f3c50ea5ef257bd011ad33fc5f6c438cfc2c58710112cc46c5f85c");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 

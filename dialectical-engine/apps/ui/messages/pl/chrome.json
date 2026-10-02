@@ -60,5 +60,12 @@
   "chrome.footer.location": "Bukareszt, Rumunia",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Strona główna",
-  "chrome.footer.cookiePreferences": "Przechowywane pliki cookie"
+  "chrome.footer.cookiePreferences": "Przechowywane pliki cookie",
+  "chrome.footer.pricing": "Cennik",
+  "chrome.footer.cancel": "Rezygnacja z planu",
+  "chrome.footer.withdraw": "Odstąpienie od planu",
+  "chrome.footer.paymentMarks": "Akceptowane karty",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

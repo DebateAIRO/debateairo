@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Gdje nudimo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI nudimo osobama koje žive u [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
+      { kind: "p", text: "DebateAI nudimo osobama koje žive u [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "563c0a014311709efb46e3667e32e3f64e6ec1e6523dabd2ee7ace35b1246fdc",
+  sha256: "16ec07cc164f97f3e5b41f6b127b7d3fd21eacf7685a4fab988290802fde17a5",
   eyebrow: "UVJETI KORIŠTENJA · v2.0 · NA SNAZI OD [DATE]",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DebateAIRO S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
