@@ -423,7 +423,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "billing-pricing",
     route: "/pricing",
-    labels: labels("Plans and prices", "Planuri și prețuri"),
+    labels: labels("Pricing", "Prețuri"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -462,7 +462,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "billing-card-change",
     route: "/settings/card",
-    labels: labels("Change the subscription card", "Schimbă cardul abonamentului"),
+    labels: labels("Update card", "Actualizați cardul"),
     audience: "member",
     availability: "excluded",
     disposition: "excluded",
@@ -473,7 +473,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "billing-cancel",
     route: "/cancel",
-    labels: labels("Cancel a subscription by email link", "Anulează un abonament prin link pe email"),
+    labels: labels("Cancel a plan", "Anularea unui abonament"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -484,7 +484,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "billing-withdraw",
     route: "/withdraw",
-    labels: labels("Withdrawal from a subscription", "Retragerea din abonament"),
+    labels: labels("Withdraw from a plan", "Retragerea dintr-un abonament"),
     audience: "any",
     availability: "public",
     disposition: "action",
@@ -495,7 +495,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "legal-privacy-versions",
     route: "/privacy/versions",
-    labels: labels("Earlier versions of the privacy policy", "Versiunile anterioare ale politicii de confidențialitate"),
+    labels: labels("All versions of this policy", "Toate versiunile acestei politici"),
     audience: "any",
     availability: "public",
     disposition: "action",
