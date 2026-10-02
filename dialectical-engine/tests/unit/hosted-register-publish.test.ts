@@ -774,6 +774,47 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
     }
     expect(await planCode(file)).toBe("NO_REFUSAL");
   });
+
+  /**
+   * Paid plans S2 (A28(c)): with `--scorecard` the version seals a VALID
+   * scorecard, so both boots count every configured model for every plan
+   * (`firstCallPlanModels`, the picker seats from all of them); the plan asks
+   * the same groups.
+   */
+  async function planCodeWithScorecard(file: unknown): Promise<string> {
+    const scorecard = parseHostedScorecardFile(bytesOf(await compatibleExampleScorecard()), await readEngineVersion());
+    return codeOfAsync(async () => planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)), scorecard));
+  }
+
+  it("refuses, with a scorecard, a site whose only priced models are on no roster and cannot pay for one first call", async () => {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      serve_reserve_basis_points: 3_000, admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500,
+      waiting_line_per_person: 1
+    });
+    for (const target of file.providerTargets as Array<Record<string, unknown>>) {
+      target.input_price_micros_per_million = 5_000_000;
+      target.output_price_micros_per_million = 25_000_000;
+    }
+    expect(await planCode(file)).toBe("NO_REFUSAL");
+    expect(await planCodeWithScorecard(file)).toBe("RUN_CEILING_BELOW_ONE_CALL");
+  });
+
+  it("lets through, with a scorecard, a ceiling the Free roster alone refuses when a cheap model on no roster is configured", async () => {
+    const file = freeRosterFile({ input: 5_000_000, output: 25_000_000 }, true);
+    const providers = (file.configuredProviderSet as Record<string, unknown>).providers as Array<Record<string, unknown>>;
+    providers.push({ ...providers[1], providerRef: "vendor:gamma", maker: "Gamma" });
+    (file.providerTargets as Array<Record<string, unknown>>).push({
+      provider_ref: "vendor:gamma",
+      base_url: "https://api.gamma-vendor-fixture.com/v1",
+      model: "gamma-small",
+      authorization_file: "/etc/debateai/runner/providers/gamma-fixture-path.header",
+      input_price_micros_per_million: 1_000_000,
+      output_price_micros_per_million: 4_000_000
+    });
+    expect(await planCode(file)).toBe("RUN_CEILING_BELOW_ONE_CALL");
+    expect(await planCodeWithScorecard(file)).toBe("NO_REFUSAL");
+  });
 });
 
 /**

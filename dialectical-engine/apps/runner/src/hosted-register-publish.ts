@@ -60,7 +60,9 @@ import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
-import { planCapsFollowPaidSiteRule, SCORECARD_PLAN_CAPS_INVALID, type PickerSettings } from "@debateai/scorecard";
+import {
+  firstCallPlanModels, planCapsFollowPaidSiteRule, SCORECARD_PLAN_CAPS_INVALID, type PickerSettings
+} from "@debateai/scorecard";
 import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
@@ -840,19 +842,29 @@ export async function planHostedRegisterPublication(
   // boots run (RUN_CEILING_BELOW_ONE_CALL), asked of the version about to be
   // sealed, by the same functions over the same inputs: the file's priced
   // targets (they must equal PROVIDER_DISCOVERY_TARGETS_JSON, which the units
-  // read), the composed JUDGE bound, the ask's largest question and each plan's
-  // roster. Only with the band, as at boot. The boots keep asking: the
-  // environment can still differ from the file.
+  // read), the composed JUDGE bound, the ask's largest question and the models
+  // each plan can seat, by the boots' own rule (`firstCallPlanModels`, paid
+  // plans S2): while the version's sealed scorecard is VALID, every configured
+  // model counts for every plan, because the picker seats from all of them;
+  // without one, each plan's own roster. `scorecard !== null` is the boots'
+  // `state === "VALID"` for this version: `parseHostedScorecardFile` admits
+  // only a VALID scorecard. Only with the band, as at boot. The boots keep
+  // asking: the environment can still differ from the file.
   if (costEnvelopeBand(costEnvelope) !== null) {
+    const firstCalls = firstPositionCallProjections({
+      targets,
+      judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
+      questionMaxBytes: askQuestionMaxBytes()
+    });
     assertRunCeilingCoversOneCall({
       bodyCeilingMicros: costEnvelopeCeilings(costEnvelope).bodyMicros,
       firstCallsByRoster: firstCallsByPlanRoster({
-        projections: firstPositionCallProjections({
-          targets,
-          judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
-          questionMaxBytes: askQuestionMaxBytes()
-        }),
-        rosters: PLAN_TIER_ROSTERS
+        projections: firstCalls,
+        rosters: firstCallPlanModels({
+          scorecardInForce: scorecard !== null,
+          rosters: PLAN_TIER_ROSTERS,
+          models: firstCalls.map((call) => call.model)
+        })
       })
     });
   }
