@@ -4,7 +4,7 @@ import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
-import { resolveDeploymentMode } from "@debateai/register";
+import { assertRelayRuntime } from "./relay-deployment-guard.js";
 import { startAgyRelay } from "./agy-relay.js";
 import { startClaudeRelay } from "./claude-relay.js";
 import { startGrokRelay } from "./grok-relay.js";
@@ -120,11 +120,12 @@ type StartedRelay = CliRelayHandle & Readonly<{
   harnessOverhead?: HarnessOverhead;
 }>;
 
-/** V-9(c): the relay host is local-mode tooling and refuses the hosted deployment outright. */
+/**
+ * V-9(c): the relay host is local-mode tooling and refuses the hosted deployment outright, through the one relay
+ * guard (acceptance/relay-deployment-guard.ts) and its codes, like every other entry point that starts a relay.
+ */
 export function assertRelayHostRuntime(environment: Readonly<Record<string, string | undefined>>): void {
-  if (resolveDeploymentMode(environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV) === "hosted") {
-    throw new TypeError("RELAY_HOST_REFUSED_IN_HOSTED");
-  }
+  assertRelayRuntime(environment);
 }
 
 export async function readRelayHostCandidates(path: string): Promise<readonly RelayHostCandidate[]> {

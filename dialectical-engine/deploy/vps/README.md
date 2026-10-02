@@ -758,7 +758,7 @@ order in both directions:
 - **The runner is never older than the API.** The API now writes a new member,
   `serve_reserve_attempts` (the calls held back for the answer), into every new debate's cost
   receipt (`envelope_basis`). An older runner reads that receipt strictly and fails the debate
-  with `RUN_COST_ENVELOPE_UNRESOLVED`. To upgrade, update the runner first (or both together), then
+  with `RUN_ENVELOPE_BASIS_INVALID`. To upgrade, update the runner first (or both together), then
   the API. To roll back, roll the API back first.
 - **Never roll the runner back on its own while debates admitted by the new API are still
   queued or running.** Their receipts carry the new member. Roll the API back first. Right after,
