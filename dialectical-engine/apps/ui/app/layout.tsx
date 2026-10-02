@@ -16,6 +16,7 @@ import { NONCE_REQUEST_HEADER } from "../content-security-policy.mjs";
 import "./globals.css";
 import "./language-switcher.css";
 import "./legal.css";
+import "./billing.css";
 
 const display = Fraunces({
   subsets: ["latin"],

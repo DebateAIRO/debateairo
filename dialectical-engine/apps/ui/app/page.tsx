@@ -17,8 +17,25 @@ import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
+import { formatUsd } from "@/lib/billing/format";
 
 export const dynamic = "force-dynamic";
+
+/** The landing's price line: the lowest paid net price, or null when billing is off or the plans cannot be read. */
+async function landingLowestPaidPrice(locale: string, headerStore: Headers): Promise<string | null> {
+  try {
+    const answer = await createServerContractClient(
+      fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
+    ).getBillingPlans();
+    const lowest = answer.plans
+      .filter((plan) => plan.plan_id !== "FREE")
+      .map((plan) => plan.net_price)
+      .sort((left, right) => Number(left) - Number(right))[0];
+    return lowest === undefined ? null : formatUsd(locale, lowest);
+  } catch {
+    return null;
+  }
+}
 
 export default async function HomePage({
   searchParams = Promise.resolve({})
@@ -39,7 +56,10 @@ export default async function HomePage({
     loadNamespace(locale, "compose")
   ]);
   const catalog = Object.freeze({ ...homeCatalog, ...chromeCatalog });
-  if (token === null) return <><LandingPage catalog={catalog} /><SupportWidget /></>;
+  if (token === null) {
+    const lowestPaidPrice = await landingLowestPaidPrice(locale, await headers());
+    return <><LandingPage catalog={catalog} lowestPaidPrice={lowestPaidPrice} /><SupportWidget /></>;
+  }
   const requestedTab = (await searchParams).tab;
   const tab: "yours" | "public" =
     requestedTab === "yours" || requestedTab === "public"

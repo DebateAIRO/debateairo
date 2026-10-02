@@ -302,6 +302,7 @@ apps/ui/app/new/defaults.tsx
 apps/ui/app/new/page.tsx
 apps/ui/app/not-found.tsx
 apps/ui/app/page.tsx
+apps/ui/app/pricing/page.tsx
 apps/ui/app/privacy/page.tsx
 apps/ui/app/privacy/us-health-data/page.tsx
 apps/ui/app/providers/page.tsx
@@ -366,6 +367,7 @@ apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
 apps/ui/components/authRoutes.source-test.mjs
 apps/ui/components/billing/LegalAcceptGate.tsx
+apps/ui/components/billing/PricingCards.tsx
 apps/ui/components/billing/ResetSentence.tsx
 apps/ui/components/billing/RoomNotice.tsx
 apps/ui/components/billing/UsageBars.tsx
@@ -415,7 +417,9 @@ apps/ui/lib/ageConfirmation.ts
 apps/ui/lib/aiDisclosure.ts
 apps/ui/lib/api.ts
 apps/ui/lib/authNavigationGuard.ts
+apps/ui/lib/billing/format.ts
 apps/ui/lib/billing/formatReset.ts
+apps/ui/lib/billing/plans.ts
 apps/ui/lib/billing/room.ts
 apps/ui/lib/billing/roomCatalog.ts
 apps/ui/lib/billing/usage.ts

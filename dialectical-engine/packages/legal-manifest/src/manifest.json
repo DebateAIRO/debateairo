@@ -5,6 +5,290 @@
     "TERMS": null
   },
   "documents": {
+    "CONSENT_IMMEDIATE_START": {
+      "ar": {
+        "version": "sha256-1f725a76c419",
+        "sha256": "1f725a76c419f846e0d92578486496b2e2bafa03cef6d6b13c9483658a2fd1b8"
+      },
+      "bg": {
+        "version": "sha256-fdb2f247c902",
+        "sha256": "fdb2f247c902d612102c151d49fe3d9ed592f755235722b80eb400927c93fa77"
+      },
+      "cs": {
+        "version": "sha256-342db07ea45f",
+        "sha256": "342db07ea45f49ad2e2455f096526e91975840dd8e418c024f0f58c430fbdb62"
+      },
+      "da": {
+        "version": "sha256-5bb8fabfb942",
+        "sha256": "5bb8fabfb9421d82ffc786a0050d622014526a7b16ddb1d2ba7077af8222e486"
+      },
+      "de": {
+        "version": "sha256-48b686b9b3a2",
+        "sha256": "48b686b9b3a2296cb1459f6b13f9656274c3802faece60307c383327cf759b0d"
+      },
+      "el": {
+        "version": "sha256-ecca5a81d2c5",
+        "sha256": "ecca5a81d2c560338555a4a0c262ccd5144851825ce2ecf330d75412742b7bc0"
+      },
+      "en": {
+        "version": "sha256-1c4d2e531d34",
+        "sha256": "1c4d2e531d34cf75b234a656f429ffa9d4ddf9e94ac27bd0ea37724dc37ee8dc"
+      },
+      "es": {
+        "version": "sha256-8def1d2e35eb",
+        "sha256": "8def1d2e35ebc34248dcb40f883d7b0abfe88d74b539ce96bcfe9f2615425b27"
+      },
+      "et": {
+        "version": "sha256-5634e457baf5",
+        "sha256": "5634e457baf524926551d1dd7fac841537a6312a0208f90eaed23f948b541fd5"
+      },
+      "fi": {
+        "version": "sha256-26569ca94acc",
+        "sha256": "26569ca94acc925c05de5b672ec98764f315acfcc82797019a597335f96929b5"
+      },
+      "fr": {
+        "version": "sha256-3f578e214a8d",
+        "sha256": "3f578e214a8d60fd84f91ca1f5d93ad69d602060f9fa0727f805dd370ea50c06"
+      },
+      "ga": {
+        "version": "sha256-9afce72449ee",
+        "sha256": "9afce72449ee54117e37543b828fdc0929e12c8785dae9d6abf46c871768c862"
+      },
+      "he": {
+        "version": "sha256-5a2a35eed2e4",
+        "sha256": "5a2a35eed2e473d2c8a2ca51922d16c9eb25370ad02ae05b72fe1e27ed9ddd45"
+      },
+      "hi": {
+        "version": "sha256-bf6cb4270ac7",
+        "sha256": "bf6cb4270ac705ab69b007f419b38a399a904e6f00cc3456d7e72702a5715dc4"
+      },
+      "hr": {
+        "version": "sha256-2bbc32632341",
+        "sha256": "2bbc3263234186c2ebd03f95443fa4c5cf7b43c44bd0e0a3c43504795504f2bf"
+      },
+      "hu": {
+        "version": "sha256-6e283ffed491",
+        "sha256": "6e283ffed49146924fc4c5d87b82ed6a7d4a59a9cd1b685146c4cd5791b12001"
+      },
+      "id": {
+        "version": "sha256-5f1a13e1abe4",
+        "sha256": "5f1a13e1abe416f2a49f3eb458894092587f69994ae28a55d6e1af52239c9b2c"
+      },
+      "it": {
+        "version": "sha256-71f792664e92",
+        "sha256": "71f792664e927db1f27e3247bf60a76905a5921b1a75d747e1dbde6f6a43604d"
+      },
+      "ja": {
+        "version": "sha256-7f468e54f9fc",
+        "sha256": "7f468e54f9fcf10739076ba9d5d733726bb9b63b9acbd29ece4ede8a9e341412"
+      },
+      "ko": {
+        "version": "sha256-b15fd82f2f9a",
+        "sha256": "b15fd82f2f9a23a5744936bf03130cf9015a5040c1ee10481ddc79aa51fc0f2e"
+      },
+      "lt": {
+        "version": "sha256-6ad9e0014dea",
+        "sha256": "6ad9e0014dea8751bd391a6ae8dbe98cc751a47988e23068dbdb71825cc6db78"
+      },
+      "lv": {
+        "version": "sha256-ba4e45219bcb",
+        "sha256": "ba4e45219bcb99fa7d0f9665da6406bf0aa47ca08de16212780275b6cef71f20"
+      },
+      "mt": {
+        "version": "sha256-67787b9cfd02",
+        "sha256": "67787b9cfd02be3c8f6ac38d47552c7f741a22c955af4de3cff35b5954e64b37"
+      },
+      "nl": {
+        "version": "sha256-ca35f7f29a97",
+        "sha256": "ca35f7f29a97d786b7b831b914fec11b553f3d8c953a64a7561e3f3382b055df"
+      },
+      "pl": {
+        "version": "sha256-7c02fa7ef062",
+        "sha256": "7c02fa7ef062adee6396409a0f6f27083912bf54ac7659add33a86741349b2f1"
+      },
+      "pt": {
+        "version": "sha256-049dfeb3e9a6",
+        "sha256": "049dfeb3e9a6ad081e8b56e1703259082b5b4788326f47ff14f7cb53efae9a43"
+      },
+      "ro": {
+        "version": "sha256-c91523a9ed8e",
+        "sha256": "c91523a9ed8e261a46af87ac31c7cebcfd9fe0b273a790a0d305250fd4e966ba"
+      },
+      "ru": {
+        "version": "sha256-953589d26b2e",
+        "sha256": "953589d26b2ee0c3ce309e565aa1aa5a1fea7dd6a31358f31cc62116f604646d"
+      },
+      "sk": {
+        "version": "sha256-83444d202d8c",
+        "sha256": "83444d202d8c74a166520ff52ad6f026fcc85c52529bca160f770f81b8bd782d"
+      },
+      "sl": {
+        "version": "sha256-ab7d45c6cf96",
+        "sha256": "ab7d45c6cf96de98c90c25d129903c270b30f9353082b5983c8907698cb34f62"
+      },
+      "sv": {
+        "version": "sha256-c7e1f6d3eb2d",
+        "sha256": "c7e1f6d3eb2d8d57955fdaf835870643d6568fb0294f6543728d11b13d280f68"
+      },
+      "tr": {
+        "version": "sha256-87ffeafc3ee7",
+        "sha256": "87ffeafc3ee76dd5807d0b0de98a655cb05ac96877e6adb40f685333bb8309e5"
+      },
+      "uk": {
+        "version": "sha256-01c54340ac56",
+        "sha256": "01c54340ac5698cc6972433d55e8ba952cafa200774b443d977df776e37dfd24"
+      },
+      "vi": {
+        "version": "sha256-d66a13e0b924",
+        "sha256": "d66a13e0b92455f0196b9e83cbda13e13e442ded7e91544e33214732a4393e31"
+      },
+      "zh": {
+        "version": "sha256-a806902ae77c",
+        "sha256": "a806902ae77ca5e6a02402e7be2748ee57bd9a629d5ae5625bc67ede25fbbda9"
+      }
+    },
+    "CONSENT_RENEWAL": {
+      "ar": {
+        "version": "sha256-3c480ddb838e",
+        "sha256": "3c480ddb838e2d7820b251e8c274d0a18cfec20b8a14aa7d180531592bdcca8d"
+      },
+      "bg": {
+        "version": "sha256-60cabc1358cf",
+        "sha256": "60cabc1358cfb260244cb566f001abd49d46d454201e666b1eb3ce539a85d844"
+      },
+      "cs": {
+        "version": "sha256-43df5d31b828",
+        "sha256": "43df5d31b828d37251f4749a929a4f30f32d5e90fcc1e00d69be4cc2df8c6eb8"
+      },
+      "da": {
+        "version": "sha256-2492f2892fce",
+        "sha256": "2492f2892fce5150fe2460787b419375a34bb1ef197b2ac464c9b07dc313e98e"
+      },
+      "de": {
+        "version": "sha256-3cfcfa34f90d",
+        "sha256": "3cfcfa34f90da65e5acdcb761f801a537a86e89ea7dfec4d84ed75f001406428"
+      },
+      "el": {
+        "version": "sha256-e81a3047f5de",
+        "sha256": "e81a3047f5de12808c1497ff787c765aa6e1a291081a7bb227e1789f565944a8"
+      },
+      "en": {
+        "version": "sha256-58ac2b4973f2",
+        "sha256": "58ac2b4973f2c6421a22cd9aaa4af7206833bab976ef37831d31d00fd4441b48"
+      },
+      "es": {
+        "version": "sha256-aed1243766c3",
+        "sha256": "aed1243766c30f5ec4b0eef78f84b53ed56a60093410d457c705f81873077cbd"
+      },
+      "et": {
+        "version": "sha256-1db9b55099b1",
+        "sha256": "1db9b55099b18c0909cea2b3bf29611e8212cc52f4c6bbba6e379d683973e361"
+      },
+      "fi": {
+        "version": "sha256-ef7adff0f922",
+        "sha256": "ef7adff0f9229a30921f6e23d911463fdcb35de8a01b7950fe8d6bfe29d9e59c"
+      },
+      "fr": {
+        "version": "sha256-875323ef9336",
+        "sha256": "875323ef93360e6c6b5243fa4e240308e9f3f50ae6923837c2ff53a61af0a919"
+      },
+      "ga": {
+        "version": "sha256-c62e1e277dd7",
+        "sha256": "c62e1e277dd7d21a72e3b5ec6ab4ed38e6f904f2bedd825d67cab508cf456d2c"
+      },
+      "he": {
+        "version": "sha256-bccfc829f800",
+        "sha256": "bccfc829f800fe2f11419e15bdbe72420b27a7f62a6f1eb974b57657126aa685"
+      },
+      "hi": {
+        "version": "sha256-72873767eb6d",
+        "sha256": "72873767eb6da199f1d05a5781b711dba5eb76c0358901ed9760452f1f4bc139"
+      },
+      "hr": {
+        "version": "sha256-5896e074299e",
+        "sha256": "5896e074299e1c088df45664698da3877e84004e2d3ce544d9390bbd66c1d1b5"
+      },
+      "hu": {
+        "version": "sha256-86f5bbd735b1",
+        "sha256": "86f5bbd735b156ed6b91de7962c31720a5ec5553f06f50594f3513ba2bd6103d"
+      },
+      "id": {
+        "version": "sha256-ee4408d413c9",
+        "sha256": "ee4408d413c90954c3868f502524c3cbb8724bc1aa8243e4de2bbcda04710147"
+      },
+      "it": {
+        "version": "sha256-3740a32c7382",
+        "sha256": "3740a32c7382d3a815638495a900894f0b2f3ff5c7b890bf72cc62bb2fa0817e"
+      },
+      "ja": {
+        "version": "sha256-3e107ac52410",
+        "sha256": "3e107ac52410171d62e3d73021f087a7c8e95751a7e06e2459abbe4c9510cb22"
+      },
+      "ko": {
+        "version": "sha256-909e69c799d6",
+        "sha256": "909e69c799d6ee68b4369f5a140aa3e933f5a6f135a4036c7c3c9bd898356fb3"
+      },
+      "lt": {
+        "version": "sha256-f54d32422e0d",
+        "sha256": "f54d32422e0d3a39919e0a869277db0d72ec5ed8e60ec0d9f429b70c3277ec92"
+      },
+      "lv": {
+        "version": "sha256-2b8e1c235404",
+        "sha256": "2b8e1c2354045462b415b784e35d69bffed90a08aa767350d9855995f03a291c"
+      },
+      "mt": {
+        "version": "sha256-f62bb882da67",
+        "sha256": "f62bb882da6715d7b6db42fbc27ec4315c99596a53d1d28939a17e068d090159"
+      },
+      "nl": {
+        "version": "sha256-22b991133bf5",
+        "sha256": "22b991133bf57e6e9270a502d9ca4f4f0b57845d297e5230adb5bc56aa82f4f7"
+      },
+      "pl": {
+        "version": "sha256-ccbac1560776",
+        "sha256": "ccbac15607765ea799dc3965c8cc6953b5b161bda9684ab0b3a036b7653613b2"
+      },
+      "pt": {
+        "version": "sha256-048f34f63730",
+        "sha256": "048f34f637308953f1c88e1819c6623133d0d9ddd161f98a26b7863c552f1f5f"
+      },
+      "ro": {
+        "version": "sha256-f46f74f25391",
+        "sha256": "f46f74f25391905a6014591ebce2149c560f4298e99c0acfd9537ee8364efd7b"
+      },
+      "ru": {
+        "version": "sha256-1ea8a4993ebc",
+        "sha256": "1ea8a4993ebc59b187a122fc318a2362d296b467d0f3eb7f6ce0561405d19049"
+      },
+      "sk": {
+        "version": "sha256-30f8938bf4e4",
+        "sha256": "30f8938bf4e47a6b051473022ebd4606179b1a5deb03adea88d07eacf2b56446"
+      },
+      "sl": {
+        "version": "sha256-d7e60595967c",
+        "sha256": "d7e60595967c25fc1a301738be97f58d8c6aac2142b42b299e05cfe9945697e3"
+      },
+      "sv": {
+        "version": "sha256-0af088d433b5",
+        "sha256": "0af088d433b5195d4d53ddc6c869c13e4b110a97946aa4380aaa3cff9c7c9584"
+      },
+      "tr": {
+        "version": "sha256-a1cdba2b15d2",
+        "sha256": "a1cdba2b15d2f3421ab782574f9b5bc7a21d8b12290f2873baa71b456a45e9f2"
+      },
+      "uk": {
+        "version": "sha256-ba996400328c",
+        "sha256": "ba996400328c664fbbe60cdc847a17780d7e340c992db0d9121f91d67d4a271d"
+      },
+      "vi": {
+        "version": "sha256-3fffb19b4879",
+        "sha256": "3fffb19b48797830cca15bc5317ba643db12fec63c43eaa1c6c670540970b9d8"
+      },
+      "zh": {
+        "version": "sha256-a59a7ed1405b",
+        "sha256": "a59a7ed1405b3041f5d85a3fc4245c9bc1e0f2e00f115c2dab9adb0348c6a94c"
+      }
+    },
     "PRIVACY": {
       "ar": {
         "version": "3.0",

@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { act, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ContractHttpError } from "@debateai/contract";
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 
@@ -27,12 +28,15 @@ type JSDOMModule = {
 const routeMocks = vi.hoisted(() => ({
   sessionCookie: null as string | null,
   readPublicDebates: vi.fn(async () => ({ items: [], total: 0 })),
-  listDebatesPageServer: vi.fn(async () => ({ summaries: [], shown: 0, total: 0 }))
+  listDebatesPageServer: vi.fn(async () => ({ summaries: [], shown: 0, total: 0 })),
+  getBillingPlans: vi.fn(async (): Promise<unknown> => {
+    throw new ContractHttpError("NOT_FOUND", 404, "Not found");
+  })
 }));
 
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
-  createServerContractClient: () => ({ readPublicDebates: routeMocks.readPublicDebates }),
+  createServerContractClient: () => ({ readPublicDebates: routeMocks.readPublicDebates, getBillingPlans: routeMocks.getBillingPlans }),
   listDebatesPageServer: routeMocks.listDebatesPageServer
 }));
 
@@ -137,8 +141,11 @@ describe("T9-C1 route split & chrome", () => {
     // ahead of any library work — so the shape admits exactly that fragment and
     // nothing looser: an arbitrary body here would let real work sneak in front
     // of the landing and the ordering assertions below would stop meaning it.
+    // Paid plans (P18, spec 2026-09-29 §2.10): the branch now awaits exactly ONE
+    // price read, the landing's lowest paid price, and nothing else, so no
+    // library work can slip in front of the landing.
     const landingBranch =
-      /if\s*\(\s*token\s*===\s*null\s*\)\s*(?:\{\s*)?return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;/.exec(
+      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+lowestPaidPrice\s*=\s*await\s+landingLowestPaidPrice\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{lowestPaidPrice\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
         pageSource
       );
     const landingReturnIndex = landingBranch?.index ?? -1;
@@ -346,17 +353,31 @@ describe("T9-C4 landing content", () => {
     expect(cardText).toMatch(/REVIEW (?:AGREED|DISPUTED) BY:/);
   });
 
-  it("keeps the hero and pricing placeholders literal", async () => {
-    // PROPERTY: this mission renders the two V-closed placeholder strings,
-    // never a live debate counter or a real price substituted in either region.
+  it("keeps the hero placeholder literal and states the pricing plainly when billing is off", async () => {
+    // PROPERTY: the hero counter stays the V-closed placeholder; the pricing line is real copy now
+    // (spec 2026-09-29 §2.10) and, with no plans to read, promises nothing about paid plans.
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
     const pricing = document.querySelector('[data-landing-section="pricing"]');
-
     expect(hero?.textContent).toContain("[PLACEHOLDER] rounds argued this week");
-    expect(pricing?.textContent).toContain(
-      "First [PLACEHOLDER] rounds free, then [PLACEHOLDER] per month. Cancel whenever."
-    );
+    expect(pricing?.textContent).toContain("Start free. No card needed.");
+    expect(pricing?.textContent).not.toContain("[PLACEHOLDER]");
+    expect(pricing?.querySelector('a[href="/pricing"]')).toBeNull();
+  });
+
+  it("names the lowest paid price from the published plans and links to the pricing page", async () => {
+    routeMocks.getBillingPlans.mockResolvedValueOnce({
+      currency: "USD",
+      plans: [
+        { plan_id: "FREE", net_price: "0.00", allowance_vs_plus: "0.04" },
+        { plan_id: "MAX", net_price: "200.00", allowance_vs_plus: "30" },
+        { plan_id: "PLUS", net_price: "20.00", allowance_vs_plus: "1" }
+      ]
+    });
+    const document = await renderRoute(null);
+    const pricing = document.querySelector('[data-landing-section="pricing"]');
+    expect(pricing?.textContent).toContain("Start free. Paid plans start at $20.00 a month plus tax. Cancel whenever.");
+    expect(pricing?.querySelector('a[href="/pricing"]')?.textContent).toBe("See the plans");
   });
 
   it("renders every binding landing paragraph verbatim in its owning subtree", async () => {
