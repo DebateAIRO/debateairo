@@ -140,7 +140,7 @@ export function createFakeApi({ log = (line) => process.stdout.write(`${line}\n`
       });
     }
     if (path === "/__fake/hold" && method === "POST") {
-      holdNextReplyMs = Math.max(0, Number(url.searchParams.get("delay") ?? 0) || 0);
+      holdNextReplyMs = Math.min(30_000, Math.max(0, Number(url.searchParams.get("delay") ?? 0) || 0));   // capped: a test-only hold, never a long timer
       return send(res, 200, { holdNextReplyMs });
     }
 
@@ -270,7 +270,7 @@ export function createFakeApi({ log = (line) => process.stdout.write(`${line}\n`
         return send(res, 404, { error: "NOT_FOUND" });
       }
       const hold = holdNextReplyMs; holdNextReplyMs = 0;
-      if (hold > 0) await new Promise((r) => setTimeout(r, hold));
+      if (hold > 0) await new Promise((r) => setTimeout(r, Math.min(hold, 30_000)));
       messageRequests.push({ sessionId: id, status: 200, text, at: Date.now(), heldMs: hold });
       return send(res, 200, {
         message_id: randomUUID(), outcome: "ANSWER_GROUNDED", text: `reply to: ${text}`,

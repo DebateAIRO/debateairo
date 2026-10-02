@@ -2,7 +2,7 @@
 // The real UI server (`node server.mjs`, a `next build` made by c4.sh's ensure_build) on 127.0.0.1:4870, in front
 // of the fake API (fake-api.mjs) on 127.0.0.1:4871. Chromium new headless (playwright-core via NODE_PATH).
 //
-// usage: node --import tsx tests/browser/s04-support-cross-tab/run.mjs --ui-root <apps/ui dir> --no-build [--only <regex>]
+// usage: node --import tsx tests/browser/s04-support-cross-tab/run.mjs --ui-root <apps/ui dir> --no-build [--only <id>[,<id>…]]
 //   --no-build  required: this harness never builds; c4.sh builds first when the build stamp differs (B3, D-S04-26).
 //   --only      a debugging subset (never used by c4.sh): the run then ends with the marker PARTIAL, never CLUSTER_GREEN.
 //   env: S04_PID_DIR (c4.sh: this run's <log>.pids/) — both PIDs are written there and killed by PID at teardown.
@@ -37,7 +37,7 @@ import { createRequire } from "node:module";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -57,7 +57,8 @@ const out = (line) => { lines.push(line); process.stdout.write(`${line}\n`); };
 const argv = process.argv.slice(2);
 const argOf = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
 const uiRoot = argOf("--ui-root") ? path.resolve(argOf("--ui-root")) : undefined;
-const only = argOf("--only") ? new RegExp(argOf("--only")) : null;
+const only = argOf("--only") ? argOf("--only").split(",").filter(Boolean) : null;   // case-id substrings, no regex
+const picked = (id) => !only || only.some((part) => id.includes(part));
 const pidDir = process.env.S04_PID_DIR ? path.resolve(process.env.S04_PID_DIR) : path.join(HERE, ".pids-unused");
 function broken(reason) { out(`BROKEN ${reason}`); out("BROKEN"); process.exit(1); }
 if (!argv.includes("--no-build")) broken("--no-build is required: the harness never builds (c4.sh ensure_build does, B3)");
@@ -185,7 +186,7 @@ let dateBroken = false;
 // The marker is words, not a token: the panel shows and stores a token-like string as "[REDACTED_SECRET_LIKE]"
 // (measured: "S04-R01-REVOKE-THIS-visible-<8 hex>" was redacted), which would make the absent oracle vacuous.
 // sendA() therefore proves the marker is shown AND stored verbatim before any case goes on.
-const nonce = () => [...randomBytes(5)].map((x) => "bcdfghjklmnpqrstvwxz"[x % 20]).join("");
+const nonce = () => Array.from({ length: 5 }, () => "bcdfghjklmnpqrstvwxz"[randomInt(20)]).join("");
 const markerFor = (id) => `S04 case ${id.replace(/-/g, " ")} nonce ${nonce()}`;
 async function openCase(id, { clockOffset } = {}) {
   const context = await browser.newContext();
@@ -625,7 +626,7 @@ async function runBfcacheProbe(c) {
 
 // ---------- run ----------
 let failures = 0, counted = 0;
-const selected = cases.filter((k) => !only || only.test(k.id));
+const selected = cases.filter((k) => picked(k.id));
 for (const k of selected) {
   counted++;
   const c = await openCase(k.id, { clockOffset: k.clockOffset });
@@ -640,7 +641,7 @@ for (const k of selected) {
   else out(`PASS ${k.id} ${result.ms}${result.extra ?? ""}`);
   await c.context.close().catch(() => {});
 }
-for (const k of recorded.filter((r) => !only || only.test(r.id))) {
+for (const k of recorded.filter((r) => picked(r.id))) {
   const c = await openCase(k.id, { clockOffset: k.clockOffset });
   try { await k.run(c); } catch (e) { out(`RECORDED ${k.id} error: ${String(e?.message ?? e).split("\n")[0].slice(0, 240)}`); }
   await c.context.close().catch(() => {});
