@@ -6,8 +6,15 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { StandingDatabase } from "./standing-db.js";
 import { startStandingDatabase } from "./standing-db.js";
-import { readPanelWeightingControls } from "@debateai/register";
+import {
+  modelScorecardFromValue,
+  readEngineVersion,
+  readPanelWeightingControls,
+  type ModelScorecardReadResult
+} from "@debateai/register";
+import type { RoleAssignment } from "@debateai/scorecard";
 import { acceptanceServiceRequestHeaders, createAcceptanceRuntime } from "./main.js";
+import { computeAcceptanceStructuralCeiling, readAcceptanceRuntimePolicy } from "./runtime-policy.js";
 import { ACCEPTANCE_REGISTER_VERSION, seedAcceptanceRegister } from "./seed-register.js";
 import { bearingsForRequest } from "../tests/support/reviewBearings.js";
 import { evaluatorSatisfied, isEvaluatorPacket } from "./test-fixtures/evaluator-double.js";
@@ -22,6 +29,7 @@ import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
 import { PANEL_PROMPT_CONTRACT, judgePromptContract, reviewPromptContract } from "@debateai/judgement";
 import { SYNTHESIZER_PROMPT_CONTRACT } from "@debateai/serve";
 import { EVALUATOR_PROMPT_CONTRACT } from "@debateai/runner";
+import { compatibleExampleScorecard } from "../tests/support/modelScorecardFixture.js";
 
 /**
  * T3 / S2-2 — the ACCEPTANCE-path receipt for the wired judge panel.
@@ -279,6 +287,8 @@ afterAll(async () => {
 describe("T3 / S2-2 — the judge panel is live on the acceptance path (author != judge)", () => {
   it("persists one reduced judgement per node carrying >= 2 panel members and a measured dispersion", async () => {
     const runtime = await createAcceptanceRuntime({
+      // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
+      modelScorecard: { state: "ABSENT" },
       pool: database.pool,
       serviceCredential: "p".repeat(43),
       environment: {
@@ -418,6 +428,8 @@ describe("T3 / S2-2 — the judge panel is live on the acceptance path (author !
     primaryProvider.failAssessCalls(true);
     secondProvider.failAssessCalls(true);
     const runtime = await createAcceptanceRuntime({
+      // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
+      modelScorecard: { state: "ABSENT" },
       pool: database.pool,
       serviceCredential: "d".repeat(43),
       environment: {
@@ -594,5 +606,152 @@ describe("S-LANG — the panel provider double classifies a packet the same with
     const body = wireBody(reviewPromptContract(1), argumentLanguageDirective("Romanian"));
     expect(body.includes("fatalFlags") && !body.includes("restatement_text")).toBe(true);
     expect(classifyRequest(body)).toBe("REVIEW");
+  });
+});
+
+/**
+ * Model scorecard A20.4 — THE PICKER ON THE ACCEPTANCE PATH, end to end.
+ *
+ * The two doubles answer as `test-layer/model` under the OpenAI and Anthropic
+ * makers, and the acceptance relays declare no thinking level, window or price.
+ * So the scorecard below is the package's example cut to one candidate per maker,
+ * each re-pointed at that model at DEFAULT_ONLY, declared compatible with this
+ * engine. It is INJECTED: this row never reads scorecards/current.json.
+ *
+ * The ask carries its plan tier (the two rows above predate the required
+ * `plan_tier` and are refused before admission; that is dev 7658e997, tracked in
+ * acceptance-baseline.md). A VALID scorecard replaces the plan-roster filter, so
+ * the doubles' model id does not have to be on the free roster.
+ */
+async function acceptancePanelScorecard(): Promise<ModelScorecardReadResult> {
+  const example = await compatibleExampleScorecard();
+  const keep = new Set(["openai-alpha-high", "anthropic-beta-medium"]);
+  const candidates = (example.candidates as readonly Record<string, unknown>[])
+    .filter((candidate) => keep.has(String(candidate.candidateId)))
+    .map((candidate) => ({ ...candidate, modelId: "test-layer/model", thinkingLevel: "DEFAULT_ONLY" }));
+  const roles = Object.fromEntries(Object.entries(example.roles as Record<string, readonly Record<string, unknown>[]>)
+    .map(([role, entries]) => [role, entries
+      .filter((entry) => keep.has(String(entry.candidateId)))
+      .map((entry) => ({ ...entry, typicalCall: { ...(entry.typicalCall as Record<string, unknown>), thinkingTokens: null } }))]));
+  return modelScorecardFromValue(
+    { ...example, candidates, roles }, "acceptance:panel-multi-maker", await readEngineVersion()
+  );
+}
+
+describe("A20 · a VALID scorecard drives the acceptance path: picked, pinned, provisioned, seated", () => {
+  it("admits through the picker, pins the assignment, sizes a runner-up's backup, and calls only pinned candidates", async () => {
+    primaryProvider.failAssessCalls(false);
+    secondProvider.failAssessCalls(false);
+    const modelScorecard = await acceptancePanelScorecard();
+    expect(modelScorecard.state).toBe("VALID");
+    const runtime = await createAcceptanceRuntime({
+      modelScorecard,
+      pool: database.pool,
+      serviceCredential: "s".repeat(43),
+      environment: {
+        DATABASE_URL: database.connectionString,
+        API_HOST: "127.0.0.1",
+        API_PORT: 8_000,
+        STRANGER_SAMPLE_RATE: 1,
+        BATTERY_VERSION: "acceptance:panel-scorecard",
+        SETTLEMENT_WATCH_HANDLE: "acceptance:panel-scorecard:watch",
+        MODEL_BASE_URL: primaryProvider.endpoint
+      },
+      makerRelays: [
+        {
+          providerRef: "acceptance:codex-cli",
+          baseUrl: primaryProvider.endpoint,
+          model: "test-layer/model",
+          authorizationHeader: "Bearer test-panel-scorecard-primary"
+        },
+        {
+          providerRef: "acceptance:claude-cli",
+          baseUrl: secondProvider.endpoint,
+          model: "test-layer/model",
+          authorizationHeader: "Bearer test-panel-scorecard-second"
+        }
+      ]
+    });
+    try {
+      const origin = "http://127.0.0.1:8000";
+      const ask = await runtime.api.inject({
+        method: "POST",
+        url: "/v1/asks",
+        headers: acceptanceServiceRequestHeaders(runtime.serviceSession, origin, true),
+        payload: {
+          question_line: "Should a city library lend tools as well as books?",
+          risk_tier: "standard",
+          tier_source: "ASKER",
+          tier_provenance_ref: "acceptance:panel-scorecard:asker",
+          composition_budget_tier: "low",
+          depth_params: { depth: 1 },
+          decision_scope: "acceptance-test",
+          as_of: "2026-09-01T00:00:00.000Z",
+          steering_presets: [],
+          steering_annotations: [],
+          plan_tier: "free"
+        }
+      });
+      if (ask.statusCode !== 202) throw new Error(`PANEL_SCORECARD_ASK_REJECTED:${ask.statusCode}:${ask.body}`);
+      // A20.3: the asker is told which strength ran (no scorecard default is overridden here).
+      const accepted = ask.json() as { run_ref: string };
+      expect(accepted).toMatchObject({
+        status: "QUEUED", model_strength_applied: "BALANCED", model_strength_stepped_down: false
+      });
+      const runId = accepted.run_ref;
+      await vi.waitFor(async () => {
+        const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+          "SELECT state, terminal_reason FROM core.work_item WHERE run_id=$1",
+          [runId]
+        );
+        if (work.rows[0]?.state === "FAILED") {
+          throw new Error(`PANEL_SCORECARD_WORK_FAILED:${work.rows[0].terminal_reason}:unclassified=`
+            + JSON.stringify([...primaryProvider.unclassifiedCalls(), ...secondProvider.unclassifiedCalls()]));
+        }
+        expect(work.rows[0]?.state).toBe("DONE");
+      }, { timeout: 60_000 });
+
+      // PINNED: one row, beside the run, every seat from the scorecard, the debaters on both relays.
+      const pinned = await database.pool.query<{ strength: string; stepped_down: boolean; assignment: RoleAssignment }>(
+        "SELECT strength, stepped_down, assignment FROM core.run_role_assignment WHERE run_id=$1",
+        [runId]
+      );
+      expect(pinned.rows).toHaveLength(1);
+      expect(pinned.rows[0]).toMatchObject({ strength: "BALANCED", stepped_down: false });
+      const assignment = pinned.rows[0]!.assignment;
+      const seats = Object.values(assignment.roles).flat();
+      expect(seats.every((seat) => seat.source === "SCORECARD")).toBe(true);
+      expect(new Set(assignment.roles.POSITION.map((seat) => seat.main.providerRef)))
+        .toEqual(new Set(["acceptance:codex-cli", "acceptance:claude-cli"]));
+      expect(seats.some((seat) => seat.runnerUp !== null)).toBe(true);
+
+      // PROVISIONED (pre-flight ruling F17): a runner-up exists, so the run's ceiling is DR-184-v5,
+      // the number the acceptance composition computes WITH the backup provision.
+      const policy = await readAcceptanceRuntimePolicy(database.pool);
+      const run = await database.pool.query<{ envelope_basis: Record<string, unknown> }>(
+        "SELECT envelope_basis FROM core.run WHERE run_id=$1",
+        [runId]
+      );
+      expect(run.rows[0]!.envelope_basis).toMatchObject({
+        formula_version: "DR-184-v5",
+        panel_size: 2,
+        max_model_attempts: computeAcceptanceStructuralCeiling(policy, 2, 1, 1).max_model_attempts
+      });
+
+      // SEATED (A15): every model call names a pinned candidate on that candidate's pinned route.
+      const pinnedRoutes = new Set(seats.flatMap((seat) => [seat.main, ...(seat.runnerUp === null ? [] : [seat.runnerUp])])
+        .map((candidate) => `${candidate.candidateId}@${candidate.providerRef}`));
+      const calls = await database.pool.query<{ candidate_id: string | null; actor_ref: string; calls: number }>(
+        `SELECT candidate_id, actor_ref, count(*)::int AS calls FROM ledger.ledger_entry
+         WHERE run_id=$1 AND action_kind='MODEL_CALL' GROUP BY candidate_id, actor_ref`,
+        [runId]
+      );
+      expect(calls.rows.length).toBeGreaterThan(0);
+      for (const row of calls.rows) {
+        expect(pinnedRoutes).toContain(`${row.candidate_id ?? "none"}@${row.actor_ref}`);
+      }
+    } finally {
+      await runtime.api.close();
+    }
   });
 });

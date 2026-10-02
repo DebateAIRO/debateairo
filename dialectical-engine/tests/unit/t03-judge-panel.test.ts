@@ -257,3 +257,148 @@ describe("T3 / S2-2 — author != judge, through the panel the runner calls", ()
     expect(result.notes[0]).toMatchObject({ memberRole: "house-b", failureKind: "SCHEMA_FAILURE" });
   });
 });
+
+describe("A15 · the panel records the route that ANSWERED (family discount input, R5)", () => {
+  const primary = { judgementRef: "artifact:author", assessment: assessmentContent, memberRole: "house-a" };
+
+  it("gives the primary the producer's route and a member its own route by default", async () => {
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+        judge: async () => ({ judgementRef: "artifact:b", assessment: assessmentContent })
+      }]
+    });
+    expect(result.judgements.map((entry) => [entry.memberRole, entry.actorRef])).toEqual([
+      ["house-a", "provider:a"], ["house-b", "provider:b"]
+    ]);
+  });
+
+  it("records a backup's route and maker when the member's judge reports them", async () => {
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+        judge: async () => ({
+          judgementRef: "artifact:c", assessment: assessmentContent, actorRef: "provider:c", memberRole: "house-c"
+        })
+      }]
+    });
+    expect(result.judgements[1]).toMatchObject({ memberRole: "house-c", actorRef: "provider:c", contractHash: "b".repeat(64) });
+  });
+
+  it("refuses a judgement that came back from the producer's own route, even through a backup", async () => {
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+        judge: async () => ({ judgementRef: "artifact:self", assessment: assessmentContent, actorRef: "provider:a", memberRole: "house-a" })
+      }]
+    });
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["artifact:author"]);
+    // A refusal AFTER the call is not the expected author skip: it has its own
+    // kind and names both the seat (`memberRole`) and the maker that answered.
+    expect(result.notes).toEqual([{
+      memberRole: "house-b",
+      answeringMemberRole: "house-a",
+      contractHash: "b".repeat(64),
+      kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL",
+      failureKind: "PRODUCER_GRADING_FORBIDDEN",
+      reason: "FX-HR-H6"
+    }]);
+  });
+
+  /**
+   * FX-HR-H6 is "no MAKER grades its own artifact" — the law the database
+   * enforces by maker (migrations 0019/0023/0026) and the evaluator checks by
+   * maker. The picker can seat a runner-up of the author's maker on ANOTHER
+   * route, so a route comparison alone would let the author's maker vote.
+   */
+  it("refuses, after the call, a backup from the author's maker on a different route", async () => {
+    let calls = 0;
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+        judge: async () => {
+          calls += 1;
+          return { judgementRef: "artifact:a2", assessment: assessmentContent, actorRef: "provider:a2", memberRole: "house-a" };
+        }
+      }]
+    });
+    expect(calls).toBe(1);
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["artifact:author"]);
+    expect(result.notes).toEqual([expect.objectContaining({
+      memberRole: "house-b", answeringMemberRole: "house-a",
+      kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL", failureKind: "PRODUCER_GRADING_FORBIDDEN", reason: "FX-HR-H6"
+    })]);
+  });
+
+  it("skips, before the call, a main seat of the author's maker on a different route", async () => {
+    let calls = 0;
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-a", actorRef: "provider:a2", contractHash: "a".repeat(64),
+        judge: async () => {
+          calls += 1;
+          return { judgementRef: "artifact:a2", assessment: assessmentContent };
+        }
+      }]
+    });
+    expect(calls).toBe(0);
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["artifact:author"]);
+    expect(result.notes).toEqual([{
+      memberRole: "house-a", contractHash: "a".repeat(64),
+      kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN", reason: "FX-HR-H6"
+    }]);
+  });
+
+  it("still refuses a different maker on the author's own route, before the call and after it", async () => {
+    let calls = 0;
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [
+        {
+          memberRole: "house-z", actorRef: "provider:a", contractHash: "z".repeat(64),
+          judge: async () => {
+            calls += 1;
+            return { judgementRef: "artifact:z", assessment: assessmentContent };
+          }
+        },
+        {
+          memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+          judge: async () => ({ judgementRef: "artifact:y", assessment: assessmentContent, actorRef: "provider:a", memberRole: "house-y" })
+        }
+      ]
+    });
+    expect(calls).toBe(0);
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["artifact:author"]);
+    expect(result.notes).toEqual([
+      expect.objectContaining({ memberRole: "house-z", kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN" }),
+      expect.objectContaining({
+        memberRole: "house-b", answeringMemberRole: "house-y",
+        kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL", failureKind: "PRODUCER_GRADING_FORBIDDEN"
+      })
+    ]);
+  });
+
+  it("keeps a backup of a third maker on a third route (the checks name only the author)", async () => {
+    const result = await runJudgePanel({
+      artifactProducerRef: "provider:a",
+      primary,
+      members: [{
+        memberRole: "house-b", actorRef: "provider:b", contractHash: "b".repeat(64),
+        judge: async () => ({ judgementRef: "artifact:c", assessment: assessmentContent, actorRef: "provider:c", memberRole: "house-c" })
+      }]
+    });
+    expect(result.judgements.map((entry) => entry.judgementRef)).toEqual(["artifact:author", "artifact:c"]);
+    expect(result.notes).toEqual([]);
+  });
+});

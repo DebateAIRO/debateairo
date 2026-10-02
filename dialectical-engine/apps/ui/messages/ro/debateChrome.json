@@ -287,5 +287,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Coordonatorul a refuzat alegerea planului. Alegeți Gratuit sau Premium, apoi încercați din nou.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Coordonatorul a refuzat solicitarea: un model necesar acestui plan nu este disponibil momentan. Încercați din nou mai târziu sau alegeți celălalt plan.",
   "requestFailure.kind.ALREADY_WAITING": "O singură întrebare poate aștepta o dată. Puneți-o pe aceasta după ce a pornit dezbaterea dvs. în așteptare.",
-  "requestFailure.kind.UNCLASSIFIED": "Eroarea s-a produs înainte de primirea oricărui răspuns, astfel că rezultatul este necunoscut. Nu este o decizie luată de coordonator."
+  "requestFailure.kind.UNCLASSIFIED": "Eroarea s-a produs înainte de primirea oricărui răspuns, astfel că rezultatul este necunoscut. Nu este o decizie luată de coordonator.",
+  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
 }

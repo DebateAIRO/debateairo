@@ -287,5 +287,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "O coordenador recusou a escolha do plano. Escolha Gratuito ou Premium e tente novamente.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "O coordenador recusou o pedido: um modelo necessário para este plano não está disponível neste momento. Tente novamente mais tarde ou escolha o outro plano.",
   "requestFailure.kind.ALREADY_WAITING": "Só uma pergunta pode aguardar de cada vez. Faça esta depois de o seu debate em espera ter começado.",
-  "requestFailure.kind.UNCLASSIFIED": "A falha ocorreu antes de ser recebida qualquer resposta, pelo que se desconhece o resultado. Não se trata de uma decisão tomada pelo coordenador."
+  "requestFailure.kind.UNCLASSIFIED": "A falha ocorreu antes de ser recebida qualquer resposta, pelo que se desconhece o resultado. Não se trata de uma decisão tomada pelo coordenador.",
+  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
 }

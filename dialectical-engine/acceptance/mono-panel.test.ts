@@ -223,6 +223,8 @@ describe("DR-182 live mono-panel composition", () => {
   // served row's scripted responses and the two rows do not depend on order.
   it("refuses a day with one maker at the door, naming the plan's missing model (tiers S02 C1)", async () => {
     const runtime = await createAcceptanceRuntime({
+      // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
+      modelScorecard: { state: "ABSENT" },
       pool: database.pool,
       serviceCredential: "r".repeat(43),
       environment: monoEnvironment(),
@@ -251,6 +253,8 @@ describe("DR-182 live mono-panel composition", () => {
 
   it("boots and serves high-stakes depth 4 with the ruled cap and disclosures when the second maker is lost after admission", async () => {
     const runtime = await createAcceptanceRuntime({
+      // Model scorecard A20.4: this suite stays on the plan rosters, whatever scorecards/current.json holds.
+      modelScorecard: { state: "ABSENT" },
       pool: database.pool,
       serviceCredential:"m".repeat(43),
       environment: monoEnvironment(),

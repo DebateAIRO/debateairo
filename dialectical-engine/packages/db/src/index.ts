@@ -9,7 +9,7 @@ import type {
   CryptoEnvelope,
   PreparedRunContentCipher
 } from "@debateai/crypto";
-import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
+import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
 
@@ -1004,6 +1004,173 @@ export async function allocateSequence(client: PoolClient): Promise<number> {
   return Number(value);
 }
 
+/**
+ * Model scorecard §2.3 (migration 0090) — THE PROMPT OF ONE MODEL-CALL ATTEMPT.
+ *
+ * `ledger.call_prompt` is a content carrier in 0063's mechanism. For a run with
+ * content encryption the stored row carries the sentinel and a NULL
+ * fingerprint, and BOTH the prompt text and its fingerprint live inside the
+ * attested envelope: a readable fingerprint would be a digest of private
+ * content, the locator 0040 replaced with random bytes on
+ * `ledger_entry.input_hash`. A legacy run keeps both in the clear. Erasure is
+ * inherited: the envelope is unreadable once the run key is shredded, and the
+ * erasure barrier (with the content lease below) refuses a new row once the
+ * run's private content is gone.
+ */
+export interface CallPromptInput {
+  readonly runId: string;
+  /** The gateway attempt the prompt was sent on: the row's primary key, a lower-case uuid. */
+  readonly attemptId: string;
+  /** The `messages` member exactly as it was serialised into the request body. */
+  readonly promptText: string;
+  /** `canonicalPromptFingerprint(messages)` (@debateai/scorecard): 64 lower-case hex characters. */
+  readonly promptFingerprint: string;
+}
+
+export type CallPromptRecord = Readonly<{
+  runId: string;
+  attemptId: string;
+  promptText: string;
+  promptFingerprint: string;
+}>;
+
+const CALL_PROMPT_ATTEMPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const CALL_PROMPT_FINGERPRINT = /^[0-9a-f]{64}$/u;
+
+export async function insertCallPrompt(pool: Pool, input: CallPromptInput): Promise<void> {
+  // The attestation binds the envelope to `attempt_id::text`, which Postgres
+  // renders lower-case; an upper-case id would seal an envelope no row accepts.
+  if (!CALL_PROMPT_ATTEMPT_ID.test(input.attemptId)
+    || !CALL_PROMPT_FINGERPRINT.test(input.promptFingerprint)
+    || typeof input.promptText !== "string" || input.promptText.length === 0) {
+    throw new TypeError("CALL_PROMPT_INPUT_INVALID");
+  }
+  await withRunContentLease(pool, [input.runId], async () => {
+    const content = await encryptAttestedContentForRun(
+      pool, input.runId, "ledger.call_prompt", input.attemptId,
+      { promptText: input.promptText, promptFingerprint: input.promptFingerprint }
+    );
+    await pool.query(
+      `INSERT INTO ledger.call_prompt (
+         attempt_id, run_id, prompt_fingerprint, prompt_text,
+         content_ciphertext, content_attestation
+       ) VALUES ($1,$2,$3,$4,$5::jsonb,$6)`,
+      [
+        input.attemptId, input.runId,
+        content === null ? input.promptFingerprint : null,
+        content === null ? input.promptText : CONTENT_CIPHERTEXT_SENTINEL,
+        content === null ? null : JSON.stringify(content.envelope),
+        content?.attestation ?? null
+      ]
+    );
+  });
+}
+
+export async function readCallPrompt(pool: Pool, attemptId: string): Promise<CallPromptRecord | null> {
+  if (!CALL_PROMPT_ATTEMPT_ID.test(attemptId)) throw new TypeError("CALL_PROMPT_INPUT_INVALID");
+  const row = (await pool.query<{
+    run_id: string;
+    prompt_fingerprint: string | null;
+    prompt_text: string;
+    content_ciphertext: CryptoEnvelope | null;
+  }>(
+    `SELECT run_id, prompt_fingerprint, prompt_text, content_ciphertext
+     FROM ledger.call_prompt WHERE attempt_id=$1`,
+    [attemptId]
+  )).rows[0];
+  if (row === undefined) return null;
+  const content = await decryptContentForRun<Readonly<{ promptText?: unknown; promptFingerprint?: unknown }>>(
+    pool, row.run_id, "ledger.call_prompt", attemptId, row.content_ciphertext,
+    { promptText: row.prompt_text, promptFingerprint: row.prompt_fingerprint }
+  );
+  if (typeof content.promptText !== "string"
+    || typeof content.promptFingerprint !== "string"
+    || !CALL_PROMPT_FINGERPRINT.test(content.promptFingerprint)) {
+    throw new TypeError("CALL_PROMPT_RECORD_INVALID");
+  }
+  return Object.freeze({
+    runId: row.run_id,
+    attemptId,
+    promptText: content.promptText,
+    promptFingerprint: content.promptFingerprint
+  });
+}
+
+/**
+ * Model scorecard §2.4 (migration 0090) — THE ROLE ASSIGNMENT PINNED ON A RUN.
+ *
+ * An append-only side table the API writes ONCE, after the run row exists and
+ * before its first work item is enqueued. It is not a column of core.run,
+ * because a column would need the in-database encrypted-run creator redefined,
+ * and a replay of 0040 or 0067 would silently restore the older body. The
+ * assignment holds engine identifiers only — provider refs, model ids,
+ * candidate ids, levels — never debate text. Its shape is `RoleAssignmentSchema`
+ * (@debateai/scorecard), which this package cannot import: the writer takes
+ * an already validated object and the reader returns it undecoded.
+ */
+export interface RunRoleAssignmentInput {
+  readonly runId: string;
+  /** A `RoleAssignment` (@debateai/scorecard), validated by the caller. */
+  readonly assignment: Readonly<Record<string, unknown>>;
+  readonly strength: ModelStrength;
+  readonly steppedDown: boolean;
+}
+
+export type RunRoleAssignmentRecord = Readonly<{
+  runId: string;
+  assignment: unknown;
+  strength: ModelStrength;
+  steppedDown: boolean;
+  createdAt: Date;
+}>;
+
+function isModelStrength(value: unknown): value is ModelStrength {
+  return typeof value === "string" && (MODEL_STRENGTHS as readonly string[]).includes(value);
+}
+
+export async function insertRunRoleAssignment(
+  executor: Pick<Pool, "query"> | PoolClient,
+  input: RunRoleAssignmentInput
+): Promise<void> {
+  if (typeof input.assignment !== "object" || input.assignment === null
+    || Array.isArray(input.assignment)
+    || !isModelStrength(input.strength)
+    || typeof input.steppedDown !== "boolean") {
+    throw new TypeError("RUN_ROLE_ASSIGNMENT_INVALID");
+  }
+  await executor.query(
+    `INSERT INTO core.run_role_assignment (run_id, assignment, strength, stepped_down)
+     VALUES ($1,$2::jsonb,$3,$4)`,
+    [input.runId, JSON.stringify(input.assignment), input.strength, input.steppedDown]
+  );
+}
+
+export async function readRunRoleAssignment(
+  executor: Pick<Pool, "query"> | PoolClient,
+  runId: string
+): Promise<RunRoleAssignmentRecord | null> {
+  const row = (await executor.query<{
+    run_id: string;
+    assignment: unknown;
+    strength: string;
+    stepped_down: boolean;
+    created_at: Date;
+  }>(
+    `SELECT run_id, assignment, strength, stepped_down, created_at
+     FROM core.run_role_assignment WHERE run_id=$1`,
+    [runId]
+  )).rows[0];
+  if (row === undefined) return null;
+  if (!isModelStrength(row.strength)) throw new TypeError("RUN_ROLE_ASSIGNMENT_INVALID");
+  return Object.freeze({
+    runId: row.run_id,
+    assignment: row.assignment,
+    strength: row.strength,
+    steppedDown: row.stepped_down,
+    createdAt: row.created_at
+  });
+}
+
 export interface InitialBatteryRow {
   readonly batteryRowId: string;
   readonly predicateRef: string;
@@ -1271,6 +1438,48 @@ export interface RunSynthesisRoleRefusalValue {
 
 export type RunLifecycleEventValue = RunCooldownLifecycleValue | RunSynthesisRoleRefusalValue;
 
+/**
+ * Model scorecard A16 (owner ruling R4): a seat moved to its other member. Kept
+ * OUT of `RunLifecycleEventValue` on purpose — that union is the set of shapes
+ * 0069 admits for a content-encrypted run, and this one is not among them (see
+ * `RunRepository.recordBackupSwitchEvent`). This is the OWNER/ADMIN side of the
+ * disclosure: it names routes, keys and causes, which the answer's own
+ * BACKUP-MODEL-USED record may not (A16c, controller carry 15).
+ */
+export interface RunBackupSwitchLifecycleValue {
+  readonly state: "BACKUP_MODEL_ENGAGED";
+  readonly role: string;
+  /** The seat index the assignment PINNED. */
+  readonly seat_index: number;
+  readonly from_provider_ref: string;
+  readonly to_provider_ref: string;
+  /**
+   * TRANSPORT_FAILURE / USAGE_CAP: during a call (R4). ABSENT_AT_CLAIM: the main
+   * was not claim-eligible, so its runner-up sits in the seat. SPENT_ON_EARLIER_PASS:
+   * a resumed pass found the planned member's key at this site already at its
+   * allowance (A16c, carry 8c) — the ledger rows under `call_site_key` say why.
+   */
+  readonly cause: "TRANSPORT_FAILURE" | "USAGE_CAP" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
+  /** The planned member's key at the site; null for a switch made at claim. */
+  readonly call_site_key: string | null;
+}
+
+/**
+ * Model scorecard A16c (controller carry 8d): every seat the assignment pinned
+ * for a multi-seat role was absent at claim, so the DEBATERS sit in that role
+ * (today's rule, A15d's `fallbackRoles`). Not a per-seat switch — the planned
+ * seats and the debaters need not pair up — so it has its own shape.
+ */
+export interface RunRoleFallbackLifecycleValue {
+  readonly state: "ROLE_FELL_BACK_TO_DEBATERS";
+  readonly role: "SUPPORT_ATTACK" | "JUDGE" | "REVIEWER";
+  /** Every route the role's pinned seats named (mains, then their runner-ups, seat by seat). */
+  readonly from_provider_refs: readonly string[];
+  /** Every route now sitting in the role (the debaters' members, seat by seat). */
+  readonly to_provider_refs: readonly string[];
+  readonly cause: "ABSENT_AT_CLAIM";
+}
+
 export interface CompletionActivationResolution {
   readonly batteryRowId: string;
   readonly state: Exclude<ActivationState, "WAIT">;
@@ -1306,6 +1515,74 @@ export class RunRepository {
          VALUES ($1,$2,$3,$4::jsonb)`,
         [input.runId, await allocateSequence(client), input.kind, JSON.stringify(input.value)]
       );
+    });
+  }
+
+  /**
+   * Model scorecard A16 — the lifecycle event for a backup switch, or for a
+   * role that fell back to the debaters, on the `ledger.could_not_do` stream the UI
+   * already reads. WITHHELD — never refused — for a content-encrypted run:
+   * 0069's `core.progress_value_is_code_shaped` admits a closed set of value
+   * shapes there and may never be redefined, so a new shape would turn a
+   * disclosure into a crashed run. Every run discloses the switch on its answer
+   * through the BACKUP-MODEL-USED records.
+   *
+   * A16c (controller carry 8: one disclosure per real switch; fix rounds 1
+   * and 2) — an event this run already holds is not written twice
+   * (`ALREADY_RECORDED`):
+   *  · a BACKUP_MODEL_ENGAGED switch is the same switch when it matches on
+   *    run, role, seat_index, call_site_key (null-safe; null for a switch made
+   *    at claim), from_provider_ref and to_provider_ref — every field but
+   *    `cause`, which alone is ignored. So a seat switched at claim is told
+   *    once however many passes re-make the claim, and an outage switch whose
+   *    pass died while the runner-up's first call was in flight — told as
+   *    TRANSPORT_FAILURE — is not told again when the next pass hands the same
+   *    key over, between the same two routes, as SPENT_ON_EARLIER_PASS. The
+   *    routes are part of the match because a key names a member SLOT, and
+   *    across a claim-shape flip (a role that fell back to the debaters on one
+   *    pass and not the next) the same slot and key can hold other routes: that
+   *    is a different switch, and it is recorded.
+   *  · a ROLE_FELL_BACK_TO_DEBATERS event is the same event when its whole
+   *    value is equal.
+   */
+  async recordBackupSwitchEvent(input: {
+    readonly runId: string;
+    readonly value: RunBackupSwitchLifecycleValue | RunRoleFallbackLifecycleValue;
+  }): Promise<"RECORDED" | "ALREADY_RECORDED" | "WITHHELD_ENCRYPTED_RUN"> {
+    return withWriteTransaction(this.pool, async (client) => {
+      const encryption = await client.query<{ encrypted: boolean | null }>(
+        "SELECT core.run_uses_content_encryption($1::uuid) AS encrypted",
+        [input.runId]
+      );
+      if (encryption.rows[0]?.encrypted !== false) return "WITHHELD_ENCRYPTED_RUN" as const;
+      const value = JSON.stringify(input.value);
+      const existing = input.value.state === "BACKUP_MODEL_ENGAGED"
+        ? await client.query(
+          `SELECT 1 FROM core.run_progress_event
+            WHERE run_id=$1 AND kind='ledger.could_not_do'
+              AND value_json->>'state'='BACKUP_MODEL_ENGAGED'
+              AND value_json->>'role'=$2
+              AND value_json->'seat_index'=to_jsonb($3::integer)
+              AND value_json->>'call_site_key' IS NOT DISTINCT FROM $4::text
+              AND value_json->>'from_provider_ref'=$5
+              AND value_json->>'to_provider_ref'=$6`,
+          [
+            input.runId, input.value.role, input.value.seat_index, input.value.call_site_key,
+            input.value.from_provider_ref, input.value.to_provider_ref
+          ]
+        )
+        : await client.query(
+          `SELECT 1 FROM core.run_progress_event
+            WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json=$2::jsonb`,
+          [input.runId, value]
+        );
+      if ((existing.rowCount ?? 0) > 0) return "ALREADY_RECORDED" as const;
+      await client.query(
+        `INSERT INTO core.run_progress_event (run_id, at_seq, kind, value_json)
+         VALUES ($1,$2,'ledger.could_not_do',$3::jsonb)`,
+        [input.runId, await allocateSequence(client), value]
+      );
+      return "RECORDED" as const;
     });
   }
 

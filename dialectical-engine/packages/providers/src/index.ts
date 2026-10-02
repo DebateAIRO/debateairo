@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { z } from "zod";
-import { TypedDomainError } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
 
@@ -49,6 +49,41 @@ export type ContentClassification =
  */
 export const PROVIDER_FINISH_REASON_LENGTH = "length" as const;
 export const PROVIDER_CONTENT_LENGTH_EXCEEDED = "LENGTH_EXCEEDED" as const;
+
+/**
+ * Model scorecard §2.2 (rulings R1, R7) — THE TWO WIRE SPELLINGS a connection
+ * reads a thinking level from. The target declares which one; the gateway never
+ * guesses. `reasoning_effort` is the OpenAI-compatible body member for vendor
+ * APIs; `x_thinking_level` is this engine's extension (the `x_` prefix follows
+ * `usage.x_cost_usd`), read only by the CLI relays under `acceptance/`.
+ */
+export const THINKING_PARAMETERS = ["reasoning_effort", "x_thinking_level"] as const;
+export type ThinkingParameter = typeof THINKING_PARAMETERS[number];
+
+/** A vendor level name is ONE lower-case code token: never a flag, never prose. */
+export const THINKING_LEVEL_TOKEN = /^[a-z][a-z0-9_-]{0,31}$/u;
+
+/**
+ * Model scorecard — the typed refusals of the thinking level, the context
+ * window and a subscription's usage cap. Each is deterministic, so none is
+ * retried (see the short-circuit list and the cap stop in `call`).
+ *  · The level and window refusals reach the caller UNWRAPPED: they are the
+ *    engine's own refusals, never a transport failure, so they never move a
+ *    seat to its backup (ruling R4).
+ *  · The usage cap reaches the caller as today's `ProviderCallFailedError`, with
+ *    the cap as its `cause` (pre-flight ruling F11): every caller that halts a
+ *    member on a relay failure keeps doing so, and the seat caller reads the cap
+ *    off `cause` to switch at once (ruling R4).
+ */
+export const PROVIDER_THINKING_LEVEL_UNSUPPORTED = "PROVIDER_THINKING_LEVEL_UNSUPPORTED" as const;
+export const PROVIDER_THINKING_LEVEL_CHANGED = "PROVIDER_THINKING_LEVEL_CHANGED" as const;
+export const PROVIDER_CONTEXT_WINDOW_EXCEEDED = "PROVIDER_CONTEXT_WINDOW_EXCEEDED" as const;
+export const PROVIDER_USAGE_CAP = "PROVIDER_USAGE_CAP" as const;
+/** The relay's own marker on its 429 (`acceptance/relay-core.ts`), carried in `x_cli_relay_error`. */
+export const CLI_RELAY_USAGE_CAP = "CLI_RELAY_USAGE_CAP" as const;
+/** The relay's markers on its 413 and 400 refusals (A8), carried in `x_cli_relay_error` (R1, pre-flight fix F1). */
+export const CLI_RELAY_CONTEXT_WINDOW_EXCEEDED = "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED" as const;
+export const CLI_RELAY_THINKING_LEVEL_UNSUPPORTED = "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED" as const;
 
 /**
  * How a provider's content was REFUSED. `LENGTH_EXCEEDED` is its own member and
@@ -99,6 +134,25 @@ export interface ProviderCallRequest {
    * Absent = no money bound, which is local mode byte-for-byte.
    */
   readonly costEnvelope?: ProviderCostEnvelopeSeam;
+  /**
+   * Model scorecard §2.2 (rulings R1, R7): the candidate's thinking level, in
+   * the connection's own vocabulary. Absent or DEFAULT_ONLY puts nothing on the
+   * wire. A level this connection did not declare is refused before the call is
+   * sent (PROVIDER_THINKING_LEVEL_UNSUPPORTED) — never run at another level.
+   */
+  readonly thinkingLevel?: string;
+  /**
+   * Model scorecard §2.1 (ruling R5): the debate job this call does, in the
+   * scorecard's seven-role vocabulary (`@debateai/kernel` DEBATE_ROLES).
+   * RECORDED on every attempt's ledger row, never sent. Optional on the type
+   * because the dormant evaluator lane has none; `role` above is the T9
+   * provider identity and stays exactly as it is.
+   */
+  readonly modelRole?: DebateRole;
+  /** Model scorecard §2.3: the scorecard candidate holding this seat. Recorded, never sent. */
+  readonly candidateId?: string | null;
+  /** Model scorecard §2.3: the scorecard version the seat's assignment came from. Recorded, never sent. */
+  readonly scorecardVersion?: number | null;
 }
 
 export class ProviderCallFailedError extends TypedDomainError {
@@ -140,6 +194,10 @@ export interface ProviderCallResult {
   readonly model: string;
   readonly maker: string;
   readonly modelVersion: string;
+  /** Model scorecard §2.2: the level the call ran at — the relay's echo, else the level sent, else DEFAULT_ONLY. */
+  readonly thinkingLevel?: string;
+  /** Model scorecard §2.3: the vendor-reported thinking tokens of the accepted attempt; null when not reported. */
+  readonly reasoningTokens?: number | null;
 }
 
 export interface ProviderGateway {
@@ -148,6 +206,8 @@ export interface ProviderGateway {
 
 const MAX_PROVIDER_TARGETS = 32;
 const MAX_PROVIDER_TARGET_CONFIG_BYTES = 64 * 1024;
+/** Model scorecard §2.2: the most level names one connection may declare. */
+const MAX_TARGET_THINKING_LEVELS = 16;
 
 export type ProviderDiscoveryTarget = Readonly<{
   providerRef: string;
@@ -174,6 +234,19 @@ export type ProviderDiscoveryTarget = Readonly<{
    */
   inputPriceMicrosPerMillionTokens?: number;
   outputPriceMicrosPerMillionTokens?: number;
+  /**
+   * Model scorecard §2.2 (ruling R7): how THIS connection carries a thinking
+   * level and which levels it can set, in the vendor's own names. Both or
+   * neither. A target that declares neither is DEFAULT_ONLY: a request that
+   * names a level is refused before it is sent.
+   */
+  thinkingParameter?: ThinkingParameter;
+  thinkingLevels?: readonly string[];
+  /**
+   * Model scorecard §2.10: this connection's context window in tokens (the pi
+   * GLM relay declares 1 000 000). Absent = no pre-send window check.
+   */
+  contextWindowTokens?: number;
 }>;
 
 /**
@@ -195,11 +268,64 @@ export function providerTargetPrice(target: ProviderDiscoveryTarget): Readonly<{
   });
 }
 
+/**
+ * Model scorecard §2.2 / §2.10: the target's thinking capability and window in
+ * the shape the gateway consumes, so no composition root re-derives the field
+ * names. Empty for a target that declares neither.
+ */
+export type ProviderTargetGatewayControls = Readonly<{
+  thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
+  contextWindowTokens?: number;
+}>;
+
+export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): ProviderTargetGatewayControls {
+  return Object.freeze({
+    ...(target.thinkingParameter === undefined || target.thinkingLevels === undefined ? {} : {
+      thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
+    }),
+    ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens })
+  });
+}
+
 /** An integer price in micro-units per million tokens, or a typed refusal. */
 function providerTargetPriceAmount(value: unknown): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0
     || value > Number.MAX_SAFE_INTEGER) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_PRICE_INVALID");
+  }
+  return value;
+}
+
+/** Model scorecard §2.2: one of the two wire spellings, or a typed refusal. */
+function providerTargetThinkingParameter(value: unknown): ThinkingParameter {
+  if (typeof value !== "string" || !(THINKING_PARAMETERS as readonly string[]).includes(value)) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+  }
+  return value as ThinkingParameter;
+}
+
+/** Model scorecard §2.2: 1..16 distinct level tokens, or a typed refusal. */
+function providerTargetThinkingLevels(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_TARGET_THINKING_LEVELS
+    || value.some((level) => typeof level !== "string" || !THINKING_LEVEL_TOKEN.test(level))
+    || new Set(value).size !== value.length) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+  }
+  return Object.freeze([...value] as string[]);
+}
+
+/**
+ * Model scorecard §2.10: a positive whole number of tokens within the
+ * usage-counter bound. One rule for the target parser and the gateway
+ * constructor (task review fix round 1, finding 4).
+ */
+function isContextWindowTokens(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= MAX_USAGE_COUNTER;
+}
+
+function providerTargetContextWindow(value: unknown): number {
+  if (!isContextWindowTokens(value)) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_CONTEXT_WINDOW_INVALID");
   }
   return value;
 }
@@ -271,7 +397,9 @@ export function parseProviderDiscoveryTargets(
     if (Object.keys(row).some((key) => ![
       "provider_ref", "base_url", "model", "authorization_header", "authorization_file",
       // V-28: the vendor's price, declared beside the vendor.
-      "input_price_micros_per_million", "output_price_micros_per_million"
+      "input_price_micros_per_million", "output_price_micros_per_million",
+      // Model scorecard §2.2 / §2.10: the thinking capability and the window.
+      "thinking_parameter", "thinking_levels", "context_window_tokens"
     ].includes(key))) {
       throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
     }
@@ -292,6 +420,22 @@ export function parseProviderDiscoveryTargets(
             providerTargetPriceAmount(row.output_price_micros_per_million)
         })
       : undefined;
+    // Model scorecard §2.2: both or neither, exactly as the price. Half a
+    // declaration is an operator's unfinished edit, and a guessed wire member is
+    // a call the vendor refuses.
+    const declaresThinkingParameter = row.thinking_parameter !== undefined;
+    if (declaresThinkingParameter !== (row.thinking_levels !== undefined)) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+    }
+    const thinking = declaresThinkingParameter
+      ? Object.freeze({
+          thinkingParameter: providerTargetThinkingParameter(row.thinking_parameter),
+          thinkingLevels: providerTargetThinkingLevels(row.thinking_levels)
+        })
+      : undefined;
+    const contextWindow = row.context_window_tokens === undefined
+      ? undefined
+      : Object.freeze({ contextWindowTokens: providerTargetContextWindow(row.context_window_tokens) });
     const providerRef = requiredProviderTargetText(
       row.provider_ref,
       "PROVIDER_DISCOVERY_TARGET_PROVIDER_REF_INVALID"
@@ -331,7 +475,9 @@ export function parseProviderDiscoveryTargets(
       model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
       ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
       ...(authorizationFile === undefined ? {} : { authorizationFile }),
-      ...(price === undefined ? {} : price)
+      ...(price === undefined ? {} : price),
+      ...(thinking === undefined ? {} : thinking),
+      ...(contextWindow === undefined ? {} : contextWindow)
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -844,6 +990,8 @@ export interface RawArtifactInput {
   readonly inputHash: string;
   readonly contractHash: string;
   readonly contentHash: string;
+  /** Model scorecard §2.3: the vendor-reported thinking tokens of this attempt; null when not reported. */
+  readonly thinkingTokens?: number | null;
 }
 
 export interface ProviderLedgerInput {
@@ -860,6 +1008,27 @@ export interface ProviderLedgerInput {
   readonly rawArtifactRef: string | null;
   readonly startedAt: Date;
   readonly finishedAt: Date;
+  /** Model scorecard §2.1: the debate job; null for a caller that names none. */
+  readonly modelRole?: DebateRole | null;
+  /** Model scorecard §2.3: the scorecard candidate and the scorecard version of the seat. */
+  readonly candidateId?: string | null;
+  readonly scorecardVersion?: number | null;
+  /** Model scorecard §2.2: the level the attempt ran at (the relay's echo, else the level sent) or DEFAULT_ONLY. */
+  readonly thinkingLevel?: string | null;
+}
+
+/**
+ * Model scorecard §2.3 — the exact prompt of ONE attempt, handed to the
+ * composition before the attempt is sent. `promptText` is the `messages`
+ * member exactly as it is serialised into the request body; `messages` is the
+ * same value, for the canonical fingerprint the composition computes. The
+ * gateway never stores it itself: the store is the run's content envelope.
+ */
+export interface CallPromptRecordInput {
+  readonly runId: string;
+  readonly attemptId: string;
+  readonly promptText: string;
+  readonly messages: PromptPacket["messages"];
 }
 
 /**
@@ -903,6 +1072,12 @@ export interface ProviderCostEnvelopeSeam {
     usage: unknown;
     /** This attempt's own pre-send maximum, the two facts `assertCallAllowed` got. */
     projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
+    /**
+     * Model scorecard §2.3: the gateway attempt this charge pays for — the id
+     * its artifact already carries and its ledger row will carry
+     * (`ledger.model_spend.attempt_id`). The gateway always passes it.
+     */
+    attemptId?: string;
   }>) => void | Promise<void>;
   /**
    * The HOSTED requirement, asked only of a SUCCESSFUL completion: a vendor that
@@ -928,6 +1103,21 @@ export interface OpenAICompatibleGatewayOptions {
   readonly fetchImplementation?: typeof fetch;
   /** L4-F8: seam for the bounded backoff between HTTP attempts; real time by default. */
   readonly sleepImplementation?: (milliseconds: number) => Promise<void>;
+  /**
+   * Model scorecard §2.2: from the target's `thinking_parameter` /
+   * `thinking_levels` (`providerTargetGatewayControls`). Absent = the
+   * connection is DEFAULT_ONLY.
+   */
+  readonly thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
+  /** Model scorecard §2.10: from the target's `context_window_tokens`. Absent = no window check. */
+  readonly contextWindowTokens?: number;
+  /**
+   * Model scorecard §2.3: records each attempt's prompt just before it is sent.
+   * Optional: the unit doubles and a gateway with no debate run record none.
+   * The runner's `createPostgresProviderGateway` always supplies it
+   * (`ledger.call_prompt`, through the run's content envelope).
+   */
+  readonly persistCallPrompt?: (prompt: CallPromptRecordInput) => Promise<void>;
 }
 
 /**
@@ -966,6 +1156,133 @@ const PROVIDER_BACKOFF_BASE_MS = 250;
 const PROVIDER_BACKOFF_CAP_MS = 4_000;
 const MAX_PROVIDER_MODEL_CHARS = 256;
 const MAX_USAGE_COUNTER = 2 ** 31 - 1;
+
+/**
+ * Model scorecard §2.10 — THE ONE LOCAL PROMPT-SIZE ESTIMATE: characters / 4,
+ * rounded up, summed over every message's content. It is the common rule of
+ * thumb for English on BPE vocabularies, simple and deterministic on purpose,
+ * not a tokenizer. It UNDER-counts dense text (JSON, Romanian diacritics,
+ * code), which is why it is NEVER the window wall (R1: the wall is
+ * `estimateWindowTokens` below). It sizes estimates only — the replay tool's
+ * `promptTokensEstimate` and the relays' informational overhead line — and it
+ * never prices money (that is `@debateai/budget`'s byte projection).
+ */
+const PROMPT_CHARACTERS_PER_TOKEN = 4;
+
+export function estimatePromptTokens(messages: PromptPacket["messages"]): number {
+  let characters = 0;
+  for (const message of messages) characters += message.content.length;
+  return Math.ceil(characters / PROMPT_CHARACTERS_PER_TOKEN);
+}
+
+/**
+ * Model scorecard §2.10, assembler reconciliation R1 — THE WINDOW WALL: UTF-8
+ * bytes / 2, rounded up, summed over every message's content. It is the SAME
+ * rule the relays apply before spawning (`acceptance/relay-core.ts`
+ * `exceedsContextWindow`) and the project's conservative floor
+ * (`@debateai/budget` projects a request at 2 bytes per token). It over-counts
+ * English on purpose so Romanian diacritics and JSON never overflow a declared
+ * window (pi/GLM declares 1M; a scorecard candidate may declare far less). It
+ * is never reported as a size and never prices money.
+ */
+const WINDOW_BYTES_PER_TOKEN = 2;
+
+export function estimateWindowTokens(messages: PromptPacket["messages"]): number {
+  let bytes = 0;
+  for (const message of messages) bytes += Buffer.byteLength(message.content, "utf8");
+  return Math.ceil(bytes / WINDOW_BYTES_PER_TOKEN);
+}
+
+/**
+ * Model scorecard §2.3 — the thinking tokens the vendor reported, read
+ * LENIENTLY off the RAW usage block: OpenAI's spelling
+ * `completion_tokens_details.reasoning_tokens`, which the relays adopt. `null`
+ * means not reported: never a guess and never a default zero, because a vendor
+ * that says nothing has not said "none".
+ */
+export function reportedReasoningTokens(rawUsage: unknown): number | null {
+  if (typeof rawUsage !== "object" || rawUsage === null || Array.isArray(rawUsage)) return null;
+  const details = (rawUsage as Readonly<Record<string, unknown>>).completion_tokens_details;
+  if (typeof details !== "object" || details === null || Array.isArray(details)) return null;
+  const value = (details as Readonly<Record<string, unknown>>).reasoning_tokens;
+  return typeof value === "number" && Number.isSafeInteger(value)
+    && value >= 0 && value <= MAX_USAGE_COUNTER ? value : null;
+}
+
+/**
+ * `echoRequired` (task review fix round 1, finding 2 — fail closed): a CLI relay
+ * (`x_thinking_level`) states on every 200 the level it ran at (the relay
+ * contract, Task A8), so a level SENT to one must come back verbatim. An API
+ * vendor (`reasoning_effort`) never echoes, and there the level sent is the
+ * level used. Nothing was sent at DEFAULT_ONLY, so nothing is required back.
+ */
+type ResolvedThinkingLevel = Readonly<{
+  wire: Readonly<Record<string, string>>;
+  sent: string;
+  echoRequired: boolean;
+}>;
+
+/** Model scorecard §2.2: the one body member a requested level becomes, or the refusal. */
+function resolveThinkingLevel(
+  requested: string | undefined,
+  control: OpenAICompatibleGatewayOptions["thinking"],
+  providerRef: string
+): ResolvedThinkingLevel {
+  if (requested === undefined || requested === THINKING_LEVEL_DEFAULT_ONLY) {
+    return Object.freeze({ wire: Object.freeze({}), sent: THINKING_LEVEL_DEFAULT_ONLY, echoRequired: false });
+  }
+  if (!THINKING_LEVEL_TOKEN.test(requested) || control === undefined || !control.levels.includes(requested)) {
+    throw new TypedDomainError(
+      PROVIDER_THINKING_LEVEL_UNSUPPORTED,
+      `${providerRef} cannot set the requested thinking level`
+    );
+  }
+  return Object.freeze({
+    wire: Object.freeze({ [control.parameter]: requested }),
+    sent: requested,
+    echoRequired: control.parameter === "x_thinking_level"
+  });
+}
+
+/** Model scorecard §2.2: the level a relay says it ran at — a token or DEFAULT_ONLY, else nothing. */
+function echoedThinkingLevel(decoded: unknown): string | null {
+  if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return null;
+  const value = (decoded as Readonly<Record<string, unknown>>).x_thinking_level;
+  if (typeof value !== "string") return null;
+  return value === THINKING_LEVEL_DEFAULT_ONLY || THINKING_LEVEL_TOKEN.test(value) ? value : null;
+}
+
+/** Model scorecard R4: the relay's typed error marker on a refused call, if any. */
+function relayErrorCode(decoded: unknown): string | null {
+  if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return null;
+  const value = (decoded as Readonly<Record<string, unknown>>).x_cli_relay_error;
+  return typeof value === "string" ? value : null;
+}
+
+/**
+ * Model scorecard §2.3: ONE token — the pattern 0090's
+ * ledger_entry_candidate_id_token CHECK holds, character for character (the
+ * scorecard's own identifierText, packages/scorecard/src/schema.ts, after the
+ * 0090 fix round 1: the first character is a letter or a digit).
+ */
+const CANDIDATE_ID_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$/u;
+
+/**
+ * Model scorecard §2.1/§2.3: the record fields are checked BEFORE anything is
+ * sent. The ledger's CHECKs would otherwise refuse the row only after a paid
+ * call, and an unrecorded paid call is the one thing this ledger must not have.
+ */
+function assertProviderCallRecord(request: ProviderCallRequest): void {
+  const role = request.modelRole;
+  const candidate = request.candidateId;
+  const version = request.scorecardVersion;
+  if ((role !== undefined && !isDebateRole(role))
+    || (candidate !== undefined && candidate !== null && !CANDIDATE_ID_TOKEN.test(candidate))
+    || (version !== undefined && version !== null
+      && (!Number.isSafeInteger(version) || version < 1 || version > MAX_USAGE_COUNTER))) {
+    throw new TypeError("PROVIDER_CALL_RECORD_INVALID");
+  }
+}
 
 /** Delay before `attempt` (only attempts after the first back off). */
 function providerBackoffMs(attempt: number): number {
@@ -1133,6 +1450,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
   readonly #options: OpenAICompatibleGatewayOptions;
 
   constructor(options: OpenAICompatibleGatewayOptions) {
+    /**
+     * Task review fix round 1, finding 4 — fail closed. A window that is not a
+     * positive whole number (NaN, 0, negative, fractional, Infinity, past the
+     * counter bound) makes the wall refuse everything or nothing by accident,
+     * with no word said. The target parser refuses it; a programmatic caller
+     * is refused here under the same rule.
+     */
+    if (options.contextWindowTokens !== undefined && !isContextWindowTokens(options.contextWindowTokens)) {
+      throw new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID");
+    }
     this.#options = options;
   }
 
@@ -1149,6 +1476,20 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
      * byte leaves the process and it is re-run on every repair packet below.
      */
     const frame = assertFramedPrompt(request.packet);
+    /**
+     * Model scorecard §2.2 (rulings R1, R7) — decided ONCE, before the first
+     * byte leaves. The level is the candidate's, the capability is the
+     * connection's, and a level this connection did not declare is refused
+     * here rather than run silently at some other level. Thrown before the
+     * loop, like the frame refusal: nothing was sent, so nothing is ledgered.
+     */
+    const thinking = resolveThinkingLevel(request.thinkingLevel, this.#options.thinking, request.providerRef);
+    assertProviderCallRecord(request);
+    const callFacts = Object.freeze({
+      modelRole: request.modelRole ?? null,
+      candidateId: request.candidateId ?? null,
+      scorecardVersion: request.scorecardVersion ?? null
+    });
     const fetcher = this.#options.fetchImplementation ?? fetch;
     const sleep = this.#options.sleepImplementation ?? realSleep;
     let attemptsMade = 0;
@@ -1167,17 +1508,43 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       ledgerEntryRef: string;
     } | null = null;
 
+    /**
+     * Model scorecard §2.10: whether one attempt fits the declared window. The
+     * prompt side is the ONE local estimate (`estimateWindowTokens`: UTF-8
+     * bytes / 2, the relays' same rule, R1); the answer side is that attempt's
+     * own token bound, because the window must hold both.
+     */
+    const contextWindowTokens = this.#options.contextWindowTokens;
+    const fitsContextWindow = (packet: PromptPacket, tokenCeiling: number): boolean =>
+      contextWindowTokens === undefined
+        || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
+
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
+      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
+      /**
+       * Task review fix round 1, finding 3. PROVIDER_CONTEXT_WINDOW_EXCEEDED
+       * means "this prompt is over this candidate's window", and the picker
+       * reads it so (`packages/scorecard/src/picker.ts`). That is only true of
+       * attempt 1. A LATER attempt can outgrow a window the original prompt
+       * fit — a length retry raises the bound, a repair packet is longer — and
+       * then nothing more is sent: the loop ends exactly as exhaustion would,
+       * before the backoff and the attempt guard, with no ledger row for an
+       * attempt that never happened, and the caller sees the earlier content
+       * rejection (or the usual PROVIDER_CALL_FAILED), never the window code.
+       */
+      if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
       // L4-F8: back off first, then re-check the ceiling, so the decision to spend an attempt is
       // taken on the freshest state rather than on state read up to a backoff ago.
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
       await request.assertAttemptAllowed?.();
-      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
       // The packet cap (L4-F2) is taken on the body actually sent, which carries the
       // per-attempt bound a length retry raised (W10/2).
+      // Model scorecard §2.2: with no level asked this is today's three-member
+      // body byte for byte; with one, the target's own member carries it.
       const body = JSON.stringify({
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,
+        ...thinking.wire,
         messages: attemptPacket.messages
       });
       /**
@@ -1201,6 +1568,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       const startedAt = new Date();
       let rawArtifactRef: string | null = null;
       let ledgerRecorded = false;
+      // Model scorecard §2.2: the level this attempt ran at, as far as it got. A
+      // failure before any body arrived records the level that was sent.
+      let attemptThinkingLevel: string = thinking.sent;
+      // Pre-flight fix F13: set when the prompt could not be recorded, so the
+      // catch below lets that failure leave unsent, unledgered and unretried.
+      let promptRecordFailed = false;
       try {
         const headers: Record<string, string> = { "content-type": "application/json" };
         if (this.#options.authorizationHeader !== undefined) {
@@ -1212,6 +1585,37 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             "PROVIDER_PACKET_TOO_LARGE",
             `Provider request packet exceeded ${MAX_PROVIDER_REQUEST_PACKET_BYTES} bytes`
           );
+        }
+        /**
+         * Model scorecard §2.10: a declared context window is a wall, checked
+         * before the call is sent (`fitsContextWindow` above). The same prompt
+         * does not fit one backoff later, so the refusal short-circuits below,
+         * after its FAILED ledger row. Only attempt 1 can reach this throw: a
+         * later attempt that would not fit ended the loop at its head (fix
+         * round 1, finding 3).
+         */
+        if (!fitsContextWindow(attemptPacket, attemptTokenCeiling)) {
+          throw new TypedDomainError(
+            PROVIDER_CONTEXT_WINDOW_EXCEEDED,
+            `${request.providerRef} declares a ${contextWindowTokens}-token context window and this attempt would not fit`
+          );
+        }
+        // Model scorecard §2.3: the exact prompt of THIS attempt, recorded
+        // before it leaves and under this attempt's id, so every attempt the
+        // ledger shows as sent — a transport failure included — has its prompt
+        // on record. A call with no run records none (the support chat).
+        if (request.runId !== null && this.#options.persistCallPrompt !== undefined) {
+          try {
+            await this.#options.persistCallPrompt({
+              runId: request.runId,
+              attemptId,
+              promptText: JSON.stringify(attemptPacket.messages),
+              messages: attemptPacket.messages
+            });
+          } catch (promptError) {
+            promptRecordFailed = true;
+            throw promptError;
+          }
         }
         const response = await fetcher(`${this.#options.endpoint}/chat/completions`, {
           method: "POST",
@@ -1254,6 +1658,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           ? (decoded as Readonly<Record<string, unknown>>).usage
           : undefined;
         const strict = responseSchema.safeParse(decoded);
+        // Model scorecard §2.2/§2.3: a relay says which level it RAN at; an API
+        // vendor does not, and then the level sent is the level used. Thinking
+        // tokens are read leniently off the RAW block, so the strict
+        // four-counter parse above (and every test pinning it) is untouched.
+        const echoedLevel = echoedThinkingLevel(decoded);
+        const thinkingLevelUsed = echoedLevel ?? thinking.sent;
+        const reasoningTokens = reportedReasoningTokens(rawUsage);
+        attemptThinkingLevel = thinkingLevelUsed;
         const finishReason = observedFinishReason(decoded);
         const content = strict.success ? strict.data.choices[0]!.message.content : null;
         let classifiedContent: ContentClassification | {
@@ -1321,7 +1733,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           parseError: classifiedContent.parseError,
           inputHash,
           contractHash: request.contractHash,
-          contentHash: digest(rawText)
+          contentHash: digest(rawText),
+          thinkingTokens: reasoningTokens
         });
         /**
          * V-28 / I4 — THE CHARGE, at the one point every attempt with a body
@@ -1340,9 +1753,70 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           projection: {
             requestBytes: Buffer.byteLength(body, "utf8"),
             completionTokenCeiling: attemptTokenCeiling
-          }
+          },
+          attemptId
         });
+        /**
+         * Model scorecard R4: a subscription tool at its usage cap answers 429
+         * with the relay's typed marker. The cap is still there one backoff
+         * later, so this is NOT retried: the loop stops below and the caller
+         * sees PROVIDER_CALL_FAILED with the cap as its `cause` (pre-flight
+         * ruling F11), which the runner's seat caller turns into an immediate
+         * switch. A bare 429 (a vendor's rate limit) stays a retried transport
+         * failure, exactly as before.
+         */
+        if (response.status === 429 && relayErrorCode(decoded) === CLI_RELAY_USAGE_CAP) {
+          throw new TypedDomainError(
+            PROVIDER_USAGE_CAP,
+            `${request.providerRef} reported that its subscription usage cap is reached`
+          );
+        }
+        /**
+         * R1 (pre-flight fix F1): a relay refuses a window or a level with its
+         * own typed marker (A8). Both are the gateway's own refusals under
+         * another name, the same one backoff later, so they short-circuit
+         * below, unwrapped — never a retried transport failure, never a reason
+         * to move a seat to its backup.
+         */
+        if (response.status === 413 && relayErrorCode(decoded) === CLI_RELAY_CONTEXT_WINDOW_EXCEEDED) {
+          throw new TypedDomainError(
+            PROVIDER_CONTEXT_WINDOW_EXCEEDED,
+            `${request.providerRef} refused the prompt: it does not fit the relay's declared context window`
+          );
+        }
+        if (response.status === 400 && relayErrorCode(decoded) === CLI_RELAY_THINKING_LEVEL_UNSUPPORTED) {
+          throw new TypedDomainError(
+            PROVIDER_THINKING_LEVEL_UNSUPPORTED,
+            `${request.providerRef} refused the requested thinking level`
+          );
+        }
         if (!response.ok) throw new Error(`PROVIDER_HTTP_STATUS_${response.status}`);
+        /**
+         * Model scorecard §2.2: the identity check's mirror for the level. A
+         * relay that ran a requested level at another one produced an answer
+         * from a candidate the scorecard did not pick. Nothing is compared
+         * when no level was asked; then the relay's own level is recorded.
+         *
+         * Task review fix round 1:
+         *  · finding 1 — decided HERE, on the raw body, before the content
+         *    classifier and the strict response parse, so a wrong-level answer
+         *    is never repaired, length-retried or retried as a transport
+         *    failure; it is one FAILED row and CHANGED, like the other
+         *    short-circuits.
+         *  · finding 2 — fail closed: a relay that was SENT a level and does
+         *    not echo it verbatim (no echo, a malformed one, DEFAULT_ONLY or
+         *    another level) is CHANGED. A vendor never echoes, so there only a
+         *    different echo is a change.
+         */
+        if (thinking.sent !== THINKING_LEVEL_DEFAULT_ONLY
+          && (thinking.echoRequired
+            ? echoedLevel !== thinking.sent
+            : echoedLevel !== null && echoedLevel !== thinking.sent)) {
+          throw new TypedDomainError(
+            PROVIDER_THINKING_LEVEL_CHANGED,
+            `${request.providerRef} was asked for thinking level ${thinking.sent} and did not report running at it`
+          );
+        }
         assertBoundedProviderResponse(decoded);
         /**
          * V-28 — THE HOSTED REQUIREMENT, asked only of a SUCCESSFUL completion.
@@ -1404,6 +1878,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             subjectItemId: request.subjectItemId,
             stanceAtAction: "UNASSIGNED",
             outcome: "FAILED",
+            ...callFacts,
+            thinkingLevel: thinkingLevelUsed,
             inputHash,
             contractHash: request.contractHash,
             actorRef: request.providerRef,
@@ -1470,6 +1946,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           subjectItemId: request.subjectItemId,
           stanceAtAction: "UNASSIGNED",
           outcome: "OK",
+          ...callFacts,
+          thinkingLevel: thinkingLevelUsed,
           inputHash,
           contractHash: request.contractHash,
           actorRef: request.providerRef,
@@ -1485,9 +1963,19 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           provider: "openai-compatible-http",
           model: responseJson.model,
           maker: this.#options.maker,
-          modelVersion: responseJson.model
+          modelVersion: responseJson.model,
+          thinkingLevel: thinkingLevelUsed,
+          reasoningTokens
         };
       } catch (error) {
+        /**
+         * Pre-flight fix F13: the prompt record could not be written (a database
+         * or erasure-barrier refusal), so this attempt was never sent and no
+         * vendor was asked. It is neither a FAILED model call nor a transport
+         * failure: no ledger row, no retry, and the error leaves unwrapped, so
+         * a seat never reads it as a reason to switch to its backup.
+         */
+        if (promptRecordFailed) throw error;
         /**
          * The refusals below are OURS, not the transport's, and none of them is
          * repaired by asking again — so each propagates untouched instead of
@@ -1514,6 +2002,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           && (error.code.startsWith("PROMPT_FRAME_")
             || error.code === "PROVIDER_MODEL_IDENTITY_CHANGED"
             || error.code === "PROVIDER_USAGE_INVALID"
+            // Model scorecard: a level run at another level, a level or a
+            // prompt the relay refused, and a prompt that cannot fit the
+            // declared window are each the same one backoff later (R1, F1).
+            || error.code === PROVIDER_THINKING_LEVEL_CHANGED
+            || error.code === PROVIDER_THINKING_LEVEL_UNSUPPORTED
+            || error.code === PROVIDER_CONTEXT_WINDOW_EXCEEDED
             || (PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).includes(error.code));
         lastContentRejection = null;
         lastError = error;
@@ -1527,6 +2021,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           subjectItemId: request.subjectItemId,
           stanceAtAction: "UNASSIGNED",
           outcome: lastOutcome,
+          ...callFacts,
+          thinkingLevel: attemptThinkingLevel,
           inputHash,
           contractHash: request.contractHash,
           actorRef: request.providerRef,
@@ -1541,6 +2037,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         // packet never reaches here at all, and one on a repair packet has
         // already been ledgered by the rejection branch above.
         if (shortCircuit) throw error;
+        /**
+         * Model scorecard R4 + pre-flight ruling F11: a usage cap is still there
+         * one backoff later, so the loop stops on the attempt that met it — after
+         * its FAILED row, like an oversized packet — and the caller gets today's
+         * PROVIDER_CALL_FAILED with the cap as its `cause`. Wrapped, so a seat
+         * with no runner-up (every legacy run) halts the member exactly as a
+         * relay failure does today; the seat caller reads the cap off `cause`
+         * and switches to the runner-up at once (A16a).
+         */
+        if (error instanceof TypedDomainError && error.code === PROVIDER_USAGE_CAP) break;
       }
       // L4-F2: an oversized packet is deterministic — resending it would burn the ceiling for
       // an identical refusal, so the loop stops on the attempt that refused it.

@@ -23,6 +23,8 @@ import {
   type RunOwnershipInput
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node } from "@debateai/contract";
+import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
+export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   MemoryRepository,
@@ -37,7 +39,7 @@ import {
   SYNTHESIS_OBJECTION_STANDING_MARK,
   buildSynthesisDigest,
   runSynthesisLoop,
-  synthesisCallSiteKey,
+  acceptedSynthesisCallSiteKeys,
   type DigestSourceNode,
   type SynthesisCodeLabel,
   type SynthesisDigest,
@@ -604,6 +606,21 @@ export type AnswerForm =
  * This mark tells the READER of the answer, which is a different duty.
  */
 export const DEGRADED_DIVERSITY_MARK = "DEGRADED-DIVERSITY" as const;
+
+/**
+ * Model scorecard A16 (R6): a member the assignment did not plan for a call
+ * answered it because the planned one was unavailable — a runner-up in place of
+ * its main (a switch during a call, a main absent at claim, a resumed pass), a
+ * main in place of a runner-up the 80-20 split chose (A16c, controller carry
+ * 12), or the debaters in place of a role whose pinned seats were all absent.
+ * Minted by the RUNNER after the serve chain (a switch can happen at claim,
+ * while authoring or inside synthesis), always with a typed record. A16c
+ * (carry 15): the record is what the answer drawer shows END USERS, so it says
+ * this in plain words and is aggregated per kind; the internals (role, seat,
+ * routes, cause, key) live in the progress stream's switch events and on the
+ * ledger rows, never in the record.
+ */
+export const BACKUP_MODEL_USED_MARK = "BACKUP-MODEL-USED" as const;
 
 /** The two synthesis seats, named once so a disclosure cannot name only one. */
 export const SYNTHESIS_ROLE_NAMES = Object.freeze(["SYNTHESIZER", "EVALUATOR"] as const);
@@ -1585,7 +1602,7 @@ export interface ConditionMarkRecord {
   // kernel mints unless the record union names it, so ALL THREE lanes' mints are
   // named here (T9B merge). Union order is not semantic; it mirrors the kernel's
   // mid-list placement.
-  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE";
+  readonly mark: "SKIPPED-BY-BUDGET" | "ENVELOPE_EXHAUSTED" | "PROTECTED-CORE-GUARD-RETIRED" | "OWED-CHECK-UNEXECUTED" | "UNRESOLVED-TYPE-FALLBACK" | "UNSERVED-MAKER-POSITION" | "SINGLE-LINEAGE" | "CRITIQUE-UNAVAILABLE" | "HIDDEN-UNJUDGEABLE" | "DERIVED-STANDING-UNREVIEWED" | "HIDDEN-LOW-SCORE" | "UNAUTHORED-BRANCH-HALTED" | "WAY-OF-KNOWING-DOWNGRADED" | "PANEL-PARTIAL" | "PANEL-DEGRADED-SINGLE-VOICE" | "BRANCH-FROZEN-LOW-LEVERAGE" | "LABEL-BASIS-INCOMPLETE" | "BACKUP-MODEL-USED";
   readonly scope: "answer" | "node";
   readonly subjectRef: string;
   readonly reason: string;
@@ -1648,7 +1665,13 @@ const REQUIRED_CONDITION_MARK_RECORDS = Object.freeze([
   "UNAUTHORED-BRANCH-HALTED",
   // T11: a label derived without a complete basis is disclosed on the answer it
   // labelled, with a typed record naming which limb of the basis was absent.
-  "LABEL-BASIS-INCOMPLETE"
+  "LABEL-BASIS-INCOMPLETE",
+  // Model scorecard A16: an answer that a stand-in model (partly) wrote carries
+  // a typed record, in plain words (A16c, carry 15). Its call_site_key and
+  // transport outcome stay NULL — 0021/0025 refuse both on this mark — so the
+  // role, seat, routes, cause and key live in the progress stream's switch
+  // events and on the ledger rows, not here.
+  "BACKUP-MODEL-USED"
 ] as const);
 
 /** DR-161: required typed records and answer marks are a two-way contract. */
@@ -2268,7 +2291,7 @@ export class ServeRepository {
             ref: round.candidateRef,
             callSiteKey: round.candidateCallSiteKey,
             role: "SYNTHESIZER" as const,
-            expected: synthesisCallSiteKey({
+            expected: acceptedSynthesisCallSiteKeys({
               role: "SYNTHESIZER",
               stage: round.synthesizerRequest.stage,
               round: round.round
@@ -2278,16 +2301,18 @@ export class ServeRepository {
             ref: round.verdictRef,
             callSiteKey: round.verdictCallSiteKey,
             role: "EVALUATOR" as const,
-            expected: synthesisCallSiteKey({ role: "EVALUATOR", round: round.round })
+            expected: acceptedSynthesisCallSiteKeys({ role: "EVALUATOR", round: round.round })
           }
         ]) {
-          // EQUALITY, not a suffix. This subsumes the round check it replaces —
-          // the round is part of the derived key — and it is what refuses a
-          // real artifact recorded under the other role's call site.
-          if (bound.callSiteKey !== bound.expected) {
+          // EQUALITY with one of the round's own keys, not a suffix. This
+          // subsumes the round check it replaces — the round is part of every
+          // derived key — and it is what refuses a real artifact recorded under
+          // the other role's call site. A15: a seat marker is admitted, a
+          // different role or round never is.
+          if (!bound.expected.includes(bound.callSiteKey)) {
             throw new TypedDomainError(
               "SYNTHESIS_ROUND_ARTIFACT_UNRESOLVED",
-              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected}`
+              `Round ${String(round.round)}'s ${bound.role} call site ${bound.callSiteKey} is not this round's ${bound.role} call site ${bound.expected[0]!} or its seat forms`
             );
           }
           const producer = await client.query<{ raw_artifact_ref: string }>(
@@ -2299,7 +2324,7 @@ export class ServeRepository {
               WHERE entry.run_id=$1 AND entry.subject_item_id=$2
                 AND entry.action_kind='MODEL_CALL' AND entry.outcome='OK'
                 AND entry.call_site_key=$3 AND entry.raw_artifact_ref=$4::uuid`,
-            [input.runId, input.workItemId, bound.expected, bound.ref]
+            [input.runId, input.workItemId, bound.callSiteKey, bound.ref]
           );
           if (producer.rows.length !== 1) {
             throw new TypedDomainError(
@@ -2667,6 +2692,9 @@ export class ServeRepository {
       sealed_at_seq: number | string;
       as_of: Date;
       relevant_as_of: Date;
+      // A21, ruling F20 (the one R2 exception): the pinned core.run_role_assignment row rides this
+      // single SELECT as a subselect instead of a second readRunRoleAssignment query per answer read.
+      role_assignment_row: PinnedRoleAssignmentRow | null;
     }>(
       `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line,
               run.content_ciphertext AS run_content_ciphertext,
@@ -2691,7 +2719,13 @@ export class ServeRepository {
               conformance.coverage_mode AS conformance_coverage_mode,
               conformance.conformance_record_id,
               conformance.content_ciphertext AS conformance_content_ciphertext,
-              run.as_of, answer.relevant_as_of
+              run.as_of, answer.relevant_as_of,
+              (SELECT jsonb_build_object(
+                        'assignment', pinned.assignment,
+                        'strength', pinned.strength,
+                        'stepped_down', pinned.stepped_down)
+                 FROM core.run_role_assignment AS pinned
+                WHERE pinned.run_id = run.run_id) AS role_assignment_row
        FROM serve.answer AS answer
        JOIN core.run AS run ON run.run_id = answer.run_id
        JOIN core.work_item AS work ON work.settled_artifact_ref = answer.answer_id
@@ -2706,6 +2740,9 @@ export class ServeRepository {
     );
     const row = answer.rows[0];
     if (row === undefined) return null;
+    // A21: which models did each job — undefined when the run pinned no assignment,
+    // or pinned one that does not parse (omitted whole and reported, never a failed answer).
+    const modelAssignment = projectModelAssignment(row.role_assignment_row, row.run_id);
     return this.#memory.withDisclosureContentLease([row.run_id],async () => {
     const [runContent, factContent, composedContent, answerContent, conformanceContent] = await Promise.all([
       decryptContentForRun<{ questionLine: string }>(
@@ -2973,7 +3010,8 @@ export class ServeRepository {
       inspection_handle: `inspection:${row.answer_id}`,
       as_of: row.as_of.toISOString(),
       staleness_state: staleness.state,
-      relevant_as_of: staleness.relevantAsOf
+      relevant_as_of: staleness.relevantAsOf,
+      ...(modelAssignment === undefined ? {} : { model_assignment: modelAssignment })
     };
     });
   }

@@ -41,6 +41,7 @@ import {
   readCountryPolicy,
   readStoryPolicyFromRegister,
   readAuthPolicy,
+  readCallTokenCeilings,
   readJudgeTokenCeiling,
   readMfaPolicy,
   readProductRolePolicy,
@@ -125,6 +126,7 @@ import {
   resolveProviderTargetCredentials
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
+import { composeAskModelPicker } from "./ask-model-picker.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
 import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
@@ -455,6 +457,31 @@ await boot.run("run-ceiling-covers-one-call", async () => {
 // it resolves each vendor's file through the same custody-checked seam.
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
   resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
+/**
+ * A20 — THE MODEL SCORECARD IN FORCE and the per-role model picker, read and
+ * built once, as the boot stages "model-scorecard" and "model-picker" under this
+ * boot's own ledger (DL7-F7). Final review I5: both stages are one function,
+ * `composeAskModelPicker` (./ask-model-picker.ts), so the hosted path is tested
+ * without Postgres. Hosted: the sealed `modelScorecard` row at REGISTER_VERSION,
+ * and a boot without a positive per-run ceiling is refused
+ * (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED). Local: the bundled public file
+ * (scorecards/current.json). ABSENT or REFUSED never stops the boot — asks keep
+ * the plan rosters — and one line on stderr says which. The targets are the
+ * DECLARED ones: levels, windows and prices, no credential. Final review I3:
+ * the sealed per-call answer bounds are read first, in their own stage, so the
+ * picker never seats a model whose window the gateway would refuse.
+ */
+const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));
+const modelPicker = await composeAskModelPicker({
+  boot,
+  pool,
+  deploymentMode: environment.DEPLOYMENT_MODE,
+  registerVersion: environment.REGISTER_VERSION,
+  targets: declaredProviderTargets,
+  perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,
+  callTokenCeilings,
+  log: (line) => console.error(line)
+});
 const resolveProviderPanel = createProviderDiscoveryResolver({
   configuredProviders: deploymentMakers.configuredProviders,
   targets: providerDiscoveryTargets,
@@ -699,6 +726,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
       }),
   ...(askBilling === undefined ? {} : { billing: askBilling }),
   resolveDiscoveredPanel: resolveProviderPanel,
+  // A20: the per-role model picker (built above, under the boot ledger).
+  modelPicker,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,
@@ -710,7 +739,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     reviewerCallsPerNode: envelopeFormulaInputs.reviewerCallsPerNode,
     synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
     evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
-    maxDepth: envelopeFormulaInputs.maxDepth
+    maxDepth: envelopeFormulaInputs.maxDepth,
+    // A14/A20 (F17): DR-184-v5 only when the pinned assignment has a runner-up.
+    backupSequencesProvisioned: input.backupSequencesProvisioned
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({
@@ -1135,6 +1166,9 @@ const api = buildApi({
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
   // the content-free disclosure record, on the same runtime pool.
   disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pool)),
+  // A21 (owner decision O4): /new's yes/no, from the very picker admission asks — the
+  // same test `evaluateAskAdmission` makes before it lets the scorecard choose.
+  modelScorecardInForce: modelPicker.scorecard.state === "VALID",
   accountErasure:erasureApplication,
   registration,
   recovery,

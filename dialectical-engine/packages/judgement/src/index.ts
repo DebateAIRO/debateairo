@@ -5,7 +5,9 @@ import {
   CLAIM_TYPES,
   REVIEW_OUTCOMES,
   TypedDomainError,
+  exhaustive,
   isRunLevelSpendStop,
+  type DebateRole,
   type ReviewOutcome,
   type WayOfKnowing
 } from "@debateai/kernel";
@@ -430,6 +432,29 @@ export function firstCallsByPlanRoster<T extends Readonly<{ model: string }>>(in
   }));
 }
 
+/**
+ * Model scorecard A13 (spec §2.1) — THE DEBATE JOB ONE AUTHORING LEG DOES.
+ *
+ * The T9 `role` stays `JUDGE` on every judgement call: it names the provider
+ * identity, not the job. The scorecard grades JOBS, and before this field the
+ * job could only be recovered by parsing `call_site_key`. A leg's kind decides
+ * it, so the mapping lives next to the leg type and nowhere else.
+ */
+export function judgeLegModelRole(leg: JudgeLeg): DebateRole {
+  switch (leg.kind) {
+    case "primary-root":
+    case "independent-root":
+      return "POSITION";
+    case "support":
+    case "attack":
+      return "SUPPORT_ATTACK";
+    case "cross-root":
+      return "CROSS_EXCHANGE";
+    default:
+      return exhaustive(leg);
+  }
+}
+
 export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 
@@ -461,6 +486,7 @@ export class Judge {
         callSiteKey: input.callSiteKey,
         role: "JUDGE",
         lane: "served",
+        modelRole: judgeLegModelRole(input.leg),
         bound: input.bound,
         contractHash: input.contractHash,
         providerRef: input.providerRef,
@@ -560,6 +586,7 @@ export class Judge {
         callSiteKey: input.callSiteKey,
         role: "JUDGE",
         lane: "served",
+        modelRole: "REVIEWER",
         bound: input.bound,
         contractHash: input.contractHash,
         providerRef: input.providerRef,
@@ -634,6 +661,7 @@ export class Judge {
         callSiteKey: input.callSiteKey,
         role: "JUDGE",
         lane: "served",
+        modelRole: "JUDGE",
         bound: input.bound,
         contractHash: input.contractHash,
         providerRef: input.providerRef,
@@ -658,7 +686,8 @@ export class Judge {
       if (error instanceof ProviderCallFailedError) {
         throw new PanelMemberFailure(
           error.lastOutcome === "TIMED_OUT" ? "TIMEOUT" : "PROVIDER_ERROR",
-          `${error.code}:${error.lastOutcome}`
+          `${error.code}:${error.lastOutcome}`,
+          { cause: error }
         );
       }
       // V-28: a run-level spend stop is the RUN's, not this member's. Rewriting
@@ -667,7 +696,11 @@ export class Judge {
       // call. It leaves exactly as it arrived. Task M2: the attempt ceiling is
       // one of them now, so it is no longer reported as a vendor error either.
       if (isRunLevelSpendStop(error)) throw error;
-      throw new PanelMemberFailure("PROVIDER_ERROR", error instanceof Error ? error.message : String(error));
+      throw new PanelMemberFailure(
+        "PROVIDER_ERROR",
+        error instanceof Error ? error.message : String(error),
+        { cause: error }
+      );
     }
     const parsed = parseStructuredArtifact(response.content, judgeAssessmentSchema);
     if (parsed.kind === "PARSE_FAILURE") throw new PanelMemberFailure("PARSE_FAILURE", parsed.message);

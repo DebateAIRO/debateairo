@@ -142,6 +142,26 @@ describe("V-28 migration 0066 — ledger.model_spend", () => {
     await expect(database.pool.query("TRUNCATE ledger.model_spend"))
       .rejects.toThrowError();
   });
+
+  it("stores the attempt a charge paid for, and NULL when the charge names none (model scorecard §2.3)", async () => {
+    const store = new PostgresModelSpendStore(database.pool);
+    const runId = await createLegacyRun();
+    const attemptId = randomUUID();
+    const linked = randomUUID();
+    const unlinked = randomUUID();
+    const charge = {
+      spendSource: "RUN" as const, runId, providerRef: "provider-1", chargedOn: "2026-02-01",
+      chargeMicros: 1, inputTokens: 1, outputTokens: 1
+    };
+    await store.recordSpend({ ...charge, spendId: linked, attemptId });
+    await store.recordSpend({ ...charge, spendId: unlinked });
+    const rows = await database.pool.query<{ spend_id: string; attempt_id: string | null }>(
+      "SELECT spend_id::text, attempt_id::text FROM ledger.model_spend WHERE spend_id = ANY($1::uuid[])",
+      [[linked, unlinked]]
+    );
+    expect(Object.fromEntries(rows.rows.map((row) => [row.spend_id, row.attempt_id])))
+      .toEqual({ [linked]: attemptId, [unlinked]: null });
+  });
 });
 
 describe("V-28 the persisted totals answer the two envelope questions", () => {

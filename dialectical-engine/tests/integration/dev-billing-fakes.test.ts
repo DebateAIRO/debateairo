@@ -27,7 +27,7 @@ function companyAnswering(companyCif: string): SellerCompany {
 
 const roots: string[] = [];
 afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
-// Ephemeral ports: a developer's running stack may hold 8797–8799. The receipt records the real ones.
+// Ephemeral ports: a developer's running stack may hold 8799–8801. The receipt records the real ones.
 const profile = { ...DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE, billingFakePorts: [0, 0, 0] as const };
 
 async function listening(server: Server, port: number): Promise<number> {

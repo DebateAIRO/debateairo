@@ -294,5 +294,6 @@
   "debateChrome.scoring.unavailableClaim.few": "{count} nedostupné tvrdenia",
   "debateChrome.scoring.unavailableClaim.many": "{count} nedostupného tvrdenia",
   "debateChrome.scoring.realScoresDetail.few": "Z odpovede hodnotenia sa zobrazujú {count} uložené ohodnotené tvrdenia.",
-  "debateChrome.scoring.realScoresDetail.many": "Z odpovede hodnotenia sa zobrazuje {count} uloženého ohodnoteného tvrdenia."
+  "debateChrome.scoring.realScoresDetail.many": "Z odpovede hodnotenia sa zobrazuje {count} uloženého ohodnoteného tvrdenia.",
+  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
 }

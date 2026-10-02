@@ -209,7 +209,7 @@ describe("S02 tier roster architecture", () => {
     expect(PLAN_TIER_ROSTERS.premium).toEqual([
       "gpt-5.6-sol",
       "claude-opus-5",
-      "grok-4.6-build"
+      "grok-4.7-build"
     ]);
   });
 
@@ -225,7 +225,7 @@ describe("S02 tier roster architecture", () => {
         "apps/ui/components/landing/cards.ts",
         "packages/contract/src/plan-tiers.ts"
       ],
-      "grok-4.6-build": ["packages/contract/src/plan-tiers.ts"]
+      "grok-4.7-build": ["packages/contract/src/plan-tiers.ts"]
     };
 
     for (const [modelId, expectedPaths] of Object.entries(expectedFiles)) {

@@ -301,5 +301,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Il-koordinatur irrifjuta l-għażla tal-pjan. Agħżel B’xejn jew Premium, imbagħad erġa’ pprova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Il-koordinatur irrifjuta t-talba: mudell meħtieġ minn dan il-pjan mhuwiex disponibbli bħalissa. Erġa’ pprova aktar tard, jew agħżel il-pjan l-ieħor.",
   "requestFailure.kind.ALREADY_WAITING": "Mistoqsija waħda biss tista’ tistenna kull darba. Staqsi din wara li jibda d-dibattitu tiegħek li qed jistenna.",
-  "requestFailure.kind.UNCLASSIFIED": "It-talba falliet qabel ma waslet xi risposta, għalhekk ir-riżultat mhuwiex magħruf. Din mhijiex deċiżjoni li ħa l-koordinatur."
+  "requestFailure.kind.UNCLASSIFIED": "It-talba falliet qabel ma waslet xi risposta, għalhekk ir-riżultat mhuwiex magħruf. Din mhijiex deċiżjoni li ħa l-koordinatur.",
+  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
 }

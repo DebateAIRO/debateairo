@@ -8,9 +8,12 @@
  * the dry-run plan. The database-backed half (publish, replay, boot readiness)
  * is `tests/integration/hosted-register-publish.test.ts`.
  */
-import { chmod, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { constants } from "node:fs";
+import { chmod, mkdtemp, open, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   HOSTED_REGISTER_EXAMPLE_SOURCE_REF,
@@ -18,9 +21,11 @@ import {
   hostedRegisterRefusalCode,
   parseHostedRegisterArguments,
   parseHostedRegisterFile,
+  parseHostedScorecardFile,
   planHostedRegisterPublication,
   publishHostedRegister,
   readHostedRegisterFile,
+  readHostedScorecardFile,
   renderHostedRegisterPlan,
   type HostedRegisterOperations
 } from "../../apps/runner/src/hosted-register-publish.js";
@@ -34,11 +39,15 @@ import {
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COUNTRY_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
+  MODEL_SCORECARD_MAX_BYTES,
+  MODEL_SCORECARD_ROW_KEY,
   loadBootstrapRegister,
   parseRegisterVersionText,
+  readEngineVersion,
   readStoryPolicy,
   type GeneralRegisterPublication
 } from "../../packages/register/src/index.js";
+import { compatibleExampleScorecard } from "../support/modelScorecardFixture.js";
 
 const EXAMPLE_PATH = new URL("../../deploy/vps/register/hosted-register.example.json", import.meta.url);
 const INLINE_SECRET = "Bearer hosted-register-test-inline-credential-must-never-print";
@@ -764,5 +773,379 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
       target.output_price_micros_per_million = 25_000_000;
     }
     expect(await planCode(file)).toBe("NO_REFUSAL");
+  });
+});
+
+/**
+ * A19 — THE MODEL SCORECARD, published beside the register file.
+ *
+ * `--scorecard <file>` carries the owners' approved scorecard as ONE ADDITIVE
+ * operator row: it has no code-owned twin, it comes from its own
+ * custody-checked file under the scorecard bound (64 KiB, owner ruling
+ * 2026-09-27, the same constant local mode reads under), and it is judged by
+ * the engine's own scorecard validation. Every other row the command seals is
+ * exactly what it seals without the scorecard.
+ */
+describe("A19 · the model scorecard, published beside the register file", () => {
+  async function hostedScorecard(scorecardVersion?: number) {
+    return parseHostedScorecardFile(
+      bytesOf(await compatibleExampleScorecard(scorecardVersion)), await readEngineVersion()
+    );
+  }
+
+  const registerFile = () => parseHostedRegisterFile(bytesOf(validFile()));
+
+  it("accepts --scorecard once, beside --file, and nothing else new", () => {
+    expect(parseHostedRegisterArguments(["--file", "a.json", "--scorecard", "s.json"]))
+      .toMatchObject({ dryRun: false, scorecardPath: resolve("s.json") });
+    expect(parseHostedRegisterArguments(["--file", "a.json"])).toMatchObject({ scorecardPath: null });
+    for (const args of [
+      ["--file", "a.json", "--scorecard"],
+      ["--file", "a.json", "--scorecard", "--dry-run"],
+      ["--file", "a.json", "--scorecard", "s.json", "--scorecard", "t.json"],
+      ["--scorecard", "s.json"]
+    ]) {
+      expect(codeOf(() => parseHostedRegisterArguments(args)), args.join(" ")).toBe("HOSTED_REGISTER_USAGE");
+    }
+  });
+
+  it("adds ONE modelScorecard row and leaves every other row exactly as without it", async () => {
+    const without = await planHostedRegisterPublication(registerFile());
+    const carried = await planHostedRegisterPublication(registerFile(), await hostedScorecard());
+    expect(without.rows.some((row) => row.rowKey === MODEL_SCORECARD_ROW_KEY)).toBe(false);
+    expect(without.modelScorecard).toBeNull();
+    expect(carried.rows.filter((row) => row.rowKey === MODEL_SCORECARD_ROW_KEY)).toHaveLength(1);
+    expect(carried.rows.filter((row) => row.rowKey !== MODEL_SCORECARD_ROW_KEY)).toEqual(without.rows);
+  });
+
+  it("seals the operator's canonical document, with provenance naming the file, the version and the hash", async () => {
+    const sealed = await hostedScorecard(9);
+    const plan = await planHostedRegisterPublication(registerFile(), sealed);
+    const row = plan.rows.find((candidate) => candidate.rowKey === MODEL_SCORECARD_ROW_KEY)!;
+    expect(row.valueJsonText).toBe(sealed.valueJsonText);
+    expect(JSON.parse(row.valueJsonText)).toMatchObject({ kind: "DEBATEAI_SCORECARD", scorecardVersion: 9 });
+    expect(row.sourceRef).toBe(`task-14b fixture: first hosted register | modelScorecard v9 sha256:${sealed.sha256}`);
+    // Carry 8: the plan also carries the API-route count it prints.
+    expect(plan.modelScorecard).toEqual({
+      scorecardVersion: 9, candidateCount: sealed.candidateCount, apiCandidateCount: sealed.apiCandidateCount,
+      sha256: sealed.sha256, bytes: sealed.bytes
+    });
+  });
+
+  it("makes a different scorecard a different publication, and the same one a replay", async () => {
+    const first = await planHostedRegisterPublication(registerFile(), await hostedScorecard(4));
+    const same = await planHostedRegisterPublication(registerFile(), await hostedScorecard(4));
+    const next = await planHostedRegisterPublication(registerFile(), await hostedScorecard(5));
+    const none = await planHostedRegisterPublication(registerFile());
+    expect(same.publicationId).toBe(first.publicationId);
+    expect(new Set([first.publicationId, next.publicationId, none.publicationId]).size).toBe(3);
+  });
+
+  it("says in the plan whether a scorecard is carried", async () => {
+    expect(renderHostedRegisterPlan(await planHostedRegisterPublication(registerFile())))
+      .toMatch(/^model_scorecard=none \(asks keep the plan rosters\)$/mu);
+    expect(renderHostedRegisterPlan(await planHostedRegisterPublication(registerFile(), await hostedScorecard(6))))
+      .toMatch(/^model_scorecard version=6 candidates=\d+ bytes=\d+ sha256=[0-9a-f]{64}$/mu);
+  });
+
+  /**
+   * Carry 8 (pre-flight H5). The hosted site reaches a model only through an
+   * API, so the plan says how many of the scorecard's candidates have an API
+   * route, and says in plain words when none has. That is NOT a refusal: the
+   * scorecard stays VALID and is sealed, and relays never run hosted either way.
+   */
+  it("counts the candidates with an API route and prints that count", async () => {
+    const example = await compatibleExampleScorecard(6);
+    const candidates = example.candidates as Array<{ accessRoutes: Array<{ kind: string }> }>;
+    const expected = candidates.filter((candidate) => candidate.accessRoutes.some((route) => route.kind === "API")).length;
+    // Not vacuous: the example mixes API and subscription-only candidates, so
+    // counting every candidate, or none, fails this row.
+    expect(expected).toBeGreaterThan(0);
+    expect(expected).toBeLessThan(candidates.length);
+    const sealed = parseHostedScorecardFile(bytesOf(example), await readEngineVersion());
+    expect(sealed.apiCandidateCount).toBe(expected);
+    const plan = await planHostedRegisterPublication(registerFile(), sealed);
+    expect(plan.modelScorecard?.apiCandidateCount).toBe(expected);
+    const text = renderHostedRegisterPlan(plan);
+    expect(text).toContain(
+      `\nmodel_scorecard api_candidates=${expected} (${expected} of the ${candidates.length} scored models`
+      + " can be reached through an API; the hosted site reaches models only that way)\n"
+    );
+    expect(text).not.toMatch(/^model_scorecard note:/mu);
+  });
+
+  it("says in plain words when no candidate has an API route, and still publishes the scorecard", async () => {
+    const example = await compatibleExampleScorecard(6);
+    const subscriptionOnly = {
+      ...example,
+      candidates: (example.candidates as Array<Record<string, unknown>>).map((candidate) => ({
+        ...candidate, accessRoutes: [{ kind: "SUBSCRIPTION", tool: "claude" }]
+      }))
+    };
+    const sealed = parseHostedScorecardFile(bytesOf(subscriptionOnly), await readEngineVersion());
+    expect(sealed.apiCandidateCount).toBe(0);
+    const plan = await planHostedRegisterPublication(registerFile(), sealed);
+    const text = renderHostedRegisterPlan(plan);
+    expect(text).toMatch(/^model_scorecard api_candidates=0 \(0 of the \d+ scored models /mu);
+    expect(text).toContain(
+      "\nmodel_scorecard note: none of these models can be reached through an API, so the hosted site will keep"
+      + " using the plan's usual models until a model it can reach through an API is scored."
+      + " The scorecard is still valid and can still be published.\n"
+    );
+    const recorded = recordingOperations();
+    await expect(publishHostedRegister({ plan, operations: recorded.operations }))
+      .resolves.toMatchObject({ outcome: "CREATED" });
+    expect(recorded.publications[0]!.rows.filter((row) => row.rowKey === MODEL_SCORECARD_ROW_KEY)).toHaveLength(1);
+  });
+
+  it("refuses a scorecard the engine refuses, by the scorecard's own reason", async () => {
+    const engine = await readEngineVersion();
+    const base = await compatibleExampleScorecard();
+    expect(codeOf(() => parseHostedScorecardFile(bytesOf({ ...base, kind: "NOT_A_SCORECARD" }), engine)))
+      .toBe("HOSTED_REGISTER_SCORECARD_REFUSED:SCHEMA_INVALID");
+    expect(codeOf(() => parseHostedScorecardFile(bytesOf({
+      ...base, engineCompatibility: { minEngineVersion: "999999.0.0", maxEngineVersion: null }
+    }), engine))).toBe("HOSTED_REGISTER_SCORECARD_REFUSED:ENGINE_INCOMPATIBLE");
+  });
+
+  it("refuses bytes the register could not seal", async () => {
+    const engine = await readEngineVersion();
+    for (const bytes of [
+      new Uint8Array(),
+      Buffer.from("not json", "utf8"),
+      Buffer.from("{\"kind\":\"DEBATEAI_SCORECARD\",\"kind\":\"DEBATEAI_SCORECARD\"}", "utf8"),
+      Buffer.from("{\"balancedMargin\":1e-7}", "utf8"),
+      new Uint8Array(MODEL_SCORECARD_MAX_BYTES + 1)
+    ]) {
+      expect(codeOf(() => parseHostedScorecardFile(bytes, engine))).toBe("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+    }
+  });
+
+  it("reads the scorecard under the same custody contract, with its own codes", async () => {
+    const engine = await readEngineVersion();
+    const loose = await custodyFile(JSON.stringify(await compatibleExampleScorecard()), 0o644);
+    expect(await codeOfAsync(() => readHostedScorecardFile(loose, engine)))
+      .toBe("HOSTED_REGISTER_SCORECARD_FILE_CUSTODY_INVALID");
+    expect(await codeOfAsync(() => readHostedScorecardFile(`${loose}.absent`, engine)))
+      .toBe("HOSTED_REGISTER_SCORECARD_FILE_ABSENT");
+  });
+
+  /*
+   * Owner ruling 2026-09-27: the scorecard bound is 64 KiB, the SAME constant
+   * local mode reads the bundled file under, so one file gets one answer in
+   * both modes. It caps the file and the canonical text that is sealed.
+   */
+  it("admits a scorecard file of exactly 64 KiB, and refuses one byte more", async () => {
+    const engine = await readEngineVersion();
+    const padded = JSON.stringify(await compatibleExampleScorecard(undefined, MODEL_SCORECARD_MAX_BYTES));
+    const size = Buffer.byteLength(padded, "utf8");
+    expect(size).toBeGreaterThan(MODEL_SCORECARD_MAX_BYTES - 1_024);
+    const atBound = await custodyFile(padded + " ".repeat(MODEL_SCORECARD_MAX_BYTES - size));
+    const sealed = await readHostedScorecardFile(atBound, engine);
+    expect(sealed.bytes).toBeGreaterThan(MODEL_SCORECARD_MAX_BYTES - 1_024);
+    expect(sealed.bytes).toBeLessThanOrEqual(MODEL_SCORECARD_MAX_BYTES);
+    const over = await custodyFile(padded + " ".repeat(MODEL_SCORECARD_MAX_BYTES + 1 - size));
+    expect(await codeOfAsync(() => readHostedScorecardFile(over, engine))).toBe("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  });
+
+  it("refuses a file under 64 KiB whose sealed form is over it", async () => {
+    // "\n" is 2 bytes in the file and `\u000a`, 6 bytes, in the register's canonical form.
+    const engine = await readEngineVersion();
+    const base = await compatibleExampleScorecard();
+    // A defined text field (fix round 1: an unknown field is now refused on its own).
+    const withVendorText = (text: string) => {
+      const value = structuredClone(base) as { candidates: Array<Record<string, unknown>> };
+      value.candidates[0]!.vendor = text;
+      return bytesOf(value);
+    };
+    // Control: the same field with one newline is accepted.
+    expect(codeOf(() => parseHostedScorecardFile(withVendorText("Vendor\n"), engine))).toBe("NO_REFUSAL");
+    const expanding = withVendorText(`Vendor${"\n".repeat(12_000)}`);
+    expect(expanding.byteLength).toBeLessThanOrEqual(MODEL_SCORECARD_MAX_BYTES);
+    expect(codeOf(() => parseHostedScorecardFile(expanding, engine))).toBe("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  });
+
+  it("prints the scorecard in a dry run and seals it through the command", async () => {
+    const path = await custodyFile(JSON.stringify(validFile()));
+    const scorecardPath = await custodyFile(JSON.stringify(await compatibleExampleScorecard(7)));
+    let stdout = "";
+    let stderr = "";
+    const output = {
+      stdout: (text: string) => { stdout += text; },
+      stderr: (text: string) => { stderr += text; }
+    };
+    expect(await runHostedRegisterPublishCli(["--dry-run", "--file", path, "--scorecard", scorecardPath], output,
+      async () => { throw new Error("a dry run opens nothing"); })).toBe(0);
+    expect(stdout).toMatch(/^model_scorecard version=7 /mu);
+    const recorded = recordingOperations();
+    expect(await runHostedRegisterPublishCli(["--file", path, "--scorecard", scorecardPath], output,
+      async () => ({ operations: recorded.operations, close: async () => undefined }))).toBe(0);
+    expect(stderr).toBe("");
+    expect(recorded.publications[0]!.rows.filter((row) => row.rowKey === MODEL_SCORECARD_ROW_KEY)).toHaveLength(1);
+  });
+
+  it("refuses a scorecard problem as operator input, before any connection", async () => {
+    const path = await custodyFile(JSON.stringify(validFile()));
+    let opened = false;
+    let stderr = "";
+    const exitCode = await runHostedRegisterPublishCli(
+      ["--file", path, "--scorecard", `${path}.absent`],
+      { stdout: () => undefined, stderr: (text) => { stderr += text; } },
+      async () => { opened = true; throw new Error("unreachable"); }
+    );
+    expect({ exitCode, stderr, opened })
+      .toEqual({ exitCode: 2, stderr: "HOSTED_REGISTER_SCORECARD_FILE_ABSENT\n", opened: false });
+  });
+});
+
+/**
+ * A19 fix round 1 (review Minor 2) — a sealed row is never edited, so hosted
+ * publish REFUSES a scorecard that carries any field the scorecard format does
+ * not define, at any depth. The format itself ignores such a field (zod strips
+ * it), which is why local mode, which seals nothing, still reads it.
+ *
+ * Fix round 2 (re-review Minor 1): the code names only the DEFINED parent path
+ * and a fixed `*` marker — never the unknown key's name, which is operator text
+ * and could be secret-shaped — and never its value.
+ */
+describe("A19 fix round 1 · a field the scorecard format does not define is never sealed", () => {
+  const SECRET = "private-evaluator-note-must-never-print";
+  /** Secret-shaped, and entirely inside the printable code alphabet, so no sanitising could hide it. */
+  const SECRET_KEY = "sk-live-4f9c2a7e1b8d6f3a0c5e9b2d7a4f1c8e";
+  type Mutable = Record<string, any>;
+
+  async function codeAndText(value: unknown): Promise<{ code: string; text: string }> {
+    try {
+      parseHostedScorecardFile(bytesOf(value), await readEngineVersion());
+    } catch (error) {
+      return { code: hostedRegisterRefusalCode(error), text: `${String(error)} ${JSON.stringify(error)}` };
+    }
+    return { code: "NO_REFUSAL", text: "" };
+  }
+
+  it("refuses an unknown field at every depth the schema defines, naming its defined parent and never its name or value", async () => {
+    const example = await compatibleExampleScorecard() as Mutable;
+    // Control: the example carries only defined fields, and is accepted.
+    expect((await codeAndText(example)).code).toBe("NO_REFUSAL");
+    const role = Object.keys(example.roles).find((name) => example.roles[name].length > 0)!;
+    const priced = (example.candidates as Mutable[]).findIndex((candidate) => candidate.apiPrice !== null);
+    expect(priced).toBeGreaterThanOrEqual(0);
+    const cases: Record<string, (value: Mutable) => void> = {
+      "*": (value) => { value[SECRET_KEY] = SECRET; },
+      "engineCompatibility.*": (value) => { value.engineCompatibility[SECRET_KEY] = SECRET; },
+      "candidates.1.*": (value) => { value.candidates[1][SECRET_KEY] = SECRET; },
+      "candidates.0.accessRoutes.0.*": (value) => { value.candidates[0].accessRoutes[0][SECRET_KEY] = SECRET; },
+      [`candidates.${priced}.apiPrice.*`]: (value) => { value.candidates[priced].apiPrice[SECRET_KEY] = SECRET; },
+      [`roles.${role}.0.*`]: (value) => { value.roles[role][0][SECRET_KEY] = SECRET; },
+      [`roles.${role}.0.quality.*`]: (value) => { value.roles[role][0].quality[SECRET_KEY] = SECRET; },
+      [`roles.${role}.0.qualityByLanguage.*`]: (value) => {
+        value.roles[role][0].qualityByLanguage = { ro: { ...value.roles[role][0].quality }, [SECRET_KEY]: SECRET };
+      },
+      [`roles.${role}.0.typicalCall.*`]: (value) => { value.roles[role][0].typicalCall[SECRET_KEY] = SECRET; },
+      [`roles.${role}.0.tags.0.*`]: (value) => {
+        value.roles[role][0].tags = [{ code: "PRIVATE_TAG", strength: "WEAK", text: "a tag", [SECRET_KEY]: SECRET }];
+      },
+      "pickerSettings.*": (value) => { value.pickerSettings[SECRET_KEY] = SECRET; },
+      [`pickerSettings.economyCap.${role}.*`]: (value) => { value.pickerSettings.economyCap[role][SECRET_KEY] = SECRET; },
+      "pickerSettings.planStrengthCaps.*": (value) => { value.pickerSettings.planStrengthCaps[SECRET_KEY] = SECRET; }
+    };
+    for (const [path, mutate] of Object.entries(cases)) {
+      const value = structuredClone(example);
+      mutate(value);
+      const refused = await codeAndText(value);
+      expect(refused.code, path).toBe(`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:${path}`);
+      expect(`${refused.code} ${refused.text}`, path).not.toContain(SECRET);
+      expect(`${refused.code} ${refused.text}`, path).not.toContain(SECRET_KEY);
+    }
+  });
+
+  it("never prints the unknown key's name, whatever its characters or length", async () => {
+    for (const name of [SECRET_KEY, "private note/é", `sk-${"a".repeat(300)}`, ""]) {
+      const value = structuredClone(await compatibleExampleScorecard()) as Mutable;
+      value.candidates[1][name] = SECRET;
+      const refused = await codeAndText(value);
+      expect(refused.code, name).toBe("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*");
+      if (name !== "") expect(`${refused.code} ${refused.text}`, name).not.toContain(name.slice(0, 16));
+    }
+  });
+
+  it("refuses it as operator input, before the plan and before any connection, with nothing from the file on stderr", async () => {
+    const path = await custodyFile(JSON.stringify(validFile()));
+    const scorecardPath = await custodyFile(JSON.stringify({ ...await compatibleExampleScorecard(), [SECRET_KEY]: SECRET }));
+    let stdout = "";
+    let stderr = "";
+    let opened = false;
+    const exitCode = await runHostedRegisterPublishCli(
+      ["--dry-run", "--file", path, "--scorecard", scorecardPath],
+      { stdout: (text) => { stdout += text; }, stderr: (text) => { stderr += text; } },
+      async () => { opened = true; throw new Error("unreachable"); }
+    );
+    expect({ exitCode, stdout, stderr, opened }).toEqual({
+      exitCode: 2, stdout: "", stderr: "HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:*\n", opened: false
+    });
+    expect(stderr).not.toContain(SECRET_KEY);
+    expect(stderr).not.toContain(SECRET);
+  });
+});
+
+/**
+ * A19 fix round 1 (review Minor 1) — the operator files are opened without
+ * waiting: a FIFO named by `--file` or `--scorecard` is refused by the custody
+ * rule (not a regular file) at once, instead of blocking the command until
+ * something writes to it.
+ */
+describe("A19 fix round 1 · a FIFO in place of an operator file", () => {
+  async function fifoInCustodyDirectory(): Promise<string> {
+    const root = await mkdtemp(join(tmpdir(), "debateai-hosted-register-"));
+    temporaryRoots.push(root);
+    await chmod(root, 0o700);
+    const fifo = join(root, "operator-file.json");
+    execFileSync("mkfifo", [fifo]);
+    await chmod(fifo, 0o600);
+    return fifo;
+  }
+
+  /** The read's answer within 2 s; a reader still blocked in open() is then released so the worker can exit. */
+  async function answerWithin(fifo: string, read: Promise<string>): Promise<string> {
+    const stop = new AbortController();
+    try {
+      return await Promise.race([
+        read,
+        delay(2_000, undefined, { signal: stop.signal }).then(() => "STILL_WAITING_FOR_A_WRITER", () => "ABORTED")
+      ]);
+    } finally {
+      stop.abort();
+      // With no reader waiting this refuses (ENXIO) and is ignored.
+      await open(fifo, constants.O_WRONLY | constants.O_NONBLOCK).then((handle) => handle.close(), () => undefined);
+      await Promise.race([read.catch(() => undefined), delay(1_000)]);
+    }
+  }
+
+  it("refuses a FIFO given as --scorecard at once", async () => {
+    const fifo = await fifoInCustodyDirectory();
+    const engine = await readEngineVersion();
+    expect(await answerWithin(fifo, codeOfAsync(() => readHostedScorecardFile(fifo, engine))))
+      .toBe("HOSTED_REGISTER_SCORECARD_FILE_CUSTODY_INVALID");
+  });
+
+  it("refuses a FIFO given as --file at once", async () => {
+    const fifo = await fifoInCustodyDirectory();
+    expect(await answerWithin(fifo, codeOfAsync(() => readHostedRegisterFile(fifo))))
+      .toBe("HOSTED_REGISTER_FILE_CUSTODY_INVALID");
+  });
+});
+
+describe("A19 fix round 2 · the refusal line admits `*` only as the unknown-field marker", () => {
+  it("prints both marker forms as codes and keeps any other `*` on the generic line", () => {
+    expect(hostedRegisterRefusalCode(new Error("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*")))
+      .toBe("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*");
+    expect(hostedRegisterRefusalCode(new Error("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:*")))
+      .toBe("HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:*");
+    expect(hostedRegisterRefusalCode(new Error("PROVIDER_TARGET_PRICE_ZERO:vendor:beta")))
+      .toBe("PROVIDER_TARGET_PRICE_ZERO:vendor:beta");
+    expect(hostedRegisterRefusalCode(new Error("PROVIDER_TARGET_PRICE_ZERO:vendor:a*b")))
+      .toBe("HOSTED_REGISTER_PUBLISH_FAILED");
+    expect(hostedRegisterRefusalCode(new Error("PROVIDER_TARGET_PRICE_ZERO:vendor:*b")))
+      .toBe("HOSTED_REGISTER_PUBLISH_FAILED");
   });
 });

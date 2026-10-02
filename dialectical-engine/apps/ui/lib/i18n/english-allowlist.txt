@@ -6,3 +6,4 @@
 # S2 settings, consent, and support
 
 # Remaining already-ticketed interface surfaces
+lib/modelStrength.ts

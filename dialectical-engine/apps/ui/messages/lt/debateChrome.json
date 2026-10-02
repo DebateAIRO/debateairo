@@ -294,5 +294,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatorius atmetė plano pasirinkimą. Pasirinkite „Nemokamas“ arba „Premium“ ir bandykite dar kartą.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatorius atmetė užklausą: šiam planui reikalingas modelis šiuo metu nepasiekiamas. Bandykite vėliau arba pasirinkite kitą planą.",
   "requestFailure.kind.ALREADY_WAITING": "Vienu metu laukti gali tik vienas klausimas. Šį klausimą užduokite, kai prasidės jūsų laukiantys debatai.",
-  "requestFailure.kind.UNCLASSIFIED": "Užklausos įvykdyti nepavyko dar negavus jokio atsakymo, todėl jos baigtis nežinoma. Tai ne koordinatoriaus sprendimas."
+  "requestFailure.kind.UNCLASSIFIED": "Užklausos įvykdyti nepavyko dar negavus jokio atsakymo, todėl jos baigtis nežinoma. Tai ne koordinatoriaus sprendimas.",
+  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
 }

@@ -360,6 +360,10 @@ describe("S06 provider gateway binding", () => {
           return { rows: [{ envelope_basis: S06_ENVELOPE_BASIS }] };
         }
         if (sql.includes("SELECT count(*)::text")) return { rows: [{ count: "0" }] };
+        // Model scorecard §2.3: the gateway records each attempt's prompt
+        // (ledger.call_prompt) before it is sent. No cipher is configured on this
+        // stub pool, so the row is the plaintext form and nothing is read back.
+        if (sql.includes("INSERT INTO ledger.call_prompt")) return { rows: [] };
         throw new Error(`UNEXPECTED_POOL_QUERY:${sql}`);
       },
     } as unknown as Pool;

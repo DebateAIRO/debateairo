@@ -129,6 +129,16 @@ export const CONDITION_MARKS = [
   // by `CONDITION_MARKS.slice(-4)`.
   "BRANCH-FROZEN-LOW-LEVERAGE",
   "DEGRADED-DIVERSITY",
+  // Model scorecard A16 (owner ruling R6, 2026-09-26): a model the assignment
+  // did not plan for a call answered it because the planned one was
+  // unavailable — a seat's main failed its call (transport exhausted after the
+  // normal retries, or a subscription usage cap) or was absent, and its
+  // runner-up answered; or a runner-up the 80-20 split chose was unavailable
+  // and its main answered (A16c, controller carry 12). Spelled with
+  // hyphens after its neighbour DEGRADED-DIVERSITY and placed HERE beside it,
+  // NOT appended: the DR-176 tail of this vocabulary is read positionally by
+  // `CONDITION_MARKS.slice(-4)`.
+  "BACKUP-MODEL-USED",
   "SINGLE-LINEAGE",
   "CRITIQUE-UNAVAILABLE",
   // S2-2 (goal-v4 T3) / confirm-item 5, ruling J13(b): the judge panel's two degradation
@@ -437,6 +447,7 @@ export function isRunLevelSpendStop(error: unknown): boolean {
     && (RUN_LEVEL_SPEND_STOP_CODES as readonly string[]).includes(code);
 }
 
+export * from "./debate-roles.js";
 export * from "./support-credentials.js";
 export * from "./support-text-views.js";
 

@@ -52,12 +52,12 @@ here, never written down. For each maker the relay asks, in this order:
 
 1. the maker's own environment key — `ACCEPTANCE_CLAUDE_BINARY`,
    `ACCEPTANCE_CODEX_BINARY`, `ACCEPTANCE_GROK_BINARY`,
-   `ACCEPTANCE_HERMES_BINARY` — which may hold a full path or a bare name to
-   look up. A key that is present but blank stops the relay with the maker's
-   bare code (`CLAUDE_CLI_BINARY_UNRESOLVED` and its three siblings): an
-   operator who set the key meant to decide, and the harness never guesses on
-   their behalf.
-2. with no key set, the maker's NAME — `claude`, `codex`, `grok`, `hermes` — is
+   `ACCEPTANCE_HERMES_BINARY`, `ACCEPTANCE_AGY_BINARY`, `ACCEPTANCE_PI_BINARY` — which may hold a full
+   path or a bare name to look up. A key that is present but blank stops the
+   relay with the maker's bare code (`CLAUDE_CLI_BINARY_UNRESOLVED` and its
+   siblings): an operator who set the key meant to decide, and the harness never
+   guesses on their behalf.
+2. with no key set, the maker's NAME — `claude`, `codex`, `grok`, `hermes`, `agy`, `pi` — is
    looked up across the directories of `PATH` in order. **The first entry that
    exists under the name is the match, and it is then admitted or refused; a
    broken entry is never stepped over.** That is deliberately unlike `command -v`,
@@ -101,6 +101,144 @@ as `UNVERIFIED tls-material openssl-unavailable` or `UNVERIFIED port
 lsof-unavailable`, and that line is all the run prints. The resolver's reason
 and path (for example `NOT_A_PROGRAM` and the file it refused) are on the
 error's `cause`, which only code calling the fixture directly can read.
+**Prompt transport, thinking level, context window, stdout lines and usage caps (model scorecard, 2026-09-26).**
+Every relay runs through `relay-core.ts`, which now carries five more laws.
+*Transport*: an adapter says how its CLI receives the prompt — `argv` (the four
+original makers, unchanged), `stdin` (written, then closed) or `file` (a mode-0600
+file in its own private directory, deleted after the call; only its path reaches the
+command line). The agy and pi relays never put a prompt on the command line.
+*Thinking level*: a request may carry `x_thinking_level`, one lower-case token; a
+level the adapter does not declare is refused with 400
+`CLI_RELAY_THINKING_LEVEL_UNSUPPORTED` before any CLI starts. Every answer echoes
+`x_thinking_level`: the level asked for, or `DEFAULT_ONLY` when none was asked (the
+CLI then ran at its own default — for agy and pi, the relay's declared default).
+Thinking tokens a CLI reports are echoed as
+`usage.completion_tokens_details.reasoning_tokens`, and only then. *Context
+window*: an adapter that declares one refuses, with 413
+`CLI_RELAY_CONTEXT_WINDOW_EXCEEDED` and before any CLI starts, a prompt whose size
+at 2 bytes per token plus the request's `max_tokens` would not fit. *Stdout lines*:
+a relay reads at most 1 MiB of its CLI's output (`CLI_RELAY_STDOUT_LIMIT` beyond it),
+and an adapter may name the lines its parser reads. Each line is then decided from its
+first 4 KiB; a line it does not need is discarded as it arrives and never counted, while
+a kept line counts like any output. The pi relay keeps only pi's final assistant
+message: pi repeats the whole prompt in its own events, and without the filter a prompt
+well inside its 1M window would run on the subscription and then be refused. *Usage caps*: a
+CLI that exits non-zero is shown to its adapter's cap classifier together with up to
+64 KiB of its stderr (kept in memory, never logged or returned); a recognised cap is
+answered 429 with `x_cli_relay_error: "CLI_RELAY_USAGE_CAP"`, so the runner switches
+the seat to its backup at once. Recognised today: Claude Code's recorded "You've
+reached your … limit" (2026-08-11). Codex, Grok, agy and pi have no recorded cap
+output yet, so their caps stay ordinary failures — retried, then absorbed by the
+backup — until one is captured. When a real cap happens, keep that call's stdout
+and stderr, remove anything credential-shaped, and add the exact signature to that
+maker's `classifyUsageCap` together with a test that replays the capture.
+
+**Serving relays for step replay (`pnpm run relays:serve`, model scorecard §2.9).**
+Local and operator-only: it refuses in the hosted deployment before it reads a
+file. Write a candidates file, `{"candidates":[{"providerRef":"local:pi-glm","tool":"pi","modelId":"glm-5.3-flash","thinkingLevels":["low","high"]}]}`,
+where `tool` is one of `claude`, `codex`, `grok`, `agy`, `pi`, then run
+`pnpm run relays:serve -- --candidates <file>`. One relay starts
+per candidate on its own loopback port with its own bearer. A candidate whose CLI
+answers as a different model than `modelId`, or cannot run one of its
+`thinkingLevels`, is left out with a `RELAY ABSENT <providerRef> <code>` line. For
+`agy`, `modelId` is the base id without the level suffix and `thinkingLevels` lists
+the suffixes to serve. The endpoints file is written with mode 0600, by default to
+`.local/relays/endpoints.json` under this engine directory (git-ignored). Add
+`--endpoints <file>` to put it elsewhere: outside the repository, or under any
+`.local/` directory inside it. Any other path inside the repository is refused
+(`RELAY_HOST_ENDPOINTS_PATH_REFUSED`), because the file holds live bearers. The
+path is judged where it really leads: a link on the way is followed to what it
+points at, and `..` after a link climbs from there, as the system itself does.
+So a link cannot carry the file into the repository. The file itself may not be
+a link, and a link that points at nothing is refused, wherever it sits in the
+path. "The repository" includes every git checkout around the engine, such as a
+main checkout that holds this one as a worktree. Its shape is
+`{relays:[{providerRef, maker, tool, modelId, baseUrl, bearerToken, thinkingLevels, contextWindowTokens}]}`,
+where `baseUrl` already ends in `/v1` and `bearerToken` is the value after `Bearer `.
+The host runs until SIGTERM or Ctrl-C, even one that arrives during start-up. It
+then deletes the endpoints file first and closes every relay; a second Ctrl-C
+does not cut that short. If the file cannot be deleted, the host says so with
+`RELAY_HOST_ENDPOINTS_REMOVE_FAILED` and the path, so you can delete it yourself.
+
+**Exporting recorded calls as moments (`pnpm run moment:export`, model scorecard §2.9).**
+Local and operator-only: it refuses in the hosted deployment. It reads one
+finished debate from the database and writes "moment" files; it never writes the
+database and never calls a model. A moment is one recorded model call: the exact
+material its prompt was built from, the question and the passages a grader needs,
+and the answer that call gave (none when the call never succeeded). Run
+`pnpm run moment:export -- --run <runId> --call-site-key <key> --out <file>` for one
+call, or `pnpm run moment:export -- --run <runId> --all --out-dir <folder>` for every
+call of the debate; `--engine-commit <hex>` records which engine version exported
+it. Before a file is written, each moment is checked twice: the recorded prompt
+must match its own fingerprint, and today's prompt builder, fed the moment, must
+send that same prompt again. If either check fails, nothing is written, not even
+the folder. Calls that cannot be moments (recorded before prompts were kept, or not
+a debate role's call) are listed as `MOMENT SKIPPED <key> <code>`. Moment files
+hold the debate's private text, decrypted: they are written owner-only (mode 0600),
+and that text goes only into those files, never to the screen or a log. So
+`--out` and `--out-dir` must sit outside the repository, or under any `.local/`
+folder inside it; any other path is refused (`MOMENT_OUTPUT_PATH_REFUSED`), judged
+where it really leads, by the same rule as the endpoints file above. Environment:
+`DATABASE_URL`. For a local debate whose content is encrypted, also
+`CONTENT_ENCRYPTION_ENABLED`, `KEK_PATH`, `USER_DEK_STORE_PATH` and
+`DEBATEAI_CUSTODY_GROUP`, the same settings the runner uses, plus
+`KEK_PREVIOUS_PATH` during a key changeover.
+
+**Asking other models the same question (`pnpm run moment:replay`, model scorecard §2.9).**
+Local and operator-only: it refuses in the hosted deployment before it reads a
+file, and it never touches the database. It takes moment files and sends each
+one's prompt, rebuilt by today's live prompt builder, to other candidate models,
+then writes down what each one answered. Run
+`pnpm run moment:replay -- --endpoints <file> --jobs <jobs.jsonl> --out <results.jsonl> --bound <maxAttempts>,<tokenCeiling>,<deadlineMs>`.
+The endpoints file is the one `relays:serve` writes. It holds the relays'
+bearers, so it must be owner-only (mode 0600), and a plain-http address must be
+this machine's own. The relays themselves run only on this machine: they are for
+local use, never for the hosted site. Each line of the jobs file names one moment
+file, one route of the endpoints file and one thinking level:
+`{"momentFile":"a.moment.json","providerRef":"local:pi-glm","thinkingLevel":"low"}`
+(a relative `momentFile` is read from the jobs file's folder). Before the first
+call, every route is checked, every moment file is read and checked, and each
+moment's prompt is built on this machine without sending it. So a bad job stops
+the batch before anyone is asked. `--bound` is required, because no
+recorded call kept its own limits: for example, `1,2048,180000` means one attempt,
+at most 2048 answer tokens, and three minutes. It applies to every call in the
+batch, so replay one kind of step per batch. Each job adds one line to the
+`--out` file. A rerun skips the jobs that already have a final answer there, so a
+stopped batch picks up where it stopped. A last line that a crash cut short is
+dropped, and its job is asked again. An `--out` file that is not a results file is
+refused (`MOMENT_REPLAY_RESULTS_UNREADABLE`) and left exactly as it was. A prompt
+too big for a model's declared window is written as `CONTEXT_TOO_LARGE` and never
+sent. When a subscription hits its usage cap, that job's line is written and the
+batch stops at once with `MOMENT_REPLAY_USAGE_CAP <providerRef>`. A capped or timed-out job is not a final
+answer: a rerun asks it again, and its newest line is the one that counts. A
+time-out does not stop the batch. The results hold the models' answers to the
+private debate text. So the `--out` file is written owner-only (0600), and it must sit
+outside the repository or under any `.local/` folder inside it, judged by the same
+rule as above (`MOMENT_OUTPUT_PATH_REFUSED`). A reply is recorded only when it is
+the model's own answer, accepted or refused. An error body from a relay or a
+vendor never is.
+
+**Lean calls (model scorecard D8, owner ruling 2026-09-26).** A relayed call
+carries what an API call would, and as little else as each CLI allows. Every relay
+opens one private directory (mode 0700) when it starts and removes it when it stops;
+each call, the handshake included, runs in a fresh EMPTY directory inside it, so no
+project file (`CLAUDE.md`, `AGENTS.md` …) is ever read. Each CLI's own system prompt
+is replaced by one fixed sentence, `RELAY_MINIMAL_SYSTEM_PROMPT` in `relay-core.ts`:
+claude `--system-prompt` (never `--bare`, which also disables the subscription
+login); codex `-c model_instructions_file=` pointing at a 0600 file in the relay's
+directory, plus one `--disable` per name in `CODEX_DISABLED_FEATURES`; grok
+`--system-prompt-override`; pi `--system-prompt` plus `--no-prompt-templates`. agy
+has no system-prompt flag and gets `--disable-slash-commands`. The engine's own
+messages are untouched. What a CLI still adds is measured once, after the
+handshake, and printed as `RELAY OVERHEAD <maker> reported=<n> own=<m> overhead=<n−m>`
+(`own` is the handshake prompt's characters ÷ 4, rounded up): information, never a
+gate, and never a price. `relays:serve` prints each line once more with the
+candidate's providerRef after the maker. The Support relay (`hermes`) is out of
+scope: it plays no debate role, so it keeps its own handshake and prompt. grok
+selects a model by a short id and reports a longer one: `startGrokRelay`'s `model`
+option, and a relay-host `grok` candidate's `modelSelection`, is what `-m` gets
+(e.g. `grok-4.7`), while the relay still reports what grok answers as (e.g.
+`grok-4.7-build`).
 
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size

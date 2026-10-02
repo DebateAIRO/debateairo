@@ -30,6 +30,7 @@
   "components/support/supportConversation.test.mjs",
   "lib/contentSecurityPolicy.test.mjs",
   "lib/edgeUpgrade.test.mjs",
+  "lib/modelStrength.test.mjs",
   "lib/publicDebatePresentation.test.mjs",
   "lib/report/fonts.test.mjs",
   "lib/recommendation.test.mjs",

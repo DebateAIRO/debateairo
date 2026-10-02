@@ -99,6 +99,10 @@ describe("T9 production entry point wiring", () => {
     );
     expect(source).toContain('role: "SYNTHESIZER"');
     expect(source).toContain('role: "EVALUATOR"');
+    // A17: both roles' packets come from the ONE exported builder, which the
+    // replay tool calls too — a replayed prompt is the live prompt by construction.
+    expect(source).toContain("export function buildSynthesisRolePrompt(");
+    expect(source.split("buildSynthesisRolePrompt(request, run.argumentLanguageName)").length - 1).toBe(2);
     // The retired organs no longer make serve-path calls.
     expect(source).not.toContain('callSiteKey: `COMPOSER:${attempt}`');
     expect(source).not.toContain('callSiteKey: `POST_COMPOSE_R9:${compositionAttempt}`');

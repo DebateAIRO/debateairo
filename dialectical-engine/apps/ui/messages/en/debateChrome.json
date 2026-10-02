@@ -179,6 +179,7 @@
   "debateChrome.condition.leverageUnresolved": "Leverage unresolved",
   "debateChrome.condition.branchFrozenLowLeverage": "Branch not expanded: it could not move the answer",
   "debateChrome.condition.degradedDiversity": "Model diversity degraded",
+  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in",
   "debateChrome.condition.singleLineage": "Single model lineage",
   "debateChrome.condition.critiqueUnavailable": "Independent critique unavailable",
   "debateChrome.condition.panelPartial": "Some judges could not assess this point",

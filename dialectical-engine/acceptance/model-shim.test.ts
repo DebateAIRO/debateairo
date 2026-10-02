@@ -1,17 +1,26 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { isAbsolute, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CODEX_BINARY_NAME,
+  CODEX_DISABLED_FEATURES,
+  CODEX_HANDSHAKE_PROMPT,
   parseCodexCompletion,
   resolveCodexBinary,
   startModelShim,
   type ModelShimHandle
 } from "./model-shim.js";
+import { CLI_RELAY_INSTRUCTIONS_FILE_NAME, RELAY_MINIMAL_SYSTEM_PROMPT } from "./relay-core.js";
+import {
+  expectLeanWorkingDirectory,
+  leanCwdReportSnippet,
+  loggedWorkspaces,
+  type LeanCwdReport
+} from "./test-fixtures/lean-call-probe.js";
 
 const fakeCli = fileURLToPath(new URL("./test-fixtures/fake-codex-cli.mjs", import.meta.url));
 const fakeSessionsRoot = fileURLToPath(new URL("./test-fixtures/codex-sessions", import.meta.url));
@@ -36,6 +45,17 @@ function digestOf(value: string): string {
 
 function relayHeaders(handle: ModelShimHandle): Readonly<Record<string, string>> {
   return { "content-type": "application/json", authorization: handle.authorizationHeader };
+}
+
+/**
+ * D8 (Task A12b): the lean flags every codex call carries after `--json`, rebuilt
+ * around the instructions path this relay chose (the path itself is pinned by the
+ * "D8 lean calls — codex" test below).
+ */
+function codexLeanArguments(argumentList: readonly string[]): readonly string[] {
+  const setting = argumentList.find((argument) => argument.startsWith("model_instructions_file="));
+  if (setting === undefined) throw new Error("TEST_CODEX_INSTRUCTIONS_SETTING_MISSING");
+  return ["-c", setting, ...CODEX_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature])];
 }
 
 async function start(timeoutMs = 1_000): Promise<ModelShimHandle> {
@@ -236,7 +256,12 @@ describe("ACC-01 model shim", () => {
       })
     ].join("\n"), fakeSessionsRoot);
 
-    expect(completion).toEqual({ content: "OK", model: "gpt-5.6-sol", usage: null });
+    // §2.3 (Task A9): usage is now READ off turn.completed instead of dropped.
+    expect(completion).toEqual({
+      content: "OK",
+      model: "gpt-5.6-sol",
+      usage: { promptTokens: 15490, completionTokens: 5, totalTokens: 15495 }
+    });
   });
 
   it("maps an OpenAI request to codex exec, closes stdin, strips the prompt echo, and reports true lineage", async () => {
@@ -258,10 +283,16 @@ describe("ACC-01 model shim", () => {
       model: string;
       maker: string;
       choices: readonly { message: { content: string } }[];
-      usage: null;
+      usage: unknown;
     };
     expect(completion).toMatchObject({ model: "gpt-5.6-sol", maker: "OpenAI" });
-    expect(completion.usage).toBeNull();
+    // §2.3 (Task A9): the fake prints the measured 0.156.1 turn.completed usage.
+    expect(completion.usage).toEqual({
+      prompt_tokens: 15490,
+      completion_tokens: 5,
+      total_tokens: 15495,
+      completion_tokens_details: { reasoning_tokens: 0 }
+    });
     const relayed = JSON.parse(completion.choices[0]!.message.content) as {
       prompt: string;
       arguments: readonly string[];
@@ -273,6 +304,7 @@ describe("ACC-01 model shim", () => {
       "--ignore-rules",
       "--ignore-user-config",
       "--json",
+      ...codexLeanArguments(relayed.arguments),
       relayed.prompt
     ]);
     expect(relayed.arguments.some((argument) => argument.startsWith("model="))).toBe(false);
@@ -316,6 +348,7 @@ describe("ACC-01 model shim", () => {
       "--ignore-rules",
       "--ignore-user-config",
       "--json",
+      ...codexLeanArguments(relayed.arguments),
       "-c", 'model="gpt-5.6-sol"',
       relayed.prompt
     ]);
@@ -499,5 +532,216 @@ describe("D10 Codex shim binary resolution", () => {
       if (previous === undefined) delete process.env.ACCEPTANCE_CODEX_BINARY;
       else process.env.ACCEPTANCE_CODEX_BINARY = previous;
     }
+  });
+});
+
+describe("§2.2 Codex thinking level and §2.3 reasoning tokens", () => {
+  interface LevelledCompletion {
+    readonly x_thinking_level: string;
+    readonly choices: readonly { readonly message: { readonly content: string } }[];
+  }
+
+  const post = (shim: ModelShimHandle, level?: string): Promise<Response> =>
+    fetch(`${shim.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: relayHeaders(shim),
+      body: JSON.stringify({
+        model: "ignored-by-shim",
+        messages: [{ role: "user", content: "Assess this claim." }],
+        ...(level === undefined ? {} : { x_thinking_level: level })
+      })
+    });
+
+  it("declares the seven measured levels and passes -c model_reasoning_effort only when one is asked", async () => {
+    const shim = await start();
+    expect(shim.thinkingLevels).toEqual(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+
+    const completion = await (await post(shim, "xhigh")).json() as LevelledCompletion;
+    expect(completion.x_thinking_level).toBe("xhigh");
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string; arguments: readonly string[];
+    };
+    expect(relayed.arguments).toEqual([
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox", "read-only",
+      "--ignore-rules",
+      "--ignore-user-config",
+      "--json",
+      ...codexLeanArguments(relayed.arguments),
+      "-c", 'model_reasoning_effort="xhigh"',
+      relayed.prompt
+    ]);
+
+    const unasked = await (await post(shim)).json() as LevelledCompletion;
+    expect(unasked.x_thinking_level).toBe("DEFAULT_ONLY");
+  });
+
+  it("orders the level after the model pin, so the prompt stays the last argument", async () => {
+    const shim = await startModelShim({
+      port: 0,
+      timeoutMs: 1_000,
+      model: "gpt-5.6-sol",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] },
+      testOnlySessionsRoot: fakeSessionsRoot
+    });
+    handles.push(shim);
+
+    const completion = await (await post(shim, "low")).json() as LevelledCompletion;
+
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string; arguments: readonly string[];
+    };
+    expect(relayed.arguments.slice(-5)).toEqual([
+      "-c", 'model="gpt-5.6-sol"',
+      "-c", 'model_reasoning_effort="low"',
+      relayed.prompt
+    ]);
+  });
+
+  it("refuses a level codex does not accept, before spawning", async () => {
+    const response = await post(await start(), "ultra");
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED",
+      x_cli_relay_error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED"
+    });
+  });
+
+  it("reads usage, reasoning tokens included, off the measured 0.156.1 turn.completed event", async () => {
+    const completion = await parseCodexCompletion([
+      JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }),
+      JSON.stringify({ type: "turn.started" }),
+      JSON.stringify({ type: "item.completed", item: { id: "item_0", type: "agent_message", text: "ok" } }),
+      JSON.stringify({
+        type: "turn.completed",
+        usage: {
+          input_tokens: 15370,
+          cached_input_tokens: 12544,
+          cache_write_input_tokens: 0,
+          output_tokens: 5,
+          reasoning_output_tokens: 0
+        }
+      })
+    ].join("\n"), fakeSessionsRoot);
+
+    expect(completion).toEqual({
+      content: "ok",
+      model: "gpt-5.6-sol",
+      usage: { promptTokens: 15370, completionTokens: 5, totalTokens: 15375, reasoningTokens: 0 }
+    });
+  });
+
+  it("keeps usage null when the stream carries no turn.completed usage", async () => {
+    const completion = await parseCodexCompletion([
+      JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }),
+      JSON.stringify({ type: "item.completed", item: { id: "item_0", type: "agent_message", text: "ok" } })
+    ].join("\n"), fakeSessionsRoot);
+
+    expect(completion.usage).toBeNull();
+  });
+});
+
+describe("D8 lean calls — codex (Task A12b)", () => {
+  it("points codex at the relay's 0600 instructions file, disables the measured extras, and keeps the prompt last", async () => {
+    const shim = await start();
+    const response = await fetch(`${shim.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: relayHeaders(shim),
+      body: JSON.stringify({ model: "ignored-by-shim", messages: [{ role: "user", content: "Lean canary 8d0b." }] })
+    });
+
+    const completion = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const relayed = JSON.parse(completion.choices[0]!.message.content) as {
+      prompt: string; arguments: readonly string[];
+    };
+    const setting = relayed.arguments.find((argument) => argument.startsWith("model_instructions_file="));
+    expect(setting).toBeDefined();
+    expect(relayed.arguments[relayed.arguments.indexOf(setting!) - 1]).toBe("-c");
+    const instructionsFile = JSON.parse(setting!.slice("model_instructions_file=".length)) as string;
+    expect(isAbsolute(instructionsFile)).toBe(true);
+    expect(basename(instructionsFile)).toBe(CLI_RELAY_INSTRUCTIONS_FILE_NAME);
+    expect(basename(dirname(instructionsFile))).toMatch(/^relay-openai-workspace-/u);
+    expect(((await stat(instructionsFile)).mode & 0o777).toString(8)).toBe("600");
+    expect(await readFile(instructionsFile, "utf8")).toBe(RELAY_MINIMAL_SYSTEM_PROMPT);
+    // M5: exactly these 18 are disabled. code_mode_host is NOT: disabling it adds an error item.
+    expect(CODEX_DISABLED_FEATURES).toEqual([
+      "apps", "browser_use", "browser_use_external", "computer_use", "goals", "hooks",
+      "image_generation", "multi_agent", "plugins", "shell_tool", "skill_search", "sleep_tool",
+      "tool_suggest", "unified_exec", "view_image", "workspace_dependencies", "in_app_browser",
+      "shell_snapshot"
+    ]);
+    expect(relayed.arguments.flatMap((argument, index) =>
+      relayed.arguments[index - 1] === "--disable" ? [argument] : []
+    )).toEqual([...CODEX_DISABLED_FEATURES]);
+    expect(relayed.arguments).not.toContain("code_mode_host");
+    expect(relayed.arguments.at(-1)).toBe(relayed.prompt);
+    expect(relayed.arguments.filter((argument) => argument.includes("Lean canary 8d0b.")))
+      .toEqual([relayed.prompt]);
+
+    await shim.close();
+
+    expect(existsSync(instructionsFile)).toBe(false);
+    expect(existsSync(dirname(instructionsFile))).toBe(false);
+  });
+
+  it("runs the handshake and every call in the relay's own 0700 workspace, each call in an empty 0700 directory; stop removes it", async () => {
+    const logPath = join(await temporaryDirectory(), "workspaces.log");
+    const probe = [
+      leanCwdReportSnippet(logPath),
+      'console.log(JSON.stringify({ type: "thread.started", thread_id: "01a000e7-3ea0-7f91-b166-7104741ef333" }));',
+      'console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: JSON.stringify(leanCwdReport) } }));'
+    ].join("\n");
+    const shim = await startModelShim({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", probe, "--"] },
+      testOnlySessionsRoot: fakeSessionsRoot
+    });
+    handles.push(shim);
+
+    const response = await fetch(`${shim.baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: relayHeaders(shim),
+      body: JSON.stringify({ model: "ignored", messages: [{ role: "user", content: "Probe cwd." }] })
+    });
+
+    const completion = await response.json() as { choices: readonly { message: { content: string } }[] };
+    const workspace = await expectLeanWorkingDirectory(
+      JSON.parse(completion.choices[0]!.message.content) as LeanCwdReport, "openai", logPath
+    );
+    await shim.close();
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("measures what codex adds around the handshake and only reports it", async () => {
+    const shim = await start();
+    const own = Math.ceil(CODEX_HANDSHAKE_PROMPT.length / 4);
+
+    // The fake prints the measured default-profile usage: 15 490 input tokens.
+    expect(shim.harnessOverhead).toEqual({
+      maker: "OpenAI", reportedInputTokens: 15_490, promptTokensEstimate: own, overheadTokens: 15_490 - own
+    });
+  });
+});
+
+describe("D8 a start whose handshake fails leaves no workspace behind (Task A12b)", () => {
+  it("removes the workspace it opened for the handshake before the start rejects", async () => {
+    const logPath = join(await temporaryDirectory(), "workspaces.log");
+    const failing = [leanCwdReportSnippet(logPath), "process.exitCode = 1;"].join("\n");
+
+    await expect(startModelShim({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: { binary: process.execPath, prefixArguments: ["-e", failing, "--"] },
+      testOnlySessionsRoot: fakeSessionsRoot
+    })).rejects.toThrow("CODEX_CLI_FAILED");
+
+    const logged = await loggedWorkspaces(logPath);
+    expect(logged.length).toBeGreaterThan(0);
+    expect(new Set(logged).size).toBe(1);
+    expect(basename(logged[0]!).startsWith("relay-openai-workspace-")).toBe(true);
+    expect(existsSync(logged[0]!)).toBe(false);
   });
 });

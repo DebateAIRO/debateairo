@@ -294,5 +294,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Координатор отклонил выбранный тариф. Выберите «Бесплатный» или «Премиум», затем повторите попытку.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Координатор отклонил запрос: модель, необходимая для этого тарифа, сейчас недоступна. Повторите попытку позже или выберите другой тариф.",
   "requestFailure.kind.ALREADY_WAITING": "Одновременно может ждать только один вопрос. Задайте этот вопрос после того, как начнутся ваши ожидающие дебаты.",
-  "requestFailure.kind.UNCLASSIFIED": "Сбой произошёл до получения ответа, поэтому результат неизвестен. Это не решение координатора."
+  "requestFailure.kind.UNCLASSIFIED": "Сбой произошёл до получения ответа, поэтому результат неизвестен. Это не решение координатора.",
+  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in"
 }

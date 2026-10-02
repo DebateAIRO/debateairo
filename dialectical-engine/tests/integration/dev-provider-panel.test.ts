@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEVELOPMENT_CLI_PROVIDER_ROSTER,
   DEVELOPMENT_MINIMUM_DISTINCT_MAKERS,
   loadDevelopmentProviderPanelFromEnvironment,
   parseDevelopmentProviderPanelTargets
@@ -15,11 +16,11 @@ describe("real development CLI provider panel", () => {
     expect(panel).toEqual(TEST_DEVELOPMENT_PROVIDER_PANEL);
     expect(panel.requiredDistinctMakers).toBe(DEVELOPMENT_MINIMUM_DISTINCT_MAKERS);
     expect(panel.healthyProviderRefs).toEqual([
-      "development:codex-cli", "development:claude-cli"
+      "development:codex-cli", "development:codex-premium-cli",
+      "development:claude-cli", "development:claude-premium-cli"
     ]);
-    expect(panel.targets.map(({ providerRef }) => providerRef)).toEqual([
-      "development:codex-cli", "development:claude-cli", "development:grok-cli"
-    ]);
+    expect(panel.targets.map(({ providerRef }) => providerRef))
+      .toEqual(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ providerRef }) => providerRef));
   });
 
   it("fails closed when the live handshake result is absent or not the exact CLI roster", () => {

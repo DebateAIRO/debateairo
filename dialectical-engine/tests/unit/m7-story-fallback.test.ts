@@ -473,8 +473,9 @@ describe("M7 · wired in the shipped runner, with Task M3's fallback reused", ()
     expect(helper.slice(0, helper.indexOf("\n}\n"))).toContain("callServeRoleWithFallback({");
     expect(runner.split("export async function callServeRoleWithFallback<")).toHaveLength(2);
     expect(runner.split("export function servePhaseFallbackOrder(")).toHaveLength(2);
-    // Still two framed-prompt builders in the runner: the story frames its own in packages/story.
-    expect(runner.split(/\bbuildFramedPrompt\(/u).length - 1).toBe(2);
+    // Still one framed-prompt builder in the runner (paid plans S1a: the scorecard's
+    // `buildSynthesisRolePrompt` replaced dev's two): the story frames its own in packages/story.
+    expect(runner.split(/\bbuildFramedPrompt\(/u).length - 1).toBe(1);
   });
 
   it("passes the fallback through the snapshot untouched", async () => {
