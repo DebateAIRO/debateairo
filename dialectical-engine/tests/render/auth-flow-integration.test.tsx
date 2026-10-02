@@ -516,6 +516,7 @@ describe("rendered auth flow integration", () => {
     );
 
     await fillAdultDateOfBirth();
+    await pickRegion("RO");
     fillCredentials();
     field("terms-accepted").checked = true;
     await submit();
@@ -531,6 +532,7 @@ describe("rendered auth flow integration", () => {
     );
 
     await fillAdultDateOfBirth();
+    await pickRegion("RO");
     fillCredentials();
     field("privacy-accepted").checked = true;
     await submit();
@@ -545,6 +547,7 @@ describe("rendered auth flow integration", () => {
       )
     );
 
+    await pickRegion("RO");
     fillCredentials();
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;

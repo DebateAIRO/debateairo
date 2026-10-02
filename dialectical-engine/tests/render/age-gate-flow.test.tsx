@@ -52,8 +52,14 @@ async function fillForm(dateOfBirth: readonly [string, string, string] | null): 
     await setValue("dob-y", dateOfBirth[2]);
   }
   await pickRegion("RO");
-  field("privacy-accepted").checked = true;
-  field("terms-accepted").checked = true;
+  for (const name of ["privacy-accepted", "terms-accepted"]) {
+    await act(async () => field(name).click());
+    const acknowledgement = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
+      .find((button) => button.textContent === "I have read it");
+    expect(acknowledgement, `missing ${name} acknowledgement`).toBeDefined();
+    await act(async () => acknowledgement!.click());
+    expect(field(name).checked).toBe(true);
+  }
 }
 
 async function submit(): Promise<void> {

@@ -25,6 +25,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 let root: Root | null = null;
 
@@ -73,6 +74,7 @@ describe("create-account gate on both consent boxes", () => {
     document.body.append(container);
     root = createRoot(container);
     await mount();
+    await pickRegion("RO");
   });
 
   afterEach(async () => {
@@ -101,7 +103,12 @@ describe("create-account gate on both consent boxes", () => {
      age gate, Turn 8) to the terms box. */
   it("keeps Create account disabled with only the privacy box ticked", async () => {
     await act(async () => { field("privacy-accepted").click(); });
+    const acknowledgement = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
+      .find((button) => button.textContent === "I have read it");
+    expect(acknowledgement).toBeDefined();
+    await act(async () => { acknowledgement!.click(); });
 
+    expect(field("privacy-accepted").checked).toBe(true);
     expect(field("terms-accepted").checked).toBe(false);
     expect(createAccountButton().disabled).toBe(true);
   });

@@ -159,6 +159,33 @@ describe("RegionField artboard states", () => {
     expect(query(".regionName").textContent).toBe("Romania");
   });
 
+  it("P4 keeps the picked path while browsing a different continent", async () => {
+    await mountRegion();
+    await pick("Europe", "RO");
+    await click("#signup-region-trigger");
+    await click(".regionBack");
+    await click('.regionContinent[data-continent="Asia"]');
+    await click("#signup-region-trigger");
+    expect(query(".regionPath").textContent).toBe("Europe · RO");
+    await click("#signup-region-trigger");
+    expect(query(".regionContinentTitle").textContent).toBe("Europe");
+  });
+
+  it("P6 closes on Escape even when focus has left a pointer-opened popover", async () => {
+    await mountRegion();
+    await click("#signup-region-trigger");
+    (document.activeElement as HTMLElement | null)?.blur();
+    await act(async () => document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(host.querySelector(".regionPopover")).toBeNull();
+  });
+
+  it("P16 closes when Tab exits the final continent row", async () => {
+    await mountRegion();
+    await click("#signup-region-trigger");
+    await key('.regionContinent[data-continent="Oceania"]', "Tab");
+    expect(host.querySelector(".regionPopover")).toBeNull();
+  });
+
   it("E8 activates focusable rows and back controls with Enter and Space", async () => {
     await mountRegion();
     await click("#signup-region-trigger");
@@ -271,6 +298,24 @@ describe("RegionField artboard states", () => {
     await submitFlow();
     expect(query<HTMLButtonElement>("#signup-region-trigger").disabled).toBe(true);
     expect(query<HTMLSelectElement>("#signup-region-state").disabled).toBe(true);
+  });
+
+  it("P11 keeps the sent pick during an in-flight request when its grid was already open", async () => {
+    await mountFlow();
+    await pickRegion("RO");
+    let rejectRegister: (reason: unknown) => void = () => undefined;
+    register.mockImplementation(() => new Promise((_resolve, reject) => { rejectRegister = reject; }));
+    await click("#signup-region-trigger");
+    await fillFlow();
+    await submitFlow();
+    expect(register).toHaveBeenCalledTimes(1);
+    expect(host.querySelector(".regionPopover"), "busy closes the already-open grid").toBeNull();
+    const sent = register.mock.calls[0]?.[5];
+    const cell = host.querySelector<HTMLButtonElement>('.regionCountry[data-code="DE"]');
+    if (cell !== null) await act(async () => cell.click());
+    await act(async () => rejectRegister(new ContractHttpError("FORBIDDEN", 403, "COUNTRY_UNKNOWN", "COUNTRY_UNKNOWN")));
+    expect(sent).toEqual({ country: "RO", usState: null });
+    expect(query(".regionName").textContent).toBe("Romania");
   });
 
   it.each(["LEGAL_DOCUMENT_STALE", "COUNTRY_SIGNUP_UNAVAILABLE", "COUNTRY_UNKNOWN", "TOR_REFUSED", "GENERIC"])("E14 keeps US/TX after %s refusal", async (code) => {

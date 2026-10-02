@@ -6797,15 +6797,16 @@ a:focus-visible {
 
 /* === region-picker S01 === */
 /* Turn 8 · 8a Region field (docs/missions/region-picker/slices/S01/DONE.md §2-§3). Tokens only. */
-.regionField { position: relative; }
+.regionField { position: relative; z-index: 30; }
+.regionPicker { position: relative; z-index: 30; container-type: inline-size; }
 .regionTrigger { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 13px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--shell); color: var(--ink); font-family: var(--font-sans); font-size: 12px; text-align: start; cursor: pointer; }
 .regionTrigger[aria-expanded="true"] { border-color: var(--con); }
 .regionTrigger:disabled { cursor: default; }
-.regionFlag { font-size: 15px; line-height: 1; }
-.regionName { flex: 1; font-weight: 600; }
-.regionPath { font-size: 10.5px; color: var(--muted); }
-.regionChevron { font-size: 9px; color: var(--muted); }
-.regionPopover { position: absolute; left: 0; right: 0; top: 62px; z-index: 30; max-height: 300px; overflow: auto; padding: 8px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--core); box-shadow: var(--shadow-pop); }
+.regionFlag { flex: none; font-size: 15px; line-height: 1; }
+.regionName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.regionPath { flex: 0 1 auto; min-width: 0; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; color: var(--muted); }
+.regionChevron { flex: none; font-size: 9px; color: var(--muted); }
+.regionPopover { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; max-height: 300px; overflow: auto; padding: 8px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--core); box-shadow: var(--shadow-pop); }
 .regionHeader, .regionContinentTitle { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .16em; color: var(--muted); }
 .regionHeader { padding: 4px 8px 8px; }
 .regionContinent { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-sans); text-align: start; cursor: pointer; }
@@ -6815,6 +6816,11 @@ a:focus-visible {
 .regionTop { display: flex; align-items: center; gap: 8px; padding: 2px 4px 8px; }
 .regionBack { padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-family: var(--font-sans); font-size: 11px; font-weight: 600; cursor: pointer; }
 .regionGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+@container (max-width: 299px) { .regionGrid { grid-template-columns: minmax(0, 1fr); } }
+@container (max-width: 299px) {
+  .regionTrigger:has(.regionFlag) { flex-wrap: wrap; row-gap: 4px; }
+  .regionTrigger:has(.regionFlag) .regionPath { order: 4; flex: 0 0 calc(100% - 25px); max-width: none; margin-left: 25px; }
+}
 .regionCountry { min-width: 0; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-sans); text-align: start; cursor: pointer; }
 .regionCountry[data-picked="true"] { background: var(--shell); }
 .regionCellFlag { font-size: 14px; line-height: 1; }

@@ -55,11 +55,26 @@ export function RegionField({ catalog, locale, value, onChange, disabled }: Read
     const onOutsidePress = (event: MouseEvent) => {
       if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
     };
+    const onDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      queueMicrotask(() => triggerRef.current?.focus());
+    };
     document.addEventListener("mousedown", onOutsidePress);
-    return () => document.removeEventListener("mousedown", onOutsidePress);
+    document.addEventListener("keydown", onDocumentKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onOutsidePress);
+      document.removeEventListener("keydown", onDocumentKeyDown);
+    };
   }, [open]);
 
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
   function toggle(): void {
+    if (disabled) return;
     if (open) {
       setOpen(false);
       return;
@@ -69,30 +84,34 @@ export function RegionField({ catalog, locale, value, onChange, disabled }: Read
   }
 
   function showCountries(next: RegionContinent): void {
+    if (disabled) return;
     setContinent(next);
     queueMicrotask(() => backRef.current?.focus());
   }
 
   function showContinents(): void {
+    if (disabled) return;
     setContinent(null);
     queueMicrotask(() => firstContinentRef.current?.focus());
   }
 
   function pickCountry(code: string): void {
+    if (disabled) return;
     onChange({ country: code, usState: code === "US" ? value.usState : "" });
     setOpen(false);
     queueMicrotask(() => triggerRef.current?.focus());
   }
 
   return (
-    <div className="authField regionField" ref={wrapperRef} onKeyDown={(event) => {
-      if (open && event.key === "Escape") {
-        event.preventDefault();
-        setOpen(false);
-        queueMicrotask(() => triggerRef.current?.focus());
-      }
+    <div className="authField regionField" ref={wrapperRef} onBlur={(event) => {
+      if (open && !event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+    }} onKeyDown={(event) => {
+      if (!open || event.key !== "Tab") return;
+      const last = wrapperRef.current?.querySelector(".regionContinent:last-of-type, .regionCountry:last-of-type");
+      if ((!event.shiftKey && event.target === last) || (event.shiftKey && event.target === triggerRef.current)) setOpen(false);
     }}>
       <label htmlFor="signup-region-trigger">{t(catalog, "auth.region.label")}</label>
+      <div className="regionPicker">
       <button
         type="button"
         id="signup-region-trigger"
@@ -119,6 +138,7 @@ export function RegionField({ catalog, locale, value, onChange, disabled }: Read
                   className="regionContinent"
                   data-continent={row}
                   key={row}
+                  disabled={disabled}
                   ref={index === 0 ? firstContinentRef : undefined}
                   onClick={() => showCountries(row)}
                   onKeyDown={(event) => onActionKey(event, () => showCountries(row))}
@@ -132,12 +152,12 @@ export function RegionField({ catalog, locale, value, onChange, disabled }: Read
           ) : (
             <>
               <div className="regionTop">
-                <button type="button" className="regionBack" ref={backRef} onClick={showContinents} onKeyDown={(event) => onActionKey(event, showContinents)}>{t(catalog, "auth.region.back")}</button>
+                <button type="button" className="regionBack" ref={backRef} disabled={disabled} onClick={showContinents} onKeyDown={(event) => onActionKey(event, showContinents)}>{t(catalog, "auth.region.back")}</button>
                 <span className="regionContinentTitle">{continentName(catalog, continent)}</span>
               </div>
               <div className="regionGrid">
                 {regionCountriesOf(continent, locale).map(({ code }) => (
-                  <button type="button" className="regionCountry" data-code={code} data-picked={String(code === value.country)} key={code} onClick={() => pickCountry(code)} onKeyDown={(event) => onActionKey(event, () => pickCountry(code))}>
+                  <button type="button" className="regionCountry" data-code={code} data-picked={String(code === value.country)} key={code} disabled={disabled} onClick={() => pickCountry(code)} onKeyDown={(event) => onActionKey(event, () => pickCountry(code))}>
                     <span className="regionCellFlag">{regionFlag(code)}</span>
                     <span className="regionCellCode">{code}</span>
                     <span className="regionCellName">{regionCountryName(code, locale)}</span>
@@ -149,6 +169,7 @@ export function RegionField({ catalog, locale, value, onChange, disabled }: Read
           )}
         </div>
       ) : null}
+      </div>
       {value.country === "US" ? (
         <div className="regionState">
           <label htmlFor="signup-region-state">{t(catalog, "auth.region.stateLabel")}</label>

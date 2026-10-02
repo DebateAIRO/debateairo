@@ -180,6 +180,7 @@ async function mount(client?: {
   };
   await act(async () => root!.render(<SignUpFlow client={stub} />));
   await settle();
+  await pickRegion("RO");
 }
 
 describe("sign-up — the Terms of Service row", () => {

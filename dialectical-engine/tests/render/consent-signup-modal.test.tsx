@@ -91,6 +91,7 @@ async function mount(client?: {
     root!.render((<SignUpFlow client={stub} />) as ReactNode);
   });
   await settle();
+  await pickRegion("RO");
 }
 
 function field(name: string): HTMLInputElement {
