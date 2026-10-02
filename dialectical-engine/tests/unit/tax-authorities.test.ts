@@ -83,19 +83,29 @@ describe("P16a taxAuthorities v1", () => {
     const defaulted = await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(without))));
     const published = defaulted.rows.find((candidate) => candidate.rowKey === "taxAuthorities");
     expect(JSON.parse(published!.valueJsonText)).toEqual(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value);
+    // ... and under the code-owned provenance line, not the file's.
+    expect(published!.sourceRef).toBe(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef);
     const corrected = structuredClone(example) as { taxAuthorities: { fallback: { when: string } } };
     corrected.taxAuthorities.fallback.when = "Ask the accountant, then the owner.";
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(corrected))));
     const row = plan.rows.find((candidate) => candidate.rowKey === "taxAuthorities");
     expect(JSON.parse(row!.valueJsonText).fallback.when).toBe("Ask the accountant, then the owner.");
+    // The operator's text is sealed under the file's own sourceRef.
+    expect(row!.sourceRef).toBe(example.sourceRef);
+    const refusalOf = async (file: unknown): Promise<string> => {
+      try {
+        await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(file))));
+        return "NO_REFUSAL";
+      } catch (error) {
+        return hostedRegisterRefusalCode(error);
+      }
+    };
     const broken = structuredClone(example) as { taxAuthorities: { entries: unknown[] } };
     broken.taxAuthorities.entries = [];
-    let code = "NO_REFUSAL";
-    try {
-      await planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(broken))));
-    } catch (error) {
-      code = hostedRegisterRefusalCode(error);
-    }
-    expect(code).toBe("TAX_AUTHORITIES_INVALID");
+    expect(await refusalOf(broken)).toBe("TAX_AUTHORITIES_INVALID");
+    // A member present with JSON null is not "left out": it is refused, never defaulted.
+    const withNull = { ...example, taxAuthorities: null };
+    expect(JSON.stringify(withNull)).toContain("\"taxAuthorities\":null");
+    expect(await refusalOf(withNull)).toBe("TAX_AUTHORITIES_INVALID");
   });
 });
