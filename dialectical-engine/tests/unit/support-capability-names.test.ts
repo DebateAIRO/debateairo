@@ -18,12 +18,17 @@ const msg = (loc: string, ref: string): string => {
     .replace(/\s*[↗→]\s*$/u, "").trim();
 };
 // SPEC-v5 R13 KEY rows (docs/missions/cookie-compliance/slices/S05/checks/capability-labels.json): the page link each names.
+// Paid plans (P24): the five paid-plan pages a screen link names — the footer's three links, the Settings card's
+// Update card and the privacy policy's link to its versions list.
 const KEY_ROWS: Readonly<Record<string, string>> = {
   "ai-transparency": "chrome:chrome.aiTransparency", "legal-notice": "chrome:chrome.legal.notice",
   "legal-terms": "chrome:chrome.legal.terms", "legal-terms-versions": "chrome:chrome.legal.versions",
   "legal-privacy": "chrome:chrome.legal.privacy", "legal-health-data": "chrome:chrome.legal.health",
   "legal-cookies": "chrome:chrome.legal.cookies", "legal-providers": "chrome:chrome.legal.providers",
-  "sign-up": "home:home.createAccount", "settings": "chrome:chrome.settings"
+  "sign-up": "home:home.createAccount", "settings": "chrome:chrome.settings",
+  "billing-pricing": "chrome:chrome.footer.pricing", "billing-card-change": "billing:billing.subscription.updateCard",
+  "billing-cancel": "chrome:chrome.footer.cancel", "billing-withdraw": "chrome:chrome.footer.withdraw",
+  "legal-privacy-versions": "legal:legal.privacyVersions.link"
 };
 const OTHER = SUPPORT_LOCALES.filter((l) => l !== "en" && l !== "ro");
 // REV-S05-p1 ct N2: in the 23 Latin-script locales a TRANSLATE name is neither a placeholder nor an English paraphrase.
@@ -94,7 +99,7 @@ function refusal(name: string): string {
 describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22)", () => {
   it("covers every catalogue capability with exactly one KEY or TRANSLATE row", () => {
     const rows = new Set([...Object.keys(KEY_ROWS), ...SUPPORT_TRANSLATED_CAPABILITY_IDS]);
-    expect(rows.size).toBe(20);
+    expect(rows.size).toBe(29);
     expect(SUPPORT_CAPABILITIES.map(({ id }) => id).sort()).toEqual([...rows].sort());
   });
   it("keeps the catalogue's own name in en and ro", () => {
@@ -130,7 +135,7 @@ describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22
           expect(refusal(name), `${loc} ${id} "${name}"`).toBe("");
         }
       }
-      expect(new Set(SUPPORT_CAPABILITIES.map((item) => supportCapabilityName(item, loc))).size, loc).toBe(20);   // N3
+      expect(new Set(SUPPORT_CAPABILITIES.map((item) => supportCapabilityName(item, loc))).size, loc).toBe(29);   // N3
       const forms = [PLAN_STEMS[loc] ?? "<no stem>"].flat();                                    // pt N1
       const planName = (SUPPORT_CAPABILITY_TRANSLATIONS[loc]?.["new-debate"] ?? "").toLocaleLowerCase(loc);
       expect(msg(loc, "newDebate:newDebate.planTier").toLocaleLowerCase(loc), `${loc} plan selector`).toContain(forms[0]);
@@ -152,7 +157,7 @@ describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22
       ...Object.values(SUPPORT_CAPABILITY_KEY_NAMES[loc]), ...SUPPORT_CONTROL_NAMES[loc].flat(),
       ...Object.values(SUPPORT_UI_LABELS[loc]), ...SUPPORT_CAPABILITIES.map((item) => supportCapabilityName(item, loc))
     ].map((name) => [loc, name] as const));
-    expect(names.length).toBeGreaterThan(35 * 20);
+    expect(names.length).toBeGreaterThan(35 * 29);
     for (const [loc, name] of names) {
       expect(name, `${loc} ${JSON.stringify(name)}`).toMatch(SHAPE);
       expect(name, `${loc} ${JSON.stringify(name)}`).not.toContain("actions=");

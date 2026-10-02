@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur siūlome DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI siūlome žmonėms, gyvenantiems [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
+      { kind: "p", text: "DebateAI siūlome žmonėms, gyvenantiems [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "2b3f802f40be87b19c7d3987fd0897471e28016e5bd608f0ba1db04347189c5c",
+  sha256: "5d2c305a346ee08725abb6503f9fd663bb2149a1cc04e4ac246d84ed6f8def12",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.0 · ĮSIGALIOJA [DATE]",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DebateAIRO S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

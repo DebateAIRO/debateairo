@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hol kínáljuk a DebateAI szolgáltatást",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "A DebateAI szolgáltatást a [the European Union and the European Economic Area] területén [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] élő személyeknek kínáljuk. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
+      { kind: "p", text: "A DebateAI szolgáltatást a [the European Union and the European Economic Area] területén [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] élő személyeknek kínáljuk. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "8ac73cf231d83ec25a741b715a010a2f3c9aa7eb0bfa5d23e33b10853746f45f",
+  sha256: "ffb7f96c4ff077c843e2ee9911eb60e6543fa4c6fd3d3d3ab8a59f7470353ec1",
   eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.0 · HATÁLYOS [DATE]",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DebateAIRO S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",

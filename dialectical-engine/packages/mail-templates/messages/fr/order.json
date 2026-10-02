@@ -1,0 +1,5 @@
+{
+  "order.planDescription": "Formule mensuelle DebateAI {plan}",
+  "order.cardCheck": "Vérification de carte DebateAI",
+  "invoice.line": "Formule DebateAI {plan}, du {from} au {to}"
+}

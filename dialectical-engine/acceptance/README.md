@@ -102,6 +102,20 @@ lsof-unavailable`, and that line is all the run prints. The resolver's reason
 and path (for example `NOT_A_PROGRAM` and the file it refused) are on the
 error's `cause`, which only code calling the fixture directly can read.
 
+**The hosted deployment never starts a relay (V-9(c)).** The command-line relays
+are the local mode. Every entry point that can start one calls the one guard in
+`relay-deployment-guard.ts` first, before it reads a file or starts a CLI:
+`dev:auth:up` and its CLI panel (`apps/runner/src/dev-auth-stack-cli.ts`,
+`dev-cli-provider-panel.ts`), and the boot, ceremony and dual-maker proof here
+(`main.ts`, `run-acceptance.ts`, `dual-maker-proof.ts`). `relay-core.ts` checks
+again at its two doors — where a CLI is started and where a relay listens — so
+an entry point that forgets still starts nothing. `DEBATEAI_DEPLOYMENT_MODE=hosted`
+refuses with `RELAY_HOST_REFUSED_IN_HOSTED`; production with no mode set refuses
+with `DEPLOYMENT_MODE_UNRESOLVED`; a mode the engine does not know refuses with
+`DEPLOYMENT_MODE_INVALID`. No mode outside production is local. A new entry point
+that starts a relay calls the guard too, with a case in
+`tests/unit/v9c-relay-entry-points.test.ts`.
+
 Ceremony boot handshakes all three providers independently. Healthy relays form
 the discovered panel; no caller supplies a maker count and no panel-size
 ceiling refuses a lawful nonempty debate. Grok's fixed relay port is

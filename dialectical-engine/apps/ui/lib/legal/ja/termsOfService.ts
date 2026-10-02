@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI を提供する地域",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "当社は、[the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] に居住する方に DebateAI を提供します。それ以外の地域では提供しません。これらの国以外にお住まいの場合、サイトにアクセスできることはありますが、当社はお客様を対象としてサービスを提供せず、お客様から支払いを受け付けず、本規約および当社のプライバシーポリシーはお客様の国の法律に対応していません。附属書Aは、当社がサービスを提供する各地域に適用される事項を定めます。" }
+      { kind: "p", text: "当社は、[the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] に居住する方に DebateAI を提供します。それ以外の地域では提供しません。これらの国以外にお住まいの場合、サイトにアクセスできることはありますが、当社はお客様を対象としてサービスを提供せず、お客様から支払いを受け付けず、本規約および当社のプライバシーポリシーはお客様の国の法律に対応していません。附属書Aは、当社がサービスを提供する各地域に適用される事項を定めます。" }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "60ec85a05b7477ccd5db40322d01ee11c7d3ed6f783a0b96593f16bfe62acca2",
+  sha256: "fed77bdd8738f2316e13b49536eff5c7c9a3f2d45d53df9c706f5dd664a5b4ab",
   eyebrow: "利用規約 · v2.0 · 発効日 [DATE]",
   title: "お客様に同意いただく事項",
   lede: "お客様と DebateAIRO S.R.L. との間の契約を平易な言葉で説明します。全19条および附属書Aです。末尾までスクロールしてください。",

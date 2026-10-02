@@ -100,6 +100,19 @@ export function resolveDeploymentMode(
   return mode;
 }
 
+/**
+ * V-9(c): the two values the deployment mode is resolved from, for a local-mode
+ * command that must refuse the hosted deployment before it does anything else
+ * (the relay guard, acceptance/relay-deployment-guard.ts). Read as they are, not
+ * validated here: `resolveDeploymentMode` decides on them, and refuses.
+ */
+export function loadDeploymentModeSource(): Readonly<Record<"DEBATEAI_DEPLOYMENT_MODE" | "NODE_ENV", string | undefined>> {
+  return Object.freeze({
+    DEBATEAI_DEPLOYMENT_MODE: process.env.DEBATEAI_DEPLOYMENT_MODE,
+    NODE_ENV: process.env.NODE_ENV
+  });
+}
+
 export type SealedCostEnvelopeStatus = "SEALED" | "NOT_SEALED";
 
 /**
@@ -228,6 +241,8 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     DEBATEAI_DEV_SYNTHESIZER_ROLE_REF: z.string().min(1).optional(),
     DEBATEAI_DEV_EVALUATOR_ROLE_REF: z.string().min(1).optional(),
     DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
+    // Paid plans (P6b): "1" makes dev:auth:up start the fake xMoney, Quaderno and SmartBill servers.
+    DEBATEAI_BILLING_FAKES: z.enum(["0", "1"]).optional(),
     NODE_ENV: z.enum(["development", "test", "production"]).optional()
   });
   return Object.freeze(Object.fromEntries(
@@ -302,6 +317,23 @@ const boundedRate = z.coerce.number().min(0).max(1);
 const legacyRegisterVersion = z.string().regex(/^[1-9][0-9]*$/u).transform((value) => (
   registerVersionToSafeLegacyNumber(parseRegisterVersionText(value))
 ));
+
+/**
+ * Paid plans P14b/P14c/P16b: the owner's billing commands (`pnpm billing:dispute`, `pnpm billing:withdraw`,
+ * `pnpm billing:tax-summary`, `pnpm billing:efactura-status`). They run
+ * on the host under `systemd-run` with the API's EnvironmentFile (deploy/vps/README.md "Billing") and read only
+ * the API's own database URL, the register version and the mode; the production floors hold here too.
+ */
+export function parseBillingOperatorEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({
+    DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment, REGISTER_VERSION: legacyRegisterVersion
+  }, source));
+}
+
+export function loadBillingOperatorEnvironment() {
+  return parseBillingOperatorEnvironment(process.env);
+}
+
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),
@@ -382,6 +414,27 @@ const apiEnvironmentShape = {
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
     EVALUATOR_DEV_MENU_ENABLED: z.enum(["true", "false"]).default("false"),
     EVALUATOR_DEV_MENU_DATABASE_URL: z.string().url().optional(),
+    // Paid plans (spec 2026-09-29 §2.11; amendments R1 A22/A23; ruling R-7). OPTIONAL in the shape: billing is off
+    // until the published billingPolicy row says `enabled: true`, and only then — hosted — does
+    // readBillingEnvironmentGroup require the whole group, naming the first missing key. The public origin is
+    // PUBLIC_APP_URL (above); billing has no second one. The company's CIF is not here either: SmartBill receives
+    // a code built from the legal notice's own facts (COMPANY's CUI, or its RO VAT code), through their mirror in
+    // @debateai/billing-core (RULINGS-R3 R3-4).
+    XMONEY_PRIVATE_KEY_PATH: z.string().min(1).optional(),
+    XMONEY_PUBLIC_KEY: z.string().min(1).optional(),
+    XMONEY_SITE_ID: z.string().min(1).optional(),
+    XMONEY_API_BASE_URL: z.string().url().optional(),
+    /**
+     * OWNER-RUN sandbox only (spec 2026-09-29 §2.8, README §14.9): whole days added to the billing jobs' clock.
+     * Absent in every real deployment; `billingClock` refuses it unless XMONEY_API_BASE_URL is xMoney's stage API.
+     */
+    BILLING_STAGE_CLOCK_OFFSET_DAYS: z.coerce.number().int().min(1).max(400).optional(),
+    QUADERNO_API_KEY_PATH: z.string().min(1).optional(),
+    QUADERNO_API_BASE_URL: z.string().url().optional(),
+    SMARTBILL_CREDENTIALS_PATH: z.string().min(1).optional(),
+    SMARTBILL_API_BASE_URL: z.string().url().optional(),
+    SMARTBILL_SERIES: z.string().min(1).optional(),
+    OWNER_REPORT_EMAIL_PATH: z.string().min(1).optional(),
     ...hatchetShape
 } as const;
 
@@ -548,6 +601,79 @@ export function parseApiEnvironment(
   source: Readonly<Record<string, string | undefined>>
 ) {
   return validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
+}
+
+/** Paid plans: the ten keys of the billing group, in the order a missing one is reported. */
+export const BILLING_ENVIRONMENT_KEYS = Object.freeze([
+  "XMONEY_PRIVATE_KEY_PATH", "XMONEY_PUBLIC_KEY", "XMONEY_SITE_ID", "XMONEY_API_BASE_URL",
+  "QUADERNO_API_KEY_PATH", "QUADERNO_API_BASE_URL",
+  "SMARTBILL_CREDENTIALS_PATH", "SMARTBILL_API_BASE_URL", "SMARTBILL_SERIES",
+  "OWNER_REPORT_EMAIL_PATH"
+] as const);
+export type BillingEnvironmentKey = typeof BILLING_ENVIRONMENT_KEYS[number];
+
+export type BillingEnvironmentGroup = Readonly<{
+  xmoneyPrivateKeyPath: string; xmoneyPublicKey: string; xmoneySiteId: string; xmoneyApiBaseUrl: string;
+  quadernoApiKeyPath: string; quadernoApiBaseUrl: string;
+  smartbillCredentialsPath: string; smartbillApiBaseUrl: string; smartbillSeries: string;
+  ownerReportEmailPath: string;
+  /** R-7: PUBLIC_APP_URL reduced to its origin; billing has no second public address. */
+  publicAppUrl: string;
+}>;
+
+const XMONEY_API_HOSTS: ReadonlySet<string> = new Set(["api.xmoney.com", "api-stage.xmoney.com"]);
+
+function billingInvalid(key: BillingEnvironmentKey): never {
+  throw new TypeError(`BILLING_CONFIGURATION_INVALID:${key}`);
+}
+
+function httpsBillingUrl(value: string, key: BillingEnvironmentKey): URL {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return billingInvalid(key);
+  }
+  if (url.protocol !== "https:") billingInvalid(key);
+  return url;
+}
+
+/**
+ * A22: called by the API boot ONLY when hosted and the billingPolicy row in force says enabled.
+ * BILLING_CONFIGURATION_INCOMPLETE:<KEY> names the first missing key; BILLING_CONFIGURATION_INVALID:<KEY>
+ * a malformed one. The public origin is taken from PUBLIC_APP_URL (R-7), which the shape already requires
+ * to be https, so billing's return and cancel links can never drift from the site's own address.
+ */
+export function readBillingEnvironmentGroup(
+  environment: Readonly<Partial<Record<BillingEnvironmentKey, string | undefined>>> & Readonly<{ PUBLIC_APP_URL: string }>
+): BillingEnvironmentGroup {
+  const value = (key: BillingEnvironmentKey): string => {
+    const found = environment[key];
+    if (found === undefined || found.trim() === "") throw new TypeError(`BILLING_CONFIGURATION_INCOMPLETE:${key}`);
+    return found;
+  };
+  const values = Object.fromEntries(BILLING_ENVIRONMENT_KEYS.map((key) => [key, value(key)])) as Record<BillingEnvironmentKey, string>;
+  if (!XMONEY_API_HOSTS.has(httpsBillingUrl(values.XMONEY_API_BASE_URL, "XMONEY_API_BASE_URL").hostname)) {
+    billingInvalid("XMONEY_API_BASE_URL");
+  }
+  httpsBillingUrl(values.QUADERNO_API_BASE_URL, "QUADERNO_API_BASE_URL");
+  httpsBillingUrl(values.SMARTBILL_API_BASE_URL, "SMARTBILL_API_BASE_URL");
+  if (!/^[0-9]{1,12}$/u.test(values.XMONEY_SITE_ID)) billingInvalid("XMONEY_SITE_ID");
+  if (!/^[\x21-\x7e]{8,256}$/u.test(values.XMONEY_PUBLIC_KEY)) billingInvalid("XMONEY_PUBLIC_KEY");
+  if (!/^[A-Za-z0-9]{1,16}$/u.test(values.SMARTBILL_SERIES)) billingInvalid("SMARTBILL_SERIES");
+  return Object.freeze({
+    xmoneyPrivateKeyPath: values.XMONEY_PRIVATE_KEY_PATH,
+    xmoneyPublicKey: values.XMONEY_PUBLIC_KEY,
+    xmoneySiteId: values.XMONEY_SITE_ID,
+    xmoneyApiBaseUrl: values.XMONEY_API_BASE_URL.replace(/\/+$/u, ""),
+    quadernoApiKeyPath: values.QUADERNO_API_KEY_PATH,
+    quadernoApiBaseUrl: values.QUADERNO_API_BASE_URL.replace(/\/+$/u, ""),
+    smartbillCredentialsPath: values.SMARTBILL_CREDENTIALS_PATH,
+    smartbillApiBaseUrl: values.SMARTBILL_API_BASE_URL.replace(/\/+$/u, ""),
+    smartbillSeries: values.SMARTBILL_SERIES,
+    ownerReportEmailPath: values.OWNER_REPORT_EMAIL_PATH,
+    publicAppUrl: new URL(environment.PUBLIC_APP_URL).origin
+  });
 }
 
 /**

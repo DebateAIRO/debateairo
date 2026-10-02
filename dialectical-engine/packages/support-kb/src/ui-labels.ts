@@ -11091,7 +11091,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "سياسة ملفات تعريف الارتباط",
     "legal-providers": "مزودو النماذج",
     "sign-up": "إنشاء حساب",
-    "settings": "الإعدادات"
+    "settings": "الإعدادات",
+    "billing-pricing": "الأسعار",
+    "billing-card-change": "حدّث البطاقة",
+    "billing-cancel": "إلغاء خطة",
+    "billing-withdraw": "الانسحاب من خطة",
+    "legal-privacy-versions": "جميع نسخ هذه السياسة"
   },
   "bg": {
     "ai-transparency": "Прозрачност за ИИ",
@@ -11103,7 +11108,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Политика за бисквитките",
     "legal-providers": "Доставчици на модели",
     "sign-up": "Създайте профил",
-    "settings": "Настройки"
+    "settings": "Настройки",
+    "billing-pricing": "Цени",
+    "billing-card-change": "Смяна на картата",
+    "billing-cancel": "Прекратяване на план",
+    "billing-withdraw": "Отказ от план",
+    "legal-privacy-versions": "Всички версии на тази политика"
   },
   "cs": {
     "ai-transparency": "Transparentnost AI",
@@ -11115,7 +11125,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Zásady používání souborů cookie",
     "legal-providers": "Poskytovatelé modelů",
     "sign-up": "Vytvořit účet",
-    "settings": "Nastavení"
+    "settings": "Nastavení",
+    "billing-pricing": "Ceník",
+    "billing-card-change": "Změnit kartu",
+    "billing-cancel": "Zrušení plánu",
+    "billing-withdraw": "Odstoupení od plánu",
+    "legal-privacy-versions": "Všechny verze těchto zásad"
   },
   "da": {
     "ai-transparency": "AI-gennemsigtighed",
@@ -11127,7 +11142,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Cookiepolitik",
     "legal-providers": "Modeludbydere",
     "sign-up": "Opret konto",
-    "settings": "Indstillinger"
+    "settings": "Indstillinger",
+    "billing-pricing": "Priser",
+    "billing-card-change": "Opdater kort",
+    "billing-cancel": "Opsig en plan",
+    "billing-withdraw": "Fortryd en plan",
+    "legal-privacy-versions": "Alle versioner af denne politik"
   },
   "de": {
     "ai-transparency": "KI-Transparenz",
@@ -11139,7 +11159,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Cookie-Richtlinie",
     "legal-providers": "Modellanbieter",
     "sign-up": "Konto erstellen",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "billing-pricing": "Preise",
+    "billing-card-change": "Karte aktualisieren",
+    "billing-cancel": "Tarif kündigen",
+    "billing-withdraw": "Tarif widerrufen",
+    "legal-privacy-versions": "Alle Fassungen dieser Erklärung"
   },
   "el": {
     "ai-transparency": "Διαφάνεια ΤΝ",
@@ -11151,7 +11176,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Πολιτική cookies",
     "legal-providers": "Πάροχοι μοντέλων",
     "sign-up": "Δημιουργία λογαριασμού",
-    "settings": "Ρυθμίσεις"
+    "settings": "Ρυθμίσεις",
+    "billing-pricing": "Τιμές",
+    "billing-card-change": "Ενημέρωση κάρτας",
+    "billing-cancel": "Ακύρωση προγράμματος",
+    "billing-withdraw": "Υπαναχώρηση από πρόγραμμα",
+    "legal-privacy-versions": "Όλες οι εκδόσεις αυτής της πολιτικής"
   },
   "en": {},
   "es": {
@@ -11164,7 +11194,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Política de cookies",
     "legal-providers": "Proveedores de modelos",
     "sign-up": "Crear cuenta",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "billing-pricing": "Precios",
+    "billing-card-change": "Actualizar tarjeta",
+    "billing-cancel": "Cancelar un plan",
+    "billing-withdraw": "Desistir de un plan",
+    "legal-privacy-versions": "Todas las versiones de esta política"
   },
   "et": {
     "ai-transparency": "Tehisintellekti läbipaistvus",
@@ -11176,7 +11211,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Küpsisepoliitika",
     "legal-providers": "Mudelipakkujad",
     "sign-up": "Looge konto",
-    "settings": "Seaded"
+    "settings": "Seaded",
+    "billing-pricing": "Hinnad",
+    "billing-card-change": "Uuenda kaarti",
+    "billing-cancel": "Paketi tühistamine",
+    "billing-withdraw": "Paketist taganemine",
+    "legal-privacy-versions": "Selle poliitika kõik versioonid"
   },
   "fi": {
     "ai-transparency": "Tekoälyn läpinäkyvyys",
@@ -11188,7 +11228,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Evästekäytäntö",
     "legal-providers": "Mallien tarjoajat",
     "sign-up": "Luo tili",
-    "settings": "Asetukset"
+    "settings": "Asetukset",
+    "billing-pricing": "Hinnat",
+    "billing-card-change": "Päivitä kortti",
+    "billing-cancel": "Peruuta tilaus",
+    "billing-withdraw": "Peru tilaus peruuttamisoikeudella",
+    "legal-privacy-versions": "Tämän käytännön kaikki versiot"
   },
   "fr": {
     "ai-transparency": "Transparence de l’IA",
@@ -11200,7 +11245,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Politique relative aux cookies",
     "legal-providers": "Fournisseurs de modèles",
     "sign-up": "Créer un compte",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "billing-pricing": "Tarifs",
+    "billing-card-change": "Mettre à jour la carte",
+    "billing-cancel": "Résilier une formule",
+    "billing-withdraw": "Se rétracter d’une formule",
+    "legal-privacy-versions": "Toutes les versions de cette politique"
   },
   "ga": {
     "ai-transparency": "Trédhearcacht IS",
@@ -11212,7 +11262,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Beartas fianán",
     "legal-providers": "Soláthraithe samhlacha",
     "sign-up": "Cruthaigh cuntas",
-    "settings": "Socruithe"
+    "settings": "Socruithe",
+    "billing-pricing": "Praghsanna",
+    "billing-card-change": "Nuashonraigh an cárta",
+    "billing-cancel": "Cuir plean ar ceal",
+    "billing-withdraw": "Tarraing siar ó phlean",
+    "legal-privacy-versions": "Gach leagan den bheartas seo"
   },
   "he": {
     "ai-transparency": "שקיפות בינה מלאכותית",
@@ -11224,7 +11279,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "מדיניות העוגיות",
     "legal-providers": "ספקי מודלים",
     "sign-up": "יצירת חשבון",
-    "settings": "הגדרות"
+    "settings": "הגדרות",
+    "billing-pricing": "מחירים",
+    "billing-card-change": "עדכון כרטיס",
+    "billing-cancel": "ביטול תוכנית",
+    "billing-withdraw": "ביטול עסקה בתוכנית",
+    "legal-privacy-versions": "כל הגרסאות של מדיניות זו"
   },
   "hi": {
     "ai-transparency": "AI पारदर्शिता",
@@ -11236,7 +11296,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "कुकी नीति",
     "legal-providers": "मॉडल प्रदाता",
     "sign-up": "खाता बनाएँ",
-    "settings": "सेटिंग्स"
+    "settings": "सेटिंग्स",
+    "billing-pricing": "मूल्य",
+    "billing-card-change": "कार्ड अपडेट करें",
+    "billing-cancel": "योजना रद्द करें",
+    "billing-withdraw": "योजना से अनुबंध वापस लें",
+    "legal-privacy-versions": "इस नीति के सभी संस्करण"
   },
   "hr": {
     "ai-transparency": "Transparentnost umjetne inteligencije",
@@ -11248,7 +11313,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Pravila o kolačićima",
     "legal-providers": "Pružatelji modela",
     "sign-up": "Izradite račun",
-    "settings": "Postavke"
+    "settings": "Postavke",
+    "billing-pricing": "Cijene",
+    "billing-card-change": "Promijeni karticu",
+    "billing-cancel": "Otkazivanje plana",
+    "billing-withdraw": "Raskid ugovora o planu",
+    "legal-privacy-versions": "Sve verzije ovih pravila"
   },
   "hu": {
     "ai-transparency": "MI-átláthatóság",
@@ -11260,7 +11330,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Sütiszabályzat",
     "legal-providers": "Modellszolgáltatók",
     "sign-up": "Fiók létrehozása",
-    "settings": "Beállítások"
+    "settings": "Beállítások",
+    "billing-pricing": "Árak",
+    "billing-card-change": "Kártya módosítása",
+    "billing-cancel": "Csomag lemondása",
+    "billing-withdraw": "Elállás a csomagtól",
+    "legal-privacy-versions": "A szabályzat összes változata"
   },
   "id": {
     "ai-transparency": "Transparansi AI",
@@ -11272,7 +11347,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Kebijakan kuki",
     "legal-providers": "Penyedia model",
     "sign-up": "Buat akun",
-    "settings": "Pengaturan"
+    "settings": "Pengaturan",
+    "billing-pricing": "Harga",
+    "billing-card-change": "Perbarui kartu",
+    "billing-cancel": "Batalkan paket",
+    "billing-withdraw": "Menarik diri dari paket",
+    "legal-privacy-versions": "Semua versi kebijakan ini"
   },
   "it": {
     "ai-transparency": "Trasparenza dell’IA",
@@ -11284,7 +11364,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Informativa sui cookie",
     "legal-providers": "Fornitori di modelli",
     "sign-up": "Crea account",
-    "settings": "Impostazioni"
+    "settings": "Impostazioni",
+    "billing-pricing": "Prezzi",
+    "billing-card-change": "Aggiorna la carta",
+    "billing-cancel": "Disdici un piano",
+    "billing-withdraw": "Recedi da un piano",
+    "legal-privacy-versions": "Tutte le versioni di questa informativa"
   },
   "ja": {
     "ai-transparency": "AIの透明性",
@@ -11296,7 +11381,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "クッキーポリシー",
     "legal-providers": "モデルプロバイダー",
     "sign-up": "アカウントを作成",
-    "settings": "設定"
+    "settings": "設定",
+    "billing-pricing": "料金",
+    "billing-card-change": "カードを更新",
+    "billing-cancel": "プランの解約",
+    "billing-withdraw": "プランの撤回",
+    "legal-privacy-versions": "本ポリシーのすべての版"
   },
   "ko": {
     "ai-transparency": "AI 투명성",
@@ -11308,7 +11398,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "쿠키 정책",
     "legal-providers": "모델 제공업체",
     "sign-up": "계정 만들기",
-    "settings": "설정"
+    "settings": "설정",
+    "billing-pricing": "요금",
+    "billing-card-change": "카드 변경",
+    "billing-cancel": "요금제 해지",
+    "billing-withdraw": "요금제 철회",
+    "legal-privacy-versions": "본 방침의 모든 버전"
   },
   "lt": {
     "ai-transparency": "DI skaidrumas",
@@ -11320,7 +11415,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Slapukų politika",
     "legal-providers": "Modelių teikėjai",
     "sign-up": "Sukurti paskyrą",
-    "settings": "Nustatymai"
+    "settings": "Nustatymai",
+    "billing-pricing": "Kainos",
+    "billing-card-change": "Atnaujinti kortelę",
+    "billing-cancel": "Atšaukti planą",
+    "billing-withdraw": "Atsisakyti plano",
+    "legal-privacy-versions": "Visos šios politikos versijos"
   },
   "lv": {
     "ai-transparency": "MI pārredzamība",
@@ -11332,7 +11432,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Sīkdatņu politika",
     "legal-providers": "Modeļu pakalpojumu sniedzēji",
     "sign-up": "Izveidot kontu",
-    "settings": "Iestatījumi"
+    "settings": "Iestatījumi",
+    "billing-pricing": "Cenas",
+    "billing-card-change": "Atjaunināt karti",
+    "billing-cancel": "Atcelt plānu",
+    "billing-withdraw": "Atteikties no plāna",
+    "legal-privacy-versions": "Visas šīs politikas versijas"
   },
   "mt": {
     "ai-transparency": "Trasparenza tal-IA",
@@ -11344,7 +11449,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Politika dwar il-cookies",
     "legal-providers": "Fornituri tal-mudelli",
     "sign-up": "Oħloq kont",
-    "settings": "Issettjar"
+    "settings": "Issettjar",
+    "billing-pricing": "Prezzijiet",
+    "billing-card-change": "Aġġorna l-karta",
+    "billing-cancel": "Ikkanċella pjan",
+    "billing-withdraw": "Irtira minn pjan",
+    "legal-privacy-versions": "Il-verżjonijiet kollha ta’ din il-politika"
   },
   "nl": {
     "ai-transparency": "AI-transparantie",
@@ -11356,7 +11466,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Cookiebeleid",
     "legal-providers": "Modelaanbieders",
     "sign-up": "Account aanmaken",
-    "settings": "Instellingen"
+    "settings": "Instellingen",
+    "billing-pricing": "Prijzen",
+    "billing-card-change": "Kaart bijwerken",
+    "billing-cancel": "Abonnement opzeggen",
+    "billing-withdraw": "Abonnement herroepen",
+    "legal-privacy-versions": "Alle versies van dit beleid"
   },
   "pl": {
     "ai-transparency": "Przejrzystość AI",
@@ -11368,7 +11483,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Polityka plików cookie",
     "legal-providers": "Dostawcy modeli",
     "sign-up": "Utwórz konto",
-    "settings": "Ustawienia"
+    "settings": "Ustawienia",
+    "billing-pricing": "Cennik",
+    "billing-card-change": "Zmień kartę",
+    "billing-cancel": "Rezygnacja z planu",
+    "billing-withdraw": "Odstąpienie od planu",
+    "legal-privacy-versions": "Wszystkie wersje tej polityki"
   },
   "pt": {
     "ai-transparency": "Transparência da IA",
@@ -11380,7 +11500,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Política de Cookies",
     "legal-providers": "Fornecedores de modelos",
     "sign-up": "Criar conta",
-    "settings": "Definições"
+    "settings": "Definições",
+    "billing-pricing": "Preços",
+    "billing-card-change": "Atualizar cartão",
+    "billing-cancel": "Cancelar um plano",
+    "billing-withdraw": "Livre resolução de um plano",
+    "legal-privacy-versions": "Todas as versões desta política"
   },
   "ro": {},
   "ru": {
@@ -11393,7 +11518,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Политика использования файлов cookie",
     "legal-providers": "Поставщики моделей",
     "sign-up": "Создать учётную запись",
-    "settings": "Настройки"
+    "settings": "Настройки",
+    "billing-pricing": "Цены",
+    "billing-card-change": "Обновить карту",
+    "billing-cancel": "Отменить тариф",
+    "billing-withdraw": "Отказаться от тарифа",
+    "legal-privacy-versions": "Все версии этой политики"
   },
   "sk": {
     "ai-transparency": "Transparentnosť AI",
@@ -11405,7 +11535,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Zásady používania súborov cookie",
     "legal-providers": "Poskytovatelia modelov",
     "sign-up": "Vytvoriť účet",
-    "settings": "Nastavenia"
+    "settings": "Nastavenia",
+    "billing-pricing": "Cenník",
+    "billing-card-change": "Zmeniť kartu",
+    "billing-cancel": "Zrušenie programu",
+    "billing-withdraw": "Odstúpenie od programu",
+    "legal-privacy-versions": "Všetky verzie týchto zásad"
   },
   "sl": {
     "ai-transparency": "Preglednost UI",
@@ -11417,7 +11552,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Pravilnik o piškotkih",
     "legal-providers": "Ponudniki modelov",
     "sign-up": "Ustvari račun",
-    "settings": "Nastavitve"
+    "settings": "Nastavitve",
+    "billing-pricing": "Cene",
+    "billing-card-change": "Posodobi kartico",
+    "billing-cancel": "Preklic paketa",
+    "billing-withdraw": "Odstop od paketa",
+    "legal-privacy-versions": "Vse različice tega pravilnika"
   },
   "sv": {
     "ai-transparency": "AI-transparens",
@@ -11429,7 +11569,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Cookiepolicy",
     "legal-providers": "Modelleverantörer",
     "sign-up": "Skapa konto",
-    "settings": "Inställningar"
+    "settings": "Inställningar",
+    "billing-pricing": "Priser",
+    "billing-card-change": "Uppdatera kort",
+    "billing-cancel": "Säg upp ett abonnemang",
+    "billing-withdraw": "Ångra ett abonnemang",
+    "legal-privacy-versions": "Alla versioner av den här policyn"
   },
   "tr": {
     "ai-transparency": "Yapay zekâ şeffaflığı",
@@ -11441,7 +11586,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Çerez Politikası",
     "legal-providers": "Model sağlayıcıları",
     "sign-up": "Hesap oluştur",
-    "settings": "Ayarlar"
+    "settings": "Ayarlar",
+    "billing-pricing": "Fiyatlar",
+    "billing-card-change": "Kartı güncelle",
+    "billing-cancel": "Plan iptali",
+    "billing-withdraw": "Plandan cayma",
+    "legal-privacy-versions": "Bu politikanın tüm sürümleri"
   },
   "uk": {
     "ai-transparency": "Прозорість ШІ",
@@ -11453,7 +11603,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Політика щодо файлів cookie",
     "legal-providers": "Постачальники моделей",
     "sign-up": "Створити обліковий запис",
-    "settings": "Налаштування"
+    "settings": "Налаштування",
+    "billing-pricing": "Ціни",
+    "billing-card-change": "Оновити картку",
+    "billing-cancel": "Скасувати план",
+    "billing-withdraw": "Відмовитися від плану",
+    "legal-privacy-versions": "Усі версії цієї політики"
   },
   "vi": {
     "ai-transparency": "Minh bạch về AI",
@@ -11465,7 +11620,12 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Chính sách cookie",
     "legal-providers": "Nhà cung cấp mô hình",
     "sign-up": "Tạo tài khoản",
-    "settings": "Cài đặt"
+    "settings": "Cài đặt",
+    "billing-pricing": "Bảng giá",
+    "billing-card-change": "Cập nhật thẻ",
+    "billing-cancel": "Hủy gói",
+    "billing-withdraw": "Rút lại gói",
+    "legal-privacy-versions": "Tất cả phiên bản của chính sách này"
   },
   "zh": {
     "ai-transparency": "AI 透明度",
@@ -11477,6 +11637,11 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "legal-cookies": "Cookie 政策",
     "legal-providers": "模型提供商",
     "sign-up": "创建账户",
-    "settings": "设置"
+    "settings": "设置",
+    "billing-pricing": "价格",
+    "billing-card-change": "更新银行卡",
+    "billing-cancel": "取消方案",
+    "billing-withdraw": "撤回方案",
+    "legal-privacy-versions": "本政策的所有版本"
   }
 } as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<string, string>>>>;

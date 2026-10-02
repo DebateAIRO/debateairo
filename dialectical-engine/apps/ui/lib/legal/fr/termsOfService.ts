@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pays dans lesquels nous proposons DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Nous proposons DebateAI aux personnes qui résident dans [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
+      { kind: "p", text: "Nous proposons DebateAI aux personnes qui résident dans [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "5c7fcc44f423c4d72cab2c17f9b1e4e9e70462e117827b548dfa223c5c8e331f",
+  sha256: "ed61eb22f8456853bfd309f8638c767418e68427a42f2faaf3a7519e496727a1",
   eyebrow: "CONDITIONS D’UTILISATION · v2.0 · PRISE D’EFFET [DATE]",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DebateAIRO S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",

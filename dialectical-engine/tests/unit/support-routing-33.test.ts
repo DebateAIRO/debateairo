@@ -20,6 +20,9 @@ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/m
 // base (SV's content check) means: check out the base tree, run with the variable, diff the temp file with the golden.
 // D-ORCH-S05-2 (N2): the same 26 queries in ENGLISH are routed for every one of the 33 locales too (keys `…|en<n>`):
 // a 33-locale visitor who types English is scored against the en catalogue names, which a localized name must not move.
+// Paid plans (P24, merge with #62): the nine paid-plan pages add 18 English capability queries (`…|en66` to `…|en83`) to
+// every locale and sign-in state. The golden was re-measured with them on the merged catalogue: every one of S05's 6,072
+// rows is byte-identical, and the 1,188 new rows are the routes the nine pages' own names and search words reach.
 const GOLDEN = resolve(process.cwd(), "tests/support/fixtures/support-routing-33.json");
 const QUERY_KEYS = [
   "chrome:chrome.aiTransparency", "chrome:chrome.legal.notice", "chrome:chrome.legal.terms", "chrome:chrome.legal.versions",
@@ -39,7 +42,7 @@ const corpus = loadHelpCorpus(resolve(process.cwd(), "packages/support-kb/conten
 });
 const queriesIn = (loc: (typeof SUPPORT_LOCALES)[number]): string[] =>
   [...SUPPORT_TOPIC_PROMPTS[loc].map(({ prompt }) => prompt), ...QUERY_KEYS.map((ref) => `${msg(loc, ref)}?`)];
-// the en catalogue's own words for each of the 20 product areas (name; name + search terms), typed by a 33-locale visitor
+// the en catalogue's own words for each of the 29 product areas (name; name + search terms), typed by a 33-locale visitor
 const CAPABILITY_QUERIES = SUPPORT_CAPABILITIES.flatMap(({ labels, searchTerms }) =>
   [`${labels.en}?`, `${labels.en} ${searchTerms.en.join(" ")}?`]);
 
@@ -76,7 +79,7 @@ describe("S05 33-locale routing pin (SPEC-v5 R10, R13)", () => {
       throw new Error(`S05_WRITE_ROUTING_GOLDEN=1 wrote ${written}; the committed golden is never regenerated here (D-ORCH-S05-3)`);
     }
     const golden = JSON.parse(readFileSync(GOLDEN, "utf8")) as Record<string, string>;
-    expect(Object.keys(golden)).toHaveLength(33 * 2 * (2 * (6 + QUERY_KEYS.length) + 2 * 20));
+    expect(Object.keys(golden)).toHaveLength(33 * 2 * (2 * (6 + QUERY_KEYS.length) + 2 * 29));
     expect(now).toEqual(golden);
   });
 });

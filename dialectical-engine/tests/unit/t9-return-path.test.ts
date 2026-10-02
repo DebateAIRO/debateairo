@@ -58,4 +58,25 @@ describe("T9 return-path validation", () => {
   ])("rejects %s", (_case, raw) => {
     expect(safeReturnPath(raw)).toBe(DEFAULT_RETURN_PATH);
   });
+
+  it.each([
+    ["/checkout?plan=PLUS", "/checkout?plan=PLUS"],
+    ["/checkout/return?charge=0123456789abcdef0123456789abcdef", "/checkout/return?charge=0123456789abcdef0123456789abcdef"],
+    ["/settings/card", "/settings/card"],
+    // P20: back from the bank's card check signed out, the sign-in returns to the charge it must poll.
+    ["/settings/card?charge=fedcba9876543210fedcba9876543210", "/settings/card?charge=fedcba9876543210fedcba9876543210"]
+  ])("preserves the paid-plans return path %s (spec 2026-09-29 §2.10)", (raw, expected) => {
+    expect(safeReturnPath(raw)).toBe(expected);
+  });
+
+  it.each([
+    ["checkout prefix", "/checkoutx?plan=PLUS"],
+    ["checkout traversal", "/checkout/../new"],
+    ["checkout sub-path", "/checkout/other"],
+    ["scheme-relative checkout", "//evil.example/checkout?plan=PLUS"],
+    ["encoded authority", "/%2F%2Fevil.example"],
+    ["settings card traversal", "/settings/card/../../x"]
+  ])("rejects the open-redirect shape %s", (_case, raw) => {
+    expect(safeReturnPath(raw)).toBe(DEFAULT_RETURN_PATH);
+  });
 });

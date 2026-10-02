@@ -121,11 +121,14 @@ const READ_MORE: readonly LegalPageKey[] = ["terms", "privacy", "cookies", "prov
 export function LegalNoticeBody({
   legalCatalog,
   chromeCatalog,
-  locale
+  locale,
+  billingOn = false
 }: {
   legalCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
   locale: LocaleCode;
+  /** Paid plans (P21, R3-4): §01 names the seller, §04 and §05 describe the paid plans. Off: the free-product text. */
+  billingOn?: boolean;
 }) {
   const [product = COMPANY.legalName, ...otherNames] = COMPANY.tradingNames;
   const vat =
@@ -160,6 +163,7 @@ export function LegalNoticeBody({
             company: COMPANY.legalName
           })}
         </p>
+        {billingOn ? <p>{withFacts(t(legalCatalog, "legal.notice.s01.seller"), { company: COMPANY.legalName })}</p> : null}
         <table className="legalTable legalFactTable">
           <tbody>
             {companyRows.map(([labelKey, value]) => (
@@ -209,11 +213,29 @@ export function LegalNoticeBody({
       </LegalSection>
 
       <LegalSection no="04" title={t(legalCatalog, "legal.notice.s04.title")}>
-        <p>{withFacts(t(legalCatalog, "legal.notice.s04.body"), { product })}</p>
+        {billingOn ? (
+          <>
+            <p>{t(legalCatalog, "legal.notice.s04.bodyPaid")}</p>
+            <p>{t(legalCatalog, "legal.notice.s04.payments")}</p>
+            <p>
+              <a href="/pricing">{t(legalCatalog, "legal.notice.s04.pricingLink")}</a>
+            </p>
+            <p>
+              <a href="/cancel">{t(legalCatalog, "legal.notice.s04.cancelLink")}</a>
+            </p>
+          </>
+        ) : (
+          <p>{withFacts(t(legalCatalog, "legal.notice.s04.body"), { product })}</p>
+        )}
       </LegalSection>
 
       <LegalSection no="05" title={t(legalCatalog, "legal.notice.s05.title")}>
-        <p>{t(legalCatalog, "legal.notice.s05.body")}</p>
+        <p>{t(legalCatalog, billingOn ? "legal.notice.s05.bodyPaid" : "legal.notice.s05.body")}</p>
+        {billingOn ? (
+          <p>
+            <a href="/withdraw">{t(legalCatalog, "legal.notice.s05.withdrawLink")}</a>
+          </p>
+        ) : null}
         <p>
           <a href="/terms#legal-section-13">{t(legalCatalog, "legal.notice.s05.link")}</a>
         </p>

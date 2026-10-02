@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Var vi erbjuder DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi erbjuder DebateAI till personer som bor i [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten." }
+      { kind: "p", text: "Vi erbjuder DebateAI till personer som bor i [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "fe24ca15c9ce9c1671a1fee28c726ef453614db66e0ac26780a9625483a5d187",
+  sha256: "0349cb24d736c23cb4d20cb483c771d2871812ac6e1c2871a65f4c06f09ac8f9",
   eyebrow: "ANVÄNDARVILLKOR · v2.0 · GÄLLER FRÅN [DATE]",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DebateAIRO S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",
