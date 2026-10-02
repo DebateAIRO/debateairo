@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Где мы предлагаем DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Мы предлагаем DebateAI лицам, проживающим в [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. В иных странах мы его не предлагаем. Если вы проживаете за пределами этих стран, сайт может быть вам доступен, однако мы не ориентируем сервис на вас, не принимаем от вас оплату, а настоящие Условия и наша Политика конфиденциальности не адаптированы к законодательству вашей страны. Приложение A устанавливает правила, применимые в каждом обслуживаемом нами регионе." }
+      { kind: "p", text: "Мы предлагаем DebateAI лицам, проживающим в [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. В иных странах мы его не предлагаем. Если вы проживаете за пределами этих стран, сайт может быть вам доступен, однако мы не ориентируем сервис на вас, не принимаем от вас оплату, а настоящие Условия и наша Политика конфиденциальности не адаптированы к законодательству вашей страны. Приложение A устанавливает правила, применимые в каждом обслуживаемом нами регионе." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "6e3582a18c06e8cad614f856e4e00de2c7d35e9e5e13461d74e13e00c62a3fe9",
+  sha256: "1985a295969f61573a9aa52fa0a59f7615a057b99d1ab5c468389a3c32a80950",
   eyebrow: "УСЛОВИЯ ИСПОЛЬЗОВАНИЯ · v2.0 · ВСТУПАЮТ В СИЛУ [DATE]",
   title: "С чем вы соглашаетесь",
   lede: "Договор между вами и DebateAIRO S.R.L. простым языком. Девятнадцать разделов и Приложение A — прокрутите до конца.",

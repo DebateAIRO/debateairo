@@ -40,6 +40,7 @@ import {
   DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE,
   type DevelopmentAuthStackProfile
 } from "./dev-auth-stack-profile.js";
+import { startDevelopmentBillingFakes } from "./dev-billing-fakes.js";
 
 type Stoppable = Readonly<{ stop(): Promise<void> }>;
 type DataPlaneHandle = Stoppable & Readonly<{
@@ -61,6 +62,8 @@ export type DevelopmentAuthStackOperations = Readonly<{
   isPublicPortOccupied(): Promise<boolean>;
   startProviderPanel(): Promise<DevelopmentCliProviderPanelHandle>;
   startSupportModelRelay(): Promise<SupportModelRelayHandle>;
+  /** Paid plans (P6b): present only with DEBATEAI_BILLING_FAKES=1. */
+  startBillingFakes?(): Promise<Stoppable>;
   startDataPlane(providerPanel: DevelopmentProviderPanel): Promise<DataPlaneHandle>;
   provisionHatchetToken(): Promise<void>;
   assembleApiEnvironment(
@@ -133,6 +136,7 @@ const KNOWN_DEVELOPMENT_ERROR_CODES: ReadonlySet<string> = new Set([
   // apps/runner/src/dev-auth-stack.ts  (this file; the three *_EXITED are built at :202 from the closed component union)
   "DEV_AUTH_STACK_API_EXITED",
   "DEV_AUTH_STACK_API_FAILED",
+  "DEV_AUTH_STACK_BILLING_FAKES_FAILED",
   "DEV_AUTH_STACK_CLEANUP_FAILED",
   "DEV_AUTH_STACK_DATA_FAILED",
   "DEV_AUTH_STACK_DATA_RECEIPT_INVALID",
@@ -196,6 +200,9 @@ const KNOWN_DEVELOPMENT_ERROR_CODES: ReadonlySet<string> = new Set([
   "DEV_AUTH_DATA_PLANE_PRINCIPAL_FAILED",
   "DEV_AUTH_DATA_PLANE_REGISTER_FAILED",
   "DEV_AUTH_DATA_PLANE_SECRET_FAILED",
+  // apps/runner/src/dev-billing-fakes.ts
+  "DEV_BILLING_FAKES_PUBLISH_FAILED",
+  "DEV_BILLING_FAKES_SECRET_INVALID",
   // apps/runner/src/dev-cli-provider-panel.ts
   "DEV_CLI_PROVIDER_PANEL_INSUFFICIENT_MAKERS",
   "DEV_CLI_PROVIDER_PANEL_RELAY_IDENTITY_INVALID",
@@ -420,6 +427,11 @@ export async function startDevelopmentAuthStack(
       () => operations.startSupportModelRelay()
     );
     owned.push(supportModelRelay);
+    const startBillingFakes = operations.startBillingFakes;
+    if (startBillingFakes !== undefined) {
+      const billingFakes = await fixedStage("DEV_AUTH_STACK_BILLING_FAKES_FAILED", () => startBillingFakes());
+      owned.push(billingFakes);
+    }
     const dataPlane = await fixedStage(
       "DEV_AUTH_STACK_DATA_FAILED",
       () => operations.startDataPlane(providerPanel.panel)
@@ -531,6 +543,9 @@ export function createDevelopmentAuthStackOperations(
         stop: () => relay.close()
       });
     },
+    ...(commandEnvironment.DEBATEAI_BILLING_FAKES === "1" ? {
+      startBillingFakes: () => startDevelopmentBillingFakes({ repositoryRoot, commandEnvironment, profile })
+    } : {}),
     startDataPlane: (providerPanel) => startDevelopmentAuthDataPlane(
       createDevelopmentAuthDataPlaneOperations(
         repositoryRoot,

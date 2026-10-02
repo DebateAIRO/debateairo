@@ -40,7 +40,9 @@ function deferredExit() {
 function operations(input: Readonly<{
   occupied?: boolean;
   preview?: boolean;
-  failAt?: "provider_panel" | "support_model" | "data" | "token" | "environment" | "api" | "runner" | "ui" | "tls";
+  /** Opt-in (P6b): offer startBillingFakes, as DEBATEAI_BILLING_FAKES=1 does. Without it the operation is absent. */
+  billing?: boolean;
+  failAt?: "provider_panel" | "support_model" | "billing_fakes" | "data" | "token" | "environment" | "api" | "runner" | "ui" | "tls";
 }> = {}): DevelopmentAuthStackOperations & Readonly<{
   calls: string[];
   apiExit: ReturnType<typeof deferredExit>;
@@ -82,6 +84,13 @@ function operations(input: Readonly<{
         stop: vi.fn(async () => { calls.push("support:stop"); })
       });
     }),
+    ...(input.billing ? {
+      startBillingFakes: vi.fn(async () => {
+        calls.push("billing:start");
+        fail("billing_fakes");
+        return Object.freeze({ stop: vi.fn(async () => { calls.push("billing:stop"); }) });
+      })
+    } : {}),
     startDataPlane: vi.fn(async () => {
       calls.push("data:start");
       fail("data");
@@ -337,6 +346,29 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
     await expect(startDevelopmentAuthStack(runtime))
       .rejects.toThrow(`DEV_AUTH_STACK_${failAt.toUpperCase()}_FAILED`);
     expect(runtime.calls).toEqual(expected);
+    expect(runtime.calls.join("\n")).not.toContain("sensitive");
+  });
+
+  it("starts the billing fakes right after the support relay and stops them right before it (P6b)", async () => {
+    const runtime = operations({ billing: true });
+    const stack = await startDevelopmentAuthStack(runtime);
+    expect(runtime.calls).toEqual([
+      "preflight", "providers:start", "support:start", "billing:start", "data:start", "token", "environment",
+      "api:start", "runner:start", "ui:start", "tls:start"
+    ]);
+    await stack.stop();
+    expect(runtime.calls).toEqual([
+      "preflight", "providers:start", "support:start", "billing:start", "data:start", "token", "environment",
+      "api:start", "runner:start", "ui:start", "tls:start",
+      "tls:stop", "ui:stop", "runner:stop", "api:stop", "data:stop", "billing:stop", "support:stop", "providers:stop"
+    ]);
+  });
+
+  it("names a failed billing-fakes start by its own stage, stops the relay and panel, and starts nothing after it (P6b)", async () => {
+    const runtime = operations({ billing: true, failAt: "billing_fakes" });
+    await expect(startDevelopmentAuthStack(runtime))
+      .rejects.toThrow("DEV_AUTH_STACK_BILLING_FAKES_FAILED");
+    expect(runtime.calls).toEqual(["preflight", "providers:start", "support:start", "billing:start", "support:stop", "providers:stop"]);
     expect(runtime.calls.join("\n")).not.toContain("sensitive");
   });
 

@@ -22,6 +22,7 @@ const styles = read("../app/globals.css");
 const home = read("../app/page.tsx");
 const verifyEmail = read("../app/verify-email/page.tsx");
 const enrollMfa = read("../app/enroll-mfa/page.tsx");
+const returnPath = read("../lib/returnPath.ts");
 const packageJson = read("../package.json");
 const authMessages = JSON.parse(read("../messages/en/auth.json"));
 
@@ -134,7 +135,8 @@ test("the login route sends an already-authenticated browser back to its debate 
   assert.match(loginPage, /const cookieStore = await cookies\(\);[\s\S]*?readSessionCookie\(cookieStore\)/);
   assert.match(loginPage, /createServerContractClient/);
   assert.match(loginPage, /\.readSession\(\)/);
-  assert.match(loginPage, /redirect\("\/#start-a-debate"\)/);
+  assert.match(loginPage, /redirect\(safeReturnPath\(typeof requested === "string" \? requested : null\)\)/);
+  assert.match(returnPath, /export const DEFAULT_RETURN_PATH = "\/#start-a-debate";/);
   assert.match(loginPage, /catch \{/);
   assert.match(loginPage, /return <LoginFlow catalog=\{catalog\} \/>/);
 });

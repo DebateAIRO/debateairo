@@ -1,5 +1,6 @@
 import { LegalHealthBody } from "@/components/legal/LegalBodies";
 import { LegalPageLayout } from "@/components/legal/LegalPageLayout";
+import { siteFooterBilling } from "@/lib/billing/footerBilling";
 import { t } from "@/lib/i18n/translate";
 import { legalPageMetadata, loadLegalPageCatalogs } from "@/lib/legal/pageCatalogs";
 
@@ -15,6 +16,7 @@ export default async function HealthDataPage() {
       eyebrow={t(legalCatalog, "legal.health.eyebrow")}
       title={t(legalCatalog, "legal.health.title")}
       meta={t(legalCatalog, "legal.health.meta")}
+      billing={await siteFooterBilling()}
     >
       <LegalHealthBody legalCatalog={legalCatalog} />
     </LegalPageLayout>

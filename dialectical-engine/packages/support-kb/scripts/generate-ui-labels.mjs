@@ -104,6 +104,9 @@ const controlKeys = Object.freeze({
 
 // cookie-compliance S05 (SPEC-v5 R13, V-22): the 10 KEY rows of the capability table of record — the page link the
 // screen shows for that product area. The other 10 capability names are written by hand in src/capability-names.ts.
+// Paid plans (P24, merge with #62): five of the nine paid-plan pages have such a link — the footer's Pricing, Cancel a
+// plan and Withdraw from a plan, the Settings card's Update card, and the privacy policy's All versions of this policy;
+// the other four (checkout, its return page, the two archived texts) are TRANSLATE rows in src/capability-names.ts.
 const capabilityKeys = Object.freeze({
   "ai-transparency": ["chrome", "chrome.aiTransparency"],
   "legal-notice": ["chrome", "chrome.legal.notice"],
@@ -115,6 +118,11 @@ const capabilityKeys = Object.freeze({
   "legal-providers": ["chrome", "chrome.legal.providers"],
   "sign-up": ["home", "home.createAccount"],
   "settings": ["chrome", "chrome.settings"],
+  "billing-pricing": ["chrome", "chrome.footer.pricing"],
+  "billing-card-change": ["billing", "billing.subscription.updateCard"],
+  "billing-cancel": ["chrome", "chrome.footer.cancel"],
+  "billing-withdraw": ["chrome", "chrome.footer.withdraw"],
+  "legal-privacy-versions": ["legal", "legal.privacyVersions.link"],
 });
 
 const topicSources = Object.freeze({

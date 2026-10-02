@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "أين نقدم DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "نقدم DebateAI للأشخاص المقيمين في [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. ولا نقدمها في أماكن أخرى. إذا كنت تقيم خارج تلك البلدان، فقد تتمكن من الوصول إلى الموقع، لكننا لا نوجّه الخدمة إليك ولا نقبل منك مدفوعات، كما أن هذه الشروط وسياسة الخصوصية لدينا غير مواءمتين مع قانون بلدك. يبين الملحق A ما يسري في كل منطقة نقدم فيها خدماتنا." }
+      { kind: "p", text: "نقدم DebateAI للأشخاص المقيمين في [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. ولا نقدمها في أماكن أخرى. إذا كنت تقيم خارج تلك البلدان، فقد تتمكن من الوصول إلى الموقع، لكننا لا نوجّه الخدمة إليك ولا نقبل منك مدفوعات، كما أن هذه الشروط وسياسة الخصوصية لدينا غير مواءمتين مع قانون بلدك. يبين الملحق A ما يسري في كل منطقة نقدم فيها خدماتنا." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "6e6190f74e986624274e9c9cf2d66fb3ddf1859a785933d2deb8dddb8c87cb57",
+  sha256: "2f16e64759d9c77dbef1c32c6d10bd50fc751906df15b7cff9aaa7fd94758374",
   eyebrow: "شروط الخدمة · v2.0 · سارية اعتبارًا من [DATE]",
   title: "ما توافق عليه",
   lede: "العقد المبرم بينك وبين DebateAIRO S.R.L.، بصياغة واضحة. تسعة عشر قسمًا والملحق A — مرّر إلى النهاية.",

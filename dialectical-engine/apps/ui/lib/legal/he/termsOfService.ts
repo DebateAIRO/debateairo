@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "היכן אנו מציעים את DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "אנו מציעים את DebateAI לאנשים המתגוררים ב-[the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. איננו מציעים אותו במקומות אחרים. אם אתם מתגוררים מחוץ למדינות אלה, ייתכן שתוכלו לגשת לאתר, אך איננו מכוונים את השירות אליכם, איננו מקבלים מכם תשלום, ותנאים אלה ומדיניות הפרטיות שלנו אינם מותאמים לדין במדינתכם. נספח A מפרט מה חל בכל אזור שבו אנו נותנים שירות." }
+      { kind: "p", text: "אנו מציעים את DebateAI לאנשים המתגוררים ב-[the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. איננו מציעים אותו במקומות אחרים. אם אתם מתגוררים מחוץ למדינות אלה, ייתכן שתוכלו לגשת לאתר, אך איננו מכוונים את השירות אליכם, איננו מקבלים מכם תשלום, ותנאים אלה ומדיניות הפרטיות שלנו אינם מותאמים לדין במדינתכם. נספח A מפרט מה חל בכל אזור שבו אנו נותנים שירות." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "531056181d8ada0b4f51f72736ceecb4bce4db3d52ff4f0ba693b2e3ec7ce715",
+  sha256: "257651aaa726a44c5ba3da2f739e42f6f5c492a61cb90d78c8470ae8ee318866",
   eyebrow: "תנאי השירות · v2.0 · בתוקף מ-[DATE]",
   title: "למה אתם מסכימים",
   lede: "החוזה ביניכם לבין DebateAIRO S.R.L., בלשון ברורה. תשעה-עשר סעיפים ונספח A — גללו עד הסוף.",

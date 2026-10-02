@@ -60,5 +60,12 @@
   "chrome.footer.location": "Bukarest, ir-Rumanija",
   "chrome.footer.product": "Prodott",
   "chrome.footer.home": "Paġna ewlenija",
-  "chrome.footer.cookiePreferences": "Il-cookies li naħżnu"
+  "chrome.footer.cookiePreferences": "Il-cookies li naħżnu",
+  "chrome.footer.pricing": "Prezzijiet",
+  "chrome.footer.cancel": "Ikkanċella pjan",
+  "chrome.footer.withdraw": "Irtira minn pjan",
+  "chrome.footer.paymentMarks": "Kards li naċċettaw",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

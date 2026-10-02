@@ -134,7 +134,11 @@ const admissionPolicyValueSchema = z.object({
   support_reads: admissionScopeValueSchema("source").optional(),
   support_sessions: admissionScopeValueSchema("owner").optional(),
   support_model_calls: admissionScopeValueSchema("source").optional(),
-  geo_availability: admissionScopeValueSchema("source").optional()
+  geo_availability: admissionScopeValueSchema("source").optional(),
+  billing_quote: admissionScopeValueSchema("owner").optional(),
+  billing_checkout: admissionScopeValueSchema("owner").optional(),
+  billing_notify: admissionScopeValueSchema("source").optional(),
+  billing_cancel_link: admissionScopeValueSchema("source").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -157,6 +161,14 @@ export type AdmissionPolicy = Readonly<{
   supportModelCalls: AdmissionScopePolicy<"source"> | null;
   /** Paid plans G3a: GET /v1/geo/availability, per source. */
   geoAvailability: AdmissionScopePolicy<"source"> | null;
+  /** Paid plans P8b: quotes, 10 an hour per owner (contract §2). */
+  billingQuote: AdmissionScopePolicy<"owner"> | null;
+  /** Paid plans P8c: checkouts, 10 an hour per owner (spec §2.7; value pending V-1). */
+  billingCheckout: AdmissionScopePolicy<"owner"> | null;
+  /** Paid plans P9a: xMoney's notices, 120 a minute per source (contract §2). */
+  billingNotify: AdmissionScopePolicy<"source"> | null;
+  /** P13 (A25): the public cancel link, per source network. */
+  billingCancelLink: AdmissionScopePolicy<"source"> | null;
   sourceRef: string;
 }>;
 
@@ -220,7 +232,11 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   sourceRef: `${ADMISSION_POLICY_REGISTER_ROW.sourceRef}`
     + " + DL1-F2 support_reads/support_sessions and DL1-F7 support_model_calls,"
     + " V ratification pending (V-1)"
-    + " + paid plans G3a geo_availability, V ratification pending (V-1)",
+    + " + paid plans G3a geo_availability, V ratification pending (V-1)"
+    + " + paid plans P8b billing_quote, V ratification pending (V-1)"
+    + " + paid plans P8c billing_checkout, V ratification pending (V-1)"
+    + " + paid plans P9a billing_notify, V ratification pending (V-1)"
+    + " + paid plans P13 billing_cancel_link, V ratification pending (V-1)",
   value: Object.freeze({
     ...ADMISSION_POLICY_REGISTER_ROW.value,
     support_reads: Object.freeze({
@@ -236,6 +252,23 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     // one call; this refuses only a scraper walking addresses through the gate.
     geo_availability: Object.freeze({
       key: "source" as const, limit: 60, window_ms: 60_000, capacity: 65_536
+    }),
+    // Paid plans P8b: quotes, 10 an hour per owner (contract §2).
+    billing_quote: Object.freeze({
+      key: "owner" as const, limit: 10, window_ms: 60 * 60_000, capacity: 65_536
+    }),
+    // Paid plans P8c: checkouts, 10 an hour per owner (spec §2.7 names the scope, not its number; V-1).
+    billing_checkout: Object.freeze({
+      key: "owner" as const, limit: 10, window_ms: 60 * 60_000, capacity: 65_536
+    }),
+    // Paid plans P9a: xMoney's notices, 120 a minute per source (contract §2).
+    billing_notify: Object.freeze({
+      key: "source" as const, limit: 120, window_ms: 60_000, capacity: 65_536
+    }),
+    // P13 (A25): five cancel-link requests or token presses an hour per source; the per-account limit (three
+    // links a day) is counted in the database by the service, silently.
+    billing_cancel_link: Object.freeze({
+      key: "source" as const, limit: 5, window_ms: 60 * 60_000, capacity: 65_536
     })
   })
 });
@@ -288,6 +321,30 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       limit: policy.geo_availability.limit,
       windowMs: policy.geo_availability.window_ms,
       capacity: policy.geo_availability.capacity
+    }),
+    billingQuote: policy.billing_quote === undefined ? null : Object.freeze({
+      key: policy.billing_quote.key,
+      limit: policy.billing_quote.limit,
+      windowMs: policy.billing_quote.window_ms,
+      capacity: policy.billing_quote.capacity
+    }),
+    billingCheckout: policy.billing_checkout === undefined ? null : Object.freeze({
+      key: policy.billing_checkout.key,
+      limit: policy.billing_checkout.limit,
+      windowMs: policy.billing_checkout.window_ms,
+      capacity: policy.billing_checkout.capacity
+    }),
+    billingNotify: policy.billing_notify === undefined ? null : Object.freeze({
+      key: policy.billing_notify.key,
+      limit: policy.billing_notify.limit,
+      windowMs: policy.billing_notify.window_ms,
+      capacity: policy.billing_notify.capacity
+    }),
+    billingCancelLink: policy.billing_cancel_link === undefined ? null : Object.freeze({
+      key: policy.billing_cancel_link.key,
+      limit: policy.billing_cancel_link.limit,
+      windowMs: policy.billing_cancel_link.window_ms,
+      capacity: policy.billing_cancel_link.capacity
     }),
     sourceRef
   });

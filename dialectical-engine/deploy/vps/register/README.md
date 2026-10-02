@@ -45,7 +45,8 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `providerTargets` | the SAME array you put in `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` | the checks both services run at boot — relays, loopback and private addresses, inline credentials, missing or zero prices |
 | `synthesisRoles` | optional: `synthesizerRoleRef` and `evaluatorRoleRef`. Leave it out and the first two different makers are used; with a single maker you must name them | the command — `HOSTED_REGISTER_ROLE_REF_UNCONFIGURED` |
 | `billingPlans` | optional: the paid plans (prices, monthly credit, day and week shares, the finish edge, Free's fixed gauges) as the register row stores them. Left out, the engine's own row is sealed | the register's own parser — `BILLING_PLANS_INVALID` |
-| `billingPolicy` | optional: the billing switch (`enabled`) and its rules. Left out, the engine's own row is sealed: billing OFF | the register's own parser — `BILLING_POLICY_INVALID`; switched on without the budget members, `BILLING_REQUIRES_ENVELOPE_MEMBERS` |
+| `billingPolicy` | optional: the billing switch (`enabled`) and its rules. Left out, the engine's own row is sealed: billing OFF | the register's own parser — `BILLING_POLICY_INVALID`; switched on without the budget members, `BILLING_REQUIRES_ENVELOPE_MEMBERS`; switched on in a version without `countryPolicy`, `BILLING_CONFIGURATION_INCOMPLETE` (the publish's boot check) |
+| `taxAuthorities` | optional: where and when each tax is paid, in plain words, for the quarterly tax summary. Left out, the code-owned `taxAuthorities` row is published unchanged; include the member to correct the text. The example carries the member, equal to the code-owned text, so a file copied from it seals that copy under your own `sourceRef`: the code-owned "research of 29 September 2026, for the accountant to confirm" provenance is dropped, and a later correction of the code-owned row never reaches your versions while your file keeps the member. Delete the member from your copy unless you are correcting the text | the register's own parser — `TAX_AUTHORITIES_INVALID` (a `null` member is refused too) |
 
 Any other member is refused (`HOSTED_REGISTER_FILE_KEY_UNKNOWN`). `providerTargets` is checked and
 **never published**: prices, addresses and credential paths stay in the two `EnvironmentFile`s,
@@ -60,10 +61,11 @@ the gate must not turn on by default.
 
 Do not add the member to `/etc/debateai/register/hosted-register.json`, or publish any version that
 carries it, until every condition in the kit's main README (§5 "Country data") holds: the site shows
-the DB-IP credit (`IP Geolocation by DB-IP`, linking to `https://db-ip.com`; the site does not show
-it yet), the owner has ruled that the Terms' list of served countries matches the switches, the
-Privacy Policy says that addresses are looked up locally, and the two data files are installed and
-refreshed. Then copy the member into the hosted file's top-level object and publish; a changed
+the DB-IP credit (`IP Geolocation by DB-IP`, linking to `https://db-ip.com`; the full site footer
+carries it since paid plans P21, so check it on the live landing page), the owner has ruled that
+the Terms' list of served countries matches the switches, the Privacy Policy says that addresses
+are looked up locally, and the two data files are installed and refreshed. The go-live checklist
+carries the four as lines 27–30. Then copy the member into the hosted file's top-level object and publish; a changed
 switch later is a new version, never an edit of a sealed one.
 
 ## What `sourceRef` becomes
@@ -74,6 +76,8 @@ Your `sourceRef` is sealed in these places, and only there:
 - the `costEnvelopePolicy` row's source reference, verbatim;
 - the `billingPlans` and `billingPolicy` rows' source reference, verbatim, when the file supplies them;
 - the `countryPolicy` row's source reference, verbatim, when the file carries the member;
+- the `taxAuthorities` row's source reference, verbatim, when the file carries the member (left
+  out, that row keeps the code-owned source reference);
 - the `configuredProviderSet` row's source reference: your `sourceRef` followed by the fixed V-9
   sentence `+ V-9 ruled 2026-09-22 (V, chat): versioned configuredProviderSet row carrying each
   vendor's V-9(4) vetting record, superseding the sealed row without altering it`. That sentence

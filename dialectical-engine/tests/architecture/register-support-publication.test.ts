@@ -255,7 +255,8 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     ]) expect(statusBlock).toContain(`${field}:`);
     expect(statusBlock).not.toMatch(/(?:password|connection[_ ]?url|token|transcript|ip_address|identity|raw_response)/iu);
 
-    expect(runtimeEnvironment.match(/REGISTER_VERSION: legacyRegisterVersion/gu)).toHaveLength(2);
+    // The API, the runner and (paid plans P14b) the owner's billing commands each read an explicit REGISTER_VERSION.
+    expect(runtimeEnvironment.match(/REGISTER_VERSION: legacyRegisterVersion/gu)).toHaveLength(3);
     expect(runtimeEnvironment).not.toMatch(
       /REGISTER_VERSION:\s*legacyRegisterVersion\s*[.]\s*(?:default|optional|catch)/u
     );
@@ -423,13 +424,18 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     // DEPLOYMENT rows, so `historicalRows` stays 14 and the legacy hash is
     // untouched. MEASURED: the port emits 60 with no duplicate keys, and 58 with
     // exactly the two billing keys removed.
+    //
+    // PAID PLANS (spec 2026-09-29 §2.5.9, Task P16a): +1. The deployment now also seals
+    // `taxAuthorities`. A DEPLOYMENT row, so `historicalRows` stays 14 and the legacy hash is untouched.
+    // MEASURED: the port emits 61 with no duplicate keys, and 60 with the key removed.
     const storyKeys: readonly string[] = STORY_ROW_KEYS;
-    expect(developmentRows).toHaveLength(60);
-    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(54);
-    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(59);
-    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(59);
-    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(59);
-    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(58);
+    expect(developmentRows).toHaveLength(61);
+    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(55);
+    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(60);
+    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(60);
+    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(60);
+    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(59);
+    expect(developmentRows.filter((row) => row.rowKey !== "taxAuthorities")).toHaveLength(60);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
 

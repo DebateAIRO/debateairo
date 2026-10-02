@@ -60,5 +60,12 @@
   "chrome.footer.location": "بوخارست، رومانيا",
   "chrome.footer.product": "المنتج",
   "chrome.footer.home": "الرئيسية",
-  "chrome.footer.cookiePreferences": "ملفات تعريف الارتباط التي نخزّنها"
+  "chrome.footer.cookiePreferences": "ملفات تعريف الارتباط التي نخزّنها",
+  "chrome.footer.pricing": "الأسعار",
+  "chrome.footer.cancel": "إلغاء خطة",
+  "chrome.footer.withdraw": "الانسحاب من خطة",
+  "chrome.footer.paymentMarks": "البطاقات التي نقبلها",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

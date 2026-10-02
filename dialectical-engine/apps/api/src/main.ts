@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -28,6 +28,8 @@ import {
   costEnvelopeCeilings,
   readBillingPlans,
   readBillingPolicy,
+  readBillingEnvironmentGroup,
+  type BillingPolicy,
   loadApiEnvironment,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
@@ -45,6 +47,7 @@ import {
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
+  readTaxAuthorities,
   resolveEffectiveRiskTier,
 } from "@debateai/register";
 // V-28 (DL4-F2): the application-wide daily spending ceiling, over the persisted
@@ -61,6 +64,7 @@ import {
 } from "@debateai/budget";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
+import { SELLER_COMPANY } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
@@ -78,6 +82,18 @@ import { AskRoom, everyWholeMinute } from "./ask-room.js";
 import type { AskBilling } from "./ask-billing.js";
 import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
+import { consoleBillingAudit } from "./billing/audit.js";
+import { createBillingRuntime } from "./billing/runtime.js";
+import {
+  StageShiftedXMoneyClient,
+  assertLiveInvoicersAreLive,
+  assertStageInvoicersAreSandboxes,
+  billingClock
+} from "./billing/stage-clock.js";
+import { createRetentionPurge } from "./retention-purge.js";
+import {
+  assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
+} from "./billing/connectors.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
@@ -88,7 +104,8 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
-import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
+import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
+import { billingMailAttachmentResolvers } from "./mail-attachments.js";
 import { EMAIL_CHANGE_LINK_TTL_MS, EMAIL_CHANGE_RESEND_COOLDOWN_MS, EmailChangeService } from "./email-change.js";
 import {
   AccountErasureNotificationReconciler,
@@ -214,7 +231,9 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
     { path: environment.AUDIT_SOURCE_IP_SALT_PATH, material: sourceIpSalt },
     { path: environment.RECORDS_KEY_PATH, material: recordsKey }
   ],
-  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH]
+  // Paid plans: the billing custody files are text, not 32-byte keys, so they cannot be pairwise compared
+  // as key material — but they are refused here if they alias any key, store or each other by path or inode.
+  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH, ...billingCustodyPaths(environment)]
 }));
 const pool = boot.hold(createPool(environment.DATABASE_URL));
 const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!));
@@ -523,6 +542,42 @@ const askBilling: AskBilling | undefined = askRoomComposition === undefined
       }),
       clock: () => new Date()
     });
+/**
+ * Paid plans (spec 2026-09-29 §2.2 rule 1, §2.11; amendments R1 A22/A23; rulings R-5, R-7). Billing exists only
+ * when this is the hosted site AND the billingPolicy row in force says enabled; local mode never reads the row.
+ * Billing on must pass B4a's one readiness question (plans row + the three budget members), and only then is the
+ * billing group of the environment validated, by name (BILLING_CONFIGURATION_INCOMPLETE:<KEY>), and SmartBill's
+ * code built from the legal notice's facts before any secret is read (BILLING_COMPANY_FACTS_UNVERIFIED:cui while the
+ * CUI is still bracketed, and :vat in SMARTBILL_CIF_FORM's "ro" form while the RO VAT code is; RULINGS-R3 R3-4).
+ */
+const billingPolicy: BillingPolicy | null = environment.DEPLOYMENT_MODE === "hosted"
+  ? await boot.run("billing-policy", () => readBillingPolicy(pool, environment.REGISTER_VERSION))
+  : null;
+if (billingPolicy?.enabled === true) {
+  await boot.run("billing-readiness", async () => {
+    assertBillingReady({
+      policy: billingPolicy,
+      plans: await readBillingPlans(pool, environment.REGISTER_VERSION),
+      envelope: await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+    });
+  });
+}
+const billingConnectors: BillingConnectors | null = billingPolicy?.enabled === true
+  ? boot.runSync("billing-connectors", () => loadBillingConnectors({
+      environment: readBillingEnvironmentGroup(environment),
+      // RULINGS-R3 R3-4: SmartBill's CIF is built from the legal notice's facts (COMPANY, mirrored), never a setting.
+      company: SELLER_COMPANY,
+      recordsKey,
+      hold: (resource) => boot.hold(resource)
+    }))
+  : null;
+// Stage and live are two xMoney systems: going live with sandbox subscriptions still open would leave them ACTIVE
+// for ever (the live renewal pass never rebills a stage order). The runbook's switch-on step closes them first.
+if (billingConnectors?.xmoneyEnvironment === "live") {
+  await boot.run("billing-stage-records", async () => {
+    assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"));
+  });
+}
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
 // V-3: over the RING, so a record still wrapped by the previous key opens for
 // the length of a changeover. Writes stay under the current key. Under the
@@ -760,6 +815,15 @@ const authenticationRiskCleanupTimer=setInterval(
   triggerAuthenticationRiskCleanup,60_000
 );
 authenticationRiskCleanupTimer.unref();
+// A15 (P16c): the retention purge runs wherever the API runs, whatever DEPLOYMENT_MODE and billingPolicy say —
+// acceptance records exist in every mode (A14). Asked daily; it purges once per UTC year, from 2 January.
+const retentionPurge = createRetentionPurge({ pool, clock: () => new Date(), log: (line) => console.error(line) });
+const triggerRetentionPurge=createSingleFlightErasureReconciler(
+  async ()=>{ await retentionPurge.runIfDue(); },
+  ()=>console.error("[RETENTION_PURGE_PENDING]")
+);
+const retentionPurgeTimer=setInterval(triggerRetentionPurge,86_400_000);
+retentionPurgeTimer.unref();
 /**
  * Budget spec 2026-09-28 §2.7 (B7b) — THE WAKER. Single-flight like every timer
  * here; once right after listen (a raised site limit arrives as a restart, and
@@ -954,19 +1018,116 @@ const supportAnswers = createSupportAnswerService({
 });
 const supportStatus = new PostgresSupportStatusRepository(supportPool);
 /**
- * Paid plans (B7a onward): the billing routes' dependencies, only while billing is
- * on (hosted, and the room composed with entitlements). Later billing tasks ADD
- * their members to this one object; absent, every billing route answers 404.
+ * Paid plans P16c (R-35): where and when each tax is paid, read only while billing is on (the owner's O1 text);
+ * billing on with no taxAuthorities row at REGISTER_VERSION is refused below by name.
  */
+const taxAuthorities = billingConnectors === null
+  ? null : await boot.run("tax-authorities", () => readTaxAuthorities(pool, environment.REGISTER_VERSION));
+/**
+ * Paid plans P7: the billing runtime (the durable outbox worker and, later, every billing job and route), composed
+ * only while billing is on (P6a built the connectors). Billing on with no plans row, country policy or country lookup
+ * is a configuration error, refused at boot by name.
+ */
+const billingRuntime = billingConnectors === null
+  ? undefined
+  : boot.runSync("billing-runtime", () => {
+    const billingPlans = askBilling?.plans ?? null;
+    if (
+      billingPolicy === null || billingPlans === null || countryPolicy === null || geoLookup === undefined
+      || taxAuthorities === null
+    ) {
+      throw new TypedDomainError(
+        "BILLING_CONFIGURATION_INCOMPLETE",
+        "billing needs billingPlans, countryPolicy, the country lookup and taxAuthorities"
+      );
+    }
+    // Paid plans P8b: the quote route charges the owner's billingQuote budget (contract §2), so billing on with an
+    // admission row that does not seal it is refused at boot by name.
+    // The hosted publish asks the same question in verifyHostedRegisterBootReadiness, so a billing admission scope required here is required there too.
+    if (admissionPolicy.billingQuote === null) {
+      throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+        "Billing is on, so the register must seal the billingQuote admission scope");
+    }
+    // Paid plans P8c: the checkout charges its own owner-keyed billingCheckout budget (spec §2.7).
+    if (admissionPolicy.billingCheckout === null) {
+      throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+        "Billing is on, so the register must seal the billingCheckout admission scope");
+    }
+    // Paid plans P9a: xMoney's notices charge the source-keyed billingNotify budget (contract §2: 120 a minute).
+    if (admissionPolicy.billingNotify === null) {
+      throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+        "Billing is on, so the register must seal the billingNotify admission scope");
+    }
+    // Paid plans P13 (A25): the public cancel link charges the source-keyed billingCancelLink budget (5 an hour).
+    if (admissionPolicy.billingCancelLink === null) {
+      throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+        "Billing is on, so the register must seal the billingCancelLink admission scope");
+    }
+    // A stage payment never reaches a live invoicing service (SmartBill has no sandbox), offset or not.
+    assertStageInvoicersAreSandboxes({
+      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
+      smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
+    });
+    // ... and a live payment never meets a sandbox invoicer (exactly one legal invoice per charge).
+    assertLiveInvoicersAreLive({
+      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
+      smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
+    });
+    const stageClock = billingClock({
+      apiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      offsetDays: environment.BILLING_STAGE_CLOCK_OFFSET_DAYS ?? null
+    });
+    // One moved clock for everything the runtime records and decides; real time wherever it talks to xMoney.
+    const runtimeConnectors = stageClock.offsetMs === 0
+      ? billingConnectors
+      : Object.freeze({
+        ...billingConnectors,
+        xmoney: new StageShiftedXMoneyClient(billingConnectors.xmoney, () => stageClock.offsetMs)
+      });
+    return createBillingRuntime({
+      pool, connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
+      geo: geoLookup, legal, dekStore,
+      // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
+      mail: {
+        sender: new TemplatedMailSender({
+          executable: environment.MAIL_SENDMAIL_PATH,
+          from: environment.MAIL_FROM,
+          timeoutMs: authPolicy.channel.transportTimeoutMs
+        }),
+        attachments: billingMailAttachmentResolvers({ audit: consoleBillingAudit })
+      },
+      // P12d: the owner's model spend, the credit-used share of a withdrawal (the same reader as B6a's room).
+      ownerSpend: new PostgresModelSpendStore(pool),
+      // P13 (R-35): the sign-up blind-index key (held by boot.hold above) and the identity lookup of the cancel link.
+      blindIndexKey,
+      identities: identityRepository,
+      // P16c (R-35): the owner's quarterly tax summary (email O1) names where and when each tax is paid.
+      taxAuthorities,
+      audit: consoleBillingAudit, clock: stageClock.clock,
+      reportPending: (code) => console.error(`[${code}]`)
+    });
+  });
+/**
+ * Paid plans (B7a onward): the billing routes' dependencies, only while billing is
+ * on. B7a's usage reader (the room composed with entitlements) and, from P8a, the
+ * billing runtime's routes; later billing tasks add their members to
+ * `billingRuntime.routes`. Absent, every billing route answers 404.
+ */
+const billingUsageReader = askRoomComposition === undefined || askRoomComposition.entitlements === null
+  ? undefined
+  : new PersonUsageReader({
+      entitlements: askRoomComposition.entitlements,
+      allowance: askRoomComposition.personAllowance,
+      spend: askRoomComposition.spend
+    });
 const billingRouteOptions: BillingRouteOptions | undefined =
-  askRoomComposition === undefined || askRoomComposition.entitlements === null
+  billingUsageReader === undefined && billingRuntime === undefined
     ? undefined
     : Object.freeze({
-        usage: new PersonUsageReader({
-          entitlements: askRoomComposition.entitlements,
-          allowance: askRoomComposition.personAllowance,
-          spend: askRoomComposition.spend
-        })
+        ...(billingUsageReader === undefined ? {} : { usage: billingUsageReader }),
+        ...(billingRuntime === undefined ? {} : billingRuntime.routes)
       });
 const api = buildApi({
   application,
@@ -989,6 +1150,8 @@ const api = buildApi({
   ...(askRoom === undefined ? {} : { askRoom }),
   ...(askBilling === undefined ? {} : { askBilling }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
+  // P15: scheduling an account erasure stops the owner's billing at once (the reconciler's sweep repeats it).
+  ...(billingRuntime === undefined ? {} : { billingErasure: billingRuntime.erasure }),
   ...(countryGate === undefined ? {} : { countryGate }),
   support: {
     configuration: supportConfiguration,
@@ -1033,7 +1196,9 @@ if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
+api.addHook("onClose",async () => billingRuntime?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
+api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => askWaker?.stop());
 const startup = installStartupResourceOwner({
   api,
@@ -1065,7 +1230,9 @@ const startup = installStartupResourceOwner({
     // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
     { end: async () => { geoLookup?.close(); } },
     // L1: the records key outlives the boot ledger; it is zeroed after every pool has closed.
-    { end: async () => { recordsKey.fill(0); } }
+    { end: async () => { recordsKey.fill(0); } },
+    // P6a: the xMoney private key outlives the boot ledger too; P7/P8 consume the connectors.
+    ...(billingConnectors === null ? [] : [{ end: async () => { billingConnectors.xmoneyPrivateKey.fill(0); } }])
   ],
   // L2-F7: zeroed after every pool that borrows from them has closed. A
   // changeover's PREVIOUS keys are in this list for the same reason the current
@@ -1106,6 +1273,8 @@ await startup.run("listen", async () => {
 // user-key destruction before completion delivery succeeds.
 triggerErasureReconciliation();
 triggerAuthenticationRiskCleanup();
+triggerRetentionPurge();
+billingRuntime?.start();
 if (askRoom !== undefined) {
   triggerAskWake();
   askWaker = everyWholeMinute(triggerAskWake);

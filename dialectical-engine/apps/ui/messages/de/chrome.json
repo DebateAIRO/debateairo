@@ -60,5 +60,12 @@
   "chrome.footer.location": "Bukarest, Rumänien",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Startseite",
-  "chrome.footer.cookiePreferences": "Gespeicherte Cookies"
+  "chrome.footer.cookiePreferences": "Gespeicherte Cookies",
+  "chrome.footer.pricing": "Preise",
+  "chrome.footer.cancel": "Tarif kündigen",
+  "chrome.footer.withdraw": "Tarif widerrufen",
+  "chrome.footer.paymentMarks": "Akzeptierte Karten",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

@@ -60,5 +60,12 @@
   "chrome.footer.location": "Bucarest, Roumanie",
   "chrome.footer.product": "Produit",
   "chrome.footer.home": "Accueil",
-  "chrome.footer.cookiePreferences": "Les cookies que nous stockons"
+  "chrome.footer.cookiePreferences": "Les cookies que nous stockons",
+  "chrome.footer.pricing": "Tarifs",
+  "chrome.footer.cancel": "Résilier une formule",
+  "chrome.footer.withdraw": "Se rétracter d’une formule",
+  "chrome.footer.paymentMarks": "Cartes acceptées",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

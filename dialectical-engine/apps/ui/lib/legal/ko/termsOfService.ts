@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI 제공 지역",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "당사는 [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]에 거주하는 사람에게 DebateAI를 제공합니다. 그 밖의 지역에는 제공하지 않습니다. 해당 국가 밖에 거주하는 경우 사이트에 접속할 수 있더라도 당사는 귀하를 대상으로 서비스를 제공하지 않고 귀하의 결제를 받지 않으며, 본 약관과 당사의 개인정보 처리방침은 귀하의 국가 법률에 맞추어 작성되지 않았습니다. 부속서 A는 당사가 서비스를 제공하는 각 지역에 적용되는 사항을 정합니다." }
+      { kind: "p", text: "당사는 [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]에 거주하는 사람에게 DebateAI를 제공합니다. 그 밖의 지역에는 제공하지 않습니다. 해당 국가 밖에 거주하는 경우 사이트에 접속할 수 있더라도 당사는 귀하를 대상으로 서비스를 제공하지 않고 귀하의 결제를 받지 않으며, 본 약관과 당사의 개인정보 처리방침은 귀하의 국가 법률에 맞추어 작성되지 않았습니다. 부속서 A는 당사가 서비스를 제공하는 각 지역에 적용되는 사항을 정합니다." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "6be52843d694090984b1f213fd65e9d991e48becf5dcf9fe1c9e1578d6cf3aa4",
+  sha256: "9e8f8f685a1be0f65525b4b06cb2b01ea0799e9530d62e6391b90351cc17d82c",
   eyebrow: "서비스 이용약관 · v2.0 · 시행일 [DATE]",
   title: "귀하가 동의하는 사항",
   lede: "귀하와 DebateAIRO S.R.L. 간의 계약을 알기 쉬운 말로 설명합니다. 19개 조항과 부속서 A가 있으며, 끝까지 스크롤하여 확인하십시오.",
