@@ -1,0 +1,214 @@
+# DebateAI — Integritetspolicy
+
+<!-- legal-chrome
+summaryTitle: Kort sagt
+eyebrow: INTEGRITETSPOLICY · v3.0 · GÄLLER FRÅN [DATE]
+title: Vad vi lagrar och varför
+lede: Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.
+endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.0
+bodyLabel: Integritetspolicyns text
+annexTitle: Bilaga B — Regionala integritetsvillkor
+jumps:
+01 PERSONUPPGIFTSANSVARIG
+02 VAD VI SAMLAR IN
+04 RÄTTSLIG GRUND
+05 MODELLER OCH ÖVERFÖRINGAR
+06 PUBLICERING
+07 LAGRINGSTID
+10 DINA GDPR-RÄTTIGHETER
+13 COOKIES
+-->
+
+2026-09-21 · @Someone
+
+**Utkast v3.0 för juridisk granskning — ersätter den publicerade v2.1 (`apps/ui/lib/privacyPolicy.ts`). Utgör inte juridisk rådgivning.** Den här versionen beskriver vad koden faktiskt gör och korrigerar de fem påståenden i v2.1 som koden motsade: sessionsdata, lagringstider, analys, export och vad som händer med publicerade debatter vid radering. Hakparenteser markerar sådant som endast du kan fylla i; [pending] markerar en funktion som policyn beskriver men som ännu inte har byggts och som måste finnas innan policyn publiceras.
+
+**Version 3.0 · Effective [date] · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DebateAIRO S.R.L., Bukarest**
+
+**In short.** Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina uppgifter och dina publicerade debatter tas bort. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto.
+
+## 1. Vem ansvarar för dina uppgifter
+
+Personuppgiftsansvarig för dina personuppgifter är **DebateAIRO S.R.L.**, [address], Bukarest, Rumänien, handelsregister [J40/…], CUI […]. Skriv till **privacy@dezbatere.ro** i alla frågor som rör denna policy; vi svarar inom en månad. Vi har inte utsett något dataskyddsombud eftersom lagen inte kräver det; denna adress bevakas av [role]. Om vi har utsett en företrädare eller integritetsansvarig för ett visst land anges den personen i bilaga B.
+
+## 2. Vad vi samlar in och varifrån det kommer
+
+Vi samlar endast in det som behövs för att ett konto ska fungera, det du väljer att lämna till oss och det som lagen kräver att vi behåller.
+
+| Kategori | Exakt vilka uppgifter | Källa |
+| --- | --- | --- |
+| **Konto** | E-postadress och återställningsadress (lagras krypterade, med ett nycklat index så att vi kan hitta kontot utan att läsa adressen); lösenord (lagras som ett hashvärde, aldrig i klartext); din hemlighet för tvåfaktorsautentisering (krypterad); tio återställningskoder (lagras som hashvärden); din pseudonym; tidpunkten då du bekräftade att du är minst 18 år | Du, vid registreringen |
+| **Sessioner och säkerhet** | En hashad sessionstoken; ett nycklat hashvärde av webbläsarens user-agent-sträng, som används för att upptäcka när en session flyttas till en annan webbläsare; tidsstämplar för skapande, senaste användning och utgång. Vi lagrar **inte** din IP-adress, enhetsnamn eller webbläsaruppgifter tillsammans med en session, och sessionslistan som visas i Inställningar innehåller endast tidsstämplar | Din webbläsare |
+| **Säkerhetslogg** | En logg över säkerhetsrelevanta händelser som endast kan utökas — registrering, verifiering, inloggningsförsök, återställning, publicering och radering. IP-adressen och user-agent-värdet för varje händelse lagras endast som nycklade envägssammandrag (Argon2id), så att de inte kan läsas tillbaka men kan matchas inom en period. Risksignaler vid inloggning och återställning lagras krypterade i 90 dagar | Din webbläsare, vid tidpunkten för varje händelse |
+| **Debattinnehåll** | Frågan du skriver; de styranteckningar du anger; påståenden, kritik, hänvisningar till belägg, poäng och utslag som motorn genererar; en ordagrann registrering av vad varje AI-leverantör returnerade; sökfrågor och källreferenser. Allt detta lagras krypterat med en nyckel som är specifik för ditt konto | Du och AI-modellerna som bearbetar din fråga |
+| **Support** | Meddelanden som du utbyter med supportassistenten eller en person, lagrade krypterade; vilket språk som används; om du gav assistenten tillåtelse att se statusen — aldrig innehållet — för dina debatter; betyg som du lämnar. Om ett meddelande utlöser missbrukskontroller behåller vi ett hashvärde av meddelandet och ett hashvärde av den IP-adress som det kom från | Du |
+| **Uppgifter om godkännanden och samtycken** | Version och innehållshash för de villkor du godkände och den policy som visades för dig; tidpunkten; den skärm och mekanism som användes; ditt språk; din IP-adress och user-agent vid den tidpunkten; varje samtycke som du lämnade eller återkallade och när | Din webbläsare, vid registreringen och varje gång du ändrar ett val |
+| **Betalningar** [pending — once a paid plan exists] | Abonnemang, pris, faktureringsperiod, transaktionsreferenser och bevis på skatterättslig hemvist. Kortuppgifter innehas av vår betalningsleverantör, aldrig av oss | Du och betalningsleverantören |
+| **Personer som inte är våra användare** | Personuppgifter om andra personer som du tar med i en fråga eller som motorn genererar när den besvarar frågan. Vi ber dig att inte göra detta; avsnitt 11 förklarar vad vi gör när det ändå händer | Du, indirekt |
+
+Vi samlar **inte** in analysdata eller telemetri om hur du använder produkten, och vi placerar inga cookies för detta ändamål. Om det ändras kommer denna policy och cookiepolicyn att ändras först, och du kommer att tillfrågas.
+
+## 3. Känsliga uppgifter
+
+En debattmotor inbjuder till frågor om politik, religion, hälsa, sexualitet och övertygelse. Dessa är särskilda kategorier av uppgifter enligt artikel 9 i GDPR och de kan förekomma i dina frågor oavsett om vi avser att samla in dem eller inte.
+
+**Om dig.** När du registrerar dig lämnar du, i en separat mening, uttryckligt samtycke till att vi behandlar känsliga uppgifter som du väljer att ta med i dina egna frågor i syfte att genomföra dina debatter. Du kan när som helst återkalla det genom att inte ta med sådana uppgifter eller genom att radera en debatt. Det du publicerar om dig själv är uppgifter som du har valt att offentliggöra.
+
+**Om andra personer.** Inget av undantagen i artikel 9.2 i GDPR tillåter oss att behandla känsliga uppgifter om en tredje person som du namnger i en fråga, och inte heller någon av våra AI-leverantörer kan åberopa ett sådant undantag. Därför förbjuder villkoren detta, därför minimerar vi det vi skickar och därför tar vi snabbt bort sådant innehåll på begäran — se avsnitt 11.
+
+**Hälsouppgifter.** Vissa länder reglerar hälsorelaterade uppgifter, inklusive slutsatser, genom särskilda lagar. Om du bor i [the State of Washington] gäller ett separat [Consumer Health Data Privacy Notice].
+
+## 4. Varför vi använder dina uppgifter och med vilken grund
+
+Varje ändamål har en enda rättslig grund enligt artikel 6.1 i GDPR, och vi återanvänder inte uppgifter som samlats in för ett ändamål för ett annat ändamål.
+
+| Ändamål | Uppgifter | Grund |
+| --- | --- | --- |
+| Skapa och driva ditt konto, autentisera dig samt genomföra och lagra dina debatter så att du kan öppna och spela upp dem igen | Konto, sessioner, debattinnehåll | **Avtal** — Art. 6(1)(b) |
+| Skicka din fråga och motorns uttalanden till AI-leverantörer för att generera en debatt | Debattinnehåll | **Avtal** — Art. 6(1)(b) |
+| Hålla tjänsten säker, upptäcka missbruk, låta dig upptäcka en inloggning som du inte har gjort och föra en granskningslogg | Sessioner, säkerhetslogg, hashvärden från supportens missbrukskontroller | **Berättigade intressen** — Art. 6(1)(f): våra och dina intressen av en säker tjänst. Du kan invända; se avsnitt 10 |
+| Bevisa att du godkände villkoren och lämnade eller återkallade ett samtycke | Uppgifter om godkännanden och samtycken | **Rättslig förpliktelse** — Art. 6(1)(c), vår skyldighet att kunna visa samtycke enligt Art. 7(1), samt berättigade intressen av att styrka avtalet |
+| Besvara supportförfrågningar | Support | **Avtal** — Art. 6(1)(b) |
+| Behandla känsliga uppgifter som du tar med om dig själv | Debattinnehåll | **Uttryckligt samtycke** — Art. 9(2)(a), lämnat separat vid registreringen |
+| Publicera en debatt som du väljer att publicera | Debattinnehåll, pseudonym | **Avtal** — Art. 6(1)(b), på din instruktion; för känsliga uppgifter om dig, Art. 9(2)(e) — uppgifter som du på ett tydligt sätt har offentliggjort |
+| Skicka produktnyheter till dig | E-postadress | **Samtycke** — Art. 6(1)(a), en omarkerad ruta; kan när som helst återkallas via ett e-postmeddelande eller Inställningar |
+| Uppfylla skatte-, bokförings- och rättsliga skyldigheter [pending paid plans] | Betalningar, uppgifter om godkännanden | **Rättslig förpliktelse** — Art. 6(1)(c) |
+| Hantera rättsliga begäranden, rapporter om olagligt innehåll och våra skyldigheter som värdtjänst | Det som är relevant för begäran | **Rättslig förpliktelse** — Art. 6(1)(c), samt berättigade intressen |
+
+Vi profilerar dig inte, vi använder inte dina uppgifter för reklam och vi säljer dem inte. Vi använder inte ditt innehåll för att träna modeller och vi tillåter inte våra leverantörer att göra det — se avsnitt 5.
+
+## 5. AI-leverantörer och internationella överföringar
+
+**Vad som skickas.** För att genomföra en debatt skickar vi text till en eller flera externa AI-leverantörer: din fråga, de styranteckningar du anger och uttalanden som motorn sammanställer under debattens gång. En leverantör ser därför text som härletts från och byggts upp kring det du skrev. Leverantören får aldrig din e-postadress, dina konto- eller sessionsidentifierare, din IP-adress eller dina betalningsuppgifter.
+
+**Vilka leverantörer.** De anges i vårt **register över AI-leverantörer** på [dezbatere.ro/providers], som utgör en del av denna policy. För varje leverantör anger registret dess juridiska person och etableringsland; vad den tar emot och i vilket syfte; i vilka länder eller regioner den behandlar uppgifterna; dess lagringsvillkor och om nollagring av uppgifter är aktiv för den slutpunkt och de funktioner vi använder; om den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi stödjer oss på; samt när vi senast verifierade varje post. Leverantörer kan ändras; registret är versionshanterat och ändringen noteras där.
+
+**Träning och lagring är olika saker.** Våra avtal med leverantörerna utesluter att ditt innehåll används för att träna eller förbättra deras modeller. [Publish only once verified per route.] Vissa leverantörer behåller promptar och svar under en begränsad tid av säkerhetsskäl, för att förebygga missbruk eller för att uppfylla sina egna rättsliga skyldigheter; registret anger hur länge och varför. När nollagring av uppgifter är aktiv anges detta i registret tillsammans med vilka funktioner den gäller. Vi kommer inte att beskriva innehåll som om det inte behålls när det faktiskt behålls.
+
+**Överföringar utanför EES.** Leverantörer som är etablerade i USA tar emot uppgifter enligt en av mekanismerna i kapitel V i GDPR: ramverket för dataskydd mellan EU och USA när den specifika avtalsparten är certifierad för dessa uppgifter, eller Europeiska kommissionens standardavtalsklausuler (modul två, personuppgiftsansvarig till personuppgiftsbiträde), som stöds av en bedömning av överföringsrisker och kompletterande åtgärder. Registret anger mekanismen för varje leverantör. Du kan få en kopia av de klausuler som vi stödjer oss på genom att skriva till privacy@dezbatere.ro. Om en mekanism som vi stödjer oss på ogiltigförklaras byter vi till en annan innan överföringarna fortsätter och informerar dig.
+
+**Andra mottagare.** Vår värdleverantör [Hetzner, Germany — region …]; vår leverantör av innehållsdistribution och transport [Cloudflare]; vår e-postförmedlare […]; [our payment provider, once a paid plan exists]. Var och en agerar enligt våra dokumenterade instruktioner med stöd av ett personuppgiftsbiträdesavtal med de skyddsåtgärder som artikel 28 kräver, och var och en anges i registret med sin plats och överföringsmekanism. Vi tillåter inte något personuppgiftsbiträde att använda dina uppgifter för egna ändamål. Om en leverantör skulle göra det är den själv personuppgiftsansvarig, och vi skickar inte dina uppgifter till den.
+
+**Offentliga myndigheter.** Vi lämnar ut personuppgifter till domstolar, tillsynsmyndigheter eller brottsbekämpande myndigheter när lagen kräver det, och vi informerar dig om inte lagen hindrar oss.
+
+## 6. Publicering och synlighet
+
+Debatter är privata tills du publicerar dem. Publicering är en avsiktlig åtgärd som bekräftas separat. En publicerad debatt visar din **pseudonym**, din fråga såsom du skrev den, argumentträdet, poängen, utslaget och konfidensnivån samt har en synlig märkning om att innehållet är AI-genererat. Den visar aldrig din e-postadress, dina sessionsuppgifter eller din kontohistorik. [Published debates are / are not] indexerade av sökmotorer [unless you choose].
+
+När publiceringen återkallas tas debatten bort från DebateAI och nyckeln till vår offentliga kopia förstörs. Kopior som redan har gjorts av läsare, sökmotorer eller arkiv ligger utanför vår kontroll och kan inte återkallas av oss.
+
+När du raderar ditt konto tar vi bort alla debatter som du har publicerat från allmän åtkomst utan onödigt dröjsmål och senast inom 30 dagar, såvida inte lagen kräver att vi behåller en viss post. [Option B — a product change; see the Terms, section 9.]
+
+## 7. Hur länge vi behåller uppgifter
+
+| Uppgifter | Hur länge | Därefter |
+| --- | --- | --- |
+| Konto | Medan kontot finns, plus en frist på 7 dagar efter att du begärt att det ska avslutas | Nycklar förstörs; posten raderas |
+| Sessionsuppgifter | 14 dagar efter senaste användning eller 90 dagar efter att de skapades, beroende på vilket som inträffar först | Raderas |
+| Länkar för e-postverifiering | 24 timmar | Raderas |
+| Risksignaler vid inloggning och återställning | 90 dagar, vilket upprätthålls av databasen | Rensas |
+| Säkerhetslogg | Under tjänstens hela livstid | Kan endast utökas; IP-adress och user-agent är envägssammandrag och kan inte läsas tillbaka |
+| Debattinnehåll (privat) | Medan kontot finns | Nycklar förstörs när kontot avslutas, vilket gör innehållet oläsbart |
+| Debattinnehåll (publicerat) | Medan det är publicerat och kontot finns | Tas bort från allmän åtkomst när publiceringen återkallas eller kontot avslutas; nycklar förstörs |
+| Uppgifter om leverantörssvar och sökreferenser | Lika länge som den debatt de tillhör | Samma |
+| Supportsamtal och ärenden | [Until closed plus 12 months] | Nycklar förstörs |
+| Uppgifter om godkännanden och samtycken | Kontots livstid plus 6 år — den längsta preskriptionstid som gäller för oss | Raderas |
+| Betalningsuppgifter [pending] | 10 år, i enlighet med rumänsk bokföringslagstiftning | Raderas |
+| Säkerhetskopior [pending] | [… days] efter att den aktiva kopian har raderats | Skrivs över |
+
+**Vad radering faktiskt innebär.** Dina debatter och kontouppgifter är krypterade med nycklar som är specifika för ditt konto och för varje debatt. När du raderar ditt konto förstörs dessa nycklar, varefter de krypterade posterna inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Vi beskriver detta som radering eftersom det är den faktiska effekten, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till tre saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; och kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering.
+
+&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
+
+## 8. Automatiserade beslut och profilering
+
+Poäng, villkorsmarkeringar och utslag i en debatt är automatiserade bedömningar av **argument, inte personer**. De får inga rättsliga följder för dig och påverkar dig inte heller på liknande sätt i betydande grad. Vi fattar inga beslut om dig som enbart grundas på automatiserad behandling och har rättsliga eller på liknande sätt betydande följder, och vi profilerar dig inte.
+
+Om vi någon gång automatiserar ett beslut om ditt konto — till exempel att stänga av det eller vägra publicera en debatt — kommer en person att granska beslutet innan det träder i kraft eller på din begäran, du får möjlighet att framföra din åsikt och du kan bestrida beslutet. Villkoren beskriver hur.
+
+## 9. Säkerhet och vad som händer om något går fel
+
+Lösenord hashas med Argon2id. Tvåfaktorsautentisering är obligatorisk. Din e-postadress, dina debatter, dina supportsamtal och dina autentiseringshemligheter krypteras i vila med nycklar som är specifika för ditt konto, och nycklarna till publicerade debatter förvaras åtskilda från nycklarna till privata debatter. Åtkomst till produktionsdata loggas. IP-adresser och webbläsaruppgifter i vår säkerhetslogg lagras endast som envägssammandrag.
+
+Om en personuppgiftsincident inträffar anmäler vi den till den rumänska tillsynsmyndigheten inom 72 timmar när lagen kräver det, och vi informerar dig direkt och utan onödigt dröjsmål när incidenten sannolikt medför en hög risk för dina rättigheter och friheter. Bilaga B anger vilka anmälningsregler som gäller i andra regioner där vi tillhandahåller tjänsten.
+
+## 10. Dina rättigheter och hur du använder dem
+
+Du kan kostnadsfritt utöva dessa rättigheter genom att skriva till **privacy@dezbatere.ro** eller via **Inställningar → Integritet** där det finns en sådan funktion. Vi svarar inom en månad; om en begäran är komplicerad kan vi behöva upp till ytterligare två månader och kommer då att förklara varför. Vi kan be dig att bekräfta din identitet via ditt konto.
+
+| Rättighet | Vad den innebär här |
+| --- | --- |
+| **Tillgång** (Art. 15) | En kopia av de personuppgifter vi har om dig samt denna information. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.] |
+| **Rättelse** (Art. 16) | Rätta din e-postadress eller återställningsadress via Inställningar. Din pseudonym kan inte ändras av de skäl som anges i villkoren; du kan avsluta kontot och öppna ett nytt |
+| **Radering** (Art. 17) | Radera en privat debatt när som helst från debattsidan. Avsluta ditt konto via Inställningar; avsnitt 7 förklarar exakt vad det innebär. Be oss att ta bort en publicerad debatt som innehåller dina uppgifter, oavsett om du är upphovsperson eller inte |
+| **Begränsning** (Art. 18) | Be oss att upphöra med behandlingen av vissa uppgifter medan en tvist om dem löses |
+| **Invändning** (Art. 21) | Invänd mot behandling som grundas på berättigade intressen — säkerhets- och granskningsbehandlingen i avsnitt 4 — så upphör vi om vi inte kan visa tvingande skäl. Invänd när som helst mot marknadsföring, så upphör vi med den |
+| **Dataportabilitet** (Art. 20) | Dina debatter och kontouppgifter i ett allmänt använt, maskinläsbart format. [Pending: same export as Access.] Icke-personligt innehåll som du skapat, såsom dina frågor, återlämnas till dig på begäran när avtalet upphör |
+| **Återkalla samtycke** (Art. 7(3)) | Återkalla samtycke till marknadsföring via ett e-postmeddelande eller Inställningar; återkalla samtycket till känsliga uppgifter genom att inte ta med sådana uppgifter eller genom att radera en debatt. Återkallandet påverkar inte behandling som redan har ägt rum |
+| **Lämna klagomål** | Till den rumänska tillsynsmyndigheten, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, eller till myndigheten i det land där du bor. Vi ser helst att du kontaktar oss först |
+
+Vi tar aldrig ut någon avgift för en begäran och behandlar dig aldrig mindre förmånligt för att du har gjort en begäran.
+
+## 11. Personer som nämns i debatter men inte är våra användare
+
+Om någon ställer en fråga till DebateAI där du namnges kan vi inneha personuppgifter om dig trots att du aldrig har använt tjänsten. Villkoren förbjuder användare att göra detta och vi minimerar det vi skickar till AI-leverantörer, men det förekommer.
+
+Detta avsnitt är den information som vi är skyldiga att lämna till dig enligt artikel 14 i GDPR. Uppgifterna är det som användaren skrev och det som motorn genererade som svar; källan är den användaren; ändamålen och den rättsliga grunden anges i avsnitt 4; mottagarna är AI-leverantörerna i registret; lagringen följer avsnitt 7. Du har samtliga rättigheter i avsnitt 10 och kan i synnerhet be oss att ta bort en publicerad eller privat debatt som innehåller dina uppgifter och att berätta vilka uppgifter vi har. Du behöver inget konto för att göra detta. Skriv till **privacy@dezbatere.ro** eller använd knappen **Rapportera** i en publicerad debatt, så agerar vi utan onödigt dröjsmål på underbyggda begäranden. Vi kan inte underrätta dig individuellt när detta händer eftersom vi inte vet vem du är eller hur vi kan nå dig; denna offentliga information och möjligheten att begära borttagning är de åtgärder vi vidtar i stället.
+
+Detsamma gäller känsliga uppgifter om dig — politik, hälsa eller religion — som förekommer i någon annans fråga. Inget undantag i artikel 9.2 i GDPR tillåter oss att fortsätta behandla dem efter att du invänt, och vi kommer inte att göra det.
+
+## 12. Barn
+
+DebateAI är avsett för vuxna. När du registrerar dig bekräftar du att du är minst 18 år, och vi behandlar inte medvetet uppgifter om någon under 18 år. Om vi får kännedom om att ett konto tillhör någon under 18 år avslutar vi det och raderar uppgifterna enligt beskrivningen i avsnitt 7. Vissa länder anser inte att en bekräftelse är tillräcklig eller ställer ytterligare krav; bilaga B anger vad som gäller på olika platser, och villkoren förklarar vad vi gör åt detta.
+
+## 13. Cookies
+
+Vi placerar två cookies som båda är strikt nödvändiga: en som håller dig inloggad och en som skyddar formulär mot förfalskning. Vi placerar inga cookies för analys, reklam eller spårning. **Cookiepolicyn** på [dezbatere.ro/cookies] listar dem och deras varaktighet, förklarar hur ditt val lagras och kommer att ändras innan någon annan cookie läggs till. Om lagen i din region behandlar vissa cookies annorlunda — exempelvis Storbritanniens regel om att analys kräver möjlighet till avanmälan — anges detta i cookiepolicyn.
+
+## 14. Ändringar av denna policy
+
+När vi ändrar denna policy publicerar vi den nya versionen med en sammanfattning av vad som har ändrats och ett nytt ikraftträdandedatum, och vi behåller tidigare versioner på [dezbatere.ro/privacy/versions]. Om en ändring lägger till ett nytt ändamål eller en ny mottagare informerar vi dig via e-post och i produkten innan den nya behandlingen börjar och ger dig tid att invända. Om ett nytt ändamål är beroende av ditt samtycke — exempelvis om vi någon gång skulle vilja använda innehåll för att förbättra modeller — ber vi separat och specifikt om det samtycket; vi behandlar aldrig godkännande av uppdaterade villkor som samtycke till ny behandling. Vid förtydliganden som inte ändrar något i det vi gör publicerar vi helt enkelt den nya versionen.
+
+Denna policy uppdaterades senast den [date]. Version 3.0 ersatte version 2.1, som beskrev sessionsdata, lagringstider, analys, export och effekten av radering på publicerade debatter på sätt som inte längre återspeglade tjänsten.
+
+## Annex B — Regionala integritetsvillkor
+
+Varje post gäller endast om dess region anges i avsnitt 2 i villkoren och anger endast vad som skiljer sig från huvuddelen av denna policy.
+
+### B.1 Europeiska unionen och Europeiska ekonomiska samarbetsområdet
+
+Huvuddelen av denna policy är skriven för dig. Vår tillsynsmyndighet är rumänska **ANSPDCP**; du kan också lämna klagomål till myndigheten i det land där du bor. Rumänska användare: denna policy finns på rumänska på [URL].
+
+### B.2 Storbritannien *(endast om regionen anges)*
+
+Vår företrädare i Storbritannien enligt artikel 27 i UK GDPR är **[name, address, email]**; du kan kontakta företrädaren om allt som rör denna policy. Tillsynsmyndigheten är **Information Commissioner's Office**, [ico.org.uk](https://ico.org.uk). Du kan lämna klagomål till oss via formuläret på [URL] och vi bekräftar mottagandet inom 30 dagar. Överföringar av dina uppgifter från Storbritannien till AI-leverantörer i USA grundas på [the UK Extension to the EU–US Data Privacy Framework, where the provider is certified / the UK International Data Transfer Addendum to the EU standard contractual clauses], med stöd av en bedömning av överföringsriskerna. Om vi någon gång placerar analyscookies skulle de omfattas av avanmälan i stället för samtycke i Storbritannien; i dag placerar vi inga. Om du är under 18 år och når tjänsten trots vår åldersregel gäller standarderna i ICO:s Children's Code för hur vi behandlar dina uppgifter.
+
+### B.3 USA *(endast om regionen anges)*
+
+**Information vid insamling.** Tabellen i avsnitt 2 listar varje kategori av personuppgifter som vi samlar in, dess ändamål och hur länge vi behåller den (avsnitt 7). Vi samlar endast in följande kategorier av *känsliga* personuppgifter när du tar med dem i dina egna frågor: [health, religious or philosophical beliefs, sexual orientation, union membership, political views], och vi använder dem endast för att genomföra dina debatter. **Vi säljer eller delar inte personuppgifter och har inte gjort det under de föregående tolv månaderna.** Vi använder inte känsliga personuppgifter för något annat ändamål än att tillhandahålla den tjänst du begär. **Preferenssignaler för avanmälan:** vi respekterar Global Privacy Control-signaler som en begäran om att välja bort försäljning eller delning, vilket vi inte gör under några omständigheter. **Dina rättigheter:** att få kännedom, radera, rätta, välja bort, begränsa användningen av känsliga personuppgifter och inte diskrimineras för att du utövar dem; gör en begäran på privacy@dezbatere.ro eller [toll-free number / form]. **Ekonomiska incitament:** vi erbjuder inga; kostnadsfria och betalda abonnemang skiljer sig inte åt i hur vi behandlar dina uppgifter. **Lagringstider** anges i avsnitt 7. Denna information uppdateras minst var tolfte månad; senast uppdaterad [date].
+
+*Washington:* vårt separata **integritetsmeddelande om konsumenthälsouppgifter** på [URL] gäller all hälsorelaterad information, inklusive slutsatser. *Texas och Nebraska:* vi säljer inte känsliga personuppgifter; om detta någonsin skulle ändras inhämtar vi först ditt samtycke [statutory language]. *Colorado, Connecticut, Virginia och andra delstater med heltäckande integritetslagar:* rättigheterna ovan gäller för dig när lagen är tillämplig på oss; överklaga en avslagen begäran genom att skriva till [appeals@dezbatere.ro].
+
+### B.4 Kanada och Quebec *(endast om regionen anges)*
+
+Vår integritetsansvariga är **[name, email]**. Vi förblir ansvariga för personuppgifter som vi överför till AI-leverantörer utanför Kanada och använder avtal för att kräva jämförbart skydd; dessa leverantörer kan omfattas av lagarna i de länder där de är verksamma, inklusive myndigheters lagliga åtkomst. Marknadsföringsmeddelanden skickas endast med ditt uttryckliga samtycke enligt CASL. **Quebec:** innan vi överför personuppgifter utanför Quebec genomför vi en konsekvensbedömning avseende integritet; de inställningar som håller dina debatter privata är aktiverade som standard; du kan be oss att avindexera eller upphöra med spridningen av personuppgifter om dig; du kan begära dina uppgifter i ett strukturerat och allmänt använt format; avsnitt 8 beskriver vår automatiserade behandling.
+
+### B.5 Australien och Nya Zeeland *(endast om regionen anges)*
+
+**Australien.** Utländska mottagare av dina personuppgifter är de AI-leverantörer och personuppgiftsbiträden som anges i registret och finns i [the United States and the European Union]; vi vidtar rimliga åtgärder för att säkerställa att de hanterar uppgifterna i enlighet med de australiska integritetsprinciperna. **Automatiserade beslut:** från och med den 10 december 2026 identifierar denna policy de typer av beslut som fattas av datorprogram och som väsentligt påverkar dina rättigheter eller intressen — det finns inga sådana; poäng och utslag gäller argument, inte dig — samt de personuppgifter som används i dem. Klagomål kan lämnas till **Office of the Australian Information Commissioner**. **Nya Zeeland.** Vår integritetsansvariga är [name]. När vi samlar in personuppgifter om dig indirekt — eftersom en annan användare tog med dem i en fråga — utgör denna policy och avsnitt 11 den information vi lämnar. Vi lämnar ut uppgifter till AI-leverantörerna i registret i egenskap av våra ombud, enligt avtal som kräver jämförbara skyddsåtgärder. Klagomål kan lämnas till **Office of the Privacy Commissioner**.
+
+### B.6 Latinamerika *(spanskspråkig bilaga; endast om regionen anges)*
+
+&#91;Published in Spanish.\] Samtycke är grunden för behandling när det inte finns någon avtalsmässig nödvändighet. ARCO-rättigheterna — tillgång, rättelse, radering och invändning — kan utövas på privacy@dezbatere.ro, med svar inom [per country]. *Mexiko:* det fullständiga *aviso de privacidad* med obligatoriska delar finns på [URL]. *Argentina:* [AAIP mandatory legend]; uppgifterna är registrerade hos […]. *Colombia:* vår *política de tratamiento de datos* finns på [URL]; myndigheten är SIC. *Chile* (från och med den 1 december 2026): myndighetens kontaktuppgifter är […]; avsnitt 8 beskriver vår automatiserade behandling.
+
+### B.7 Gulfstaterna — Förenade Arabemiraten och Saudiarabien *(endast om regionen anges)*
+
+När vi behandlar dina uppgifter för andra ändamål än att tillhandahålla tjänsten stödjer vi oss på ditt samtycke, som du kan återkalla. Dina uppgifter lämnar [UAE / Kingdom of Saudi Arabia] och behandlas i Europeiska unionen och USA enligt [SDAIA standard contractual clauses / the mechanism in the Register]. Marknadsföring skickas endast med ditt samtycke. Ta inte med känsliga personuppgifter i dina frågor.
+
+### B.8 Asien och Stillahavsområdet *(endast raderna för angivna regioner)*
+
+*Singapore:* vårt dataskyddsombud är **[name, email]**; överföringar grundas på avtalsförpliktelser som ger ett skydd jämförbart med PDPA; vi anmäler anmälningspliktiga incidenter till PDPC inom 3 dagar. *Japan:* vi använder dina personuppgifter för ändamålen i avsnitt 4 och inga andra; ditt innehåll överförs till leverantörer i [named countries — e.g. the United States], vars integritetsregelverk och skyddsåtgärder beskrivs i registret, och du samtycker till detta vid registreringen. *Sydkorea:* vår integritetsansvariga är **[name]**; poster, destination, tidpunkt, mottagare, ändamål och lagringstid för utlandsöverföringar anges i registret; politiska åsikter i dina frågor är känsliga uppgifter och vi behandlar dem endast för att genomföra dina debatter; samtycken till valfri behandling inhämtas separat. *Indien* (när DPDP-reglerna blir tillämpliga): det fristående samtyckesmeddelandet på [URL] gäller; begäranden besvaras inom 90 dagar; användare under 18 år behöver verifierbart samtycke från en förälder. *Filippinerna:* vårt dataskyddsombud är [name]; klagomål kan lämnas till National Privacy Commission; avsnitt 8 beskriver vår automatiserade behandling. *Thailand:* vår företrädare är [name] [if appointed].
+
+### B.9 Reserverat
+
+Turkiet, Brasilien och Indonesien kräver var för sig ett meddelande på det lokala språket, en företrädare eller registrering samt myndighetsinlagor, och dessa har inte utarbetats här. Kina, Vietnam och Ryssland betjänas inte.

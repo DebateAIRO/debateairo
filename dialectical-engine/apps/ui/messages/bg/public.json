@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Този доклад не е наличен.",
   "public.report.error.tryAgain": "Докладът не можа да бъде изготвен в момента. Моля, опитайте отново след малко.",
   "public.story.morePaths.one": "и още {count} позиция",
-  "public.story.morePaths.other": "и още {count} позиции"
+  "public.story.morePaths.other": "и още {count} позиции",
+  "public.publication.contentCheck.refusedHeading": "Не публикувахме този дебат",
+  "public.publication.contentCheck.refusedWhatBlock": "Автоматична проверка откри в този дебат текст, който нарушава правилата ни, затова дебатът не бе публикуван.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Автоматична проверка не успя да потвърди, че този дебат спазва правилата ни, затова дебатът не бе публикуван.",
+  "public.publication.contentCheck.partsIntro": "Къде проверката откри текста:",
+  "public.publication.contentCheck.part.question": "Въпросът",
+  "public.publication.contentCheck.part.summary": "Обобщението, бележките за заключението и оставащите възражения",
+  "public.publication.contentCheck.part.arguments": "Аргументите",
+  "public.publication.contentCheck.part.reviews": "Коментарите на оценителите",
+  "public.publication.contentCheck.part.story": "Разказът за заключението",
+  "public.publication.contentCheck.groundTerms": "Основание: нашите Условия за ползване, раздел 7 (не се допуска съдържание, подбуждащо към насилие или омраза).",
+  "public.publication.contentCheck.groundIllegal": "Текстът може също да е незаконен.",
+  "public.publication.contentCheck.automated": "Това решение е взето от автоматизиран инструмент. Все още не е прегледано от човек.",
+  "public.publication.contentCheck.stillPrivate": "Дебатът ви остава частен и непроменен. Само вие можете да го виждате.",
+  "public.publication.contentCheck.appeal": "За да поискате човек да прегледа това решение, пишете на [appeals@dezbatere.ro] в срок от шест месеца.",
+  "public.publication.contentCheck.unavailable": "Проверката на съдържанието в момента не е достъпна, затова нищо не бе публикувано. Дебатът ви остава частен. Опитайте отново след няколко минути."
 }

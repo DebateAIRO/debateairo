@@ -192,5 +192,20 @@
   "public.story.morePaths.two": "u {count} pożizzjonijiet oħra",
   "public.story.morePaths.few": "u {count} pożizzjonijiet oħra",
   "public.story.morePaths.many": "u {count}-il pożizzjoni oħra",
-  "public.story.morePaths.other": "u {count} pożizzjoni oħra"
+  "public.story.morePaths.other": "u {count} pożizzjoni oħra",
+  "public.publication.contentCheck.refusedHeading": "Ma ppubblikajniex dan id-dibattitu",
+  "public.publication.contentCheck.refusedWhatBlock": "Verifika awtomatika sabet test f’dan id-dibattitu li jikser ir-regoli tagħna, għalhekk id-dibattitu ma ġiex ippubblikat.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Verifika awtomatika ma setgħetx tikkonferma li dan id-dibattitu jsegwi r-regoli tagħna, għalhekk id-dibattitu ma ġiex ippubblikat.",
+  "public.publication.contentCheck.partsIntro": "Fejn il-verifika sabet it-test:",
+  "public.publication.contentCheck.part.question": "Il-mistoqsija",
+  "public.publication.contentCheck.part.summary": "Is-sommarju, in-noti dwar il-verdett u l-oġġezzjonijiet li fadal",
+  "public.publication.contentCheck.part.arguments": "L-argumenti",
+  "public.publication.contentCheck.part.reviews": "Il-kummenti tar-reviżuri",
+  "public.publication.contentCheck.part.story": "L-istorja tal-verdett",
+  "public.publication.contentCheck.groundTerms": "Bażi: it-Termini tas-Servizz tagħna, taqsima 7 (ebda kontenut li jinċita l-vjolenza jew il-mibegħda).",
+  "public.publication.contentCheck.groundIllegal": "It-test jista’ jkun ukoll illegali.",
+  "public.publication.contentCheck.automated": "Din id-deċiżjoni ttieħdet minn għodda awtomatika. Għadha ma ġiet riveduta minn ebda persuna.",
+  "public.publication.contentCheck.stillPrivate": "Id-dibattitu tiegħek jibqa’ privat u ma jinbidilx. Int biss tista’ tarah.",
+  "public.publication.contentCheck.appeal": "Biex titlob lil persuna tirrevedi din id-deċiżjoni, ikteb lil [appeals@dezbatere.ro] fi żmien sitt xhur.",
+  "public.publication.contentCheck.unavailable": "Il-verifika tal-kontenut mhijiex disponibbli bħalissa, għalhekk ma ġie ppubblikat xejn. Id-dibattitu tiegħek jibqa’ privat. Erġa’ pprova fi ftit minuti."
 }

@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Nơi chúng tôi cung cấp DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Chúng tôi cung cấp DebateAI cho những người sống tại [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
+      { kind: "p", text: "Chúng tôi cung cấp DebateAI cho những người sống tại [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
     ]
   },
   {
@@ -131,6 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Nội dung của bạn vẫn thuộc về bạn. Bạn giữ mọi quyền mình có đối với các câu hỏi, nhận định, chú thích và chất vấn đã gửi. Bạn cấp cho chúng tôi giấy phép không độc quyền, trên toàn thế giới, miễn tiền bản quyền để lưu trữ, bảo quản, sao chép, điều chỉnh và xử lý nội dung đó nhằm vận hành dịch vụ: tiến hành cuộc tranh luận, lưu trữ để bạn có thể mở lại và phát lại, cung cấp hỗ trợ, thực hiện nghĩa vụ pháp lý của chúng tôi và — chỉ khi bạn chọn công khai — phục vụ các mục đích tại mục 9. Giấy phép này chấm dứt khi nội dung bị xóa, trừ trường hợp mục 9 hoặc pháp luật có yêu cầu khác." },
       { kind: "p", text: "Chúng tôi không huấn luyện bằng nội dung của bạn. Chúng tôi không huấn luyện mô hình bằng nội dung của bạn, và hợp đồng giữa chúng tôi với các nhà cung cấp AI loại trừ việc họ sử dụng nội dung của bạn để huấn luyện hoặc cải thiện mô hình của họ. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Cách nội dung của bạn được chuyển đến các nhà cung cấp AI. Để tiến hành một cuộc tranh luận, chúng tôi gửi văn bản đến một hoặc nhiều nhà cung cấp mô hình bên ngoài. Nội dung một nhà cung cấp nhận được là câu hỏi của bạn, các chú thích định hướng bạn thiết lập và các phát biểu do công cụ tổng hợp trong quá trình tranh luận — vì vậy nhà cung cấp thấy văn bản được phái sinh và xây dựng xoay quanh nội dung bạn nhập, chứ không chỉ những từ ngữ ban đầu của bạn. Nhà cung cấp không bao giờ nhận địa chỉ email, mã định danh tài khoản, hồ sơ phiên hoặc thông tin thanh toán của bạn." },
+      { kind: "p", text: "Những gì cuộc trò chuyện hỗ trợ gửi đi. Trợ lý hỗ trợ cũng là một mô hình AI. Khi bạn viết cho trợ lý, chúng tôi gửi tin nhắn của bạn đến một nhà cung cấp mô hình bên ngoài để mô hình có thể trả lời, cùng với các bài viết trợ giúp mà mô hình dựa vào để trả lời. Trước khi gửi, chúng tôi che mọi thứ trông giống mật khẩu, mã dùng một lần hoặc khóa. Nếu bạn yêu cầu nói chuyện với một người, chúng tôi cũng gửi cuộc trò chuyện, được che theo cùng cách, đến mô hình để mô hình viết một bản tóm tắt ngắn cho thành viên trong nhóm của chúng tôi tiếp nhận trường hợp của bạn. Chúng tôi không đính kèm địa chỉ email, mã định danh tài khoản hoặc thông tin thanh toán của bạn, nhưng mô hình nhận mọi nội dung khác bạn nhập vào cuộc trò chuyện, vì vậy đừng viết ở đó bất cứ điều gì bạn không muốn mô hình đọc." },
       { kind: "p", text: "Nhà cung cấp nào và tại đâu. Sổ đăng ký nhà cung cấp AI của chúng tôi tại [dezbatere.ro/providers] là một phần của các Điều khoản này. Sổ đăng ký liệt kê từng nhà cung cấp chúng tôi có thể sử dụng: pháp nhân và quốc gia của họ; dữ liệu họ nhận và lý do; nơi họ xử lý; điều khoản lưu giữ; liệu chế độ không lưu giữ dữ liệu có được kích hoạt cho điểm cuối chúng tôi sử dụng hay không; liệu họ có thể dùng dữ liệu đầu vào để huấn luyện theo hợp đồng với chúng tôi hay không; cơ chế chuyển dữ liệu mà chúng tôi dựa vào; và ngày chúng tôi xác minh lần gần nhất đối với mỗi mục. Các nhà cung cấp có thể ở ngoài quốc gia của bạn và ngoài Khu vực Kinh tế Châu Âu. Chính sách quyền riêng tư của chúng tôi giải thích các biện pháp bảo đảm." },
       { kind: "p", text: "Ba khái niệm khác nhau. \"Không được dùng để huấn luyện mô hình\", \"được lưu giữ trong thời gian có hạn vì lý do bảo mật, phòng chống lạm dụng hoặc pháp lý\" và \"không lưu giữ dữ liệu — không được duy trì sau khi xử lý\" là những khái niệm khác nhau. Khi một nhà cung cấp lưu giữ câu lệnh trong thời gian có hạn, Sổ đăng ký cho biết thời hạn và lý do. Khi chế độ không lưu giữ dữ liệu được kích hoạt, Sổ đăng ký nêu rõ điều đó và các tính năng áp dụng. Chúng tôi sẽ không nói rằng nội dung không được lưu giữ nếu thực tế không phải vậy." },
       { kind: "p", text: "Kết quả. Trong quan hệ giữa bạn và chúng tôi, bạn có thể sử dụng kết quả từ các cuộc tranh luận của chính mình cho bất kỳ mục đích hợp pháp nào, và chúng tôi không tuyên bố quyền sở hữu đối với văn bản được tạo ra. Hãy lưu ý rằng kết quả được tạo ra có thể không được bảo hộ quyền tác giả tại nhiều hệ thống pháp luật; kết quả tương tự có thể được tạo ra cho người dùng khác; kết quả có thể sao chép hoặc giống tài liệu của bên thứ ba; và một số tài liệu nguồn do nhà cung cấp AI truy xuất có thể chịu hạn chế về việc tái sử dụng. Bạn chịu trách nhiệm kiểm tra trước khi dựa vào hoặc công bố lại kết quả." }
@@ -298,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Vương quốc Anh (chỉ khi được liệt kê tại mục 2)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Đại diện của chúng tôi tại Vương quốc Anh theo Điều 27 UK GDPR là [name, address, email]. Đạo luật Quyền của Người tiêu dùng năm 2015 áp dụng cho bạn và không nội dung nào trong các Điều khoản này hạn chế các quyền của bạn theo đạo luật đó; từ [January 2027], các quy tắc về gói đăng ký trong Đạo luật Thị trường Kỹ thuật số, Cạnh tranh và Người tiêu dùng năm 2024 áp dụng cho các gói trả phí, bao gồm khoảng thời gian cân nhắc sau khi gia hạn và sau thời gian dùng thử miễn phí. Cách chúng tôi bảo vệ người dùng khỏi nội dung bất hợp pháp: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Công nghệ chủ động chúng tôi sử dụng: [describe, or \"none\"]. Bảo đảm độ tuổi: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Thủ tục khiếu nại tại mục 10 tiếp nhận khiếu nại về nội dung bất hợp pháp, việc gỡ bỏ sai nội dung của bạn, hạn chế đối với tài khoản của bạn, việc sử dụng công cụ tự động ảnh hưởng đến nội dung của bạn và mọi đánh giá độ tuổi chặn bạn một cách sai trái. Thủ tục này dành cho cả người bị ảnh hưởng bởi nội dung nhưng không phải người dùng." }
+      { kind: "p", text: "Đại diện của chúng tôi tại Vương quốc Anh theo Điều 27 UK GDPR là [name, address, email]. Đạo luật Quyền của Người tiêu dùng năm 2015 áp dụng cho bạn và không nội dung nào trong các Điều khoản này hạn chế các quyền của bạn theo đạo luật đó; khi các quy tắc về gói đăng ký trong Đạo luật Thị trường Kỹ thuật số, Cạnh tranh và Người tiêu dùng năm 2024 có hiệu lực (dự kiến vào năm 2027), các quy tắc này sẽ áp dụng cho các gói trả phí, bao gồm khoảng thời gian cân nhắc sau khi gia hạn và sau thời gian dùng thử miễn phí. Cách chúng tôi bảo vệ người dùng khỏi nội dung bất hợp pháp: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Công nghệ chủ động chúng tôi sử dụng: [describe, or \"none\"]. Bảo đảm độ tuổi: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Thủ tục khiếu nại tại mục 10 tiếp nhận khiếu nại về nội dung bất hợp pháp, việc gỡ bỏ sai nội dung của bạn, hạn chế đối với tài khoản của bạn, việc sử dụng công cụ tự động ảnh hưởng đến nội dung của bạn và mọi đánh giá độ tuổi chặn bạn một cách sai trái. Thủ tục này dành cho cả người bị ảnh hưởng bởi nội dung nhưng không phải người dùng. Phụ lục B.2 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn." }
     ]
   },
   {
@@ -308,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Thỏa thuận trọng tài và từ bỏ khởi kiện tập thể. Nếu sống tại Hoa Kỳ, bạn và DebateAIRO đồng ý giải quyết mọi tranh chấp phát sinh từ các Điều khoản này hoặc dịch vụ bằng trọng tài cá nhân có tính ràng buộc do [the American Arbitration Association / JAMS] quản lý theo quy tắc dành cho người tiêu dùng của tổ chức đó, thay vì tại tòa án, ngoại trừ việc mỗi bên có thể đưa khiếu kiện cá nhân ra tòa tiểu ngạch. Bạn có thể từ chối tham gia bằng cách gửi email đến [address] trong vòng 30 ngày kể từ lần đầu chấp nhận các Điều khoản này. Thỏa thuận này chịu sự điều chỉnh của Đạo luật Trọng tài Liên bang. Chúng tôi thanh toán phí nộp đơn trọng tài. Việc khởi kiện tập thể, khởi kiện chung và khởi kiện đại diện bị từ bỏ trong phạm vi pháp luật cho phép. Mục này chỉ áp dụng trong tương lai và không áp dụng cho các khiếu kiện phát sinh trước khi bạn chấp nhận mục này." },
       { kind: "p", text: "Thông báo và gỡ bỏ. Hình ảnh riêng tư không có sự đồng thuận có thể được báo cáo tại [URL] mà không cần tài khoản và được gỡ bỏ trong vòng 48 giờ kể từ khi nhận yêu cầu hợp lệ. Khiếu nại về quyền tác giả được gửi đến đại diện được chỉ định của chúng tôi nêu tại mục 16." },
-      { kind: "p", text: "Quy định riêng theo tiểu bang. California: điều khoản tự động gia hạn tại mục 12 được áp dụng; bạn có thể hủy trực tuyến bất kỳ lúc nào; chúng tôi lưu giữ sự đồng ý của bạn với điều khoản gia hạn trong ít nhất ba năm. New York: bạn có thể hủy trong vòng 14 ngày kể từ bất kỳ khoản thu nào theo giá đã tăng và nhận khoản hoàn tiền theo tỷ lệ. Texas và Nebraska: chúng tôi không bán dữ liệu cá nhân nhạy cảm; nếu điều đó thay đổi, trước tiên chúng tôi sẽ xin sự đồng ý của bạn [statutory notice language]. Washington: Thông báo quyền riêng tư về dữ liệu sức khỏe người tiêu dùng của chúng tôi tại [URL] áp dụng cho thông tin liên quan đến sức khỏe. Colorado: không nội dung nào trong dịch vụ đưa ra quyết định có hậu quả đối với bạn." }
+      { kind: "p", text: "Quy định riêng theo tiểu bang. California: điều khoản tự động gia hạn tại mục 12 được áp dụng; bạn có thể hủy trực tuyến bất kỳ lúc nào; chúng tôi lưu giữ sự đồng ý của bạn với điều khoản gia hạn trong ít nhất ba năm. New York: bạn có thể hủy trong vòng 14 ngày kể từ bất kỳ khoản thu nào theo giá đã tăng và nhận khoản hoàn tiền theo tỷ lệ. Texas và Nebraska: chúng tôi không bán dữ liệu cá nhân nhạy cảm. Washington: Thông báo quyền riêng tư về dữ liệu sức khỏe người tiêu dùng của chúng tôi tại [URL] áp dụng cho thông tin liên quan đến sức khỏe. Colorado: không nội dung nào trong dịch vụ đưa ra quyết định có hậu quả đối với bạn. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn và các quyền riêng tư của bạn theo luật tiểu bang." }
     ]
   },
   {
@@ -316,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada và Quebec (chỉ khi được liệt kê)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi là [name, email]. Quebec: các Điều khoản này được cung cấp bằng tiếng Pháp tại [URL], và phiên bản tiếng Pháp đã được trình bày cho bạn trước; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình." }
+      { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là [name], privacy@dezbatere.ro. Phụ lục B.4 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. Quebec: các Điều khoản này được cung cấp bằng tiếng Pháp; hãy chọn tiếng Pháp bằng bộ chuyển đổi ngôn ngữ; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình; không có thỏa thuận trọng tài hay điều khoản từ bỏ khởi kiện tập thể nào áp dụng cho bạn." }
     ]
   },
   {
@@ -329,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Châu Mỹ Latinh (phụ lục bằng tiếng Tây Ban Nha; chỉ khi được liệt kê)",
+    title: "Thụy Sĩ (chỉ khi được liệt kê)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Sự đồng ý là cơ sở cho hoạt động xử lý khi không có sự cần thiết theo hợp đồng; trước cuộc tranh luận đầu tiên, bạn đồng ý rõ ràng đối với mọi dữ liệu nhạy cảm mà mình lựa chọn đưa vào. Các quyền ARCO của bạn có thể được thực hiện tại [address], với phản hồi trong vòng [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexico: aviso de privacidad đầy đủ có tại [URL]; rút lui trong vòng [5] ngày. Argentina: [AAIP legend]; sử dụng botón de arrepentimiento tại [URL] trong vòng 10 ngày. Colombia: política de tratamiento có tại [URL]; rút lui trong vòng 5 ngày. Chile (từ ngày 1 tháng 12 năm 2026): thông tin liên hệ của Cơ quan là […]; bạn có thể hủy bằng cùng phương thức đã dùng để đăng ký; quyền rút lui không áp dụng cho dịch vụ kỹ thuật số." }
+      { kind: "p", text: "Đạo luật Liên bang Thụy Sĩ về Bảo vệ Dữ liệu áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.6). Bạn có thể khởi kiện tại tòa án nơi bạn sinh sống ở Thụy Sĩ. Gói trả phí không có quyền rút lại theo luật định; chính sách hoàn tiền của chúng tôi là […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Vùng Vịnh — Các Tiểu vương quốc Ả Rập Thống nhất và Ả Rập Xê Út (chỉ khi được liệt kê)",
+    title: "Moldova (chỉ khi được liệt kê)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Khi xử lý dữ liệu của bạn cho mục đích khác ngoài cung cấp dịch vụ, chúng tôi thực hiện trên cơ sở sự đồng ý của bạn và bạn có thể rút lại sự đồng ý đó. Dữ liệu của bạn được xử lý bên ngoài [UAE / Kingdom of Saudi Arabia], bao gồm tại Liên minh Châu Âu và Hoa Kỳ, theo [SDAIA standard contractual clauses / the mechanism in the Register]. Bạn chịu trách nhiệm bảo đảm rằng mọi nội dung mình công khai tuân thủ pháp luật của quốc gia nơi bạn đang ở, bao gồm luật liên quan đến tôn giáo, trật tự công cộng và đạo đức; chúng tôi có thể hạn chế việc công khai các cuộc tranh luận về những chủ đề như vậy tại khu vực của bạn." }
+      { kind: "p", text: "Theo các Điều khoản này, bạn có các quyền giống như người tiêu dùng tại Liên minh Châu Âu, bao gồm quyền rút lại trong 14 ngày tại mục 13. Bạn có thể khởi kiện tại tòa án của Moldova. Luật số 195/2024 của Moldova về bảo vệ dữ liệu cá nhân áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Châu Á–Thái Bình Dương (chỉ những dòng dành cho các khu vực được liệt kê)",
+    title: "Ukraine (chỉ khi được liệt kê)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapore: Cán bộ Bảo vệ Dữ liệu của chúng tôi là [name, email]; việc chuyển dữ liệu dựa trên biện pháp bảo vệ theo hợp đồng tương đương với PDPA; gói trả phí không có thời gian cân nhắc theo luật định và chính sách hoàn tiền của chúng tôi là […]. Nhật Bản: thông tin công bố theo luật định theo Đạo luật Giao dịch Thương mại Đặc định có tại [URL]; gói đăng ký trực tuyến không có thời gian cân nhắc chung và chính sách hoàn tiền của chúng tôi là […]; nội dung của bạn có thể được chuyển đến các nhà cung cấp tại [named countries], và bạn đồng ý với việc này thông qua các sự đồng ý khi đăng ký. Hàn Quốc: sự đồng ý đối với hoạt động xử lý tùy chọn và hoạt động tiếp thị được thu thập riêng với các nội dung cần thiết để vận hành dịch vụ; Cán bộ phụ trách quyền riêng tư của chúng tôi là [name]; bạn có thể rút khỏi gói trả phí trong vòng 7 ngày kể từ khi đăng ký theo Đạo luật Thương mại Điện tử; chúng tôi xin lại sự đồng ý của bạn trước mỗi lần tăng giá định kỳ hoặc chuyển đổi từ miễn phí sang trả phí; khi Đạo luật Cơ bản về AI yêu cầu, chúng tôi thông báo trước rằng dịch vụ dựa trên AI và gắn nhãn kết quả. Ấn Độ (sau khi các quy tắc DPDP được áp dụng): thông báo đồng ý tại [URL] được áp dụng; người dùng dưới 18 tuổi cần sự đồng ý có thể xác minh của cha mẹ. Thái Lan: đại diện của chúng tôi tại Thái Lan là [name] [if appointed]. Philippines: thông tin định danh doanh nghiệp và cơ chế khiếu nại của chúng tôi theo Đạo luật Giao dịch Internet có tại [URL]; khiếu nại có thể được gửi đến Ủy ban Quyền riêng tư Quốc gia." }
+      { kind: "p", text: "Chúng tôi cung cấp DebateAI tại Ukraine, trừ các khu vực không do chính phủ Ukraine kiểm soát. Sản phẩm và các Điều khoản này được cung cấp bằng tiếng Ukraine. Luật của Ukraine \"Về bảo vệ dữ liệu cá nhân\" áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Dành riêng",
+    title: "Israel (chỉ khi được liệt kê)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Bạn có thể hủy gói trả phí theo những gì Luật Bảo vệ Người tiêu dùng 5741-1981 cho phép [state the cancellation terms]. Các Điều khoản này và Chính sách quyền riêng tư của chúng tôi được cung cấp bằng tiếng Do Thái. Luật Bảo vệ Quyền riêng tư của Israel áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Châu Á–Thái Bình Dương (chỉ những dòng dành cho các khu vực được liệt kê)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapore: Cán bộ Bảo vệ Dữ liệu của chúng tôi là [name, email]; việc chuyển dữ liệu dựa trên biện pháp bảo vệ theo hợp đồng tương đương với PDPA; gói trả phí không có thời gian cân nhắc theo luật định và chính sách hoàn tiền của chúng tôi là […]. Nhật Bản: thông tin công bố theo luật định theo Đạo luật Giao dịch Thương mại Đặc định có tại [URL]; gói đăng ký trực tuyến không có thời gian cân nhắc chung và chính sách hoàn tiền của chúng tôi là […]; chúng tôi gửi nội dung của bạn đến các nhà cung cấp AI tại Hoa Kỳ và Liên minh Châu Âu, mỗi nhà cung cấp theo một hợp đồng yêu cầu mức bảo vệ tương đương với Đạo luật Bảo vệ Thông tin Cá nhân của Nhật Bản, và khi được yêu cầu, chúng tôi cho bạn biết các biện pháp đó là gì. Hàn Quốc: sự đồng ý đối với hoạt động xử lý tùy chọn và hoạt động tiếp thị được thu thập riêng với các nội dung cần thiết để vận hành dịch vụ; cán bộ phụ trách quyền riêng tư của chúng tôi là [name], privacy@dezbatere.ro; bạn có thể rút khỏi gói trả phí trong vòng 7 ngày kể từ khi đăng ký theo Đạo luật Thương mại Điện tử; chúng tôi xin lại sự đồng ý của bạn trước mỗi lần tăng giá định kỳ hoặc chuyển đổi từ miễn phí sang trả phí; dịch vụ sử dụng AI tạo sinh, chúng tôi cho bạn biết điều đó trước khi bạn sử dụng và gắn nhãn kết quả do AI tạo ra. Đài Loan: bạn có thể rút khỏi gói trả phí trong vòng 7 ngày kể từ khi đăng ký theo Đạo luật Bảo vệ Người tiêu dùng; Đạo luật Bảo vệ Dữ liệu Cá nhân của Đài Loan áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.10). Thái Lan: đại diện của chúng tôi tại Thái Lan là [name] [if appointed]. Philippines: thông tin định danh doanh nghiệp và cơ chế khiếu nại của chúng tôi theo Đạo luật Giao dịch Internet có tại [URL]; khiếu nại có thể được gửi đến Ủy ban Quyền riêng tư Quốc gia." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Dành riêng",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Mỗi quốc gia Thổ Nhĩ Kỳ, Brazil và Indonesia đều yêu cầu phụ lục bằng ngôn ngữ địa phương, đại diện hoặc đăng ký, cùng các hồ sơ phải nộp. Các nội dung đó chưa được soạn thảo tại đây và nằm ngoài mục 2 cho đến khi được chủ động bổ sung. Dịch vụ không được cung cấp tại Trung Quốc, Việt Nam và Nga." }
     ]
@@ -363,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "097654fe565ef87cfd80646057057ecc3c50ce70a959024c60e4ca58abc090de",
   eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.0 · CÓ HIỆU LỰC [DATE]",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DebateAIRO S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",

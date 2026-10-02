@@ -1195,7 +1195,7 @@ setTimeout(() => undefined, 500);
     expect(registered.response.message).toMatch(/spam/i);
     expect(registered.user).toMatchObject({ state: "pending_verification" });
     expect(registered.user.audit_token).not.toBe(registered.user.user_id);
-    expect(registered.user.pseudonym).toMatch(/^[a-z]+-[a-z]+-[0-9a-f]{6}$/);
+    expect(registered.user.pseudonym).toMatch(/^[A-Z][a-z]{2,8}[A-Z][a-z]{2,8}[1-9][0-9]$/);
     expect(registered.user.pseudonym).not.toContain("happy");
     expect(registered.user.password_hash).toMatch(/^\$argon2id\$v=19\$m=65536,t=3,p=1\$/);
     expect((flow.mail as MemoryMailSender).messages).toHaveLength(1);

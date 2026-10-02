@@ -127,6 +127,8 @@ export function assertLegalLocale({ english, localized, locale, key }) {
   for (const field of ["titleId", "gateHintId", "sectionIdPrefix"]) {
     assert.equal(localized[field], english[field], `${locale}/${key}: ${field} differs`);
   }
+  assert.equal(localized.version, english.version, `${locale}/${key}: document version differs from English`);
+  assert.match(localized.sha256, /^[0-9a-f]{64}$/, `${locale}/${key}: document hash is not a sha256`);
   assert.deepEqual(
     localized.sections.map(({ no }) => no),
     english.sections.map(({ no }) => no),

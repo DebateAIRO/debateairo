@@ -3,7 +3,9 @@ import type {
   AnswerIndex,
   Deployment,
   Edge,
-  Node as ContractNode
+  Node,
+  PublicMakerLineage,
+  PublicNodeReview
 } from "@debateai/contract";
 import type { RunProjection } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
@@ -20,9 +22,18 @@ import type {
   WorkerStatus
 } from "../types.js";
 
+/**
+ * A node as the workspace reads it: the owner's full Node or the public
+ * page's PublicNode. The workspace only ever shows a lineage's maker and model,
+ * and the public one carries nothing else (compliance C17/B11).
+ */
+export type ContractNode = Omit<Node, "maker_lineage" | "review"> & {
+  maker_lineage: PublicMakerLineage | null;
+  review: PublicNodeReview | null;
+};
+
 export type TreeProjectableAnswer = Pick<
   Answer,
-  | "nodes"
   | "edges"
   | "condition_mark_records"
   | "answer_id"
@@ -31,6 +42,7 @@ export type TreeProjectableAnswer = Pick<
   | "terminal"
   | "serve_state"
 > & {
+  nodes: readonly ContractNode[];
   composed_text: ReadonlyArray<Pick<Answer["composed_text"][number], "text">>;
 };
 
@@ -307,7 +319,7 @@ export function debateDetailFromAnswer(
   };
 }
 
-export function contractNodesById(answer: Pick<Answer, "nodes">): Map<string, ContractNode> {
+export function contractNodesById<N extends ContractNode>(answer: Readonly<{ nodes: readonly N[] }>): Map<string, N> {
   return new Map(answer.nodes.map((node) => [node.node_id, node]));
 }
 
@@ -688,6 +700,10 @@ export function debateDetailFromRunProjection(
     active_generation: null,
     children: []
   }), run_state: presentedState, hold_until: run.hold_until,
+  // Budget spec §2.7: a waiting run says when it will start (sentence C), or
+  // (Important 1) that it starts once one of its person's own debates finishes.
+  waits_until: run.state === "WAITING" ? run.waits_until ?? null : null,
+  waits_for: run.state === "WAITING" ? run.waits_for ?? null : null,
   ...(holdReason === null ? {} : {
     completion: { state: "running" as const, reasonCode: "PROVIDER_RECOVERY_HOLD", humanReason: holdReason }
   }) };
@@ -732,7 +748,7 @@ export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
     .map((run) => ({
       id: run.run_ref,
       topic: run.question_line,
-      status: run.state === "FAILED" ? "failed" : "generating",
+      status: run.state === "FAILED" ? "failed" : run.state === "WAITING" ? "waiting" : "generating",
       created_at: "",
       completed_at: null,
       models: [],

@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "استخدام خطتك",
+  "billing.usage.line": "اليوم {dayPct}% · هذا الأسبوع {weekPct}% · هذا الشهر {monthPct}%",
+  "billing.usage.lineFree": "هذا الشهر {monthPct}%",
+  "billing.usage.day": "اليوم",
+  "billing.usage.week": "هذا الأسبوع",
+  "billing.usage.month": "هذا الشهر",
+  "billing.usage.resets": "إعادة التعيين: {time}"
+}

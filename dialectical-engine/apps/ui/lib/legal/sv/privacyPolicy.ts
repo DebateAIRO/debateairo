@@ -255,7 +255,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Storbritannien (endast om regionen anges)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Vår företrädare i Storbritannien enligt artikel 27 i UK GDPR är [name, address, email]; du kan kontakta företrädaren om allt som rör denna policy. Tillsynsmyndigheten är Information Commissioner's Office, ico.org.uk. Du kan lämna klagomål till oss via formuläret på [URL] och vi bekräftar mottagandet inom 30 dagar. Överföringar av dina uppgifter från Storbritannien till AI-leverantörer i USA grundas på [the UK Extension to the EU–US Data Privacy Framework, where the provider is certified / the UK International Data Transfer Addendum to the EU standard contractual clauses], med stöd av en bedömning av överföringsriskerna. Om vi någon gång placerar analyscookies skulle de omfattas av avanmälan i stället för samtycke i Storbritannien; i dag placerar vi inga. Om du är under 18 år och når tjänsten trots vår åldersregel gäller standarderna i ICO:s Children's Code för hur vi behandlar dina uppgifter." }
+      { kind: "p", text: "Vår företrädare i Storbritannien enligt artikel 27 i UK GDPR är [name, address, email]; du kan kontakta företrädaren om allt som rör denna policy. Tillsynsmyndigheten är Information Commissioner's Office, ico.org.uk. Om du vill lämna klagomål till oss skriver du till privacy@dezbatere.ro; vi bekräftar mottagandet av ditt klagomål inom 30 dagar. Överföringar av dina uppgifter från Storbritannien till AI-leverantörer i USA grundas på Storbritanniens tillägg till ramverket för dataskydd mellan EU och USA när leverantören är certifierad, och annars på Storbritanniens International Data Transfer Addendum till EU:s standardavtalsklausuler, med stöd av en bedömning av överföringsriskerna; registret anger vilket verktyg som används för varje leverantör. Vi anmäler en personuppgiftsincident till ICO inom 72 timmar när lagen kräver det och informerar dig utan onödigt dröjsmål om den innebär en hög risk för dig. Om vi någon gång placerar analyscookies skulle de omfattas av avanmälan i stället för samtycke i Storbritannien; i dag placerar vi inga. Om du är under 18 år och når tjänsten trots vår åldersregel gäller standarderna i ICO:s Children's Code för hur vi behandlar dina uppgifter." }
     ]
   },
   {
@@ -263,8 +263,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "USA (endast om regionen anges)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Information vid insamling. Tabellen i avsnitt 2 listar varje kategori av personuppgifter som vi samlar in, dess ändamål och hur länge vi behåller den (avsnitt 7). Vi samlar endast in följande kategorier av känsliga personuppgifter när du tar med dem i dina egna frågor: [health, religious or philosophical beliefs, sexual orientation, union membership, political views], och vi använder dem endast för att genomföra dina debatter. Vi säljer eller delar inte personuppgifter och har inte gjort det under de föregående tolv månaderna. Vi använder inte känsliga personuppgifter för något annat ändamål än att tillhandahålla den tjänst du begär. Preferenssignaler för avanmälan: vi respekterar Global Privacy Control-signaler som en begäran om att välja bort försäljning eller delning, vilket vi inte gör under några omständigheter. Dina rättigheter: att få kännedom, radera, rätta, välja bort, begränsa användningen av känsliga personuppgifter och inte diskrimineras för att du utövar dem; gör en begäran på privacy@dezbatere.ro eller [toll-free number / form]. Ekonomiska incitament: vi erbjuder inga; kostnadsfria och betalda abonnemang skiljer sig inte åt i hur vi behandlar dina uppgifter. Lagringstider anges i avsnitt 7. Denna information uppdateras minst var tolfte månad; senast uppdaterad [date]." },
-      { kind: "p", text: "Washington: vårt separata integritetsmeddelande om konsumenthälsouppgifter på [URL] gäller all hälsorelaterad information, inklusive slutsatser. Texas och Nebraska: vi säljer inte känsliga personuppgifter; om detta någonsin skulle ändras inhämtar vi först ditt samtycke [statutory language]. Colorado, Connecticut, Virginia och andra delstater med heltäckande integritetslagar: rättigheterna ovan gäller för dig när lagen är tillämplig på oss; överklaga en avslagen begäran genom att skriva till [appeals@dezbatere.ro]." }
+      { kind: "p", text: "Information vid insamling. Tabellen i avsnitt 2 listar varje kategori av personuppgifter som vi samlar in, dess ändamål och hur länge vi behåller den (avsnitt 7). Vi samlar endast in följande kategorier av känsliga personuppgifter när du tar med dem i dina egna frågor om dig själv: hälsa, religiös eller filosofisk övertygelse, sexualliv eller sexuell läggning, politiska åsikter, medlemskap i fackförening samt ras eller etniskt ursprung. Vi använder dem endast för att genomföra dina debatter, och först efter det separata samtycket i avsnitt 3. Vi säljer eller delar inte personuppgifter och har inte gjort det under de föregående tolv månaderna. Vi använder inte personuppgifter för riktad reklam, och vi använder inte känsliga personuppgifter för något annat ändamål än att tillhandahålla den tjänst du begär. Preferenssignaler för avanmälan: eftersom vi inte säljer eller delar personuppgifter eller använder dem för riktad reklam finns det inget att välja bort, och en Global Privacy Control-signal ändrar ingenting. Dina rättigheter: att få kännedom, radera, rätta, välja bort, begränsa användningen av känsliga personuppgifter och inte diskrimineras för att du utövar dem; gör en begäran på privacy@dezbatere.ro. Ekonomiska incitament: vi erbjuder inga; våra ändamål och skyddsåtgärder är desamma för kostnadsfria och betalda abonnemang. Lagringstider anges i avsnitt 7. Incidenter: vi underrättar invånare och delstatsmyndigheter i enlighet med varje delstats lag om säkerhetsincidenter. Denna information uppdateras minst var tolfte månad; senast uppdaterad [date]." },
+      { kind: "p", text: "Connecticut: vi behandlar känsliga uppgifter endast med ditt uttryckliga samtycke, som du lämnar på den separata skärmen före din första debatt (avsnitt 3); vi använder inte dina personuppgifter för att träna AI-modeller. Washington: vårt separata integritetsmeddelande om konsumenthälsouppgifter på [URL] gäller all hälsorelaterad information, inklusive slutsatser. Texas och Nebraska: vi säljer inte känsliga personuppgifter. Colorado, Connecticut, Virginia och andra delstater med heltäckande integritetslagar: rättigheterna ovan gäller för dig när lagen är tillämplig på oss. Om vi avslår en begäran kan du överklaga genom att svara på vårt svar till privacy@dezbatere.ro; om vi avslår överklagandet kan du vända dig till delstatens justitieminister (Attorney General)." }
     ]
   },
   {
@@ -272,7 +272,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada och Quebec (endast om regionen anges)",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Vår integritetsansvariga är [name, email]. Vi förblir ansvariga för personuppgifter som vi överför till AI-leverantörer utanför Kanada och använder avtal för att kräva jämförbart skydd; dessa leverantörer kan omfattas av lagarna i de länder där de är verksamma, inklusive myndigheters lagliga åtkomst. Marknadsföringsmeddelanden skickas endast med ditt uttryckliga samtycke enligt CASL. Quebec: innan vi överför personuppgifter utanför Quebec genomför vi en konsekvensbedömning avseende integritet; de inställningar som håller dina debatter privata är aktiverade som standard; du kan be oss att avindexera eller upphöra med spridningen av personuppgifter om dig; du kan begära dina uppgifter i ett strukturerat och allmänt använt format; avsnitt 8 beskriver vår automatiserade behandling." }
+      { kind: "p", text: "Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är [name], privacy@dezbatere.ro. Vi besvarar begäranden inom 30 dagar. Vi förblir ansvariga för personuppgifter som vi överför till AI-leverantörer utanför Kanada och använder avtal för att kräva jämförbart skydd; dessa leverantörer kan omfattas av lagarna i de länder där de är verksamma, inklusive myndigheters lagliga åtkomst. Marknadsföringsmeddelanden skickas endast med ditt uttryckliga samtycke enligt CASL. Vi anmäler ett intrång i säkerhetsskyddet som medför en verklig risk för betydande skada för dig till Office of the Privacy Commissioner of Canada och till dig, och vi för ett register över varje intrång i 24 månader. Quebec: innan vi överför personuppgifter utanför Quebec genomför vi en konsekvensbedömning avseende integritet; vi anmäler en sekretessincident som innebär en risk för allvarlig skada till Commission d'accès à l'information och till dig, och vi för ett register över incidenter; de inställningar som håller dina debatter privata är aktiverade som standard; du kan be oss att avindexera eller upphöra med spridningen av personuppgifter om dig; du kan begära dina uppgifter i ett strukturerat och allmänt använt format; avsnitt 8 beskriver vår automatiserade behandling." }
     ]
   },
   {
@@ -285,32 +285,48 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.6",
-    title: "Latinamerika (spanskspråkig bilaga; endast om regionen anges)",
+    title: "Schweiz (endast om regionen anges)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Samtycke är grunden för behandling när det inte finns någon avtalsmässig nödvändighet. ARCO-rättigheterna — tillgång, rättelse, radering och invändning — kan utövas på privacy@dezbatere.ro, med svar inom [per country]. Mexiko: det fullständiga aviso de privacidad med obligatoriska delar finns på [URL]. Argentina: [AAIP mandatory legend]; uppgifterna är registrerade hos […]. Colombia: vår política de tratamiento de datos finns på [URL]; myndigheten är SIC. Chile (från och med den 1 december 2026): myndighetens kontaktuppgifter är […]; avsnitt 8 beskriver vår automatiserade behandling." }
+      { kind: "p", text: "Schweiz federala dataskyddslag (FADP) gäller. Tillsynsmyndigheten är Federal Data Protection and Information Commissioner (FDPIC), edoeb.admin.ch. Dina uppgifter går till de länder som anges i registret — EU-länder och USA. För USA stödjer vi oss på ramverket för dataskydd mellan Schweiz och USA när leverantören är certifierad, och annars på standardavtalsklausuler som FDPIC har erkänt. Vi anmäler en personuppgiftsincident som sannolikt innebär en hög risk för dig till FDPIC så snart som möjligt. [We have assessed that we do not need a representative in Switzerland. / Our representative in Switzerland is …]" }
     ]
   },
   {
     no: "B.7",
-    title: "Gulfstaterna — Förenade Arabemiraten och Saudiarabien (endast om regionen anges)",
+    title: "Moldavien (endast om regionen anges)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "När vi behandlar dina uppgifter för andra ändamål än att tillhandahålla tjänsten stödjer vi oss på ditt samtycke, som du kan återkalla. Dina uppgifter lämnar [UAE / Kingdom of Saudi Arabia] och behandlas i Europeiska unionen och USA enligt [SDAIA standard contractual clauses / the mechanism in the Register]. Marknadsföring skickas endast med ditt samtycke. Ta inte med känsliga personuppgifter i dina frågor." }
+      { kind: "p", text: "Moldaviens lag nr 195/2024 om skydd av personuppgifter gäller. Den följer GDPR, och huvuddelen av denna policy beskriver dina rättigheter enligt den. Tillsynsmyndigheten är National Center for Personal Data Protection (CNPDCP). [We have assessed that we do not need a representative in Moldova. / Our representative in Moldova is …] Överföringar av dina uppgifter till USA grundas på [the mechanism named in the Register]. Vi anmäler en personuppgiftsincident till CNPDCP inom 72 timmar när lagen kräver det." }
     ]
   },
   {
     no: "B.8",
-    title: "Asien och Stillahavsområdet (endast raderna för angivna regioner)",
+    title: "Ukraina (endast om regionen anges)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Singapore: vårt dataskyddsombud är [name, email]; överföringar grundas på avtalsförpliktelser som ger ett skydd jämförbart med PDPA; vi anmäler anmälningspliktiga incidenter till PDPC inom 3 dagar. Japan: vi använder dina personuppgifter för ändamålen i avsnitt 4 och inga andra; ditt innehåll överförs till leverantörer i [named countries — e.g. the United States], vars integritetsregelverk och skyddsåtgärder beskrivs i registret, och du samtycker till detta vid registreringen. Sydkorea: vår integritetsansvariga är [name]; poster, destination, tidpunkt, mottagare, ändamål och lagringstid för utlandsöverföringar anges i registret; politiska åsikter i dina frågor är känsliga uppgifter och vi behandlar dem endast för att genomföra dina debatter; samtycken till valfri behandling inhämtas separat. Indien (när DPDP-reglerna blir tillämpliga): det fristående samtyckesmeddelandet på [URL] gäller; begäranden besvaras inom 90 dagar; användare under 18 år behöver verifierbart samtycke från en förälder. Filippinerna: vårt dataskyddsombud är [name]; klagomål kan lämnas till National Privacy Commission; avsnitt 8 beskriver vår automatiserade behandling. Thailand: vår företrädare är [name] [if appointed]." }
+      { kind: "p", text: "Ukrainas lag ”Om skydd av personuppgifter” gäller. Vi erbjuder inte DebateAI i de områden i Ukraina som inte kontrolleras av landets regering. Dina uppgifter går till EU-länder och USA (se registret). Du kan lämna klagomål till Ukrainian Parliament Commissioner for Human Rights." }
     ]
   },
   {
     no: "B.9",
-    title: "Reserverat",
+    title: "Israel (endast om regionen anges)",
     accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Israels Protection of Privacy Law gäller. Du har ingen rättslig skyldighet att lämna dina uppgifter till oss; utan kontouppgifterna kan vi inte öppna ett konto åt dig. Vi använder dina uppgifter för ändamålen i avsnitt 4 och lämnar dem till mottagarna i avsnitt 5. Du kan begära att få se dem och att få dem rättade (avsnitt 10). Tillsynsmyndigheten är Privacy Protection Authority." }
+    ]
+  },
+  {
+    no: "B.10",
+    title: "Asien och Stillahavsområdet (endast raderna för angivna regioner)",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Singapore: vårt dataskyddsombud är [name, email]; överföringar grundas på avtalsförpliktelser som ger ett skydd jämförbart med PDPA; vi anmäler anmälningspliktiga incidenter till PDPC inom 3 dagar. Japan: vi använder dina personuppgifter för ändamålen i avsnitt 4 och inga andra. Vi lämnar dem till de AI-leverantörer och värdtjänstleverantörer i registret som finns i USA och EU-länder, enligt avtal som kräver att de skyddar uppgifterna enligt standarden i Japans Act on the Protection of Personal Information; på begäran berättar vi vad de gör för att skydda dem och om integritetsskyddssystemet i deras land. Din övertygelse, inklusive religiös och politisk övertygelse, och din hälsa är personuppgifter som kräver särskild omsorg; vi samlar in dem endast med ditt förhandssamtycke (avsnitt 3). Vårt namn och vår adress är DebateAIRO S.R.L., [address], Rumänien, och vår företrädare är [name], verkställande direktör; hur du gör en begäran framgår av avsnitt 10, våra säkerhetsåtgärder av avsnitt 9, och klagomål skickas till privacy@dezbatere.ro. Vi anmäler incidenter till Personal Information Protection Commission enligt lagens krav. Sydkorea: vår integritetsansvariga är [name], verkställande direktör, privacy@dezbatere.ro. Vi överför personuppgifter till utlandet eftersom det krävs för att genomföra dina debatter enligt vårt avtal med dig: varje gång en debatt körs skickar vi din fråga och debattens påståenden, och i supportchatten dina meddelanden, över en krypterad anslutning till de AI-leverantörer och värdtjänstleverantörer som anges i registret, som för varje mottagare anger land, kontaktuppgifter, ändamål och hur länge uppgifterna sparas. Du kan vägra överföringen genom att inte starta debatter eller genom att radera ditt konto; då kan vi inte genomföra debatter åt dig. Politiska åsikter, övertygelser och hälsa är känsliga uppgifter; vi behandlar dem endast med ditt separata samtycke (avsnitt 3). Vi fattar inga helt automatiserade beslut om dig (avsnitt 8). Vi besvarar begäranden inom [10] dagar och anmäler incidenter till Personal Information Protection Commission och till dig enligt kraven i Personal Information Protection Act. Taiwan: Taiwans Personal Data Protection Act gäller. Vi behåller dina uppgifter under de perioder som anges i avsnitt 7; de används i Rumänien, andra EU-länder och USA (se registret); mottagarna anges i avsnitt 5; våra system och AI-modeller behandlar dem automatiskt för att genomföra dina debatter. Du kan fråga vilka uppgifter vi har, se dem, få en kopia, rätta dem, få oss att sluta använda dem och radera dem (avsnitt 10). Det är frivilligt att lämna kontouppgifterna, men utan dem kan vi inte öppna ett konto åt dig. Vi besvarar begäranden om tillgång inom [15] dagar. Filippinerna: vårt dataskyddsombud är [name]; klagomål kan lämnas till National Privacy Commission; avsnitt 8 beskriver vår automatiserade behandling. Thailand: vår företrädare är [name] [if appointed]." }
+    ]
+  },
+  {
+    no: "B.11",
+    title: "Reserverat",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Turkiet, Brasilien och Indonesien kräver var för sig ett meddelande på det lokala språket, en företrädare eller registrering samt myndighetsinlagor, och dessa har inte utarbetats här. Kina, Vietnam och Ryssland betjänas inte." }
     ]
@@ -319,6 +335,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
+  version: "3.0",
+  sha256: "6a212699d9543ff9a7d67495cfa3d7dbdb2e83b3d9005a4fabc955745ca8529a",
   eyebrow: "INTEGRITETSPOLICY · v3.0 · GÄLLER FRÅN [DATE]",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",

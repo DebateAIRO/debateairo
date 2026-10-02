@@ -80,7 +80,7 @@ it("never prints the token, a scheme-prefixed credential or a path at or beneath
 it("removes the scratch root and releases the port before it returns", async () => {
   const result = await pass();
   await expect(stat(result.scratchRoot!)).rejects.toMatchObject({ code: "ENOENT" });
-  expect(isPortListening(result.port!)).toBe(false);
+  expect(await isPortListening(result.port!)).toBe(false);
 });
 
 it("names the first case that did not hold when the vendor rejects the provisioned credential", async () => {
@@ -116,10 +116,21 @@ it("reports UNVERIFIED with the resolver's own error and never falls back", asyn
 });
 
 it("reports UNVERIFIED when the run-time certificate cannot be built", async () => {
-  const result = await run({ opensslExecutable: "/nonexistent/openssl" });
+  const result = await run({ environment: { ...process.env, ACCEPTANCE_OPENSSL_BINARY: "/nonexistent/openssl" } });
   expect(result.outcome).toBe("UNVERIFIED");
   expect(result.lines.at(-1)).toBe("PES-S02-ACCEPT: UNVERIFIED tls-material openssl-unavailable");
   expect(result.lines).toHaveLength(2);
+  await expect(stat(result.scratchRoot!)).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+it("reports UNVERIFIED when lsof cannot measure a port free", async () => {
+  const result = await run({ environment: { ...process.env, ACCEPTANCE_LSOF_BINARY: "/nonexistent/lsof" } });
+  expect(result.outcome).toBe("UNVERIFIED");
+  expect(result.lines).toEqual([
+    `PES-S02 SCRATCH-DIR ${result.scratchRoot}`,
+    "PES-S02 DNS api.localtest.me 127.0.0.1",
+    "PES-S02-ACCEPT: UNVERIFIED port lsof-unavailable"
+  ]);
   await expect(stat(result.scratchRoot!)).rejects.toMatchObject({ code: "ENOENT" });
 });
 

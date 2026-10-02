@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Gdje nudimo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI nudimo osobama koje žive u [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea]. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
+      { kind: "p", text: "DebateAI nudimo osobama koje žive u [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
     ]
   },
   {
@@ -131,6 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Vaš sadržaj ostaje vaš. Zadržavate sva prava koja imate na pitanja, tvrdnje, bilješke i osporavanja koja šaljete. Dajete nam neisključivu, svjetsku i besplatnu licenciju za smještaj, pohranu, umnožavanje, prilagodbu i obradu tog sadržaja u svrhu rada usluge: provedbe rasprave, njezine pohrane kako biste je mogli ponovno otvoriti i reproducirati, pružanja podrške, ispunjavanja naših pravnih obveza te — samo ako je odlučite objaviti — u svrhe iz odjeljka 9. Ta licencija prestaje kada se sadržaj izbriše, osim kada odjeljak 9. ili zakon zahtijeva drukčije." },
       { kind: "p", text: "Ne treniramo modele na vašem sadržaju. Ne treniramo modele na vašem sadržaju, a naši ugovori s pružateljima usluga umjetne inteligencije isključuju njihovu uporabu vašeg sadržaja za treniranje ili poboljšavanje njihovih modela. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Kako vaš sadržaj dolazi do pružatelja usluga umjetne inteligencije. Radi provedbe rasprave šaljemo tekst jednom ili više vanjskih pružatelja modela. Pružatelj prima vaše pitanje, usmjeravajuće bilješke koje ste postavili i izjave koje sustav sastavlja tijekom rasprave — stoga pružatelj vidi tekst izveden iz onoga što ste upisali i izgrađen oko toga, a ne samo vaše izvorne riječi. Nikada ne prima vašu adresu e-pošte, identifikatore računa, zapise o sesijama ni podatke o plaćanju." },
+      { kind: "p", text: "Što šalje chat za podršku. Pomoćnik za podršku također je model umjetne inteligencije. Kada mu pišete, vašu poruku šaljemo vanjskom pružatelju modela kako bi model mogao odgovoriti, zajedno s člancima pomoći na kojima temelji odgovor. Prije slanja maskiramo sve što izgleda kao lozinka, jednokratni kôd ili ključ. Ako zatražite razgovor s osobom, modelu šaljemo i razgovor, maskiran na isti način, kako bi napisao kratak sažetak za člana našeg tima koji preuzima vaš slučaj. Ne prilažemo vašu adresu e-pošte, identifikatore računa ni podatke o plaćanju, ali model prima sve ostalo što upišete u chat, stoga ondje ne pišite ništa što ne biste htjeli da pročita." },
       { kind: "p", text: "Koji pružatelji i gdje. Naš Registar pružatelja usluga umjetne inteligencije na [dezbatere.ro/providers] sastavni je dio ovih Uvjeta. U njemu je za svakog pružatelja kojeg možemo upotrebljavati navedeno: njegov pravni subjekt i država; što prima i zašto; gdje obrađuje podatke; njegovi rokovi čuvanja; je li za krajnju točku koju upotrebljavamo aktivirano nulto zadržavanje podataka; smije li prema našem ugovoru upotrebljavati ulazne podatke za treniranje; mehanizam prijenosa na koji se oslanjamo; i datum posljednje provjere svakog unosa. Pružatelji se mogu nalaziti izvan vaše države i izvan Europskoga gospodarskog prostora. Naša Pravila o privatnosti objašnjavaju zaštitne mjere." },
       { kind: "p", text: "Tri različite stvari. „Ne upotrebljava se za treniranje modela”, „čuva se ograničeno vrijeme radi sigurnosti, sprječavanja zlouporabe ili pravnih razloga” i „nulto zadržavanje podataka — ne pohranjuje se nakon obrade” nisu isto. Kada pružatelj čuva upite ograničeno vrijeme, u Registru je navedeno koliko dugo i zašto. Kada je nulto zadržavanje podataka aktivno, u Registru je to navedeno, zajedno sa značajkama na koje se odnosi. Nećemo vam tvrditi da se sadržaj ne čuva ako to nije istina." },
       { kind: "p", text: "Izlazni sadržaj. U odnosu između vas i nas, izlazni sadržaj vlastitih rasprava možete upotrebljavati u bilo koju zakonitu svrhu, a mi ne polažemo pravo vlasništva na generirani tekst. Imajte na umu da generirani izlazni sadržaj u mnogim pravnim sustavima možda nije zaštićen autorskim pravom; da se sličan izlazni sadržaj može generirati za druge korisnike; da izlazni sadržaj može reproducirati materijale trećih strana ili im nalikovati; te da neki izvorni materijali koje pružatelj usluga umjetne inteligencije dohvati mogu podlijegati ograničenjima ponovne uporabe. Odgovorni ste za provjeru prije nego što se oslonite na izlazni sadržaj ili ga ponovno objavite." }
@@ -298,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ujedinjena Kraljevina (samo ako je navedena u odjeljku 2.)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Naš predstavnik u Ujedinjenoj Kraljevini prema članku 27. UK GDPR-a jest [name, address, email]. Na vas se primjenjuje Zakon o pravima potrošača iz 2015. i ništa u ovim Uvjetima ne ograničava vaša prava prema tom zakonu; od [January 2027] na plaćene planove primjenjuju se pravila o pretplatama iz Zakona o digitalnim tržištima, tržišnom natjecanju i potrošačima iz 2024., uključujući razdoblje za odustanak nakon obnavljanja i nakon besplatnih probnih razdoblja. Kako štitimo korisnike od nezakonitog sadržaja: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktivna tehnologija koju upotrebljavamo: [describe, or \"none\"]. Provjera dobi: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Postupak za pritužbe iz odjeljka 10. prihvaća pritužbe na nezakonit sadržaj, neopravdano uklanjanje vašeg sadržaja, ograničenja vašeg računa, uporabu automatiziranih alata koji utječu na vaš sadržaj i svaku procjenu dobi koja vas neopravdano blokira. Otvoren je osobama na koje sadržaj utječe, a koje nisu korisnici." }
+      { kind: "p", text: "Naš predstavnik u Ujedinjenoj Kraljevini prema članku 27. UK GDPR-a jest [name, address, email]. Na vas se primjenjuje Zakon o pravima potrošača iz 2015. i ništa u ovim Uvjetima ne ograničava vaša prava prema tom zakonu; kada pravila o pretplatama iz Zakona o digitalnim tržištima, tržišnom natjecanju i potrošačima iz 2024. stupe na snagu (očekuje se 2027.), primjenjivat će se na plaćene planove, uključujući razdoblje za odustanak nakon obnavljanja i nakon besplatnih probnih razdoblja. Kako štitimo korisnike od nezakonitog sadržaja: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktivna tehnologija koju upotrebljavamo: [describe, or \"none\"]. Provjera dobi: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Postupak za pritužbe iz odjeljka 10. prihvaća pritužbe na nezakonit sadržaj, neopravdano uklanjanje vašeg sadržaja, ograničenja vašeg računa, uporabu automatiziranih alata koji utječu na vaš sadržaj i svaku procjenu dobi koja vas neopravdano blokira. Otvoren je osobama na koje sadržaj utječe, a koje nisu korisnici. Vaše podatke uređuje Prilog B.2 naših Pravila o privatnosti." }
     ]
   },
   {
@@ -308,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Sporazum o arbitraži i odricanje od skupne tužbe. Ako živite u Sjedinjenim Američkim Državama, vi i DebateAIRO suglasni ste da ćete svaki spor koji proizlazi iz ovih Uvjeta ili usluge rješavati obvezujućom pojedinačnom arbitražom koju vodi [the American Arbitration Association / JAMS] prema svojim pravilima za potrošače, umjesto pred sudom, osim što svatko od nas može podnijeti pojedinačni zahtjev sudu za sporove male vrijednosti. Možete se izuzeti slanjem e-poruke na [address] u roku od 30 dana od prvog prihvaćanja ovih Uvjeta. Ovaj je sporazum uređen Saveznim zakonom o arbitraži. Mi plaćamo pristojbe za pokretanje arbitraže. Skupne, kolektivne i predstavničke tužbe isključene su u mjeri dopuštenoj zakonom. Ovaj se odjeljak primjenjuje samo ubuduće i ne primjenjuje se na zahtjeve nastale prije nego što ste ga prihvatili." },
       { kind: "p", text: "Obavijesti i uklanjanja. Intimne snimke objavljene bez privole mogu se prijaviti na [URL] bez računa i uklanjaju se u roku od 48 sati od valjanog zahtjeva. Pritužbe zbog autorskih prava upućuju se našem imenovanom zastupniku navedenom u odjeljku 16." },
-      { kind: "p", text: "Posebno po saveznim državama. Kalifornija: primjenjuju se uvjeti automatskog obnavljanja iz odjeljka 12.; u bilo kojem trenutku možete otkazati putem interneta; vašu privolu na uvjete obnavljanja čuvamo najmanje tri godine. New York: možete otkazati u roku od 14 dana od svakog terećenja po povećanoj cijeni i dobiti razmjerni povrat. Teksas i Nebraska: ne prodajemo osjetljive osobne podatke; ako se to ikada promijeni, prethodno ćemo pribaviti vašu privolu [statutory notice language]. Washington: na zdravstvene podatke primjenjuje se naša Obavijest o privatnosti zdravstvenih podataka potrošača na [URL]. Colorado: ništa u usluzi ne donosi odluke koje imaju znatan učinak na vas." }
+      { kind: "p", text: "Posebno po saveznim državama. Kalifornija: primjenjuju se uvjeti automatskog obnavljanja iz odjeljka 12.; u bilo kojem trenutku možete otkazati putem interneta; vašu privolu na uvjete obnavljanja čuvamo najmanje tri godine. New York: možete otkazati u roku od 14 dana od svakog terećenja po povećanoj cijeni i dobiti razmjerni povrat. Teksas i Nebraska: ne prodajemo osjetljive osobne podatke. Washington: na zdravstvene podatke primjenjuje se naša Obavijest o privatnosti zdravstvenih podataka potrošača na [URL]. Colorado: ništa u usluzi ne donosi odluke koje imaju znatan učinak na vas. Vaše podatke i vaša prava na privatnost prema zakonima vaše savezne države uređuje Prilog B.3 naših Pravila o privatnosti." }
     ]
   },
   {
@@ -316,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada i Quebec (samo ako su navedeni)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Naš službenik za privatnost jest [name, email]. Quebec: ovi su Uvjeti dostupni na francuskom jeziku na [URL], a francuska vam je verzija predstavljena prva; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja." }
+      { kind: "p", text: "Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest [name], privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.4 naših Pravila o privatnosti. Quebec: ovi su Uvjeti dostupni na francuskom jeziku; odaberite francuski u izborniku jezika; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja; na vas se ne primjenjuju sporazum o arbitraži ni odricanje od skupne tužbe." }
     ]
   },
   {
@@ -329,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latinska Amerika (prilog na španjolskom jeziku; samo ako je navedena)",
+    title: "Švicarska (samo ako je navedena)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Privola je osnova obrade kada ne postoji potreba za izvršenjem ugovora; prije svoje prve rasprave izričito pristajete na obradu svih osjetljivih podataka koje odlučite uključiti. Svoja prava ARCO možete ostvariti na [address], uz odgovore u roku od [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Meksiko: potpuni aviso de privacidad nalazi se na [URL]; odustanak u roku od [5] dana. Argentina: [AAIP legend]; upotrijebite botón de arrepentimiento na [URL] u roku od 10 dana. Kolumbija: política de tratamiento nalazi se na [URL]; odustanak u roku od 5 dana. Čile (od 1. prosinca 2026.): kontakt Agencije jest […]; možete otkazati na isti način na koji ste se pretplatili; pravo na odustanak ne primjenjuje se na digitalne usluge." }
+      { kind: "p", text: "Na vaše se podatke primjenjuje švicarski Savezni zakon o zaštiti podataka (Pravila o privatnosti, Prilog B.6). Postupak možete pokrenuti pred sudovima mjesta u Švicarskoj u kojem živite. Na plaćeni plan ne primjenjuje se zakonsko pravo na odustanak; naša politika povrata jest […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Zaljev — Ujedinjeni Arapski Emirati i Saudijska Arabija (samo ako su navedeni)",
+    title: "Moldova (samo ako je navedena)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Kada vaše podatke obrađujemo u svrhe različite od pružanja usluge, činimo to uz vašu privolu, koju možete povući. Vaši se podaci obrađuju izvan [UAE / Kingdom of Saudi Arabia], među ostalim u Europskoj uniji i Sjedinjenim Američkim Državama, na temelju [SDAIA standard contractual clauses / the mechanism in the Register]. Odgovorni ste osigurati da sve što objavite bude u skladu s pravom države u kojoj se nalazite, uključujući zakone koji se odnose na vjeru, javni poredak i moral; u vašoj regiji možemo ograničiti objavljivanje rasprava o takvim temama." }
+      { kind: "p", text: "Prema ovim Uvjetima imate ista prava kao potrošač u Europskoj uniji, uključujući pravo na odustanak u roku od 14 dana iz odjeljka 13. Postupak možete pokrenuti pred sudovima Moldove. Na vaše se podatke primjenjuje moldavski Zakon br. 195/2024 o zaštiti osobnih podataka (Pravila o privatnosti, Prilog B.7)." }
     ]
   },
   {
     no: "A.8",
-    title: "Azija i Pacifik (samo retci za navedene regije)",
+    title: "Ukrajina (samo ako je navedena)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Singapur: naš službenik za zaštitu podataka jest [name, email]; prijenosi se temelje na ugovornoj zaštiti usporedivoj s PDPA-om; na plaćeni plan ne primjenjuje se zakonsko razdoblje za odustanak, a naša politika povrata jest […]. Japan: zakonska objava prema Zakonu o određenim trgovačkim transakcijama nalazi se na [URL]; na internetske pretplate ne primjenjuje se opće razdoblje za odustanak, a naša politika povrata jest […]; vaš se sadržaj može prenijeti pružateljima u [named countries], a vi na to pristajete privolama pri registraciji. Južna Koreja: privole za neobveznu obradu i marketing prikupljaju se zasebno od stavki potrebnih za rad usluge; naš službenik za privatnost jest [name]; od plaćenog plana možete odustati u roku od 7 dana od pretplate, podložno Zakonu o elektroničkoj trgovini; pribavljamo vašu novu privolu prije svakog ponavljajućeg povećanja cijene ili prelaska s besplatnog plana na plaćeni plan; kada to zahtijeva Temeljni zakon o umjetnoj inteligenciji, unaprijed vas obavještavamo da se usluga temelji na umjetnoj inteligenciji i označavamo generirani sadržaj. Indija (nakon početka primjene pravila DPDP-a): primjenjuje se obavijest o privoli na [URL]; korisnici mlađi od 18 godina trebaju provjerljivu roditeljsku privolu. Tajland: naš predstavnik u Tajlandu jest [name] [if appointed]. Filipini: identifikacijski podaci o našem poslovanju i mehanizam pravne zaštite prema Zakonu o internetskim transakcijama nalaze se na [URL]; pritužbe se mogu podnijeti Nacionalnom povjerenstvu za privatnost." }
+      { kind: "p", text: "DebateAI nudimo u Ukrajini, osim na područjima koja nisu pod nadzorom ukrajinske vlade. Proizvod i ovi Uvjeti dostupni su na ukrajinskom jeziku. Na vaše se podatke primjenjuje Zakon Ukrajine „O zaštiti osobnih podataka” (Pravila o privatnosti, Prilog B.8)." }
     ]
   },
   {
     no: "A.9",
-    title: "Rezervirano",
+    title: "Izrael (samo ako je naveden)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Plaćeni plan možete otkazati kako to dopušta izraelski Zakon o zaštiti potrošača 5741-1981 [state the cancellation terms]. Ovi Uvjeti i naša Pravila o privatnosti dostupni su na hebrejskom jeziku. Na vaše se podatke primjenjuje izraelski Zakon o zaštiti privatnosti (Pravila o privatnosti, Prilog B.9)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Azija i Pacifik (samo retci za navedene regije)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Singapur: naš službenik za zaštitu podataka jest [name, email]; prijenosi se temelje na ugovornoj zaštiti usporedivoj s PDPA-om; na plaćeni plan ne primjenjuje se zakonsko razdoblje za odustanak, a naša politika povrata jest […]. Japan: zakonska objava prema Zakonu o određenim trgovačkim transakcijama nalazi se na [URL]; na internetske pretplate ne primjenjuje se opće razdoblje za odustanak, a naša politika povrata jest […]; vaš sadržaj šaljemo pružateljima usluga umjetne inteligencije u Sjedinjenim Američkim Državama i Europskoj uniji, svakome na temelju ugovora koji zahtijeva zaštitu jednakovrijednu onoj iz japanskog Zakona o zaštiti osobnih informacija, a na zahtjev vam kažemo koje su to mjere. Južna Koreja: privole za neobveznu obradu i marketing prikupljaju se zasebno od stavki potrebnih za rad usluge; naš službenik za privatnost jest [name], privacy@dezbatere.ro; od plaćenog plana možete odustati u roku od 7 dana od pretplate, podložno Zakonu o elektroničkoj trgovini; pribavljamo vašu novu privolu prije svakog ponavljajućeg povećanja cijene ili prelaska s besplatnog plana na plaćeni plan; usluga upotrebljava generativnu umjetnu inteligenciju, o tome vas obavještavamo prije nego što je počnete upotrebljavati, a sadržaj koji generira umjetna inteligencija označavamo. Tajvan: od plaćenog plana možete odustati u roku od 7 dana od pretplate, prema Zakonu o zaštiti potrošača; na vaše se podatke primjenjuje tajvanski Zakon o zaštiti osobnih podataka (Pravila o privatnosti, Prilog B.10). Tajland: naš predstavnik u Tajlandu jest [name] [if appointed]. Filipini: identifikacijski podaci o našem poslovanju i mehanizam pravne zaštite prema Zakonu o internetskim transakcijama nalaze se na [URL]; pritužbe se mogu podnijeti Nacionalnom povjerenstvu za privatnost." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Rezervirano",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Turska, Brazil i Indonezija zahtijevaju prilog na lokalnom jeziku, predstavnika ili registraciju i podnošenje prijava. Ovdje nisu sastavljeni i nisu obuhvaćeni odjeljkom 2. dok se namjerno ne uključe. Usluga se ne nudi u Kini, Vijetnamu ni Rusiji." }
     ]
@@ -363,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "563c0a014311709efb46e3667e32e3f64e6ec1e6523dabd2ee7ace35b1246fdc",
   eyebrow: "UVJETI KORIŠTENJA · v2.0 · NA SNAZI OD [DATE]",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DebateAIRO S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",

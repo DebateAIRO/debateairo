@@ -14,6 +14,7 @@
   "time.status.claimed": "Claimed",
   "time.status.running": "Running",
   "time.status.holding": "Provider recovery hold",
+  "time.status.waiting": "Waiting",
   "time.status.settled": "Settled",
   "time.status.generating": "Generating",
   "time.status.failed": "Failed",

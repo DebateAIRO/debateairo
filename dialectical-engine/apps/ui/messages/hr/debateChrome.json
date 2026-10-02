@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Sve u ovoj raspravi — argumente, preglede, rezultate i presudu — generiraju modeli umjetne inteligencije; sav je taj sadržaj strojno čitljivo označen i može biti netočan.",
+  "debateChrome.status.waiting": "Čeka na početak. Vaša će rasprava započeti sama u {time}.",
+  "debateChrome.status.waitingOwnDebates": "Vaše ostale rasprave zasad koriste ostatak vašeg ograničenja. Ova će rasprava započeti sama čim jedna od njih završi.",
   "debateChrome.backToLibrary": "← Natrag u knjižnicu",
   "debateChrome.loading": "Učitavanje…",
   "debateChrome.error.claimGenerationFailed": "Stvaranje tvrdnje nije uspjelo",
@@ -284,5 +286,6 @@
   "requestFailure.kind.UNREADABLE": "Odgovor koordinatora nije bilo moguće pročitati, pa je ishod nepoznat.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator je odbio odabir plana. Odaberite „Besplatno” ili „Premium”, a zatim pokušajte ponovno.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator je odbio zahtjev: model potreban za ovaj plan trenutačno nije dostupan. Pokušajte ponovno kasnije ili odaberite drugi plan.",
+  "requestFailure.kind.ALREADY_WAITING": "Samo jedno pitanje može čekati u isto vrijeme. Ovo postavite nakon što započne vaša rasprava na čekanju.",
   "requestFailure.kind.UNCLASSIFIED": "Došlo je do pogreške prije nego što je stigao odgovor, pa je ishod nepoznat. To nije odluka koordinatora."
 }

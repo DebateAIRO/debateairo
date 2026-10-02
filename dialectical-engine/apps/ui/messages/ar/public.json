@@ -193,5 +193,20 @@
   "public.story.morePaths.two": "و{count} موقفان آخران",
   "public.story.morePaths.few": "و{count} مواقف أخرى",
   "public.story.morePaths.many": "و{count} موقفًا آخر",
-  "public.story.morePaths.other": "و{count} موقف آخر"
+  "public.story.morePaths.other": "و{count} موقف آخر",
+  "public.publication.contentCheck.refusedHeading": "لم ننشر هذا النقاش",
+  "public.publication.contentCheck.refusedWhatBlock": "عثرت مراجعة آلية على نص في هذا النقاش يخالف قواعدنا، لذا لم يُنشر النقاش.",
+  "public.publication.contentCheck.refusedWhatUnsure": "لم تتمكن مراجعة آلية من التأكد من أن هذا النقاش يلتزم بقواعدنا، لذا لم يُنشر النقاش.",
+  "public.publication.contentCheck.partsIntro": "المواضع التي عثرت فيها المراجعة على النص:",
+  "public.publication.contentCheck.part.question": "السؤال",
+  "public.publication.contentCheck.part.summary": "الملخص وملاحظات الحكم والاعتراضات المتبقية",
+  "public.publication.contentCheck.part.arguments": "الحجج",
+  "public.publication.contentCheck.part.reviews": "تعليقات المراجعين",
+  "public.publication.contentCheck.part.story": "سرد الحكم",
+  "public.publication.contentCheck.groundTerms": "الأساس: شروط الخدمة لدينا، القسم 7 (يُحظر المحتوى الذي يحرض على العنف أو الكراهية).",
+  "public.publication.contentCheck.groundIllegal": "قد يكون النص مخالفًا للقانون أيضًا.",
+  "public.publication.contentCheck.automated": "اتخذت أداة آلية هذا القرار. لم يراجعه أي شخص بعد.",
+  "public.publication.contentCheck.stillPrivate": "يبقى نقاشك خاصًا ودون تغيير. أنت وحدك تستطيع رؤيته.",
+  "public.publication.contentCheck.appeal": "لطلب مراجعة هذا القرار من شخص، اكتب إلى [appeals@dezbatere.ro] خلال ستة أشهر.",
+  "public.publication.contentCheck.unavailable": "مراجعة المحتوى غير متاحة حاليًا، لذا لم يُنشر أي شيء. يبقى نقاشك خاصًا. حاول مجددًا بعد بضع دقائق."
 }

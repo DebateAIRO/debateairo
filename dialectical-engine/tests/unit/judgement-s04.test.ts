@@ -337,6 +337,8 @@ const EXPECTED_PANEL_NOTE_REASONS = [
   // the closed PanelMemberFailure vocabulary, forwarded as the note's reason
   "CONSTRUCTION_ERROR", "TIMEOUT", "PROVIDER_ERROR", "PARSE_FAILURE",
   "SCHEMA_FAILURE", "UNCONFIGURED_FAMILY", "PRODUCER_GRADING_FORBIDDEN",
+  // a seat left out for money (B9)
+  "SPEND_REFUSED", "RUN_COST_ENVELOPE_MONEY_REACHED", "DAILY_COST_ENVELOPE_REACHED", "PERSON_ALLOWANCE_REACHED",
   // typed provider codes that can arrive un-converted on a caller-wired judge
   "PROVIDER_CALL_FAILED", "PROVIDER_CONTENT_UNACCEPTED",
   // the fixed fallback, and the pre-existing self-grading constant
@@ -457,7 +459,7 @@ describe("F-DIAG-S04-PANEL-NOTE — the panel note never carries a raw caught me
    * codex r1b F1 remainder. `PANEL_MEMBER_FAILURE_KINDS` is EXPORTED and NOT frozen:
    * `as const` is a type-level assertion and `readonly string[]` aliases rather than
    * copies. A membership check that reads through the export closes the alphabet over
-   * the array's CURRENT CONTENTS, not over the seven promised spellings — so a caller
+   * the array's CURRENT CONTENTS, not over the eight promised spellings — so a caller
    * that pushes into the export widens the reason alphabet. The helper must own its
    * vocabulary.
    */
@@ -483,7 +485,7 @@ describe("F-DIAG-S04-PANEL-NOTE — the panel note never carries a raw caught me
     expect(reason).not.toBe(INJECTED);
     // the export is restored, so no later test inherits a widened vocabulary
     expect([...(PANEL_MEMBER_FAILURE_KINDS as unknown as string[])]).toEqual(original);
-    expect(original).toHaveLength(7);
+    expect(original).toHaveLength(8);
   });
 
   /**

@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Dieser Bericht ist nicht verfügbar.",
   "public.report.error.tryAgain": "Der Bericht konnte gerade nicht erstellt werden. Bitte versuchen Sie es gleich noch einmal.",
   "public.story.morePaths.one": "und {count} weitere Position",
-  "public.story.morePaths.other": "und {count} weitere Positionen"
+  "public.story.morePaths.other": "und {count} weitere Positionen",
+  "public.publication.contentCheck.refusedHeading": "Wir haben diese Debatte nicht veröffentlicht",
+  "public.publication.contentCheck.refusedWhatBlock": "Eine automatische Prüfung hat in dieser Debatte Text gefunden, der gegen unsere Regeln verstößt. Deshalb wurde die Debatte nicht veröffentlicht.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Eine automatische Prüfung konnte nicht bestätigen, dass diese Debatte unseren Regeln entspricht. Deshalb wurde die Debatte nicht veröffentlicht.",
+  "public.publication.contentCheck.partsIntro": "Hier wurde der Text bei der Prüfung gefunden:",
+  "public.publication.contentCheck.part.question": "Die Frage",
+  "public.publication.contentCheck.part.summary": "Die Zusammenfassung, Anmerkungen zum Urteil und verbleibenden Einwände",
+  "public.publication.contentCheck.part.arguments": "Die Argumente",
+  "public.publication.contentCheck.part.reviews": "Die Kommentare der prüfenden Modelle",
+  "public.publication.contentCheck.part.story": "Die Erläuterung des Urteils",
+  "public.publication.contentCheck.groundTerms": "Grundlage: unsere Nutzungsbedingungen, Abschnitt 7 (keine Inhalte, die zu Gewalt oder Hass aufstacheln).",
+  "public.publication.contentCheck.groundIllegal": "Der Text könnte auch rechtswidrig sein.",
+  "public.publication.contentCheck.automated": "Diese Entscheidung wurde von einem automatischen Werkzeug getroffen. Sie wurde noch von keiner Person geprüft.",
+  "public.publication.contentCheck.stillPrivate": "Ihre Debatte bleibt privat und unverändert. Nur Sie können sie sehen.",
+  "public.publication.contentCheck.appeal": "Um eine Überprüfung dieser Entscheidung durch eine Person zu beantragen, schreiben Sie innerhalb von sechs Monaten an [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.unavailable": "Die Inhaltsprüfung ist derzeit nicht verfügbar. Deshalb wurde nichts veröffentlicht. Ihre Debatte bleibt privat. Versuchen Sie es in einigen Minuten erneut."
 }

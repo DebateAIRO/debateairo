@@ -8,21 +8,29 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, RunRepository } from "@debateai/db";
+import { configureContentEncryption, createPool, EntitlementRepository, RunRepository } from "@debateai/db";
+import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
+  costEnvelopeBand,
+  costEnvelopeCeilings,
   loadRunnerEnvironment,
+  readBillingPlans,
   readCostEnvelopePolicy,
   readStoryPolicyFromRegister
 } from "@debateai/register";
 import {
   CostEnvelopeGuard,
   PostgresModelSpendStore,
+  assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
-  type CostEnvelopePhase
+  type CostEnvelopePhase,
+  type SharedWallApplication
 } from "@debateai/budget";
+import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
+import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
@@ -35,7 +43,7 @@ import {
   resolveStoryPackDir,
   type StoryPack
 } from "@debateai/story";
-import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logServeDisclosure, WalkingSkeletonRunner } from "./index.js";
+import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -171,19 +179,96 @@ const hatchet = new Hatchet({
  * cannot be null there — the refusal is kept anyway, because a control that
  * depends on another control having run is one edit away from being none.
  */
-const costEnvelopeGuard = environment.DEPLOYMENT_MODE === "hosted"
-  ? new CostEnvelopeGuard({
-      store: new PostgresModelSpendStore(pool),
+const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
+  ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+  : null;
+const modelSpendStore = new PostgresModelSpendStore(pool);
+/**
+ * B9 (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE
+ * ARGUING, in two independent halves, built whenever hosted.
+ *
+ *  · THE SITE'S DAY, only with the costEnvelopePolicy row's three band members,
+ *    read by their one reader (`costEnvelopeBand`, task B1), at the band's
+ *    finish edge (115%). Without the band there is no site-day wall and no body
+ *    fallback (budget spec §2.4): `finishBasisPoints` is null.
+ *  · THE PERSON, for every run with a charge scope (ruling R-19: the person wall
+ *    applies iff the row exists), band or no band: each of the run owner's
+ *    windows at its own finish edge (110%, from the plan). The owner is the one
+ *    billing pinned on the run at admission (`billing.run_charge_scope`, read by
+ *    the spend store); the windows come from `BillingPersonAllowanceSource`
+ *    (billing-core) over the READ-ONLY entitlement port —
+ *    `billing.person_windows_v`, never the lazy Free append (ruling R-12). The
+ *    wall reads each window's finish edge and never its close edge, so without
+ *    the band the source is built with a close edge of 10 000 (inside the range
+ *    it accepts). B6 writes a charge scope only while billing is on, so under
+ *    old settings the only change is one read by primary key per walled BODY
+ *    call, and it finds no owner.
+ *
+ * Amendment A20: those two relations, the billingPlans and costEnvelopePolicy
+ * rows and the pure billing-core are all this process reads of billing — never
+ * billingPolicy — and a paid plan past its paid-through time already reads as
+ * FREE inside the view (A8).
+ *
+ * A missing band or missing plans at the runner, on a run with a charge scope,
+ * means the API and the runner are on different register versions (billing on
+ * needs both at the API's version, A22; the runbook pins the same
+ * REGISTER_VERSION in both units; a mismatch or a staggered restart breaks
+ * that). The walls fail closed: without the band the person half still stands;
+ * without `billingPlans` it refuses (`plansUnresolvedPersonAllowance`) every
+ * walled call of such a run as the person's month, the arguing stops and the
+ * answer is still written. A run with no charge scope is untouched. The boot
+ * says the plans are missing once, in one content-free line.
+ */
+const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);
+const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);
+if (costEnvelopePolicy !== null && billingPlans === null) {
+  console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
+}
+const sharedWallTerms = costEnvelopePolicy === null
+  ? null
+  : Object.freeze({
+      finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints,
+      persons: billingPlans === null
+        ? plansUnresolvedPersonAllowance()
+        : new BillingPersonAllowanceSource({
+            entitlements: new EntitlementRepository(pool).readOnlyPort(),
+            plans: billingPlans,
+            closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints
+          }),
+      owners: modelSpendStore
+    });
+const costEnvelopeGuard = costEnvelopePolicy === null
+  ? undefined
+  : new CostEnvelopeGuard({
+      store: modelSpendStore,
       // Verdict story: the story's OWN ceiling and overrun, when the register
       // sealed them. Engine money rule, Task M7: built by the one check over
       // BOTH money rows, which refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT)
       // when the day cannot hold one full run plus its story.
-      policy: costEnvelopeGuardPolicy(
-        await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION),
-        storyPolicy
-      )
+      policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy),
+      ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms })
+    });
+/**
+ * B9 (budget spec §2.10) — A LIMIT BELOW ONE CALL REFUSES THIS BOOT
+ * (RUN_CEILING_BELOW_ONE_CALL), instead of failing a person's first debate.
+ * Hosted, and only with the costEnvelopePolicy row's three band members (the
+ * same `envelopeBand` that builds the shared wall's site-day half, B9b).
+ * Priced per plan: the cheapest price among each plan's models, and every
+ * plan's cheapest must fit.
+ */
+if (costEnvelopePolicy !== null && envelopeBand !== null) {
+  assertRunCeilingCoversOneCall({
+    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,
+    firstCallsByRoster: firstCallsByPlanRoster({
+      projections: firstPositionCallProjections({
+        targets: declaredProviderTargets,
+        judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
+        questionMaxBytes: askQuestionMaxBytes()
+      }),
+      rosters: PLAN_TIER_ROSTERS
     })
-  : undefined;
+  });
+}
 const providerTopology = createRunnerProviderTopology(providerTargets, (target) => {
   const price = providerTargetPrice(target);
   if (costEnvelopeGuard !== undefined && price === null) {
@@ -201,8 +286,9 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       // to report usage: a call that cannot be billed cannot be bounded.
       // Task M1: the gateway also names the call's phase, so an answer-writing
       // call is held to the answer's ceiling and every other call to the body's.
-      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase) => costEnvelopeGuard.providerSeam({
-        runId, price, requireReportedUsage: true, phase
+      // B9: and whether the call is walled (`providerCallSharedWall`).
+      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => costEnvelopeGuard.providerSeam({
+        runId, price, requireReportedUsage: true, phase, sharedWall
       }),
       // Verdict story (spec §8): the story's calls spend its OWN envelope. With
       // no sealed story ceiling there is no story seam, and the gateway refuses
@@ -320,11 +406,23 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
   providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
+  // B9 (budget spec §2.9, §2.4): a call while arguing refused for money moves
+  // to a cheaper claim-eligible maker — hosted, and only with the
+  // costEnvelopePolicy row's three band members: the same `envelopeBand` that
+  // builds the shared wall's site-day half. (The wall's person half is on
+  // whenever hosted; without the band nothing moves.)
+  bodyCostFallback: envelopeBand !== null,
   // Engine money rule, Task M3 (spec §14.4.5): the row goes to the runner's own
   // pool (the default store); a failure to write it is the runner's one
   // code-only DEBATEAI_SERVE_DISCLOSURE line, named here so the shipped wiring
   // says where it goes.
   serveDisclosure: { log: logServeDisclosure },
+  // B9 (budget spec §2.9, §2.12): each moved call's owner record goes to the
+  // runner's own pool (the default store, B8's RunCostSubstitutionRepository);
+  // the moved call and a failed write are the runner's content-free
+  // DEBATEAI_BODY_COST_FALLBACK lines, named here so the shipped wiring says
+  // where they go.
+  costSubstitutions: { log: logBodyCostFallback },
   claimTimeSynthesisRoleProbe: async (providerRef) => {
     const target = providerTargets.find((candidate) => candidate.providerRef === providerRef);
     if (target === undefined) {

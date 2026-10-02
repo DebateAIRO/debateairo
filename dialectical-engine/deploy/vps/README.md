@@ -105,6 +105,7 @@ Create the three service users, the custody group and the runtime trees:
 for service in api ui runner; do
   adduser --system --group --no-create-home --home /nonexistent "debateai-$service"
 done
+adduser --system --group --no-create-home --home /nonexistent debateai-geoip
 adduser debateai-api postdrop     # postfix maildrop is setgid; NoNewPrivileges neuters setgid
 groupadd --system debateai-custody
 usermod -a -G debateai-custody debateai-api
@@ -144,7 +145,7 @@ process start: restart both units after either change.
 | `/etc/debateai/observation-agent.env` | `0600` | `debateai-observer` | observation agent `EnvironmentFile` (§12; the unit is not enabled) |
 | `/etc/debateai/hatchet.env` | `0600` | `root:root` | container `env_file`: `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*` |
 | `/etc/debateai/hatchet.pgpass` | `0600` | `root:root` | the `debateai_prod_hatchet` role's password, read once by `bootstrap.sql` (§4) |
-| `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin`, `support-kek.bin` (the support chat's master key — the file name is checked and must be exactly this) |
+| `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin`, `support-kek.bin` (the support chat's master key — the file name is checked and must be exactly this), `records-key.bin` (the records key, §9) |
 | `/etc/debateai/api/providers/` | `0700` | `debateai-api` | the API's own copy of each vendor credential (V-9, §11) |
 | `/etc/debateai/runner/` | `0700` | `debateai-runner` | `kek.bin` (the runner's own copy of the same bytes — a master-key rotation must replace this file too, §3 "Changing a master key") |
 | `/etc/debateai/runner/providers/` | `0700` | `debateai-runner` | the runner's own copy of each vendor credential (V-9, §11) |
@@ -162,6 +163,7 @@ process start: restart both units after either change.
 | `/var/lib/debateai/api/user-deks` | `2750` | `debateai-api:debateai-custody` | user-DEK store — the one tree the runner also reads (V-19) |
 | `/var/lib/debateai/api/publication-keys` | `0700` | `debateai-api` | publication-key store |
 | `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
+| `/var/lib/debateai-geoip` | `0755` | `debateai-geoip` | the DB-IP Lite country file and the Tor exit list (public data, `0644`), written only by `debateai-geoip-refresh.service` (§5 "Country data") |
 
 `/etc/default/caddy` carries `DEBATEAI_PUBLIC_HOSTNAME` and `DEBATEAI_ACME_EMAIL`.
 
@@ -200,17 +202,19 @@ test ! -e /etc/debateai/api/kek.bin && (umask 0177 && head -c 32 /dev/urandom > 
   `0600` key file is unreadable by the service — `EnvironmentFile` semantics (read by root, handed
   over) do **not** carry over to key files.
 - Directories are `0700`, owned by the same service user.
-- The five secrets must be pairwise distinct: the API refuses at boot with
+- The six secrets must be pairwise distinct: the API refuses at boot with
   `SECRET_DOMAIN_MUST_BE_SEPARATE` if two paths resolve to the same bytes or the same inode, and
-  with `SUPPORT_KEK_PATH_MUST_BE_SEPARATE` if the support KEK is one of the other four.
+  with `SUPPORT_KEK_PATH_MUST_BE_SEPARATE` if the support KEK is one of the other four, and with
+  `RECORDS_KEY_PATH_MUST_BE_SEPARATE` if the records key path names any other key file.
 
-The other four are made the same way. Each is its own 32 random bytes:
+The other five are made the same way. Each is its own 32 random bytes:
 
 ```sh
 test ! -e /etc/debateai/api/corpus-kek.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/corpus-kek.bin) && chown debateai-api:debateai-api /etc/debateai/api/corpus-kek.bin
 test ! -e /etc/debateai/api/blind-index-key.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/blind-index-key.bin) && chown debateai-api:debateai-api /etc/debateai/api/blind-index-key.bin
 test ! -e /etc/debateai/api/audit-source-ip-salt.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/audit-source-ip-salt.bin) && chown debateai-api:debateai-api /etc/debateai/api/audit-source-ip-salt.bin
 test ! -e /etc/debateai/api/support-kek.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/support-kek.bin) && chown debateai-api:debateai-api /etc/debateai/api/support-kek.bin
+test ! -e /etc/debateai/api/records-key.bin && (umask 0177 && head -c 32 /dev/urandom > /etc/debateai/api/records-key.bin) && chown debateai-api:debateai-api /etc/debateai/api/records-key.bin
 ```
 
 The runner's own copy of the user-DEK KEK is the SAME 32 bytes as `/etc/debateai/api/kek.bin`,
@@ -673,6 +677,9 @@ install -d -m 0700 -o root -g root /etc/debateai/register
 test ! -e /etc/debateai/register/hosted-register.json && install -m 0600 -o root -g root deploy/vps/register/hosted-register.example.json /etc/debateai/register/hosted-register.json
 ```
 
+The example carries no `countryPolicy` member, so the version you publish from it has no country
+gate; §5 "Country data" says what must hold before you add one.
+
 Edit `/etc/debateai/register/hosted-register.json` as §11 says (the real vendors and their
 vetting, `providerTargets` equal to `runner.env`'s `PROVIDER_DISCOVERY_TARGETS_JSON`), then
 validate it without writing anything, then publish:
@@ -715,8 +722,9 @@ baseline test checks that list against the P3-01 manifest.
 ```sh
 install -m 0644 deploy/vps/systemd/*.service deploy/vps/systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
+systemctl start debateai-geoip-refresh.service
 systemctl enable --now debateai-hatchet debateai-api debateai-ui debateai-runner \
-  debateai-backup.timer
+  debateai-backup.timer debateai-geoip-refresh.timer
 ```
 
 `debateai-observation-agent.service` is installed by the first line and deliberately **not**
@@ -772,6 +780,51 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created
 - After the upgrade, every story is stored as failed with `STORY_NOT_CONFIGURED` until the next
   hosted register publish (§11, "What the runner's log says about answers and stories").
 
+### Upgrading an existing host (paid plans Part 1a)
+
+This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
+sealed under a new key, and ships the country gate switched off. A host that already runs an
+earlier release does these, in this order, before the API next starts on this code (the new
+checkout in place, with its dependencies installed: this release adds the `mmdb-lib` package):
+
+1. **Apply the migration.** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then
+   `hardening.sql` as §4 step 3 does, and close the window (§4 step 5). This release's migration is
+   `migrations/0080_legal_acceptance.sql` (numbered 0079 until dev's 0078 and 0079 came first);
+   `pnpm db:migrate` applies it, and any other pending migration, in order.
+2. **Create the records key and name it in `api.env`.** Run the `records-key.bin` line of §3 "The
+   key-file contract": 32 random bytes in `/etc/debateai/api/records-key.bin`, `0600`, owned by
+   `debateai-api`. The line begins with `test ! -e`, so it never replaces a key that exists. Then
+   add `RECORDS_KEY_PATH=/etc/debateai/api/records-key.bin` to `/etc/debateai/api.env`, as
+   `env/api.env.example` has it. The key is required in every mode: without it the API refuses to
+   start, and a path that names another key file refuses with `RECORDS_KEY_PATH_MUST_BE_SEPARATE`.
+3. **Add the two country-data paths to `api.env`**, as `env/api.env.example` has them:
+   `GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb` and
+   `TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt`. Only the paths are needed now: a
+   hosted API without them refuses with `GEOIP_PATHS_REQUIRED`. The files themselves are needed
+   once a register version carrying `countryPolicy` is in force (§5 "Country data").
+4. **Add `RECORDS_KEY_PATH=/etc/debateai/api/records-key.bin` to `/etc/debateai/backup.conf`**, as
+   `backup.conf.example` has it. Without it `backup.sh` stops before it writes anything — the whole
+   nightly backup, not only the key — and the restore drill refuses too.
+5. **Escrow the records key, and prove it.** The next nightly backup escrows it as the sixth secret,
+   in a new escrow envelope (`BACKUP_ESCROW_WRITTEN` in its journal, because the set of secrets
+   changed). After that backup the owner runs the drill once: §9 "Owner confirmation — the records
+   key in escrow" (OWNER-RUN). Both scripts must be executable on this host; check with
+   `ls -l /opt/debateai/dialectical-engine/deploy/vps/backup.sh /opt/debateai/dialectical-engine/deploy/vps/restore-drill.sh`.
+   The kit committed them without the execute bit from their first commit through this release;
+   the fix that followed it commits both executable. Until both show `x`, `debateai-backup.service`
+   cannot start `backup.sh` (`203/EXEC`), so no nightly backup runs at all, and the drill cannot
+   start.
+6. **Leave the country gate off.** Nothing in this release turns it on: a hosted file without the
+   `countryPolicy` member — every file copied from the kit's example — publishes no row. It stays
+   off until every condition in §5 "Country data" holds; that section says how to turn it on.
+7. **Expect one accept screen for every existing account.** In hosted mode an account with no
+   acceptance record owes both documents, and no account created before this release has one. So
+   each existing person sees the accept screen once, the next time they open a signed-in page: they
+   read the current Terms of Service and Privacy Policy to the end and accept them, and are not
+   asked again until a document's re-acceptance floor moves. `/settings` is never behind that
+   screen, so account deletion, consent withdrawal and sign-out stay reachable without accepting
+   anything.
+
 ### Production floors the code itself enforces
 
 `assertProductionFloors` (`packages/register/src/runtime-environment.ts`) refuses to boot when
@@ -793,6 +846,120 @@ these are advisory: the process exits.
 `deploy/dev-auth/` stack — the local CA, the sendmail capture, the dev principals, the dev Hatchet
 token, `DEBATEAI_DEV_CUSTODY_ROOT` — exist only for a workstation. No `DEBATEAI_DEV_` variable
 appears in any file under `/etc/debateai`, and the architecture test pins that.
+
+### Country data — the GeoIP and Tor refresh (paid plans G4)
+
+The country gate reads two public data files: DB-IP's Lite country database and the Tor exit list.
+Their PATHS are required in every hosted `api.env` (`GEOIP_COUNTRY_DB_PATH`, `TOR_EXIT_LIST_PATH`;
+without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist from the moment the
+register version in force publishes a `countryPolicy` row: the API then opens them at boot, and a
+missing file refuses the boot with `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a
+malformed one with `GEOIP_COUNTRY_DB_INVALID` or `TOR_EXIT_LIST_INVALID`; what the refresh checks
+before it renames a file into place, and where that falls short of the API's own check, is at the
+end of this section). A Tor list with no address in it — an
+empty file, or only blank lines and `#` comments — counts as malformed: the boot refuses it with
+`TOR_EXIT_LIST_INVALID`, and a running API keeps its last good list and logs the code
+(`geo.reload.failed`), because an empty list would let every Tor exit through. So never create the
+file by hand to get past a first boot's `TOR_EXIT_LIST_UNAVAILABLE`: run the refresh (below) until
+it prints `GEOIP_REFRESH_OK tor-list`. `debateai-geoip-refresh.service` writes
+both into `/var/lib/debateai-geoip`, as its own user `debateai-geoip`, which owns nothing else. §5
+starts it once, and waits for it, before enabling the API, so the files are there before any
+register version turns the gate on. The daily timer then refreshes the Tor list every day and the
+country file when it is older than 27 days; the API notices a replaced file within a minute, and a
+refused download keeps the previous file. Addresses are looked up on this host: no visitor's
+address is ever sent anywhere.
+
+**The country gate is off in this kit, and stays off until the four conditions below hold.** It
+runs only once the register version in force publishes a `countryPolicy` row, and a hosted register
+file publishes that row only when it carries the `countryPolicy` member. The kit's example
+(`deploy/vps/register/hosted-register.example.json`, the file §4 step 4b copies into
+`/etc/debateai/register/hosted-register.json`) does NOT carry it, so a register published from it
+has no country gate (A14). The §1.5 switches are kept apart, in
+`deploy/vps/register/country-policy.example.json`, which holds exactly that one member. Signing in
+and reading one's debates are never gated.
+
+Publish no register version that carries `countryPolicy` until ALL of these hold:
+
+1. **The site shows the DB-IP credit.** DB-IP's Lite data is licensed CC BY 4.0, and its licence
+   requires the credit `IP Geolocation by DB-IP` linking to `https://db-ip.com` wherever its results
+   are used. The site does NOT show it yet: task P21 adds it to the full site footer
+   (`apps/ui/components/SiteFooter.tsx`, the footer of the landing page and the legal pages). Open
+   the landing page, signed out, and check that its footer shows `IP Geolocation by DB-IP`
+   linking to `https://db-ip.com`. Whether the one-line footer of the other screens must carry it
+   too is counsel's open question (P21).
+2. **The owner has ruled that the Terms' list of served countries and the `countryPolicy` switches
+   match.** The Terms' list is filled from `countryPolicy` (spec §2.12 item 1); the Terms' Annex A
+   changed on 2026-09-30 and no longer matches the switches in the example. Whichever side changes,
+   a new value of the switches is a new register version, never an edit of a sealed one.
+3. **The Privacy Policy says that the address is looked up locally,** in DB-IP's database and
+   against the Tor exit list, at sign-up and at each new debate (spec §2.12 item 5). It does not
+   say so yet.
+4. **The two files are installed and refreshed:** the `debateai-geoip` user exists (§2), the
+   refresh unit and timer are installed and enabled (§5), and the last run's journal (below) shows
+   `GEOIP_REFRESH_OK tor-list` and, for the country file, `GEOIP_REFRESH_OK` or
+   `GEOIP_REFRESH_SKIPPED`.
+
+Then turn the gate on: open a migrator window (§4 steps 2 and 5), copy the `countryPolicy` member
+from `deploy/vps/register/country-policy.example.json` into the top-level object of
+`/etc/debateai/register/hosted-register.json`, beside `costEnvelopePolicy`, and publish as §11
+"Publishing the settings register on this host" says; pin the version it prints. To turn the gate
+off again, remove the member and publish again: that new version has no row.
+
+To check the last refresh:
+
+```sh
+journalctl -u debateai-geoip-refresh.service --since yesterday --no-pager
+```
+
+Each run prints one line per file: `GEOIP_REFRESH_OK`, `GEOIP_REFRESH_SKIPPED` (the country file is
+fresh) or `GEOIP_REFRESH_REFUSED` with the reason. To refresh now:
+
+```sh
+systemctl start debateai-geoip-refresh.service
+```
+
+**What each side checks.** For the Tor list the refresh applies the API's own rules (every line an
+address, as the API's parser reads it) and asks for more (at least 500 addresses), so a list it
+installs always opens. The country file it checks less: the download must succeed (https only,
+`curl --fail`), decompress cleanly (gzip's checksum), be at least 1 000 000 bytes and carry the MMDB
+metadata marker; the script never opens the database. The API does open it, with the real reader,
+which also parses the metadata and the first nodes of the search tree, at boot and at each reload;
+a file that fails is `GEOIP_COUNTRY_DB_INVALID`. So the refresh can install a country file the API
+refuses. A running API keeps its last good data and logs `geo.reload.failed` with that code, but
+its next start — a deploy, an unattended reboot — refuses to boot with `GEOIP_COUNTRY_DB_INVALID`,
+and then nothing is served, signing in and reading included. Damage deeper in the file passes the
+reader's open: a record it cannot read then answers "no country" for that address (sign-up is
+refused with `COUNTRY_UNKNOWN`; signing in and reading are untouched), logged once per file as
+`geo.reload.failed` with the same code. An address with no country may still start new debates,
+because only the always-blocked countries are refused there: if the damaged record covers one of
+their ranges, that range can start debates until the file is replaced.
+
+**If the API refuses to boot with `GEOIP_COUNTRY_DB_INVALID` after a refresh:**
+
+1. Decide whether to stay down or to bring the site back without the gate; that is the owner's
+   call. Without the gate, until step 4, sign-up is open to every country, Tor included, and the
+   always-blocked countries (`"blocked": true` in `country-policy.example.json`) can start new
+   debates. To bring it back: in a migrator window remove the `countryPolicy` member from
+   `/etc/debateai/register/hosted-register.json`, publish (§11), pin the version it prints in both
+   `api.env` and `runner.env`, and restart both units. With no row in force the API does not open
+   the two files at all. Do not pin an older version instead: every version is a complete register,
+   so an older one also rolls back the vendors, ceilings and support rows sealed since, and a
+   changed vendor list refuses the boot (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`).
+2. Remove the refused file and fetch it again; the refresh fetches a missing country file at once:
+
+```sh
+rm -f /var/lib/debateai-geoip/dbip-country-lite.mmdb
+systemctl start debateai-geoip-refresh.service
+journalctl -u debateai-geoip-refresh.service --since '15 minutes ago' --no-pager
+```
+
+3. The journal must show `GEOIP_REFRESH_OK country-db`. After `GEOIP_REFRESH_REFUSED`, stay on the
+   version of step 1 and run the block again later.
+4. Put the gate back: pin the gated version that was in force before step 1 in both files (or copy
+   the member back in and publish again) and restart both units. If the API
+   refuses again with `GEOIP_COUNTRY_DB_INVALID`, the file DB-IP publishes is itself damaged: go back
+   to step 1 and repeat steps 2 to 4 on a later day. The refresh keeps a file for 27 days, so remove
+   it each time before you fetch it again.
 
 ---
 
@@ -860,13 +1027,17 @@ manifest forbids minting one a long-lived superuser credential (audit L5-F8).
    a key referenced by a dumped row is present in the later snapshot; the reverse order can leave
    a row whose key no longer exists. A dump **alone restores nothing** — every private run is
    ciphertext under keys that live outside PostgreSQL (audit L2-F3).
-2. **Escrow recipient** — the five raw 32-byte secrets (`kek`, `corpus-kek`, `blind-index-key`,
-   `audit-source-ip-salt`, `support-kek`), written only when their sha256 changed. Held by V,
+2. **Escrow recipient** — the six raw 32-byte secrets (`kek`, `corpus-kek`, `blind-index-key`,
+   `audit-source-ip-salt`, `support-kek`, `records-key`), written only when their sha256 changed. Held by V,
    offline, on different media from the data key: whoever holds one envelope alone restores
    nothing. The audit source-IP salt is a key, not metadata: bundling it with the dump would let
    one envelope re-identify every hashed source IP in it. The support KEK (`DL2-F5`) wraps the
    support session and case keys, which live IN the dump — without it in escrow a restore opens no
-   support conversation, and beside the dump it would open every one.
+   support conversation, and beside the dump it would open every one. The records key is the
+   sixth escrowed secret, in this same envelope (paid plans ruling Q-12). It seals the acceptance
+   and billing evidence kept for years after an account is erased; without it those rows cannot be
+   read, and beside the dump it would open every one, so it rides here and never in the data
+   envelope.
 
 **What erasure means for a backup.** Deleting a support conversation (or a private debate)
 destroys its key in place, and from then on the live system cannot open it. The key bytes as they
@@ -905,6 +1076,9 @@ scratch custody directory, then:
 4. the support KEK — refuses unless a 32-byte `support-kek.bin` came out of the escrow envelope
    (`RESTORE_DRILL_SUPPORT_KEK bytes=32`). This proves the key is in escrow; it does not decrypt a
    support conversation.
+5. the records key — refuses unless a 32-byte `records-key.bin` came out of the escrow envelope
+   (`RESTORE_DRILL_RECORDS_KEY bytes=32`). This proves the key is in escrow; it does not open an
+   acceptance row.
 
 Only then does it print `RESTORE_DRILL_OK` and drop the scratch database and directory. Prefer
 running the whole drill on a **separate machine**: that exercises "the VPS is gone" rather than
@@ -912,6 +1086,14 @@ running the whole drill on a **separate machine**: that exercises "the VPS is go
 `DRILL_APPLY_GLOBALS=true`.
 
 Record each drill: date, artefact, `core.run` count, chain totals, and the decrypt line.
+
+**Owner confirmation — the records key in escrow (paid plans ruling Q-12). OWNER-RUN, once, after the first
+nightly backup that follows the paid-plans L1 deploy.** Run the restore drill above. It must print
+`RESTORE_DRILL_RECORDS_KEY bytes=32` before `RESTORE_DRILL_OK`. Write that line, the date and the artefact name in
+the drill record. That record is the owner's confirmation that the records key is the sixth secret in the same
+escrow envelope as the other five. If the drill prints `RESTORE_DRILL_REFUSED no restored records key`, check that
+`/etc/debateai/backup.conf` names `RECORDS_KEY_PATH` and that the backup ran after it was added, then run the
+drill again.
 
 #### The restore rehearsal — before go-live
 
@@ -1170,68 +1352,136 @@ service.
 
 ### The cost envelopes (V-28) — and the temporary values for the first paid run
 
-Two ceilings, both in money, both enforced in code in the hosted deployment only: **per run** and
-**per day** across every debate and vendor (no new debate starts until the next UTC day; debates
-under way finish). At the per-run ceiling the call that would cross it is refused before it is
-made, and since the engine money rule (V-28 amended 2026-09-28; spec 2026-09-26 §14.4) the debate
-still gets its answer: a stop while it is argued ends the arguing only, and the run goes on to
-write its answer from what it has, with money kept aside for that (the reserve and overrun below).
-If the planned answer-writing model cannot be paid, the same call is retried on a cheaper model
-the run may use. Only when no model can be paid does the sealed answer stay components-only,
-marked `ENVELOPE_EXHAUSTED`, and the page then shows the **floor** (the label and the debate's
-strongest position; see "One answer's record" below). Every charged call is one row in
-`ledger.model_spend`, and both ceilings are sums over those rows. The operator record is
-`docs/missions/2026-09-01-security-hardening/COST-ENVELOPES-2026-09-22.md`.
+Every limit here is in money, enforced in code, in the hosted deployment only. Local mode spends no money and has none of them.
+
+- **The site's limits.** **Per run** is what one debate may spend across every vendor it touches. **Per day** is what every debate and every verdict story may spend together in a UTC day.
+- **Each person's limits,** once billing is switched on. A monthly allowance comes with a daily and a weekly slice; see "Each person's windows" below.
+
+Every charged call is one row in `ledger.model_spend`, and every limit is a sum over those rows. The operator record is `docs/missions/2026-09-01-security-hardening/COST-ENVELOPES-2026-09-22.md`.
 
 **The values in force are temporary and deliberately low**, for the owner's first paid run:
 
-| Row member | Value | In dollars |
+| Row member | Value | Meaning |
 |---|---|---|
 | `per_run_ceiling_micros` | `250000` | 0.25 USD per debate |
 | `daily_ceiling_micros` | `2000000` | 2.00 USD per UTC day |
 | `serve_reserve_basis_points` | `3000` | 30% of each debate's money is kept for writing the answer |
 | `serve_overrun_basis_points` | `2000` | writing the answer may go 20% over the per-debate ceiling |
+| `admission_close_basis_points` | `9500` | from 95% of a limit, the ask page says the limit is close |
+| `finish_up_to_basis_points` | `11500` | a debate already running may take the site's day up to 115% so it can finish |
+| `waiting_line_per_person` | `1` | one question per person may wait for the reset |
 
-**The last two rows keep money for the answer** (engine money rule, spec 2026-09-26 §14.4.1).
-They are in basis points, where `10000` is the whole per-debate ceiling. With the values above,
-the calls made while a debate is argued may spend up to 70% of the per-debate ceiling
-(0.175 USD); the calls that write the answer may take the same debate's total up to 120% of it
-(0.30 USD). Both limits count the same running total, so the reserve is simply the part the
-arguing may not touch. The daily ceiling must hold one debate at its new maximum (per-debate
-ceiling plus the overrun, here 0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`);
-each new debate then reserves that maximum, plus the story's own ceiling, against the day.
-The verdict story's cap is a code-owned row the publication seals for you (`storyCostEnvelopePolicy`:
-0.05 USD per story, and since engine money rule task M7 a 20% margin over it,
-`per_story_overrun_basis_points` `2000`, so 0.06 USD). The day must hold one debate AND its story
-at their maxima, here 0.30 + 0.06 = 0.36 USD; a day below that is refused when you publish and
-when either service starts (`STORY_DAILY_CEILING_INSUFFICIENT`).
-Every debate charge written from now on is recorded with the part of the debate that spent it
-(`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer;
-empty for the support chat, the story and older rows), so the first paid run shows the two
-amounts separately.
+Basis points are hundredths of a percent, so `10000` is the whole limit.
 
-**Both are optional, and a version without them means 0: no money is kept back and the margin
-is off.** Every register version published before these members existed, and every file that
-leaves them out, keeps exactly the old single ceiling. The kit's example file carries `3000` and
-`2000`, but on this host they take effect only when you publish a register version whose
-`costEnvelopePolicy` carries them (§"Publishing the settings register on this host"; go-live
-checklist line 12). The file format stays `debateai.hosted-register.v1`: a v1 file without them
-is still valid and still means what it meant.
+#### Money kept for the answer (engine money rule)
 
-The `costEnvelopePolicy` row says so about itself: it carries `provisional: true` and a
-`provisional_reason` naming V-28. They are meant to stop things — a normal debate costs dollars,
-so the first paid run is expected to hit the per-run ceiling partway, and that stop is the
-measurement. The real values are sealed afterwards (per run about three times the measured cost of
-one normal debate; per day what the owner is comfortable losing on a bad day) as a **new version**
-of the row with `provisional: false`. The provisional row is never edited: it stays as the record
-of what the first paid run ran under (go-live checklist line 1).
+The reserve and the overrun keep money for writing the answer (spec 2026-09-26 §14.4.1).
 
-While a debate runs, the refusals are `RUN_COST_ENVELOPE_MONEY_REACHED`,
-`DAILY_COST_ENVELOPE_REACHED` (an ask after the day is spent is answered `429` with `Retry-After`
-at the next UTC midnight) and `PROVIDER_USAGE_UNREPORTED` (a vendor answered without usage
-figures, so its cost cannot be counted). Set a monthly spending cap on each vendor's own dashboard
-as well (go-live checklist line 8): the envelopes are the application's ceiling, the dashboard cap
-is the vendor's.
+- **The split.** With the values above, the calls made while a debate is argued may spend up to 70% of the per-debate ceiling (0.175 USD). The calls that write the answer may take the same debate's total up to 120% of it (0.30 USD). Both count the same running total, so the reserve is simply the part the arguing may not touch.
+- **The day must hold one debate at its maximum** (0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
+- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`: 0.05 USD, with a 20% margin, 0.06 USD). The day must hold one debate AND its story, here 0.36 USD, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
+- **Every debate charge records its part** (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer).
+- **A version without the two members means 0:** no money is kept back and the margin is off (go-live checklist line 12). The file format stays `debateai.hosted-register.v1`.
+
+#### The band, holds and the waiting line (budget rule, spec 2026-09-28)
+
+The last three rows switch on the budget rule of `docs/superpowers/specs/2026-09-28-budget-never-stops-a-debate-design.md`: a debate is almost never stopped for money. A limit bends from −5% to +15%.
+
+- **Used** means what has been spent **plus a hold** for every debate still running.
+  - The hold is the debate's estimate, written once when the debate starts.
+  - It counts only its unspent part, and stops counting when the debate has no job left.
+  - Holds replace the old 30-minute reservation. A debate that dies at birth has no job left, so its hold stops counting at once; one whose first job never reached a runner is handed to the job system again within minutes (below). Neither wedges the day shut.
+- **The estimate** is the 75th percentile of the last 20 hosted debates with the same settings that settled in the last 30 days, at today's prices, capped at one debate's maximum.
+  - With fewer than 20 such debates, it is that maximum: the careful side.
+  - It is never sent to a browser.
+- **Asking:**
+  - Under 95%, when the question fits, the debate starts.
+  - From 95%, or when the question would cross 100%, the debate still starts, and the ask page says the limit is close.
+  - From 100%, the question is accepted (`202`, `WAITING`) and **waits in line**. The API's 60-second waker starts it by itself at the reset, oldest first and one per person.
+  - A second waiting question from the same person is refused `422 ASK_ALREADY_WAITING`, and the page names the time the first will start.
+- **While a debate runs** it is measured against real spend only, up to the **finish edge**: 115% of the site's day, 110% of a person's window.
+  - An arguing call that would cross it is retried on the debate's cheaper models first.
+  - Only when none fits does the arguing stop, and the answer is still written.
+  - The opening position and the answer are exempt.
+  - Every swap is one row in `core.run_cost_substitution`. The owner sees it; the person never does.
+- **Log lines** (content-free): `api.ask.waiting`, `api.wait.started`, `api.wait.tick` (with counts) and `runner.body.cheaper_model`.
+- **A started debate whose first job never reached a runner** (the API stopped between starting it and handing the job over, or the hand-over failed) would keep its hold counting on every later day and window. So each minute the waker also hands every such job that has waited five minutes to the job system again: `api.wait.redispatched` with its `runId`, and `redispatched` in `api.wait.tick`. A runner claims a job once, so a debate handed over twice still runs once.
+
+**All three members absent means today's behaviour, exactly.** A version without them keeps the `429 DAILY_COST_ENVELOPE_REACHED` with `Retry-After` at the next UTC midnight, keeps the 30-minute reservation, and has no waiting line and no running wall.
+
+The three are all or none (`COST_ENVELOPE_POLICY_INVALID` otherwise). Their ranges:
+- `admission_close_basis_points` from 5000 to 10000;
+- `finish_up_to_basis_points` from 10000 to 20000;
+- `waiting_line_per_person` from 1 to 10.
+
+**Publishing them** (go-live checklist line 13):
+1. Add them to `costEnvelopePolicy` in `/etc/debateai/register/hosted-register.json`. The kit's example carries `9500`, `11500` and `1`.
+2. Run the dry run. It prints `cost_envelope_band admission_close_basis_points=… finish_up_to_basis_points=… waiting_line_per_person=…`, and `cost_envelope_band absent` while they are missing.
+3. Publish.
+4. Pin `REGISTER_VERSION` in both `EnvironmentFile`s.
+5. Restart both units.
+
+Publish them only on a build that runs the whole rule. The waiting line, holds, the waker, the running wall and the boot check ship together.
+
+**Removing them again.** A version without the three members builds no room and therefore no waker, so a question already waiting could never start. The API therefore refuses to boot on such a version while `core.run_waiting_v` lists any run: its `ask-room` boot step stops with `WAITING_LINE_REQUIRES_BAND`, and a waiting debate's page read is refused by the same name instead of promising a start time. So publish such a version only when `sudo -u postgres psql -d debateai -Atc 'SELECT count(*) FROM core.run_waiting_v'` prints `0`. If it does not, wait for the reset that starts the line, check again, then publish. Billing switched on forbids the removal anyway (`BILLING_REQUIRES_ENVELOPE_MEMBERS`).
+
+**The boot check.** Both hosted services refuse to start with `RUN_CEILING_BELOW_ONE_CALL` when the arguing ceiling is below the projected cost of the opening position's call. The arguing ceiling is per run × (10000 − reserve) / 10000. The projected cost uses:
+- a question of the maximum size, made of the character that grows most on the way;
+- the judge's output token ceiling (the runner policy's `JUDGE` bound);
+- the cheapest price among each plan's models; every plan's cheapest must fit (a plan takes part only when every model on its roster is configured).
+
+A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
+
+The publish command asks the same question before anything is sealed, a dry run included: it prices the opening call on the file's `providerTargets` (which must equal `PROVIDER_DISCOVERY_TARGETS_JSON`) and on the judge bound it is about to seal, and refuses with the same `RUN_CEILING_BELOW_ONE_CALL`. Both units still ask at start-up, because the environment can differ from the file.
+
+#### Each person's windows (billing)
+
+**Do not switch `billingPolicy` on before Part 2 (plans and payments) is deployed.** Nothing in this release stops you, but with billing on now:
+- every signed-in person becomes Free: 0.20 USD of credit a month, the sealed fixed settings and the Free plan's two models;
+- there is no way to subscribe, because checkout is Part 2;
+- the "See plans" link under the full-limit sentences (Free's ends "or choose a plan to continue now") goes to `/pricing`, a page that does not exist yet.
+
+Until then, keep `enabled: false`, as the kit's example and the engine's own row have it.
+
+With billing on (hosted, and a published `billingPolicy` saying `enabled: true`), each person also has three windows:
+- the **month**, from the day they subscribed (Free: the day they signed up);
+- the **week**, in 7-day blocks from the month start;
+- the **day**, in 24-hour blocks from the month start.
+
+All are in UTC, and each person sees them in their own time zone.
+
+- **The limits** come from the `billingPlans` row: the plan's monthly credit, and for paid plans a day and a week share of it. Free has its month only.
+- **A running debate may finish up to 110%** of any person window (`finish_bp` `11000`). The extra is on the site; it is not taken from the next month.
+- **The server decides the ask:**
+  - the plan's tier;
+  - for Free, the sealed fixed gauges;
+  - until the model scorecard merges, a paid ask that does not fit the person's room and starts now runs on the Free roster (owner record, reason `PERSON`). One that must wait keeps its plan's models and settings, and starts on them after the reset.
+  - A request with no signed-in account is refused `401 ASK_SIGN_IN_REQUIRED`.
+  - A running debate that reaches a person's finish edge stops arguing with `PERSON_ALLOWANCE_REACHED` and still writes its answer.
+- **Billing needs the budget rule.** A version whose `billingPolicy` says `enabled: true` is refused at publish and at boot:
+  - `BILLING_REQUIRES_ENVELOPE_MEMBERS` when `costEnvelopePolicy` lacks the three members above;
+  - `BILLING_PLANS_UNRESOLVED` when it seals no `billingPlans`.
+- **The publish command warns** `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` when a plan's smallest window (its day cap, or Free's whole month) is below the per-run ceiling.
+  - It does not refuse: admission uses the estimate, so a small window still fits a small debate.
+  - At today's 0.25 USD per debate, Free's 0.20 USD month triggers it. Publish realistic per-run and daily ceilings before switching billing on.
+- **The site's daily ceiling protects the company, not the person.** At launch it must be at least the expected daily spend of all subscribers: subscribers × each plan's day cap × 0.3, or better, the measured figure.
+
+#### The provisional values
+
+The `costEnvelopePolicy` row says so about itself: it carries `provisional: true` and a `provisional_reason` naming V-28. The values are meant to stop things. A normal debate costs dollars, so the first paid run is expected to hit the per-run ceiling partway, and that stop is the measurement.
+
+The real values are sealed afterwards as a **new version** of the row with `provisional: false`:
+- per run, about three times the measured cost of one normal debate;
+- per day, what the owner is comfortable losing on a bad day.
+
+The provisional row is never edited: it stays as the record of what the first paid run ran under (go-live checklist line 1).
+
+While a debate runs, the refusals are:
+- `RUN_COST_ENVELOPE_MONEY_REACHED`: one debate's own ceiling;
+- `DAILY_COST_ENVELOPE_REACHED` and `PERSON_ALLOWANCE_REACHED`: the shared walls. With the budget members published they only stop the arguing, never a debate.
+- `PROVIDER_USAGE_UNREPORTED`: a vendor answered without usage figures, so its cost cannot be counted.
+
+Set a monthly spending cap on each vendor's own dashboard as well (go-live checklist line 8): the envelopes are the application's ceiling, and the dashboard cap is the vendor's.
 
 #### One answer's record: what money and size did to it
 
@@ -1279,18 +1529,20 @@ The runner writes one JSON line per event to its journal. Each line carries ids 
 never debate or model text, and none of these events changes an answer. Today's lines:
 
 ```sh
-journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DISCLOSURE|DEBATEAI_STORY'
+journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DISCLOSURE|DEBATEAI_STORY|DEBATEAI_BODY_COST_FALLBACK|DEBATEAI_PERSON_WALL'
 ```
 
 | Signal | What it means | What to do |
 |---|---|---|
 | `"kind":"DEBATEAI_SERVE_DISCLOSURE"`, `"event":"SERVE_DISCLOSURE_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `answerId` | The answer's owner-side record (above) could not be written. The answer itself is exactly what it would have been. What is lost is the record. **When no model could write the answer, its floor is lost**: the pages say the verdict is unavailable instead of showing "Our best answer:", the answer gets no story, and `pnpm ops:serve-disclosure` answers `SERVE_DISCLOSURE_NOT_FOUND`. For a written answer, the owner's record and the PDF's lower-cost note are missing. | Nothing writes the row later: it is written once, right after the answer. Keep the line. A typed `code` (for example `SERVE_DISCLOSURE_RECORD_INVALID`) is a defect to report. `UNTYPED` with a `sqlState` is the database refusing (for example `23503`) or a lost connection. More than one in a day is worth investigating. |
 | A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, shown on the owner's page as "Debate generation failed: …" and kept in `core.work_item.terminal_reason` | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
-| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE` or `RUN_SETUP_FAILED:DISPATCH`, shown the same way | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), or handing that job to the job system (`DISPATCH`). The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the other two at the database. |
+| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, shown the same way | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
 | `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
 | `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
 | `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
 | `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
+| `"kind":"DEBATEAI_BODY_COST_FALLBACK"`, `"event":"RUN_COST_SUBSTITUTION_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `callSiteKey` | An arguing call was moved to one of the debate's cheaper models (the `runner.body.cheaper_model` line just before it), and the owner's record of that move (`core.run_cost_substitution`) could not be written. The debate is exactly what it would have been. What is lost is that one row, so the operator's run report and the owner's read do not show that move. | Nothing writes the row later. A typed `code` is a defect to report. `UNTYPED` with a `sqlState` is the database refusing or a lost connection. More than one in a day is worth investigating. |
+| `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish, pin the new version in both `EnvironmentFile`s and restart both units. After billing is switched on it means the API and the runner are on different register versions: pin the same `REGISTER_VERSION` in both and restart both. |
 
 The API writes these related lines to its own journal (`journalctl -u debateai-api`), again with
 ids and a bounded diagnostic only:
@@ -1299,7 +1551,10 @@ ids and a bounded diagnostic only:
 |---|---|---|
 | `"event":"api.disclosure.unreadable"`, with `diagnostic` | An answer's owner-side record exists but is corrupt: a floor without its label receipt (`SERVE_DISCLOSURE_ROW_INVALID`) or a stored cause outside the closed list (`SCHEMA_VALIDATION_ERROR`). The owner's page and the PDF then behave as if there were no record: no floor, no lower-cost note. A database outage is not this line; it stays a 500. | A defect to report, with the answer id from `pnpm ops:serve-disclosure`. |
 | `"event":"api.story.unreadable"`, with `diagnostic` | The story of an answer the caller owns could not be read, decrypted or derived (a database hiccup included). The route answers "unavailable" rather than an error; the owner's page asks again a few times, then shows the answer without its story. | A single one during a database hiccup is harmless. Repeated ones for the same answer are a defect to report. |
-| `"event":"api.run.setup_failure_unrecorded"`, with `runId`, `reason` and `diagnostic` | A debate's start failed as for `RUN_SETUP_FAILED` above, and marking it failed failed too, most likely in the same database outage. The asker still got the original error. That debate keeps showing as "generating" on its owner's page, because nothing will ever start it. | Rare. Report the `runId`. Nothing here closes that debate on its own. |
+| `"event":"api.run.setup_failure_unrecorded"`, with `runId`, `reason` and `diagnostic` | A debate's start failed as for `RUN_SETUP_FAILED` above, and marking it failed failed too, most likely in the same database outage. The asker still got the original error. What happens next depends on `reason`. With `RUN_SETUP_FAILED:DISPATCH`, or `RUN_SETUP_FAILED:ADMISSION_RELEASE` while the budget rule's members are published, the debate was started or placed in the waiting line before the failure. A started one has its first job queued, but no runner may have been handed it: with the members published, the API's waker hands it to the job system again once it has waited five minutes (`api.wait.redispatched` with the same `runId`), and without them the next runner start does. A question placed in the line starts by itself when there is room. The debate then runs normally, and only once: a runner claims a job once. With `RUN_SETUP_FAILED:PLAN_CHANGED`, the question stays in the line only until a later tick manages to record it failed: its owner's plan no longer covers it, so it never starts. With any other reason the debate has no job, so nothing will ever start it, and it keeps showing as "generating" on its owner's page. | `DISPATCH` with the budget members published: nothing; the waker hands the job over again within about five minutes (if `api.wait.redispatch_failed` repeats with that `runId`, see that row). `DISPATCH` without them (this host until go-live line 13): `systemctl restart debateai-runner.service`; a runner start hands every queued job over. `ADMISSION_RELEASE` with the members published: nothing; the question starts by itself when there is room. `PLAN_CHANGED`: nothing; a later tick records the debate failed, so it never starts. `ADMISSION_RELEASE` without the members, and any other reason: the debate has no job and never starts; rare; report the `runId`. Nothing here closes that debate on its own. |
+| `"event":"api.wait.redispatch_failed"`, with `runId` and `diagnostic` | The waker tried to hand a started debate's first job to the job system again (the job had waited five minutes, see the row above) and the job system refused. The job stays queued, its hold keeps counting, and the next tick tries again. Nothing is marked failed, because the job may already be on its way. | One: nothing. Every minute: the job system is not taking work. The `diagnostic` names the code; check `debateai-hatchet` and the API's `api.request.failed` lines, as for `RUN_SETUP_FAILED:DISPATCH`. |
+| `"event":"api.wait.start_failed"`, with `runId` and `diagnostic` | The waker tried to start a waiting question, and the attempt failed inside its locked transaction (most likely the database): before the room was measured, while starting it, or while recording why it still waits. Nothing of the start was written: no hold, no job, no start mark. The question stays in the line, in its place, and the next tick tries again. | One: nothing. Every minute for the same `runId`: that question cannot start, although the tick goes on to the questions behind it. Read the `diagnostic` and the API's `api.request.failed` lines from the same minutes. A typed code is a defect to report with the `runId`. |
+| `[ASK_WAITING_LINE_WAKE_PENDING]` (a bare marker, once a minute while it lasts) | A whole tick of the waker failed before it finished, most often because the database refused the line's own read. The marker carries no diagnostic. What the tick had already started stays started, and the next whole minute tries again. While it repeats, waiting questions may not start and stalled first jobs are not handed over again. | One: nothing. Every minute: the line has stopped draining. Check the database, and read the API's other lines from the same minutes. Once the database answers again, the next tick drains the line by itself. |
 
 The story's other events carry codes only: `STORY_STORED` (every story, with its outcome),
 `STORY_LATER_ROUND_FAILED`, `STORY_MATERIAL_TOO_LARGE`, `STORY_SNAPSHOT_FAILED`,
@@ -1321,6 +1576,7 @@ version must carry, besides the algorithm's own rows:
 | Row key | Without it |
 |---|---|
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
+| `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` |
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |
@@ -1339,9 +1595,13 @@ version must carry, besides the algorithm's own rows:
   loopback or private address, TLS only, no inline credential, every target priced, every vendor
   vetted, envelopes well formed) before anything is written — `--dry-run` stops there;
 - imports the sealed historical bootstrap first (refusing a database that holds a different one),
-  then publishes ONE new version: the engine's code-owned rows plus the two rows the file
-  supplies, `configuredProviderSet` and `costEnvelopePolicy`. It never edits a sealed version. A
-  changed file is a new version; the same file again returns the version that already holds it;
+  then publishes ONE new version: the engine's code-owned rows plus the rows the file supplies,
+  `configuredProviderSet` and `costEnvelopePolicy`, and `billingPlans` / `billingPolicy` when it
+  names them. It never edits a sealed version. A changed file is a new version; the same file
+  again returns the version that already holds it;
+- seals the file's `countryPolicy`, when the file carries it, as that version's `countryPolicy`
+  row; a file without it publishes no `countryPolicy` row, so that version has no country gate
+  (A14). The kit's example leaves it out; §5 "Country data" says what must hold before you add it;
 - then runs the start-up readers against the new version, and only then prints the version to pin.
 
 `providerTargets` in the file (prices, addresses, credential paths) is never sealed: it is there
@@ -1354,6 +1614,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | Output line | What to do |
 |---|---|
 | `HOSTED_REGISTER_PLAN …` | the plan: vendors, ceilings, row count, snapshot hash, `provenance=development-source-refs (known limitation)` (§10); nothing secret is printed |
+| `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` | a plan's smallest window is below one debate's ceiling: a warning, never a refusal (see "Each person's windows") |
 | `HOSTED_REGISTER_PUBLISHED outcome=CREATED` / `outcome=REPLAYED` | a new version was sealed / this exact content was already sealed and nothing was added |
 | `HOSTED_REGISTER_BOOT_READY register_version=N` then `REGISTER_VERSION=N` | both services' start-up readers accept version N in hosted mode: write `REGISTER_VERSION=N` into `api.env` and `runner.env`, restart both units |
 | `HOSTED_REGISTER_NOT_BOOT_READY register_version=N` | sealed, but a start-up reader refused it (`HOSTED_REGISTER_BOOT_CHECK_FAILED:` + the reader's code on stderr): pin nothing, correct the file, publish again |
@@ -1369,8 +1630,11 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `PROVIDER_TARGET_PRICE_REQUIRED:` / `PROVIDER_TARGET_PRICE_ZERO:` + ref | the same refusals the units raise at start-up |
 | `PROVIDER_TARGET_LOOPBACK_REFUSED:` / `PROVIDER_BASE_URL_TLS_REQUIRED:` / `PROVIDER_INLINE_CREDENTIAL_REFUSED:` + ref | a relay, a local or private address, cleartext, or a credential written into the file |
 | `PROVIDER_VENDOR_NOT_VETTED:` + ref | the vendor's V-9(4) record is missing or incomplete |
-| `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000 |
+| `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000; or the budget rule's three members are not all present or all absent, or one is out of range (`admission_close_basis_points` from 5000 to 10000, `finish_up_to_basis_points` from 10000 to 20000, `waiting_line_per_person` from 1 to 10) |
 | `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin, 0.06 USD); raise `daily_ceiling_micros` |
+| `RUN_CEILING_BELOW_ONE_CALL` | with the budget rule's three members in `costEnvelopePolicy`, the arguing ceiling cannot pay for the opening position's call at the cheapest price among one plan's models, priced on `providerTargets` (the start-up check, "The boot check" under the cost envelopes above); raise `per_run_ceiling_micros` or lower `serve_reserve_basis_points` |
+| `BILLING_PLANS_INVALID` / `BILLING_POLICY_INVALID` | a billing row in the file is not the register's shape: prices in whole cents, plans FREE, PLUS, PRO, MAX in price order; the policy is strict (no `xmoney_environment`, no owner address) |
+| `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |

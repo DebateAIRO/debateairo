@@ -67,4 +67,14 @@ Cost of layers 1–5: about one agent-day on top of RUN1's one to two.
 - **The numbers stay unsealed**, as ruled: the first paid runs measure them. `ledger.model_spend.spend_phase` now keeps the arguing spend apart from the answer spend.
 - **Deploy as one.** The reserve and overrun must not be published on a deployment that lacks the rest of the rule: with the reserve alone, a stop would come at 70% and still end without an answer.
 
+## Amendment to V-28 (2026-09-29): new debates wait in line, and each person has windows
+
+**Owner, 28 and 29 September 2026.** The rules are "a debate must almost never be interrupted for budget reasons" (`docs/superpowers/specs/2026-09-28-budget-never-stops-a-debate-design.md`) and the paid plans (`docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md`). The row above is left as ruled; this note amends it.
+
+- **Part (2) is amended.** It said that when the daily ceiling is reached "no new run starts until the next day". Now a new question waits in line and starts by itself at the reset: one per person, and a second is refused `ASK_ALREADY_WAITING`. From 95% the ask page says the limit is close. A running debate may take the day to 115% to finish, cheaper models first. The old `429` remains only for register versions without the three new `costEnvelopePolicy` members.
+- **Each person's windows (billing).** With billing on, each person has a month from their subscription (Free: sign-up), with 7-day and 24-hour blocks, from the `billingPlans` row: paid plans have day and week caps of 20% and 50% of their credit. A running debate may finish at up to 110%, and the extra is on the site. Billing may be switched on only with the three members (`BILLING_REQUIRES_ENVELOPE_MEMBERS`).
+- **J24's cost exception extends to arguing calls.** J24 ("a sealed identity is never substituted") already had a disclosed exception for cost in the answer's calls (verdict-story spec §14.4.2). An arguing call refused for money may now be retried on a cheaper model of the same run. Panel seats are excluded, because a swap would give one model two votes. The interim cheaper roster for a paid ask that does not fit the person's room is the same exception. Every swap is recorded in `core.run_cost_substitution`, owner-only.
+- **Parts (1) and (3) stand,** with the 28 September amendment above.
+- **Deploy as one.** Publish the three members only on a build that runs the whole rule (GO-LIVE-CHECKLIST line 13).
+
 Not to be confused with the V-28 in `docs/missions/debate-tiers/V-DECISIONS-PACKET.md`, a different ruling that shares the id.

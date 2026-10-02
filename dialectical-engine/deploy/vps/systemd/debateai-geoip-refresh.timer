@@ -1,0 +1,14 @@
+# deploy/vps/systemd/debateai-geoip-refresh.timer — paid plans G4.
+[Unit]
+Description=Daily DebateAI country data refresh
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+
+[Timer]
+OnCalendar=*-*-* 04:10:00
+RandomizedDelaySec=30m
+# A host that was off at 04:10 refreshes on the next boot.
+Persistent=true
+Unit=debateai-geoip-refresh.service
+
+[Install]
+WantedBy=timers.target

@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hol kínáljuk a DebateAI szolgáltatást",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "A DebateAI szolgáltatást a [the European Union and the European Economic Area] területén [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Singapore / Japan / South Korea] élő személyeknek kínáljuk. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
+      { kind: "p", text: "A DebateAI szolgáltatást a [the European Union and the European Economic Area] területén [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] élő személyeknek kínáljuk. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
     ]
   },
   {
@@ -131,6 +131,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Az Ön tartalma az Öné marad. Ön megtartja a beküldött kérdéseihez, állításaihoz, megjegyzéseihez és kifogásaihoz fűződő valamennyi jogát. Ön nem kizárólagos, az egész világra kiterjedő, jogdíjmentes engedélyt ad számunkra e tartalom tárhelyen tartására, tárolására, többszörözésére, átdolgozására és feldolgozására a szolgáltatás működtetése céljából: a vita futtatásához, annak tárolásához, hogy Ön újból megnyithassa és lejátszhassa, támogatás nyújtásához, jogi kötelezettségeink teljesítéséhez, valamint — kizárólag akkor, ha Ön a közzététel mellett dönt — a 9. szakaszban foglalt célokra. Ez az engedély a tartalom törlésekor megszűnik, kivéve, ha a 9. szakasz vagy a jog ettől eltérően rendelkezik." },
       { kind: "p", text: "Nem tanítjuk be az Ön tartalmán a modelleket. Nem tanítunk be modelleket az Ön tartalmán, és az MI-szolgáltatókkal kötött szerződéseink kizárják, hogy az Ön tartalmát saját modelljeik betanítására vagy továbbfejlesztésére használják. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Hogyan jut el az Ön tartalma az MI-szolgáltatókhoz. Egy vita futtatásához szöveget küldünk egy vagy több külső modellszolgáltatónak. A szolgáltató megkapja az Ön kérdését, az Ön által beállított irányító megjegyzéseket és a motor által a vita során összeállított állításokat — így nem csupán az Ön eredeti szavait látja, hanem az Ön által beírt szövegből származó és aköré épített szöveget is. Az Ön e-mail-címét, fiókazonosítóit, munkamenet-nyilvántartásait vagy fizetési adatait soha nem kapja meg." },
+      { kind: "p", text: "Mit küld a támogatási csevegés. A támogatási asszisztens szintén MI-modell. Amikor Ön ír neki, üzenetét elküldjük egy külső modellszolgáltatónak, hogy a modell válaszolni tudjon, azokkal a súgócikkekkel együtt, amelyekre a válaszát alapozza. Küldés előtt elfedünk mindent, ami jelszónak, egyszer használatos kódnak vagy kulcsnak tűnik. Ha Ön azt kéri, hogy személlyel beszélhessen, a beszélgetést is — ugyanígy elfedve — elküldjük a modellnek, hogy rövid összefoglalót írjon csapatunk azon tagjának, aki átveszi az Ön ügyét. Az Ön e-mail-címét, fiókazonosítóit vagy fizetési adatait nem csatoljuk, de a modell minden mást megkap, amit Ön a csevegésbe beír, ezért ne írjon oda semmit, amit nem szeretne, hogy elolvasson." },
       { kind: "p", text: "Mely szolgáltatók és hol. A [dezbatere.ro/providers] címen elérhető MI-szolgáltatói nyilvántartásunk e Feltételek részét képezi. Felsorolja az általunk igénybe vehető valamennyi szolgáltatót: jogi személyét és országát; azt, hogy mit kap meg és milyen célból; hol végzi az adatkezelést; megőrzési feltételeit; hogy az általunk használt végponton aktív-e a nulla adatmegőrzés; hogy szerződésünk alapján felhasználhatja-e a bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; valamint az egyes bejegyzések legutóbbi ellenőrzésének időpontját. A szolgáltatók az Ön országán és az Európai Gazdasági Térségen kívül is működhetnek. A garanciákat Adatvédelmi szabályzatunk ismerteti." },
       { kind: "p", text: "Három különböző dolog. A „nem használják modellek betanítására”, a „biztonsági, visszaélés-megelőzési vagy jogi okból korlátozott ideig megőrzik” és a „nulla adatmegőrzés — a feldolgozást követően nem tárolják tartósan” eltérő fogalmak. Ha egy szolgáltató korlátozott ideig megőrzi a promptokat, a Nyilvántartás megadja, hogy mennyi ideig és miért. Ha aktív a nulla adatmegőrzés, a Nyilvántartás ezt, valamint az érintett funkciókat is feltünteti. Nem állítjuk, hogy egy tartalmat nem őriznek meg, ha ez nem igaz." },
       { kind: "p", text: "Kimenetek. Az Ön és közöttünk fennálló jogviszonyban saját vitáinak kimenetét bármely jogszerű célra felhasználhatja, mi pedig nem tartunk igényt a létrehozott szöveg tulajdonjogára. Vegye figyelembe, hogy a létrehozott kimenet számos joghatóságban nem részesülhet szerzői jogi védelemben; más felhasználók számára hasonló kimenet jöhet létre; a kimenetek harmadik felek anyagait többszörözhetik vagy azokhoz hasonlíthatnak; továbbá az MI-szolgáltató által lekért egyes forrásanyagokra újrafelhasználási korlátozások vonatkozhatnak. Ön felel azért, hogy a kimenetekre való támaszkodás vagy azok újbóli közzététele előtt ellenőrzést végezzen." }
@@ -298,7 +299,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Egyesült Királyság (csak akkor, ha szerepel a 2. szakaszban)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Az Egyesült Királyság GDPR-rendeletének 27. cikke szerinti egyesült királysági képviselőnk: [name, address, email]. Önre alkalmazandó a fogyasztói jogokról szóló 2015. évi törvény, és e Feltételek egyetlen rendelkezése sem korlátozza az abból eredő jogait; [January 2027] időponttól a digitális piacokról, a versenyről és a fogyasztókról szóló 2024. évi törvény előfizetési szabályai alkalmazandók a fizetős csomagokra, ideértve a megújítások és az ingyenes próbaidőszakok utáni türelmi időt. Hogyan védjük a felhasználókat a jogellenes tartalomtól: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Az általunk használt proaktív technológia: [describe, or \"none\"]. Életkor-ellenőrzés: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. A 10. szakasz szerinti panaszkezelési eljárás fogadja a jogellenes tartalomra, az Ön tartalmának jogtalan eltávolítására, fiókjának korlátozására, az Ön tartalmát érintő automatizált eszközök használatára, valamint az Önt tévesen kizáró életkor-megállapításra vonatkozó panaszokat. Az eljárás a tartalom által érintett azon személyek számára is nyitva áll, akik nem felhasználók." }
+      { kind: "p", text: "Az Egyesült Királyság GDPR-rendeletének 27. cikke szerinti egyesült királysági képviselőnk: [name, address, email]. Önre alkalmazandó a fogyasztói jogokról szóló 2015. évi törvény, és e Feltételek egyetlen rendelkezése sem korlátozza az abból eredő jogait; a digitális piacokról, a versenyről és a fogyasztókról szóló 2024. évi törvény előfizetési szabályai hatálybalépésüktől (várhatóan 2027-től) alkalmazandók a fizetős csomagokra, ideértve a megújítások és az ingyenes próbaidőszakok utáni türelmi időt. Hogyan védjük a felhasználókat a jogellenes tartalomtól: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Az általunk használt proaktív technológia: [describe, or \"none\"]. Életkor-ellenőrzés: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. A 10. szakasz szerinti panaszkezelési eljárás fogadja a jogellenes tartalomra, az Ön tartalmának jogtalan eltávolítására, fiókjának korlátozására, az Ön tartalmát érintő automatizált eszközök használatára, valamint az Önt tévesen kizáró életkor-megállapításra vonatkozó panaszokat. Az eljárás a tartalom által érintett azon személyek számára is nyitva áll, akik nem felhasználók. Adatait Adatvédelmi szabályzatunk B.2 pontja szabályozza." }
     ]
   },
   {
@@ -308,7 +309,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Választottbírósági megállapodás és lemondás a csoportos keresetről. Ha Ön az Egyesült Államokban él, Ön és a DebateAIRO megállapodnak abban, hogy az e Feltételekből vagy a szolgáltatásból eredő jogvitákat bírósági eljárás helyett a [the American Arbitration Association / JAMS] által a fogyasztói szabályai szerint kezelt, kötelező erejű egyéni választottbírósági eljárásban rendezik, azzal, hogy bármelyik fél egyéni igényt érvényesíthet a kis értékű követelések bírósága előtt. Ön kizárhatja az alkalmazást, ha e Feltételek első elfogadásától számított 30 napon belül e-mailt küld a [address] címre. E megállapodásra a szövetségi választottbíráskodási törvény irányadó. A választottbírósági eljárás benyújtási díjait mi fizetjük. A jogszabályok által megengedett mértékben a felek lemondanak a csoportos, kollektív és képviseleti eljárásokról. E szakasz kizárólag a jövőre nézve alkalmazandó, és nem vonatkozik az Ön általi elfogadás előtt keletkezett igényekre." },
       { kind: "p", text: "Értesítések és eltávolítások. A hozzájárulás nélkül megosztott intim képfelvételeket fiók nélkül be lehet jelenteni a [URL] címen, és érvényes kérelem esetén 48 órán belül eltávolítjuk azokat. A szerzői jogi panaszokat a 16. szakaszban megnevezett kijelölt megbízottunkhoz kell benyújtani." },
-      { kind: "p", text: "Államspecifikus rendelkezések. Kalifornia: a 12. szakasz automatikus megújítási feltételei alkalmazandók; Ön bármikor lemondhatja előfizetését online; a megújítási feltételekhez adott hozzájárulását legalább három évig megőrizzük. New York: bármely emelt összegű terheléstől számított 14 napon belül lemondhatja előfizetését, és időarányos visszatérítést kaphat. Texas és Nebraska: érzékeny személyes adatokat nem értékesítünk; ha ez valaha megváltozik, előbb beszerezzük az Ön hozzájárulását [statutory notice language]. Washington: az egészséggel kapcsolatos adatokra a [URL] címen elérhető Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk alkalmazandó. Colorado: a szolgáltatás semmilyen, Önre nézve jelentős következménnyel járó döntést nem hoz." }
+      { kind: "p", text: "Államspecifikus rendelkezések. Kalifornia: a 12. szakasz automatikus megújítási feltételei alkalmazandók; Ön bármikor lemondhatja előfizetését online; a megújítási feltételekhez adott hozzájárulását legalább három évig megőrizzük. New York: bármely emelt összegű terheléstől számított 14 napon belül lemondhatja előfizetését, és időarányos visszatérítést kaphat. Texas és Nebraska: érzékeny személyes adatokat nem értékesítünk. Washington: az egészséggel kapcsolatos adatokra a [URL] címen elérhető Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk alkalmazandó. Colorado: a szolgáltatás semmilyen, Önre nézve jelentős következménnyel járó döntést nem hoz. Adatait és az állama szerinti adatvédelmi jogait Adatvédelmi szabályzatunk B.3 pontja szabályozza." }
     ]
   },
   {
@@ -316,7 +317,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada és Québec (csak akkor, ha szerepel)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Adatvédelmi tisztviselőnk: [name, email]. Québec: e Feltételek francia nyelven elérhetők a [URL] címen, és először a francia változatot mutattuk be Önnek; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását." }
+      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: [name], privacy@dezbatere.ro. Adatait Adatvédelmi szabályzatunk B.4 pontja szabályozza. Québec: e Feltételek francia nyelven is elérhetők; a franciát a nyelvválasztóban választhatja ki; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását; Önre nem vonatkozik választottbírósági megállapodás vagy a csoportos keresetről való lemondás." }
     ]
   },
   {
@@ -329,32 +330,48 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.6",
-    title: "Latin-Amerika (spanyol nyelvű melléklet; csak akkor, ha szerepel)",
+    title: "Svájc (csak akkor, ha szerepel)",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "[Published in Spanish.] Ha az adatkezelés nem szükséges szerződés teljesítéséhez, annak jogalapja a hozzájárulás; Ön első vitája előtt kifejezetten hozzájárul az általa megadni kívánt érzékeny adatok kezeléséhez. ARCO-jogait a [address] címen gyakorolhatja, a válaszadási határidő [Mexico 20 business days / Colombia 10–15 business days / Argentina 10 business days / Chile per Law 21.719]. Mexikó: a teljes aviso de privacidad a [URL] címen érhető el; elállás [5] napon belül. Argentína: [AAIP legend]; használja a [URL] címen elérhető botón de arrepentimiento gombot 10 napon belül. Kolumbia: a política de tratamiento a [URL] címen érhető el; elállás 5 napon belül. Chile (2026. december 1-jétől): az Ügynökség elérhetősége: […]; előfizetését az előfizetéssel azonos módon mondhatja le; digitális szolgáltatásokra nem vonatkozik elállási jog." }
+      { kind: "p", text: "Adataira a svájci szövetségi adatvédelmi törvény alkalmazandó (Adatvédelmi szabályzat, B.6 pont). Svájcban a lakóhelye szerinti bíróság előtt indíthat eljárást. A fizetős csomagra nem vonatkozik törvényes elállási jog; visszatérítési szabályzatunk: […]." }
     ]
   },
   {
     no: "A.7",
-    title: "Öböl-menti államok — Egyesült Arab Emírségek és Szaúd-Arábia (csak akkor, ha szerepel)",
+    title: "Moldova (csak akkor, ha szerepel)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Ha adatait a szolgáltatás nyújtásától eltérő célokra kezeljük, azt az Ön visszavonható hozzájárulásával tesszük. Adatait a [UAE / Kingdom of Saudi Arabia] területén kívül, többek között az Európai Unióban és az Egyesült Államokban kezelik, a [SDAIA standard contractual clauses / the mechanism in the Register] alapján. Ön felel azért, hogy minden általa közzétett tartalom megfeleljen a tartózkodási helye szerinti ország jogának, ideértve a vallásra, a közrendre és a közerkölcsre vonatkozó jogszabályokat; az ilyen témákról szóló viták közzétételét az Ön régiójában korlátozhatjuk." }
+      { kind: "p", text: "E Feltételek alapján Önt ugyanazok a jogok illetik meg, mint egy európai uniós fogyasztót, ideértve a 13. szakasz szerinti 14 napos elállási jogot. Moldova bíróságai előtt indíthat eljárást. Adataira Moldova személyes adatok védelméről szóló 195/2024. számú törvénye alkalmazandó (Adatvédelmi szabályzat, B.7 pont)." }
     ]
   },
   {
     no: "A.8",
-    title: "Ázsia és a csendes-óceáni térség (csak a felsorolt régiókra vonatkozó sorok)",
+    title: "Ukrajna (csak akkor, ha szerepel)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Szingapúr: adatvédelmi tisztviselőnk: [name, email]; az adattovábbítások a PDPA rendelkezéseihez hasonló szerződéses garanciákon alapulnak; a fizetős csomagra nem vonatkozik törvényes türelmi elállási jog, visszatérítési szabályzatunk pedig: […]. Japán: a meghatározott kereskedelmi ügyletekről szóló törvény szerinti kötelező tájékoztatás a [URL] címen érhető el; az online előfizetésekre nem vonatkozik általános türelmi elállási jog, visszatérítési szabályzatunk pedig: […]; tartalmát a [named countries] területén működő szolgáltatóknak továbbíthatjuk, Ön pedig a regisztrációkor adott hozzájárulásokkal ebbe beleegyezik. Dél-Korea: az opcionális adatkezeléshez és marketinghez adott hozzájárulásokat a szolgáltatás működtetéséhez szükséges tételektől elkülönítve gyűjtjük; adatvédelmi tisztviselőnk: [name]; az elektronikus kereskedelemről szóló törvényre figyelemmel az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; minden ismétlődő áremelés vagy ingyenesről fizetősre váltás előtt újból beszerezzük hozzájárulását; ha az MI-alaptörvény előírja, előzetesen tájékoztatjuk, hogy a szolgáltatás MI-alapú, és megjelöljük a kimeneteket. India (a DPDP-szabályok alkalmazandóvá válásától): a [URL] címen elérhető hozzájárulási tájékoztató alkalmazandó; a 18 év alatti felhasználóknak ellenőrizhető szülői hozzájárulásra van szükségük. Thaiföld: thaiföldi képviselőnk: [name] [if appointed]. Fülöp-szigetek: az internetes ügyletekről szóló törvény szerinti üzleti azonosító adataink és jogorvoslati mechanizmusunk a [URL] címen érhetők el; panasz a Nemzeti Adatvédelmi Bizottsághoz nyújtható be." }
+      { kind: "p", text: "A DebateAI szolgáltatást Ukrajnában kínáljuk, kivéve azokat a területeket, amelyek nem állnak az ukrán kormány ellenőrzése alatt. A termék és e Feltételek ukrán nyelven is elérhetők. Adataira Ukrajna „A személyes adatok védelméről” szóló törvénye alkalmazandó (Adatvédelmi szabályzat, B.8 pont)." }
     ]
   },
   {
     no: "A.9",
-    title: "Fenntartva",
+    title: "Izrael (csak akkor, ha szerepel)",
     accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Fizetős csomagját a fogyasztóvédelemről szóló 5741-1981. számú izraeli törvény szerint mondhatja le [state the cancellation terms]. E Feltételek és Adatvédelmi szabályzatunk héber nyelven is elérhetők. Adataira Izrael magánszféra védelméről szóló törvénye alkalmazandó (Adatvédelmi szabályzat, B.9 pont)." }
+    ]
+  },
+  {
+    no: "A.10",
+    title: "Ázsia és a csendes-óceáni térség (csak a felsorolt régiókra vonatkozó sorok)",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Szingapúr: adatvédelmi tisztviselőnk: [name, email]; az adattovábbítások a PDPA rendelkezéseihez hasonló szerződéses garanciákon alapulnak; a fizetős csomagra nem vonatkozik törvényes türelmi elállási jog, visszatérítési szabályzatunk pedig: […]. Japán: a meghatározott kereskedelmi ügyletekről szóló törvény szerinti kötelező tájékoztatás a [URL] címen érhető el; az online előfizetésekre nem vonatkozik általános türelmi elállási jog, visszatérítési szabályzatunk pedig: […]; tartalmát az Egyesült Államokban és az Európai Unióban működő MI-szolgáltatóknak küldjük el, mindegyiknek olyan szerződés alapján, amely a japán személyesinformáció-védelmi törvénnyel egyenértékű védelmet ír elő, és kérésre tájékoztatjuk ezekről az intézkedésekről. Dél-Korea: az opcionális adatkezeléshez és marketinghez adott hozzájárulásokat a szolgáltatás működtetéséhez szükséges tételektől elkülönítve gyűjtjük; adatvédelmi tisztviselőnk: [name], privacy@dezbatere.ro; az elektronikus kereskedelemről szóló törvényre figyelemmel az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; minden ismétlődő áremelés vagy ingyenesről fizetősre váltás előtt újból beszerezzük hozzájárulását; a szolgáltatás generatív MI-t használ, erről a használat előtt tájékoztatjuk, és megjelöljük az MI által létrehozott kimeneteket. Tajvan: a fogyasztóvédelmi törvény alapján az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; adataira Tajvan személyes adatok védelméről szóló törvénye alkalmazandó (Adatvédelmi szabályzat, B.10 pont). Thaiföld: thaiföldi képviselőnk: [name] [if appointed]. Fülöp-szigetek: az internetes ügyletekről szóló törvény szerinti üzleti azonosító adataink és jogorvoslati mechanizmusunk a [URL] címen érhetők el; panasz a Nemzeti Adatvédelmi Bizottsághoz nyújtható be." }
+    ]
+  },
+  {
+    no: "A.11",
+    title: "Fenntartva",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Törökország, Brazília és Indonézia mindegyike helyi nyelvű mellékletet, képviselőt vagy nyilvántartásba vételt és bejelentéseket követel meg. Ezeket itt nem dolgoztuk ki, és mindaddig nem tartoznak a 2. szakasz hatálya alá, amíg kifejezetten fel nem vesszük őket. Kínában, Vietnamban és Oroszországban nem kínáljuk a szolgáltatást." }
     ]
@@ -363,6 +380,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
+  version: "2.0",
+  sha256: "8ac73cf231d83ec25a741b715a010a2f3c9aa7eb0bfa5d23e33b10853746f45f",
   eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.0 · HATÁLYOS [DATE]",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DebateAIRO S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",

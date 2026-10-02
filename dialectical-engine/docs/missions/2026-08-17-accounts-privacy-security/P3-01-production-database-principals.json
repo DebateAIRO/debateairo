@@ -284,10 +284,12 @@
       ],
       "ownsSchemas": [
         "audit_crypto_internal",
+        "billing",
         "core",
         "evidence",
         "identity",
         "ledger",
+        "legal",
         "memory",
         "obs",
         "observation",

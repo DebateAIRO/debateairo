@@ -27,7 +27,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // compared with this list, so a new schema fails the test rather than silently
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
-  "core", "evaluator", "evidence", "identity", "ledger", "memory",
+  "billing", "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
   "obs", "observation", "register", "scorecard", "serve", "support"
 ] as const;
 
@@ -425,7 +425,36 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0077_age_gate.sql",
         // Sensitive-data consent (V's ruling of 2026-09-29): identity.sensitive_data_consent,
         // the one-time Article 9 consent before the first debate. The next free prefix, no pair.
-        "0078_sensitive_data_consent.sql"
+        "0078_sensitive_data_consent.sql",
+        // Turn 14 change email: identity.email_change_request, the CHANGE_EMAIL
+        // step-up grant and its six definer capabilities. The next free prefix, no pair.
+        "0079_email_change.sql",
+        // Paid plans L3a (spec 2026-09-29 §2.3.2 and §2.16, amendments R1 A14/A15, RULINGS-R3 R3-1):
+        // legal.acceptance, the retention purge, the sign-up consent wrapper (with the age record)
+        // and the G3a country-gate audit capability. 0078 and 0079 are the colleague's consent and
+        // change-email files, so R3-1 moves this to 0080; no pair.
+        "0080_legal_acceptance.sql",
+        // Hate-speech S02 R10: append-only, content-free publication check record.
+        // Written as 0078 on the slice branch; renamed to the next free prefix after
+        // dev's 0078/0079/0080 when origin/dev merged in (INTEG-HS-dev). Idempotent
+        // statement by statement, so a database that applied it as 0078 re-applies it
+        // harmlessly under this name (the runner tracks migrations by full file name). No pair.
+        "0081_publication_check_record.sql",
+        // Hate-speech S02 FIX p1 (sd-N1, sd-N2): identifier grammar, call count and distinct members on the record.
+        // Written as 0079; renamed with its table's file (DROP CONSTRAINT IF EXISTS before each ADD). No pair.
+        "0082_publication_check_record_identifiers.sql",
+        // Budget spec 2026-09-28 (B3): the holds, the waiting line, the owner record of
+        // cheaper models, and the ALLOWANCE stop kind on serve.serve_disclosure. The
+        // spec named it 0077; dev's age gate took 0077, the sensitive-data consent holds
+        // 0078, the change-email turn 0079, legal acceptance is 0080 and dev's publication check
+        // record holds 0081 and 0082 (RULINGS-R3 R3-1). A new prefix, no pair.
+        "0083_budget_holds_waiting_line.sql",
+        // Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): the entitlement,
+        // the run's charge scope and the runner's windows view. The next free
+        // prefix after dev's 0077 (age gate), the colleague's 0078
+        // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
+        // (publication check record) and B3's 0083. No pair.
+        "0084_billing_entitlement.sql"
       ]);
   });
 });

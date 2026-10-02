@@ -1,0 +1,9 @@
+{
+  "billing.usage.title": "Използване на плана ви",
+  "billing.usage.line": "Днес {dayPct}% · Тази седмица {weekPct}% · Този месец {monthPct}%",
+  "billing.usage.lineFree": "Този месец {monthPct}%",
+  "billing.usage.day": "Днес",
+  "billing.usage.week": "Тази седмица",
+  "billing.usage.month": "Този месец",
+  "billing.usage.resets": "Нулира се: {time}"
+}

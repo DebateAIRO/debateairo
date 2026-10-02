@@ -190,5 +190,20 @@
   "public.report.error.tryAgain": "Non è stato possibile preparare il rapporto in questo momento. Riprova tra poco.",
   "public.story.morePaths.one": "e {count} altra posizione",
   "public.story.morePaths.many": "e altre {count} posizioni",
-  "public.story.morePaths.other": "e altre {count} posizioni"
+  "public.story.morePaths.other": "e altre {count} posizioni",
+  "public.publication.contentCheck.refusedHeading": "Non abbiamo pubblicato questo dibattito",
+  "public.publication.contentCheck.refusedWhatBlock": "Un controllo automatico ha trovato in questo dibattito del testo che viola le nostre regole, quindi il dibattito non è stato pubblicato.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Un controllo automatico non ha potuto confermare che questo dibattito rispetti le nostre regole, quindi il dibattito non è stato pubblicato.",
+  "public.publication.contentCheck.partsIntro": "Dove il controllo ha trovato il testo:",
+  "public.publication.contentCheck.part.question": "La domanda",
+  "public.publication.contentCheck.part.summary": "Il riepilogo, le note sul verdetto e le obiezioni rimanenti",
+  "public.publication.contentCheck.part.arguments": "Gli argomenti",
+  "public.publication.contentCheck.part.reviews": "I commenti dei revisori",
+  "public.publication.contentCheck.part.story": "Il racconto del verdetto",
+  "public.publication.contentCheck.groundTerms": "Motivo: le nostre Condizioni di servizio, sezione 7 (nessun contenuto che inciti alla violenza o all’odio).",
+  "public.publication.contentCheck.groundIllegal": "Il testo potrebbe anche essere illegale.",
+  "public.publication.contentCheck.automated": "Questa decisione è stata presa da uno strumento automatico. Nessuna persona l’ha ancora esaminata.",
+  "public.publication.contentCheck.stillPrivate": "Il dibattito resta privato e invariato. Solo tu puoi vederlo.",
+  "public.publication.contentCheck.appeal": "Per chiedere a una persona di riesaminare questa decisione, scrivi a [appeals@dezbatere.ro] entro sei mesi.",
+  "public.publication.contentCheck.unavailable": "Il controllo dei contenuti non è disponibile al momento, quindi non è stato pubblicato nulla. Il dibattito resta privato. Riprova tra qualche minuto."
 }

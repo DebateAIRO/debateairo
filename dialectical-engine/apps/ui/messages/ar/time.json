@@ -30,6 +30,7 @@
   "time.status.claimed": "تم استلامها",
   "time.status.running": "قيد التشغيل",
   "time.status.holding": "معلّقة لاسترداد المزوّد",
+  "time.status.waiting": "قيد الانتظار",
   "time.status.settled": "تمت تسويتها",
   "time.status.generating": "قيد التوليد",
   "time.status.failed": "فشلت",

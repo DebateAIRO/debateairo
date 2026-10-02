@@ -243,11 +243,51 @@ function latinDetection(text: string): ArgumentLanguageDetection {
   return detected(winner.tag);
 }
 
-function matrixClause(text: string): string {
-  return text.replace(
-    /«[^»]*»|„[^“”]*[“”]|“[^”]*”|‘[^’]*’|‹[^›]*›|「[^」]*」|『[^』]*』|"[^"]*"/gu,
-    " "
-  );
+// Each opening quotation mark and the marks that close it („ closes with “ or ”).
+const QUOTATION_CLOSERS: Readonly<Record<string, string>> = Object.freeze({
+  "«": "»", "„": "“”", "“": "”", "‘": "’", "‹": "›", "「": "」", "『": "』", "\"": "\""
+});
+
+/**
+ * Blanks every quoted span to one space, so only the claim's own words are scored.
+ * It blanks exactly what `text.replace(/«[^»]*»|„[^“”]*[“”]|“[^”]*”|‘[^’]*’|‹[^›]*›|「[^」]*」|『[^』]*』|"[^"]*"/gu, " ")`
+ * blanks, in one left-to-right pass: an opener's nearest closer is looked up once and
+ * reused until the scan passes it, so a long run of unclosed openers costs linear time
+ * where that pattern costs quadratic time (CodeQL js/polynomial-redos). Exported for its test.
+ */
+export function matrixClause(text: string): string {
+  const nearestCloser = new Map<string, number>();
+  const parts: string[] = [];
+  let kept = 0;
+  let at = 0;
+  while (at < text.length) {
+    const opener = text[at]!;
+    const closers = QUOTATION_CLOSERS[opener];
+    if (closers === undefined) {
+      at += 1;
+      continue;
+    }
+    let closer = nearestCloser.get(opener);
+    if (closer === undefined || (closer !== -1 && closer <= at)) {
+      closer = -1;
+      for (let index = at + 1; index < text.length; index += 1) {
+        if (closers.includes(text[index]!)) {
+          closer = index;
+          break;
+        }
+      }
+      nearestCloser.set(opener, closer);
+    }
+    if (closer === -1) {
+      at += 1;
+      continue;
+    }
+    parts.push(text.slice(kept, at), " ");
+    kept = closer + 1;
+    at = closer + 1;
+  }
+  parts.push(text.slice(kept));
+  return parts.join("");
 }
 
 /**

@@ -1,0 +1,1 @@
+{"name":"@debateai/geo","version":"0.1.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@debateai/kernel":"workspace:*","@debateai/register":"workspace:*","mmdb-lib":"2.2.1"}}

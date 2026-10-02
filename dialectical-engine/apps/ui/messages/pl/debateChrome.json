@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Wszystko w tej debacie — argumenty, recenzje, oceny i werdykt — jest generowane przez modele AI, oznaczone w sposób możliwy do odczytu maszynowego i może być niedokładne.",
+  "debateChrome.status.waiting": "Czeka na rozpoczęcie. Twoja debata rozpocznie się sama o {time}.",
+  "debateChrome.status.waitingOwnDebates": "Twoje pozostałe debaty wykorzystują na razie resztę Twojego limitu. Ta debata rozpocznie się sama, gdy tylko jedna z nich się zakończy.",
   "debateChrome.backToLibrary": "← Wróć do biblioteki",
   "debateChrome.loading": "Wczytywanie…",
   "debateChrome.error.claimGenerationFailed": "Generowanie tezy nie powiodło się",
@@ -291,5 +293,6 @@
   "requestFailure.kind.UNREADABLE": "Nie udało się odczytać odpowiedzi koordynatora, dlatego nie wiadomo, jaki jest wynik żądania.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordynator odrzucił wybór planu. Wybierz Bezpłatny lub Premium, a następnie ponów próbę.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordynator odrzucił żądanie: model wymagany przez ten plan jest obecnie niedostępny. Ponów próbę później lub wybierz inny plan.",
+  "requestFailure.kind.ALREADY_WAITING": "Naraz może czekać tylko jedno pytanie. Zadaj to pytanie, gdy rozpocznie się Twoja oczekująca debata.",
   "requestFailure.kind.UNCLASSIFIED": "Błąd wystąpił przed nadejściem odpowiedzi, dlatego nie wiadomo, jaki jest wynik żądania. Nie jest to decyzja koordynatora."
 }

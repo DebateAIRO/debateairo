@@ -1,6 +1,7 @@
 "use client";
 
 import { AiNotice } from "@/components/AiNotice";
+import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
 import miscEnglish from "@/messages/en/misc.json";
@@ -1180,6 +1181,14 @@ export default function DebatePageClient({
   // status gives way to it, as the verdict area's line does. The honesty
   // drawer keeps the true marks.
   const completionReason = floorView === null ? debate?.completion?.humanReason ?? null : null;
+  // Budget spec §2.11: a waiting debate says when it will start (sentence C),
+  // in the reader's time zone, formatted in the browser.
+  const waitingStart = debate?.run_state === "WAITING" && typeof debate.waits_until === "string"
+    ? debate.waits_until
+    : null;
+  // Final review Part 1b, Important 1: a debate that waits only for its
+  // person's own running debates says so in C's place, with no time.
+  const waitingOnOwnDebates = waitingStart !== null && debate?.waits_for === "OWN_DEBATES";
 
   const progress = useMemo(() => {
     if (!debate) return { pct: 0, label: "", count: "" };
@@ -1695,6 +1704,24 @@ export default function DebatePageClient({
           </section>
         )}
       </ScoringErrorBoundary>
+
+      {/* Budget spec §2.11: sentence C, with its start time, in its own full-width
+          line below the top bar. The top bar's status slot is clamped to one
+          ellipsed line and the claim row is hidden on a phone, so C lives here,
+          where it wraps and is never cut. */}
+      {waitingStart !== null ? (
+        <div className="debateWaitingNotice" role="status">
+          {waitingOnOwnDebates ? (
+            <span>{t(debateChromeCatalog, "debateChrome.status.waitingOwnDebates")}</span>
+          ) : (
+            <ResetSentence
+              text={t(debateChromeCatalog, "debateChrome.status.waiting", { time: RESET_TIME_MARK })}
+              at={waitingStart}
+              locale={locale}
+            />
+          )}
+        </div>
+      ) : null}
 
       {/* ---- generation progress strip ---- */}
       {generating ? (

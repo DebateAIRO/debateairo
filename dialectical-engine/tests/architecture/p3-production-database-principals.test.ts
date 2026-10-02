@@ -311,7 +311,7 @@ describe("P3-01 production database-principal manifest", () => {
           effectiveMemberships: [],
           ownsDatabases: ["debateai"],
           ownsSchemas: [
-            "audit_crypto_internal", "core", "evidence", "identity", "ledger",
+            "audit_crypto_internal", "billing", "core", "evidence", "identity", "ledger", "legal",
             "memory", "obs", "observation", "register", "scorecard", "serve", "support"
           ]
         });

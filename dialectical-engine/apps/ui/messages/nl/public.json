@@ -189,5 +189,20 @@
   "public.report.error.notAvailable": "Dit verslag is niet beschikbaar.",
   "public.report.error.tryAgain": "Het verslag kon nu niet worden gemaakt. Probeer het over een ogenblik opnieuw.",
   "public.story.morePaths.one": "en nog {count} standpunt",
-  "public.story.morePaths.other": "en nog {count} standpunten"
+  "public.story.morePaths.other": "en nog {count} standpunten",
+  "public.publication.contentCheck.refusedHeading": "We hebben dit debat niet gepubliceerd",
+  "public.publication.contentCheck.refusedWhatBlock": "Een automatische controle heeft in dit debat tekst gevonden die onze regels schendt. Daarom is het debat niet gepubliceerd.",
+  "public.publication.contentCheck.refusedWhatUnsure": "Een automatische controle kon niet bevestigen dat dit debat aan onze regels voldoet. Daarom is het debat niet gepubliceerd.",
+  "public.publication.contentCheck.partsIntro": "Waar de controle de tekst heeft gevonden:",
+  "public.publication.contentCheck.part.question": "De vraag",
+  "public.publication.contentCheck.part.summary": "De samenvatting, toelichtingen bij het oordeel en resterende bezwaren",
+  "public.publication.contentCheck.part.arguments": "De argumenten",
+  "public.publication.contentCheck.part.reviews": "De opmerkingen van de beoordelaars",
+  "public.publication.contentCheck.part.story": "Het verhaal achter het oordeel",
+  "public.publication.contentCheck.groundTerms": "Grondslag: onze Servicevoorwaarden, artikel 7 (geen inhoud die aanzet tot geweld of haat).",
+  "public.publication.contentCheck.groundIllegal": "De tekst kan ook onwettig zijn.",
+  "public.publication.contentCheck.automated": "Deze beslissing is genomen door een automatisch hulpmiddel. Er heeft nog niemand naar gekeken.",
+  "public.publication.contentCheck.stillPrivate": "Uw debat blijft privé en ongewijzigd. Alleen u kunt het zien.",
+  "public.publication.contentCheck.appeal": "Om een persoon te vragen deze beslissing te herzien, schrijft u binnen zes maanden naar [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.unavailable": "De inhoudscontrole is momenteel niet beschikbaar. Daarom is er niets gepubliceerd. Uw debat blijft privé. Probeer het over enkele minuten opnieuw."
 }

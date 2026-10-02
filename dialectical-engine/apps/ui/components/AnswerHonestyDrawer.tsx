@@ -8,6 +8,7 @@ import {
   abstentionKindLabel,
   conditionMarkLabel,
   conditionRecordLabel,
+  liftPathIsOperatorOnly,
   markLabelFromRecords,
   panelSpendStopKind,
   riskTierSourceLabel,
@@ -229,7 +230,7 @@ export function AnswerHonestyDrawer({
                     {panelSpendStopKind(record) !== null ? (
                       // A panel a spend stop cut short: the runner's remedy blames failed members (M2 carry).
                       <div className="drawerFindingText">{panelStoppedWords(panelSpendStopKind(record)!, catalog)}</div>
-                    ) : record.lift_path !== null ? (
+                    ) : record.lift_path !== null && !liftPathIsOperatorOnly(record) ? (
                       <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.liftPath", { liftPath: record.lift_path })}</div>
                     ) : null}
                   </li>

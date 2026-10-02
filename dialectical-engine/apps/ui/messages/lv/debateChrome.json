@@ -1,5 +1,7 @@
 {
   "debateChrome.aiNotice": "Visu šajās debatēs — argumentus, pārskatus, vērtējumus un spriedumu — ģenerē MI modeļi; saturs ir mašīnlasāmi marķēts un var būt neprecīzs.",
+  "debateChrome.status.waiting": "Gaida sākumu. Jūsu debates sāksies pašas {time}.",
+  "debateChrome.status.waitingOwnDebates": "Jūsu pārējās debates pagaidām izmanto atlikušo jūsu ierobežojuma daļu. Šīs debates sāksies pašas, tiklīdz kādas no tām beigsies.",
   "debateChrome.backToLibrary": "← Atpakaļ uz bibliotēku",
   "debateChrome.loading": "Ielādē…",
   "debateChrome.error.claimGenerationFailed": "Apgalvojuma ģenerēšana neizdevās",
@@ -284,5 +286,6 @@
   "requestFailure.kind.UNREADABLE": "Koordinatora atbildi neizdevās nolasīt, tāpēc iznākums nav zināms.",
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinators noraidīja plāna izvēli. Izvēlieties Bezmaksas vai Premium un pēc tam mēģiniet vēlreiz.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinators pieprasījumu noraidīja: kāds no šim plānam nepieciešamajiem modeļiem pašlaik nav pieejams. Mēģiniet vēlreiz vēlāk vai izvēlieties otru plānu.",
+  "requestFailure.kind.ALREADY_WAITING": "Vienlaikus gaidīt var tikai viens jautājums. Uzdodiet šo jautājumu, kad būs sākušās jūsu gaidošās debates.",
   "requestFailure.kind.UNCLASSIFIED": "Darbība neizdevās, pirms tika saņemta atbilde, tāpēc iznākums nav zināms. Koordinators šādu lēmumu nepieņēma."
 }
