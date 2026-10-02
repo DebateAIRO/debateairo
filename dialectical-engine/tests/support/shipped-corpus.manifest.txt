@@ -758,6 +758,7 @@ packages/register/src/runtime-environment.ts
 packages/register/src/session-policy.ts
 packages/register/src/story-policy.ts
 packages/register/src/support-config.ts
+packages/register/src/tax-authorities.ts
 packages/serve/src/index.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
