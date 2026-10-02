@@ -17,6 +17,7 @@ beforeAll(async () => {
 afterAll(async () => { await h?.stop(); });
 
 const MINUTE = 60_000;
+const DAY = 86_400_000;
 const IP = "198.51.100.7";
 const deps = () => subscriptionDeps(h.database.pool, {
   recordsKey: h.recordsKey, tax: h.tax, xmoney: h.xmoney, geo: h.geo, clock: h.clock.read
@@ -111,6 +112,47 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     await expect(quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "PRO", ip: IP, now: h.clock.now }))
       .rejects.toMatchObject({ code: "UPGRADE_NOT_AVAILABLE_NOW" });
     h.clock.now = new Date(end.getTime() + MINUTE);
+  });
+
+  it("refunds a day-old upgrade paid once the next period's renewal charge exists, and writes nothing", async () => {
+    const paid = await h.activate({ planId: "PLUS" });
+    const end = await h.periodEndOf(paid.subscriptionId);
+    const plusTotal = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).announcedTotalMicros;
+    h.clock.now = new Date(end.getTime() - 2 * DAY);
+    const quoted = await quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", ip: IP, now: h.clock.now });
+    expect(await startUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", quoteRef: quoted.quote_ref }))
+      .toMatchObject({ state: "PENDING" });
+    // The upgrade stays SUBMITTED (no drain). A day later it no longer holds the renewal, priced at the old plan.
+    h.clock.now = new Date(end.getTime() - MINUTE);
+    await h.renewal.runOnce();
+    const renewals = await renewalCharges(paid.subscriptionId);
+    expect(renewals).toHaveLength(1);
+    expect(renewals[0]).toMatchObject({ totalMicros: plusTotal, periodStart: end });
+    // The upgrade's payment verified now, before RENEWED moved the period: as P9b's VERIFY_PAYMENT calls it.
+    const upgrade = (await h.repository.chargesForSubscription(paid.subscriptionId)).find((row) => row.kind === "UPGRADE")!;
+    const read = (await h.repository.charge(upgrade.chargeId))!;
+    const transaction = h.xmoney.transactions.get(read.events.find((event) => event.kind === "SUBMITTED")!.xmoneyTransactionId!)!;
+    const quote = (await h.repository.quote(upgrade.quoteId!, paid.ownerRef))!;
+    const customer = (await h.repository.customerByOwner(paid.ownerRef))!;
+    const rowsBefore = (await h.entitlementRows(paid.ownerRef)).length;
+    const settlement = createUpgradeSettlement({ repository: h.repository, entitlements: h.entitlements, plans: testBillingPlans });
+    const result = await h.repository.withTransaction(async (client) => {
+      const events = await h.repository.subscriptionEvents(paid.subscriptionId, client);
+      return settlement.succeeded({
+        client, now: h.clock.now, charge: upgrade, transaction, subscription: foldSubscription(events), events, quote,
+        ownerRef: paid.ownerRef, customerId: customer.customerId, cardCountry: "RO"
+      });
+    });
+    expect(result).toEqual({ kind: "REFUND", reason: "SUBSCRIPTION_ENDED" });
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).some((event) => event.kind === "UPGRADED")).toBe(false);
+    expect(await h.entitlementRows(paid.ownerRef)).toHaveLength(rowsBefore);
+    // The real VERIFY_PAYMENT jobs: the renewal settles at PLUS, the upgrade goes back in full through RefundDesk.
+    await h.worker.drain(10);
+    const after = await h.repository.subscriptionEvents(paid.subscriptionId);
+    expect(after.at(-1)?.kind).toBe("RENEWED");
+    expect(foldSubscription(after).planId).toBe("PLUS");
+    expect((await h.repository.charge(upgrade.chargeId))!.events.find((event) => event.kind === "REFUND_REQUESTED"))
+      .toMatchObject({ errorCode: "SUBSCRIPTION_ENDED" });
   });
 
   it("refuses an upgrade quoted inside the renewal's lead", async () => {

@@ -290,7 +290,8 @@ export class RenewalService {
     // upgrade settles after P14a's 30-minute adoption wait), so it is R2 Q-1's pending renewal: the plan is kept by
     // one RENEWAL_PENDING row, written now — inside the lead, before the period end — so paid access never lapses
     // between two passes. The next period still starts at `periodStart`. A day-old unsettled upgrade no longer holds
-    // it: the UPGRADE settlement refunds that one if it is ever paid, its period being over.
+    // the renewal: if it is paid once this renewal's charge exists, or after RENEWED moved the period, the UPGRADE
+    // settlement refunds it in full and writes nothing.
     if (await this.upgradeUnsettled(state, charges, now)) {
       await this.holdPending(state, periodStart, now, "UPGRADE_UNSETTLED");
       return "skipped";

@@ -380,13 +380,14 @@ const PAYMENT_GOES_BACK: SettlementResult = Object.freeze({ kind: "REFUND" as co
 
 /**
  * The UPGRADE charge kind's settlement on P9b's `VerifyPaymentHandler`. A payment that can no longer buy the upgrade
- * — the subscription is no longer ACTIVE, it is already on this plan or above, or a renewal has closed the period
- * the upgrade was priced for — changes nothing and goes back in full through P9b's `RefundDesk` (reason
- * `SUBSCRIPTION_ENDED`, which leaves an ACTIVE subscription as it is). A declined upgrade changes nothing (spec
- * §2.5.6). Every read runs on the settlement's own connection.
+ * — the subscription is no longer ACTIVE, it is already on this plan or above, a renewal has closed the period the
+ * upgrade was priced for (RENEWED moved it), or the next period's RENEWAL charge already exists (priced and charged
+ * at the old plan, before RENEWED: the same signal `renewalUnderWay` refuses a new upgrade on) — changes nothing and
+ * goes back in full through P9b's `RefundDesk` (reason `SUBSCRIPTION_ENDED`, which leaves an ACTIVE subscription as
+ * it is). A declined upgrade changes nothing (spec §2.5.6). Every read runs on the settlement's own connection.
  */
 export function createUpgradeSettlement(deps: Readonly<{
-  repository: Pick<BillingRepository, "appendSubscriptionEvent" | "periodCreditOverride">;
+  repository: Pick<BillingRepository, "appendSubscriptionEvent" | "chargesForSubscription" | "periodCreditOverride">;
   entitlements: Pick<EntitlementRepository, "append">;
   plans: BillingPlans;
 }>): ChargeSettlement {
@@ -399,6 +400,10 @@ export function createUpgradeSettlement(deps: Readonly<{
       if (subscription.status !== "ACTIVE" || subscription.currentPeriodStart === null
         || planById(deps.plans, quote.planId).netPriceMicros <= planById(deps.plans, subscription.planId).netPriceMicros
         || !chargeInCurrentPeriod(charge, subscription)) {
+        return PAYMENT_GOES_BACK;
+      }
+      const charges = await deps.repository.chargesForSubscription(subscription.subscriptionId, client);
+      if (charges.some((row) => row.kind === "RENEWAL" && row.periodStart.getTime() === charge.periodEnd.getTime())) {
         return PAYMENT_GOES_BACK;
       }
       const currentOverride = await deps.repository.periodCreditOverride({
