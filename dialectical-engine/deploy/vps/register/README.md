@@ -61,10 +61,11 @@ the gate must not turn on by default.
 
 Do not add the member to `/etc/debateai/register/hosted-register.json`, or publish any version that
 carries it, until every condition in the kit's main README (§5 "Country data") holds: the site shows
-the DB-IP credit (`IP Geolocation by DB-IP`, linking to `https://db-ip.com`; the site does not show
-it yet), the owner has ruled that the Terms' list of served countries matches the switches, the
-Privacy Policy says that addresses are looked up locally, and the two data files are installed and
-refreshed. Then copy the member into the hosted file's top-level object and publish; a changed
+the DB-IP credit (`IP Geolocation by DB-IP`, linking to `https://db-ip.com`; the full site footer
+carries it since paid plans P21, so check it on the live landing page), the owner has ruled that
+the Terms' list of served countries matches the switches, the Privacy Policy says that addresses
+are looked up locally, and the two data files are installed and refreshed. The go-live checklist
+carries the four as lines 27–30. Then copy the member into the hosted file's top-level object and publish; a changed
 switch later is a new version, never an edit of a sealed one.
 
 ## What `sourceRef` becomes

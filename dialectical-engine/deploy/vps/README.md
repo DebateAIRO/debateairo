@@ -1760,3 +1760,472 @@ incident notes) have no production credential path at all, and `support:shred` l
 production credential at `secrets/api-support.json` under its working directory. Answering a
 case or shredding a conversation on this host is not possible until those are given production
 paths.
+
+---
+
+## 14. Billing (paid plans)
+
+Billing is **off** until you publish a `billingPolicy` version with `enabled: true`. Until then:
+
+- the billing routes answer 404;
+- the pricing page is "not found", and so are `/cancel` and `/withdraw`;
+- the full site footer (on the landing and the legal pages) shows no pricing, cancel or withdraw link and no card
+  marks; every legal link and the DB-IP credit stay;
+- the legal notice (`/legal`) says paid plans are not available yet;
+- Settings shows no subscription card;
+- the site keeps its site-wide daily limit only.
+
+Local mode never has billing at all. Spec: `docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md`.
+
+### 14.1 What you need before you start
+
+- An approved xMoney merchant account. In the xMoney dashboard, under Sites, find the site's id, its private key
+  and its public key.
+- A Quaderno account and its API key (Business plan).
+- A SmartBill account on the Platinum plan, with its API user and token.
+- The company details, filled in (§14.7).
+- The official Visa and Mastercard artwork files (§14.7).
+- Nobody but you ever sees a key. You paste each key into its file yourself, and no agent reads it.
+
+### 14.2 The key files and the API settings
+
+Every secret is a file the API reads as its own user, mode `0600`, in a `0700` directory (§3 "The key-file
+contract"). Create the directory once:
+
+```sh
+install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api/billing
+```
+
+Each file holds **one line** and nothing else:
+
+| File | The one line |
+|---|---|
+| `xmoney-private-key` | the site's private key, as the xMoney dashboard shows it |
+| `quaderno-api-key` | the Quaderno API key |
+| `smartbill-credentials` | `user:token`: the SmartBill API user, a colon, the token |
+| `owner-report-email` | the address the quarterly tax summary goes to |
+
+Run the four lines below as root, **one block at a time**: each asks for its value at a prompt, so the value never
+appears on screen, on a command line, in shell history or in an editor's temporary copy. Paste one, answer its
+prompt, then paste the next (a waiting prompt would take the next pasted line as its answer). Each file is created
+`0600` and owned by `debateai-api`. The single newline the prompt adds is accepted by `readCustodyAuthorizationHeader`
+and by `readCustodyTextSecretBytes` (which trims, A23). A file that already exists is never replaced: to change a key,
+remove its file on purpose, run its line again, then restart `debateai-api`. The address is not a secret, so its
+prompt shows what you type, and a typo is caught at once.
+
+```sh
+test ! -e /etc/debateai/api/billing/xmoney-private-key && (umask 0177 && systemd-ask-password 'xMoney private key' > /etc/debateai/api/billing/xmoney-private-key) && chown debateai-api:debateai-api /etc/debateai/api/billing/xmoney-private-key
+```
+
+```sh
+test ! -e /etc/debateai/api/billing/quaderno-api-key && (umask 0177 && systemd-ask-password 'Quaderno API key' > /etc/debateai/api/billing/quaderno-api-key) && chown debateai-api:debateai-api /etc/debateai/api/billing/quaderno-api-key
+```
+
+```sh
+test ! -e /etc/debateai/api/billing/smartbill-credentials && (umask 0177 && systemd-ask-password 'SmartBill user:token' > /etc/debateai/api/billing/smartbill-credentials) && chown debateai-api:debateai-api /etc/debateai/api/billing/smartbill-credentials
+```
+
+```sh
+test ! -e /etc/debateai/api/billing/owner-report-email && (umask 0177 && systemd-ask-password --echo=yes 'Owner report email address' > /etc/debateai/api/billing/owner-report-email) && chown debateai-api:debateai-api /etc/debateai/api/billing/owner-report-email
+```
+
+The `umask` runs in a subshell, so your own shell session's mask stays as it was. Check the directory — the two
+`find` lines printing nothing is the pass:
+
+```sh
+stat -c '%a %U %G %n' /etc/debateai/api/billing/*
+find /etc/debateai/api/billing -type f ! -perm 0600 -print
+find /etc/debateai/api/billing ! -user debateai-api -print
+```
+
+Add these lines to `/etc/debateai/api.env`. Their shapes are in `deploy/vps/env/api.env.example`:
+
+| Variable | Value |
+|---|---|
+| `XMONEY_PRIVATE_KEY_PATH` | `/etc/debateai/api/billing/xmoney-private-key` |
+| `XMONEY_PUBLIC_KEY` | the site's public key (not a secret) |
+| `XMONEY_SITE_ID` | the site id (not a secret) |
+| `XMONEY_API_BASE_URL` | `https://api-stage.xmoney.com` for the sandbox, `https://api.xmoney.com` for live. This also decides whether the card form is the sandbox one or the live one. |
+| `QUADERNO_API_KEY_PATH` | `/etc/debateai/api/billing/quaderno-api-key` |
+| `QUADERNO_API_BASE_URL` | the API address your Quaderno account shows (its sandbox address while testing) |
+| `SMARTBILL_CREDENTIALS_PATH` | `/etc/debateai/api/billing/smartbill-credentials` |
+| `SMARTBILL_API_BASE_URL` | SmartBill's API address, as X1's facts file records it |
+| `SMARTBILL_SERIES` | the invoice series agreed with the accountant |
+| `OWNER_REPORT_EMAIL_PATH` | `/etc/debateai/api/billing/owner-report-email` |
+
+The company's tax codes are not `api.env` settings. In `COMPANY` (`apps/ui/lib/legal/pages.ts`), fill `cui` with the
+CUI as digits only, never with `RO`, and `vat` with `{ kind: "registered", number: "RO…" }`, the RO VAT code (`RO`
+followed by the same digits). Copy the same values into `SELLER_COMPANY` (`packages/billing-core/src/company.ts`) in
+the same commit. The legal notice shows them on two rows, and every Romanian invoice carries one of them. Until the
+CUI is filled, the API refuses to switch billing on with `BILLING_COMPANY_FACTS_UNVERIFIED:cui`. If SmartBill wants
+the RO form (row 16 of `docs/architecture/smartbill-api-facts.md`), it also refuses with
+`BILLING_COMPANY_FACTS_UNVERIFIED:vat` until the VAT code is filled. §14.7 says how.
+
+Three more settings billing relies on are **already** in `api.env`, because the API has refused to start without
+them since the Terms records and the country gate arrived. Check them; do not add them twice:
+
+- `RECORDS_KEY_PATH`: the records key from §3. It keeps acceptance, billing and location evidence readable for 10
+  years, so the nightly backup escrows it as the sixth secret in the same envelope as the other five (§9). The
+  restore drill proves it with the line `RESTORE_DRILL_RECORDS_KEY bytes=32`; confirm that line once, as §9's owner
+  step says, before billing goes on. The API refuses to start without the key, and with
+  `RECORDS_KEY_PATH_MUST_BE_SEPARATE` if it points at another key's file.
+- `GEOIP_COUNTRY_DB_PATH` and `TOR_EXIT_LIST_PATH`: the two country files of §14.3. A hosted API refuses to start
+  without them (`GEOIP_PATHS_REQUIRED`).
+
+Billing needs no address setting of its own. xMoney's return link (`/checkout/return`) and every emailed link
+(`/cancel`, `/terms`, `/settings`, `/settings/card`, `/pricing`) are built from `PUBLIC_APP_URL`, the site address
+`api.env` already carries for the sign-up emails.
+
+When billing is on, the API refuses to start if any of the ten billing lines in the table is missing. It prints
+`BILLING_CONFIGURATION_INCOMPLETE` with the variable's name. It also refuses with
+`BILLING_REQUIRES_ENVELOPE_MEMBERS` if the published `costEnvelopePolicy` lacks the three budget members:
+`admission_close_basis_points`, `finish_up_to_basis_points` and `waiting_line_per_person`.
+
+The website needs one setting too. In `/etc/debateai/ui.env`, add `XMONEY_SDK_ORIGIN`:
+`https://secure-stage.xmoney.com` for the sandbox, `https://secure.xmoney.com` for live. It must match
+`XMONEY_API_BASE_URL`. Only the three card pages (`/checkout`, `/checkout/return` and `/settings/card`) load
+xMoney's form; every other page keeps its old security policy. Then restart both services:
+
+```sh
+systemctl restart debateai-api debateai-ui
+```
+
+### 14.3 The country files
+
+The country gate reads DB-IP's free country database and the Tor exit list.
+§5 "Country data — the GeoIP and Tor refresh" installs them and enables their daily timer; billing needs nothing more.
+Before switching billing on, check that the timer is listed and ran:
+
+```sh
+systemctl list-timers debateai-geoip-refresh.timer
+```
+
+DB-IP's free licence requires a credit link. The full site footer carries it on the landing, on every legal page and
+on every billing page, with the exact text "IP Geolocation by DB-IP", linking to db-ip.com. Do not remove it.
+
+### 14.4 Publishing the billing settings
+
+The hosted register file (§11) has four billing members:
+
+- `billingPlans`: the prices and monthly credits;
+- `billingPolicy`: `enabled`, the retry days and the withdrawal days;
+- `countryPolicy`: each country's two switches (left out, that version has no country gate at all);
+- `taxAuthorities`: where each tax is paid, for the summary.
+
+The kit's example (`deploy/vps/register/hosted-register.example.json`) carries `billingPlans` and `billingPolicy`
+with the spec's values and billing **off**: copy those two into `/etc/debateai/register/hosted-register.json`. It
+also carries `taxAuthorities`, equal to the code-owned text; copy that member only to correct the text (the register
+README's `taxAuthorities` row says what carrying it costs). `countryPolicy` is not in that example: it lives in
+`deploy/vps/register/country-policy.example.json`, and goes into the hosted file only once every condition of §5
+"Country data" holds (go-live lines 27–30). Then, inside a migrator window (§4 steps 2 and 5), check and publish:
+
+```sh
+pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json
+```
+
+```sh
+pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
+```
+
+Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`, then restart both. Every change
+below is the same: edit the file, dry-run, publish, pin, restart. A published version is never edited.
+
+**A price change reaches only new subscriptions.** Each subscription keeps the net price it was sold at (its
+`recurring_net_micros`) and renews at that price plus the current tax. So a `billingPlans` version with a new price
+reaches only new subscriptions; existing subscribers keep their price until a price-change command with the 30 days'
+notice of Terms §12 exists (it is not built yet).
+
+### 14.5 Tell xMoney where to send payment notices
+
+In the xMoney dashboard, go to **Sites → Payment Page** and set the notification URL to
+`https://dezbatere.ro/api/v1/billing/xmoney/notify` (use your site's own address when it is not dezbatere.ro). The
+notice travels the normal `/api/*` path through Caddy, so Caddy needs no change.
+
+**What the notice address answers.** It answers `200` with the body `OK` once it has stored the notice, and also to
+one it cannot decrypt, so xMoney stops resending garbage. There are two exceptions, both so that xMoney sends a real
+notice again (after about 1 minute, 5 minutes, 1 hour and 24 hours) instead of the person waiting up to a day for the
+daily reconciliation:
+
+- `429` when one address sends more notices than its admission budget allows (the `billing_notify` row);
+- `500` when the database could not store the notice.
+
+A run of `500` answers in xMoney's dashboard means the site's database is failing, not xMoney. A notice that never
+arrives is still found by the daily reconciliation.
+
+**The card pages' permissions.** Every page sends `Permissions-Policy: …, payment=(), …` (set in
+`apps/ui/next.config.mjs`). X0's recording shows whether xMoney's form needs the Payment Request API. If it does
+not, nothing changes. If it does, a code change (go-live line 20 and its note, item 6) makes the three card pages
+(`/checkout`, `/checkout/return`, `/settings/card`) send `payment=(self "https://secure.xmoney.com")` on live (the
+value of `XMONEY_SDK_ORIGIN`), and every other page keeps `payment=()`; that change ships like any other release.
+The website's middleware sets this on each request from `XMONEY_SDK_ORIGIN` in `ui.env`, so moving that setting from
+the sandbox to live takes a restart. No rebuild is needed for it, and there is nothing else to configure. Go-live
+line 20 checks it.
+
+**The card pages and 3-D Secure pop-ups.** Caddy sends `Cross-Origin-Opener-Policy: same-origin` on every page.
+X0's sandbox recording shows whether the bank's security check opens a pop-up window. If it does, add one path
+matcher to the site block in `/etc/caddy/Caddyfile`:
+
+- a matcher named `cardForm`, for the paths `/checkout`, `/checkout/return` and `/settings/card`;
+- a `header` line that sets `Cross-Origin-Opener-Policy same-origin-allow-popups` for `@cardForm` only.
+
+Then reload Caddy:
+
+```sh
+systemctl reload caddy
+```
+
+Every other page keeps `same-origin`.
+
+### 14.6 Switching a country's payments on
+
+A country in the "pay off until the tax registration is done" group opens like this:
+
+1. Register for tax there.
+2. In the file's `countryPolicy.countries`, set that country's `pay` to `true` and its `reason` to `OFFERED`.
+3. Publish as in §14.4.
+
+Signing up stays as it was. A country can never have `pay: true` with `signup: false`; the publish refuses it.
+
+### 14.7 The company details and the card marks
+
+**The company details.** The legal notice (`/legal`), the footer, the invoices and every email use the company
+details (name, registered office, trade register number, CUI, VAT, share capital, the person responsible, phone,
+emails) from **one place**: the `COMPANY` constant in `apps/ui/lib/legal/pages.ts`. The values in square brackets are
+blanks. They stay visible on the site until you fill them in.
+
+- Fill `cui` with the CUI as digits only, never with `RO` (the legal notice shows it on its CUI row).
+- The company is VAT-registered, so replace `[RO…]` in `vat: Object.freeze({ kind: "registered", number: "[RO…]" })`
+  with the RO VAT code: `RO` followed by the same digits (the legal notice's VAT row). Every Romanian invoice carries
+  one of these two codes.
+
+The API and the emails cannot read the website's files, so they read one copy of these details: `SELLER_COMPANY` in
+`packages/billing-core/src/company.ts`. Copy every value you change into it, exactly as you wrote it in `COMPANY`,
+and commit both files together. Then run the two checks below from the `dialectical-engine` folder. The first fails
+when the copy differs from `COMPANY` or the CUI carries `RO`; the second when the emails would print anything else:
+
+```sh
+pnpm exec vitest run tests/unit/billing-seller-company.test.tsx tests/unit/mail-company-facts.test.tsx
+```
+
+Until the CUI is filled, the API refuses to switch billing on with `BILLING_COMPANY_FACTS_UNVERIFIED:cui`. If SmartBill
+wants the RO form (row 16 of `docs/architecture/smartbill-api-facts.md`), it also refuses with
+`BILLING_COMPANY_FACTS_UNVERIFIED:vat` until the VAT code is filled.
+
+**The card marks.** Put the official Visa and Mastercard artwork at `apps/ui/public/payment-marks/visa.svg` and
+`apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only when its file is there.
+
+**The Terms archive.** Every published Terms and Privacy version is kept, by its fingerprint, under
+`apps/ui/legal/archive/` (one folder per language). `pnpm run generate:legal` adds the file for each new version.
+Never delete or edit a file there: each is a version someone accepted, and the confirmation email attaches the
+version the person accepted from there, even after the Terms change. The site lists them at `/terms/versions` and
+`/privacy/versions`, as both documents promise, and shows each one at its own address.
+
+### 14.8 Switching billing on, the tax summary, and disputes
+
+**Switching billing on.** Before this, make sure:
+
+- the go-live checklist's budget and billing rows are proven (rows 13–37);
+- the sandbox run of §14.9 passed.
+
+**Going from xMoney's sandbox to live on the same host.** Skip this if this host never ran with
+`XMONEY_API_BASE_URL=https://api-stage.xmoney.com`. The sandbox and live are two separate xMoney systems, and the live
+site never renews a sandbox plan, so a sandbox plan left open would stay active for ever. So, while the host still
+points at the sandbox:
+
+1. Sign in as each sandbox test account and cancel its plan in Settings (or withdraw it, within 14 days). A cancelled
+   plan whose month has not ended yet is fine: it is never renewed.
+2. Wait until every sandbox charge has an outcome. The payment checks run every few minutes; a charge still waiting
+   the next day is settled by the daily reconciliation.
+3. Check that both of these print 0:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_subscriptions FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'xmoney_environment') = 'stage' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CANCEL_REQUESTED')"
+```
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN'))"
+```
+
+4. Only then change `XMONEY_API_BASE_URL` to `https://api.xmoney.com` and `XMONEY_SDK_ORIGIN` to
+   `https://secure.xmoney.com`, and restart both services.
+
+The API checks this itself at start-up: pointed at live while a sandbox plan or charge is still open, it refuses to
+start and prints `BILLING_STAGE_RECORDS_OPEN` with the two counts. The first query can count a cancelled plan that
+had a later event (a card change, say) as open; the start-up check has the last word. If it refuses, put the sandbox
+address back, restart, close what is left, and try again.
+
+The sandbox plans and charges stay in the database, but they never count as sales:
+the quarterly tax summary and its email read only live charges.
+
+Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4. Also check that the published
+`costEnvelopePolicy` has real per-run and daily ceilings. The site's daily ceiling protects the company: it must be
+at least the expected daily spend of all subscribers. A first estimate is subscribers × day cap × 0.3; better, use
+the figure measured after the first paid debates.
+
+**Stopping sales, and switching billing off.** These are two different things. Almost always, you want the first.
+
+*To stop new sales,* publish a `countryPolicy` version that sets `pay: false` for every country, the default rule
+included. Each such row needs a valid reason, such as `TAX_NOT_READY` or `NOT_OFFERED`. Leave every `signup` as it is,
+and publish as in §14.4. Nobody can start a new plan then. Everything that looks after existing subscribers keeps
+running: renewals, the price-change and yearly emails (M3, M4), cancel in Settings, the emailed cancel link,
+withdrawal, xMoney's payment notices, refunds and the daily reconciliation. In plain words, one thing stops for them
+too: upgrades and card changes are refused. So a subscriber whose card is failing cannot replace it, and after the
+payment retries their plan ends and they move to Free.
+
+*To switch billing off* (`billingPolicy.enabled: false`), first check, on the same day, that all three of these
+print 0:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS live_subscriptions FROM billing.subscription_latest_v WHERE kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')"
+```
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_billing_jobs FROM billing.outbox WHERE done_at IS NULL AND dead_at IS NULL"
+```
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS unsettled_owner_withdrawals FROM billing.subscription_event w WHERE w.kind = 'WITHDRAWN' AND jsonb_extract_path_text(w.data, 'refund_by_owner') = 'true' AND NOT EXISTS (SELECT 1 FROM billing.withdrawal_owner_settlement s WHERE s.subscription_id = w.subscription_id)"
+```
+
+The first counts every subscription that is not over yet: created, active (a pending cancel included), past due and
+suspended. The second counts the refunds, invoices, credit notes, emails and payment checks still waiting. The third
+counts the withdrawals handed to you that you have not settled yet with `pnpm billing:withdraw --refund` (below): the
+first count leaves them out, because a withdrawn plan is over, but their refund is still owed, and the jobs your
+settlement writes would never run with billing off. Only when all three are 0, publish the version with
+`enabled: false`.
+
+Why they must be 0: with billing off, every billing route answers 404, including xMoney's payment notices, cancel,
+the emailed cancel link and withdraw (a 14-day legal right), and no billing job runs. When billing comes back on, every
+subscription whose period ended in between is charged at once, once for each missed period. A refund or a chargeback
+made at xMoney while billing is off is recorded only if billing comes back on within 120 days, and a payment only
+within 30 days. After that, you record it by hand.
+
+**The tax summary.** The owner's quarterly summary is also emailed on the 5th day after each quarter ends. It is
+built from our own charge records and shows, for each country or state:
+
+- the net sales;
+- the tax collected;
+- whether we are registered there;
+- where and by when to pay.
+
+To print it on demand for a quarter, run it as the API's own user with the API's settings. `sudo -u` does not read
+the unit's `EnvironmentFile`; `systemd-run` does, so the command reaches the database without the credential ever
+being on a command line. Change `2026-Q4` to the quarter you want:
+
+```sh
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:tax-summary --quarter 2026-Q4
+```
+
+**Disputes (chargebacks).** A disputed payment pauses the paid features. xMoney sends no signal when a dispute ends,
+so when xMoney tells you the outcome, record it with `pnpm billing:dispute`, giving the charge reference (find it
+with the command below: match the xMoney transaction id of the dispute) with `--charge` and the outcome with
+`--outcome won` or `--outcome lost`:
+
+- `won` gives the plan back;
+- `lost` ends it.
+
+The command below lists the chargebacks not recorded as won, each with its charge reference, the kind of charge,
+xMoney's transaction id, its `error_code`, when it arrived, and the subscription's state now. A charge-back counts as
+won only by a `CHARGEBACK_RESOLVED` on its own transaction. It is not a list of open disputes: a lost dispute writes
+no charge event, so it stays on the list. The state tells you which are still waiting (`SUSPENDED`) and which have
+ended (`ENDED`: either recorded as lost, or ended by the period-end sweep, when a won outcome can still be recorded):
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT e.charge_id, c.kind AS charge_kind, e.xmoney_transaction_id, e.error_code, e.at, s.kind AS subscription_now FROM billing.charge_event e JOIN billing.charge c ON c.charge_id = e.charge_id JOIN billing.subscription_latest_v s ON s.subscription_id = c.subscription_id WHERE e.kind = 'CHARGEBACK' AND NOT EXISTS (SELECT 1 FROM billing.charge_event r WHERE r.charge_id = e.charge_id AND r.kind = 'CHARGEBACK_RESOLVED' AND r.xmoney_transaction_id = e.xmoney_transaction_id) ORDER BY e.at"
+```
+
+An `error_code` of `DUPLICATE_PAYMENT` marks the charge-back of a second payment of the same order, which never paused
+the plan; an empty one is the plan's own payment. When one charge lists both, the command settles the plan's own
+charge-back first, so give the outcome of that dispute first, then run it again for the second payment's.
+
+Then record the outcome. The command asks for the two values at the prompt, so nothing has to be edited inside it:
+
+```sh
+# Paste the charge reference (32 characters) and press Enter; then type won or lost and press Enter.
+read -r CHARGE_REF && read -r OUTCOME && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:dispute --charge "$CHARGE_REF" --outcome "$OUTCOME"
+```
+
+It prints one line saying what it did. Two answers need a word:
+
+- `STILL_DISPUTED`: the dispute was won and is recorded, but another payment of the same subscription is still
+  charged back, so the paid features stay paused until that dispute's outcome is recorded too.
+- `BILLING_DISPUTE_AMBIGUOUS` (a refusal): you recorded `won`, the plan is no longer paused, and the charge still lists
+  more than one open charge-back, so the command cannot tell which one you mean. Nothing is written. Check both
+  disputes in the xMoney dashboard and report the case: it is settled by hand, not by running the command again.
+
+**A withdrawal sent by email or on the model form.** The Terms (§13) let a person in the EU, the EEA or the UK
+withdraw within 14 days by the model form attached to their confirmation email, or by any clear statement, sent to
+the company's address. You carry it out with `pnpm billing:withdraw`, the same day it arrives. It records the
+withdrawal as of the moment the statement arrived (a statement sent in time counts even if you run the command after
+the 14 days), ends the plan, queues the refund, and emails the person the confirmation (M8).
+
+First find the person's owner reference. If they wrote through the support chat while signed in, it is the
+`identity_owner_ref` of their case. `pnpm support:inbox` has no production credential on this host yet (§13), so
+match the case by when they wrote:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT case_id, identity_owner_ref, created_at, state FROM support.\"case\" WHERE identity_owner_ref IS NOT NULL ORDER BY created_at DESC LIMIT 20"
+```
+
+If they wrote only by email, reply and ask them to send the same statement from the support chat while signed in.
+The time you record is still the arrival of their first email. Then record the withdrawal; the command asks for the
+two values at the prompt:
+
+```sh
+# Paste the owner reference and press Enter; then the time the first statement arrived, in UTC (for example 2026-10-12T08:30:00Z), and press Enter.
+read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --received "$RECEIVED_AT"
+```
+
+If it prints that a refund made in the xMoney dashboard already touched one of the payments, nothing is refunded
+automatically. Work out what is still due, then settle it within 14 days of the withdrawal, in this order. Until you
+do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`.
+
+1. **First, in the xMoney dashboard,** refund the part due on the payment the dashboard refund touched. The command
+   cannot take money back from that payment: it refuses it and writes nothing.
+2. **Then run the command** with two amounts: the amount the site refunds on the other payments (`--refund`, `0.00`
+   when nothing is due there), and the amount you just refunded in the dashboard for this withdrawal (`--dashboard`,
+   `0.00` when none). The site records both, and the person's confirmation email (M8) names their sum.
+
+```sh
+# Paste the owner reference and press Enter; then the amount the site refunds (for example 12.10, or 0.00) and press Enter; then the amount you refunded in the xMoney dashboard (for example 5.00, or 0.00) and press Enter.
+read -r OWNER_REF && read -r REFUND && read -r DASHBOARD && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --refund "$REFUND" --dashboard "$DASHBOARD"
+```
+
+A withdrawal is settled once. Running the command a second time for the same withdrawal is refused.
+
+**A refund that could not be completed.** If xMoney refuses a refund the site asked for, or its outcome stays
+unknown after every retry, you get an email at once (O2, "A refund could not be completed and needs your
+attention") with the charge reference, the amount and the reason code. No more tries are made by themselves: look
+the charge up in the xMoney dashboard and settle the refund there by hand. The owner summary lists it until then.
+
+**When xMoney or the tax service is down at a renewal.** The plan stays active,
+and the renewal is retried quietly for up to 3 days (72 hours from the end of the paid month). Nobody is charged
+without a fresh price, and no "payment failed" email goes out. Only if there is still no answer after 3 days does the
+normal failed-payment path start: retries on days 1, 3 and 7, each with its email, and then the Free plan.
+
+**What the renewal pass writes to the API's journal** (`journalctl -u debateai-api`). The pass runs every minute and
+writes no report line while all is well. Two signals matter:
+
+| Signal | What it means | What to do |
+|---|---|---|
+| `"event":"billing.renewal.report"`, with `failed`, `taxRefused` and `codes` | One line for a minute's pass that had trouble. `failed` counts the renewals (or the pass's own steps) that failed, and `codes` lists their distinct codes, for example `TAX_SERVICE_UNAVAILABLE` while the tax service is down, which the 3 days above cover (an xMoney outage at the rebill is not counted here: it writes `"event":"billing.renewal.unknown"` instead). `taxRefused` counts renewals the tax service refused to price (a wrong or revoked Quaderno key, or a request it rejects): those are not an outage, so nobody is charged, no retry email goes out, and each such renewal also writes `"event":"billing.renewal.tax_refused"` once per period with Quaderno's code. | `failed` during a known outage: nothing. The same code minute after minute with no outage: read the API's other lines from the same minutes, and report the code. Any `taxRefused`: check the Quaderno key file and the Quaderno account at once; fix the key, restart `debateai-api`, and the next pass prices those renewals again. |
+| `[BILLING_RENEWAL_PENDING]` (a bare marker) | A whole minute's pass, or the billing upkeep it runs every 10 minutes, stopped with an error before it finished, most often because the database did not answer. It carries no diagnostic. The next minute tries again. | One: nothing. Every minute: renewals are not running. Check the database and the API's other lines from the same minutes; once the database answers, the next pass catches up by itself. |
+
+**e-Factura.** SmartBill sends each Romanian invoice to ANAF itself, through a setting in your SmartBill account. The
+site does not read the e-Factura status back, so check it in SmartBill or in ANAF's SPV, as your accountant advises.
+The quarterly summary lists the quarter's Romanian invoices and credit notes under
+"Romanian e-Factura documents to confirm", as the list to check. Each line names the document as its series and
+number joined by a dash (for example `DBAI-0042`).
+
+When you have ANAF's answer for a document, record it with `pnpm billing:efactura-status`, giving the document with
+`--invoice` and the answer with `--status ACCEPTED` or `--status REJECTED`. An accepted document leaves the list; a
+rejected one stays on it with its status, so you can see what still needs your accountant. The command asks for the
+two values at the prompt:
+
+```sh
+# Paste the document exactly as the summary prints it (for example DBAI-0042) and press Enter; then type ACCEPTED or REJECTED and press Enter.
+read -r INVOICE && read -r STATUS && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:efactura-status --invoice "$INVOICE" --status "$STATUS"
+```
+
+It prints one line naming the document it recorded. A document the site never issued is refused
+(`EFACTURA_DOCUMENT_UNKNOWN`) and nothing is written.
