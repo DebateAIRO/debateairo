@@ -23,9 +23,12 @@ export class BillingJobQueries {
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('debateai.billing.owner:'||$1,0))", [ownerRef]);
   }
 
-  /** The subscription's session lease (a rebill, a dunning retry, a period-end ending). */
+  /**
+   * The subscription's session lease (a rebill, a dunning retry, a period-end ending, an upgrade). `use` receives the
+   * lease's own connection (P12c), so a holder can run its transactions on it without a second pool connection.
+   */
   async withSubscriptionLease<T>(
-    subscriptionId: string, use: () => Promise<T>
+    subscriptionId: string, use: (client: PoolClient) => Promise<T>
   ): Promise<Readonly<{ kind: "RAN"; value: T }> | Readonly<{ kind: "BUSY" }>> {
     return this.withLease(`${SUBSCRIPTION_LEASE_NAMESPACE}${subscriptionId}`, use);
   }
@@ -33,10 +36,12 @@ export class BillingJobQueries {
   /**
    * A session-level try-lock on `key`, held across an external call (a rebill, a refund call). Two API processes
    * sharing the database never both make the call: the loser gets BUSY and moves on. The lock is released before the
-   * connection returns to the pool; a connection that cannot confirm the release is destroyed.
+   * connection returns to the pool; a connection that cannot confirm the release is destroyed. `use` is handed the
+   * connection that holds the lock (P12c: `withTransactionOn` runs a holder's writes on it); the lock is released only
+   * after `use` has finished with it.
    */
   async withLease<T>(
-    key: string, use: () => Promise<T>
+    key: string, use: (client: PoolClient) => Promise<T>
   ): Promise<Readonly<{ kind: "RAN"; value: T }> | Readonly<{ kind: "BUSY" }>> {
     const client = await this.pool.connect();
     let failure: unknown;
@@ -46,7 +51,7 @@ export class BillingJobQueries {
       );
       if (locked.rows[0]?.locked !== true) return Object.freeze({ kind: "BUSY" as const });
       try {
-        return Object.freeze({ kind: "RAN" as const, value: await use() });
+        return Object.freeze({ kind: "RAN" as const, value: await use(client) });
       } finally {
         const unlocked = await client.query<{ unlocked: boolean }>(
           "SELECT pg_advisory_unlock(hashtextextended($1,0)) AS unlocked", [key]

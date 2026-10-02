@@ -965,6 +965,27 @@ export async function withWriteTransaction<T>(
   }
 }
 
+/**
+ * `withWriteTransaction` on a connection the caller already holds (a session lease's): BEGIN, the operation, COMMIT,
+ * or ROLLBACK on failure, under the same write-transaction marker, so `assertNoOpenWriteTransaction` refuses a
+ * provider call inside it exactly as it does inside `withWriteTransaction`. The connection is NOT released here: its
+ * owner (the lease) releases it after its own last use.
+ */
+export async function withWriteTransactionOn<T>(
+  client: PoolClient,
+  operation: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  try {
+    await client.query("BEGIN");
+    const result = await writeTransaction.run(true, () => operation(client));
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
+}
+
 export function assertNoOpenWriteTransaction(): void {
   if (writeTransaction.getStore() === true) {
     throw new TypedDomainError("PROVIDER_CALL_INSIDE_TRANSACTION", "A provider call cannot run inside a write transaction");

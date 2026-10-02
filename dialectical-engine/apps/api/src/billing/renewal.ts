@@ -285,6 +285,16 @@ export class RenewalService {
     const periodStart = state.currentPeriodEnd!;
     const charges = await this.deps.repository.chargesForSubscription(subscriptionId);
     if (charges.some((charge) => charge.kind === "RENEWAL" && charge.periodStart.getTime() === periodStart.getTime())) return "skipped";
+    // P12c: an upgrade of this period still waiting for its payment settles first, so the renewal is priced at the
+    // plan it settles to; the next 60-second pass tries again. The wait can outlast the period end (an unknown
+    // upgrade settles after P14a's 30-minute adoption wait), so it is R2 Q-1's pending renewal: the plan is kept by
+    // one RENEWAL_PENDING row, written now — inside the lead, before the period end — so paid access never lapses
+    // between two passes. The next period still starts at `periodStart`. A day-old unsettled upgrade no longer holds
+    // it: the UPGRADE settlement refunds that one if it is ever paid, its period being over.
+    if (await this.upgradeUnsettled(state, charges, now)) {
+      await this.holdPending(state, periodStart, now, "UPGRADE_UNSETTLED");
+      return "skipped";
+    }
     const priced = await this.pricedOrPending(state, periodStart, now);
     if (priced === null) return "dunning";
     const decision = renewalNoticeDecision({
@@ -305,6 +315,17 @@ export class RenewalService {
     if (created === null) return "skipped";
     await this.submit(created.charge, created.state, now);
     return "charged";
+  }
+
+  /** An UPGRADE charge of the current period (P12c's key: it ends with the period) with no outcome yet. */
+  private async upgradeUnsettled(state: SubscriptionState, charges: ReadonlyArray<ChargeRow>, now: Date): Promise<boolean> {
+    for (const charge of charges) {
+      if (charge.kind !== "UPGRADE" || charge.periodEnd.getTime() !== state.currentPeriodEnd?.getTime()) continue;
+      if (now.getTime() - charge.createdAt.getTime() >= 86_400_000) continue;
+      const read = await this.deps.repository.charge(charge.chargeId);
+      if (read !== null && !read.events.some((event) => event.kind === "SUCCEEDED" || event.kind === "FAILED")) return true;
+    }
+    return false;
   }
 
   /**

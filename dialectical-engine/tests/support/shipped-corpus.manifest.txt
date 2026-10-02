@@ -50,6 +50,7 @@ apps/api/src/billing/subscription-core.ts
 apps/api/src/billing/subscription-deps.ts
 apps/api/src/billing/subscription-routes.ts
 apps/api/src/billing/subscription-view.ts
+apps/api/src/billing/upgrade.ts
 apps/api/src/billing/usage.ts
 apps/api/src/billing/verify-payment.ts
 apps/api/src/boot-custody.ts
@@ -592,6 +593,7 @@ packages/billing-core/src/money.ts
 packages/billing-core/src/plan-lookup.ts
 packages/billing-core/src/ports.ts
 packages/billing-core/src/subscription.ts
+packages/billing-core/src/upgrade-credit.ts
 packages/billing-core/src/windows.ts
 packages/billing-core/src/withdrawal-deadline.ts
 packages/budget/src/cost-envelope.ts

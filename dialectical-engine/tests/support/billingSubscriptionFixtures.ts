@@ -3,13 +3,14 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, type CustomerXMoneyEnvironment } from "@debateai/db";
 import { computeWindows } from "@debateai/billing-core";
+import { TypedDomainError } from "@debateai/kernel";
 import { planById, type PlanId } from "@debateai/register";
 import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
 import { sealBillingProfile, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { installSubscriptionRoutes } from "../../apps/api/src/billing/subscription-routes.js";
 import type { SubscriptionRouteDeps } from "../../apps/api/src/billing/subscription-deps.js";
-import { AdjustableTaxEngine, testBillingPlans, testBillingPolicy } from "./billingFixtures.js";
+import { AdjustableTaxEngine, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy } from "./billingFixtures.js";
 import type { TestHttpIdentity } from "./httpSession.js";
 
 /** A generated records key: tests never hold a real one. */
@@ -145,6 +146,14 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     legal: { requiresReacceptance: async () => false },
     audit: recordingAudit(),
     clock: () => new Date(),
+    xmoney: {
+      rebill: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "no fake configured"); }
+    },
+    // The connectors' xMoney system in these tests, as P6a's fakes and `seedActiveSubscription`'s default.
+    xmoneyEnvironment: "stage",
+    countryPolicy: testCountryPolicy,
+    geo: new StubGeo(),
+    kick: () => undefined,
     ...overrides
   });
 }

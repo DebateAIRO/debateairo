@@ -27,6 +27,7 @@ import { createInitialSettlement } from "./settlement-initial.js";
 import { createRenewalSettlement } from "./settlement-renewal.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
+import { createUpgradeSettlement } from "./upgrade.js";
 import { VerifyPaymentHandler } from "./verify-payment.js";
 
 /**
@@ -110,6 +111,8 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     repository, entitlements, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl
   });
   verify.registerSettlement("RENEWAL", renewalSettlement);
+  // P12c: a paid upgrade changes the plan only here, inside VERIFY_PAYMENT's one transaction (A3f).
+  verify.registerSettlement("UPGRADE", createUpgradeSettlement({ repository, entitlements, plans: deps.plans }));
   // P11a: `drain` is declared below; the kick only runs once a tick does. P15 adds
   // `erasurePending: erasurePendingOf(repository)` here, over `billing.owner_erasure_pending` (which P15 makes answer
   // true for an `age_frozen` owner as well, R3-2).
@@ -181,7 +184,14 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     publicAppUrl: deps.connectors.publicAppUrl,
     legal: deps.legal,
     audit: deps.audit,
-    clock: deps.clock
+    clock: deps.clock,
+    // P12c: the upgrade's rebill, its xMoney system (D5 5h), checkout's country gate and the outbox kick (`drain` is
+    // declared below; the kick only runs once an upgrade is submitted).
+    xmoney: deps.connectors.xmoney,
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
+    countryPolicy: deps.countryPolicy,
+    geo: deps.geo,
+    kick: () => drain()
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({

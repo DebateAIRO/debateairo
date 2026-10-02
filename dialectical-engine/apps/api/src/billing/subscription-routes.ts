@@ -2,13 +2,18 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   BillingDowngradeRequestSchema,
   BillingInvoicesResponseSchema,
-  BillingSubscriptionResponseSchema
+  BillingSubscriptionResponseSchema,
+  BillingUpgradeQuoteRequestSchema,
+  BillingUpgradeQuoteResponseSchema,
+  BillingUpgradeRequestSchema,
+  BillingUpgradeResponseSchema
 } from "@debateai/contract";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
 import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
 import { cancelForOwner, revokeCancelForOwner, scheduleDowngrade } from "./subscription-actions.js";
 import { listInvoices, readSubscriptionView } from "./subscription-view.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
+import { quoteUpgrade, startUpgrade } from "./upgrade.js";
 
 /** The subscriber's routes; B7a's `BILLING_ROUTE_PATHS` spreads this list, so the two never drift. */
 export const SUBSCRIPTION_ROUTE_PATHS = Object.freeze([
@@ -16,7 +21,9 @@ export const SUBSCRIPTION_ROUTE_PATHS = Object.freeze([
   "GET /v1/billing/invoices",
   "POST /v1/billing/subscription/downgrade",
   "POST /v1/billing/subscription/cancel",
-  "POST /v1/billing/subscription/cancel-revoke"
+  "POST /v1/billing/subscription/cancel-revoke",
+  "POST /v1/billing/subscription/upgrade-quote",
+  "POST /v1/billing/subscription/upgrade"
 ] as const);
 export type SubscriptionRoutePath = typeof SUBSCRIPTION_ROUTE_PATHS[number];
 
@@ -89,6 +96,26 @@ export function installSubscriptionRoutes(
       return reply.status(204).send();
     });
   });
-  // P12c (the upgrade quote, which reads the caller's address) is the first route to read `source`.
-  void source;
+  api.post("/v1/billing/subscription/upgrade-quote", policy("POST /v1/billing/subscription/upgrade-quote"), async (request, reply) => {
+    if (deps === undefined) return notFound(reply);
+    const ownerRef = ownerOf(request);
+    if (ownerRef === null) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+    const parsed = BillingUpgradeQuoteRequestSchema.safeParse(request.body);
+    if (!parsed.success) return malformed(reply);
+    // Every quote is a paid tax call: the same sealed per-owner budget as checkout's quote (P8b's billingQuote).
+    if (!admit.gate(reply, "billingQuote", "POST /v1/billing/subscription/upgrade-quote", ownerRef)) return reply;
+    return answer(reply, async () => reply.send(BillingUpgradeQuoteResponseSchema.parse(await quoteUpgrade(deps, {
+      ownerRef, planId: parsed.data.plan_id, ip: source(request).ip, now: deps.clock()
+    }))));
+  });
+  api.post("/v1/billing/subscription/upgrade", policy("POST /v1/billing/subscription/upgrade"), async (request, reply) => {
+    if (deps === undefined) return notFound(reply);
+    const ownerRef = ownerOf(request);
+    if (ownerRef === null) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+    const parsed = BillingUpgradeRequestSchema.safeParse(request.body);
+    if (!parsed.success) return malformed(reply);
+    return answer(reply, async () => reply.send(BillingUpgradeResponseSchema.parse(await startUpgrade(deps, {
+      ownerRef, planId: parsed.data.plan_id, quoteRef: parsed.data.quote_ref
+    }))));
+  });
 }

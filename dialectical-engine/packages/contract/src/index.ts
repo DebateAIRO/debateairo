@@ -438,6 +438,36 @@ export const BillingInvoicesResponseSchema = z.object({
 }).strict();
 export type BillingInvoicesResponse = z.infer<typeof BillingInvoicesResponseSchema>;
 
+/** P12c: an upgrade goes to a dearer paid plan; Plus is never an upgrade target. */
+export const BillingUpgradeQuoteRequestSchema = z.object({ plan_id: z.enum(["PRO", "MAX"]) }).strict();
+/**
+ * P12c (A7): the prorated difference with its tax, and the new plan's full recurring total the next renewal charges.
+ * `tax_rate_basis_points` is not required to be whole: a US combined rate such as 8.875 % is 887.5 basis points
+ * (0085's `numeric(8,2)`).
+ */
+export const BillingUpgradeQuoteResponseSchema = z.object({
+  quote_ref: z.uuid(),
+  plan_id: z.enum(["PRO", "MAX"]),
+  net: BillingDecimalMoneySchema,
+  tax: BillingDecimalMoneySchema,
+  total: BillingDecimalMoneySchema,
+  tax_name: z.string().min(1).max(64),
+  tax_rate_basis_points: z.number().nonnegative().max(10_000),
+  tax_country: z.string().regex(/^[A-Z]{2}$/u),
+  recurring_total: BillingDecimalMoneySchema,
+  renews_on: z.iso.datetime(),
+  expires_at: z.iso.datetime()
+}).strict();
+export type BillingUpgradeQuoteResponse = z.infer<typeof BillingUpgradeQuoteResponseSchema>;
+export const BillingUpgradeRequestSchema = z.object({ plan_id: z.enum(["PRO", "MAX"]), quote_ref: z.uuid() }).strict();
+/** P12c: the upgrade charge's state; the plan changes only once VERIFY_PAYMENT confirms the payment. */
+export const BillingUpgradeResponseSchema = z.object({
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u),
+  state: z.enum(["PENDING", "SUCCEEDED", "FAILED"]),
+  reason_code: z.enum(["PAYMENT_DECLINED", "VOIDED", "REBILL_REFUSED", "NO_TRANSACTION"]).nullable()
+}).strict();
+export type BillingUpgradeResponse = z.infer<typeof BillingUpgradeResponseSchema>;
+
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
  * `core.run.argument_language_tag` (a BCP-47 tag, "und" when detection was not
@@ -1240,7 +1270,9 @@ export const contractInventory = Object.freeze({
     "GET /v1/billing/invoices",
     "POST /v1/billing/subscription/downgrade",
     "POST /v1/billing/subscription/cancel",
-    "POST /v1/billing/subscription/cancel-revoke"
+    "POST /v1/billing/subscription/cancel-revoke",
+    "POST /v1/billing/subscription/upgrade-quote",
+    "POST /v1/billing/subscription/upgrade"
   ]),
   resources: Object.freeze({
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
@@ -1266,6 +1298,8 @@ export const contractInventory = Object.freeze({
     AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
-    BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema
+    BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
+    BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
+    BillingUpgradeResponseSchema
   })
 });

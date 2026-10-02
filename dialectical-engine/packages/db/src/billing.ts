@@ -9,7 +9,7 @@ import {
   type SubscriptionState,
   type TaxStatus
 } from "@debateai/billing-core";
-import { withWriteTransaction } from "./index.js";
+import { withWriteTransaction, withWriteTransactionOn } from "./index.js";
 
 /**
  * PAID PLANS (spec 2026-09-29 §2.5.2; amendments R1 A2/A3/A17/A21) — every SQL statement over
@@ -262,6 +262,33 @@ export class BillingRepository {
 
   withTransaction<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
     return withWriteTransaction(this.pool, fn);
+  }
+
+  /**
+   * `withTransaction` on a connection the caller already holds (P12c: the subscription lease's own), so a lease
+   * holder never waits on the pool for a second connection. The caller keeps and releases the connection.
+   */
+  withTransactionOn<T>(client: PoolClient, fn: (c: PoolClient) => Promise<T>): Promise<T> {
+    return withWriteTransactionOn(client, fn);
+  }
+
+  /**
+   * P12c/P14b (A6): the month-credit override in force for this subscription's plan in the current period — the
+   * one on its latest entitlement event of that plan effective in [since, until] — or null (the plan's own credit).
+   * A settlement reads it on VERIFY_PAYMENT's own connection (`executor`).
+   */
+  async periodCreditOverride(
+    input: Readonly<{ subscriptionId: string; planId: string; since: Date; until: Date }>,
+    executor: BillingReadExecutor = this.pool
+  ): Promise<number | null> {
+    const row = (await executor.query<{ override: string | null }>(`
+      SELECT month_credit_override_micros::text AS override
+      FROM billing.entitlement_event
+      WHERE subscription_id = $1 AND plan_id = $2 AND effective_at >= $3 AND effective_at <= $4
+      ORDER BY effective_at DESC, recorded_at DESC
+      LIMIT 1
+    `, [input.subscriptionId, input.planId, input.since, input.until])).rows[0];
+    return row === undefined || row.override === null ? null : micros(row.override);
   }
 
   /**

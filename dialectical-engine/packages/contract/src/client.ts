@@ -37,6 +37,8 @@ import {
   BillingChargeStatusResponseSchema,
   BillingInvoicesResponseSchema,
   BillingSubscriptionResponseSchema,
+  BillingUpgradeQuoteResponseSchema,
+  BillingUpgradeResponseSchema,
   BillingUsageResponseSchema,
   DeploymentSchema,
   ExecutionLedgerDigestSchema,
@@ -74,6 +76,8 @@ import {
   type BillingChargeStatusResponse,
   type BillingInvoicesResponse,
   type BillingSubscriptionResponse,
+  type BillingUpgradeQuoteResponse,
+  type BillingUpgradeResponse,
   type BillingUsageResponse,
   type Deployment,
   type EmailChangePending,
@@ -418,6 +422,9 @@ export interface ContractClient {
   downgradeSubscription(planId: "PLUS" | "PRO"): Promise<void>;
   cancelSubscription(): Promise<void>;
   revokeSubscriptionCancel(): Promise<void>;
+  /** P12c: the prorated upgrade price with tax and the new plan's recurring total; spend it with `upgradeSubscription`. */
+  quoteSubscriptionUpgrade(planId: "PRO" | "MAX"): Promise<BillingUpgradeQuoteResponse>;
+  upgradeSubscription(planId: "PRO" | "MAX", quoteRef: string): Promise<BillingUpgradeResponse>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;
   readAnswerIndex(limit: number, offset: number): Promise<AnswerIndex>;
@@ -731,6 +738,14 @@ export function createContractClient(
     ),
     revokeSubscriptionCancel: () => requestNoContent(
       root.href, fetchImplementation, "/v1/billing/subscription/cancel-revoke", { method: "POST" }, auth
+    ),
+    quoteSubscriptionUpgrade: (planId: "PRO" | "MAX") => request(
+      "/v1/billing/subscription/upgrade-quote", BillingUpgradeQuoteResponseSchema,
+      { method: "POST", body: JSON.stringify({ plan_id: planId }) }
+    ),
+    upgradeSubscription: (planId: "PRO" | "MAX", quoteRef: string) => request(
+      "/v1/billing/subscription/upgrade", BillingUpgradeResponseSchema,
+      { method: "POST", body: JSON.stringify({ plan_id: planId, quote_ref: quoteRef }) }
     ),
     readSession: () => request("/v1/session", SessionSchema),
     readDeployment: () => request("/v1/deployment", DeploymentSchema),

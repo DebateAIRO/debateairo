@@ -74,7 +74,9 @@ export type BillingAuditEvent =
   /** P12b: a pending cancel was revoked. No field. */
   | "billing.cancel.revoked"
   /** P12b: a downgrade to a lower plan was scheduled for the next renewal; the field is the plan id. */
-  | "billing.downgrade.scheduled";
+  | "billing.downgrade.scheduled"
+  /** P12c: an upgrade charge was written and its rebill is about to be sent; the field is the plan id. */
+  | "billing.upgrade.requested";
 
 export type BillingAuditField = string | number | boolean | null;
 export type BillingAudit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => void;

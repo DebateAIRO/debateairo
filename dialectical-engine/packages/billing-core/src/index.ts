@@ -11,6 +11,8 @@ export {
   upgradeProrationMicros,
   withdrawalRefundMicros
 } from "./money.js";
+// P12c (A6): the month credit after an upgrade.
+export { upgradeMonthCreditOverrideMicros } from "./upgrade-credit.js";
 export { addBusinessDays, businessDaysBetween, invoiceIssuerFor, periodBoundary } from "./calendar.js";
 export {
   SUBSCRIPTION_EVENT_KINDS,
