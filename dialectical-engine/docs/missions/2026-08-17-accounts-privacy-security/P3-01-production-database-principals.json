@@ -409,6 +409,14 @@
           "environmentKey": "DATABASE_URL",
           "purpose": "LEGACY_ASK_ADMISSION_POOL",
           "binding": "WIRED"
+        },
+        {
+          "component": "apps/api:billing-dispute-cli",
+          "sourceFile": "apps/api/src/billing/dispute-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_DISPUTE_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:dispute"
         }
       ]
     },

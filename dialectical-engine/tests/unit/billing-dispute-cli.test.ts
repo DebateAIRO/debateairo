@@ -28,6 +28,9 @@ describe("P14b the dispute command", () => {
     expect(renderDisputeResult("ENDED_DISPUTE", { chargeRef: REF, outcome: "lost" })).toContain("has ended");
     expect(renderDisputeResult("SECOND_PAYMENT", { chargeRef: REF, outcome: "won" })).toContain("second payment");
     expect(renderDisputeResult("SECOND_PAYMENT", { chargeRef: REF, outcome: "lost" })).toContain("plan is unchanged");
+    expect(renderDisputeResult("STILL_DISPUTED", { chargeRef: REF, outcome: "won" })).toBe(`The dispute on charge ${REF}`
+      + " was won and is recorded. Another payment of this subscription is still disputed, so the paid features stay"
+      + " paused until that dispute's outcome is recorded.\n");
     const usage = output();
     expect(await runBillingDisputeCli(["--charge"], usage.sink, vi.fn())).toBe(2);
     expect(usage.lines.err).toBe("BILLING_DISPUTE_USAGE\n");

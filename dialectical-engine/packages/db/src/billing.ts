@@ -96,7 +96,7 @@ export type OutboxJob = Readonly<{
 /**
  * P16b's row (R-31): one SALE per SUCCEEDED event of an INITIAL, RENEWAL or UPGRADE charge (`amountMicros` = the
  * charge total), one REFUND per REFUNDED event (`amountMicros` = the refunded amount), one CHARGEBACK per CHARGEBACK
- * event on a charge with no CHARGEBACK_RESOLVED (`amountMicros` = the event's amount, else the charge total). Only
+ * event whose own transaction has no CHARGEBACK_RESOLVED (`amountMicros` = the event's amount, else the charge total). Only
  * charges of the xMoney system `quarterSummaryRows` is asked for: a sandbox payment is never a sale. `at` is when
  * xMoney says the money moved (the event's `xmoney_created_at`, present only on a SUCCEEDED or on a REFUNDED that is
  * its own refund transaction), else when it was recorded — so a refund or charge-back of the payment itself is dated
@@ -849,6 +849,9 @@ export class BillingRepository {
         AND NOT EXISTS (
           SELECT 1 FROM billing.charge_event AS resolved
           WHERE dated.kind = 'CHARGEBACK' AND resolved.charge_id = dated.charge_id AND resolved.kind = 'CHARGEBACK_RESOLVED'
+            -- Settled per transaction (0086's (xmoney_transaction_id, kind) key): another payment's won dispute on
+            -- the same charge never hides this one.
+            AND resolved.xmoney_transaction_id = dated.xmoney_transaction_id
         )
       ORDER BY dated.money_at, charge.charge_id, dated.seq
     `, [from, to, environment])).rows;

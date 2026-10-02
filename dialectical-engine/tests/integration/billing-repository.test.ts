@@ -483,6 +483,9 @@ describe("P1b — invoices, notices and the tax summary", () => {
       // A second payment of the same charge, charged back too: it was never a sale, so it gives no row.
       await billing.appendChargeEvent(c, event(open.chargeId, "DUPLICATE_PAYMENT", paidAt, "32003", 24_200_000));
       await billing.appendChargeEvent(c, event(open.chargeId, "CHARGEBACK", disputedAt, "32003", 24_200_000));
+      // The second payment's dispute is won back: that settles transaction 32003 only, never the open charge-back
+      // of the payment itself (32001), whose money the bank kept.
+      await billing.appendChargeEvent(c, event(open.chargeId, "CHARGEBACK_RESOLVED", new Date("2032-03-01T12:00:00.000Z"), "32003", null));
       await billing.appendChargeEvent(c, event(won.chargeId, "SUCCEEDED", paidAt, "32002", 24_200_000));
       await billing.appendChargeEvent(c, event(won.chargeId, "CHARGEBACK", disputedAt, "32002", 10_000_000));
       // The owner's `billing:dispute --outcome won` (D6b): that charge-back is over; the sale stays.

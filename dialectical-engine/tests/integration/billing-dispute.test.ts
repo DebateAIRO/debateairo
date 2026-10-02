@@ -168,10 +168,104 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     });
     // The dispute that suspended the plan is the one on the first payment, whatever came after it.
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("RESUMED");
-    const resolved = (await new BillingRepository(database.pool).charge(seeded.initialChargeId))!.events
-      .filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.xmoneyTransactionId);
-    expect(resolved).toEqual([seeded.initialTransactionId]);
+    const resolvedTransactions = async () => (await new BillingRepository(database.pool).charge(seeded.initialChargeId))!
+      .events.filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.xmoneyTransactionId);
+    expect(await resolvedTransactions()).toEqual([seeded.initialTransactionId]);
+    // The next call settles the one still open, the second payment's; once both are settled nothing is left.
+    expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("SECOND_PAYMENT");
+    expect(await resolvedTransactions()).toEqual([seeded.initialTransactionId, "7719101"]);
+    expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("ALREADY_SETTLED");
+    expect(foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId)).status).toBe("ACTIVE");
   }, 10_000);
+
+  it("settles two second payments' charge-backs on one charge one after the other (D5 5f)", async () => {
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
+    });
+    const billing = new BillingRepository(database.pool);
+    await billing.withTransaction(async (client) => {
+      for (const transactionId of ["7719201", "7719202"]) {
+        await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "DUPLICATE_PAYMENT", new Date(), {
+          xmoneyTransactionId: transactionId, amountMicros: seeded.totalMicros, errorCode: null
+        }));
+        await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", new Date(), {
+          xmoneyTransactionId: transactionId, amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
+        }));
+      }
+    });
+    expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("SECOND_PAYMENT");
+    expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("SECOND_PAYMENT");
+    const resolved = (await billing.charge(seeded.initialChargeId))!.events
+      .filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.xmoneyTransactionId);
+    expect([...resolved].sort()).toEqual(["7719201", "7719202"]);
+    expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("ALREADY_SETTLED");
+    expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId)).status).toBe("ACTIVE");
+  }, 10_000);
+
+  it("refuses a won outcome it cannot place once the plan's own dispute was lost and a second payment's is open", async () => {
+    const seeded = await disputed("PLUS");
+    const billing = new BillingRepository(database.pool);
+    await billing.withTransaction(async (client) => {
+      await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "DUPLICATE_PAYMENT", new Date(), {
+        xmoneyTransactionId: "7719301", amountMicros: seeded.totalMicros, errorCode: null
+      }));
+      await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", new Date(), {
+        xmoneyTransactionId: "7719301", amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
+      }));
+    });
+    expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "lost" })).toBe("ENDED_DISPUTE");
+    // A lost outcome writes no charge event, so the plan's own charge-back still reads open: this won may be about
+    // either dispute. Nothing is written.
+    await expect(recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" }))
+      .rejects.toThrow("BILLING_DISPUTE_AMBIGUOUS");
+    expect((await billing.charge(seeded.initialChargeId))!.events.some((event) => event.kind === "CHARGEBACK_RESOLVED"))
+      .toBe(false);
+    expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId))).toMatchObject({
+      status: "ENDED", endedCause: "DISPUTE"
+    });
+  }, 10_000);
+
+  it("keeps the plan paused while another payment of the subscription is still charged back (spec 1.3, A9)", async () => {
+    const billing = new BillingRepository(database.pool);
+    const entitlements = new EntitlementRepository(database.pool);
+    // The usual stolen-card case: the first payment and its upgrade are both charged back. P9c suspends on the first
+    // and, the plan being SUSPENDED already, writes only the CHARGEBACK row for the upgrade's.
+    const seedBoth = async (transactionId: string) => {
+      let upgradeChargeId = "";
+      const seeded = await disputed("PLUS", async (plus) => {
+        upgradeChargeId = (await seedPaidUpgrade(database.pool, plus, {
+          at: new Date(Date.now() - DAY), netMicros: 15_000_000, taxMicros: 2_850_000, transactionId,
+          monthCreditOverrideMicros: 12_500_000
+        })).chargeId;
+      });
+      await billing.withTransaction((client) => billing.appendChargeEvent(client, chargeEvent(upgradeChargeId,
+        "CHARGEBACK", new Date(), { xmoneyTransactionId: transactionId, amountMicros: 17_850_000, errorCode: null })));
+      return { seeded, upgradeChargeId };
+    };
+
+    const lostLater = await seedBoth("7719401");
+    expect(await recordDisputeOutcome(stores(), { chargeRef: lostLater.seeded.initialChargeId, outcome: "won" }))
+      .toBe("STILL_DISPUTED");
+    expect(foldSubscription(await billing.subscriptionEvents(lostLater.seeded.subscriptionId)).status).toBe("SUSPENDED");
+    expect((await billing.subscriptionEvents(lostLater.seeded.subscriptionId)).map((event) => event.kind)).not.toContain("RESUMED");
+    expect(await entitlements.current(lostLater.seeded.ownerRef, new Date())).toMatchObject({
+      planId: "FREE", cause: "SUSPENDED_CHARGEBACK"
+    });
+    // The other dispute is lost: one lost dispute ends a SUSPENDED plan.
+    expect(await recordDisputeOutcome(stores(), { chargeRef: lostLater.upgradeChargeId, outcome: "lost" })).toBe("ENDED_DISPUTE");
+    expect(foldSubscription(await billing.subscriptionEvents(lostLater.seeded.subscriptionId))).toMatchObject({
+      status: "ENDED", endedCause: "DISPUTE"
+    });
+
+    const wonBoth = await seedBoth("7719402");
+    expect(await recordDisputeOutcome(stores(), { chargeRef: wonBoth.seeded.initialChargeId, outcome: "won" }))
+      .toBe("STILL_DISPUTED");
+    expect(await recordDisputeOutcome(stores(), { chargeRef: wonBoth.upgradeChargeId, outcome: "won" })).toBe("RESUMED");
+    expect(foldSubscription(await billing.subscriptionEvents(wonBoth.seeded.subscriptionId)).status).toBe("ACTIVE");
+    expect(await entitlements.current(wonBoth.seeded.ownerRef, new Date())).toMatchObject({
+      planId: "PRO", cause: "RESUMED", monthCreditOverrideMicros: 12_500_000
+    });
+  }, 20_000);
 
   it("refuses a charge that has no chargeback, and one that does not exist", async () => {
     const seeded = await seedActiveSubscription(database.pool, {
