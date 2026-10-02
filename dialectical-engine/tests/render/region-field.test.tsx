@@ -24,6 +24,15 @@ async function click(selector: string): Promise<void> {
 async function key(selector: string, value: string): Promise<void> {
   await act(async () => query<HTMLElement>(selector).dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true })));
 }
+async function insidePress(selector: string): Promise<void> {
+  const target = query<HTMLElement>(selector);
+  await act(async () => target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true })));
+  await act(async () => (document.activeElement as HTMLElement | null)?.blur());
+  await act(async () => {
+    target.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    target.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}
 async function mountRegion(locale = "en"): Promise<void> {
   const specifier = "../../apps/ui/components/" + "RegionField.js";
   const { RegionField, EMPTY_REGION_PICK } = await import(/* @vite-ignore */ specifier);
@@ -186,6 +195,52 @@ describe("RegionField artboard states", () => {
     expect(host.querySelector(".regionPopover")).toBeNull();
   });
 
+  it("Q1 keeps the list open when an inside header or padding press moves focus to body", async () => {
+    await mountRegion();
+    query<HTMLButtonElement>("#signup-region-trigger").focus();
+    await click("#signup-region-trigger");
+    await insidePress(".regionHeader");
+    expect(host.querySelector(".regionPopover"), "inside header press").not.toBeNull();
+    query<HTMLButtonElement>("#signup-region-trigger").focus();
+    await insidePress(".regionPopover");
+    expect(host.querySelector(".regionPopover"), "inside padding press").not.toBeNull();
+  });
+
+  it("Q2 keeps the grid open when an inside title or gap press moves focus to body", async () => {
+    await mountRegion();
+    await click("#signup-region-trigger");
+    await click('.regionContinent[data-continent="Europe"]');
+    expect(document.activeElement).toBe(query(".regionBack"));
+    await insidePress(".regionContinentTitle");
+    expect(host.querySelector(".regionPopover"), "inside title press").not.toBeNull();
+    query<HTMLButtonElement>(".regionBack").focus();
+    await insidePress(".regionGrid");
+    expect(host.querySelector(".regionPopover"), "inside grid gap press").not.toBeNull();
+  });
+
+  it("Q3 closes on Tab from the final country cell but stays open from the previous cell", async () => {
+    await mountRegion();
+    await click("#signup-region-trigger");
+    await click('.regionContinent[data-continent="Europe"]');
+    const cells = all<HTMLButtonElement>(".regionCountry");
+    await key(`.regionCountry[data-code="${cells.at(-2)!.dataset.code}"]`, "Tab");
+    expect(host.querySelector(".regionPopover")).not.toBeNull();
+    await key(`.regionCountry[data-code="${cells.at(-1)!.dataset.code}"]`, "Tab");
+    expect(host.querySelector(".regionPopover")).toBeNull();
+  });
+
+  it("Q4 closes on Shift+Tab from the trigger, but stays open from the first row", async () => {
+    await mountRegion();
+    await click("#signup-region-trigger");
+    const shiftTab = async (selector: string) => act(async () => query<HTMLElement>(selector).dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true })
+    ));
+    await shiftTab('.regionContinent[data-continent="Africa"]');
+    expect(host.querySelector(".regionPopover")).not.toBeNull();
+    await shiftTab("#signup-region-trigger");
+    expect(host.querySelector(".regionPopover")).toBeNull();
+  });
+
   it("E8 activates focusable rows and back controls with Enter and Space", async () => {
     await mountRegion();
     await click("#signup-region-trigger");
@@ -305,8 +360,9 @@ describe("RegionField artboard states", () => {
     await pickRegion("RO");
     let rejectRegister: (reason: unknown) => void = () => undefined;
     register.mockImplementation(() => new Promise((_resolve, reject) => { rejectRegister = reject; }));
-    await click("#signup-region-trigger");
     await fillFlow();
+    await click("#signup-region-trigger");
+    expect(host.querySelector(".regionPopover"), "the grid is open immediately before submit").not.toBeNull();
     await submitFlow();
     expect(register).toHaveBeenCalledTimes(1);
     expect(host.querySelector(".regionPopover"), "busy closes the already-open grid").toBeNull();

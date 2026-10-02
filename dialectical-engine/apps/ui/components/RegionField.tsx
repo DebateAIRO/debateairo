@@ -103,9 +103,7 @@ export function RegionField({ catalog, locale, value, onChange, disabled }: Read
   }
 
   return (
-    <div className="authField regionField" ref={wrapperRef} onBlur={(event) => {
-      if (open && !event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
-    }} onKeyDown={(event) => {
+    <div className="authField regionField" ref={wrapperRef} onKeyDown={(event) => {
       if (!open || event.key !== "Tab") return;
       const last = wrapperRef.current?.querySelector(".regionContinent:last-of-type, .regionCountry:last-of-type");
       if ((!event.shiftKey && event.target === last) || (event.shiftKey && event.target === triggerRef.current)) setOpen(false);

@@ -54,7 +54,7 @@ describe("region picker CSS contract", () => {
     const rules: Array<[string, string[]]> = [
       [".regionTrigger", ["border: 1px solid var(--line-strong)", "background: var(--shell)"]],
       ['.regionTrigger[aria-expanded="true"]', ["var(--con)"]],
-      [".regionPopover", ["background: var(--core)", "box-shadow: var(--shadow-pop)", "top: calc(100% + 4px)", "z-index: 30"]],
+      [".regionPopover", ["background: var(--core)", "box-shadow: var(--shadow-pop)", "top: calc(100% + 8px)", "z-index: 30"]],
       [".regionGrid", ["grid-template-columns: 1fr 1fr"]],
       ['.regionCountry[data-picked="true"]', ["background: var(--shell)"]],
       ['.regionCountry[data-picked="true"] .regionCellName', ["font-weight: 700"]],
@@ -74,7 +74,9 @@ describe("region picker CSS contract", () => {
     expect(block).toMatch(/@container\s*\(max-width:\s*299px\)\s*\{[\s\S]*?\.regionGrid\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
     expect(bodyAfter(block, ".regionName { ")).toContain("text-overflow: ellipsis");
     expect(bodyAfter(block, ".regionPath { ")).toContain("text-overflow: ellipsis");
-    expect(block).toContain(".regionTrigger:has(.regionFlag) .regionPath { order: 4;");
+    expect(block).toMatch(/@container\s*\(max-width:\s*299px\)\s*\{[\s\S]*?\.regionCellName\s*\{[^}]*white-space:\s*normal;[^}]*overflow-wrap:\s*anywhere;/);
+    expect(block).toMatch(/@container\s*\(max-width:\s*299px\)\s*\{[\s\S]*?\.regionTrigger:has\(\.regionFlag\)\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*auto minmax\(0,\s*1fr\) auto;/);
+    expect(block).toContain(".regionTrigger:has(.regionFlag) .regionPath { grid-column: 2 / 4; grid-row: 2;");
   });
 
   it("F5 gives each keyboard control the shared focus token", () => {

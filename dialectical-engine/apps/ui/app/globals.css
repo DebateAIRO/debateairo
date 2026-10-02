@@ -6806,7 +6806,7 @@ a:focus-visible {
 .regionName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .regionPath { flex: 0 1 auto; min-width: 0; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; color: var(--muted); }
 .regionChevron { flex: none; font-size: 9px; color: var(--muted); }
-.regionPopover { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; max-height: 300px; overflow: auto; padding: 8px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--core); box-shadow: var(--shadow-pop); }
+.regionPopover { position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 30; max-height: 300px; overflow: auto; padding: 8px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--core); box-shadow: var(--shadow-pop); }
 .regionHeader, .regionContinentTitle { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .16em; color: var(--muted); }
 .regionHeader { padding: 4px 8px 8px; }
 .regionContinent { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-sans); text-align: start; cursor: pointer; }
@@ -6816,10 +6816,15 @@ a:focus-visible {
 .regionTop { display: flex; align-items: center; gap: 8px; padding: 2px 4px 8px; }
 .regionBack { padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-family: var(--font-sans); font-size: 11px; font-weight: 600; cursor: pointer; }
 .regionGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
-@container (max-width: 299px) { .regionGrid { grid-template-columns: minmax(0, 1fr); } }
 @container (max-width: 299px) {
-  .regionTrigger:has(.regionFlag) { flex-wrap: wrap; row-gap: 4px; }
-  .regionTrigger:has(.regionFlag) .regionPath { order: 4; flex: 0 0 calc(100% - 25px); max-width: none; margin-left: 25px; }
+  .regionGrid { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 299px) {
+  .regionTrigger:has(.regionFlag) { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; }
+  .regionTrigger:has(.regionFlag) .regionFlag { grid-column: 1; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionName { grid-column: 2; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionChevron { grid-column: 3; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionPath { grid-column: 2 / 4; grid-row: 2; max-width: none; }
 }
 .regionCountry { min-width: 0; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-sans); text-align: start; cursor: pointer; }
 .regionCountry[data-picked="true"] { background: var(--shell); }
@@ -6827,6 +6832,9 @@ a:focus-visible {
 .regionCellCode { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--muted); }
 .regionCellName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 500; }
 .regionCountry[data-picked="true"] .regionCellName { font-weight: 700; }
+@container (max-width: 299px) {
+  .regionCellName { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+}
 .regionDiamond { flex: 0 0 auto; width: 7px; height: 7px; transform: rotate(45deg); background: var(--gold); opacity: 0; }
 .regionCountry[data-picked="true"] .regionDiamond { opacity: 1; }
 .regionContinent:hover, .regionCountry:hover { background: color-mix(in oklch, var(--muted) 12%, transparent); }
