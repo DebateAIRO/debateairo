@@ -4,7 +4,7 @@ import {
   buildApi,
   type AskApplication
 } from "@debateai/api";
-import { contractInventory } from "@debateai/contract";
+import { contractInventory, staffContractInventory } from "@debateai/contract";
 import {
   RETIRED_DEV_HEADER,TEST_APP_ORIGIN,testHttpIdentity,
   testSessionApplication,testSessionHeaders
@@ -203,12 +203,23 @@ function buildUserApi(application:AskApplication=fixtureApplication()) {
 }
 
 describe("S7 deny-by-default authorization", () => {
-  it("keeps one complete, duplicate-free policy row per contract route", () => {
+  it("keeps complete legacy policy coverage and leaves the exact18 Task7 staff contracts unmounted", async () => {
     const governed = authorizationPolicyInventory.map((policy) => policy.route);
     expect(new Set(contractInventory.routes).size).toBe(contractInventory.routes.length);
     expect(new Set(governed).size).toBe(governed.length);
-    expect(governed).toHaveLength(contractInventory.routes.length);
-    expect(new Set(governed)).toEqual(new Set(contractInventory.routes));
+    // Task4 prepares guards only. Task7 MUST remove this temporary exception and govern all routes.
+    const dormant = new Set<string>(staffContractInventory.routes);
+    expect(dormant.size).toBe(18);
+    const mountedContracts = contractInventory.routes.filter(route => !dormant.has(route));
+    expect(governed).toHaveLength(mountedContracts.length);
+    expect(new Set(governed)).toEqual(new Set(mountedContracts));
+    const api = buildUserApi();
+    for (const route of staffContractInventory.routes) {
+      const [method,path] = route.split(" ");
+      const response = await api.inject({method:method as "GET"|"POST"|"PATCH",url:path!.replace("{staffId}",OWNED_RUN_ID),headers:USER_MUTATION_HEADERS});
+      expect(response.statusCode,route).toBe(404);
+    }
+    await api.close();
     expect(authorizationPolicyInventory).toEqual(EXPECTED_AUTHORIZATION_MATRIX);
   });
 

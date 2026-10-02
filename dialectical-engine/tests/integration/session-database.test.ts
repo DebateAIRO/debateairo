@@ -145,8 +145,8 @@ describe("S5 sessions on real PostgreSQL", () => {
       idleExpiresAt: new Date(absolute.getTime() - 10_000),
       absoluteExpiresAt: absolute
     });
-    const boundary = new Date(Date.now() + 1_000);
-    await database.pool.query(`UPDATE identity.session SET idle_expires_at=$2 WHERE session_id=$1`, [
+    const boundary = new Date(Date.now() - 1);
+    await database.pool.query(`UPDATE identity.session SET created_at=LEAST(created_at,$2::timestamptz-interval '1 second'),last_seen_at=LEAST(last_seen_at,$2::timestamptz-interval '1 second'),idle_expires_at=$2 WHERE session_id=$1`, [
       boundaryId, boundary
     ]);
     expect(boundaryId).toBeTruthy();

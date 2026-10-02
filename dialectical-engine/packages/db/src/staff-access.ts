@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import type { InvitationContext,InvitationProof,OwnerPossessionContext,Reason,SecurityReceipt,StaffCapability,StaffContext,StaffProof } from '@debateai/kernel';
 import type { CryptoEnvelope } from '@debateai/crypto';
 
@@ -7,7 +7,37 @@ export type StaffAlertIntent=Readonly<{schema:'staff-alert-v1';event:'INVITE'|'A
 export type StaffInvitationDeliveryIntent=Readonly<{schema:'staff-invitation-delivery-v1';operationId:string;envelope:CryptoEnvelope}>;
 export type StaffMutation=Readonly<{actor:StaffContext;proof:StaffProof;operationId:string;reason:Reason;alertIntent:StaffAlertIntent}>;
 export type InvitationAcceptCommand=Readonly<{context:InvitationContext;proof:InvitationProof;operationId:string;reason:Reason;alertIntent:StaffAlertIntent}>;
+export type StaffAuthenticationRecord = Readonly<{ context:StaffContext; csrfTokenHash:string; expiresAt:Date }>;
+/** Only narrow authority reads use this deadline; no pool/global database setting changes.
+ * Abort destroys this dedicated connection, including a blocked query. A late acquired
+ * connection is released without running SQL, so a cancelled poll cannot admit work. */
+export async function guardedAuthorityQuery<T extends QueryResultRow>(pool:Pool, sql:string, values:readonly unknown[], signal?:AbortSignal):Promise<QueryResult<T>> {
+ let client:PoolClient|undefined; let released=false; let stopped=false;
+ let refuse:(error:Error)=>void=()=>{};
+ const cancelled=new Promise<never>((_resolve,reject)=>{refuse=reject;});
+ const abort=()=>{if(stopped)return;stopped=true;if(client!==undefined&&!released){released=true;client.release(true);}refuse(new Error('AUTHORITY_CHECK_UNAVAILABLE'));};
+ const timer=setTimeout(abort,750);
+ signal?.addEventListener('abort',abort,{once:true});
+ if(signal?.aborted)abort();
+ const work=(async()=>{
+  const acquired=await pool.connect();client=acquired;
+  if(stopped){if(!released){released=true;acquired.release(true);}throw new Error('AUTHORITY_CHECK_UNAVAILABLE');}
+  try {
+   await acquired.query('BEGIN');
+   await acquired.query("SET LOCAL statement_timeout='700ms'");
+   const result=await acquired.query<T>(sql,[...values]);
+   await acquired.query('COMMIT');return result;
+  } catch(error) { if(!released)await acquired.query('ROLLBACK').catch(()=>undefined);throw error; }
+  finally {if(!released){released=true;acquired.release();}}
+ })();
+ try {return await Promise.race([work,cancelled]);}
+ finally {stopped=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+}
 export interface StaffRepository {
+ readAuthentication(input:Readonly<{userId:string;ordinarySessionId:string;ordinaryTokenHash:string;staffTokenHash:string}>,signal?:AbortSignal):Promise<StaffAuthenticationRecord|null>;
+ readCurrentContext(input:Readonly<{context:StaffContext;ordinaryTokenHash:string}>,signal?:AbortSignal):Promise<StaffAuthenticationRecord|null>;
+ readActionProof(input:Readonly<{context:StaffContext;ordinaryTokenHash:string;proofHandleHash:string;binding:import('@debateai/kernel').ActionBinding}>,signal?:AbortSignal):Promise<StaffProof|null>;
+ subscribeRevocations?(listener:()=>void):()=>void;
  readContext(input:Readonly<{userId:string;ordinarySessionId:string;staffTokenHash:string}>):Promise<StaffContext|null>;
  /** Capability-only persistent authority check; mutations validate and consume action proof separately. */
  authorize(input:Readonly<{context:StaffContext;capability:StaffCapability}>):Promise<boolean>;
@@ -162,6 +192,37 @@ function invitation(value:InvitationContext):InvitationContext {return Object.fr
 /** This adapter accepts trusted server-domain inputs; SQL owns all security clocks/state. */
 export class PostgresStaffRepository implements StaffRepository,StaffWebAuthnRepository {
  constructor(private readonly pool:Pool) {}
+ private async guarded<T>(sql:string,values:readonly unknown[],signal?:AbortSignal):Promise<T> {
+  const result=await guardedAuthorityQuery<{value:T}>(this.pool,sql,values,signal);
+  if(result.rows[0]===undefined)throw new Error('STAFF_DATABASE_RESULT_MISSING');return result.rows[0].value;
+ }
+ private authentication(value:StaffAuthenticationRecord|null):StaffAuthenticationRecord|null {
+  return value===null?null:Object.freeze({...value,context:Object.freeze({...value.context,capabilities:Object.freeze([...value.context.capabilities])}),expiresAt:date(value.expiresAt)});
+ }
+ async readAuthentication(input:Parameters<StaffRepository['readAuthentication']>[0],signal?:AbortSignal):Promise<StaffAuthenticationRecord|null> {
+  return this.authentication(await this.guarded('SELECT staff.read_authentication($1,$2,$3,$4) AS value',[input.userId,input.ordinarySessionId,input.ordinaryTokenHash,input.staffTokenHash],signal));
+ }
+ async readCurrentContext(input:Parameters<StaffRepository['readCurrentContext']>[0],signal?:AbortSignal):Promise<StaffAuthenticationRecord|null> {
+  return this.authentication(await this.guarded('SELECT staff.read_current_context($1::jsonb,$2) AS value',[input.context,input.ordinaryTokenHash],signal));
+ }
+ async readActionProof(input:Parameters<StaffRepository['readActionProof']>[0],signal?:AbortSignal):Promise<StaffProof|null> {
+  const value=await this.guarded<StaffProof|null>('SELECT staff.read_action_proof($1::jsonb,$2,$3,$4::jsonb) AS value',[input.context,input.ordinaryTokenHash,input.proofHandleHash,input.binding],signal);
+  return value===null?null:Object.freeze({...value,verifiedAt:date(value.verifiedAt),expiresAt:date(value.expiresAt)});
+ }
+ subscribeRevocations(listener:()=>void):()=>void {
+  let disposed=false;let client:PoolClient|undefined;
+  const notify=(message:Readonly<{channel:string;payload?:string|undefined}>)=>{if(!disposed&&message.channel==='staff_authority_changed'&&message.payload==='changed')listener();};
+  const failed=()=>{if(!disposed)listener();};
+  void this.pool.connect().then(async acquired=>{
+   if(disposed){acquired.release();return;}client=acquired;
+   acquired.on('notification',notify);acquired.on('error',failed);
+   try {await acquired.query('LISTEN staff_authority_changed');}
+   catch {failed();dispose();}
+  }).catch(failed);
+  const dispose=()=>{if(disposed)return;disposed=true;if(client!==undefined){client.removeListener('notification',notify);client.removeListener('error',failed);client.release(true);client=undefined;}};
+  return dispose;
+ }
+
  private async call<T>(sql:string,values:readonly unknown[]):Promise<T> {
   const result=await this.pool.query<{value:T}>(sql,[...values]);
   if(result.rows[0]===undefined)throw new Error('STAFF_DATABASE_RESULT_MISSING');return result.rows[0].value;

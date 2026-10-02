@@ -60,6 +60,8 @@ export type LoginResult = Readonly<{
 }>;
 
 export interface SessionApplication {
+  /** Non-refreshing current generation/expiry/hold check. Missing implementations deny streaming. */
+  assertCurrent?(session:AuthenticatedSession,signal?:AbortSignal):Promise<void>;
   authenticate(sessionToken: string, source: AuthSourceContext): Promise<AuthenticatedSession | null>;
   authenticateErasureStatus?(sessionToken:string,source:AuthSourceContext):
     Promise<AuthenticatedSession|null>;
@@ -112,7 +114,7 @@ export interface SessionApplication {
   }>>;
 }
 
-type SessionRepository = Pick<PostgresSessionRepository,
+type SessionRepository = Partial<Pick<PostgresSessionRepository,"assertSessionCurrent">> & Pick<PostgresSessionRepository,
   | "authenticateSession"
   | "authenticateAccountErasureStatusSession"
   | "confirmAccountAge"
@@ -279,6 +281,15 @@ export class SessionService implements SessionApplication {
       });
     }
     throw new AuthFlowError("MFA_RATE_LIMITED");
+  }
+
+  async assertCurrent(session:AuthenticatedSession,signal?:AbortSignal):Promise<void> {
+    try {
+      if(session.authKind!=="cookie" || this.dependencies.repository.assertSessionCurrent===undefined
+        || !await this.dependencies.repository.assertSessionCurrent({userId:session.userId,sessionId:session.session.session_id,tokenHash:session.tokenHash},signal)) {
+        throw new Error("SESSION_REQUIRED");
+      }
+    } catch {throw new Error("SESSION_REQUIRED");}
   }
 
   async authenticate(sessionToken: string, source: AuthSourceContext): Promise<AuthenticatedSession | null> {

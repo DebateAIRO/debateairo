@@ -4,6 +4,7 @@ import {
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
+import { guardedAuthorityQuery } from "./staff-access.js";
 import type { AuthSourceContext } from "./identity.js";
 
 export interface LoginIdentityRecord {
@@ -72,6 +73,13 @@ function versionedAuditDigest(value: string): string {
 }
 
 export class PostgresSessionRepository {
+  async assertSessionCurrent(input: Readonly<{userId:string;sessionId:string;tokenHash:string}>,signal?:AbortSignal):Promise<boolean> {
+    assertCredentialHash(input.tokenHash);
+    const result=await guardedAuthorityQuery<{current:boolean}>(this.pool,
+      'SELECT identity.assert_session_current($1,$2,$3) AS current',[input.userId,input.sessionId,input.tokenHash],signal);
+    return result.rows[0]?.current===true;
+  }
+
   async readAccountSecurityHold(userId: string): Promise<boolean> {
     const result = await this.pool.query<{ held: boolean }>(
       'SELECT identity.read_account_security_hold($1) AS held', [userId]
@@ -161,7 +169,7 @@ export class PostgresSessionRepository {
         WHERE user_id=u.user_id AND factor_type='totp' AND state='active'
         ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
       ) f ON true
-      WHERE u.email_blind_index=$1 AND u.state='active'
+      WHERE u.email_blind_index=$1 AND u.state='active' AND NOT identity.read_account_security_hold(u.user_id)
     `, [emailBlindIndex]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
@@ -262,7 +270,7 @@ export class PostgresSessionRepository {
       JOIN identity."user" u ON u.user_id=c.user_id AND u.state='active'
       JOIN identity.mfa_factor f ON f.mfa_factor_id=c.mfa_factor_id
         AND f.user_id=u.user_id AND f.factor_type='totp' AND f.state='active'
-      WHERE c.token_hash=$1 AND u.password_hash=c.password_hash_snapshot
+      WHERE c.token_hash=$1 AND u.password_hash=c.password_hash_snapshot AND NOT identity.read_account_security_hold(u.user_id)
     `, [challengeTokenHash]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
@@ -565,7 +573,7 @@ export class PostgresSessionRepository {
         WHERE user_id=u.user_id AND factor_type='totp' AND state='active'
         ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
       ) f ON true
-      WHERE u.user_id=$1 AND u.state='active'
+      WHERE u.user_id=$1 AND u.state='active' AND NOT identity.read_account_security_hold(u.user_id)
     `, [userId]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({

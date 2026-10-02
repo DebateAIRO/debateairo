@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CSRF_COOKIE_NAME,
@@ -8,7 +8,7 @@ import {
   buildApi
 } from "@debateai/api";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
-import { RunRepository, configureContentEncryption, migrate } from "@debateai/db";
+import { RunRepository, PostgresSessionRepository, configureContentEncryption, migrate } from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JudgementRepository } from "@debateai/judgement";
 import { LedgerRepository } from "@debateai/ledger";
@@ -115,13 +115,13 @@ async function createIdentity(label: string, token: string, csrf: string): Promi
        created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
      ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
        now()+interval '2 hours',now())`,
-    [session.session_id,userId,`sha256:${randomBytes(32).toString("hex")}`,
-      `sha256:${randomBytes(32).toString("hex")}`]
+    [session.session_id,userId,`sha256:${createHash("sha256").update(token).digest("hex")}`,
+      `sha256:${createHash("sha256").update(csrf).digest("hex")}`]
   );
   return Object.freeze({
     userId, ownerRef, auditToken, pseudonym, email, blindHex: blind.toString("hex"), csrf,
     auth: Object.freeze({
-      session, userId, ownerRef, tokenHash: `hash:${token}`, csrfTokenHash: `hash:${csrf}`, authKind: "cookie"
+      session, userId, ownerRef, tokenHash: `sha256:${createHash("sha256").update(token).digest("hex")}`, csrfTokenHash: `sha256:${createHash("sha256").update(csrf).digest("hex")}`, authKind: "cookie"
     })
   });
 }
@@ -335,7 +335,13 @@ beforeAll(async () => {
     [OWNER_TOKEN, owner.auth],
     [FOREIGN_TOKEN, foreign.auth]
   ]);
+  const currentSessions = new PostgresSessionRepository(database.pool,{} as never);
   const sessions = {
+    assertCurrent: async (session:AuthenticatedSession,signal?:AbortSignal) => {
+      if (![...sessionsByToken.values()].some(current => current.userId===session.userId
+        && current.session.session_id===session.session.session_id && current.tokenHash===session.tokenHash)
+        || !await currentSessions.assertSessionCurrent({userId:session.userId,sessionId:session.session.session_id,tokenHash:session.tokenHash},signal)) throw new Error("SESSION_REQUIRED");
+    },
     authenticate: async (token: string) => sessionsByToken.get(token) ?? null,
     verifyCsrf: (authenticated: AuthenticatedSession, supplied: string) =>
       supplied === (authenticated.userId === owner.userId ? OWNER_CSRF : FOREIGN_CSRF)
@@ -872,7 +878,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     )).rows[0]!.count).toBe("1");
   }, 60_000);
 
-  it("keeps S10-style severance on the run-to-identity lock order", async () => {
+  it("keeps S10-style severance on the security-subject then run-to-identity lock order", async () => {
     const deleting = await createIdentity("s10-lock-order", "z".repeat(43), "w".repeat(43));
     const runId = await createOwnedRunHead(deleting, `s10-lock-order-${randomUUID()}`);
     const severer = await database.pool.connect();
@@ -880,6 +886,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     let claim: Promise<unknown> | undefined;
     try {
       await severer.query("BEGIN");
+      await severer.query("SELECT identity.lock_security_subjects($1::uuid[])",[[deleting.userId]]);
       await severer.query("SELECT run_id FROM core.run WHERE run_id=$1 FOR UPDATE", [runId]);
 
       await claimant.query("BEGIN");
@@ -903,11 +910,12 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       await expect(claim).rejects.toThrow(/RUN_OWNERSHIP_OWNER_REF_NOT_ACTIVE/);
       await claimant.query("ROLLBACK");
     } finally {
+      // Release the blocker first even if an assertion fails while the claim is pending.
+      await severer.query("ROLLBACK").catch(() => undefined);
+      severer.release();
       await Promise.allSettled(claim === undefined ? [] : [claim]);
       await claimant.query("ROLLBACK").catch(() => undefined);
-      await severer.query("ROLLBACK").catch(() => undefined);
       claimant.release();
-      severer.release();
     }
     expect((await database.pool.query<{ count: string }>(
       `SELECT count(*) FROM core.run_ownership_event WHERE run_id=$1`, [runId]

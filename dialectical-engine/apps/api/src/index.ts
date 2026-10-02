@@ -77,7 +77,7 @@ import {
   AskRoomQuerySchema,
   AskRoomResponseSchema
 } from "@debateai/contract";
-import type { Pool, PoolClient } from "pg";
+import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
@@ -141,6 +141,9 @@ import {
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
+import type { StaffCapability } from "@debateai/kernel";
+import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, streamAuthorizedEvents, type StaffAccessApplication, type StaffAuthentication } from "./staff/access.js";
+export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER } from "./staff/access.js";
 import type { PublicationApplication } from "./publications.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
@@ -166,7 +169,7 @@ import {
 } from "./support/index.js";
 import { installBillingRoutes, type BillingRouteOptions } from "./billing/index.js";
 
-type RouteAuthPolicy = "public" | "user" | "operator";
+type RouteAuthPolicy = "public" | "user" | "operator" | "staff";
 type RouteOriginPolicy = "trusted";
 type RouteSessionPolicy = "optional";
 
@@ -1244,7 +1247,7 @@ const authorizationPolicies = new Map<string, typeof authorizationPolicyInventor
 );
 
 function routePolicy(route: AuthorizationRoute): { readonly config: {
-  readonly auth: RouteAuthPolicy;
+  readonly auth: Exclude<RouteAuthPolicy,"staff">;
   readonly origin?: RouteOriginPolicy;
   readonly session?: RouteSessionPolicy;
 } } {
@@ -1358,6 +1361,7 @@ function passwordWithinRequestBound(body: Readonly<Record<string, unknown>>): bo
 declare module "fastify" {
   interface FastifyContextConfig {
     auth?: RouteAuthPolicy;
+    staffCapability?: StaffCapability;
     origin?: RouteOriginPolicy;
     session?: RouteSessionPolicy;
   }
@@ -1365,6 +1369,7 @@ declare module "fastify" {
   interface FastifyRequest {
     session: Session;
     authenticatedSession?: AuthenticatedSession;
+    staffAuthentication?: StaffAuthentication;
     cookieRefresh?: Readonly<{ sessionToken: string; csrfToken: string | null }>;
   }
 }
@@ -1382,7 +1387,7 @@ export interface AskApplication {
   recordInvestigation(answerId: string, gapRef: string, userInput: string | null, session: Session, ownership: RunOwnershipAccess): Promise<InvestigationAccepted | null>;
   unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null>;
   readDeployment(session: Session): Promise<Deployment>;
-  events(runId: string, session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown>;
+  events(runId: string, session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): AsyncIterable<unknown>;
 }
 
 export type AskPrincipal =
@@ -1419,6 +1424,7 @@ export interface ApiOptions {
   readonly recovery?: RecoveryApplication;
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
+  readonly staffAccess?: StaffAccessApplication;
   readonly publications?: PublicationApplication;
   /**
    * hate-speech S02 (SPEC-v2 R1, D-S02-22): the pre-publish content check,
@@ -1755,6 +1761,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
   });
   api.addHook("onRoute", (route) => {
+    // Future Task7 routes must explicitly declare a sealed core-A staff capability.
+    if (route.config?.auth === "staff" && ["TEAM_READ","TEAM_INVITE","TEAM_GRANT","TEAM_DISABLE","AUDIT_READ","EMERGENCY_DISABLE"].includes(route.config.staffCapability ?? "")) return;
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
       const key = canonicalRoute(method, route.url);
       const policy = authorizationPolicies.get(key);
@@ -1768,6 +1776,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.decorateRequest("session");
   api.decorateRequest("authenticatedSession");
+  api.decorateRequest("staffAuthentication");
   api.decorateRequest("cookieRefresh");
   /**
    * Paid plans L3b: the Terms and Privacy pairs a register request carried, keyed by the request object
@@ -1882,13 +1891,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }
       return;
     }
-    if (authPolicy !== "user" && authPolicy !== "operator") {
+    if (authPolicy !== "user" && authPolicy !== "operator" && authPolicy !== "staff") {
       return reply.status(401).send({ error: "SESSION_REQUIRED" });
     }
     const rawCookie = request.headers.cookie;
     const cookieWasPresented = typeof rawCookie === "string"
       && rawCookie.split(";").some((member) => member.trimStart().startsWith(`${SESSION_COOKIE_NAME}=`));
-    if (typeof request.headers[RETIRED_DEV_HEADER] === "string") {
+    if (request.headers[RETIRED_DEV_HEADER] !== undefined || (authPolicy === "staff" && request.headers.authorization !== undefined)) {
       return reply.status(401).send({ error: "SESSION_REQUIRED" });
     }
     if (cookieWasPresented) {
@@ -1918,12 +1927,45 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         }
       }
       request.cookieRefresh = Object.freeze({ sessionToken: sessionToken!, csrfToken: csrfCookieToken });
+      if (authPolicy === "staff") {
+        const staffToken = exactStaffCookie(rawCookie, STAFF_COOKIE_NAME);
+        if (staffToken === null || options.staffAccess === undefined || request.routeOptions.config.staffCapability === undefined) {
+          return reply.status(401).send({ error: "STAFF_AUTHORITY_INVALID" });
+        }
+        const staffAuth = await options.staffAccess.authenticate(authenticated, staffToken);
+        if (staffAuth === null) return reply.status(401).send({ error: "STAFF_AUTHORITY_INVALID" });
+        try { await options.staffAccess.requireCapability(staffAuth, request.routeOptions.config.staffCapability); }
+        catch { return reply.status(403).send({ error: "STAFF_AUTHORITY_INVALID" }); }
+        if (MUTATING_METHODS.has(request.method)) {
+          const csrf = exactStaffCsrfPair(request.headers[STAFF_CSRF_HEADER], exactStaffCookie(rawCookie, STAFF_CSRF_COOKIE_NAME));
+          if (csrf === null || !await options.staffAccess.verifyCsrf(staffAuth, csrf)) return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });
+        }
+        request.staffAuthentication = staffAuth;
+      }
       if (authPolicy === "operator") {
         return reply.status(403).send({ error: "OPERATOR_REQUIRED" });
       }
       return;
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
+  });
+  api.addHook("preSerialization", async (request, reply, payload) => {
+    if (request.staffAuthentication === undefined || reply.statusCode >= 400) return payload;
+    try { await options.staffAccess!.assertCurrent(request.staffAuthentication); }
+    catch { reply.code(401); return { error: "STAFF_AUTHORITY_INVALID" }; }
+    return payload;
+  });
+  // Fastify skips preSerialization for string/Buffer/stream payloads. Final emission always checks.
+  api.addHook("onSend", async (request, reply, payload) => {
+    if (request.staffAuthentication === undefined || reply.statusCode >= 400) return payload;
+    try {
+      if (payload !== null && typeof payload === "object" && !Buffer.isBuffer(payload)) throw new Error("STAFF_AUTHORITY_INVALID");
+      await options.staffAccess!.assertCurrent(request.staffAuthentication);
+      return payload;
+    } catch {
+      reply.code(401); reply.header("content-type","application/json; charset=utf-8");
+      return JSON.stringify({error:"STAFF_AUTHORITY_INVALID"});
+    }
   });
   /**
    * Paid plans G3a (spec §2.3.3): the country gate in front of register. The registration mount region
@@ -2941,11 +2983,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
       connection: "keep-alive"
     });
-    for await (const candidate of options.application.events(runId.data, request.session, ownership)) {
-      const event = RunEventSchema.parse(candidate);
-      reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
-    }
-    reply.raw.end();
+    await streamAuthorizedEvents({
+      events: signal => options.application.events(runId.data, request.session, ownership, signal),
+      check: async signal => {
+        if (request.authenticatedSession === undefined || options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
+        await options.sessions.assertCurrent(request.authenticatedSession, signal);
+      },
+      write: candidate => {
+        const event = RunEventSchema.parse(candidate);
+        reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
+      },
+      close: () => { if (!reply.raw.destroyed) reply.raw.end(); }, peer: reply.raw
+    });
   });
   api.get<{ Params: { id: string } }>("/v1/runs/:id", routePolicy("GET /v1/runs/{id}"), async (request, reply) => {
     const runId = ResourceIdSchema.safeParse(request.params.id);
@@ -3364,6 +3413,25 @@ export type WaitingLineTick = Readonly<{
  * free runner is READY too, so it is dispatched again at most once per bound.
  */
 const STALLED_START_SECONDS = 300;
+
+/** Private SSE snapshot reads have only a local peer/revocation cancellation seam.
+ * Destroy the dedicated client on abort, including a blocked PostgreSQL query;
+ * do not change pool/global settings or impose the authority-check deadline on content reads. */
+async function queryPrivateSnapshot<T extends QueryResultRow>(pool:Pool,sql:string,values:readonly unknown[],signal?:AbortSignal):Promise<QueryResult<T>> {
+  if(signal===undefined)return pool.query<T>(sql,[...values]);
+  let client:PoolClient|undefined,released=false,aborted=false;
+  let rejectAbort:(error:Error)=>void=()=>{};
+  const cancelled=new Promise<never>((_resolve,reject)=>{rejectAbort=reject;});
+  const abort=()=>{if(aborted)return;aborted=true;if(client!==undefined&&!released){released=true;client.release(true);}rejectAbort(new Error("PRIVATE_STREAM_CLOSED"));};
+  signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();
+  const work=(async()=>{const acquired=await pool.connect();client=acquired;
+    if(aborted){if(!released){released=true;acquired.release(true);}throw new Error("PRIVATE_STREAM_CLOSED");}
+    try{return await acquired.query<T>(sql,[...values]);}
+    finally{if(!released){released=true;acquired.release();}}
+  })();
+  try{return await Promise.race([work,cancelled]);}
+  finally{signal.removeEventListener("abort",abort);}
+}
 
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
@@ -4015,43 +4083,44 @@ export class PostgresAskApplication implements AskApplication {
     });
   }
 
-  async *events(runId: string, _session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown> {
+  async *events(runId: string, _session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): AsyncIterable<unknown> {
+    if (signal?.aborted) return;
     const access = ownership;
-    const [result, failedWork] = await Promise.all([this.pool.query<{
+    const [result, failedWork] = await Promise.all([queryPrivateSnapshot<{
       event_id: string;
       kind: string;
       at_seq: string;
       value_json: unknown;
       content_ciphertext: CryptoEnvelope | null;
-    }>(
+    }>(this.pool,
       `SELECT event.event_id, event.kind, event.at_seq, event.value_json, event.content_ciphertext
        FROM core.run_progress_event AS event
        JOIN core.run AS run ON run.run_id = event.run_id
       WHERE event.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) ORDER BY event.at_seq`,
-      [runId, access.ownerRef, access.legacyAskerId]
-    ), this.pool.query<{
+      [runId, access.ownerRef, access.legacyAskerId],signal
+    ), queryPrivateSnapshot<{
       work_item_id: string;
       created_at_seq: string;
       terminal_reason: string;
-    }>(
+    }>(this.pool,
       `SELECT work.work_item_id, work.created_at_seq, work.terminal_reason
        FROM core.work_item AS work
        JOIN core.run AS run ON run.run_id = work.run_id
        WHERE work.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) AND work.state = 'FAILED'
        ORDER BY work.created_at_seq`,
-      [runId, access.ownerRef, access.legacyAskerId]
+      [runId, access.ownerRef, access.legacyAskerId],signal
     )]);
-    if (result.rows.length === 0 && failedWork.rows.length === 0) return;
+    if (signal?.aborted || (result.rows.length === 0 && failedWork.rows.length === 0)) return;
     const projected = await this.#splitLifecycle.read(runId);
     // Lifecycle projection performs additional ungated reads. Revalidate after
     // every source snapshot and before yielding any bytes so a claim committed
     // between the stored-event query and projection cannot disclose data to the
     // superseded owner.
-    const stillOwned = await this.pool.query<{ owned: boolean }>(
+    const stillOwned = await queryPrivateSnapshot<{ owned: boolean }>(this.pool,
       `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
-      [runId, access.ownerRef, access.legacyAskerId]
+      [runId, access.ownerRef, access.legacyAskerId],signal
     );
-    if (stillOwned.rows[0]?.owned !== true) return;
+    if (signal?.aborted || stillOwned.rows[0]?.owned !== true) return;
     // V-6 (0069): only an encrypted run's investigation-gap rows carry an
     // envelope; every other row is read as stored, with no key work at all.
     // Fix round 1 / 4: the run's key is prepared ONCE per read (one lease, one
@@ -4113,6 +4182,6 @@ export class PostgresAskApplication implements AskApplication {
         payload: event.payload
       }))
     ].sort((left, right) => left.at_sequence - right.at_sequence);
-    for (const event of events) yield event;
+    for (const event of events) { if (signal?.aborted) return; yield event; }
   }
 }
