@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Küpsised",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Paigaldame kaks küpsist, mis on mõlemad rangelt vajalikud: üks hoiab teid sisselogituna ja teine kaitseb vorme võltsimise eest. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. Küpsisepoliitikas aadressil [dezbatere.ro/cookies] on need loetletud koos kestusega, selgitatud, kuidas teie valik salvestatakse, ning seda muudetakse enne mis tahes muu küpsise lisamist. Kui teie piirkonna õigus käsitleb mõnda küpsist teisiti — näiteks Ühendkuningriigi analüütikast loobumise reegel — on see Küpsisepoliitikas kirjas." }
+      { kind: "p", text: "DebateAI kasutab kaheksat üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult DebateAI: neli küpsist ja neli kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. Küpsisepoliitikas aadressil [dezbatere.ro/cookies] on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Küpsis (HttpOnly) — Hoiab teid sisselogituna. Seda pikendatakse, kuni te teenust kasutate. — 14 päeva",
+        "__Host-debateai-csrf — Küpsis — Takistab teistel veebisaitidel teie nimel vorme esitamast. — 14 päeva",
+        "__Host-debateai-age-refusal — Küpsis (HttpOnly) — Pärast tagasilükatud vanusekontrolli takistab see sellel brauseril 30 päeva jooksul uuesti proovimast. See sisaldab ainult sõna „tagasi lükatud“, mitte isikuandmeid. — 30 päeva",
+        "debateai.locale — Küpsis — Jätab meelde teie valitud liidese keele. — 1 aasta",
+        "debateai.consent — Kohalik salvestusruum — Jätab meelde, et olete küpsiseteate näinud, nii et seda näidatakse vaid korra. — Kuni te selle kustutate",
+        "debateai.mode — Kohalik salvestusruum — Kas kasutate heledat või tumedat kuvarežiimi. — Kuni te selle kustutate",
+        "debateai.languageOffer.dismissed — Seansi salvestusruum — Jätab selle vahekaardi jaoks meelde, et loobusite pakkumisest näidata väitlust teises keeles. — Kuni te vahekaardi sulgete",
+        "debateai.support.conversation.v2 — Seansi salvestusruum — Hoiab teie abivestluse ekraanil, kuni vahekaart on avatud. See kustutatakse, kui keegi selles vahekaardis sisse või välja logib. — Kuni te vahekaardi sulgete"
+        ]
+      },
+      { kind: "p", text: "Ükski teine osapool ei kogu DebateAI kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel." },
+      { kind: "p", text: "Brauserid võivad saata signaali „Do Not Track“ või muu sarnase signaali. DebateAI ei jälgi teid, seega pole sellisel signaalil midagi välja lülitada: teenus töötab samamoodi nii signaaliga kui ka ilma." },
+      { kind: "p", text: "Nende üksuste keelamiseks blokeerige või kustutage selle saidi küpsised ja saidiandmed oma brauseri seadetes. Mis siis enam ei tööta: sisselogimine ning teie keele- ja kuvavaliku meelespidamine; ka küpsiseteade kuvatakse uuesti." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "f7bf451a7ce18ff247f657f4505015c0fcec7a6c436a9d929caeeba5b77ffad3",
+  sha256: "5911b94fec60c371a08dc421ef6fa2224ad96e78c50c26f60eb86ee719f506e3",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.0 · KEHTIB ALATES [DATE]",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",

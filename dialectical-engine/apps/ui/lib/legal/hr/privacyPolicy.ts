@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kolačići",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Postavljamo dva kolačića, oba strogo nužna: jedan vas zadržava prijavljenima, a drugi štiti obrasce od krivotvorenja. Ne postavljamo analitičke, oglasne ni prateće kolačiće. Pravila o kolačićima na [dezbatere.ro/cookies] navode ih s njihovim trajanjem, objašnjavaju kako se vaš odabir pohranjuje i promijenit će se prije dodavanja bilo kojeg drugog kolačića. Ako pravo vaše regije drukčije uređuje neke kolačiće — primjerice pravilo Ujedinjene Kraljevine o odustajanju od analitike — Pravila o kolačićima to navode." }
+      { kind: "p", text: "DebateAI koristi osam stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo DebateAI: četiri kolačića i četiri zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. Pravila o kolačićima na [dezbatere.ro/cookies] navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Kolačić (HttpOnly) — Zadržava vas prijavljenima. Obnavlja se dok upotrebljavate uslugu. — 14 dana",
+        "__Host-debateai-csrf — Kolačić — Sprječava druga web-mjesta da u vaše ime šalju obrasce. — 14 dana",
+        "__Host-debateai-age-refusal — Kolačić (HttpOnly) — Nakon odbijene provjere dobi sprječava ovaj preglednik da pokuša ponovno tijekom 30 dana. Sadrži samo riječ „odbijeno”, bez osobnih podataka. — 30 dana",
+        "debateai.locale — Kolačić — Pamti jezik sučelja koji ste odabrali. — 1 godina",
+        "debateai.consent — Lokalna pohrana — Pamti da ste vidjeli obavijest o kolačićima, pa se prikazuje samo jednom. — Dok ga ne izbrišete",
+        "debateai.mode — Lokalna pohrana — Upotrebljavate li svijetli ili tamni način prikaza. — Dok ga ne izbrišete",
+        "debateai.languageOffer.dismissed — Pohrana sesije — Pamti, za ovu karticu, da ste odbili ponudu da se rasprava prikaže na drugom jeziku. — Dok ne zatvorite karticu",
+        "debateai.support.conversation.v2 — Pohrana sesije — Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. — Dok ne zatvorite karticu"
+        ]
+      },
+      { kind: "p", text: "Nijedna druga strana putem DebateAI-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima." },
+      { kind: "p", text: "Preglednici mogu slati signal „Do Not Track” ili sličan signal. DebateAI vas ne prati, pa takav signal nema što isključiti: usluga radi jednako s njim ili bez njega." },
+      { kind: "p", text: "Da biste odbili ove stavke, blokirajte ili izbrišite kolačiće i podatke web-mjesta za ovo web-mjesto u postavkama preglednika. Što tada prestaje raditi: prijava te pamćenje vašeg odabira jezika i načina prikaza; obavijest o kolačićima također će se ponovno prikazati." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "23234b61d7ad3cbedaa3a9bdf61cba5cdb2bc1f135ddce92872f7103e0821cab",
+  sha256: "8ffa9c19aa04260f25711b6ebb2dfc9803b64b2cda91a22d7f8c9ff7348f6596",
   eyebrow: "PRAVILA O PRIVATNOSTI · v3.0 · NA SNAZI OD [DATE]",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | **Proposed** — V ratifies. This ADR **transcribes** decisions already taken in the `consent-ui` mission's frozen SPEC and DECISIONS; it proposes no new decision, and a new decision written into an ADR would be a SPEC change wearing an ADR's clothes. |
+| **Status** | **Proposed** — V ratifies. This ADR **transcribes** decisions already taken in the `consent-ui` mission's frozen SPEC and DECISIONS; it proposes no new decision, and a new decision written into an ADR would be a SPEC change wearing an ADR's clothes. Superseded in part by ADR-0032 (decisions 1, 2, 3, 5). |
 | **Date** | 2026-09-06 |
 | **Authored by** | Mission `consent-ui`, slice S01, cluster `S01-C2`, step `S01-S47` (board `consent-ui`, `t_8d084df2`). |
 | **Owning context** | **Browser-local consent preferences** — introduced by this mission and owned entirely by `apps/ui/lib/consent.ts`. Nothing outside `apps/ui/components/consent/` reads it. |

@@ -7,6 +7,7 @@ import type { LocaleCode } from "../lib/i18n/locales.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import settingsEnglish from "../messages/en/settings.json";
 import { clearStoredSupportConversation } from "./support/conversation.js";
+import { announceSessionChange } from "./support/sessionChange.js";
 
 export type SessionControlClient = Pick<ContractClient,
   "listSessions" | "logout" | "revokeSession" | "revokeAllSessions" | "stepUp"
@@ -82,6 +83,8 @@ export function SessionControls({
     // outlived the account that produced it — the next person to sign in on this
     // browser opened Help and read the previous person's support conversation.
     clearStoredSupportConversation();
+    // S04-R01: the other tabs of this browser drop their copies too.
+    announceSessionChange();
     if (onSessionEnded !== undefined) onSessionEnded();
     else if (typeof window !== "undefined") window.location.assign("/settings");
   };
