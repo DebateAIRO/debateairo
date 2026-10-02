@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Gdzie oferujemy DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Oferujemy DebateAI osobom mieszkającym na terenie [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie." }
+      { kind: "p", text: "Oferujemy DebateAI osobom mieszkającym na terenie [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "69874d08ec29203501d7698c711209e3cce6a64ed0b6c6557528ec8f6a9aae37",
+  sha256: "4821f751aa3a532ce6764ad3724a92e7aebbc13febcabe71abaf2b8824378da2",
   eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.0 · OBOWIĄZUJĄ OD [DATE]",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DebateAIRO S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",

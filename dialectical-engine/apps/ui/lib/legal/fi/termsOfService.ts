@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Missä tarjoamme DebateAI-palvelua",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Tarjoamme DebateAI-palvelua henkilöille, jotka asuvat [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
+      { kind: "p", text: "Tarjoamme DebateAI-palvelua henkilöille, jotka asuvat [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "8ea2b9a9680d218d6dcbc512b801768a5aea80cf7d97313c2b64ba90740743c3",
+  sha256: "84227b1a2876d467ea77804c24838a876f14145ef8427ff0c412e181d1c44098",
   eyebrow: "KÄYTTÖEHDOT · v2.0 · VOIMASSA [DATE]",
   title: "Mihin sitoudut",
   lede: "Sinun ja DebateAIRO S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",

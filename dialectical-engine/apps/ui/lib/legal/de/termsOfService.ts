@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Wo wir DebateAI anbieten",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wir bieten DebateAI Personen an, die in [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
+      { kind: "p", text: "Wir bieten DebateAI Personen an, die in [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "aa88561a8ce9597a86184c51cf3de2e19b70a6240dd5c24427c70004f448601a",
+  sha256: "9ef3b73ce665e3ca4300eee314dc2f5862f55ddb0cd9349c56c8d410866e0822",
   eyebrow: "NUTZUNGSBEDINGUNGEN · v2.0 · GÜLTIG AB [DATE]",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DebateAIRO S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",

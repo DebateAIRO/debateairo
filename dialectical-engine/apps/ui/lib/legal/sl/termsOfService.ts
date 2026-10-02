@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kje ponujamo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI ponujamo osebam, ki živijo v [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
+      { kind: "p", text: "DebateAI ponujamo osebam, ki živijo v [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "f1cc4e668081cd52b36ef05d845df0a96bbfadafecf908d2331a77d922440b04",
+  sha256: "2c6137ce8c95464396eca18ad3d73ddd7c64daae1ab20e6039926d6f25206769",
   eyebrow: "POGOJI UPORABE · v2.0 · VELJAVNI OD [DATE]",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DebateAIRO S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
