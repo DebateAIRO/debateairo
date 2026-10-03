@@ -116,7 +116,11 @@ export function CardChangeFlow({
           </button>
         </div>
       )}
-      {messageKey !== null ? <p className="billingError" role="alert">{t(catalog, messageKey)}</p> : null}
+      {messageKey === null ? null : messageKey === "billing.checkout.reacceptRequired" ? (
+        // W10 (P2-M20): the accept screen covers the signed-in home page (L4); a plain anchor, so leaving the card
+        // page is a full page load (P2-I14).
+        <p className="billingError" role="alert"><a href="/">{t(catalog, messageKey)}</a></p>
+      ) : <p className="billingError" role="alert">{t(catalog, messageKey)}</p>}
       <p className="billingActions"><a href="/settings">{t(catalog, "billing.card.back")}</a></p>
     </section>
   );

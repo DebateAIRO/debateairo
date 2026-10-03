@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Atcelt manu plānu",
   "billing.cancelPage.done": "Jūsu plāns ir atcelts, un no jums vairs netiks iekasēta maksa. Mēs jums nosūtīsim e-pastā datumu, kad beidzas jūsu piekļuve.",
   "billing.cancelPage.linkInvalid": "Šīs saites derīgums ir beidzies, vai tā jau izmantota. Pieprasiet jaunu zemāk.",
-  "billing.cancelPage.nothingToCancel": "Šajā kontā vairs nav neviena plāna, ko atcelt.",
+  "billing.cancelPage.nothingToCancel": "Šī saite neko neatcēla. Pārbaudiet savu plānu iestatījumos.",
   "billing.cancelPage.signedInHint": "Esat pierakstījies? Varat atcelt arī iestatījumos.",
   "billing.withdrawPage.title": "Atteikšanās no līguma",
   "billing.withdrawPage.who": "Ja dzīvojat ES, EEZ vai Apvienotajā Karalistē, jūs varat atteikties no maksas plāna 14 dienu laikā pēc abonēšanas, nenorādot iemeslu.",

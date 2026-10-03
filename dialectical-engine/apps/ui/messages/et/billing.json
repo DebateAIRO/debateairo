@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Tühista minu pakett",
   "billing.cancelPage.done": "Teie pakett on tühistatud ja teilt ei võeta enam tasu. Saadame teile e-kirjaga kuupäeva, mil teie juurdepääs lõpeb.",
   "billing.cancelPage.linkInvalid": "See link on aegunud või juba kasutatud. Küsige allpool uus.",
-  "billing.cancelPage.nothingToCancel": "Sellel kontol pole enam ühtegi paketti, mida tühistada.",
+  "billing.cancelPage.nothingToCancel": "See link ei tühistanud midagi. Kontrollige oma paketti seadetes.",
   "billing.cancelPage.signedInHint": "Olete sisse logitud? Saate tühistada ka seadetes.",
   "billing.withdrawPage.title": "Lepingust taganemine",
   "billing.withdrawPage.who": "Kui elate ELis, EMPs või Ühendkuningriigis, võite tasulisest paketist taganeda 14 päeva jooksul pärast tellimist ilma põhjust esitamata.",

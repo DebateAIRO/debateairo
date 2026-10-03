@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Batalkan paket saya",
   "billing.cancelPage.done": "Paket Anda dibatalkan dan Anda tidak akan ditagih lagi. Kami akan mengirim email berisi tanggal akses Anda berakhir.",
   "billing.cancelPage.linkInvalid": "Tautan ini sudah kedaluwarsa atau sudah digunakan. Minta yang baru di bawah ini.",
-  "billing.cancelPage.nothingToCancel": "Tidak ada lagi paket yang dapat dibatalkan di akun ini.",
+  "billing.cancelPage.nothingToCancel": "Tautan ini tidak membatalkan apa pun. Periksa paket Anda di Pengaturan.",
   "billing.cancelPage.signedInHint": "Sudah masuk? Anda juga dapat membatalkan di Pengaturan.",
   "billing.withdrawPage.title": "Menarik diri dari kontrak",
   "billing.withdrawPage.who": "Jika Anda tinggal di UE, EEA, atau Inggris, Anda dapat menarik diri dari paket berbayar dalam 14 hari setelah berlangganan, tanpa memberikan alasan.",

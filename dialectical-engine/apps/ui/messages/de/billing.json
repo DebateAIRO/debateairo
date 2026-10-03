@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Meinen Tarif kündigen",
   "billing.cancelPage.done": "Ihr Tarif ist gekündigt, und es wird nichts mehr abgebucht. Wir senden Ihnen per E-Mail das Datum, an dem Ihr Zugang endet.",
   "billing.cancelPage.linkInvalid": "Dieser Link ist abgelaufen oder wurde bereits verwendet. Fordern Sie unten einen neuen an.",
-  "billing.cancelPage.nothingToCancel": "Für dieses Konto gibt es keinen Tarif mehr, der gekündigt werden kann.",
+  "billing.cancelPage.nothingToCancel": "Mit diesem Link wurde nichts gekündigt. Prüfen Sie Ihren Tarif in den Einstellungen.",
   "billing.cancelPage.signedInHint": "Angemeldet? Sie können auch in den Einstellungen kündigen.",
   "billing.withdrawPage.title": "Vom Vertrag zurücktreten",
   "billing.withdrawPage.who": "Wenn Sie in der EU, im EWR oder im Vereinigten Königreich wohnen, können Sie einen kostenpflichtigen Tarif innerhalb von 14 Tagen nach Abschluss ohne Angabe von Gründen widerrufen.",

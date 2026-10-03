@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "ألغِ خطتي",
   "billing.cancelPage.done": "أُلغيت خطتك ولن يُقتطع منك أي مبلغ مرة أخرى. سنرسل إليك بالبريد الإلكتروني تاريخ انتهاء وصولك.",
   "billing.cancelPage.linkInvalid": "انتهت صلاحية هذا الرابط أو سبق استخدامه. اطلب رابطًا جديدًا أدناه.",
-  "billing.cancelPage.nothingToCancel": "لا توجد خطة متبقية لإلغائها في هذا الحساب.",
+  "billing.cancelPage.nothingToCancel": "لم يُلغِ هذا الرابط أي شيء. تحقّق من خطتك في الإعدادات.",
   "billing.cancelPage.signedInHint": "هل سجّلت الدخول؟ يمكنك أيضًا الإلغاء من الإعدادات.",
   "billing.withdrawPage.title": "الانسحاب من عقدك",
   "billing.withdrawPage.who": "إذا كنت تقيم في الاتحاد الأوروبي أو المنطقة الاقتصادية الأوروبية أو المملكة المتحدة، يمكنك الانسحاب من خطة مدفوعة خلال 14 يومًا من الاشتراك، دون ذكر سبب.",

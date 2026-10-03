@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "プランを解約する",
   "billing.cancelPage.done": "プランを解約しました。今後請求されることはありません。ご利用が終了する日付をメールでお知らせします。",
   "billing.cancelPage.linkInvalid": "このリンクは期限切れか、すでに使用されています。下から新しいリンクをリクエストしてください。",
-  "billing.cancelPage.nothingToCancel": "このアカウントには解約できるプランが残っていません。",
+  "billing.cancelPage.nothingToCancel": "このリンクでは何も解約されませんでした。プランの状態は設定でご確認ください。",
   "billing.cancelPage.signedInHint": "サインイン済みの場合は、設定からも解約できます。",
   "billing.withdrawPage.title": "契約の撤回",
   "billing.withdrawPage.who": "EU、EEA または英国にお住まいの場合、登録から 14 日以内であれば、理由を示さずに有料プランを撤回できます。",

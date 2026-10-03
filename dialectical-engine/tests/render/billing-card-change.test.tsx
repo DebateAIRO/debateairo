@@ -126,6 +126,15 @@ describe("P20 the card change page (A11, A12)", () => {
       await settle();
       expect(container.textContent, code).toContain(sentence);
       expect(container.textContent, code).not.toContain("Something went wrong");
+      // W10 (P2-M20): only the updated-Terms sentence is a link, a plain anchor to the signed-in home page (L4's
+      // accept screen), so leaving the card page is a full page load (P2-I14).
+      const link = container.querySelector<HTMLAnchorElement>('[role="alert"] a');
+      if (code === "LEGAL_REACCEPTANCE_REQUIRED") {
+        expect(link?.textContent, code).toBe(sentence);
+        expect(link?.getAttribute("href"), code).toBe("/");
+      } else {
+        expect(link, code).toBeNull();
+      }
     }
   });
 

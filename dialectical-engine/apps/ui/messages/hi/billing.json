@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "मेरी योजना रद्द करें",
   "billing.cancelPage.done": "आपकी योजना रद्द हो गई है और आपसे दोबारा शुल्क नहीं लिया जाएगा। आपकी पहुँच किस तारीख को समाप्त होगी, यह हम आपको ईमेल करेंगे।",
   "billing.cancelPage.linkInvalid": "यह लिंक समाप्त हो गया है या पहले ही उपयोग हो चुका है। नीचे नया लिंक माँगें।",
-  "billing.cancelPage.nothingToCancel": "इस खाते पर रद्द करने के लिए कोई योजना नहीं बची है।",
+  "billing.cancelPage.nothingToCancel": "इस लिंक से कुछ भी रद्द नहीं हुआ। सेटिंग्स में अपनी योजना देखें।",
   "billing.cancelPage.signedInHint": "साइन इन हैं? आप सेटिंग्स में भी रद्द कर सकते हैं।",
   "billing.withdrawPage.title": "अपने अनुबंध से वापसी",
   "billing.withdrawPage.who": "यदि आप EU, EEA या UK में रहते हैं, तो आप सदस्यता लेने के 14 दिनों के भीतर बिना कोई कारण बताए सशुल्क योजना से अनुबंध वापस ले सकते हैं।",

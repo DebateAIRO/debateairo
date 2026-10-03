@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Lemondom a csomagomat",
   "billing.cancelPage.done": "A csomagját lemondtuk, és több terhelés nem lesz. E-mailben elküldjük, mikor ér véget a hozzáférése.",
   "billing.cancelPage.linkInvalid": "Ez a hivatkozás lejárt, vagy már felhasználták. Kérjen újat alább.",
-  "billing.cancelPage.nothingToCancel": "Ezen a fiókon már nincs lemondható csomag.",
+  "billing.cancelPage.nothingToCancel": "Ez a hivatkozás semmit sem mondott le. Csomagját a Beállításokban ellenőrizheti.",
   "billing.cancelPage.signedInHint": "Be van jelentkezve? A Beállításokban is lemondhatja.",
   "billing.withdrawPage.title": "Elállás a szerződéstől",
   "billing.withdrawPage.who": "Ha az EU-ban, az EGT-ben vagy az Egyesült Királyságban él, az előfizetéstől számított 14 napon belül indoklás nélkül elállhat a fizetős csomagtól.",

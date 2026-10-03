@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Prekliči moj paket",
   "billing.cancelPage.done": "Vaš paket je preklican in ničesar vam ne bomo več zaračunali. Po e-pošti vam bomo poslali datum, ko se vaš dostop konča.",
   "billing.cancelPage.linkInvalid": "Ta povezava je potekla ali je bila že uporabljena. Spodaj zahtevajte novo.",
-  "billing.cancelPage.nothingToCancel": "V tem računu ni več paketa, ki bi ga lahko preklicali.",
+  "billing.cancelPage.nothingToCancel": "Ta povezava ni ničesar preklicala. Svoj paket preverite v Nastavitvah.",
   "billing.cancelPage.signedInHint": "Ste prijavljeni? Prekličete lahko tudi v Nastavitvah.",
   "billing.withdrawPage.title": "Odstop od pogodbe",
   "billing.withdrawPage.who": "Če živite v EU, EGP ali Združenem kraljestvu, lahko od plačljivega paketa odstopite v 14 dneh od naročila, ne da bi navedli razlog.",

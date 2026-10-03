@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Peruuta tilaukseni",
   "billing.cancelPage.done": "Tilauksesi on peruutettu, eikä sinulta veloiteta enää. Lähetämme sinulle sähköpostilla päivämäärän, jolloin käyttöoikeutesi päättyy.",
   "billing.cancelPage.linkInvalid": "Tämä linkki on vanhentunut tai jo käytetty. Pyydä uusi alta.",
-  "billing.cancelPage.nothingToCancel": "Tällä tilillä ei ole enää peruutettavaa tilausta.",
+  "billing.cancelPage.nothingToCancel": "Tämä linkki ei peruuttanut mitään. Tarkista tilauksesi Asetuksista.",
   "billing.cancelPage.signedInHint": "Oletko kirjautunut sisään? Voit peruuttaa myös Asetuksissa.",
   "billing.withdrawPage.title": "Sopimuksen peruminen",
   "billing.withdrawPage.who": "Jos asut EU:ssa, ETA-alueella tai Yhdistyneessä kuningaskunnassa, voit perua maksullisen tilauksen 14 päivän kuluessa tilaamisesta ilman syytä.",

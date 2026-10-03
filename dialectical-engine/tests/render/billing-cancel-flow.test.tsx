@@ -77,13 +77,20 @@ describe("P21 /cancel without signing in (Terms §12, A25)", () => {
     expect(container.querySelector("#cancel-email")).not.toBeNull();
   });
 
-  it("a link whose plan had nothing left to cancel says so, never 'your plan is cancelled' (W10, P2-M18)", async () => {
+  it("a link that cancelled nothing says only that, points to Settings and keeps the email form (W10, P2-M18)", async () => {
+    // NOTHING_TO_CANCEL folds four states: a cancel already pending, a plan that ended, a plan SUSPENDED by a dispute
+    // (it comes back if we win) and a newer plan in the token's place. The sentence must hold for all four, so it
+    // never says the account has no plan.
     client.cancelByToken.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 409, "x", "NOTHING_TO_CANCEL"));
     window.history.replaceState(null, "", `/cancel#token=${TOKEN}`);
     await render();
     await act(async () => { button("Cancel my plan")!.click(); });
     await settle();
-    expect(container.textContent).toContain("There is no plan left to cancel on this account.");
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert?.textContent).toBe("This link didn't cancel anything. Check your plan in Settings.");
+    expect(container.textContent).not.toContain("no plan left");
+    expect(container.querySelector("#cancel-email")).not.toBeNull();
+    expect(container.querySelector('a[href="/settings"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Your plan is cancelled");
     expect(container.textContent).not.toContain("won't be charged again");
     // The token is spent: no button to press again.

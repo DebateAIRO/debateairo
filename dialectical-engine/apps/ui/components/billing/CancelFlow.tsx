@@ -31,7 +31,7 @@ export function CancelFlow({
   catalog = billingEnglish,
   client = contractClient
 }: Readonly<{ catalog?: MessageCatalog; client?: CancelClient }>) {
-  const [stage, setStage] = useState<"EMAIL" | "CONFIRM" | "SENT" | "DONE" | "NOTHING">("EMAIL");
+  const [stage, setStage] = useState<"EMAIL" | "CONFIRM" | "SENT" | "DONE">("EMAIL");
   const [token, setToken] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -74,10 +74,12 @@ export function CancelFlow({
         setStage("EMAIL");
         setMessageKey("billing.cancelPage.linkInvalid");
       } else if (failure instanceof ContractHttpError && failure.serverCode === "NOTHING_TO_CANCEL") {
-        // W10 (P2-M18): the token is spent, but its plan was already cancelled, ended, paused or replaced; nothing
-        // changed, so the page never says "your plan is cancelled".
+        // W10 (P2-M18): the token is spent, but its plan was already cancelled, ended, paused by a dispute or
+        // replaced by a newer one; nothing changed. The page never says "your plan is cancelled" nor that the account
+        // has no plan: it says only what this link did and keeps the email form with its Settings link.
         setToken(null);
-        setStage("NOTHING");
+        setStage("EMAIL");
+        setMessageKey("billing.cancelPage.nothingToCancel");
       } else {
         // A network or server failure, or the hourly limit, spends nothing: the same button may be pressed again.
         setMessageKey(failureKey(failure));
@@ -103,7 +105,6 @@ export function CancelFlow({
         </>
       ) : null}
       {stage === "DONE" ? <p className="billingStatus" role="status">{t(catalog, "billing.cancelPage.done")}</p> : null}
-      {stage === "NOTHING" ? <p className="billingStatus" role="status">{t(catalog, "billing.cancelPage.nothingToCancel")}</p> : null}
       {stage === "SENT" ? <p className="billingStatus" role="status">{t(catalog, "billing.cancelPage.sent")}</p> : null}
       {messageKey !== null ? <p className="billingError" role="alert">{t(catalog, messageKey)}</p> : null}
       {stage === "EMAIL" ? (

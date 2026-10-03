@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Anulați-mi abonamentul",
   "billing.cancelPage.done": "Abonamentul dvs. este anulat și nu veți mai fi taxat. Vă trimitem pe e-mail data la care se încheie accesul dvs.",
   "billing.cancelPage.linkInvalid": "Acest link a expirat sau a fost deja folosit. Cereți unul nou mai jos.",
-  "billing.cancelPage.nothingToCancel": "Nu mai există niciun abonament de anulat pentru acest cont.",
+  "billing.cancelPage.nothingToCancel": "Acest link nu a anulat nimic. Verificați-vă abonamentul în Setări.",
   "billing.cancelPage.signedInHint": "Sunteți autentificat? Puteți anula și din Setări.",
   "billing.withdrawPage.title": "Retragerea din contract",
   "billing.withdrawPage.who": "Dacă locuiți în UE, în SEE sau în Regatul Unit, vă puteți retrage dintr-un abonament plătit în 14 zile de la abonare, fără să indicați un motiv.",

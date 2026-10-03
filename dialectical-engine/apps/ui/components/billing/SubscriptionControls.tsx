@@ -166,7 +166,12 @@ export function SubscriptionControls({
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  // `linksHome`: W10 (P2-M20) the updated-Terms sentence is a plain link to the signed-in home page, whose accept
+  // screen L4 shows (a full page load, never a client-side move). Every other sentence is plain text.
+  const [message, setMessageState] = useState<Readonly<{ text: string; linksHome: boolean }> | null>(null);
+  const setMessage = useCallback((text: string | null, linksHome = false): void => {
+    setMessageState(text === null ? null : { text, linksHome });
+  }, []);
 
   /**
    * Reads the subscription, then the invoices. One after the other on purpose: with billing off (local mode, or
@@ -199,7 +204,7 @@ export function SubscriptionControls({
       setMessage(t(catalog, "billing.subscription.actionFailed"));
     }
     return current.subscription;
-  }, [catalog, client]);
+  }, [catalog, client, setMessage]);
 
   useEffect(() => { void reload(); }, [reload]);
 
@@ -215,7 +220,7 @@ export function SubscriptionControls({
     } catch (failure) {
       const chosen = words(failure);
       if (chosen.reload) await reload();
-      setMessage(t(catalog, chosen.key));
+      setMessage(t(catalog, chosen.key), chosen === REACCEPT_REQUIRED);
     } finally {
       setBusy(false);
     }
@@ -454,7 +459,9 @@ export function SubscriptionControls({
           ) : null}
         </>
       ) : null}
-      {message !== null ? <p className="setStatus" role="status">{message}</p> : null}
+      {message !== null ? (
+        <p className="setStatus" role="status">{message.linksHome ? <a href="/">{message.text}</a> : message.text}</p>
+      ) : null}
       {invoices !== null ? (
         <div>
           <h3 className="setCardTitle">{t(catalog, "billing.subscription.invoices")}</h3>

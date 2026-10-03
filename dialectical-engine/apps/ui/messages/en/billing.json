@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Cancel my plan",
   "billing.cancelPage.done": "Your plan is cancelled and you won't be charged again. We'll email you the date your access ends.",
   "billing.cancelPage.linkInvalid": "This link has expired or was already used. Ask for a new one below.",
-  "billing.cancelPage.nothingToCancel": "There is no plan left to cancel on this account.",
+  "billing.cancelPage.nothingToCancel": "This link didn't cancel anything. Check your plan in Settings.",
   "billing.cancelPage.signedInHint": "Signed in? You can also cancel in Settings.",
   "billing.withdrawPage.title": "Withdraw from your contract",
   "billing.withdrawPage.who": "If you live in the EU, the EEA or the UK, you can withdraw from a paid plan within 14 days of subscribing, without giving a reason.",

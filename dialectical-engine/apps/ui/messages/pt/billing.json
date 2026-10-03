@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Cancelar o meu plano",
   "billing.cancelPage.done": "O seu plano foi cancelado e não voltará a ser cobrado. Enviaremos por e-mail a data em que o seu acesso termina.",
   "billing.cancelPage.linkInvalid": "Esta ligação expirou ou já foi utilizada. Peça uma nova abaixo.",
-  "billing.cancelPage.nothingToCancel": "Já não há nenhum plano para cancelar nesta conta.",
+  "billing.cancelPage.nothingToCancel": "Esta ligação não cancelou nada. Verifique o seu plano nas Definições.",
   "billing.cancelPage.signedInHint": "Já iniciou sessão? Também pode cancelar nas Definições.",
   "billing.withdrawPage.title": "Livre resolução do contrato",
   "billing.withdrawPage.who": "Se reside na UE, no EEE ou no Reino Unido, pode exercer o direito de livre resolução de um plano pago no prazo de 14 dias após a subscrição, sem indicar o motivo.",

@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Zrušit můj plán",
   "billing.cancelPage.done": "Váš plán je zrušen a nic dalšího vám nebude účtováno. E-mailem vám pošleme datum, kdy váš přístup skončí.",
   "billing.cancelPage.linkInvalid": "Platnost tohoto odkazu vypršela nebo už byl použit. Níže si vyžádejte nový.",
-  "billing.cancelPage.nothingToCancel": "U tohoto účtu už není žádný plán ke zrušení.",
+  "billing.cancelPage.nothingToCancel": "Tento odkaz nic nezrušil. Zkontrolujte svůj plán v Nastavení.",
   "billing.cancelPage.signedInHint": "Jste přihlášeni? Zrušit můžete i v Nastavení.",
   "billing.withdrawPage.title": "Odstoupení od smlouvy",
   "billing.withdrawPage.who": "Pokud žijete v EU, EHP nebo Spojeném království, můžete od placeného plánu odstoupit do 14 dnů od předplacení, a to bez udání důvodu.",

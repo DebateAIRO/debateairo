@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Atšaukti mano planą",
   "billing.cancelPage.done": "Jūsų planas atšauktas ir mokestis daugiau nebus nuskaičiuotas. El. laišku atsiųsime datą, kada baigsis jūsų prieiga.",
   "billing.cancelPage.linkInvalid": "Šios nuorodos galiojimas baigėsi arba ji jau panaudota. Paprašykite naujos toliau.",
-  "billing.cancelPage.nothingToCancel": "Šioje paskyroje neliko plano, kurį būtų galima atšaukti.",
+  "billing.cancelPage.nothingToCancel": "Ši nuoroda nieko neatšaukė. Savo planą patikrinkite nustatymuose.",
   "billing.cancelPage.signedInHint": "Esate prisijungę? Atšaukti galite ir nustatymuose.",
   "billing.withdrawPage.title": "Sutarties atsisakymas",
   "billing.withdrawPage.who": "Jei gyvenate ES, EEE arba Jungtinėje Karalystėje, mokamo plano galite atsisakyti per 14 dienų nuo užsisakymo, nenurodydami priežasties.",

@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Disdici il mio piano",
   "billing.cancelPage.done": "Il tuo piano è disdetto e non ti verrà addebitato altro. Ti invieremo via e-mail la data in cui termina il tuo accesso.",
   "billing.cancelPage.linkInvalid": "Questo link è scaduto o è già stato usato. Richiedine uno nuovo qui sotto.",
-  "billing.cancelPage.nothingToCancel": "Su questo account non resta nessun piano da disdire.",
+  "billing.cancelPage.nothingToCancel": "Questo link non ha disdetto nulla. Controlla il tuo piano nelle Impostazioni.",
   "billing.cancelPage.signedInHint": "Hai già effettuato l’accesso? Puoi disdire anche nelle Impostazioni.",
   "billing.withdrawPage.title": "Recedi dal contratto",
   "billing.withdrawPage.who": "Se vivi nell’UE, nel SEE o nel Regno Unito, puoi recedere da un piano a pagamento entro 14 giorni dall’abbonamento, senza indicarne il motivo.",

@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Cuir mo phlean ar ceal",
   "billing.cancelPage.done": "Tá do phlean curtha ar ceal agus ní ghearrfar táille ort arís. Seolfaimid ríomhphost chugat leis an dáta a gcríochnaíonn do rochtain.",
   "billing.cancelPage.linkInvalid": "Tá an nasc seo imithe in éag nó úsáideadh cheana é. Iarr ceann nua thíos.",
-  "billing.cancelPage.nothingToCancel": "Níl aon phlean fágtha le cur ar ceal ar an gcuntas seo.",
+  "billing.cancelPage.nothingToCancel": "Níor chuir an nasc seo aon rud ar ceal. Seiceáil do phlean sna Socruithe.",
   "billing.cancelPage.signedInHint": "Sínithe isteach? Is féidir leat cur ar ceal sna Socruithe freisin.",
   "billing.withdrawPage.title": "Tarraing siar ó do chonradh",
   "billing.withdrawPage.who": "Má chónaíonn tú san AE, sa LEE nó sa Ríocht Aontaithe, is féidir leat tarraingt siar ó phlean íoctha laistigh de 14 lá ó liostáil, gan cúis a thabhairt.",

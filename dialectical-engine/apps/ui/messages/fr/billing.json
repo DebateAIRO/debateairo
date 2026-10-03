@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Résilier ma formule",
   "billing.cancelPage.done": "Votre formule est résiliée et vous ne serez plus prélevé. Nous vous enverrons par e-mail la date à laquelle votre accès prend fin.",
   "billing.cancelPage.linkInvalid": "Ce lien a expiré ou a déjà été utilisé. Demandez-en un nouveau ci-dessous.",
-  "billing.cancelPage.nothingToCancel": "Il n’y a plus de formule à résilier sur ce compte.",
+  "billing.cancelPage.nothingToCancel": "Ce lien n’a rien résilié. Vérifiez votre formule dans les Paramètres.",
   "billing.cancelPage.signedInHint": "Vous êtes connecté ? Vous pouvez aussi résilier dans les Paramètres.",
   "billing.withdrawPage.title": "Se rétracter du contrat",
   "billing.withdrawPage.who": "Si vous résidez dans l’UE, l’EEE ou au Royaume-Uni, vous pouvez vous rétracter d’une formule payante dans les 14 jours suivant votre abonnement, sans donner de motif.",

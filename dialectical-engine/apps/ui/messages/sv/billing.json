@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Säg upp mitt abonnemang",
   "billing.cancelPage.done": "Ditt abonnemang är uppsagt och du debiteras inte igen. Vi mejlar dig datumet då din åtkomst upphör.",
   "billing.cancelPage.linkInvalid": "Den här länken har gått ut eller har redan använts. Be om en ny nedan.",
-  "billing.cancelPage.nothingToCancel": "Det finns inget abonnemang kvar att säga upp på det här kontot.",
+  "billing.cancelPage.nothingToCancel": "Den här länken sade inte upp något. Kontrollera ditt abonnemang under Inställningar.",
   "billing.cancelPage.signedInHint": "Inloggad? Du kan också säga upp i Inställningar.",
   "billing.withdrawPage.title": "Ångra ditt avtal",
   "billing.withdrawPage.who": "Om du bor i EU, EES eller Storbritannien kan du ångra ett betalabonnemang inom 14 dagar från att du tecknade det, utan att ange något skäl.",

@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Mijn abonnement opzeggen",
   "billing.cancelPage.done": "Uw abonnement is opgezegd en er wordt niets meer in rekening gebracht. We e-mailen u de datum waarop uw toegang eindigt.",
   "billing.cancelPage.linkInvalid": "Deze link is verlopen of al gebruikt. Vraag hieronder een nieuwe aan.",
-  "billing.cancelPage.nothingToCancel": "Er is op dit account geen abonnement meer om op te zeggen.",
+  "billing.cancelPage.nothingToCancel": "Deze link heeft niets opgezegd. Controleer uw abonnement in Instellingen.",
   "billing.cancelPage.signedInHint": "Ingelogd? U kunt ook opzeggen in Instellingen.",
   "billing.withdrawPage.title": "Uw overeenkomst herroepen",
   "billing.withdrawPage.who": "Als u in de EU, de EER of het Verenigd Koninkrijk woont, kunt u een betaald abonnement binnen 14 dagen na het afsluiten herroepen, zonder opgave van redenen.",

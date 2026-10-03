@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Zrušiť môj program",
   "billing.cancelPage.done": "Váš program je zrušený a nič ďalšie vám nebude účtované. E-mailom vám pošleme dátum, keď sa váš prístup skončí.",
   "billing.cancelPage.linkInvalid": "Platnosť tohto odkazu vypršala alebo už bol použitý. Nižšie si vyžiadajte nový.",
-  "billing.cancelPage.nothingToCancel": "V tomto účte už nie je žiadny program na zrušenie.",
+  "billing.cancelPage.nothingToCancel": "Tento odkaz nič nezrušil. Skontrolujte svoj program v Nastaveniach.",
   "billing.cancelPage.signedInHint": "Ste prihlásení? Zrušiť môžete aj v Nastaveniach.",
   "billing.withdrawPage.title": "Odstúpenie od zmluvy",
   "billing.withdrawPage.who": "Ak žijete v EÚ, EHP alebo Spojenom kráľovstve, môžete od plateného programu odstúpiť do 14 dní od predplatenia, a to bez udania dôvodu.",

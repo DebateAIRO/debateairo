@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Hủy gói của tôi",
   "billing.cancelPage.done": "Gói của bạn đã được hủy và bạn sẽ không bị tính phí thêm. Chúng tôi sẽ gửi email cho bạn ngày quyền truy cập kết thúc.",
   "billing.cancelPage.linkInvalid": "Liên kết này đã hết hạn hoặc đã được dùng. Hãy yêu cầu liên kết mới bên dưới.",
-  "billing.cancelPage.nothingToCancel": "Tài khoản này không còn gói nào để hủy.",
+  "billing.cancelPage.nothingToCancel": "Liên kết này không hủy gì cả. Hãy kiểm tra gói của bạn trong Cài đặt.",
   "billing.cancelPage.signedInHint": "Đã đăng nhập? Bạn cũng có thể hủy trong Cài đặt.",
   "billing.withdrawPage.title": "Rút lại hợp đồng",
   "billing.withdrawPage.who": "Nếu bạn sống ở EU, EEA hoặc Vương quốc Anh, bạn có thể rút lại gói trả phí trong vòng 14 ngày kể từ khi đăng ký, không cần nêu lý do.",

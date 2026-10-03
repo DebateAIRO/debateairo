@@ -204,7 +204,7 @@ test("each refusal D6b's routes answer is worded as the server means it, in Engl
     // and the cancel link.
     "billing.checkout.rateLimited": "Too many tries in the last hour. Please try again later.",
     // W10 (P2-M18): 409 NOTHING_TO_CANCEL from the emailed cancel link; nothing was cancelled.
-    "billing.cancelPage.nothingToCancel": "There is no plan left to cancel on this account."
+    "billing.cancelPage.nothingToCancel": "This link didn't cancel anything. Check your plan in Settings."
   };
   for (const [key, value] of Object.entries(expected)) assert.equal(english[key], value, key);
   // None of them may blame the password: only a refused step-up asks to check it (billing.subscription.withdrawRefused).

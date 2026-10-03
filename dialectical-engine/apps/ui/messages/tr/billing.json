@@ -159,7 +159,7 @@
   "billing.cancelPage.confirm": "Planımı iptal et",
   "billing.cancelPage.done": "Planınız iptal edildi ve sizden yeniden ücret alınmayacak. Erişiminizin sona ereceği tarihi size e-postayla bildireceğiz.",
   "billing.cancelPage.linkInvalid": "Bu bağlantının süresi doldu veya zaten kullanıldı. Aşağıdan yenisini isteyin.",
-  "billing.cancelPage.nothingToCancel": "Bu hesapta iptal edilecek bir plan kalmadı.",
+  "billing.cancelPage.nothingToCancel": "Bu bağlantı hiçbir şeyi iptal etmedi. Planınızı Ayarlar’dan kontrol edin.",
   "billing.cancelPage.signedInHint": "Oturum açtınız mı? Ayarlar’dan da iptal edebilirsiniz.",
   "billing.withdrawPage.title": "Sözleşmeden cayma",
   "billing.withdrawPage.who": "AB’de, AEA’da veya Birleşik Krallık’ta yaşıyorsanız, abone olduktan sonraki 14 gün içinde gerekçe göstermeden ücretli bir plandan cayabilirsiniz.",
