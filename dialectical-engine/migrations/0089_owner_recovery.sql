@@ -1,30 +1,38 @@
 -- Task6. Independent replacement-only Owner authority. Never changes private run ownership/keys.
-CREATE TABLE staff.owner_lineage (
+CREATE TABLE IF NOT EXISTS staff.owner_lineage (
  singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),lineage_id uuid NOT NULL UNIQUE,
  staff_id uuid NOT NULL REFERENCES staff.subject,changed_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE TABLE staff.owner_recovery_generation (
+CREATE TABLE IF NOT EXISTS staff.owner_recovery_generation (
  singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),generation uuid NOT NULL UNIQUE,
  verifier text NOT NULL CHECK(verifier ~ '^sha256:[0-9a-f]{64}$'),installation_operation_id uuid NOT NULL,
  installed_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE TABLE staff.owner_recovery_operation (
+CREATE TABLE IF NOT EXISTS staff.owner_recovery_operation (
  operation_id uuid PRIMARY KEY,command_id uuid NOT NULL UNIQUE,receipt_ids uuid[] NOT NULL CHECK(cardinality(receipt_ids)=2 AND receipt_ids[1]<>receipt_ids[2]),
  purpose text NOT NULL CHECK(purpose IN('BOOTSTRAP','RECOVER_OWNER')),previous_generation uuid NOT NULL,next_generation uuid NOT NULL UNIQUE,
  next_lineage_id uuid NOT NULL UNIQUE,request_sha256 text NOT NULL CHECK(request_sha256 ~ '^[0-9a-f]{64}$'),
  receipt jsonb NOT NULL,recorded_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.owner_recovery_operation FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
-ALTER TABLE staff.owner_command ADD COLUMN recovery_generation uuid;
-ALTER TABLE staff.owner_command ADD COLUMN previous_lineage_id uuid;
-ALTER TABLE staff.owner_command ADD COLUMN previous_erased boolean NOT NULL DEFAULT false;
-ALTER TABLE staff.owner_command DROP CONSTRAINT owner_command_previous_user_id_fkey;
-ALTER TABLE staff.owner_command ADD CONSTRAINT owner_command_previous_user_id_fkey FOREIGN KEY(previous_user_id) REFERENCES identity."user" ON DELETE SET NULL;
-ALTER TABLE staff.owner_command DROP CONSTRAINT owner_command_check;
-ALTER TABLE staff.owner_command ADD CONSTRAINT owner_command_predecessor CHECK(
+CREATE OR REPLACE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.owner_recovery_operation FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
+ALTER TABLE staff.owner_command ADD COLUMN IF NOT EXISTS recovery_generation uuid;
+ALTER TABLE staff.owner_command ADD COLUMN IF NOT EXISTS previous_lineage_id uuid;
+ALTER TABLE staff.owner_command ADD COLUMN IF NOT EXISTS previous_erased boolean NOT NULL DEFAULT false;
+ALTER TABLE staff.owner_command DROP CONSTRAINT IF EXISTS owner_command_previous_user_id_fkey;
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid='staff.owner_command'::regclass AND conname='owner_command_previous_user_id_fkey') THEN
+  ALTER TABLE staff.owner_command ADD CONSTRAINT owner_command_previous_user_id_fkey FOREIGN KEY(previous_user_id) REFERENCES identity."user" ON DELETE SET NULL;
+ END IF;
+END $$;
+ALTER TABLE staff.owner_command DROP CONSTRAINT IF EXISTS owner_command_check;
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid='staff.owner_command'::regclass AND conname='owner_command_predecessor') THEN
+  ALTER TABLE staff.owner_command ADD CONSTRAINT owner_command_predecessor CHECK(
  (purpose='BOOTSTRAP' AND previous_user_id IS NULL AND previous_lineage_id IS NULL AND NOT previous_erased)
  OR (purpose='RECOVER_OWNER' AND ((previous_lineage_id IS NOT NULL AND ((previous_erased AND previous_user_id IS NULL) OR (NOT previous_erased AND previous_user_id IS NOT NULL AND previous_user_id<>target_user_id))) OR (recovery_generation IS NULL AND ((previous_user_id IS NOT NULL AND previous_user_id<>target_user_id) OR (state='CANCELLED' AND previous_user_id IS NULL AND previous_erased)))))
 );
+ END IF;
+END $$;
 -- No historical row can act as a freshly independently prepared command.
 UPDATE staff.owner_command SET state='CANCELLED' WHERE state='PENDING';
 -- Existing current designation is authoritative only when still active. Erased/ambiguous
@@ -35,26 +43,38 @@ DO $$ BEGIN
   INSERT INTO staff.owner_lineage(singleton,lineage_id,staff_id) SELECT true,designation_id,staff_id FROM staff.owner_designation WHERE active;
  END IF;
 END $$;
-CREATE FUNCTION staff.require_owner_recovery_jit() RETURNS void
+CREATE OR REPLACE FUNCTION staff.require_owner_recovery_jit() RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN
  IF session_user<>'debateai_prod_staff_recovery' OR NOT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname=session_user AND rolcanlogin AND rolvaliduntil>clock_timestamp() AND rolvaliduntil<=clock_timestamp()+interval '5 minutes') THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_RECOVERY_JIT_REQUIRED';END IF;
 END $$;
-CREATE FUNCTION staff.owner_recovery_commit_guard() RETURNS trigger
+CREATE OR REPLACE FUNCTION staff.owner_recovery_commit_guard() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN
  PERFORM staff.require_owner_recovery_jit();RETURN NEW;
 END $$;
-CREATE CONSTRAINT TRIGGER owner_recovery_generation_commit AFTER INSERT OR UPDATE ON staff.owner_recovery_generation DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION staff.owner_recovery_commit_guard();
-CREATE CONSTRAINT TRIGGER owner_recovery_operation_commit AFTER INSERT ON staff.owner_recovery_operation DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION staff.owner_recovery_commit_guard();
-CREATE FUNCTION staff.owner_command_prepare_commit_guard() RETURNS trigger
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid='staff.owner_recovery_generation'::regclass AND tgname='owner_recovery_generation_commit' AND NOT tgisinternal) THEN
+  CREATE CONSTRAINT TRIGGER owner_recovery_generation_commit AFTER INSERT OR UPDATE ON staff.owner_recovery_generation DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION staff.owner_recovery_commit_guard();
+ END IF;
+END $$;
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid='staff.owner_recovery_operation'::regclass AND tgname='owner_recovery_operation_commit' AND NOT tgisinternal) THEN
+  CREATE CONSTRAINT TRIGGER owner_recovery_operation_commit AFTER INSERT ON staff.owner_recovery_operation DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION staff.owner_recovery_commit_guard();
+ END IF;
+END $$;
+CREATE OR REPLACE FUNCTION staff.owner_command_prepare_commit_guard() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN
  IF NEW.recovery_generation IS NOT NULL THEN PERFORM staff.require_owner_recovery_jit();END IF;RETURN NEW;
 END $$;
-CREATE CONSTRAINT TRIGGER owner_command_prepare_commit AFTER INSERT ON staff.owner_command DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION staff.owner_command_prepare_commit_guard();
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgrelid='staff.owner_command'::regclass AND tgname='owner_command_prepare_commit' AND NOT tgisinternal) THEN
+  CREATE CONSTRAINT TRIGGER owner_command_prepare_commit AFTER INSERT ON staff.owner_command DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION staff.owner_command_prepare_commit_guard();
+ END IF;
+END $$;
 CREATE OR REPLACE FUNCTION staff.prepare_owner_command(p_purpose text,p_target uuid,p_previous uuid,p_credentials text[],p_operation uuid,p_nonce text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN
  PERFORM staff.require_owner_recovery_jit();PERFORM identity.lock_security_subjects(ARRAY[p_target,p_previous]);PERFORM staff.require_owner_recovery_jit();RAISE EXCEPTION 'OWNER_RECOVERY_GENERATION_REQUIRED';
 END $$;
-CREATE FUNCTION staff.install_owner_recovery_generation(p_generation uuid,p_verifier text,p_operation uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.install_owner_recovery_generation(p_generation uuid,p_verifier text,p_operation uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v staff.owner_recovery_generation%ROWTYPE;BEGIN
  PERFORM staff.require_owner_recovery_jit();PERFORM pg_advisory_xact_lock(hashtextextended('staff:owner-lineage',0));PERFORM pg_advisory_xact_lock(hashtextextended('staff:owner-generation',0));PERFORM staff.require_owner_recovery_jit();
@@ -68,11 +88,11 @@ DECLARE v staff.owner_recovery_generation%ROWTYPE;BEGIN
  END IF;
  PERFORM staff.require_owner_recovery_jit();RETURN jsonb_build_object('operationId',v.installation_operation_id,'outcome','COMPLETED','recordedAt',v.installed_at);
 END $$;
-CREATE FUNCTION staff.owner_command_json(p_command uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.owner_command_json(p_command uuid) RETURNS jsonb
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT jsonb_strip_nulls(jsonb_build_object('commandId',command_id,'operationId',operation_id,'purpose',purpose,'targetUserId',target_user_id,'previousOwnerUserId',previous_user_id,'previousOwnerLineageId',previous_lineage_id,'previousErased',previous_erased,'targetAccountSecurityEpoch',target_account_security_epoch,'credentialIds',credential_ids,'nonceSha256',nonce_sha256,'expiresAt',expires_at,'createdAt',created_at,'generation',recovery_generation,'state',state)) FROM staff.owner_command WHERE command_id=p_command
 $$;
-CREATE FUNCTION staff.require_owner_predecessor(p_purpose text,p_target uuid,p_lineage uuid,p_previous uuid,p_erased boolean) RETURNS void
+CREATE OR REPLACE FUNCTION staff.require_owner_predecessor(p_purpose text,p_target uuid,p_lineage uuid,p_previous uuid,p_erased boolean) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v record;BEGIN
  IF p_purpose='BOOTSTRAP' THEN
@@ -84,7 +104,7 @@ DECLARE v record;BEGIN
    (NOT p_erased AND (p_previous IS NULL OR p_previous=p_target OR v.user_id IS DISTINCT FROM p_previous OR v.state='ERASED' OR NOT EXISTS(SELECT 1 FROM staff.owner_designation WHERE staff_id=v.staff_id AND active))) THEN RAISE EXCEPTION 'STAFF_OWNER_PREDECESSOR_INVALID';END IF;
  ELSE RAISE EXCEPTION 'STAFF_OWNER_COMMAND_INVALID';END IF;
 END $$;
-CREATE FUNCTION staff.prepare_owner_command_v2(p_command uuid,p_purpose text,p_target uuid,p_lineage uuid,p_previous uuid,p_erased boolean,p_credentials text[],p_operation uuid,p_nonce text,p_generation uuid,p_verifier text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.prepare_owner_command_v2(p_command uuid,p_purpose text,p_target uuid,p_lineage uuid,p_previous uuid,p_erased boolean,p_credentials text[],p_operation uuid,p_nonce text,p_generation uuid,p_verifier text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v staff.owner_command%ROWTYPE;g staff.owner_recovery_generation%ROWTYPE;BEGIN
  PERFORM staff.require_owner_recovery_jit();PERFORM identity.lock_security_subjects(ARRAY[p_target,p_previous]);
@@ -103,37 +123,37 @@ DECLARE v staff.owner_command%ROWTYPE;g staff.owner_recovery_generation%ROWTYPE;
  END IF;
  PERFORM staff.require_owner_recovery_jit();RETURN staff.owner_command_json(p_command);
 END $$;
-CREATE FUNCTION staff.read_owner_command(p_command uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_owner_command(p_command uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ DECLARE v jsonb;BEGIN
  PERFORM staff.require_owner_recovery_jit();v:=staff.owner_command_json(p_command);PERFORM staff.require_owner_recovery_jit();RETURN v;
 END $$;
-CREATE FUNCTION staff.read_owner_receipts(p_command uuid,p_receipts uuid[]) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_owner_receipts(p_command uuid,p_receipts uuid[]) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ DECLARE v jsonb;BEGIN
  PERFORM staff.require_owner_recovery_jit();IF p_command IS NULL OR p_receipts IS NULL OR cardinality(p_receipts)<>2 OR p_receipts[1] IS NULL OR p_receipts[2] IS NULL OR p_receipts[1]=p_receipts[2] THEN RAISE EXCEPTION 'STAFF_OWNER_RECEIPTS_INVALID';END IF;
  SELECT COALESCE(jsonb_agg(jsonb_build_object('receiptId',r.receipt_id,'commandId',r.command_id,'purpose',r.purpose,'targetUserId',r.target_user_id,'ordinarySessionId',r.ordinary_session_id,'targetAccountSecurityEpoch',r.target_account_security_epoch,'credentialId',r.credential_id,'nonceSha256',r.nonce_sha256,'verifiedAt',r.verified_at,'expiresAt',r.expires_at,'consumedAt',r.consumed_at) ORDER BY array_position(p_receipts,r.receipt_id)),'[]') INTO v FROM staff.owner_possession_receipt r WHERE r.command_id=p_command AND r.receipt_id=ANY(p_receipts);
  PERFORM staff.require_owner_recovery_jit();RETURN v;
 END $$;
-CREATE FUNCTION staff.read_owner_alert_metadata(p_command uuid,p_operation uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_owner_alert_metadata(p_command uuid,p_operation uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ DECLARE v jsonb;BEGIN
  PERFORM staff.require_owner_recovery_jit();
  SELECT jsonb_build_object('commandId',c.command_id,'operationId',c.operation_id,'targetUserId',c.target_user_id,'keyRef',u.audit_token,'event',c.purpose,'actorStaffId',NULL,'subjectStaffId',NULL,'reason',jsonb_build_object('code',CASE WHEN c.purpose='BOOTSTRAP' THEN 'BOOTSTRAP' ELSE 'RECOVERY' END)) INTO v FROM staff.owner_command c JOIN identity."user" u ON u.user_id=c.target_user_id JOIN staff.owner_recovery_generation g ON g.singleton AND g.generation=c.recovery_generation WHERE c.command_id=p_command AND c.operation_id=p_operation AND c.state='PENDING' AND c.expires_at>clock_timestamp() AND u.state='active' AND NOT identity.read_account_security_hold(u.user_id) AND NOT EXISTS(SELECT 1 FROM identity.account_erasure_request WHERE user_id=u.user_id AND cancelled_at IS NULL);
  PERFORM staff.require_owner_recovery_jit();RETURN v;
 END $$;
-CREATE FUNCTION staff.authorize_owner_alert_operation(p_command uuid,p_operation uuid,p_hash text,p_generation uuid) RETURNS boolean
+CREATE OR REPLACE FUNCTION staff.authorize_owner_alert_operation(p_command uuid,p_operation uuid,p_hash text,p_generation uuid) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ DECLARE v boolean;BEGIN
  PERFORM staff.require_owner_recovery_jit();IF staff.read_owner_alert_metadata(p_command,p_operation) IS NULL THEN RAISE EXCEPTION 'STAFF_OWNER_COMMAND_INVALID';END IF;
  v:=staff.authorize_alert_operation(p_operation,p_hash,p_generation);PERFORM staff.require_owner_recovery_jit();IF staff.read_owner_alert_metadata(p_command,p_operation) IS NULL THEN RAISE EXCEPTION 'STAFF_OWNER_COMMAND_INVALID';END IF;RETURN v;
 END $$;
-CREATE FUNCTION staff.owner_recovery_request(p_command uuid,p_receipts uuid[],p_operation uuid,p_purpose text,p_generation uuid,p_next uuid,p_next_verifier text,p_lineage uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.owner_recovery_request(p_command uuid,p_receipts uuid[],p_operation uuid,p_purpose text,p_generation uuid,p_next uuid,p_next_verifier text,p_lineage uuid) RETURNS jsonb
 LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$ SELECT jsonb_build_object('commandId',p_command,'receiptIds',p_receipts,'operationId',p_operation,'purpose',p_purpose,'previousGeneration',p_generation,'nextGeneration',p_next,'nextVerifier',p_next_verifier,'nextLineageId',p_lineage) $$;
-CREATE FUNCTION staff.read_committed_owner_operation(p_command uuid,p_receipts uuid[],p_operation uuid,p_purpose text,p_generation uuid,p_next uuid,p_next_verifier text,p_lineage uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_committed_owner_operation(p_command uuid,p_receipts uuid[],p_operation uuid,p_purpose text,p_generation uuid,p_next uuid,p_next_verifier text,p_lineage uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ DECLARE v staff.owner_recovery_operation%ROWTYPE;BEGIN
  PERFORM staff.require_owner_recovery_jit();SELECT * INTO v FROM staff.owner_recovery_operation WHERE operation_id=p_operation;
  IF NOT FOUND THEN PERFORM staff.require_owner_recovery_jit();RETURN NULL;END IF;
  IF v.request_sha256<>encode(sha256(convert_to(staff.owner_recovery_request(p_command,p_receipts,p_operation,p_purpose,p_generation,p_next,p_next_verifier,p_lineage)::text,'UTF8')),'hex') THEN RAISE EXCEPTION 'STAFF_OPERATION_CONFLICT';END IF;
  PERFORM staff.require_owner_recovery_jit();RETURN v.receipt;
 END $$;
-CREATE FUNCTION staff.commit_owner_command(p_command uuid,p_receipts uuid[],p_operation uuid,p_purpose text,p_generation uuid,p_verifier text,p_next uuid,p_next_verifier text,p_lineage uuid,p_alert jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.commit_owner_command(p_command uuid,p_receipts uuid[],p_operation uuid,p_purpose text,p_generation uuid,p_verifier text,p_next uuid,p_next_verifier text,p_lineage uuid,p_alert jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.owner_command%ROWTYPE;g staff.owner_recovery_generation%ROWTYPE;r staff.owner_possession_receipt%ROWTYPE;t timestamptz;v_receipt jsonb;v_count integer:=0;v_base uuid;v_staff uuid;v_previous_staff uuid;v_request jsonb;BEGIN
  PERFORM staff.require_owner_recovery_jit();SELECT * INTO c FROM staff.owner_command WHERE command_id=p_command;
@@ -177,7 +197,7 @@ DECLARE c staff.owner_command%ROWTYPE;g staff.owner_recovery_generation%ROWTYPE;
  PERFORM staff.require_owner_recovery_jit();IF NOT staff.live_account(c.target_user_id,v_base) THEN RAISE EXCEPTION 'STAFF_OWNER_COMMAND_INVALID';END IF;RETURN v_receipt;
 END $$;
 -- Final COMMIT clock, after deferred audit/outbox guards and any blocking inserts.
-CREATE FUNCTION staff.recheck_owner_commit(p_command uuid,p_receipts uuid[]) RETURNS void
+CREATE OR REPLACE FUNCTION staff.recheck_owner_commit(p_command uuid,p_receipts uuid[]) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.owner_command%ROWTYPE;t timestamptz:=clock_timestamp();BEGIN
  SELECT * INTO c FROM staff.owner_command WHERE command_id=p_command;

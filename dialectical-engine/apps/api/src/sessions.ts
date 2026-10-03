@@ -68,7 +68,7 @@ export type StaffPrerequisiteRequest = Readonly<{session: AuthenticatedSession; 
 export type StaffPrerequisiteResult = Readonly<{sessionToken: string; csrfToken: string; prerequisiteHandle: string; expiresAt: Date}>;
 
 export interface SessionApplication {
-  stepUpStaffPrerequisite?(input: StaffPrerequisiteRequest, source: AuthSourceContext): Promise<StaffPrerequisiteResult>;
+  stepUpStaffPrerequisite?(input: StaffPrerequisiteRequest, source: AuthSourceContext, signal?: AbortSignal): Promise<StaffPrerequisiteResult>;
   /** Non-refreshing current generation/expiry/hold check. Missing implementations deny streaming. */
   assertCurrent?(session:AuthenticatedSession,signal?:AbortSignal):Promise<void>;
   authenticate(sessionToken: string, source: AuthSourceContext): Promise<AuthenticatedSession | null>;
@@ -634,16 +634,16 @@ export class SessionService implements SessionApplication {
     return this.freshStepUp(input, source);
   }
 
-  async stepUpStaffPrerequisite(input: StaffPrerequisiteRequest, source: AuthSourceContext): Promise<StaffPrerequisiteResult> {
+  async stepUpStaffPrerequisite(input: StaffPrerequisiteRequest, source: AuthSourceContext, signal?: AbortSignal): Promise<StaffPrerequisiteResult> {
     if (this.dependencies.staffPrerequisites === undefined) throw new Error("STAFF_UNAVAILABLE");
-    const result = await this.freshStepUp(input, source, input);
+    const result = await this.freshStepUp(input, source, input, signal);
     if (result.prerequisiteHandle === undefined || result.expiresAt === undefined) throw new Error("STAFF_UNAVAILABLE");
     return {sessionToken: result.sessionToken, csrfToken: result.csrfToken,
       prerequisiteHandle: result.prerequisiteHandle, expiresAt: result.expiresAt};
   }
 
   private async freshStepUp(input: Parameters<SessionApplication["stepUp"]>[0], source: AuthSourceContext,
-    prerequisite?: StaffPrerequisiteRequest): Promise<Awaited<ReturnType<SessionApplication["stepUp"]>> & Partial<StaffPrerequisiteResult>> {
+    prerequisite?: StaffPrerequisiteRequest, signal?: AbortSignal): Promise<Awaited<ReturnType<SessionApplication["stepUp"]>> & Partial<StaffPrerequisiteResult>> {
     const now = this.now();
     let identity: LoginIdentityRecord | null = null;
     let rotationAttempted = false;
@@ -687,6 +687,7 @@ export class SessionService implements SessionApplication {
       });
       const acceptedStep = await this.totpStep(challenge, input.code, now);
       if (acceptedStep === null) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
+      if (signal?.aborted) throw new Error("STAFF_UNAVAILABLE");
       const replacementToken = generateVerificationToken();
       const replacementCsrf = generateVerificationToken();
       const grantToken = input.authorization === undefined
@@ -705,7 +706,8 @@ export class SessionService implements SessionApplication {
           handleHash: staffTokenHash(prerequisiteHandle)!,
           ...(prerequisite.purpose === "KEY_PREREGISTRATION" ? {purpose: "KEY_PREREGISTRATION" as const}
             : {purpose: "OWNER_POSSESSION" as const, commandId: prerequisite.commandId, nonceHash: staffTokenHash(prerequisite.commandNonce)!})
-        });
+        }, signal);
+      if (signal?.aborted) throw new Error("STAFF_UNAVAILABLE");
       const rotated = prerequisite === undefined ? await this.dependencies.repository.rotateAfterStepUp({
         identity,
         currentSessionId: input.session.session.session_id,

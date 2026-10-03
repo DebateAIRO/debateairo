@@ -12,6 +12,8 @@ import type {
 import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
+import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
 
 export {
   PostgresSessionRepository,
@@ -369,16 +371,25 @@ export interface RunContentLease {
  */
 export async function acquireRunContentLease(
   pool: Pool,
-  requestedRunIds: readonly string[]
+  requestedRunIds: readonly string[],
+  signal?: AbortSignal
 ): Promise<RunContentLease> {
   const runIds = Object.freeze([...new Set(requestedRunIds)].sort());
   if (runIds.length === 0) throw new TypeError("CONTENT_LEASE_RUN_REQUIRED");
   for (;;) {
-    const client = await pool.connect();
+    const client = await abortablePrivateWork(() => pool.connect(), signal, late => late.release(true));
     const acquired: string[] = [];
     let released = false;
     let invalidated: Error | undefined;
+    let previousLockTimeout: string | undefined;
+    const abort = () => {
+      invalidated ??= new Error("PRIVATE_STREAM_CLOSED");
+      if (!released) { released = true; void cancelAndDestroyPrivateClient(pool, client).catch(() => {}); }
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
     const unlock = async (): Promise<void> => {
+      signal?.removeEventListener("abort", abort);
       if (released) return;
       released = true;
       let failure: unknown = invalidated;
@@ -396,17 +407,26 @@ export async function acquireRunContentLease(
           failure ??= error;
         }
       }
+      if (failure === undefined && previousLockTimeout !== undefined) {
+        try { await client.query("SELECT set_config('lock_timeout',$1,false)", [previousLockTimeout]); }
+        catch (error) { failure = error; }
+      }
       if (failure === undefined) client.release();
       else client.release(failure instanceof Error ? failure : new Error("CONTENT_LEASE_UNLOCK_FAILED"));
       if (failure !== undefined) throw failure;
     };
     try {
+      if (signal !== undefined) {
+        const prior = await abortablePrivateWork(() => client.query<{lock_timeout:string}>("SHOW lock_timeout"), signal);
+        previousLockTimeout = prior.rows[0]?.lock_timeout ?? '0';
+        await abortablePrivateWork(() => client.query("SET lock_timeout='700ms'"), signal);
+      }
       let contended = false;
       for (const runId of runIds) {
-        const result = await client.query<{ acquired: boolean }>(
+        const result = await abortablePrivateWork(() => client.query<{ acquired: boolean }>(
           "SELECT pg_try_advisory_lock_shared(hashtextextended($1,0)) AS acquired",
           [`${CONTENT_LEASE_NAMESPACE}${runId}`]
-        );
+        ), signal);
         if (result.rows[0]?.acquired !== true) {
           contended = true;
           break;
@@ -415,7 +435,7 @@ export async function acquireRunContentLease(
       }
       if (contended) {
         await unlock();
-        await new Promise<void>((resolve) => setTimeout(resolve,10));
+        await abortablePrivateWork(() => new Promise<void>((resolve) => setTimeout(resolve,10)), signal);
         continue;
       }
       return Object.freeze({
@@ -425,7 +445,7 @@ export async function acquireRunContentLease(
           invalidated ??= error;
         },
         assertLive: async () => {
-          const result = await client.query<{ run_id: string; live: boolean }>(
+          const result = await abortablePrivateWork(() => client.query<{ run_id: string; live: boolean }>(
             `SELECT run.run_id,
                     CASE WHEN run.content_encryption_version=1
                       THEN core.run_private_content_is_live(run.run_id)
@@ -434,7 +454,7 @@ export async function acquireRunContentLease(
              WHERE run.run_id=ANY($1::uuid[])
              ORDER BY run.run_id`,
             [runIds]
-          );
+          ), signal);
           if (result.rows.length !== runIds.length
             || result.rows.some((row) => row.live !== true)) {
             throw new TypedDomainError(
@@ -508,7 +528,8 @@ export interface LeasedPreparedRunContentCipher {
 
 export async function prepareLeasedContentEncryptionForRuns(
   pool: Pool,
-  requestedRunIds: readonly string[]
+  requestedRunIds: readonly string[],
+  signal?: AbortSignal
 ): Promise<ReadonlyMap<string, LeasedPreparedRunContentCipher>> {
   const requested = [...new Set(requestedRunIds)].sort();
   const current = contentLeaseScope.getStore();
@@ -520,13 +541,13 @@ export async function prepareLeasedContentEncryptionForRuns(
     );
   }
   const borrowed = current?.pool === pool;
-  const lease = borrowed ? current.lease : await acquireRunContentLease(pool, requested);
+  const lease = borrowed ? current.lease : await acquireRunContentLease(pool, requested, signal);
   const preparedByRun = new Map<string, PreparedRunContentCipher | null>();
   try {
     await lease.assertLive();
     const cipher = contentCipherFor(pool);
     for (const runId of requested) {
-      const enabled = await runUsesContentEncryption(lease.client, runId);
+      const enabled = await abortablePrivateWork(() => runUsesContentEncryption(lease.client, runId), signal);
       if (!enabled) {
         preparedByRun.set(runId, null);
         continue;
@@ -537,7 +558,7 @@ export async function prepareLeasedContentEncryptionForRuns(
           "Encrypted content cannot be read without the external key store"
         );
       }
-      preparedByRun.set(runId, await cipher.prepareRun(runId));
+      preparedByRun.set(runId, await abortablePrivateWork(() => cipher.prepareRun(runId), signal, late => late.close()));
     }
     await lease.assertLive();
     let closed = false;
@@ -566,9 +587,10 @@ export async function prepareLeasedContentEncryptionForRuns(
 
 export async function prepareLeasedContentEncryptionForRun(
   pool: Pool,
-  runId: string
+  runId: string,
+  signal?: AbortSignal
 ): Promise<LeasedPreparedRunContentCipher> {
-  const leased = await prepareLeasedContentEncryptionForRuns(pool, [runId]);
+  const leased = await prepareLeasedContentEncryptionForRuns(pool, [runId], signal);
   return leased.get(runId)!;
 }
 

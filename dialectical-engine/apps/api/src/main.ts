@@ -83,7 +83,7 @@ import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
-import { PostgresStaffAlertRepository, RootStaffAlertConfiguration, StaffAlertDispatcher, StaffAlertIntentProducer, StaffIndependentAlertReadiness, RootConfiguredStaffAlertTransport } from "./staff/alerts.js";
+import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication } from "./publications.js";
 import { createPublicationContentCheck, PUBLICATION_CHECK_DEADLINE_MS } from "./publication-check/check.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
@@ -617,29 +617,15 @@ const sessions = await boot.run("session-service", () => SessionService.create({
 // Explicit v2 composition retains current-state checks and refuses unavailable operator readiness.
 const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
   ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;
-// Real ACK adapter, target transport and independent JIT publication remain operator inputs.
-const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2 ? (() => {
-  const repository = new PostgresStaffAlertRepository(pool);
-  const configuration = new RootStaffAlertConfiguration({
-    path: environment.STAFF_ACCESS.independentAlertConfigPath,
-    acknowledgements: new Map()
-  });
-  const readiness = new StaffIndependentAlertReadiness(configuration, repository);
-  return Object.freeze({
-    readiness,
-    intents: new StaffAlertIntentProducer({ keys: dekStore, mappings: repository, readiness }),
-    dispatcher: new StaffAlertDispatcher({
-      repository, keys: dekStore,
-      independentTransport: new RootConfiguredStaffAlertTransport(configuration),
-      readiness: () => readiness.readIndependentAlertReadiness(),
-      log: code => console.error('[STAFF_ALERT_FAILURE]', code)
-    })
-  });
-})() : undefined;
+// Explicit protected adapters plus installation/policy/current publication are startup-only gates.
+const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
+  ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
+if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
-  intents: staffAlerts.intents
+  intents: staffAlerts.intents,
+  targetInvitationTransport: staffAlerts.targetInvitationTransport
 };
 // Turn 14 — change email: the capabilities of migration 0079 are granted to the
 // authorization role, beside the step-up that mints their CHANGE_EMAIL grant.
@@ -1069,6 +1055,7 @@ if (publicationCleanupTimer !== undefined) {
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => askWaker?.stop());
+api.addHook("onClose",async () => staffAlerts?.close());
 const startup = installStartupResourceOwner({
   api,
   registration,
@@ -1144,3 +1131,5 @@ if (askRoom !== undefined) {
   triggerAskWake();
   askWaker = everyWholeMinute(triggerAskWake);
 }
+
+staffAlerts?.start();

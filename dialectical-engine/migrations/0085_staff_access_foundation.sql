@@ -13,38 +13,38 @@ DO $$ BEGIN
   END IF;
 END $$;
 GRANT debateai_staff_recovery TO debateai_prod_staff_recovery WITH ADMIN FALSE, INHERIT TRUE, SET TRUE;
-CREATE SCHEMA staff AUTHORIZATION debateai_staff_security_owner;
+CREATE SCHEMA IF NOT EXISTS staff AUTHORIZATION debateai_staff_security_owner;
 REVOKE ALL ON SCHEMA staff FROM PUBLIC;
 GRANT USAGE ON SCHEMA staff TO debateai_runtime,debateai_staff_recovery;
 GRANT USAGE ON SCHEMA identity TO debateai_staff_security_owner;
-CREATE TABLE identity.account_security_hold (
+CREATE TABLE IF NOT EXISTS identity.account_security_hold (
   user_id uuid PRIMARY KEY REFERENCES identity."user" ON DELETE CASCADE,
   held boolean NOT NULL DEFAULT false, security_epoch bigint NOT NULL DEFAULT 0 CHECK(security_epoch>=0),
   changed_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE FUNCTION identity.lock_security_subjects(p_users uuid[]) RETURNS void
+CREATE OR REPLACE FUNCTION identity.lock_security_subjects(p_users uuid[]) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_user uuid; BEGIN
   FOR v_user IN SELECT DISTINCT u FROM unnest(p_users) u WHERE u IS NOT NULL ORDER BY u LOOP
     PERFORM pg_advisory_xact_lock(hashtextextended('identity:security-subject:'||v_user::text,0));
   END LOOP;
 END $$;
-CREATE FUNCTION identity.read_account_security_hold(p_user uuid) RETURNS boolean
+CREATE OR REPLACE FUNCTION identity.read_account_security_hold(p_user uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
   SELECT NOT EXISTS(SELECT 1 FROM identity."user" WHERE user_id=p_user AND state='active')
     OR COALESCE((SELECT held FROM identity.account_security_hold WHERE user_id=p_user),false)
 $$;
-CREATE FUNCTION identity.staff_rotation_binding_current(p_user uuid,p_session uuid,p_factor uuid,p_step bigint,p_rotated_hash text) RETURNS boolean
+CREATE OR REPLACE FUNCTION identity.staff_rotation_binding_current(p_user uuid,p_session uuid,p_factor uuid,p_step bigint,p_rotated_hash text) RETURNS boolean
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT COALESCE(p_step>=0 AND p_rotated_hash ~ '^sha256:[0-9a-f]{64}$' AND NOT identity.read_account_security_hold(p_user)
  AND EXISTS(SELECT 1 FROM identity.session WHERE user_id=p_user AND session_id=p_session AND token_hash=p_rotated_hash AND revoked_at IS NULL AND idle_expires_at>clock_timestamp() AND absolute_expires_at>clock_timestamp())
  AND EXISTS(SELECT 1 FROM identity.mfa_factor WHERE user_id=p_user AND mfa_factor_id=p_factor AND factor_type='totp' AND state='active' AND verified_at IS NOT NULL AND last_accepted_step=p_step),false)
 $$;
-CREATE FUNCTION staff.account_epoch(p_user uuid) RETURNS bigint
+CREATE OR REPLACE FUNCTION staff.account_epoch(p_user uuid) RETURNS bigint
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT COALESCE((SELECT security_epoch FROM identity.account_security_hold WHERE user_id=p_user),0)
 $$;
-CREATE FUNCTION staff.live_account(p_user uuid,p_session uuid) RETURNS boolean
+CREATE OR REPLACE FUNCTION staff.live_account(p_user uuid,p_session uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT NOT identity.read_account_security_hold(p_user)
   AND EXISTS(SELECT 1 FROM identity.channel_binding WHERE user_id=p_user AND channel_type='email' AND state='verified')
@@ -53,13 +53,13 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
   AND EXISTS(SELECT 1 FROM identity.session WHERE user_id=p_user AND session_id=p_session AND revoked_at IS NULL
     AND idle_expires_at>clock_timestamp() AND absolute_expires_at>clock_timestamp())
 $$;
-CREATE FUNCTION staff.valid_capabilities(p_caps text[]) RETURNS boolean
+CREATE OR REPLACE FUNCTION staff.valid_capabilities(p_caps text[]) RETURNS boolean
 LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$
  SELECT p_caps IS NOT NULL AND cardinality(p_caps) BETWEEN 1 AND 3
   AND p_caps<@ARRAY['TEAM_READ','AUDIT_READ','EMERGENCY_DISABLE']::text[]
   AND cardinality(p_caps)=(SELECT count(DISTINCT x) FROM unnest(p_caps) x)
 $$;
-CREATE TABLE staff.subject (
+CREATE TABLE IF NOT EXISTS staff.subject (
  staff_id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid UNIQUE REFERENCES identity."user" ON DELETE SET NULL,
  state text NOT NULL DEFAULT 'ACTIVE' CHECK(state IN('ACTIVE','DISABLED','ERASED')),
  security_epoch bigint NOT NULL DEFAULT 0 CHECK(security_epoch>=0),
@@ -67,39 +67,39 @@ CREATE TABLE staff.subject (
  capabilities text[] NOT NULL DEFAULT '{}' CHECK(capabilities<@ARRAY['TEAM_READ','TEAM_INVITE','TEAM_GRANT','TEAM_DISABLE','AUDIT_READ','EMERGENCY_DISABLE']::text[]),
  created_at timestamptz NOT NULL DEFAULT clock_timestamp(), CHECK(user_id IS NOT NULL OR state='ERASED')
 );
-CREATE TABLE staff.owner_designation (
+CREATE TABLE IF NOT EXISTS staff.owner_designation (
  designation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),staff_id uuid NOT NULL REFERENCES staff.subject,
  active boolean NOT NULL DEFAULT true,created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE UNIQUE INDEX staff_one_active_owner ON staff.owner_designation((true)) WHERE active;
-CREATE TABLE staff.bootstrap_marker (
+CREATE UNIQUE INDEX IF NOT EXISTS staff_one_active_owner ON staff.owner_designation((true)) WHERE active;
+CREATE TABLE IF NOT EXISTS staff.bootstrap_marker (
  singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),operation_id uuid NOT NULL UNIQUE,
  created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE TABLE staff.grant_event (
+CREATE TABLE IF NOT EXISTS staff.grant_event (
  event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),operation_id uuid NOT NULL UNIQUE,
  staff_id uuid NOT NULL,actor_staff_id uuid,revision bigint NOT NULL CHECK(revision>=0),
  capabilities text[] NOT NULL,created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE TABLE staff.audit_event (
+CREATE TABLE IF NOT EXISTS staff.audit_event (
  event_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),operation_id uuid NOT NULL UNIQUE,request_sha256 text NOT NULL CHECK(request_sha256 ~ '^[0-9a-f]{64}$'),
  event_type text NOT NULL CHECK(event_type IN('INVITE','ACCEPT','GRANT','DISABLE','BOOTSTRAP','RECOVER_OWNER','KEY_CHANGE')),
  actor_staff_id uuid,subject_staff_id uuid,reason_code text NOT NULL CHECK(reason_code IN('TEAM_ONBOARDING','GRANT_CHANGE','OFFBOARDING','SECURITY_RESPONSE','KEY_MAINTENANCE','BOOTSTRAP','RECOVERY')),
  ticket_ref text CHECK(ticket_ref IS NULL OR ticket_ref ~ '^[A-Za-z0-9_:/.-]{1,128}$'),
  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE TABLE staff.alert_outbox (
+CREATE TABLE IF NOT EXISTS staff.alert_outbox (
  outbox_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),event_id uuid NOT NULL REFERENCES staff.audit_event,
  purpose text NOT NULL CHECK(purpose IN('INDEPENDENT_METADATA_ALERT','TARGET_INVITATION')),
  key_ref uuid NOT NULL,encrypted_payload jsonb NOT NULL CHECK(core.is_content_envelope(encrypted_payload)),
  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),UNIQUE(event_id,purpose)
 );
-CREATE TABLE staff.alert_delivery_receipt (
+CREATE TABLE IF NOT EXISTS staff.alert_delivery_receipt (
  receipt_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),outbox_id uuid NOT NULL REFERENCES staff.alert_outbox,
  outcome text NOT NULL CHECK(outcome IN('DELIVERED','FAILED')),failure_code text CHECK(failure_code IS NULL OR failure_code IN('TRANSPORT_UNAVAILABLE','TIMEOUT','DESTINATION_REJECTED')),
  recorded_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE TABLE staff.invitation (
+CREATE TABLE IF NOT EXISTS staff.invitation (
  invitation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),operation_id uuid NOT NULL UNIQUE,
  target_user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,
  issuer_staff_id uuid NOT NULL REFERENCES staff.subject,issuer_security_epoch bigint NOT NULL CHECK(issuer_security_epoch>=0),
@@ -108,7 +108,7 @@ CREATE TABLE staff.invitation (
  expires_at timestamptz NOT NULL DEFAULT clock_timestamp()+interval '24 hours',consumed_at timestamptz,revoked_at timestamptz,
  created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
-CREATE TABLE staff.privilege_session (
+CREATE TABLE IF NOT EXISTS staff.privilege_session (
  privilege_session_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),staff_id uuid NOT NULL REFERENCES staff.subject,
  user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,ordinary_session_id uuid NOT NULL REFERENCES identity.session ON DELETE CASCADE,
  token_hash text NOT NULL UNIQUE CHECK(token_hash ~ '^sha256:[0-9a-f]{64}$'),csrf_token_hash text CHECK(csrf_token_hash ~ '^sha256:[0-9a-f]{64}$'),
@@ -117,7 +117,7 @@ CREATE TABLE staff.privilege_session (
  idle_expires_at timestamptz NOT NULL,absolute_expires_at timestamptz NOT NULL,revoked_at timestamptz,
  CHECK(idle_expires_at<=absolute_expires_at)
 );
-CREATE TABLE staff.action_proof (
+CREATE TABLE IF NOT EXISTS staff.action_proof (
  proof_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),staff_id uuid NOT NULL REFERENCES staff.subject,
  user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,ordinary_session_id uuid NOT NULL REFERENCES identity.session ON DELETE CASCADE,
  privilege_session_id uuid NOT NULL REFERENCES staff.privilege_session ON DELETE CASCADE,
@@ -126,14 +126,14 @@ CREATE TABLE staff.action_proof (
  credential_id text NOT NULL,verified_at timestamptz NOT NULL DEFAULT clock_timestamp(),expires_at timestamptz NOT NULL,consumed_at timestamptz,
  CHECK(expires_at<=verified_at+interval '5 minutes')
 );
-CREATE TABLE staff.invitation_proof (
+CREATE TABLE IF NOT EXISTS staff.invitation_proof (
  proof_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),invitation_id uuid NOT NULL REFERENCES staff.invitation ON DELETE CASCADE,
  user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,ordinary_session_id uuid NOT NULL REFERENCES identity.session ON DELETE CASCADE,
  issuer_security_epoch bigint NOT NULL CHECK(issuer_security_epoch>=0),target_account_security_epoch bigint NOT NULL CHECK(target_account_security_epoch>=0),invitation_revision bigint NOT NULL CHECK(invitation_revision>=0),
  credential_id text NOT NULL,verified_at timestamptz NOT NULL DEFAULT clock_timestamp(),expires_at timestamptz NOT NULL,consumed_at timestamptz,
  CHECK(expires_at<=verified_at+interval '5 minutes')
 );
-CREATE TABLE staff.owner_command (
+CREATE TABLE IF NOT EXISTS staff.owner_command (
  command_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),operation_id uuid NOT NULL UNIQUE,purpose text NOT NULL CHECK(purpose IN('BOOTSTRAP','RECOVER_OWNER')),
  target_user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,previous_user_id uuid REFERENCES identity."user" ON DELETE CASCADE,
  target_account_security_epoch bigint NOT NULL CHECK(target_account_security_epoch>=0),credential_ids text[] NOT NULL CHECK(cardinality(credential_ids)=2 AND credential_ids[1]<>credential_ids[2]),
@@ -141,14 +141,14 @@ CREATE TABLE staff.owner_command (
  state text NOT NULL DEFAULT 'PENDING' CHECK(state IN('PENDING','COMMITTED','CANCELLED')),created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  CHECK((purpose='BOOTSTRAP' AND previous_user_id IS NULL) OR (purpose='RECOVER_OWNER' AND previous_user_id IS NOT NULL AND previous_user_id<>target_user_id))
 );
-CREATE TABLE staff.password_totp_rotation_receipt (
+CREATE TABLE IF NOT EXISTS staff.password_totp_rotation_receipt (
  receipt_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,
  ordinary_session_id uuid NOT NULL REFERENCES identity.session ON DELETE CASCADE,factor_id uuid NOT NULL REFERENCES identity.mfa_factor ON DELETE CASCADE,
  accepted_step bigint NOT NULL CHECK(accepted_step>=0),rotated_token_hash text NOT NULL CHECK(rotated_token_hash ~ '^sha256:[0-9a-f]{64}$'),
  account_security_epoch bigint NOT NULL CHECK(account_security_epoch>=0),verified_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  UNIQUE(factor_id,accepted_step),UNIQUE(ordinary_session_id,rotated_token_hash)
 );
-CREATE TABLE staff.prerequisite_receipt (
+CREATE TABLE IF NOT EXISTS staff.prerequisite_receipt (
  receipt_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),handle_sha256 text NOT NULL UNIQUE CHECK(handle_sha256 ~ '^sha256:[0-9a-f]{64}$'),
  user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,ordinary_session_id uuid NOT NULL REFERENCES identity.session ON DELETE CASCADE,
  account_security_epoch bigint NOT NULL CHECK(account_security_epoch>=0),factor_receipt_id uuid NOT NULL UNIQUE REFERENCES staff.password_totp_rotation_receipt ON DELETE CASCADE,
@@ -158,7 +158,7 @@ CREATE TABLE staff.prerequisite_receipt (
  CHECK((purpose='KEY_PREREGISTRATION' AND command_id IS NULL AND nonce_sha256 IS NULL AND credential_ids IS NULL) OR (purpose='OWNER_POSSESSION' AND command_id IS NOT NULL AND nonce_sha256 IS NOT NULL AND cardinality(credential_ids)=2)),
  CHECK(expires_at<=verified_at+interval '5 minutes')
 );
-CREATE TABLE staff.webauthn_challenge (
+CREATE TABLE IF NOT EXISTS staff.webauthn_challenge (
  challenge_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,
  ordinary_session_id uuid NOT NULL REFERENCES identity.session ON DELETE CASCADE,account_security_epoch bigint NOT NULL CHECK(account_security_epoch>=0),
  purpose text NOT NULL CHECK(purpose IN('REGISTRATION','ELEVATION','ACTION','INVITATION_ACCEPT','OWNER_POSSESSION')),
@@ -170,8 +170,8 @@ CREATE TABLE staff.webauthn_challenge (
  failed_attempts integer NOT NULL DEFAULT 0 CHECK(failed_attempts BETWEEN 0 AND 5),
  CHECK(expires_at<=created_at+interval '5 minutes')
 );
-CREATE UNIQUE INDEX staff_owner_challenge_fixed_key ON staff.webauthn_challenge(command_id,credential_id) WHERE purpose='OWNER_POSSESSION';
-CREATE TABLE staff.owner_possession_receipt (
+CREATE UNIQUE INDEX IF NOT EXISTS staff_owner_challenge_fixed_key ON staff.webauthn_challenge(command_id,credential_id) WHERE purpose='OWNER_POSSESSION';
+CREATE TABLE IF NOT EXISTS staff.owner_possession_receipt (
  receipt_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),command_id uuid NOT NULL REFERENCES staff.owner_command ON DELETE CASCADE,
  purpose text NOT NULL CHECK(purpose IN('BOOTSTRAP','RECOVER_OWNER')),target_user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,
  ordinary_session_id uuid NOT NULL REFERENCES identity.session ON DELETE CASCADE,target_account_security_epoch bigint NOT NULL CHECK(target_account_security_epoch>=0),
@@ -179,22 +179,22 @@ CREATE TABLE staff.owner_possession_receipt (
  verified_at timestamptz NOT NULL DEFAULT clock_timestamp(),expires_at timestamptz NOT NULL,consumed_at timestamptz,
  UNIQUE(command_id,credential_id),CHECK(expires_at<=verified_at+interval '5 minutes')
 );
-CREATE FUNCTION staff.reject_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION staff.reject_mutation() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$
  BEGIN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='STAFF_RECORD_IMMUTABLE'; END $$;
-CREATE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.bootstrap_marker FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
-CREATE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.grant_event FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
-CREATE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.audit_event FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
-CREATE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.alert_outbox FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
-CREATE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.alert_delivery_receipt FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
-CREATE FUNCTION staff.erase_subject_mapping() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.bootstrap_marker FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
+CREATE OR REPLACE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.grant_event FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
+CREATE OR REPLACE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.audit_event FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
+CREATE OR REPLACE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.alert_outbox FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
+CREATE OR REPLACE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.alert_delivery_receipt FOR EACH STATEMENT EXECUTE FUNCTION staff.reject_mutation();
+CREATE OR REPLACE FUNCTION staff.erase_subject_mapping() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[OLD.user_id]);
  UPDATE staff.owner_designation SET active=false WHERE staff_id IN(SELECT staff_id FROM staff.subject WHERE user_id=OLD.user_id);
  UPDATE staff.subject SET user_id=NULL,state='ERASED',security_epoch=security_epoch+1,grant_revision=grant_revision+1,capabilities='{}' WHERE user_id=OLD.user_id;
  RETURN OLD;
 END $$;
-CREATE TRIGGER staff_erase_account BEFORE DELETE ON identity."user" FOR EACH ROW EXECUTE FUNCTION staff.erase_subject_mapping();
-CREATE FUNCTION staff.context_internal(p_user uuid,p_base uuid,p_privilege uuid) RETURNS jsonb
+CREATE OR REPLACE TRIGGER staff_erase_account BEFORE DELETE ON identity."user" FOR EACH ROW EXECUTE FUNCTION staff.erase_subject_mapping();
+CREATE OR REPLACE FUNCTION staff.context_internal(p_user uuid,p_base uuid,p_privilege uuid) RETURNS jsonb
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT jsonb_build_object('staffId',s.staff_id,'userId',s.user_id,'ordinarySessionId',p.ordinary_session_id,'privilegeSessionId',p.privilege_session_id,
  'designation',CASE WHEN EXISTS(SELECT 1 FROM staff.owner_designation WHERE staff_id=s.staff_id AND active) THEN 'OWNER' ELSE 'DELEGATED' END,
@@ -204,7 +204,7 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  AND p.security_epoch=s.security_epoch AND p.grant_revision=s.grant_revision AND p.account_security_epoch=staff.account_epoch(s.user_id)
  AND p.idle_expires_at>clock_timestamp() AND p.absolute_expires_at>clock_timestamp() AND staff.live_account(s.user_id,p_base)
 $$;
-CREATE FUNCTION staff.read_context(p_user uuid,p_base uuid,p_token text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_context(p_user uuid,p_base uuid,p_token text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_privilege uuid; v_context jsonb;BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[p_user]);
@@ -213,7 +213,7 @@ DECLARE v_privilege uuid; v_context jsonb;BEGIN
  IF v_context IS NOT NULL THEN UPDATE staff.privilege_session SET last_seen_at=clock_timestamp(),idle_expires_at=LEAST(absolute_expires_at,clock_timestamp()+interval '15 minutes') WHERE privilege_session_id=v_privilege; END IF;
  RETURN v_context;
 END $$;
-CREATE FUNCTION staff.authorize_action(p_context jsonb,p_capability text) RETURNS boolean
+CREATE OR REPLACE FUNCTION staff.authorize_action(p_context jsonb,p_capability text) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_current jsonb;BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[(p_context->>'userId')::uuid]);
@@ -222,7 +222,7 @@ DECLARE v_current jsonb;BEGIN
  AND (p_capability NOT IN('TEAM_INVITE','TEAM_GRANT','TEAM_DISABLE') OR EXISTS(SELECT 1 FROM staff.owner_designation WHERE staff_id=(v_current->>'staffId')::uuid AND active))
  AND p_capability=ANY(ARRAY['TEAM_READ','TEAM_INVITE','TEAM_GRANT','TEAM_DISABLE','AUDIT_READ','EMERGENCY_DISABLE']),false);
 END $$;
-CREATE FUNCTION staff.consume_action(p_context jsonb,p_proof uuid,p_binding jsonb,p_capability text,p_action text,p_target uuid,p_operation uuid) RETURNS void
+CREATE OR REPLACE FUNCTION staff.consume_action(p_context jsonb,p_proof uuid,p_binding jsonb,p_capability text,p_action text,p_target uuid,p_operation uuid) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  IF NOT staff.authorize_action(p_context,p_capability) THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_AUTHORITY_INVALID'; END IF;
@@ -234,7 +234,7 @@ BEGIN
  AND account_security_epoch=(p_context->>'accountSecurityEpoch')::bigint AND grant_revision=(p_context->>'grantRevision')::bigint AND binding=p_binding;
  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_PROOF_INVALID'; END IF;
 END $$;
-CREATE FUNCTION staff.record_mutation(p_operation uuid,p_event text,p_actor uuid,p_subject uuid,p_reason jsonb,p_key_user uuid,p_alert jsonb,p_request jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.record_mutation(p_operation uuid,p_event text,p_actor uuid,p_subject uuid,p_reason jsonb,p_key_user uuid,p_alert jsonb,p_request jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_event uuid;v_key uuid;v_time timestamptz;BEGIN
  IF NOT core.jsonb_has_exact_keys(p_reason,ARRAY['code']) AND NOT core.jsonb_has_exact_keys(p_reason,ARRAY['code','ticketRef']) THEN RAISE EXCEPTION 'STAFF_REASON_INVALID';END IF;
@@ -245,7 +245,7 @@ DECLARE v_event uuid;v_key uuid;v_time timestamptz;BEGIN
  INSERT INTO staff.alert_outbox(event_id,purpose,key_ref,encrypted_payload) VALUES(v_event,'INDEPENDENT_METADATA_ALERT',v_key,p_alert->'envelope');
  RETURN jsonb_build_object('operationId',p_operation,'outcome','COMPLETED','recordedAt',v_time);
 END $$;
-CREATE FUNCTION staff.replay_mutation(p_operation uuid,p_request jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.replay_mutation(p_operation uuid,p_request jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_event staff.audit_event%ROWTYPE;BEGIN
  PERFORM pg_advisory_xact_lock(hashtextextended('staff:operation:'||p_operation::text,0));
@@ -254,7 +254,7 @@ DECLARE v_event staff.audit_event%ROWTYPE;BEGIN
  IF v_event.request_sha256 IS DISTINCT FROM encode(sha256(convert_to(p_request::text,'UTF8')),'hex') THEN RAISE EXCEPTION 'STAFF_OPERATION_CONFLICT';END IF;
  RETURN jsonb_build_object('operationId',p_operation,'outcome','COMPLETED','recordedAt',v_event.recorded_at);
 END $$;
-CREATE FUNCTION staff.invite(p_context jsonb,p_proof uuid,p_binding jsonb,p_target uuid,p_capabilities text[],p_operation uuid,p_reason jsonb,p_token_hash text,p_alert jsonb,p_delivery jsonb DEFAULT NULL) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.invite(p_context jsonb,p_proof uuid,p_binding jsonb,p_target uuid,p_capabilities text[],p_operation uuid,p_reason jsonb,p_token_hash text,p_alert jsonb,p_delivery jsonb DEFAULT NULL) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_result jsonb;v_event uuid;v_key uuid;v_request jsonb;v_replay jsonb;BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[(p_context->>'userId')::uuid,p_target]);
@@ -272,7 +272,7 @@ DECLARE v_result jsonb;v_event uuid;v_key uuid;v_request jsonb;v_replay jsonb;BE
  INSERT INTO staff.alert_outbox(event_id,purpose,key_ref,encrypted_payload) VALUES(v_event,'TARGET_INVITATION',v_key,p_delivery->'envelope');
  RETURN v_result;
 END $$;
-CREATE FUNCTION staff.read_invitation_context(p_user uuid,p_base uuid,p_token text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_invitation_context(p_user uuid,p_base uuid,p_token text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_issuer uuid;v_result jsonb;BEGIN
  SELECT s.user_id INTO v_issuer FROM staff.invitation i JOIN staff.subject s ON s.staff_id=i.issuer_staff_id WHERE i.token_hash=p_token;
@@ -285,7 +285,7 @@ DECLARE v_issuer uuid;v_result jsonb;BEGIN
  AND i.target_account_security_epoch=staff.account_epoch(p_user) AND staff.live_account(p_user,p_base);
  RETURN v_result;
 END $$;
-CREATE FUNCTION staff.accept(p_invitation uuid,p_user uuid,p_base uuid,p_proof uuid,p_command jsonb,p_alert jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.accept(p_invitation uuid,p_user uuid,p_base uuid,p_proof uuid,p_command jsonb,p_alert jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_inv staff.invitation%ROWTYPE;v_issuer uuid;v_subject uuid;v_operation uuid;v_request jsonb;v_replay jsonb;BEGIN
  SELECT s.user_id INTO v_issuer FROM staff.invitation i JOIN staff.subject s ON s.staff_id=i.issuer_staff_id WHERE i.invitation_id=p_invitation;
@@ -307,7 +307,7 @@ DECLARE v_inv staff.invitation%ROWTYPE;v_issuer uuid;v_subject uuid;v_operation 
  INSERT INTO staff.grant_event(operation_id,staff_id,actor_staff_id,revision,capabilities) VALUES(v_operation,v_subject,v_inv.issuer_staff_id,0,v_inv.capabilities);
  RETURN staff.record_mutation(v_operation,'ACCEPT',v_inv.issuer_staff_id,v_subject,p_command->'reason',p_user,p_alert,v_request);
 END $$;
-CREATE FUNCTION staff.grant(p_context jsonb,p_proof uuid,p_binding jsonb,p_target uuid,p_capabilities text[],p_operation uuid,p_reason jsonb,p_alert jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.grant(p_context jsonb,p_proof uuid,p_binding jsonb,p_target uuid,p_capabilities text[],p_operation uuid,p_reason jsonb,p_alert jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_target staff.subject%ROWTYPE;v_user uuid;v_request jsonb;v_replay jsonb;BEGIN
  SELECT user_id INTO v_user FROM staff.subject WHERE staff_id=p_target;
@@ -323,7 +323,7 @@ DECLARE v_target staff.subject%ROWTYPE;v_user uuid;v_request jsonb;v_replay json
  INSERT INTO staff.grant_event(operation_id,staff_id,actor_staff_id,revision,capabilities) VALUES(p_operation,p_target,(p_context->>'staffId')::uuid,v_target.grant_revision+1,p_capabilities);
  RETURN staff.record_mutation(p_operation,'GRANT',(p_context->>'staffId')::uuid,p_target,p_reason,v_target.user_id,p_alert,v_request);
 END $$;
-CREATE FUNCTION staff.hold_account_internal(p_user uuid) RETURNS void
+CREATE OR REPLACE FUNCTION staff.hold_account_internal(p_user uuid) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[p_user]);
@@ -343,7 +343,7 @@ BEGIN
  UPDATE staff.owner_possession_receipt SET consumed_at=clock_timestamp() WHERE target_user_id=p_user AND consumed_at IS NULL;
  UPDATE staff.invitation SET revoked_at=clock_timestamp() WHERE (target_user_id=p_user OR issuer_staff_id IN(SELECT staff_id FROM staff.subject WHERE user_id=p_user)) AND revoked_at IS NULL;
 END $$;
-CREATE FUNCTION staff.disable(p_context jsonb,p_proof uuid,p_binding jsonb,p_target uuid,p_mode text,p_operation uuid,p_reason jsonb,p_alert jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.disable(p_context jsonb,p_proof uuid,p_binding jsonb,p_target uuid,p_mode text,p_operation uuid,p_reason jsonb,p_alert jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_target staff.subject%ROWTYPE;v_user uuid;v_cap text;v_action text;v_request jsonb;v_replay jsonb;BEGIN
  SELECT user_id INTO v_user FROM staff.subject WHERE staff_id=p_target;
@@ -364,7 +364,7 @@ DECLARE v_target staff.subject%ROWTYPE;v_user uuid;v_cap text;v_action text;v_re
  IF p_mode='COMPROMISE' THEN PERFORM staff.hold_account_internal(v_target.user_id);END IF;
  RETURN staff.record_mutation(p_operation,'DISABLE',(p_context->>'staffId')::uuid,p_target,p_reason,v_target.user_id,p_alert,v_request);
 END $$;
-CREATE FUNCTION staff.prepare_owner_command(p_purpose text,p_target uuid,p_previous uuid,p_credentials text[],p_operation uuid,p_nonce text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.prepare_owner_command(p_purpose text,p_target uuid,p_previous uuid,p_credentials text[],p_operation uuid,p_nonce text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_command staff.owner_command%ROWTYPE;v_epoch bigint;BEGIN
  IF session_user<>'debateai_prod_staff_recovery' OR NOT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname=session_user AND rolcanlogin AND rolvaliduntil>clock_timestamp() AND rolvaliduntil<=clock_timestamp()+interval '5 minutes') THEN
@@ -433,7 +433,7 @@ DECLARE v_command staff.owner_command%ROWTYPE;v_epoch bigint;BEGIN
 END $$;
 -- Purpose-bound C1 receipt. Only this distinct password+TOTP rotation producer
 -- creates it; ordinary login/last_mfa_at/recovery codes cannot.
-CREATE FUNCTION staff.step_up_prerequisite(p_user uuid,p_owner uuid,p_password text,p_factor uuid,p_step bigint,p_base uuid,p_current text,p_replacement text,p_csrf text,p_binding jsonb,p_source jsonb,p_handle text,p_purpose text,p_command uuid DEFAULT NULL,p_nonce text DEFAULT NULL) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.step_up_prerequisite(p_user uuid,p_owner uuid,p_password text,p_factor uuid,p_step bigint,p_base uuid,p_current text,p_replacement text,p_csrf text,p_binding jsonb,p_source jsonb,p_handle text,p_purpose text,p_command uuid DEFAULT NULL,p_nonce text DEFAULT NULL) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_command staff.owner_command%ROWTYPE;v_receipt staff.prerequisite_receipt%ROWTYPE;v_valid boolean;v_rotation uuid;v_issued timestamptz;BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[p_user]);
@@ -453,7 +453,7 @@ DECLARE v_command staff.owner_command%ROWTYPE;v_receipt staff.prerequisite_recei
  VALUES(p_handle,p_user,p_base,staff.account_epoch(p_user),v_rotation,p_purpose,p_command,p_nonce,v_command.credential_ids,v_issued,LEAST(v_issued+interval '5 minutes',COALESCE(v_command.expires_at,v_issued+interval '5 minutes'))) RETURNING * INTO v_receipt;
  RETURN jsonb_build_object('receiptId',v_receipt.receipt_id,'expiresAt',v_receipt.expires_at);
 END $$;
-CREATE FUNCTION staff.read_owner_possession_context(p_user uuid,p_base uuid,p_command uuid,p_nonce text,p_credential text,p_prerequisite text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_owner_possession_context(p_user uuid,p_base uuid,p_command uuid,p_nonce text,p_credential text,p_prerequisite text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_result jsonb;BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[p_user]);
@@ -465,7 +465,7 @@ DECLARE v_result jsonb;BEGIN
  AND staff.rotation_receipt_current(r.factor_receipt_id,p_user,p_base,r.account_security_epoch) AND r.handle_sha256=p_prerequisite AND r.user_id=p_user AND r.ordinary_session_id=p_base AND r.purpose='OWNER_POSSESSION' AND r.nonce_sha256=c.nonce_sha256 AND r.credential_ids=c.credential_ids AND r.account_security_epoch=c.target_account_security_epoch AND r.expires_at>clock_timestamp();
  RETURN v_result;
 END $$;
-CREATE FUNCTION staff.begin_invitation_challenge(p_user uuid,p_base uuid,p_token text,p_hash text,p_credential text) RETURNS uuid
+CREATE OR REPLACE FUNCTION staff.begin_invitation_challenge(p_user uuid,p_base uuid,p_token text,p_hash text,p_credential text) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_context jsonb;v_id uuid;v_issued timestamptz;BEGIN
  v_context:=staff.read_invitation_context(p_user,p_base,p_token);IF v_context IS NULL THEN RAISE EXCEPTION 'STAFF_INVITATION_INVALID';END IF;
@@ -474,7 +474,7 @@ DECLARE v_context jsonb;v_id uuid;v_issued timestamptz;BEGIN
  INSERT INTO staff.webauthn_challenge(user_id,ordinary_session_id,account_security_epoch,purpose,challenge_sha256,credential_id,invitation_id,issuer_security_epoch,invitation_revision,created_at,expires_at)
  VALUES(p_user,p_base,(v_context->>'targetAccountSecurityEpoch')::bigint,'INVITATION_ACCEPT',p_hash,p_credential,(v_context->>'invitationId')::uuid,(v_context->>'issuerSecurityEpoch')::bigint,(v_context->>'invitationRevision')::bigint,v_issued,LEAST(v_issued+interval '5 minutes',(v_context->>'expiresAt')::timestamptz)) RETURNING challenge_id INTO v_id;RETURN v_id;
 END $$;
-CREATE FUNCTION staff.begin_owner_possession_challenge(p_user uuid,p_base uuid,p_command uuid,p_nonce text,p_credential text,p_prerequisite text,p_hash text) RETURNS uuid
+CREATE OR REPLACE FUNCTION staff.begin_owner_possession_challenge(p_user uuid,p_base uuid,p_command uuid,p_nonce text,p_credential text,p_prerequisite text,p_hash text) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_context jsonb;v_id uuid;v_issued timestamptz;BEGIN
  v_context:=staff.read_owner_possession_context(p_user,p_base,p_command,p_nonce,p_credential,p_prerequisite);IF v_context IS NULL THEN RAISE EXCEPTION 'STAFF_OWNER_COMMAND_INVALID';END IF;
@@ -484,7 +484,7 @@ DECLARE v_context jsonb;v_id uuid;v_issued timestamptz;BEGIN
  VALUES(p_user,p_base,(v_context->'command'->>'targetAccountSecurityEpoch')::bigint,'OWNER_POSSESSION',p_hash,p_credential,p_command,(v_context->>'prerequisiteReceiptId')::uuid,v_issued,LEAST(v_issued+interval '5 minutes',(v_context->'command'->>'expiresAt')::timestamptz)) RETURNING challenge_id INTO v_id;
  UPDATE staff.prerequisite_receipt SET consumed_at=COALESCE(consumed_at,v_issued) WHERE receipt_id=(v_context->>'prerequisiteReceiptId')::uuid;RETURN v_id;
 END $$;
-CREATE FUNCTION staff.consume_ceremony(p_challenge uuid,p_user uuid,p_base uuid,p_purpose text,p_credential text,p_counter bigint,p_rp text,p_origin text) RETURNS staff.webauthn_challenge
+CREATE OR REPLACE FUNCTION staff.consume_ceremony(p_challenge uuid,p_user uuid,p_base uuid,p_purpose text,p_credential text,p_counter bigint,p_rp text,p_origin text) RETURNS staff.webauthn_challenge
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_challenge staff.webauthn_challenge%ROWTYPE;v_factor record;BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[p_user]);
@@ -495,7 +495,7 @@ DECLARE v_challenge staff.webauthn_challenge%ROWTYPE;v_factor record;BEGIN
  UPDATE identity.mfa_factor SET signature_counter=p_counter WHERE mfa_factor_id=v_factor.mfa_factor_id;
  UPDATE staff.webauthn_challenge SET consumed_at=clock_timestamp() WHERE challenge_id=p_challenge;RETURN v_challenge;
 END $$;
-CREATE FUNCTION staff.complete_invitation_proof(p_challenge uuid,p_user uuid,p_base uuid,p_credential text,p_counter bigint,p_rp text,p_origin text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.complete_invitation_proof(p_challenge uuid,p_user uuid,p_base uuid,p_credential text,p_counter bigint,p_rp text,p_origin text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_challenge staff.webauthn_challenge%ROWTYPE;v_inv staff.invitation%ROWTYPE;v_issuer uuid;v_proof staff.invitation_proof%ROWTYPE;v_issued timestamptz;BEGIN
  SELECT s.user_id INTO v_issuer FROM staff.webauthn_challenge c JOIN staff.invitation i ON i.invitation_id=c.invitation_id JOIN staff.subject s ON s.staff_id=i.issuer_staff_id WHERE c.challenge_id=p_challenge;
@@ -509,7 +509,7 @@ DECLARE v_challenge staff.webauthn_challenge%ROWTYPE;v_inv staff.invitation%ROWT
  VALUES(v_inv.invitation_id,p_user,p_base,v_inv.issuer_security_epoch,v_inv.target_account_security_epoch,v_inv.revision,p_credential,v_issued,LEAST(v_inv.expires_at,v_issued+interval '5 minutes')) RETURNING * INTO v_proof;
  RETURN jsonb_build_object('proofId',v_proof.proof_id,'purpose','INVITATION_ACCEPT','context',jsonb_build_object('invitationId',v_inv.invitation_id,'targetUserId',p_user,'ordinarySessionId',p_base,'issuerStaffId',v_inv.issuer_staff_id,'issuerSecurityEpoch',v_inv.issuer_security_epoch,'targetAccountSecurityEpoch',v_inv.target_account_security_epoch,'invitationRevision',v_inv.revision,'expiresAt',v_inv.expires_at),'credentialId',v_proof.credential_id,'verifiedAt',v_proof.verified_at,'expiresAt',v_proof.expires_at);
 END $$;
-CREATE FUNCTION staff.complete_owner_possession(p_challenge uuid,p_user uuid,p_base uuid,p_credential text,p_counter bigint,p_rp text,p_origin text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.complete_owner_possession(p_challenge uuid,p_user uuid,p_base uuid,p_credential text,p_counter bigint,p_rp text,p_origin text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_challenge staff.webauthn_challenge%ROWTYPE;v_command staff.owner_command%ROWTYPE;v_id uuid;v_issued timestamptz;BEGIN
  v_challenge:=staff.consume_ceremony(p_challenge,p_user,p_base,'OWNER_POSSESSION',p_credential,p_counter,p_rp,p_origin);
@@ -521,12 +521,12 @@ DECLARE v_challenge staff.webauthn_challenge%ROWTYPE;v_command staff.owner_comma
  VALUES(v_command.command_id,v_command.purpose,p_user,p_base,v_command.target_account_security_epoch,p_credential,v_command.nonce_sha256,v_issued,LEAST(v_command.expires_at,v_issued+interval '5 minutes')) RETURNING receipt_id INTO v_id;RETURN jsonb_build_object('receiptId',v_id);
 END $$;
 
-CREATE FUNCTION staff.rotation_receipt_current(p_receipt uuid,p_user uuid,p_base uuid,p_epoch bigint) RETURNS boolean
+CREATE OR REPLACE FUNCTION staff.rotation_receipt_current(p_receipt uuid,p_user uuid,p_base uuid,p_epoch bigint) RETURNS boolean
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT EXISTS(SELECT 1 FROM staff.password_totp_rotation_receipt r WHERE r.receipt_id=p_receipt AND r.user_id=p_user AND r.ordinary_session_id=p_base AND r.account_security_epoch=p_epoch
  AND r.verified_at>clock_timestamp()-interval '5 minutes' AND identity.staff_rotation_binding_current(r.user_id,r.ordinary_session_id,r.factor_id,r.accepted_step,r.rotated_token_hash))
 $$;
-CREATE FUNCTION staff.begin_registration_challenge(p_user uuid,p_base uuid,p_handle text,p_hash text) RETURNS uuid
+CREATE OR REPLACE FUNCTION staff.begin_registration_challenge(p_user uuid,p_base uuid,p_handle text,p_hash text) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_receipt staff.prerequisite_receipt%ROWTYPE;v_id uuid;BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[p_user]);
@@ -1243,7 +1243,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE debateai_staff_security_owner IN SCHEMA staff 
 ALTER FUNCTION staff.replay_mutation(uuid,jsonb) OWNER TO debateai_staff_security_owner;
 REVOKE ALL ON FUNCTION staff.replay_mutation(uuid,jsonb) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 
-CREATE FUNCTION staff.expected_revision(p_binding jsonb) RETURNS bigint
+CREATE OR REPLACE FUNCTION staff.expected_revision(p_binding jsonb) RETURNS bigint
 LANGUAGE plpgsql IMMUTABLE SET search_path=pg_catalog AS $$
 DECLARE v_revision bigint;BEGIN
  IF jsonb_typeof(p_binding->'expectedRevision') IS DISTINCT FROM 'number'
@@ -2927,7 +2927,7 @@ END;
 $$;
 
 -- Capability reads do not validate or consume action proof. Owner-only powers derive live designation independently.
-CREATE FUNCTION staff.invitation_issuer_current(p_staff uuid,p_epoch bigint) RETURNS boolean
+CREATE OR REPLACE FUNCTION staff.invitation_issuer_current(p_staff uuid,p_epoch bigint) RETURNS boolean
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT EXISTS(SELECT 1 FROM staff.subject s JOIN staff.owner_designation d USING(staff_id)
  WHERE s.staff_id=p_staff AND s.state='ACTIVE' AND s.security_epoch=p_epoch AND d.active

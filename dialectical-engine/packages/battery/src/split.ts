@@ -88,7 +88,7 @@ export class SplitLifecycleProjection {
     this.#graph = new GraphRepository(pool);
   }
 
-  read(runId: string): Promise<readonly NodeLifecycleEvent[]> {
-    return this.#graph.readNodeLifecycleEvents(runId);
+  read(runId: string, signal?: AbortSignal): Promise<readonly NodeLifecycleEvent[]> {
+    return this.#graph.readNodeLifecycleEvents(runId, signal);
   }
 }

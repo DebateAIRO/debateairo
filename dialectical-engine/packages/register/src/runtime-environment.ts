@@ -758,7 +758,8 @@ export function parseStaffAccessEnvironment(source: EnvironmentSource): StaffAcc
   const origin = source.STAFF_WEBAUTHN_ORIGIN;
   const rpId = source.STAFF_WEBAUTHN_RP_ID;
   const configPath = source.STAFF_INDEPENDENT_ALERT_CONFIG_PATH;
-  if (!publicUrl || !origin || !rpId || !configPath) throw new TypeError("STAFF_ACCESS_CONFIGURATION_REQUIRED");
+  const operatorModulePath = source.STAFF_ALERT_OPERATOR_MODULE_PATH, operatorModuleSha256 = source.STAFF_ALERT_OPERATOR_MODULE_SHA256;
+  if (!publicUrl || !origin || !rpId || !configPath || !operatorModulePath || !operatorModuleSha256) throw new TypeError("STAFF_ACCESS_CONFIGURATION_REQUIRED");
   let app: URL;
   let ceremony: URL;
   try { app = new URL(publicUrl); ceremony = new URL(origin); }
@@ -771,5 +772,12 @@ export function parseStaffAccessEnvironment(source: EnvironmentSource): StaffAcc
   if (configPath !== configPath.trim() || !isAbsolute(configPath) || /[\u0000-\u001f\u007f]/u.test(configPath)) {
     throw new TypeError("STAFF_INDEPENDENT_ALERT_CONFIG_PATH_INVALID");
   }
-  return Object.freeze({ policyVersion: 2, origin, rpId, independentAlertConfigPath: configPath });
+  if (operatorModulePath !== operatorModulePath.trim() || !isAbsolute(operatorModulePath) || /[\u0000-\u001f\u007f]/u.test(operatorModulePath) || operatorModulePath.split('/').some(part => part === '..' || part === '.')) throw new TypeError("STAFF_ALERT_OPERATOR_MODULE_PATH_INVALID");
+  if (!/^[0-9a-f]{64}$/u.test(operatorModuleSha256)) throw new TypeError("STAFF_ALERT_OPERATOR_MODULE_SHA256_INVALID");
+  return Object.freeze({ policyVersion: 2, origin, rpId, independentAlertConfigPath: configPath, operatorModulePath, operatorModuleSha256 });
+}
+
+/** Owner CLI must inspect the full snapshot for forbidden secrets, including unexpected names. */
+export function loadOwnerOperatorEnvironment(): Readonly<NodeJS.ProcessEnv> {
+  return Object.freeze({ ...process.env });
 }

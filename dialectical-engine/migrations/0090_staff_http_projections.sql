@@ -1,5 +1,5 @@
 -- Private team HTTP projections. Existing NOLOGIN owner; no new principal/table or raw runtime access.
-CREATE FUNCTION staff.require_http_authority(p_context jsonb,p_token text,p_capability text) RETURNS void
+CREATE OR REPLACE FUNCTION staff.require_http_authority(p_context jsonb,p_token text,p_capability text) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  IF staff.read_current_context(p_context,p_token) IS NULL
@@ -7,7 +7,7 @@ BEGIN
   RAISE EXCEPTION 'STAFF_AUTHORITY_INVALID';
  END IF;
 END $$;
-CREATE FUNCTION staff.http_delivery_state(p_event uuid) RETURNS text
+CREATE OR REPLACE FUNCTION staff.http_delivery_state(p_event uuid) RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT CASE WHEN count(*)=0 THEN 'PENDING'
   WHEN bool_and(last_outcome='DELIVERED') THEN 'DELIVERED'
@@ -16,7 +16,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
                ORDER BY r.recorded_at DESC,r.receipt_id DESC LIMIT 1) AS last_outcome
        FROM staff.alert_outbox o WHERE o.event_id=p_event) deliveries
 $$;
-CREATE FUNCTION staff.read_enrollment(p_user uuid,p_base uuid,p_token text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_enrollment(p_user uuid,p_base uuid,p_token text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_count integer;v_email boolean;v_totp boolean;
 BEGIN
@@ -31,7 +31,7 @@ BEGIN
   'email_verified',v_email,'totp_active',v_totp,'security_hold',false,'verified_credential_count',v_count,
   'owner_credential_requirement_met',v_count>=2,'delegated_credential_requirement_met',v_count>=1));
 END $$;
-CREATE FUNCTION staff.read_team_page(p_context jsonb,p_token text,p_limit integer,p_after_time timestamptz,p_after_id uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_team_page(p_context jsonb,p_token text,p_limit integer,p_after_time timestamptz,p_after_id uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_rows jsonb;v_next jsonb;v_count integer;
 BEGIN
@@ -52,7 +52,7 @@ BEGIN
  PERFORM staff.require_http_authority(p_context,p_token,'TEAM_READ');
  RETURN jsonb_build_object('members',v_rows,'nextPosition',CASE WHEN v_count>p_limit THEN v_next ELSE NULL END,'order','CREATED_AT_ID_ASC');
 END $$;
-CREATE FUNCTION staff.read_audit_page(p_context jsonb,p_token text,p_limit integer,p_after_time timestamptz,p_after_id uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_audit_page(p_context jsonb,p_token text,p_limit integer,p_after_time timestamptz,p_after_id uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_rows jsonb;v_next jsonb;v_count integer;
 BEGIN
@@ -73,7 +73,7 @@ BEGIN
  PERFORM staff.require_http_authority(p_context,p_token,'AUDIT_READ');
  RETURN jsonb_build_object('events',v_rows,'nextPosition',CASE WHEN v_count>p_limit THEN v_next ELSE NULL END,'order','RECORDED_AT_ID_ASC');
 END $$;
-CREATE FUNCTION staff.read_invitation_proof(p_context jsonb,p_token text,p_handle text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_invitation_proof(p_context jsonb,p_token text,p_handle text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE p staff.invitation_proof%ROWTYPE;i staff.invitation%ROWTYPE;v_context jsonb;v_users uuid[];
 BEGIN
@@ -95,7 +95,7 @@ BEGIN
  IF identity.assert_session_current(p.user_id,p.ordinary_session_id,p_token) IS DISTINCT FROM true OR p.expires_at<=clock_timestamp() THEN RETURN NULL;END IF;
  RETURN jsonb_build_object('proofId',p.proof_id,'purpose','INVITATION_ACCEPT','context',v_context,'credentialId',p.credential_id,'verifiedAt',p.verified_at,'expiresAt',p.expires_at);
 END $$;
-CREATE FUNCTION staff.read_issued_invitation(p_context jsonb,p_token text,p_operation uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_issued_invitation(p_context jsonb,p_token text,p_operation uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_result jsonb;
 BEGIN
@@ -105,7 +105,7 @@ BEGIN
  PERFORM staff.require_http_authority(p_context,p_token,'TEAM_INVITE');
  RETURN v_result;
 END $$;
-CREATE FUNCTION staff.read_mutation_target(p_context jsonb,p_token text,p_staff uuid,p_capability text) RETURNS uuid
+CREATE OR REPLACE FUNCTION staff.read_mutation_target(p_context jsonb,p_token text,p_staff uuid,p_capability text) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_user uuid;
 BEGIN
@@ -116,7 +116,7 @@ BEGIN
  PERFORM staff.require_http_authority(p_context,p_token,p_capability);
  RETURN v_user;
 END $$;
-CREATE FUNCTION staff.read_target_invitation_channel(p_outbox uuid,p_claim uuid,p_event uuid,p_operation uuid,p_target uuid) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_target_invitation_channel(p_outbox uuid,p_claim uuid,p_event uuid,p_operation uuid,p_target uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_result jsonb;v_issuer uuid;
 BEGIN

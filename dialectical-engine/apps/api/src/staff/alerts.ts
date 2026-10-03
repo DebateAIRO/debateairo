@@ -449,6 +449,9 @@ function failure(error: unknown): StaffAlertFailureCode {
 }
 export class StaffAlertDispatcher {
     private draining = false;
+    private stopped = false;
+    private readonly activeDeliveries = new Set<AbortController>();
+    stop(): void { this.stopped = true; for (const controller of this.activeDeliveries) controller.abort(); }
     constructor(private readonly dependencies: Readonly<{
         repository: StaffAlertRepository;
         keys: Pick<ReadableUserDekStore, 'load'>;
@@ -462,16 +465,25 @@ export class StaffAlertDispatcher {
             throw new StaffAlertError('TIMEOUT');
     }
     private async bounded(action: (signal: AbortSignal) => Promise<void>): Promise<void> {
+        if (this.stopped) throw new StaffAlertError('TIMEOUT');
         const controller = new AbortController();
+        this.activeDeliveries.add(controller);
         let timer: ReturnType<typeof setTimeout> | undefined;
+        let rejectAbort: (error: StaffAlertError) => void = () => {};
+        const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject; });
+        const abort = () => rejectAbort(new StaffAlertError('TIMEOUT'));
+        controller.signal.addEventListener('abort', abort, {once:true});
         try {
             await Promise.race([
+                aborted,
                 Promise.resolve().then(() => action(controller.signal)),
                 new Promise<never>((_resolve, reject) => { timer = setTimeout(() => { controller.abort(); reject(new StaffAlertError('TIMEOUT')); }, this.dependencies.timeoutMs ?? 5000); })
             ]);
         }
         finally {
             clearTimeout(timer);
+            this.activeDeliveries.delete(controller);
+            controller.signal.removeEventListener('abort', abort);
             controller.abort();
         }
     }
@@ -571,10 +583,10 @@ export class StaffAlertDispatcher {
         try {
             // Claim just in time; a batch of 100 five-second sends must not carry a
             // single already-expired lease by the time its last event is admitted.
-            for (let count = 0; count < limit; count++) {
+            for (let count = 0; count < limit && !this.stopped; count++) {
                 const claims = await this.dependencies.repository.claim(1);
                 const claim = claims[0];
-                if (!claim)
+                if (!claim || this.stopped)
                     break;
                 try {
                     await this.bounded(signal => this.deliver(claim, signal));

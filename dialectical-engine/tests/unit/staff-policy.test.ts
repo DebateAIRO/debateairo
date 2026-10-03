@@ -16,7 +16,8 @@ const parseRuntime = (env: Record<string, string | undefined>) =>
 const configured = {
   STAFF_ACCESS_POLICY_VERSION: "2", PUBLIC_APP_URL: "https://admin.example.test",
   STAFF_WEBAUTHN_ORIGIN: "https://admin.example.test", STAFF_WEBAUTHN_RP_ID: "admin.example.test",
-  STAFF_INDEPENDENT_ALERT_CONFIG_PATH: "/private/test-fixture/staff-alert.json"
+  STAFF_INDEPENDENT_ALERT_CONFIG_PATH: "/private/test-fixture/staff-alert.json",
+  STAFF_ALERT_OPERATOR_MODULE_PATH: "/private/test-fixture/staff-adapters.mjs", STAFF_ALERT_OPERATOR_MODULE_SHA256: "a".repeat(64)
 };
 
 afterEach(() => vi.unstubAllEnvs());
@@ -128,8 +129,8 @@ describe("sealed staff policy v2", () => {
   it("requires explicit matching origin/RP and independent alert configuration for v2", () => {
     expect(parseRuntime({})).toEqual({ policyVersion: 1 });
     expect(parseRuntime(configured)).toEqual({ policyVersion: 2, origin: "https://admin.example.test",
-      rpId: "admin.example.test", independentAlertConfigPath: "/private/test-fixture/staff-alert.json" });
-    for (const field of ["PUBLIC_APP_URL", "STAFF_WEBAUTHN_ORIGIN", "STAFF_WEBAUTHN_RP_ID", "STAFF_INDEPENDENT_ALERT_CONFIG_PATH"]) {
+      rpId: "admin.example.test", independentAlertConfigPath: "/private/test-fixture/staff-alert.json", operatorModulePath: "/private/test-fixture/staff-adapters.mjs", operatorModuleSha256: "a".repeat(64) });
+    for (const field of ["PUBLIC_APP_URL", "STAFF_WEBAUTHN_ORIGIN", "STAFF_WEBAUTHN_RP_ID", "STAFF_INDEPENDENT_ALERT_CONFIG_PATH", "STAFF_ALERT_OPERATOR_MODULE_PATH", "STAFF_ALERT_OPERATOR_MODULE_SHA256"]) {
       expect(() => parseRuntime({ ...configured, [field]: undefined })).toThrow();
     }
     for (const change of [

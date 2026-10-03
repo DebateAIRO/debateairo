@@ -331,7 +331,8 @@
         "staff.read_invitation_proof",
         "staff.read_issued_invitation",
         "staff.read_mutation_target",
-        "staff.read_target_invitation_channel"
+        "staff.read_target_invitation_channel",
+        "staff.read_owner_recovery_installation"
       ]
     }
   ],

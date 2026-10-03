@@ -1,4 +1,5 @@
 import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
+import { cancelAndDestroyPrivateClient } from './private-stream.js';
 import type { InvitationContext, InvitationProof, OwnerPossessionContext, Reason, SecurityReceipt, StaffCapability, StaffContext, StaffProof } from '@debateai/kernel';
 import type { CryptoEnvelope } from '@debateai/crypto';
 /** Internal encrypted intent: constructed by the trusted alert application, never a browser DTO. */
@@ -44,7 +45,7 @@ export async function guardedAuthorityQuery<T extends QueryResultRow>(pool: Pool
     const abort = () => { if (stopped)
         return; stopped = true; if (client !== undefined && !released) {
         released = true;
-        client.release(true);
+        void cancelAndDestroyPrivateClient(pool, client).catch(() => {});
     } refuse(new Error('AUTHORITY_CHECK_UNAVAILABLE')); };
     const timer = setTimeout(abort, 750);
     signal?.addEventListener('abort', abort, { once: true });
@@ -387,7 +388,7 @@ export type StaffPrerequisiteInput = Readonly<{
     nonceHash: string;
 }>);
 export interface StaffPrerequisiteProducer {
-    complete(input: StaffPrerequisiteInput): Promise<Readonly<{
+    complete(input: StaffPrerequisiteInput, signal?: AbortSignal): Promise<Readonly<{
         expiresAt: Date;
     }>>;
 }
@@ -428,7 +429,7 @@ function nextCursor(position: unknown): string | null {
 /** Runtime pool only; the authorization repository remains separate. Source hashes precede BEGIN. */
 export class PostgresStaffPrerequisiteProducer implements StaffPrerequisiteProducer {
     constructor(private readonly pool: Pool, private readonly auditContext: import('@debateai/crypto').AuditContextHasher) { }
-    async complete(input: StaffPrerequisiteInput): Promise<Readonly<{
+    async complete(input: StaffPrerequisiteInput, signal?: AbortSignal): Promise<Readonly<{
         expiresAt: Date;
     }>> {
         const normalized = (value: unknown, bound: number) => (typeof value === 'string' ? value.trim() : '').slice(0, bound) || 'unknown';
@@ -438,32 +439,16 @@ export class PostgresStaffPrerequisiteProducer implements StaffPrerequisiteProdu
         };
         if (!Object.values(source).every(value => /^argon2id-audit:v1:[0-9a-f]{64}$/.test(value)))
             throw new Error('STAFF_PREREQUISITE_INVALID');
-        const client = await this.pool.connect();
-        try {
-            await client.query('BEGIN');
-            const result = await client.query<{
-                value: {
-                    expiresAt: unknown;
-                };
-            }>('SELECT staff.step_up_prerequisite($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15) AS value', [input.identity.userId, input.identity.ownerRef, input.identity.passwordHash, input.identity.factorId,
-                input.acceptedStep, input.currentSessionId, input.currentTokenHash, input.replacementTokenHash,
-                input.replacementCsrfHash, input.bindingContext, source, input.handleHash, input.purpose,
-                input.purpose === 'OWNER_POSSESSION' ? input.commandId : null,
-                input.purpose === 'OWNER_POSSESSION' ? input.nonceHash : null]);
-            const value = result.rows[0]?.value;
-            if (value === undefined)
-                throw new Error('STAFF_PREREQUISITE_INVALID');
-            const expiresAt = date(value.expiresAt);
-            await client.query('COMMIT');
-            return Object.freeze({ expiresAt });
-        }
-        catch (error) {
-            await client.query('ROLLBACK').catch(() => undefined);
-            throw error;
-        }
-        finally {
-            client.release();
-        }
+        const result = await guardedAuthorityQuery<{value:{expiresAt:unknown}}>(this.pool,
+          'SELECT staff.step_up_prerequisite($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15) AS value',
+          [input.identity.userId, input.identity.ownerRef, input.identity.passwordHash, input.identity.factorId,
+           input.acceptedStep, input.currentSessionId, input.currentTokenHash, input.replacementTokenHash,
+           input.replacementCsrfHash, input.bindingContext, source, input.handleHash, input.purpose,
+           input.purpose === 'OWNER_POSSESSION' ? input.commandId : null,
+           input.purpose === 'OWNER_POSSESSION' ? input.nonceHash : null], signal);
+        const value = result.rows[0]?.value;
+        if (value === undefined) throw new Error('STAFF_PREREQUISITE_INVALID');
+        return Object.freeze({expiresAt:date(value.expiresAt)});
     }
 }
 function date(value: unknown): Date {
@@ -477,6 +462,10 @@ function invitation(value: InvitationContext): InvitationContext { return Object
 /** This adapter accepts trusted server-domain inputs; SQL owns all security clocks/state. */
 export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRepository, StaffManagementRepository, StaffTargetInvitationChannels {
     constructor(private readonly pool: Pool) { }
+    async readOwnerRecoveryInstallation(): Promise<SecurityReceipt | null> {
+      const value = await this.guarded<SecurityReceipt | null>('SELECT staff.read_owner_recovery_installation() AS value', []);
+      return value === null ? null : receipt(value);
+    }
     async readEnrollment(input: Parameters<StaffManagementRepository['readEnrollment']>[0]): Promise<StaffEnrollmentRecord | null> {
         return this.guarded('SELECT staff.read_enrollment($1,$2,$3) AS value', [input.userId, input.ordinarySessionId, input.ordinaryTokenHash]);
     }

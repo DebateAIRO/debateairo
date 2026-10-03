@@ -138,9 +138,18 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         const input = parse(contract.StaffPrerequisiteStepUpRequestSchema, request.body);
         if (application!.sessions.stepUpStaffPrerequisite === undefined)
             throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
-        const result = await application!.sessions.stepUpStaffPrerequisite({ session: request.authenticatedSession!, password: input.password, code: input.totp_code,
-            ...(input.purpose === 'KEY_PREREGISTRATION' ? { purpose: input.purpose }
-                : { purpose: input.purpose, commandId: input.command_id, commandNonce: input.command_nonce }) }, transport.sourceFor(request));
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        const closed = () => { if (!reply.raw.writableEnded) abort(); };
+        request.raw.once('aborted', abort); reply.raw.once('close', closed);
+        if (request.raw.aborted || reply.raw.destroyed) abort();
+        let result: Awaited<ReturnType<NonNullable<SessionApplication['stepUpStaffPrerequisite']>>>;
+        try {
+          result = await application!.sessions.stepUpStaffPrerequisite({ session: request.authenticatedSession!, password: input.password, code: input.totp_code,
+              ...(input.purpose === 'KEY_PREREGISTRATION' ? { purpose: input.purpose }
+                  : { purpose: input.purpose, commandId: input.command_id, commandNonce: input.command_nonce }) }, transport.sourceFor(request), controller.signal);
+          if (controller.signal.aborted) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+        } finally { request.raw.removeListener('aborted', abort); reply.raw.removeListener('close', closed); }
         const base = await application!.sessions.authenticate(result.sessionToken, transport.sourceFor(request));
         if (base === null || base.userId !== request.authenticatedSession!.userId || base.session.session_id !== request.authenticatedSession!.session.session_id)
             refuse();

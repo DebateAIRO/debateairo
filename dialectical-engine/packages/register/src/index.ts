@@ -847,6 +847,7 @@ export {
   type SealedCostEnvelopeStatus,
   loadApiEnvironment,
   loadDevelopmentCommandEnvironment,
+  loadOwnerOperatorEnvironment,
   loadKeyRotationEnvironment,
   loadLivenessEnvironment,
   loadMigrationEnvironment,

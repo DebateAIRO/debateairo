@@ -1,6 +1,6 @@
 -- Owned native WebAuthn; dormant API source is the cryptographic verifier.
 -- SQL rechecks state/binding atomically. It does not independently verify signatures.
-CREATE TABLE identity.staff_webauthn_metadata (
+CREATE TABLE IF NOT EXISTS identity.staff_webauthn_metadata (
  mfa_factor_id uuid PRIMARY KEY REFERENCES identity.mfa_factor ON DELETE CASCADE,
  user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,
  user_handle_sha256 text NOT NULL CHECK(user_handle_sha256 ~ '^sha256:[0-9a-f]{64}$'),
@@ -8,17 +8,17 @@ CREATE TABLE identity.staff_webauthn_metadata (
     AND transports<@ARRAY['usb','nfc','ble','internal','hybrid','cable','smart-card']::text[])
 );
 ALTER TABLE staff.webauthn_challenge
- ADD COLUMN handle_sha256 text UNIQUE CHECK(handle_sha256 ~ '^sha256:[0-9a-f]{64}$'),
- ADD COLUMN allowed_credential_ids text[] CHECK(cardinality(allowed_credential_ids)<=100),
- ADD COLUMN relying_party_id text,ADD COLUMN credential_origin text,
- ADD COLUMN user_handle_sha256 text CHECK(user_handle_sha256 ~ '^sha256:[0-9a-f]{64}$'),
- ADD COLUMN registration_proof_id uuid REFERENCES staff.action_proof ON DELETE CASCADE,
- ADD COLUMN operation_id uuid,ADD COLUMN scope jsonb;
-ALTER TABLE staff.action_proof ADD COLUMN handle_sha256 text UNIQUE CHECK(handle_sha256 ~ '^sha256:[0-9a-f]{64}$');
-ALTER TABLE staff.invitation_proof ADD COLUMN handle_sha256 text UNIQUE CHECK(handle_sha256 ~ '^sha256:[0-9a-f]{64}$');
+ ADD COLUMN IF NOT EXISTS handle_sha256 text UNIQUE CHECK(handle_sha256 ~ '^sha256:[0-9a-f]{64}$'),
+ ADD COLUMN IF NOT EXISTS allowed_credential_ids text[] CHECK(cardinality(allowed_credential_ids)<=100),
+ ADD COLUMN IF NOT EXISTS relying_party_id text,ADD COLUMN IF NOT EXISTS credential_origin text,
+ ADD COLUMN IF NOT EXISTS user_handle_sha256 text CHECK(user_handle_sha256 ~ '^sha256:[0-9a-f]{64}$'),
+ ADD COLUMN IF NOT EXISTS registration_proof_id uuid REFERENCES staff.action_proof ON DELETE CASCADE,
+ ADD COLUMN IF NOT EXISTS operation_id uuid,ADD COLUMN IF NOT EXISTS scope jsonb;
+ALTER TABLE staff.action_proof ADD COLUMN IF NOT EXISTS handle_sha256 text UNIQUE CHECK(handle_sha256 ~ '^sha256:[0-9a-f]{64}$');
+ALTER TABLE staff.invitation_proof ADD COLUMN IF NOT EXISTS handle_sha256 text UNIQUE CHECK(handle_sha256 ~ '^sha256:[0-9a-f]{64}$');
 GRANT SELECT(mfa_factor_id,user_id,transports) ON identity.staff_webauthn_metadata TO debateai_staff_security_owner;
 REVOKE ALL ON identity.staff_webauthn_metadata FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
-CREATE FUNCTION staff.owned_action_allowed(p_context jsonb,p_binding jsonb) RETURNS boolean
+CREATE OR REPLACE FUNCTION staff.owned_action_allowed(p_context jsonb,p_binding jsonb) RETURNS boolean
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT COALESCE(CASE
  WHEN p_binding->>'action' IN('CREDENTIAL_REGISTER','CREDENTIAL_REVOKE') THEN p_binding->>'targetId'=p_context->>'userId'
@@ -28,7 +28,7 @@ LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  WHEN p_binding->>'action'='EMERGENCY_DISABLE' THEN staff.authorize_action(p_context,'EMERGENCY_DISABLE')
  ELSE false END,false)
 $$;
-CREATE FUNCTION staff.owned_challenge_current(p_id uuid,p_context jsonb,p_binding jsonb,p_scope jsonb) RETURNS boolean
+CREATE OR REPLACE FUNCTION staff.owned_challenge_current(p_id uuid,p_context jsonb,p_binding jsonb,p_scope jsonb) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.webauthn_challenge%ROWTYPE;
 r staff.prerequisite_receipt%ROWTYPE;
@@ -131,7 +131,7 @@ END IF;
  END IF;
 RETURN COALESCE((false),false);
 END $$;
-CREATE FUNCTION staff.begin_owned_webauthn(p_user uuid,p_base uuid,p_purpose text,p_hash text,p_handle text,p_rp text,p_origin text,p_user_handle text,p_operation uuid,p_context jsonb,p_binding jsonb,p_scope jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.begin_owned_webauthn(p_user uuid,p_base uuid,p_purpose text,p_hash text,p_handle text,p_rp text,p_origin text,p_user_handle text,p_operation uuid,p_context jsonb,p_binding jsonb,p_scope jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_id uuid;
 v_ids text[];
@@ -304,7 +304,7 @@ SELECT jsonb_agg(x) INTO v_credentials FROM jsonb_array_elements(v_credentials) 
  UPDATE staff.webauthn_challenge SET handle_sha256=p_handle,allowed_credential_ids=CASE WHEN p_purpose='REGISTRATION' THEN '{}'::text[] ELSE v_ids END,relying_party_id=p_rp,credential_origin=p_origin,user_handle_sha256=p_user_handle,operation_id=p_operation,scope=p_scope,created_at=v_issued,expires_at=v_expiry WHERE challenge_id=v_id;
  RETURN jsonb_build_object('challengeId',v_id,'expiresAt',v_expiry,'credentials',v_credentials);
 END $$;
-CREATE FUNCTION staff.read_owned_webauthn_challenge(p_user uuid,p_base uuid,p_handle text,p_purpose text,p_context jsonb,p_binding jsonb,p_scope jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_owned_webauthn_challenge(p_user uuid,p_base uuid,p_handle text,p_purpose text,p_context jsonb,p_binding jsonb,p_scope jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.webauthn_challenge%ROWTYPE;
 v_issuer uuid;
@@ -335,7 +335,7 @@ END IF;
 END IF;
  RETURN jsonb_build_object('challengeId',c.challenge_id,'challengeSha256',c.challenge_sha256,'expiresAt',c.expires_at,'rpId',c.relying_party_id,'origin',c.credential_origin,'operationId',c.operation_id,'scope',c.scope,'allowedCredentialIds',c.allowed_credential_ids);
 END $$;
-CREATE FUNCTION staff.fail_owned_webauthn(p_user uuid,p_base uuid,p_id uuid) RETURNS void
+CREATE OR REPLACE FUNCTION staff.fail_owned_webauthn(p_user uuid,p_base uuid,p_id uuid) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  PERFORM identity.lock_security_subjects(ARRAY[p_user]);
@@ -348,7 +348,7 @@ BEGIN
     AND expires_at>clock_timestamp();
 END $$;
 -- This bounded identity-owned helper returns only public verification material.
-CREATE FUNCTION identity.staff_read_owned_webauthn_key(p_user uuid,p_base uuid,p_id uuid,p_credential text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.staff_read_owned_webauthn_key(p_user uuid,p_base uuid,p_id uuid,p_credential text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.webauthn_challenge%ROWTYPE;
 v_issuer uuid;
@@ -383,7 +383,7 @@ END IF;
     AND f.credential_origin=c.credential_origin;
  RETURN v_result;
 END $$;
-CREATE FUNCTION identity.staff_insert_owned_webauthn_key(p_id uuid,p_factor uuid,p_credential text,p_key text,p_counter bigint,p_label jsonb,p_transports text[],p_time timestamptz) RETURNS timestamptz
+CREATE OR REPLACE FUNCTION identity.staff_insert_owned_webauthn_key(p_id uuid,p_factor uuid,p_credential text,p_key text,p_counter bigint,p_label jsonb,p_transports text[],p_time timestamptz) RETURNS timestamptz
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.webauthn_challenge%ROWTYPE;
 v_issued timestamptz;
@@ -418,7 +418,7 @@ END IF;
  IF NOT FOUND THEN RAISE EXCEPTION 'STAFF_CREDENTIAL_INVALID';END IF;
  RETURN v_issued;
 END $$;
-CREATE FUNCTION staff.complete_owned_webauthn_registration(p_user uuid,p_base uuid,p_id uuid,p_operation uuid,p_factor uuid,p_credential text,p_key text,p_counter bigint,p_label jsonb,p_transports text[],p_alert jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.complete_owned_webauthn_registration(p_user uuid,p_base uuid,p_id uuid,p_operation uuid,p_factor uuid,p_credential text,p_key text,p_counter bigint,p_label jsonb,p_transports text[],p_alert jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.webauthn_challenge%ROWTYPE;
 v_time timestamptz;
@@ -509,7 +509,7 @@ END IF;
  UPDATE staff.webauthn_challenge SET consumed_at=v_time WHERE challenge_id=p_challenge;
 RETURN c;
 END $$;
-CREATE FUNCTION staff.complete_owned_webauthn_assertion(p_user uuid,p_base uuid,p_id uuid,p_credential text,p_counter bigint,p_rp text,p_origin text,p_purpose text,p_context jsonb,p_binding jsonb,p_scope jsonb,p_token text,p_csrf text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.complete_owned_webauthn_assertion(p_user uuid,p_base uuid,p_id uuid,p_credential text,p_counter bigint,p_rp text,p_origin text,p_purpose text,p_context jsonb,p_binding jsonb,p_scope jsonb,p_token text,p_csrf text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.webauthn_challenge%ROWTYPE;
 v_issuer uuid;

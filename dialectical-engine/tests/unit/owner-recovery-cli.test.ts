@@ -80,3 +80,11 @@ describe('root-private offline generation material',()=>{
  });
 
 });
+
+it('checks the complete register-loader environment snapshot for a PostgreSQL secret under an unexpected name',()=>{
+ const secret='postgresql://synthetic-user:synthetic-do-not-print@127.0.0.1/fixture';
+ for(const name of ['owner-bootstrap-cli','owner-recovery-cli']){
+  const child=spawnSync(process.execPath,[tsx,resolve(`apps/runner/src/${name}.ts`)],{encoding:'utf8',env:{PATH:'/usr/bin:/bin',HOME:process.env.HOME!,UNEXPECTED_DEBUG_SETTING:secret}});
+  expect(child.status).toBe(1);expect(child.stdout).toBe('');expect(child.stderr.trim()).toBe('OWNER_SECRET_INPUT_REFUSED');expect(child.stdout+child.stderr).not.toContain(secret);
+ }
+});

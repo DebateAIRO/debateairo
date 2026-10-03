@@ -86,6 +86,7 @@ import {
   RunRepository,
   decryptLeasedContentForRun,
   prepareLeasedContentEncryptionForRun,
+  queryPrivateStream,
   withOwnerAskAdmissionLease,
   withRunContentLease,
   type CryptoEnvelope,
@@ -3448,19 +3449,7 @@ const STALLED_START_SECONDS = 300;
  * Destroy the dedicated client on abort, including a blocked PostgreSQL query;
  * do not change pool/global settings or impose the authority-check deadline on content reads. */
 async function queryPrivateSnapshot<T extends QueryResultRow>(pool:Pool,sql:string,values:readonly unknown[],signal?:AbortSignal):Promise<QueryResult<T>> {
-  if(signal===undefined)return pool.query<T>(sql,[...values]);
-  let client:PoolClient|undefined,released=false,aborted=false;
-  let rejectAbort:(error:Error)=>void=()=>{};
-  const cancelled=new Promise<never>((_resolve,reject)=>{rejectAbort=reject;});
-  const abort=()=>{if(aborted)return;aborted=true;if(client!==undefined&&!released){released=true;client.release(true);}rejectAbort(new Error("PRIVATE_STREAM_CLOSED"));};
-  signal.addEventListener("abort",abort,{once:true});if(signal.aborted)abort();
-  const work=(async()=>{const acquired=await pool.connect();client=acquired;
-    if(aborted){if(!released){released=true;acquired.release(true);}throw new Error("PRIVATE_STREAM_CLOSED");}
-    try{return await acquired.query<T>(sql,[...values]);}
-    finally{if(!released){released=true;acquired.release();}}
-  })();
-  try{return await Promise.race([work,cancelled]);}
-  finally{signal.removeEventListener("abort",abort);}
+  return queryPrivateStream<T>(pool,sql,values,signal);
 }
 
 export class PostgresAskApplication implements AskApplication {
@@ -4141,7 +4130,7 @@ export class PostgresAskApplication implements AskApplication {
       [runId, access.ownerRef, access.legacyAskerId],signal
     )]);
     if (signal?.aborted || (result.rows.length === 0 && failedWork.rows.length === 0)) return;
-    const projected = await this.#splitLifecycle.read(runId);
+    const projected = await this.#splitLifecycle.read(runId, signal);
     // Lifecycle projection performs additional ungated reads. Revalidate after
     // every source snapshot and before yielding any bytes so a claim committed
     // between the stored-event query and projection cannot disclose data to the
@@ -4157,7 +4146,7 @@ export class PostgresAskApplication implements AskApplication {
     // key load), however many gap rows the stream holds.
     let decryptedRows = result.rows;
     if (result.rows.some((row) => (row.content_ciphertext ?? null) !== null)) {
-      const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+      const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId, signal);
       try {
         decryptedRows = result.rows.map((row) => (row.content_ciphertext ?? null) === null
           ? row

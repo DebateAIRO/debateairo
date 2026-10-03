@@ -1,4 +1,5 @@
 import { pathToFileURL } from 'node:url';
+import { loadOwnerOperatorEnvironment } from '@debateai/register';
 import { createPool, PostgresOwnerCommandRepository, PostgresStaffIndependentReadinessPublisher } from '@debateai/db';
 import type { ReadableUserDekStore } from '@debateai/crypto';
 import { RootStaffAlertConfiguration, type StaffAlertAcknowledgementAdapter } from '../../api/src/staff/alerts.js';
@@ -167,7 +168,7 @@ export async function runOwnerCli(purpose: 'BOOTSTRAP' | 'RECOVER_OWNER', args: 
 }
 export async function ownerCliMain(purpose: 'BOOTSTRAP' | 'RECOVER_OWNER'): Promise<void> {
     try {
-        await runOwnerCli(purpose, process.argv.slice(2), process.env);
+        await runOwnerCli(purpose, process.argv.slice(2), loadOwnerOperatorEnvironment());
     }
     catch (error) {
         process.stderr.write((error instanceof OwnerRecoveryError ? error.code : 'OWNER_COMMAND_REFUSED') + '\n');

@@ -11,7 +11,7 @@ it("declares a closed independent recovery identity without runtime or private-c
 it('exports the adapter and denies direct secret columns in the staff migration',async()=>{
  const sql=await readFile('migrations/0085_staff_access_foundation.sql','utf8');
  expect(sql).toContain('identity.staff_rotation_binding_current');
- expect(sql).toContain('CREATE TABLE staff.password_totp_rotation_receipt');
+ expect(sql).toContain('CREATE TABLE IF NOT EXISTS staff.password_totp_rotation_receipt');
  expect(sql).not.toContain('SELECT * INTO v_factor FROM identity.mfa_factor');
  expect(await readFile('packages/db/src/index.ts','utf8')).toContain('"./staff-access.js"');
  expect(await readFile('packages/db/src/sessions.ts','utf8')).toContain('readAccountSecurityHold');

@@ -1,6 +1,6 @@
 -- Task4 current authority. All existing mutation/cascade authority remains in0085/0086.
 -- No raw table/key grants, no enabling HTTP route, no provider admission.
-CREATE FUNCTION identity.assert_session_current(p_user uuid,p_session uuid,p_token text) RETURNS boolean
+CREATE OR REPLACE FUNCTION identity.assert_session_current(p_user uuid,p_session uuid,p_token text) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_account record;v_session identity.session%ROWTYPE;v_now timestamptz;
 BEGIN
@@ -19,7 +19,7 @@ END $$;
 REVOKE ALL ON FUNCTION identity.assert_session_current(uuid,uuid,text) FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_staff_recovery;
 GRANT EXECUTE ON FUNCTION identity.read_account_security_hold(uuid) TO debateai_authorization_runtime;
 GRANT EXECUTE ON FUNCTION identity.assert_session_current(uuid,uuid,text) TO debateai_runtime,debateai_authorization_runtime,debateai_staff_security_owner;
-CREATE FUNCTION staff.read_authentication(p_user uuid,p_base uuid,p_ordinary_token text,p_staff_token text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_authentication(p_user uuid,p_base uuid,p_ordinary_token text,p_staff_token text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE p staff.privilege_session%ROWTYPE;v_context jsonb;v_now timestamptz;
 BEGIN
@@ -32,7 +32,7 @@ BEGIN
  UPDATE staff.privilege_session SET last_seen_at=v_now,idle_expires_at=LEAST(absolute_expires_at,v_now+interval '15 minutes') WHERE privilege_session_id=p.privilege_session_id;
  RETURN jsonb_build_object('context',v_context,'csrfTokenHash',p.csrf_token_hash,'expiresAt',p.absolute_expires_at);
 END $$;
-CREATE FUNCTION staff.read_current_context(p_context jsonb,p_ordinary_token text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_current_context(p_context jsonb,p_ordinary_token text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE p staff.privilege_session%ROWTYPE;v_context jsonb;
 BEGIN
@@ -44,7 +44,7 @@ BEGIN
  IF v_context IS NULL OR v_context IS DISTINCT FROM p_context OR p.csrf_token_hash IS NULL THEN RETURN NULL; END IF;
  RETURN jsonb_build_object('context',v_context,'csrfTokenHash',p.csrf_token_hash,'expiresAt',p.absolute_expires_at);
 END $$;
-CREATE FUNCTION staff.read_action_proof(p_context jsonb,p_ordinary_token text,p_handle text,p_binding jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION staff.read_action_proof(p_context jsonb,p_ordinary_token text,p_handle text,p_binding jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE p staff.action_proof%ROWTYPE;
 BEGIN
@@ -66,16 +66,16 @@ ALTER FUNCTION staff.read_action_proof(jsonb,text,text,jsonb) OWNER TO debateai_
 REVOKE ALL ON FUNCTION staff.read_authentication(uuid,uuid,text,text),staff.read_current_context(jsonb,text),staff.read_action_proof(jsonb,text,text,jsonb) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 GRANT EXECUTE ON FUNCTION staff.read_authentication(uuid,uuid,text,text),staff.read_current_context(jsonb,text),staff.read_action_proof(jsonb,text,text,jsonb) TO debateai_runtime;
 -- A notification has no subject/token payload and confers no authority. Polling is mandatory.
-CREATE FUNCTION staff.notify_authority_change() RETURNS trigger
+CREATE OR REPLACE FUNCTION staff.notify_authority_change() RETURNS trigger
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN PERFORM pg_notify('staff_authority_changed','changed'); RETURN NULL; END $$;
 ALTER FUNCTION staff.notify_authority_change() OWNER TO debateai_staff_security_owner;
 REVOKE ALL ON FUNCTION staff.notify_authority_change() FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
-CREATE TRIGGER staff_notify_subject AFTER UPDATE OR DELETE ON staff.subject FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
-CREATE TRIGGER staff_notify_owner AFTER INSERT OR UPDATE OR DELETE ON staff.owner_designation FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
-CREATE TRIGGER staff_notify_privilege AFTER UPDATE OF revoked_at ON staff.privilege_session FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
-CREATE TRIGGER staff_notify_hold AFTER INSERT OR UPDATE OR DELETE ON identity.account_security_hold FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
-CREATE TRIGGER staff_notify_ordinary AFTER UPDATE OF token_hash,revoked_at,absolute_expires_at ON identity.session FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
+CREATE OR REPLACE TRIGGER staff_notify_subject AFTER UPDATE OR DELETE ON staff.subject FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
+CREATE OR REPLACE TRIGGER staff_notify_owner AFTER INSERT OR UPDATE OR DELETE ON staff.owner_designation FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
+CREATE OR REPLACE TRIGGER staff_notify_privilege AFTER UPDATE OF revoked_at ON staff.privilege_session FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
+CREATE OR REPLACE TRIGGER staff_notify_hold AFTER INSERT OR UPDATE OR DELETE ON identity.account_security_hold FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
+CREATE OR REPLACE TRIGGER staff_notify_ordinary AFTER UPDATE OF token_hash,revoked_at,absolute_expires_at ON identity.session FOR EACH STATEMENT EXECUTE FUNCTION staff.notify_authority_change();
 
 -- Existing ordinary producers inherit the hold-aware, security-subject-first account lock.
 -- Preserve their owner/ACL with CREATE OR REPLACE; acquire time after final blocking locks.

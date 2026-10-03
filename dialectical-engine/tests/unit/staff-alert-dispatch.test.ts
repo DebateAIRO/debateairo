@@ -90,3 +90,17 @@ it('does not start submission when protected configuration evidence resumes afte
  const loader=new alerts.RootStaffAlertConfiguration({path:'/operator/config.json',files:fixture.files,acknowledgements:new Map([['capture-v1',stalled]])}),transport=new alerts.RootConfiguredStaffAlertTransport(loader),controller=new AbortController();
  const sending=transport.send(`${uuid()}:INDEPENDENT_METADATA_ALERT`,{schema:'staff-security-metadata-v1',event:'GRANT',operationId:uuid(),actorStaffId:null,subjectStaffId:null,reason:{code:'GRANT_CHANGE'}},controller.signal);await started;controller.abort();release(await fixture.ack.evidence());await expect(sending).rejects.toThrow('TIMEOUT');await expect(readFile(capture,'utf8')).rejects.toMatchObject({code:'ENOENT'});
 });
+
+it('stops an in-flight pre-send readiness await promptly and never begins a late delivery',async()=>{
+ const userId=uuid(),keyRef=uuid(),operationId=uuid(),key=generateDek(),copies:Buffer[]=[];
+ const keys={load:async()=>{const copy=Buffer.from(key);copies.push(copy);return copy;}};
+ const producer=new alerts.StaffAlertIntentProducer({keys,mappings:{resolveUser:async()=>({userId,keyRef})},readiness:{require:async()=>{}}});
+ const intent=await producer.mutation({event:'GRANT',operationId,keyUserId:userId,actorStaffId:null,subjectStaffId:null,reason:{code:'GRANT_CHANGE'}});
+ let release:()=>void=()=>{},entered:()=>void=()=>{},sends=0,claimed=0;const started=new Promise<void>(r=>entered=r),wait=new Promise<void>(r=>release=r);
+ const claim={outboxId:uuid(),eventId:uuid(),operationId,keyRef,claimToken:uuid(),event:'GRANT',purpose:'INDEPENDENT_METADATA_ALERT',envelope:intent.envelope};
+ const dispatcher=new alerts.StaffAlertDispatcher({keys,repository:{claim:async()=>{claimed++;return [claim];},resolveClaim:async()=>({state:'CURRENT',mapping:{userId,keyRef}}),settle:async()=>true,status:async()=>({pending:1})} as never,independentTransport:{send:async()=>{sends++;return 'ACK';}},readiness:async()=>{entered();await wait;return 'READY';}});
+ const draining=dispatcher.drain({limit:2}).then(()=> 'closed');
+ try{await started;dispatcher.stop();expect(await Promise.race([draining,new Promise(r=>setTimeout(()=>r('pending'),100))])).toBe('closed');}
+ finally{release();await draining;await new Promise(r=>setTimeout(r,0));key.fill(0);}
+ expect(sends).toBe(0);expect(claimed).toBe(1);expect(copies.every(copy=>copy.equals(Buffer.alloc(copy.length)))).toBe(true);
+});

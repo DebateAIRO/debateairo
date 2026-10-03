@@ -148,4 +148,4 @@ export type StaffAccessPolicy = Readonly<{
 export type InternalAllowancePolicy = Readonly<{ enabled: false; sourceRef: string }>;
 export type StaffAccessEnvironment =
   | Readonly<{ policyVersion: 1 }>
-  | Readonly<{ policyVersion: 2; origin: string; rpId: string; independentAlertConfigPath: string }>;
+  | Readonly<{ policyVersion: 2; origin: string; rpId: string; independentAlertConfigPath: string; operatorModulePath: string; operatorModuleSha256: string }>;
