@@ -2195,8 +2195,11 @@ It prints one line saying what it did. Two answers need a word:
 withdraw within 14 days by the model form attached to their confirmation email, or by any clear statement, sent to
 the company's address. You carry it out with `pnpm billing:withdraw`, the same day it arrives. It records the
 withdrawal as of the moment the statement arrived (a statement sent in time counts even if you run the command after
-the 14 days), ends the plan, queues the refund, and emails the person the confirmation (M8). When the 14th day is a
-Saturday or a Sunday, the person still has until the end of the next Monday; the command counts it the same way.
+the 14 days), ends the plan, queues the refund, and emails the person at once that their withdrawal was received
+(M8_RECEIVED, "We've received your withdrawal", dated when the statement arrived). The confirmation that the money
+went back (M8) follows once the refund is done; when nothing is due back, M8 goes at once instead and is the only
+email. A withdrawal made in Settings sends the same emails. When the 14th day is a Saturday or a Sunday, the person
+still has until the end of the next Monday; the command counts it the same way.
 
 First find the person's owner reference. If they wrote through the support chat while signed in, it is the
 `identity_owner_ref` of their case. `pnpm support:inbox` has no production credential on this host yet (§13), so
@@ -2228,7 +2231,12 @@ to the person's statement and ask the accountant about the credit note.
 
 If it prints that a refund made in the xMoney dashboard already touched one of the payments, nothing is refunded
 automatically. Work out what is still due, then settle it within 14 days of the withdrawal, in this order. Until you
-do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`. What is due is worked out per payment, exactly
+do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`. You also get an email at once (O2_WITHDRAWAL,
+"A withdrawal needs you to settle its refund by hand") with the owner reference, the reason code
+`WITHDRAWAL_BY_OWNER`, the day of the withdrawal and the date the refund is due by: 14 days after the withdrawal. The
+same email comes when this happens to a withdrawal made in Settings, so you never learn of one only from the summary.
+The person's own email says that a refund was already made on one of their payments and that you will email them
+within 14 days. What is due is worked out per payment, exactly
 as the site does it: each payment gives back its amount times (1 minus the larger of two shares).
 - **Its amount** is what it still holds: what it paid, less what was already refunded on it. For the payment the
   dashboard refund touched, the amount already refunded is the amount the xMoney dashboard shows as refunded.
@@ -2259,8 +2267,13 @@ A withdrawal is settled once. Running the command a second time for the same wit
 
 **A refund that could not be completed.** If xMoney refuses a refund the site asked for, or its outcome stays
 unknown after every retry, you get an email at once (O2, "A refund could not be completed and needs your
-attention") with the charge reference, the amount and the reason code. No more tries are made by themselves: look
-the charge up in the xMoney dashboard and settle the refund there by hand. The owner summary lists it until then.
+attention") with the charge reference, the amount, the reason code and what the refund was for (the refund reason,
+for example `WITHDRAWAL`). No more tries are made by themselves: look the charge up in the xMoney dashboard and
+settle the refund there by hand. The owner summary lists it until then. For a withdrawal's refund the email also says
+the date the law requires it to be made by (14 days after the person withdrew). Refund at least the amount it names,
+on that payment, in one refund: once xMoney reports it, the site records it as this refund, and the person's
+confirmation (M8) follows by itself (after the last refund, when the withdrawal refunds two payments). A smaller refund, or one split into several, may be recorded only as a refund made at xMoney; then no
+M8 follows, and you confirm the refund to the person yourself.
 The one exception is the reason code `REFUND_NOT_REQUESTED`: that refund job matches no refund request our records
 hold for the payment, and nothing was sent to xMoney. Do not refund it, and do not treat its amount as owed.
 Something able to write to the billing database queued it, so tell whoever runs the server; they check that charge's
