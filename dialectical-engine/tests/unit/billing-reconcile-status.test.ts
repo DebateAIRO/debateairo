@@ -173,7 +173,8 @@ function openUpgrade(
 
 /**
  * The reconciler over stubbed repositories: `charges` are both the adoption candidates and what `charge()` reads back,
- * `histories` each subscription's events (a function may throw), `list` the fake xMoney listing.
+ * `histories` each subscription's events (a function may throw), `list` the fake xMoney listing, `deadRefunds` the rows
+ * the owner's dead-refund count reads.
  */
 function stubbedReconciler(input: Readonly<{
   now: Date;
@@ -182,6 +183,9 @@ function stubbedReconciler(input: Readonly<{
   histories?: ReadonlyMap<string, () => Promise<SubscriptionEvent[]>>;
   list?: (query: XMoneyTransactionListQuery) => Promise<never[]>;
   lockOwner?: (ownerRef: string) => Promise<void>;
+  deadRefunds?: ReadonlyArray<Readonly<{
+    chargeId: string; transactionId: string; reason: string | null; code: string | null; since: Date;
+  }>>;
   /** A moving clock, for the tick tests; `now` otherwise. */
   clock?: () => Date;
 }>) {
@@ -201,7 +205,7 @@ function stubbedReconciler(input: Readonly<{
       [...charges, ...(input.stale ?? [])].find((charge) => charge.chargeId === chargeId) ?? null,
     appendChargeEvent: async (_client: unknown, row: ChargeEventInput) => { appended.push(row); return "INSERTED" as const; },
     enqueue: async () => undefined,
-    deadRefunds: async () => [],
+    deadRefunds: async () => [...(input.deadRefunds ?? [])],
     longUnsettledCharges: async () => []
   };
   const jobs = {
@@ -352,15 +356,22 @@ describe("W13 the three daily listings run independently (P2-I18)", () => {
         asked.push(query.dateType ?? "none");
         if (query.dateType === "charge-back" && chargeBackRefused) throw refusedListing();
         return [];
-      }
+      },
+      // One refund xMoney refused is still owed: the owner's count must come from the full pass only (A29 (o)).
+      deadRefunds: [{
+        chargeId: "9".repeat(32), transactionId: "777", reason: "WITHDRAWAL", code: "XMONEY_REFUSED",
+        since: new Date("2026-10-09T00:00:00.000Z")
+      }]
     });
     const adoption = vi.spyOn(reconciler, "runAdoption");
     const failedLines = () => audit.filter((line) => line.event === "billing.reconcile.listing_failed").length;
+    const deadRefundLines = () => audit.filter((line) => line.event === "billing.refund.dead");
 
     expect((await reconciler.tick()).refusedListings).toEqual(["charge-back"]);
     expect(asked.splice(0)).toEqual(["creation", "charge-back", "refund"]);
     expect(adoption).toHaveBeenLastCalledWith(expect.any(Date), "DAILY");
     expect(failedLines()).toBe(1);
+    expect(deadRefundLines()).toEqual([{ event: "billing.refund.dead", fields: { count: 1 } }]);
     // Ten minutes on: inside the hour, only the frequent adoption pass.
     now = new Date(now.getTime() + 10 * 60_000);
     expect((await reconciler.tick()).refusedListings).toEqual([]);
@@ -381,9 +392,39 @@ describe("W13 the three daily listings run independently (P2-I18)", () => {
     await reconciler.tick();
     expect(asked.splice(0)).toEqual([]);
     expect(failedLines()).toBe(2);
-    // The full pass still comes a day after the first one.
+    // Never the owner's counts on an hourly retry: still the first full pass's one line.
+    expect(deadRefundLines()).toHaveLength(1);
+    // The full pass still comes a day after the first one, and counts the dead refund once more.
     now = new Date("2026-10-11T00:00:00.000Z");
     await reconciler.tick();
     expect(asked.splice(0)).toEqual(["creation", "charge-back", "refund"]);
+    expect(deadRefundLines()).toHaveLength(2);
+  });
+
+  it("fails the 24-hour checkout on the hourly retry that reads the creation listing again", async () => {
+    let now = new Date("2026-10-10T12:00:00.000Z");
+    let creationRefused = true;
+    const asked: string[] = [];
+    const stale = openUpgrade("8".repeat(32), "sub-retry", new Date(now.getTime() - 25 * 3_600_000), "INITIAL");
+    const histories = new Map<string, () => Promise<SubscriptionEvent[]>>([
+      ["sub-retry", async () => [subscriptionEventAt("sub-retry", "CREATED", new Date(now.getTime() - 5 * 86_400_000), "506")]]
+    ]);
+    const { reconciler, appended } = stubbedReconciler({
+      now, clock: () => now, stale: [stale], histories, list: async (query) => {
+        asked.push(query.dateType ?? "none");
+        if (query.dateType === "creation" && creationRefused) throw refusedListing();
+        return [];
+      }
+    });
+    // The full pass cannot read the creation listing: the 25-hour-old checkout is left as it is.
+    expect(await reconciler.tick()).toMatchObject({ failed: 0, refusedListings: ["creation"] });
+    expect(asked.splice(0)).toEqual(["creation", "charge-back", "refund"]);
+    expect(appended).toEqual([]);
+    // An hour later the creation listing answers: the retry asks it alone, and fails the checkout as the full pass would.
+    creationRefused = false;
+    now = new Date(now.getTime() + 61 * 60_000);
+    expect(await reconciler.tick()).toMatchObject({ failed: 1, refusedListings: [] });
+    expect(asked.splice(0)).toEqual(["creation"]);
+    expect(appended.map((row) => [row.chargeId, row.kind, row.errorCode])).toEqual([[stale.chargeId, "FAILED", "NO_TRANSACTION"]]);
   });
 });
