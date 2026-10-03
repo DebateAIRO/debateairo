@@ -286,7 +286,10 @@
       "ownsRelations": [
         "staff.independent_alert_readiness",
         "staff.alert_operation_readiness",
-        "staff.alert_dispatch_state"
+        "staff.alert_dispatch_state",
+        "staff.owner_lineage",
+        "staff.owner_recovery_generation",
+        "staff.owner_recovery_operation"
       ],
       "ownsFunctions": [
         "staff.require_alert_readiness_jit",
@@ -302,7 +305,24 @@
         "staff.read_alert_key_mapping",
         "staff.claim_alert_delivery",
         "staff.settle_alert_delivery",
-        "staff.read_alert_delivery_status"
+        "staff.read_alert_delivery_status",
+        "staff.require_owner_recovery_jit",
+        "staff.owner_recovery_commit_guard",
+        "staff.owner_command_prepare_commit_guard",
+        "staff.prepare_owner_command",
+        "staff.install_owner_recovery_generation",
+        "staff.owner_command_json",
+        "staff.require_owner_predecessor",
+        "staff.prepare_owner_command_v2",
+        "staff.read_owner_command",
+        "staff.read_owner_receipts",
+        "staff.read_owner_alert_metadata",
+        "staff.authorize_owner_alert_operation",
+        "staff.owner_recovery_request",
+        "staff.read_committed_owner_operation",
+        "staff.commit_owner_command",
+        "staff.recheck_owner_commit",
+        "staff.erase_subject_mapping"
       ]
     }
   ],
@@ -1852,6 +1872,11 @@
       "id": "STAFF_INDEPENDENT_ACK_AND_ROOT_PUBLICATION",
       "ownerTicket": "P3-02",
       "requiredEvidence": "rootUID0 protected config generation/hash; independent destination and rehearsed acknowledgement adapter; operator-approved publication/refresh/revoke lifecycle under existing closed five-minute JIT; no source defaults or daemon"
+    },
+    {
+      "id": "OWNER_RECOVERY_ROOT_CUSTODY_AND_REPLACEMENT_ONLY",
+      "ownerTicket": "P3-02",
+      "requiredEvidence": "separately reviewed rootUID0 pinned operator/key/ACK/Python/helper paths; Linux inherited descriptor flock rehearsal; root-private fsynced current/next generation and journal custody; five-minute login closure; replacement-account-only and no private content/key transfer"
     }
   ],
   "invariants": [
@@ -1863,5 +1888,27 @@
     "NO_PREDEFINED_PG_ROLE_MEMBERSHIP_EXCEPT_OBSERVATION_AGENT_PG_MONITOR",
     "AUTHORIZATION_EFFECTIVE_MEMBERSHIP_IS_AUTHORIZATION_PLUS_RUNTIME_ONLY",
     "PRODUCTION_EVALUATOR_DEV_MENU_FORBIDDEN"
-  ]
+  ],
+  "independentOwnerRecovery": {
+    "version": 1,
+    "loginRole": "debateai_prod_staff_recovery",
+    "capabilityRole": "debateai_staff_recovery",
+    "maximumLifetimeSeconds": 300,
+    "defaultPassword": "NULL",
+    "defaultValidUntil": "-infinity",
+    "exportReusableUrl": false,
+    "executeFunctions": [
+      "staff.prepare_owner_command",
+      "staff.install_owner_recovery_generation",
+      "staff.prepare_owner_command_v2",
+      "staff.read_owner_command",
+      "staff.read_owner_receipts",
+      "staff.read_owner_alert_metadata",
+      "staff.authorize_owner_alert_operation",
+      "staff.read_committed_owner_operation",
+      "staff.commit_owner_command",
+      "staff.publish_independent_alert_readiness",
+      "staff.revoke_independent_alert_readiness"
+    ]
+  }
 }

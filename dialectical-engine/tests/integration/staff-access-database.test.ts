@@ -1,3 +1,4 @@
+import { initializeOwnerRecoveryFixture, prepareOwnerRecoveryFixture } from '../support/staffOwnerRecoveryFixture.js';
 import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, rm, readFile, readdir } from "node:fs/promises";
@@ -74,7 +75,7 @@ beforeAll(async()=>{
   } catch(error){await client.query('ROLLBACK');throw error;} finally {client.release();}
   const guardedFunctions=["identity.lock_account_t9_internal", "identity.lock_mfa_enrollment_bearer_internal", "identity.record_verification_delivery_with_audit", "identity.prepare_account_erasure", "identity.finalize_account_erasure", "core.append_run_ownership_event", "identity.audit_publication_preflight_denial", "core.transition_run_publication", "core.prepare_run_key_provision", "core.lock_run_key_provision_for_commit", "serve.prepare_publication_key_provision", "serve.abandon_publication_key_provision", "identity.create_pending_account_with_audit", "identity.consume_verification_with_audit", "identity.prepare_verification_resend_with_audit", "identity.reserve_publication_event_refs", "core.prepare_private_run_erasure", "core.resume_private_run_erasure", "core.finalize_private_run_erasure", "identity.schedule_account_erasure", "identity.cancel_current_account_erasure", "core.claim_legacy_runs"];
   const identityWitness=async()=>(await database.pool.query(`SELECT p.oid::regprocedure::text AS signature,pg_get_userbyid(p.proowner) AS owner,p.proacl::text AS acl,encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') AS definition_sha256 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname||'.'||p.proname=ANY($1::text[]) ORDER BY signature`,[guardedFunctions])).rows;
-  const before=await identityWitness();expect(before).toHaveLength(22);await migrate(database.pool);const after=await identityWitness();
+  const before=await identityWitness();expect(before).toHaveLength(22);await migrate(database.pool);await initializeOwnerRecoveryFixture(database.pool,database.connectionString);const after=await identityWitness();
   expect(after.map(({signature,owner})=>({signature,owner}))).toEqual(before.map(({signature,owner})=>({signature,owner})));
   for(let i=0;i<before.length;i++)if(!before[i]!.signature.startsWith('identity.lock_account_t9_internal('))expect(after[i]!.acl).toBe(before[i]!.acl);
   console.info('[STAFF_IDENTITY_OWNER_ACL]',JSON.stringify({before,after}));
@@ -216,7 +217,7 @@ describe('scoped rotation, JIT and trusted ceremony persistence',()=>{
     has_function_privilege('debateai_runtime',p.oid,'EXECUTE') AS runtime,has_function_privilege('debateai_staff_recovery',p.oid,'EXECUTE') AS recovery
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='staff' OR (n.nspname='identity' AND p.proname IN('lock_security_subjects','read_account_security_hold','staff_rotation_binding_current')) ORDER BY signature`)).rows;
   const runtimeNames=new Set(['read_authentication','read_current_context','read_action_proof','read_context','authorize_action','invite','read_invitation_context','accept','grant','disable','step_up_prerequisite','read_owner_possession_context','begin_invitation_challenge','begin_owner_possession_challenge','complete_invitation_proof','complete_owner_possession','begin_registration_challenge','read_account_security_hold','begin_owned_webauthn','read_owned_webauthn_challenge','fail_owned_webauthn','complete_owned_webauthn_registration','complete_owned_webauthn_assertion','staff_read_owned_webauthn_key','read_independent_alert_readiness','authorize_alert_operation','read_alert_user_mapping','read_alert_key_mapping','claim_alert_delivery','settle_alert_delivery','read_alert_delivery_status']);
-  for(const row of rows){expect(row.public,row.signature).toBe(false);expect(row.runtime,row.signature).toBe(runtimeNames.has(row.proname));expect(row.recovery,row.signature).toBe(['prepare_owner_command','publish_independent_alert_readiness','revoke_independent_alert_readiness'].includes(row.proname));if(row.nspname==='staff')expect(row.owner).toBe('debateai_staff_security_owner');}
+  for(const row of rows){expect(row.public,row.signature).toBe(false);expect(row.runtime,row.signature).toBe(runtimeNames.has(row.proname));expect(row.recovery,row.signature).toBe(['prepare_owner_command','publish_independent_alert_readiness','revoke_independent_alert_readiness','install_owner_recovery_generation','prepare_owner_command_v2','read_owner_command','read_owner_receipts','read_owner_alert_metadata','authorize_owner_alert_operation','read_committed_owner_operation','commit_owner_command'].includes(row.proname));if(row.nspname==='staff')expect(row.owner).toBe('debateai_staff_security_owner');}
   console.info('[STAFF_FUNCTION_ACL]',JSON.stringify(rows));
   const denied=[['user','password_hash'],['user','email_ciphertext'],['session','token_hash'],['mfa_factor','secret_ciphertext'],['mfa_factor','public_key']];
   for(const [table,column] of denied)expect((await database.pool.query(`SELECT has_column_privilege('debateai_staff_security_owner',$1,$2,'SELECT') AS allowed`,['identity.'+(table==='user'?'"user"':table),column])).rows[0].allowed).toBe(false);
@@ -257,7 +258,7 @@ describe('scoped rotation, JIT and trusted ceremony persistence',()=>{
     await barrier.query('COMMIT');await rejected;
    } finally {await barrier.query('ROLLBACK');barrier.release();}
    await database.pool.query(`ALTER ROLE debateai_prod_staff_recovery VALID UNTIL '${new Date(Date.now()+240000).toISOString()}'`);
-   const command=(await recovery.query('SELECT staff.prepare_owner_command($1,$2,$3,$4,$5,$6) AS value',['RECOVER_OWNER',target.userId,owner.userId,keys,op,nonce])).rows[0].value;
+   const command=await prepareOwnerRecoveryFixture(database.pool,recovery,{purpose:'RECOVER_OWNER',targetUserId:target.userId,previousUserId:owner.userId,credentialIds:keys,operationId:op,nonceHash:nonce}) as {commandId:string};
    const r=await prerequisite(target,'OWNER_POSSESSION',command.commandId,nonce);
    await expect(runtime.query('SELECT staff.begin_registration_challenge($1,$2,$3,$4)',[target.userId,target.sessionId,r.handle,hash(randomUUID())])).rejects.toThrow('STAFF_PREREQUISITE_INVALID');
    for(const key of keys){

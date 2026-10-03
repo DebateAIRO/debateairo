@@ -1,3 +1,4 @@
+import { initializeOwnerRecoveryFixture, prepareOwnerRecoveryFixture } from '../support/staffOwnerRecoveryFixture.js';
 import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
@@ -42,7 +43,7 @@ async function waitForLock(pid: number) { for (let i = 0; i < 100; i++) {
 async function completion(a: Awaited<ReturnType<typeof staff>>, options: Awaited<ReturnType<StaffWebAuthnService['beginElevation']>>, counter = 1) { const response = assertion(a.one.f, options.options.challenge, counter), verified = verifyAssertion(response, { credentialId: a.one.f.expected.credentialId, publicKey: b64(a.one.f.k.wire), counter: 0, userHandleSha256: digest(a.one.f.handle) }, { origin, rpId, challengeSha256: digest(options.options.challenge) }); const challenge = await repo.readWebAuthnChallenge({ ...a, purpose: 'ELEVATION', handleHash: digest(options.challenge_handle), context: null, binding: null, scope: {} }); if (!challenge)
     throw new Error('MISSING_CHALLENGE'); return { ...a, challengeId: challenge.challengeId, credentialId: verified.credentialId, newCounter: verified.counter, rpId, origin, purpose: 'ELEVATION' as const, context: null, binding: null, scope: {}, tokenHash: digest(randomBytes(32)), csrfHash: digest(randomBytes(32)) }; }
 async function preparedPair(a: Account) { const one = await enrolled(a), two = await enrolled(a), nonce = b64(randomBytes(32)); const expiry = (await database.pool.query("SELECT (clock_timestamp()+interval '5 minutes')::text AS value")).rows[0].value as string; await database.pool.query(`ALTER ROLE debateai_prod_staff_recovery LOGIN PASSWORD 'task3-recovery-test-only' VALID UNTIL '${expiry}'`); const url = new URL(database.connectionString); url.username = 'debateai_prod_staff_recovery'; url.password = 'task3-recovery-test-only'; const closed = createPool(url.toString()); try {
-    const command = (await closed.query('SELECT staff.prepare_owner_command($1,$2,$3,$4::text[],$5,$6) AS value', ['BOOTSTRAP', a.userId, null, [one.f.expected.credentialId, two.f.expected.credentialId], randomUUID(), digest(nonce)])).rows[0].value;
+    const command = await prepareOwnerRecoveryFixture(database.pool,closed,{purpose:'BOOTSTRAP',targetUserId:a.userId,previousUserId:null,credentialIds:[one.f.expected.credentialId,two.f.expected.credentialId],operationId:randomUUID(),nonceHash:digest(nonce)}) as {commandId:string};
     const prerequisiteHandle = await prerequisite(a, 'OWNER_POSSESSION', command.commandId, digest(nonce));
     const context = await repo.readOwnerPossessionContext({ ...a, commandId: command.commandId, nonceHash: digest(nonce), credentialId: one.f.expected.credentialId, prerequisiteHandleHash: digest(prerequisiteHandle) });
     if (!context)
@@ -53,7 +54,7 @@ finally {
     await closed.end();
     await database.pool.query("ALTER ROLE debateai_prod_staff_recovery PASSWORD NULL VALID UNTIL '-infinity'");
 } }
-beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); await database.pool.query(`CREATE ROLE webauthn_test_runtime LOGIN PASSWORD 'webauthn-test-only' IN ROLE debateai_runtime`); const url = new URL(database.connectionString); url.username = 'webauthn_test_runtime'; url.password = 'webauthn-test-only'; runtime = createPool(url.toString()); repo = new PostgresStaffRepository(runtime); service = new StaffWebAuthnService(repo, { publicAppUrl: origin }); }, 120000);
+beforeAll(async () => { database = await startTestDatabase(); await migrate(database.pool); await initializeOwnerRecoveryFixture(database.pool,database.connectionString); await database.pool.query(`CREATE ROLE webauthn_test_runtime LOGIN PASSWORD 'webauthn-test-only' IN ROLE debateai_runtime`); const url = new URL(database.connectionString); url.username = 'webauthn_test_runtime'; url.password = 'webauthn-test-only'; runtime = createPool(url.toString()); repo = new PostgresStaffRepository(runtime); service = new StaffWebAuthnService(repo, { publicAppUrl: origin }); }, 120000);
 afterAll(async () => { await runtime?.end(); await database?.stop(); });
 describe('owned WebAuthn persistence and trusted API composition', () => {
     it('rolls verified registration key/audit/outbox back when independent readiness is absent',async()=>{

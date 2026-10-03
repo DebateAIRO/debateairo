@@ -63,8 +63,22 @@ type ManifestMembershipGrant = Readonly<{
   setOption: boolean;
 }>;
 
+const OWNER_RECOVERY_EXECUTE_FUNCTIONS = [
+  'staff.prepare_owner_command',
+  'staff.install_owner_recovery_generation',
+  'staff.prepare_owner_command_v2',
+  'staff.read_owner_command',
+  'staff.read_owner_receipts',
+  'staff.read_owner_alert_metadata',
+  'staff.authorize_owner_alert_operation',
+  'staff.read_committed_owner_operation',
+  'staff.commit_owner_command',
+  'staff.publish_independent_alert_readiness',
+  'staff.revoke_independent_alert_readiness',
+] as const;
 type ProductionPrincipalManifest = Readonly<{
   format: string;
+  independentOwnerRecovery?: Readonly<{version:number;loginRole:string;capabilityRole:string;maximumLifetimeSeconds:number;defaultPassword:string;defaultValidUntil:string;exportReusableUrl:boolean;executeFunctions:readonly string[]}>;
   principals: readonly ManifestPrincipal[];
   capabilityRoles: readonly ManifestCapabilityRole[];
   ownershipRoles: readonly Readonly<{ roleName: string }>[];
@@ -346,6 +360,15 @@ function parseManifest(value: unknown): ProductionPrincipalManifest {
     fail("PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID");
   }
   const manifest = value as unknown as ProductionPrincipalManifest;
+  const ownerRecovery = manifest.independentOwnerRecovery;
+  if (ownerRecovery === undefined || ownerRecovery.version !== 1
+    || ownerRecovery.loginRole !== 'debateai_prod_staff_recovery'
+    || ownerRecovery.capabilityRole !== 'debateai_staff_recovery'
+    || ownerRecovery.maximumLifetimeSeconds !== 300 || ownerRecovery.defaultPassword !== 'NULL'
+    || ownerRecovery.defaultValidUntil !== '-infinity' || ownerRecovery.exportReusableUrl !== false
+    || JSON.stringify(ownerRecovery.executeFunctions) !== JSON.stringify(OWNER_RECOVERY_EXECUTE_FUNCTIONS)) {
+    fail('PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID');
+  }
   const recovery = manifest.principals.find(({ id }) => id === "staff-recovery");
   const requirement = manifest.credentialRequirements.find(({ principalId }) => principalId === "staff-recovery");
   if (JSON.stringify(manifest.provisioner?.closedPrincipalIds) !== JSON.stringify(["staff-recovery"])

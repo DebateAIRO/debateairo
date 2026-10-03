@@ -1839,3 +1839,93 @@ A crash after receiver ACK but before receipt persistence remains ambiguous:
 expired claims append `ACK_UNCERTAIN` and can resend the same stable identity. This
 is at-least-once delivery, with receiver dedupe by event **and purpose**, not an
 exactly-once guarantee across SQL and the transport.
+
+## Independent first Owner and replacement recovery (Task 6, inactive)
+
+The declared `owner:bootstrap` and `owner:recover` commands are operator ceremonies.
+No Owner, material, credential, destination, adapter, or deployment has been activated.
+Missing operator inputs refuse. First signup, email verification, browser roles and an enrolled
+key count grant no staff authority. Recovery designates a reviewed **different existing account**;
+it holds the previous live account and leaves its private runs, ciphertext and DEKs in place.
+Erasure remains available and severs the previous user mapping. The permanent bootstrap marker
+and current opaque lineage survive; an arbitrary former Owner cannot become the predecessor.
+
+A separate activation review must supply and vet every path and adapter below. Do not invent
+production paths, install a refresher, run these ceremonies, or mint database credentials from
+this runbook. Existing `debateai_prod_staff_recovery` stays `PASSWORD NULL`, expired and without
+an exported reusable URI; its sole capability remains `debateai_staff_recovery`. An independently
+operated login is bounded to five minutes and every definer checks the actual connected login,
+including after waits and at COMMIT. Website/runtime credentials cannot prepare, commit, publish
+recovery material, or read its protected tables.
+
+The CLI inputs are `--phase material|prepare|commit`, `--input-file`, `--operator-module`,
+`--operator-sha256`, `--jit-fd` (at least 3), and `--proof-fd` for prepare/commit (stdin 0 or a
+separate private descriptor; never 1/2 or the JIT descriptor). JIT descriptor JSON is exactly
+`{"databaseUrl":"<independent short-lived connection>"}`. The proof descriptor carries exactly
+32 raw bytes. Secret-bearing argv/environment inputs refuse. SQL URLs must use the existing
+protected socket or verified transport URL rules. Neither proof nor URI is printed or exported.
+
+The pinned, reviewed root-owned module exports `createOwnerOperatorAdapters()` returning exactly
+`paths`, `alertConfigPath`, `acknowledgements`, `keys`, `pythonPath`, and `lockHelperPath`.
+`paths` contains distinct absolute canonical `materialFile`, `verifierFile`, `nonceFile`,
+`journalFile`, `nextMaterialFile`, `nextVerifierFile`, and `lockFile`; material/verifier and their
+prepared next counterparts share their respective parent directories for atomic rename. The
+module and all its imports must be vetted deployment code. It supplies an independent acknowledged
+alert adapter and a target-only external key loader, never a website connection or customer-key
+transfer. The CLI constructs actual production custody and its own independent SQL pool; the
+module cannot provide a ready/root-owned flag or replace custody validation.
+
+All custodial files are bounded regular files without symlinks, UID 0, exact private 0600 mode,
+under canonical root-owned ancestors that are not writable by group/others. Executable/module
+inputs are root-owned, protected and vetted; `pythonPath` is the canonical Python executable.
+`lockHelperPath` must contain the exact repo-owned `owner-recovery-lock.py` bytes pinned in source.
+Python uses only its standard `fcntl.flock` on the inherited private descriptor. Node retains that
+same open-file description until completion. The lock inode is retained; never unlink a “stale”
+lock file. Actual Mac contender, descriptor retention, SIGKILL/reacquire and cleanup tests pass;
+Linux/VPS rehearsal and executable custody remain activation requirements.
+
+The material phase accepts `{}` and creates an exclusive fsynced random offline bundle plus a
+separate generation/verifier document, then installs its generation only through JIT. Creation
+returns an internal verifier; stdout contains only the installation receipt. The proof hash is
+`SHA256("debateai:owner-recovery-proof:v1" + NUL + generation + NUL + raw32bytes)`.
+Prepare input is `{commandId,operationId,targetUserId,credentialIds:[first,second],purpose}`;
+`RECOVER_OWNER` additionally requires `predecessor:{kind:"LIVE",lineageId,userId}` or
+`predecessor:{kind:"ERASED",lineageId}`. Bootstrap accepts neither predecessor form. Both selected
+keys must be distinct verified UV/non-BE/non-BS keys on a verified active email/TOTP account.
+Prepare fixes the target epoch, purpose, pair, nonce hash, generation and five-minute expiry and
+assigns no Owner. Its nonce is written exclusively to the private handoff; stdout is a bounded
+command ID/expiry handle. Candidate browser wire fields and ordinary staff context stay unchanged.
+The ordinary fresh password/TOTP prerequisite plus two real native key signatures produce the
+stored receipt IDs. Uploaded receipt bodies never confer authority.
+
+Commit input is exactly `{commandId,receiptIds:[first,second],receiptFile}`. The CLI independently
+checks the stored command and every loaded receipt field, then uses current protected Task 5
+configuration plus independent ACK rehearsal evidence to publish readiness immediately before
+an owned-command operation lease. Publication lasts at most 30 seconds, the lease at most 10;
+audit/outbox COMMIT guards recheck it. Protected encrypted intent uses the existing trusted
+factory and AAD; receivers see sanitized staff/operation metadata, no raw proof, key or nonce.
+
+Before SQL, the exclusive lock protects a fsynced prepared next bundle/verifier and a private
+fsynced journal. The journal retains bounded operation/command/receipt IDs, paths, generations,
+verifier hashes and file digests, not raw proof or customer identity. SQL atomically consumes the
+current generation, exact pending command and two fresh protected receipts with Owner designation,
+old-account hold, audit/outbox, next generation and one operation receipt. Sorted security subjects
+precede lineage/generation/command locks; deferred COMMIT checks include command/receipt expiry,
+live ordinary session, fresh rotation, selected active keys and target epoch. Files are then
+published by atomic rename and fsynced directory updates. SQL and filesystem are **not atomic**.
+
+At an interruption, preserve current/next files and the journal in private custody. A mismatch
+refuses a different ceremony. Retry only the identical command, ordered receipt IDs, paths and
+old proof: constrained same-operation committed-state inspection can complete publication and
+receipt delivery without designating again, refreshing authority, or reactivating old material.
+A partial/unparseable uncommitted file refuses and requires reviewed private reconciliation;
+never discard it or change generation blindly. The 0600 security receipt is durable before
+nonce/journal cleanup and stdout. If stdout is lost after cleanup, read that protected receipt;
+a new CLI replay refuses. Retire obsolete private bundles/journals only after reviewed handoff
+and backup/escrow reconciliation. Receipt/stdout contain no proof, verifier, key or nonce.
+
+Task 7 mounts only the implemented ordinary candidate possession routes and restores its full
+route/dependency gate. Tasks 9/12 must evaluate dependent cancellation, resource cleanup and
+future privileged notification fanout. Actual Owner choice, root offline material, independent
+credential operation, external key/destination/ACK setup and Linux/VPS rehearsal stay separate
+reviewed activation decisions at the final handoff.

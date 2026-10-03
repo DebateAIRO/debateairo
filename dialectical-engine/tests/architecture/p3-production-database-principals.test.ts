@@ -214,8 +214,8 @@ describe("P3-01 production database-principal manifest", () => {
         ownsFunctions: []
       }
        ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"],
-        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state'],
-        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status'] }
+        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation'],
+        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping'] }
     ]);
 
     expect(manifest.principals.map(({ id, roleName, kind }) => ({ id, roleName, kind })))
@@ -566,7 +566,8 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "CREDENTIAL_MATERIAL_PAIRWISE_DISTINCT", ownerTicket: "P3-02" },
         { id: "JIT_HUMAN_CREDENTIAL_HAS_BOUNDED_EXPIRY", ownerTicket: "P3-02" },
         { id: "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS", ownerTicket: "P3-02" },
-        { id: "STAFF_INDEPENDENT_ACK_AND_ROOT_PUBLICATION", ownerTicket: "P3-02" }
+        { id: "STAFF_INDEPENDENT_ACK_AND_ROOT_PUBLICATION", ownerTicket: "P3-02" },
+        { id: "OWNER_RECOVERY_ROOT_CUSTODY_AND_REPLACEMENT_ONLY", ownerTicket: "P3-02" }
       ]);
     expect(manifest.deploymentObligations.every(({ requiredEvidence }) =>
       requiredEvidence.trim().length > 0)).toBe(true);
@@ -781,4 +782,15 @@ describe("P3-01 production database-principal manifest", () => {
     );
     expect(manifest.status).toBe("MIXED_PROVISIONING_STATE");
   });
+  it('pins the independent Owner ceremony lifecycle to only enumerated JIT definers',async()=>{
+    const manifest=JSON.parse(await readFile(manifestPath,'utf8'));
+    expect(manifest.independentOwnerRecovery).toEqual({version:1,loginRole:'debateai_prod_staff_recovery',capabilityRole:'debateai_staff_recovery',maximumLifetimeSeconds:300,defaultPassword:'NULL',defaultValidUntil:'-infinity',exportReusableUrl:false,executeFunctions:['staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.read_committed_owner_operation','staff.commit_owner_command','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness']});
+  });
+
+  it('rejects mixed Owner recovery grants before accepting credential material or touching SQL',async()=>{
+    const {provisionProductionDatabasePrincipals}=await import('../../apps/runner/src/production-database-principals.js');
+    const manifest=JSON.parse(await readFile(manifestPath,'utf8'));manifest.independentOwnerRecovery={version:1,loginRole:'debateai_prod_staff_recovery',capabilityRole:'debateai_staff_recovery',maximumLifetimeSeconds:300,defaultPassword:'NULL',defaultValidUntil:'-infinity',exportReusableUrl:false,executeFunctions:['staff.commit_owner_command','staff.authorize_action']};
+    const {mkdtemp,rm}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),{join}=await import('node:path'),root=await mkdtemp(join(tmpdir(),'task6-p3-'));try{await expect(provisionProductionDatabasePrincipals({adminPool:{} as import('@debateai/db').Pool,adminDatabaseUrl:'postgresql://synthetic:fixture@127.0.0.1/synthetic',manifest,credentialEnvelope:{},supportConfigCredentialFilePath:join(root,'unused-output')})).rejects.toThrow('PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID');}finally{await rm(root,{recursive:true,force:true});}
+  });
+
 });

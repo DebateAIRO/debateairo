@@ -69,7 +69,7 @@ export type OwnerCommand = Readonly<{
   expiresAt: Date;
 }> & (
   | Readonly<{ purpose: "BOOTSTRAP"; previousOwnerUserId?: never }>
-  | Readonly<{ purpose: "RECOVER_OWNER"; previousOwnerUserId: string }>
+  | Readonly<{ purpose: "RECOVER_OWNER"; previousOwnerUserId?: string }>
 );
 export type OwnerPossessionContext = Readonly<{
   command: OwnerCommand;
