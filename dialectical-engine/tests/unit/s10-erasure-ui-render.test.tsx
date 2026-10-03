@@ -139,7 +139,7 @@ describe("S10 rendered erasure boundaries",()=>{
       await act(async ()=>{ await vi.advanceTimersByTimeAsync(5_000); });
       expect(document.body.textContent).toContain("Irreversible deletion is processing");
       expect(document.body.textContent).not.toContain("Cancel account deletion");
-      expect(document.body.textContent).not.toContain("Schedule account deletion");
+      expect(document.body.textContent).not.toContain(settingsEnglish["settings.erasure.schedule"]);
     });
 
     // W7 (P2-I10): while a paid plan is live, one sentence says what scheduling does to it.
