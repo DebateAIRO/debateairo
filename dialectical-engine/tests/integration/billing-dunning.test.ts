@@ -173,6 +173,20 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     expect(reminders).toHaveLength(1);
   });
 
+  it("names the plan the reminder's price is for: a scheduled downgrade's plan, never the current one (P2-M14)", async () => {
+    const paid = await h.activate({ planId: "PRO" });
+    const state = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));
+    // DOWNGRADE_SCHEDULED (P12b) announces the lower plan's total; the plan renews at it from the next period.
+    await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client, subscriptionEvent(
+      state, "DOWNGRADE_SCHEDULED", h.clock.now, { announced_total_micros: 24_200_000, recurring_net_micros: 20_000_000 },
+      { planId: "PLUS" }
+    )));
+    h.clock.now = new Date(addYearsClamped(state.activatedAt!, 1).getTime() + 60 * MINUTE);
+    await h.maintenance.runOnce();
+    const reminder = (await h.outboxRows(paid.subscriptionId)).find((row) => row.ref === `M4:${paid.subscriptionId}:1`);
+    expect(reminder?.payload).toMatchObject({ template: "M4", "param.plan": "PLUS", "param.totalAmount": "24.20" });
+  });
+
   it("announces a changed total 10 business days ahead, and then renews at the new total without postponing", async () => {
     const paid = await h.activate();
     const end = await h.periodEndOf(paid.subscriptionId);

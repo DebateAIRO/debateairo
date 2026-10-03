@@ -205,7 +205,8 @@ export class BillingMaintenance {
     const job = emailJob({
       template: "M4", recipient: { kind: "CUSTOMER", customerId: customer.customerId }, dedupeRef: `${state.subscriptionId}:${years}`,
       params: {
-        plan: state.planId, totalAmount: microsToDecimal(state.announcedTotalMicros ?? 0),
+        // P2-M14: the price is the next renewal's (a scheduled downgrade announces the lower plan's), so is the plan.
+        plan: state.scheduledDowngradePlanId ?? state.planId, totalAmount: microsToDecimal(state.announcedTotalMicros ?? 0),
         renewDate: state.currentPeriodEnd.toISOString(), cancelPageUrl: new URL("/cancel", this.deps.publicAppUrl).toString()
       },
       notBefore: now
