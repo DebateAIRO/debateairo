@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -81,6 +81,7 @@ import type { BillingRouteOptions } from "./billing/index.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
+import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { PostgresStaffAlertRepository, RootStaffAlertConfiguration, StaffAlertDispatcher, StaffAlertIntentProducer, StaffIndependentAlertReadiness, RootConfiguredStaffAlertTransport } from "./staff/alerts.js";
 import { PostgresPublicationApplication } from "./publications.js";
@@ -601,6 +602,7 @@ const mfa = new MfaEnrollmentService({
 });
 const sessions = await boot.run("session-service", () => SessionService.create({
   repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
+  ...(environment.STAFF_ACCESS.policyVersion === 2 ? {staffPrerequisites: new PostgresStaffPrerequisiteProducer(pool, auditContextHasher)} : {}),
   riskSignals:authenticationRiskSignals,
   onRiskSignalFailure:(error)=>console.error(
     "[LOGIN_RISK_SIGNAL_PENDING]",riskSignalFailureIdentity(error)
@@ -612,12 +614,10 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   sessionPolicy,
   blindIndexKey
 }));
-// Explicit v2 selection prepares authority only; future readiness never mounts an Admin route here.
+// Explicit v2 composition retains current-state checks and refuses unavailable operator readiness.
 const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
   ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;
-// Task5 prepares the v2 producers only. No ACK adapter, target transport,
-// recurring drain, publication, or Admin route is activated here. Task7 supplies
-// reviewed command consumers; real delivery configuration/rehearsal stays an input.
+// Real ACK adapter, target transport and independent JIT publication remain operator inputs.
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2 ? (() => {
   const repository = new PostgresStaffAlertRepository(pool);
   const configuration = new RootStaffAlertConfiguration({
@@ -636,7 +636,11 @@ const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2 ? (() => {
     })
   });
 })() : undefined;
-void staffAlerts;
+const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
+  access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
+  webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
+  intents: staffAlerts.intents
+};
 // Turn 14 — change email: the capabilities of migration 0079 are granted to the
 // authorization role, beside the step-up that mints their CHANGE_EMAIL grant.
 const emailChange = new EmailChangeService({
@@ -1007,6 +1011,8 @@ const api = buildApi({
   mfa,
   sessions,
   ...(staffAccess === undefined ? {} : { staffAccess }),
+  staffPolicyVersion: environment.STAFF_ACCESS.policyVersion,
+  ...(staffHttp === undefined ? {} : {staff: staffHttp}),
   legacyRunClaim,
   legal,
   emailChange,

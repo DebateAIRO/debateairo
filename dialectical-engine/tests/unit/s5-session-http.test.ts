@@ -444,14 +444,14 @@ describe("S5 HTTP session boundary", () => {
   });
 });
 
-// Task4 exercises prepared hooks only; these synthetic URLs are never shipped by buildApi.
+// Exercise hook barriers under exact canonical policies; v1 fixture leaves these mounts to each test.
 describe('prepared staff HTTP authority', () => {
     it('denies missing separate staff cookie instead of admitting ordinary MFA', async () => {
         const staff = await import('../../apps/api/src/staff/access.js');
         expect(staff).not.toBeNull();
         const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN });
-        api.get('/test/staff', staff.staffRoutePolicy('TEAM_READ'), async () => ({ secret: 'private' }));
-        expect((await api.inject({ url: '/test/staff', headers: { cookie } })).statusCode).toBe(401);
+        api.get('/v1/admin/team', staff.staffRoutePolicy('TEAM_READ'), async () => ({ secret: 'private' }));
+        expect((await api.inject({ url: '/v1/admin/team', headers: { cookie } })).statusCode).toBe(401);
         await api.close();
     });
 });
@@ -486,29 +486,29 @@ describe('Task4 exact staff transport and response boundary', () => {
     ])('rejects %s before a staff mutation handler', async (_label, change) => {
         const f = await staffHttpFixture();
         let reached = false;
-        f.api.post('/test/staff', f.staff.staffRoutePolicy('TEAM_READ'), async () => { reached = true; return { secret: 'private' }; });
+        f.api.post('/v1/admin/webauthn/action/options', {config: {auth: 'staff'}}, async () => { reached = true; return { secret: 'private' }; });
         const headers = Object.fromEntries(Object.entries({ ...f.headers, ...change }).filter(([, value]) => value !== undefined)) as Record<string, string>;
-        const response = await f.api.inject({ method: 'POST', url: '/test/staff', headers });
+        const response = await f.api.inject({ method: 'POST', url: '/v1/admin/webauthn/action/options', headers });
         expect(response.statusCode).toBe(403);
         expect(reached).toBe(false);
         await f.api.close();
     });
     it('requires separate cookies, rejects duplicates/retired channels, and preserves safe GET Origin semantics', async () => {
         const f = await staffHttpFixture();
-        f.api.get('/test/staff', f.staff.staffRoutePolicy('TEAM_READ'), async () => ({ own: true }));
+        f.api.get('/v1/admin/team', f.staff.staffRoutePolicy('TEAM_READ'), async () => ({ own: true }));
         for (const headers of [{ cookie }, { cookie: f.bothCookies + '; ' + f.staff.STAFF_COOKIE_NAME + '=' + f.token }, { cookie: f.bothCookies, authorization: 'Bearer ' + f.token }, { cookie: f.bothCookies, [RETIRED_DEV_HEADER]: 'legacy' }])
-            expect((await f.api.inject({ url: '/test/staff', headers })).statusCode).toBe(401);
-        const read = await f.api.inject({ url: '/test/staff', headers: { cookie: f.bothCookies } });
+            expect((await f.api.inject({ url: '/v1/admin/team', headers })).statusCode).toBe(401);
+        const read = await f.api.inject({ url: '/v1/admin/team', headers: { cookie: f.bothCookies } });
         expect(read.statusCode).toBe(200);
         expect(read.json()).toEqual({ own: true });
         await f.api.close();
     });
     it('requires persistent capability, keeps Session ASKER and sends secrets only in trusted Set-Cookie', async () => {
         const f = await staffHttpFixture();
-        f.api.get('/test/staff', f.staff.staffRoutePolicy('TEAM_READ'), async (request, reply) => { expect(request.session.caller_scope).toBe('ASKER'); reply.header('set-cookie', f.staff.staffCookies({ staffToken: f.token, staffCsrfToken: f.csrf, expiresAt: new Date(Date.now() + 60000) })); return { own: true }; });
-        f.api.get('/test/audit', f.staff.staffRoutePolicy('AUDIT_READ'), async () => ({ secret: 'audit' }));
-        expect((await f.api.inject({ url: '/test/audit', headers: f.headers })).statusCode).toBe(403);
-        const response = await f.api.inject({ url: '/test/staff', headers: f.headers });
+        f.api.get('/v1/admin/team', f.staff.staffRoutePolicy('TEAM_READ'), async (request, reply) => { expect(request.session.caller_scope).toBe('ASKER'); reply.header('set-cookie', f.staff.staffCookies({ staffToken: f.token, staffCsrfToken: f.csrf, expiresAt: new Date(Date.now() + 60000) })); return { own: true }; });
+        f.api.get('/v1/admin/audit', f.staff.staffRoutePolicy('AUDIT_READ'), async () => ({ secret: 'audit' }));
+        expect((await f.api.inject({ url: '/v1/admin/audit', headers: f.headers })).statusCode).toBe(403);
+        const response = await f.api.inject({ url: '/v1/admin/team', headers: f.headers });
         expect(response.statusCode).toBe(200);
         expect(response.body).not.toContain(f.token);
         expect(response.body).not.toContain(f.csrf);
@@ -527,8 +527,8 @@ describe('Task4 exact staff transport and response boundary', () => {
         const f = await staffHttpFixture();
         let started: () => void = () => { }, release: () => void = () => { };
         const waiting = new Promise<void>(r => { started = r; }), barrier = new Promise<void>(r => { release = r; });
-        f.api.get('/test/staff', f.staff.staffRoutePolicy('TEAM_READ'), async () => { started(); await barrier; return { secret: 'must never emit' }; });
-        const pending = f.api.inject({ url: '/test/staff', headers: f.headers });
+        f.api.get('/v1/admin/team', f.staff.staffRoutePolicy('TEAM_READ'), async () => { started(); await barrier; return { secret: 'must never emit' }; });
+        const pending = f.api.inject({ url: '/v1/admin/team', headers: f.headers });
         await waiting;
         if (mode === 'disable')
             f.revoke();
@@ -563,8 +563,8 @@ describe('Task4 exact staff transport and response boundary', () => {
 });
 it('rechecks a prepared staff string response at final onSend after its handler revokes authority', async () => {
     const f = await staffHttpFixture();
-    f.api.get('/test/staff', f.staff.staffRoutePolicy('TEAM_READ'), async () => { f.revoke(); return 'SECRET_STRING_MUST_NOT_ESCAPE'; });
-    const response = await f.api.inject({ url: '/test/staff', headers: f.headers });
+    f.api.get('/v1/admin/team', f.staff.staffRoutePolicy('TEAM_READ'), async () => { f.revoke(); return 'SECRET_STRING_MUST_NOT_ESCAPE'; });
+    const response = await f.api.inject({ url: '/v1/admin/team', headers: f.headers });
     expect(response.statusCode).toBe(401);
     expect(response.body).not.toContain('SECRET_STRING_MUST_NOT_ESCAPE');
     await f.api.close();

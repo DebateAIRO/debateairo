@@ -203,24 +203,20 @@ function buildUserApi(application:AskApplication=fixtureApplication()) {
 }
 
 describe("S7 deny-by-default authorization", () => {
-  it("keeps complete legacy policy coverage and leaves the exact18 Task7 staff contracts unmounted", async () => {
-    const governed = authorizationPolicyInventory.map((policy) => policy.route);
+  it("governs the entire canonical inventory and mounts every route in explicit v2", async () => {
+    const governed = authorizationPolicyInventory.map(policy => policy.route);
     expect(new Set(contractInventory.routes).size).toBe(contractInventory.routes.length);
     expect(new Set(governed).size).toBe(governed.length);
-    // Task4 prepares guards only. Task7 MUST remove this temporary exception and govern all routes.
-    const dormant = new Set<string>(staffContractInventory.routes);
-    expect(dormant.size).toBe(18);
-    const mountedContracts = contractInventory.routes.filter(route => !dormant.has(route));
-    expect(governed).toHaveLength(mountedContracts.length);
-    expect(new Set(governed)).toEqual(new Set(mountedContracts));
-    const api = buildUserApi();
-    for (const route of staffContractInventory.routes) {
-      const [method,path] = route.split(" ");
-      const response = await api.inject({method:method as "GET"|"POST"|"PATCH",url:path!.replace("{staffId}",OWNED_RUN_ID),headers:USER_MUTATION_HEADERS});
-      expect(response.statusCode,route).toBe(404);
+    expect(new Set(governed)).toEqual(new Set(contractInventory.routes));
+    const api = buildApi({application: fixtureApplication(), sessions: testSessionApplication([USER_IDENTITY]), allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, registration: {} as never, recovery: {} as never, mfa: {} as never, support: {} as never, evaluatorDevMenu: {} as never, evaluatorDevMenuRegisterVersion: 1});
+    await api.ready();
+    for (const route of contractInventory.routes) {
+      const [method, path] = route.split(" ");
+      expect(api.hasRoute({method: method as "GET" | "POST" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
     }
     await api.close();
-    expect(authorizationPolicyInventory).toEqual(EXPECTED_AUTHORIZATION_MATRIX);
+    expect(authorizationPolicyInventory.filter(policy => !policy.route.startsWith("GET /v1/admin/") && !policy.route.startsWith("POST /v1/admin/") && !policy.route.startsWith("PATCH /v1/admin/"))).toEqual(EXPECTED_AUTHORIZATION_MATRIX);
+    expect(staffContractInventory.routes).toHaveLength(18);
   });
 
   it("registers the full optional composition and rejects anonymous access to every governed private route", async () => {

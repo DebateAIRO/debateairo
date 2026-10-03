@@ -3,6 +3,7 @@ import type {
   AuthSourceContext,
   LoginChallengeRecord,
   LoginIdentityRecord,
+  StaffPrerequisiteProducer,
   PostgresAuthenticationRiskSignalRepository,
   PostgresSessionRepository
 } from "@debateai/db";
@@ -29,6 +30,8 @@ import {
 } from "@debateai/crypto";
 import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
 import { MfaVerificationLimiter } from "./mfa.js";
+
+import { staffTokenHash } from "./staff/access.js";
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -59,7 +62,13 @@ export type LoginResult = Readonly<{
   replacementRecoveryCode?: string;
 }>;
 
+export type StaffPrerequisiteRequest = Readonly<{session: AuthenticatedSession; password: string; code: string}> & (
+  Readonly<{purpose: "KEY_PREREGISTRATION"}> | Readonly<{purpose: "OWNER_POSSESSION"; commandId: string; commandNonce: string}>
+);
+export type StaffPrerequisiteResult = Readonly<{sessionToken: string; csrfToken: string; prerequisiteHandle: string; expiresAt: Date}>;
+
 export interface SessionApplication {
+  stepUpStaffPrerequisite?(input: StaffPrerequisiteRequest, source: AuthSourceContext): Promise<StaffPrerequisiteResult>;
   /** Non-refreshing current generation/expiry/hold check. Missing implementations deny streaming. */
   assertCurrent?(session:AuthenticatedSession,signal?:AbortSignal):Promise<void>;
   authenticate(sessionToken: string, source: AuthSourceContext): Promise<AuthenticatedSession | null>;
@@ -192,6 +201,7 @@ export class SessionService implements SessionApplication {
 
   private constructor(private readonly dependencies: Readonly<{
     repository: SessionRepository;
+    staffPrerequisites?: StaffPrerequisiteProducer;
     riskSignals:SessionRiskSignals;
     onRiskSignalFailure:(error:unknown)=>void;
     dekStore: ReadableUserDekStore;
@@ -210,6 +220,7 @@ export class SessionService implements SessionApplication {
 
   static async create(dependencies: Readonly<{
     repository: SessionRepository;
+    staffPrerequisites?: StaffPrerequisiteProducer;
     riskSignals:SessionRiskSignals;
     onRiskSignalFailure:(error:unknown)=>void;
     dekStore: ReadableUserDekStore;
@@ -620,6 +631,19 @@ export class SessionService implements SessionApplication {
     grantToken?: string;
     grantExpiresAt?: Date;
   }>> {
+    return this.freshStepUp(input, source);
+  }
+
+  async stepUpStaffPrerequisite(input: StaffPrerequisiteRequest, source: AuthSourceContext): Promise<StaffPrerequisiteResult> {
+    if (this.dependencies.staffPrerequisites === undefined) throw new Error("STAFF_UNAVAILABLE");
+    const result = await this.freshStepUp(input, source, input);
+    if (result.prerequisiteHandle === undefined || result.expiresAt === undefined) throw new Error("STAFF_UNAVAILABLE");
+    return {sessionToken: result.sessionToken, csrfToken: result.csrfToken,
+      prerequisiteHandle: result.prerequisiteHandle, expiresAt: result.expiresAt};
+  }
+
+  private async freshStepUp(input: Parameters<SessionApplication["stepUp"]>[0], source: AuthSourceContext,
+    prerequisite?: StaffPrerequisiteRequest): Promise<Awaited<ReturnType<SessionApplication["stepUp"]>> & Partial<StaffPrerequisiteResult>> {
     const now = this.now();
     let identity: LoginIdentityRecord | null = null;
     let rotationAttempted = false;
@@ -671,7 +695,18 @@ export class SessionService implements SessionApplication {
         ? undefined
         : new Date(now.getTime() + this.dependencies.sessionPolicy.stepUpFreshnessMs);
       rotationAttempted = true;
-      const rotated = await this.dependencies.repository.rotateAfterStepUp({
+      const prerequisiteHandle = prerequisite === undefined ? undefined : generateVerificationToken();
+      const prerequisiteResult = prerequisite === undefined || prerequisiteHandle === undefined ? undefined
+        : await this.dependencies.staffPrerequisites!.complete({
+          identity: {userId: identity.userId, ownerRef: identity.ownerRef, passwordHash: identity.passwordHash, factorId: identity.factorId},
+          currentSessionId: input.session.session.session_id, currentTokenHash: input.session.tokenHash, acceptedStep,
+          replacementTokenHash: hashToken("session", replacementToken), replacementCsrfHash: hashToken("csrf", replacementCsrf),
+          bindingContext: Object.freeze({user_agent_hash: this.bindingHash(source)}), source,
+          handleHash: staffTokenHash(prerequisiteHandle)!,
+          ...(prerequisite.purpose === "KEY_PREREGISTRATION" ? {purpose: "KEY_PREREGISTRATION" as const}
+            : {purpose: "OWNER_POSSESSION" as const, commandId: prerequisite.commandId, nonceHash: staffTokenHash(prerequisite.commandNonce)!})
+        });
+      const rotated = prerequisite === undefined ? await this.dependencies.repository.rotateAfterStepUp({
         identity,
         currentSessionId: input.session.session.session_id,
         currentTokenHash: input.session.tokenHash,
@@ -698,12 +733,13 @@ export class SessionService implements SessionApplication {
                   targetRunId: input.authorization.targetRunId,
                   expiresAt: grantExpiresAt
                 } })
-      });
+      }) : true;
       if (!rotated) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       this.limiter.clearEnrollment(rateKey);
       return Object.freeze({
         sessionToken: replacementToken,
         csrfToken: replacementCsrf,
+        ...(prerequisiteHandle === undefined || prerequisiteResult === undefined ? {} : {prerequisiteHandle, expiresAt: prerequisiteResult.expiresAt}),
         ...(grantToken === undefined || grantExpiresAt === undefined
           ? {}
           : { grantToken, grantExpiresAt })

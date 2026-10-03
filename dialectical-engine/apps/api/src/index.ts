@@ -142,6 +142,7 @@ import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
 import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
 import type { StaffCapability } from "@debateai/kernel";
+import { registerStaffRoutes, staffAuthorizationPolicyInventory, type StaffHttpApplication } from "./staff/routes.js";
 import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, streamAuthorizedEvents, type StaffAccessApplication, type StaffAuthentication } from "./staff/access.js";
 export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER } from "./staff/access.js";
 import type { PublicationApplication } from "./publications.js";
@@ -1229,15 +1230,17 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
-  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" }
+  { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
+  ...staffAuthorizationPolicyInventory
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
   origin?: RouteOriginPolicy;
   session?: RouteSessionPolicy;
+  staffCapability?: StaffCapability;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status" | "geo" | "billing";
+    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit";
   action: string;
 }>[]);
 
@@ -1246,8 +1249,14 @@ const authorizationPolicies = new Map<string, typeof authorizationPolicyInventor
   authorizationPolicyInventory.map((policy) => [policy.route, policy])
 );
 
+type RoutePolicyConfig = {readonly config: {readonly auth: RouteAuthPolicy; readonly staffCapability?: StaffCapability;
+  readonly origin?: RouteOriginPolicy; readonly session?: RouteSessionPolicy}};
+function routePolicy(route: Exclude<AuthorizationRoute, typeof staffAuthorizationPolicyInventory[number]["route"]>):
+  {readonly config: {readonly auth: Exclude<RouteAuthPolicy, "staff">; readonly origin?: RouteOriginPolicy; readonly session?: RouteSessionPolicy}};
+function routePolicy(route: AuthorizationRoute): RoutePolicyConfig;
 function routePolicy(route: AuthorizationRoute): { readonly config: {
-  readonly auth: Exclude<RouteAuthPolicy,"staff">;
+  readonly auth: RouteAuthPolicy;
+  readonly staffCapability?: StaffCapability;
   readonly origin?: RouteOriginPolicy;
   readonly session?: RouteSessionPolicy;
 } } {
@@ -1255,7 +1264,8 @@ function routePolicy(route: AuthorizationRoute): { readonly config: {
   if (policy === undefined) throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${route}`);
   return Object.freeze({
     config: Object.freeze({
-      auth: policy.auth,
+      auth: policy.auth as RouteAuthPolicy,
+      ...("staffCapability" in policy ? { staffCapability: policy.staffCapability } : {}),
       ...("origin" in policy ? { origin: policy.origin } : {}),
       ...("session" in policy ? { session: policy.session } : {})
     })
@@ -1425,6 +1435,8 @@ export interface ApiOptions {
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly staffAccess?: StaffAccessApplication;
+  readonly staffPolicyVersion?: 1 | 2;
+  readonly staff?: StaffHttpApplication;
   readonly publications?: PublicationApplication;
   /**
    * hate-speech S02 (SPEC-v2 R1, D-S02-22): the pre-publish content check,
@@ -1761,13 +1773,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
   });
   api.addHook("onRoute", (route) => {
-    // Future Task7 routes must explicitly declare a sealed core-A staff capability.
-    if (route.config?.auth === "staff" && ["TEAM_READ","TEAM_INVITE","TEAM_GRANT","TEAM_DISABLE","AUDIT_READ","EMERGENCY_DISABLE"].includes(route.config.staffCapability ?? "")) return;
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
       const key = canonicalRoute(method, route.url);
       const policy = authorizationPolicies.get(key);
       if (policy === undefined
         || route.config?.auth !== policy.auth
+        || route.config?.staffCapability !== ("staffCapability" in policy ? policy.staffCapability : undefined)
         || route.config?.origin !== ("origin" in policy ? policy.origin : undefined)
         || route.config?.session !== ("session" in policy ? policy.session : undefined)) {
         throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${key}`);
@@ -1929,12 +1940,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       request.cookieRefresh = Object.freeze({ sessionToken: sessionToken!, csrfToken: csrfCookieToken });
       if (authPolicy === "staff") {
         const staffToken = exactStaffCookie(rawCookie, STAFF_COOKIE_NAME);
-        if (staffToken === null || options.staffAccess === undefined || request.routeOptions.config.staffCapability === undefined) {
+        if (staffToken === null || options.staffAccess === undefined) {
           return reply.status(401).send({ error: "STAFF_AUTHORITY_INVALID" });
         }
         const staffAuth = await options.staffAccess.authenticate(authenticated, staffToken);
         if (staffAuth === null) return reply.status(401).send({ error: "STAFF_AUTHORITY_INVALID" });
-        try { await options.staffAccess.requireCapability(staffAuth, request.routeOptions.config.staffCapability); }
+        try {
+          await options.staffAccess.assertCurrent(staffAuth);
+          if (request.routeOptions.config.staffCapability !== undefined) await options.staffAccess.requireCapability(staffAuth, request.routeOptions.config.staffCapability);
+        }
         catch { return reply.status(403).send({ error: "STAFF_AUTHORITY_INVALID" }); }
         if (MUTATING_METHODS.has(request.method)) {
           const csrf = exactStaffCsrfPair(request.headers[STAFF_CSRF_HEADER], exactStaffCookie(rawCookie, STAFF_CSRF_COOKIE_NAME));
@@ -1950,14 +1964,28 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
   api.addHook("preSerialization", async (request, reply, payload) => {
-    if (request.staffAuthentication === undefined || reply.statusCode >= 400) return payload;
+    if (reply.statusCode >= 400) return payload;
+    if (request.routeOptions.url?.startsWith("/v1/admin/") && request.authenticatedSession !== undefined) {
+      try {
+        if (options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
+        await options.sessions.assertCurrent(request.authenticatedSession);
+      } catch { reply.code(401); return typeof payload === "string" ? JSON.stringify({error: "SESSION_REQUIRED"}) : {error: "SESSION_REQUIRED"}; }
+    }
+    if (request.staffAuthentication === undefined) return payload;
     try { await options.staffAccess!.assertCurrent(request.staffAuthentication); }
     catch { reply.code(401); return { error: "STAFF_AUTHORITY_INVALID" }; }
     return payload;
   });
   // Fastify skips preSerialization for string/Buffer/stream payloads. Final emission always checks.
   api.addHook("onSend", async (request, reply, payload) => {
-    if (request.staffAuthentication === undefined || reply.statusCode >= 400) return payload;
+    if (reply.statusCode >= 400) return payload;
+    if (request.routeOptions.url?.startsWith("/v1/admin/") && request.authenticatedSession !== undefined) {
+      try {
+        if (options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
+        await options.sessions.assertCurrent(request.authenticatedSession);
+      } catch { reply.code(401); return typeof payload === "string" ? JSON.stringify({error: "SESSION_REQUIRED"}) : {error: "SESSION_REQUIRED"}; }
+    }
+    if (request.staffAuthentication === undefined) return payload;
     try {
       if (payload !== null && typeof payload === "object" && !Buffer.isBuffer(payload)) throw new Error("STAFF_AUTHORITY_INVALID");
       await options.staffAccess!.assertCurrent(request.staffAuthentication);
@@ -3160,6 +3188,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   );
   // Paid plans (R-3): the one billing routes module, always installed.
   installBillingRoutes(api, { ...options.billing, policy: (route) => routePolicy(route) });
+  if (options.staffPolicyVersion === 2) registerStaffRoutes(api, options.staff,
+    route => routePolicy(route as AuthorizationRoute), {sourceFor, refreshedCookies});
   return api;
 }
 

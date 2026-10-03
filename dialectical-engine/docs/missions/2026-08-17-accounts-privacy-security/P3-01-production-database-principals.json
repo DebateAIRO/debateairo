@@ -322,7 +322,16 @@
         "staff.read_committed_owner_operation",
         "staff.commit_owner_command",
         "staff.recheck_owner_commit",
-        "staff.erase_subject_mapping"
+        "staff.erase_subject_mapping",
+        "staff.require_http_authority",
+        "staff.http_delivery_state",
+        "staff.read_enrollment",
+        "staff.read_team_page",
+        "staff.read_audit_page",
+        "staff.read_invitation_proof",
+        "staff.read_issued_invitation",
+        "staff.read_mutation_target",
+        "staff.read_target_invitation_channel"
       ]
     }
   ],

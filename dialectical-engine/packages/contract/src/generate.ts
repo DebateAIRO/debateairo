@@ -23,15 +23,16 @@ await writeFile(
   `${JSON.stringify({
     openapi: "3.1.0",
     info: { title: "DebateAI V3", version: "v1" },
-    paths: Object.fromEntries(contractInventory.routes.map((route) => {
+    paths: contractInventory.routes.reduce<Record<string, Record<string, unknown>>>((paths, route) => {
       const separator = route.indexOf(" ");
       const method = route.slice(0, separator).toLowerCase();
       const path = route.slice(separator + 1);
-      return [path, { [method]: {
+      (paths[path] ??= {})[method] = {
         operationId: route.replaceAll(/[^A-Za-z0-9]+/g, "_"),
         ...(staffContractInventory.routes.includes(route) ? { "x-required-product-role-policy-version": staffContractInventory.policyVersion } : {})
-      } }];
-    }))
+      };
+      return paths;
+    }, {})
   }, null, 2)}\n`,
   "utf8"
 );

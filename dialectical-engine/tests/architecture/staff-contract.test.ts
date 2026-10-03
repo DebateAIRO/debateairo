@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import * as contract from "../../packages/contract/src/index.js";
 import type { ZodType } from "zod";
@@ -50,6 +51,19 @@ describe("strict staff wire boundary", () => {
       expect(response.safeParse({ ...value, ...extra }).success).toBe(false);
     }
     expect(response.safeParse({ receipt: value.receipt }).success).toBe(false);
+  });
+
+  it("requires business intent so HTTP derives action digest and refuses uploaded authority", () => {
+    const intent = { action: "TEAM_INVITE", target_user_id: id, capabilities: ["TEAM_READ"], expected_revision: 0,
+      operation_id: id, reason: { code: "TEAM_ONBOARDING" } };
+    expect(schema("StaffActionOptionsRequestSchema").safeParse({ intent }).success).toBe(true);
+    expect(schema("StaffActionOptionsRequestSchema").safeParse({ binding: { action: "TEAM_INVITE", target_id: id,
+      body_sha256: "a".repeat(64), expected_revision: 0, operation_id: id } }).success).toBe(false);
+    for (const extra of [{ body_sha256: "a".repeat(64) }, { role: "owner" }, { capability: "ROOT_ACCESS" }]) {
+      expect(schema("StaffActionOptionsRequestSchema").safeParse({ intent: { ...intent, ...extra } }).success).toBe(false);
+    }
+    expect(schema("StaffRegistrationOptionsRequestSchema").safeParse({ proof_handle: handle, operation_id: id }).success).toBe(true);
+    expect(schema("StaffRegistrationOptionsRequestSchema").safeParse({ proof_handle: handle }).success).toBe(false);
   });
 
   it("binds action purpose, exact target, body digest, revision and idempotency", () => {
@@ -161,4 +175,10 @@ describe("strict staff wire boundary", () => {
     expect(contract.contractInventory.routes).not.toContain("POST /v1/admin/bootstrap-owner");
     expect(contract.contractInventory.routes).not.toContain("POST /v1/admin/recover-owner");
   });
+});
+
+it("publishes every canonical method without overwriting shared-path operations", async () => {
+  const document = JSON.parse(await readFile("packages/contract/generated/openapi.json", "utf8")) as {paths: Record<string, Record<string, unknown>>};
+  const published = Object.entries(document.paths).flatMap(([path, methods]) => Object.keys(methods).map(method => method.toUpperCase() + " " + path));
+  expect(new Set(published)).toEqual(new Set(contract.contractInventory.routes));
 });
