@@ -316,22 +316,22 @@ describe("P22 the Billing runbook", () => {
     // the open-items file whose status names the go-live rows that share its work, and row 38 holds them all.
     const row = (number: number): string => table.split("\n").find((line) => line.startsWith(`| ${number} |`)) ?? "";
     for (const [number, needles] of [
-      [39, ["P2-I3", "A12 (the card change)", "`transaction-rebill-auth-order-released` reads `void-ok`"]],
-      [40, ["P2-I5", "billing-only database role", "`runner-runtime`", "`scheduler-liveness`", "`email_ciphertext`",
+      [40, ["P2-I3", "A12 (the card change)", "`transaction-rebill-auth-order-released` reads `void-ok`"]],
+      [41, ["P2-I5", "billing-only database role", "`runner-runtime`", "`scheduler-liveness`", "`email_ciphertext`",
         "(a) to (c)"]],
-      [41, ["P2-I8", "Terms §13", "how an upgrade's own days are counted", "CRD art. 14(3)"]],
-      [42, ["P2-I9", "public holiday", "Regulation 1182/71 art. 3(4)", "withdrawal-deadline.ts"]],
-      [43, ["P2-I13", "`withdrawal_days`", "`billing.consent.immediateStart`", "country-neutral", "generate:legal:check"]],
-      [44, ["P2-I15", "never took money", "`billing.purge_expired_records`", "Privacy Policy"]],
-      [45, ["P2-M2", "refund transaction", "verify-payment.ts", "refunds.ts", "reconcile.ts", "`refund-ok`"]],
-      [46, ["P2-M17", "`billing.checkout.total`", "31 January", "anchor day"]],
-      [47, ["P2-M21", "the buyer's language", "packages/tax-quaderno/src/index.ts", "tax-quaderno-recorded-fixtures.test.ts"]],
-      [48, ["P2-M25", "`mentions`", "debateai-charge:", "accountant"]],
-      [49, ["P2-M26", "`taxAuthorities`", "`tax_statuses: null`", "REVERSE_CHARGE", "row 16"]],
-      [50, ["P2-M28", "credit note gives back the VAT", "tests/unit/tax-quaderno-recorded-fixtures.test.ts"]],
-      [51, ["P2-M36", "support@dezbatere.ro", "`COMPANY.emails.general`", "`SELLER_COMPANY`"]],
-      [52, ["P2-M37", "PricingCards.tsx", "`home.pricingCopy`", "counsel"]],
-      [53, ["Before billing is switched on", "PART2-FINAL-REVIEW-OPEN-ITEMS.md", "P2-M4, P2-M6, P2-M7, P2-M13, P2-M22, P2-M23, P2-M29, P2-M30, P2-M33, "
+      [42, ["P2-I8", "Terms §13", "how an upgrade's own days are counted", "CRD art. 14(3)"]],
+      [43, ["P2-I9", "public holiday", "Regulation 1182/71 art. 3(4)", "withdrawal-deadline.ts"]],
+      [44, ["P2-I13", "`withdrawal_days`", "`billing.consent.immediateStart`", "country-neutral", "generate:legal:check"]],
+      [45, ["P2-I15", "never took money", "`billing.purge_expired_records`", "Privacy Policy"]],
+      [46, ["P2-M2", "refund transaction", "verify-payment.ts", "refunds.ts", "reconcile.ts", "`refund-ok`"]],
+      [47, ["P2-M17", "`billing.checkout.total`", "31 January", "anchor day"]],
+      [48, ["P2-M21", "the buyer's language", "packages/tax-quaderno/src/index.ts", "tax-quaderno-recorded-fixtures.test.ts"]],
+      [49, ["P2-M25", "`mentions`", "debateai-charge:", "accountant"]],
+      [50, ["P2-M26", "`taxAuthorities`", "`tax_statuses: null`", "REVERSE_CHARGE", "row 16"]],
+      [51, ["P2-M28", "credit note gives back the VAT", "tests/unit/tax-quaderno-recorded-fixtures.test.ts"]],
+      [52, ["P2-M36", "support@dezbatere.ro", "`COMPANY.emails.general`", "`SELLER_COMPANY`"]],
+      [53, ["P2-M37", "PricingCards.tsx", "`home.pricingCopy`", "counsel"]],
+      [54, ["Before billing is switched on", "PART2-FINAL-REVIEW-OPEN-ITEMS.md", "P2-M4, P2-M6, P2-M7, P2-M13, P2-M22, P2-M23, P2-M29, P2-M30, P2-M33, "
         + "P2-M39, P2-M40, P2-M41, P2-M43"]]
     ] as const) {
       const line = row(number);
@@ -339,7 +339,7 @@ describe("P22 the Billing runbook", () => {
       expect(line, `row ${number} is open`).toMatch(/\| — \|$/u);
     }
     // W16 fix F1: the "later" Minors gate switching billing on, each fixed or accepted in writing.
-    expect(row(53)).not.toContain("None blocks switching billing on alone");
+    expect(row(54)).not.toContain("None blocks switching billing on alone");
   });
 
   it("the final review's open items say, for each row, whether Part 2b fixed it or which go-live row holds it (W16)", () => {
@@ -358,8 +358,8 @@ describe("P22 the Billing runbook", () => {
     const rowOf = (id: string): string[] | undefined => rows.find((cells) => cells[0] === id);
     const isClosed = (cells: readonly string[]): boolean => (cells.at(-1) ?? "").startsWith("closed");
     for (const [id, needle] of [
-      ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 39"], ["P2-I5 (part 3)", "go-live row 41"],
-      ["P2-I8", "go-live rows 24 and 41"], ["P2-I9", "go-live row 43"], ["P2-I13", "go-live row 44"],
+      ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 40"], ["P2-I5 (part 3)", "go-live row 41"],
+      ["P2-I8", "go-live rows 24 and 42"], ["P2-I9", "go-live row 43"], ["P2-I13", "go-live row 44"],
       ["P2-I15", "go-live row 45"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 54"],
       ["Owner items", "go-live rows 14, 16, 24 and 38"]
     ] as const) {
@@ -370,8 +370,8 @@ describe("P22 the Billing runbook", () => {
     const ruled = rows.find((cells) => cells[0] === "Minors" && cells[1]!.startsWith("P2-M2 "));
     expect(ruled, "no ruled Minors row").toBeDefined();
     if (!isClosed(ruled!)) {
-      for (const needle of ["45 (P2-M2)", "46 (P2-M17)", "47 (P2-M21)", "48 (P2-M25)", "49 (P2-M26)", "50 (P2-M28)",
-        "51 (P2-M36)", "52 (P2-M37)"]) {
+      for (const needle of ["46 (P2-M2)", "47 (P2-M17)", "48 (P2-M21)", "49 (P2-M25)", "50 (P2-M26)", "51 (P2-M28)",
+        "52 (P2-M36)", "53 (P2-M37)"]) {
         expect(ruled!.at(-1), needle).toContain(needle);
       }
     }
