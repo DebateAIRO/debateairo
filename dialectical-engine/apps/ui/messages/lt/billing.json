@@ -125,7 +125,7 @@
   "billing.subscription.code": "Tapatybės patvirtinimo kodas",
   "billing.subscription.stepUpExpired": "Dar kartą patvirtinkite, kad tai jūs: šio patvirtinimo galiojimas baigėsi arba jis jau panaudotas.",
   "billing.subscription.withdrawConfirm": "Atsisakyti ir grąžinti pinigus",
-  "billing.subscription.withdrawDone": "Atlikta. Į jūsų kortelę grąžinome {amount}.",
+  "billing.subscription.withdrawDone": "Gavome jūsų sutarties atsisakymą. Grąžiname {amount} į jūsų kortelę ir, kai tai bus atlikta, parašysime jums el. laišką.",
   "billing.subscription.withdrawRefused": "Sutarties atsisakymo užbaigti nepavyko. Patikrinkite slaptažodį ir kodą ir bandykite dar kartą.",
   "billing.subscription.withdrawNothingDue": "Atlikta. Jūsų planas baigėsi. Jau panaudota dalis padengia visą kainą, todėl jums nieko nepriklauso grąžinti.",
   "billing.subscription.withdrawOwnerReview": "Jūsų planas baigėsi. Vienam iš jūsų mokėjimų jau buvo atliktas grąžinimas, todėl patikrinsime, kas dar priklauso, ir per 14 dienų parašysime jums el. laišką.",

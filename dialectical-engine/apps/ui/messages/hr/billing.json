@@ -125,7 +125,7 @@
   "billing.subscription.code": "Autentifikacijski kod",
   "billing.subscription.stepUpExpired": "Ponovno potvrdite da ste to vi: ta je potvrda istekla ili je već iskorištena.",
   "billing.subscription.withdrawConfirm": "Raskini ugovor i vrati novac",
-  "billing.subscription.withdrawDone": "Gotovo. Vratili smo {amount} na vašu karticu.",
+  "billing.subscription.withdrawDone": "Primili smo vaš raskid ugovora. Vraćamo {amount} na vašu karticu i javit ćemo vam se e-poštom kada to bude gotovo.",
   "billing.subscription.withdrawRefused": "Raskid ugovora nije se mogao dovršiti. Provjerite lozinku i kod pa pokušajte ponovno.",
   "billing.subscription.withdrawNothingDue": "Gotovo. Vaš je plan završio. Dio koji ste već iskoristili pokriva cijelu cijenu, pa vam ništa nije pripadalo natrag.",
   "billing.subscription.withdrawOwnerReview": "Vaš je plan završio. Na jednom od vaših plaćanja povrat je već izvršen, pa ćemo provjeriti što je još dospjelo i javiti vam se e-poštom u roku od 14 dana.",

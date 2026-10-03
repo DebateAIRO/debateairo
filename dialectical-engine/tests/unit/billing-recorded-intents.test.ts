@@ -31,6 +31,9 @@ const PAYMENT = "61001";
 const SECOND_PAYMENT = "61005";
 const TOTAL = 24_200_000;
 const RECORDS_KEY = randomBytes(32);
+/** When the person withdrew (an email that arrived before the owner recorded it, at WITHDRAWN_AT). */
+const WITHDREW_AT = new Date("2026-10-09T08:30:00.000Z");
+const WITHDRAWN_AT = new Date("2026-10-09T10:00:00.000Z");
 
 /** Any member a test did not give throws, so a handler that reaches a vendor, a lease or a write fails loudly. */
 function only<T extends object>(members: Partial<Record<string, unknown>>, name: string): T {
@@ -100,7 +103,9 @@ function desk(recorded: ChargeRow & { events: ChargeEventRow[] }, refusal: strin
         appended.push(row.kind);
         return "INSERTED";
       },
-      customerByOwner: async () => ({ customerId: CUSTOMER_ID })
+      customerByOwner: async () => ({ customerId: CUSTOMER_ID }),
+      // W9 (P2-M8): the withdrawal a dead WITHDRAWAL refund belongs to, for its O2's deadline.
+      subscriptionEvents: async () => [{ kind: "WITHDRAWN", at: WITHDRAWN_AT, data: { withdrew_at: WITHDREW_AT.toISOString() } }]
     }, "repository"),
     jobs: only({
       withLease: async (_key: string, work: () => Promise<unknown>) => ({ kind: "RAN", value: await work() }),
@@ -182,6 +187,35 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
         "param.notRequested": "false"
       })
     })]);
+  });
+
+  it("names a dead withdrawal refund's reason and its 14-day deadline in O2, from when the person withdrew (W9, P2-M8)", async () => {
+    const made = desk(charge([
+      event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "WITHDRAWAL")
+    ]), "XMONEY_REFUSED");
+    expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL" }), NOW))
+      .toEqual({ kind: "DEAD", code: "XMONEY_REFUSED" });
+    expect(made.enqueued).toEqual([expect.objectContaining({
+      kind: "EMAIL", ref: `O2:${CHARGE_ID}:${PAYMENT}`,
+      payload: expect.objectContaining({
+        template: "O2", "param.reasonCode": "XMONEY_REFUSED", "param.notRequested": "false",
+        "param.refundReason": "WITHDRAWAL", "param.refundDeadline": "2026-10-23T08:30:00.000Z"
+      })
+    })]);
+  });
+
+  it("names another refund's reason in O2 without a deadline, and a forged job's O2 carries neither (W9, P2-M8)", async () => {
+    const made = desk(charge([
+      event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "SUBSCRIPTION_ENDED")
+    ]), "XMONEY_REFUSED");
+    await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "SUBSCRIPTION_ENDED" }), NOW);
+    expect(made.enqueued[0]!.payload).toMatchObject({ "param.refundReason": "SUBSCRIPTION_ENDED" });
+    expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundDeadline");
+    const forged = desk(charge([event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "WITHDRAWAL")]));
+    await forged.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: TOTAL, whole: false, reason: "WITHDRAWAL" }), NOW);
+    expect(forged.enqueued[0]!.payload).toMatchObject({ "param.notRequested": "true" });
+    expect(forged.enqueued[0]!.payload).not.toHaveProperty("param.refundReason");
+    expect(forged.enqueued[0]!.payload).not.toHaveProperty("param.refundDeadline");
   });
 
   it("refuses a forged job before its retry looks anything up at xMoney", async () => {

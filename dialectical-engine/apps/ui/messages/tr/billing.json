@@ -125,7 +125,7 @@
   "billing.subscription.code": "Kimlik doğrulayıcı kodu",
   "billing.subscription.stepUpExpired": "Lütfen siz olduğunuzu yeniden doğrulayın: bu doğrulamanın süresi doldu veya zaten kullanıldı.",
   "billing.subscription.withdrawConfirm": "Cay ve iade al",
-  "billing.subscription.withdrawDone": "Tamam. Kartınıza {amount} iade ettik.",
+  "billing.subscription.withdrawDone": "Cayma talebinizi aldık. Kartınıza {amount} iade ediyoruz ve işlem tamamlandığında size e-posta göndereceğiz.",
   "billing.subscription.withdrawRefused": "Cayma işlemi tamamlanamadı. Parolanızı ve kodunuzu kontrol edip yeniden deneyin.",
   "billing.subscription.withdrawNothingDue": "Tamam. Planınız sona erdi. Önceden kullandığınız kısım fiyatın tamamını karşılıyor, bu nedenle geri ödenecek bir tutar yok.",
   "billing.subscription.withdrawOwnerReview": "Planınız sona erdi. Ödemelerinizden birine zaten iade yapılmış, bu yüzden hâlâ ne borçlu olduğumuzu kontrol edip 14 gün içinde size e-posta göndereceğiz.",

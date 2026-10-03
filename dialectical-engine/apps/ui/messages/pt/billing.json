@@ -125,7 +125,7 @@
   "billing.subscription.code": "Código do autenticador",
   "billing.subscription.stepUpExpired": "Confirme novamente que é o próprio: essa confirmação expirou ou já foi utilizada.",
   "billing.subscription.withdrawConfirm": "Resolver e reembolsar",
-  "billing.subscription.withdrawDone": "Concluído. Reembolsámos {amount} no seu cartão.",
+  "billing.subscription.withdrawDone": "Recebemos a sua livre resolução. Estamos a reembolsar {amount} no seu cartão e enviar-lhe-emos um e-mail quando estiver concluído.",
   "billing.subscription.withdrawRefused": "Não foi possível concluir a livre resolução. Verifique a sua palavra-passe e o código e tente novamente.",
   "billing.subscription.withdrawNothingDue": "Concluído. O seu plano terminou. A parte que já utilizou cobre o preço total, pelo que não lhe é devido qualquer reembolso.",
   "billing.subscription.withdrawOwnerReview": "O seu plano terminou. Já foi feito um reembolso num dos seus pagamentos, por isso vamos verificar o que ainda é devido e enviar-lhe um e-mail no prazo de 14 dias.",

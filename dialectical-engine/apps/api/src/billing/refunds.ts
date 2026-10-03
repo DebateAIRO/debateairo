@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
+import { decimalToMicros, microsToDecimal, withdrawalRefundDeadline } from "@debateai/billing-core";
 import type {
   BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, CustomerXMoneyEnvironment, OutboxJob
 } from "@debateai/db";
@@ -361,19 +361,44 @@ export class RefundDesk {
    * P2-I5: REFUND_NOT_REQUESTED is no refund to make (the job matches no request the charge records, and nothing was
    * sent), so its O2 says so (`notRequested`) and has a ref of its own: it never absorbs, and is never absorbed by, a
    * real refund's O2 for the same payment.
+   * W9 (P2-M8): a real refund's O2 also names what it was for (`refundReason`, the intent's reason), and a withdrawal
+   * refund's its legal deadline, 14 days after the person withdrew (`withdrawalRefundDeadline` of the WITHDRAWN row's
+   * `withdrew_at`), with how to refund it by hand so that M8 still follows. A forged job's O2 carries neither: its
+   * reason is only the job's claim.
    */
   private async deadLetter(intent: RefundIntent, code: string, now: Date): Promise<OutboxOutcome> {
     const notRequested = code === "REFUND_NOT_REQUESTED";
     const ref = `${intent.chargeId}:${intent.transactionId}`;
+    const deadline = notRequested ? null : await this.withdrawalDeadlineOf(intent);
     await this.deps.repository.withTransaction((client) => enqueueEmail(this.deps.repository, client, {
       template: "O2", recipient: { kind: "OWNER" }, dedupeRef: notRequested ? `${ref}:not-requested` : ref,
       params: {
         chargeRef: intent.chargeId, refundAmount: microsToDecimal(intent.amountMicros), reasonCode: code,
-        notRequested: notRequested ? "true" : "false"
+        notRequested: notRequested ? "true" : "false",
+        ...(notRequested ? {} : { refundReason: intent.reason }),
+        ...(deadline === null ? {} : { refundDeadline: deadline.toISOString() })
       },
       notBefore: now
     }));
     return dead(code);
+  }
+
+  /**
+   * W9 (P2-M8): when a WITHDRAWAL refund's money is due at the latest, from the withdrawal its charge's subscription
+   * records (`withdrew_at`: the Settings click, or the arrival of the statement the owner recorded; the row's own time
+   * for a row written before it carried one). Null for any other reason, or when the charge or its WITHDRAWN row
+   * cannot be found (O2 then names the reason without a date).
+   */
+  private async withdrawalDeadlineOf(intent: RefundIntent): Promise<Date | null> {
+    if (intent.reason !== "WITHDRAWAL") return null;
+    const charge = await this.deps.repository.charge(intent.chargeId);
+    if (charge === null) return null;
+    const withdrawn = (await this.deps.repository.subscriptionEvents(charge.subscriptionId))
+      .find((event) => event.kind === "WITHDRAWN");
+    if (withdrawn === undefined) return null;
+    const recorded = withdrawn.data.withdrew_at;
+    const withdrewAt = typeof recorded === "string" ? new Date(recorded) : withdrawn.at;
+    return withdrawalRefundDeadline(Number.isFinite(withdrewAt.getTime()) ? withdrewAt : withdrawn.at);
   }
 
   /**

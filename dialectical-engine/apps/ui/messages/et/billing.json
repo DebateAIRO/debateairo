@@ -125,7 +125,7 @@
   "billing.subscription.code": "Autentimisrakenduse kood",
   "billing.subscription.stepUpExpired": "Kinnitage uuesti, et see olete teie: see kinnitus on aegunud või juba kasutatud.",
   "billing.subscription.withdrawConfirm": "Taganen ja saan raha tagasi",
-  "billing.subscription.withdrawDone": "Valmis. Tagastasime {amount} teie kaardile.",
+  "billing.subscription.withdrawDone": "Oleme teie taganemise kätte saanud. Tagastame teie kaardile {amount} ja kirjutame teile, kui see on tehtud.",
   "billing.subscription.withdrawRefused": "Taganemist ei õnnestunud lõpule viia. Kontrollige oma parooli ja koodi ning proovige uuesti.",
   "billing.subscription.withdrawNothingDue": "Valmis. Teie pakett on lõppenud. Juba kasutatud osa katab kogu hinna, seega ei kuulu teile midagi tagastamisele.",
   "billing.subscription.withdrawOwnerReview": "Teie pakett on lõppenud. Ühele teie maksetest on juba tehtud tagasimakse, seega kontrollime, mis on veel tasumata, ja kirjutame teile 14 päeva jooksul.",

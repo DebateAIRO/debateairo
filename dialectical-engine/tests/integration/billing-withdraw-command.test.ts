@@ -52,6 +52,11 @@ const m8Of = async (subscriptionId: string) => (await database.pool.query<{ payl
   "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref=$1", [`M8:${subscriptionId}`]
 )).rows;
 
+/** The EMAIL job a template queued under this ref (W9: `M8_RECEIVED:<subscription>`, `O2_WITHDRAWAL:<subscription>`). */
+const emailOf = async (template: string, ref: string) => (await database.pool.query<{ payload: Record<string, unknown> }>(
+  "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref=$1", [`${template}:${ref}`]
+)).rows;
+
 const withdrawalRequests = async (chargeId: string) => ((await rows().charge(chargeId))?.events ?? [])
   .filter((event) => event.kind === "REFUND_REQUESTED" && event.errorCode === "WITHDRAWAL")
   .map((event) => [event.xmoneyTransactionId, event.amountMicros]);
@@ -109,6 +114,12 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
       .toMatchObject({ planId: "FREE", cause: "ENDED_WITHDRAWAL" });
     expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([[seeded.initialTransactionId, expected]]);
     expect(await m8Of(seeded.subscriptionId)).toEqual([]);
+    // W9 (P2-I11): the acknowledgement goes at once, dated when the statement arrived, never "refunded".
+    expect((await emailOf("M8_RECEIVED", seeded.subscriptionId)).map((row) => row.payload)).toEqual([expect.objectContaining({
+      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PLUS",
+      "param.withdrawalDate": receivedAt.toISOString(), "param.refundAmount": microsToDecimal(expected)
+    })]);
+    expect(await emailOf("O2_WITHDRAWAL", seeded.subscriptionId)).toEqual([]);
     await moveRefunds(seeded.initialChargeId);
     expect((await m8Of(seeded.subscriptionId))[0]?.payload)
       .toMatchObject({ "param.refundAmount": microsToDecimal(expected), "param.plan": "PLUS" });
@@ -163,8 +174,21 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
       monthCreditOverrideMicros: 12_500_000
     });
     await dashboardRefund(seeded, new Date(now.getTime() - DAY));
-    expect(await recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt: new Date(now.getTime() - 60_000) }))
+    const receivedAt = new Date(now.getTime() - 60_000);
+    expect(await recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt }))
       .toEqual({ kind: "OWNER_REVIEW" });
+    // W9 (P2-I11): the person's acknowledgement (no amount: the owner works it out), and the owner's own alert with
+    // the 14-day deadline counted from when the statement arrived.
+    const acknowledged = (await emailOf("M8_RECEIVED", seeded.subscriptionId)).map((row) => row.payload);
+    expect(acknowledged).toEqual([expect.objectContaining({
+      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.withdrawalDate": receivedAt.toISOString()
+    })]);
+    expect(acknowledged[0]).not.toHaveProperty("param.refundAmount");
+    expect((await emailOf("O2_WITHDRAWAL", seeded.subscriptionId)).map((row) => row.payload)).toEqual([expect.objectContaining({
+      template: "O2_WITHDRAWAL", recipient: "OWNER", "param.ownerRef": seeded.ownerRef,
+      "param.reasonCode": "WITHDRAWAL_BY_OWNER", "param.withdrawalDate": receivedAt.toISOString(),
+      "param.refundDeadline": new Date(receivedAt.getTime() + 14 * DAY).toISOString()
+    })]);
     expect((await rows().subscriptionEvents(seeded.subscriptionId)).at(-1)).toMatchObject({
       kind: "WITHDRAWN", data: { refund_micros: null, refund_by_owner: true, source: "OWNER" }
     });

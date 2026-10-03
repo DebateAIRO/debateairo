@@ -64,7 +64,9 @@ describe("P2-I4 a job of the other xMoney system never reaches a vendor", () => 
     const repository = only<ConstructorParameters<typeof RefundDesk>[0]["repository"]>({
       charge: async () => stageCharge(),
       withTransaction: async (work: (client: unknown) => Promise<unknown>) => work({}),
-      enqueue: async (_client: unknown, queued: Readonly<{ kind: string; ref: string }>) => { enqueued.push(queued); return "queued"; }
+      enqueue: async (_client: unknown, queued: Readonly<{ kind: string; ref: string }>) => { enqueued.push(queued); return "queued"; },
+      // W9 (P2-M8): a dead WITHDRAWAL refund's O2 looks up the withdrawal for its deadline; none is recorded here.
+      subscriptionEvents: async () => []
     }, "repository");
     const desk = new RefundDesk({
       repository,

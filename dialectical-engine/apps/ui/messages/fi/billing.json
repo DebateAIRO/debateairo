@@ -125,7 +125,7 @@
   "billing.subscription.code": "Todennuskoodi",
   "billing.subscription.stepUpExpired": "Vahvista henkilöllisyytesi uudelleen: vahvistus on vanhentunut tai jo käytetty.",
   "billing.subscription.withdrawConfirm": "Peru ja palauta rahat",
-  "billing.subscription.withdrawDone": "Valmista. Palautimme {amount} kortillesi.",
+  "billing.subscription.withdrawDone": "Olemme vastaanottaneet peruuttamisesi. Palautamme {amount} kortillesi ja lähetämme sinulle sähköpostia, kun se on tehty.",
   "billing.subscription.withdrawRefused": "Peruminen ei onnistunut. Tarkista salasanasi ja koodisi ja yritä uudelleen.",
   "billing.subscription.withdrawNothingDue": "Valmista. Tilauksesi on päättynyt. Jo käyttämäsi osuus kattaa koko hinnan, joten sinulle ei kuulu palautusta.",
   "billing.subscription.withdrawOwnerReview": "Tilauksesi on päättynyt. Yhteen maksuistasi on jo tehty palautus, joten tarkistamme, mitä on vielä maksettava takaisin, ja lähetämme sinulle sähköpostia 14 päivän kuluessa.",

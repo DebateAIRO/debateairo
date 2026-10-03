@@ -39,7 +39,11 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   quarter: "2026-Q4",
   summaryText: "RO  net 100.00  tax 21.00\nDE  net 50.00  tax 9.50",
   chargeRef: "0123456789abcdef0123456789abcdef",
-  reasonCode: "XMONEY_REFUSED"
+  reasonCode: "XMONEY_REFUSED",
+  withdrawalDate: "2026-10-12T08:30:00.000Z",
+  refundDeadline: "2026-10-26T08:30:00.000Z",
+  refundReason: "WITHDRAWAL",
+  ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93"
 });
 
 /** Every param a template declares, the optional ones included. */
@@ -231,7 +235,9 @@ describe("P17 renderMail", () => {
   });
 
   it("keeps O2 for a refund xMoney refused exactly as it was before P2-I5's flag", () => {
-    const refused = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false" });
+    // W9's optional reason and deadline left out: the render of every O2 queued before them.
+    const { refundReason: _reason, refundDeadline: _deadline, ...before } = paramsFor("O2");
+    const refused = renderMail("O2", "en", { ...before, notRequested: "false" });
     // The five sentences of ruling Q-5's O2, in order and unchanged (compared with the render before the flag existed).
     expect(refused.text.startsWith([
       "Hello,",
@@ -243,6 +249,64 @@ describe("P17 renderMail", () => {
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
     expect(refused.subject).toBe("A refund could not be completed and needs your attention");
+  });
+
+  it("names a dead withdrawal refund's reason, its legal deadline and how to settle it so M8 follows (W9, P2-M8)", () => {
+    const dead = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false" });
+    expect(dead.text).toContain("Reason code: XMONEY_REFUSED\n\nRefund reason: WITHDRAWAL\n\n");
+    expect(dead.text).toContain(
+      "This is a withdrawal refund: the law requires it to be made by October 26, 2026 at the latest (14 days after"
+      + " the withdrawal). Refund at least $12.10 on this payment, in one refund, so the site records it and the"
+      + " customer's refund email (M8) follows by itself."
+    );
+    // The reason alone (another refund than a withdrawal's): no deadline sentence.
+    const { refundDeadline: _deadline, ...other } = paramsFor("O2");
+    const refusedCard = renderMail("O2", "en", { ...other, refundReason: "CARD_COUNTRY_BLOCKED", notRequested: "false" }).text;
+    expect(refusedCard).toContain("Refund reason: CARD_COUNTRY_BLOCKED");
+    expect(refusedCard).not.toContain("withdrawal");
+    expect(Object.keys(MAIL_TEMPLATES.O2.optional ?? {}).sort()).toEqual(["refundDeadline", "refundReason"]);
+  });
+
+  it("tells the owner at once of a withdrawal they must settle by hand, with its deadline (W9, P2-I11)", () => {
+    const owner = renderMail("O2_WITHDRAWAL", "ro", { ...paramsFor("O2_WITHDRAWAL"), reasonCode: "WITHDRAWAL_BY_OWNER" });
+    expect(owner.subject).toBe("A withdrawal needs you to settle its refund by hand");
+    expect(owner.html).toContain('<html lang="en" dir="ltr">');
+    expect(owner.text.startsWith([
+      "Hello,",
+      "A customer withdrew from their plan, and the plan has ended. A refund made in the xMoney dashboard, or an"
+        + " earlier refund request, already touched one of their payments, so the site could not work out what is still"
+        + " due. Nothing has been refunded for this withdrawal yet.",
+      "Owner reference: 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93",
+      "Reason code: WITHDRAWAL_BY_OWNER",
+      "Withdrawn on October 12, 2026. The law requires the refund to be made by October 26, 2026 at the latest (14"
+        + " days after the withdrawal).",
+      "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"),"
+        + " refund in the xMoney dashboard what the site cannot, then record the settlement with pnpm billing:withdraw"
+        + " --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93 --refund <amount> --dashboard <amount>. The customer's refund"
+        + " email (M8) follows. The owner summary lists it as WITHDRAWAL_BY_OWNER until then.",
+      "The DebateAI team"
+    ].join("\n\n"))).toBe(true);
+    // Owner-facing: the owner reference, the code and two dates; never a customer's name, email or card.
+    expect(Object.keys(MAIL_TEMPLATES.O2_WITHDRAWAL.params).sort())
+      .toEqual(["ownerRef", "reasonCode", "refundDeadline", "withdrawalDate"]);
+  });
+
+  it("acknowledges a withdrawal at once, saying only what has happened (W9, P2-I11's M8_RECEIVED)", () => {
+    const refunding = renderMail("M8_RECEIVED", "en", paramsFor("M8_RECEIVED"));
+    expect(refunding.subject).toBe("We've received your withdrawal");
+    expect(refunding.text).toContain("We received your withdrawal from your Plus plan on October 12, 2026. Your plan has ended.");
+    expect(refunding.text).toContain("We're refunding $12.10 to your card and will email you again when it's done.");
+    // Never "refunded" before the money moved: M8 says that, after the refund.
+    expect(refunding.text).not.toMatch(/refunded|confirmed/u);
+    const { refundAmount: _amount, ...byOwner } = paramsFor("M8_RECEIVED");
+    const review = renderMail("M8_RECEIVED", "en", byOwner).text;
+    expect(review).toContain("We received your withdrawal from your Plus plan on October 12, 2026. Your plan has ended.");
+    expect(review).toContain(
+      "A refund was already made on one of your payments, so we'll check what is still due and email you within 14 days."
+    );
+    expect(review).not.toContain("We're refunding");
+    expect(MAIL_TEMPLATES.M8_RECEIVED.subject).not.toBe(MAIL_TEMPLATES.M8.subject);
+    expect(renderMail("M8_RECEIVED", "ro", paramsFor("M8_RECEIVED")).subject).toBe("Am primit retragerea dumneavoastră");
   });
 
   it("never asks the owner to refund a job the charge records no request for (P2-I5's REFUND_NOT_REQUESTED)", () => {

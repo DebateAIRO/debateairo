@@ -125,7 +125,7 @@
   "billing.subscription.code": "Kode fra godkendelsesappen",
   "billing.subscription.stepUpExpired": "Bekræft igen, at det er dig: den bekræftelse er udløbet eller allerede brugt.",
   "billing.subscription.withdrawConfirm": "Fortryd og refunder",
-  "billing.subscription.withdrawDone": "Færdig. Vi har refunderet {amount} til dit kort.",
+  "billing.subscription.withdrawDone": "Vi har modtaget din fortrydelse. Vi refunderer {amount} til dit kort og skriver til dig, når det er gjort.",
   "billing.subscription.withdrawRefused": "Fortrydelsen kunne ikke gennemføres. Tjek din adgangskode og kode, og prøv igen.",
   "billing.subscription.withdrawNothingDue": "Færdig. Din plan er afsluttet. Den del, du allerede har brugt, dækker hele prisen, så du har intet til gode.",
   "billing.subscription.withdrawOwnerReview": "Din plan er afsluttet. Der er allerede foretaget en refusion på en af dine betalinger, så vi tjekker, hvad der stadig skal betales tilbage, og skriver til dig inden for 14 dage.",

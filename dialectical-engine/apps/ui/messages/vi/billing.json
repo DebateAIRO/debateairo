@@ -125,7 +125,7 @@
   "billing.subscription.code": "Mã xác thực",
   "billing.subscription.stepUpExpired": "Vui lòng xác nhận lại đó là bạn: lần xác nhận đó đã hết hạn hoặc đã được dùng.",
   "billing.subscription.withdrawConfirm": "Rút lại và hoàn tiền",
-  "billing.subscription.withdrawDone": "Xong. Chúng tôi đã hoàn {amount} vào thẻ của bạn.",
+  "billing.subscription.withdrawDone": "Chúng tôi đã nhận được yêu cầu rút lại của bạn. Chúng tôi đang hoàn {amount} vào thẻ của bạn và sẽ gửi email cho bạn khi hoàn tất.",
   "billing.subscription.withdrawRefused": "Không thể hoàn tất việc rút lại. Hãy kiểm tra mật khẩu và mã của bạn, rồi thử lại.",
   "billing.subscription.withdrawNothingDue": "Xong. Gói của bạn đã kết thúc. Phần bạn đã dùng bao trọn toàn bộ giá, nên không có khoản nào phải hoàn lại.",
   "billing.subscription.withdrawOwnerReview": "Gói của bạn đã kết thúc. Một trong các khoản thanh toán của bạn đã được hoàn tiền trước đó, nên chúng tôi sẽ kiểm tra số tiền còn phải trả lại và gửi email cho bạn trong vòng 14 ngày.",

@@ -9,5 +9,12 @@
   "owner.O2.next": "Check this charge in the xMoney dashboard and settle the refund by hand there. The owner summary lists it until then.",
   "owner.O2.notRequestedIntro": "A refund job was stopped before anything was sent to xMoney: it does not match any refund request our records hold for this payment. No money moved, and no more tries are made.",
   "owner.O2.notRequestedAmount": "Amount the job named: {refundAmount}. This is only the job's own figure, not a refund to make.",
-  "owner.O2.notRequestedNext": "Do not refund anything for this job. Something able to write to the billing database queued it, so tell whoever runs the server. They check this charge's own refund requests: a request that was never refunded is still owed."
+  "owner.O2.notRequestedNext": "Do not refund anything for this job. Something able to write to the billing database queued it, so tell whoever runs the server. They check this charge's own refund requests: a request that was never refunded is still owed.",
+  "owner.O2.refundReason": "Refund reason: {refundReason}",
+  "owner.O2.withdrawalDeadline": "This is a withdrawal refund: the law requires it to be made by {refundDeadline} at the latest (14 days after the withdrawal). Refund at least {refundAmount} on this payment, in one refund, so the site records it and the customer's refund email (M8) follows by itself.",
+  "owner.O2_WITHDRAWAL.subject": "A withdrawal needs you to settle its refund by hand",
+  "owner.O2_WITHDRAWAL.intro": "A customer withdrew from their plan, and the plan has ended. A refund made in the xMoney dashboard, or an earlier refund request, already touched one of their payments, so the site could not work out what is still due. Nothing has been refunded for this withdrawal yet.",
+  "owner.O2_WITHDRAWAL.owner": "Owner reference: {ownerRef}",
+  "owner.O2_WITHDRAWAL.deadline": "Withdrawn on {withdrawalDate}. The law requires the refund to be made by {refundDeadline} at the latest (14 days after the withdrawal).",
+  "owner.O2_WITHDRAWAL.next": "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"), refund in the xMoney dashboard what the site cannot, then record the settlement with pnpm billing:withdraw --owner {ownerRef} --refund <amount> --dashboard <amount>. The customer's refund email (M8) follows. The owner summary lists it as WITHDRAWAL_BY_OWNER until then."
 }

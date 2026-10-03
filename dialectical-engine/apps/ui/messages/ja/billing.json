@@ -125,7 +125,7 @@
   "billing.subscription.code": "認証アプリのコード",
   "billing.subscription.stepUpExpired": "ご本人であることをもう一度確認してください。その確認は期限切れか、すでに使用されています。",
   "billing.subscription.withdrawConfirm": "撤回して返金を受ける",
-  "billing.subscription.withdrawDone": "完了しました。{amount} をカードに返金しました。",
+  "billing.subscription.withdrawDone": "撤回を受け付けました。{amount} をカードに返金する手続きを進めており、完了しましたらメールでお知らせします。",
   "billing.subscription.withdrawRefused": "撤回を完了できませんでした。パスワードとコードを確認して、もう一度お試しください。",
   "billing.subscription.withdrawNothingDue": "完了しました。プランは終了しました。すでに利用した分が料金全額に相当するため、返金額はありません。",
   "billing.subscription.withdrawOwnerReview": "プランは終了しました。お支払いのうち 1 件はすでに返金済みのため、未払い分を確認し、14 日以内にメールでご連絡します。",

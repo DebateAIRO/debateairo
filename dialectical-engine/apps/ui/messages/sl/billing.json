@@ -125,7 +125,7 @@
   "billing.subscription.code": "Koda za preverjanje pristnosti",
   "billing.subscription.stepUpExpired": "Znova potrdite, da ste to vi: ta potrditev je potekla ali je bila že uporabljena.",
   "billing.subscription.withdrawConfirm": "Odstopi in vrni denar",
-  "billing.subscription.withdrawDone": "Končano. Na vašo kartico smo vrnili {amount}.",
+  "billing.subscription.withdrawDone": "Prejeli smo vaš odstop od pogodbe. Na vašo kartico vračamo {amount} in vam bomo pisali po e-pošti, ko bo vračilo opravljeno.",
   "billing.subscription.withdrawRefused": "Odstopa ni bilo mogoče dokončati. Preverite geslo in kodo ter poskusite znova.",
   "billing.subscription.withdrawNothingDue": "Končano. Vaš paket se je končal. Že porabljeni del pokrije celotno ceno, zato vam ne pripada nobeno vračilo.",
   "billing.subscription.withdrawOwnerReview": "Vaš paket se je končal. Za eno od vaših plačil je bilo vračilo že izvedeno, zato bomo preverili, kaj vam še pripada, in vam v 14 dneh pisali po e-pošti.",

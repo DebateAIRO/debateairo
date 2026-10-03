@@ -125,7 +125,7 @@
   "billing.subscription.code": "प्रमाणक कोड",
   "billing.subscription.stepUpExpired": "कृपया फिर से पुष्टि करें कि यह आप ही हैं: वह पुष्टि समाप्त हो गई या पहले ही उपयोग हो चुकी है।",
   "billing.subscription.withdrawConfirm": "अनुबंध वापस लें और धनवापसी पाएँ",
-  "billing.subscription.withdrawDone": "हो गया। हमने आपके कार्ड पर {amount} वापस कर दिए हैं।",
+  "billing.subscription.withdrawDone": "हमें आपकी वापसी मिल गई है। हम आपके कार्ड पर {amount} वापस कर रहे हैं और यह पूरा होने पर आपको ईमेल करेंगे।",
   "billing.subscription.withdrawRefused": "अनुबंध वापस लेने की प्रक्रिया पूरी नहीं हो सकी। अपना पासवर्ड और कोड जाँचें, फिर से प्रयास करें।",
   "billing.subscription.withdrawNothingDue": "हो गया। आपकी योजना समाप्त हो गई है। आपके द्वारा पहले से उपयोग किया गया हिस्सा पूरी कीमत को कवर करता है, इसलिए कुछ भी वापस देय नहीं है।",
   "billing.subscription.withdrawOwnerReview": "आपकी योजना समाप्त हो गई है। आपके एक भुगतान पर पहले ही धनवापसी हो चुकी है, इसलिए हम जाँचेंगे कि अभी क्या देय है और 14 दिनों के भीतर आपको ईमेल करेंगे।",

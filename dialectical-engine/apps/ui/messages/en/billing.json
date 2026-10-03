@@ -125,7 +125,7 @@
   "billing.subscription.code": "Authenticator code",
   "billing.subscription.stepUpExpired": "Please confirm it's you again: that confirmation expired or was already used.",
   "billing.subscription.withdrawConfirm": "Withdraw and refund",
-  "billing.subscription.withdrawDone": "Done. We refunded {amount} to your card.",
+  "billing.subscription.withdrawDone": "We've received your withdrawal. We're refunding {amount} to your card and will email you when it's done.",
   "billing.subscription.withdrawRefused": "The withdrawal couldn't be completed. Check your password and code, then try again.",
   "billing.subscription.withdrawNothingDue": "Done. Your plan has ended. The part you already used covers the whole price, so nothing was due back.",
   "billing.subscription.withdrawOwnerReview": "Your plan has ended. A refund was already made on one of your payments, so we'll check what is still due and email you within 14 days.",

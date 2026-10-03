@@ -125,7 +125,7 @@
   "billing.subscription.code": "Code d’authentification",
   "billing.subscription.stepUpExpired": "Veuillez confirmer à nouveau qu’il s’agit bien de vous : cette confirmation a expiré ou a déjà été utilisée.",
   "billing.subscription.withdrawConfirm": "Se rétracter et être remboursé",
-  "billing.subscription.withdrawDone": "C’est fait. Nous avons remboursé {amount} sur votre carte.",
+  "billing.subscription.withdrawDone": "Nous avons reçu votre rétractation. Nous vous remboursons {amount} sur votre carte et vous écrirons par e-mail une fois que ce sera fait.",
   "billing.subscription.withdrawRefused": "La rétractation n’a pas pu aboutir. Vérifiez votre mot de passe et votre code, puis réessayez.",
   "billing.subscription.withdrawNothingDue": "C’est fait. Votre formule a pris fin. La part déjà utilisée couvre la totalité du prix ; aucun montant ne vous était donc dû.",
   "billing.subscription.withdrawOwnerReview": "Votre formule a pris fin. Un remboursement a déjà été effectué sur l’un de vos paiements ; nous vérifierons donc ce qui reste dû et vous écrirons par e-mail sous 14 jours.",

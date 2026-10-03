@@ -125,7 +125,7 @@
   "billing.subscription.code": "Codice dell’app di autenticazione",
   "billing.subscription.stepUpExpired": "Conferma di nuovo che sei tu: quella conferma è scaduta o è già stata usata.",
   "billing.subscription.withdrawConfirm": "Recedi e rimborsa",
-  "billing.subscription.withdrawDone": "Fatto. Abbiamo rimborsato {amount} sulla tua carta.",
+  "billing.subscription.withdrawDone": "Abbiamo ricevuto il tuo recesso. Ti stiamo rimborsando {amount} sulla carta e ti scriveremo via e-mail quando sarà fatto.",
   "billing.subscription.withdrawRefused": "Non è stato possibile completare il recesso. Controlla password e codice, poi riprova.",
   "billing.subscription.withdrawNothingDue": "Fatto. Il tuo piano è terminato. La parte già utilizzata copre l’intero prezzo, quindi non ti spetta alcun rimborso.",
   "billing.subscription.withdrawOwnerReview": "Il tuo piano è terminato. Su uno dei tuoi pagamenti è già stato effettuato un rimborso, quindi verificheremo cosa resta dovuto e ti scriveremo via e-mail entro 14 giorni.",

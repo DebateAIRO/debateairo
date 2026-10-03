@@ -8,16 +8,18 @@ import { openBillingProfile, type BillingProfile } from "./records.js";
 /**
  * The same ids as P17's `MailTemplateId` (packages/mail-templates/src/templates.ts); P17 is built later and pins the
  * two lists equal. R-8's sixteen, plus Q-5's owner template `O2` ("A refund could not be completed and needs your
- * attention", English only, params `chargeRef`, `refundAmount`, `reasonCode` and the flag `notRequested`, P2-I5),
- * which RefundDesk's dead-letter path queues (P9b).
+ * attention", English only, params `chargeRef`, `refundAmount`, `reasonCode` and the flag `notRequested`, P2-I5; W9
+ * adds the optional `refundReason` and `refundDeadline`), which RefundDesk's dead-letter path queues (P9b), plus W9's
+ * (P2-I11) `M8_RECEIVED` (a withdrawal's acknowledgement of receipt) and `O2_WITHDRAWAL` (a withdrawal the owner
+ * settles by hand), both queued by `recordWithdrawal`.
  */
 export type BillingMailTemplateId =
   | "M1" | "M2_INVOICE_LINK" | "M2_INVOICE_ATTACHED" | "M3" | "M4" | "M5A" | "M5B" | "M5C"
-  | "M6" | "M7" | "M8" | "M9" | "M10" | "M11" | "M11_DUPLICATE" | "O1" | "O2";
+  | "M6" | "M7" | "M8" | "M8_RECEIVED" | "M9" | "M10" | "M11" | "M11_DUPLICATE" | "O1" | "O2" | "O2_WITHDRAWAL";
 
 const TEMPLATE_IDS: ReadonlySet<string> = new Set<BillingMailTemplateId>([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL"
 ]);
 
 /** Structurally P17's `MailAttachment` (apps/api/src/mail-mime.ts). */

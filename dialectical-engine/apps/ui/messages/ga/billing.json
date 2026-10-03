@@ -125,7 +125,7 @@
   "billing.subscription.code": "Cód fíordheimhnitheora",
   "billing.subscription.stepUpExpired": "Deimhnigh arís gur tusa atá ann: chuaigh an deimhniú sin in éag nó úsáideadh cheana é.",
   "billing.subscription.withdrawConfirm": "Tarraing siar agus aisíoc",
-  "billing.subscription.withdrawDone": "Déanta. D’aisíocamar {amount} chuig do chárta.",
+  "billing.subscription.withdrawDone": "Fuaireamar do tharraingt siar. Táimid ag aisíoc {amount} le do chárta agus seolfaimid ríomhphost chugat nuair a bheidh sé déanta.",
   "billing.subscription.withdrawRefused": "Níorbh fhéidir an tarraingt siar a chur i gcrích. Seiceáil do phasfhocal agus do chód, agus bain triail eile as.",
   "billing.subscription.withdrawNothingDue": "Déanta. Tá deireadh le do phlean. Clúdaíonn an chuid a d’úsáid tú cheana an praghas iomlán, mar sin níl aon rud le tabhairt ar ais duit.",
   "billing.subscription.withdrawOwnerReview": "Tá deireadh le do phlean. Rinneadh aisíocaíocht cheana ar cheann de d’íocaíochtaí, mar sin seiceálfaimid cad atá dlite fós agus seolfaimid ríomhphost chugat laistigh de 14 lá.",

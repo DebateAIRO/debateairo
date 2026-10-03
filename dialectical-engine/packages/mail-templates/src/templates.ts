@@ -1,7 +1,10 @@
-/** R-8's sixteen ids plus ruling Q-5's owner template O2 (a refund that could not be completed). */
+/**
+ * R-8's sixteen ids, ruling Q-5's owner template O2 (a refund that could not be completed), and W9's (P2-I11)
+ * M8_RECEIVED (a withdrawal's acknowledgement of receipt) and O2_WITHDRAWAL (a withdrawal the owner settles by hand).
+ */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -136,6 +139,20 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     paragraphs: [{ ifParam: "refundAmount", test: "nonzero", then: "mail.M8.refunded", otherwise: "mail.M8.nothingDue" }],
     params: { plan: "plan", refundAmount: "amount" }
   }),
+  // W9 (P2-I11): Directive 2011/83/EU art. 11(3)'s acknowledgement of receipt on a durable medium, queued in the
+  // withdrawal's own transaction (Settings and the owner's command alike). It says only what has happened: received
+  // on {withdrawalDate} and the plan ended; then either the refund on its way (refundAmount present; M8 says
+  // "refunded" once the money moved) or, without an amount, the owner's check (a refund was already made). A
+  // withdrawal with nothing due back sends no M8_RECEIVED: its M8, queued in the same transaction, is the acknowledgement.
+  M8_RECEIVED: define({
+    catalogue: "mail", subject: "mail.M8_RECEIVED.subject",
+    paragraphs: [
+      "mail.M8_RECEIVED.received",
+      { ifParam: "refundAmount", test: "present", then: "mail.M8_RECEIVED.refunding", otherwise: "mail.M8_RECEIVED.ownerReview" }
+    ],
+    params: { plan: "plan", withdrawalDate: "date" },
+    optional: { refundAmount: "amount" }
+  }),
   M9: define({
     catalogue: "mail", subject: "mail.M9.subject",
     paragraphs: ["mail.M9.link", "mail.M9.ignore"],
@@ -167,6 +184,9 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // the dead job's code; never a customer's name, email or card. P2-I5: a job the charge records no request for
   // (REFUND_NOT_REQUESTED, notRequested "true") moved no money and is no refund to make, so it says that instead:
   // nothing went to xMoney, the amount is only the job's, and whoever runs the server checks the charge's requests.
+  // W9 (P2-M8): a real refund's O2 also names what the refund was for (`refundReason`, the intent's reason) and, for a
+  // withdrawal's, its legal deadline and how to refund by hand so that M8 still follows (`refundDeadline`). Both are
+  // optional, so an O2 queued before them renders as it did; RefundDesk sends neither for REFUND_NOT_REQUESTED.
   O2: define({
     catalogue: "owner", subject: "owner.O2.subject",
     paragraphs: [
@@ -174,8 +194,23 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
       "owner.O2.charge",
       { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedAmount", otherwise: "owner.O2.amount" },
       "owner.O2.reason",
+      { ifParam: "refundReason", test: "present", then: "owner.O2.refundReason", otherwise: null },
+      { ifParam: "refundDeadline", test: "present", then: "owner.O2.withdrawalDeadline", otherwise: null },
       { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedNext", otherwise: "owner.O2.next" }
     ],
-    params: { chargeRef: "text", refundAmount: "amount", reasonCode: "text", notRequested: "flag" }
+    params: { chargeRef: "text", refundAmount: "amount", reasonCode: "text", notRequested: "flag" },
+    optional: { refundReason: "text", refundDeadline: "date" }
+  }),
+  // W9 (P2-I11): the O2 variant for a withdrawal handed to the owner (`refund_by_owner`: a dashboard refund or an
+  // earlier request touched a payment), sent at once from the withdrawal's own transaction, so the 14-day refund
+  // deadline never waits for the quarterly O1. The owner reference (an opaque id, what `pnpm billing:withdraw --owner`
+  // takes), the summary's code WITHDRAWAL_BY_OWNER and two dates; never a customer's name, email or card.
+  O2_WITHDRAWAL: define({
+    catalogue: "owner", subject: "owner.O2_WITHDRAWAL.subject",
+    paragraphs: [
+      "owner.O2_WITHDRAWAL.intro", "owner.O2_WITHDRAWAL.owner", "owner.O2.reason", "owner.O2_WITHDRAWAL.deadline",
+      "owner.O2_WITHDRAWAL.next"
+    ],
+    params: { ownerRef: "text", reasonCode: "text", withdrawalDate: "date", refundDeadline: "date" }
   })
 });

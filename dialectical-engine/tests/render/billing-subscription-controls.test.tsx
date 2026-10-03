@@ -144,7 +144,9 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Withdraw and refund");
     expect(client.stepUp).toHaveBeenCalledWith("correct horse", "123456", { action: "WITHDRAW_SUBSCRIPTION" });
     expect(client.withdrawSubscription).toHaveBeenCalledWith("G".repeat(43));
-    expect(text()).toContain("Done. We refunded $18.00 to your card.");
+    // W9 (P2-I11): only what has happened; the refund is on its way, and M8 says when it is done.
+    expect(text()).toContain("We've received your withdrawal. We're refunding $18.00 to your card and will email you when it's done.");
+    expect(text()).not.toContain("We refunded");
   });
 
   it("words P12d's two other withdrawal answers: nothing due back, and a refund the owner settles (refund: null)", async () => {

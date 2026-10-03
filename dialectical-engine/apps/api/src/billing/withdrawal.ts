@@ -1,7 +1,9 @@
 import type { PoolClient } from "pg";
 import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
-import { microsToDecimal, withdrawalRefundPerPaymentMicros, type WithdrawalPayment } from "@debateai/billing-core";
+import {
+  microsToDecimal, withdrawalRefundDeadline, withdrawalRefundPerPaymentMicros, type WithdrawalPayment
+} from "@debateai/billing-core";
 import type { ChargeEventRow, ChargeRow } from "@debateai/db";
 import { planById } from "@debateai/register";
 import type { AuthenticatedSession } from "../sessions.js";
@@ -64,7 +66,10 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
  * Spec §2.5.6 withdraw. The decision and every record commit together — WITHDRAWN, the FREE entitlement and the
  * refund intents (P9b's RefundDesk: REFUND_REQUESTED + one XMONEY_REFUND job per transaction, split newest first) —
  * and only then does money move, through the outbox this function kicks; M8 ("we refunded …") follows the last
- * refund (RefundDesk's WITHDRAWAL follow-up), or goes now when nothing is due back. The credit share uses the credit
+ * refund (RefundDesk's WITHDRAWAL follow-up), or goes now when nothing is due back. W9 (P2-I11): the same transaction
+ * queues the acknowledgement of receipt (Directive 2011/83/EU art. 11(3)) for every withdrawal it records: M8_RECEIVED
+ * ("we received your withdrawal on …; we're refunding {amount}", or the owner's check), or, when nothing is due back,
+ * M8 itself, which then says everything at once. The credit share uses the credit
  * in force at `withdrewAt` (A6's override after an upgrade) and the credit spent from the period start to it
  * ("withdrawal after an upgrade: the paid total is the sum of all successful charges since the first activation");
  * both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is written.
@@ -76,7 +81,8 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
  * (`REFUND_TRANSACTION_ALREADY_REFUNDED`), the refund due cannot be taken from our rows: the withdrawal is recorded
  * (the plan ends now) with `refund_by_owner`, and no intent and no M8 are written. The owner settles it with
  * `pnpm billing:withdraw --owner <ref> --refund <amount> --dashboard <amount>` (P14c); P16b's summary lists it until
- * then.
+ * then. W9 (P2-I11): the owner is emailed at once (O2_WITHDRAWAL, reason WITHDRAWAL_BY_OWNER, with the refund's 14-day
+ * deadline counted from `withdrewAt`), in the same transaction, so the deadline never waits for the quarterly O1.
  */
 export async function recordWithdrawal(deps: WithdrawalDeps, request: WithdrawalRequest): Promise<WithdrawalOutcome> {
   const now = deps.clock();
@@ -147,15 +153,36 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
       ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ENDED_WITHDRAWAL", effectiveAt: now,
       subscriptionId: state.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
     });
-    // Nothing to refund: nothing will move, so M8 goes now. Otherwise RefundDesk queues it after the last refund; a
-    // withdrawal handed to the owner gets its M8 when the owner settles it (P14c).
-    const customer = byOwner || allocations.length > 0
-      ? null : await deps.billing.customerByOwner(ownerRef, undefined, client);
+    // Nothing to refund: nothing will move, so M8 goes now, and it is the acknowledgement too. Otherwise the person is
+    // told at once only what has happened (W9, M8_RECEIVED: the refund on its way, or the owner's check), and
+    // RefundDesk queues M8 after the last refund; a withdrawal handed to the owner gets its M8 when the owner settles
+    // it (P14c).
+    const customer = await deps.billing.customerByOwner(ownerRef, undefined, client);
+    const withdrawalDate = withdrewAt.toISOString();
     if (customer !== null) {
+      const recipient = { kind: "CUSTOMER", customerId: customer.customerId } as const;
+      await enqueueEmail(deps.billing, client, !byOwner && allocations.length === 0
+        ? {
+          template: "M8", recipient, dedupeRef: state.subscriptionId,
+          params: { plan: state.planId, refundAmount: microsToDecimal(refundMicros) }, notBefore: now
+        }
+        : {
+          template: "M8_RECEIVED", recipient, dedupeRef: state.subscriptionId,
+          params: byOwner
+            ? { plan: state.planId, withdrawalDate }
+            : { plan: state.planId, withdrawalDate, refundAmount: microsToDecimal(refundMicros) },
+          notBefore: now
+        });
+    }
+    if (byOwner) {
+      // W9 (P2-I11): the owner's own alert, never left to the quarterly O1 (English only, no customer data).
       await enqueueEmail(deps.billing, client, {
-        template: "M8", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
-        dedupeRef: state.subscriptionId,
-        params: { plan: state.planId, refundAmount: microsToDecimal(refundMicros) }, notBefore: now
+        template: "O2_WITHDRAWAL", recipient: { kind: "OWNER" }, dedupeRef: state.subscriptionId,
+        params: {
+          ownerRef, reasonCode: "WITHDRAWAL_BY_OWNER", withdrawalDate,
+          refundDeadline: withdrawalRefundDeadline(withdrewAt).toISOString()
+        },
+        notBefore: now
       });
     }
     return Object.freeze({ refundMicros: byOwner ? null : refundMicros, refunds: allocations.length, byOwner });

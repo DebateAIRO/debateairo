@@ -113,6 +113,8 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(await stack.subscriptionStatus(person.ownerRef)).toBe("WITHDRAWN");
     expect(await stack.entitlementPlan(person.ownerRef)).toBe("FREE");
     expect(ids(stack.mailsTo(person.email))).toContain("M8");
+    // W9 (P2-I11): the acknowledgement of receipt, rendered and sent before the refund ran, then M8 once it did.
+    expect(ids(stack.mailsTo(person.email)).filter((id) => id === "M8_RECEIVED" || id === "M8")).toEqual(["M8_RECEIVED", "M8"]);
     // The plan is already withdrawn, so a replay is refused before its grant is read. The grant itself was spent
     // inside the withdrawal's own transaction by billing.consume_withdrawal_grant (P12a).
     const replay = await stack.post(person, "/v1/billing/subscription/withdraw", { step_up_grant: grant });

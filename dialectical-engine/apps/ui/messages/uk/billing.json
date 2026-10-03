@@ -125,7 +125,7 @@
   "billing.subscription.code": "Код застосунку-автентифікатора",
   "billing.subscription.stepUpExpired": "Підтвердьте ще раз, що це ви: термін того підтвердження минув або його вже використано.",
   "billing.subscription.withdrawConfirm": "Відмовитися й повернути кошти",
-  "billing.subscription.withdrawDone": "Готово. Ми повернули {amount} на вашу картку.",
+  "billing.subscription.withdrawDone": "Ми отримали вашу відмову від договору. Ми повертаємо {amount} на вашу картку й напишемо вам, коли повернення буде виконано.",
   "billing.subscription.withdrawRefused": "Не вдалося оформити відмову. Перевірте пароль і код і спробуйте знову.",
   "billing.subscription.withdrawNothingDue": "Готово. Ваш план завершено. Уже використана частина покриває всю ціну, тому повертати нічого.",
   "billing.subscription.withdrawOwnerReview": "Ваш план завершено. За одним із ваших платежів уже було здійснено повернення, тому ми перевіримо, що ще належить, і напишемо вам протягом 14 днів.",

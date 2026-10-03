@@ -125,7 +125,7 @@
   "billing.subscription.code": "رمز المصادقة",
   "billing.subscription.stepUpExpired": "يُرجى تأكيد أنك أنت مرة أخرى: انتهت صلاحية ذلك التأكيد أو سبق استخدامه.",
   "billing.subscription.withdrawConfirm": "انسحب واسترد المبلغ",
-  "billing.subscription.withdrawDone": "تم. رددنا {amount} إلى بطاقتك.",
+  "billing.subscription.withdrawDone": "تلقّينا انسحابك. نحن بصدد ردّ {amount} إلى بطاقتك، وسنراسلك عبر البريد الإلكتروني عند اكتمال ذلك.",
   "billing.subscription.withdrawRefused": "تعذّر إتمام الانسحاب. تحقّق من كلمة المرور والرمز، ثم حاول مرة أخرى.",
   "billing.subscription.withdrawNothingDue": "تم. انتهت خطتك. الجزء الذي استخدمته بالفعل يغطي السعر كاملًا، لذا لا يُستحق ردّ أي مبلغ.",
   "billing.subscription.withdrawOwnerReview": "انتهت خطتك. سبق ردّ مبلغ في إحدى دفعاتك، لذا سنتحقق مما لا يزال مستحقًا ونراسلك عبر البريد الإلكتروني خلال 14 يومًا.",

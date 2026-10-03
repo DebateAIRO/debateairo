@@ -125,7 +125,7 @@
   "billing.subscription.code": "Kodiċi tal-awtentikatur",
   "billing.subscription.stepUpExpired": "Jekk jogħġbok ikkonferma mill-ġdid li int: dik il-konferma skadiet jew diġà ntużat.",
   "billing.subscription.withdrawConfirm": "Irtira u rrimborsa",
-  "billing.subscription.withdrawDone": "Lest. Irrimborsajna {amount} fuq il-karta tiegħek.",
+  "billing.subscription.withdrawDone": "Irċevejna l-irtirar tiegħek. Qed nirrimborsaw {amount} fuq il-karta tiegħek u nibagħtulek email meta jkun lest.",
   "billing.subscription.withdrawRefused": "L-irtirar ma setax jitlesta. Iċċekkja l-password u l-kodiċi tiegħek, imbagħad erġa’ pprova.",
   "billing.subscription.withdrawNothingDue": "Lest. Il-pjan tiegħek intemm. Il-parti li diġà użajt tkopri l-prezz kollu, għalhekk xejn mhu dovut lura lilek.",
   "billing.subscription.withdrawOwnerReview": "Il-pjan tiegħek intemm. Diġà sar rimborż fuq wieħed mill-ħlasijiet tiegħek, għalhekk se niċċekkjaw x’għadu dovut u nibagħtulek email fi żmien 14-il jum.",

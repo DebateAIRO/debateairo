@@ -83,6 +83,9 @@ describe("P22 the Billing runbook", () => {
       "\"event\":\"billing.renewal.report\"", "taxRefused", "[BILLING_RENEWAL_PENDING]",
       // §14.8 (ruling Q-5): a refund that could not be completed reaches the owner at once.
       "A refund that could not be completed", "O2",
+      // §14.8 (W9, P2-I11, P2-M8): the acknowledgement of receipt, the owner's alert for a withdrawal settled by hand,
+      // and a dead withdrawal refund's deadline and one-refund rule.
+      "M8_RECEIVED", "O2_WITHDRAWAL", "the date the refund is due by", "in one refund",
       // §14.4 (D6a's recurring net): a new price reaches only new subscriptions.
       "reaches only new subscriptions",
       // §14.8 (D6a P10b, D6b P16b): nobody reads the e-Factura status for you; the summary lists what to check,

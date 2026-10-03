@@ -85,3 +85,20 @@ export function withdrawalDeadline(input: Readonly<{
     closesAt: localMidnight(lastDay + dayMs, closeZone)
   });
 }
+
+/** Directive 2011/83/EU art. 13(1) (RO: OUG 34/2014 art. 13(1)): the refund is due within 14 days of the withdrawal. */
+const WITHDRAWAL_REFUND_DAYS = 14;
+
+/**
+ * W9 (P2-I11, P2-M8): the latest instant the refund of a withdrawal is due, told to the owner when it must be made by
+ * hand (O2_WITHDRAWAL, and O2 for a dead withdrawal refund): 14 days of 24 hours after `withdrewAt` (when the person
+ * withdrew: the Settings click, or the arrival of the email or form). It is the law's fixed period, not the register's
+ * `withdrawalDays` (the length of the window to withdraw), and it never moves to a later weekday: an owner refunding
+ * by it is never late.
+ */
+export function withdrawalRefundDeadline(withdrewAt: Date): Date {
+  if (!Number.isFinite(withdrewAt.getTime())) {
+    throw new TypedDomainError("BILLING_PERIOD_INVALID", "The withdrawal instant is not a date");
+  }
+  return new Date(withdrewAt.getTime() + WITHDRAWAL_REFUND_DAYS * 86_400_000);
+}

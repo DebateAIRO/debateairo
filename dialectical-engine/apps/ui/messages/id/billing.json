@@ -125,7 +125,7 @@
   "billing.subscription.code": "Kode autentikator",
   "billing.subscription.stepUpExpired": "Harap konfirmasikan lagi bahwa ini Anda: konfirmasi itu sudah kedaluwarsa atau sudah digunakan.",
   "billing.subscription.withdrawConfirm": "Tarik diri dan kembalikan dana",
-  "billing.subscription.withdrawDone": "Selesai. Kami telah mengembalikan {amount} ke kartu Anda.",
+  "billing.subscription.withdrawDone": "Kami telah menerima penarikan Anda. Kami sedang mengembalikan {amount} ke kartu Anda dan akan mengirim email kepada Anda setelah selesai.",
   "billing.subscription.withdrawRefused": "Penarikan diri tidak dapat diselesaikan. Periksa kata sandi dan kode Anda, lalu coba lagi.",
   "billing.subscription.withdrawNothingDue": "Selesai. Paket Anda telah berakhir. Bagian yang sudah Anda gunakan menutupi seluruh harga, jadi tidak ada yang perlu dikembalikan.",
   "billing.subscription.withdrawOwnerReview": "Paket Anda telah berakhir. Pengembalian dana sudah dilakukan pada salah satu pembayaran Anda, jadi kami akan memeriksa apa yang masih terutang dan mengirim email kepada Anda dalam 14 hari.",

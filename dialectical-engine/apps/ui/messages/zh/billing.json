@@ -125,7 +125,7 @@
   "billing.subscription.code": "身份验证器代码",
   "billing.subscription.stepUpExpired": "请再次确认是您本人：该确认已过期或已被使用。",
   "billing.subscription.withdrawConfirm": "撤回并退款",
-  "billing.subscription.withdrawDone": "完成。我们已向您的卡退款 {amount}。",
+  "billing.subscription.withdrawDone": "我们已收到您的撤回。我们正在向您的卡退款 {amount}，完成后会发邮件告诉您。",
   "billing.subscription.withdrawRefused": "无法完成撤回。请检查密码和代码后重试。",
   "billing.subscription.withdrawNothingDue": "完成。您的方案已结束。您已使用的部分已覆盖全部价格，因此无需退还任何款项。",
   "billing.subscription.withdrawOwnerReview": "您的方案已结束。您的其中一笔付款已办理过退款，因此我们会核实仍需退还的金额，并在 14 天内发邮件给您。",

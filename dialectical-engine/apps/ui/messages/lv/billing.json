@@ -125,7 +125,7 @@
   "billing.subscription.code": "Autentifikatora kods",
   "billing.subscription.stepUpExpired": "Lūdzu, vēlreiz apstipriniet, ka tas esat jūs: šī apstiprinājuma derīgums ir beidzies vai tas jau izmantots.",
   "billing.subscription.withdrawConfirm": "Atteikties un atmaksāt",
-  "billing.subscription.withdrawDone": "Gatavs. Mēs atmaksājām {amount} jūsu kartē.",
+  "billing.subscription.withdrawDone": "Esam saņēmuši jūsu atteikumu. Mēs atmaksājam {amount} uz jūsu karti un, kad tas būs izdarīts, jums uzrakstīsim e-pastu.",
   "billing.subscription.withdrawRefused": "Atteikumu neizdevās pabeigt. Pārbaudiet paroli un kodu un mēģiniet vēlreiz.",
   "billing.subscription.withdrawNothingDue": "Gatavs. Jūsu plāns ir beidzies. Jau izmantotā daļa sedz visu cenu, tāpēc jums nekas nepienākas atpakaļ.",
   "billing.subscription.withdrawOwnerReview": "Jūsu plāns ir beidzies. Vienam no jūsu maksājumiem jau ir veikta atmaksa, tāpēc mēs pārbaudīsim, kas vēl pienākas, un 14 dienu laikā jums uzrakstīsim e-pastu.",

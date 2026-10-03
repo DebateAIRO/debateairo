@@ -125,7 +125,7 @@
   "billing.subscription.code": "Код за удостоверяване",
   "billing.subscription.stepUpExpired": "Моля, потвърдете отново, че сте Вие: това потвърждение е изтекло или вече е използвано.",
   "billing.subscription.withdrawConfirm": "Откажи се и възстанови сумата",
-  "billing.subscription.withdrawDone": "Готово. Възстановихме {amount} по картата Ви.",
+  "billing.subscription.withdrawDone": "Получихме отказа Ви. Възстановяваме {amount} по картата Ви и ще Ви пишем по имейл, когато това стане.",
   "billing.subscription.withdrawRefused": "Отказът не можа да бъде извършен. Проверете паролата и кода си и опитайте отново.",
   "billing.subscription.withdrawNothingDue": "Готово. Планът Ви приключи. Вече използваната част покрива цялата цена, така че не Ви се дължи нищо обратно.",
   "billing.subscription.withdrawOwnerReview": "Планът Ви приключи. По едно от плащанията Ви вече е направено възстановяване, затова ще проверим какво още се дължи и ще Ви пишем по имейл в рамките на 14 дни.",

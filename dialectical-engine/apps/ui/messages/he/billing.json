@@ -125,7 +125,7 @@
   "billing.subscription.code": "קוד מיישומון האימות",
   "billing.subscription.stepUpExpired": "אשרו שוב שזה אתם: תוקף האישור הזה פג או שכבר נעשה בו שימוש.",
   "billing.subscription.withdrawConfirm": "ביטול העסקה והחזר",
-  "billing.subscription.withdrawDone": "בוצע. החזרנו {amount} לכרטיס שלכם.",
+  "billing.subscription.withdrawDone": "קיבלנו את ביטול ההתקשרות שלכם. אנחנו מחזירים {amount} לכרטיס שלכם ונשלח לכם הודעה בדוא״ל כשההחזר יושלם.",
   "billing.subscription.withdrawRefused": "לא ניתן היה להשלים את ביטול העסקה. בדקו את הסיסמה והקוד ונסו שוב.",
   "billing.subscription.withdrawNothingDue": "בוצע. התוכנית שלכם הסתיימה. החלק שכבר ניצלתם מכסה את המחיר המלא, ולכן לא מגיע לכם החזר.",
   "billing.subscription.withdrawOwnerReview": "התוכנית שלכם הסתיימה. על אחד התשלומים שלכם כבר בוצע החזר, ולכן נבדוק מה עוד מגיע לכם ונשלח לכם הודעה בדוא״ל תוך 14 ימים.",

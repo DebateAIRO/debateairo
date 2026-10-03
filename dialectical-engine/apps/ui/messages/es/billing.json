@@ -125,7 +125,7 @@
   "billing.subscription.code": "Código del autenticador",
   "billing.subscription.stepUpExpired": "Confirme de nuevo que es usted: esa confirmación caducó o ya se utilizó.",
   "billing.subscription.withdrawConfirm": "Desistir y reembolsar",
-  "billing.subscription.withdrawDone": "Listo. Hemos reembolsado {amount} en su tarjeta.",
+  "billing.subscription.withdrawDone": "Hemos recibido su desistimiento. Le estamos reembolsando {amount} en su tarjeta y le escribiremos por correo cuando esté hecho.",
   "billing.subscription.withdrawRefused": "No se pudo completar el desistimiento. Revise su contraseña y su código e inténtelo de nuevo.",
   "billing.subscription.withdrawNothingDue": "Listo. Su plan ha terminado. La parte que ya utilizó cubre el precio completo, por lo que no le corresponde ninguna devolución.",
   "billing.subscription.withdrawOwnerReview": "Su plan ha terminado. Ya se hizo un reembolso en uno de sus pagos, así que comprobaremos lo que aún se le debe y le escribiremos por correo en un plazo de 14 días.",

@@ -125,7 +125,7 @@
   "billing.subscription.code": "Autentiseringskod",
   "billing.subscription.stepUpExpired": "Bekräfta igen att det är du: den bekräftelsen har gått ut eller har redan använts.",
   "billing.subscription.withdrawConfirm": "Ångra och återbetala",
-  "billing.subscription.withdrawDone": "Klart. Vi har återbetalat {amount} till ditt kort.",
+  "billing.subscription.withdrawDone": "Vi har tagit emot ditt utnyttjande av ångerrätten. Vi återbetalar {amount} till ditt kort och mejlar dig när det är klart.",
   "billing.subscription.withdrawRefused": "Ångrandet kunde inte slutföras. Kontrollera ditt lösenord och din kod och försök igen.",
   "billing.subscription.withdrawNothingDue": "Klart. Ditt abonnemang har upphört. Den del du redan har använt täcker hela priset, så du har inget att få tillbaka.",
   "billing.subscription.withdrawOwnerReview": "Ditt abonnemang har upphört. En återbetalning har redan gjorts på en av dina betalningar, så vi kontrollerar vad som återstår att betala tillbaka och mejlar dig inom 14 dagar.",

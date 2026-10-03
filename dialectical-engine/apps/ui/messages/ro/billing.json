@@ -125,7 +125,7 @@
   "billing.subscription.code": "Cod din aplicația de autentificare",
   "billing.subscription.stepUpExpired": "Vă rugăm să confirmați din nou că sunteți dvs.: acea confirmare a expirat sau a fost deja folosită.",
   "billing.subscription.withdrawConfirm": "Mă retrag și primesc banii înapoi",
-  "billing.subscription.withdrawDone": "Gata. V-am rambursat {amount} pe card.",
+  "billing.subscription.withdrawDone": "Am primit retragerea dumneavoastră. Vă rambursăm {amount} pe card și vă trimitem un e-mail când rambursarea este finalizată.",
   "billing.subscription.withdrawRefused": "Retragerea nu a putut fi finalizată. Verificați parola și codul, apoi încercați din nou.",
   "billing.subscription.withdrawNothingDue": "Gata. Abonamentul dvs. s-a încheiat. Partea pe care ați folosit-o deja acoperă întregul preț, așa că nu vi se cuvine nicio sumă înapoi.",
   "billing.subscription.withdrawOwnerReview": "Abonamentul dvs. s-a încheiat. Pentru una dintre plățile dvs. s-a făcut deja o rambursare, așa că verificăm ce vi se mai cuvine și vă scriem pe e-mail în cel mult 14 zile.",

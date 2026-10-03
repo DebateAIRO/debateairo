@@ -125,7 +125,7 @@
   "billing.subscription.code": "Authentifizierungscode",
   "billing.subscription.stepUpExpired": "Bitte bestätigen Sie erneut, dass Sie es sind: Diese Bestätigung ist abgelaufen oder wurde bereits verwendet.",
   "billing.subscription.withdrawConfirm": "Widerrufen und erstatten",
-  "billing.subscription.withdrawDone": "Erledigt. Wir haben {amount} auf Ihre Karte erstattet.",
+  "billing.subscription.withdrawDone": "Wir haben Ihren Widerruf erhalten. Wir erstatten {amount} auf Ihre Karte und schreiben Ihnen per E-Mail, sobald das erledigt ist.",
   "billing.subscription.withdrawRefused": "Der Widerruf konnte nicht abgeschlossen werden. Prüfen Sie Ihr Passwort und Ihren Code und versuchen Sie es erneut.",
   "billing.subscription.withdrawNothingDue": "Erledigt. Ihr Tarif ist beendet. Der bereits genutzte Teil deckt den gesamten Preis, daher steht Ihnen keine Rückzahlung zu.",
   "billing.subscription.withdrawOwnerReview": "Ihr Tarif ist beendet. Auf eine Ihrer Zahlungen wurde bereits eine Erstattung geleistet, daher prüfen wir, was noch offen ist, und schreiben Ihnen innerhalb von 14 Tagen per E-Mail.",

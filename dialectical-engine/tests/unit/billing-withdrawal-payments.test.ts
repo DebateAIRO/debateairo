@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { withdrawalRefundDeadline } from "@debateai/billing-core";
 import type { ChargeRow } from "@debateai/db";
 import type { PaidTransaction } from "../../apps/api/src/billing/refunds.js";
 import { withdrawalPayments } from "../../apps/api/src/billing/withdrawal.js";
@@ -46,5 +47,13 @@ describe("W6 each paid transaction's own coverage (P2-I8)", () => {
   it("refuses a paid transaction whose charge is not among the subscription's charges", () => {
     expect(() => withdrawalPayments([payment("elsewhere", "9", 1_000_000)], [], PERIOD))
       .toThrow(expect.objectContaining({ code: "BILLING_SUBSCRIPTION_EVENTS_INVALID" }));
+  });
+});
+
+describe("W9 the refund deadline the owner is told (P2-I11, P2-M8)", () => {
+  it("is 14 days after the person withdrew (Directive 2011/83/EU art. 13(1)), whatever the withdrawal window's length", () => {
+    expect(withdrawalRefundDeadline(new Date("2026-10-12T08:30:00.000Z")).toISOString()).toBe("2026-10-26T08:30:00.000Z");
+    // Across a daylight-saving change the instant still moves by 14 times 24 hours (the email shows its UTC date).
+    expect(withdrawalRefundDeadline(new Date("2026-10-20T23:59:59.000Z")).toISOString()).toBe("2026-11-03T23:59:59.000Z");
   });
 });

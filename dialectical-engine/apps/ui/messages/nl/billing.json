@@ -125,7 +125,7 @@
   "billing.subscription.code": "Authenticatiecode",
   "billing.subscription.stepUpExpired": "Bevestig opnieuw dat u het bent: die bevestiging is verlopen of al gebruikt.",
   "billing.subscription.withdrawConfirm": "Herroepen en terugbetalen",
-  "billing.subscription.withdrawDone": "Klaar. We hebben {amount} teruggestort op uw kaart.",
+  "billing.subscription.withdrawDone": "We hebben uw herroeping ontvangen. We storten {amount} terug op uw kaart en e-mailen u zodra dat gebeurd is.",
   "billing.subscription.withdrawRefused": "De herroeping kon niet worden voltooid. Controleer uw wachtwoord en code en probeer het opnieuw.",
   "billing.subscription.withdrawNothingDue": "Klaar. Uw abonnement is beëindigd. Het deel dat u al hebt gebruikt, dekt de volledige prijs, dus u hebt niets terug te krijgen.",
   "billing.subscription.withdrawOwnerReview": "Uw abonnement is beëindigd. Op een van uw betalingen is al een terugbetaling gedaan, dus we controleren wat er nog verschuldigd is en e-mailen u binnen 14 dagen.",

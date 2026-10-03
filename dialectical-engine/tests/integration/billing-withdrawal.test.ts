@@ -62,6 +62,11 @@ const m8Of = async (subscriptionId: string) => (await database.pool.query<{ payl
   "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref=$1", [`M8:${subscriptionId}`]
 )).rows;
 
+/** The EMAIL jobs a template queued under this ref (W9: `M8_RECEIVED:<subscription>`, `O2_WITHDRAWAL:<subscription>`). */
+const emailOf = async (template: string, ref: string) => (await database.pool.query<{ payload: Record<string, unknown> }>(
+  "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref=$1", [`${template}:${ref}`]
+)).rows.map((row) => row.payload);
+
 /** The XMONEY_REFUND jobs these refs name, claimed as P7's worker would (attempt 1). */
 async function claimRefunds(refs: readonly string[]): Promise<OutboxJob[]> {
   const claimed = await new BillingRepository(database.pool).claim(["XMONEY_REFUND"], 50, "p12d-test", new Date());
@@ -115,6 +120,12 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     expect(run.kick).toHaveBeenCalledTimes(1);
     // No "we refunded" email while the money has not moved.
     expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
+    // W9 (P2-I11): the acknowledgement of receipt, queued in the withdrawal's own transaction, says only what happened.
+    expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toEqual([expect.objectContaining({
+      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PRO",
+      "param.withdrawalDate": run.now.toISOString(), "param.refundAmount": microsToDecimal(expected)
+    })]);
+    expect(await emailOf("O2_WITHDRAWAL", run.seeded.subscriptionId)).toEqual([]);
     const jobs = await claimRefunds(refs);
     expect(jobs.map((job) => job.ref)).toEqual(refs);
     const desk = deskWith(async () => undefined);
@@ -143,6 +154,12 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     const refused = deskWith(async () => { throw new TypedDomainError("XMONEY_REFUSED", "fake refusal"); });
     expect(await refused.handle(job!, new Date())).toEqual({ kind: "DEAD", code: "XMONEY_REFUSED" });
     expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
+    // W9: the person still holds the acknowledgement, and the owner's O2 names the reason and the legal deadline.
+    expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toHaveLength(1);
+    expect(await emailOf("O2", `${run.seeded.initialChargeId}:${run.seeded.initialTransactionId}`)).toEqual([expect.objectContaining({
+      template: "O2", recipient: "OWNER", "param.reasonCode": "XMONEY_REFUSED", "param.refundReason": "WITHDRAWAL",
+      "param.refundDeadline": new Date(run.now.getTime() + 14 * DAY).toISOString()
+    })]);
     await run.api.close();
   });
 
@@ -153,6 +170,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     expect(refused.json().error).toBe("STEP_UP_REQUIRED");
     expect(foldSubscription(await run.billing.subscriptionEvents(run.seeded.subscriptionId)).status).toBe("ACTIVE");
     expect(await refundRequests(run.billing, run.seeded.initialChargeId)).toEqual([]);
+    expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toEqual([]);
     expect(run.kick).not.toHaveBeenCalled();
     await run.api.close();
   });
@@ -176,6 +194,8 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     expect(foldSubscription(await run.billing.subscriptionEvents(run.seeded.subscriptionId)).status).toBe("WITHDRAWN");
     expect(await refundRequests(run.billing, run.seeded.initialChargeId)).toEqual([]);
     expect((await m8Of(run.seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "0.00" });
+    // W9: M8 is itself the acknowledgement here (queued in the same transaction), so no second email says the same.
+    expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toEqual([]);
     expect(run.kick).not.toHaveBeenCalled();
     await run.api.close();
   });
@@ -224,6 +244,17 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     expect((await refundRequests(run.billing, run.seeded.initialChargeId))
       .filter(([, , reason]) => reason === "WITHDRAWAL")).toEqual([]);
     expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
+    // W9 (P2-I11): the person's acknowledgement names no amount; the owner is told at once, with the deadline.
+    const acknowledged = await emailOf("M8_RECEIVED", run.seeded.subscriptionId);
+    expect(acknowledged).toEqual([expect.objectContaining({
+      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PLUS", "param.withdrawalDate": run.now.toISOString()
+    })]);
+    expect(acknowledged[0]).not.toHaveProperty("param.refundAmount");
+    expect(await emailOf("O2_WITHDRAWAL", run.seeded.subscriptionId)).toEqual([expect.objectContaining({
+      template: "O2_WITHDRAWAL", recipient: "OWNER", "param.ownerRef": run.identity.authenticated.ownerRef,
+      "param.reasonCode": "WITHDRAWAL_BY_OWNER", "param.withdrawalDate": run.now.toISOString(),
+      "param.refundDeadline": new Date(run.now.getTime() + 14 * DAY).toISOString()
+    })]);
     expect(run.kick).not.toHaveBeenCalled();
     expect(run.audit.events.map(({ event }) => event))
       .toEqual(expect.arrayContaining(["billing.withdrawal", "billing.withdrawal.owner_review"]));
@@ -252,6 +283,9 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     expect((await run.billing.subscriptionEvents(run.seeded.subscriptionId)).at(-1))
       .toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: null, refund_by_owner: true } });
     expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
+    // W9: the savepoint took back the refund intents, not the acknowledgement or the owner's alert.
+    expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toHaveLength(1);
+    expect(await emailOf("O2_WITHDRAWAL", run.seeded.subscriptionId)).toHaveLength(1);
     await run.api.close();
   });
 

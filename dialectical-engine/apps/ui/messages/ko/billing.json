@@ -125,7 +125,7 @@
   "billing.subscription.code": "인증 앱 코드",
   "billing.subscription.stepUpExpired": "본인임을 다시 확인해 주세요. 해당 확인이 만료되었거나 이미 사용되었습니다.",
   "billing.subscription.withdrawConfirm": "철회하고 환불받기",
-  "billing.subscription.withdrawDone": "완료되었습니다. {amount}을(를) 카드로 환불했습니다.",
+  "billing.subscription.withdrawDone": "철회 요청을 받았습니다. {amount}을(를) 카드로 환불하는 중이며, 완료되면 이메일로 알려 드리겠습니다.",
   "billing.subscription.withdrawRefused": "철회를 완료할 수 없습니다. 비밀번호와 코드를 확인한 후 다시 시도해 주세요.",
   "billing.subscription.withdrawNothingDue": "완료되었습니다. 요금제가 종료되었습니다. 이미 사용한 부분이 전체 가격에 해당하므로 돌려드릴 금액이 없습니다.",
   "billing.subscription.withdrawOwnerReview": "요금제가 종료되었습니다. 결제 중 한 건에 대해 이미 환불이 이루어졌으므로, 아직 돌려드려야 할 금액을 확인한 뒤 14일 이내에 이메일로 알려 드리겠습니다.",

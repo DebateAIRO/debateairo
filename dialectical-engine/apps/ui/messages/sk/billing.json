@@ -125,7 +125,7 @@
   "billing.subscription.code": "Kód autentifikátora",
   "billing.subscription.stepUpExpired": "Znova potvrďte, že ste to vy: toto potvrdenie vypršalo alebo už bolo použité.",
   "billing.subscription.withdrawConfirm": "Odstúpiť a vrátiť peniaze",
-  "billing.subscription.withdrawDone": "Hotovo. Vrátili sme {amount} na vašu kartu.",
+  "billing.subscription.withdrawDone": "Vaše odstúpenie od zmluvy sme prijali. Vraciame {amount} na vašu kartu, a keď to bude hotové, napíšeme vám e-mail.",
   "billing.subscription.withdrawRefused": "Odstúpenie sa nepodarilo dokončiť. Skontrolujte heslo a kód a skúste to znova.",
   "billing.subscription.withdrawNothingDue": "Hotovo. Váš program sa skončil. Už využitá časť pokrýva celú cenu, takže vám nič nepatrí späť.",
   "billing.subscription.withdrawOwnerReview": "Váš program sa skončil. Pri jednej z vašich platieb už bola vykonaná refundácia, preto skontrolujeme, čo je ešte splatné, a do 14 dní vám napíšeme e-mail.",
