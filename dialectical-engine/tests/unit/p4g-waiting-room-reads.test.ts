@@ -47,6 +47,7 @@ function waitingRun(): WaitingRun {
 /** A room whose site day is full, so a waiting run waits for midnight; counts what each expected start reads. */
 function roomAt(start: Date, runs: readonly WaitingRun[]) {
   let now = start;
+  const byRunId = new Map(runs.map((run) => [run.runId, run] as const));
   const counts = { readWaiting: 0, estimate: 0, daySpent: 0 };
   const spend = {
     readDaySpentMicros: async () => { counts.daySpent += 1; return 100_000; },
@@ -58,7 +59,7 @@ function roomAt(start: Date, runs: readonly WaitingRun[]) {
   const line = {
     readWaiting: async (runId: string) => {
       counts.readWaiting += 1;
-      return runs.find((run) => run.runId === runId) ?? null;
+      return byRunId.get(runId) ?? null;
     },
     siteLineBlocking: async () => false,
     waitingForOwner: async () => [],
@@ -114,6 +115,24 @@ describe("P4-G a WAITING run's expected start is computed once per short window,
     await Promise.all([room.expectedStart(one.runId), room.expectedStart(one.runId), room.expectedStart(two.runId)]);
     expect(counts.estimate).toBe(2);
     expect(counts.readWaiting).toBe(2);
+  });
+
+  it("keeps at most 4,096 runs: the oldest is dropped first, and the newest is still answered from the table", async () => {
+    const first = waitingRun();
+    const others = Array.from({ length: 4_096 }, () => waitingRun());
+    const { room, counts } = roomAt(new Date("2026-09-30T18:00:05.000Z"), [first, ...others]);
+    // One instant throughout, so no entry's window has ended: only the bound can drop one.
+    await room.expectedStart(first.runId);
+    for (const other of others) await room.expectedStart(other.runId);
+    expect(counts.estimate).toBe(4_097);
+    // The 4,097th run pushed the oldest (the first) out, so it is computed again inside its window.
+    await room.expectedStart(first.runId);
+    expect(counts.estimate).toBe(4_098);
+    // The run read last is still in the table: no new computation.
+    const last = others.at(-1);
+    if (last === undefined) throw new TypeError("test: no runs");
+    await room.expectedStart(last.runId);
+    expect(counts.estimate).toBe(4_098);
   });
 
   it("does not keep a failed computation: the next read tries again", async () => {
