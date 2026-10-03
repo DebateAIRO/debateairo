@@ -2320,8 +2320,8 @@ It prints one line naming the document it recorded. A document the site never is
 **An invoice, a credit note or an email that was never sent.** When a job that issues an invoice or a credit note,
 or that sends an email, stops after its last try, the site emails you at once (O3, "A legal document or a required
 email was not sent and needs your attention"), and the owner summary lists it until it is settled: invoices and
-credit notes under "Invoices and credit notes to check by hand", emails under "Emails that never went out". Each line,
-and the email, says what to do. Typical causes: a wrong or revoked Quaderno key (`TAX_SERVICE_REFUSED`), Quaderno or
+credit notes under "Invoices and credit notes to check by hand", emails under "Emails that never went out". Below
+each list the summary says what to do for each kind of line, and the email says it for its job. Typical causes: a wrong or revoked Quaderno key (`TAX_SERVICE_REFUSED`), Quaderno or
 SmartBill not answering for more than about 15 hours (`TAX_SERVICE_UNAVAILABLE`, `INVOICE_SERVICE_UNAVAILABLE`), or
 SmartBill not saying whether it issued an invoice (`INVOICE_UNKNOWN`: SmartBill cannot be asked afterwards, so the
 invoice may be there already).
