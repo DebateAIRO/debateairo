@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
@@ -11,6 +11,13 @@ export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
 export const AskTierSourceSchema = z.enum(["ASKER", "MACHINE_DEFAULT"]);
 export const CompositionBudgetTierSchema = z.enum(["low", "medium", "high"]);
+/**
+ * Model-scorecard design, the model-strength control (owner ruling R2): Economy, Balanced or
+ * Best, minted in @debateai/kernel. OPTIONAL on the ask, because "absent" must stay
+ * distinguishable: the default is the active scorecard's pickerSettings.defaultStrength, or
+ * BALANCED when there is none.
+ */
+export const ModelStrengthSchema = z.enum(MODEL_STRENGTHS);
 export const WayOfKnowingSchema = z.enum(["LOOKED_UP", "RAN", "REASONING"]);
 export const CheckStatusSchema = z.enum(["PASS", "FAIL", "NOT_SAMPLED"]);
 export const StalenessStateSchema = z.enum(["FRESH", "UNDER_REVIEW", "STALE", "ARCHIVED_REVIVED"]);
@@ -157,6 +164,7 @@ export const AskRequestSchema = z.object({
   as_of: z.iso.datetime(),
   steering_presets: z.array(z.string().trim().min(1)),
   plan_tier: PlanTierSchema,
+  model_strength: ModelStrengthSchema.optional(),
   steering_annotations: z.array(z.string().min(1))
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
@@ -212,7 +220,12 @@ export const AskAcceptedSchema = z.object({
   // Final review Part 1b, Important 1: only on a WAITING answer whose person's
   // own running debates are all that fill their windows (a person scope).
   waits_for: WaitsForSchema.optional(),
-  applied: AskAppliedSchema.optional()
+  applied: AskAppliedSchema.optional(),
+  // Model-scorecard design, cost estimate before a run: the strength the picker applied, and
+  // whether the per-run money ceiling stepped it down. Optional, so an accepted ask without
+  // them reads exactly as before (QUEUED or WAITING alike; paid plans S1a).
+  model_strength_applied: ModelStrengthSchema.optional(),
+  model_strength_stepped_down: z.boolean().optional()
 }).strict().superRefine((accepted, context) => {
   const waiting = accepted.status === "WAITING";
   if (waiting !== (accepted.waits_until !== undefined) || waiting !== (accepted.waiting_scope !== undefined)) {
@@ -541,7 +554,16 @@ const ServerSessionSchema = z.object({
   session_id: z.uuid(),
   caller_scope: z.literal("ASKER"),
   ownership_provenance: z.literal("server_session"),
-  provisional_identity_model: z.literal(false)
+  provisional_identity_model: z.literal(false),
+  /**
+   * A21 (owner decision O4, 2026-09-28): ONE yes/no for the /new page, which reads this
+   * response already — is a VALID model scorecard in force for this deployment? When it is
+   * not, the model-strength control is shown greyed out and marked not in effect. Never the
+   * scorecard's version, source, state name or refusal reason. GET /v1/session always sends
+   * it; it is optional so every other session (the login answer, the API's own) reads
+   * exactly as before.
+   */
+  model_scorecard_in_force: z.boolean().optional()
 }).strict();
 
 export const SessionSchema = ServerSessionSchema;
@@ -1094,6 +1116,41 @@ export const PublicDebateSchema = z.object({
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
+/**
+ * A21 — WHICH MODELS WERE CHOSEN FOR EACH DEBATE JOB, projected from the run's
+ * pinned role assignment (core.run_role_assignment); absent when the run pinned
+ * none (no scorecard was in force) OR its pin could not be read (A21.1 fix
+ * round 1: omitted whole and reported to the operator as
+ * ANSWER_MODEL_ASSIGNMENT_INVALID), so an absent field never proves which of
+ * the two happened. Owner decisions O1/O3: the honesty drawer
+ * shows visitors only the model names per job and never the step-down; this
+ * full detail is for the JSON export and audit. Engine identifiers only —
+ * makers, model ids, thinking levels — never a provider route, a candidate id,
+ * a price or a prompt.
+ */
+const AnswerModelSeatSchema = z.object({
+  maker: z.string().min(1),
+  model_id: z.string().min(1),
+  thinking_level: z.string().min(1)
+}).strict();
+
+export const AnswerModelAssignmentSchema = z.object({
+  strength: ModelStrengthSchema,
+  stepped_down: z.boolean(),
+  scorecard_version: z.number().int().positive().nullable(),
+  roles: z.array(z.object({
+    role: z.enum(DEBATE_ROLES),
+    seats: z.array(z.object({
+      seat_index: z.number().int().nonnegative(),
+      source: z.enum(["SCORECARD", "FALLBACK"]),
+      main: AnswerModelSeatSchema,
+      runner_up: AnswerModelSeatSchema.nullable(),
+      runner_up_share: z.number().min(0).max(1)
+    }).strict())
+  }).strict())
+}).strict();
+export type AnswerModelAssignment = z.infer<typeof AnswerModelAssignmentSchema>;
+
 export const AnswerSchema = z.object({
   answer_id: z.string().min(1),
   answer_version: z.number().int().positive(),
@@ -1164,7 +1221,9 @@ export const AnswerSchema = z.object({
   inspection_handle: z.string().min(1),
   as_of: z.iso.datetime(),
   staleness_state: StalenessStateSchema,
-  relevant_as_of: z.iso.datetime()
+  relevant_as_of: z.iso.datetime(),
+  // A21: optional, so every stored and fixture answer without it still parses.
+  model_assignment: AnswerModelAssignmentSchema.optional()
 }).strict().superRefine((answer, context) => {
   if ((answer.confidence_band === null) !== (answer.band_ceiling === null)) {
     context.addIssue({ code: "custom", message: "confidence_band and band_ceiling must be present together" });

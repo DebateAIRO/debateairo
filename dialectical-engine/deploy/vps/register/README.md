@@ -113,3 +113,64 @@ never as an edit of the sealed one.
 The file is read under the same custody rule as the key files: mode `0600`, owned by the user who
 runs the command, inside a `0700` directory owned by that same user, not a symlink
 (`HOSTED_REGISTER_FILE_CUSTODY_INVALID`).
+
+## The model scorecard (optional): `--scorecard`
+
+The owners' approved model scorecard is published **beside** the register file, never inside it. It is its own
+document, with its own argument and its own size limit: **64 KiB** (65,536 bytes), for the file and for the scorecard
+as it is stored. Local mode reads its scorecard file (`scorecards/current.json`) under the same limit, so on SIZE a
+file gets the same answer in both. (On fields they differ: see the "only the fields the scorecard format defines"
+point below.)
+
+Why 64 KiB (the owners' ruling of 2026-09-27): the database re-checks a stored value one character at a time, and that
+takes longer the bigger the value, faster than in step with its size. A scorecard close to 64 KiB takes about 40
+seconds to publish; one of about 100 KB took almost a minute and a half. The seven-model example scorecard is about
+18 KB.
+
+```sh
+pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json --scorecard /etc/debateai/register/model-scorecard.json
+```
+
+```sh
+pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json --scorecard /etc/debateai/register/model-scorecard.json
+```
+
+- The scorecard file is read under the same custody rule as the register file: mode 0600, in a 0700 directory you own.
+  Its refusals are `HOSTED_REGISTER_SCORECARD_FILE_ABSENT`, `…_CUSTODY_INVALID` and `…_INVALID`. `…_INVALID` also
+  covers a file over 64 KiB, and a file whose stored form would be over 64 KiB (for example, many `\n` escapes,
+  which are stored as the longer `\u000a`).
+- It is checked by the engine's own scorecard validation. A refusal is `HOSTED_REGISTER_SCORECARD_REFUSED:` followed by
+  the reason (`SCHEMA_INVALID`, `ENGINE_INCOMPATIBLE`, `UNKNOWN_CANDIDATE` or `NUMBER_SHAPE`).
+- It may carry only the fields the scorecard format defines. The format itself ignores a field it does not know, but a
+  sealed version can never be edited, so publishing refuses such a field instead of sealing it forever:
+  `HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:` followed by the place that holds it and a `*` (for example
+  `candidates.1.*`: the second candidate has a field it should not; just `*` means the top level). The line never
+  prints the field's name or its value, since either could be private. Local mode ignores such a field instead, so
+  the same file can work locally and still be refused here. The evaluator writes only defined fields, so an approved
+  scorecard is not refused.
+- It becomes the `modelScorecard` row of the NEW register version. The row's source reference is your `sourceRef`,
+  followed by ` | modelScorecard v<version> sha256:<hash of the sealed document>`.
+- The plan prints `model_scorecard version=… candidates=… bytes=… sha256=…`, or
+  `model_scorecard=none (asks keep the plan rosters)`.
+- The hosted site reaches a model only through an API, so the plan also prints how many of the scorecard's models can
+  be reached that way: `model_scorecard api_candidates=N (N of the M scored models can be reached through an API; the
+  hosted site reaches models only that way)`. When that number is 0 it adds one more line, `model_scorecard note: …`,
+  saying the hosted site will keep using the plan's usual models until a model it can reach through an API is scored.
+  That is a warning, not a refusal: the scorecard is still valid and can still be published.
+- **Every publication is a complete register version.**
+  - Publishing again *without* `--scorecard` seals a version with **no** scorecard, and asks then use the plan rosters.
+  - To keep the scorecard while you change something else, pass the same `--scorecard` again.
+  - To go back to an earlier scorecard, publish again from your current file with the earlier scorecard file
+    (`--scorecard` and the earlier file's path): that gives a version with the earlier scorecard and everything else
+    as it is now. Pin the version it prints in both `EnvironmentFile`s and restart both units. Keep a copy of every
+    scorecard file you publish, so the earlier one is there when you need it.
+  - Do not pin an older version instead: every version is a complete register, so an older one also rolls back the
+    vendors, ceilings, support rows, billing settings and country gate sealed since. A changed vendor list refuses
+    the boot (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`), and once billing is on, an older version sealed with billing
+    off switches it off for every live subscription, without the checks the kit's main README asks for first
+    (§14.8, "Stopping sales, and switching billing off"). No sealed version is ever edited.
+  - Publishing a scorecard, like publishing any release that changes `packages/serve/src/index.ts`, seals a new
+    version; the older versions stay sealed as they are.
+- When the API starts, it prints one line saying which scorecard it runs: `MODEL_SCORECARD state=VALID|ABSENT|REFUSED …`.
+
+**Plan caps on a site that sells plans (paid plans).** The scorecard's `pickerSettings.planStrengthCaps` is keyed by plan TIER: `free` caps the Free plan and `premium` every paid plan — with billing on, the engine sets each ask's tier from the person's plan in the `billingPlans` row. The owners' rule (29 September 2026) is Free → Economy and every paid plan → Best: set `"planStrengthCaps": { "free": "ECONOMY" }` in the evaluator's `config/evaluator.config.json` before `scorecard:approve` (the evaluator's own default, `{ "free": "BALANCED" }`, breaks the rule). With billing on, a scorecard whose `free` cap is not `ECONOMY`, or whose `premium` cap is not `BEST` (leaving it out is fine), is refused `SCORECARD_PLAN_CAPS_INVALID`, by `register:publish-hosted --scorecard` before anything is sealed and again when the API starts. On the website each debate is planned inside the asking person's remaining allowance, never past it: when even Economy does not fit it, the debate still starts at Economy; a question waits only when one of the person's limits is full, and if it is started after all when its turn is decided, it starts with the plan made for that moment. While a scorecard is in force, a paid ask is never moved to the Free models to fit (that interim rule applies only without a scorecard).

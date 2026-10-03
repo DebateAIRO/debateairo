@@ -119,6 +119,9 @@ describe("S02 owner/public affordance drift pins", () => {
       ["misc.answerHonesty.perItemFreshness", "Per-item freshness"],
       // TYPED ABSENCE — named explicitly as not included in the public snapshot.
       ["misc.answerHonesty.costEnvelope", "Spending and attempt limits"],
+      // N/A — the model assignment is not in the public envelope (A21.1): the owner's own answer
+      // routes and the JSON export only. The title claims a choice, never use (carry 6).
+      ["misc.answerHonesty.modelsChosen.title", "Models chosen for this debate"],
       // TREE SURFACE — public edges are projected into the shared reading views.
       ["misc.answerHonesty.graphEdges", "Graph edges"],
       // NODE DRAWER — public nodes retain labeled numbers with owner pointers redacted.
@@ -153,6 +156,6 @@ describe("S02 owner/public affordance drift pins", () => {
     for (const [key, english] of expectedSections) {
       expect(miscEnglish[key], `${key} English catalogue value`).toBe(english);
     }
-    expect(sections).toHaveLength(20);
+    expect(sections).toHaveLength(21);
   });
 });

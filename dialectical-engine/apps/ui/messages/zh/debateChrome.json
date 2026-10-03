@@ -277,5 +277,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "协调器拒绝了所选方案。请选择免费版或高级版，然后重试。",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "协调器拒绝了该请求：此方案所需的某个模型目前不可用。请稍后重试，或选择另一方案。",
   "requestFailure.kind.ALREADY_WAITING": "同一时间只能有一个问题等待。请在等待中的辩论开始后再提这个问题。",
-  "requestFailure.kind.UNCLASSIFIED": "在收到任何响应之前请求便已失败，因此结果未知。这并非协调器作出的决定。"
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "这场辩论的费用将超过本站对单场辩论允许的额度。",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "协调器拒绝了该请求：辩论中的某项任务目前没有可用的 AI 模型。请稍后重试。",
+  "requestFailure.kind.UNCLASSIFIED": "在收到任何响应之前请求便已失败，因此结果未知。这并非协调器作出的决定。",
+  "debateChrome.condition.backupModelUsed": "计划使用的 AI 模型无法使用时，已由另一个模型接替"
 }

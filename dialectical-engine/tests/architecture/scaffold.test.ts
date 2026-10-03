@@ -45,9 +45,12 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
   // 32 -> 33: the tax-quaderno package row (A26(a)).
   // 33 -> 34: the invoice-smartbill package row (A26(a)).
   // 34 -> 35: the mail-templates package row (A26(a)).
-  it("matches all 35 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
+  // 35 -> 36: the `scorecard` package row (model-scorecard design, 2026-09-26; merged by
+  // paid plans S1a, A26(a)). @debateai/scorecard depends on the kernel alone; register, serve,
+  // api and runner name it in their own rows.
+  it("matches all 36 dependency-edge rows and structural rules 1–5, dev's three F31 edges apart", async () => {
     const report = await auditArchitecture();
-    expect(report.edgeRowsChecked).toBe(35);
+    expect(report.edgeRowsChecked).toBe(36);
     expect(report.violations.filter((violation) => !DEV_F31_OBS_CAPTURE_EDGES.includes(violation)))
       .toEqual([]);
   });

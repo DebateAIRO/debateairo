@@ -17,6 +17,16 @@ import { SupportWidget } from "@/components/support/SupportWidget";
 import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
 import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+import type { ModelStrength } from "@debateai/kernel";
+import {
+  MODEL_STRENGTH_KEYS,
+  MODEL_STRENGTH_OPTIONS,
+  PLAN_CARD_KEYS,
+  isModelStrength,
+  modelStrengthControl,
+  planCardNamesRoster,
+  type ScorecardSignal
+} from "@/lib/modelStrength";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   buildNewDebateAskConfig,
@@ -138,6 +148,11 @@ function NewDebateForm({
   const [maxTokens, setMaxTokens] = useState(800);
   const [riskTier, setRiskTier] = useState("standard");
   const [riskTierWasEdited, setRiskTierWasEdited] = useState(false);
+  // A21: null = the asker has not chosen; the ask then omits model_strength.
+  const [modelStrength, setModelStrength] = useState<ModelStrength | null>(null);
+  // A21 O4: the control unlocks only once the session says a scored model list is in force.
+  // A21.3 carry 14 / fix round 1: PENDING until the session answers, READ_FAILED if it cannot be read.
+  const [modelScorecard, setModelScorecard] = useState<ScorecardSignal>("PENDING");
   const [budgetTier, setBudgetTier] = useState<CompositionBudgetTier>(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
   const [decisionScope, setDecisionScope] = useState<string>(DECISION_SCOPE_DEFAULT);
   const [asOf, setAsOf] = useState(() => dateTimeLocalValue(new Date()));
@@ -179,11 +194,13 @@ function NewDebateForm({
     void contractClient.readSession().then((session) => {
       if (!active) return;
       const defaults = deriveSessionAskDefaults(session, new Date(), catalog);
+      setModelScorecard(session.model_scorecard_in_force === true ? "IN_FORCE" : "NOT_IN_FORCE");
       setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);
       setAsOf(defaults.asOf);
       setSessionDefaultsError(null);
     }).catch((failure: unknown) => {
       if (!active) return;
+      setModelScorecard("READ_FAILED");
       // DL3-F7: classified copy, never the contract client's server-authored text.
       setSessionDefaultsError(requestFailureMessage("SESSION_DEFAULTS",failure,catalog));
     });
@@ -195,6 +212,7 @@ function NewDebateForm({
     if (value !== "free") return;
     setRiskTier("standard");
     setRiskTierWasEdited(false);
+    setModelStrength(null);
     setBudgetTier(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT);
     setDepth(2);
     setDepthMode("fixed");
@@ -204,6 +222,7 @@ function NewDebateForm({
     setMaxTokens(800);
   }
 
+  const strengthControl = modelStrengthControl({ scorecard: modelScorecard, planTier });
   const askAsOf = new Date(asOf);
   // The button becomes ready only for the complete ask that will be submitted.
   // UX-01 makes machine-derived values visible and editable rather than hidden.
@@ -240,7 +259,9 @@ function NewDebateForm({
         asOf,
         depth,
         asOfWasEdited: false,
-        riskTierWasEdited
+        riskTierWasEdited,
+        // A21 O4: a locked control sends nothing, so the deployment's own default applies.
+        modelStrength: strengthControl.locked ? null : modelStrength
       }, submitTime, catalog);
       let debate;
       try {
@@ -312,18 +333,7 @@ function NewDebateForm({
                 >
                   <span className="ndTierName">{t(catalog, option.nameKey)}</span>
                   <span className="ndTierPromise">{t(catalog, option.promiseKey)}</span>
-                  <span className="ndTierModels">
-                    {PLAN_TIER_ROSTERS[option.value].map((modelId) => (
-                      <span key={modelId} className="ndTierModel">
-                        <span
-                          className="modelDot"
-                          style={{ "--dot": modelDot(modelId) } as CSSProperties}
-                          aria-hidden
-                        />
-                        {modelId}
-                      </span>
-                    ))}
-                  </span>
+                  <PlanCardModels plan={option.value} scorecard={modelScorecard} catalog={catalog} />
                 </button>
               ))}
             </div>
@@ -397,6 +407,17 @@ function NewDebateForm({
               value={depth}
               disabled={planTier === "free"}
               onChange={setDepth}
+            />
+            <SegmentedRow
+              field="modelStrength"
+              label={t(catalog, MODEL_STRENGTH_KEYS.label)}
+              hint={t(catalog, strengthControl.hintKey)}
+              options={MODEL_STRENGTH_OPTIONS.map((option) => ({ value: option.value, label: t(catalog, option.labelKey) }))}
+              value={strengthControl.locked ? "" : modelStrength ?? ""}
+              disabled={strengthControl.locked}
+              onChange={(value) => {
+                if (isModelStrength(value)) setModelStrength(value);
+              }}
             />
             {/* S1-2 · V ruling 2026-09-03: the two steering textareas that stood
                 here are removed. Their values were collected and discarded — no
@@ -510,6 +531,34 @@ function NewDebateForm({
       </div>
       <SupportWidget />
     </div>
+  );
+}
+
+/* Final review C1: a plan card names its plan's usual models only while the
+   session says no scored model list is in force — the one state in which that
+   list is what a debate is seated with. Otherwise (in force, pending, failed)
+   it carries one plain line, true in every one of those states. */
+function PlanCardModels({ plan, scorecard, catalog }: { plan: PlanTier; scorecard: ScorecardSignal; catalog: MessageCatalog }) {
+  if (!planCardNamesRoster(scorecard)) {
+    return (
+      <span className="ndTierModels">
+        <span className="ndTierModelsNote">{t(catalog, PLAN_CARD_KEYS.modelsChosenPerPart)}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="ndTierModels">
+      {PLAN_TIER_ROSTERS[plan].map((modelId) => (
+        <span key={modelId} className="ndTierModel">
+          <span
+            className="modelDot"
+            style={{ "--dot": modelDot(modelId) } as CSSProperties}
+            aria-hidden
+          />
+          {modelId}
+        </span>
+      ))}
+    </span>
   );
 }
 

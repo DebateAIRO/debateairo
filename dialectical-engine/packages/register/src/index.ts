@@ -190,6 +190,17 @@ export interface StructuralCeilingInput {
    * was already admitted.
    */
   readonly maxDepth: number;
+  /**
+   * A14 · DR-184-v5 (model scorecard; pre-flight ruling F17) — whether each
+   * seat call is provisioned ONE backup sequence: 1 only when the run's pinned
+   * role assignment gives at least one seat a runner-up, else 0. Admission
+   * decides it (`evaluateAskAdmission`). Absent means 0 — DR-184-v4 exactly,
+   * the number V sealed on 2026-09-05 without padding — which is the right
+   * value for every caller that predates the scorecard: no runner-up can exist
+   * without a pinned assignment. Checked below: exactly 0 or 1, never a count;
+   * only `undefined` counts as absent (`null` is refused like any other value).
+   */
+  readonly backupSequencesProvisioned?: 0 | 1;
 }
 
 /**
@@ -198,7 +209,7 @@ export interface StructuralCeilingInput {
  * pass, so an omitted term reached the arithmetic as `undefined` and minted a
  * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
  */
-const STRUCTURAL_CEILING_MEMBERS: readonly (keyof StructuralCeilingInput)[] = Object.freeze([
+const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned">[] = Object.freeze([
   "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
   "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
   "compositionSegmentCap", "fixedOrgansPerComposition",
@@ -303,6 +314,62 @@ export const SERVE_LEG = Object.freeze({
  * Repair attempts are NOT a separate term: `buildRepairPacket` is consumed
  * inside the per-site attempt loop (packages/providers/src/index.ts:326-427),
  * so a repair is one of the `maxAttempts` the site already provisions.
+ *
+ * A14 · DR-184-v5 (model scorecard; owner ruling R4, 2026-09-26; pre-flight
+ * ruling F17; A14 fix round 1) — ONE BACKUP SEQUENCE PER SWITCHABLE SEAT
+ * CALL, ONLY WHEN PROVISIONED. A seat whose main candidate fails its call
+ * (transport exhausted after the normal retries, or a subscription usage cap)
+ * is answered by its runner-up, under the runner-up's OWN call-site key
+ * (`…:seat:runnerUp`), so the gateway's cumulative per-key count gives it a
+ * fresh allowance that v4 never provisioned. What v5 seals is the per-site
+ * maximum across restarts; cross-exchange sites have no backup and keep v4's
+ * allowance:
+ *  · a run pass keeps its "down" marks in memory only, so a resumed run can
+ *    switch a seat again. What holds across restarts is the ledger's per-key
+ *    count: each candidate key is capped at the `maxAttempts` its caller
+ *    passes, and a key at its cap is refused before any spend
+ *    (`CALL_BUDGET_EXHAUSTED`, which is never a reason to switch). So every
+ *    bound below is a bound per SITE across restarts, not a story about one call;
+ *  · AUTHOR/REVIEWER (cooldown-wrapped): sequence 1 passes `judge` to each of
+ *    the seat's two keys; the post-cooldown sequence passes `judge + final` to
+ *    ONE key and so adds only that key's remainder, the final retry; a resumed
+ *    pass meets a spent key's refusal, not a second post-cooldown sequence —
+ *    `2 * judge + final`, the number the earlier draft reached for a single key
+ *    and the ledger refuted; it is reachable now only through TWO keys;
+ *  · CROSS-EXCHANGE AUTHOR: written by its root's own answerer on a seat built
+ *    with no runner-up, so ONE key and v4's `judge + final` in every run,
+ *    disclosed as `per_site_attempts.cross_exchange_site`. They are the
+ *    `panelSize * (panelSize - 1)` exchange nodes among the author sites; their
+ *    panel and review sites are ordinary judge seats and keep the backup;
+ *  · PANEL: two keys, never cooldown-wrapped — `2 * judge`;
+ *  · SERVE: two keys at the synthesis bound — `2 * organ`;
+ *  · the 80-20 split MOVES a call between a seat's two keys, never adds one;
+ *  · the runner calls at most `panelSize - 1` judges per node and refuses an
+ *    assignment that seats more than `panelSize` debaters, so the four site
+ *    counts are v4's.
+ * PRECONDITION (controller ruling A14; A16c, controller carries 11 and 14a):
+ * these bounds are exact provided every run pass derives a site's eligible
+ * members, their order and — for a cross-exchange — the root's writer from the
+ * site's identity and the ledger alone, never from in-memory visit order: the
+ * pinned assignment, the site-pure 80-20 ordinal (`seatSiteOrdinal`), and the
+ * ledger's per-key history (A15d's restoration, A16a's preference and
+ * hand-off), so a resumed pass meets the same members in the same order at
+ * every site it re-authors. A15d and A16a guarantee this; the per-key gateway
+ * caps plus A15d's final-retry check (carry 3) are what bound the site across
+ * any number of passes. Caveat (carry 14a): a cross-exchange site keeps the ONE
+ * key the ledger already holds for it, so after a resumed root is written by
+ * its other slot the key's `:seat:` marker no longer names the member that
+ * answers — the bound still holds, because it counts per KEY, but the marker is
+ * never a record of who answered; read the ledger row's actor and candidate.
+ * A run with no runner-up can never spend a backup sequence, so admission
+ * passes `backupSequencesProvisioned: 0` (or nothing) for it and the ceiling
+ * stays DR-184-v4, the TRUE maximum V ruled on 2026-09-05 to seal without
+ * padding. The receipt names its formula, and its per-site values are read
+ * WITH that name: `per_site_attempts.judge` is always the sequence bound;
+ * `organ` is the per-round serve limit in v4 and the serve site's total,
+ * backup included, in v5; `panel_member` and `cooldown_site` are per site; and
+ * `cross_exchange_site` exists on v5 receipts only, so a v4 receipt is
+ * byte-identical to the one minted before A14.
  */
 export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Readonly<Record<string, unknown>> & {
   readonly max_model_attempts: number;
@@ -317,6 +384,17 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
       );
     }
   }
+  // A14 (pre-flight ruling F17): the backup provision is a switch, never a count.
+  // Only a MISSING value means 0: `null`, `"1"`, `true` or `NaN` is a caller's
+  // defect, refused rather than read as DR-184-v4 in silence.
+  const provision: unknown = input.backupSequencesProvisioned;
+  if (provision !== undefined && provision !== 0 && provision !== 1) {
+    throw new TypedDomainError(
+      "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID",
+      "The structural ceiling input backupSequencesProvisioned must be 0 or 1"
+    );
+  }
+  const backupSequences = provision === 1 ? 1 : 0;
   if (input.depth > input.maxDepth) {
     // B2: the refusal belongs HERE, at admission. `evaluateAskAdmission` wraps
     // this call and `markAskRefusal` turns a TypedDomainError into an
@@ -334,13 +412,23 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   if (!Number.isInteger(nodesPerRoot)) {
     throw new TypedDomainError("STRUCTURAL_CEILING_TREE_INVALID", "The expansion tree is not integral");
   }
+  // The M(M-1) cross-root exchange nodes (`buildCrossRootExchangePlan`).
+  const crossExchangeNodes = input.panelSize === 1 ? 0 : input.panelSize * (input.panelSize - 1);
   // S2-2: the walking-skeleton literal is reachable at M=1 only — one node, no
   // panel, no cross-maker review.
   const materializedNodes = input.panelSize === 1
     ? 1
-    : input.panelSize * nodesPerRoot + input.panelSize * (input.panelSize - 1);
-  const cooldownSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts;
+    : input.panelSize * nodesPerRoot + crossExchangeNodes;
+  // A14 (DR-184-v5 when provisioned): one backup sequence per switchable seat call — see the doc comment.
+  const backupJudgeSequence = input.judgeMaxAttempts * backupSequences;
+  const backupOrganSequence = input.organMaxAttempts * backupSequences;
+  const cooldownSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts + backupJudgeSequence;
+  // A14 fix round 1: a cross-exchange author seat has no runner-up, so v4's allowance in every run.
+  const crossExchangeSiteAttempts = input.judgeMaxAttempts + input.finalRetryAttempts;
+  const panelMemberAttempts = input.judgeMaxAttempts + backupJudgeSequence;
+  const serveSiteAttempts = input.organMaxAttempts + backupOrganSequence;
   const authorSites = materializedNodes;
+  const crossExchangeAuthorSites = crossExchangeNodes;
   const panelSites = input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
   const reviewerSites = input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
   // THE RETIRED COMPOSITION TOPOLOGY — declared, checked, and BILLED NOWHERE.
@@ -364,19 +452,29 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   // F-T17T9-3: the serve leg is the SHIPPED chain, read from the one rule.
   const synthesisLoopSites = SERVE_LEG.sites(input);
   const serveSites = synthesisLoopSites;
-  const maxModelAttempts = (authorSites + reviewerSites) * cooldownSiteAttempts
-    + panelSites * input.judgeMaxAttempts
-    + serveSites * input.organMaxAttempts;
+  // In v4 the cross-exchange term equals the cooldown term, so this is v4's sum exactly.
+  const maxModelAttempts = (authorSites - crossExchangeAuthorSites + reviewerSites) * cooldownSiteAttempts
+    + crossExchangeAuthorSites * crossExchangeSiteAttempts
+    + panelSites * panelMemberAttempts
+    + serveSites * serveSiteAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
     panel_size: input.panelSize,
     depth: input.depth,
+    /**
+     * Read WITH `formula_version`. `judge` is the per-sequence bound in both
+     * formulas. `organ` is the per-round serve limit in DR-184-v4 and the serve
+     * site's total, main plus backup, in DR-184-v5. `panel_member` and
+     * `cooldown_site` are per site. `cross_exchange_site` exists on DR-184-v5
+     * only (A14 fix round 1), so a DR-184-v4 receipt keeps its sealed bytes.
+     */
     per_site_attempts: Object.freeze({
       judge: input.judgeMaxAttempts,
-      organ: input.organMaxAttempts,
-      panel_member: input.judgeMaxAttempts,
-      cooldown_site: cooldownSiteAttempts
+      organ: serveSiteAttempts,
+      panel_member: panelMemberAttempts,
+      cooldown_site: cooldownSiteAttempts,
+      ...(backupSequences === 1 ? { cross_exchange_site: crossExchangeSiteAttempts } : {})
     }),
     call_sites: Object.freeze({
       author: authorSites,
@@ -397,20 +495,24 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     }),
     /**
      * Engine money rule, Task M1 (spec 2026-09-26 §14.4.1) — THE ANSWER'S
-     * CALLS, HELD BACK. The serve leg priced in attempts, exactly as it is
-     * billed into `max_model_attempts` above (`serveSites x organMaxAttempts`).
-     * A call made while the debate is argued sees `max_model_attempts` less
-     * this; an answer-writing call sees the whole ceiling. So a debate that
-     * uses up its own calls still leaves the answer its calls.
+     * CALLS, HELD BACK: the serve leg priced in attempts exactly as it is
+     * billed into `max_model_attempts` above (`serveSites x serveSiteAttempts`).
+     * In DR-184-v4 that is the per-round organ limit; in DR-184-v5 (paid plans
+     * S1a) it is the serve site's total, main plus backup, so the body can never
+     * spend the answer's backup allowance. `parseCostEnvelopeBasis` checks the
+     * same product against `per_site_attempts.organ`. A call made while the
+     * debate is argued sees `max_model_attempts` less this; an answer-writing
+     * call sees the whole ceiling. So a debate that uses up its own calls still
+     * leaves the answer its calls.
      *
      * Carried on the receipt rather than re-derived by the reader, so the rule
      * is the one the run was ADMITTED under: a receipt minted before this
      * member existed has no reserve (`parseCostEnvelopeBasis` reads it as 0).
      */
-    serve_reserve_attempts: serveSites * input.organMaxAttempts,
+    serve_reserve_attempts: serveSites * serveSiteAttempts,
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: "DR-184-v4",
+    formula_version: backupSequences === 1 ? "DR-184-v5" : "DR-184-v4",
     bounds_source_ref: "engine-exports+register"
   });
 }
@@ -487,6 +589,48 @@ export function judgeTokenCeilingFromValue(value: unknown): number {
     throw new TypedDomainError("STRUCTURAL_CEILING_INPUTS_UNRESOLVED", "The judge bound's token ceiling is absent");
   }
   return parsed.data.organs.JUDGE.tokenCeiling;
+}
+
+/**
+ * Final review I3 — THE SEALED PER-CALL ANSWER BOUNDS the debate jobs' calls use,
+ * read once at boot for the model picker. The gateway's window wall is the
+ * prompt (UTF-8 bytes / 2) PLUS the attempt's `tokenCeiling`, so the picker needs
+ * each role's own bound to seat only candidates the gateway will not refuse:
+ *  - `judge`: `acceptanceOrganCostBounds.organs.JUDGE` — every debate call
+ *    (positions, arguments, exchanges, the panel, reviews) runs under it;
+ *  - `synthesizer` / `evaluator`: the synthesis-role rows `synthesizerCallBound`
+ *    and `evaluatorCallBound` (W10/3) — the answer writer's and checker's calls.
+ * Rows absent at this register version, or without a positive whole bound,
+ * refuse by one fixed code. Nothing here restates a sealed value.
+ */
+const callTokenCeilingSchema = z.object({ tokenCeiling: z.number().int().positive() }).passthrough();
+const organTokenCeilingsSchema = z.object({
+  kind: z.literal("ACCEPTANCE_ORGAN_COST_BOUNDS"),
+  organs: z.object({ JUDGE: callTokenCeilingSchema }).passthrough()
+}).passthrough();
+
+export async function readCallTokenCeilings(pool: Pool, registerVersion: number): Promise<{
+  readonly judge: number;
+  readonly synthesizer: number;
+  readonly evaluator: number;
+}> {
+  const result = await pool.query<{ row_key: string; value_json: unknown }>(
+    `SELECT row_key, value_json FROM register.register_row
+     WHERE register_version=$1 AND row_key=ANY($2::text[])`,
+    [registerVersion, ["acceptanceOrganCostBounds", "synthesizerCallBound", "evaluatorCallBound"]]
+  );
+  const byKey = new Map(result.rows.map((row) => [row.row_key, row.value_json]));
+  const organs = organTokenCeilingsSchema.safeParse(byKey.get("acceptanceOrganCostBounds"));
+  const synthesizer = callTokenCeilingSchema.safeParse(byKey.get("synthesizerCallBound"));
+  const evaluator = callTokenCeilingSchema.safeParse(byKey.get("evaluatorCallBound"));
+  if (!organs.success || !synthesizer.success || !evaluator.success) {
+    throw new TypeError("CALL_TOKEN_CEILINGS_UNRESOLVED");
+  }
+  return Object.freeze({
+    judge: organs.data.organs.JUDGE.tokenCeiling,
+    synthesizer: synthesizer.data.tokenCeiling,
+    evaluator: evaluator.data.tokenCeiling
+  });
 }
 
 export async function readPanelDiscoveryPolicy(pool: Pool, registerVersion: number): Promise<{
@@ -960,6 +1104,19 @@ export {
   type StoryRegisterRow,
   type StoryRegisterRowsInput
 } from "./story-policy.js";
+// A19: the optional model scorecard (absent -> the plan rosters choose the models).
+export {
+  BUNDLED_MODEL_SCORECARD_SOURCE_REF,
+  BUNDLED_MODEL_SCORECARD_URL,
+  MODEL_SCORECARD_MAX_BYTES,
+  MODEL_SCORECARD_ROW_KEY,
+  modelScorecardFromValue,
+  readBundledModelScorecard,
+  readEngineVersion,
+  readModelScorecard,
+  type ModelScorecardReadResult,
+  type ModelScorecardRefusalReason
+} from "./model-scorecard-policy.js";
 export {
   MFA_POLICY_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,

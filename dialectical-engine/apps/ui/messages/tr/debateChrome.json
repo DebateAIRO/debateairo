@@ -284,5 +284,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatör plan seçimini reddetti. Ücretsiz veya Premium planı seçip yeniden deneyin.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatör isteği reddetti: Bu planın gerektirdiği bir model şu anda kullanılamıyor. Daha sonra yeniden deneyin veya diğer planı seçin.",
   "requestFailure.kind.ALREADY_WAITING": "Aynı anda yalnızca bir soru bekleyebilir. Bekleyen tartışmanız başladıktan sonra bu soruyu sorun.",
-  "requestFailure.kind.UNCLASSIFIED": "Herhangi bir yanıt gelmeden önce işlem başarısız olduğundan sonuç bilinmiyor. Bu, koordinatörün verdiği bir karar değil."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Bu tartışma, bu sitenin tek bir tartışma için izin verdiğinden daha fazlasına mal olur.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatör isteği reddetti: Tartışmanın görevlerinden biri için şu anda erişilebilen bir yapay zekâ modeli yok. Daha sonra yeniden deneyin.",
+  "requestFailure.kind.UNCLASSIFIED": "Herhangi bir yanıt gelmeden önce işlem başarısız olduğundan sonuç bilinmiyor. Bu, koordinatörün verdiği bir karar değil.",
+  "debateChrome.condition.backupModelUsed": "Planlanan bir yapay zekâ modelinin kullanılamadığı yerde yerine başka biri geçti"
 }

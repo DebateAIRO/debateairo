@@ -6784,6 +6784,11 @@ a:focus-visible {
   color: var(--text-3);
   white-space: nowrap;
 }
+/* Final review C1: the plain line a plan card shows when it names no models. */
+.ndTierModelsNote {
+  font-size: 10.5px;
+  color: var(--text-3);
+}
 .ndSegItem:disabled,
 .ndSlider:disabled,
 .ndSteerInput:disabled,

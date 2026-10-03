@@ -1,14 +1,21 @@
 import { z } from "zod";
 import {
   CliRelayFailure,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
   invokeCli,
+  openRelayWorkspace,
+  reportHarnessOverhead,
   resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
   type CliCompletion,
+  type CliFailureEvidence,
+  type CliInvocation,
   type CliRelayAdapter,
   type CliRelayHandle,
-  type CommandSpec
+  type CommandSpec,
+  type HarnessOverhead,
+  type RelayWorkspace
 } from "./relay-core.js";
 
 /**
@@ -68,6 +75,18 @@ export const CLAUDE_HANDSHAKE_PROMPT =
  * "user,project,local" — project and local remain excluded.
  */
 export const CLAUDE_SETTING_SOURCES = "user" as const;
+/** §2.2 — `claude --help` 2.1.282 (M4, 2026-09-26): `--effort low|medium|high|xhigh|max`. */
+export const CLAUDE_THINKING_LEVELS = Object.freeze(["low", "medium", "high", "xhigh", "max"] as const);
+/**
+ * R4 — the ONE usage-cap signature on record for this CLI: 2026-08-11, the
+ * default model answered `is_error: true` with "You've reached your Fable 5
+ * limit" (api_error 429), see CLAUDE_MODEL_ALIAS above. Only that wording is a
+ * cap; every other failure stays CLAUDE_CLI_FAILED, which the gateway retries
+ * and the runner's backup absorbs after the normal retries. A new wording is
+ * added only from a redacted real capture.
+ */
+export const CLAUDE_USAGE_CAP_PATTERN = /\byou(?:'|’)ve reached your\b[^\n]{0,80}?\blimit\b/iu;
+export const CLAUDE_CLI_USAGE_CAP = "CLAUDE_CLI_USAGE_CAP" as const;
 
 const envelopeSchema = z.object({
   is_error: z.boolean(),
@@ -81,6 +100,13 @@ const observedTokenUsageSchema = z.object({
   output_tokens: z.number().int().nonnegative().optional(),
   inputTokens: z.number().int().nonnegative().optional(),
   outputTokens: z.number().int().nonnegative().optional(),
+  // D8: Claude Code counts cached input APART from inputTokens (M5: 2 input +
+  // 685 cache-creation on a lean one-line call). Read for the harness-overhead
+  // line only; usage.promptTokens keeps its meaning.
+  cacheCreationInputTokens: z.number().int().nonnegative().optional(),
+  cacheReadInputTokens: z.number().int().nonnegative().optional(),
+  cache_creation_input_tokens: z.number().int().nonnegative().optional(),
+  cache_read_input_tokens: z.number().int().nonnegative().optional(),
   canonicalModel: z.string().trim().min(1).optional()
 }).passthrough();
 
@@ -113,7 +139,11 @@ function parseClaudeEnvelope(stdout: string, alias: string) {
   }
   const envelope = envelopeSchema.safeParse(decoded);
   if (!envelope.success) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_OUTPUT_INVALID");
-  if (envelope.data.is_error !== false) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_FAILED");
+  if (envelope.data.is_error !== false) {
+    throw CLAUDE_USAGE_CAP_PATTERN.test(envelope.data.result)
+      ? new CliRelayFailure("USAGE_CAP", CLAUDE_CLI_USAGE_CAP)
+      : new CliRelayFailure("FAILED", "CLAUDE_CLI_FAILED");
+  }
   const content = envelope.data.result.trim();
   if (content.length === 0) throw new CliRelayFailure("FAILED", "CLAUDE_CLI_OUTPUT_INVALID");
   const model = resolveClaudeModel(envelope.data.modelUsage, alias);
@@ -133,11 +163,41 @@ function parseClaudeEnvelope(stdout: string, alias: string) {
       : { totalTokens: inputTokens + outputTokens }),
     ...(costUsd === undefined ? {} : { costUsd })
   };
+  const cacheTokens = observed.success
+    ? [
+      observed.data.cacheCreationInputTokens ?? observed.data.cache_creation_input_tokens,
+      observed.data.cacheReadInputTokens ?? observed.data.cache_read_input_tokens
+    ].filter((count): count is number => count !== undefined)
+    : [];
   return Object.freeze({
     content,
     model,
-    usage: Object.keys(usage).length === 0 ? null : Object.freeze(usage)
+    usage: Object.keys(usage).length === 0 ? null : Object.freeze(usage),
+    // D8: everything the CLI says the model read, cache included.
+    ...(inputTokens === undefined || cacheTokens.length === 0
+      ? {}
+      : { reportedInputTokens: cacheTokens.reduce((sum, count) => sum + count, inputTokens) })
   });
+}
+
+/**
+ * R4 for a NON-ZERO exit: the recorded cap exited 1 with its envelope on
+ * stdout. §2.3: the Claude envelope carries no thinking-token counter (its
+ * recorded members are is_error, result, modelUsage and total_cost_usd), so
+ * this relay reports none and never guesses one.
+ */
+function claudeUsageCapCode(evidence: CliFailureEvidence): string | null {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(evidence.stdout);
+  } catch {
+    return null;
+  }
+  const envelope = envelopeSchema.safeParse(decoded);
+  return envelope.success && envelope.data.is_error === true
+    && CLAUDE_USAGE_CAP_PATTERN.test(envelope.data.result)
+    ? CLAUDE_CLI_USAGE_CAP
+    : null;
 }
 
 function createClaudeAdapter(alias: string): CliRelayAdapter {
@@ -157,6 +217,8 @@ function createClaudeAdapter(alias: string): CliRelayAdapter {
   ],
   failureCode: "CLAUDE_CLI_FAILED",
   timeoutCode: "CLAUDE_CLI_TIMEOUT",
+  thinkingLevels: CLAUDE_THINKING_LEVELS,
+  classifyUsageCap: claudeUsageCapCode,
   // --no-session-persistence: relay calls must not accrete resumable sessions;
   // --tools "": the relay is a pure completion transport, no agentic tools.
   //
@@ -181,15 +243,24 @@ function createClaudeAdapter(alias: string): CliRelayAdapter {
   // Both are needed: --setting-sources user narrows WHICH SCOPES load,
   // --safe-mode disables the CUSTOMIZATIONS within them. Neither alone is
   // sufficient — dropping either is caught by a test.
-  buildArguments: (prompt) => [
+  // §2.2: `--effort` is APPENDED only when a level was asked, so an unasked
+  // call carries no level flag at all.
+  //
+  // D8 (lean calls, M5): `--system-prompt` REPLACES Claude Code's own large
+  // system prompt with the relay's one fixed sentence (a lean call measured
+  // ~687 input tokens). `--bare` would strip more, but it also disables the
+  // OAuth/keychain login, so a subscription could not sign in: never pass it.
+  buildArguments: (prompt: string, invocation?: CliInvocation) => [
     "-p", prompt,
     "--output-format", "json",
+    "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT,
     "--setting-sources", CLAUDE_SETTING_SOURCES,
     "--safe-mode",
     "--strict-mcp-config",
     "--no-session-persistence",
     "--tools", "",
-    "--model", alias
+    "--model", alias,
+    ...(invocation?.thinkingLevel === undefined ? [] : ["--effort", invocation.thinkingLevel])
   ],
   parseCompletion: (stdout) => parseClaudeEnvelope(stdout, alias)
   };
@@ -208,6 +279,10 @@ export interface ClaudeRelayHandle extends CliRelayHandle {
   /** The model id the CLI itself reported during the startup handshake. */
   readonly model: string;
   readonly maker: typeof ANTHROPIC_MAKER;
+  /** §2.2: the `--effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
+  /** D8: what Claude Code added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
 }
 
 export interface ClaudePreflightOptions {
@@ -216,6 +291,11 @@ export interface ClaudePreflightOptions {
   readonly testOnlyCommand?: CommandSpec;
   /** Use the same requested model for the handshake and served calls. */
   readonly modelAlias?: string;
+  /**
+   * D8: the relay's own workspace, lent for its handshake. Absent (the
+   * ceremony's standalone preflight) ⇒ a private one is opened and removed here.
+   */
+  readonly workspace?: RelayWorkspace;
 }
 
 export interface ClaudePreflightResult {
@@ -247,13 +327,15 @@ export async function preflightClaudeCli(
     options.testOnlyCommand,
     "TEST_ONLY_CLAUDE_COMMAND_FORBIDDEN"
   );
-  const handshake = await invokeCli(
-    command,
-    createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS),
-    CLAUDE_HANDSHAKE_PROMPT,
-    options.timeoutMs
-  );
-  return Object.freeze({ command, handshake });
+  const adapter = createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS);
+  // D8: the handshake runs exactly where served calls run.
+  const workspace = options.workspace ?? await openRelayWorkspace(adapter);
+  try {
+    const handshake = await invokeCli(command, adapter, CLAUDE_HANDSHAKE_PROMPT, options.timeoutMs, { workspace });
+    return Object.freeze({ command, handshake });
+  } finally {
+    if (options.workspace === undefined) await workspace.close();
+  }
 }
 
 /**
@@ -265,23 +347,36 @@ export async function preflightClaudeCli(
  */
 export async function startClaudeRelay(options: ClaudeRelayOptions): Promise<ClaudeRelayHandle> {
   const claudeAdapter = createClaudeAdapter(options.modelAlias ?? CLAUDE_MODEL_ALIAS);
-  const { command, handshake } = await preflightClaudeCli({
-    timeoutMs: options.timeoutMs,
-    ...(options.modelAlias === undefined ? {} : { modelAlias: options.modelAlias }),
-    ...(options.testOnlyCommand === undefined ? {} : { testOnlyCommand: options.testOnlyCommand })
-  });
-  const server = await startCliRelayServer({
-    port: options.port,
-    timeoutMs: options.timeoutMs,
-    command,
-    adapter: claudeAdapter
-  });
-  return Object.freeze({
-    port: server.port,
-    baseUrl: server.baseUrl,
-    authorizationHeader: server.authorizationHeader,
-    model: handshake.model,
-    maker: ANTHROPIC_MAKER,
-    close: () => server.close()
-  });
+  // D8: ONE private workspace for this relay's whole life, the handshake
+  // included; the server removes it at close().
+  const workspace = await openRelayWorkspace(claudeAdapter);
+  try {
+    const { command, handshake } = await preflightClaudeCli({
+      timeoutMs: options.timeoutMs,
+      workspace,
+      ...(options.modelAlias === undefined ? {} : { modelAlias: options.modelAlias }),
+      ...(options.testOnlyCommand === undefined ? {} : { testOnlyCommand: options.testOnlyCommand })
+    });
+    const harnessOverhead = reportHarnessOverhead(ANTHROPIC_MAKER, CLAUDE_HANDSHAKE_PROMPT, handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      adapter: claudeAdapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model: handshake.model,
+      maker: ANTHROPIC_MAKER,
+      thinkingLevels: CLAUDE_THINKING_LEVELS,
+      harnessOverhead,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
 }

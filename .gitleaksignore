@@ -11,3 +11,8 @@ f76e47f945c8944694c1acfd8791ea37d2ee8836:dialectical-engine/apps/ui/messages/sl/
 # 2026-09-30 — paid-plans plan (task X0's code, quoted in the plan): generic-api-key matched the dummy xMoney fixture
 # key "0123456789abcdef" written twice, a made-up test value; not a key. Owner's ruling on PR #48. The plan now writes it as a join.
 7270e3615c0bed144416cee543f99b46efea072c:dialectical-engine/docs/superpowers/plans/2026-09-29-paid-plans-and-payments.md:generic-api-key:28523
+# 2026-10-03 — paid-plans Part 3 (PR #70): generic-api-key matched the scorecard test's deliberate fake key
+# "sk-live-" + made-up hex (commit ede2d62e, the owner's scorecard branch, 2026-09-28), which proves an unknown
+# scorecard field's key-shaped name is never printed. A made-up value, not a key. Owner's ruling on PR #70.
+# The test now builds the value from pieces, so later edits do not raise the same match.
+ede2d62e142e0a0f4f5881b0c9f2af55f8e1bc0e:dialectical-engine/tests/unit/hosted-register-publish.test.ts:generic-api-key:778

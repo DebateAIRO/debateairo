@@ -106,6 +106,11 @@ if (process.env.FAKE_CLAUDE_ALWAYS_FAIL === "1") {
 } else if (prompt.includes("IGNORE_SIGTERM_CLI")) {
   process.on("SIGTERM", () => undefined);
   setTimeout(() => process.stdout.write(`${envelope({ result: "unreachable late output" })}\n`), 2_000);
+} else if (prompt.includes("USAGE_CAP_CLI")) {
+  // R4: the one recorded cap (2026-08-11, `claude-relay.ts` CLAUDE_MODEL_ALIAS
+  // note): exit 1, is_error true, the CLI's own "You've reached your … limit".
+  process.stdout.write(`${envelope({ is_error: true, result: "You've reached your fake-model limit", modelUsage: {} })}\n`);
+  process.exitCode = 1;
 } else if (prompt.includes("IS_ERROR_CLI")) {
   // Observed live on 2026-08-10: auth failure => exit 1, is_error true,
   // result carries the CLI's own error text, modelUsage empty.

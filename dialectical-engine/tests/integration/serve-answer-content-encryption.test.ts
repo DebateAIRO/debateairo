@@ -14,6 +14,7 @@ import {
   CONTENT_JSON_SENTINEL,
   RunRepository,
   configureContentEncryption,
+  insertRunRoleAssignment,
   migrate
 } from "@debateai/db";
 import { WorkItemRepository } from "@debateai/battery";
@@ -27,6 +28,7 @@ import {
   type ServeGateResult
 } from "@debateai/serve";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import { EXPECTED_ANSWER_MODEL_ASSIGNMENT, PINNED_ROLE_ASSIGNMENT } from "../support/roleAssignmentFixture.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 // L5-F2 (security hardening, B21): an encrypted run's final verdict text lives
@@ -482,6 +484,34 @@ describe("serve.answer verdict text is an encrypted content carrier (L5-F2)", ()
       .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: firstText } });
     await expect(serve.readAnswerProjection(answerId, { ownerRef, legacyAskerId: null }, 2))
       .resolves.toMatchObject({ answer_form: { kind: "VERDICT", text: secondText } });
+  }, 120_000);
+
+  // A21 fix round 1 (M2). The pinned role assignment is engine identifiers, not
+  // a content carrier (0090), so the projection reads it in the clear beside
+  // the other served metadata. This proves an ENCRYPTED run serves it too,
+  // next to its decrypted verdict and through the same owner-scoped read.
+  it("serves an encrypted run's pinned model assignment beside its decrypted verdict (A21)", async () => {
+    const marker = randomUUID();
+    const verdictText = `B21_A21_PINNED_VERDICT_${marker}`;
+    const runId = await createEncryptedRun(`b21 a21 pinned question ${marker}`);
+    await insertRunRoleAssignment(database.pool, {
+      runId, assignment: { ...PINNED_ROLE_ASSIGNMENT }, strength: "BALANCED", steppedDown: true
+    });
+    const answerId = await persistVerdict(
+      runId, { kind: "VERDICT", text: verdictText }, `b21-a21-segment-${marker}`
+    );
+    const storedRow = await readStoredAnswer(answerId);
+    expect(storedRow.answer_form).toEqual(CONTENT_JSON_SENTINEL);
+    expect(storedRow.row_text).not.toContain(verdictText);
+
+    const projection = await new ServeRepository(database.pool)
+      .readAnswerProjection(answerId, { ownerRef, legacyAskerId: null });
+    expect(projection).toMatchObject({
+      answer_id: answerId,
+      run_ref: runId,
+      answer_form: { kind: "VERDICT", text: verdictText }
+    });
+    expect(projection?.model_assignment).toEqual(EXPECTED_ANSWER_MODEL_ASSIGNMENT);
   }, 120_000);
 
   // FIX ROUND 1 / F1. This migration must not OWN any function an earlier

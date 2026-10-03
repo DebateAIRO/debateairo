@@ -13,6 +13,8 @@ const REMOVED_SCAFFOLD_MODEL = "qa-deterministic-v1";
 export const DEVELOPMENT_UNAVAILABLE_CLI_MODEL = "CLI_HANDSHAKE_UNAVAILABLE" as const;
 export const DEVELOPMENT_MINIMUM_DISTINCT_MAKERS = 1 as const;
 export const DEVELOPMENT_CLI_CALL_TIMEOUT_MS = 180_000 as const;
+/** §2.2: every development relay reads its level from the engine's extension member. */
+export const DEVELOPMENT_RELAY_THINKING_PARAMETER = "x_thinking_level" as const;
 
 export const REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON = JSON.stringify([{
   provider_ref: REMOVED_SCAFFOLD_PROVIDER_REF,
@@ -22,10 +24,13 @@ export const REMOVED_DEVELOPMENT_SCAFFOLD_TARGETS_JSON = JSON.stringify([{
 
 /**
  * One slot per plan-tier roster member (V, 2026-09-12: "Both free and premium need to be
- * accessible at the same time"). Discovery is 1:1 with the configured provider set — one
- * target per provider_ref, checked in parseProviderDiscoveryTargets — so a maker that
- * serves two tiers needs two slots. The order is the order of the discovery targets and
- * of the sealed configuredProviderSet row; appending is safe, reordering is not.
+ * accessible at the same time"), then the two subscription makers of the owner's model
+ * scorecard ruling (spec §2.10, 2026-09-26): Google through `agy` and Z.AI (GLM) through
+ * `pi`. Discovery is 1:1 with the configured provider set — one target per provider_ref,
+ * checked in parseProviderDiscoveryTargets — so a maker that serves two tiers needs two
+ * slots. The order is the order of the discovery targets and of the sealed
+ * configuredProviderSet row; appending is safe, reordering is not. A grown set reaches
+ * the register as a NEW version (the seed step, or dev:auth:publish-provider-set).
  */
 export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
   Object.freeze({
@@ -57,6 +62,18 @@ export const DEVELOPMENT_CLI_PROVIDER_ROSTER = Object.freeze([
     adapterKind: "openai-compatible-http" as const,
     maker: "xAI",
     port: 8_793
+  }),
+  Object.freeze({
+    providerRef: "development:agy-cli",
+    adapterKind: "openai-compatible-http" as const,
+    maker: "Google",
+    port: 8_797
+  }),
+  Object.freeze({
+    providerRef: "development:pi-glm-cli",
+    adapterKind: "openai-compatible-http" as const,
+    maker: "Z.AI",
+    port: 8_798
   })
 ] as const);
 
@@ -93,6 +110,8 @@ type DevelopmentCliTargetObservation = Readonly<{
   baseUrl: string;
   model: string;
   authorizationHeader?: string;
+  thinkingLevels?: readonly string[];
+  contextWindowTokens?: number;
 }>;
 
 function configuredProvidersFor(
@@ -129,6 +148,7 @@ export function buildDevelopmentProviderPanel(
     const healthy = observation.model !== DEVELOPMENT_UNAVAILABLE_CLI_MODEL;
     if ((healthy && observation.authorizationHeader === undefined)
       || (!healthy && observation.authorizationHeader !== undefined)
+      || (!healthy && (observation.thinkingLevels !== undefined || observation.contextWindowTokens !== undefined))
       || observation.model === REMOVED_SCAFFOLD_MODEL
       || observation.providerRef === REMOVED_SCAFFOLD_PROVIDER_REF) {
       throw new TypeError("DEV_CLI_PROVIDER_PANEL_TARGET_INVALID");
@@ -138,7 +158,15 @@ export function buildDevelopmentProviderPanel(
       base_url: observation.baseUrl,
       model: observation.model,
       ...(observation.authorizationHeader === undefined
-        ? {} : { authorization_header: observation.authorizationHeader })
+        ? {} : { authorization_header: observation.authorizationHeader }),
+      // §2.2/§2.10: a healthy relay declares what its CLI can do; an absent one
+      // declares nothing, because nothing answered.
+      ...(observation.thinkingLevels === undefined ? {} : {
+        thinking_parameter: DEVELOPMENT_RELAY_THINKING_PARAMETER,
+        thinking_levels: observation.thinkingLevels
+      }),
+      ...(observation.contextWindowTokens === undefined
+        ? {} : { context_window_tokens: observation.contextWindowTokens })
     });
   });
   const targetsJson = JSON.stringify(rows);
@@ -187,12 +215,20 @@ export function parseDevelopmentProviderPanelTargets(
   if (targets.some((target) => target.authorizationFile !== undefined)) {
     throw new TypeError("DEV_CLI_PROVIDER_PANEL_AUTHORIZATION_FILE_UNSUPPORTED");
   }
+  // §2.2: development relays read x_thinking_level and nothing else; a row naming
+  // another member would be rewritten on the round trip, so it is refused.
+  if (targets.some((target) => target.thinkingParameter !== undefined
+    && target.thinkingParameter !== DEVELOPMENT_RELAY_THINKING_PARAMETER)) {
+    throw new TypeError("DEV_CLI_PROVIDER_PANEL_THINKING_PARAMETER_INVALID");
+  }
   return buildDevelopmentProviderPanel(targets.map((target) => Object.freeze({
     providerRef: target.providerRef,
     baseUrl: target.baseUrl,
     model: target.model,
     ...(target.authorizationHeader === undefined
-      ? {} : { authorizationHeader: target.authorizationHeader })
+      ? {} : { authorizationHeader: target.authorizationHeader }),
+    ...(target.thinkingLevels === undefined ? {} : { thinkingLevels: target.thinkingLevels }),
+    ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens })
   })), profile);
 }
 

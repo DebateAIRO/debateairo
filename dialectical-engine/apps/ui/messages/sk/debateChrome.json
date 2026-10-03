@@ -284,6 +284,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinátor odmietol výber programu. Vyberte Bezplatný alebo Premium a potom to skúste znova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinátor požiadavku odmietol: model, ktorý tento program potrebuje, momentálne nie je dostupný. Skúste to znova neskôr alebo vyberte druhý program.",
   "requestFailure.kind.ALREADY_WAITING": "Naraz môže čakať iba jedna otázka. Túto položte, keď sa začne vaša čakajúca debata.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Táto debata by stála viac, než táto stránka povoľuje na jednu debatu.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinátor požiadavku odmietol: pre jednu z úloh debaty teraz nie je dostupný žiadny model AI. Skúste to znova neskôr.",
   "requestFailure.kind.UNCLASSIFIED": "Požiadavka zlyhala skôr, než prišla akákoľvek odpoveď, takže výsledok nie je známy. Nejde o rozhodnutie koordinátora.",
   "debateChrome.score.distinctPair.few": "{count} odlišné dvojice doména zdroja/metóda",
   "debateChrome.score.distinctPair.many": "{count} odlišnej dvojice doména zdroja/metóda",
@@ -298,5 +300,6 @@
   "debateChrome.scoring.unavailableClaim.few": "{count} nedostupné tvrdenia",
   "debateChrome.scoring.unavailableClaim.many": "{count} nedostupného tvrdenia",
   "debateChrome.scoring.realScoresDetail.few": "Z odpovede hodnotenia sa zobrazujú {count} uložené ohodnotené tvrdenia.",
-  "debateChrome.scoring.realScoresDetail.many": "Z odpovede hodnotenia sa zobrazuje {count} uloženého ohodnoteného tvrdenia."
+  "debateChrome.scoring.realScoresDetail.many": "Z odpovede hodnotenia sa zobrazuje {count} uloženého ohodnoteného tvrdenia.",
+  "debateChrome.condition.backupModelUsed": "Kde plánovaný model AI nebolo možné použiť, zastúpil ho iný"
 }

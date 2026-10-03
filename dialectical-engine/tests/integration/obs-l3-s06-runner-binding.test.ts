@@ -360,6 +360,10 @@ describe("S06 provider gateway binding", () => {
           return { rows: [{ envelope_basis: S06_ENVELOPE_BASIS }] };
         }
         if (sql.includes("SELECT count(*)::text")) return { rows: [{ count: "0" }] };
+        // Model scorecard §2.3: the gateway records each attempt's prompt
+        // (ledger.call_prompt) before it is sent. No cipher is configured on this
+        // stub pool, so the row is the plaintext form and nothing is read back.
+        if (sql.includes("INSERT INTO ledger.call_prompt")) return { rows: [] };
         throw new Error(`UNEXPECTED_POOL_QUERY:${sql}`);
       },
     } as unknown as Pool;
@@ -520,7 +524,7 @@ export async function resolve(specifier, context, nextResolve) {
       // \`readStoryPolicyFromRegister\`, the optional story rows' boot read.
       // Paid plans B9b added \`EntitlementRepository\` (@debateai/db, above),
       // \`costEnvelopeBand\` and \`readBillingPlans\`; B9d added \`costEnvelopeCeilings\`.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {}",
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function readEngineVersion() {} export function readModelScorecard() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
     };
     if (Object.hasOwn(stubs, specifier)) {

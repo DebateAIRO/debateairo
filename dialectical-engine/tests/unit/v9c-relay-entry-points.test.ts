@@ -14,6 +14,7 @@ import {
   type CommandSpec
 } from "../../acceptance/relay-core.js";
 import { assertRelayRuntime, relayRuntimeRefusalCode } from "../../acceptance/relay-deployment-guard.js";
+import { serveRelayHost } from "../../acceptance/relay-host.js";
 import { runAcceptanceCeremony, type AcceptanceArguments } from "../../acceptance/run-acceptance.js";
 import {
   DEVELOPMENT_CLI_PROVIDER_ROSTER,
@@ -198,6 +199,19 @@ describe("V-9(c) every entry point that starts a relay refuses the hosted deploy
     for (const [label, environment] of LOCAL) {
       const rejection = runAcceptanceCeremony(parsed, { ...environment });
       await expect(rejection, label).rejects.toThrow(/ACCEPTANCE_DB_PORT/u);
+      await expect(rejection, label).rejects.not.toThrow(REFUSAL_CODES);
+    }
+  });
+
+  it("the relay host (`relays:serve`) refuses before it reads its candidates; local goes on to read them", async () => {
+    // The candidates file does not exist, so a local host stops at its first read and serves nothing.
+    const candidatesPath = join(tmpdir(), "v9c-relay-host-absent-candidates.json");
+    for (const [label, environment, code] of REFUSED) {
+      await expect(serveRelayHost({ candidatesPath, environment }), label).rejects.toMatchObject({ code, message: code });
+    }
+    for (const [label, environment] of LOCAL) {
+      const rejection = serveRelayHost({ candidatesPath, environment });
+      await expect(rejection, label).rejects.toThrow("RELAY_HOST_CANDIDATES_UNREADABLE");
       await expect(rejection, label).rejects.not.toThrow(REFUSAL_CODES);
     }
   });

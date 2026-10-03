@@ -298,5 +298,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinátor odmítl zvolený plán. Vyberte Zdarma nebo Premium a poté akci zopakujte.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinátor požadavek odmítl: model, který tento plán vyžaduje, momentálně není k dispozici. Zkuste to znovu později nebo zvolte jiný plán.",
   "requestFailure.kind.ALREADY_WAITING": "Čekat může vždy jen jedna otázka. Tuto položte, až začne vaše čekající debata.",
-  "requestFailure.kind.UNCLASSIFIED": "K selhání došlo ještě před doručením jakékoli odpovědi, takže výsledek není znám. Nejde o rozhodnutí koordinátoru."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Tato debata by stála víc, než tento web povoluje na jednu debatu.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinátor požadavek odmítl: pro jednu z úloh debaty teď není dostupný žádný model AI. Zkuste to znovu později.",
+  "requestFailure.kind.UNCLASSIFIED": "K selhání došlo ještě před doručením jakékoli odpovědi, takže výsledek není znám. Nejde o rozhodnutí koordinátoru.",
+  "debateChrome.condition.backupModelUsed": "Kde plánovaný model AI nešlo použít, zastoupil ho jiný"
 }

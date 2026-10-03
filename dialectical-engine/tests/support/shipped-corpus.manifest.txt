@@ -13,6 +13,7 @@
 apps/api/src/account-erasure.ts
 apps/api/src/admission.ts
 apps/api/src/ask-billing.ts
+apps/api/src/ask-model-picker.ts
 apps/api/src/ask-room.ts
 apps/api/src/billing/account-email.ts
 apps/api/src/billing/audit.ts
@@ -81,6 +82,7 @@ apps/api/src/mail-channel.ts
 apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
+apps/api/src/person-room-picker.ts
 apps/api/src/provider-discovery.ts
 apps/api/src/publication-check/check.ts
 apps/api/src/publication-check/judge-transport.ts
@@ -270,6 +272,7 @@ apps/runner/src/production-database-url.ts
 apps/runner/src/provider-topology.ts
 apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts
+apps/runner/src/run-seats.ts
 apps/runner/src/runner-startup-reconciliation.ts
 apps/runner/src/serve-disclosure-cli.ts
 apps/runner/src/story-snapshot.ts
@@ -557,6 +560,8 @@ apps/ui/lib/legal/zh/termsOfService.ts
 apps/ui/lib/legalDocument.ts
 apps/ui/lib/makerIdentity.ts
 apps/ui/lib/mfaEnrollment.ts
+apps/ui/lib/modelStrength.test.mjs
+apps/ui/lib/modelStrength.ts
 apps/ui/lib/models.ts
 apps/ui/lib/observability/index.ts
 apps/ui/lib/observability/logger.ts
@@ -743,6 +748,7 @@ packages/judgement/src/prompts.ts
 packages/judgement/src/s04.ts
 packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
+packages/kernel/src/debate-roles.ts
 packages/kernel/src/index.ts
 packages/kernel/src/support-credentials.ts
 packages/kernel/src/support-text-views.ts
@@ -797,6 +803,7 @@ packages/register/src/country-policy.ts
 packages/register/src/engine-shape.ts
 packages/register/src/index.ts
 packages/register/src/mfa-policy.ts
+packages/register/src/model-scorecard-policy.ts
 packages/register/src/product-role-policy.ts
 packages/register/src/recovery-policy.ts
 packages/register/src/register-publication.ts
@@ -805,7 +812,18 @@ packages/register/src/session-policy.ts
 packages/register/src/story-policy.ts
 packages/register/src/support-config.ts
 packages/register/src/tax-authorities.ts
+packages/scorecard/scripts/write-schema.ts
+packages/scorecard/src/estimate.ts
+packages/scorecard/src/first-call-plan-models.ts
+packages/scorecard/src/index.ts
+packages/scorecard/src/json-schema.ts
+packages/scorecard/src/moment.ts
+packages/scorecard/src/parse.ts
+packages/scorecard/src/picker.ts
+packages/scorecard/src/plan-caps.ts
+packages/scorecard/src/schema.ts
 packages/serve/src/index.ts
+packages/serve/src/model-assignment.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
 packages/story/src/contracts.ts

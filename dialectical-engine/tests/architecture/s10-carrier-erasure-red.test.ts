@@ -229,6 +229,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       .sort();
     expect(providerFiles).toEqual([
       "apps/runner/src/index.ts",
+      // Model scorecard A15: the seat caller's candidate stamp forwards the leased runner's request.
+      "apps/runner/src/run-seats.ts",
       "packages/evaluator/src/index.ts",
       "packages/judgement/src/index.ts",
       // Verdict story: the writer calls ONLY the gateway the runner hands it (the
@@ -243,9 +245,20 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/withPublicSampleLease\(sample/);
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/provider\.classify/);
     expect(contents.get("packages/evaluator/src/index.ts")).toMatch(/withRunContentLease/);
-    // Judge is a pure prompt/parser object. Its only production construction is
-    // under the leased runner and the run-required gateway above.
-    expect(contents.get("apps/runner/src/index.ts")).toMatch(/new Judge\(/);
+    // Judge is a pure prompt/parser object. Its production constructions are all
+    // under the leased runner and the run-required gateway above: the runner's
+    // own, and the seat book's (model scorecard A15), which builds a Judge around
+    // a configured maker's gateway wrapped in the candidate stamp. run-seats.ts
+    // opens no lease of its own, and only the leased runner imports it.
+    expect([...contents].filter(([,body]) => /new Judge\(/.test(body)).map(([path]) => path).sort()).toEqual([
+      "apps/runner/src/index.ts",
+      "apps/runner/src/run-seats.ts"
+    ]);
+    // Paid plans S1a: the seat's judge is built over the stamped provider, or over the
+    // gateway the runner's cheaper-model-while-arguing factory wraps around it.
+    expect(contents.get("apps/runner/src/run-seats.ts")).toMatch(/new Judge\(judgeGateway\)/);
+    expect([...contents].filter(([,body]) => /from "\.\/run-seats\.js"/.test(body)).map(([path]) => path))
+      .toEqual(["apps/runner/src/index.ts"]);
   });
 
   it("classifies direct ContentCipher consumers as provisioning or public-corpus paths", async () => {

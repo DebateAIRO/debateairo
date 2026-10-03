@@ -284,5 +284,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinaattori hylkäsi tilaustason valinnan. Valitse Maksuton tai Premium ja yritä sitten uudelleen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinaattori hylkäsi pyynnön: tämän tilaustason tarvitsema malli ei ole juuri nyt saatavilla. Yritä myöhemmin uudelleen tai valitse toinen tilaustaso.",
   "requestFailure.kind.ALREADY_WAITING": "Vain yksi kysymys voi odottaa kerrallaan. Esitä tämä, kun odottava väittelysi on alkanut.",
-  "requestFailure.kind.UNCLASSIFIED": "Pyyntö epäonnistui ennen vastauksen saapumista, joten lopputulos ei ole tiedossa. Tämä ei ole koordinaattorin tekemä päätös."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Tämä väittely maksaisi enemmän kuin sivusto sallii yhdelle väittelylle.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinaattori hylkäsi pyynnön: yhdelle väittelyn tehtävistä ei juuri nyt tavoiteta yhtään tekoälymallia. Yritä myöhemmin uudelleen.",
+  "requestFailure.kind.UNCLASSIFIED": "Pyyntö epäonnistui ennen vastauksen saapumista, joten lopputulos ei ole tiedossa. Tämä ei ole koordinaattorin tekemä päätös.",
+  "debateChrome.condition.backupModelUsed": "Kun suunniteltua tekoälymallia ei voitu käyttää, toinen tuli sen tilalle"
 }

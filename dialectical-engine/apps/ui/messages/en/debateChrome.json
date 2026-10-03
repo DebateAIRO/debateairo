@@ -183,6 +183,7 @@
   "debateChrome.condition.leverageUnresolved": "Leverage unresolved",
   "debateChrome.condition.branchFrozenLowLeverage": "Branch not expanded: it could not move the answer",
   "debateChrome.condition.degradedDiversity": "Model diversity degraded",
+  "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in",
   "debateChrome.condition.singleLineage": "Single model lineage",
   "debateChrome.condition.critiqueUnavailable": "Independent critique unavailable",
   "debateChrome.condition.panelPartial": "Some judges could not assess this point",
@@ -284,5 +285,7 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "The coordinator refused the plan choice. Choose Free or Premium, then retry.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "The coordinator refused it: a model this plan needs is not available right now. Retry later, or choose the other plan.",
   "requestFailure.kind.ALREADY_WAITING": "One question can wait at a time. Ask this one after your waiting debate has started.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "This debate would cost more than this site allows for one debate.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "The coordinator refused it: one of the debate's jobs has no AI model it can reach right now. Retry later.",
   "requestFailure.kind.UNCLASSIFIED": "It failed before any answer arrived, so the outcome is unknown. This is not a decision the coordinator made."
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEVELOPMENT_CLI_PROVIDER_ROSTER,
   DEVELOPMENT_MINIMUM_DISTINCT_MAKERS,
   loadDevelopmentProviderPanelFromEnvironment,
   parseDevelopmentProviderPanelTargets
@@ -14,16 +15,21 @@ describe("real development CLI provider panel", () => {
     });
     expect(panel).toEqual(TEST_DEVELOPMENT_PROVIDER_PANEL);
     expect(panel.requiredDistinctMakers).toBe(DEVELOPMENT_MINIMUM_DISTINCT_MAKERS);
-    // The fixture declares the five roster slots (6a05a0d0: a free and a premium slot per
-    // maker, grok unavailable); nothing here reads this machine's CLIs or relays.
+    // The fixture declares the seven roster slots (6a05a0d0: a free and a premium slot per
+    // maker, grok unavailable; then the scorecard's agy and pi slots, not healthy here);
+    // nothing here reads this machine's CLIs or relays.
     expect(panel.healthyProviderRefs).toEqual([
       "development:codex-cli", "development:codex-premium-cli",
       "development:claude-cli", "development:claude-premium-cli"
     ]);
     expect(panel.targets.map(({ providerRef }) => providerRef)).toEqual([
       "development:codex-cli", "development:codex-premium-cli",
-      "development:claude-cli", "development:claude-premium-cli", "development:grok-cli"
+      "development:claude-cli", "development:claude-premium-cli", "development:grok-cli",
+      // the scorecard's two §2.10 slots
+      "development:agy-cli", "development:pi-glm-cli"
     ]);
+    expect(panel.targets.map(({ providerRef }) => providerRef))
+      .toEqual(DEVELOPMENT_CLI_PROVIDER_ROSTER.map(({ providerRef }) => providerRef));
   });
 
   it("fails closed when the live handshake result is absent or not the exact CLI roster", () => {

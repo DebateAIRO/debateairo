@@ -1,13 +1,21 @@
 import { z } from "zod";
 import {
   CliRelayFailure,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
+  buildCliUsage,
   invokeCli,
+  openRelayWorkspace,
+  reportHarnessOverhead,
   resolveConfiguredBinary,
   resolveTestGuardedCommand,
   startCliRelayServer,
+  type CliInvocation,
   type CliRelayAdapter,
   type CliRelayHandle,
-  type CommandSpec
+  type CliUsage,
+  type CommandSpec,
+  type HarnessOverhead,
+  type RelayWorkspace
 } from "./relay-core.js";
 
 /** The NAME this maker's CLI is looked up by; never a path (D10, 2026-09-17). */
@@ -29,6 +37,19 @@ export function resolveGrokBinary(source: NodeJS.ProcessEnv = process.env): stri
   );
 }
 export const XAI_MAKER = "xAI" as const;
+/**
+ * §2.2 — grok 1.0.41 (M4, 2026-09-26): `--reasoning-effort` accepts exactly
+ * these; anything else is refused locally with exit 1. No usage-cap output is
+ * on record for grok, so a cap stays GROK_CLI_FAILED (README: "usage caps").
+ */
+export const GROK_THINKING_LEVELS = Object.freeze(["low", "medium", "high", "xhigh"] as const);
+/**
+ * D8 / A20b (M5, 2026-09-26): grok SELECTS a model by a short id and REPORTS a
+ * longer one — `-m grok-4.7` answers as `grok-4.7-build`, and
+ * `-m grok-4.7-build` is refused ("unknown model id"). A relay started with a
+ * `model` passes it as `-m`; the relayed lineage is always the reported id.
+ */
+const GROK_MODEL_SELECTION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 export const GROK_HANDSHAKE_PROMPT =
   "GROK-01 acceptance transport handshake. Reply with the single word: OK" as const;
 
@@ -41,19 +62,23 @@ const envelopeSchema = z.object({
 
 const observedTokenUsageSchema = z.object({
   input_tokens: z.number().int().nonnegative().optional(),
-  output_tokens: z.number().int().nonnegative().optional()
+  output_tokens: z.number().int().nonnegative().optional(),
+  // grok 1.0.41 (M4 capture, 2026-09-26) spells the per-model counters in
+  // camelCase; 1.0.0 spelled them in snake_case. Both are read, snake first.
+  inputTokens: z.number().int().nonnegative().optional(),
+  outputTokens: z.number().int().nonnegative().optional()
+}).passthrough();
+
+/** §2.3 — grok 1.0.41 reports thinking tokens in the top-level usage block (M4). */
+const reportedReasoningSchema = z.object({
+  reasoning_tokens: z.number().int().nonnegative()
 }).passthrough();
 
 function parseGrokEnvelope(stdout: string): {
   readonly content: string;
   readonly model: string;
   readonly costUsd: number | null;
-  readonly usage: null | {
-    readonly promptTokens?: number;
-    readonly completionTokens?: number;
-    readonly totalTokens?: number;
-    readonly costUsd?: number;
-  };
+  readonly usage: CliUsage | null;
 } {
   let decoded: unknown;
   try {
@@ -71,22 +96,20 @@ function parseGrokEnvelope(stdout: string): {
     throw new CliRelayFailure("FAILED", "GROK_CLI_MODEL_UNRESOLVED");
   }
   const observed = observedTokenUsageSchema.safeParse(envelope.data.modelUsage[model]);
-  const inputTokens = observed.success ? observed.data.input_tokens : undefined;
-  const outputTokens = observed.success ? observed.data.output_tokens : undefined;
+  const inputTokens = observed.success ? observed.data.input_tokens ?? observed.data.inputTokens : undefined;
+  const outputTokens = observed.success ? observed.data.output_tokens ?? observed.data.outputTokens : undefined;
   const costUsd = envelope.data.total_cost_usd;
-  const usage = {
-    ...(inputTokens === undefined ? {} : { promptTokens: inputTokens }),
-    ...(outputTokens === undefined ? {} : { completionTokens: outputTokens }),
-    ...(inputTokens === undefined || outputTokens === undefined
-      ? {}
-      : { totalTokens: inputTokens + outputTokens }),
-    ...(costUsd === undefined ? {} : { costUsd })
-  };
+  const reasoning = reportedReasoningSchema.safeParse(envelope.data.usage);
   return Object.freeze({
     content,
     model,
     costUsd: costUsd ?? null,
-    usage: Object.keys(usage).length === 0 ? null : Object.freeze(usage)
+    usage: buildCliUsage({
+      promptTokens: inputTokens,
+      completionTokens: outputTokens,
+      costUsd,
+      reasoningTokens: reasoning.success ? reasoning.data.reasoning_tokens : undefined
+    })
   });
 }
 
@@ -100,7 +123,7 @@ const GROK_SANDBOX_FLAG = "--sandbox" as const;
  * relay that had to start WITHOUT its sandbox profile.
  *
  * It is deliberately NOT a member of the kernel's `CONDITION_MARKS`. That
- * vocabulary is closed and pinned (37 members, whose last four are read
+ * vocabulary is closed and pinned (38 members, whose last four are read
  * POSITIONALLY by `CONDITION_MARKS.slice(-4)`), it is minted only by the
  * kernel — this ticket's contract touches neither — and every member of it
  * describes a property of a DEBATE that ran. This names a property of the
@@ -109,20 +132,33 @@ const GROK_SANDBOX_FLAG = "--sandbox" as const;
  */
 export const SANDBOX_PROFILE_UNAVAILABLE = "SANDBOX-PROFILE-UNAVAILABLE" as const;
 
-function grokArguments(prompt: string, sandboxProfile: string | null): readonly string[] {
+function grokArguments(
+  prompt: string,
+  sandboxProfile: string | null,
+  modelSelection: string | undefined,
+  thinkingLevel: string | undefined
+): readonly string[] {
   return [
     "--single", prompt,
     "--output-format", "json",
     "--verbatim",
+    // D8 / A20b: `-m` only when this relay was started with a model to select.
+    ...(modelSelection === undefined ? [] : ["-m", modelSelection]),
+    // D8 (lean calls, M5): the relay's one sentence REPLACES grok's own system
+    // prompt. grok's harness still adds ~18k tokens a call; that is disclosed.
+    "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT,
     ...(sandboxProfile === null ? [] : [GROK_SANDBOX_FLAG, sandboxProfile]),
     "--no-memory",
     "--no-subagents",
     "--disable-web-search",
-    "--tools", ""
+    "--tools", "",
+    // §2.2: APPENDED only when a level was asked, so an unasked call carries no
+    // level flag (and the sandbox probe's flag list is the same at every level).
+    ...(thinkingLevel === undefined ? [] : ["--reasoning-effort", thinkingLevel])
   ];
 }
 
-function grokAdapterFor(sandboxProfile: string | null): CliRelayAdapter {
+function grokAdapterFor(sandboxProfile: string | null, modelSelection: string | undefined): CliRelayAdapter {
   return {
     maker: XAI_MAKER,
     authEnvironmentKeys: ["XAI_API_KEY"],
@@ -134,13 +170,12 @@ function grokAdapterFor(sandboxProfile: string | null): CliRelayAdapter {
     ],
     failureCode: "GROK_CLI_FAILED",
     timeoutCode: "GROK_CLI_TIMEOUT",
-    buildArguments: (prompt) => grokArguments(prompt, sandboxProfile),
+    thinkingLevels: GROK_THINKING_LEVELS,
+    buildArguments: (prompt: string, invocation?: CliInvocation) =>
+      grokArguments(prompt, sandboxProfile, modelSelection, invocation?.thinkingLevel),
     parseCompletion: (stdout) => parseGrokEnvelope(stdout)
   };
 }
-
-/** The sandboxed adapter: argument-for-argument what every Grok call was before this seam. */
-const grokAdapter: CliRelayAdapter = grokAdapterFor(GROK_SANDBOX_PROFILE);
 
 export interface GrokRelayOptions {
   readonly port: number;
@@ -149,11 +184,21 @@ export interface GrokRelayOptions {
   readonly testOnlyCommand?: CommandSpec;
   /** CLI sandbox profile; defaults to `read-only`. See GrokSandboxProfile. */
   readonly sandboxProfile?: GrokSandboxProfile;
+  /**
+   * D8 / A20b: the id grok's `-m` SELECTS (e.g. `grok-4.7`, which grok reports
+   * as `grok-4.7-build`). Absent ⇒ the CLI's own default. The relayed lineage
+   * is always the id the CLI reports.
+   */
+  readonly model?: string;
 }
 
 export interface GrokRelayHandle extends CliRelayHandle {
   readonly model: string;
   readonly maker: typeof XAI_MAKER;
+  /** §2.2: the `--reasoning-effort` values this relay accepts as `x_thinking_level`. */
+  readonly thinkingLevels: readonly string[];
+  /** D8: what grok added around the handshake prompt. Informational only. */
+  readonly harnessOverhead: HarnessOverhead;
   readonly handshakeCostUsd: number | null;
   /** The profile this relay actually applies to every call; null ⇒ none could be applied. */
   readonly sandboxProfile: typeof GROK_SANDBOX_PROFILE | null;
@@ -198,16 +243,20 @@ function failureCodeOf(error: unknown): string {
  */
 async function handshakeWithProbedSandbox(
   command: CommandSpec,
-  timeoutMs: number
+  timeoutMs: number,
+  workspace: RelayWorkspace,
+  modelSelection: string | undefined
 ): Promise<{
   readonly handshake: ReturnType<typeof parseGrokEnvelope>;
   readonly adapter: CliRelayAdapter;
   readonly sandboxProfile: typeof GROK_SANDBOX_PROFILE | null;
   readonly degradation: typeof SANDBOX_PROFILE_UNAVAILABLE | null;
 }> {
+  // The sandboxed adapter: this relay's standing configuration whenever the host can apply it.
+  const grokAdapter = grokAdapterFor(GROK_SANDBOX_PROFILE, modelSelection);
   const sandboxedHandshake = async (): Promise<ReturnType<typeof parseGrokEnvelope>> =>
     await invokeCli(
-      command, grokAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs
+      command, grokAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs, { workspace }
     ) as ReturnType<typeof parseGrokEnvelope>;
   const kept = (handshake: ReturnType<typeof parseGrokEnvelope>) => ({
     handshake, adapter: grokAdapter, sandboxProfile: GROK_SANDBOX_PROFILE, degradation: null
@@ -227,9 +276,9 @@ async function handshakeWithProbedSandbox(
     // stays the one reported: it is what the run was actually refused with.
   }
 
-  const unsandboxedAdapter = grokAdapterFor(null);
+  const unsandboxedAdapter = grokAdapterFor(null, modelSelection);
   const handshake = await invokeCli(
-    command, unsandboxedAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs
+    command, unsandboxedAdapter, GROK_HANDSHAKE_PROMPT, timeoutMs, { workspace }
   ).catch(() => { throw originalFailure; }) as ReturnType<typeof parseGrokEnvelope>;
   // Loud on the ceremony's own stdout: protections were removed, by whom,
   // and under which failure. Never a silent downgrade.
@@ -250,35 +299,55 @@ export async function startGrokRelay(options: GrokRelayOptions): Promise<GrokRel
     options.testOnlyCommand,
     "TEST_ONLY_GROK_COMMAND_FORBIDDEN"
   );
-  const probed = options.sandboxProfile === "none"
-    ? await handshakeWithoutSandbox(command, options.timeoutMs)
-    : await handshakeWithProbedSandbox(command, options.timeoutMs);
-  const server = await startCliRelayServer({
-    port: options.port,
-    timeoutMs: options.timeoutMs,
-    command,
-    // The SERVED calls inherit the probed adapter, so a dropped profile is the
-    // relay's standing configuration rather than a retry the handshake hid.
-    adapter: probed.adapter
-  });
-  return Object.freeze({
-    port: server.port,
-    baseUrl: server.baseUrl,
-    authorizationHeader: server.authorizationHeader,
-    model: probed.handshake.model,
-    maker: XAI_MAKER,
-    handshakeCostUsd: probed.handshake.costUsd,
-    sandboxProfile: probed.sandboxProfile,
-    degradation: probed.degradation,
-    close: () => server.close()
-  });
+  if (options.model !== undefined && !GROK_MODEL_SELECTION_PATTERN.test(options.model)) {
+    throw new CliRelayFailure("FAILED", "GROK_CLI_MODEL_PIN_INVALID");
+  }
+  // D8: ONE private workspace for this relay's whole life, every handshake of
+  // the sandbox probe included; the server removes it at close().
+  const workspace = await openRelayWorkspace({ maker: XAI_MAKER });
+  try {
+    const probed = options.sandboxProfile === "none"
+      ? await handshakeWithoutSandbox(command, options.timeoutMs, workspace, options.model)
+      : await handshakeWithProbedSandbox(command, options.timeoutMs, workspace, options.model);
+    const harnessOverhead = reportHarnessOverhead(XAI_MAKER, GROK_HANDSHAKE_PROMPT, probed.handshake);
+    const server = await startCliRelayServer({
+      port: options.port,
+      timeoutMs: options.timeoutMs,
+      command,
+      // The SERVED calls inherit the probed adapter, so a dropped profile is the
+      // relay's standing configuration rather than a retry the handshake hid.
+      adapter: probed.adapter,
+      workspace
+    });
+    return Object.freeze({
+      port: server.port,
+      baseUrl: server.baseUrl,
+      authorizationHeader: server.authorizationHeader,
+      model: probed.handshake.model,
+      maker: XAI_MAKER,
+      thinkingLevels: GROK_THINKING_LEVELS,
+      harnessOverhead,
+      handshakeCostUsd: probed.handshake.costUsd,
+      sandboxProfile: probed.sandboxProfile,
+      degradation: probed.degradation,
+      close: () => server.close()
+    });
+  } catch (error) {
+    await workspace.close();
+    throw error;
+  }
 }
 
 /** Preserve the development panel's explicit profile while reporting the degraded protection. */
-async function handshakeWithoutSandbox(command: CommandSpec, timeoutMs: number) {
-  const adapter = grokAdapterFor("none");
+async function handshakeWithoutSandbox(
+  command: CommandSpec,
+  timeoutMs: number,
+  workspace: RelayWorkspace,
+  modelSelection: string | undefined
+) {
+  const adapter = grokAdapterFor("none", modelSelection);
   const handshake = await invokeCli(
-    command, adapter, GROK_HANDSHAKE_PROMPT, timeoutMs
+    command, adapter, GROK_HANDSHAKE_PROMPT, timeoutMs, { workspace }
   ) as ReturnType<typeof parseGrokEnvelope>;
   process.stdout.write(`RELAY DEGRADED ${XAI_MAKER} ${SANDBOX_PROFILE_UNAVAILABLE} EXPLICIT_NONE_PROFILE\n`);
   return { handshake, adapter, sandboxProfile: null, degradation: SANDBOX_PROFILE_UNAVAILABLE };

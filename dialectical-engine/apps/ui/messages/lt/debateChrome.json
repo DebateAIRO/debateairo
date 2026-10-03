@@ -298,5 +298,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatorius atmetė plano pasirinkimą. Pasirinkite „Nemokamas“ arba „Premium“ ir bandykite dar kartą.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatorius atmetė užklausą: šiam planui reikalingas modelis šiuo metu nepasiekiamas. Bandykite vėliau arba pasirinkite kitą planą.",
   "requestFailure.kind.ALREADY_WAITING": "Vienu metu laukti gali tik vienas klausimas. Šį klausimą užduokite, kai prasidės jūsų laukiantys debatai.",
-  "requestFailure.kind.UNCLASSIFIED": "Užklausos įvykdyti nepavyko dar negavus jokio atsakymo, todėl jos baigtis nežinoma. Tai ne koordinatoriaus sprendimas."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Šie debatai kainuotų daugiau, nei ši svetainė leidžia vieniems debatams.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatorius atmetė užklausą: vienai iš debatų užduočių šiuo metu nepasiekiamas nė vienas DI modelis. Bandykite vėliau.",
+  "requestFailure.kind.UNCLASSIFIED": "Užklausos įvykdyti nepavyko dar negavus jokio atsakymo, todėl jos baigtis nežinoma. Tai ne koordinatoriaus sprendimas.",
+  "debateChrome.condition.backupModelUsed": "Kai suplanuoto DI modelio nepavyko panaudoti, jį pakeitė kitas"
 }

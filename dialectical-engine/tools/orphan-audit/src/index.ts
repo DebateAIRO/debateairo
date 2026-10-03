@@ -14,8 +14,11 @@ const rows: readonly Row[] = [
   ["propagation", "packages/propagation", ["kernel", "published-arithmetic"]],
   ["battery-decision", "packages/battery/decision", ["kernel"]],
   ["contract", "packages/contract", ["kernel"]],
+  // Model-scorecard design (2026-09-26): the scorecard format, its parser and the pure
+  // per-role picker. Kernel only, so register, api and runner can all import it.
+  ["scorecard", "packages/scorecard", ["kernel"]],
   ["db", "packages/db", ["kernel", "crypto", "billing-core"]],
-  ["register", "packages/register", ["kernel", "db", "contract"]],
+  ["register", "packages/register", ["kernel", "db", "contract", "scorecard"]],
   ["geo", "packages/geo", ["kernel", "register"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
   ["providers", "packages/providers", ["kernel", "register", "ledger"]],
@@ -40,7 +43,7 @@ const rows: readonly Row[] = [
   // Paid plans (A26(a)): the SmartBill invoice connector over plain fetch (P5).
   ["invoice-smartbill", "packages/invoice-smartbill", ["kernel", "billing-core"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
-  ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
+  ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness", "scorecard"]],
   // Verdict story (2026-09-26): the story package. The edges its later tasks need
   // (register for the policy rows, db/crypto/ledger for the repository and the
   // enrichment reader) are declared with it, so the row is written once.
@@ -55,8 +58,8 @@ const rows: readonly Row[] = [
   // SUP-01 C1 — schema, role grants, kill switch, reservation, status"); the table
   // lagged the product only because this audit was crashing on the retired `web`
   // manifest read and had never reported a verdict. Both rows are the same commit.
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-xmoney", "tax-quaderno", "invoice-smartbill", "mail-templates"]],
-  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story"]],
+  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-xmoney", "tax-quaderno", "invoice-smartbill", "mail-templates", "scorecard"]],
+  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story", "scorecard"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
   // The `web` row retired with its surface: `web/` is retired in favour of
