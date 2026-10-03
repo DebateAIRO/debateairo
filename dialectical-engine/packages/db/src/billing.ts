@@ -658,6 +658,32 @@ export class BillingRepository {
     };
   }
 
+  /**
+   * W14 (P2-I19): what lies more than a day ahead of `now`, the API's real clock at a live boot. `rows`: the billing
+   * changes, whichever xMoney system, by the time they record (every writer stamps them with the billing clock's
+   * `now`, so only a moved stage clock dates one ahead): subscription events (`at`), entitlement events
+   * (`effective_at`), charges (`created_at`) and charge events (`at`). `jobs`: outbox jobs neither done nor dead whose
+   * `not_before` is ahead (their `created_at` is the database's own clock, so a job queued on a moved clock shows only
+   * here). Every retry is due within a day (outbox.ts: 12 h for a failure, 24 h for a payment not yet final); the one
+   * job due later by design, the quarter's tax summary (06:00 on the 5th day after its quarter ends, at most four days
+   * and six hours ahead), counts only past five days.
+   */
+  async recordsDatedAhead(now: Date): Promise<{ rows: number; jobs: number }> {
+    const counted = (await this.pool.query<{ rows: string; jobs: string }>(`
+      WITH edge AS (SELECT $1::timestamptz + interval '1 day' AS at)
+      SELECT
+        (SELECT count(*) FROM billing.subscription_event AS event, edge WHERE event.at > edge.at)
+        + (SELECT count(*) FROM billing.entitlement_event AS event, edge WHERE event.effective_at > edge.at)
+        + (SELECT count(*) FROM billing.charge AS charge, edge WHERE charge.created_at > edge.at)
+        + (SELECT count(*) FROM billing.charge_event AS event, edge WHERE event.at > edge.at) AS rows,
+        (SELECT count(*) FROM billing.outbox AS job
+          WHERE job.done_at IS NULL AND job.dead_at IS NULL
+            AND job.not_before > $1::timestamptz
+              + CASE WHEN job.kind = 'OWNER_TAX_SUMMARY' THEN interval '5 days' ELSE interval '1 day' END) AS jobs
+    `, [now])).rows[0];
+    return { rows: Number(counted?.rows ?? "0"), jobs: Number(counted?.jobs ?? "0") };
+  }
+
   async insertCharge(c: PoolClient, ch: ChargeRow): Promise<void> {
     try {
       await c.query(`

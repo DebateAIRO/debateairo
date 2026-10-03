@@ -118,6 +118,19 @@ export function assertStageRecordsClosed(
 }
 
 /**
+ * W14 (P2-I19): a live boot is also refused while any billing row or open outbox job is dated more than a day ahead
+ * (`BillingRepository.recordsDatedAhead`). Only a host that ran the sandbox with `BILLING_STAGE_CLOCK_OFFSET_DAYS`
+ * writes such rows, and its jobs would wait up to a month and then run against the live services. The runbook keeps
+ * that run on its own throwaway server; this is the guard for a host that took the same-host path anyway. It is
+ * only a guard: a month after such a run its rows are no longer ahead. The counts are content-free.
+ */
+export function assertNoRecordsDatedAhead(counts: Readonly<{ rows: number; jobs: number }>): void {
+  if (counts.rows > 0 || counts.jobs > 0) {
+    throw new TypeError(`BILLING_RECORDS_DATED_AHEAD:rows=${counts.rows}:jobs=${counts.jobs}`);
+  }
+}
+
+/**
  * Builds every billing connector from the custody files. Called under boot.runSync, so a refusal
  * closes the boot ledger (DL7-F7). SmartBill's code is built from the company's facts first, before any
  * secret is read (smartBillCompanyCif; main.ts passes SELLER_COMPANY, tests and the development fakes

@@ -14,7 +14,7 @@
 //             [--as renewal|auth-order|declined]
 //   refund    --key-file F --capture-dir D --transaction T --order O --as partial|second-partial|full|extra
 //             [--amount A] [--wait-seconds 600]
-//   release   --key-file F --capture-dir D --transaction T
+//   release   --key-file F --capture-dir D --transaction T [--as card-check|auth-order-rebill]
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -319,6 +319,29 @@ async function waitForRefundRows(
   }
 }
 
+/**
+ * X0 (h): what `release` records, by `--as`. `card-check` (the default) releases the 1.00 `auth` payment of step 3 and
+ * keeps its read before and after. `auth-order-rebill` (W14, P2-I3) releases the transaction `rebill --as auth-order`
+ * made; that command already captured its read, so only the status after the release is new.
+ */
+export function releaseCapture(step: string): Readonly<{ before: string | null; after: string }> {
+  if (step === "card-check") return Object.freeze({ before: "transaction-auth", after: "transaction-auth-released" });
+  if (step === "auth-order-rebill") return Object.freeze({ before: null, after: "transaction-rebill-auth-order-released" });
+  throw new TypeError("XMONEY_ARGUMENT_REQUIRED:--as");
+}
+
+/**
+ * W14 (P2-I3): whether a rebill of the card check's `auth` order took the money, read from its status after the
+ * release. A hold and a capture both read `complete-ok` before, so only the release tells them apart: a released
+ * hold reads `void-ok` (no money moved), a captured payment is refunded and reads `refund-ok`. Every other status
+ * settles nothing. A12 assumes CAPTURED; HOLD means A12 changes before billing is on.
+ */
+export function authOrderRebillAnswer(statusAfterRelease: string): "CAPTURED" | "HOLD" | "UNKNOWN" {
+  if (statusAfterRelease === "refund-ok") return "CAPTURED";
+  if (statusAfterRelease === "void-ok") return "HOLD";
+  return "UNKNOWN";
+}
+
 const statusOf = (body: unknown): string => String(dataOf(body)?.transactionStatus ?? "NONE");
 const amountOf = (body: unknown): string => String(dataOf(body)?.amount ?? "NONE");
 
@@ -486,15 +509,23 @@ async function main(argv: readonly string[]): Promise<void> {
       return;
     }
     if (command === "release") {
+      const step = argument(argv, "--as", "card-check");
+      const kinds = releaseCapture(step);
       const path = `/transaction/${encodeURIComponent(argument(argv, "--transaction"))}`;
       const before = await stageRequest(key, "GET", path);
-      capture(captureDir, "transaction-auth", before.body);
+      if (kinds.before !== null) capture(captureDir, kinds.before, before.body);
+      // No amount: the whole transaction, as A12's release of the card check and RefundDesk's whole refunds send it.
       const reply = await stageRequest(key, "DELETE", path, new URLSearchParams({
         reason: "customer-demand", message: RECORDING_MESSAGE
       }));
       const after = await stageRequest(key, "GET", path);
-      capture(captureDir, "transaction-auth-released", after.body);
-      console.log(`XMONEY_RELEASE=${statusOf(before.body)}->${reply.httpStatus}->${statusOf(after.body)}`);
+      capture(captureDir, kinds.after, after.body);
+      const line = `${statusOf(before.body)}->${reply.httpStatus}->${statusOf(after.body)}`;
+      if (step === "card-check") {
+        console.log(`XMONEY_RELEASE=${line}`);
+      } else {
+        console.log(`XMONEY_RELEASE=${step}:${line}:capture=${authOrderRebillAnswer(statusOf(after.body)).toLowerCase()}`);
+      }
       return;
     }
     if (command === "serve") {

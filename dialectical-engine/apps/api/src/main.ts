@@ -92,7 +92,7 @@ import {
 } from "./billing/stage-clock.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import {
-  assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
+  assertNoRecordsDatedAhead, assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
 } from "./billing/connectors.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
@@ -576,6 +576,10 @@ const billingConnectors: BillingConnectors | null = billingPolicy?.enabled === t
 if (billingConnectors?.xmoneyEnvironment === "live") {
   await boot.run("billing-stage-records", async () => {
     assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"));
+  });
+  // W14 (P2-I19): nor while billing rows or open jobs are dated more than a day ahead (a moved stage clock's leftovers).
+  await boot.run("billing-records-dated-ahead", async () => {
+    assertNoRecordsDatedAhead(await new BillingRepository(pool).recordsDatedAhead(new Date()));
   });
 }
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));

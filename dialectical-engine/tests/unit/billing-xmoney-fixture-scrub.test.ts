@@ -307,12 +307,14 @@ describe("X0 — xMoney fixture scrubbing", () => {
   });
 
   it("refuses a key file other users can read, a capture it cannot classify, and two captures of one kind", () => {
-    expect(XMONEY_REQUIRED_FIXTURE_KINDS).toHaveLength(27);
+    expect(XMONEY_REQUIRED_FIXTURE_KINDS).toHaveLength(28);
     expect(XMONEY_OPTIONAL_FIXTURE_KINDS).toHaveLength(7);
     // W1 (P2-I1, P2-I6): the customer POST /customer created is required; a second POST of it is optional.
     expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[]).toContain("customer-response");
     // W13 (P2-I18): the daily money check's charge-back listing, which X0 must show xMoney accepts.
     expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[]).toContain("transaction-list-charge-back");
+    // W14 (P2-I3): the rebill of the card check's `auth` order, after its release: a hold voids, a capture refunds.
+    expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[]).toContain("transaction-rebill-auth-order-released");
     expect(XMONEY_OPTIONAL_FIXTURE_KINDS as readonly string[]).toContain("customer-response-repeat");
     for (const kind of ["transaction-list-refund-after-partial", "transaction-refund-second-partial",
       "transaction-list-refund-after-second-partial"]) {

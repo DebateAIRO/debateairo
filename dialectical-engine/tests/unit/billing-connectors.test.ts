@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { SELLER_COMPANY, type SellerCompany } from "@debateai/billing-core";
 import {
   SMARTBILL_CIF_FORM,
+  assertNoRecordsDatedAhead,
   assertStageRecordsClosed,
   billingCustodyPaths,
   loadBillingConnectors,
@@ -180,6 +181,13 @@ describe("P6a — BillingConnectors", () => {
     // P2-I4: a sandbox refund or invoice job still queued would otherwise run against the live services.
     expect(() => assertStageRecordsClosed({ subscriptions: 0, charges: 0, jobs: 3 }))
       .toThrow("BILLING_STAGE_RECORDS_OPEN:subscriptions=0:charges=0:jobs=3");
+  });
+
+  it("refuses to go live while any billing row or open job is dated more than a day ahead (W14, P2-I19)", () => {
+    expect(() => assertNoRecordsDatedAhead({ rows: 0, jobs: 0 })).not.toThrow();
+    // A host that ran the sandbox with BILLING_STAGE_CLOCK_OFFSET_DAYS holds rows and jobs up to a month ahead.
+    expect(() => assertNoRecordsDatedAhead({ rows: 2, jobs: 0 })).toThrow("BILLING_RECORDS_DATED_AHEAD:rows=2:jobs=0");
+    expect(() => assertNoRecordsDatedAhead({ rows: 0, jobs: 1 })).toThrow("BILLING_RECORDS_DATED_AHEAD:rows=0:jobs=1");
   });
 
   it("lists the billing custody paths that are configured, for the secret-domain check", () => {

@@ -160,7 +160,7 @@ describe("P3b — what X0's customer step posts is what XMoneyClient.createCusto
 
 // X0's fixture of the order the stage form ACCEPTED, re-signed under the published test key. Skipped by name
 // until the owner records it; P22's go-live checklist row 14 (docs/missions/2026-09-01-security-hardening/
-// GO-LIVE-CHECKLIST.md) carries "all 27 required X0 kinds present and the X0 suites green".
+// GO-LIVE-CHECKLIST.md) carries "all 28 required X0 kinds present and the X0 suites green".
 const ACCEPTED_ORDER = resolve(import.meta.dirname, "../fixtures/xmoney/order-payload.json");
 describe.runIf(existsSync(ACCEPTED_ORDER))("P3a — the order xMoney's stage accepted (X0 fixture)", () => {
   it("is reproduced byte for byte: payload and checksum", () => {

@@ -14,13 +14,24 @@ export type FakeXMoneyTransaction = {
   amountCents: number; refundedCents: number; currency: string; ip: string;
   createdAt: Date; refundedAt: Date | null; chargedBackAt: Date | null; relatedTransactionIds: number[];
 };
-type FakeOrder = { id: number; customerId: number; externalOrderId: string; orderType: "managed"; currency: string };
+/** `mode`: the cardTransactionMode of the payment that created the order (A12's card check makes an `auth` order). */
+type FakeOrder = {
+  id: number; customerId: number; externalOrderId: string; orderType: "managed"; currency: string;
+  mode: "authAndCapture" | "auth";
+};
 type FakeCustomer = { id: number; identifier: string; email: string; country: string | null };
 type FakeCard = { id: number; customerId: number; countryCode: string | null };
 type SentNotice = XMoneyNotice & { opensslResult: string };
 
 export type FakeXMoneyOptions = Readonly<{
   privateKey?: Buffer; publicKey?: string; siteId?: string; port?: number; maxPerPage?: number;
+  /**
+   * W14 (P2-I3): how a rebill of an `auth`-mode order (A12's card check) is booked — X0 item (h)'s recorded answer.
+   * `capture` (the default, what A12 assumes) books it `authAndCapture`; `hold` books it `auth`, so it reads
+   * `complete-ok` all the same and its release voids it (`void-ok`) instead of refunding it. P3b's recorded suite
+   * starts the fake with the recorded answer and compares.
+   */
+  authOrderRebill?: "capture" | "hold";
 }>;
 
 export type FakeXMoney = Readonly<{
@@ -63,6 +74,7 @@ export async function startFakeXMoney(options: FakeXMoneyOptions = {}): Promise<
   const publicKey = options.publicKey ?? `pk_fake_${randomBytes(8).toString("hex")}`;
   const siteId = options.siteId ?? "1";
   const maxPerPage = options.maxPerPage ?? 100;
+  const authOrderRebill = options.authOrderRebill ?? "capture";
   const customers = new Map<number, FakeCustomer>();
   const orders = new Map<number, FakeOrder>();
   const cards = new Map<number, FakeCard>();
@@ -126,7 +138,10 @@ export async function startFakeXMoney(options: FakeXMoneyOptions = {}): Promise<
     if (customer === undefined) throw new TypeError("FAKE_XMONEY_CUSTOMER_UNKNOWN");
     let order = [...orders.values()].find((candidate) => candidate.externalOrderId === i.externalOrderId);
     if (order === undefined) {
-      order = { id: allocate(), customerId: customer.id, externalOrderId: i.externalOrderId, orderType: "managed", currency: "USD" };
+      order = {
+        id: allocate(), customerId: customer.id, externalOrderId: i.externalOrderId, orderType: "managed", currency: "USD",
+        mode: i.cardTransactionMode ?? "authAndCapture"
+      };
       orders.set(order.id, order);
     }
     const card: FakeCard = { id: allocate(), customerId: customer.id, countryCode: i.cardCountry };
@@ -270,7 +285,8 @@ export async function startFakeXMoney(options: FakeXMoneyOptions = {}): Promise<
       const transaction = addTransaction({
         orderId: order.id, customerId: order.customerId, cardId: previous?.cardId ?? null, transactionType: "deposit",
         transactionStatus: failing === null ? "complete-ok" : "complete-failed", transactionSource: "re-bill",
-        mode: "authAndCapture", amountCents: cents(amount), currency: order.currency, ip: "203.0.113.10"
+        mode: order.mode === "auth" && authOrderRebill === "hold" ? "auth" : "authAndCapture",
+        amountCents: cents(amount), currency: order.currency, ip: "203.0.113.10"
       });
       if (stallRebill) { stallRebill = false; return; }
       if (failing !== null) {

@@ -1,7 +1,7 @@
 // tests/unit/payments-xmoney-recorded-fixtures.test.ts
 // X0's recorded stage fixtures, run through the REAL client and the real notice decoder. Until the owner records
 // them this suite is skipped BY NAME (the describe says so) — the one test here that can be inert, and the go-live
-// checklist's row 14 (written by P22) lists "all 27 required X0 kinds present and the X0 suites green" so the skip
+// checklist's row 14 (written by P22) lists "all 28 required X0 kinds present and the X0 suites green" so the skip
 // cannot be forgotten.
 // Once any fixture exists, every required kind must: a missing one fails loudly, never silently passes.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -18,6 +18,7 @@ import {
   XMONEY_OPTIONAL_FIXTURE_KINDS,
   XMONEY_REQUIRED_FIXTURE_KINDS
 } from "../../tools/billing/scrub-xmoney-fixture.js";
+import { authOrderRebillAnswer } from "../../tools/billing/xmoney-sandbox.js";
 import { transactionRoute } from "../../apps/api/src/billing/rows.js";
 import { startFakeXMoney } from "../support/fake-xmoney.js";
 
@@ -69,7 +70,7 @@ async function answeredWith<T>(
 const SINGLE_TRANSACTION_KINDS = [
   "transaction-initial", "transaction-rebill", "transaction-auth", "transaction-auth-released",
   "transaction-refund-partial", "transaction-refund-second-partial", "transaction-refund-full",
-  "transaction-rebill-auth-order"
+  "transaction-rebill-auth-order", "transaction-rebill-auth-order-released"
 ] as const;
 const LIST_KINDS = [
   "transaction-list", "transaction-list-after-refund", "transaction-list-refund-after-partial",
@@ -186,7 +187,10 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
   );
 
   it("the fake answers each recorded step as xMoney did: refunds, the hold, its release and the auth-order rebill", async () => {
-    const fake = await startFakeXMoney();
+    // W14 (P2-I3): the fake books a rebill of the auth-mode order the way X0 recorded it (a hold or a capture), and
+    // the release below must then read exactly as xMoney's did.
+    const recordedRebill = authOrderRebillAnswer(String(recordedStatus("transaction-rebill-auth-order-released")));
+    const fake = await startFakeXMoney({ authOrderRebill: recordedRebill === "HOLD" ? "hold" : "capture" });
     try {
       const client = new XMoneyClient({ baseUrl: fake.baseUrl, privateKey: fake.privateKey, siteId: fake.siteId });
       const from = new Date(Date.now() - 3_600_000);
@@ -245,9 +249,24 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
       const rebilled = await client.rebill({ orderId: held.notice.orderId, customerId: held.customerId, amountDecimal: "1.00" });
       expect(recordedStatus("transaction-rebill-auth-order"), "a rebill of the auth-mode order")
         .toBe((await client.getTransaction(rebilled.transactionId)).status);
+      // X0 item (h), W14: the same rebill released as a whole, as `release --as auth-order-rebill` did.
+      await client.refund({ transactionId: rebilled.transactionId, amountDecimal: null, reason: "customer-demand", message: "x0" });
+      expect(recordedStatus("transaction-rebill-auth-order-released"), "the auth-mode order's rebill, released")
+        .toBe((await client.getTransaction(rebilled.transactionId)).status);
     } finally {
       await fake.stop();
     }
+  });
+
+  // W14 (P2-I3): A12 makes the card check's `auth` order the subscription's order, and every later renewal and upgrade
+  // rebills it. A hold and a capture both read complete-ok, so VERIFY_PAYMENT would renew, invoice and receipt a hold
+  // that is never collected. X0 releases that rebill: `refund-ok` means it took the money, `void-ok` a hold. Any
+  // answer but CAPTURED keeps billing off until A12 changes (for example, a card check paid in full, then refunded) and
+  // this expectation changes with it (go-live row 14).
+  it("A12's card check leaves an order whose rebills take the money (W14, P2-I3)", () => {
+    const status = String(recordedStatus("transaction-rebill-auth-order-released"));
+    expect(authOrderRebillAnswer(status), `a rebill of the auth-mode order released as ${status}: A12 changes before billing is on`)
+      .toBe("CAPTURED");
   });
 
   // X0 (i) is optional: xMoney may name no test amount that declines a rebill. When it was recorded, the real reply

@@ -35,4 +35,16 @@ describe("P6a — the API boot wires billing only when hosted and switched on", 
     expect(main.slice(connectors, stage)).toContain('billingConnectors?.xmoneyEnvironment === "live"');
     expect(main.slice(stage, stage + 240)).toContain('assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"))');
   });
+
+  it("refuses a live boot while billing rows or open jobs are dated more than a day ahead (W14, P2-I19)", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const stage = main.indexOf('boot.run("billing-stage-records"');
+    const ahead = main.indexOf('boot.run("billing-records-dated-ahead"');
+    const live = main.lastIndexOf('if (billingConnectors?.xmoneyEnvironment === "live") {', stage);
+    expect(ahead).toBeGreaterThan(stage);
+    expect(live).toBeGreaterThan(0);
+    // Inside the same live-only block as the stage check: a stage boot runs on its moved clock by design.
+    expect(main.slice(live, ahead)).not.toContain("\n}\n");
+    expect(main.slice(ahead, ahead + 240)).toContain("assertNoRecordsDatedAhead(await new BillingRepository(pool).recordsDatedAhead(new Date()))");
+  });
 });

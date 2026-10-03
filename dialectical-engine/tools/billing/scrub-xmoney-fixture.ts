@@ -24,6 +24,8 @@ export const XMONEY_REQUIRED_FIXTURE_KINDS = Object.freeze([
   "transaction-initial", "transaction-list", "order", "card",
   "rebill-response", "transaction-rebill",
   "transaction-auth", "transaction-auth-released", "transaction-rebill-auth-order",
+  // W14 (P2-I3): that rebill after its release, which shows whether it captured money (`refund-ok`) or held it (`void-ok`).
+  "transaction-rebill-auth-order-released",
   "refund-response", "transaction-refund-partial", "transaction-list-after-refund",
   // X0 (g), second half: how (and how soon) the refund listing shows a partial refund, and a second one.
   "transaction-list-refund-after-partial", "transaction-refund-second-partial",
