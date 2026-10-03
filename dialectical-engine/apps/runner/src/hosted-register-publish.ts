@@ -867,5 +867,5 @@ export function buildHostedStaffV2RegisterPublicationRows(
 ): readonly RegisterPublicationRow[] {
   const configuration = parseStaffAccessEnvironment(source);
   if (configuration.policyVersion !== 2) throw new TypeError("STAFF_V2_CONFIGURATION_REQUIRED");
-  return composeStaffPolicyRegisterPublicationRows(v1Rows, { policyVersion: 2 });
+  return composeStaffPolicyRegisterPublicationRows(v1Rows, { policyVersion: 2, ...(configuration.internalAllowancePolicy === undefined ? {} : { internalAllowance: configuration.internalAllowancePolicy }) });
 }

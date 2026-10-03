@@ -5,7 +5,7 @@ import type { CryptoEnvelope } from '@debateai/crypto';
 /** Internal encrypted intent: constructed by the trusted alert application, never a browser DTO. */
 export type StaffAlertIntent = Readonly<{
     schema: 'staff-alert-v1';
-    event: 'INVITE' | 'ACCEPT' | 'GRANT' | 'DISABLE' | 'BOOTSTRAP' | 'RECOVER_OWNER' | 'KEY_CHANGE';
+    event: 'INVITE' | 'ACCEPT' | 'GRANT' | 'DISABLE' | 'BOOTSTRAP' | 'RECOVER_OWNER' | 'KEY_CHANGE' | 'ALLOWANCE_CONFIGURED' | 'ALLOWANCE_REVOKED';
     operationId: string;
     envelope: CryptoEnvelope;
 }>;

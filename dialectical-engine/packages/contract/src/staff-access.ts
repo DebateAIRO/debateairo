@@ -219,3 +219,48 @@ export const staffContractInventory = Object.freeze({
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, StaffAuditPageSchema
     })
 });
+
+/** Funded v2 is explicitly selected; the historical core-A schemas above stay strict. */
+export const FundedActiveStaffCapabilitiesSchema = z.array(StaffCapabilitySchema).max(7)
+    .refine(values => new Set(values).size === values.length, "Capabilities must be unique");
+export const FundedStaffActionSchema = z.enum([
+    ...StaffActionSchema.options, "ALLOWANCE_CONFIGURE", "ALLOWANCE_REVOKE"
+]);
+export const FundedActionBindingSchema = ActionBindingSchema.extend({ action: FundedStaffActionSchema }).strict();
+export const FundedStaffElevationResponseSchema = StaffElevationResponseSchema.extend({ capabilities: FundedActiveStaffCapabilitiesSchema }).strict();
+export const FundedStaffTeamMemberSchema = StaffTeamMemberSchema.extend({ capabilities: FundedActiveStaffCapabilitiesSchema }).strict();
+export const FundedStaffTeamPageSchema = StaffTeamPageSchema.extend({ members: z.array(FundedStaffTeamMemberSchema).max(100) }).strict();
+const FiniteFundingMicrosSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+const FundingReasonSchema = z.object({ code: z.literal("FUNDING_APPROVAL"), ticket_ref: TicketReferenceSchema.optional() }).strict();
+const FundingMutationShape = { operation_id: z.uuid(), reason: FundingReasonSchema };
+const FundingConfigureShape = {
+    amount_micros: FiniteFundingMicrosSchema, day_micros: FiniteFundingMicrosSchema, week_micros: FiniteFundingMicrosSchema,
+    starts_at: z.iso.datetime(), expires_at: z.iso.datetime(), funding_approval_ref: TicketReferenceSchema,
+    ...FundingMutationShape
+};
+function finiteFundingWindow(value: { amount_micros: number; day_micros: number; week_micros: number; starts_at: string; expires_at: string }, context: z.RefinementCtx): void {
+    const duration = Date.parse(value.expires_at) - Date.parse(value.starts_at);
+    if (value.day_micros > value.week_micros || value.week_micros > value.amount_micros
+        || !Number.isFinite(duration) || duration <= 0 || duration > 2678400000) {
+        context.addIssue({ code: "custom", message: "Funding limits and window must be finite and ordered" });
+    }
+}
+const FundedConfigureIntentSchema = z.object({ action: z.literal("ALLOWANCE_CONFIGURE"), ...FundingConfigureShape }).strict().superRefine(finiteFundingWindow);
+const FundedRevokeIntentSchema = z.object({ action: z.literal("ALLOWANCE_REVOKE"), grant_id: z.uuid(), ...FundingMutationShape }).strict();
+export const FundedStaffActionIntentSchema = z.union([StaffActionIntentSchema, FundedConfigureIntentSchema, FundedRevokeIntentSchema]);
+export const FundedStaffActionOptionsRequestSchema = z.object({ intent: FundedStaffActionIntentSchema }).strict();
+export const FundedStaffActionVerifyRequestSchema = z.object({ intent: FundedStaffActionIntentSchema,
+    challenge_handle: OpaqueHandleSchema, credential: WebAuthnAuthenticationCredentialSchema }).strict().superRefine(ceremonyBodyBound);
+export const InternalAllowanceConfigureRequestSchema = z.object({ ...FundingConfigureShape, proof_handle: OpaqueHandleSchema }).strict().superRefine(finiteFundingWindow);
+export const InternalAllowanceRevokeRequestSchema = z.object({ ...FundingMutationShape, proof_handle: OpaqueHandleSchema }).strict();
+export const InternalAllowanceTargetParamsSchema = z.object({ grantId: z.uuid() }).strict();
+export type InternalAllowanceIntent = z.infer<typeof FundedConfigureIntentSchema> | z.infer<typeof FundedRevokeIntentSchema>;
+export type FundedStaffActionIntent = z.infer<typeof FundedStaffActionIntentSchema>;
+export const fundedStaffContractInventory = Object.freeze({
+    fundingPolicyVersion: 1 as const,
+    routes: Object.freeze(["POST /v1/admin/internal-allowances", "DELETE /v1/admin/internal-allowances/{grantId}"] as const),
+    resources: Object.freeze({ FundedActiveStaffCapabilitiesSchema, FundedStaffActionSchema, FundedActionBindingSchema,
+        FundedStaffElevationResponseSchema, FundedStaffTeamMemberSchema, FundedStaffTeamPageSchema,
+        FundedStaffActionIntentSchema, FundedStaffActionOptionsRequestSchema, FundedStaffActionVerifyRequestSchema,
+        InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, InternalAllowanceTargetParamsSchema })
+});

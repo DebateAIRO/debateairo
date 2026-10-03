@@ -215,8 +215,10 @@ describe("S7 deny-by-default authorization", () => {
       expect(api.hasRoute({method: method as "GET" | "POST" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
     }
     await api.close();
-    expect(authorizationPolicyInventory.filter(policy => !policy.route.startsWith("GET /v1/admin/") && !policy.route.startsWith("POST /v1/admin/") && !policy.route.startsWith("PATCH /v1/admin/"))).toEqual(EXPECTED_AUTHORIZATION_MATRIX);
+    expect(authorizationPolicyInventory.filter(policy => !policy.route.startsWith("GET /v1/admin/") && !policy.route.startsWith("POST /v1/admin/") && !policy.route.startsWith("PATCH /v1/admin/") && policy.route !== "DELETE /v1/admin/internal-allowances/{grantId}")).toEqual(EXPECTED_AUTHORIZATION_MATRIX);
     expect(staffContractInventory.routes).toHaveLength(18);
+    expect(contractInventory.routes).toHaveLength(86);
+    expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
   it("registers the full optional composition and rejects anonymous access to every governed private route", async () => {

@@ -1,4 +1,5 @@
 import { isAbsolute } from "node:path";
+import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
 import type { StaffAccessEnvironment } from "@debateai/kernel";
 import { z } from "zod";
 import {
@@ -752,6 +753,11 @@ export const OBSERVATION_AGENT_ENVIRONMENT_KEYS =
 /** Configuration shape only: custody, implementation and independent alert readiness are later activation gates. */
 export function parseStaffAccessEnvironment(source: EnvironmentSource): StaffAccessEnvironment {
   const version = source.STAFF_ACCESS_POLICY_VERSION;
+  const fundingKeys = ["INTERNAL_ALLOWANCE_POLICY_VERSION", "INTERNAL_ALLOWANCE_CURRENCY", "INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS",
+    "INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS", "INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS", "INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS",
+    "INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP", "INTERNAL_ALLOWANCE_POLICY_SOURCE_REF"];
+  const hasFunding = fundingKeys.some(key => source[key] !== undefined);
+  if ((version === undefined || version === "1") && hasFunding) throw new TypeError("INTERNAL_ALLOWANCE_STAFF_V2_REQUIRED");
   if (version === undefined || version === "1") return Object.freeze({ policyVersion: 1 });
   if (version !== "2") throw new TypeError("STAFF_ACCESS_POLICY_VERSION_INVALID");
   const publicUrl = source.PUBLIC_APP_URL;
@@ -774,7 +780,19 @@ export function parseStaffAccessEnvironment(source: EnvironmentSource): StaffAcc
   }
   if (operatorModulePath !== operatorModulePath.trim() || !isAbsolute(operatorModulePath) || /[\u0000-\u001f\u007f]/u.test(operatorModulePath) || operatorModulePath.split('/').some(part => part === '..' || part === '.')) throw new TypeError("STAFF_ALERT_OPERATOR_MODULE_PATH_INVALID");
   if (!/^[0-9a-f]{64}$/u.test(operatorModuleSha256)) throw new TypeError("STAFF_ALERT_OPERATOR_MODULE_SHA256_INVALID");
-  return Object.freeze({ policyVersion: 2, origin, rpId, independentAlertConfigPath: configPath, operatorModulePath, operatorModuleSha256 });
+  if (!hasFunding) return Object.freeze({ policyVersion: 2, origin, rpId, independentAlertConfigPath: configPath, operatorModulePath, operatorModuleSha256 });
+  if (source.INTERNAL_ALLOWANCE_POLICY_VERSION !== "1" || fundingKeys.some(key => source[key] === undefined)) throw new TypeError("INTERNAL_ALLOWANCE_CONFIGURATION_REQUIRED");
+  const integer = (key: string) => {
+    const text = source[key];
+    if (text === undefined || !/^[1-9][0-9]*$/u.test(text)) throw new TypeError("INTERNAL_ALLOWANCE_CONFIGURATION_INVALID");
+    return Number(text);
+  };
+  const policy = internalAllowancePolicyFromValue({ enabled: true, funding_policy_version: 1, currency: source.INTERNAL_ALLOWANCE_CURRENCY,
+    maximum_grant_micros: integer("INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS"), maximum_day_micros: integer("INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS"),
+    maximum_week_micros: integer("INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS"), maximum_lifetime_ms: integer("INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS"),
+    finish_allowance_bp: integer("INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP") }, source.INTERNAL_ALLOWANCE_POLICY_SOURCE_REF!);
+  if (!policy.enabled) throw new TypeError("INTERNAL_ALLOWANCE_CONFIGURATION_INVALID");
+  return Object.freeze({ policyVersion: 2, origin, rpId, independentAlertConfigPath: configPath, operatorModulePath, operatorModuleSha256, internalAllowancePolicy: policy });
 }
 
 /** Owner CLI must inspect the full snapshot for forbidden secrets, including unexpected names. */

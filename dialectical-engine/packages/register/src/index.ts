@@ -977,6 +977,7 @@ export {
   PRODUCT_ROLE_IDS,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_V2_REGISTER_ROW,
+  PRODUCT_ROLE_POLICY_FUNDED_V2_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_ROW_KEY,
   productRolePolicyFromRegisterRows,
   readProductRolePolicy,
@@ -1040,3 +1041,5 @@ export {
   readStaffAccessPolicy, readInternalAllowancePolicy,
   composeStaffPolicyRegisterPublicationRows
 } from "./staff-access-policy.js";
+
+export { internalAllowancePolicyValue } from "./internal-allowance-policy.js";

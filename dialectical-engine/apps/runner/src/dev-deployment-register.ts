@@ -1008,9 +1008,10 @@ export async function buildDevelopmentStaffV2DeploymentRegisterPublicationRows(
   bootstrap: BootstrapRegister,
   providerPanel: DevelopmentProviderPanel,
   roleRefs: DevelopmentSynthesisRoleRefs = deriveSynthesisRoleRefs(providerPanel.configuredProviders),
-  deployment: "local" | "hosted" = "local"
+  deployment: "local" | "hosted" = "local",
+  internalAllowance?: Extract<import("@debateai/kernel").InternalAllowancePolicy, { enabled: true }>
 ): Promise<readonly RegisterPublicationRow[]> {
   return composeStaffPolicyRegisterPublicationRows(
-    await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, providerPanel, roleRefs, deployment), { policyVersion: 2 }
+    await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, providerPanel, roleRefs, deployment), { policyVersion: 2, ...(internalAllowance === undefined ? {} : { internalAllowance }) }
   );
 }

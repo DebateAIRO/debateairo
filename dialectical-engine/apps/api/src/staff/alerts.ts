@@ -19,13 +19,13 @@ export type StaffIndependentAlertMetadata = Readonly<{
     actorStaffId: string | null;
     subjectStaffId: string | null;
     reason: Readonly<{
-        code: 'TEAM_ONBOARDING' | 'GRANT_CHANGE' | 'OFFBOARDING' | 'SECURITY_RESPONSE' | 'KEY_MAINTENANCE' | 'BOOTSTRAP' | 'RECOVERY';
+        code: 'TEAM_ONBOARDING' | 'GRANT_CHANGE' | 'OFFBOARDING' | 'SECURITY_RESPONSE' | 'KEY_MAINTENANCE' | 'BOOTSTRAP' | 'RECOVERY' | 'FUNDING_APPROVAL';
         ticketRef?: string;
     }>;
 }>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const EVENTS = new Set(['INVITE', 'ACCEPT', 'GRANT', 'DISABLE', 'BOOTSTRAP', 'RECOVER_OWNER', 'KEY_CHANGE']);
-const REASONS = new Set(['TEAM_ONBOARDING', 'GRANT_CHANGE', 'OFFBOARDING', 'SECURITY_RESPONSE', 'KEY_MAINTENANCE', 'BOOTSTRAP', 'RECOVERY']);
+const EVENTS = new Set(['INVITE', 'ACCEPT', 'GRANT', 'DISABLE', 'BOOTSTRAP', 'RECOVER_OWNER', 'KEY_CHANGE', 'ALLOWANCE_CONFIGURED', 'ALLOWANCE_REVOKED']);
+const REASONS = new Set(['TEAM_ONBOARDING', 'GRANT_CHANGE', 'OFFBOARDING', 'SECURITY_RESPONSE', 'KEY_MAINTENANCE', 'BOOTSTRAP', 'RECOVERY', 'FUNDING_APPROVAL']);
 const EMAIL = /^[A-Za-z0-9_.+-]{1,64}@[A-Za-z0-9.-]{1,190}$/;
 const sha = (body: string | Buffer) => createHash('sha256').update(body).digest('hex');
 function object(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null; }

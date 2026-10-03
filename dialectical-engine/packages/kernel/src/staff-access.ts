@@ -101,7 +101,7 @@ export type StaffPrerequisiteReceipt = Readonly<{
   | Readonly<{ purpose: "KEY_PREREGISTRATION"; registrationChallengeId: string | null }>
   | Readonly<{ purpose: "OWNER_POSSESSION"; commandId: string; nonceSha256: string; credentialIds: readonly [string, string] }>
 );
-export type StaffAccessPolicy = Readonly<{
+type StaffAccessPolicyBase = Readonly<{
   policyVersion: 2;
   cookieName: "__Host-debateai-staff";
   csrfCookieName: "__Host-debateai-staff-csrf";
@@ -141,11 +141,63 @@ export type StaffAccessPolicy = Readonly<{
   algorithms: readonly [-7, -257];
   ceremonyBodyMaxBytes: 32768;
   challengeMaxFailures: 5;
-  activeCapabilities: readonly Exclude<StaffCapability, "ALLOWANCE_WRITE">[];
   delegatedCapabilities: readonly DelegatedStaffCapability[];
   sourceRef: string;
 }>;
-export type InternalAllowancePolicy = Readonly<{ enabled: false; sourceRef: string }>;
+export type StaffAccessPolicy = StaffAccessPolicyBase & (
+  | Readonly<{ fundingPolicyVersion?: never; activeCapabilities: readonly Exclude<StaffCapability, "ALLOWANCE_WRITE">[] }>
+  | Readonly<{ fundingPolicyVersion: 1; activeCapabilities: readonly StaffCapability[] }>
+);
+export type InternalAllowancePolicy =
+  | Readonly<{ enabled: false; sourceRef: string }>
+  | Readonly<{
+      enabled: true;
+      fundingPolicyVersion: 1;
+      currency: "USD";
+      maximumGrantMicros: number;
+      maximumDayMicros: number;
+      maximumWeekMicros: number;
+      maximumLifetimeMs: number;
+      finishAllowanceBp: 10000;
+      sourceRef: string;
+    }>;
+export type FundingBasis =
+  | Readonly<{ kind: "SUBSCRIPTION"; planId: "FREE" | "PLUS" | "PRO" | "MAX"; entitlementEventId: string }>
+  | Readonly<{ kind: "INTERNAL"; grantId: string; grantEventId: string }>;
+export type InternalGrant = Readonly<{
+  grantId: string;
+  grantEventId: string;
+  ownerRef: string;
+  revision: number;
+  amountMicros: number;
+  dayMicros: number;
+  weekMicros: number;
+  startsAt: Date;
+  expiresAt: Date;
+  fundingApprovalRef: string;
+  policyRegisterVersion: number;
+}>;
+export type InternalAllowanceConfigure = Readonly<{
+  ownerRef: string;
+  expectedRevision: number;
+  policyRegisterVersion: number;
+  amountMicros: number;
+  dayMicros: number;
+  weekMicros: number;
+  startsAt: Date;
+  expiresAt: Date;
+  fundingApprovalRef: string;
+}>;
+export type InternalAllowanceRevoke = Readonly<{
+  ownerRef: string;
+  grantId: string;
+  expectedRevision: number;
+  policyRegisterVersion: number;
+}>;
+export interface InternalAllowanceReadPort {
+  current(ownerRef: string, now: Date): Promise<InternalGrant | null>;
+  forRun(runId: string, now: Date): Promise<InternalGrant | null>;
+}
 export type StaffAccessEnvironment =
   | Readonly<{ policyVersion: 1 }>
-  | Readonly<{ policyVersion: 2; origin: string; rpId: string; independentAlertConfigPath: string; operatorModulePath: string; operatorModuleSha256: string }>;
+  | Readonly<{ policyVersion: 2; origin: string; rpId: string; independentAlertConfigPath: string; operatorModulePath: string; operatorModuleSha256: string; internalAllowancePolicy?: Extract<InternalAllowancePolicy, { enabled: true }> }>;

@@ -1,4 +1,4 @@
-import { staffContractInventory } from "./staff-access.js";
+import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
 export * from "./staff-access.js";
 import { z } from "zod";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
@@ -245,6 +245,10 @@ export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
 
 /** Paid-plans spec §1.2: the four plans, as billingPlans names them (`PlanId` in @debateai/register). */
 export const PlanIdSchema = z.enum(["FREE", "PLUS", "PRO", "MAX"]);
+export const FundingBasisSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("SUBSCRIPTION"), planId: PlanIdSchema, entitlementEventId: z.uuid() }).strict(),
+  z.object({ kind: z.literal("INTERNAL"), grantId: z.uuid(), grantEventId: z.uuid() }).strict()
+]) satisfies z.ZodType<import("@debateai/kernel").FundingBasis>;
 
 /** Budget spec §2.7: GET /v1/asks/room — the ask's settings class, as query parameters. */
 export const AskRoomQuerySchema = z.object({
@@ -1017,6 +1021,7 @@ export type RunEvent = z.infer<typeof RunEventSchema>;
 export const contractInventory = Object.freeze({
   routes: Object.freeze([
     ...staffContractInventory.routes,
+    ...fundedStaffContractInventory.routes,
     "POST /v1/auth/age-check",
     "POST /v1/auth/register",
     "POST /v1/auth/verify-email",
@@ -1087,6 +1092,8 @@ export const contractInventory = Object.freeze({
   ]),
   resources: Object.freeze({
     ...staffContractInventory.resources,
+    ...fundedStaffContractInventory.resources,
+    FundingBasisSchema,
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
     BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,

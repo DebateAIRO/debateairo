@@ -214,8 +214,8 @@ describe("P3-01 production database-principal manifest", () => {
         ownsFunctions: []
       }
        ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"],
-        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation'],
-        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation'] }
+        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'billing.internal_grant', 'billing.internal_grant_event'],
+        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis'] }
     ]);
 
     expect(manifest.principals.map(({ id, roleName, kind }) => ({ id, roleName, kind })))
@@ -543,31 +543,58 @@ describe("P3-01 production database-principal manifest", () => {
         && currentProvisioner === "migrations/0034_obs_foundation.sql")).toBe(true);
 
     expect(manifest.privilegeDisclosures).toEqual([
-      {
-        roleName: "debateai_evaluator_api",
-        source: "migrations/0023_evaluator_foundation.sql",
-        grants: [
-        "USAGE ON SCHEMA ledger",
-        "SELECT, UPDATE ON ledger.sequence_allocator",
-        "EXECUTE ON FUNCTION ledger.allocate_sequence()"
-        ]
-      },
-      {
-        roleName: "debateai_evaluator_api",
-        source: "migrations/0029_evaluator_dev_menu_grants.sql",
-        grants: [
-          "USAGE ON SCHEMA register",
-          "SELECT ON register.register_row,register.register_version"
-        ]
-      }
-    ]);
+  {
+    "roleName": "debateai_evaluator_api",
+    "source": "migrations/0023_evaluator_foundation.sql",
+    "grants": [
+      "USAGE ON SCHEMA ledger",
+      "SELECT, UPDATE ON ledger.sequence_allocator",
+      "EXECUTE ON FUNCTION ledger.allocate_sequence()"
+    ]
+  },
+  {
+    "roleName": "debateai_evaluator_api",
+    "source": "migrations/0029_evaluator_dev_menu_grants.sql",
+    "grants": [
+      "USAGE ON SCHEMA register",
+      "SELECT ON register.register_row,register.register_version"
+    ]
+  },
+  {
+    "roleName": "debateai_staff_security_owner",
+    "source": "migrations/0092_internal_funded_allowance.sql",
+    "grants": [
+      "USAGE ON SCHEMA register, billing",
+      "SELECT(register_version,row_key,value_json,source_ref) ON register.register_row",
+      "SELECT(register_version,sealed,row_count) ON register.register_version",
+      "SELECT(owner_ref) ON identity.\"user\"",
+      "SELECT,INSERT ON billing.run_charge_scope",
+      "EXECUTE ON FUNCTION register.canonical_json_text(text),register._canonical_json_value(text,integer,integer),register._canonical_decimal(text)"
+    ]
+  },
+  {
+    "roleName": "debateai_runtime",
+    "source": "migrations/0092_internal_funded_allowance.sql",
+    "grants": [
+      "EXECUTE ON FUNCTION staff.read_internal_funding_policy()",
+      "EXECUTE ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid)",
+      "EXECUTE ON FUNCTION staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+      "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+      "EXECUTE ON FUNCTION billing.read_internal_allowance(uuid,timestamptz)",
+      "EXECUTE ON FUNCTION billing.read_internal_allowance_for_run(uuid,timestamptz)",
+      "EXECUTE ON FUNCTION billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)",
+      "EXECUTE ON FUNCTION billing.read_run_funding_basis(uuid)"
+    ]
+  }
+]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
       .toEqual([
         { id: "CREDENTIAL_MATERIAL_PAIRWISE_DISTINCT", ownerTicket: "P3-02" },
         { id: "JIT_HUMAN_CREDENTIAL_HAS_BOUNDED_EXPIRY", ownerTicket: "P3-02" },
         { id: "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS", ownerTicket: "P3-02" },
         { id: "STAFF_INDEPENDENT_ACK_AND_ROOT_PUBLICATION", ownerTicket: "P3-02" },
-        { id: "OWNER_RECOVERY_ROOT_CUSTODY_AND_REPLACEMENT_ONLY", ownerTicket: "P3-02" }
+        { id: "OWNER_RECOVERY_ROOT_CUSTODY_AND_REPLACEMENT_ONLY", ownerTicket: "P3-02" },
+        { id: "INTERNAL_ALLOWANCE_EXPLICIT_FINITE_SEALED_SELECTION", ownerTicket: "P3-02" }
       ]);
     expect(manifest.deploymentObligations.every(({ requiredEvidence }) =>
       requiredEvidence.trim().length > 0)).toBe(true);
@@ -720,6 +747,7 @@ describe("P3-01 production database-principal manifest", () => {
       })
       .sort();
     const manifestEvaluatorCrossSchemaGrants = manifest.privilegeDisclosures
+      .filter(({ roleName }) => roleName === "debateai_evaluator_api")
       .flatMap(({ roleName, grants }) => grants.map((grant) =>
         `GRANT ${grant} TO ${roleName};`))
       .sort();
@@ -793,4 +821,15 @@ describe("P3-01 production database-principal manifest", () => {
     const {mkdtemp,rm}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),{join}=await import('node:path'),root=await mkdtemp(join(tmpdir(),'task6-p3-'));try{await expect(provisionProductionDatabasePrincipals({adminPool:{} as import('@debateai/db').Pool,adminDatabaseUrl:'postgresql://synthetic:fixture@127.0.0.1/synthetic',manifest,credentialEnvelope:{},supportConfigCredentialFilePath:join(root,'unused-output')})).rejects.toThrow('PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID');}finally{await rm(root,{recursive:true,force:true});}
   });
 
+});
+
+it("discloses exactly the reviewed additive funding grants without other principals or selector writes", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0092_internal_funded_allowance.sql", "utf8");
+  const actual = [...sql.matchAll(/^GRANT [^\n]+ TO (?:debateai_runtime|debateai_staff_security_owner);$/gm)]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0092_internal_funded_allowance.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  expect(declared.some(grant => /(?:INSERT|UPDATE|DELETE).*funding_policy_selection/u.test(grant))).toBe(false);
 });

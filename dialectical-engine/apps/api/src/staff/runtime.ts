@@ -1,11 +1,13 @@
+import type { ProviderDiscoveryTarget } from "@debateai/providers";
 import { constants } from 'node:fs';
 import { lstat, open, realpath } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, normalize } from 'node:path';
 import type { ReadableUserDekStore } from '@debateai/crypto';
-import { PostgresStaffAlertRepository, PostgresStaffRepository, type Pool } from '@debateai/db';
+import { PostgresInternalAllowanceRepository, PostgresStaffAlertRepository, PostgresStaffRepository, type Pool } from '@debateai/db';
 import type { StaffAccessEnvironment } from '@debateai/kernel';
-import { readStaffAccessPolicy } from '@debateai/register';
+import { readStaffAccessPolicy, type BillingPlans } from '@debateai/register';
+import { StaffInternalFundingReadiness } from './internal-allowances.js';
 import { RootStaffAlertConfiguration, RootConfiguredStaffAlertTransport, StaffAlertDispatcher, StaffAlertIntentProducer, StaffIndependentAlertReadiness, VerifiedStaffTargetInvitationTransport, type StaffAlertAcknowledgementAdapter, type StaffAlertConfigFiles, type StaffAlertFileStat, type StaffInvitationChannelDelivery } from './alerts.js';
 export type StaffAlertOperatorAdapters = Readonly<{
     schema: 'staff-alert-operator-v1';
@@ -116,13 +118,24 @@ export async function createStaffRuntime(input: Readonly<{
     operatorFiles?: StaffAlertConfigFiles;
     configurationFiles?: StaffAlertConfigFiles;
     log?: (code: string) => void;
+    deploymentMode?: "hosted" | "local";
+    billingPlans?: BillingPlans | null;
+    providerTargets?: readonly ProviderDiscoveryTarget[];
 }>) {
     const operator = await loadStaffAlertOperator({ path: input.environment.operatorModulePath, sha256: input.environment.operatorModuleSha256, ...(input.operatorFiles ? { files: input.operatorFiles } : {}) });
     try {
-        await readStaffAccessPolicy(input.pool, input.registerVersion);
+        await readStaffAccessPolicy(input.pool, input.registerVersion, input.environment.internalAllowancePolicy === undefined ? undefined : 1);
+        const allowances = new PostgresInternalAllowanceRepository(input.pool, { registerVersion: input.registerVersion });
+        const selectedFunding = await allowances.readPolicy();
+        if ((input.environment.internalAllowancePolicy === undefined) !== (selectedFunding === null)) throw unavailable();
         const repository = new PostgresStaffAlertRepository(input.pool), staffRepository = new PostgresStaffRepository(input.pool);
         const configuration = new RootStaffAlertConfiguration({ path: input.environment.independentAlertConfigPath, acknowledgements: operator.acknowledgements, ...(input.configurationFiles ? { files: input.configurationFiles } : {}) });
         const readiness = new StaffIndependentAlertReadiness(configuration, repository);
+        const funding = input.environment.internalAllowancePolicy === undefined ? undefined : new StaffInternalFundingReadiness(allowances, {
+            expectedPolicy: input.environment.internalAllowancePolicy, deploymentMode: input.deploymentMode ?? 'local', billingPlans: input.billingPlans ?? null,
+            providerTargets: input.providerTargets ?? [], independentReadiness: readiness
+        });
+        if (funding !== undefined) await funding.requireReady();
         const installation = await staffRepository.readOwnerRecoveryInstallation();
         if (installation === null || installation.outcome !== 'COMPLETED' || await readiness.readIndependentAlertReadiness() !== 'READY')
             throw unavailable();
@@ -134,7 +147,7 @@ export async function createStaffRuntime(input: Readonly<{
                 return;
             running = dispatcher.drain({ limit: operator.dispatch.batchSize }).catch(() => { input.log?.('TRANSPORT_UNAVAILABLE'); }).finally(() => { running = undefined; });
         };
-        return Object.freeze({ readiness, targetInvitationTransport, intents: new StaffAlertIntentProducer({ keys: input.keys, mappings: repository, readiness }),
+        return Object.freeze({ readiness, funding, targetInvitationTransport, intents: new StaffAlertIntentProducer({ keys: input.keys, mappings: repository, readiness }),
             start() {
                 if (closed)
                     throw unavailable();

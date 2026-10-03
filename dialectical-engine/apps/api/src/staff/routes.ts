@@ -1,3 +1,6 @@
+import { parseCanonicalRegisterJson } from '@debateai/register';
+import type { InternalAllowanceCommandState } from '@debateai/db';
+import type { StaffInternalFundingApplication } from './internal-allowances.js';
 import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest, RouteOptions } from 'fastify';
 import type { z } from 'zod';
@@ -27,7 +30,9 @@ export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'PATCH /v1/admin/team/{staffId}/grants', auth: 'staff', staffCapability: 'TEAM_GRANT', resource: 'staff-team', action: 'grant' },
     // The strict mode selects TEAM_DISABLE or EMERGENCY_DISABLE inside the handler.
     { route: 'POST /v1/admin/team/{staffId}/disable', auth: 'staff', resource: 'staff-team', action: 'disable' },
-    { route: 'GET /v1/admin/audit', auth: 'staff', staffCapability: 'AUDIT_READ', resource: 'staff-audit', action: 'list' }
+    { route: 'GET /v1/admin/audit', auth: 'staff', staffCapability: 'AUDIT_READ', resource: 'staff-audit', action: 'list' },
+    { route: 'POST /v1/admin/internal-allowances', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-configure' },
+    { route: 'DELETE /v1/admin/internal-allowances/{grantId}', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-revoke' }
 ] as const);
 /** Explicit v2 composition only. No ready flags, command prepare/commit, or private content readers. */
 export interface StaffHttpApplication {
@@ -37,6 +42,7 @@ export interface StaffHttpApplication {
     webauthn: Pick<StaffWebAuthnService, 'beginRegistration' | 'finishRegistration' | 'beginElevation' | 'finishElevation' | 'beginAction' | 'finishAction' | 'beginInvitationAcceptance' | 'finishInvitationAcceptance' | 'beginOwnerPossession' | 'finishOwnerPossession'>;
     intents: Pick<StaffAlertIntentProducer, 'mutation' | 'newInvitation' | 'enrollment'>;
     targetInvitationTransport?: StaffTargetInvitationTransport;
+    funding?: StaffInternalFundingApplication;
 }
 export interface StaffRouteTransport {
     sourceFor(request: FastifyRequest): AuthSourceContext;
@@ -80,7 +86,27 @@ export function canonicalStaffActionBinding(intent: contract.StaffActionIntent, 
     return { action: intent.action, targetId, expectedRevision: intent.expected_revision, operationId: intent.operation_id,
         bodySha256: createHash('sha256').update(JSON.stringify(body)).digest('hex') };
 }
-function capability(intent: contract.StaffActionIntent): Exclude<StaffCapability, 'ALLOWANCE_WRITE'> | null {
+/** The browser supplies only self business intent; state is produced by the guarded SQL reader. */
+export function canonicalInternalAllowanceActionBinding(input: contract.InternalAllowanceIntent, state: InternalAllowanceCommandState): ActionBinding {
+    const intent = parse(contract.FundedStaffActionIntentSchema, input);
+    if (intent.action !== 'ALLOWANCE_CONFIGURE' && intent.action !== 'ALLOWANCE_REVOKE') refuse();
+    const targetId = intent.action === 'ALLOWANCE_CONFIGURE' ? state.ownerRef : intent.grant_id;
+    const body = {
+        action: intent.action, target_id: targetId,
+        ...(intent.action === 'ALLOWANCE_CONFIGURE' ? {
+            amount_micros: intent.amount_micros, day_micros: intent.day_micros, week_micros: intent.week_micros,
+            starts_at: new Date(intent.starts_at).toISOString(), expires_at: new Date(intent.expires_at).toISOString(),
+            funding_approval_ref: intent.funding_approval_ref
+        } : { owner_ref: state.ownerRef }),
+        expected_revision: state.expectedRevision, policy_register_version: state.policyRegisterVersion,
+        operation_id: intent.operation_id,
+        reason: { code: intent.reason.code, ...(intent.reason.ticket_ref === undefined ? {} : { ticket_ref: intent.reason.ticket_ref }) }
+    };
+    return { action: intent.action, targetId, expectedRevision: state.expectedRevision, operationId: intent.operation_id,
+        bodySha256: createHash('sha256').update(parseCanonicalRegisterJson(Buffer.from(JSON.stringify(body)))).digest('hex') };
+}
+function capability(intent: contract.FundedStaffActionIntent): StaffCapability | null {
+    if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE') return 'ALLOWANCE_WRITE';
     return intent.action === 'CREDENTIAL_REGISTER' ? null : intent.action;
 }
 export function registerStaffRoutes(api: FastifyInstance, application: StaffHttpApplication | undefined, routePolicy: RoutePolicy, transport: StaffRouteTransport): void {
@@ -90,21 +116,32 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         await application.sessions.assertCurrent(base);
     }
     const auth = (request: FastifyRequest): StaffAuthentication => request.staffAuthentication ?? refuse();
-    async function actionAuthority(request: FastifyRequest, intent: contract.StaffActionIntent): Promise<Readonly<{
+    async function actionAuthority(request: FastifyRequest, intent: contract.FundedStaffActionIntent): Promise<Readonly<{
         authentication: StaffAuthentication;
         binding: ActionBinding;
+        allowanceState?: InternalAllowanceCommandState;
     }>> {
-        const authentication = auth(request), binding = canonicalStaffActionBinding(intent, authentication), required = capability(intent);
+        const authentication = auth(request), required = capability(intent);
+        let binding: ActionBinding;
+        let allowanceState: InternalAllowanceCommandState | undefined;
+        if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE') {
+            if (application!.funding === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+            await application!.funding.requireReady();
+            allowanceState = await application!.funding.allowances.readSelfCommand(authentication.context,
+                authentication.baseSession.tokenHash, intent.action === 'ALLOWANCE_REVOKE' ? intent.grant_id : null);
+            if (authentication.context.designation !== 'OWNER' || allowanceState.ownerRef !== authentication.baseSession.ownerRef) refuse();
+            binding = canonicalInternalAllowanceActionBinding(intent, allowanceState);
+        } else binding = canonicalStaffActionBinding(intent, authentication);
         await application!.access.assertCurrent(authentication);
         if (required !== null)
             await application!.access.requireCapability(authentication, required, binding);
-        return { authentication, binding };
+        return { authentication, binding, ...(allowanceState === undefined ? {} : { allowanceState }) };
     }
     async function scopedInvitation(request: FastifyRequest, handle: string) {
         const context = await application!.access.readInvitationContext(request.authenticatedSession!, handle);
         return context ?? refuse();
     }
-    function route(method: 'GET' | 'POST' | 'PATCH', path: string, handler: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>): void {
+    function route(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, handler: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>): void {
         api.route({ method, url: path, ...routePolicy(`${method} ${path.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, '{$1}')}`), bodyLimit: 32768,
             handler: async (request, reply) => {
                 try {
@@ -192,21 +229,21 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
             refuse();
         request.staffAuthentication = authentication;
         reply.header('set-cookie', [...transport.refreshedCookies(request.cookieRefresh!), ...staffCookies(result)]);
-        return project(contract.StaffElevationResponseSchema, { staff_id: result.staffId, capabilities: [...result.capabilities], grant_revision: result.grantRevision, expires_at: result.expiresAt.toISOString() });
+        return project(application!.funding === undefined ? contract.StaffElevationResponseSchema : contract.FundedStaffElevationResponseSchema, { staff_id: result.staffId, capabilities: [...result.capabilities], grant_revision: result.grantRevision, expires_at: result.expiresAt.toISOString() });
     });
     route('POST', '/v1/admin/webauthn/action/options', async (request) => {
-        const { intent } = parse(contract.StaffActionOptionsRequestSchema, request.body), { authentication, binding } = await actionAuthority(request, intent);
+        const { intent } = parse(application!.funding === undefined ? contract.StaffActionOptionsRequestSchema : contract.FundedStaffActionOptionsRequestSchema, request.body), { authentication, binding } = await actionAuthority(request, intent);
         return project(contract.StaffAuthenticationOptionsResponseSchema, await application!.webauthn.beginAction(authentication.context, binding));
     });
     route('POST', '/v1/admin/webauthn/action/verify', async (request) => {
-        const input = parse(contract.StaffActionVerifyRequestSchema, request.body), { authentication, binding } = await actionAuthority(request, input.intent);
+        const input = parse(application!.funding === undefined ? contract.StaffActionVerifyRequestSchema : contract.FundedStaffActionVerifyRequestSchema, request.body), { authentication, binding } = await actionAuthority(request, input.intent);
         const result = await application!.webauthn.finishAction(authentication.context, binding, { challenge_handle: input.challenge_handle, credential: input.credential });
         return project(contract.StaffActionProofResponseSchema, { proof_handle: result.proofHandle, expires_at: result.proof.expiresAt.toISOString() });
     });
     route('GET', '/v1/admin/team', async (request) => {
         const query = parse(contract.StaffTeamQuerySchema, request.query), authentication = auth(request);
         await application!.access.requireCapability(authentication, 'TEAM_READ');
-        return project(contract.StaffTeamPageSchema, await application!.repository.readTeamPage({ context: authentication.context, ordinaryTokenHash: authentication.baseSession.tokenHash, limit: query.limit, ...(query.cursor === undefined ? {} : { cursor: query.cursor }) }));
+        return project(application!.funding === undefined ? contract.StaffTeamPageSchema : contract.FundedStaffTeamPageSchema, await application!.repository.readTeamPage({ context: authentication.context, ordinaryTokenHash: authentication.baseSession.tokenHash, limit: query.limit, ...(query.cursor === undefined ? {} : { cursor: query.cursor }) }));
     });
     route('GET', '/v1/admin/audit', async (request) => {
         const query = parse(contract.StaffAuditQuerySchema, request.query), authentication = auth(request);
@@ -293,4 +330,33 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
     }
     route('PATCH', '/v1/admin/team/:staffId/grants', request => mutate(request, 'GRANT'));
     route('POST', '/v1/admin/team/:staffId/disable', request => mutate(request, 'DISABLE'));
+    async function mutateAllowance(request: FastifyRequest, action: 'ALLOWANCE_CONFIGURE' | 'ALLOWANCE_REVOKE') {
+        if (application!.funding === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+        const configure = action === 'ALLOWANCE_CONFIGURE' ? parse(contract.InternalAllowanceConfigureRequestSchema, request.body) : null;
+        const revoke = action === 'ALLOWANCE_REVOKE' ? parse(contract.InternalAllowanceRevokeRequestSchema, request.body) : null;
+        const intent: contract.InternalAllowanceIntent = configure !== null
+            ? { action: 'ALLOWANCE_CONFIGURE', amount_micros: configure.amount_micros, day_micros: configure.day_micros,
+                week_micros: configure.week_micros, starts_at: configure.starts_at, expires_at: configure.expires_at,
+                funding_approval_ref: configure.funding_approval_ref, operation_id: configure.operation_id, reason: configure.reason }
+            : { action: 'ALLOWANCE_REVOKE', grant_id: parse(contract.InternalAllowanceTargetParamsSchema, request.params).grantId,
+                operation_id: revoke!.operation_id, reason: revoke!.reason };
+        const { authentication, binding, allowanceState } = await actionAuthority(request, intent);
+        if (allowanceState === undefined) refuse();
+        const proof = await application!.access.readActionProof(authentication, (configure ?? revoke)!.proof_handle, binding);
+        if (proof === null) refuse();
+        const purpose = reason(intent.reason);
+        const alertIntent = await application!.intents.mutation({ event: action === 'ALLOWANCE_CONFIGURE' ? 'ALLOWANCE_CONFIGURED' : 'ALLOWANCE_REVOKED',
+            operationId: binding.operationId, keyUserId: authentication.context.userId, actorStaffId: authentication.context.staffId,
+            subjectStaffId: authentication.context.staffId, reason: purpose });
+        await application!.access.requireCapability(authentication, 'ALLOWANCE_WRITE', binding);
+        const common = { ...allowanceState, actor: authentication.context, proof, operationId: binding.operationId, reason: purpose, alertIntent };
+        const result = intent.action === 'ALLOWANCE_CONFIGURE'
+            ? await application!.funding.allowances.configure({ ...common, amountMicros: intent.amount_micros, dayMicros: intent.day_micros,
+                weekMicros: intent.week_micros, startsAt: new Date(intent.starts_at), expiresAt: new Date(intent.expires_at), fundingApprovalRef: intent.funding_approval_ref })
+            : await application!.funding.allowances.revoke({ ...common, grantId: intent.grant_id });
+        return project(contract.SecurityReceiptSchema, receipt(result));
+    }
+    route('POST', '/v1/admin/internal-allowances', request => mutateAllowance(request, 'ALLOWANCE_CONFIGURE'));
+    route('DELETE', '/v1/admin/internal-allowances/:grantId', request => mutateAllowance(request, 'ALLOWANCE_REVOKE'));
+
 }

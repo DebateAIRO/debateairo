@@ -289,7 +289,10 @@
         "staff.alert_dispatch_state",
         "staff.owner_lineage",
         "staff.owner_recovery_generation",
-        "staff.owner_recovery_operation"
+        "staff.owner_recovery_operation",
+        "staff.funding_policy_selection",
+        "billing.internal_grant",
+        "billing.internal_grant_event"
       ],
       "ownsFunctions": [
         "staff.require_alert_readiness_jit",
@@ -332,7 +335,23 @@
         "staff.read_issued_invitation",
         "staff.read_mutation_target",
         "staff.read_target_invitation_channel",
-        "staff.read_owner_recovery_installation"
+        "staff.read_owner_recovery_installation",
+        "billing.guard_internal_grant_projection",
+        "staff.erase_internal_grant_mapping",
+        "staff.read_internal_funding_policy",
+        "staff.effective_capabilities",
+        "staff.read_self_allowance_command",
+        "staff.internal_allowance_body",
+        "staff.assert_internal_allowance_binding",
+        "staff.configure_internal_allowance",
+        "staff.revoke_internal_allowance",
+        "billing.guard_internal_grant_commit",
+        "billing.internal_grant_json",
+        "billing.read_internal_allowance",
+        "billing.read_internal_allowance_for_run",
+        "billing.guard_internal_charge_scope",
+        "billing.record_internal_charge_scope",
+        "billing.read_run_funding_basis"
       ]
     }
   ],
@@ -1860,6 +1879,32 @@
         "USAGE ON SCHEMA register",
         "SELECT ON register.register_row,register.register_version"
       ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0092_internal_funded_allowance.sql",
+      "grants": [
+        "USAGE ON SCHEMA register, billing",
+        "SELECT(register_version,row_key,value_json,source_ref) ON register.register_row",
+        "SELECT(register_version,sealed,row_count) ON register.register_version",
+        "SELECT(owner_ref) ON identity.\"user\"",
+        "SELECT,INSERT ON billing.run_charge_scope",
+        "EXECUTE ON FUNCTION register.canonical_json_text(text),register._canonical_json_value(text,integer,integer),register._canonical_decimal(text)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0092_internal_funded_allowance.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.read_internal_funding_policy()",
+        "EXECUTE ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid)",
+        "EXECUTE ON FUNCTION staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION billing.read_internal_allowance(uuid,timestamptz)",
+        "EXECUTE ON FUNCTION billing.read_internal_allowance_for_run(uuid,timestamptz)",
+        "EXECUTE ON FUNCTION billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)",
+        "EXECUTE ON FUNCTION billing.read_run_funding_basis(uuid)"
+      ]
     }
   ],
   "deploymentObligations": [
@@ -1887,6 +1932,11 @@
       "id": "OWNER_RECOVERY_ROOT_CUSTODY_AND_REPLACEMENT_ONLY",
       "ownerTicket": "P3-02",
       "requiredEvidence": "separately reviewed rootUID0 pinned operator/key/ACK/Python/helper paths; Linux inherited descriptor flock rehearsal; root-private fsynced current/next generation and journal custody; five-minute login closure; replacement-account-only and no private content/key transfer"
+    },
+    {
+      "id": "INTERNAL_ALLOWANCE_EXPLICIT_FINITE_SEALED_SELECTION",
+      "ownerTicket": "P3-02",
+      "requiredEvidence": "Independent trusted migration/bootstrap operator receipt: reviewed source and exact sealed funded-v2 three-row register version/count/provenance/maxima; unseeded NOLOGIN-owner-only selector; hosted billing/priced targets/independent evidence; no actual amount selected by source and no runtime/recovery selector write"
     }
   ],
   "invariants": [

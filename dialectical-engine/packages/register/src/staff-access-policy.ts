@@ -2,8 +2,10 @@ import type { Pool } from "pg";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
 import type { InternalAllowancePolicy, StaffAccessPolicy } from "@debateai/kernel";
+import { internalAllowancePolicyFromValue, internalAllowancePolicyValue } from "./internal-allowance-policy.js";
+export { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
 import { canonicalDecimal, canonicalRegisterJson } from "./register-publication.js";
-import { PRODUCT_ROLE_POLICY_REGISTER_ROW, PRODUCT_ROLE_POLICY_V2_REGISTER_ROW, PRODUCT_ROLE_POLICY_ROW_KEY } from "./product-role-policy.js";
+import { PRODUCT_ROLE_POLICY_REGISTER_ROW, PRODUCT_ROLE_POLICY_V2_REGISTER_ROW, PRODUCT_ROLE_POLICY_FUNDED_V2_REGISTER_ROW, PRODUCT_ROLE_POLICY_ROW_KEY } from "./product-role-policy.js";
 import type { CanonicalJsonAst, RegisterPublicationRow } from "./register-publication.js";
 
 export const STAFF_ACCESS_POLICY_ROW_KEY = "staffAccessPolicy" as const;
@@ -46,7 +48,14 @@ const staffAccessPolicyValueSchema = z.object({
     z.literal("TEAM_DISABLE"), z.literal("AUDIT_READ"), z.literal("EMERGENCY_DISABLE")]),
   delegated_capabilities: z.tuple([z.literal("TEAM_READ"), z.literal("AUDIT_READ"), z.literal("EMERGENCY_DISABLE")])
 }).strict();
-const disabledInternalAllowancePolicyValueSchema = z.object({ enabled: z.literal(false) }).strict();
+
+const fundedStaffAccessPolicyValueSchema = staffAccessPolicyValueSchema.extend({
+  funding_policy_version: z.literal(1),
+  active_capabilities: z.tuple([
+    z.literal("TEAM_READ"), z.literal("TEAM_INVITE"), z.literal("TEAM_GRANT"), z.literal("TEAM_DISABLE"),
+    z.literal("AUDIT_READ"), z.literal("EMERGENCY_DISABLE"), z.literal("ALLOWANCE_WRITE")
+  ])
+}).strict();
 
 function publicationAst(value: unknown): CanonicalJsonAst {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
@@ -97,12 +106,13 @@ export const STAFF_ACCESS_POLICY_REGISTER_ROW = publicationRow(STAFF_ACCESS_POLI
 export const INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW = publicationRow(INTERNAL_ALLOWANCE_POLICY_ROW_KEY, { enabled: false });
 
 export function staffAccessPolicyFromValue(value: unknown, sourceRef: string): StaffAccessPolicy {
-  const parsed = staffAccessPolicyValueSchema.safeParse(value);
+  const parsed = z.union([staffAccessPolicyValueSchema, fundedStaffAccessPolicyValueSchema]).safeParse(value);
   if (!parsed.success) throw new TypedDomainError("STAFF_ACCESS_POLICY_INVALID", "The staff access policy is malformed");
   if (sourceRef.trim() === "") throw new TypedDomainError("STAFF_ACCESS_POLICY_PROVENANCE_MISSING", "The staff access policy has no source_ref");
   const policy = parsed.data;
   return Object.freeze({
     policyVersion: policy.policy_version,
+    ...('funding_policy_version' in policy ? { fundingPolicyVersion: 1 as const } : {}),
     cookieName: policy.cookie_name,
     csrfCookieName: policy.csrf_cookie_name,
     tokenBytes: policy.token_bytes,
@@ -133,14 +143,7 @@ export function staffAccessPolicyFromValue(value: unknown, sourceRef: string): S
     backupEligible: policy.backup_eligible, backedUp: policy.backed_up, algorithms: Object.freeze(policy.algorithms),
     ceremonyBodyMaxBytes: policy.ceremony_body_max_bytes, challengeMaxFailures: policy.challenge_max_failures,
     activeCapabilities: Object.freeze(policy.active_capabilities), delegatedCapabilities: Object.freeze(policy.delegated_capabilities), sourceRef
-  });
-}
-export function internalAllowancePolicyFromValue(value: unknown, sourceRef: string): InternalAllowancePolicy {
-  if (!disabledInternalAllowancePolicyValueSchema.safeParse(value).success) {
-    throw new TypedDomainError("INTERNAL_ALLOWANCE_POLICY_INVALID", "The internal allowance policy is malformed or not delivered");
-  }
-  if (sourceRef.trim() === "") throw new TypedDomainError("INTERNAL_ALLOWANCE_POLICY_PROVENANCE_MISSING", "The internal allowance policy has no source_ref");
-  return Object.freeze({ enabled: false, sourceRef });
+  }) as StaffAccessPolicy;
 }
 
 type PolicyRow = { row_key: string; value_json: unknown; source_ref: string; sealed: boolean; declared_row_count: number; actual_row_count: string };
@@ -165,9 +168,11 @@ async function readSealedPolicy(pool: Pool, registerVersion: number, rowKey: str
   }
   return row;
 }
-export async function readStaffAccessPolicy(pool: Pool, registerVersion: number): Promise<StaffAccessPolicy> {
+export async function readStaffAccessPolicy(pool: Pool, registerVersion: number, fundingPolicyVersion?: 1): Promise<StaffAccessPolicy> {
   const row = await readSealedPolicy(pool, registerVersion, STAFF_ACCESS_POLICY_ROW_KEY, "STAFF_ACCESS_POLICY");
-  return staffAccessPolicyFromValue(row.value_json, row.source_ref);
+  const policy = staffAccessPolicyFromValue(row.value_json, row.source_ref);
+  if (policy.fundingPolicyVersion !== fundingPolicyVersion) throw new TypedDomainError("STAFF_ACCESS_POLICY_VARIANT_MISMATCH", "The selected staff policy variant does not match");
+  return policy;
 }
 export async function readInternalAllowancePolicy(pool: Pool, registerVersion: number): Promise<InternalAllowancePolicy> {
   const row = await readSealedPolicy(pool, registerVersion, INTERNAL_ALLOWANCE_POLICY_ROW_KEY, "INTERNAL_ALLOWANCE_POLICY");
@@ -176,9 +181,12 @@ export async function readInternalAllowancePolicy(pool: Pool, registerVersion: n
 
 /** Produces proposal rows only. Historical bootstrap and default deployment composers keep v1. */
 export function composeStaffPolicyRegisterPublicationRows(
-  rows: readonly RegisterPublicationRow[], selection: Readonly<{ policyVersion: 1 | 2 }>
+  rows: readonly RegisterPublicationRow[], selection: Readonly<{ policyVersion: 1 | 2; internalAllowance?: Extract<InternalAllowancePolicy, { enabled: true }> }>
 ): readonly RegisterPublicationRow[] {
-  if (selection.policyVersion === 1) return rows;
+  if (selection.policyVersion === 1) {
+    if (selection.internalAllowance !== undefined) throw new TypeError("STAFF_POLICY_PUBLICATION_VERSION_INVALID");
+    return rows;
+  }
   if (selection.policyVersion !== 2) throw new TypeError("STAFF_POLICY_PUBLICATION_VERSION_INVALID");
   const originals = rows.filter((row) => row.rowKey === PRODUCT_ROLE_POLICY_ROW_KEY);
   if (originals.length !== 1 || new Set(rows.map((row) => row.rowKey)).size !== rows.length
@@ -190,8 +198,17 @@ export function composeStaffPolicyRegisterPublicationRows(
   const publication = (row: Readonly<{ rowKey: string; valueAst: CanonicalJsonAst; sourceRef: string }>): RegisterPublicationRow => Object.freeze({
     rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef
   });
-  return Object.freeze([
+  if (selection.internalAllowance === undefined) return Object.freeze([
     ...rows.map((row) => row.rowKey === PRODUCT_ROLE_POLICY_ROW_KEY ? publication(PRODUCT_ROLE_POLICY_V2_REGISTER_ROW) : row),
     publication(STAFF_ACCESS_POLICY_REGISTER_ROW), publication(INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW)
+  ]);
+  const allowance = internalAllowancePolicyValue(selection.internalAllowance);
+  const staff = publicationRow(STAFF_ACCESS_POLICY_ROW_KEY, {
+    ...(STAFF_ACCESS_POLICY_REGISTER_ROW.value as Record<string, unknown>), funding_policy_version: 1,
+    active_capabilities: [...(STAFF_ACCESS_POLICY_REGISTER_ROW.value as { active_capabilities: string[] }).active_capabilities, "ALLOWANCE_WRITE"]
+  });
+  return Object.freeze([
+    ...rows.map(row => row.rowKey === PRODUCT_ROLE_POLICY_ROW_KEY ? publication(PRODUCT_ROLE_POLICY_FUNDED_V2_REGISTER_ROW) : row),
+    publication(staff), publication({ ...publicationRow(INTERNAL_ALLOWANCE_POLICY_ROW_KEY, allowance), sourceRef: selection.internalAllowance.sourceRef })
   ]);
 }

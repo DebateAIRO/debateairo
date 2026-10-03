@@ -59,3 +59,26 @@ Private SSE keeps ordinary ownership and current-session checks. Peer/revocation
 No privileged stream exists. Dormant staff revocation subscription uses a dedicated LISTEN connection per subscription; future privileged-stream deployment must budget that capacity and review fanout first.
 
 Task 12 owns explicit fresh Dev intake/dependency installation. The observed 1,066 files/192 commits of drift require root review before later deployment. This isolated task does not merge/rebase/checkout that source.
+
+## Explicit finite funding selection (Tasks 10–11)
+
+Core A retains the exact six-capability sealed rows, v1 customer contract and disabled allowance publication. The optional funded-v2 bundle adds `funding_policy_version:1` to the staff and product-role rows, seven Owner capabilities, and an enabled internal-allowance row with explicit positive safe-integer USD total/day/week maxima, ordered day <= week <= total, an explicit lifetime of at most 2,678,400,000 milliseconds and finish allowance 10,000 basis points. There is no amount/default/selector/grant seeded by source. Deployment must provide every `INTERNAL_ALLOWANCE_*` input accepted by `parseStaffAccessEnvironment`, including provenance, and publish all three coherent rows in one new sealed register.
+
+Only the already trusted independent migration/bootstrap operator may write the unseeded `staff.funding_policy_selection`, under existing NOLOGIN `debateai_staff_security_owner`. The website and recovery capability have no selection write, publication, role membership or new operator function. Review the intended register version, seal/count, three exact values and provenance, immutable snapshot and approved finite limits before using this separately operated SQL step. Bind the version as a reviewed parameter; never copy a website session or credential into it.
+
+```sql
+BEGIN;
+SET LOCAL ROLE debateai_staff_security_owner;
+INSERT INTO staff.funding_policy_selection(singleton,register_version)
+VALUES(true, :reviewed_register_version)
+ON CONFLICT(singleton) DO UPDATE
+SET register_version=EXCLUDED.register_version,selected_at=clock_timestamp();
+SELECT staff.read_internal_funding_policy();
+COMMIT;
+```
+
+The independent receipt records operator identity, exact source/migration hashes, selected register version/seal/count/snapshot and the three row hashes/provenances, policy maxima, selection timestamp and successful commit/readback. This document performs none of those steps. A refusal rolls the transaction back. To withdraw the selection, the same independent operator deletes the singleton in a separate reviewed transaction and records its readback/receipt; restoring a prior reviewed version is a separate explicit selection. Grants/events/charges are retained. Withdrawal, an invalid bundle, a register mismatch, replacement, expiry or revocation never converts an already pinned INTERNAL run into SUBSCRIPTION/FREE. An invalid selected bundle also refuses current Owner context, including core mutations; the existing DISABLE exception for an independent transport outage still applies while the selected policy/context is valid.
+
+Funded API startup requires explicit enabled policy inputs, a non-null selection matching the configured `REGISTER_VERSION` and exact enabled policy, hosted billing and both priced provider sides, installed recovery and fresh independent evidence. Each funding action rechecks policy/selection/current Owner/ordinary generation/security hold, resolves only that Owner's own `owner_ref` and lineage revision server-side and binds the exact selected register version into the canonical proof digest. Configure grant ID is its SecurityReceipt operation ID. Revoke accepts that known grant ID; there is no discovery, customer search or other-staff funding route. Database mutations consume native action proof, serialize the subject/owner lineage, reject overlap, and atomically persist finite grant/event/audit/encrypted outbox. Erasure severs the grant's owner mapping and preserves opaque immutable event/charge history.
+
+Under a valid matching policy, `current` returns null for an expired/revoked grant when resolving a new run. `forRun` refuses an expired/revoked/mismatched pinned INTERNAL basis. Task 11 must propagate the exact `FundingBasis` and CONFIGURED grant-event pin through admission/wait/run/wake/provider/spend/usage. Generic browser clients accept seven-capability elevation/team/action only with explicit `fundingPolicyVersion:1`; the current Team UI constructor remains Core A until Task 11 supplies reviewed funded composition. Task 10 provides policy/data/actor-only commands and proves no funding admission, spend, provider or own-usage behavior yet.

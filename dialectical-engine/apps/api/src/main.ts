@@ -619,13 +619,14 @@ const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
   ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;
 // Explicit protected adapters plus installation/policy/current publication are startup-only gates.
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
-  ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
+  ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
   intents: staffAlerts.intents,
-  targetInvitationTransport: staffAlerts.targetInvitationTransport
+  targetInvitationTransport: staffAlerts.targetInvitationTransport,
+  ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
 // Turn 14 — change email: the capabilities of migration 0079 are granted to the
 // authorization role, beside the step-up that mints their CHANGE_EMAIL grant.

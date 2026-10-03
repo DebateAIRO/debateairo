@@ -1925,3 +1925,5 @@ export { PostgresStaffIndependentReadinessPublisher, type StaffIndependentReadin
 export { PostgresOwnerCommandRepository, OwnerCommandAlertKeyMappings, type OwnerCommandRepository, type OwnerCommandInput, type OwnerCommandPurpose, type OwnerPredecessor, type OwnerRecoveryProofBinding, type OwnerRecoveryRotation, type PreparedOwnerCommand, type StoredOwnerPossessionReceipt, type OwnerCommitInput, type OwnerAlertMetadata } from './owner-recovery.js';
 
 export { PostgresStaffPrerequisiteProducer, type StaffPrerequisiteProducer, type StaffPrerequisiteInput, type StaffManagementRepository, type StaffProjectionRead, type StaffEnrollmentRecord, type StaffTeamPageRecord, type StaffAuditPageRecord, type StaffTargetInvitationChannels, type StaffTargetInvitationChannelInput } from "./staff-access.js";
+
+export { PostgresInternalAllowanceRepository, type InternalAllowancePort, type InternalAllowanceCommandState, type InternalAllowanceConfigureCommand, type InternalAllowanceRevokeCommand, type SelectedInternalAllowancePolicy } from "./internal-allowance.js";

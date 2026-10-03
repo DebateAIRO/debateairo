@@ -9,11 +9,17 @@ export type RegistrationInput = Input<typeof contract.StaffRegistrationOptionsRe
 export type InvitationAcceptInput = Pick<Input<typeof contract.StaffInvitationAcceptRequestSchema>, "invitation_handle" | "operation_id">;
 export type PossessionInput = Input<typeof contract.OwnerPossessionOptionsRequestSchema>;
 /** Private handles remain in the caller's current ceremony. No browser storage or URL transport. */
-export function createStaffApiClient({ fetchImplementation = fetch, apiBase = API_BASE, browser = createStaffWebAuthnBrowser() }: {
+export function createStaffApiClient({ fetchImplementation = fetch, apiBase = API_BASE, browser = createStaffWebAuthnBrowser(), fundingPolicyVersion }: {
     fetchImplementation?: typeof fetch;
     apiBase?: string;
     browser?: StaffBrowser;
+    fundingPolicyVersion?: 1;
 } = {}) {
+    const actionIntentSchema = fundingPolicyVersion === 1 ? contract.FundedStaffActionIntentSchema : contract.StaffActionIntentSchema;
+    const actionOptionsSchema = fundingPolicyVersion === 1 ? contract.FundedStaffActionOptionsRequestSchema : contract.StaffActionOptionsRequestSchema;
+    const actionVerifySchema = fundingPolicyVersion === 1 ? contract.FundedStaffActionVerifyRequestSchema : contract.StaffActionVerifyRequestSchema;
+    const elevationSchema = fundingPolicyVersion === 1 ? contract.FundedStaffElevationResponseSchema : contract.StaffElevationResponseSchema;
+    const teamSchema = fundingPolicyVersion === 1 ? contract.FundedStaffTeamPageSchema : contract.StaffTeamPageSchema;
     let lifecycle = 0;
     const assertCurrent = (epoch: number) => {
         if (lifecycle !== epoch)
@@ -82,30 +88,38 @@ export function createStaffApiClient({ fetchImplementation = fetch, apiBase = AP
     };
     const finishRegistration = async (input: Input<typeof contract.StaffRegistrationVerifyRequestSchema>) => request("/webauthn/registration/verify", contract.StaffRegistrationResponseSchema, "POST", checked(contract.StaffRegistrationVerifyRequestSchema, input));
     const beginElevation = async () => request("/webauthn/elevation/options", contract.StaffAuthenticationOptionsResponseSchema, "POST", {});
-    const finishElevation = async (input: Input<typeof contract.StaffAuthenticationVerifyRequestSchema>) => request("/webauthn/elevation/verify", contract.StaffElevationResponseSchema, "POST", checked(contract.StaffAuthenticationVerifyRequestSchema, input));
-    const beginAction = async (intent: contract.StaffActionIntent) => request("/webauthn/action/options", contract.StaffAuthenticationOptionsResponseSchema, "POST", checked(contract.StaffActionOptionsRequestSchema, { intent }), true);
-    const finishAction = async (input: Input<typeof contract.StaffActionVerifyRequestSchema>) => request("/webauthn/action/verify", contract.StaffActionProofResponseSchema, "POST", checked(contract.StaffActionVerifyRequestSchema, input), true);
+    const finishElevation = async (input: Input<typeof contract.StaffAuthenticationVerifyRequestSchema>) => request("/webauthn/elevation/verify", elevationSchema, "POST", checked(contract.StaffAuthenticationVerifyRequestSchema, input));
+    const beginAction = async (intent: contract.FundedStaffActionIntent) => request("/webauthn/action/options", contract.StaffAuthenticationOptionsResponseSchema, "POST", checked(actionOptionsSchema, { intent }), true);
+    const finishAction = async (input: Input<typeof contract.FundedStaffActionVerifyRequestSchema>) => request("/webauthn/action/verify", contract.StaffActionProofResponseSchema, "POST", checked(actionVerifySchema, input), true);
     const beginInvitation = async (invitation_handle: string) => request("/team/invitations/accept/options", contract.StaffInvitationOptionsResponseSchema, "POST", checked(contract.StaffInvitationOptionsRequestSchema, { invitation_handle }));
     const finishInvitation = async (input: Input<typeof contract.StaffInvitationVerifyRequestSchema>) => request("/team/invitations/accept/verify", contract.StaffActionProofResponseSchema, "POST", checked(contract.StaffInvitationVerifyRequestSchema, input));
     const acceptInvitation = async (input: Input<typeof contract.StaffInvitationAcceptRequestSchema>) => request("/team/invitations/accept", contract.SecurityReceiptSchema, "POST", checked(contract.StaffInvitationAcceptRequestSchema, input));
     const beginPossession = async (input: PossessionInput) => request("/owner-possession/options", contract.StaffAuthenticationOptionsResponseSchema, "POST", checked(contract.OwnerPossessionOptionsRequestSchema, input));
     const finishPossession = async (input: Input<typeof contract.OwnerPossessionVerifyRequestSchema>) => request("/owner-possession/verify", contract.OwnerPossessionResponseSchema, "POST", checked(contract.OwnerPossessionVerifyRequestSchema, input));
-    async function proveAction(input: contract.StaffActionIntent) {
+    async function proveAction(input: contract.FundedStaffActionIntent) {
         const epoch = lifecycle;
-        const intent = checked(contract.StaffActionIntentSchema, input);
+        const intent = checked(actionIntentSchema, input);
         const options = await beginAction(intent);
         assertCurrent(epoch);
         const credential = await browser.authenticate(options);
         assertCurrent(epoch);
         return finishAction({ intent, challenge_handle: options.challenge_handle, credential });
     }
-    async function mutate(input: contract.StaffActionIntent) {
+    async function mutate(input: contract.FundedStaffActionIntent) {
         const epoch = lifecycle;
-        const intent = checked(contract.StaffActionIntentSchema, input);
+        const intent = checked(actionIntentSchema, input);
         if (intent.action === "CREDENTIAL_REGISTER")
             throw new contract.ContractHttpError("MALFORMED_REQUEST", 400, "STAFF_INPUT_INVALID");
         const proof = await proveAction(intent);
         assertCurrent(epoch);
+        if (intent.action === "ALLOWANCE_CONFIGURE") {
+            const { action: _action, ...business } = intent;
+            return request("/internal-allowances", contract.SecurityReceiptSchema, "POST", checked(contract.InternalAllowanceConfigureRequestSchema, { ...business, proof_handle: proof.proof_handle }), true);
+        }
+        if (intent.action === "ALLOWANCE_REVOKE") {
+            return request(`/internal-allowances/${encodeURIComponent(intent.grant_id)}`, contract.SecurityReceiptSchema, "DELETE",
+                checked(contract.InternalAllowanceRevokeRequestSchema, { operation_id: intent.operation_id, reason: intent.reason, proof_handle: proof.proof_handle }), true);
+        }
         const { action, ...business } = intent;
         const body = { ...business, proof_handle: proof.proof_handle };
         if (action === "TEAM_INVITE")
@@ -161,7 +175,7 @@ export function createStaffApiClient({ fetchImplementation = fetch, apiBase = AP
         team(input: contract.StaffPageQuery) {
             const value = checked(contract.StaffTeamQuerySchema, input);
             const query = new URLSearchParams({ limit: String(value.limit), ...(value.cursor === undefined ? {} : { cursor: value.cursor }) });
-            return request(`/team?${query}`, contract.StaffTeamPageSchema);
+            return request(`/team?${query}`, teamSchema);
         },
         audit(input: contract.StaffPageQuery) {
             const value = checked(contract.StaffAuditQuerySchema, input);
