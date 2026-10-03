@@ -308,7 +308,7 @@ function alreadyWaiting(evaluation: RoomEvaluation): AskAlreadyWaitingError {
  * change. A debate page polls GET /v1/runs/{id}; without this every poll ran the estimator and the
  * room's reads again. A server-side window protects against any client, which a slower poll would not.
  */
-export const EXPECTED_START_KEEP_MS = 30_000;
+const EXPECTED_START_KEEP_MS = 30_000;
 /** The most runs whose expected start one process keeps; beyond it the oldest is dropped first. */
 const EXPECTED_START_KEEP_RUNS = 4_096;
 
