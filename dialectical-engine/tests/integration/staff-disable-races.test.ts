@@ -1,3 +1,4 @@
+import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, it, expect } from 'vitest';
@@ -39,7 +40,7 @@ async function elevation(a: Actor) {
         throw new Error('NO_CONTEXT');
     return { issued, context };
 }
-async function action(a: Actor, c: NonNullable<Awaited<ReturnType<typeof repo.readContext>>>, targetId: string, kind: 'TEAM_DISABLE' | 'TEAM_GRANT' | 'EMERGENCY_DISABLE' = 'TEAM_DISABLE', counter = 2) { const binding = { action: kind, targetId, bodySha256: 'a'.repeat(64), expectedRevision: 0, operationId: randomUUID() }, options = await web.beginAction(c, binding), p = await web.finishAction(c, binding, { challenge_handle: options.challenge_handle, credential: assertion(a, options.options.challenge, counter) }); return { ...p, binding }; }
+async function action(a: Actor, c: NonNullable<Awaited<ReturnType<typeof repo.readContext>>>, targetId: string, kind: 'TEAM_DISABLE' | 'TEAM_GRANT' | 'EMERGENCY_DISABLE' = 'TEAM_DISABLE', counter = 2) { const binding = { action: kind, targetId, bodySha256: 'a'.repeat(64), expectedRevision: 0, operationId: randomUUID() }, options = await web.beginAction(c, binding), p = await web.finishAction(c, binding, { challenge_handle: options.challenge_handle, credential: assertion(a, options.options.challenge, counter) }); await authorizeStaffAlertFixture(database.pool,binding.operationId);return { ...p, binding }; }
 async function disable(owner: Actor, c: NonNullable<Awaited<ReturnType<typeof repo.readContext>>>, target: Actor, mode: 'OFFBOARD' | 'COMPROMISE', connection = runtime, counter = 2) { const p = await action(owner, c, target.staffId, mode === 'COMPROMISE' ? 'EMERGENCY_DISABLE' : 'TEAM_DISABLE', counter); return new PostgresStaffRepository(connection).disable({ actor: c, proof: p.proof, targetStaffId: target.staffId, mode, operationId: p.binding.operationId, reason: { code: 'SECURITY_RESPONSE' }, alertIntent: { schema: 'staff-alert-v1', event: 'DISABLE', operationId: p.binding.operationId, envelope: env } }); }
 async function waitForLock(pid: number) {
     for (let n = 0; n < 100; n++) {

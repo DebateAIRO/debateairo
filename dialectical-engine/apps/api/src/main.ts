@@ -82,6 +82,7 @@ import { createSupportCaseMaterial, createSupportCaseService, createSupportMessa
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { StaffAccessService } from "./staff/access.js";
+import { PostgresStaffAlertRepository, RootStaffAlertConfiguration, StaffAlertDispatcher, StaffAlertIntentProducer, StaffIndependentAlertReadiness, RootConfiguredStaffAlertTransport } from "./staff/alerts.js";
 import { PostgresPublicationApplication } from "./publications.js";
 import { createPublicationContentCheck, PUBLICATION_CHECK_DEADLINE_MS } from "./publication-check/check.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
@@ -614,6 +615,28 @@ const sessions = await boot.run("session-service", () => SessionService.create({
 // Explicit v2 selection prepares authority only; future readiness never mounts an Admin route here.
 const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
   ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;
+// Task5 prepares the v2 producers only. No ACK adapter, target transport,
+// recurring drain, publication, or Admin route is activated here. Task7 supplies
+// reviewed command consumers; real delivery configuration/rehearsal stays an input.
+const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2 ? (() => {
+  const repository = new PostgresStaffAlertRepository(pool);
+  const configuration = new RootStaffAlertConfiguration({
+    path: environment.STAFF_ACCESS.independentAlertConfigPath,
+    acknowledgements: new Map()
+  });
+  const readiness = new StaffIndependentAlertReadiness(configuration, repository);
+  return Object.freeze({
+    readiness,
+    intents: new StaffAlertIntentProducer({ keys: dekStore, mappings: repository, readiness }),
+    dispatcher: new StaffAlertDispatcher({
+      repository, keys: dekStore,
+      independentTransport: new RootConfiguredStaffAlertTransport(configuration),
+      readiness: () => readiness.readIndependentAlertReadiness(),
+      log: code => console.error('[STAFF_ALERT_FAILURE]', code)
+    })
+  });
+})() : undefined;
+void staffAlerts;
 // Turn 14 — change email: the capabilities of migration 0079 are granted to the
 // authorization role, beside the step-up that mints their CHANGE_EMAIL grant.
 const emailChange = new EmailChangeService({

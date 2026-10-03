@@ -1761,3 +1761,81 @@ incident notes) have no production credential path at all, and `support:shred` l
 production credential at `secrets/api-support.json` under its working directory. Answering a
 case or shredding a conversation on this host is not possible until those are given production
 paths.
+
+### Staff independent alerts (v2 source only; activation blocked)
+
+Task5 prepares encrypted producers and a dispatcher under explicit staff policy v2.
+Main does not mount Admin routes, register an acknowledgement adapter, publish
+readiness, select a target invitation transport, or start a drain/refresher. The
+independent recipient, transport, receiver/reader, ACK evidence route and readiness
+publication lifecycle are deployment inputs. No real recipient or executable is
+supplied by this release. Routine continuous enabling remains unavailable because
+**no independent readiness refresher is installed or approved**.
+
+The required configuration file is the operator-selected
+`STAFF_ACCESS.independentAlertConfigPath`. It has exact keys `schema`, `generation`,
+`executable`, `from`, `recipient`, `ackAdapterId`; schema is
+`staff-independent-alert-config-v1`, generation is a UUID, and ackAdapterId selects
+an independently configured acknowledgement adapter. The loader accepts a regular
+root-UID0 file, no symlinks, root-owned protected ancestors, no group/other write,
+no writable parent replacement, and at most4096 bytes. It opens with O_NOFOLLOW and
+checks fstat identity. The configured executable and every ancestor receive the
+same ownership/write-protection checks. API may read; website/team cannot modify.
+Tests inject stat/read fixtures; no actual root ownership or config was changed.
+
+An adapter rehearsal must provide exact configuration SHA256 and generation,
+rehearsal UUID and future evidence expiry within five minutes. The rehearsal must
+establish usable acknowledged delivery at the independent receiver/operator reader,
+including the route that reads the strict nonsecret event metadata and proves the
+stable `eventId:purpose` and SHA256 of the exact submitted canonical metadata bytes. A sendmail exit0 proves local queue
+submission only (`SUBMITTED`); it cannot become `ACK`/`DELIVERED` without this trusted
+route. Inbox/relay acceptance alone is insufficient. Do not grant the receiver
+raw customer DEKs, private-content access, or use a fallback key after erasure.
+Database outbox storage remains encrypted under the mapped user key and becomes
+unreadable after governed key/mapping severance. The dispatcher authenticates and
+validates that envelope, then sends only `StaffIndependentAlertMetadata`: schema,
+event, operationId, actorStaffId/subjectStaffId (staff references or null), and enum
+reason with optional bounded nonsecret ticketRef. The receiver reads this bounded
+metadata without any customer key. It never receives userId, audit_token, keyRef,
+ciphertext, an invitation bearer, a browser-selected recipient, request body,
+password/TOTP/recovery material, or raw WebAuthn data. TLS/MTA delivery and the
+independent endpoint/operator reader remain required activation inputs. The target invitation adapter
+is separate and must resolve only the verified existing target account's current
+channel, honour cancellation, and keep the decrypted bearer out of issuer responses
+and logs.
+
+The independently opened existing `debateai_prod_staff_recovery` principal remains
+closed except for its approved maximum-five-minute JIT session. Task6 uses
+`publishStaffIndependentAlertReadiness(configuration,
+PostgresStaffIndependentReadinessPublisher(jitPool))` to re-read protected bytes and
+ACK evidence immediately before an intended enabling action/Owner commit. SQL
+publication lasts at most30 seconds and never past evidence expiry. Runtime cannot
+publish or revoke; it may obtain an operation-specific lease of at most10 seconds
+only for the exact published hash/generation. Root/JIT generation-specific revoke
+or replacement invalidates prior leases. All publisher/revoke calls check actual
+JIT validity again after blocking row writes. No reusable recovery URL, daemon,
+scheduled test email, or automatic JIT reopening is supplied.
+
+Before activation the operator must approve the concrete routine publication,
+refresh and revocation lifecycle, its independent custody and JIT handoff, and the
+chosen evidence lifetime/receiver route. Until then an operator can only publish
+immediately before an explicitly intended action within the short window; missing,
+stale or mismatched evidence remains `UNAVAILABLE`. File/generation/evidence changes
+require fresh matching publication. Enabling audit/outbox writes check readiness
+before insert and again in deferred COMMIT guards after blocking insert work. The
+final shared publication lock orders enabling commit against root revoke/update.
+Emergency `DISABLE`/`COMPROMISE` remains atomic with encrypted audit/outbox during an
+alert transport outage; missing encryption/key/audit persistence is a failure.
+
+Delivery uses immutable audit/outbox/receipts plus separate guarded dispatch state:
+limit1–100, just-in-time fifteen-second claims, at most three attempts, persisted
+one-/five-second retry delays, and a maximum-five-second whole delivery pipeline.
+Mapping/claim state is checked again at admission; cancellation reaches protected
+config admission and the bounded no-shell child submission. Child stdin carries
+headers/body, stdout/stderr are discarded, header injection/payload overbounds are
+rejected, and timeout kills/reaps the child. A proven erased/severed mapping records
+`SEVERED`; transient key/custody errors retry as metadata-only `KEY_UNAVAILABLE`.
+A crash after receiver ACK but before receipt persistence remains ambiguous:
+expired claims append `ACK_UNCERTAIN` and can resend the same stable identity. This
+is at-least-once delivery, with receiver dedupe by event **and purpose**, not an
+exactly-once guarantee across SQL and the transport.

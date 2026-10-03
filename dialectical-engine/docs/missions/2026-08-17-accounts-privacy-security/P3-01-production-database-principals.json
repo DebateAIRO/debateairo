@@ -283,8 +283,27 @@
       "ownsSchemas": [
         "staff"
       ],
-      "ownsRelations": [],
-      "ownsFunctions": []
+      "ownsRelations": [
+        "staff.independent_alert_readiness",
+        "staff.alert_operation_readiness",
+        "staff.alert_dispatch_state"
+      ],
+      "ownsFunctions": [
+        "staff.require_alert_readiness_jit",
+        "staff.publish_independent_alert_readiness",
+        "staff.revoke_independent_alert_readiness",
+        "staff.read_independent_alert_readiness",
+        "staff.authorize_alert_operation",
+        "staff.require_alert_operation",
+        "staff.guard_alert_audit_insert",
+        "staff.guard_alert_outbox_insert",
+        "staff.guard_alert_commit",
+        "staff.read_alert_user_mapping",
+        "staff.read_alert_key_mapping",
+        "staff.claim_alert_delivery",
+        "staff.settle_alert_delivery",
+        "staff.read_alert_delivery_status"
+      ]
     }
   ],
   "principals": [
@@ -1460,6 +1479,12 @@
           "environmentKey": null,
           "purpose": "JIT_OWNER_COMMAND_PREPARE",
           "binding": "CLOSED_JIT"
+        },
+        {
+          "component": "operator:staff-independent-alert",
+          "environmentKey": null,
+          "purpose": "JIT_ALERT_READINESS_PUBLISH_REVOKE",
+          "binding": "CLOSED_JIT"
         }
       ]
     },
@@ -1822,6 +1847,11 @@
       "id": "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS",
       "ownerTicket": "P3-02",
       "requiredEvidence": "resolved connection principal identities for each component"
+    },
+    {
+      "id": "STAFF_INDEPENDENT_ACK_AND_ROOT_PUBLICATION",
+      "ownerTicket": "P3-02",
+      "requiredEvidence": "rootUID0 protected config generation/hash; independent destination and rehearsed acknowledgement adapter; operator-approved publication/refresh/revoke lifecycle under existing closed five-minute JIT; no source defaults or daemon"
     }
   ],
   "invariants": [

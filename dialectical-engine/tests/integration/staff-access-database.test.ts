@@ -1,3 +1,4 @@
+import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, rm, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,7 +12,7 @@ let database: TestDatabase;
 let runtime: Pool;
 const hash = (text: string) => `sha256:${createHash("sha256").update(text).digest("hex")}`;
 const envelope = { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" };
-const alertFor = (operationId:string,event:string) => ({schema:"staff-alert-v1",event,operationId,envelope});
+const alertFor = async(operationId:string,event:string) => {await authorizeStaffAlertFixture(database.pool,operationId);return {schema:"staff-alert-v1",event,operationId,envelope};};
 async function account() {
   const userId=randomUUID(), sessionId=randomUUID(), factorId=randomUUID();
   await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES ($1,$2,'{}','{}','fixture-password',$3,'active',now())`,[userId,createHash("sha256").update(userId).digest(),userId]);
@@ -34,11 +35,11 @@ async function staff(owner=false) {
 async function proof(actor:Awaited<ReturnType<typeof staff>>, action:string,targetId:string, expectedRevision=0) {
   const operationId=randomUUID(), proofId=randomUUID(), binding={action,targetId,expectedRevision,operationId,bodySha256:hash(operationId).slice(7)};
   await database.pool.query(`INSERT INTO staff.action_proof(proof_id,staff_id,user_id,ordinary_session_id,privilege_session_id,security_epoch,account_security_epoch,grant_revision,binding,credential_id,expires_at) VALUES($1,$2,$3,$4,$5,0,0,0,$6,'fixture-verified-key',now()+interval '5 minutes')`,[proofId,actor.staffId,actor.userId,actor.sessionId,actor.context.privilegeSessionId,binding]);
-  return {proofId,operationId,binding};
+  await authorizeStaffAlertFixture(database.pool,operationId);return {proofId,operationId,binding};
 }
 async function invite(actor:Awaited<ReturnType<typeof staff>>,target:Awaited<ReturnType<typeof account>>) {
   const p=await proof(actor,'TEAM_INVITE',target.userId), tokenHash=hash(p.operationId);
-  const result=await runtime.query(`SELECT staff.invite($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8,$9::jsonb,$10::jsonb) AS receipt`,[actor.context,p.proofId,p.binding,target.userId,['TEAM_READ'],p.operationId,{code:'TEAM_ONBOARDING'},tokenHash,alertFor(p.operationId,'INVITE'),{schema:'staff-invitation-delivery-v1',operationId:p.operationId,envelope}]);
+  const result=await runtime.query(`SELECT staff.invite($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8,$9::jsonb,$10::jsonb) AS receipt`,[actor.context,p.proofId,p.binding,target.userId,['TEAM_READ'],p.operationId,{code:'TEAM_ONBOARDING'},tokenHash,await alertFor(p.operationId,'INVITE'),{schema:'staff-invitation-delivery-v1',operationId:p.operationId,envelope}]);
   const invitationId=(await database.pool.query(`SELECT invitation_id FROM staff.invitation WHERE operation_id=$1`,[p.operationId])).rows[0].invitation_id;
   return {invitationId,tokenHash,receipt:result.rows[0].receipt};
 }
@@ -95,7 +96,7 @@ describe('persistent staff authority on disposable PostgreSQL',()=>{
     const owner=await staff(true), target=await account(), other=await account(), inv=await invite(owner,target);
     expect((await runtime.query('SELECT staff.read_invitation_context($1,$2,$3) AS context',[other.userId,other.sessionId,inv.tokenHash])).rows[0].context).toBeNull();
     const p=await invitationProof(inv.invitationId,target), op=randomUUID();
-    await expect(runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,p, {operationId:op,reason:{code:'TEAM_ONBOARDING'}},alertFor(op,'ACCEPT')])).resolves.toBeDefined();
+    await expect(runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,p, {operationId:op,reason:{code:'TEAM_ONBOARDING'}},await alertFor(op,'ACCEPT')])).resolves.toBeDefined();
     expect((await database.pool.query('SELECT count(*)::int AS count FROM staff.privilege_session WHERE user_id=$1',[target.userId])).rows[0].count).toBe(0);
     await expect(runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,p,{operationId:randomUUID(),reason:{code:'TEAM_ONBOARDING'}},{}])).rejects.toThrow('STAFF_INVITATION_INVALID');
     await database.pool.query('UPDATE staff.owner_designation SET active=false WHERE staff_id=$1',[owner.staffId]);
@@ -108,8 +109,8 @@ describe('persistent staff authority on disposable PostgreSQL',()=>{
   });
   it('refuses reserved capabilities, stale revisions and forged binding bodies',async()=>{
     const owner=await staff(true),target=await staff(),p=await proof(owner,'TEAM_GRANT',target.staffId);
-    await expect(runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['ALLOWANCE_WRITE'],p.operationId,{code:'GRANT_CHANGE'},alertFor(p.operationId,'GRANT')])).rejects.toThrow('STAFF_CAPABILITIES_INVALID');
-    await expect(runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,{...p.binding,bodySha256:'0'.repeat(64)},target.staffId,['TEAM_READ'],p.operationId,{code:'GRANT_CHANGE'},alertFor(p.operationId,'GRANT')])).rejects.toThrow('STAFF_PROOF_INVALID');
+    await expect(runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['ALLOWANCE_WRITE'],p.operationId,{code:'GRANT_CHANGE'},await alertFor(p.operationId,'GRANT')])).rejects.toThrow('STAFF_CAPABILITIES_INVALID');
+    await expect(runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,{...p.binding,bodySha256:'0'.repeat(64)},target.staffId,['TEAM_READ'],p.operationId,{code:'GRANT_CHANGE'},await alertFor(p.operationId,'GRANT')])).rejects.toThrow('STAFF_PROOF_INVALID');
     await database.pool.query('UPDATE staff.owner_designation SET active=false WHERE staff_id=$1',[owner.staffId]);
   });
   it('rolls back grant, consumed proof and audit when encrypted outbox persistence fails',async()=>{
@@ -123,10 +124,10 @@ describe('persistent staff authority on disposable PostgreSQL',()=>{
   it('linearizes grant after committed disable using a two-connection subject barrier',async()=>{
     const owner=await staff(true),target=await staff(),p=await proof(owner,'TEAM_GRANT',target.staffId),barrier=await database.pool.connect();
     await barrier.query('BEGIN');await barrier.query('SELECT identity.lock_security_subjects($1::uuid[])',[[owner.userId,target.userId]]);
-    const operation=runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['TEAM_READ'],p.operationId,{code:'GRANT_CHANGE'},alertFor(p.operationId,'GRANT')]);
+    const operation=runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['TEAM_READ'],p.operationId,{code:'GRANT_CHANGE'},await alertFor(p.operationId,'GRANT')]);
     const rejected=expect(operation).rejects.toThrow('STAFF_TARGET_INVALID');await pending(operation);
     const disabled=await proof(owner,'TEAM_DISABLE',target.staffId);
-    await barrier.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,disabled.proofId,disabled.binding,target.staffId,'OFFBOARD',disabled.operationId,{code:'OFFBOARDING'},alertFor(disabled.operationId,'DISABLE')]);await barrier.query('COMMIT');barrier.release();await rejected;
+    await barrier.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,disabled.proofId,disabled.binding,target.staffId,'OFFBOARD',disabled.operationId,{code:'OFFBOARDING'},await alertFor(disabled.operationId,'DISABLE')]);await barrier.query('COMMIT');barrier.release();await rejected;
     await database.pool.query('UPDATE staff.owner_designation SET active=false WHERE staff_id=$1',[owner.staffId]);
   });
   it('singleton Owner marker serializes competing first inserts on two connections',async()=>{
@@ -153,7 +154,7 @@ describe('persistent staff authority on disposable PostgreSQL',()=>{
   });
   it('keeps audit and outbox immutable even under their definer owner',async()=>{
     const owner=await staff(true),target=await staff(),p=await proof(owner,'TEAM_GRANT',target.staffId);
-    await runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},alertFor(p.operationId,'GRANT')]);
+    await runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},await alertFor(p.operationId,'GRANT')]);
     for(const sql of [`UPDATE staff.audit_event SET event_type='DISABLE'`,'DELETE FROM staff.alert_outbox','TRUNCATE staff.audit_event CASCADE'])await expect(database.pool.query(sql)).rejects.toMatchObject({code:'55000'});
     await database.pool.query('UPDATE staff.owner_designation SET active=false WHERE staff_id=$1',[owner.staffId]);
   });
@@ -161,15 +162,15 @@ describe('persistent staff authority on disposable PostgreSQL',()=>{
   it('blocks accept after a target disable wins the subject barrier, issuing no new staff session',async()=>{
     const owner=await staff(true),target=await account(),inv=await invite(owner,target),p=await invitationProof(inv.invitationId,target),op=randomUUID(),barrier=await database.pool.connect();
     await barrier.query('BEGIN');await barrier.query('SELECT identity.lock_security_subjects($1::uuid[])',[[target.userId,owner.userId]]);
-    const operation=runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,p,{operationId:op,reason:{code:'TEAM_ONBOARDING'}},alertFor(op,'ACCEPT')]);
+    const operation=runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,p,{operationId:op,reason:{code:'TEAM_ONBOARDING'}},await alertFor(op,'ACCEPT')]);
     const rejected=expect(operation).rejects.toThrow('STAFF_INVITATION_INVALID');await pending(operation);
     const targetStaff=randomUUID();await barrier.query("INSERT INTO staff.subject(staff_id,user_id,capabilities) VALUES($1,$2,'{TEAM_READ}')",[targetStaff,target.userId]);
-    const disabled=await proof(owner,'EMERGENCY_DISABLE',targetStaff);await barrier.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,disabled.proofId,disabled.binding,targetStaff,'COMPROMISE',disabled.operationId,{code:'SECURITY_RESPONSE'},alertFor(disabled.operationId,'DISABLE')]);await barrier.query('COMMIT');barrier.release();await rejected;
+    const disabled=await proof(owner,'EMERGENCY_DISABLE',targetStaff);await barrier.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,disabled.proofId,disabled.binding,targetStaff,'COMPROMISE',disabled.operationId,{code:'SECURITY_RESPONSE'},await alertFor(disabled.operationId,'DISABLE')]);await barrier.query('COMMIT');barrier.release();await rejected;
     expect((await database.pool.query("SELECT count(*)::int AS count FROM staff.subject WHERE user_id=$1 AND state='ACTIVE'",[target.userId])).rows[0].count).toBe(0);
   });
   it('compromise disable durably revokes ordinary credentials and invalidates persistent staff authority',async()=>{
     const owner=await staff(true),target=await staff(),p=await proof(owner,'EMERGENCY_DISABLE',target.staffId);
-    await runtime.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,'COMPROMISE',p.operationId,{code:'SECURITY_RESPONSE'},alertFor(p.operationId,'DISABLE')]);
+    await runtime.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,'COMPROMISE',p.operationId,{code:'SECURITY_RESPONSE'},await alertFor(p.operationId,'DISABLE')]);
     expect((await runtime.query('SELECT identity.read_account_security_hold($1) AS held',[target.userId])).rows[0].held).toBe(true);
     expect((await runtime.query('SELECT staff.read_context($1,$2,$3) AS context',[target.userId,target.sessionId,target.tokenHash])).rows[0].context).toBeNull();
     expect((await database.pool.query('SELECT state FROM identity.mfa_factor WHERE mfa_factor_id=$1',[target.factorId])).rows[0].state).toBe('revoked');
@@ -179,7 +180,7 @@ describe('persistent staff authority on disposable PostgreSQL',()=>{
     const owner=await staff(true),target=await staff(),p=await proof(owner,'EMERGENCY_DISABLE',target.staffId);
     await database.pool.query(`CREATE FUNCTION public.staff_test_audit_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture-audit-failure'; END $$; CREATE TRIGGER staff_test_audit_failure BEFORE INSERT ON staff.audit_event FOR EACH ROW EXECUTE FUNCTION public.staff_test_audit_failure()`);
     try {
-      await expect(runtime.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,'COMPROMISE',p.operationId,{code:'SECURITY_RESPONSE'},alertFor(p.operationId,'DISABLE')])).rejects.toThrow('fixture-audit-failure');
+      await expect(runtime.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,'COMPROMISE',p.operationId,{code:'SECURITY_RESPONSE'},await alertFor(p.operationId,'DISABLE')])).rejects.toThrow('fixture-audit-failure');
       expect((await database.pool.query('SELECT state FROM staff.subject WHERE staff_id=$1',[target.staffId])).rows[0].state).toBe('ACTIVE');
       expect((await runtime.query('SELECT identity.read_account_security_hold($1) AS held',[target.userId])).rows[0].held).toBe(false);
       expect((await database.pool.query('SELECT revoked_at FROM identity.session WHERE session_id=$1',[target.sessionId])).rows[0].revoked_at).toBeNull();
@@ -214,8 +215,8 @@ describe('scoped rotation, JIT and trusted ceremony persistence',()=>{
     EXISTS(SELECT 1 FROM aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS public,
     has_function_privilege('debateai_runtime',p.oid,'EXECUTE') AS runtime,has_function_privilege('debateai_staff_recovery',p.oid,'EXECUTE') AS recovery
     FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='staff' OR (n.nspname='identity' AND p.proname IN('lock_security_subjects','read_account_security_hold','staff_rotation_binding_current')) ORDER BY signature`)).rows;
-  const runtimeNames=new Set(['read_authentication','read_current_context','read_action_proof','read_context','authorize_action','invite','read_invitation_context','accept','grant','disable','step_up_prerequisite','read_owner_possession_context','begin_invitation_challenge','begin_owner_possession_challenge','complete_invitation_proof','complete_owner_possession','begin_registration_challenge','read_account_security_hold','begin_owned_webauthn','read_owned_webauthn_challenge','fail_owned_webauthn','complete_owned_webauthn_registration','complete_owned_webauthn_assertion','staff_read_owned_webauthn_key']);
-  for(const row of rows){expect(row.public,row.signature).toBe(false);expect(row.runtime,row.signature).toBe(runtimeNames.has(row.proname));expect(row.recovery,row.signature).toBe(row.proname==='prepare_owner_command');if(row.nspname==='staff')expect(row.owner).toBe('debateai_staff_security_owner');}
+  const runtimeNames=new Set(['read_authentication','read_current_context','read_action_proof','read_context','authorize_action','invite','read_invitation_context','accept','grant','disable','step_up_prerequisite','read_owner_possession_context','begin_invitation_challenge','begin_owner_possession_challenge','complete_invitation_proof','complete_owner_possession','begin_registration_challenge','read_account_security_hold','begin_owned_webauthn','read_owned_webauthn_challenge','fail_owned_webauthn','complete_owned_webauthn_registration','complete_owned_webauthn_assertion','staff_read_owned_webauthn_key','read_independent_alert_readiness','authorize_alert_operation','read_alert_user_mapping','read_alert_key_mapping','claim_alert_delivery','settle_alert_delivery','read_alert_delivery_status']);
+  for(const row of rows){expect(row.public,row.signature).toBe(false);expect(row.runtime,row.signature).toBe(runtimeNames.has(row.proname));expect(row.recovery,row.signature).toBe(['prepare_owner_command','publish_independent_alert_readiness','revoke_independent_alert_readiness'].includes(row.proname));if(row.nspname==='staff')expect(row.owner).toBe('debateai_staff_security_owner');}
   console.info('[STAFF_FUNCTION_ACL]',JSON.stringify(rows));
   const denied=[['user','password_hash'],['user','email_ciphertext'],['session','token_hash'],['mfa_factor','secret_ciphertext'],['mfa_factor','public_key']];
   for(const [table,column] of denied)expect((await database.pool.query(`SELECT has_column_privilege('debateai_staff_security_owner',$1,$2,'SELECT') AS allowed`,['identity.'+(table==='user'?'"user"':table),column])).rows[0].allowed).toBe(false);
@@ -274,7 +275,7 @@ describe('scoped rotation, JIT and trusted ceremony persistence',()=>{
 it('returns the original grant receipt for identical operation retry and rejects changed retries',async()=>{
  const owner=await staff(true),target=await staff(),p=await proof(owner,'TEAM_GRANT',target.staffId);
  const sql='SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb) AS value';
- const values=[owner.context,p.proofId,p.binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},alertFor(p.operationId,'GRANT')];
+ const values=[owner.context,p.proofId,p.binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},await alertFor(p.operationId,'GRANT')];
  const first=(await runtime.query(sql,values)).rows[0].value;expect((await runtime.query(sql,values)).rows[0].value).toEqual(first);
  await expect(runtime.query(sql,[...values.slice(0,4),['TEAM_READ'],...values.slice(5)])).rejects.toThrow('STAFF_OPERATION_CONFLICT');
  expect((await database.pool.query('SELECT grant_revision FROM staff.subject WHERE staff_id=$1',[target.staffId])).rows[0].grant_revision).toBe('1');
@@ -317,8 +318,8 @@ it('rolls back invitation and acceptance state on actual audit insert failure',a
  const owner=await staff(true),target=await account(),inv=await invite(owner,target),p=await invitationProof(inv.invitationId,target),another=await account(),inviteProof=await proof(owner,'TEAM_INVITE',another.userId),acceptOp=randomUUID();
  await database.pool.query(`CREATE FUNCTION public.staff_audit_insert_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture-audit-insert-failure'; END $$; CREATE TRIGGER staff_audit_insert_fail BEFORE INSERT ON staff.audit_event FOR EACH ROW EXECUTE FUNCTION public.staff_audit_insert_fail()`);
  try {
-  await expect(runtime.query('SELECT staff.invite($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8,$9::jsonb,$10::jsonb)',[owner.context,inviteProof.proofId,inviteProof.binding,another.userId,['TEAM_READ'],inviteProof.operationId,{code:'TEAM_ONBOARDING'},hash(randomUUID()),alertFor(inviteProof.operationId,'INVITE'),{schema:'staff-invitation-delivery-v1',operationId:inviteProof.operationId,envelope}])).rejects.toThrow('fixture-audit-insert-failure');
-  await expect(runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,p,{operationId:acceptOp,reason:{code:'TEAM_ONBOARDING'}},alertFor(acceptOp,'ACCEPT')])).rejects.toThrow('fixture-audit-insert-failure');
+  await expect(runtime.query('SELECT staff.invite($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8,$9::jsonb,$10::jsonb)',[owner.context,inviteProof.proofId,inviteProof.binding,another.userId,['TEAM_READ'],inviteProof.operationId,{code:'TEAM_ONBOARDING'},hash(randomUUID()),await alertFor(inviteProof.operationId,'INVITE'),{schema:'staff-invitation-delivery-v1',operationId:inviteProof.operationId,envelope}])).rejects.toThrow('fixture-audit-insert-failure');
+  await expect(runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,p,{operationId:acceptOp,reason:{code:'TEAM_ONBOARDING'}},await alertFor(acceptOp,'ACCEPT')])).rejects.toThrow('fixture-audit-insert-failure');
   expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.invitation WHERE operation_id=$1',[inviteProof.operationId])).rows[0].n).toBe(0);
   expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.subject WHERE user_id=$1',[target.userId])).rows[0].n).toBe(0);
   expect((await database.pool.query('SELECT consumed_at FROM staff.invitation WHERE invitation_id=$1',[inv.invitationId])).rows[0].consumed_at).toBeNull();
@@ -329,7 +330,7 @@ it('rolls back an already-inserted audit event when the database outbox insert f
  const owner=await staff(true),target=await staff(),p=await proof(owner,'TEAM_GRANT',target.staffId);
  await database.pool.query(`CREATE FUNCTION public.staff_outbox_insert_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture-outbox-insert-failure'; END $$; CREATE TRIGGER staff_outbox_insert_fail BEFORE INSERT ON staff.alert_outbox FOR EACH ROW EXECUTE FUNCTION public.staff_outbox_insert_fail()`);
  try {
-  await expect(runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},alertFor(p.operationId,'GRANT')])).rejects.toThrow('fixture-outbox-insert-failure');
+  await expect(runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},await alertFor(p.operationId,'GRANT')])).rejects.toThrow('fixture-outbox-insert-failure');
   expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.audit_event WHERE operation_id=$1',[p.operationId])).rows[0].n).toBe(0);
   expect((await database.pool.query('SELECT grant_revision FROM staff.subject WHERE staff_id=$1',[target.staffId])).rows[0].grant_revision).toBe('0');
   expect((await database.pool.query('SELECT consumed_at FROM staff.action_proof WHERE proof_id=$1',[p.proofId])).rows[0].consumed_at).toBeNull();
@@ -342,7 +343,7 @@ it('governed erasure cascades invitations and severs mapping while fixture alert
  const aad:AeadAad=['staff','alert_outbox.encrypted_payload',op,'run:none',auditToken,'staff-alert-dek:'+auditToken,'1'];
  try {
   await users.store(target.userId,dek);const encrypted=encrypt(dek,Buffer.from('fixture metadata alert'),aad);dek.fill(0);
-  await runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,proofId,{operationId:op,reason:{code:'TEAM_ONBOARDING'}},{schema:'staff-alert-v1',event:'ACCEPT',operationId:op,envelope:encrypted}]);
+  await authorizeStaffAlertFixture(database.pool,op);await runtime.query('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb)',[inv.invitationId,target.userId,target.sessionId,proofId,{operationId:op,reason:{code:'TEAM_ONBOARDING'}},{schema:'staff-alert-v1',event:'ACCEPT',operationId:op,envelope:encrypted}]);
   const stored=(await database.pool.query('SELECT o.key_ref,o.encrypted_payload FROM staff.alert_outbox o JOIN staff.audit_event a USING(event_id) WHERE a.operation_id=$1',[op])).rows[0];
   expect(stored.key_ref).toBe(auditToken);const readable=await users.load(target.userId);expect(decrypt(readable,stored.encrypted_payload,aad).toString()).toBe('fixture metadata alert');readable.fill(0);
   const erasure=randomUUID();await database.pool.query("INSERT INTO identity.account_erasure_request(erasure_id,user_id,requested_at,execute_at) VALUES($1,$2,clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second')",[erasure,target.userId]);
@@ -360,7 +361,7 @@ it('governed erasure cascades invitations and severs mapping while fixture alert
 });
 it('refuses compromise self-disable without consuming proof or holding the actor',async()=>{
  const owner=await staff(true),p=await proof(owner,'EMERGENCY_DISABLE',owner.staffId);
- await expect(runtime.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,owner.staffId,'COMPROMISE',p.operationId,{code:'SECURITY_RESPONSE'},alertFor(p.operationId,'DISABLE')])).rejects.toThrow('STAFF_SELF_DISABLE_FORBIDDEN');
+ await expect(runtime.query('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,owner.staffId,'COMPROMISE',p.operationId,{code:'SECURITY_RESPONSE'},await alertFor(p.operationId,'DISABLE')])).rejects.toThrow('STAFF_SELF_DISABLE_FORBIDDEN');
  expect((await database.pool.query('SELECT state FROM staff.subject WHERE staff_id=$1',[owner.staffId])).rows[0].state).toBe('ACTIVE');
  expect((await database.pool.query('SELECT consumed_at FROM staff.action_proof WHERE proof_id=$1',[p.proofId])).rows[0].consumed_at).toBeNull();
 });
@@ -368,7 +369,7 @@ it('rejects null and string revisions even when a malformed persisted binding ma
  for(const revision of [null,'0']) {
   const owner=await staff(true),target=await staff(),p=await proof(owner,'TEAM_GRANT',target.staffId),binding={...p.binding,expectedRevision:revision};
   await database.pool.query('UPDATE staff.action_proof SET binding=$1 WHERE proof_id=$2',[binding,p.proofId]);
-  await expect(runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},alertFor(p.operationId,'GRANT')])).rejects.toThrow('STAFF_REVISION_INVALID');
+  await expect(runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},await alertFor(p.operationId,'GRANT')])).rejects.toThrow('STAFF_REVISION_INVALID');
   expect((await database.pool.query('SELECT grant_revision FROM staff.subject WHERE staff_id=$1',[target.staffId])).rows[0].grant_revision).toBe('0');
  }
 });
@@ -450,7 +451,7 @@ it('allows unrelated security subjects to progress independently',async()=>{
  const unrelated=await account(),owner=await staff(true),target=await staff(),p=await proof(owner,'TEAM_GRANT',target.staffId),barrier=await database.pool.connect();
  try {
   await barrier.query('BEGIN');await barrier.query('SELECT identity.lock_security_subjects($1::uuid[])',[[unrelated.userId]]);
-  const operation=runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},alertFor(p.operationId,'GRANT')]);
+  const operation=runtime.query('SELECT staff.grant($1::jsonb,$2,$3::jsonb,$4,$5::text[],$6,$7::jsonb,$8::jsonb)',[owner.context,p.proofId,p.binding,target.staffId,['AUDIT_READ'],p.operationId,{code:'GRANT_CHANGE'},await alertFor(p.operationId,'GRANT')]);
   expect(await Promise.race([operation.then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),500))])).toBe(true);
  } finally {await barrier.query('ROLLBACK');barrier.release();}
 });

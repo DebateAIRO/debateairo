@@ -293,3 +293,42 @@ async completeWebAuthnAssertion(input: StaffAssertionCompletion): ReturnType<Sta
   return receipt(await this.call('SELECT staff.disable($1::jsonb,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb) AS value',[input.actor,input.proof.proofId,input.proof.binding,input.targetStaffId,input.mode,input.operationId,input.reason,input.alertIntent]));
  }
 }
+
+export type StaffAlertPurpose = 'INDEPENDENT_METADATA_ALERT' | 'TARGET_INVITATION';
+export type StaffAlertFailureCode = 'TRANSPORT_UNAVAILABLE' | 'TIMEOUT' | 'DESTINATION_REJECTED' | 'ACK_UNAVAILABLE' | 'PAYLOAD_INVALID' | 'KEY_UNAVAILABLE';
+export type StaffAlertKeyMapping = Readonly<{userId:string;keyRef:string}>;
+export type StaffAlertReadinessBinding = Readonly<{configSha256:string;generation:string}>;
+export type StaffAlertClaim = Readonly<{outboxId:string;eventId:string;operationId:string;event:StaffAlertIntent['event'];purpose:StaffAlertPurpose;keyRef:string;envelope:CryptoEnvelope;claimToken:string;attempt:number}>;
+export type StaffClaimKeyState = Readonly<{state:'CURRENT';mapping:StaffAlertKeyMapping}> | Readonly<{state:'SEVERED'|'UNAVAILABLE'}>;
+export interface StaffAlertKeyMappings {resolveUser(userId:string):Promise<StaffAlertKeyMapping|null>}
+export interface StaffAlertRepository extends StaffAlertKeyMappings {
+ authorizeOperation(operationId:string,binding:StaffAlertReadinessBinding):Promise<boolean>;
+ readIndependentAlertReadiness(binding:StaffAlertReadinessBinding):Promise<'READY'|'UNAVAILABLE'>;
+ claim(limit:number):Promise<readonly StaffAlertClaim[]>;
+ resolveClaim(claim:StaffAlertClaim):Promise<StaffClaimKeyState>;
+ settle(claim:StaffAlertClaim,outcome:'DELIVERED'|'FAILED'|'SEVERED',failure:StaffAlertFailureCode|'SEVERED'|null):Promise<boolean>;
+ status():Promise<Readonly<{pending:number;acked:number;severed:number;exhausted:number}>>;
+}
+/** Enumerated definer calls only. Caller cannot upload an outbox payload or receipt body. */
+export class PostgresStaffAlertRepository implements StaffAlertRepository {
+ constructor(private readonly pool:Pool){}
+ private async value<T>(sql:string,values:readonly unknown[]=[]):Promise<T>{const r=await guardedAuthorityQuery<{value:T}>(this.pool,sql,values);if(!r.rows[0])throw new Error('STAFF_ALERT_DATABASE_UNAVAILABLE');return r.rows[0].value;}
+ resolveUser(userId:string):Promise<StaffAlertKeyMapping|null>{return this.value('SELECT staff.read_alert_user_mapping($1) AS value',[userId]);}
+ authorizeOperation(operationId:string,binding:StaffAlertReadinessBinding):Promise<boolean>{return this.value('SELECT staff.authorize_alert_operation($1,$2,$3) AS value',[operationId,binding.configSha256,binding.generation]);}
+ readIndependentAlertReadiness(binding:StaffAlertReadinessBinding):Promise<'READY'|'UNAVAILABLE'>{return this.value('SELECT staff.read_independent_alert_readiness($1,$2) AS value',[binding.configSha256,binding.generation]);}
+ claim(limit:number):Promise<readonly StaffAlertClaim[]>{return this.value('SELECT staff.claim_alert_delivery($1) AS value',[limit]);}
+ resolveClaim(claim:StaffAlertClaim):Promise<StaffClaimKeyState>{return this.value('SELECT staff.read_alert_key_mapping($1,$2) AS value',[claim.outboxId,claim.claimToken]);}
+ settle(claim:StaffAlertClaim,outcome:'DELIVERED'|'FAILED'|'SEVERED',failure:StaffAlertFailureCode|'SEVERED'|null):Promise<boolean>{return this.value('SELECT staff.settle_alert_delivery($1,$2,$3,$4) AS value',[claim.outboxId,claim.claimToken,outcome,failure]);}
+ status():ReturnType<StaffAlertRepository['status']>{return this.value('SELECT staff.read_alert_delivery_status() AS value');}
+}
+
+export interface StaffIndependentReadinessPublisher {
+ publish(input:StaffAlertReadinessBinding&Readonly<{ackAdapterId:string;rehearsalId:string;evidenceExpiresAt:Date}>):Promise<boolean>;
+ revoke(generation:string):Promise<boolean>;
+}
+/** Instantiate only with the independently opened existing closed JIT principal. */
+export class PostgresStaffIndependentReadinessPublisher implements StaffIndependentReadinessPublisher {
+ constructor(private readonly pool:Pool){}
+ async publish(input:Parameters<StaffIndependentReadinessPublisher['publish']>[0]):Promise<boolean>{const result=await guardedAuthorityQuery<{value:boolean}>(this.pool,'SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5) AS value',[input.configSha256,input.generation,input.ackAdapterId,input.rehearsalId,input.evidenceExpiresAt]);return result.rows[0]?.value===true;}
+ async revoke(generation:string):Promise<boolean>{const result=await guardedAuthorityQuery<{value:boolean}>(this.pool,'SELECT staff.revoke_independent_alert_readiness($1) AS value',[generation]);return result.rows[0]?.value===true;}
+}

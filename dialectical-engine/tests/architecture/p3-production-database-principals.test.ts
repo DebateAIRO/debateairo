@@ -213,7 +213,9 @@ describe("P3-01 production database-principal manifest", () => {
         ownsRelations: [],
         ownsFunctions: []
       }
-      ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"], ownsRelations: [], ownsFunctions: [] }
+       ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"],
+        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state'],
+        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status'] }
     ]);
 
     expect(manifest.principals.map(({ id, roleName, kind }) => ({ id, roleName, kind })))
@@ -451,6 +453,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "operator:support-config", environmentKey: null, purpose: "JIT_SUPPORT_CONFIGURATION", binding: "JIT_HUMAN" },
         { component: "operator:support-status", environmentKey: null, purpose: "SUPPORT_STATUS_DATA", binding: "WIRED" },
         { component: "operator:staff-recovery", environmentKey: null, purpose: "JIT_OWNER_COMMAND_PREPARE", binding: "CLOSED_JIT" },
+        { component: "operator:staff-independent-alert", environmentKey: null, purpose: "JIT_ALERT_READINESS_PUBLISH_REVOKE", binding: "CLOSED_JIT" },
         { component: "hatchet", environmentKey: "HATCHET_DATABASE_URL", purpose: "HATCHET_INTERNAL_DATABASE", binding: "EXTERNAL_COMPONENT" }
       ].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))));
     expect(manifest.developmentOnlyPrincipalBindings).toEqual([{
@@ -562,7 +565,8 @@ describe("P3-01 production database-principal manifest", () => {
       .toEqual([
         { id: "CREDENTIAL_MATERIAL_PAIRWISE_DISTINCT", ownerTicket: "P3-02" },
         { id: "JIT_HUMAN_CREDENTIAL_HAS_BOUNDED_EXPIRY", ownerTicket: "P3-02" },
-        { id: "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS", ownerTicket: "P3-02" }
+        { id: "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS", ownerTicket: "P3-02" },
+        { id: "STAFF_INDEPENDENT_ACK_AND_ROOT_PUBLICATION", ownerTicket: "P3-02" }
       ]);
     expect(manifest.deploymentObligations.every(({ requiredEvidence }) =>
       requiredEvidence.trim().length > 0)).toBe(true);
