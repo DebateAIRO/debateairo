@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseHostedRegisterFile } from "../../apps/runner/src/hosted-register-publish.js";
@@ -179,6 +179,8 @@ describe("P22 the Billing runbook", () => {
       .flatMap((path) => [...read(path).matchAll(/reportPending\("(BILLING_[A-Z_]+)"\)/gu)].map((match) => match[1]!));
     expect(new Set(markers).size).toBeGreaterThanOrEqual(5);
     for (const marker of markers) expect(billing, marker).toContain(`| \`[${marker}]\` (a bare marker) |`);
+    // P4-H (P2-I18's open clause): the API's own one-off marker has its row too.
+    expect(billing).toContain("| `[BILLING_ERASURE_STOP_PENDING]` (a bare marker) |");
     // W9 fix round 1 (F1): a dead refund is never settled with "at least" its amount.
     expect(billing).not.toContain("Refund at least");
     // R-7: the public origin is the existing PUBLIC_APP_URL; no second setting names it.
@@ -194,6 +196,123 @@ describe("P22 the Billing runbook", () => {
     // G5 and P16a: the hosted example carries neither the country switches nor a reason to keep taxAuthorities, so
     // the runbook never tells the operator to copy "the four members" from it.
     expect(billing).not.toContain("Copy those four members");
+  });
+
+  it("P4-H (P2-I18's open clause): every billing line the API can write has a journal row, or is named routine", () => {
+    // The source list: the audit event union, the billing lines written straight to the journal, and every bracketed
+    // billing marker (the runtime's reportPending codes and the API's own console markers).
+    const sources = (dir: string): string[] => (readdirSync(resolve(dir), { recursive: true }) as string[])
+      .filter((name) => name.endsWith(".ts")).map((name) => read(`${dir}/${name}`));
+    const api = sources("apps/api/src");
+    const audited = [...read("apps/api/src/billing/audit.ts").matchAll(/^\s*\|\s*"(billing\.[a-z_.]+)"/gmu)].map((m) => m[1]!);
+    const direct = api.flatMap((text) => [...text.matchAll(/event:\s*"(billing\.[a-z_.]+)"/gu)].map((m) => m[1]!));
+    const events = new Set([...audited, ...direct]);
+    expect(audited.length).toBeGreaterThanOrEqual(50);
+    expect(direct).toContain("billing.cancel_link.failed");
+    const markers = new Set(api.flatMap((text) => [
+      ...[...text.matchAll(/reportPending\("(BILLING_[A-Z_]+)"\)/gu)].map((m) => m[1]!),
+      ...[...text.matchAll(/console\.error\("\[(BILLING_[A-Z_]+)\]"\)/gu)].map((m) => m[1]!)
+    ]));
+    expect(markers).toContain("BILLING_ERASURE_STOP_PENDING");
+
+    const start = billing.indexOf("| Signal | What it means | What to do |");
+    expect(start).toBeGreaterThan(0);
+    const tableLines: string[] = [];
+    for (const line of billing.slice(start).split("\n")) {
+      if (!line.startsWith("|")) break;
+      tableLines.push(line);
+    }
+    const firstCell = (line: string): string => line.split(" | ")[0] ?? "";
+    const rowEvents = tableLines.flatMap((line) => [...firstCell(line).matchAll(/`"event":"(billing\.[a-z_.]+)"`/gu)].map((m) => m[1]!));
+    const rowMarkers = tableLines.flatMap((line) => [...firstCell(line).matchAll(/`\[(BILLING_[A-Z_]+)\]`/gu)].map((m) => m[1]!));
+    const routineAt = billing.indexOf("**Every other billing line records a normal event and needs nothing from you:**");
+    expect(routineAt, "the routine sentence").toBeGreaterThan(start);
+    const routineText = billing.slice(routineAt, billing.indexOf("\n\n", routineAt));
+    const routine = [...routineText.matchAll(/`(billing\.[a-z_.]+)`/gu)].map((m) => m[1]!);
+
+    // Every line has exactly one home, and no row or routine name is stale.
+    for (const event of events) {
+      expect(rowEvents.includes(event) || routine.includes(event), `${event} is neither a row nor routine`).toBe(true);
+    }
+    for (const event of routine) expect(rowEvents, `${event} is both a row and routine`).not.toContain(event);
+    for (const event of [...rowEvents, ...routine]) expect(events, `${event} is not written by the API`).toContain(event);
+    expect(new Set(rowEvents).size, "one row per line").toBe(rowEvents.length);
+    for (const marker of markers) expect(rowMarkers, marker).toContain(marker);
+    for (const marker of rowMarkers) expect(markers, `${marker} is not written by the API`).toContain(marker);
+
+    // Each line that asks the owner to act (part4-scope.md §4.3, the open-items row "P2-I18 (X0)" and the W13
+    // re-review's additions) is a row of its own, never only the routine sentence.
+    for (const alarm of [
+      "billing.notice.undecryptable", "billing.mail.attachment_missing", "billing.renewal.stuck",
+      "billing.renewal.price_missing", "billing.renewal.history_invalid", "billing.maintenance.report",
+      "billing.reconcile.errors", "billing.reconcile.expired", "billing.reconcile.rows_rejected", "billing.refund.dead",
+      "billing.refund.unrecorded", "billing.xmoney.row_rejected", "billing.outbox.other_system",
+      "billing.refund.outcome_unknown", "billing.refund.refused", "billing.renewal.owner_stopped",
+      "billing.renewal.dunning_unpriced", "billing.reconcile.no_transaction", "billing.cancel_link.failed",
+      "billing.renewal.tax_refused", "billing.renewal.unknown", "billing.renewal.pending", "billing.chargeback",
+      "billing.withdrawal.owner_review",
+      // W13's rows, kept.
+      "billing.renewal.report", "billing.reconcile.listing_failed", "billing.outbox.dead", "billing.outbox.alert_failed",
+      "billing.outbox.settle_failed", "billing.xmoney.credentials_refused", "billing.quote.refused",
+      "billing.invoice.unknown", "billing.payment.mismatch"
+    ]) {
+      expect(rowEvents, alarm).toContain(alarm);
+    }
+    // Each row says what to do: the third cell is never empty.
+    for (const line of tableLines.slice(2)) expect((line.split(" | ")[2] ?? "").trim(), line).not.toBe("");
+
+    // The rows the brief's sources ask for, word for word where the action matters.
+    for (const needle of [
+      // P2-W4 / P2-W3 (b) (the P4-B judge's forward): the other-system row covers a renewal notice too.
+      "or a renewal notice (`RENEWAL_NOTICE`) of a plan of the other system",
+      // The daily dead-refund count holds jobs that owe nothing; the summary's code says which.
+      "Not every one is owed", "the summary's own names",
+      // A notice the key cannot open is answered 200 and never stored, so its payment waits for the daily check.
+      "this host's xMoney private key cannot decrypt",
+      // The erasure stop that failed at scheduling is repeated by the sweep.
+      "the sweep in front of the money check",
+      "The page had already said a link is on its way"
+    ]) {
+      expect(billing.replace(/\s+/gu, " "), needle).toContain(needle);
+    }
+  });
+
+  it("P4-H (P2-M41, the owner's ruling of 3 October 2026): switching billing off once plans are live is unsupported", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const off = flat.indexOf("*To switch billing off*");
+    expect(off).toBeGreaterThan(0);
+    const paragraph = flat.slice(off, flat.indexOf("**The tax summary.**", off));
+    for (const needle of [
+      "**Switching billing off once plans are live is not supported.**",
+      "Nothing in the code refuses it",
+      "Do it only with no live plan and no open billing job",
+      // The queries that show it: no live plan, no open billing job, no withdrawal still owed by hand.
+      "AS live_subscriptions FROM billing.subscription_latest_v", "AS open_billing_jobs FROM billing.outbox WHERE done_at IS NULL AND dead_at IS NULL",
+      "AS unsettled_owner_withdrawals",
+      "If any of them is not 0, do not switch billing off"
+    ]) {
+      expect(paragraph, needle).toContain(needle);
+    }
+  });
+
+  it("P4-H (§4.3's optional notes): the runner's looser Free check, and what §14.9's journal filter prints", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    // The S4b review's M-1: the runner never reads billingPolicy, so only the API's start and the publish are strict.
+    for (const needle of [
+      "the runner's own start-up check", "prices Free over every configured model",
+      "the API's start-up and the publish price Free on the Free plan's models only"
+    ]) {
+      expect(flat, needle).toContain(needle);
+    }
+    // The W13 judge's minor: the filter prints only three kinds of line, and a second command shows every billing line.
+    const before = flat.slice(flat.indexOf("**Before step 1: read the journal of the first start with billing on.**"),
+      flat.indexOf("**Every purchase in steps 1–5"));
+    for (const needle of [
+      "This filter prints nothing else", "To read every billing line of that start",
+      "grep -E '\"event\":\"billing\\.|\\[BILLING_'", "Every other billing line records a normal event"
+    ]) {
+      expect(before, needle).toContain(needle);
+    }
   });
 
   it("asks for every billing secret at a prompt, never through an editor, and never replaces one", () => {
