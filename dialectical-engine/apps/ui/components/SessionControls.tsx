@@ -82,6 +82,7 @@ export function SessionControls({
     // outlived the account that produced it — the next person to sign in on this
     // browser opened Help and read the previous person's support conversation.
     clearStoredSupportConversation();
+    window.dispatchEvent(new Event("debateai:staff-session-ended"));
     if (onSessionEnded !== undefined) onSessionEnded();
     else if (typeof window !== "undefined") window.location.assign("/settings");
   };
@@ -155,6 +156,7 @@ export function SessionControls({
         String(data.get("step-up-code") ?? "")
       );
       setStepUpComplete(true);
+      window.dispatchEvent(new Event("debateai:staff-session-ended"));
       form.reset();
       await refresh();
     } catch (failure) {

@@ -134,6 +134,10 @@ export const StaffAuthenticationOptionsResponseSchema = z.object({
         userVerification: z.literal("required"), allowCredentials: z.array(CredentialDescriptorSchema).min(1).max(100)
     }).strict()
 }).strict();
+/** Only the authenticated invitation target receives its current revision. */
+export const StaffInvitationOptionsResponseSchema = StaffAuthenticationOptionsResponseSchema.extend({
+    invitation_revision: RevisionSchema
+}).strict();
 export const OwnerPossessionOptionsRequestSchema = z.object({
     command_id: z.uuid(), command_nonce: OpaqueHandleSchema, credential_id: CredentialIdSchema, prerequisite_handle: OpaqueHandleSchema
 }).strict();
@@ -210,7 +214,7 @@ export const staffContractInventory = Object.freeze({
         StaffElevationOptionsRequestSchema, StaffAuthenticationVerifyRequestSchema, StaffElevationResponseSchema,
         StaffActionIntentSchema, StaffActionOptionsRequestSchema, StaffActionVerifyRequestSchema, StaffActionProofResponseSchema, StaffRegistrationOptionsResponseSchema, StaffAuthenticationOptionsResponseSchema,
         OwnerPossessionOptionsRequestSchema, OwnerPossessionVerifyRequestSchema, OwnerPossessionResponseSchema,
-        StaffInviteRequestSchema, StaffInviteResponseSchema, StaffInvitationOptionsRequestSchema, StaffInvitationVerifyRequestSchema,
+        StaffInviteRequestSchema, StaffInviteResponseSchema, StaffInvitationOptionsRequestSchema, StaffInvitationOptionsResponseSchema, StaffInvitationVerifyRequestSchema,
         StaffInvitationAcceptRequestSchema, StaffTargetParamsSchema, StaffGrantRequestSchema, StaffDisableModeSchema, StaffDisableRequestSchema,
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, StaffAuditPageSchema
     })

@@ -191,10 +191,13 @@ describe('actual native signed staff HTTP', () => {
         expect((await f.api.inject({method:'POST',url:'/v1/admin/team/invitations/accept/options',headers:headers(other),payload:{invitation_handle:handle}})).statusCode).toBe(403);
         expect((await f.api.inject({method:'POST',url:'/v1/admin/team/invitations/accept/options?invitation_handle='+handle,headers:headers(target),payload:{invitation_handle:handle}})).statusCode).toBe(422);
         const options=await f.api.inject({method:'POST',url:'/v1/admin/team/invitations/accept/options',headers:headers(target),payload:{invitation_handle:handle}});expect(options.statusCode).toBe(200);
+        expect(options.json().invitation_revision).toBe(0);
+        expect(contract.StaffInvitationOptionsResponseSchema.parse(options.json()).invitation_revision).toBe(0);
+        expect(Object.keys(options.json()).sort()).toEqual(['challenge_handle','invitation_revision','options']);
         const verified=await f.api.inject({method:'POST',url:'/v1/admin/team/invitations/accept/verify',headers:headers(target),payload:{invitation_handle:handle,challenge_handle:options.json().challenge_handle,credential:assertion(target,options.json().options.challenge)}});expect(verified.statusCode).toBe(200);
         const invitationProof=verified.json().proof_handle as string;
         expect((await f.api.inject({url:'/v1/admin/team?limit=1',headers:{...headers(target),cookie:headers(target).cookie+'; __Host-debateai-staff='+invitationProof}})).statusCode).toBe(401);
-        const accept={invitation_handle:handle,proof_handle:invitationProof,operation_id:randomUUID(),expected_revision:0};
+        const accept={invitation_handle:handle,proof_handle:invitationProof,operation_id:randomUUID(),expected_revision:options.json().invitation_revision};
         expect((await f.api.inject({method:'POST',url:'/v1/admin/team/invitations/accept',headers:headers(target),payload:{...accept,expected_revision:1}})).statusCode).toBe(403);
         const accepted=await f.api.inject({method:'POST',url:'/v1/admin/team/invitations/accept',headers:headers(target),payload:accept});expect(accepted.statusCode).toBe(200);
         expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.privilege_session WHERE user_id=$1',[target.userId])).rows[0].n).toBe(0);

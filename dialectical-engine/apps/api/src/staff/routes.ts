@@ -227,7 +227,8 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
     });
     route('POST', '/v1/admin/team/invitations/accept/options', async (request) => {
         const input = parse(contract.StaffInvitationOptionsRequestSchema, request.body), context = await scopedInvitation(request, input.invitation_handle);
-        return project(contract.StaffAuthenticationOptionsResponseSchema, await application!.webauthn.beginInvitationAcceptance(context, { invitationHandle: input.invitation_handle }));
+        const options = await application!.webauthn.beginInvitationAcceptance(context, { invitationHandle: input.invitation_handle });
+        return project(contract.StaffInvitationOptionsResponseSchema, { ...options, invitation_revision: context.invitationRevision });
     });
     route('POST', '/v1/admin/team/invitations/accept/verify', async (request) => {
         const input = parse(contract.StaffInvitationVerifyRequestSchema, request.body), context = await scopedInvitation(request, input.invitation_handle);

@@ -330,11 +330,19 @@ export interface EvaluatorDevMenuView {
   }[];
 }
 
+/** Reads only non-HttpOnly CSRF cookies; duplicates or malformed members grant no header. */
+export function readBrowserCsrfCookie(name: "__Host-debateai-csrf" | "__Host-debateai-staff-csrf"): string | null {
+  if (typeof document === "undefined") return null;
+  const values = document.cookie.split(";").flatMap((member) => {
+    const index = member.indexOf("=");
+    if (index < 1 || member.slice(0, index).trim() !== name) return [];
+    return [member.slice(index + 1).trim()];
+  });
+  return values.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(values[0]!) ? values[0]! : null;
+}
+
 async function evaluatorDevMenuRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-  const csrfToken = typeof document === "undefined" ? null : document.cookie.split(";").flatMap((member) => {
-    const [name, value] = member.trim().split("=", 2);
-    return name === "__Host-debateai-csrf" && value !== undefined ? [value] : [];
-  })[0] ?? null;
+  const csrfToken = readBrowserCsrfCookie("__Host-debateai-csrf");
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     cache: "no-store",

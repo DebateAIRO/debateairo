@@ -182,3 +182,14 @@ it("publishes every canonical method without overwriting shared-path operations"
   const published = Object.entries(document.paths).flatMap(([path, methods]) => Object.keys(methods).map(method => method.toUpperCase() + " " + path));
   expect(new Set(published)).toEqual(new Set(contract.contractInventory.routes));
 });
+
+it("invitation options expose only scoped revision plus the sealed native options", () => {
+  const response = schema("StaffInvitationOptionsResponseSchema");
+  const value = { invitation_revision: 7, challenge_handle: handle, options: { challenge: handle, rpId: "app.test", timeout: 300000, userVerification: "required", allowCredentials: [{ id: "aA", type: "public-key" }] } };
+  expect(response.parse(value)).toEqual(value);
+  for (const revision of [-1, 0.5, Number.MAX_SAFE_INTEGER + 1]) expect(response.safeParse({ ...value, invitation_revision: revision }).success).toBe(false);
+  for (const extra of [{ issuer_staff_id: id }, { target_user_id: id }, { invitation_handle: handle }, { capabilities: ["TEAM_READ"] }, { staff_id: id }]) expect(response.safeParse({ ...value, ...extra }).success).toBe(false);
+  const { invitation_revision: _revision, ...native } = value;
+  expect(response.safeParse(native).success).toBe(false);
+  expect(schema("StaffAuthenticationOptionsResponseSchema").safeParse(value).success).toBe(false);
+});
