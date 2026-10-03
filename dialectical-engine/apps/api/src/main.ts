@@ -821,7 +821,8 @@ const authenticationRiskCleanupTimer=setInterval(
 );
 authenticationRiskCleanupTimer.unref();
 // A15 (P16c): the retention purge runs wherever the API runs, whatever DEPLOYMENT_MODE and billingPolicy say —
-// acceptance records exist in every mode (A14). Asked daily; it purges once per UTC year, from 2 January.
+// acceptance records exist in every mode (A14). Asked once right after listen (below), so a service restarted more
+// often than daily still reaches a check (P2-M42), then daily; it purges once per UTC year, from 2 January.
 const retentionPurge = createRetentionPurge({ pool, clock: () => new Date(), log: (line) => console.error(line) });
 const triggerRetentionPurge=createSingleFlightErasureReconciler(
   async ()=>{ await retentionPurge.runIfDue(); },
