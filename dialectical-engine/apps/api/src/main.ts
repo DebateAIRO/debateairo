@@ -520,7 +520,9 @@ const askRoom = askRoomComposition?.room;
  * from the guard's policy, and with billing on a scorecard that breaks the
  * owners' plan-cap rule refuses this stage (SCORECARD_PLAN_CAPS_INVALID), and
  * so does one whose Free caps are unset or above Economy's
- * (SCORECARD_FREE_CAPS_INVALID, paid plans S4b).
+ * (SCORECARD_FREE_CAPS_INVALID, paid plans S4b), and one under which no declared
+ * Free-plan model can take the answer writer's or the answer checker's job
+ * (SCORECARD_FREE_ANSWER_UNSCORED, paid plans P4-E).
  */
 const billingEnabled = (askRoomComposition?.billingPlans ?? null) !== null;
 const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));

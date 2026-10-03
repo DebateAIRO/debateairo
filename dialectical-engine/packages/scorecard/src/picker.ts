@@ -298,8 +298,18 @@ export function typicalCallWindowTokens(typicalCall: ScorecardRoleEntry["typical
   return typicalCall.inputTokens * WINDOW_TOKENS_PER_VENDOR_TOKEN + answerTokenCeiling;
 }
 
+/**
+ * What `eligiblePool` reads of an ask: the mode, the reachable targets, their prices (for the cost
+ * only, never for eligibility) and the roles' sealed answer bounds. A full `PickerInput` is one; the
+ * publish and boot check (`roleHasEligibleCandidate`, paid plans P4-E) builds one with the two
+ * answer roles' bounds alone.
+ */
+type EligibilityInput = Readonly<Pick<PickerInput, "mode" | "reachable" | "prices"> & {
+  answerTokenCeilingByRole: Readonly<Partial<Record<DebateRole, number>>>;
+}>;
+
 /** The role's sealed answer bound, or +Infinity — fits no declared window — when the input carries none usable. */
-function answerTokenCeilingOf(input: PickerInput, role: DebateRole): number {
+function answerTokenCeilingOf(input: EligibilityInput, role: DebateRole): number {
   const ceiling = input.answerTokenCeilingByRole?.[role];
   return typeof ceiling === "number" && Number.isSafeInteger(ceiling) && ceiling >= 1 ? ceiling : Number.POSITIVE_INFINITY;
 }
@@ -385,7 +395,7 @@ function seatDemandOf(input: PickerInput, role: DebateRole): number {
  * CROSS_EXCHANGE answer bound) — the identical test `eligiblePool` applies to the role's own entry.
  */
 function crossExchangeEligible(
-  input: PickerInput,
+  input: EligibilityInput,
   scorecard: Scorecard,
   candidate: ScorecardCandidate,
   target: ReachableTarget
@@ -409,7 +419,7 @@ function crossExchangeEligible(
  * Entries are walked in candidateId order so the notes do not depend on the file's order.
  */
 function eligiblePool(
-  input: PickerInput,
+  input: EligibilityInput,
   scorecard: Scorecard,
   role: DebateRole,
   notes: string[],
@@ -444,6 +454,30 @@ function eligiblePool(
     pool.push(Object.freeze({ candidateId: candidate.candidateId, candidate: seatCandidateFrom(candidate, target), quality: entry.quality.score, cost }));
   }
   return pool;
+}
+
+/**
+ * Paid plans P4-E (Part 3b re-review M-4): whether at least one scorecard candidate may sit in
+ * `role` for an ask that reaches `reachable` — `eligiblePool` itself, so the publish and boot checks
+ * read the picker's own eligibility and never restate it. Prices only rank the pool, so none are
+ * passed, and the pool's notes are not kept.
+ */
+export function roleHasEligibleCandidate(
+  input: Readonly<{
+    scorecard: Scorecard;
+    mode: PickerInput["mode"];
+    reachable: readonly ReachableTarget[];
+    answerTokenCeilingByRole: Readonly<Partial<Record<DebateRole, number>>>;
+  }>,
+  role: DebateRole
+): boolean {
+  const eligibility: EligibilityInput = Object.freeze({
+    mode: input.mode,
+    reachable: input.reachable,
+    prices: new Map<string, TargetPrice>(),
+    answerTokenCeilingByRole: input.answerTokenCeilingByRole
+  });
+  return eligiblePool(eligibility, input.scorecard, role, []).length > 0;
 }
 
 /** Seat by seat: never a route twice; the lowest penalty class first; then the strength rule. */

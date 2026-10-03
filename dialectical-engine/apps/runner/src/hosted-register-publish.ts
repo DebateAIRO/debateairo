@@ -61,8 +61,9 @@ import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import {
-  firstCallPlanModels, freeCapsFollowPaidSiteRule, planCapsFollowPaidSiteRule, SCORECARD_FREE_CAPS_INVALID,
-  SCORECARD_PLAN_CAPS_INVALID, type PickerSettings
+  firstCallPlanModels, freeAnswerJobsFollowPaidSiteRule, freeCapsFollowPaidSiteRule, planCapsFollowPaidSiteRule,
+  SCORECARD_FREE_ANSWER_UNSCORED, SCORECARD_FREE_CAPS_INVALID, SCORECARD_PLAN_CAPS_INVALID, type PickerSettings,
+  type Scorecard
 } from "@debateai/scorecard";
 import {
   assertDeploymentProviderTargets,
@@ -88,6 +89,7 @@ import {
   billingPlansFromValue,
   billingPolicyFromValue,
   buildConfiguredProviderSetDeploymentRow,
+  callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   costEnvelopeBand,
   costEnvelopeCeilings,
@@ -507,6 +509,8 @@ export type HostedModelScorecard = Readonly<{
   /** Paid plans S4b: Free's own caps and the Economy caps, checked against the owners' Free rule when the version sells plans. */
   freeCap: PickerSettings["freeCap"];
   economyCap: PickerSettings["economyCap"];
+  /** Paid plans P4-E: the validated scorecard, which the Free answer-job rule reads through the picker's own eligibility. */
+  scorecard: Scorecard;
   sha256: string;
   bytes: number;
 }>;
@@ -604,6 +608,7 @@ export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: strin
     planStrengthCaps: read.scorecard.pickerSettings.planStrengthCaps,
     freeCap: read.scorecard.pickerSettings.freeCap,
     economyCap: read.scorecard.pickerSettings.economyCap,
+    scorecard: read.scorecard,
     sha256: createHash("sha256").update(valueJsonText).digest("hex"),
     bytes: Buffer.byteLength(valueJsonText, "utf8")
   });
@@ -893,6 +898,24 @@ export async function planHostedRegisterPublication(
   // owners' Free rule — every role's Free money cap set, at or below its Economy cap.
   if (billingPolicy?.enabled === true && scorecard !== null && !freeCapsFollowPaidSiteRule(scorecard)) {
     refuse(SCORECARD_FREE_CAPS_INVALID);
+  }
+  // Paid plans P4-E (Part 3b re-review M-4; ruling C4): and only one under which a Free ask
+  // can seat its answer writer and answer checker. With billing on those two take a scored
+  // Free-roster model or none, so a scorecard where no configured Free-roster model can take
+  // one of them would refuse every Free question. Asked by the picker's own eligibility over
+  // the file's targets and the version's sealed answer bounds (the writer's call runs under
+  // the synthesizer bound, the checker's under the evaluator bound, as the API's
+  // `answerTokenCeilingsByRole` maps them); the API's boot asks the same.
+  if (billingPolicy?.enabled === true && scorecard !== null) {
+    const ceilings = callTokenCeilingsFromValues((rowKey) => sealed(rowKey)?.value);
+    if (!freeAnswerJobsFollowPaidSiteRule({
+      scorecard: scorecard.scorecard,
+      targets,
+      freeRosterModelIds: PLAN_TIER_ROSTERS.free,
+      answerTokenCeilingByRole: { ANSWER_WRITER: ceilings.synthesizer, ANSWER_CHECKER: ceilings.evaluator }
+    })) {
+      refuse(SCORECARD_FREE_ANSWER_UNSCORED);
+    }
   }
   // §2.5.1: WARN, never refuse, when a plan's smallest window (the day cap, or
   // Free's whole month) is below what one debate may spend.
