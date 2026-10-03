@@ -3,13 +3,14 @@
 -- Several recurring billing queries read a whole append-only table that grows for ten years (A15's retention). Each
 -- index below serves one of them, named in the comment above it; a partial index carries the query's own filter, so
 -- the query's WHERE implies its predicate (tests/integration/billing-migrations.test.ts plans each query as the
--- repository sends it and finds its index). Measured at P4-M's head on a copy with 200,000 subscription events,
--- 180,000 entitlement events, 100,000 charges and notices, 300,000 charge events and 200,000 outbox jobs: every scan
--- named here became an index scan.
--- Indexes only: no table, column, function or grant changes. The runner applies a file inside its one migration
--- transaction (packages/db/src/index.ts, migrate), so these are plain CREATE INDEX (CONCURRENTLY cannot run in a
--- transaction); each holds its table's SHARE lock (reads go on, writes wait) for the moment the build takes, which is
--- short at launch volumes. IF NOT EXISTS, as 0065's ledger hygiene requires, so a replay is harmless.
+-- repository sends it and finds its index). Measured at P4-M's head on a copy with about 200,000 subscription
+-- events, 180,000 entitlement events, 100,000 charges, 220,000 charge events, 100,000 notices and 200,000 outbox
+-- jobs: every scan named here became an index scan.
+-- Indexes only: no table, column, function or grant changes. The runner applies every pending file inside one
+-- migration transaction (packages/db/src/index.ts, migrate), so these are plain CREATE INDEX (CONCURRENTLY cannot run
+-- in a transaction); each takes its table's SHARE lock (reads go on, writes wait), held until the migration run
+-- commits, which at launch volumes is moments. IF NOT EXISTS, as 0065's ledger hygiene requires, so a replay is
+-- harmless.
 
 -- checkoutPaymentSignals (packages/db/src/billing-jobs.ts): the notices of one charge, by our externalOrderId in
 -- the charge's xMoney system. A notice may carry no externalOrderId; the query's equality never matches those.
@@ -17,7 +18,8 @@ CREATE INDEX IF NOT EXISTS xmoney_notice_external_order_idx
   ON billing.xmoney_notice (external_order_id, xmoney_environment) WHERE external_order_id IS NOT NULL;
 
 -- checkoutPaymentSignals: an open job's notice, joined as written, `origin.notice_id::text = payload->>'notice_id'`
--- (the payload's notice_id may be null, so the query compares text and never casts the payload).
+-- (the payload is not checked: its notice_id may be missing or not a uuid, and a cast would throw on the latter, so
+-- the query compares text and never casts the payload).
 CREATE INDEX IF NOT EXISTS xmoney_notice_id_text_idx
   ON billing.xmoney_notice ((notice_id::text));
 
