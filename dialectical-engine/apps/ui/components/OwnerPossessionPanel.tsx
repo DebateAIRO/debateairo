@@ -24,7 +24,9 @@ export function OwnerPossessionPanel({ client, catalog, disabled, onAuthorityEnd
         const form = event.currentTarget, data = new FormData(form);
         const command_id = String(data.get("command_id") ?? "").trim();
         const command_nonce = String(data.get("command_nonce") ?? "").trim();
-        const credentialIds = [String(data.get("credential_one") ?? "").trim(), String(data.get("credential_two") ?? "").trim()];
+        const firstCredentialId = String(data.get("credential_one") ?? "").trim();
+        const secondCredentialId = String(data.get("credential_two") ?? "").trim();
+        const credentialIds = secondCredentialId === "" ? [firstCredentialId] : [firstCredentialId, secondCredentialId];
         const password = String(data.get("password") ?? ""), totp_code = String(data.get("totp_code") ?? "");
         form.reset();
         setBusy(true);
@@ -32,7 +34,7 @@ export function OwnerPossessionPanel({ client, catalog, disabled, onAuthorityEnd
         setStatus(null);
         setReceipts([]);
         try {
-            if (credentialIds[0] === credentialIds[1])
+            if (firstCredentialId === "" || new Set(credentialIds).size !== credentialIds.length)
                 throw new Error("STAFF_INPUT_INVALID");
             const prerequisite = await client.prerequisite({ purpose: "OWNER_POSSESSION", command_id, command_nonce, password, totp_code });
             onAuthorityEnded();
@@ -57,7 +59,7 @@ export function OwnerPossessionPanel({ client, catalog, disabled, onAuthorityEnd
       <fieldset disabled={disabled || busy}>
         {([["command_id", "staff.command"], ["command_nonce", "staff.nonce"], ["credential_one", "staff.keyOne"], ["credential_two", "staff.keyTwo"], ["password", "staff.password"], ["totp_code", "staff.code"]] as const).map(([name, key]) => <div className="setField" key={name}>
           <label htmlFor={`owner-${name}`}>{t(catalog, key)}</label>
-          <input id={`owner-${name}`} name={name} type={name === "password" || name === "command_nonce" ? "password" : "text"} autoComplete={name === "password" ? "current-password" : name === "totp_code" ? "one-time-code" : "off"} maxLength={name === "command_nonce" ? 43 : 1024} required/>
+          <input id={`owner-${name}`} name={name} type={name === "password" || name === "command_nonce" ? "password" : "text"} autoComplete={name === "password" ? "current-password" : name === "totp_code" ? "one-time-code" : "off"} maxLength={name === "command_nonce" ? 43 : 1024} required={name !== "credential_two"}/>
         </div>)}
         <button className="setBtn setBtnPrimary" type="submit">{t(catalog, "staff.possess")}</button>
       </fieldset>

@@ -42,9 +42,9 @@ export function parseOwnerRecoveryBundle(value: unknown): OwnerRecoveryBundle {
         || !ownerUuid(value.binding.operationId) 
         || !['BOOTSTRAP', 'RECOVER_OWNER'].includes(value.binding.purpose as string) 
         || !Array.isArray(value.binding.receiptIds) 
-        || value.binding.receiptIds.length !== 2 
+        || ![1, 2].includes(value.binding.receiptIds.length)
         || !value.binding.receiptIds.every(ownerUuid) 
-        || value.binding.receiptIds[0] === value.binding.receiptIds[1]))
+        || new Set(value.binding.receiptIds).size !== value.binding.receiptIds.length))
         throw new OwnerRecoveryError('OWNER_RECOVERY_MATERIAL_INVALID');
     return value as OwnerRecoveryBundle;
 }

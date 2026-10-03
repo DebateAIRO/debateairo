@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import type { OwnerCredentialSet } from '@debateai/kernel';
 import { vi, expect } from 'vitest';
 import { buildApi } from '@debateai/api';
 import * as contract from '@debateai/contract';
@@ -34,7 +35,12 @@ import { TEST_DEVELOPMENT_PROVIDER_PANEL } from './developmentProviderPanel.js';
 import { createStaffRuntime } from '../../apps/api/src/staff/runtime.js';
 import { decodeBase32, type UserDekStore } from '@debateai/crypto';
 
-export async function runStaffSecurityJourney(database:TestDatabase,runtime:Pool) {
+function selectedSet(values:readonly string[]):OwnerCredentialSet {
+ if(values.length===1)return [values[0]!];
+ if(values.length===2)return [values[0]!,values[1]!];
+ throw new Error('SYNTHETIC_SELECTED_SET_INVALID');
+}
+export async function runStaffSecurityJourney(database:TestDatabase,runtime:Pool,ownerKeyCount:1|2=2) {
  let authorization:Pool|undefined;const argon2=new Argon2WorkerPool({workers:1});let sessions:SessionService;
  const passwordHash=await hashPassword(argon2,'Task9-disposable-signup-password!A42',authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS).password.argon2id);
  const authUrl=new URL(database.connectionString);await database.pool.query("CREATE ROLE task9_journey_authorization LOGIN PASSWORD 'task9-ordinary-only' IN ROLE debateai_authorization_runtime");authUrl.username='task9_journey_authorization';authUrl.password='task9-ordinary-only';authorization=createPool(authUrl.toString());
@@ -147,7 +153,7 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
   const credential=selected.f.assertion({client:Buffer.from(JSON.stringify({type:'webauthn.get',challenge:options.json().options.challenge,origin,crossOrigin:false})),auth:selected.f.auth(5,selected.counter)});
   const verified=await api.inject({method:'POST',url:'/v1/admin/owner-possession/verify',headers:headers(a),payload:{challenge_handle:options.json().challenge_handle,credential:{...credential,response:{...credential.response,userHandle:selected.userHandle}},command_id:commandId,command_nonce:nonce,credential_id:selected.f.expected.credentialId}});expect(verified.statusCode).toBe(200);receipts.push(verified.json().receipt_id);
  }
- return receipts as [string,string];
+ return selectedSet(receipts);
 }
 
  const root=await mkdtemp(join(tmpdir(),'task9-journey-custody-')),custody=syntheticOwnerCustody(root),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:'/usr/bin/python3',helperPath:resolve('apps/runner/src/owner-recovery-lock.py')});
@@ -187,14 +193,26 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
   expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.owner_designation WHERE active')).rows[0].n).toBe(0);
   await api.close();api=composition().api;runtimeComposed.start();
   await disconnectPrerequisite(api,owner);
-  const one=await registerKey(api,owner),two=await registerKey(api,owner);owner.one=one;colleague.one=await registerKey(api,colleague);
+  const one=await registerKey(api,owner),ownerKeys=[one];
+  if(ownerKeyCount===1){
+   const readiness=await api.inject({url:'/v1/admin/enrollment',headers:headers(owner)});expect(readiness.statusCode).toBe(200);
+   expect(readiness.json().readiness).toMatchObject({verified_credential_count:1,owner_credential_requirement_met:true,delegated_credential_requirement_met:true});
+  }
+  if(ownerKeyCount===2)ownerKeys.push(await registerKey(api,owner));owner.one=one;colleague.one=await registerKey(api,colleague);
   expect((await api.inject({method:'POST',url:'/v1/admin/webauthn/elevation/options',headers:headers(owner),payload:{}})).statusCode).toBe(403);
   const privateInput:OwnerPrivateInput={repository,custody,lock,paths,proof:Buffer.from(bundle.proof,'base64url'),configuration,publisher,keys:users};
-  const commandId=randomUUID(),operationId=randomUUID();await prepareOwnerCommand({purpose:'BOOTSTRAP',commandId,operationId,targetUserId:owner.userId,credentialIds:[one.f.expected.credentialId,two.f.expected.credentialId]},privateInput);
-  const nonce=(JSON.parse(await readFile(paths.nonceFile,'utf8')) as {nonce:string}).nonce,receiptIds=await possession(api,owner,commandId,nonce,[one,two]);
+  const commandId=randomUUID(),operationId=randomUUID();await prepareOwnerCommand({purpose:'BOOTSTRAP',commandId,operationId,targetUserId:owner.userId,credentialIds:selectedSet(ownerKeys.map(selected=>selected.f.expected.credentialId))},privateInput);
+  const nonce=(JSON.parse(await readFile(paths.nonceFile,'utf8')) as {nonce:string}).nonce,receiptIds=await possession(api,owner,commandId,nonce,ownerKeys);
   expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.owner_designation WHERE active')).rows[0].n).toBe(0);
-  const receiptFile=join(root,'bootstrap-receipt');expect((await bootstrapOwner({commandId,receiptIds,receiptFile},privateInput)).outcome).toBe('COMPLETED');privateInput.proof.fill(0);
-  await expect(prepareOwnerCommand({purpose:'BOOTSTRAP',commandId:randomUUID(),operationId:randomUUID(),targetUserId:other.userId,credentialIds:[one.f.expected.credentialId,two.f.expected.credentialId]},{...privateInput,proof:Buffer.from(bundle.proof,'base64url')})).rejects.toThrow();
+  const receiptFile=join(root,'bootstrap-receipt'),selection={commandId,receiptIds,receiptFile};
+  if(ownerKeyCount===1){
+   // Durable SQL-after crash: new one-receipt journal/material must resume only the exact command.
+   const interrupted=Object.create(repository) as typeof repository;interrupted.commit=async(...args)=>{await repository.commit(...args);throw new Error('STEP6C1_SQL_AFTER_INTERRUPTION');};
+   await expect(bootstrapOwner(selection,{...privateInput,repository:interrupted})).rejects.toThrow('STEP6C1_SQL_AFTER_INTERRUPTION');
+   await expect(bootstrapOwner({...selection,receiptIds:[randomUUID()]},privateInput)).rejects.toThrow('OWNER_JOURNAL_MISMATCH');
+  }
+  expect((await bootstrapOwner(selection,privateInput)).outcome).toBe('COMPLETED');privateInput.proof.fill(0);
+  await expect(prepareOwnerCommand({purpose:'BOOTSTRAP',commandId:randomUUID(),operationId:randomUUID(),targetUserId:other.userId,credentialIds:selectedSet(ownerKeys.map(selected=>selected.f.expected.credentialId))},{...privateInput,proof:Buffer.from(bundle.proof,'base64url')})).rejects.toThrow();
   const elevated=await elevation(api,owner),inviteId=randomUUID(),inviteIntent:contract.StaffActionIntent={action:'TEAM_INVITE',target_user_id:colleague.userId,capabilities:['TEAM_READ'],expected_revision:0,operation_id:inviteId,reason:{code:'TEAM_ONBOARDING'}},proof=await action(api,owner,elevated,inviteIntent);
   const issued=await api.inject({method:'POST',url:'/v1/admin/team/invitations',headers:headers(owner,elevated),payload:{target_user_id:colleague.userId,capabilities:['TEAM_READ'],expected_revision:0,operation_id:inviteId,reason:{code:'TEAM_ONBOARDING'},proof_handle:proof}});expect(issued.statusCode).toBe(200);
   for(let i=0;i<100;i++){try{const lines=(await readFile(targetCapture,'utf8')).trim().split('\n');captured.push(...lines.map(line=>JSON.parse(line)));if(captured.some(mail=>mail.recipient===colleague.email))break;}catch{}await new Promise(resolve=>setTimeout(resolve,10));}
@@ -221,9 +239,9 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
   const recoveredOrdinary={...colleague,sessionToken:ordinaryRecovered.sessionToken,csrfToken:ordinaryRecovered.csrfToken,ordinarySessionId:ordinaryRecovered.session.session_id};
   expect((await api.inject({method:'POST',url:'/v1/admin/webauthn/elevation/options',headers:headers(recoveredOrdinary),payload:{}})).statusCode).toBe(403);
   const readyAgain=await configuration.read();await publisher.publish({...readyAgain!.binding,ackAdapterId:config.ackAdapterId,rehearsalId:readyAgain!.evidence.rehearsalId,evidenceExpiresAt:readyAgain!.evidence.expiresAt});
-  const replacement=await account(),replacementKeys=[await registerKey(api,replacement),await registerKey(api,replacement)];replacement.one=replacementKeys[0]!;
+  const replacement=await account(),replacementKeys=[await registerKey(api,replacement)];if(ownerKeyCount===2)replacementKeys.push(await registerKey(api,replacement));replacement.one=replacementKeys[0]!;
   const currentBundle=parseOwnerRecoveryBundle(JSON.parse(await readFile(paths.materialFile,'utf8'))),lineage=(await database.pool.query('SELECT lineage_id FROM staff.owner_lineage')).rows[0].lineage_id as string;
-  const recoveryInput={...privateInput,proof:Buffer.from(currentBundle.proof,'base64url')},recoveryId=randomUUID(),recoveryOp=randomUUID();await prepareOwnerCommand({purpose:'RECOVER_OWNER',commandId:recoveryId,operationId:recoveryOp,targetUserId:replacement.userId,credentialIds:[replacementKeys[0]!.f.expected.credentialId,replacementKeys[1]!.f.expected.credentialId],predecessor:{kind:'LIVE',lineageId:lineage,userId:owner.userId}},recoveryInput);
+  const recoveryInput={...privateInput,proof:Buffer.from(currentBundle.proof,'base64url')},recoveryId=randomUUID(),recoveryOp=randomUUID();await prepareOwnerCommand({purpose:'RECOVER_OWNER',commandId:recoveryId,operationId:recoveryOp,targetUserId:replacement.userId,credentialIds:selectedSet(replacementKeys.map(selected=>selected.f.expected.credentialId)),predecessor:{kind:'LIVE',lineageId:lineage,userId:owner.userId}},recoveryInput);
   const recoveryNonce=(JSON.parse(await readFile(paths.nonceFile,'utf8')) as {nonce:string}).nonce,recoveryReceipts=await possession(api,replacement,recoveryId,recoveryNonce,replacementKeys);
   expect((await recoverOwner({commandId:recoveryId,receiptIds:recoveryReceipts,receiptFile:join(root,'recovery-receipt')},recoveryInput)).outcome).toBe('COMPLETED');recoveryInput.proof.fill(0);
   expect((await api.inject({url:'/v1/admin/team?limit=1',headers:headers(owner,elevated)})).statusCode).toBe(401);
@@ -236,9 +254,9 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
   await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1',[replacement.userId]);
   expect((await database.pool.query('SELECT user_id,state FROM staff.subject WHERE staff_id=(SELECT staff_id FROM staff.owner_lineage)')).rows[0]).toEqual({user_id:null,state:'ERASED'});
   const erasedBundle=parseOwnerRecoveryBundle(JSON.parse(await readFile(paths.materialFile,'utf8'))),erasedLineage=(await database.pool.query('SELECT lineage_id FROM staff.owner_lineage')).rows[0].lineage_id as string;
-  const final=await account(),finalKeys=[await registerKey(api,final),await registerKey(api,final)];final.one=finalKeys[0]!;
+  const final=await account(),finalKeys=[await registerKey(api,final)];if(ownerKeyCount===2)finalKeys.push(await registerKey(api,final));final.one=finalKeys[0]!;
   const finalInput={...privateInput,proof:Buffer.from(erasedBundle.proof,'base64url')},finalCommand=randomUUID(),finalOperation=randomUUID();
-  await prepareOwnerCommand({purpose:'RECOVER_OWNER',commandId:finalCommand,operationId:finalOperation,targetUserId:final.userId,credentialIds:[finalKeys[0]!.f.expected.credentialId,finalKeys[1]!.f.expected.credentialId],predecessor:{kind:'ERASED',lineageId:erasedLineage}},finalInput);
+  await prepareOwnerCommand({purpose:'RECOVER_OWNER',commandId:finalCommand,operationId:finalOperation,targetUserId:final.userId,credentialIds:selectedSet(finalKeys.map(selected=>selected.f.expected.credentialId)),predecessor:{kind:'ERASED',lineageId:erasedLineage}},finalInput);
   const finalNonce=(JSON.parse(await readFile(paths.nonceFile,'utf8')) as {nonce:string}).nonce,finalReceipts=await possession(api,final,finalCommand,finalNonce,finalKeys);
   expect((await recoverOwner({commandId:finalCommand,receiptIds:finalReceipts,receiptFile:join(root,'erased-recovery-receipt')},finalInput)).outcome).toBe('COMPLETED');finalInput.proof.fill(0);
   const finalPrivilege=await elevation(api,final);expect((await api.inject({url:'/v1/admin/team?limit=1',headers:headers(final,finalPrivilege)})).statusCode).toBe(200);

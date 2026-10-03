@@ -60,11 +60,12 @@ export type InvitationProof = Readonly<{
   verifiedAt: Date;
   expiresAt: Date;
 }>;
+export type OwnerCredentialSet = readonly [string] | readonly [string, string];
 export type OwnerCommand = Readonly<{
   commandId: string;
   targetUserId: string;
   targetAccountSecurityEpoch: number;
-  credentialIds: readonly [string, string];
+  credentialIds: OwnerCredentialSet;
   nonceSha256: string;
   expiresAt: Date;
 }> & (
@@ -99,7 +100,7 @@ export type StaffPrerequisiteReceipt = Readonly<{
   expiresAt: Date;
 }> & (
   | Readonly<{ purpose: "KEY_PREREGISTRATION"; registrationChallengeId: string | null }>
-  | Readonly<{ purpose: "OWNER_POSSESSION"; commandId: string; nonceSha256: string; credentialIds: readonly [string, string] }>
+  | Readonly<{ purpose: "OWNER_POSSESSION"; commandId: string; nonceSha256: string; credentialIds: OwnerCredentialSet }>
 );
 type StaffAccessPolicyBase = Readonly<{
   policyVersion: 2;
@@ -133,7 +134,7 @@ type StaffAccessPolicyBase = Readonly<{
   invitationLifetimeMs: 86400000;
   epochPollIntervalMs: 1000;
   externalOperationTimeoutMs: 5000;
-  ownerCredentialMinimum: 2;
+  ownerCredentialMinimum: 1;
   delegatedCredentialMinimum: 1;
   userVerification: "required";
   backupEligible: false;

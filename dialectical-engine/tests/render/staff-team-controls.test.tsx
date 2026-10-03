@@ -297,3 +297,13 @@ it("removes invitation fragment before an earlier sibling's passive auth work", 
     expect(calls.every(call => call.hash === "")).toBe(true);
     expect(host.innerHTML).not.toContain(handle);
 });
+
+
+it('records one selected Owner key without requiring or requesting an optional second key', async () => {
+ await mount();
+ const second=host.querySelector<HTMLInputElement>('[name="credential_two"]')!;
+ expect(second.required).toBe(false);
+ await submit('[data-owner-possession]', { command_id: targetId, command_nonce: handle, credential_one: "aA", password: "synthetic", totp_code: "123456" });
+ expect(calls.filter(call=>call.path.endsWith('/owner-possession/verify'))).toHaveLength(1);
+ expect(host.querySelector('[data-owner-receipts]')?.textContent).toContain('33333333-3333-4333-8333-333333333333');
+});

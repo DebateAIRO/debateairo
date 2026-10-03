@@ -592,10 +592,7 @@ export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRe
     }
     async readOwnerPossessionContext(input: Parameters<StaffRepository['readOwnerPossessionContext']>[0]): Promise<OwnerPossessionContext | null> {
         const value = await this.call<OwnerPossessionContext | null>('SELECT staff.read_owner_possession_context($1,$2,$3,$4,$5,$6) AS value', [input.userId, input.ordinarySessionId, input.commandId, input.nonceHash, input.credentialId, input.prerequisiteHandleHash]);
-        return value === null ? null : Object.freeze({ ...value, command: Object.freeze({ ...value.command, credentialIds: Object.freeze([...value.command.credentialIds]) as readonly [
-                    string,
-                    string
-                ], expiresAt: date(value.command.expiresAt) }) });
+        return value === null ? null : Object.freeze({ ...value, command: Object.freeze({ ...value.command, credentialIds: Object.freeze([...value.command.credentialIds]) as OwnerPossessionContext["command"]["credentialIds"], expiresAt: date(value.command.expiresAt) }) });
     }
     storeOwnerPossessionReceipt(input: Parameters<StaffRepository['storeOwnerPossessionReceipt']>[0]): Promise<Readonly<{
         receiptId: string;

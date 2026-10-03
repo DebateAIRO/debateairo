@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import type { OwnerCommand, OwnerPossessionReceipt, SecurityReceipt } from '@debateai/kernel';
+import type { OwnerCommand, OwnerCredentialSet, OwnerPossessionReceipt, SecurityReceipt } from '@debateai/kernel';
 import type { StaffAlertIntent, StaffAlertKeyMapping, StaffAlertReadinessBinding } from './staff-access.js';
 import { guardedAuthorityQuery } from './staff-access.js';
 export type OwnerCommandPurpose = OwnerCommand['purpose'];
@@ -15,10 +15,7 @@ export type OwnerCommandInput = Readonly<{
     commandId: string;
     operationId: string;
     targetUserId: string;
-    credentialIds: readonly [
-        string,
-        string
-    ];
+    credentialIds: OwnerCredentialSet;
 }> & (Readonly<{
     purpose: 'BOOTSTRAP';
     predecessor?: never;
@@ -48,10 +45,7 @@ export type StoredOwnerPossessionReceipt = OwnerPossessionReceipt & Readonly<{
 }>;
 export type OwnerCommitInput = Readonly<{
     commandId: string;
-    receiptIds: readonly [
-        string,
-        string
-    ];
+    receiptIds: OwnerCredentialSet;
     operationId: string;
     purpose: OwnerCommandPurpose;
 }>;
@@ -76,10 +70,7 @@ export interface OwnerCommandRepository {
         expiresAt: Date;
     }>>;
     read(commandId: string): Promise<PreparedOwnerCommand | null>;
-    readReceipts(commandId: string, receiptIds: readonly [
-        string,
-        string
-    ]): Promise<readonly StoredOwnerPossessionReceipt[]>;
+    readReceipts(commandId: string, receiptIds: OwnerCredentialSet): Promise<readonly StoredOwnerPossessionReceipt[]>;
     commit(input: OwnerCommitInput, rotation: OwnerRecoveryRotation, alertIntent: StaffAlertIntent): Promise<SecurityReceipt>;
     readCommitted(input: OwnerCommitInput, rotation: Omit<OwnerRecoveryRotation, 'verifier'>): Promise<SecurityReceipt | null>;
     readAlertMetadata(commandId: string, operationId: string): Promise<OwnerAlertMetadata | null>;
@@ -122,18 +113,12 @@ export class PostgresOwnerCommandRepository implements OwnerCommandRepository {
         const value = await this.value<PreparedOwnerCommand | null>('SELECT staff.read_owner_command($1) AS value', [commandId]);
         return value === null ? null : Object.freeze({
             ...value, 
-            credentialIds: Object.freeze([...value.credentialIds]) as readonly [
-                string,
-                string
-            ], 
+            credentialIds: Object.freeze([...value.credentialIds]) as OwnerCredentialSet,
             createdAt: date(value.createdAt), 
             expiresAt: date(value.expiresAt)
         });
     }
-    async readReceipts(commandId: string, receiptIds: readonly [
-        string,
-        string
-    ]): Promise<readonly StoredOwnerPossessionReceipt[]> {
+    async readReceipts(commandId: string, receiptIds: OwnerCredentialSet): Promise<readonly StoredOwnerPossessionReceipt[]> {
         const values = await this.value<readonly StoredOwnerPossessionReceipt[]>('SELECT staff.read_owner_receipts($1,$2::uuid[]) AS value', [commandId, receiptIds]);
         return Object.freeze(values.map(v => Object.freeze({
             ...v, 

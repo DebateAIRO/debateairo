@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 import type { ReadableUserDekStore } from '@debateai/crypto';
 import { OwnerCommandAlertKeyMappings, type OwnerCommandInput, type OwnerCommandRepository, type OwnerCommitInput, type OwnerRecoveryRotation, type PreparedOwnerCommand, type StaffIndependentReadinessPublisher, type StoredOwnerPossessionReceipt } from '@debateai/db';
-import type { SecurityReceipt } from '@debateai/kernel';
+import type { OwnerCredentialSet, SecurityReceipt } from '@debateai/kernel';
 import { RootStaffAlertConfiguration, StaffAlertIntentProducer } from '../../api/src/staff/alerts.js';
 import { OwnerRecoveryCustody, OwnerRecoveryError, ownerDigest, ownerExact, ownerJson, ownerUuid, type OwnerRecoveryLock } from './owner-recovery-custody.js';
 import { ownerRecoveryVerifier, parseOwnerRecoveryBundle, prepareOwnerMaterial, readOwnerMaterial } from './owner-recovery-material.js';
@@ -31,10 +31,7 @@ export type OwnerCommandHandle = Readonly<{
 }>;
 export type OwnerCommitSelection = Readonly<{
     commandId: string;
-    receiptIds: readonly [
-        string,
-        string
-    ];
+    receiptIds: OwnerCredentialSet;
     receiptFile: string;
 }>;
 type Handoff = Readonly<{
@@ -70,8 +67,8 @@ export function validateOwnerCommandInput(input: unknown): asserts input is Owne
         && input.purpose === 'RECOVER_OWNER' ? ['commandId', 'operationId', 'targetUserId', 'credentialIds', 'purpose', 'predecessor'] : ['commandId', 'operationId', 'targetUserId', 'credentialIds', 'purpose']) 
         || ![input.commandId, input.operationId, input.targetUserId].every(ownerUuid) 
         || !Array.isArray(input.credentialIds) 
-        || input.credentialIds.length !== 2 
-        || input.credentialIds[0] === input.credentialIds[1] 
+        || ![1, 2].includes(input.credentialIds.length)
+        || new Set(input.credentialIds).size !== input.credentialIds.length
         || !input.credentialIds.every(x => typeof x === 'string' 
         && /^[A-Za-z0-9_-]{1,1366}$/.test(x)))
         throw new OwnerRecoveryError('OWNER_COMMAND_INPUT_INVALID');
@@ -161,13 +158,15 @@ export function validateOwnerReceipts(command: PreparedOwnerCommand, selection: 
         || command.createdAt.getTime() > time 
         || command.expiresAt.getTime() > command.createdAt.getTime() + 300001 
         || !Number.isSafeInteger(command.targetAccountSecurityEpoch) 
-        || receipts.length !== 2 
-        || new Set(selection.receiptIds).size !== 2 
-        || new Set(command.credentialIds).size !== 2)
+        || ![1, 2].includes(command.credentialIds.length)
+        || receipts.length !== command.credentialIds.length
+        || selection.receiptIds.length !== command.credentialIds.length
+        || new Set(selection.receiptIds).size !== command.credentialIds.length
+        || new Set(command.credentialIds).size !== command.credentialIds.length)
         throw new OwnerRecoveryError('OWNER_POSSESSION_RECEIPTS_INVALID');
     let session: string | undefined;
     const keys = new Set<string>();
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < command.credentialIds.length; i++) {
         const r = receipts[i]!;
         if (![r.verifiedAt.getTime(), r.expiresAt.getTime()].every(Number.isFinite) 
             || r.verifiedAt.getTime() < command.createdAt.getTime() 
@@ -191,7 +190,7 @@ export function validateOwnerReceipts(command: PreparedOwnerCommand, selection: 
         session = r.ordinarySessionId;
         keys.add(r.credentialId);
     }
-    if (keys.size !== 2)
+    if (keys.size !== command.credentialIds.length)
         throw new OwnerRecoveryError('OWNER_POSSESSION_RECEIPTS_INVALID');
 }
 function journal(value: unknown): Journal {
@@ -200,9 +199,9 @@ function journal(value: unknown): Journal {
         || !ownerExact(value.input, ['commandId', 'receiptIds', 'operationId', 'purpose']) 
         || ![value.input.commandId, value.input.operationId].every(ownerUuid) 
         || !Array.isArray(value.input.receiptIds) 
-        || value.input.receiptIds.length !== 2 
+        || ![1, 2].includes(value.input.receiptIds.length)
         || !value.input.receiptIds.every(ownerUuid) 
-        || value.input.receiptIds[0] === value.input.receiptIds[1] 
+        || new Set(value.input.receiptIds).size !== value.input.receiptIds.length
         || !['BOOTSTRAP', 'RECOVER_OWNER'].includes(value.input.purpose as string) 
         || !ownerExact(value.paths, ['materialFile', 'verifierFile', 'nonceFile', 'journalFile', 'nextMaterialFile', 'nextVerifierFile', 'lockFile']) 
         || !Object.values(value.paths).every(x => typeof x === 'string') 
@@ -244,9 +243,9 @@ async function commitOwner(purpose: OwnerCommitInput['purpose'], selection: Owne
     if (!ownerExact(selection, ['commandId', 'receiptIds', 'receiptFile']) 
         || !ownerUuid(selection.commandId) 
         || !Array.isArray(selection.receiptIds) 
-        || selection.receiptIds.length !== 2 
+        || ![1, 2].includes(selection.receiptIds.length)
         || !selection.receiptIds.every(ownerUuid) 
-        || selection.receiptIds[0] === selection.receiptIds[1])
+        || new Set(selection.receiptIds).size !== selection.receiptIds.length)
         throw new OwnerRecoveryError('OWNER_COMMAND_INPUT_INVALID');
     paths(privateInput, selection.receiptFile);
     return privateInput.lock.withLock(privateInput.paths.lockFile, async () => {

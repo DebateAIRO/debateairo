@@ -10,7 +10,7 @@ import type { CanonicalJsonAst, RegisterPublicationRow } from "./register-public
 
 export const STAFF_ACCESS_POLICY_ROW_KEY = "staffAccessPolicy" as const;
 export const INTERNAL_ALLOWANCE_POLICY_ROW_KEY = "internalAllowancePolicy" as const;
-export const STAFF_POLICY_SOURCE_REF = "2026-10-02-v3-owner-and-team-access.md#authentication-and-proposed-policy-values";
+export const STAFF_POLICY_SOURCE_REF = "v3-owner-access-runbook.md#step6c1-one-key-owner-amendment";
 
 const staffAccessPolicyValueSchema = z.object({
   kind: z.literal("STAFF_ACCESS_POLICY"), policy_version: z.literal(2),
@@ -39,7 +39,7 @@ const staffAccessPolicyValueSchema = z.object({
   challenge_lifetime_ms: z.literal(300000), action_proof_lifetime_ms: z.literal(300000),
   prerequisite_lifetime_ms: z.literal(300000), owner_command_lifetime_ms: z.literal(300000),
   invitation_lifetime_ms: z.literal(86400000), epoch_poll_interval_ms: z.literal(1000),
-  external_operation_timeout_ms: z.literal(5000), owner_credential_minimum: z.literal(2),
+  external_operation_timeout_ms: z.literal(5000), owner_credential_minimum: z.literal(1),
   delegated_credential_minimum: z.literal(1), user_verification: z.literal("required"),
   backup_eligible: z.literal(false), backed_up: z.literal(false),
   algorithms: z.tuple([z.literal(-7), z.literal(-257)]),
@@ -97,7 +97,7 @@ export const STAFF_ACCESS_POLICY_REGISTER_ROW = publicationRow(STAFF_ACCESS_POLI
   challenge_lifetime_ms: 300000, action_proof_lifetime_ms: 300000,
   prerequisite_lifetime_ms: 300000, owner_command_lifetime_ms: 300000,
   invitation_lifetime_ms: 86400000, epoch_poll_interval_ms: 1000,
-  external_operation_timeout_ms: 5000, owner_credential_minimum: 2,
+  external_operation_timeout_ms: 5000, owner_credential_minimum: 1,
   delegated_credential_minimum: 1, user_verification: "required", backup_eligible: false, backed_up: false,
   algorithms: [-7, -257], ceremony_body_max_bytes: 32768, challenge_max_failures: 5,
   active_capabilities: ["TEAM_READ", "TEAM_INVITE", "TEAM_GRANT", "TEAM_DISABLE", "AUDIT_READ", "EMERGENCY_DISABLE"],
