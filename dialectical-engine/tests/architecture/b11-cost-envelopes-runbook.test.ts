@@ -17,7 +17,9 @@ describe("the runbook's cost envelopes (B11b)", () => {
     for (const needle of [
       "`admission_close_basis_points`", "`finish_up_to_basis_points`", "`waiting_line_per_person`",
       "`9500`", "`11500`", "hold", "waits in line", "ASK_ALREADY_WAITING", "cost_envelope_band",
-      "api.ask.waiting", "api.wait.started", "api.wait.tick", "runner.body.cheaper_model", "core.run_cost_substitution"
+      "api.ask.waiting", "api.wait.started", "api.wait.tick", "runner.body.cheaper_model", "core.run_cost_substitution",
+      // P4-G, ruling C7 (go-live row 31): line 13 seals the room read's budget in the same version as the band.
+      "`askRoomReads`", "ASK_ROOM_ADMISSION_UNSEALED"
     ]) expect(money, needle).toContain(needle);
   });
 
@@ -59,7 +61,7 @@ describe("the runbook's cost envelopes (B11b)", () => {
     for (const needle of [
       "| `billingPlans`, `billingPolicy` |", "| `BILLING_PLANS_INVALID` / `BILLING_POLICY_INVALID` |",
       "| `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` |",
-      "| `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` |"
+      "| `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` |", "| `ASK_ROOM_ADMISSION_UNSEALED` |"
     ]) expect(publishing, needle).toContain(needle);
     expect(publishing).toMatch(/^\| `COST_ENVELOPE_POLICY_INVALID` \|[^\n]*`waiting_line_per_person`/mu);
   });
@@ -96,7 +98,7 @@ describe("the runbook's cost envelopes (B11b)", () => {
 
   it("lists the new members in the register file's README", async () => {
     const fileReadme = await read("deploy/vps/register/README.md");
-    for (const needle of ["| `billingPlans` |", "| `billingPolicy` |", "`admission_close_basis_points`"]) {
+    for (const needle of ["| `billingPlans` |", "| `billingPolicy` |", "`admission_close_basis_points`", "| `askRoomReads` |"]) {
       expect(fileReadme, needle).toContain(needle);
     }
   });

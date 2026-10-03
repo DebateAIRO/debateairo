@@ -41,7 +41,7 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `sourceRef` | a short, non-secret line saying why this version exists; it is sealed into the register (see "What `sourceRef` becomes" below) | the command |
 | `configuredProviderSet` | `requiredDistinctMakers` and the vendor list: `providerRef`, `adapterKind` (`openai-compatible-http`), `maker`, `vetting` | `buildConfiguredProviderSetDeploymentRow` — `PROVIDER_VENDOR_NOT_VETTED` |
 | `costEnvelopePolicy` | the V-28 ceilings in USD micro-units, as the register row stores them; optionally `serve_reserve_basis_points` (the share kept for writing the answer) and `serve_overrun_basis_points` (how far the answer may go over), both 0 when left out — see "The cost envelopes" in `deploy/vps/README.md`; optionally, all three or none, the budget rule's `admission_close_basis_points`, `finish_up_to_basis_points` and `waiting_line_per_person` (the example carries 9500, 11500 and 1; see "The band, holds and the waiting line" in `deploy/vps/README.md`). A file with the three band members must also carry `askRoomReads` (next row) | the register's own schema — `COST_ENVELOPE_POLICY_INVALID` |
-| `askRoomReads` | optional, but required whenever `costEnvelopePolicy` carries the band: how many times one signed-in person may read the room (the "is there room for my question" check on the new-debate page) in a window, as `{ "key": "owner", "limit": …, "window_ms": …, "capacity": … }`. The example carries an EXAMPLE budget, 60 reads a minute per person (`"limit": 60, "window_ms": 60000`) for up to 65,536 people at once (`"capacity": 65536`); set your own. It is added to the code-owned `admissionPolicy` row as its `ask_room_reads` member; every other member of that row stays as the engine has it. See "The room read's budget" below | the register's own parser — `ADMISSION_POLICY_INVALID` (a key other than `owner`, a limit of 0, an extra field or a `null` member); the band without it, `ASK_ROOM_ADMISSION_UNSEALED` (by the plan, by the publish's boot check and again when the API starts) |
+| `askRoomReads` | optional, but required whenever `costEnvelopePolicy` carries the band: how many times one person may read the room (the "is there room for my question" check that the new-debate page and the home page's question box both make) in a window: a signed-in account is counted by its owner, a visitor who has not signed in by their browser session. Written as `{ "key": "owner", "limit": …, "window_ms": …, "capacity": … }`. The example carries an EXAMPLE budget, 60 reads a minute per person (`"limit": 60, "window_ms": 60000`) for up to 65,536 people at once (`"capacity": 65536`); set your own. It is added to the code-owned `admissionPolicy` row as its `ask_room_reads` member; every other member of that row stays as the engine has it. See "The room read's budget" below | the register's own parser — `ADMISSION_POLICY_INVALID` (a key other than `owner`, a limit of 0, an extra field or a `null` member); the band without it, `ASK_ROOM_ADMISSION_UNSEALED` (by the plan, by the publish's boot check and again when the API starts) |
 | `countryPolicy` | optional, and NOT in the example: for every country, the two switches `signup` and `pay`, the reason, and `blocked`; unknown connections and Tor are refused. Left out, no `countryPolicy` row is published and that register version has no country gate (A14); the member turns the gate on, and is added only as "The country gate's switches" below says | the register's own parser — `COUNTRY_POLICY_INVALID` (a `pay: true` with `signup: false`, or a blocked country with a switch on, is refused; so are a `null` member and `"blocked": false` — `blocked` is `true` or left out) |
 | `providerTargets` | the SAME array you put in `PROVIDER_DISCOVERY_TARGETS_JSON` in `runner.env` | the checks both services run at boot — relays, loopback and private addresses, inline credentials, missing or zero prices |
 | `synthesisRoles` | optional: `synthesizerRoleRef` and `evaluatorRoleRef`. Leave it out and the first two different makers are used; with a single maker you must name them | the command — `HOSTED_REGISTER_ROLE_REF_UNCONFIGURED` |
@@ -71,13 +71,15 @@ switch later is a new version, never an edit of a sealed one.
 
 ## The room read's budget
 
-Paid plans P4-G (go-live row 31). Once the band is sealed, the new-debate page's room read
-(`GET /v1/asks/room`) is a real computation on every call: the cost estimate and the room's own
-reads. So it has its own admission budget, per signed-in person, which the register's
-`admissionPolicy` row holds as `ask_room_reads`. A person who goes over it gets `429
-ADMISSION_RATE_LIMITED` for the rest of the window; the page then simply shows no room word, and
-the question itself is still decided when it is asked. A version without `ask_room_reads` does not
-limit the read at all.
+Paid plans P4-G (go-live row 31). Once the band is sealed, the room read (`GET /v1/asks/room`) is
+a real computation on every call: the cost estimate and the room's own reads. Two pages make it:
+the new-debate page (`/new`) and the home page's question box. So it has its own admission budget,
+which the register's `admissionPolicy` row holds as `ask_room_reads`. The budget is per person: a
+signed-in account is charged by its owner, so all of that person's sessions and devices share one
+budget, and a visitor who has not signed in is charged by their browser session. This is the same
+key `POST /v1/asks` charges by. A person who goes over it gets `429 ADMISSION_RATE_LIMITED` for the
+rest of the window; the page then simply shows no room word, and the question itself is still
+decided when it is asked. A version without `ask_room_reads` does not limit the read at all.
 
 - **Seal it in the same new version as the band.** Go-live line 13 publishes the band's three
   members (`admission_close_basis_points`, `finish_up_to_basis_points`, `waiting_line_per_person`).
@@ -85,9 +87,11 @@ limit the read at all.
   and without the budget is refused: by the dry run and the publish (`ASK_ROOM_ADMISSION_UNSEALED`),
   by the publish's boot check (`HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`), and
   by the API when it starts.
-- **The value is yours.** The example's 60 reads a minute per person is an example. The page reads
-  the room once when it opens and again each time the question's settings change, so a person
-  changing settings quickly makes a few reads a minute.
+- **The value is yours.** The example's 60 reads a minute per person is an example. The
+  new-debate page reads the room once when it opens and again each time the question's settings
+  change, so a person changing settings quickly makes a few reads a minute. The home page's
+  question box reads it once when it opens, and again when a question is refused because the
+  person already has one waiting. Both pages spend the same person's one budget.
 - The plan prints `ask_room_reads key=owner limit=… window_ms=… capacity=…`, or
   `ask_room_reads absent`.
 - A changed budget is a new version published from an edited copy of your file, never an edit of
