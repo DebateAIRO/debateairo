@@ -28,6 +28,29 @@ const claimedCheck = (transactionId: string, attempts: number) => ({
   jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: transactionId, payload: {}, attempts, notBefore: h.clock.now,
   createdAt: h.clock.now, claimedBy: "test", claimedAt: h.clock.now
 }) as unknown as Parameters<typeof h.verify.handle>[0];
+/**
+ * P2-M6: claims the one open job of this kind and ref for `workerId` at `now`, exactly as P1b's `claim` does (the
+ * worker, the time, the next attempt), touching no other job of the shared database. Returns it as the worker hands
+ * it to its handler.
+ */
+async function claimOnly(kind: string, ref: string, workerId: string, now: Date): Promise<Parameters<typeof h.refunds.handle>[0]> {
+  const row = (await h.database.pool.query<{ job_id: string; payload: Record<string, unknown>; created_at: Date; not_before: Date; attempts: number }>(`
+    UPDATE billing.outbox SET claimed_by = $3, claimed_at = $4, attempts = attempts + 1
+    WHERE kind = $1 AND ref = $2 AND done_at IS NULL AND dead_at IS NULL
+    RETURNING job_id, payload, created_at, not_before, attempts
+  `, [kind, ref, workerId, now])).rows[0]!;
+  return {
+    jobId: row.job_id, kind, ref, payload: row.payload, createdAt: row.created_at, notBefore: row.not_before,
+    attempts: row.attempts, claimedBy: workerId, claimedAt: now
+  } as unknown as Parameters<typeof h.refunds.handle>[0];
+}
+/**
+ * Hands a job `claimOnly` took back unclaimed and due, as the queue held it before (a test that called a handler
+ * directly settles nothing, so the harness's later drains run the job, as they did before P2-M6's claims).
+ */
+const unclaim = (jobId: string) => h.database.pool.query(
+  "UPDATE billing.outbox SET claimed_by = NULL, claimed_at = NULL WHERE job_id = $1", [jobId]
+);
 /** One charge event, committed on its own (a row another path wrote earlier). */
 const appendEvent = (chargeId: string, kind: ChargeEventKind, fields: Parameters<typeof chargeEvent>[3]) =>
   h.repository.withTransaction((client) => h.repository.appendChargeEvent(client, chargeEvent(chargeId, kind, h.clock.now, fields)));
@@ -533,10 +556,10 @@ describe("P9b VERIFY_PAYMENT", () => {
       chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: false,
       ownerRef: paid.ownerRef, reason: "WITHDRAWAL"
     }, h.clock.now));
-    const [job] = (await h.outboxRows(`${paid.chargeId}:${paid.transaction.transactionId}`)).filter((row) => row.kind === "XMONEY_REFUND");
-    const claimed = { jobId: randomUUID(), kind: "XMONEY_REFUND", ref: job!.ref, payload: job!.payload, attempts: 1,
-      notBefore: h.clock.now, createdAt: h.clock.now, claimedBy: "test", claimedAt: h.clock.now } as unknown as Parameters<typeof desk.handle>[0];
+    // The job itself, claimed (P2-M6: only its claim holder may record the call's stage and make the call).
+    const claimed = await claimOnly("XMONEY_REFUND", `${paid.chargeId}:${paid.transaction.transactionId}`, "test", h.clock.now);
     expect(await desk.handle(claimed, h.clock.now)).toEqual({ kind: "DEAD", code: "XMONEY_REFUSED" });
+    await unclaim(claimed.jobId);
     const ownerMail = (await h.outboxRows(`O2:${paid.chargeId}:${paid.transaction.transactionId}`)).find((row) => row.kind === "EMAIL");
     expect(ownerMail?.ref).toBe(`O2:${paid.chargeId}:${paid.transaction.transactionId}`);
     expect(ownerMail?.payload).toMatchObject({
@@ -558,10 +581,13 @@ describe("P9b VERIFY_PAYMENT", () => {
       chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: false,
       ownerRef: paid.ownerRef, reason: "WITHDRAWAL"
     }, h.clock.now));
-    const [job] = (await h.outboxRows(`${paid.chargeId}:${paid.transaction.transactionId}`)).filter((row) => row.kind === "XMONEY_REFUND");
-    const claimed = { jobId: randomUUID(), kind: "XMONEY_REFUND", ref: job!.ref, payload: job!.payload, attempts: 9,
-      notBefore: h.clock.now, createdAt: h.clock.now, claimedBy: "test", claimedAt: h.clock.now } as unknown as Parameters<typeof desk.handle>[0];
+    // The job itself, claimed at its 9th attempt (P2-M6: only its claim holder may record the stage and make the call).
+    const ref = `${paid.chargeId}:${paid.transaction.transactionId}`;
+    await h.database.pool.query("UPDATE billing.outbox SET attempts = 8 WHERE kind = 'XMONEY_REFUND' AND ref = $1", [ref]);
+    const claimed = await claimOnly("XMONEY_REFUND", ref, "test", h.clock.now);
+    expect(claimed.attempts).toBe(9);
     const outcome = await desk.handle(claimed, h.clock.now);
+    await unclaim(claimed.jobId);
     expect(outcome).toEqual({ kind: "RETRY", code: "XMONEY_CREDENTIALS_REFUSED", retryAt: new Date(h.clock.now.getTime() + 12 * 3_600_000) });
     expect(h.auditLines).toContainEqual({ event: "billing.xmoney.credentials_refused", operation: "refund" });
     expect(await h.eventKinds(paid.chargeId)).not.toContain("REFUNDED");
@@ -641,15 +667,43 @@ describe("P9b VERIFY_PAYMENT", () => {
   });
 
   it("records a call's stage on an open job only", async () => {
+    const ref = `M10:stage-${randomUUID()}`;
     const jobId = await h.repository.withTransaction((client) => h.repository.enqueue(client, {
-      kind: "EMAIL", ref: `M10:stage-${randomUUID()}`, notBefore: h.clock.now, payload: {}
+      kind: "EMAIL", ref, notBefore: h.clock.now, payload: {}
     }));
+    const held = await claimOnly("EMAIL", ref, "stage-worker", h.clock.now);
     expect(await h.jobs.jobStage(jobId)).toBeNull();
-    await h.jobs.markJobStage(jobId, "REFUND_CALL_STARTED");
+    expect(await h.jobs.markJobStage(held, "REFUND_CALL_STARTED")).toBe(true);
     expect(await h.jobs.jobStage(jobId)).toBe("REFUND_CALL_STARTED");
     await h.repository.complete(jobId, h.clock.now);
-    await h.jobs.markJobStage(jobId, "SOMETHING_ELSE");
+    expect(await h.jobs.markJobStage(held, "SOMETHING_ELSE")).toBe(false);
     expect(await h.jobs.jobStage(jobId)).toBe("REFUND_CALL_STARTED");
+  });
+
+  it("refuses a stale claim's stage write, and its holder stops before any refund call (P2-M6)", async () => {
+    const paid = await h.activate();
+    const before = h.xmoney.refunds.length;
+    const ref = `${paid.chargeId}:${paid.transaction.transactionId}`;
+    await h.repository.withTransaction((client) => h.refunds.requestAll(client, {
+      ownerRef: paid.ownerRef, reason: "WITHDRAWAL", at: h.clock.now,
+      allocations: [{ chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 12_100_000 }]
+    }));
+    // Process A claims the job; its 5-minute lease runs out while it is slow, and process B claims it again.
+    const stale = await claimOnly("XMONEY_REFUND", ref, "process-a", h.clock.now);
+    const current = await claimOnly("XMONEY_REFUND", ref, "process-b", new Date(h.clock.now.getTime() + 301_000));
+    expect(current.attempts).toBe(stale.attempts + 1);
+    // Only the current holder moves the stage; A's write changes nothing.
+    expect(await h.jobs.markJobStage(stale, "REFUND_CALL_STARTED")).toBe(false);
+    expect(await h.jobs.jobStage(stale.jobId)).toBeNull();
+    // A's handler, still running, reaches the call: it stops before it, and nothing is recorded.
+    const outcome = await h.refunds.handle(stale, h.clock.now);
+    expect(outcome).toMatchObject({ kind: "RETRY", code: "BILLING_OUTBOX_CLAIM_LOST" });
+    expect(h.xmoney.refunds.length - before).toBe(0);
+    expect(await h.jobs.jobStage(stale.jobId)).toBeNull();
+    expect(await h.eventKinds(paid.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED", "REFUND_REQUESTED"));
+    // B, the current holder, still moves it.
+    expect(await h.jobs.markJobStage(current, "REFUND_CALL_STARTED")).toBe(true);
+    expect(await h.jobs.jobStage(current.jobId)).toBe("REFUND_CALL_STARTED");
   });
 
   it("calls a full-amount refund again after a failure that moved nothing, and refunds exactly once", async () => {
@@ -704,10 +758,10 @@ describe("P9b VERIFY_PAYMENT", () => {
     }));
     await h.worker.drain(10);
     // Model the process that made the call dying during it: the stage it wrote before calling is all that is left.
-    const jobId = (await h.database.pool.query<{ job_id: string }>(
-      "SELECT job_id FROM billing.outbox WHERE kind = 'XMONEY_REFUND' AND ref = $1", [ref]
-    )).rows[0]!.job_id;
-    await h.jobs.markJobStage(jobId, "REFUND_CALL_STARTED");
+    // (Written as that process wrote it while it held the claim; the job has been released for its retry since.)
+    await h.database.pool.query(
+      "UPDATE billing.outbox SET last_error_code = 'REFUND_CALL_STARTED' WHERE kind = 'XMONEY_REFUND' AND ref = $1", [ref]
+    );
     // Attempt 2: the look fails. Attempt 3: the payment reads complete-ok and xMoney lists no refund for it.
     h.xmoney.failNextLookup(paid.transaction.transactionId);
     h.clock.advance(61_000);

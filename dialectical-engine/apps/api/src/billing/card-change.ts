@@ -13,7 +13,10 @@ import { storedTaxContext } from "./stored-tax-context.js";
 import { appendChecked, lockedSubscription, refuse } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
-/** A12: the hold that proves a card. X0's recording switches it to 0 if `auth` accepts a zero amount. */
+/**
+ * A12: the hold that proves a card. X0's recording switches it to 0 if `auth` accepts a zero amount; RefundDesk then
+ * records the release of a 0.00 hold without any xMoney call (P2-M4).
+ */
 function cardCheckHoldMicros(): number {
   return 1_000_000;
 }

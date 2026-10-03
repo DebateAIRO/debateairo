@@ -5,7 +5,7 @@ import { testCountryPolicy } from "../support/billingFixtures.js";
 import { subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
 import { createCardCheckSettlement, startCardChange } from "../../apps/api/src/billing/card-change.js";
 import { chargeStatusOf } from "../../apps/api/src/billing/charge-status.js";
-import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
+import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 
 let h: BillingHarness;
 beforeAll(async () => {
@@ -33,7 +33,49 @@ async function changeCard(paid: Awaited<ReturnType<BillingHarness["activate"]>>,
   return { chargeRef: started.charge_ref, hold };
 }
 
+/**
+ * P2-M4: a card change's CARD_CHECK charge with the hold `holdMicros`, written as `startCardChange` writes it (the charge
+ * row and its REQUESTED under the owner's plan). The route's own hold is fixed at 1.00 (A12); a 0.00 hold is what X0
+ * may switch it to, so this test writes the charge itself.
+ */
+async function cardCheckCharge(paid: Awaited<ReturnType<BillingHarness["activate"]>>, holdMicros: number): Promise<string> {
+  const chargeId = newChargeId();
+  await h.repository.withTransaction(async (client) => {
+    await h.repository.insertCharge(client, {
+      chargeId, ownerRef: paid.ownerRef, subscriptionId: paid.subscriptionId, kind: "CARD_CHECK", attempt: 1,
+      periodStart: h.clock.now, periodEnd: new Date(h.clock.now.getTime() + DAY), quoteId: null, netMicros: holdMicros,
+      taxMicros: 0, totalMicros: holdMicros, currency: "USD", createdAt: h.clock.now, xmoneyEnvironment: "stage"
+    });
+    await h.repository.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", h.clock.now, {
+      xmoneyTransactionId: null, amountMicros: holdMicros, errorCode: null
+    }));
+  });
+  return chargeId;
+}
+
 describe("P12e the card change through VERIFY_PAYMENT", () => {
+  it("releases nothing for a 0.00 hold: its release ends done with no xMoney call and no dead refund (P2-M4); a 1.00 hold is released", async () => {
+    for (const [holdMicros, amountDecimal] of [[0, "0.00"], [1_000_000, "1.00"]] as const) {
+      const paid = await h.activate();
+      const chargeId = await cardCheckCharge(paid, holdMicros);
+      const hold = h.xmoney.pay({ externalOrderId: chargeId, amountDecimal, cardCountry: "RO", customerId: paid.transaction.customerId });
+      await h.settle(hold.transactionId);
+      expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1))
+        .toMatchObject({ kind: "CARD_CHANGED", xmoneyOrderId: hold.orderId });
+      expect((await h.outboxRows(chargeId)).filter((row) => row.kind === "XMONEY_REFUND")).toEqual([expect.objectContaining({
+        done: true, dead: false,
+        payload: expect.objectContaining({ reason: "CARD_CHECK_RELEASE", whole: true, amount_micros: holdMicros })
+      })]);
+      // The release is recorded either way (REFUNDED at the hold's own amount), so nothing reads as a refund still owed.
+      expect((await h.repository.charge(chargeId))!.events.filter((event) => event.kind === "REFUNDED"))
+        .toEqual([expect.objectContaining({ xmoneyTransactionId: hold.transactionId, amountMicros: holdMicros })]);
+      expect((await h.repository.deadRefunds()).filter((dead) => dead.chargeId === chargeId)).toEqual([]);
+      // Only a hold that holds money is released at xMoney.
+      expect(h.xmoney.refunds.some((refund) => refund.transactionId === hold.transactionId)).toBe(holdMicros > 0);
+    }
+  });
+
+
   it("releases a blocked-country card's hold with no email, keeps the old card, and reads FAILED(CARD_CHECK_REFUSED)", async () => {
     const paid = await h.activate();
     const before = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));

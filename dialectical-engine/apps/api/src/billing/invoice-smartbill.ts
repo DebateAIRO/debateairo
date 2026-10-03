@@ -8,7 +8,7 @@ import {
   creditNoteContext, invoicesOfCharge, loadPaidCharge, otherSystemOutcome, recordedChargeOf, saleRecordOf,
   type InvoiceJobDeps, type PaidCharge, type RecordedCharge
 } from "./invoice-common.js";
-import { DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
+import { claimLost, DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 
 type SmartBillDocument = IssuedDocument;
 
@@ -127,7 +127,8 @@ async function issueOnce(
       return DONE;
     }
   }
-  await deps.jobs.markJobStage(job.jobId, CALL_STARTED);
+  // P2-M6: only the job's current claim holder records the stage; a stale holder stops before SmartBill is called.
+  if (!await deps.jobs.markJobStage(job, CALL_STARTED)) return claimLost(now);
   let document: SmartBillDocument;
   try {
     document = await issue();

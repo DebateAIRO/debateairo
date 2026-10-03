@@ -332,6 +332,34 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     await run.api.close();
   });
 
+  it("records one refund once when the call's answer and VERIFY_PAYMENT's report of it arrive at once: one REFUNDED, one M8 (P2-M6)", async () => {
+    // 3.00 of Plus's 5.00 credit used: the larger share is 60 %, so the refund is under half the payment and 0086's sum
+    // guard alone would let a second REFUNDED row for it in.
+    const run = await start("p2-m6-two-recorders", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: 3_000_000 });
+    expect((await run.withdraw()).statusCode).toBe(200);
+    const ownerRef = run.identity.authenticated.ownerRef;
+    const [request] = (await refundRequests(run.billing, run.seeded.initialChargeId))
+      .filter(([, , reason]) => reason === "WITHDRAWAL");
+    const amountMicros = request![1] as number;
+    const paidMicros = (await run.billing.charge(run.seeded.initialChargeId))!.totalMicros;
+    expect(2 * amountMicros).toBeLessThanOrEqual(paidMicros);
+    const intent = {
+      chargeId: run.seeded.initialChargeId, transactionId: run.seeded.initialTransactionId, amountMicros,
+      whole: false, ownerRef, reason: "WITHDRAWAL" as const
+    };
+    // Two API processes: one's RefundDesk records the call's answer (on the payment), the other's VERIFY_PAYMENT
+    // records xMoney's own refund transaction naming the payment (D5 5g), each on its own connection.
+    await Promise.all([
+      deskWith(async () => undefined).recordRefunded(intent, new Date()),
+      deskWith(async () => undefined).recordRefunded(intent, new Date(), "7700991", new Date())
+    ]);
+    const refunded = (await run.billing.charge(run.seeded.initialChargeId))!.events.filter((event) => event.kind === "REFUNDED");
+    expect(refunded).toHaveLength(1);
+    expect(refunded[0]).toMatchObject({ amountMicros });
+    expect(await m8Of(run.seeded.subscriptionId)).toHaveLength(1);
+    await run.api.close();
+  });
+
   it("withdraws on a pool of ONE connection: every read under the owner lock uses the transaction's own", async () => {
     const small = createPool(database.connectionString, { max: 1 });
     try {

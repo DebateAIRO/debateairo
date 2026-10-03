@@ -1,6 +1,6 @@
 import { addBusinessDays, foldSubscription, microsToDecimal, type SubscriptionState } from "@debateai/billing-core";
 import type { BillingJobQueries, BillingRepository, CustomerXMoneyEnvironment, EntitlementRepository } from "@debateai/db";
-import { exhaustive } from "@debateai/kernel";
+import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import type { BillingPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import { emailJob } from "./email-job.js";
@@ -8,6 +8,7 @@ import { enqueueOnce } from "./outbox.js";
 import { codeOf, failureCode, type RenewalService, type RetryPrice } from "./renewal.js";
 import { addDays, anniversaryDue, dunningProgress } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
+import { endDunning } from "./settlement-renewal.js";
 
 export type MaintenanceDeps = Readonly<{
   repository: BillingRepository;
@@ -148,7 +149,7 @@ export class BillingMaintenance {
    * REQUESTED are dated when it really runs (`submit` dates the call's outcome when the call returns).
    */
   private async retry(subscriptionId: string, report: MaintenanceReport): Promise<void> {
-    const leased = await this.deps.jobs.withSubscriptionLease(subscriptionId, async () => {
+    const leased = await this.deps.jobs.withSubscriptionLease(subscriptionId, async (): Promise<"RETRIED" | "ENDED" | false> => {
       const now = this.deps.clock();
       const events = await this.deps.repository.subscriptionEvents(subscriptionId);
       const state = foldSubscription(events);
@@ -157,13 +158,15 @@ export class BillingMaintenance {
       if (state.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return false;
       const progress = dunningProgress(events, state);
       if (progress === null) return false;
-      const retryDay = this.deps.policy.dunningRetryDays[progress.failedAttempts - 1];
-      if (retryDay === undefined) return false;
       const periodStart = state.currentPeriodEnd;
       const next = progress.failedAttempts + 1;
       const made = (await this.deps.repository.chargesForSubscription(subscriptionId)).some((charge) =>
         charge.kind === "RENEWAL" && charge.periodStart.getTime() === periodStart.getTime() && charge.attempt >= next);
       if (made) return false;
+      const retryDay = this.deps.policy.dunningRetryDays[progress.failedAttempts - 1];
+      // P2-M13: the policy in force has no retry day left for this many failed attempts (the owner published shorter
+      // `dunning_retry_days` during this dunning). No attempt is open, so nothing else would ever end it: it ends here.
+      if (retryDay === undefined) return await this.endSpentDunning(state, progress.failedAttempts, now) ? "ENDED" : false;
       const cardChangedSince = events.some((event) => event.kind === "CARD_CHANGED" && event.data.retry_now === true
         && event.at.getTime() > progress.lastFailedAt.getTime());
       if (!cardChangedSince && now.getTime() < addDays(progress.firstFailedAt, retryDay).getTime()) return false;
@@ -181,19 +184,56 @@ export class BillingMaintenance {
           return false;
         }
         if (code !== "TAX_SERVICE_UNAVAILABLE") throw error;
-        return this.deps.renewal.failUnpricedAttempt(state, periodStart, next, progress.firstFailedAt, now, code);
+        return await this.deps.renewal.failUnpricedAttempt(state, periodStart, next, progress.firstFailedAt, now, code)
+          ? "RETRIED" : false;
       }
       // P2-M10: a total the person was never told about is never charged; the attempt fails with no charge.
       if (price.kind === "CHANGED") {
-        return this.deps.renewal.failUnpricedAttempt(state, periodStart, next, progress.firstFailedAt, now, "RETRY_TOTAL_CHANGED");
+        return await this.deps.renewal.failUnpricedAttempt(state, periodStart, next, progress.firstFailedAt, now, "RETRY_TOTAL_CHANGED")
+          ? "RETRIED" : false;
       }
       // Written only if the owner lock's fresh fold still allows it (still PAST_DUE here, no cancel, no erasure).
       const created = await this.deps.renewal.createRetryCharge(state, periodStart, next, price.priced, now);
       if (created === null) return false;
       await this.deps.renewal.submit(created.charge, created.state);
+      return "RETRIED";
+    });
+    if (leased.kind === "RAN" && leased.value === "RETRIED") report.retried += 1;
+    if (leased.kind === "RAN" && leased.value === "ENDED") report.ended += 1;
+  }
+
+  /**
+   * P2-M13 (LC-7): a PAST_DUE plan whose `failedAttempts` the policy in force gives no retry day (a shorter
+   * `dunning_retry_days` published during its dunning) would otherwise stay PAST_DUE for ever, and its owner could not
+   * check out again. Under the lease (`retry`'s) and the owner lock, on the history folded again inside it, the dunning
+   * ends as a failed last attempt ends it (`endDunning`): ENDED(DUNNING), Free from now and M6. Only while nothing
+   * changed since the visit read it: still PAST_DUE on the same period, no cancel pending (P11b's sweep ends that one),
+   * the same number of failed attempts, still no retry day for it, and no RENEWAL charge of a later attempt for the
+   * period (that attempt's own outcome decides). An owner the stop port names (a pending or finished erasure, an
+   * age-frozen account) is left to P15's sweep, as it is never retried. Nothing is charged; the ENDED row names neither
+   * a charge nor a `reason`, so P16b's charge-less dunning list does not read it as an unpriced attempt.
+   */
+  private async endSpentDunning(seen: SubscriptionState, failedAttempts: number, now: Date): Promise<boolean> {
+    if (await this.deps.renewal.erasureBlocks(seen.ownerRef)) return false;
+    return this.deps.repository.withTransaction(async (client): Promise<boolean> => {
+      await this.deps.jobs.lockOwner(client, seen.ownerRef);
+      const events = await this.deps.repository.subscriptionEvents(seen.subscriptionId, client);
+      const state = foldSubscription(events);
+      if (state.status !== "PAST_DUE" || state.cancelRequested || state.currentPeriodEnd === null) return false;
+      if (state.currentPeriodEnd.getTime() !== seen.currentPeriodEnd?.getTime()) return false;
+      if (dunningProgress(events, state)?.failedAttempts !== failedAttempts) return false;
+      if (this.deps.policy.dunningRetryDays[failedAttempts - 1] !== undefined) return false;
+      const periodStart = state.currentPeriodEnd;
+      const later = (await this.deps.repository.chargesForSubscription(seen.subscriptionId, client)).some((charge) =>
+        charge.kind === "RENEWAL" && charge.periodStart.getTime() === periodStart.getTime() && charge.attempt > failedAttempts);
+      if (later) return false;
+      const customer = await this.deps.repository.customerByOwner(state.ownerRef, undefined, client);
+      if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a subscription without its customer");
+      await endDunning(this.deps, client, {
+        subscription: state, customerId: customer.customerId, data: { retry_days_spent: true }, now
+      });
       return true;
     });
-    if (leased.kind === "RAN" && leased.value) report.retried += 1;
   }
 
   private async remind(state: SubscriptionState, now: Date, report: MaintenanceReport): Promise<void> {

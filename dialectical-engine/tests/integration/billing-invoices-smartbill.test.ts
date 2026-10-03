@@ -65,6 +65,7 @@ class RecordingSmartBill {
 
 let h: BillingHarness;
 let smartbill: RecordingSmartBill;
+let invoiceHandler: () => ReturnType<typeof createSmartBillInvoiceHandler>;
 beforeAll(async () => {
   h = await startBillingHarness();
   smartbill = new RecordingSmartBill();
@@ -73,6 +74,7 @@ beforeAll(async () => {
     recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy,
     publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const
   });
+  invoiceHandler = () => createSmartBillInvoiceHandler(deps());
   h.worker.register("SMARTBILL_INVOICE", async (job, now) => createSmartBillInvoiceHandler(deps())(job, now));
   h.worker.register("SMARTBILL_STORNO", async (job, now) => createSmartBillStornoHandler(deps())(job, now));
 });
@@ -182,6 +184,38 @@ describe("P10b SmartBill invoices for Romania", () => {
     await h.worker.drain(10);
     expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
     expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: true });
+    smartbill.withLookup = true;
+  });
+
+  it("never issues from a stale claim: only the job's current claim holder records the stage and calls SmartBill (P2-M6)", async () => {
+    smartbill.withLookup = false;
+    smartbill.failIssue = "DOWN";
+    const paid = await h.activate();
+    await h.worker.drain(10);
+    // Attempt 1 proved nothing was created, so the next attempt may call `issue` again (A17b).
+    expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: false, dead: false, lastErrorCode: "INVOICE_SERVICE_UNAVAILABLE" });
+    // Process A claims attempt 2; its lease runs out while it is slow, and process B claims attempt 3.
+    const claim = async (workerId: string, at: Date) => {
+      const row = (await h.database.pool.query<{ job_id: string; payload: Record<string, unknown>; created_at: Date; not_before: Date; attempts: number }>(`
+        UPDATE billing.outbox SET claimed_by = $2, claimed_at = $3, attempts = attempts + 1
+        WHERE kind = 'SMARTBILL_INVOICE' AND ref = $1 AND done_at IS NULL AND dead_at IS NULL
+        RETURNING job_id, payload, created_at, not_before, attempts
+      `, [paid.chargeId, workerId, at])).rows[0]!;
+      return {
+        jobId: row.job_id, kind: "SMARTBILL_INVOICE" as const, ref: paid.chargeId, payload: row.payload as never,
+        createdAt: row.created_at, notBefore: row.not_before, attempts: row.attempts, claimedBy: workerId, claimedAt: at
+      };
+    };
+    const stale = await claim("process-a", h.clock.now);
+    const current = await claim("process-b", new Date(h.clock.now.getTime() + 301_000));
+    expect(await invoiceHandler()(stale, h.clock.now)).toMatchObject({ kind: "RETRY", code: "BILLING_OUTBOX_CLAIM_LOST" });
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(0);
+    expect(await invoiceJob(paid.chargeId)).toMatchObject({ lastErrorCode: "INVOICE_SERVICE_UNAVAILABLE" });
+    // B, the holder, issues it once.
+    expect(await invoiceHandler()(current, h.clock.now)).toEqual({ kind: "DONE" });
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
+    expect(await h.repository.complete(current.jobId, h.clock.now, { workerId: "process-b", attempts: current.attempts })).toBe(true);
+    expect(await invoices(paid.chargeId)).toHaveLength(1);
     smartbill.withLookup = true;
   });
 

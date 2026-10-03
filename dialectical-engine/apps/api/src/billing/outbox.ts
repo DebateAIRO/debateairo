@@ -35,6 +35,16 @@ export function otherXMoneySystem(
   return Object.freeze({ kind: "DEAD" as const, code: "OTHER_XMONEY_SYSTEM" as const });
 }
 
+/**
+ * P2-M6: a handler whose job was claimed again by another worker (its claim's lease ran out while it ran) learns it
+ * from `markJobStage`, which only the current claim holder can move. It stops there, before any vendor call, with this
+ * outcome; P1b's fence then refuses its settle too (the worker reports `BILLING_OUTBOX_CLAIM_LOST`), and the new holder
+ * runs the job.
+ */
+export function claimLost(now: Date): OutboxOutcome {
+  return Object.freeze({ kind: "RETRY" as const, code: "BILLING_OUTBOX_CLAIM_LOST", retryAt: new Date(now.getTime() + 60_000) });
+}
+
 /** `attempts` counts the attempt that just failed (the claim increments it). 1m, 5m, 30m, 2h, 12h, then dead. */
 export function failureRetryAt(attempts: number, now: Date): Date | null {
   const delaysMs = [60_000, 300_000, 1_800_000, 7_200_000, 43_200_000];

@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { CustomerXMoneyEnvironment, OutboxKind, OutboxPayload } from "./billing.js";
+import type { CustomerXMoneyEnvironment, OutboxJob, OutboxKind, OutboxPayload } from "./billing.js";
 
 const SUBSCRIPTION_LEASE_NAMESPACE = "debateai.billing.subscription:";
 
@@ -70,11 +70,18 @@ export class BillingJobQueries {
    * column). A later attempt tells "the call may have moved money / created the document" (the stage is still there:
    * the process died mid-call) from "the call proved nothing was sent" (the worker overwrote it with that code).
    * RefundDesk (P9b) and the SmartBill jobs (P10b, A17b) use it.
+   * P2-M6: P1b's claim fence holds here too. Only the job's current claim holder (the worker and the attempt its claim
+   * gave it, `claimedBy` and `attempts` as the claim handed the job over) moves the stage. A stale holder, whose lease
+   * ran out and whose job another worker claimed again, changes nothing and gets false, and its caller stops before
+   * any vendor call. With one process the holder is always current, so nothing changes there.
    */
-  async markJobStage(jobId: string, code: string): Promise<void> {
-    await this.pool.query(
-      "UPDATE billing.outbox SET last_error_code=$2 WHERE job_id=$1 AND done_at IS NULL AND dead_at IS NULL", [jobId, code]
-    );
+  async markJobStage(job: Pick<OutboxJob, "jobId" | "claimedBy" | "attempts">, code: string): Promise<boolean> {
+    if (job.claimedBy === null) return false;
+    const result = await this.pool.query(`
+      UPDATE billing.outbox SET last_error_code=$2
+      WHERE job_id=$1 AND done_at IS NULL AND dead_at IS NULL AND claimed_by=$3 AND attempts=$4
+    `, [job.jobId, code, job.claimedBy, job.attempts]);
+    return result.rowCount === 1;
   }
 
   async jobStage(jobId: string): Promise<string | null> {
