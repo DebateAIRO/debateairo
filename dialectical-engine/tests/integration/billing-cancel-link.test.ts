@@ -8,7 +8,9 @@ import {
 } from "@debateai/db";
 import { foldSubscription } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { recordingAudit, seedActiveSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
+import {
+  holdOwnerLock, recordingAudit, seedActiveSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
+} from "../support/billingSubscriptionFixtures.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
 import { DekBillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
 import { CancelLinkService, cancelTokenSha256 } from "../../apps/api/src/billing/cancel-link.js";
@@ -81,6 +83,26 @@ function service(clock: { now: Date }, pool: Pool = database.pool) {
 const tokenOf = (mail: BillingMail): string => new URL(mail.params.cancelLinkUrl!).hash.slice("#token=".length);
 
 describe("P13 the cancel link on real PostgreSQL", () => {
+  it("dates the emailed link's cancel after the owner lock it waited for (P2-M12)", async () => {
+    const clock = { now: new Date() };
+    const { links, mails } = service(clock);
+    const email = `m12-${randomUUID().slice(0, 8)}@example.test`;
+    const ownerRef = await account(email);
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "RO"
+    });
+    expect(await links.request(email)).toBe("SENT");
+    const lock = await holdOwnerLock(database.pool, ownerRef);
+    const cancelled = links.cancelByToken(tokenOf(mails[0]!));
+    await lock.waiter();
+    clock.now = new Date(clock.now.getTime() + 60_000);
+    await lock.release();
+    expect(await cancelled).toBe("CANCELLED");
+    const cancel = (await new BillingRepository(database.pool).subscriptionEvents(seeded.subscriptionId))
+      .find((event) => event.kind === "CANCEL_REQUESTED");
+    expect(cancel?.at).toEqual(clock.now);
+  });
+
   it("sends one link to the account's current address, stores only its hash, and cancels once through it", async () => {
     const clock = { now: new Date() };
     const { links, mails, audit } = service(clock);

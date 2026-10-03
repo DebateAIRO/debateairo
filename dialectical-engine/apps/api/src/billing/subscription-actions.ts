@@ -121,10 +121,11 @@ export async function writeCancelLocked(
  * cancel of Terms §12 must work whatever the person has or has not accepted, and it commits them to nothing new.
  */
 export async function cancelForOwner(deps: SubscriptionRouteDeps, ownerRef: string): Promise<void> {
-  const now = deps.clock();
   const outcome = await deps.billing.withTransaction(async (client) => {
     const locked = await lockedSubscription(deps, client, ownerRef);
-    return locked === null ? "NOT_CANCELLABLE" as const : requestCancelLocked(deps, client, locked, now, "SETTINGS");
+    // P2-M12: the clock is read once the lock is held, so a grace or hold row a writer dated while this waited for
+    // the lock never outranks the cancel's FREE row (`billing.entitlement_at` takes the latest `effective_at`).
+    return locked === null ? "NOT_CANCELLABLE" as const : requestCancelLocked(deps, client, locked, deps.clock(), "SETTINGS");
   });
   if (outcome === "NOT_CANCELLABLE") refuse(409, "NOT_SUBSCRIBED");
   if (outcome === "REQUESTED") deps.audit("billing.cancel", { source: "SETTINGS" });

@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import {
@@ -329,4 +330,36 @@ export async function mountSubscriptionRoutes(
   );
   await api.ready();
   return api;
+}
+
+/**
+ * P2-M12: holds `ownerRef`'s billing owner lock (P8c's `lockOwner`) on a connection of its own until `release`, so a
+ * test can start a writer, see it wait for the lock (`waiter`: an advisory lock not granted, polled for up to 5 s),
+ * move its clock meanwhile, and only then let it in.
+ */
+export async function holdOwnerLock(pool: Pool, ownerRef: string): Promise<Readonly<{
+  waiter(): Promise<void>; release(): Promise<void>;
+}>> {
+  const holder = await pool.connect();
+  await holder.query("BEGIN");
+  await new BillingJobQueries(pool).lockOwner(holder, ownerRef);
+  return Object.freeze({
+    async waiter() {
+      for (let tries = 0; tries < 100; tries += 1) {
+        const waiting = await pool.query<{ n: number }>(
+          "SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted"
+        );
+        if ((waiting.rows[0]?.n ?? 0) > 0) return;
+        await delay(50);
+      }
+      throw new Error("no writer waited for the owner lock within 5 s");
+    },
+    async release() {
+      try {
+        await holder.query("COMMIT");
+      } finally {
+        holder.release();
+      }
+    }
+  });
 }

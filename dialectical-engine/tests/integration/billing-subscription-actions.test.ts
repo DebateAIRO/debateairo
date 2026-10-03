@@ -6,6 +6,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { testHttpIdentity } from "../support/httpSession.js";
 import { AdjustableTaxEngine, testBillingPolicy } from "../support/billingFixtures.js";
 import {
+  holdOwnerLock,
   mountSubscriptionRoutes,
   recordingAudit,
   seedActiveSubscription,
@@ -110,6 +111,24 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     expect((await events(seeded.subscriptionId)).filter((event) => event.kind === "CANCEL_REQUESTED")).toHaveLength(2);
     expect((await outbox("EMAIL", `M7:${seeded.subscriptionId}`)).map((row) => row.ref)).toEqual([m7Ref]);
     await api.close();
+  });
+
+  it("dates the cancel after the owner lock it waited for, never before a row written meanwhile (P2-M12)", async () => {
+    const ownerRef = randomUUID();
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE"
+    });
+    const clock = { now: new Date() };
+    const deps = subscriptionDeps(database.pool, { clock: () => clock.now });
+    // A renewal settlement (or any owner-locked writer) holds the lock; the cancel waits for it.
+    const lock = await holdOwnerLock(database.pool, ownerRef);
+    const cancelled = cancelForOwner(deps, ownerRef);
+    await lock.waiter();
+    clock.now = new Date(clock.now.getTime() + 60_000);
+    await lock.release();
+    await cancelled;
+    // Dated after the wait: a grace or hold row the lock holder wrote meanwhile can never outrank its FREE row.
+    expect((await events(seeded.subscriptionId)).find((event) => event.kind === "CANCEL_REQUESTED")?.at).toEqual(clock.now);
   });
 
   it("lets a plan of the other xMoney system be cancelled, but never revoked or offered a withdrawal (P2-I4)", async () => {

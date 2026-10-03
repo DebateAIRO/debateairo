@@ -150,7 +150,8 @@ export class CancelLinkService {
       if (first === undefined) return "NOTHING_TO_CANCEL" as const;
       const locked = await lockedSubscription(this.deps, client, first.ownerRef);
       if (locked === null || locked.state.subscriptionId !== used.subscriptionId) return "NOTHING_TO_CANCEL" as const;
-      return await requestCancelLocked(this.deps, client, locked, now, "EMAIL_LINK") === "REQUESTED"
+      // P2-M12: the cancel is dated once the owner lock is held (the token was checked at the first reading).
+      return await requestCancelLocked(this.deps, client, locked, this.deps.clock(), "EMAIL_LINK") === "REQUESTED"
         ? "CANCELLED" as const : "NOTHING_TO_CANCEL" as const;
     });
     if (outcome === "CANCELLED") this.deps.audit("billing.cancel", { source: "EMAIL_LINK" });
