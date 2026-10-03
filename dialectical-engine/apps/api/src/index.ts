@@ -3344,7 +3344,7 @@ export type PlannedAskAdmission = {
   readonly modelAssignment?: AdmittedModelAssignment;
   /** S2: the figure the run's hold opens with when the picker planned it (hosted); B6 uses its estimator otherwise. */
   readonly pickedHoldMicros?: number;
-  /** S2 / A5: nothing fitted the person's room even at ECONOMY; the debate starts at ECONOMY (logged when it does). */
+  /** S2 / A5: nothing fitted the person's room at any strength; the debate starts on the cheapest choice the site allows (logged when it does). */
   readonly personRoomTight?: boolean;
 };
 
@@ -3428,9 +3428,23 @@ async function admitWithScorecard(input: Readonly<{
   // Carry 15 (A20.2 review m1): first, as an engine fault. `evaluateAskAdmission`
   // already asked it before discovery (carry 16 m3); this keeps the promise local.
   assertHostedPickerCeiling(picker);
-  const reachable = reachableInTodaysOrder(discoveredPanel, input.rosterModelIds, picker.targetFacts);
+  // Paid plans S4b (final review P3-I2; the owner's ruling of 3 October 2026): on a
+  // site that sells plans a Free ask is seated, backed up and fallen back from the
+  // Free roster only, and its ECONOMY pick reads Free's own caps (the picker's
+  // `plansSold`). With no Free-roster model reachable it takes the path of a role
+  // with no eligible model below; no premium-roster model ever takes a Free seat.
+  // S4b fix round 1: its answer writer and answer checker never fall back, since a
+  // FALLBACK answer seat is served by the register's sealed refs (F18), which no
+  // roster bounds. With no scored Free-roster model for one of them the picker
+  // leaves the role empty and refuses NO_REACHABLE_CANDIDATE, which the asker reads
+  // as ASK_MODEL_CANDIDATE_UNAVAILABLE.
+  // B8 already rewrote `ask.plan_tier` to the person's plan's tier with billing on.
+  const plansSold = picker.mode === "HOSTED" && picker.plansSold === true;
+  const freeRosterOnly = plansSold && ask.plan_tier === "free";
+  const reachable = reachableInTodaysOrder(discoveredPanel, input.rosterModelIds, picker.targetFacts, freeRosterOnly);
   const plannedDebaters = debaterSeatCount(reachable, input.rosterModelIds.length);
-  // Carry 10: zero reachable makers (only an empty discovery) is refused HERE,
+  // Carry 10: zero reachable makers (an empty discovery, or — S4b — a Free ask on a
+  // site that sells plans with no Free-roster model discovered) is refused HERE,
   // before the basis and before the picker, so neither ever sees the incoherent
   // demand "no debaters, but a writer and a checker". Makers are counted by
   // exact string, as the roster filter counts them.
@@ -3470,6 +3484,7 @@ async function admitWithScorecard(input: Readonly<{
     seatDemand: seatDemandForDebaters(plannedDebaters),
     expectedCallsByRole: expectedCallsByRoleFromBasis(plannedBasis),
     perRunCeilingMicros: picker.perRunCeilingMicros,
+    plansSold,
     prices: targetPricesOf(picker.targetFacts),
     // Final review I3: the gateway's window wall adds each call's sealed answer bound.
     answerTokenCeilingByRole: picker.answerTokenCeilings
@@ -3585,8 +3600,10 @@ async function admitWithScorecard(input: Readonly<{
   const nowAt = input.personRoom?.ifStartsNowAt;
   if (nowAt === undefined) return planned;
   // S2: a WAIT preview — the same ask planned for NOW, from the same discovery. A
-  // refusal here is the SITE's (A5 starts every person-tight ask at ECONOMY against
-  // the site's ceiling), so it refuses the ask exactly as the wake plan's would.
+  // refusal here is the SITE's: A5 starts every person-tight ask on the cheapest
+  // strength that fits the site's ceiling (P3-I1), and refuses only when no strength
+  // up to the ask's own fits it — exactly when the site alone would refuse the ask,
+  // so it refuses the ask exactly as the wake plan's would.
   return Object.freeze({ ...planned, ifStartsNow: await admitPicked(pickAt(nowAt)) });
 }
 
@@ -4246,7 +4263,7 @@ export class PostgresAskApplication implements AskApplication {
       await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
       throw error;
     }
-    // A5: nothing fitted the person's room even at ECONOMY, and it started (content-free: ids only).
+    // A5: nothing fitted the person's room at any strength, and it started on the cheapest choice (content-free: ids only).
     if (pinned.personRoomTight === true) {
       console.info(JSON.stringify(Object.freeze({ event: "api.ask.person_room_tight", runId: outcome.runId })));
     }

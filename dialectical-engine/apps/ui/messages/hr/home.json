@@ -24,7 +24,6 @@
   "runFailure.NOT_STARTED": "Nešto je pošlo po zlu na našoj strani prije nego što je ova rasprava počela. Molimo, pitajte ponovno.",
   "runFailure.MODELS_UNAVAILABLE": "Ova rasprava nije mogla započeti jer modeli umjetne inteligencije koji su joj potrebni nisu bili dostupni. Molimo, pokušajte ponovno malo kasnije.",
   "runFailure.RUN_LIMIT_REACHED": "Ova je rasprava dosegnula svoje ograničenje prije nego što je mogla dati odgovor.",
-  "runFailure.DAILY_LIMIT_REACHED": "Današnje ograničenje za rasprave iskorišteno je dok je ova rasprava započinjala. Molimo, pitajte ponovno sutra.",
   "runFailure.STOPPED": "Ova je rasprava prekinuta na pola puta zbog problema na našoj strani. Molimo, ponovno postavite svoje pitanje.",
   "home.status.waiting": "Čeka na početak. Vaša će rasprava započeti sama u {time}.",
   "home.status.waitingOwnDebates": "Vaše ostale rasprave zasad koriste ostatak vašeg ograničenja. Ova će rasprava započeti sama čim jedna od njih završi.",

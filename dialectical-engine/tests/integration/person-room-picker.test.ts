@@ -6,7 +6,10 @@
  * planned for the room at the instant the wait can first end (the window's reset
  * when their spend fills it; the next minute, with the room as measured, when only
  * their own live debate's hold does), a Free person is capped by the tier B8
- * decides, and the site's refusal is unchanged. CI skips this directory: run it by hand.
+ * decides, and the site's refusal is unchanged. With economy caps above a role's
+ * BALANCED pick (Part 3's final review P3-I1), a person short on room starts on the
+ * cheapest plan the site allows and a FULL window waits — never the site's refusal.
+ * CI skips this directory: run it by hand.
  */
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -29,7 +32,7 @@ import type { ProviderDiscoveryTarget } from "@debateai/providers";
 import { computeStructuralCeilingBasis, type BillingPlans } from "@debateai/register";
 import { resolveBillingAsk, type AskBilling } from "../../apps/api/src/ask-billing.js";
 import { AskRoom, nextWholeMinute, type RoomPreview } from "../../apps/api/src/ask-room.js";
-import { testCandidate, testEntry, testScorecard } from "../support/scorecardFixtures.js";
+import { economyCaps, testCandidate, testEntry, testScorecard } from "../support/scorecardFixtures.js";
 import { createLegacyStoryRun } from "../support/storyEncryptedOwner.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -91,20 +94,24 @@ const PLANS: BillingPlans = Object.freeze({
   sourceRef: "test:s2-plans"
 });
 
-function settings(site: AskMoneyPolicy = SITE): RunCreationSettings {
+/** What discovery and the scorecard offer: the two-tier world above unless a test names its own. */
+type World = Readonly<{ scorecard: typeof SCORECARD; targets: readonly ProviderDiscoveryTarget[]; panel: readonly DiscoveredPanelMember[] }>;
+const TWO_TIERS: World = Object.freeze({ scorecard: SCORECARD, targets: TARGETS, panel: PANEL });
+
+function settings(site: AskMoneyPolicy = SITE, world: World = TWO_TIERS): RunCreationSettings {
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
     batteryVersion: "battery:s2",
     settlementWatchHandle: "watch:s2",
-    resolveDiscoveredPanel: async () => PANEL,
+    resolveDiscoveredPanel: async () => world.panel,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned }) =>
       computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned }),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
     modelPicker: askModelPickerSettings({
-      scorecard: Object.freeze({ state: "VALID" as const, scorecard: SCORECARD, sourceRef: "test:s2-scorecard" }),
+      scorecard: Object.freeze({ state: "VALID" as const, scorecard: world.scorecard, sourceRef: "test:s2-scorecard" }),
       deploymentMode: "hosted",
-      targets: TARGETS,
+      targets: world.targets,
       perRunCeilingMicros: site.perRunCeilingMicros,
       moneyPolicy: site,
       callTokenCeilings: { judge: 2048, synthesizer: 2048, evaluator: 2048 }
@@ -327,6 +334,95 @@ describe("S2 · the person's room on the picker path (hosted, VALID scorecard)",
     expect(withoutPerson).toMatchObject({ code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
     const ref = await owner("PLUS", 0);
     const withPerson = await evaluateAskAdmission(settings(tinySite), ask("premium"), await roomOf(ref)).then(() => null, (error: unknown) => error);
+    expect(withPerson).toBeInstanceOf(AskRefusal);
+    expect(withPerson).toMatchObject({ code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
+  });
+});
+
+/**
+ * P3-I1 (controller's ruling, 3 October 2026): spec A5's "the debate starts at the cheapest choice" governs.
+ * Three tiers per maker — top (1000 a call, q95), mid (300, q92) and lite (20, q70) — with every role's economy
+ * cap at 1000 a call, above BALANCED's pick: ECONOMY is "the best model under that cap", the tops, so it is the
+ * DEAREST plan here, not the cheapest. Two debaters at depth 1 make 30 calls, 24 while arguing:
+ *   BEST tops 30 000 (24 000 arguing) · BALANCED mids 9000 (7200 arguing) · ECONOMY tops 30 000 (24 000 arguing).
+ */
+describe("P3-I1 · A5 starts at the cheapest choice when ECONOMY is not the cheapest plan (hosted, VALID scorecard)", () => {
+  const candidates = [
+    ...CANDIDATES,
+    testCandidate("oa-mid", "OpenAI"), testCandidate("an-mid", "Anthropic")
+  ];
+  const entries = [...ENTRIES, testEntry("oa-mid", 92, 1), testEntry("an-mid", 92, 1)];
+  const cap = Object.freeze({ moneyMicrosPerCall: 1000, secondsPerCall: 50 });
+  const tierPrice = (candidateId: string) => (candidateId.endsWith("-mid") ? 300_000 : priceOf(candidateId));
+  const world: World = Object.freeze({
+    scorecard: testScorecard(
+      candidates,
+      Object.fromEntries(DEBATE_ROLES.map((role) => [role, entries])),
+      { diversityShare: 0, planStrengthCaps: { free: "ECONOMY" }, economyCap: economyCaps(Object.fromEntries(DEBATE_ROLES.map((role) => [role, cap]))) }
+    ),
+    targets: candidates.map((candidate) => Object.freeze({
+      providerRef: `provider:${candidate.candidateId}`, maker: candidate.maker, baseUrl: "https://vendor.test/v1",
+      model: candidate.modelId,
+      inputPriceMicrosPerMillionTokens: tierPrice(candidate.candidateId),
+      outputPriceMicrosPerMillionTokens: tierPrice(candidate.candidateId)
+    })),
+    panel: candidates.map((candidate) => Object.freeze({
+      provider_ref: `provider:${candidate.candidateId}`, maker: candidate.maker, model_id: candidate.modelId,
+      probe_evidence_ref: `probe:${candidate.candidateId}`, probed_at: "2026-10-01T00:00:00.000Z"
+    }))
+  });
+  // Site ceiling 20 000 (arguing 14 000, whole run 24 000): BALANCED fits it, ECONOMY and BEST do not.
+  const site20k: AskMoneyPolicy = Object.freeze({ perRunCeilingMicros: 20_000, serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
+
+  it("plans the site alone at BALANCED (the site allows BALANCED)", async () => {
+    const admitted = await evaluateAskAdmission(settings(site20k, world), ask("premium"), null);
+    expect(admitted.modelAssignment?.appliedStrength).toBe("BALANCED");
+    expect(debaterModels(admitted.discoveredPanel)).toEqual(["model-an-mid", "model-oa-mid"]);
+  });
+
+  it("STARTS a person short on room on the cheapest plan the site allows (BALANCED), never the site's refusal", async () => {
+    // Today 995 000 of 1 000 000: a room of 5000 (arguing 3500) — no strength fits the person.
+    const ref = await owner("PLUS", 995_000);
+    const preview = await previewOf(ref);
+    expect(preview.admission.kind).toBe("START");
+    const admitted = await evaluateAskAdmission(settings(site20k, world), ask("premium"), personRoomOf(preview));
+    expect(admitted.modelAssignment?.appliedStrength).toBe("BALANCED");
+    expect(admitted.modelAssignment?.steppedDown).toBe(true);
+    expect(admitted.personRoomTight).toBe(true);
+    expect(admitted.pickedHoldMicros).toBe(9000);
+    expect(debaterModels(admitted.discoveredPanel)).toEqual(["model-an-mid", "model-oa-mid"]);
+  });
+
+  it("lets a person with a FULL window WAIT, and plans NOW on the cheapest plan the site allows — never a refusal", async () => {
+    const ref = await owner("PLUS", 1_000_000);
+    const preview = await previewOf(ref);
+    expect(preview.admission.kind).toBe("WAIT");
+    const admitted = await evaluateAskAdmission(settings(site20k, world), ask("premium"), personRoomOf(preview));
+    // The wake plan (the day has reset): the person's room is large, and the site allows BALANCED.
+    expect(admitted.modelAssignment?.appliedStrength).toBe("BALANCED");
+    expect(admitted.personRoomTight).toBe(false);
+    // The plan for NOW (a room of 0): A5 on the cheapest plan the site allows.
+    expect(admitted.ifStartsNow?.modelAssignment?.appliedStrength).toBe("BALANCED");
+    expect(admitted.ifStartsNow?.personRoomTight).toBe(true);
+    expect(admitted.ifStartsNow?.pickedHoldMicros).toBe(9000);
+  });
+
+  it("starts a short person on BALANCED's 9000, not ECONOMY's 30 000, when the site allows every strength", async () => {
+    const ref = await owner("PLUS", 995_000);
+    const admitted = await evaluateAskAdmission(settings(SITE, world), ask("premium"), await roomOf(ref));
+    expect(admitted.modelAssignment?.appliedStrength).toBe("BALANCED");
+    expect(admitted.personRoomTight).toBe(true);
+    expect(admitted.pickedHoldMicros).toBe(9000);
+  });
+
+  it("refuses only when no strength fits the site — the site's own refusal, person or not", async () => {
+    // Site 5000 (arguing 3500): BALANCED's 7200 of arguing is over it, and so is every other strength.
+    const smallSite: AskMoneyPolicy = Object.freeze({ perRunCeilingMicros: 5000, serveReserveBasisPoints: 3000, serveOverrunBasisPoints: 2000 });
+    const withoutPerson = await evaluateAskAdmission(settings(smallSite, world), ask("premium"), null).then(() => null, (error: unknown) => error);
+    expect(withoutPerson).toBeInstanceOf(AskRefusal);
+    expect(withoutPerson).toMatchObject({ code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
+    const ref = await owner("PLUS", 995_000);
+    const withPerson = await evaluateAskAdmission(settings(smallSite, world), ask("premium"), await roomOf(ref)).then(() => null, (error: unknown) => error);
     expect(withPerson).toBeInstanceOf(AskRefusal);
     expect(withPerson).toMatchObject({ code: "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL" });
   });

@@ -1630,18 +1630,17 @@ are read from. Left unset, the runner finds `story-shapes/` in its own checkout,
 
 A failed debate's reason code is for operators. It stays in `core.work_item.terminal_reason`, in
 the `terminal_reason` field of `GET /v1/runs/:id` and in the logs above. The pages never show it.
-They show one of five fixed sentences in the reader's language instead, picked by the code's
+They show one of four fixed sentences in the reader's language instead, picked by the code's
 group (`apps/ui/lib/v3/runFailure.ts`, words in `apps/ui/messages/<locale>/home.json` and
 `debateChrome.json` under `runFailure.*`). When an asker quotes a sentence, this table gives the codes
 to look for:
 
 | The asker sees (English) | Group | Reason codes |
 |---|---|---|
-| "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, any step (see the row above) |
-| "This debate could not start because the AI models it needs were unavailable. Please try again in a while." | `MODELS_UNAVAILABLE` | `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` and `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:<role>`. The runner writes these first, then its job catch overwrites them with `RUNNER_EXECUTION_FAILED:<the same code>` (the role is lost there). Both forms read the same. |
+| "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, any step (see the row above), and `RUN_ROLE_ASSIGNMENT_INVALID` (the runner, claiming the debate, found the model scorecard's role assignment pinned at the ask corrupt or unable to seat a debate; its job catch then overwrites it with `RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID`, and both forms read the same) |
+| "This debate could not start because the AI models it needs were unavailable. Please try again in a while." | `MODELS_UNAVAILABLE` | `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM`, `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:<role>`. The runner writes these first, then its job catch overwrites them with `RUNNER_EXECUTION_FAILED:<the same code>` (the role is lost there). Both forms read the same. |
 | "This debate reached its limit before it could produce an answer." | `RUN_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL` (see the row above) |
-| "Today's limit for debates ran out while this one was starting. Please ask again tomorrow." | `DAILY_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED`. **Not reachable today**: the day's limit is checked only when a question is asked, and a refused question never becomes a debate (the asker sees "We've reached today's limit for new debates…" instead). The runner keeps the code as a stop of its own, so it keeps its sentence here too. |
-| "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
+| "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), `DAILY_COST_ENVELOPE_REACHED` and `PERSON_ALLOWANCE_REACHED` (with the budget members published they stop only the arguing and never end a debate; a question the day holds back waits in line, and its page says when it will start), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
 
 A code added to the engine lands in `STOPPED` until it is given a group of its own. The UI's test
 (`apps/ui/lib/v3/runFailure.test.mjs`) reads each code's write site in the runner and the API, and

@@ -8,7 +8,6 @@
   "runFailure.NOT_STARTED": "משהו השתבש אצלנו לפני שהדיון הזה התחיל. נא לשאול שוב.",
   "runFailure.MODELS_UNAVAILABLE": "לא ניתן היה להתחיל את הדיון הזה, כי מודלי הבינה המלאכותית הדרושים לו לא היו זמינים. נא לנסות שוב בעוד זמן מה.",
   "runFailure.RUN_LIMIT_REACHED": "הדיון הזה הגיע למגבלה שלו לפני שהספיק לתת תשובה.",
-  "runFailure.DAILY_LIMIT_REACHED": "מגבלת הדיונים להיום נוצלה בזמן שהדיון הזה התחיל. נא לשאול שוב מחר.",
   "runFailure.STOPPED": "הדיון הזה נעצר באמצע בגלל תקלה אצלנו. נא לשאול את השאלה שוב.",
   "debateChrome.error.unableToLoadDebate": "לא ניתן לטעון את הדיון",
   "debateChrome.error.unableToLoadScoring": "לא ניתן לטעון את הציונים",

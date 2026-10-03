@@ -85,6 +85,7 @@ import { agg, σ } from "@debateai/published-arithmetic";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
 import {
   ServeRepository,
+  seatBaseCallSiteKey,
   type ConditionMarkRecord,
   type PreservedConditionMarkRecord,
   type ServeGateResult
@@ -8653,14 +8654,25 @@ const B9_TINY_PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1, outputMicr
 const B9_OWNER = randomUUID();
 
 type B9WallScope = "SITE_DAY" | "PERSON";
-type B9Maker = "primary" | "secondary";
-type B9WallPrices = Readonly<Record<B9Maker, ProviderTargetPrice>>;
+/**
+ * Paid plans S4c: the seat harness (`b9SeatScenario`) adds the third route (the SUPPORT_ATTACK seat and the checker)
+ * and the judge-only fourth (every JUDGE and REVIEWER seat). Neither is priced by the move window, so each pays the
+ * tiny price: only the two debaters' prices decide who may move.
+ */
+type B9Maker = "primary" | "secondary" | "third" | "fourth";
+type B9WallPrices = Readonly<Record<"primary" | "secondary", ProviderTargetPrice>>;
 /**
  * B9c's options for the invariant: each maker's own price and the move window (see `b9WallGuard`), and
  * `cheaperModelsOn` — the runner under test moves calls and leaves money-refused seats out (the caller passes
  * `bodyCostFallback: true` in `settings`, a setting B9c adds, so this helper never reads it).
  */
-type B9WallOptions = Readonly<{ prices?: B9WallPrices; moveWindowReads?: number; cheaperModelsOn?: boolean }>;
+type B9WallOptions = Readonly<{
+  prices?: B9WallPrices;
+  moveWindowReads?: number;
+  cheaperModelsOn?: boolean;
+  /** Paid plans S4c (final review P3-M3): run every debate on the seat harness, an ASSIGNED run (`b9SeatScenario`). */
+  seats?: boolean;
+}>;
 type B9WallCase = Readonly<{ label: string; scope: B9WallScope; fuseAt: number; runId: string }>;
 
 function b9WallGuard(input: Readonly<{
@@ -8732,7 +8744,11 @@ function b9WallGuard(input: Readonly<{
         builds.push({ maker, phase, sharedWall });
         const site = lastRequest.callSiteKey;
         const seam = guard.providerSeam({
-          runId, price: input.prices?.[maker] ?? B9_TINY_PRICE, requireReportedUsage: false, phase, sharedWall
+          runId,
+          price: (maker === "primary" || maker === "secondary" ? input.prices?.[maker] : undefined) ?? B9_TINY_PRICE,
+          requireReportedUsage: false,
+          phase,
+          sharedWall
         });
         return {
           ...seam,
@@ -8808,6 +8824,7 @@ async function runB9WallInvariant(
   wallOptions: B9WallOptions = {}
 ): Promise<readonly B9WallCase[]> {
   const scenarioFor = async (label: string, wall: ReturnType<typeof b9WallGuard>) => {
+    if (wallOptions.seats === true) return b9SeatScenario(`b9-seat-invariant-${label}`, wall, settings);
     const debate = b9Debate(`B9 invariant ${label}`);
     return executeResil01Scenario({
       label: `b9-invariant-${label}`,
@@ -8832,9 +8849,11 @@ async function runB9WallInvariant(
   // debates' sites are compared with each node id read as one placeholder (`JUDGE:review:<node>`).
   const siteOf = (callSiteKey: string | undefined): string | undefined =>
     callSiteKey?.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/giu, "<node>");
+  // Paid plans S4c: an assigned run marks every key with its seat; a family is read on the key without it.
+  const inFamily = (pattern: RegExp, callSiteKey: string): boolean => pattern.test(seatBaseCallSiteKey(callSiteKey));
   const firstReadAt = (matches: (read: typeof reads[number]) => boolean): number => reads.findIndex(matches) + 1;
   const familyOrdinals = B9_WALL_FAMILIES.map(([name, pattern]) => {
-    const ordinal = firstReadAt((read) => pattern.test(read.callSiteKey));
+    const ordinal = firstReadAt((read) => inFamily(pattern, read.callSiteKey));
     expect(ordinal, `the debate reaches ${name}`).toBeGreaterThan(0);
     return ordinal;
   });
@@ -8885,7 +8904,7 @@ async function runB9WallInvariant(
     cases.push(Object.freeze({ label, scope: walled.scope, fuseAt: walled.fuseAt, runId: scenario.runId }));
   }
   for (const [name, pattern] of B9_WALL_FAMILIES) {
-    expect([...firstMet].some((key) => pattern.test(key)), `some case meets the wall first at ${name}`).toBe(true);
+    expect([...firstMet].some((key) => inFamily(pattern, key)), `some case meets the wall first at ${name}`).toBe(true);
   }
   return Object.freeze(cases);
 }
@@ -9816,7 +9835,10 @@ async function executeSeatScenario(input: {
   /** Paid plans S1a: every request a route's gateway is handed, before its seam (dev's `observe`). */
   readonly observe?: (route: string, request: ProviderCallRequest) => void;
   /** Paid plans S1a: a route's money seam, as a hosted runner builds one per call (dev's `moneySeam(…).build`). */
-  readonly costEnvelopes?: Readonly<Partial<Record<SeatRoute | JudgeOnlyRoute, (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam>>>;
+  readonly costEnvelopes?: Readonly<Partial<Record<
+    SeatRoute | JudgeOnlyRoute,
+    (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => ProviderCostEnvelopeSeam
+  >>>;
 }) {
   const doubles = {
     primary: await startProviderDouble(input.primary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.primary ?? 0),
@@ -11512,6 +11534,149 @@ describe("S1a · the answer's seats inside dev's money fallback and disclosure",
     } finally {
       await rm(momentDirectory, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * Paid plans S4c (final review P3-M3) — B9's wall on an ASSIGNED run, for `runB9WallInvariant`'s seat harness.
+ * A15's debate with every JUDGE and REVIEWER seat on the judge-only fourth route, so no panel or review rotation
+ * (which is drawn from the run's id) can change who is read between the probe and a case, and with a runner-up on
+ * the answer writer's seat. Each walled route builds its seam from `wall`, and every request it is handed is
+ * observed first, so the wall files each read under the seat-marked call site that made it. Spares on every queue:
+ * a moved call is answered by the maker it moved to.
+ */
+async function b9SeatScenario(
+  label: string,
+  wall: ReturnType<typeof b9WallGuard>,
+  settings: Partial<WalkingSkeletonSettings>
+) {
+  const walled: readonly B9Maker[] = ["primary", "secondary", "third", "fourth"];
+  return executeSeatScenario({
+    label,
+    assignment: pinnedAssignment({
+      POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+      SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+      CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+      JUDGE: [judgeOnlySeat(0, "fourth")],
+      REVIEWER: [judgeOnlySeat(0, "fourth")],
+      // Share 0: the runner-up is the writer's backup only, so who is read never depends on the run's id.
+      ANSWER_WRITER: [pinnedSeat(0, "secondary", "third", 0)],
+      ANSWER_CHECKER: [pinnedSeat(0, "third")]
+    }),
+    judgeOnlyRoutes: true,
+    primary: b9Judgements(`${label} primary`, 4),
+    secondary: [...b9Judgements(`${label} secondary`, 4), resil01Composition],
+    // The third double also serves the fourth route: its reviews queue here.
+    third: [...b9Judgements(`${label} third`, 5), ...b9Reviews(`${label} fourth`, 9), resil01Composition, evaluatorSatisfied()],
+    costEnvelopes: {
+      primary: wall.buildFor("primary"),
+      secondary: wall.buildFor("secondary"),
+      third: wall.buildFor("third"),
+      fourth: wall.buildFor("fourth")
+    },
+    observe: (route, request) => {
+      const maker = walled.find((name) => name === route);
+      if (maker !== undefined) wall.observe(maker, request);
+    },
+    settings
+  });
+}
+
+describe("S4c · an assigned run's arguing moves for money, and no debate ends FAILED for it (final review P3-M3)", () => {
+  it("keeps the tested invariant on an assigned run, and every move it lets through goes by the seat book", async () => {
+    // Every case's error, answer, terminal and stop reason are asserted inside the invariant itself.
+    const cases = await runB9WallInvariant(
+      { bodyCostFallback: true, providerPrices: B9_PRICES },
+      {
+        prices: { primary: B9_PRICES.get(PRIMARY_REF)!, secondary: B9_PRICES.get(SECONDARY_REF)! },
+        moveWindowReads: 2,
+        cheaperModelsOn: true,
+        seats: true
+      }
+    );
+    expect(cases.length).toBeGreaterThan(B9_WALL_FAMILIES.length);
+    expect(new Set(cases.map((walled) => walled.scope))).toEqual(new Set(["SITE_DAY", "PERSON"]));
+    const moved: { walled: B9WallCase; rows: Awaited<ReturnType<typeof b9Substitutions>> }[] = [];
+    for (const walled of cases) {
+      const rows = await b9Substitutions(walled.runId);
+      if (rows.length > 0) moved.push({ walled, rows });
+    }
+    // Some fuse fell on a call planned on the dearer secondary's seat, which the window let the primary make
+    // instead. Without the seat book's cheaper-model gateway (`judgeGatewayFor`) no assigned call moves at all.
+    expect(moved.length).toBeGreaterThan(0);
+    for (const { walled, rows } of moved) {
+      for (const row of rows) {
+        expect({
+          seatMarked: row.callSiteKey.endsWith(":seat:main"),
+          plannedProviderRef: row.plannedProviderRef,
+          usedProviderRef: row.usedProviderRef,
+          reason: row.reason
+        }, walled.label).toEqual({
+          seatMarked: true,
+          plannedProviderRef: SECONDARY_REF,
+          usedProviderRef: PRIMARY_REF,
+          reason: walled.scope === "SITE_DAY" ? "SITE_DAY" : "PERSON"
+        });
+      }
+    }
+  }, 1_200_000);
+
+  it("moves a seat's judge call refused for money to the cheaper debater; the node's maker and its panel follow who wrote it", async () => {
+    const LEG = /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+:seat:main$/u;
+    let refusedAt: string | null = null;
+    // The third's FIRST support/attack leg is refused for money before it is sent; nothing else is.
+    const thirdSeam = refuseBodyCallSites((key) => {
+      if (refusedAt !== null || !LEG.test(key)) return false;
+      refusedAt = key;
+      return true;
+    });
+    const scenario = await executeSeatScenario({
+      label: "s4c-assigned-leg-moved",
+      // A15's seats: the third holds SUPPORT_ATTACK, and judges and reviews beside the primary.
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      // B9_PRICES: the primary is the cheaper of the two claim-eligible debaters (the third is not one).
+      settings: { bodyCostFallback: true, providerPrices: B9_PRICES },
+      costEnvelopes: { third: thirdSeam.build },
+      observe: (route, request) => { if (route === "third") thirdSeam.observe(request); },
+      // The primary answers the moved leg from its spare judgement.
+      primary: [...b9Judgements("S4c primary", 3), ...b9Reviews("S4c primary", 8)],
+      secondary: [...b9Judgements("S4c secondary", 2), resil01Composition],
+      third: [...b9Judgements("S4c third", 4), ...b9Reviews("S4c third", 8), evaluatorSatisfied()]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(SERVED_TERMINALS).toContain(scenario.answer?.terminal);
+    expect(refusedAt).not.toBeNull();
+    const key = refusedAt!;
+    // The moved row keeps the seat-marked key; the cheaper debater wrote it over its own route, so it names no
+    // candidate. The third's try was refused before sending and left no row.
+    expect(scenario.calls.filter((call) => call.call_site_key === key)
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref, call.candidate_id]))
+      .toEqual([[key, "OK", PRIMARY_REF, null]]);
+    // The owner's record of the move (core.run_cost_substitution, through B8's one reader).
+    expect(await b9Substitutions(scenario.runId)).toEqual([
+      { callSiteKey: key, plannedProviderRef: THIRD_REF, usedProviderRef: PRIMARY_REF, reason: "RUN_ARGUING" }
+    ]);
+    // The node's maker is the model that wrote it, and its panel names that author...
+    const node = await b9NodeAt(scenario.runId, key);
+    expect(node?.provider_ref).toBe(PRIMARY_REF);
+    expect(await b9PanelAuthor(scenario.runId, node!.node_id)).toEqual([PRIMARY_REF]);
+    // ...so the panel refuses that maker: the leg is judged by the third alone (A15 has the primary judge the
+    // third's legs), and the review goes to the third as well.
+    const panel = scenario.calls.filter((call) => call.call_site_key.startsWith(`PANEL:${seatBaseCallSiteKey(key)}:`));
+    expect(panel.map((call) => call.actor_ref)).toEqual([THIRD_REF]);
+    const review = scenario.calls.filter((call) => call.call_site_key.startsWith(`JUDGE:review:${node!.node_id}`));
+    expect(review.map((call) => call.actor_ref)).toEqual([THIRD_REF]);
+    // The move fitted, so nothing was cut short.
+    expect(scenario.answer?.condition_marks).not.toContain("ENVELOPE_EXHAUSTED");
   });
 });
 

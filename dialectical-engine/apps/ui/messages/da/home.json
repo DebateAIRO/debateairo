@@ -24,7 +24,6 @@
   "runFailure.NOT_STARTED": "Noget gik galt hos os, før denne debat gik i gang. Prøv venligst at stille spørgsmålet igen.",
   "runFailure.MODELS_UNAVAILABLE": "Denne debat kunne ikke starte, fordi de AI-modeller, den har brug for, ikke var tilgængelige. Prøv venligst igen om lidt.",
   "runFailure.RUN_LIMIT_REACHED": "Denne debat nåede sin grænse, før den kunne give et svar.",
-  "runFailure.DAILY_LIMIT_REACHED": "Dagens grænse for debatter blev opbrugt, mens denne debat var ved at starte. Stil venligst dit spørgsmål igen i morgen.",
   "runFailure.STOPPED": "Denne debat stoppede halvvejs på grund af et problem hos os. Stil venligst dit spørgsmål igen.",
   "home.status.waiting": "Venter på at starte. Din debat starter af sig selv {time}.",
   "home.status.waitingOwnDebates": "Dine andre debatter bruger resten af din grænse lige nu. Denne debat starter af sig selv, så snart en af dem er færdig.",

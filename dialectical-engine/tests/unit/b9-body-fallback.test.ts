@@ -345,4 +345,17 @@ describe("B9c · the shipped runner switches it on only with the new settings", 
     expect(call).toContain("onRunLevelSpendStop: input.onSpendStop === \"AUTHOR_ONLY\" ? \"RETURN_HEARD\" : \"RETHROW\"");
     expect(call).toContain("leaveOutMoneyRefusedSeats: this.settings.bodyCostFallback === true");
   });
+
+  // Paid plans S4c (final review P3-M3): an assigned run's seats build their judges over the cheaper-model
+  // gateway only through this one spread. Deleted, no arguing call of an assigned run would ever move for money.
+  it("hands an assigned run's seat book the cheaper-model gateway, only under that setting", async () => {
+    const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    const start = source.indexOf("assignedSeats = buildAssignedRunSeatBook({");
+    expect(start).toBeGreaterThan(0);
+    const call = source.slice(start, source.indexOf("});", start));
+    expect(call).toContain("assignment: roleAssignment, configured: configuredByProviderRef, routeHealth,");
+    expect(call).toContain("...(this.settings.bodyCostFallback === true ? { judgeGatewayFor: bodyGatewayFor } : {})");
+    // The factory is the one the legacy book's judges are wrapped with, over the claim-eligible makers.
+    expect(source).toContain("const bodyGatewayFor = (planned: ConfiguredSeatMaker, provider: ProviderGateway): ProviderGateway =>\n      bodyCostFallbackGateway({");
+  });
 });

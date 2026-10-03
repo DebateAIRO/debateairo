@@ -224,3 +224,65 @@ test("each plan carries one name in every locale: the billing pages', /new's and
     }
   }
 });
+
+// Part 3b S4d (P3-M12 and P3-I2's text half; the owner's rulings of 3 October 2026): /pricing says what is true.
+// A paid debate starts on Balanced (Balanced stays the paid default), so the paid line names the three strengths a
+// paid person chooses from instead of promising "the best models"; Free runs on low-cost models chosen for the most
+// value inside Free's own cost cap (S4b), not on "the cheapest models". The lines below are the retired wording of
+// every locale, which no catalogue may show again.
+const RETIRED_PLAN_LINES = {
+  ar: ["مناظِران، أرخص النماذج، إعدادات ثابتة", "3 مناظرين، كل الإعدادات، أفضل النماذج"],
+  bg: ["2 участници в дебата, най-евтините модели, фиксирани настройки", "3 участници в дебата, всички настройки, най-добрите модели"],
+  cs: ["2 účastníci debaty, nejlevnější modely, pevné nastavení", "3 účastníci debaty, všechna nastavení, nejlepší modely"],
+  da: ["2 debattører, de billigste modeller, faste indstillinger", "3 debattører, alle indstillinger, de bedste modeller"],
+  de: ["2 Debattierende, die günstigsten Modelle, feste Einstellungen", "3 Debattierende, alle Einstellungen, die besten Modelle"],
+  el: ["2 συμμετέχοντες στην αντιπαράθεση, τα φθηνότερα μοντέλα, σταθερές ρυθμίσεις", "3 συμμετέχοντες στην αντιπαράθεση, όλες οι ρυθμίσεις, τα καλύτερα μοντέλα"],
+  en: ["2 debaters, the cheapest models, fixed settings", "3 debaters, all settings, the best models"],
+  es: ["2 participantes en el debate, los modelos más económicos, ajustes fijos", "3 participantes en el debate, todos los ajustes, los mejores modelos"],
+  et: ["2 väitlejat, kõige odavamad mudelid, fikseeritud seaded", "3 väitlejat, kõik seaded, parimad mudelid"],
+  fi: ["2 väittelijää, edullisimmat mallit, kiinteät asetukset", "3 väittelijää, kaikki asetukset, parhaat mallit"],
+  fr: ["2 débatteurs, les modèles les moins chers, des réglages fixes", "3 débatteurs, tous les réglages, les meilleurs modèles"],
+  ga: ["2 dhíospóireoir, na samhlacha is saoire, socruithe seasta", "3 dhíospóireoir, gach socrú, na samhlacha is fearr"],
+  he: ["2 משתתפים בדיון, המודלים הזולים ביותר, הגדרות קבועות", "3 משתתפים בדיון, כל ההגדרות, המודלים הטובים ביותר"],
+  hi: ["2 वाद-विवादकर्ता, सबसे सस्ते मॉडल, तय सेटिंग्स", "3 वाद-विवादकर्ता, सभी सेटिंग्स, सबसे अच्छे मॉडल"],
+  hr: ["2 sudionika rasprave, najjeftiniji modeli, fiksne postavke", "3 sudionika rasprave, sve postavke, najbolji modeli"],
+  hu: ["2 vitázó, a legolcsóbb modellek, rögzített beállítások", "3 vitázó, minden beállítás, a legjobb modellek"],
+  id: ["2 pendebat, model termurah, pengaturan tetap", "3 pendebat, semua pengaturan, model terbaik"],
+  it: ["2 partecipanti al dibattito, i modelli più economici, impostazioni fisse", "3 partecipanti al dibattito, tutte le impostazioni, i modelli migliori"],
+  ja: ["ディベーター 2 名、最も安価なモデル、固定設定", "ディベーター 3 名、すべての設定、最高のモデル"],
+  ko: ["토론자 2명, 가장 저렴한 모델, 고정 설정", "토론자 3명, 모든 설정, 최고의 모델"],
+  lt: ["2 debatų dalyviai, pigiausi modeliai, fiksuoti nustatymai", "3 debatų dalyviai, visi nustatymai, geriausi modeliai"],
+  lv: ["2 debatētāji, lētākie modeļi, fiksēti iestatījumi", "3 debatētāji, visi iestatījumi, labākie modeļi"],
+  mt: ["2 dibattenti, l-irħas mudelli, settings fissi", "3 dibattenti, is-settings kollha, l-aqwa mudelli"],
+  nl: ["2 debaters, de goedkoopste modellen, vaste instellingen", "3 debaters, alle instellingen, de beste modellen"],
+  pl: ["2 uczestników debaty, najtańsze modele, stałe ustawienia", "3 uczestników debaty, wszystkie ustawienia, najlepsze modele"],
+  pt: ["2 debatedores, os modelos mais baratos, definições fixas", "3 debatedores, todas as definições, os melhores modelos"],
+  ro: ["2 participanți la dezbatere, cele mai ieftine modele, setări fixe", "3 participanți la dezbatere, toate setările, cele mai bune modele"],
+  ru: ["2 участника дебатов, самые дешёвые модели, фиксированные настройки", "3 участника дебатов, все настройки, лучшие модели"],
+  sk: ["2 účastníci debaty, najlacnejšie modely, pevné nastavenia", "3 účastníci debaty, všetky nastavenia, najlepšie modely"],
+  sl: ["2 udeleženca razprave, najcenejši modeli, fiksne nastavitve", "3 udeleženci razprave, vse nastavitve, najboljši modeli"],
+  sv: ["2 debattörer, de billigaste modellerna, fasta inställningar", "3 debattörer, alla inställningar, de bästa modellerna"],
+  tr: ["2 tartışmacı, en ucuz modeller, sabit ayarlar", "3 tartışmacı, tüm ayarlar, en iyi modeller"],
+  uk: ["2 учасники дебатів, найдешевші моделі, фіксовані налаштування", "3 учасники дебатів, усі налаштування, найкращі моделі"],
+  vi: ["2 người tranh luận, các mô hình rẻ nhất, cài đặt cố định", "3 người tranh luận, mọi cài đặt, các mô hình tốt nhất"],
+  zh: ["2 位辩手，最经济的模型，固定设置", "3 位辩手，全部设置，最好的模型"],
+};
+
+test("/pricing's plan lines say what is true: Free's low-cost models, and the paid choice of strengths (S4d)", () => {
+  const english = catalogue("en");
+  assert.equal(english["billing.pricing.freeFeatures"], "2 debaters, carefully chosen low-cost models, fixed settings");
+  assert.equal(english["billing.pricing.paidFeatures"], "3 debaters, all settings, and your pick of Best, Balanced or Economy models for each debate");
+  assert.deepEqual(Object.keys(RETIRED_PLAN_LINES).sort(), LOCALES.map(({ code }) => code).sort());
+  for (const { code } of LOCALES) {
+    const billing = catalogue(code);
+    const newDebate = JSON.parse(source(`messages/${code}/newDebate.json`));
+    const [retiredFree, retiredPaid] = RETIRED_PLAN_LINES[code];
+    assert.notEqual(billing["billing.pricing.freeFeatures"], retiredFree, `${code}: Free's line no longer promises the cheapest models`);
+    assert.notEqual(billing["billing.pricing.paidFeatures"], retiredPaid, `${code}: the paid line no longer promises the best models`);
+    // The paid line names the strengths with the very labels of /new's Model strength chooser.
+    for (const strength of ["Best", "Balanced", "Economy"]) {
+      const label = newDebate[`newDebate.modelStrength${strength}`];
+      assert.ok(billing["billing.pricing.paidFeatures"].includes(label), `${code}: the paid line names ${strength} as /new does (${label})`);
+    }
+  }
+});

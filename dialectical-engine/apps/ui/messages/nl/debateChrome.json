@@ -8,7 +8,6 @@
   "runFailure.NOT_STARTED": "Er ging aan onze kant iets mis voordat dit debat begon. Stel uw vraag alstublieft nog een keer.",
   "runFailure.MODELS_UNAVAILABLE": "Dit debat kon niet starten omdat de benodigde AI-modellen niet beschikbaar waren. Probeer het over een tijdje alstublieft opnieuw.",
   "runFailure.RUN_LIMIT_REACHED": "Dit debat heeft zijn limiet bereikt voordat het een antwoord kon geven.",
-  "runFailure.DAILY_LIMIT_REACHED": "De limiet van vandaag voor debatten werd bereikt terwijl dit debat startte. Stel uw vraag morgen alstublieft opnieuw.",
   "runFailure.STOPPED": "Dit debat is halverwege gestopt door een probleem aan onze kant. Stel uw vraag alstublieft opnieuw.",
   "debateChrome.error.unableToLoadDebate": "Debat kon niet worden geladen",
   "debateChrome.error.unableToLoadScoring": "Scores konden niet worden geladen",

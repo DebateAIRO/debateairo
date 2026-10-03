@@ -128,9 +128,25 @@ const EconomyCapSchema = z.object({
   secondsPerCall: z.number().min(0).nullable()
 });
 
+/**
+ * Paid plans S4b (final review P3-I2; the owner's ruling of 3 October 2026): Free's own, stricter
+ * per-role money cap. Hosted money only (local mode sells no plans). `null` means "not set".
+ */
+const FreeCapSchema = z.object({
+  moneyMicrosPerCall: countInteger.nullable()
+});
+
 export const PickerSettingsSchema = z.object({
   balancedMargin: qualityPoints,
   economyCap: z.record(debateRoleSchema, EconomyCapSchema),
+  /**
+   * S4b: on a site that sells plans (hosted, billing on) a Free ask's ECONOMY pick is the best
+   * candidate under THIS cap, per role, instead of the Economy cap; publish and boot then refuse a
+   * scorecard where a role's Free cap is unset or above that role's Economy cap
+   * (`freeCapsFollowPaidSiteRule`, SCORECARD_FREE_CAPS_INVALID). Optional: a scorecard for a site
+   * that sells no plans (billing off, local mode) need not carry it, and nothing reads it there.
+   */
+  freeCap: z.record(debateRoleSchema, FreeCapSchema).optional(),
   planStrengthCaps: z.object({
     free: modelStrengthSchema.optional(),
     premium: modelStrengthSchema.optional()

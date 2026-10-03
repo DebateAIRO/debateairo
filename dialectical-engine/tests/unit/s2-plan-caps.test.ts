@@ -5,15 +5,21 @@
  * scorecard always says what the site does. Local mode and billing off keep today.
  */
 import { describe, expect, it } from "vitest";
-import type { ModelStrength } from "@debateai/kernel";
-import { SCORECARD_PLAN_CAPS_INVALID, planCapsFollowPaidSiteRule } from "@debateai/scorecard";
+import { DEBATE_ROLES, type ModelStrength } from "@debateai/kernel";
+import { SCORECARD_PLAN_CAPS_INVALID, planCapsFollowPaidSiteRule, type PickerSettings } from "@debateai/scorecard";
 import { askModelPickerSettings } from "@debateai/api";
 import { testCandidate, testEntry, testScorecard } from "../support/scorecardFixtures.js";
 
 type Caps = Readonly<{ free?: ModelStrength; premium?: ModelStrength }>;
 
-const scorecardWith = (planStrengthCaps: Caps) =>
-  testScorecard([testCandidate("only", "OpenAI")], { JUDGE: [testEntry("only", 90, 1)] }, { planStrengthCaps });
+// Paid plans S4b: Free caps that follow the owners' Free rule (EXAMPLE values: every role's Free
+// money cap equal to the fixture's Economy cap of 50), so only the plan caps decide here.
+const FREE_CAPS_FOLLOWING_THE_RULE = Object.fromEntries(DEBATE_ROLES.map((role) => [role, { moneyMicrosPerCall: 50 }])) as
+  NonNullable<PickerSettings["freeCap"]>;
+
+const scorecardWith = (planStrengthCaps: Caps) => testScorecard(
+  [testCandidate("only", "OpenAI")], { JUDGE: [testEntry("only", 90, 1)] }, { planStrengthCaps, freeCap: FREE_CAPS_FOLLOWING_THE_RULE }
+);
 
 const settingsFor = (caps: Caps, deploymentMode: "hosted" | "local", billingEnabled: boolean) => () => askModelPickerSettings({
   scorecard: Object.freeze({ state: "VALID" as const, scorecard: scorecardWith(caps), sourceRef: "test:s2-caps" }),

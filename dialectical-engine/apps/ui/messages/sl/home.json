@@ -24,7 +24,6 @@
   "runFailure.NOT_STARTED": "Še preden se je ta razprava začela, je na naši strani šlo nekaj narobe. Prosimo, vprašajte znova.",
   "runFailure.MODELS_UNAVAILABLE": "Te razprave ni bilo mogoče začeti, ker modeli UI, ki jih potrebuje, niso bili na voljo. Prosimo, poskusite znova čez nekaj časa.",
   "runFailure.RUN_LIMIT_REACHED": "Ta razprava je dosegla svojo omejitev, preden je lahko podala odgovor.",
-  "runFailure.DAILY_LIMIT_REACHED": "Današnja omejitev za razprave je bila dosežena, medtem ko se je ta razprava začenjala. Prosimo, vprašajte znova jutri.",
   "runFailure.STOPPED": "Ta razprava se je sredi poteka ustavila zaradi težave na naši strani. Prosimo, znova zastavite svoje vprašanje.",
   "home.status.waiting": "Čaka na začetek. Vaša razprava se bo začela sama ob {time}.",
   "home.status.waitingOwnDebates": "Vaše druge razprave zaenkrat porabljajo preostanek vaše omejitve. Ta razprava se bo začela sama, takoj ko se ena od njih konča.",

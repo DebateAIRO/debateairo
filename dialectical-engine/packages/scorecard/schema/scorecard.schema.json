@@ -473,6 +473,50 @@
             "ANSWER_CHECKER"
           ]
         },
+        "freeCap": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "POSITION",
+              "SUPPORT_ATTACK",
+              "CROSS_EXCHANGE",
+              "JUDGE",
+              "REVIEWER",
+              "ANSWER_WRITER",
+              "ANSWER_CHECKER"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "moneyMicrosPerCall": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "moneyMicrosPerCall"
+            ]
+          },
+          "required": [
+            "POSITION",
+            "SUPPORT_ATTACK",
+            "CROSS_EXCHANGE",
+            "JUDGE",
+            "REVIEWER",
+            "ANSWER_WRITER",
+            "ANSWER_CHECKER"
+          ]
+        },
         "planStrengthCaps": {
           "type": "object",
           "properties": {

@@ -260,7 +260,11 @@ const costEnvelopeGuard = costEnvelopePolicy === null
  * plan's cheapest must fit.
  * Paid plans S2: while the sealed model scorecard at this register version is
  * VALID (the row the hosted API's picker reads), each plan's models are every
- * configured model, because the picker seats from all of them.
+ * configured model, because the picker seats from all of them. Paid plans S4b:
+ * with billing on the picker seats Free from the Free roster only, but this
+ * process never reads billingPolicy (amendment A20), so it keeps the looser
+ * all-models groups; the API's boot and the hosted publish, which know billing,
+ * price Free on its own roster (`ownRosterOnly`).
  */
 if (costEnvelopePolicy !== null && envelopeBand !== null) {
   const firstCalls = firstPositionCallProjections({

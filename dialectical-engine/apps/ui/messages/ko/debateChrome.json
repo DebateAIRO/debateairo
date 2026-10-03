@@ -8,7 +8,6 @@
   "runFailure.NOT_STARTED": "이 토론이 시작되기 전에 저희 쪽에서 문제가 발생했습니다. 다시 질문해 주세요.",
   "runFailure.MODELS_UNAVAILABLE": "필요한 AI 모델을 사용할 수 없어 이 토론을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "runFailure.RUN_LIMIT_REACHED": "이 토론은 답변을 내기 전에 한도에 도달했습니다.",
-  "runFailure.DAILY_LIMIT_REACHED": "이 토론을 시작하는 중에 오늘의 토론 한도가 모두 소진되었습니다. 내일 다시 질문해 주세요.",
   "runFailure.STOPPED": "저희 쪽 문제로 이 토론이 중간에 멈췄습니다. 질문을 다시 해 주세요.",
   "debateChrome.error.unableToLoadDebate": "토론을 불러올 수 없음",
   "debateChrome.error.unableToLoadScoring": "채점 정보를 불러올 수 없음",

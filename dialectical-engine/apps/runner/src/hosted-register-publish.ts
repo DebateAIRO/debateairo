@@ -61,7 +61,8 @@ import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import {
-  firstCallPlanModels, planCapsFollowPaidSiteRule, SCORECARD_PLAN_CAPS_INVALID, type PickerSettings
+  firstCallPlanModels, freeCapsFollowPaidSiteRule, planCapsFollowPaidSiteRule, SCORECARD_FREE_CAPS_INVALID,
+  SCORECARD_PLAN_CAPS_INVALID, type PickerSettings
 } from "@debateai/scorecard";
 import {
   assertDeploymentProviderTargets,
@@ -503,6 +504,9 @@ export type HostedModelScorecard = Readonly<{
   apiCandidateCount: number;
   /** Paid plans S2: the scorecard's plan caps, checked against the owners' rule when the sealed version sells plans. */
   planStrengthCaps: PickerSettings["planStrengthCaps"];
+  /** Paid plans S4b: Free's own caps and the Economy caps, checked against the owners' Free rule when the version sells plans. */
+  freeCap: PickerSettings["freeCap"];
+  economyCap: PickerSettings["economyCap"];
   sha256: string;
   bytes: number;
 }>;
@@ -598,6 +602,8 @@ export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: strin
     apiCandidateCount: read.scorecard.candidates
       .filter((candidate) => candidate.accessRoutes.some((route) => route.kind === "API")).length,
     planStrengthCaps: read.scorecard.pickerSettings.planStrengthCaps,
+    freeCap: read.scorecard.pickerSettings.freeCap,
+    economyCap: read.scorecard.pickerSettings.economyCap,
     sha256: createHash("sha256").update(valueJsonText).digest("hex"),
     bytes: Buffer.byteLength(valueJsonText, "utf8")
   });
@@ -849,7 +855,13 @@ export async function planHostedRegisterPublication(
   // without one, each plan's own roster. `scorecard !== null` is the boots'
   // `state === "VALID"` for this version: `parseHostedScorecardFile` admits
   // only a VALID scorecard. Only with the band, as at boot. The boots keep
-  // asking: the environment can still differ from the file.
+  // asking: the environment can still differ from the file. Paid plans S4b: a
+  // version that sells plans prices Free on the Free roster alone, as the API's
+  // boot does, because the picker seats a Free ask from it only then.
+  const plansRow = sealed(BILLING_PLANS_ROW_KEY);
+  const policyRow = sealed(BILLING_POLICY_ROW_KEY);
+  const billingPlans = plansRow === null ? null : billingPlansFromValue(plansRow.value, plansRow.sourceRef);
+  const billingPolicy = policyRow === null ? null : billingPolicyFromValue(policyRow.value, policyRow.sourceRef);
   if (costEnvelopeBand(costEnvelope) !== null) {
     const firstCalls = firstPositionCallProjections({
       targets,
@@ -863,15 +875,12 @@ export async function planHostedRegisterPublication(
         rosters: firstCallPlanModels({
           scorecardInForce: scorecard !== null,
           rosters: PLAN_TIER_ROSTERS,
-          models: firstCalls.map((call) => call.model)
+          models: firstCalls.map((call) => call.model),
+          ownRosterOnly: billingPolicy?.enabled === true ? ["free"] : []
         })
       })
     });
   }
-  const plansRow = sealed(BILLING_PLANS_ROW_KEY);
-  const policyRow = sealed(BILLING_POLICY_ROW_KEY);
-  const billingPlans = plansRow === null ? null : billingPlansFromValue(plansRow.value, plansRow.sourceRef);
-  const billingPolicy = policyRow === null ? null : billingPolicyFromValue(policyRow.value, policyRow.sourceRef);
   // R1 A22: billing may be switched on only with its plans and the three budget
   // members, asked here of the version about to be sealed, so a dry run says so.
   assertBillingReady({ policy: billingPolicy, plans: billingPlans, envelope: costEnvelope });
@@ -879,6 +888,11 @@ export async function planHostedRegisterPublication(
   // scorecard that follows the owners' plan-cap rule — a sealed row is never edited.
   if (billingPolicy?.enabled === true && scorecard !== null && !planCapsFollowPaidSiteRule(scorecard.planStrengthCaps)) {
     refuse(SCORECARD_PLAN_CAPS_INVALID);
+  }
+  // Paid plans S4b (final review P3-I2): and only one whose Free caps follow the
+  // owners' Free rule — every role's Free money cap set, at or below its Economy cap.
+  if (billingPolicy?.enabled === true && scorecard !== null && !freeCapsFollowPaidSiteRule(scorecard)) {
+    refuse(SCORECARD_FREE_CAPS_INVALID);
   }
   // §2.5.1: WARN, never refuse, when a plan's smallest window (the day cap, or
   // Free's whole month) is below what one debate may spend.

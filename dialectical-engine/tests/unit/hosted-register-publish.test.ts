@@ -814,6 +814,17 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
     });
     expect(await planCode(file)).toBe("RUN_CEILING_BELOW_ONE_CALL");
     expect(await planCodeWithScorecard(file)).toBe("NO_REFUSAL");
+    // Paid plans S4b: a version that sells plans prices Free on the Free roster alone, as the API's
+    // boot does, because the picker then seats a Free ask from it only: the same ceiling is refused.
+    file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
+    const example = await compatibleExampleScorecard();
+    const pickerSettings = example.pickerSettings as Record<string, unknown>;
+    const scorecard = parseHostedScorecardFile(bytesOf({
+      ...example,
+      pickerSettings: { ...pickerSettings, planStrengthCaps: { free: "ECONOMY" }, freeCap: exampleFreeCaps(pickerSettings, 0.5) }
+    }), await readEngineVersion());
+    expect(await codeOfAsync(async () => planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)), scorecard)))
+      .toBe("RUN_CEILING_BELOW_ONE_CALL");
   });
 });
 
@@ -1205,10 +1216,18 @@ describe("Paid plans S2 · the plan caps of a scorecard published with billing o
     file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
     return file;
   };
-  const planCodeWith = async (file: Record<string, unknown>, planStrengthCaps: Readonly<Record<string, string>>) => {
+  // Paid plans S4b: every row here carries Free caps that follow the owners' Free rule unless it names
+  // others, or "OMIT" for none.
+  const planCodeWith = async (
+    file: Record<string, unknown>,
+    planStrengthCaps: Readonly<Record<string, string>>,
+    freeCap: unknown = "FOLLOWS_THE_RULE"
+  ) => {
     const example = await compatibleExampleScorecard(8);
+    const pickerSettings = example.pickerSettings as Record<string, unknown>;
+    const caps = freeCap === "FOLLOWS_THE_RULE" ? exampleFreeCaps(pickerSettings, 0.5) : freeCap;
     const scorecard = parseHostedScorecardFile(bytesOf({
-      ...example, pickerSettings: { ...(example.pickerSettings as Record<string, unknown>), planStrengthCaps }
+      ...example, pickerSettings: { ...pickerSettings, planStrengthCaps, ...(caps === "OMIT" ? {} : { freeCap: caps }) }
     }), await readEngineVersion());
     return codeOfAsync(async () => planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)), scorecard));
   };
@@ -1224,4 +1243,39 @@ describe("Paid plans S2 · the plan caps of a scorecard published with billing o
   it("keeps sealing the example's { free: BALANCED } with billing off, as today", async () => {
     expect(await planCodeWith(validFile(), { free: "BALANCED" })).toBe("NO_REFUSAL");
   });
+
+  /**
+   * Paid plans S4b (final review P3-I2; the owner's ruling of 3 October 2026): a version that sells
+   * plans seals only a scorecard whose every role has a Free money cap at or below its Economy cap.
+   */
+  it.each([
+    ["without Free caps", (settings: Record<string, unknown>): unknown => { void settings; return "OMIT"; }],
+    ["with a role's Free cap unset", (settings: Record<string, unknown>) =>
+      ({ ...exampleFreeCaps(settings, 0.5), JUDGE: { moneyMicrosPerCall: null } })],
+    ["with a role's Free cap above its Economy cap", (settings: Record<string, unknown>) =>
+      ({ ...exampleFreeCaps(settings, 0.5), POSITION: exampleFreeCaps(settings, 2).POSITION })]
+  ])("refuses a scorecard %s, by a content-free code", async (_name, freeCapOf) => {
+    const example = await compatibleExampleScorecard(8);
+    const freeCap = freeCapOf(example.pickerSettings as Record<string, unknown>);
+    expect(await planCodeWith(billingOn(), { free: "ECONOMY" }, freeCap)).toBe("SCORECARD_FREE_CAPS_INVALID");
+  });
+
+  it("seals Free caps equal to the Economy caps, and keeps sealing a scorecard without Free caps with billing off", async () => {
+    const example = await compatibleExampleScorecard(8);
+    const equal = exampleFreeCaps(example.pickerSettings as Record<string, unknown>, 1);
+    expect(await planCodeWith(billingOn(), { free: "ECONOMY" }, equal)).toBe("NO_REFUSAL");
+    expect(await planCodeWith(validFile(), { free: "BALANCED" }, "OMIT")).toBe("NO_REFUSAL");
+  });
+
+  it("asks the plan-cap rule first", async () => {
+    expect(await planCodeWith(billingOn(), { free: "BALANCED" }, "OMIT")).toBe("SCORECARD_PLAN_CAPS_INVALID");
+  });
 });
+
+/** S4b: EXAMPLE Free caps — each role's Economy money cap × `share`, floored. Not production numbers. */
+function exampleFreeCaps(pickerSettings: Record<string, unknown>, share: number): Record<string, { moneyMicrosPerCall: number }> {
+  const economyCap = pickerSettings.economyCap as Record<string, { moneyMicrosPerCall: number }>;
+  return Object.fromEntries(Object.entries(economyCap).map(([role, cap]) => [
+    role, { moneyMicrosPerCall: Math.floor(cap.moneyMicrosPerCall * share) }
+  ]));
+}

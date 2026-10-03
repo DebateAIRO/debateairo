@@ -1,7 +1,7 @@
 import { t,type MessageCatalog } from "../i18n/translate.js";
 
 /**
- * What the asker is told when their debate FAILED: one of five fixed
+ * What the asker is told when their debate FAILED: one of four fixed
  * sentences, chosen from the run's terminal reason code and never containing
  * it. Same shape as `requestFailure.ts` (DL3-F7): a closed alphabet, nothing
  * derived from the stored value beyond which group it belongs to.
@@ -11,25 +11,31 @@ import { t,type MessageCatalog } from "../i18n/translate.js";
  * below is listed against its codes in deploy/vps/README.md ("What the asker
  * sees when a debate fails").
  *
- * Owner rulings, 2026-09-28: the five sentences are the owner's picks, and
- * CALL_BUDGET_EXHAUSTED (a re-claim finding a step's tries used up) is
- * "stopped partway", not a spending limit.
+ * Owner rulings, 2026-09-28: the four remaining sentences are the owner's
+ * picks (the fifth, the day's limit, was retired by the budget rule, spec
+ * 2026-09-28 §2.11), and CALL_BUDGET_EXHAUSTED (a re-claim finding a step's
+ * tries used up) is "stopped partway", not a spending limit.
  */
 
 export const RUN_FAILURE_KINDS = Object.freeze([
-  /** The API created the run, then could not finish setting it up (`RUN_SETUP_FAILED:<step>`). */
+  /**
+   * The API created the run, then could not finish setting it up
+   * (`RUN_SETUP_FAILED:<step>`), or the runner, claiming it, refused its pinned
+   * role assignment (RUN_ROLE_ASSIGNMENT_INVALID).
+   */
   "NOT_STARTED",
   /** The models pinned when the question was asked were gone when the runner claimed it. */
   "MODELS_UNAVAILABLE",
   /** The run's own ceiling refused its very first call. */
   "RUN_LIMIT_REACHED",
   /**
-   * The day's spend stopped a run under way. Not reachable today: the day is
-   * asked only when a NEW run is admitted (a refused ask never becomes a run).
-   * The runner keeps it as a stop of its own kind, and so does this list.
+   * Anything else, a code nobody has mapped, or no code at all. Budget spec
+   * 2026-09-28 §2.11: that includes the site's day and a person's allowance
+   * (`DAILY_COST_ENVELOPE_REACHED`, `PERSON_ALLOWANCE_REACHED`). With the budget
+   * members published they stop only the arguing and never end a debate, and a
+   * question the day holds back waits in line (sentence C) instead, so a stray
+   * one reads as stopped partway.
    */
-  "DAILY_LIMIT_REACHED",
-  /** Anything else, a code nobody has mapped, or no code at all. */
   "STOPPED"
 ] as const);
 
@@ -49,8 +55,15 @@ export const RUN_FAILURE_CODES: Readonly<Record<string, RunFailureKind>> = Objec
   RUN_SETUP_FAILED: "NOT_STARTED",
   RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM: "MODELS_UNAVAILABLE",
   SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM: "MODELS_UNAVAILABLE",
-  RUN_CEILING_BELOW_FIRST_CALL: "RUN_LIMIT_REACHED",
-  DAILY_COST_ENVELOPE_REACHED: "DAILY_LIMIT_REACHED"
+  /**
+   * Part 3's final review, P3-M18: the model scorecard's claim-time refusal. The
+   * role assignment stored at the ask was refused by its schema or its seat
+   * count when the runner claimed the debate, before any model was probed, so
+   * the debate never began; a new ask repairs it. (A pinned model that is gone
+   * at claim fails later, with one of the two codes above.)
+   */
+  RUN_ROLE_ASSIGNMENT_INVALID: "NOT_STARTED",
+  RUN_CEILING_BELOW_FIRST_CALL: "RUN_LIMIT_REACHED"
 });
 
 export function runFailureKind(reason: string | null | undefined): RunFailureKind {
