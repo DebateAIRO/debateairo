@@ -28,7 +28,7 @@ import { estimateRunCost, estimateRunCostByPhase, typicalCallMicros, type PhaseC
  *   ECONOMY_CAP_UNMET:<role>                  nothing was under the cap; the cheapest sits
  *   PRICE_UNUSABLE:<providerRef>              a hosted route without a usable price
  *   ESTIMATE_UNAVAILABLE                      a called seat has no typical call or no price
- *   PERSON_ROOM_BELOW_ECONOMY                 nothing fitted the person's room; ECONOMY at the site's ceiling (paid plans A5)
+ *   PERSON_ROOM_BELOW_ECONOMY                 nothing fitted the person's room; the cheapest plan that fits the site's ceiling (paid plans A5, P3-I1)
  *   CROSS_EXCHANGE_INELIGIBLE:<candidateId>   a POSITION candidate could not also take its own cross-exchange call
  */
 
@@ -579,6 +579,28 @@ function refusePick(reason: "BUDGET_TOO_SMALL" | "NO_REACHABLE_CANDIDATE", detai
 }
 
 /**
+ * The strength an ask is planned at before any money step-down: the asker's, else the
+ * scorecard's default, else BALANCED; a HOSTED plan cap lowers it (noted `PLAN_CAP`).
+ */
+export function cappedAskStrength(
+  input: Pick<PickerInput, "scorecard" | "mode" | "strength" | "planTier">
+): Readonly<{ strength: ModelStrength; planCapNote: string | null }> {
+  const asked: ModelStrength = input.strength ?? input.scorecard?.pickerSettings.defaultStrength ?? "BALANCED";
+  const planCap = input.mode === "HOSTED" && input.planTier !== null && input.scorecard !== null
+    ? input.scorecard.pickerSettings.planStrengthCaps[input.planTier]
+    : undefined;
+  if (planCap !== undefined && strengthIndex(asked) > strengthIndex(planCap)) {
+    return Object.freeze({ strength: planCap, planCapNote: `PLAN_CAP:${String(input.planTier)}:${asked}->${planCap}` });
+  }
+  return Object.freeze({ strength: asked, planCapNote: null });
+}
+
+/** Every strength from the cheapest-ranked (ECONOMY) up to `top`, in that order. */
+export function strengthsUpTo(top: ModelStrength): readonly ModelStrength[] {
+  return MODEL_STRENGTHS.slice(0, strengthIndex(top) + 1);
+}
+
+/**
  * Fills every seat. The strength is the asker's, else the scorecard's default, else BALANCED;
  * a HOSTED plan cap lowers it. With a HOSTED per-run ceiling and a known money estimate, the
  * strength steps down one notch at a time until the estimate fits, and the ask is refused
@@ -586,14 +608,9 @@ function refusePick(reason: "BUDGET_TOO_SMALL" | "NO_REACHABLE_CANDIDATE", detai
  */
 export function pickRoleAssignment(input: PickerInput): PickerOutcome {
   const notes: string[] = input.scorecard === null ? ["SCORECARD_ABSENT"] : [];
-  let strength: ModelStrength = input.strength ?? input.scorecard?.pickerSettings.defaultStrength ?? "BALANCED";
-  const planCap = input.mode === "HOSTED" && input.planTier !== null && input.scorecard !== null
-    ? input.scorecard.pickerSettings.planStrengthCaps[input.planTier]
-    : undefined;
-  if (planCap !== undefined && strengthIndex(strength) > strengthIndex(planCap)) {
-    notes.push(`PLAN_CAP:${String(input.planTier)}:${strength}->${planCap}`);
-    strength = planCap;
-  }
+  const capped = cappedAskStrength(input);
+  let strength: ModelStrength = capped.strength;
+  if (capped.planCapNote !== null) notes.push(capped.planCapNote);
   const limits: PickerMoneyLimits | null = input.mode !== "HOSTED"
     ? null
     : input.moneyLimits ?? (input.perRunCeilingMicros === null ? null : Object.freeze({

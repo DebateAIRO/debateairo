@@ -1,7 +1,14 @@
 import { mostOneRunMaySpendMicros } from "@debateai/budget";
 import { exhaustive } from "@debateai/kernel";
 import { costEnvelopeCeilings } from "@debateai/register";
-import { pickRoleAssignment, type PickerInput, type PickerMoneyLimits, type PickerOutcome } from "@debateai/scorecard";
+import {
+  cappedAskStrength,
+  pickRoleAssignment,
+  strengthsUpTo,
+  type PickerInput,
+  type PickerMoneyLimits,
+  type PickerOutcome
+} from "@debateai/scorecard";
 import { isUsablePerRunCeiling, type AskModelPickerSettings, type AskMoneyPolicy } from "./ask-model-picker.js";
 import type { RoomPreview, RoomWindowUse } from "./ask-room.js";
 
@@ -13,9 +20,13 @@ import type { RoomPreview, RoomWindowUse } from "./ask-room.js";
  * first look (`AskRoom.precheck`) measures the person's windows; this module
  * turns that preview into the room at the instant the debate would start, cuts
  * the picker's money limits from min(site per-run ceiling, that room at 100%)
- * and, when nothing fits the person even at ECONOMY, starts the debate at
- * ECONOMY against the site's own ceiling (CLOSE). The site's refusal keeps its
- * meaning for the site. Pure: every read is the room's.
+ * and, when nothing fits the person even at the cheapest strength, starts the
+ * debate on the cheapest choice the site's own ceiling allows (CLOSE): every
+ * strength from ECONOMY up to the ask's (capped) strength is planned against the
+ * site, and the smallest estimate that fits is kept (Part 3's final review P3-I1:
+ * ECONOMY is "the best model under a cost cap", not always the cheapest plan).
+ * The site's refusal keeps its meaning for the site: it is given only when no
+ * strength fits the site. Pure: every read is the room's.
  */
 
 /** What admission hands the picker about the person: their windows as the room measured them, and the instant the debate would start. */
@@ -75,7 +86,7 @@ export type PersonRoomPick =
   | Readonly<{
     state: "ASSIGNED";
     outcome: Extract<PickerOutcome, { state: "ASSIGNED" }>;
-    /** A5: nothing fitted the person's room even at ECONOMY; the debate starts at ECONOMY as CLOSE. */
+    /** A5: nothing fitted the person's room at any strength; the debate starts on the cheapest choice the site allows, as CLOSE. */
     personRoomTight: boolean;
     /** The figure the run's hold opens with (HOSTED); null in LOCAL mode. */
     holdMicros: number | null;
@@ -161,15 +172,37 @@ export function pickWithinPersonRoom(input: Readonly<{
   if (first.reason !== "BUDGET_TOO_SMALL" || input.personRoomMicros === null) {
     return Object.freeze({ state: "REFUSED" as const, outcome: first });
   }
-  // A5: too small for the PERSON even at ECONOMY — the debate starts at ECONOMY
-  // against the SITE's ceiling, as CLOSE; the running wall trims the arguing and the
-  // answer is always written. Too small for the site too: the site's refusal.
-  const economy = pickRoleAssignment({ ...input.picker, strength: "ECONOMY", moneyLimits: limitsFor(null) });
-  if (economy.state === "REFUSED") return Object.freeze({ state: "REFUSED" as const, outcome: economy });
+  // A5 (spec §2.15: "the debate starts at the cheapest choice" as CLOSE; P3-I1):
+  // too small for the PERSON at every strength. Each strength from ECONOMY up to
+  // the ask's capped strength is planned against the SITE's limits, and the plan
+  // with the smallest estimate that fits is kept — an unknown estimate counts as
+  // the run maximum, and a tie keeps the lower strength. The running wall trims the
+  // arguing and the answer is always written. A plan-capped ask (Free) is planned
+  // only up to its cap, so its cheapest choice is its own plan's pick.
+  const capped = cappedAskStrength(input.picker);
+  const site = limitsFor(null);
+  let cheapest: Extract<PickerOutcome, { state: "ASSIGNED" }> | null = null;
+  let siteAnswer: PickerOutcome | null = null;
+  for (const strength of strengthsUpTo(capped.strength)) {
+    // A plan that had to step down below `strength` is a lower strength's own plan,
+    // already weighed: the strict `<` keeps that lower one.
+    siteAnswer = pickRoleAssignment({ ...input.picker, strength, moneyLimits: site });
+    if (siteAnswer.state === "ASSIGNED" && (cheapest === null || holdOf(siteAnswer) < holdOf(cheapest))) cheapest = siteAnswer;
+  }
+  // Nothing fits the site: the last plan, the ask's capped strength stepped down
+  // through every lower one against the site alone, is exactly the site's refusal.
+  if (cheapest === null) {
+    if (siteAnswer === null || siteAnswer.state !== "REFUSED") throw new TypeError("PERSON_ROOM_PICK_INVARIANT");
+    return Object.freeze({ state: "REFUSED" as const, outcome: siteAnswer });
+  }
   const outcome = Object.freeze({
-    ...economy,
+    ...cheapest,
     steppedDown: true,
-    notes: Object.freeze([...new Set([...economy.notes, "PERSON_ROOM_BELOW_ECONOMY"])])
+    notes: Object.freeze([...new Set([
+      ...(capped.planCapNote === null ? [] : [capped.planCapNote]),
+      ...cheapest.notes,
+      "PERSON_ROOM_BELOW_ECONOMY"
+    ])])
   });
   return Object.freeze({ state: "ASSIGNED" as const, outcome, personRoomTight: true, holdMicros: holdOf(outcome) });
 }

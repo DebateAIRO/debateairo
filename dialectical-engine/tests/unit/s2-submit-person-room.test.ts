@@ -10,13 +10,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelStrength } from "@debateai/kernel";
 import type { PickerMoneyLimits, PickerOutcome, RoleAssignment, RoleSeat, Scorecard, SeatCandidate } from "@debateai/scorecard";
 
-const picker = vi.hoisted(() => ({ outcomes: [] as unknown[], inputs: [] as Array<{ moneyLimits?: unknown }> }));
+const picker = vi.hoisted(() => ({ outcomes: [] as unknown[], inputs: [] as Array<{ moneyLimits?: unknown; strength?: unknown }> }));
 const pins = vi.hoisted(() => ({ order: [] as string[], pinned: [] as Array<{ strength: string; steppedDown: boolean }> }));
 
 vi.mock("@debateai/scorecard", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@debateai/scorecard")>()),
   // One answer per call, in order; the last one repeats.
-  pickRoleAssignment: (input: { moneyLimits?: unknown }) => {
+  pickRoleAssignment: (input: { moneyLimits?: unknown; strength?: unknown }) => {
     picker.inputs.push(input);
     return picker.outcomes.length > 1 ? picker.outcomes.shift() : picker.outcomes[0];
   }
@@ -108,7 +108,12 @@ function assignedHosted(strength: ModelStrength = "BALANCED", moneyMicros = 8000
 const tooSmall = (): PickerOutcome => Object.freeze({ state: "REFUSED" as const, reason: "BUDGET_TOO_SMALL" as const, detail: "test" });
 
 const HOSTED_PICKER: AskModelPickerSettings = Object.freeze({
-  scorecard: Object.freeze({ state: "VALID" as const, scorecard: Object.freeze({ scorecardVersion: 7 }) as unknown as Scorecard, sourceRef: "test:s2" }),
+  // The picker is mocked; A5 reads only the plan caps (none for a paid tier) to know which strengths to plan.
+  scorecard: Object.freeze({
+    state: "VALID" as const,
+    scorecard: Object.freeze({ scorecardVersion: 7, pickerSettings: Object.freeze({ planStrengthCaps: Object.freeze({}) }) }) as unknown as Scorecard,
+    sourceRef: "test:s2"
+  }),
   mode: "HOSTED" as const,
   targetFacts: new Map(),
   perRunCeilingMicros: SITE.perRunCeilingMicros,
@@ -210,7 +215,8 @@ function arrange(input: Readonly<{
   );
   const submit = () => application.submit(ask, session, { kind: "server", userId: "s2-user", ownerRef: OWNER_REF });
   const limits = () => picker.inputs.map((entry) => entry.moneyLimits as PickerMoneyLimits | null | undefined);
-  return { order, holds, logged, pinned: pins.pinned, limits, submit };
+  const strengths = () => picker.inputs.map((entry) => entry.strength);
+  return { order, holds, logged, pinned: pins.pinned, limits, strengths, submit };
 }
 
 afterEach(() => {
@@ -222,7 +228,7 @@ afterEach(() => {
 const WAKE_LIMITS = Object.freeze({ bodyMicros: 700, serveMicros: 1000, personRoomMicros: 1000, unknownEstimateMicros: 300_000 });
 // The same windows NOW, the day spent: nothing left.
 const NOW_LIMITS = Object.freeze({ bodyMicros: 0, serveMicros: 0, personRoomMicros: 0, unknownEstimateMicros: 300_000 });
-// A5: ECONOMY against the site's own ceiling.
+// A5: each strength from ECONOMY up to the ask's against the site's own ceiling (P3-I1).
 const SITE_LIMITS = Object.freeze({ bodyMicros: 175_000, serveMicros: 300_000, personRoomMicros: null, unknownEstimateMicros: 300_000 });
 
 describe("S2 · the ask path plans the debate inside the person's room", () => {
@@ -238,12 +244,14 @@ describe("S2 · the ask path plans the debate inside the person's room", () => {
   });
 
   it("WAIT, decided WAIT: the wake plan is pinned; the plan for NOW is made too, and not used", async () => {
-    const { order, holds, limits, pinned, submit } = arrange({
+    const { order, holds, limits, strengths, pinned, submit } = arrange({
       preview: preview(WAIT, [use(1000, 1000)]), modelPicker: HOSTED_PICKER,
       outcomes: [assignedHosted("BEST", 900), tooSmall(), assignedHosted("ECONOMY", 600)]
     });
     await expect(submit()).resolves.toMatchObject({ status: "WAITING", model_strength_applied: "BEST", model_strength_stepped_down: false });
-    expect(limits()).toEqual([WAKE_LIMITS, NOW_LIMITS, SITE_LIMITS]);
+    // The plan for NOW is A5: every strength up to the ask's (BEST) is planned against the site alone.
+    expect(limits()).toEqual([WAKE_LIMITS, NOW_LIMITS, SITE_LIMITS, SITE_LIMITS, SITE_LIMITS]);
+    expect(strengths()).toEqual(["BEST", "BEST", "ECONOMY", "BALANCED", "BEST"]);
     expect(pinned).toEqual([{ strength: "BEST", steppedDown: false }]);
     expect(holds).toEqual([]);
     expect(order.slice(-1)).toEqual(["enterWait"]);
@@ -257,7 +265,7 @@ describe("S2 · the ask path plans the debate inside the person's room", () => {
     await expect(submit()).resolves.toMatchObject({
       status: "QUEUED", model_strength_applied: "ECONOMY", model_strength_stepped_down: true
     });
-    expect(limits()).toEqual([WAKE_LIMITS, NOW_LIMITS, SITE_LIMITS]);
+    expect(limits()).toEqual([WAKE_LIMITS, NOW_LIMITS, SITE_LIMITS, SITE_LIMITS, SITE_LIMITS]);
     // Never the wake plan: it was sized for a reset window that has not reset.
     expect(pinned).toEqual([{ strength: "ECONOMY", steppedDown: true }]);
     expect(holds).toEqual([600]);

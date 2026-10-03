@@ -3343,7 +3343,7 @@ export type PlannedAskAdmission = {
   readonly modelAssignment?: AdmittedModelAssignment;
   /** S2: the figure the run's hold opens with when the picker planned it (hosted); B6 uses its estimator otherwise. */
   readonly pickedHoldMicros?: number;
-  /** S2 / A5: nothing fitted the person's room even at ECONOMY; the debate starts at ECONOMY (logged when it does). */
+  /** S2 / A5: nothing fitted the person's room at any strength; the debate starts on the cheapest choice the site allows (logged when it does). */
   readonly personRoomTight?: boolean;
 };
 
@@ -3584,8 +3584,10 @@ async function admitWithScorecard(input: Readonly<{
   const nowAt = input.personRoom?.ifStartsNowAt;
   if (nowAt === undefined) return planned;
   // S2: a WAIT preview — the same ask planned for NOW, from the same discovery. A
-  // refusal here is the SITE's (A5 starts every person-tight ask at ECONOMY against
-  // the site's ceiling), so it refuses the ask exactly as the wake plan's would.
+  // refusal here is the SITE's: A5 starts every person-tight ask on the cheapest
+  // strength that fits the site's ceiling (P3-I1), and refuses only when no strength
+  // up to the ask's own fits it — exactly when the site alone would refuse the ask,
+  // so it refuses the ask exactly as the wake plan's would.
   return Object.freeze({ ...planned, ifStartsNow: await admitPicked(pickAt(nowAt)) });
 }
 
@@ -4245,7 +4247,7 @@ export class PostgresAskApplication implements AskApplication {
       await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
       throw error;
     }
-    // A5: nothing fitted the person's room even at ECONOMY, and it started (content-free: ids only).
+    // A5: nothing fitted the person's room at any strength, and it started on the cheapest choice (content-free: ids only).
     if (pinned.personRoomTight === true) {
       console.info(JSON.stringify(Object.freeze({ event: "api.ask.person_room_tight", runId: outcome.runId })));
     }
