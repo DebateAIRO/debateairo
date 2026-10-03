@@ -21,8 +21,10 @@ beforeEach(() => { h.geo.country = "RO"; h.geo.tor = false; });
 const consents = () => ({
   renewal: testConsentDocuments("CONSENT_RENEWAL", "en")!, immediateStart: testConsentDocuments("CONSENT_IMMEDIATE_START", "en")!
 });
-const quoteFor = (ownerRef: string, address: Readonly<{ name: string | null; city: string | null }> = { name: "Test Buyer", city: "Bucuresti" }) => h.quotes.create({
-  ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", region: "B", postalCode: null, company: null, now: h.clock.now,
+const quoteFor = (
+  ownerRef: string, address: Readonly<{ name: string | null; city: string | null; region?: string }> = { name: "Test Buyer", city: "Sector 1" }
+) => h.quotes.create({
+  ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", region: "Bucuresti", postalCode: null, company: null, now: h.clock.now,
   ...address
 });
 const startWith = (ownerRef: string, quoteRef: string, overrides: Partial<CheckoutInput> = {}) =>
@@ -50,7 +52,7 @@ describe("P8c the checkout", () => {
     const customer = await h.repository.customerByOwner(bought.ownerRef);
     const profile = await h.repository.latestProfile(customer!.customerId);
     expect(openBillingProfile(h.recordsKey, customer!.customerId, profile!.profileCiphertext))
-      .toMatchObject({ email: `buyer-${bought.userId.slice(0, 8)}@example.test`, locale: "en", country: "RO", name: "Test Buyer", city: "Bucuresti", region: "B" });
+      .toMatchObject({ email: `buyer-${bought.userId.slice(0, 8)}@example.test`, locale: "en", country: "RO", name: "Test Buyer", city: "Sector 1", region: "Bucuresti" });
     const order = JSON.parse(Buffer.from(bought.orderPayload, "base64").toString("utf8")) as Parameters<typeof signOrderPayload>[0];
     expect(order).toMatchObject({
       publicKey: "pk_test_harness", siteId: "site-test", saveCard: true, cardTransactionMode: "authAndCapture",
@@ -84,7 +86,7 @@ describe("P8c the checkout", () => {
   it("makes a new charge, from the new quote, when the buyer's details changed within 30 minutes (A3(b))", async () => {
     const ownerRef = randomUUID();
     const first = await h.buy({ ownerRef });
-    const moved = await quoteFor(ownerRef, { name: "Test Buyer", city: "Cluj-Napoca" });
+    const moved = await quoteFor(ownerRef, { name: "Test Buyer", city: "Cluj-Napoca", region: "Cluj" });
     const again = await startWith(ownerRef, moved.quote.quoteId);
     expect(again.reused).toBe(false);
     expect(again.chargeId).not.toBe(first.chargeId);
@@ -325,8 +327,8 @@ describe("P8c the checkout", () => {
       });
       const ownerRef = randomUUID();
       const quote = (at: Date) => h.quotes.create({
-        ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", region: "B", postalCode: null, company: null, now: at,
-        name: "Test Buyer", city: "Bucuresti"
+        ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", region: "Bucuresti", postalCode: null, company: null, now: at,
+        name: "Test Buyer", city: "Sector 1"
       });
       const checkout = async (at: Date) => service.start({
         ownerRef, userId: randomUUID(), ip: "198.51.100.7", userAgent: "test", quoteRef: (await quote(at)).quote.quoteId,

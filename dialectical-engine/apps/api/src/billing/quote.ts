@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { computeWindows, invoiceIssuerFor, type TaxEngine } from "@debateai/billing-core";
+import { isRomanianInvoiceLocality } from "@debateai/contract";
 import type { BillingRepository, QuoteRow } from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
 import { TypedDomainError } from "@debateai/kernel";
@@ -61,8 +62,10 @@ export function taxRefusalDetail(error: unknown): string {
 
 /**
  * R-15: the issuer the rules give this tax country (SmartBill for Romania) refuses an invoice without the buyer's
- * name, city and county. A company's name is the buyer's name. Spec §1.3: US and Canadian sales tax is decided by the
- * state or the ZIP code, so a buyer there gives at least one of the two.
+ * name, city and county. A company's name is the buyer's name. P2-M15: the county must be one SmartBill names and, in
+ * Bucharest, the city a sector (`isRomanianInvoiceLocality`, the same lists the checkout offers), or SPV will not
+ * validate the e-Factura. Spec §1.3: US and Canadian sales tax is decided by the state or the ZIP code, so a buyer
+ * there gives at least one of the two.
  */
 export function addressRequired(location: QuoteLocation, taxCountry: string, policy: BillingPolicy): boolean {
   if ((location.country === "US" || location.country === "CA") && location.region === null && location.postalCode === null) {
@@ -70,7 +73,8 @@ export function addressRequired(location: QuoteLocation, taxCountry: string, pol
   }
   if (invoiceIssuerFor(taxCountry, policy.invoiceIssuerRules) !== "SMARTBILL") return false;
   const name = location.company?.name ?? location.name;
-  return name === null || location.city === null || location.region === null;
+  return name === null || location.city === null || location.region === null
+    || !isRomanianInvoiceLocality(location.region, location.city);
 }
 
 export class QuoteService implements QuoteServicePort {

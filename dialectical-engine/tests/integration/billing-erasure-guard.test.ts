@@ -36,8 +36,8 @@ async function scheduleErasure(pool: Pool, ownerRef: string): Promise<void> {
 }
 
 const quoteInput = (ownerRef: string) => ({
-  ownerRef, ip: IP, planId: "PLUS" as const, country: "RO", name: "Test Buyer", region: "B", postalCode: null,
-  city: "Bucuresti", company: null, now: h.clock.now
+  ownerRef, ip: IP, planId: "PLUS" as const, country: "RO", name: "Test Buyer", region: "Bucuresti", postalCode: null,
+  city: "Sector 1", company: null, now: h.clock.now
 });
 
 describe("P15 no new money while an account erasure is pending", () => {

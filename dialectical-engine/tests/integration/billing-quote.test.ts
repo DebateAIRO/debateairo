@@ -31,8 +31,8 @@ const service = () => new QuoteService({
   recordsKey: KEY, audit: (event, fields) => { audit.push({ event, ...fields }); }
 });
 const input = (ownerRef: string, overrides: Partial<QuoteInput> = {}): QuoteInput => ({
-  ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Ana Pop", region: "B", postalCode: "010101",
-  city: "Bucuresti", company: null, now: NOW, ...overrides
+  ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Ana Pop", region: "Bucuresti", postalCode: "010101",
+  city: "Sector 1", company: null, now: NOW, ...overrides
 });
 
 describe("P8b the quote", () => {
@@ -47,7 +47,7 @@ describe("P8b the quote", () => {
       taxCountry: "RO", taxRateBasisPoints: 2_100, taxStatus: "TAXABLE", expiresAt: new Date(NOW.getTime() + 1_800_000)
     });
     expect(openQuoteLocation(KEY, result.quote.quoteId, stored!.locationCiphertext)).toEqual({
-      name: "Ana Pop", country: "RO", region: "B", postalCode: "010101", city: "Bucuresti", street: null,
+      name: "Ana Pop", country: "RO", region: "Bucuresti", postalCode: "010101", city: "Sector 1", street: null,
       ip: "198.51.100.7", ipCountry: "RO", company: null
     });
     expect(await repository.quote(result.quote.quoteId, randomUUID())).toBeNull();
@@ -65,6 +65,21 @@ describe("P8b the quote", () => {
     expect(result).toMatchObject({ addressRequired: true, quote: { totalMicros: 24_200_000 } });
     const company = { name: "SC Test SRL", vatId: "RO123VALID", address: "Str. Test 1" };
     expect((await service().create(input(randomUUID(), { name: null, company }))).addressRequired).toBe(false);
+  });
+
+  it("asks for a county SmartBill knows and, in Bucharest, a sector, or ANAF refuses the e-Factura (P2-M15)", async () => {
+    const asks = async (region: string, city: string) =>
+      (await service().create(input(randomUUID(), { region, city }))).addressRequired;
+    expect(await asks("Bucuresti", "Sector 3")).toBe(false);
+    expect(await asks("Cluj", "Cluj-Napoca")).toBe(false);
+    // SPV validates a Bucharest buyer only with a city of Sector 1 to Sector 6 (smartbill-api-facts.md row 3).
+    expect(await asks("B", "Bucuresti")).toBe(true);
+    expect(await asks("Bucuresti", "Bucuresti")).toBe(true);
+    expect(await asks("Atlantis", "Poseidonia")).toBe(true);
+    // A company is invoiced at the same county and city.
+    const company = { name: "SC Test SRL", vatId: "RO123VALID", address: "Str. Test 1" };
+    expect((await service().create(input(randomUUID(), { name: null, company, region: "B", city: "Bucuresti" }))).addressRequired)
+      .toBe(true);
   });
 
   it("asks a US or Canadian buyer for a state or a postal code before the checkout (spec §1.3)", async () => {

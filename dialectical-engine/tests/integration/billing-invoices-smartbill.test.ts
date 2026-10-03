@@ -91,7 +91,7 @@ describe("P10b SmartBill invoices for Romania", () => {
     const paid = await h.activate();
     await h.worker.drain(10);
     expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
-    expect(smartbill.issued.find((sale) => sale.chargeId === paid.chargeId)?.customer).toMatchObject({ name: "Test Buyer", city: "Bucuresti", region: "B" });
+    expect(smartbill.issued.find((sale) => sale.chargeId === paid.chargeId)?.customer).toMatchObject({ name: "Test Buyer", city: "Sector 1", region: "Bucuresti" });
     const [invoice] = await invoices(paid.chargeId);
     expect(invoice).toMatchObject({ issuer: "SMARTBILL", kind: "INVOICE", series: "DBAI" });
     const mail = (await h.outboxRows(paid.chargeId)).find((row) => row.ref === `M2_INVOICE_ATTACHED:${paid.chargeId}`);

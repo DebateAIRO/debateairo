@@ -472,7 +472,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       // A Romanian buyer carries the name, city and county SmartBill needs (R-15).
       const quoted = await quotes.create({
         ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country: input.country ?? "RO",
-        name: "Test Buyer", region: "B", postalCode: null, city: "Bucuresti", company: input.company ?? null, now: clock.now
+        name: "Test Buyer", region: "Bucuresti", postalCode: null, city: "Sector 1", company: input.company ?? null, now: clock.now
       });
       const chargeId = input.chargeId;
       const service = chargeId === undefined ? checkout : checkoutWith({ chargeIds: () => chargeId });

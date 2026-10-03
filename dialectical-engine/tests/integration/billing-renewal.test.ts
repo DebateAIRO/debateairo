@@ -363,8 +363,8 @@ describe("P11a monthly renewal", () => {
     expect(rebills(paid)).toBe(1);
     // A new checkout under the same version pays the new price.
     const quoted = await h.quotesWith(plusAt25).create({
-      ownerRef: randomUUID(), ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Test Buyer", region: "B",
-      postalCode: null, city: "Bucuresti", company: null, now: h.clock.now
+      ownerRef: randomUUID(), ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Test Buyer", region: "Bucuresti",
+      postalCode: null, city: "Sector 1", company: null, now: h.clock.now
     });
     expect(quoted.quote).toMatchObject({ netMicros: 25_000_000, taxMicros: 5_250_000, totalMicros: 30_250_000 });
   });
