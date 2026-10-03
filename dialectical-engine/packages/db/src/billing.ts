@@ -1314,18 +1314,25 @@ export class BillingRepository {
    * which never starts dunning, or any hold that outlived its 72 hours with nothing written. The person is on Free
    * until the renewal is priced again. A hold over a charge that was sent (PAYMENT_NOT_VERIFIED, a not-sent rebill)
    * has its RENEWAL charge, and P14a's lists own it. `since` is when paid access lapsed.
+   *
+   * P4-M (P2-M43, migration 0092): read from the RENEWAL_PENDING rows (0092's partial index), keeping one only when
+   * no event of its owner in force comes after it in B5's order (0084's per-owner index), instead of a DISTINCT ON
+   * over every owner's latest event, which read the whole table. The same rows in the same order: B5's order is the
+   * row comparison below (all three columns NOT NULL, event_id unique, so it is total).
    */
   async blockedRenewals(now: Date): Promise<Array<{ subscriptionId: string; since: Date }>> {
     const held = (await this.pool.query<{ subscription_id: string; paid_through: Date }>(`
-      SELECT latest.subscription_id, latest.paid_through
-      FROM (
-        SELECT DISTINCT ON (event.owner_ref) event.subscription_id, event.cause, event.paid_through
-        FROM billing.entitlement_event AS event
-        WHERE event.effective_at <= $1
-        ORDER BY event.owner_ref, event.effective_at DESC, event.recorded_at DESC, event.event_id DESC
-      ) AS latest
-      WHERE latest.cause = 'RENEWAL_PENDING' AND latest.paid_through < $1 AND latest.subscription_id IS NOT NULL
-      ORDER BY latest.paid_through, latest.subscription_id
+      SELECT pending.subscription_id, pending.paid_through
+      FROM billing.entitlement_event AS pending
+      WHERE pending.cause = 'RENEWAL_PENDING' AND pending.subscription_id IS NOT NULL
+        AND pending.paid_through < $1 AND pending.effective_at <= $1
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.entitlement_event AS later
+          WHERE later.owner_ref = pending.owner_ref AND later.effective_at <= $1
+            AND (later.effective_at, later.recorded_at, later.event_id)
+              > (pending.effective_at, pending.recorded_at, pending.event_id)
+        )
+      ORDER BY pending.paid_through, pending.subscription_id
     `, [now])).rows;
     if (held.length === 0) return [];
     const ids = held.map((row) => row.subscription_id);

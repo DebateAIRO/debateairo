@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { RunRepository, migrate } from "@debateai/db";
+import { BillingJobQueries, BillingRepository, RunRepository, migrate } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
@@ -601,5 +601,160 @@ describe("P1a — the waiting line refuses a row its reader could not read (B11d
       "SELECT run_id, depth FROM core.run_waiting_v WHERE run_id = $1", [good]
     );
     expect(line.rows).toEqual([{ run_id: good, depth: 1 }]);
+  });
+});
+
+describe("P2-M43 — migration 0092: an index for each recurring billing query (the owner's ruling of 3 October 2026)", () => {
+  // Every definition as PostgreSQL prints it back (pg_indexes.indexdef), predicate included for a partial index.
+  const INDEXES: Record<string, string> = {
+    xmoney_notice_external_order_idx: "CREATE INDEX xmoney_notice_external_order_idx ON billing.xmoney_notice USING btree (external_order_id, xmoney_environment) WHERE (external_order_id IS NOT NULL)",
+    xmoney_notice_id_text_idx: "CREATE INDEX xmoney_notice_id_text_idx ON billing.xmoney_notice USING btree (((notice_id)::text))",
+    outbox_live_verify_external_order_idx: "CREATE INDEX outbox_live_verify_external_order_idx ON billing.outbox USING btree (((payload ->> 'external_order_id'::text))) WHERE ((kind = 'VERIFY_PAYMENT'::text) AND (done_at IS NULL) AND (dead_at IS NULL))",
+    outbox_live_verify_charge_idx: "CREATE INDEX outbox_live_verify_charge_idx ON billing.outbox USING btree (((payload ->> 'charge_id'::text))) WHERE ((kind = 'VERIFY_PAYMENT'::text) AND (done_at IS NULL) AND (dead_at IS NULL))",
+    subscription_event_withdrawn_by_owner_idx: "CREATE INDEX subscription_event_withdrawn_by_owner_idx ON billing.subscription_event USING btree (at, subscription_id) WHERE ((kind = 'WITHDRAWN'::text) AND ((data ->> 'refund_by_owner'::text) = 'true'::text))",
+    outbox_dead_idx: "CREATE INDEX outbox_dead_idx ON billing.outbox USING btree (kind, dead_at, ref) WHERE (dead_at IS NOT NULL)",
+    outbox_kind_ref_created_idx: "CREATE INDEX outbox_kind_ref_created_idx ON billing.outbox USING btree (kind, ref, created_at)",
+    charge_event_dashboard_refund_idx: "CREATE INDEX charge_event_dashboard_refund_idx ON billing.charge_event USING btree (charge_id) WHERE ((kind = 'REFUNDED'::text) AND (error_code = 'PROVIDER_REFUND'::text) AND (refunds_transaction_id IS NULL))",
+    entitlement_event_renewal_pending_idx: "CREATE INDEX entitlement_event_renewal_pending_idx ON billing.entitlement_event USING btree (paid_through) WHERE ((cause = 'RENEWAL_PENDING'::text) AND (subscription_id IS NOT NULL))",
+    subscription_event_at_idx: "CREATE INDEX subscription_event_at_idx ON billing.subscription_event USING btree (at)",
+    entitlement_event_effective_at_idx: "CREATE INDEX entitlement_event_effective_at_idx ON billing.entitlement_event USING btree (effective_at)",
+    charge_created_at_idx: "CREATE INDEX charge_created_at_idx ON billing.charge USING btree (created_at)"
+  };
+
+  it("creates every index with its definition and, when partial, its predicate", async () => {
+    const found = await database.pool.query<{ indexname: string; indexdef: string }>(
+      "SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'billing' AND indexname = ANY($1::text[]) ORDER BY indexname",
+      [Object.keys(INDEXES)]
+    );
+    expect(Object.fromEntries(found.rows.map((row) => [row.indexname, row.indexdef]))).toEqual(INDEXES);
+  });
+
+  /**
+   * The queries exactly as the repository sends them (a recording pool), each planned with sequential scans
+   * disabled: a partial index is in the plan only when the query's own WHERE implies its predicate, so a query and
+   * its index that drift apart fail here. One transaction, rolled back: nothing it seeds outlives the row.
+   */
+  it("serves each recurring query from its index, as the repository writes it", async () => {
+    const client = await database.pool.connect();
+    const sent: Array<{ text: string; values: unknown[] | undefined }> = [];
+    const recording = { query: (text: string, values?: unknown[]) => { sent.push({ text, values }); return client.query(text, values); } };
+    const viaClient = new Proxy(database.pool, {
+      get(target, property) {
+        if (property === "query") return recording.query;
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+    });
+    const billing = new BillingRepository(viaClient);
+    const jobs = new BillingJobQueries(viaClient);
+    // Every index any plan node of the method's queries reads.
+    const plans = async (run: () => Promise<unknown>): Promise<string[]> => {
+      sent.length = 0;
+      await run();
+      const queries = [...sent];
+      expect(queries.length).toBeGreaterThan(0);
+      const names = new Set<string>();
+      const walk = (node: unknown): void => {
+        if (Array.isArray(node)) { node.forEach(walk); return; }
+        if (typeof node !== "object" || node === null) return;
+        for (const [key, value] of Object.entries(node)) {
+          if (key === "Index Name" && typeof value === "string") names.add(value);
+          else walk(value);
+        }
+      };
+      for (const query of queries) {
+        const plan = await client.query<{ "QUERY PLAN": unknown }>(`EXPLAIN (FORMAT JSON) ${query.text}`, query.values);
+        for (const row of plan.rows) {
+          const value = row["QUERY PLAN"];
+          walk(typeof value === "string" ? JSON.parse(value) : value);
+        }
+      }
+      return [...names].sort();
+    };
+    try {
+      await client.query("BEGIN");
+      // Enough rows that the planner's costs tell the indexes apart (on empty tables any index ties): a few thousand
+      // charges, payments, refunds, notices, jobs and events, a few of each kind the queries look for, and some
+      // lapsed holds so blockedRenewals reaches its later queries too.
+      const seed = randomUUID();
+      const txBase = 900_000_000_000 + Math.floor(Math.random() * 99_000_000_000);
+      await client.query(`
+        INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end,
+          quote_id, net_micros, tax_micros, total_micros, currency, created_at, xmoney_environment)
+        SELECT md5($1 || i), gen_random_uuid(), gen_random_uuid(), 'CARD_CHECK', 1, now() - i * interval '1 hour',
+          now() - i * interval '1 hour' + interval '1 month', NULL, 0, 0, 0, 'USD', now() - i * interval '1 hour', 'stage'
+        FROM generate_series(1, 2000) AS i
+      `, [seed]);
+      await client.query(`
+        INSERT INTO billing.charge_event (charge_id, kind, at, xmoney_environment, xmoney_transaction_id, amount_micros)
+        SELECT md5($1 || i), 'SUCCEEDED', now() - i * interval '1 hour', 'stage', ($2::bigint + i)::text, 0
+        FROM generate_series(1, 2000) AS i
+      `, [seed, txBase]);
+      await client.query(`
+        INSERT INTO billing.charge_event (charge_id, kind, at, xmoney_environment, xmoney_transaction_id, amount_micros,
+          error_code)
+        SELECT md5($1 || i), 'REFUNDED', now() - i * interval '1 hour', 'stage', ($2::bigint + i)::text, 0,
+          CASE WHEN i % 100 = 0 THEN 'PROVIDER_REFUND' END
+        FROM generate_series(1, 2000) AS i WHERE i % 10 = 0
+      `, [seed, txBase]);
+      await client.query(`
+        INSERT INTO billing.xmoney_notice (notice_id, received_at, payload_sha256, transaction_id, order_id,
+          external_order_id, status, xmoney_environment)
+        SELECT gen_random_uuid(), now() - i * interval '1 hour', encode(sha256(($1 || i)::bytea), 'hex'),
+          ($2::bigint + i)::text, ($2::bigint + i)::text, md5($1 || i), 'complete-ok', 'stage'
+        FROM generate_series(1, 2000) AS i
+      `, [seed, txBase]);
+      await client.query(`
+        INSERT INTO billing.outbox (job_id, kind, ref, payload, created_at, not_before, done_at, dead_at, last_error_code)
+        SELECT gen_random_uuid(),
+          (ARRAY['VERIFY_PAYMENT','QUADERNO_RECORD_SALE','QUADERNO_RECORD_REFUND','SMARTBILL_INVOICE','SMARTBILL_STORNO',
+            'EMAIL','RENEWAL_NOTICE','OWNER_TAX_SUMMARY','XMONEY_REFUND','RETENTION_PURGE'])[1 + i % 10],
+          md5($1 || i) || ':' || i,
+          CASE WHEN i % 10 = 0 THEN jsonb_build_object('notice_id', gen_random_uuid()::text, 'external_order_id', md5($1 || i))
+            ELSE '{}'::jsonb END,
+          now() - i * interval '1 minute', now() - i * interval '1 minute',
+          CASE WHEN i % 50 IN (0, 1) THEN NULL ELSE now() END,
+          CASE WHEN i % 50 = 1 THEN now() END, CASE WHEN i % 50 = 1 THEN 'SEEDED_DEAD' END
+        FROM generate_series(1, 4000) AS i
+      `, [seed]);
+      await client.query(`
+        INSERT INTO billing.subscription_event (event_id, subscription_id, owner_ref, kind, at, plan_id, data)
+        SELECT gen_random_uuid(), gen_random_uuid(), gen_random_uuid(),
+          CASE WHEN i % 200 = 0 THEN 'WITHDRAWN' ELSE 'RENEWED' END, now() - i * interval '1 hour', 'PLUS',
+          CASE WHEN i % 400 = 0 THEN '{"refund_by_owner": true}'::jsonb ELSE '{}'::jsonb END
+        FROM generate_series(1, 2000) AS i
+      `);
+      await client.query(`
+        INSERT INTO billing.entitlement_event (event_id, owner_ref, plan_id, effective_at, period_anchor_at, cause,
+          subscription_id, paid_through)
+        SELECT gen_random_uuid(), owner.ref, 'PLUS', now() - (10 - k) * interval '30 days',
+          now() - (10 - k) * interval '30 days', CASE WHEN k = 9 AND owner.n % 50 = 0 THEN 'RENEWAL_PENDING' ELSE 'RENEWED' END,
+          owner.subscription, now() - (9 - k) * interval '30 days' - interval '1 day'
+        FROM (SELECT n, gen_random_uuid() AS ref, gen_random_uuid() AS subscription FROM generate_series(1, 200) AS n) AS owner,
+          generate_series(0, 9) AS k
+      `);
+      await client.query("ANALYZE billing.xmoney_notice, billing.outbox, billing.subscription_event, billing.charge, billing.charge_event, billing.entitlement_event");
+      await client.query("SET LOCAL enable_seqscan = off");
+      const now = new Date();
+      const checkout = await plans(() => jobs.checkoutPaymentSignals(recording as unknown as PoolClient, chargeIdOf(), "stage", now));
+      for (const index of ["xmoney_notice_external_order_idx", "xmoney_notice_id_text_idx", "outbox_live_verify_external_order_idx", "outbox_live_verify_charge_idx"]) {
+        expect(checkout, `checkoutPaymentSignals: ${index} in ${checkout.join(",")}`).toContain(index);
+      }
+      expect(await plans(() => billing.withdrawalsAwaitingOwner())).toContain("subscription_event_withdrawn_by_owner_idx");
+      expect(await plans(() => billing.deadRefunds())).toContain("outbox_dead_idx");
+      const invoice = await plans(() => billing.invoiceUnknownItems());
+      for (const index of ["outbox_dead_idx", "outbox_kind_ref_created_idx", "charge_event_dashboard_refund_idx"]) {
+        expect(invoice, `invoiceUnknownItems: ${index}`).toContain(index);
+      }
+      expect(await plans(() => billing.blockedRenewals(now))).toContain("entitlement_event_renewal_pending_idx");
+      const ahead = await plans(() => billing.recordsDatedAhead(now));
+      // charge_event needs no index of its own: PostgreSQL 18's skip scan reads 0086's (kind, at) by `at` alone.
+      for (const index of ["subscription_event_at_idx", "entitlement_event_effective_at_idx", "charge_created_at_idx", "charge_event_kind_at_idx", "outbox_due_idx"]) {
+        expect(ahead, `recordsDatedAhead: ${index}`).toContain(index);
+      }
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
   });
 });

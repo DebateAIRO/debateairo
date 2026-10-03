@@ -315,6 +315,38 @@ describe("P16b the summary reads our own rows", () => {
     expect(await blocked(now)).toEqual([]);
   });
 
+  it("lists a lapsed RENEWAL_PENDING only while it is the owner's entitlement in force, in B5's order (P2-M43's rewrite)", async () => {
+    // P4-M reads the held renewals from the RENEWAL_PENDING rows (0092's partial index) and keeps one only when no
+    // event of its owner in force comes after it, instead of folding every owner's latest event. Same answer: an
+    // event effective later than `now` does not replace it yet, and a later event with the SAME effective_at does
+    // (recorded_at breaks the tie, as B5's order and the old DISTINCT ON have it).
+    const billing = new BillingRepository(database.pool);
+    const entitlements = new EntitlementRepository(database.pool);
+    const now = new Date();
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 40 * 86_400_000), taxCountry: "RO"
+    });
+    const paidThrough = new Date(seeded.periodEnd.getTime() + 72 * 3_600_000);
+    const heldAt = new Date(seeded.periodEnd.getTime() - 60_000);
+    const append = (cause: "RENEWAL_PENDING" | "RENEWED", effectiveAt: Date, until: Date) =>
+      billing.withTransaction((client) => entitlements.append(client, {
+        ownerRef: seeded.ownerRef, planId: "PLUS", periodAnchorAt: seeded.periodStart, cause, effectiveAt,
+        subscriptionId: seeded.subscriptionId, paidThrough: until, monthCreditOverrideMicros: null
+      }));
+    const blocked = async (at: Date) => (await billing.blockedRenewals(at))
+      .filter((item) => item.subscriptionId === seeded.subscriptionId);
+    // An older RENEWAL_PENDING of the same owner, replaced by the newer one, is never listed twice.
+    await append("RENEWAL_PENDING", new Date(heldAt.getTime() - 3_600_000), new Date(paidThrough.getTime() - 3_600_000));
+    await append("RENEWAL_PENDING", heldAt, paidThrough);
+    expect(await blocked(now)).toEqual([{ subscriptionId: seeded.subscriptionId, since: paidThrough }]);
+    // Not in force yet: an event effective tomorrow leaves today's answer as it was.
+    await append("RENEWED", new Date(now.getTime() + 86_400_000), new Date(now.getTime() + 31 * 86_400_000));
+    expect(await blocked(now)).toEqual([{ subscriptionId: seeded.subscriptionId, since: paidThrough }]);
+    // The same effective_at, recorded later: it is the event in force now, so the hold is no longer listed.
+    await append("RENEWED", heldAt, new Date(now.getTime() + 30 * 86_400_000));
+    expect(await blocked(now)).toEqual([]);
+  });
+
   it("lists a second refund made elsewhere that our records cannot hold, once per refund transaction (P9c's dead mark)", async () => {
     const billing = new BillingRepository(database.pool);
     const refundTransactionId = String(7_700_000_000 + Math.floor(Math.random() * 99_999_999));
