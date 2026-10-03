@@ -108,7 +108,7 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
       ["EMAIL M1", `M1:${CHARGE}`],
       ["EMAIL M3", "M3:sub:2026-11-01T00:00:00.000Z:23800000"]
     ]);
-    expect(String(enqueued[1]!.payload["param.nextSteps"])).toContain("not charged");
+    expect(String(enqueued[1]!.payload["param.nextSteps"])).toContain("nothing is charged and the plan stays active until a notice goes out");
   });
 
   it("presents a job our records do not back as nothing to issue or re-queue (the W4 forward), never as a document to record", () => {
@@ -142,7 +142,10 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
 
   it("says what a lost email means for each kind of email", () => {
     expect(deadEmailAction("M1", "CUSTOMER")).toContain("withdrawal form");
-    expect(deadEmailAction("M3", "CUSTOMER")).toContain("not charged");
+    // F1 (review M-6): nothing is charged, and the plan stays active, until a notice goes out.
+    expect(deadEmailAction("M3", "CUSTOMER")).toBe("the notice of a changed renewal amount never went out: nothing is"
+      + " charged and the plan stays active until a notice goes out; the renewal waits and sends the notice again when its"
+      + " 7-business-day wait ends; report the code");
     expect(deadEmailAction("M8_RECEIVED", "CUSTOMER")).toContain("acknowledgement");
     expect(deadEmailAction("M2_INVOICE_ATTACHED", "CUSTOMER")).toContain("receipt");
     expect(deadEmailAction("O1", "OWNER")).toContain("OWNER_REPORT_EMAIL_PATH");

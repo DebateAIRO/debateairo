@@ -119,8 +119,8 @@ export function deadEmailAction(template: string | null, recipient: string | nul
     return `the customer never got the receipt: ${address} and send them their invoice from Quaderno or SmartBill`;
   }
   if (template === "M3") {
-    return "the notice of a changed renewal amount never went out, so the changed amount is not charged: the renewal"
-      + " waits and sends the notice again when its 7-business-day wait ends; report the code";
+    return "the notice of a changed renewal amount never went out: nothing is charged and the plan stays active until a"
+      + " notice goes out; the renewal waits and sends the notice again when its 7-business-day wait ends; report the code";
   }
   if (template === "M8_RECEIVED") {
     return "the acknowledgement of a withdrawal never went out, which the law requires: "
