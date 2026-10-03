@@ -34,6 +34,9 @@ describe("P22 the Billing runbook", () => {
       "packages/billing-core/src/company.ts", "SELLER_COMPANY", "BILLING_COMPANY_FACTS_UNVERIFIED",
       "The company's tax codes are not `api.env` settings", "as digits only, never with `RO`",
       "tests/unit/billing-seller-company.test.tsx",
+      // P2-M35: the facts every billing email prints are refused while bracketed, like the CUI.
+      "BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice", "BILLING_COMPANY_FACTS_UNVERIFIED:emails.general",
+      "BILLING_COMPANY_FACTS_UNVERIFIED:legalName",
       // §14.8: billing off is only for a host with nothing live and nothing queued (the rule cannot silently go).
       "billing.subscription_latest_v", "open_billing_jobs", "Stopping sales, and switching billing off",
       // §14.8 (P14c judge, carried): a withdrawal handed to the owner and not settled yet also blocks billing off.

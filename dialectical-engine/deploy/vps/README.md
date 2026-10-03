@@ -1862,7 +1862,9 @@ followed by the same digits). Copy the same values into `SELLER_COMPANY` (`packa
 the same commit. The legal notice shows them on two rows, and every Romanian invoice carries one of them. Until the
 CUI is filled, the API refuses to switch billing on with `BILLING_COMPANY_FACTS_UNVERIFIED:cui`. If SmartBill wants
 the RO form (row 16 of `docs/architecture/smartbill-api-facts.md`), it also refuses with
-`BILLING_COMPANY_FACTS_UNVERIFIED:vat` until the VAT code is filled. §14.7 says how.
+`BILLING_COMPANY_FACTS_UNVERIFIED:vat` until the VAT code is filled. Every billing email prints the company's name,
+registered office and general email address, so the API also refuses while one of them is still in square brackets:
+`BILLING_COMPANY_FACTS_UNVERIFIED:legalName`, `:registeredOffice` or `:emails.general`. §14.7 says how.
 
 Three more settings billing relies on are **already** in `api.env`, because the API has refused to start without
 them since the Terms records and the country gate arrived. Check them; do not add them twice:
@@ -2015,7 +2017,10 @@ pnpm exec vitest run tests/unit/billing-seller-company.test.tsx tests/unit/mail-
 
 Until the CUI is filled, the API refuses to switch billing on with `BILLING_COMPANY_FACTS_UNVERIFIED:cui`. If SmartBill
 wants the RO form (row 16 of `docs/architecture/smartbill-api-facts.md`), it also refuses with
-`BILLING_COMPANY_FACTS_UNVERIFIED:vat` until the VAT code is filled.
+`BILLING_COMPANY_FACTS_UNVERIFIED:vat` until the VAT code is filled. Every receipt and the model withdrawal form print
+the company's name (`legalName`), its registered office (`registeredOffice`) and its general email address
+(`emails.general`), so until each is filled the API refuses with `BILLING_COMPANY_FACTS_UNVERIFIED:legalName`,
+`BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice` or `BILLING_COMPANY_FACTS_UNVERIFIED:emails.general`.
 
 **The card marks.** Put the official Visa and Mastercard artwork at `apps/ui/public/payment-marks/visa.svg` and
 `apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only when its file is there.
@@ -2514,7 +2519,8 @@ In `api.env` set:
 The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if the stage API sits beside anything but
 Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
 builds the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the CUI is
-still in square brackets. In `ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Write down what
+still in square brackets, and likewise while the company's name, registered office or general email address is
+(`BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice`, for example), because the sandbox emails print them too. In `ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Write down what
 you see at each step; go-live row 15 needs your notes.
 
 **Before step 1: read the journal of the first start with billing on.** At each start the API runs the daily money

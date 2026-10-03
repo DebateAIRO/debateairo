@@ -42,9 +42,13 @@ const files = {
   smartbill: "owner@firma.ro:tok_0123456789\n", owner: "owner@firma.ro\n"
 };
 // The mirror of COMPANY with its two tax codes filled in, as the owner will fill them (X1 Step 3 item 6, RULINGS-R3
-// R3-4): the CUI as digits only (what /legal's CUI row shows) and the RO VAT code (its VAT row). Every other fact stays
-// as the legal notice has it today. With both filled, X1 row 16's flip of SMARTBILL_CIF_FORM changes no fixture here.
-const filledCui: SellerCompany = Object.freeze({ ...SELLER_COMPANY, cui: "12345678" });
+// R3-4): the CUI as digits only (what /legal's CUI row shows) and the RO VAT code (its VAT row), with the registered
+// office and the general address every email prints (P2-M35). Every other fact stays as the legal notice has it today.
+// With both codes filled, X1 row 16's flip of SMARTBILL_CIF_FORM changes no fixture here.
+const filledCui: SellerCompany = Object.freeze({
+  ...SELLER_COMPANY, cui: "12345678", registeredOffice: "Str. Exemplu 1, București, România",
+  emails: Object.freeze({ ...SELLER_COMPANY.emails, general: "hello@dezbatere.ro" })
+});
 const company: SellerCompany = Object.freeze({
   ...filledCui, vat: Object.freeze({ kind: "registered", number: "RO12345678" } as const)
 });
@@ -103,6 +107,22 @@ describe("P6a — BillingConnectors", () => {
       environment: group(root), company: { ...company, cui: "RO12345678" }, recordsKey: Buffer.alloc(32), hold: (resource) => held.push(resource)
     })).toThrow("BILLING_COMPANY_FACTS_INVALID:cui");
     // No refusal read the private key: nothing was handed to the boot ledger.
+    expect(held).toHaveLength(0);
+  });
+
+  it("refuses, before reading any secret, a company fact every email prints that is still bracketed (P2-M35)", () => {
+    const held: Array<{ end(): Promise<void> }> = [];
+    const root = custody(files);
+    const load = (facts: SellerCompany) => () => loadBillingConnectors({
+      environment: group(root), company: facts, recordsKey: Buffer.alloc(32), hold: (resource) => held.push(resource)
+    });
+    // Every footer and the model withdrawal form's "To:" line print the legal name, the registered office and the
+    // general address (packages/mail-templates/src/render.ts).
+    expect(load({ ...company, registeredOffice: SELLER_COMPANY.registeredOffice })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice");
+    expect(load({ ...company, emails: SELLER_COMPANY.emails })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:emails.general");
+    expect(load({ ...company, legalName: "[…] S.R.L." })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:legalName");
+    // The CUI is still named first: the facts today fail on it.
+    expect(load(SELLER_COMPANY)).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:cui");
     expect(held).toHaveLength(0);
   });
 

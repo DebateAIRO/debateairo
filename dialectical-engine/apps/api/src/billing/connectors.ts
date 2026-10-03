@@ -92,6 +92,20 @@ export function smartBillCompanyCif(company: SellerCompany, form: SmartBillCifFo
   return vat.number;
 }
 
+/**
+ * P2-M35: the company facts every billing email prints, in each footer and in the model withdrawal form's "To:" line
+ * (packages/mail-templates/src/render.ts): the legal name, the registered office and the general address. A bracketed
+ * value is the legal notice's placeholder, and billing cannot start until the owner has filled it in, as for the CUI.
+ */
+export function assertMailedCompanyFacts(company: SellerCompany): void {
+  const printed: ReadonlyArray<readonly [string, string]> = [
+    ["legalName", company.legalName], ["registeredOffice", company.registeredOffice], ["emails.general", company.emails.general]
+  ];
+  for (const [name, value] of printed) {
+    if (isUnverifiedCompanyFact(value)) throw new TypeError(`BILLING_COMPANY_FACTS_UNVERIFIED:${name}`);
+  }
+}
+
 /** The public key goes to every browser; if it were the private key, anyone could sign orders and read notices. */
 function refuseTheSecretAsPublic(publicKey: string, privateKey: Buffer): void {
   const candidate = Buffer.from(publicKey, "latin1");
@@ -134,7 +148,8 @@ export function assertNoRecordsDatedAhead(counts: Readonly<{ rows: number; jobs:
  * Builds every billing connector from the custody files. Called under boot.runSync, so a refusal
  * closes the boot ledger (DL7-F7). SmartBill's code is built from the company's facts first, before any
  * secret is read (smartBillCompanyCif; main.ts passes SELLER_COMPANY, tests and the development fakes
- * pass the mirror filled with their fake's code). The private key
+ * pass the mirror filled with their fake's code), and the facts every email prints must be filled in too
+ * (assertMailedCompanyFacts, P2-M35). The private key
  * (L1's text-secret loader, A23) is handed to `hold` the moment it exists; Quaderno's key, SmartBill's
  * `user:token` and the owner's address are text credentials read like provider keys
  * (`readCustodyAuthorizationHeader`).
@@ -148,6 +163,7 @@ export function loadBillingConnectors(input: Readonly<{
 }>): BillingConnectors {
   const environment = input.environment;
   const companyCif = smartBillCompanyCif(input.company);
+  assertMailedCompanyFacts(input.company);
   const xmoneyPrivateKey = readCustodyTextSecretBytes(environment.xmoneyPrivateKeyPath);
   input.hold({ end: async () => { xmoneyPrivateKey.fill(0); } });
   aesKeyFromPrivateKey(xmoneyPrivateKey).fill(0);

@@ -548,7 +548,8 @@ const askBilling: AskBilling | undefined = askRoomComposition === undefined
  * Billing on must pass B4a's one readiness question (plans row + the three budget members), and only then is the
  * billing group of the environment validated, by name (BILLING_CONFIGURATION_INCOMPLETE:<KEY>), and SmartBill's
  * code built from the legal notice's facts before any secret is read (BILLING_COMPANY_FACTS_UNVERIFIED:cui while the
- * CUI is still bracketed, and :vat in SMARTBILL_CIF_FORM's "ro" form while the RO VAT code is; RULINGS-R3 R3-4).
+ * CUI is still bracketed, and :vat in SMARTBILL_CIF_FORM's "ro" form while the RO VAT code is; RULINGS-R3 R3-4), and
+ * the facts every email prints checked the same way (:legalName, :registeredOffice, :emails.general; P2-M35).
  */
 const billingPolicy: BillingPolicy | null = environment.DEPLOYMENT_MODE === "hosted"
   ? await boot.run("billing-policy", () => readBillingPolicy(pool, environment.REGISTER_VERSION))
