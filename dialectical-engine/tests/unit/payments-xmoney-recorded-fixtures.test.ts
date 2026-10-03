@@ -26,7 +26,9 @@ const DIRECTORY = resolve(import.meta.dirname, "../fixtures/xmoney");
 const FORMAT = "debateai.xmoney-fixture.v1";
 const TEST_KEY = Buffer.from("0123456789abcdef0123456789abcdef", "latin1");
 type Framing = { ivBytes: number; alphabet: string; padded: boolean; lineBreaks: boolean; plusArrivedAsSpace: boolean };
-type Fixture = { format: string; kind: string; body: unknown; testKeyOpensslResult: string | null; framing: Framing | null };
+type Fixture = {
+  format: string; kind: string; recordedOn: string; body: unknown; testKeyOpensslResult: string | null; framing: Framing | null;
+};
 const fixtures: Fixture[] = existsSync(DIRECTORY)
   ? readdirSync(DIRECTORY).filter((name) => name.endsWith(".json"))
     .map((name) => JSON.parse(readFileSync(join(DIRECTORY, name), "utf8")) as Fixture)
@@ -39,6 +41,20 @@ function fixture(kind: string): Fixture {
 }
 const dataOf = (kind: string): Record<string, unknown> => (fixture(kind).body as { data: Record<string, unknown> }).data;
 const recordedStatus = (kind: string): unknown => dataOf(kind).transactionStatus;
+
+/**
+ * P2-M3 (W15 G1): a creation time the client read is not proof enough. A millisecond `creationTimestamp` read as
+ * seconds, or a time read in the wrong zone, still parses; only a time near the day the owner recorded the fixture
+ * proves the zone and the unit. 400 days either side of `recordedOn` allows a listing's older rows and nothing more.
+ */
+const RECORDED_WINDOW_MS = 400 * 86_400_000;
+function expectNearRecording(createdAt: Date | null, kind: string, label: string): void {
+  expect(createdAt, `${label}: creation time with its zone`).not.toBeNull();
+  const recordedOn = Date.parse(`${fixture(kind).recordedOn}T00:00:00Z`);
+  expect(Number.isFinite(recordedOn), `${kind}: recordedOn is a date`).toBe(true);
+  expect(Math.abs(createdAt!.getTime() - recordedOn), `${label}: within 400 days of recordedOn (zone and unit right)`)
+    .toBeLessThanOrEqual(RECORDED_WINDOW_MS);
+}
 
 /**
  * Runs `use` against a real XMoneyClient whose every call is answered with `body` (a later page with an empty
@@ -119,9 +135,9 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
         (client) => client.getTransaction("1"));
       expect((XMONEY_STATUSES as ReadonlyArray<string>).includes(parsed.status), kind).toBe(true);
       expect(transactionRoute(parsed.transactionType), kind).toBe(kind === "transaction-refund" ? "REFUND" : "PAYMENT");
-      // P2-M3: xMoney's time is read with its zone (an offset in creationDate, or creationTimestamp), never in this
-      // host's zone; it anchors plans, dates the tax rows and bounds A2's windows. If this fails, the parse changes.
-      expect(parsed.createdAt, `${kind}: creation time with its zone`).not.toBeNull();
+      // P2-M3: xMoney's time is read with its zone (an offset in creationDate, or creationTimestamp in seconds), never
+      // in this host's zone; it anchors plans, dates the tax rows and bounds A2's windows. If this fails, the parse changes.
+      expectNearRecording(parsed.createdAt, kind, kind);
     }
   });
 
@@ -148,7 +164,7 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
         (client) => client.listTransactions({ from: new Date(0), to: new Date(), onRejected: (transactionId) => rejected.push(transactionId) }));
       expect(rejected, kind).toEqual([]);
       expect(listed.length, kind).toBe(((fixture(kind).body as { data: unknown[] }).data).length);
-      expect(listed.filter((row) => row.createdAt === null).map((row) => row.transactionId), `${kind}: rows with no zoned time`).toEqual([]);
+      for (const row of listed) expectNearRecording(row.createdAt, kind, `${kind} row ${row.transactionId}`);
     }
   });
 

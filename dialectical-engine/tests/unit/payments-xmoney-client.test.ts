@@ -289,5 +289,11 @@ describe("P3b — xMoney client against the fake", () => {
     expect(row({ creationTimestamp: "soon" })).toBeNull();
     expect(row({ creationTimestamp: -5 })).toBeNull();
     expect(row({})).toBeNull();
+    // A millisecond timestamp, read as seconds, would anchor a plan in year 58722: refused in both forms, never taken.
+    expect(row({ creationDate: "2026-10-02 10:00:00", creationTimestamp: instant.getTime() })).toBeNull();
+    expect(row({ creationTimestamp: String(instant.getTime()) })).toBeNull();
+    expect(row({ creationTimestamp: String(instant.getTime()).slice(0, 12) })).toBeNull();
+    // Control: the same instant in seconds, numeric, is still read.
+    expect(row({ creationDate: "2026-10-02 10:00:00", creationTimestamp: 1_759_399_200 })).toEqual(new Date(1_759_399_200_000));
   });
 });

@@ -111,8 +111,11 @@ const ZONED_DATE_TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})
 /**
  * P2-M3: when xMoney created a transaction. `creationDate` is taken only with its zone: written without one
  * ("2026-10-02 10:00:00"), `Date` would read it in this server's own zone, and that instant anchors plans, dates the
- * tax rows and bounds A2's adoption windows. Otherwise `creationTimestamp` (Unix seconds, unambiguous) is read; with
- * neither, the time is unknown (null), as for a row with no date at all.
+ * tax rows and bounds A2's adoption windows. Otherwise `creationTimestamp` (Unix seconds) is read, number or digit
+ * string alike, but only below one plausible-seconds bound: a millisecond value read as seconds would anchor a plan in
+ * year 58722 (which 0084's `period_anchor_at <= effective_at` refuses, so the plan would never start), and every
+ * millisecond value after March 1973 exceeds the bound. With neither, or outside the bound, the time is unknown (null),
+ * as for a row with no date at all, and the caller's existing fallback applies.
  */
 function creationInstant(value: Readonly<Record<string, unknown>>): Date | null {
   const date = value.creationDate;
@@ -120,9 +123,10 @@ function creationInstant(value: Readonly<Record<string, unknown>>): Date | null 
     const parsed = new Date(date);
     if (Number.isFinite(parsed.getTime())) return parsed;
   }
+  const secondsBound = 1e11; // Unix seconds up to the year 5138; any millisecond timestamp after March 1973 is above it.
   const stamp = value.creationTimestamp;
   const seconds = typeof stamp === "number" ? stamp : typeof stamp === "string" && /^[0-9]{1,12}$/u.test(stamp) ? Number(stamp) : Number.NaN;
-  return Number.isSafeInteger(seconds) && seconds > 0 ? new Date(seconds * 1_000) : null;
+  return Number.isSafeInteger(seconds) && seconds > 0 && seconds < secondsBound ? new Date(seconds * 1_000) : null;
 }
 
 export function parseXMoneyTransaction(value: unknown): XMoneyTransaction {
