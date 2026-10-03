@@ -171,6 +171,118 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     expect(await jobsOf(paid.chargeId, "SMARTBILL_STORNO")).toHaveLength(1);
   });
 
+  it("settles the storno chain: an unknown invoice makes the credit note wait and die; the invoice is recorded, then the credit note re-queued (fix I-2)", async () => {
+    const paid = await romanianSaleThat("UNKNOWN");
+    // A9: a void after success is a refund in full, so a storno is queued; it waits for the invoice nobody recorded.
+    h.xmoney.setStatus(paid.transaction.transactionId, "cancel-ok");
+    await h.settle(paid.transaction.transactionId);
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      await documents.drain(5);
+      h.clock.advance(13 * 3_600_000);
+    }
+    expect(await jobsOf(paid.chargeId, "SMARTBILL_STORNO"))
+      .toEqual([expect.objectContaining({ dead: true, lastErrorCode: "INVOICE_ORIGINAL_MISSING" })]);
+    expect((await h.outboxRows("O3:")).filter((row) => row.payload["param.reference"] === `charge ${paid.chargeId}`)
+      .map((row) => `${String(row.payload["param.jobKind"])} ${String(row.payload["param.reasonCode"])}`).sort())
+      .toEqual(["SMARTBILL_INVOICE INVOICE_UNKNOWN", "SMARTBILL_STORNO INVOICE_ORIGINAL_MISSING"]);
+    expect((await listed(paid.chargeId)).map((item) => `${item.jobKind} ${item.code}`).sort())
+      .toEqual(["SMARTBILL_INVOICE INVOICE_UNKNOWN", "SMARTBILL_STORNO INVOICE_ORIGINAL_MISSING"]);
+    // The credit note cannot come first, for either action.
+    for (const args of [["--record", "DBAI-0901"], ["--requeue", "--confirm-not-issued"]]) {
+      expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", ...args), args.join(" "))
+        .toMatchObject({ code: 1, err: "BILLING_INVOICE_ORIGINAL_MISSING\n" });
+    }
+    const recorded = await invoiceCommand("--charge", paid.chargeId, "--kind", "INVOICE", "--record", "DBAI-0900");
+    expect(recorded).toMatchObject({ code: 0, err: "" });
+    expect(recorded.out).toContain(`A credit note of this charge was waiting for this invoice: re-queue it with pnpm`
+      + ` billing:invoice --charge ${paid.chargeId} --kind CREDIT_NOTE --requeue --confirm-not-issued (once you have checked`
+      + " SmartBill).");
+    expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--requeue", "--confirm-not-issued"))
+      .toMatchObject({ code: 0, err: "" });
+    await documents.drain(5);
+    const refunded = (await h.repository.charge(paid.chargeId))!.events.find((event) => event.kind === "REFUNDED")!;
+    expect(refunded).toMatchObject({ errorCode: "PROVIDER_VOID" });
+    expect(await invoices(paid.chargeId)).toEqual([
+      expect.objectContaining({ kind: "CREDIT_NOTE", issuer: "SMARTBILL", total_micros: String(refunded.amountMicros) }),
+      expect.objectContaining({ kind: "INVOICE", external_ref: "DBAI-0900", total_micros: "24200000" })
+    ]);
+    expect(await listed(paid.chargeId)).toEqual([]);
+  });
+
+  it("records a credit note issued by hand at the charge's own REFUNDED amount, never the job's figure (fix I-2)", async () => {
+    const paid = await h.activate();
+    await documents.drain(5);
+    expect((await invoices(paid.chargeId)).map((row) => row.kind)).toEqual(["INVOICE"]);
+    // D5 5g: a partial refund made in the dashboard, reported as its own transaction, carries its true amount; SmartBill
+    // cannot make a partial credit note by itself (no creditPartial here), so the storno dies CREDIT_NOTE_MANUAL.
+    await h.xmoney.refund({ transactionId: paid.transaction.transactionId, amountDecimal: "5.00", reason: "customer-demand", message: "dashboard" });
+    const [refundRow] = h.xmoney.refundTransactionsOf(paid.transaction.transactionId);
+    await h.settle(refundRow!.transactionId);
+    await documents.drain(5);
+    const stornoRef = `${paid.chargeId}:${paid.transaction.transactionId}`;
+    expect(await jobsOf(paid.chargeId, "SMARTBILL_STORNO"))
+      .toEqual([expect.objectContaining({ ref: stornoRef, dead: true, lastErrorCode: "CREDIT_NOTE_MANUAL" })]);
+    // A later job of the same ref claiming another figure is the one listed: the command still credits the REFUNDED row.
+    const claimed = await h.repository.withTransaction((client) => h.repository.enqueue(client, {
+      kind: "SMARTBILL_STORNO", ref: stornoRef, notBefore: h.clock.now,
+      payload: { charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, refund_micros: 9_990_000 }
+    }));
+    expect(await h.repository.fail(claimed, "CREDIT_NOTE_MANUAL", null, h.clock.now)).toBe(true);
+    const recorded = await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0950");
+    expect(recorded).toMatchObject({ code: 0, err: "" });
+    expect(recorded.out).toContain(`Recorded: SmartBill credit note DBAI-0950 for charge ${paid.chargeId}.`);
+    expect(recorded.out).not.toContain("The receipt (M2)");
+    const refunded = (await h.repository.charge(paid.chargeId))!.events.find((event) => event.kind === "REFUNDED")!;
+    expect(refunded).toMatchObject({ amountMicros: 5_000_000, refundsTransactionId: paid.transaction.transactionId });
+    const credit = (await invoices(paid.chargeId)).find((row) => row.kind === "CREDIT_NOTE")!;
+    expect(credit).toMatchObject({ issuer: "SMARTBILL", series: "DBAI", number: "0950", total_micros: "5000000" });
+    expect(await statuses(credit.invoice_id)).toEqual(["SENT_BY_ACCOUNT_SETTING"]);
+    expect(await listed(paid.chargeId)).toEqual([]);
+  });
+
+  it("refuses a credit note for a dashboard refund of unknown amount, and a charge with no payment (fix I-2)", async () => {
+    const paid = await h.activate();
+    await documents.drain(5);
+    // P9c: a refund made in the dashboard and seen only as the payment's refund-ok holds an upper bound, no amount;
+    // P9c queues no credit note for it. A job naming it can only be forged, and the command refuses to record it.
+    h.xmoney.setStatus(paid.transaction.transactionId, "refund-ok");
+    await h.settle(paid.transaction.transactionId);
+    expect(await jobsOf(paid.chargeId, "SMARTBILL_STORNO")).toEqual([]);
+    expect(await listed(paid.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND" })]);
+    expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0960"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_NOTHING_LISTED\n" });
+    const forged = await h.repository.withTransaction((client) => h.repository.enqueue(client, {
+      kind: "SMARTBILL_STORNO", ref: `${paid.chargeId}:${paid.transaction.transactionId}`, notBefore: h.clock.now,
+      payload: { charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, refund_micros: 24_200_000 }
+    }));
+    expect(await h.repository.fail(forged, "CREDIT_NOTE_MANUAL", null, h.clock.now)).toBe(true);
+    expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0960"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN\n" });
+    expect((await invoices(paid.chargeId)).map((row) => row.kind)).toEqual(["INVOICE"]);
+    const unpaid = await h.buy();
+    expect(await invoiceCommand("--charge", unpaid.chargeId, "--kind", "INVOICE", "--requeue"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_CHARGE_NOT_PAID\n" });
+  });
+
+  it("records a Quaderno invoice by its document id, with the settings-link receipt (fix I-2)", async () => {
+    h.geo.country = "DE";
+    const bought = await h.buy({ country: "DE" });
+    const paying = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "DE" });
+    h.tax.failNext("TAX_SERVICE_REFUSED");
+    await h.settle(paying.transactionId);
+    await documents.drain(5);
+    expect(await listed(bought.chargeId)).toEqual([expect.objectContaining({ jobKind: "QUADERNO_RECORD_SALE", code: "TAX_SERVICE_REFUSED" })]);
+    const recorded = await invoiceCommand("--charge", bought.chargeId, "--kind", "INVOICE", "--record", "qd_7f3a91");
+    expect(recorded).toMatchObject({ code: 0, err: "" });
+    expect(recorded.out).toContain(`Recorded: Quaderno invoice qd_7f3a91 for charge ${bought.chargeId}. The receipt (M2) is queued`);
+    expect(recorded.out).not.toContain("e-Factura");
+    expect(await invoices(bought.chargeId)).toEqual([expect.objectContaining({
+      issuer: "QUADERNO", kind: "INVOICE", external_ref: "qd_7f3a91", number: "qd_7f3a91", total_micros: String(Math.round(Number(bought.totalDecimal) * 1_000_000))
+    })]);
+    expect((await h.outboxRows(bought.chargeId)).map((row) => row.ref)).toContain(`M2_INVOICE_LINK:${bought.chargeId}`);
+    expect(await listed(bought.chargeId)).toEqual([]);
+  });
+
   it("refuses a charge it does not know, one of the other xMoney system, and one with nothing listed", async () => {
     expect(await invoiceCommand("--charge", "f".repeat(32), "--kind", "INVOICE", "--requeue"))
       .toMatchObject({ code: 1, err: "BILLING_INVOICE_CHARGE_UNKNOWN\n" });

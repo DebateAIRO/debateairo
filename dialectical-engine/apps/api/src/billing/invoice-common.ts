@@ -164,10 +164,40 @@ export function saleRecordOf(
  * The refund a credit-note job names (`enqueueCreditNote`, P9c). Only a pointer: `creditNoteContext` credits the
  * amount of the charge's own REFUNDED row (P2-I5 (2)), so `refundMicros` is read here only to refuse a malformed row.
  */
-export function refundJobOf(job: OutboxJob): Readonly<{ chargeId: string; transactionId: string; refundMicros: number }> | null {
+export function refundJobOf(job: Pick<OutboxJob, "payload">): Readonly<{ chargeId: string; transactionId: string; refundMicros: number }> | null {
   const { charge_id: chargeId, transaction_id: transactionId, refund_micros: refundMicros } = job.payload;
   return typeof chargeId === "string" && typeof transactionId === "string" && typeof refundMicros === "number" && refundMicros > 0
     ? Object.freeze({ chargeId, transactionId, refundMicros }) : null;
+}
+
+/**
+ * The REFUNDED row a credit note credits (P2-I5 (2)), in ONE definition for the credit-note jobs (`creditNoteContext`)
+ * and `pnpm billing:invoice --record` (W12 fix I-2), so the two can never credit different amounts. The credit note
+ * credits what the charge records, never what the job says: the refund of the SALE's paid transaction, on its own row
+ * or on a refund transaction naming it (D5 5g), gives the amount and the date. A job naming any other transaction (a
+ * duplicate payment's refund was never a sale), or one with no such REFUNDED row, is MISSING. P9c's dashboard refund
+ * recorded on the payment itself (PROVIDER_REFUND, no refund transaction) holds only an upper bound: xMoney's read
+ * named no amount (`quarterSummaryRows` marks it amountKnown=false), so it is AMOUNT_UNKNOWN. A D5 5g PROVIDER_REFUND
+ * on its own refund transaction, and a PROVIDER_VOID, carry their true amount.
+ */
+export type SaleRefund =
+  | Readonly<{ kind: "BACKED"; refunded: ChargeEventRow; amountMicros: number }>
+  | Readonly<{ kind: "MISSING" }>
+  | Readonly<{ kind: "AMOUNT_UNKNOWN" }>;
+
+export function saleRefundOf(
+  charge: Readonly<{ events: readonly ChargeEventRow[] }>, paid: ChargeEventRow, transactionId: string
+): SaleRefund {
+  const refunded = transactionId === paid.xmoneyTransactionId
+    ? charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId)
+    : undefined;
+  if (refunded === undefined || refunded.amountMicros === null || refunded.amountMicros <= 0) {
+    return Object.freeze({ kind: "MISSING" as const });
+  }
+  if (refunded.errorCode === "PROVIDER_REFUND" && refunded.refundsTransactionId === null) {
+    return Object.freeze({ kind: "AMOUNT_UNKNOWN" as const });
+  }
+  return Object.freeze({ kind: "BACKED" as const, refunded, amountMicros: refunded.amountMicros });
 }
 
 /** What a credit-note job knows once its opening checks pass: the paid charge, the invoice it credits, the refund. */
@@ -199,29 +229,24 @@ export async function creditNoteContext(
   if (original === undefined) {
     return Object.freeze({ kind: "RETRY" as const, code: "INVOICE_ORIGINAL_MISSING", retryAt: failureRetryAt(job.attempts, now) });
   }
-  // P2-I5 (2): the credit note credits what the charge records, never what the job says. The refund of the SALE's
-  // paid transaction, on its own row or on a refund transaction naming it (D5 5g), gives the amount and the date; a
-  // job naming any other transaction (a duplicate payment's refund was never a sale) or one with no REFUNDED row yet
-  // (every real job is queued in the REFUNDED row's own transaction) waits, and dies when the schedule is spent.
-  const refunded = refund.transactionId === paid.paid.xmoneyTransactionId
-    ? paid.charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === refund.transactionId)
-    : undefined;
-  if (refunded === undefined || refunded.amountMicros === null || refunded.amountMicros <= 0) {
+  // P2-I5 (2): the credit note credits what the charge records, never what the job says (`saleRefundOf`). A job with
+  // no REFUNDED row of the sale yet (every real job is queued in the REFUNDED row's own transaction) waits, and dies
+  // when the schedule is spent.
+  const sale = saleRefundOf(paid.charge, paid.paid, refund.transactionId);
+  if (sale.kind === "MISSING") {
     return Object.freeze({ kind: "RETRY" as const, code: "CREDIT_NOTE_REFUND_MISSING", retryAt: failureRetryAt(job.attempts, now) });
   }
-  // P9c's dashboard refund recorded on the payment itself (PROVIDER_REFUND, no refund transaction) holds only an upper
-  // bound: xMoney's read named no amount (`quarterSummaryRows` marks it amountKnown=false). P9c queues no credit note
-  // for it, and a job that names it issues none at that figure: it goes to the owner (P16b lists the charge). A D5 5g
-  // PROVIDER_REFUND on its own refund transaction, and a PROVIDER_VOID, carry their true amount and stay automatic.
-  if (refunded.errorCode === "PROVIDER_REFUND" && refunded.refundsTransactionId === null) {
+  // P9c queues no credit note for a dashboard refund of unknown amount, and a job that names it issues none at that
+  // figure: it goes to the owner (P16b lists the charge as DASHBOARD_REFUND).
+  if (sale.kind === "AMOUNT_UNKNOWN") {
     deps.audit("billing.invoice.unknown", { issuer, kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
     return Object.freeze({ kind: "DEAD" as const, code: "CREDIT_NOTE_MANUAL" });
   }
   return Object.freeze({
     paid, original,
     refund: Object.freeze({
-      chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: refunded.at,
-      refundTotalMicros: refunded.amountMicros, original: { documentId: original.externalRef, number: original.number },
+      chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: sale.refunded.at,
+      refundTotalMicros: sale.amountMicros, original: { documentId: original.externalRef, number: original.number },
       // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language, the same sentence
       // the invoice carried for the period it credits (SmartBill's P5 still names its negative line itself).
       description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period)

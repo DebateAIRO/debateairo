@@ -28,11 +28,10 @@ import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { xmoneyEnvironmentOf } from "@debateai/payments-xmoney";
 import { loadBillingInvoiceEnvironment } from "@debateai/register";
 import { documentOfJob, issuerOfJob, isDocumentJobKind, unbackedDocumentCode, type DocumentJobKind } from "./dead-jobs.js";
-import type { RecordedCharge } from "./invoice-common.js";
+import { refundJobOf, saleRefundOf, type RecordedCharge } from "./invoice-common.js";
 import { recordQuadernoDocument } from "./invoice-quaderno.js";
 import { INVOICE_CONFIRMED_NOT_ISSUED, parseSmartBillReference, recordSmartBillDocument } from "./invoice-smartbill.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
-import { refundTarget } from "./rows.js";
 
 export type InvoiceArguments =
   | Readonly<{ chargeId: string; kind: "INVOICE" | "CREDIT_NOTE"; mode: "RECORD"; reference: string }>
@@ -167,7 +166,7 @@ async function record(deps: InvoiceCommandDeps, input: Readonly<{
   if (await deps.jobs.documentByExternalRef(issuer, externalRef)) {
     return refuse("BILLING_INVOICE_DOCUMENT_TAKEN", "this document is already recorded for a charge");
   }
-  const totalMicros = document === "INVOICE" ? charge.totalMicros : creditedMicros(charge, input.paid, dead.payload);
+  const totalMicros = document === "INVOICE" ? charge.totalMicros : creditedMicros(charge, input.paid, dead);
   const quote = charge.quoteId === null ? null : await deps.repository.quote(charge.quoteId, charge.ownerRef);
   const customer = await deps.repository.customerByOwner(charge.ownerRef);
   if (quote === null || customer === null) return refuse("BILLING_INVOICE_DATA_MISSING", "a paid charge without its quote or customer");
@@ -200,21 +199,20 @@ async function record(deps: InvoiceCommandDeps, input: Readonly<{
 
 /**
  * The amount a recorded credit note credits: the charge's own REFUNDED row for the sale's payment that the dead job
- * names (P2-I5 (2), as `creditNoteContext` reads it), never the job's figure. A job naming another transaction, or no
- * such row, is not backed; a dashboard refund recorded on the payment itself holds only an upper bound.
+ * names, read by the same `saleRefundOf` the credit-note jobs read (P2-I5 (2), W12 fix I-2), never the job's figure.
+ * A malformed job, one naming another charge or transaction, or no such row, is not backed; a dashboard refund
+ * recorded on the payment itself holds only an upper bound.
  */
-function creditedMicros(charge: PaidChargeRow, paid: ChargeEventRow, payload: OutboxJob["payload"]): number {
-  const transactionId = payload.transaction_id;
-  const refunded = typeof transactionId === "string" && transactionId === paid.xmoneyTransactionId
-    ? charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId)
-    : undefined;
-  if (refunded === undefined || refunded.amountMicros === null || refunded.amountMicros <= 0) {
+function creditedMicros(charge: PaidChargeRow, paid: ChargeEventRow, dead: ListedJob): number {
+  const refund = refundJobOf(dead);
+  const sale = refund === null || refund.chargeId !== charge.chargeId ? null : saleRefundOf(charge, paid, refund.transactionId);
+  if (sale === null || sale.kind === "MISSING") {
     return refuse("BILLING_INVOICE_NOTHING_TO_ISSUE", "no refund of the sale backs this credit note");
   }
-  if (refunded.errorCode === "PROVIDER_REFUND" && refunded.refundsTransactionId === null) {
+  if (sale.kind === "AMOUNT_UNKNOWN") {
     return refuse("BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN", "a dashboard refund whose amount only the dashboard shows");
   }
-  return refunded.amountMicros;
+  return sale.amountMicros;
 }
 
 export function renderInvoiceResult(input: InvoiceArguments, result: InvoiceResult): string {
