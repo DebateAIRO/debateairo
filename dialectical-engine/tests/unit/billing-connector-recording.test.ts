@@ -95,7 +95,8 @@ describe("P4 — the connector recorder and its scrubber", () => {
   });
 
   it("replaces every document link, whose path or query carries the document's access token (P2-M31)", () => {
-    const token = "Zx9tok3nSECRET";
+    // Built from pieces so the secret scan does not read this made-up value as a key (owner's ruling, PR #71).
+    const token = ["Zx9tok3", "nSECRET"].join("");
     const links = {
       // SmartBill (no sandbox: its recording is a real invoice of the company).
       url: `https://ws.smartbill.ro/invoice/view?token=${token}`,

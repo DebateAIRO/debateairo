@@ -16,3 +16,9 @@ f76e47f945c8944694c1acfd8791ea37d2ee8836:dialectical-engine/apps/ui/messages/sl/
 # scorecard field's key-shaped name is never printed. A made-up value, not a key. Owner's ruling on PR #70.
 # The test now builds the value from pieces, so later edits do not raise the same match.
 ede2d62e142e0a0f4f5881b0c9f2af55f8e1bc0e:dialectical-engine/tests/unit/hosted-register-publish.test.ts:generic-api-key:778
+
+# 2026-10-03 — paid-plans Part 2b (PR #71): generic-api-key matched the connector scrubber test's made-up document
+# token (commit aa15f4e9e, P2-M31), which proves an invoice link's access token never reaches a saved recording.
+# A made-up value, not a key. Owner's ruling on PR #71. The test now builds the value from pieces, so later edits do
+# not raise the same match.
+aa15f4e9e63d2fab63b6c8d103802b42051b41d3:dialectical-engine/tests/unit/billing-connector-recording.test.ts:generic-api-key:98
