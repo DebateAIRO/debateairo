@@ -218,6 +218,30 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(h.auditLines.slice(before)).toEqual([{ event: "billing.payment.mismatch", code: "CUSTOMER_MISMATCH" }]);
   });
 
+  it("ends the checkout ABANDONED and reads FAILED when the owner refunded its payment before we verified it (P2-M5)", async () => {
+    const bought = await h.buy();
+    // Refunded in the xMoney dashboard before any check of ours ran: the payment's own status is already refund-ok.
+    const refunded = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO", status: "refund-ok" });
+    await h.settle(refunded.transactionId);
+    // The money came and went: recorded as such, with no plan, no invoice and no M1.
+    expect(await h.eventKinds(bought.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED", "REFUND_REQUESTED", "REFUNDED"));
+    expect((await h.repository.subscriptionEvents(bought.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED", reason: "PROVIDER_REFUND" } });
+    expect(await subscriptionKinds(bought.subscriptionId)).not.toContain("ACTIVATED");
+    // The waiting screen never says "Your plan is active", and the person can buy again at once (no CHECKOUT_PENDING).
+    expect(await status(bought.chargeId, bought.ownerRef)).toEqual({ state: "FAILED", reasonCode: "PROVIDER_REFUND" });
+    const again = await h.buy({ ownerRef: bought.ownerRef });
+    expect(again.chargeId).not.toBe(bought.chargeId);
+  });
+
+  it("answers no one but the charge's owner about its status (P2-M16)", async () => {
+    const paid = await h.activate();
+    expect(await status(paid.chargeId, paid.ownerRef)).toEqual({ state: "SUCCEEDED", reasonCode: null });
+    // Another signed-in person who learned the charge reference reads nothing, as for a reference that does not exist.
+    expect(await status(paid.chargeId, randomUUID())).toBeNull();
+    expect(await status("0".repeat(32), paid.ownerRef)).toBeNull();
+  });
+
   it("refunds a card from a blocked country through the refund job: intent first, one call, no invoice, M11", async () => {
     const bought = await h.buy();
     const paid = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RU" });

@@ -744,6 +744,14 @@ export class VerifyPaymentHandler {
           xmoneyCreatedAt: transaction.createdAt
         }));
         if (inserted === "DUPLICATE") return;
+        // P2-M5: the checkout this payment was for bought nothing, so it ends now (folded under the lock), instead of
+        // holding CHECKOUT_PENDING for the 24 hours until P11b's sweep; the waiting screen reads FAILED (`chargeStatusOf`).
+        if (charge.kind === "INITIAL") {
+          const subscription = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId, client));
+          if (subscription.status === "CREATED") {
+            await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "ENDED", now, { cause: "ABANDONED", reason }));
+          }
+        }
       }
       if (amountMicros > 0) {
         const fields = { xmoneyTransactionId: transaction.transactionId, amountMicros, errorCode: reason };
