@@ -348,8 +348,9 @@ describe("P17 renderMail", () => {
     expect(owner.html).toContain("<pre");
     expect(owner.text.startsWith([
       "Hello,",
-      "A job that issues an invoice or a credit note, or that sends an email, stopped after its last try. Nothing more"
-        + " is tried by itself.",
+      // F4: true beside the M3 line ("the renewal waits and sends the notice again"), which can be in the same O3.
+      "A job that issues an invoice or a credit note, or that sends an email, stopped after its last try. That job is not"
+        + " tried again by itself; only the notice of a changed renewal amount (M3) is sent again, by the renewal.",
       "Job: SMARTBILL_INVOICE",
       "Reference: charge 0123456789abcdef0123456789abcdef",
       "Reason code: INVOICE_UNKNOWN",
