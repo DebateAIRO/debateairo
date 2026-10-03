@@ -8,7 +8,6 @@
   "runFailure.NOT_STARTED": "Še preden se je ta razprava začela, je na naši strani šlo nekaj narobe. Prosimo, vprašajte znova.",
   "runFailure.MODELS_UNAVAILABLE": "Te razprave ni bilo mogoče začeti, ker modeli UI, ki jih potrebuje, niso bili na voljo. Prosimo, poskusite znova čez nekaj časa.",
   "runFailure.RUN_LIMIT_REACHED": "Ta razprava je dosegla svojo omejitev, preden je lahko podala odgovor.",
-  "runFailure.DAILY_LIMIT_REACHED": "Današnja omejitev za razprave je bila dosežena, medtem ko se je ta razprava začenjala. Prosimo, vprašajte znova jutri.",
   "runFailure.STOPPED": "Ta razprava se je sredi poteka ustavila zaradi težave na naši strani. Prosimo, znova zastavite svoje vprašanje.",
   "debateChrome.error.unableToLoadDebate": "Razprave ni mogoče naložiti",
   "debateChrome.error.unableToLoadScoring": "Ocenjevanja ni mogoče naložiti",

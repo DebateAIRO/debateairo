@@ -8,7 +8,6 @@
   "runFailure.NOT_STARTED": "Valami hiba történt nálunk, mielőtt ez a vita elkezdődött volna. Kérjük, kérdezzen újra.",
   "runFailure.MODELS_UNAVAILABLE": "Ez a vita nem tudott elindulni, mert a szükséges MI-modellek nem voltak elérhetők. Kérjük, próbálja újra egy kis idő múlva.",
   "runFailure.RUN_LIMIT_REACHED": "Ez a vita elérte a korlátját, mielőtt választ adhatott volna.",
-  "runFailure.DAILY_LIMIT_REACHED": "A viták mai korlátja kimerült, miközben ez a vita indult. Kérjük, kérdezzen újra holnap.",
   "runFailure.STOPPED": "Ez a vita félúton leállt egy nálunk történt hiba miatt. Kérjük, tegye fel újra a kérdését.",
   "debateChrome.error.unableToLoadDebate": "A vita nem tölthető be",
   "debateChrome.error.unableToLoadScoring": "A pontozás nem tölthető be",

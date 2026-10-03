@@ -8,7 +8,6 @@
   "runFailure.NOT_STARTED": "Jotain meni vikaan meidän päässämme ennen kuin tämä väittely alkoi. Kysythän uudelleen.",
   "runFailure.MODELS_UNAVAILABLE": "Tätä väittelyä ei voitu aloittaa, koska sen tarvitsemat tekoälymallit eivät olleet käytettävissä. Yritäthän uudelleen hetken kuluttua.",
   "runFailure.RUN_LIMIT_REACHED": "Tämä väittely saavutti rajansa ennen kuin se ehti antaa vastauksen.",
-  "runFailure.DAILY_LIMIT_REACHED": "Tämän päivän raja väittelyille täyttyi juuri, kun tämä väittely oli alkamassa. Esitäthän kysymyksesi uudelleen huomenna.",
   "runFailure.STOPPED": "Tämä väittely pysähtyi kesken meidän päässämme olleen ongelman vuoksi. Esitäthän kysymyksesi uudelleen.",
   "debateChrome.error.unableToLoadDebate": "Väittelyä ei voitu ladata",
   "debateChrome.error.unableToLoadScoring": "Pisteytystä ei voitu ladata",

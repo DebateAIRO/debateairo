@@ -5,7 +5,7 @@ import test from "node:test";
 
 import { RUN_FAILURE_CODES, RUN_FAILURE_KINDS, runFailureKind, runFailureMessage } from "./runFailure.ts";
 
-// A failed debate is told to its asker in one of five sentences, never by the
+// A failed debate is told to its asker in one of four sentences, never by the
 // engine's own terminal reason code (owner ruling 2026-09-28: codes stay for
 // operators — the database, GET /v1/runs/:id, the logs, deploy/vps/README.md).
 
@@ -21,25 +21,32 @@ const LOCALES = readdirSync(messagesRoot, { withFileTypes: true })
 /** The two catalogues whose pages show a failed debate: the home list, and the debate page's banner. */
 const NAMESPACES = ["home", "debateChrome"];
 
-/** The owner's picks, 2026-09-28 (1b 2b 3b 4b 5b). */
+/** The owner's picks, 2026-09-28 (1b 2b 3b 5b); 4b was retired by the budget rule (spec 2026-09-28 §2.11). */
 const ENGLISH = Object.freeze({
   NOT_STARTED: "Something went wrong on our side before this debate began. Please ask again.",
   MODELS_UNAVAILABLE:
     "This debate could not start because the AI models it needs were unavailable. Please try again in a while.",
   RUN_LIMIT_REACHED: "This debate reached its limit before it could produce an answer.",
-  DAILY_LIMIT_REACHED: "Today's limit for debates ran out while this one was starting. Please ask again tomorrow.",
   STOPPED: "This debate stopped partway because of a problem on our side. Please ask your question again."
 });
 
 test("every code family lands in its group, whether or not the runner wrapped it", () => {
   const cases = [
     // The API records these after creating the run (PostgresAskApplication.submit);
-    // MODEL_ASSIGNMENT is the model-scorecard line's extra step, not yet on dev.
+    // MODEL_ASSIGNMENT is the model scorecard's extra step (pinning the picker's
+    // role assignment), on dev since Part 3 (P3-M18).
     ["RUN_SETUP_FAILED:ADMISSION_RELEASE", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:MEMORY_QUESTION", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:WORK_QUEUE", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:DISPATCH", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:MODEL_ASSIGNMENT", "NOT_STARTED"],
+    // Part 1b's setup steps (B6b, B7b, B8): a question that could not take its
+    // place in line, hold its estimate, start under its current plan, or record
+    // its roster swap never began.
+    ["RUN_SETUP_FAILED:WAITING_LINE", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:ROOM_HOLD", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:PLAN_CHANGED", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:COST_RECORD", "NOT_STARTED"],
     // The runner's claim-time refusals, first as written, then as the Hatchet
     // catch overwrites them (the role suffix is lost there).
     ["RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", "MODELS_UNAVAILABLE"],
@@ -47,8 +54,31 @@ test("every code family lands in its group, whether or not the runner wrapped it
     ["SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:SYNTHESIZER", "MODELS_UNAVAILABLE"],
     ["SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:EVALUATOR", "MODELS_UNAVAILABLE"],
     ["RUNNER_EXECUTION_FAILED:SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM", "MODELS_UNAVAILABLE"],
+    // Part 3's final review, P3-M18: the model scorecard's claim-time refusal.
+    // The role assignment pinned at the ask cannot seat a debate when the runner
+    // claims it, so the models chosen for it were not usable and it never began.
+    ["RUN_ROLE_ASSIGNMENT_INVALID", "MODELS_UNAVAILABLE"],
+    ["RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID", "MODELS_UNAVAILABLE"],
     ["RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL", "RUN_LIMIT_REACHED"],
-    ["RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED", "DAILY_LIMIT_REACHED"],
+    // Budget spec 2026-09-28 §2.11: group 4 is retired. The shared wall stops
+    // only the arguing, so these never end a debate; a stray one is STOPPED.
+    ["RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED", "STOPPED"],
+    ["DAILY_COST_ENVELOPE_REACHED", "STOPPED"],
+    ["RUNNER_EXECUTION_FAILED:PERSON_ALLOWANCE_REACHED", "STOPPED"],
+    // P3-M18: Part 3's other codes in the runner's alphabet, each a failure
+    // of a debate already under way (a seat marker the ledger refused, a
+    // question too long for a model's context window, a thinking level the
+    // vendor refused or changed, a usage cap that outlasted the seat's
+    // backup), so the debate stopped partway. The rest Part 3 added never
+    // end a run (ASK_MODEL_* refuse the ask, ANSWER_MODEL_ASSIGNMENT_INVALID
+    // is a serve-time log line, STRUCTURAL_CEILING_* refuses at admission)
+    // and would read STOPPED all the same.
+    ["RUNNER_EXECUTION_FAILED:CALL_SITE_SEAT_ALREADY_MARKED", "STOPPED"],
+    ["RUNNER_EXECUTION_FAILED:CALL_SITE_SEAT_MARKER_REQUIRED", "STOPPED"],
+    ["RUNNER_EXECUTION_FAILED:PROVIDER_CONTEXT_WINDOW_EXCEEDED", "STOPPED"],
+    ["RUNNER_EXECUTION_FAILED:PROVIDER_THINKING_LEVEL_CHANGED", "STOPPED"],
+    ["RUNNER_EXECUTION_FAILED:PROVIDER_THINKING_LEVEL_UNSUPPORTED", "STOPPED"],
+    ["RUNNER_EXECUTION_FAILED:PROVIDER_USAGE_CAP", "STOPPED"],
     // Owner ruling 2026-09-28: a re-claim that finds a step's tries used up is
     // "stopped partway", not a spending limit.
     ["CALL_BUDGET_EXHAUSTED", "STOPPED"],
@@ -82,7 +112,6 @@ test("says the owner's chosen English sentence in both catalogues, and on the En
     NOT_STARTED: "RUN_SETUP_FAILED:DISPATCH",
     MODELS_UNAVAILABLE: "RUNNER_EXECUTION_FAILED:RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
     RUN_LIMIT_REACHED: "RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL",
-    DAILY_LIMIT_REACHED: "RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED",
     STOPPED: "CALL_BUDGET_EXHAUSTED"
   };
   for (const kind of RUN_FAILURE_KINDS) {
@@ -138,7 +167,10 @@ test("words every group in all 35 locales, the same in both catalogues, with no 
       );
       seen.add(value);
     }
-    assert.equal(seen.size, RUN_FAILURE_KINDS.length, `${locale}: five different sentences`);
+    // Budget spec 2026-09-28 §2.11: the retired group-4 sentence is gone from both catalogues.
+    assert.equal(Object.hasOwn(home, "runFailure.DAILY_LIMIT_REACHED"), false, `${locale}/home still has group 4`);
+    assert.equal(Object.hasOwn(chrome, "runFailure.DAILY_LIMIT_REACHED"), false, `${locale}/debateChrome still has group 4`);
+    assert.equal(seen.size, RUN_FAILURE_KINDS.length, `${locale}: one different sentence per group`);
   }
 });
 
@@ -176,16 +208,42 @@ test("maps only codes their writers still produce", () => {
       runner.includes(`reason: "${code}"`) && thrown(code) && inAlphabet(code),
     SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM: (code) =>
       runner.includes(`reason: \`${code}:\${role}\``) && thrown(code) && inAlphabet(code),
-    RUN_CEILING_BELOW_FIRST_CALL: (code) => thrown(code) && inAlphabet(code),
-    // Not reachable today: the day's limit is asked only when a NEW run is
-    // admitted (the asker then sees requestFailure's DAILY_LIMIT_REACHED), never
-    // mid-run. The runner keeps it as a stop of its own kind all the same, and so
-    // does this table, so the day it is raised under way the asker reads its sentence.
-    DAILY_COST_ENVELOPE_REACHED: (code) => runner.includes(`${code}: "DAILY"`) && inAlphabet(code)
+    // P3-M18: the scorecard's claim-time refusal, written as the run's terminal
+    // reason and then thrown (the catch keeps it, since it is in the alphabet).
+    RUN_ROLE_ASSIGNMENT_INVALID: (code) =>
+      runner.includes(`reason: "${code}"`) && thrown(code) && inAlphabet(code),
+    RUN_CEILING_BELOW_FIRST_CALL: (code) => thrown(code) && inAlphabet(code)
   };
   assert.deepEqual(Object.keys(RUN_FAILURE_CODES).sort(), Object.keys(writers).sort(), "a writer check per mapped code");
   for (const [code, kind] of Object.entries(RUN_FAILURE_CODES)) {
     assert.ok(RUN_FAILURE_KINDS.includes(kind), `${code} → ${kind}`);
     assert.ok(writers[code](code), `${code} is still written where this table expects`);
+  }
+});
+
+test("a debate the site's day stopped is told the group-5 sentence (budget spec 2026-09-28 §2.11)", () => {
+  assert.equal(RUN_FAILURE_KINDS.includes("DAILY_LIMIT_REACHED"), false, "group 4 is retired");
+  assert.equal(Object.hasOwn(RUN_FAILURE_CODES, "DAILY_COST_ENVELOPE_REACHED"), false, "the day's code maps to no group of its own");
+  for (const reason of [
+    "RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED",
+    "DAILY_COST_ENVELOPE_REACHED",
+    "DAILY_LIMIT_REACHED",
+    "RUNNER_EXECUTION_FAILED:PERSON_ALLOWANCE_REACHED",
+    "PERSON_ALLOWANCE_REACHED"
+  ]) {
+    assert.equal(runFailureKind(reason), "STOPPED", `${reason} → STOPPED`);
+    for (const namespace of NAMESPACES) {
+      assert.equal(runFailureMessage(reason, catalogue("en", namespace)), ENGLISH.STOPPED, `en/${namespace} ${reason}`);
+    }
+  }
+});
+
+test("a debate whose pinned models could not be seated at claim is told the models sentence (P3-M18)", () => {
+  for (const reason of ["RUN_ROLE_ASSIGNMENT_INVALID", "RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID"]) {
+    for (const namespace of NAMESPACES) {
+      assert.equal(
+        runFailureMessage(reason, catalogue("en", namespace)), ENGLISH.MODELS_UNAVAILABLE, `en/${namespace} ${reason}`
+      );
+    }
   }
 });

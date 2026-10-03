@@ -136,7 +136,8 @@ describe("LOAD-01 real debate-page render", () => {
     expect(html).toContain("Provider recovery hold");
     expect(html).toContain("10 minutes remaining");
     expect(html).toContain("one final attempt is scheduled");
-    expect(RUN_FAILURE_SENTENCES).toHaveLength(5);
+    // Four groups since the day's-limit sentence was retired (budget spec 2026-09-28 §2.11).
+    expect(RUN_FAILURE_SENTENCES).toHaveLength(4);
     for (const sentence of RUN_FAILURE_SENTENCES) expect(html).not.toContain(sentence);
   });
 

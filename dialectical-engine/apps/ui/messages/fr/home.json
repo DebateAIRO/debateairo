@@ -24,7 +24,6 @@
   "runFailure.NOT_STARTED": "Un problème est survenu de notre côté avant le début de ce débat. Veuillez poser votre question à nouveau.",
   "runFailure.MODELS_UNAVAILABLE": "Ce débat n’a pas pu démarrer, car les modèles d’IA dont il a besoin étaient indisponibles. Veuillez réessayer un peu plus tard.",
   "runFailure.RUN_LIMIT_REACHED": "Ce débat a atteint sa limite avant de pouvoir apporter une réponse.",
-  "runFailure.DAILY_LIMIT_REACHED": "La limite du jour pour les débats a été atteinte pendant le lancement de celui-ci. Veuillez reposer votre question demain.",
   "runFailure.STOPPED": "Ce débat s’est interrompu en cours de route à cause d’un problème de notre côté. Veuillez reposer votre question.",
   "home.status.waiting": "En attente de démarrage. Votre débat démarrera de lui-même à {time}.",
   "home.status.waitingOwnDebates": "Vos autres débats utilisent pour l’instant le reste de votre limite. Celui-ci démarrera de lui-même dès que l’un d’eux sera terminé.",

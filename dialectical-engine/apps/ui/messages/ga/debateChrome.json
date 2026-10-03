@@ -8,7 +8,6 @@
   "runFailure.NOT_STARTED": "Chuaigh rud éigin mícheart ar ár dtaobh sular thosaigh an díospóireacht seo. Cuir an cheist arís, le do thoil.",
   "runFailure.MODELS_UNAVAILABLE": "Níorbh fhéidir an díospóireacht seo a thosú mar nach raibh na samhlacha IS a bhí de dhíth uirthi ar fáil. Bain triail eile as ar ball, le do thoil.",
   "runFailure.RUN_LIMIT_REACHED": "Shroich an díospóireacht seo a teorainn sula raibh sí in ann freagra a thabhairt.",
-  "runFailure.DAILY_LIMIT_REACHED": "Sroicheadh teorainn an lae inniu do dhíospóireachtaí agus an ceann seo á thosú. Cuir do cheist arís amárach, le do thoil.",
   "runFailure.STOPPED": "Stad an díospóireacht seo i lár báire mar gheall ar fhadhb ar ár dtaobh. Cuir do cheist arís, le do thoil.",
   "debateChrome.error.unableToLoadDebate": "Ní féidir an díospóireacht a lódáil",
   "debateChrome.error.unableToLoadScoring": "Ní féidir an scóráil a lódáil",
