@@ -142,6 +142,64 @@ describe("S4b · a Free ask on a site that sells plans takes Free's own, stricte
   });
 });
 
+describe("S4b fix round 1 · a Free answer writer or checker takes no FALLBACK seat on a site that sells plans", () => {
+  // The scorecard scores the four candidates in ONE answer role only: the other answer role has no
+  // eligible candidate. A FALLBACK answer seat would hand that role to the register's own answer
+  // models (pre-flight ruling F18), which no plan roster bounds — so a Free ask is refused instead.
+  const scoredIn = (role: "ANSWER_WRITER" | "ANSWER_CHECKER"): Scorecard => testScorecard(CAST, { [role]: WRITER_ENTRIES }, {
+    diversityShare: 0,
+    planStrengthCaps: { free: "ECONOMY" },
+    economyCap: everyRole(EXAMPLE_ECONOMY_CAP_MICROS),
+    freeCap: freeCaps(EXAMPLE_FREE_CAP_MICROS)
+  });
+  const answerPick = (overrides: Partial<PickerInput>, scorecard: Scorecard) => pickRoleAssignment(testPickerInput({
+    scorecard,
+    reachable: CAST.map((candidate) => targetFor(candidate)),
+    seatDemand: roleNumbers({ ANSWER_WRITER: 1, ANSWER_CHECKER: 1 }),
+    mode: "HOSTED",
+    prices: PRICES,
+    ...overrides
+  }));
+
+  it.each([
+    ["ANSWER_WRITER", "ANSWER_CHECKER"],
+    ["ANSWER_CHECKER", "ANSWER_WRITER"]
+  ] as const)("refuses a Free ask NO_REACHABLE_CANDIDATE when no scored reachable model can take its %s", (unscored, scored) => {
+    const outcome = answerPick({ planTier: "free", plansSold: true }, scoredIn(scored));
+    expect(outcome).toMatchObject({ state: "REFUSED", reason: "NO_REACHABLE_CANDIDATE" });
+    if (outcome.state === "REFUSED") expect(outcome.detail).toContain(unscored);
+  });
+
+  it.each([
+    ["billing off (plansSold false)", { planTier: "free" as const, plansSold: false }],
+    ["billing off (plansSold absent)", { planTier: "free" as const }],
+    ["a paid ask", { planTier: "premium" as const, plansSold: true, strength: "ECONOMY" as const }],
+    ["local mode", { mode: "LOCAL" as const, planTier: "free" as const, plansSold: true, prices: new Map() }]
+  ])("keeps the FALLBACK answer seat for %s, as before", (_name, overrides) => {
+    for (const scored of ["ANSWER_WRITER", "ANSWER_CHECKER"] as const) {
+      const outcome = assignedOutcome(answerPick(overrides, scoredIn(scored)));
+      const unscored = scored === "ANSWER_WRITER" ? "ANSWER_CHECKER" : "ANSWER_WRITER";
+      expect(outcome.assignment.roles[unscored].map((seat) => seat.source)).toEqual(["FALLBACK"]);
+      expect(outcome.assignment.roles[scored].map((seat) => seat.source)).toEqual(["SCORECARD"]);
+      expect(outcome.notes).toContain(`ROLE_FALLBACK:${unscored}:NO_ELIGIBLE_CANDIDATE`);
+    }
+  });
+
+  it("keeps a Free ask's debate roles on their FALLBACK seats: only the answer roles are held to the scorecard", () => {
+    const outcome = assignedOutcome(pickRoleAssignment(testPickerInput({
+      scorecard: writerScorecard(),
+      reachable: CAST.map((candidate) => targetFor(candidate)),
+      seatDemand: roleNumbers({ JUDGE: 1, ANSWER_WRITER: 1 }),
+      mode: "HOSTED",
+      prices: PRICES,
+      planTier: "free",
+      plansSold: true
+    })));
+    expect(outcome.assignment.roles.JUDGE.map((seat) => seat.source)).toEqual(["FALLBACK"]);
+    expect(outcome.assignment.roles.ANSWER_WRITER.map((seat) => seat.source)).toEqual(["SCORECARD"]);
+  });
+});
+
 describe("S4b · freeCapsFollowPaidSiteRule: every role's Free cap is set and at or below its Economy cap", () => {
   const settingsWith = (freeCap: PickerSettings["freeCap"], economyCap = everyRole(EXAMPLE_ECONOMY_CAP_MICROS)) =>
     ({ freeCap, economyCap });
@@ -285,9 +343,27 @@ describe("S4b · a Free ask's seats and fallbacks come only from the Free roster
     freeCap: freeCaps(EXAMPLE_FREE_CAP_MICROS)
   });
 
-  function hostedPicker(plansSold: boolean): AskModelPickerSettings {
+  // S4b fix round 1: the same scorecard, which also scores both Free-roster models in the two answer
+  // roles (and in no debate role).
+  const freeCandidates = PANEL.filter((entry) => PLAN_TIER_ROSTERS.free.includes(entry.model_id))
+    .map((entry) => testCandidate(entry.model_id, entry.maker, { modelId: entry.model_id }));
+  const SCORECARD_WITH_FREE_ANSWERS = testScorecard([...candidates, ...freeCandidates], Object.fromEntries(DEBATE_ROLES.map((role) => [
+    role, [
+      ...candidates.map((candidate, index) => testEntry(candidate.candidateId, 95 - index, 10)),
+      ...(role === "ANSWER_WRITER" || role === "ANSWER_CHECKER"
+        ? freeCandidates.map((candidate, index) => testEntry(candidate.candidateId, 80 - index, 10))
+        : [])
+    ]
+  ])), {
+    diversityShare: 0.2,
+    planStrengthCaps: { free: "ECONOMY" },
+    economyCap: everyRole(EXAMPLE_ECONOMY_CAP_MICROS),
+    freeCap: freeCaps(EXAMPLE_FREE_CAP_MICROS)
+  });
+
+  function hostedPicker(plansSold: boolean, scorecard: Scorecard = SCORECARD): AskModelPickerSettings {
     return Object.freeze({
-      scorecard: Object.freeze({ state: "VALID" as const, scorecard: SCORECARD, sourceRef: "test:s4b" }),
+      scorecard: Object.freeze({ state: "VALID" as const, scorecard, sourceRef: "test:s4b" }),
       mode: "HOSTED" as const,
       targetFacts: new Map<string, AskTargetFacts>(PANEL.map((entry) => [entry.provider_ref, Object.freeze({
         thinkingLevels: Object.freeze([]), contextWindowTokens: null,
@@ -304,14 +380,24 @@ describe("S4b · a Free ask's seats and fallbacks come only from the Free roster
   const seatedModels = (roles: Readonly<Record<string, readonly RoleSeat[]>>): string[] => Object.values(roles)
     .flatMap((seats) => seats.flatMap((seat) => [seat.main.modelId, ...(seat.runnerUp === null ? [] : [seat.runnerUp.modelId])]));
 
-  it("with billing on, a Free ask whose roles all fall back seats Free-roster models only, never a premium one", async () => {
-    const admitted = await evaluateAskAdmission(settingsWith(hostedPicker(true)), ask("free", "BEST"));
+  it("with billing on, a Free ask whose debate roles fall back seats Free-roster models only, and scored Free-roster answer models", async () => {
+    const admitted = await evaluateAskAdmission(settingsWith(hostedPicker(true, SCORECARD_WITH_FREE_ANSWERS)), ask("free", "BEST"));
     const assignment = admitted.modelAssignment!.assignment;
     const models = seatedModels(assignment.roles);
     expect(models.length).toBeGreaterThan(0);
     expect(models.every((model) => PLAN_TIER_ROSTERS.free.includes(model))).toBe(true);
     expect(admitted.discoveredPanel.map((entry) => entry.model_id)).toEqual([FREE_OPENAI, FREE_ANTHROPIC]);
-    expect(Object.values(assignment.roles).flat().every((seat) => seat.source === "FALLBACK")).toBe(true);
+    for (const role of ["POSITION", "SUPPORT_ATTACK", "CROSS_EXCHANGE", "JUDGE", "REVIEWER"] as const) {
+      expect(assignment.roles[role].every((seat) => seat.source === "FALLBACK")).toBe(true);
+    }
+    for (const role of ["ANSWER_WRITER", "ANSWER_CHECKER"] as const) {
+      expect(assignment.roles[role].map((seat) => seat.source)).toEqual(["SCORECARD"]);
+    }
+  });
+
+  it("with billing on, a Free ask whose answer roles no scored Free-roster model can take is refused, never handed to the register's answer models", async () => {
+    await expect(evaluateAskAdmission(settingsWith(hostedPicker(true)), ask("free", "BEST")))
+      .rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
   });
 
   it("with billing on, a paid ask still seats the scored models", async () => {
@@ -322,6 +408,65 @@ describe("S4b · a Free ask's seats and fallbacks come only from the Free roster
   it("with billing off nothing changes: the same Free ask is seated from every reachable model, as before", async () => {
     const admitted = await evaluateAskAdmission(settingsWith(hostedPicker(false)), ask("free", "BEST"));
     expect(seatedModels(admitted.modelAssignment!.assignment.roles).some((model) => !PLAN_TIER_ROSTERS.free.includes(model))).toBe(true);
+  });
+
+  describe("the A5 seam (S4a judge's carry (a1)): a Free person whose room is too small for every strength", () => {
+    // Every role scores Free-roster A (quality 85, 100 micros a call), Free-roster B (quality 92, 250
+    // micros) and a premium-roster model that would beat both (quality 99, 50 micros). Free's cap is
+    // 150, Economy's 300: Free's own pick is A where Economy's looser cap would take B, and the
+    // premium model is out of a Free seat by the roster.
+    const FREE_A = FREE_OPENAI!;
+    const FREE_B = FREE_ANTHROPIC!;
+    const MICROS_PER_CALL = new Map<string, number>([[FREE_A, 100], [FREE_B, 250], [PAID_OPENAI!, 50]]);
+    const a5Candidates = PANEL.filter((entry) => MICROS_PER_CALL.has(entry.model_id))
+      .map((entry) => testCandidate(entry.model_id, entry.maker, { modelId: entry.model_id }));
+    const QUALITY = new Map<string, number>([[FREE_A, 85], [FREE_B, 92], [PAID_OPENAI!, 99]]);
+    const a5Scorecard = (freeCapMicros: number): Scorecard => testScorecard(a5Candidates, Object.fromEntries(DEBATE_ROLES.map((role) => [
+      role, a5Candidates.map((candidate) => testEntry(candidate.candidateId, QUALITY.get(candidate.modelId)!, 10))
+    ])), {
+      diversityShare: 0.2,
+      planStrengthCaps: { free: "ECONOMY" },
+      economyCap: everyRole(EXAMPLE_ECONOMY_CAP_MICROS),
+      freeCap: freeCaps(freeCapMicros)
+    });
+    const a5Picker = (scorecard: Scorecard, log: (line: string) => void): AskModelPickerSettings => Object.freeze({
+      ...hostedPicker(true, scorecard),
+      // One testEntry call is 1000 input tokens: `micros * 1000` per million tokens costs `micros` a call.
+      targetFacts: new Map<string, AskTargetFacts>(PANEL.map((entry) => [entry.provider_ref, Object.freeze({
+        thinkingLevels: Object.freeze([]), contextWindowTokens: null,
+        price: Object.freeze({ inputMicrosPerMTok: (MICROS_PER_CALL.get(entry.model_id) ?? 1) * 1000, outputMicrosPerMTok: 0 })
+      })])),
+      log
+    });
+    const AT = new Date("2026-10-03T12:00:00.000Z");
+    // A person room of 10 micros: no strength fits it.
+    const TINY_ROOM = Object.freeze({
+      uses: Object.freeze([Object.freeze({
+        scope: "PERSON_DAY" as const, limitMicros: 10, usedMicros: 0,
+        resetsAt: new Date("2026-10-04T00:00:00.000Z"), closeBasisPoints: 9_500
+      })]),
+      at: AT
+    });
+
+    it("starts through A5 on Free's own pick under Free's cap, seated from the Free roster only", async () => {
+      const lines: string[] = [];
+      const admitted = await evaluateAskAdmission(settingsWith(a5Picker(a5Scorecard(EXAMPLE_FREE_CAP_MICROS), (line) => lines.push(line))), ask("free", "BEST"), TINY_ROOM);
+      expect(admitted.personRoomTight).toBe(true);
+      expect(lines).toContain("MODEL_PICKER note PERSON_ROOM_BELOW_ECONOMY");
+      expect(lines).toContain("MODEL_PICKER note FREE_CAPS");
+      const assignment = admitted.modelAssignment!.assignment;
+      expect(assignment.strength).toBe("ECONOMY");
+      expect(assignment.roles.ANSWER_WRITER.map((seat) => [seat.source, seat.main.modelId])).toEqual([["SCORECARD", FREE_A]]);
+      const models = seatedModels(assignment.roles);
+      expect(models.every((model) => PLAN_TIER_ROSTERS.free.includes(model))).toBe(true);
+      expect(models).not.toContain(PAID_OPENAI);
+    });
+
+    it("(control) with Free's cap at Economy's, the same Free ask's writer is Economy's looser pick, B", async () => {
+      const admitted = await evaluateAskAdmission(settingsWith(a5Picker(a5Scorecard(EXAMPLE_ECONOMY_CAP_MICROS), () => undefined)), ask("free", "BEST"), TINY_ROOM);
+      expect(admitted.personRoomTight).toBe(true);
+      expect(admitted.modelAssignment!.assignment.roles.ANSWER_WRITER[0]?.main.modelId).toBe(FREE_B);
+    });
   });
 
   it("with billing on and no Free-roster model reachable, the Free ask takes the existing no-model path", async () => {

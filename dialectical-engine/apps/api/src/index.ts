@@ -3432,6 +3432,11 @@ async function admitWithScorecard(input: Readonly<{
   // Free roster only, and its ECONOMY pick reads Free's own caps (the picker's
   // `plansSold`). With no Free-roster model reachable it takes the path of a role
   // with no eligible model below; no premium-roster model ever takes a Free seat.
+  // S4b fix round 1: its answer writer and answer checker never fall back, since a
+  // FALLBACK answer seat is served by the register's sealed refs (F18), which no
+  // roster bounds. With no scored Free-roster model for one of them the picker
+  // leaves the role empty and refuses NO_REACHABLE_CANDIDATE, which the asker reads
+  // as ASK_MODEL_CANDIDATE_UNAVAILABLE.
   // B8 already rewrote `ask.plan_tier` to the person's plan's tier with billing on.
   const plansSold = picker.mode === "HOSTED" && picker.plansSold === true;
   const freeRosterOnly = plansSold && ask.plan_tier === "free";

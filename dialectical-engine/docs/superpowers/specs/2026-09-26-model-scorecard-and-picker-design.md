@@ -117,7 +117,7 @@ The scorecard is a single JSON document. Its schema is published in the public r
 |---|---|
 | `balancedMargin` | How many points below the best still counts as "not clearly worse". |
 | `economyCap` | Per role, a money cost per call (hosted) and seconds per call (local). |
-| `freeCap` | Optional. Per role, Free's own money cost per call, at or below `economyCap` (paid plans S4b, 3 October 2026): on a site that sells plans, a Free ask's Economy pick reads it instead of `economyCap`, from the Free plan's models only. |
+| `freeCap` | Optional. Per role, Free's own money cost per call, at or below `economyCap` (paid plans S4b, 3 October 2026): on a site that sells plans, a Free ask's Economy pick reads it instead of `economyCap`, from the Free plan's models only. Its answer writer and answer checker take no fallback there: a scored Free-plan model, or the ask is refused `ASK_MODEL_CANDIDATE_UNAVAILABLE` (the register's `synthesisRoles` never serve a Free answer). |
 | `planStrengthCaps` | For example `free → BALANCED`. |
 
 **Rules for the file**

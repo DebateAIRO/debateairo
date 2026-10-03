@@ -33,10 +33,14 @@ import type { BootCustody } from "./boot-custody.js";
  *    roster order (what the roster filter seats today), then every other
  *    healthy discovered target in discovery order — so a role the scorecard
  *    does not cover falls back to the model today's roster would seat (debate
- *    roles; the answer roles keep their sealed refs). Paid plans S4b: on a site
- *    that sells plans (`plansSold`) a FREE ask's reachable targets are the Free
- *    roster's models only, so its seats, runner-ups and fallbacks all come from
- *    the Free roster (the owner's ruling of 3 October 2026);
+ *    roles; an answer role the scorecard does not cover keeps the register's
+ *    sealed refs — except as below). Paid plans S4b: on a site that sells plans
+ *    (`plansSold`) a FREE ask's reachable targets are the Free roster's models
+ *    only, so its seats, runner-ups and debate-role fallbacks all come from the
+ *    Free roster (the owner's ruling of 3 October 2026); its ANSWER_WRITER and
+ *    ANSWER_CHECKER take no fallback at all (the sealed refs are bound to no
+ *    roster): a scored Free-roster model, or the ask is refused
+ *    ASK_MODEL_CANDIDATE_UNAVAILABLE (S4b fix round 1);
  *  - SEAT DEMAND — how many debaters the plan seats (its roster's LENGTH,
  *    capped by the distinct makers reachable) and a seat per debater in every
  *    debate role; one each for the two answer roles;
