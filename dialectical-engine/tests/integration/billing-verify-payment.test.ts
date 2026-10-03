@@ -466,6 +466,31 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "REFUNDED")).toHaveLength(1);
   });
 
+  it("hands the owner a dashboard refund of the same amount as our landed refund, never reading it as ours (P2-M1)", async () => {
+    const paid = await h.activate();
+    h.xmoney.refundLostResponses = 1;
+    await h.repository.withTransaction((client) => h.refunds.requestAll(client, {
+      ownerRef: paid.ownerRef, reason: "WITHDRAWAL", at: h.clock.now,
+      allocations: [{ chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 12_100_000 }]
+    }));
+    await h.worker.drain(10);
+    h.clock.advance(61_000);
+    await h.worker.drain(10);
+    // Ours landed and is recorded on its own refund transaction (the payment still reads complete-ok: a partial refund).
+    const [ours] = h.xmoney.refundTransactionsOf(paid.transaction.transactionId);
+    expect((await h.repository.charge(paid.chargeId))!.events.find((event) => event.kind === "REFUNDED"))
+      .toMatchObject({ xmoneyTransactionId: ours!.transactionId, amountMicros: 12_100_000 });
+    // The owner then refunds the same 12.10 again in the dashboard: another refund transaction, not ours.
+    await h.xmoney.refund({ transactionId: paid.transaction.transactionId, amountDecimal: "12.10", reason: "customer-demand", message: "dashboard" });
+    const dashboard = h.xmoney.refundTransactionsOf(paid.transaction.transactionId).find((row) => row.transactionId !== ours!.transactionId);
+    const linesBefore = h.auditLines.length;
+    await h.settle(dashboard!.transactionId);
+    expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "REFUNDED")).toHaveLength(1);
+    expect((await h.outboxRows(dashboard!.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === dashboard!.transactionId))
+      .toEqual([expect.objectContaining({ dead: true, lastErrorCode: "REFUND_UNRECORDED" })]);
+    expect(h.auditLines.slice(linesBefore)).toContainEqual({ event: "billing.refund.unrecorded", reason: "PROVIDER_REFUND" });
+  });
+
   it("never sends a partial refund twice when its answer was lost and xMoney shows no refund row; the owner gets it (A4c)", async () => {
     const paid = await h.activate();
     const before = h.xmoney.refunds.length;

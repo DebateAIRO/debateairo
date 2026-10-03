@@ -1040,6 +1040,31 @@ export class BillingRepository {
   }
 
   /**
+   * P2-M1: the amounts (micros) of the REFUNDED rows written on each of these paid transactions' own rows, in one
+   * xMoney system: our refunds recorded when their call answered, and a provider refund read from the payment's own
+   * status. A refund xMoney lists as its own transaction is settled through its payment only by one of these of the
+   * same amount; any other is a refund made elsewhere, for VERIFY_PAYMENT to record or hand to the owner.
+   */
+  async refundedAmountsByPayment(
+    paymentIds: readonly string[], environment: CustomerXMoneyEnvironment
+  ): Promise<ReadonlyMap<string, ReadonlyArray<number>>> {
+    const amounts = new Map<string, number[]>();
+    if (paymentIds.length === 0) return amounts;
+    const result = await this.pool.query<{ transaction_id: string; amount_micros: string | null }>(`
+      SELECT xmoney_transaction_id::text AS transaction_id, amount_micros
+      FROM billing.charge_event
+      WHERE kind = 'REFUNDED' AND xmoney_environment = $2 AND xmoney_transaction_id::text = ANY($1::text[])
+    `, [[...new Set(paymentIds)], environment]);
+    for (const row of result.rows) {
+      if (row.amount_micros === null) continue;
+      const seen = amounts.get(row.transaction_id) ?? [];
+      seen.push(micros(row.amount_micros));
+      amounts.set(row.transaction_id, seen);
+    }
+    return amounts;
+  }
+
+  /**
    * P14a: charges of these kinds in one xMoney system with neither SUCCEEDED nor FAILED, created before
    * `createdBefore`, oldest first.
    */

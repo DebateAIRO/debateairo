@@ -155,23 +155,31 @@ export function expectedChargeEventKinds(
 
 /**
  * Whether our rows already hold this transaction's final outcome. A refund that is its own transaction is also
- * settled by the REFUNDED on a payment it names (`relatedTransactionIds`, D5 5g): RefundDesk records our own refund
- * on the payment it refunded. A dispute that is its own transaction is settled by the CHARGEBACK of a payment it names
+ * settled by a REFUNDED of the same amount on a payment it names (`relatedTransactionIds`, D5 5g): RefundDesk records
+ * our own refund on the payment it refunded, and P9c a provider refund read from the payment's own status. P2-M1: a
+ * REFUNDED of another amount never settles it (a dashboard refund after our partial one would go unrecorded, with
+ * no credit note and no owner item); VERIFY_PAYMENT then records it or hands it to the owner. `refunded` holds those
+ * amounts by payment id. A dispute that is its own transaction is settled by the CHARGEBACK of a payment it names
  * (P2-I2): VERIFY_PAYMENT records one dispute once, under the payment's id. `recorded` holds the kinds by transaction
  * id, the related payments' included.
  */
 export function transactionSettled(
-  transaction: Pick<XMoneyTransaction, "transactionId" | "status" | "transactionType" | "relatedTransactionIds">,
-  recorded: ReadonlyMap<string, ReadonlySet<ChargeEventKind>>
+  transaction: Pick<XMoneyTransaction, "transactionId" | "status" | "transactionType" | "relatedTransactionIds" | "amountDecimal">,
+  recorded: ReadonlyMap<string, ReadonlySet<ChargeEventKind>>,
+  refunded: ReadonlyMap<string, ReadonlyArray<number>>
 ): boolean {
   const expected = expectedChargeEventKinds(transaction);
   if (expected === null) return false;
   const own = recorded.get(transaction.transactionId);
   if (own !== undefined && expected.some((kind) => own.has(kind))) return true;
   const route = transactionRoute(transaction.transactionType);
-  const settledBy: ChargeEventKind | null = route === "REFUND" ? "REFUNDED" : route === "DISPUTE" ? "CHARGEBACK" : null;
-  return settledBy !== null
-    && transaction.relatedTransactionIds.some((paymentId) => recorded.get(paymentId)?.has(settledBy) ?? false);
+  if (route === "REFUND") {
+    const amount = amountOf(transaction);
+    return amount !== null
+      && transaction.relatedTransactionIds.some((paymentId) => refunded.get(paymentId)?.includes(amount) ?? false);
+  }
+  return route === "DISPUTE"
+    && transaction.relatedTransactionIds.some((paymentId) => recorded.get(paymentId)?.has("CHARGEBACK") ?? false);
 }
 
 /** A payment that can be a rebill's: never a refund, a dispute or a representment (D5 5g, P2-I2). */
@@ -179,7 +187,7 @@ function isPayment(transaction: XMoneyTransaction): boolean {
   return transactionRoute(transaction.transactionType) === "PAYMENT";
 }
 
-function amountOf(transaction: XMoneyTransaction): number | null {
+function amountOf(transaction: Pick<XMoneyTransaction, "amountDecimal">): number | null {
   try {
     return decimalToMicros(transaction.amountDecimal);
   } catch {
@@ -368,11 +376,16 @@ export class BillingReconciler {
     // The kinds of every listed transaction and of every payment a listed refund names.
     const ids = [...byId.values()].flatMap((transaction) => [transaction.transactionId, ...transaction.relatedTransactionIds]);
     const recorded = await this.deps.billing.chargeEventKindsByTransaction(ids, environment);
+    const refunded = await this.deps.billing.refundedAmountsByPayment(
+      [...byId.values()].filter((transaction) => transactionRoute(transaction.transactionType) === "REFUND")
+        .flatMap((transaction) => transaction.relatedTransactionIds),
+      environment
+    );
     const touched = new Set<string>();
     let enqueued = 0;
     let uncertain = false;
     for (const transaction of byId.values()) {
-      const settled = transactionSettled(transaction, recorded);
+      const settled = transactionSettled(transaction, recorded, refunded);
       // Any payment not yet settled on our side — final or still in flight — marks its order as reached, so its
       // checkout charge is never failed as "no transaction". The lookups run only when a charge could be failed. A
       // refund is matched through the payment it names, never through its order (D5 5g).

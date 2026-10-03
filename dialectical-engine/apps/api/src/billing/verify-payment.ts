@@ -645,7 +645,11 @@ export class VerifyPaymentHandler {
       await this.outcome(noticeId, now, "REFUNDED");
       return DONE;
     }
-    const ours = charge.events.some((event) => event.kind === "REFUNDED" && refundTarget(event) === paymentId
+    // P2-M1: only a REFUNDED written on the payment's own row (our call's answer) can be this refund's own report: one
+    // recorded on another refund transaction (our landed refund) already settled that transaction, so a same-amount
+    // refund now is a second one made elsewhere, for the owner. On the payment's own row the amount is all there is
+    // to tell ours from a dashboard refund of the same amount until X0 (g)/(h) shows xMoney's real report.
+    const ours = charge.events.some((event) => event.kind === "REFUNDED" && event.xmoneyTransactionId === paymentId
       && event.errorCode !== "PROVIDER_REFUND" && event.errorCode !== "PROVIDER_VOID"
       && amountMatches(transaction.amountDecimal, event.amountMicros ?? -1));
     if (ours) {

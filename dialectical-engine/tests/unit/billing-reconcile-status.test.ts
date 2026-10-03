@@ -37,15 +37,32 @@ describe("P14a what a listed transaction should already have left in our rows", 
       ["72", new Set<ChargeEventKind>(["SUCCEEDED", "REFUNDED"])],
       ["73", new Set<ChargeEventKind>(["SUCCEEDED"])]
     ]);
-    const payment = { transactionId: "71", status: "complete-ok" as const, transactionType: "deposit", relatedTransactionIds: [] };
-    expect(transactionSettled(payment, recorded)).toBe(true);
-    expect(transactionSettled({ ...payment, transactionId: "79" }, recorded)).toBe(false);
-    const refund = { transactionId: "80", status: "complete-ok" as const, transactionType: "refund", relatedTransactionIds: ["72"] };
-    expect(transactionSettled(refund, recorded)).toBe(true);
+    const refunded = new Map<string, ReadonlyArray<number>>([["72", [2_000_000]]]);
+    const payment = { transactionId: "71", status: "complete-ok" as const, transactionType: "deposit", relatedTransactionIds: [], amountDecimal: "24.20" };
+    expect(transactionSettled(payment, recorded, refunded)).toBe(true);
+    expect(transactionSettled({ ...payment, transactionId: "79" }, recorded, refunded)).toBe(false);
+    const refund = { transactionId: "80", status: "complete-ok" as const, transactionType: "refund", relatedTransactionIds: ["72"], amountDecimal: "2.00" };
+    expect(transactionSettled(refund, recorded, refunded)).toBe(true);
     // Its payment was never refunded on our side: VERIFY_PAYMENT has to look at it.
-    expect(transactionSettled({ ...refund, relatedTransactionIds: ["73"] }, recorded)).toBe(false);
+    expect(transactionSettled({ ...refund, relatedTransactionIds: ["73"] }, recorded, refunded)).toBe(false);
     // A payment is never settled by what its "related" transactions hold.
-    expect(transactionSettled({ ...payment, transactionId: "79", relatedTransactionIds: ["72"] }, recorded)).toBe(false);
+    expect(transactionSettled({ ...payment, transactionId: "79", relatedTransactionIds: ["72"] }, recorded, refunded)).toBe(false);
+  });
+
+  it("settles a refund through its payment only when that payment holds a REFUNDED of the same amount (P2-M1)", () => {
+    const recorded = new Map<string, ReadonlySet<ChargeEventKind>>([["72", new Set<ChargeEventKind>(["SUCCEEDED", "REFUNDED"])]]);
+    // We refunded 2.00 of payment 72 (a withdrawal), recorded on the payment's own row.
+    const refunded = new Map<string, ReadonlyArray<number>>([["72", [2_000_000]]]);
+    const ours = { transactionId: "80", status: "complete-ok" as const, transactionType: "refund", relatedTransactionIds: ["72"], amountDecimal: "2.00" };
+    expect(transactionSettled(ours, recorded, refunded)).toBe(true);
+    // The owner refunds 3.00 more in the dashboard: no REFUNDED of ours is that refund, so VERIFY_PAYMENT must look
+    // (it records it, or hands it to the owner), never left unrecorded with the quarter still counting it as a sale.
+    expect(transactionSettled({ ...ours, transactionId: "81", amountDecimal: "3.00" }, recorded, refunded)).toBe(false);
+    // Recorded on its own id, it is settled whatever the payment holds.
+    const own = new Map([...recorded, ["81", new Set<ChargeEventKind>(["REFUNDED"])]]);
+    expect(transactionSettled({ ...ours, transactionId: "81", amountDecimal: "3.00" }, own, refunded)).toBe(true);
+    // An amount that cannot be read never matches.
+    expect(transactionSettled({ ...ours, amountDecimal: "2.0x" }, recorded, refunded)).toBe(false);
   });
 
   it("settles a dispute reported as its own transaction by the CHARGEBACK of the payment it names (P2-I2)", () => {
@@ -54,7 +71,7 @@ describe("P14a what a listed transaction should already have left in our rows", 
       ["82", new Set<ChargeEventKind>(["SUCCEEDED"])],
       ["83", new Set<ChargeEventKind>(["SUCCEEDED", "CHARGEBACK", "CHARGEBACK_RESOLVED"])]
     ]);
-    const dispute = { transactionId: "90", status: "charge-back" as const, transactionType: "chargeback", relatedTransactionIds: ["81"] };
+    const dispute = { transactionId: "90", status: "charge-back" as const, transactionType: "chargeback", relatedTransactionIds: ["81"], amountDecimal: "24.20" };
     expect(transactionSettled(dispute, recorded)).toBe(true);
     // A dispute already won stays settled: its payment's CHARGEBACK is still there.
     expect(transactionSettled({ ...dispute, relatedTransactionIds: ["83"] }, recorded)).toBe(true);
@@ -200,6 +217,7 @@ function stubbedReconciler(input: Readonly<{
       return history === undefined ? [] : history();
     },
     chargeEventKindsByTransaction: async () => new Map(),
+    refundedAmountsByPayment: async () => new Map(),
     withTransaction: async <T>(use: (client: never) => Promise<T>) => use({} as never),
     charge: async (chargeId: string) =>
       [...charges, ...(input.stale ?? [])].find((charge) => charge.chargeId === chargeId) ?? null,

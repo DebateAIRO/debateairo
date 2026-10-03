@@ -347,6 +347,40 @@ describe("P14a reconciliation on real PostgreSQL", () => {
     expect(adoptionLine?.fields.count).toBeGreaterThanOrEqual(1);
   });
 
+  it("looks at a second refund of a payment we refunded in part: only a same-amount REFUNDED settles it (P2-M1)", async () => {
+    const now = new Date();
+    const billing = new BillingRepository(database.pool);
+    const partly = await seed(now);
+    const whole = await seed(now);
+    await billing.withTransaction(async (client) => {
+      // Our withdrawal refund of 2.00, recorded on the payment's own row when its call answered.
+      for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
+        await billing.appendChargeEvent(client, chargeEvent(partly.initialChargeId, kind, now, {
+          xmoneyTransactionId: partly.initialTransactionId, amountMicros: 2_000_000, errorCode: "WITHDRAWAL"
+        }));
+      }
+      // A full dashboard refund read from the payment's own refund-ok (P9c's PROVIDER_REFUND on the payment's row).
+      for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
+        await billing.appendChargeEvent(client, chargeEvent(whole.initialChargeId, kind, now, {
+          xmoneyTransactionId: whole.initialTransactionId, amountMicros: whole.totalMicros, errorCode: "PROVIDER_REFUND"
+        }));
+      }
+    });
+    const xmoney = fakeXMoney();
+    xmoney.state.byDateType.set("refund", [
+      // Our 2.00, reported as its own transaction: settled through the payment.
+      tx("997001", partly.xmoneyOrderId, "complete-ok", "2.00", "refund", null, [partly.initialTransactionId]),
+      // 3.00 more, refunded by the owner in the dashboard: nothing of ours records it, so VERIFY_PAYMENT must look.
+      tx("997002", partly.xmoneyOrderId, "complete-ok", "3.00", "refund", null, [partly.initialTransactionId]),
+      // The full dashboard refund's own transaction: the same refund the payment's refund-ok already recorded.
+      tx("997003", whole.xmoneyOrderId, "complete-ok", "24.20", "refund", null, [whole.initialTransactionId])
+    ]);
+    await reconciler(xmoney, now).runDaily(now);
+    expect(await verifyJobs("997001")).toBe(0);
+    expect(await verifyJobs("997002")).toBe(1);
+    expect(await verifyJobs("997003")).toBe(0);
+  });
+
   it("never lets old unknowns hide a fresh one: the frequent pass skips double unknowns, the daily pass pages through all", async () => {
     const now = new Date();
     const seeded = await seed(now);
