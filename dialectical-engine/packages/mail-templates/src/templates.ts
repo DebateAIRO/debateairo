@@ -49,15 +49,22 @@ export function mailAttachmentFactsOf(
 }
 
 /**
+ * A sentence that depends on a param: `then` when the test holds, `otherwise` when not (`null` shows nothing). P2-W4:
+ * `otherwise` may itself be a condition, so one paragraph chooses among three sentences on two flags (O2's intro).
+ */
+export type MailParamCondition = Readonly<{
+  ifParam: string; test: MailParamTest; then: string; otherwise: string | MailParamCondition | null;
+}>;
+
+/**
  * A catalogue key, the owner summary's block, a sentence that depends on an attachment (`attached` when the message
- * carries it, `missing` otherwise; both use the same params), or a sentence that depends on a param (`then` when the
- * test holds, `otherwise` when not; `null` shows nothing).
+ * carries it, `missing` otherwise; both use the same params), or a sentence that depends on a param.
  */
 export type MailParagraph =
   | string
   | Readonly<{ block: string }>
   | Readonly<{ ifAttached: MailAttachmentFact; attached: string; missing: string }>
-  | Readonly<{ ifParam: string; test: MailParamTest; then: string; otherwise: string | null }>;
+  | MailParamCondition;
 
 export type MailTemplateDefinition = Readonly<{
   catalogue: "mail" | "owner";
@@ -202,19 +209,24 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // W9 (P2-M8): a real refund's O2 also names what the refund was for (`refundReason`, the intent's reason) and, for a
   // withdrawal's, its legal deadline and how to refund by hand so that M8 still follows (`refundDeadline`). Both are
   // optional, so an O2 queued before them renders as it did; RefundDesk sends neither for REFUND_NOT_REQUESTED.
+  // P2-W4: REFUND_CHARGE_MISSING also takes the not-requested sentences (notRequested "true"). A job of the other
+  // xMoney system (OTHER_XMONEY_SYSTEM, the optional flag `otherSystem` "true") says nothing was sent and nothing is
+  // owed on this server, with no deadline; notRequested wins if both were ever set. Left out, it changes nothing.
   O2: define({
     catalogue: "owner", subject: "owner.O2.subject",
     paragraphs: [
-      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedIntro", otherwise: "owner.O2.intro" },
+      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedIntro",
+        otherwise: { ifParam: "otherSystem", test: "true", then: "owner.O2.otherSystemIntro", otherwise: "owner.O2.intro" } },
       "owner.O2.charge",
       { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedAmount", otherwise: "owner.O2.amount" },
       "owner.O2.reason",
       { ifParam: "refundReason", test: "present", then: "owner.O2.refundReason", otherwise: null },
       { ifParam: "refundDeadline", test: "present", then: "owner.O2.withdrawalDeadline", otherwise: null },
-      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedNext", otherwise: "owner.O2.next" }
+      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedNext",
+        otherwise: { ifParam: "otherSystem", test: "true", then: "owner.O2.otherSystemNext", otherwise: "owner.O2.next" } }
     ],
     params: { chargeRef: "text", refundAmount: "amount", reasonCode: "text", notRequested: "flag" },
-    optional: { refundReason: "text", refundDeadline: "date" }
+    optional: { refundReason: "text", refundDeadline: "date", otherSystem: "flag" }
   }),
   // W9 (P2-I11): the O2 variant for a withdrawal handed to the owner (`refund_by_owner`: a dashboard refund or an
   // earlier request touched a payment), sent at once from the withdrawal's own transaction, so the 14-day refund

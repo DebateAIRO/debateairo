@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MAIL_LOCALES, MAIL_TEMPLATES, RESERVED_MAIL_PARAMS } from "@debateai/mail-templates";
+import {
+  MAIL_LOCALES, MAIL_TEMPLATES, RESERVED_MAIL_PARAMS, type MailParagraph, type MailParamCondition
+} from "@debateai/mail-templates";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import { assertLocalizedCatalog, assertTranslationSample } from "../support/mailCatalogueContract.js";
 
@@ -11,6 +13,19 @@ const read = (path: string): Record<string, string> =>
   JSON.parse(readFileSync(join(MESSAGES, path), "utf8")) as Record<string, string>;
 const placeholders = (value: string): string[] =>
   [...value.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)].map((match) => match[1]!);
+
+/**
+ * Each param condition of a paragraph, a nested `otherwise` condition (P2-W4) as one of its own: `otherwise` is then
+ * the sentence key or null that this condition itself shows when its test fails.
+ */
+type FlatCondition = Readonly<{ ifParam: string; test: MailParamCondition["test"]; then: string; otherwise: string | null }>;
+function conditionsOf(paragraph: MailParagraph): FlatCondition[] {
+  if (typeof paragraph === "string" || !("ifParam" in paragraph)) return [];
+  const { otherwise } = paragraph;
+  const own = { ifParam: paragraph.ifParam, test: paragraph.test, then: paragraph.then,
+    otherwise: otherwise === null || typeof otherwise === "string" ? otherwise : null };
+  return [own, ...(otherwise === null || typeof otherwise === "string" ? [] : conditionsOf(otherwise))];
+}
 
 describe("P17 mail catalogues", () => {
   it("names exactly the interface's 35 locales, one directory each", () => {
@@ -44,8 +59,10 @@ describe("P17 mail catalogues", () => {
         else if ("block" in paragraph) used.add(paragraph.block);
         else if ("ifAttached" in paragraph) keys.push(paragraph.attached, paragraph.missing);
         else {
-          used.add(paragraph.ifParam);
-          keys.push(paragraph.then, ...(paragraph.otherwise === null ? [] : [paragraph.otherwise]));
+          for (const condition of conditionsOf(paragraph)) {
+            used.add(condition.ifParam);
+            keys.push(condition.then, ...(condition.otherwise === null ? [] : [condition.otherwise]));
+          }
         }
       }
       for (const key of keys) {
@@ -93,17 +110,19 @@ describe("P17 mail catalogues", () => {
           }
           continue;
         }
-        // Only the `then` sentence of a `present` test on that very param may read an optional param.
-        for (const key of [paragraph.then, ...(paragraph.otherwise === null ? [] : [paragraph.otherwise])]) {
-          for (const name of placeholders(english[key]!).filter((candidate) => optional.has(candidate))) {
-            expect(paragraph.test === "present" && paragraph.ifParam === name && key === paragraph.then, `${id} ${key} reads {${name}}`)
-              .toBe(true);
+        for (const condition of conditionsOf(paragraph)) {
+          // Only the `then` sentence of a `present` test on that very param may read an optional param.
+          for (const key of [condition.then, ...(condition.otherwise === null ? [] : [condition.otherwise])]) {
+            for (const name of placeholders(english[key]!).filter((candidate) => optional.has(candidate))) {
+              expect(condition.test === "present" && condition.ifParam === name && key === condition.then, `${id} ${key} reads {${name}}`)
+                .toBe(true);
+            }
           }
+          const kind = declared[condition.ifParam];
+          const fits = condition.test === "present" ? optional.has(condition.ifParam)
+            : condition.test === "true" ? kind === "flag" : kind === "amount";
+          expect(fits, `${id}: ${condition.test} on ${condition.ifParam} (${String(kind)})`).toBe(true);
         }
-        const kind = declared[paragraph.ifParam];
-        const fits = paragraph.test === "present" ? optional.has(paragraph.ifParam)
-          : paragraph.test === "true" ? kind === "flag" : kind === "amount";
-        expect(fits, `${id}: ${paragraph.test} on ${paragraph.ifParam} (${String(kind)})`).toBe(true);
       }
     }
   });

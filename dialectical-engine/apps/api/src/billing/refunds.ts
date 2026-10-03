@@ -365,17 +365,27 @@ export class RefundDesk {
    * refund's its legal deadline, 14 days after the person withdrew (`withdrawalRefundDeadline` of the WITHDRAWN row's
    * `withdrew_at`), with how to refund it by hand so that M8 still follows. A forged job's O2 carries neither: its
    * reason is only the job's claim.
+   * P2-W4: two more dead ends stop before any xMoney call, so O2 never says "xMoney refused" for them.
+   * REFUND_CHARGE_MISSING (the job names a charge we do not have) is no refund to make either, so it takes the
+   * not-requested sentences and ref. OTHER_XMONEY_SYSTEM (the payment was taken in the other xMoney system) has its own
+   * sentences (`otherSystem`) and ref: nothing was sent and nothing is owed on this server, and this API never sees
+   * that system's refunds, so it carries no deadline ("M8 follows by itself" would be false). Neither carries a reason:
+   * no recorded request was checked, so it is only the job's claim.
    */
   private async deadLetter(intent: RefundIntent, code: string, now: Date): Promise<OutboxOutcome> {
-    const notRequested = code === "REFUND_NOT_REQUESTED";
+    const notRequested = code === "REFUND_NOT_REQUESTED" || code === "REFUND_CHARGE_MISSING";
+    const otherSystem = code === "OTHER_XMONEY_SYSTEM";
+    const real = !notRequested && !otherSystem;
     const ref = `${intent.chargeId}:${intent.transactionId}`;
-    const deadline = notRequested ? null : await this.withdrawalDeadlineOf(intent);
+    const deadline = real ? await this.withdrawalDeadlineOf(intent) : null;
+    const dedupeRef = notRequested ? `${ref}:not-requested` : otherSystem ? `${ref}:other-system` : ref;
     await this.deps.repository.withTransaction((client) => enqueueEmail(this.deps.repository, client, {
-      template: "O2", recipient: { kind: "OWNER" }, dedupeRef: notRequested ? `${ref}:not-requested` : ref,
+      template: "O2", recipient: { kind: "OWNER" }, dedupeRef,
       params: {
         chargeRef: intent.chargeId, refundAmount: microsToDecimal(intent.amountMicros), reasonCode: code,
         notRequested: notRequested ? "true" : "false",
-        ...(notRequested ? {} : { refundReason: intent.reason }),
+        ...(otherSystem ? { otherSystem: "true" } : {}),
+        ...(real ? { refundReason: intent.reason } : {}),
         ...(deadline === null ? {} : { refundDeadline: deadline.toISOString() })
       },
       notBefore: now

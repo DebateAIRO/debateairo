@@ -6,6 +6,7 @@ import { MAIL_LOCALES, mailDirectionOf, mailLocaleOf, type MailLocale } from "./
 import {
   MAIL_TEMPLATES,
   type MailAttachmentFact,
+  type MailParamCondition,
   type MailParamKind,
   type MailParamTest,
   type MailTemplateDefinition,
@@ -180,6 +181,13 @@ function paramHolds(test: MailParamTest, raw: string | undefined): boolean {
   }
 }
 
+/** The sentence a param condition picks, following a nested `otherwise` condition (P2-W4); null shows nothing. */
+function conditionKey(condition: MailParamCondition, params: Readonly<Record<string, string>>): string | null {
+  if (paramHolds(condition.test, params[condition.ifParam])) return condition.then;
+  const otherwise = condition.otherwise;
+  return otherwise === null || typeof otherwise === "string" ? otherwise : conditionKey(otherwise, params);
+}
+
 function interpolate(template: string, values: ReadonlyMap<string, Segment>, where: string): Segment[] {
   const segments: Segment[] = [];
   let last = 0;
@@ -263,7 +271,7 @@ export function renderMail(
       return [interpolate(lookup(key), values, key)];
     }
     if ("ifParam" in paragraph) {
-      const key = paramHolds(paragraph.test, params[paragraph.ifParam]) ? paragraph.then : paragraph.otherwise;
+      const key = conditionKey(paragraph, params);
       return key === null ? [] : [interpolate(lookup(key), values, key)];
     }
     const block = values.get(paragraph.block);

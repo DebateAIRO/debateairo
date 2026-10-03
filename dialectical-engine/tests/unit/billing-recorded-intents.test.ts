@@ -86,7 +86,7 @@ const refundJob = (payload: RefundPayload): OutboxJob => job("XMONEY_REFUND", `$
  * A RefundDesk over one charge whose xMoney records every refund call it receives and answers it (or, with
  * `refusal`, refuses it with that code).
  */
-function desk(recorded: ChargeRow & { events: ChargeEventRow[] }, refusal: string | null = null) {
+function desk(recorded: (ChargeRow & { events: ChargeEventRow[] }) | null, refusal: string | null = null) {
   const calls: Array<Readonly<{ transactionId: string; amountDecimal: string | null }>> = [];
   const enqueued: Array<Readonly<{ kind: string; ref: string; payload: Record<string, unknown> }>> = [];
   const appended: ChargeEventRow["kind"][] = [];
@@ -216,6 +216,47 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
     expect(forged.enqueued[0]!.payload).toMatchObject({ "param.notRequested": "true" });
     expect(forged.enqueued[0]!.payload).not.toHaveProperty("param.refundReason");
     expect(forged.enqueued[0]!.payload).not.toHaveProperty("param.refundDeadline");
+  });
+
+  it("tells the owner a job naming a charge we do not have is no refund to make (P2-W4: REFUND_CHARGE_MISSING)", async () => {
+    // Nothing was sent and no request of ours backs it: the not-requested sentences are true for it, and its own ref.
+    const made = desk(null);
+    expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL" }), NOW))
+      .toEqual({ kind: "DEAD", code: "REFUND_CHARGE_MISSING" });
+    expect(made.calls).toEqual([]);
+    expect(made.enqueued).toEqual([expect.objectContaining({
+      kind: "EMAIL", ref: `O2:${CHARGE_ID}:${PAYMENT}:not-requested`,
+      payload: expect.objectContaining({
+        template: "O2", "param.reasonCode": "REFUND_CHARGE_MISSING", "param.notRequested": "true"
+      })
+    })]);
+    expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundReason");
+    expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundDeadline");
+  });
+
+  it("tells the owner a job of the other xMoney system was never sent, with no deadline (P2-W4: OTHER_XMONEY_SYSTEM)", async () => {
+    // A sandbox payment's withdrawal refund on the live API: this API never sees that system's refunds, so neither
+    // "refund exactly … M8 follows by itself" nor the legal deadline is true here; nor is its reason a recorded one.
+    const stagePaid = charge([
+      event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "WITHDRAWAL")
+    ]);
+    const made = desk({ ...stagePaid, xmoneyEnvironment: "stage" });
+    expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL" }), NOW))
+      .toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
+    expect(made.calls).toEqual([]);
+    expect(made.enqueued).toEqual([expect.objectContaining({
+      kind: "EMAIL", ref: `O2:${CHARGE_ID}:${PAYMENT}:other-system`,
+      payload: expect.objectContaining({
+        template: "O2", "param.reasonCode": "OTHER_XMONEY_SYSTEM", "param.notRequested": "false", "param.otherSystem": "true"
+      })
+    })]);
+    expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundDeadline");
+    expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundReason");
+    // Control: the same withdrawal refund refused in this API's own system keeps its deadline, and no other-system flag.
+    const refused = desk(stagePaid, "XMONEY_REFUSED");
+    await refused.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL" }), NOW);
+    expect(refused.enqueued[0]!.payload).toMatchObject({ "param.refundDeadline": "2026-10-23T08:30:00.000Z" });
+    expect(refused.enqueued[0]!.payload).not.toHaveProperty("param.otherSystem");
   });
 
   it("refuses a forged job before its retry looks anything up at xMoney", async () => {

@@ -10,6 +10,7 @@ export {
   mailAttachmentFactsOf,
   type MailAttachmentFact,
   type MailParagraph,
+  type MailParamCondition,
   type MailParamKind,
   type MailParamTest,
   type MailTemplateDefinition,

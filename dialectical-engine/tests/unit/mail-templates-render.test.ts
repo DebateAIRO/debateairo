@@ -35,6 +35,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   withdrawalDays: "14",
   canUndo: "true",
   notRequested: "true",
+  otherSystem: "true",
   bankDeclined: "true",
   endedPlan: "PRO",
   invoiceNumber: "DBAI 0042",
@@ -265,7 +266,7 @@ describe("P17 renderMail", () => {
   });
 
   it("tells the owner at once, in English, which refund could not be completed (ruling Q-5's O2)", () => {
-    const owner = renderMail("O2", "de", { ...paramsFor("O2"), notRequested: "false" });
+    const owner = renderMail("O2", "de", { ...paramsFor("O2"), notRequested: "false", otherSystem: "false" });
     expect(owner.subject).toBe("A refund could not be completed and needs your attention");
     expect(owner.text).toContain("Charge reference: 0123456789abcdef0123456789abcdef");
     expect(owner.text).toContain("Amount to refund: $12.10");
@@ -279,8 +280,8 @@ describe("P17 renderMail", () => {
   });
 
   it("keeps O2 for a refund xMoney refused exactly as it was before P2-I5's flag", () => {
-    // W9's optional reason and deadline left out: the render of every O2 queued before them.
-    const { refundReason: _reason, refundDeadline: _deadline, ...before } = paramsFor("O2");
+    // W9's optional reason and deadline and P2-W4's other-system flag left out: the render of every O2 queued before them.
+    const { refundReason: _reason, refundDeadline: _deadline, otherSystem: _other, ...before } = paramsFor("O2");
     const refused = renderMail("O2", "en", { ...before, notRequested: "false" });
     // The five sentences of ruling Q-5's O2, in order and unchanged (compared with the render before the flag existed).
     expect(refused.text.startsWith([
@@ -296,7 +297,7 @@ describe("P17 renderMail", () => {
   });
 
   it("names a dead withdrawal refund's reason, its legal deadline and how to settle it so M8 follows (W9, P2-M8)", () => {
-    const dead = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false" });
+    const dead = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false", otherSystem: "false" });
     expect(dead.text).toContain("Reason code: XMONEY_REFUSED\n\nRefund reason: WITHDRAWAL\n\n");
     expect(dead.text).toContain(
       "This is a withdrawal refund: the law requires it to be made by October 26, 2026 at the latest (14 days after"
@@ -311,10 +312,12 @@ describe("P17 renderMail", () => {
     expect(dead.html).not.toContain("at least");
     // The reason alone (another refund than a withdrawal's): no deadline sentence.
     const { refundDeadline: _deadline, ...other } = paramsFor("O2");
-    const refusedCard = renderMail("O2", "en", { ...other, refundReason: "CARD_COUNTRY_BLOCKED", notRequested: "false" }).text;
+    const refusedCard = renderMail("O2", "en", {
+      ...other, refundReason: "CARD_COUNTRY_BLOCKED", notRequested: "false", otherSystem: "false"
+    }).text;
     expect(refusedCard).toContain("Refund reason: CARD_COUNTRY_BLOCKED");
     expect(refusedCard).not.toContain("withdrawal");
-    expect(Object.keys(MAIL_TEMPLATES.O2.optional ?? {}).sort()).toEqual(["refundDeadline", "refundReason"]);
+    expect(Object.keys(MAIL_TEMPLATES.O2.optional ?? {}).sort()).toEqual(["otherSystem", "refundDeadline", "refundReason"]);
   });
 
   it("tells the owner at once of a withdrawal they must settle by hand, with its deadline (W9, P2-I11)", () => {
@@ -398,6 +401,40 @@ describe("P17 renderMail", () => {
     expect(forged.text).toContain("Amount the job named: $12.10. This is only the job's own figure, not a refund to make.");
     expect(forged.text).toContain("Something able to write to the billing database queued it, so tell whoever runs the server.");
     expect(forged.text).toContain("They check this charge's own refund requests: a request that was never refunded is still owed.");
+  });
+
+  it("tells the owner a refund job of the other xMoney system sent nothing and is owed nothing here (P2-W4)", () => {
+    // RefundDesk sends the flag and neither the reason nor the deadline (C2: the scope's English, the default).
+    const { refundReason: _reason, refundDeadline: _deadline, ...base } = paramsFor("O2");
+    const other = renderMail("O2", "en", { ...base, reasonCode: "OTHER_XMONEY_SYSTEM", notRequested: "false", otherSystem: "true" });
+    expect(other.subject).toBe("A refund could not be completed and needs your attention");
+    expect(other.text.startsWith([
+      "Hello,",
+      "A refund job was stopped before anything was sent to xMoney: the payment it names was taken in the other xMoney"
+        + " system (sandbox or live), which this server does not use. No money moved.",
+      "Charge reference: 0123456789abcdef0123456789abcdef",
+      "Amount to refund: $12.10",
+      "Reason code: OTHER_XMONEY_SYSTEM",
+      "Nothing is owed on this server. If it was a real customer's payment in the other system, refund it in that"
+        + " system's dashboard; a sandbox test payment needs nothing. The owner summary lists it as REFUND_OTHER_SYSTEM.",
+      "The DebateAI team"
+    ].join("\n\n"))).toBe(true);
+    for (const part of [other.text, other.html]) {
+      expect(part).not.toContain("xMoney refused");
+      expect(part).not.toContain("settle the refund by hand");
+      // No deadline paragraph, and never "M8 follows by itself": this API never sees the other system's refunds.
+      expect(part).not.toContain("the law requires");
+      expect(part).not.toContain("M8");
+      expect(part).not.toContain("A refund job was stopped before anything was sent to xMoney: it does not match");
+    }
+    // The flag off (or left out, as in every O2 queued before it) keeps the refused wording; notRequested still wins.
+    const refused = renderMail("O2", "en", { ...base, notRequested: "false", otherSystem: "false" }).text;
+    expect(refused).toContain("xMoney refused a refund we asked for");
+    expect(refused).not.toContain("other xMoney system");
+    const forged = renderMail("O2", "en", { ...base, notRequested: "true" }).text;
+    expect(forged).toContain("it does not match any refund request our records hold for this payment");
+    expect(forged).not.toContain("other xMoney system");
+    expect(MAIL_TEMPLATES.O2.optional?.otherSystem).toBe("flag");
   });
 
   it("refuses missing, unknown, reserved and malformed params with a code and no value", () => {

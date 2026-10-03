@@ -30,15 +30,18 @@ export type EFacturaCheckItem = Readonly<{
 }>;
 /**
  * What the owner checks in xMoney or at the tax service: a refund xMoney refused (still owed) or one whose outcome is
- * unknown; a refund job the charge records no request for (P2-I5's REFUND_NOT_REQUESTED: nothing was sent, it is no
- * refund to make, and whoever runs the server checks who queued it); a second refund made elsewhere on one payment,
+ * unknown; a refund job the charge records no request for, or naming a charge we do not have (P2-I5's
+ * REFUND_NOT_REQUESTED: nothing was sent, it is no refund to make, and whoever runs the server checks who queued it); a
+ * refund job of a payment of the other xMoney system (P2-W4's REFUND_OTHER_SYSTEM: nothing was sent, nothing is owed on
+ * this server); a second refund made elsewhere on one payment,
  * which our records cannot hold (P9c's REFUND_UNRECORDED: its amount is in no line of the summary); a withdrawal
  * handed to the owner; a renewal closed with its outcome unknown; a charge with no outcome after 30 days; R2 Q-1's
  * renewals with no charge (a dunning the tax service could not price, a plan such a dunning ended, a renewal a tax
  * refusal blocks); a subscription whose history does not fold (renewals skip it: what was its subscriber charged?).
  */
 export type PaymentCheck =
-  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_UNRECORDED" | "WITHDRAWAL_BY_OWNER"
+  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_OTHER_SYSTEM" | "REFUND_UNRECORDED"
+  | "WITHDRAWAL_BY_OWNER"
   | "RENEWAL_STUCK" | "PAYMENT_UNSETTLED" | "DUNNING_UNPRICED" | "ENDED_UNPRICED" | "RENEWAL_BLOCKED"
   | "SUBSCRIPTION_HISTORY_INVALID";
 export type PaymentToCheckItem = Readonly<{
@@ -53,7 +56,8 @@ export type PaymentToCheckItem = Readonly<{
    * A dead refund's reason (a WITHDRAWAL refund is due within 14 days of the withdrawal), or the code a charge-less
    * attempt names (TAX_SERVICE_UNAVAILABLE: the tax service could not price it; RETRY_TOTAL_CHANGED: P2-M10's retry
    * priced afresh at a total other than the announced one, so nothing was charged); else null. Null for
-   * REFUND_NOT_REQUESTED: its payload's reason is only what the job claimed.
+   * REFUND_NOT_REQUESTED and REFUND_OTHER_SYSTEM: no recorded request was checked, so its payload's reason is only what
+   * the job claimed.
    */
   reason: string | null;
   since: Date;
@@ -176,7 +180,8 @@ export async function paymentsToCheckFrom(
   const lookBack = new Date(now.getTime() - 120 * dayMs);
   const refunds = (await billing.deadRefunds()).map((item): PaymentToCheckItem => {
     const what = deadRefundCheck(item.code);
-    return Object.freeze({ what, ref: item.chargeId, reason: what === "REFUND_NOT_REQUESTED" ? null : item.reason, since: item.since });
+    const claimedOnly = what === "REFUND_NOT_REQUESTED" || what === "REFUND_OTHER_SYSTEM";
+    return Object.freeze({ what, ref: item.chargeId, reason: claimedOnly ? null : item.reason, since: item.since });
   });
   const unrecorded = (await billing.unrecordedRefunds(lookBack)).map((item): PaymentToCheckItem => Object.freeze({
     what: "REFUND_UNRECORDED", ref: item.transactionId, reason: null, since: item.since
@@ -212,14 +217,21 @@ export async function deadEmailsFrom(
 
 /**
  * Which list a dead XMONEY_REFUND job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
- * (P2-I5) moved no money and is no refund to make; every other dead end leaves the money owed.
+ * (P2-I5) and REFUND_CHARGE_MISSING (P2-W4: the job names a charge we do not have) moved no money and are no refund to
+ * make; OTHER_XMONEY_SYSTEM (P2-W4) moved none and is owed nothing on this server; every other dead end leaves the
+ * money owed.
  */
-function deadRefundCheck(code: string | null): "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" {
+function deadRefundCheck(
+  code: string | null
+): "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_OTHER_SYSTEM" {
   switch (code) {
     case "REFUND_OUTCOME_UNKNOWN":
       return "REFUND_OUTCOME_UNKNOWN";
     case "REFUND_NOT_REQUESTED":
+    case "REFUND_CHARGE_MISSING":
       return "REFUND_NOT_REQUESTED";
+    case "OTHER_XMONEY_SYSTEM":
+      return "REFUND_OTHER_SYSTEM";
     default:
       return "REFUND_REFUSED";
   }
@@ -240,6 +252,7 @@ function subjectOf(item: PaymentToCheckItem): string {
     case "REFUND_REFUSED":
     case "REFUND_OUTCOME_UNKNOWN":
     case "REFUND_NOT_REQUESTED":
+    case "REFUND_OTHER_SYSTEM":
     case "RENEWAL_STUCK":
     case "PAYMENT_UNSETTLED":
       return `charge ${item.ref}`;
@@ -477,6 +490,8 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to the"
       + " billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
       + " (one never refunded is still owed);"
+      + " REFUND_OTHER_SYSTEM: a refund job for a payment of the other xMoney system (sandbox or live): nothing was"
+      + " sent, and nothing is owed on this server;"
       + " REFUND_UNRECORDED: a second refund made in the xMoney dashboard on a payment that already had one, which our"
       + " records cannot hold, so it is in no figure above: read its amount on that transaction in the dashboard and"
       + " take it off that country's net sales and tax by hand;"

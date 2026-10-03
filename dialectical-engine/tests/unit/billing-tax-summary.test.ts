@@ -82,6 +82,7 @@ describe("P16b the summary", () => {
       { what: "REFUND_REFUSED", ref: "7".repeat(32), reason: null, since: new Date("2026-11-06T00:00:00.000Z") },
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: new Date("2026-11-09T00:00:00.000Z") },
       { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: new Date("2026-11-17T00:00:00.000Z") },
+      { what: "REFUND_OTHER_SYSTEM", ref: "2".repeat(32), reason: null, since: new Date("2026-11-20T00:00:00.000Z") },
       { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: new Date("2026-11-11T00:00:00.000Z") },
       { what: "WITHDRAWAL_BY_OWNER", ref: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", reason: null, since: new Date("2026-11-10T00:00:00.000Z") },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: new Date("2026-11-12T00:00:00.000Z") },
@@ -158,6 +159,10 @@ describe("P16b the summary", () => {
       + " payment, so nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to"
       + " the billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
       + " (one never refunded is still owed);");
+    // P2-W4: a refund job of the other xMoney system sent nothing and is owed nothing on this server (C2's legend).
+    expect(text).toContain(`charge ${"2".repeat(32)}: REFUND_OTHER_SYSTEM, since 2026-11-20`);
+    expect(text).toContain("REFUND_OTHER_SYSTEM: a refund job for a payment of the other xMoney system (sandbox or live):"
+      + " nothing was sent, and nothing is owed on this server;");
     // The two real dead ends keep their own words.
     expect(text).toContain("(REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund it from the dashboard;"
       + " REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the dashboard before refunding again;"
@@ -256,7 +261,11 @@ describe("P16b the summary", () => {
         { chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED", since: now },
         { chargeId: "6".repeat(32), transactionId: "2", reason: "WITHDRAWAL", code: "REFUND_OUTCOME_UNKNOWN", since: now },
         // P2-I5: a forged job's payload reason is only its claim, so the line carries none.
-        { chargeId: "4".repeat(32), transactionId: "3", reason: "CARD_CHECK_RELEASE", code: "REFUND_NOT_REQUESTED", since: now }
+        { chargeId: "4".repeat(32), transactionId: "3", reason: "CARD_CHECK_RELEASE", code: "REFUND_NOT_REQUESTED", since: now },
+        // P2-W4: neither reached xMoney, so neither is a refund xMoney refused. A job naming a charge we do not have is
+        // no refund to make; a job of the other xMoney system is owed nothing here. Neither payload reason is verified.
+        { chargeId: "3".repeat(32), transactionId: "4", reason: "WITHDRAWAL", code: "REFUND_CHARGE_MISSING", since: now },
+        { chargeId: "2".repeat(32), transactionId: "5", reason: "WITHDRAWAL", code: "OTHER_XMONEY_SYSTEM", since: now }
       ],
       unrecordedRefunds: async (since) => {
         // P9c's second refunds made elsewhere, as far back as A10's refund listing reaches.
@@ -292,6 +301,8 @@ describe("P16b the summary", () => {
       { what: "REFUND_REFUSED", ref: "7".repeat(32), reason: "WITHDRAWAL", since: now },
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: now },
       { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: now },
+      { what: "REFUND_NOT_REQUESTED", ref: "3".repeat(32), reason: null, since: now },
+      { what: "REFUND_OTHER_SYSTEM", ref: "2".repeat(32), reason: null, since: now },
       { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: now },
       { what: "WITHDRAWAL_BY_OWNER", ref: owner, reason: null, since: now },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: now },
