@@ -12,10 +12,16 @@ import {
   parseTaxQuarter,
   paymentsToCheckFrom,
   renderTaxSummary,
-  type TaxQuarter
+  type TaxQuarter,
+  type TaxSummaryLimit
 } from "./tax-summary.js";
 
 const TAX_SUMMARY_REF = "tax-summary:";
+/**
+ * W12 fix I-1: O1's bound. Its text is one `block` param, which holds at most 65,536 characters, so O1 prints at most
+ * 40 lines of each list and never more than 60,000 characters; `pnpm billing:tax-summary` prints the rest.
+ */
+const O1_LIMIT: TaxSummaryLimit = Object.freeze({ itemsPerSection: 40, maxChars: 60_000 });
 
 /** Spec §2.5.9: the summary of the quarter that ended last, due at 06:00 UTC on the 5th day after it ended. */
 export function taxSummaryJobFor(now: Date): Readonly<{
@@ -68,7 +74,7 @@ export class OwnerJobs {
       paymentsToCheck: await paymentsToCheckFrom(this.deps.billing, now),
       deadEmails: await deadEmailsFrom(this.deps.billing, now),
       authorities: this.deps.taxAuthorities
-    }));
+    }), O1_LIMIT);
     // O1 is queued at most once per quarter, whatever state an earlier O1 is in (a re-run after it was sent mails nobody).
     const queued = await this.deps.billing.withTransaction((client) => enqueueOnce(
       { repository: this.deps.billing, jobs: this.deps.jobs }, client,

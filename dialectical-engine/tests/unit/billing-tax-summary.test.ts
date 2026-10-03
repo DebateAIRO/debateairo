@@ -128,18 +128,28 @@ describe("P16b the summary", () => {
     expect(text).toContain(`charge ${"b".repeat(32)}: SMARTBILL_STORNO (CREDIT_NOTE_MANUAL), since 2026-11-05`);
     expect(text).toContain(`charge ${"c".repeat(32)}: SMARTBILL_INVOICE (INVOICE_SERVICE_REFUSED), since 2026-11-07`);
     expect(text).toContain(`charge ${"e".repeat(32)}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since 2026-11-08`);
-    // W12 (P2-I16, P2-I17): each line says what to do, with the command to copy; a job our records do not back is
-    // nothing to issue or re-queue (the W4 judge's forward).
-    expect(text).toContain(`charge ${"a".repeat(32)}: SMARTBILL_INVOICE (INVOICE_UNKNOWN), since 2026-11-04: SmartBill never`
-      + ` confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice --charge ${"a".repeat(32)}`
-      + " --kind INVOICE --record <series>-<number>;");
-    expect(text).toContain(`charge ${"d".repeat(32)}: QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED), since 2026-11-09: Quaderno refused it`);
-    expect(text).toContain(`pnpm billing:invoice --charge ${"d".repeat(32)} --kind INVOICE --requeue`);
-    expect(text).toContain(`charge ${"f".repeat(32)}: QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING), since 2026-11-10: no refund`
-      + " is recorded for this sale: nothing to issue or re-queue; tell whoever runs the server");
-    expect(text).toContain("Emails that never went out (the last 120 days; nothing sends them again by itself):");
-    expect(text).toContain(`M1 (job M1:${"a".repeat(32)}): BILLING_PROFILE_UNREADABLE, since 2026-11-19: the customer never got`
-      + " the confirmation with the Terms and the model withdrawal form");
+    // W12 (P2-I16, P2-I17): what to do is said once per job kind and code below the list (fix I-1), with the command
+    // to copy (<charge> for the line's charge); a job our records do not back is nothing to issue or re-queue (the W4
+    // judge's forward).
+    expect(text).toContain(`charge ${"a".repeat(32)}: SMARTBILL_INVOICE (INVOICE_UNKNOWN), since 2026-11-04\n`);
+    expect(text).toContain(`charge ${"d".repeat(32)}: QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED), since 2026-11-09\n`);
+    expect(text).toContain(`charge ${"f".repeat(32)}: QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING), since 2026-11-10\n`);
+    expect(text).toContain("where <charge> stands for the line's charge");
+    expect(text).toContain("  What to do:\n  * SMARTBILL_INVOICE (INVOICE_UNKNOWN): SmartBill never confirmed it: look for it in"
+      + " SmartBill; if it is there, record it with pnpm billing:invoice --charge <charge> --kind INVOICE --record"
+      + " <series>-<number>;");
+    expect(text).toContain("  * QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED): Quaderno refused it");
+    expect(text).toContain("pnpm billing:invoice --charge <charge> --kind INVOICE --requeue");
+    expect(text).toContain("  * QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING): no refund is recorded for this sale:"
+      + " nothing to issue or re-queue; tell whoever runs the server");
+    // F4: the job itself is not tried again; only M3 is sent again, by the renewal.
+    expect(text).toContain("Emails that never went out (the last 120 days; a dead email job is not tried again, and only the"
+      + " notice of a changed renewal amount, M3, is sent again, by the renewal; what each one means is said once for each"
+      + " email below the list):");
+    expect(text).not.toContain("nothing sends them again by itself");
+    expect(text).toContain(`M1 (job M1:${"a".repeat(32)}): BILLING_PROFILE_UNREADABLE, since 2026-11-19\n`);
+    expect(text).toContain("  * M1 to the customer: the customer never got the confirmation with the Terms and the model"
+      + " withdrawal form");
     expect(text).toContain(`charge ${"7".repeat(32)}: REFUND_REFUSED, since 2026-11-06`);
     expect(text).toContain(`charge ${"6".repeat(32)}: REFUND_OUTCOME_UNKNOWN (WITHDRAWAL), since 2026-11-09`);
     // P2-I5: a refund job the charge records no request for moved no money; the help text says it is no refund to make.
@@ -204,6 +214,21 @@ describe("P16b the summary", () => {
     expect(both.lines.find((line) => line.taxCountry === "RO")).toMatchObject({
       netMicros: 10_000_000, taxMicros: 2_100_000, refunds: 1, unknownRefunds: 1
     });
+  });
+
+  it("caps each list and cuts the whole text at a line boundary only when a limit is given (O1; W12 fix I-1)", () => {
+    const full = renderTaxSummary(summary);
+    expect(full).not.toContain("more: run pnpm billing:tax-summary");
+    const capped = renderTaxSummary(summary, { itemsPerSection: 2, maxChars: 1_000_000 });
+    expect(capped).toContain(`charge ${"b".repeat(32)}: SMARTBILL_STORNO (CREDIT_NOTE_MANUAL), since 2026-11-05\n`
+      + "  - and 4 more: run pnpm billing:tax-summary --quarter 2026-Q4 on the host for the whole list\n  What to do:");
+    // The legend names only what the printed lines need.
+    expect(capped).not.toContain("  * QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED):");
+    const cut = renderTaxSummary(summary, { itemsPerSection: 40, maxChars: 2_000 });
+    expect(cut.length).toBeLessThanOrEqual(2_000);
+    expect(cut.endsWith("The summary is cut here: it is longer than one email holds. Run pnpm billing:tax-summary --quarter"
+      + " 2026-Q4 on the host for the whole of it.\n")).toBe(true);
+    expect(full.startsWith(cut.slice(0, cut.lastIndexOf("\nThe summary is cut here")))).toBe(true);
   });
 
   it("prints the fallback for a country the row does not cover, and says when there is nothing to list", () => {
