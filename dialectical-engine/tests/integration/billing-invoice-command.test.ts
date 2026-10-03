@@ -104,8 +104,11 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     const [invoice] = await invoices(paid.chargeId);
     expect(invoice).toMatchObject({ issuer: "SMARTBILL", kind: "INVOICE", series: "DBAI", number: "0700", external_ref: "DBAI-0700", total_micros: "24200000" });
     expect(await statuses(invoice.invoice_id)).toEqual(["SENT_BY_ACCOUNT_SETTING"]);
-    expect((await h.outboxRows(paid.chargeId)).find((row) => row.ref === `M2_INVOICE_ATTACHED:${paid.chargeId}`)?.payload)
-      .toMatchObject({ "param.invoiceNumber": "DBAI 0700", attachments: "SMARTBILL_INVOICE_PDF" });
+    // W12 fix F6: the receipt names the number typed by hand but never fetches a PDF by it (two swapped numbers would
+    // mail one customer another's invoice); M2 then says where the invoice is listed and how to ask for a copy.
+    const receipt = (await h.outboxRows(paid.chargeId)).find((row) => row.ref === `M2_INVOICE_ATTACHED:${paid.chargeId}`)?.payload;
+    expect(receipt).toMatchObject({ template: "M2_INVOICE_ATTACHED", "param.invoiceNumber": "DBAI 0700" });
+    expect(receipt?.attachments).toBe("");
     expect(await listed(paid.chargeId)).toEqual([]);
     // Once only, and never a document SmartBill already numbered for another charge.
     expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "INVOICE", "--record", "DBAI-0701"))

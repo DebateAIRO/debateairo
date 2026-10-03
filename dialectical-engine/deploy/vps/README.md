@@ -2332,6 +2332,8 @@ For an invoice or a credit note, settle the line with `pnpm billing:invoice`, gi
 - `--record` with a document you issued or found by hand: for SmartBill (a Romanian sale) its series and number
   joined by a dash, as SmartBill prints it (for example `DBAI-0042`); for Quaderno its document id. The site stores
   it and, for an invoice, emails the customer the receipt (M2); a SmartBill document also joins the e-Factura list.
+  A SmartBill receipt recorded this way names the invoice number but does not attach the PDF (a number typed by hand
+  is never used to fetch a document for a customer); it tells the customer to write to you for a copy.
 - `--requeue` to let the site try the job again once the cause is fixed (the Quaderno key replaced, Quaderno or
   SmartBill answering again). A SmartBill job also needs `--confirm-not-issued`: add it only after you have checked
   in SmartBill that the document was NOT issued, because SmartBill would issue a second one. A Quaderno job needs no

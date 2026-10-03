@@ -6,7 +6,8 @@
  *   pnpm billing:invoice --charge <ref> --kind INVOICE|CREDIT_NOTE --requeue [--confirm-not-issued]
  *
  * `--record` stores a document the owner issued or found by hand, through the handlers' own record path (P10b's
- * `record()` for SmartBill: the row, its SENT_BY_ACCOUNT_SETTING status and, for an invoice, M2 with SmartBill's PDF;
+ * `record()` for SmartBill: the row, its SENT_BY_ACCOUNT_SETTING status and, for an invoice, M2 naming the invoice
+ * number without SmartBill's PDF (W12 fix F6: a number typed by hand is never used to fetch a document for a customer);
  * P10a's for Quaderno: the row and, for an invoice, M2 with the settings link). `--requeue` queues the dead job again
  * for the API's outbox; a SmartBill job only with `--confirm-not-issued`, once the owner checked in SmartBill that
  * nothing was issued (SmartBill has no lookup, X1 row 8), and a Quaderno job freely (P4 looks a sale or a refund up by
@@ -179,9 +180,13 @@ async function record(deps: InvoiceCommandDeps, input: Readonly<{
     chargeId: charge.chargeId, kind: document, issuer, requestedAt: now
   }));
   if (smartbill !== null) {
-    // The API resolves SmartBill's PDF when M2 is sent; without one, M2 goes out naming the invoice.
+    // W12 fix F6 (privacy): no PDF. The API's resolver would fetch whatever SmartBill holds under the typed series and
+    // number, so two swapped hand-issued numbers would mail one customer another's invoice (DOCUMENT_TAKEN only catches
+    // numbers already recorded). M2 goes out with its missing-attachment paragraph: the invoice number, where it is
+    // listed in Settings, and the merchant address for a copy. The handler's own record path still attaches the PDF of
+    // a document SmartBill itself just returned.
     await recordSmartBillDocument(deps.repository, {
-      charge: recorded, kind: document, totalMicros, now, attachPdf: true,
+      charge: recorded, kind: document, totalMicros, now, attachPdf: false,
       document: { series: smartbill.series, number: smartbill.number, externalRef }
     });
   } else {
