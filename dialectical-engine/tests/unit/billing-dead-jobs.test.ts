@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { OutboxJob, OutboxKind } from "@debateai/db";
 import {
@@ -174,5 +176,19 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
     expect(await handler(false)(claimed, NOW)).toEqual({ kind: "DONE" });
     expect(sent).toHaveLength(1);
     expect(after).toHaveBeenCalledWith(claimed, NOW);
+  });
+
+  it("the billing runtime wires the dead-letter alert into its outbox worker and M3's record into its EMAIL handler (fix F3)", () => {
+    // Every other suite wires its own copy of these hooks (the harness, the command's test), so this pins the
+    // composition the API runs; billing-whole-flow's O3 case drives the first one through createBillingRuntime.
+    const runtime = readFileSync(resolve("apps/api/src/billing/runtime.ts"), "utf8");
+    const slice = (anchor: string, end: string): string => {
+      const start = runtime.indexOf(anchor);
+      expect(start, anchor).toBeGreaterThanOrEqual(0);
+      return runtime.slice(start, runtime.indexOf(end, start));
+    };
+    expect(slice("const outbox = new BillingOutboxWorker({", "});")).toContain("onDead: createDeadJobAlert({ repository })");
+    expect(slice('outbox.register("EMAIL", createEmailJobHandler({', "}));"))
+      .toContain("sent: (job, now) => renewal.noticeMailSent(job, now)");
   });
 });
