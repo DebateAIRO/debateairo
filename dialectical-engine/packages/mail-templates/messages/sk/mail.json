@@ -43,6 +43,7 @@
   "mail.M8.subject": "Vaše odstúpenie od zmluvy je potvrdené",
   "mail.M8.refunded": "Váš program {plan} sa skončil a vrátili sme {refundAmount} na vašu kartu. Zobrazenie vo vašej banke môže trvať niekoľko dní.",
   "mail.M8.nothingDue": "Váš program {plan} sa skončil. Už využitá časť pokrýva celú cenu, takže vám nič nepatrilo späť.",
+  "mail.M8.nothingMoreDue": "Váš program {plan} sa skončil a nič ďalšie vám už nepatrí späť.",
   "mail.M8_RECEIVED.subject": "Vaše odstúpenie od zmluvy sme prijali",
   "mail.M8_RECEIVED.received": "Dňa {withdrawalDate} sme prijali vaše odstúpenie od programu {plan}. Váš program sa skončil.",
   "mail.M8_RECEIVED.refunding": "Vraciame {refundAmount} na vašu kartu, a keď to bude hotové, znova vám napíšeme e-mail.",

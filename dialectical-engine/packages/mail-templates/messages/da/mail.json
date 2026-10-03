@@ -43,6 +43,7 @@
   "mail.M8.subject": "Din fortrydelse er bekræftet",
   "mail.M8.refunded": "Dit {plan}-abonnement er afsluttet, og vi har refunderet {refundAmount} til dit kort. Det kan tage nogle dage, før din bank viser det.",
   "mail.M8.nothingDue": "Dit {plan}-abonnement er afsluttet. Den del, du allerede har brugt, dækker hele prisen, så du havde intet til gode.",
+  "mail.M8.nothingMoreDue": "Dit {plan}-abonnement er afsluttet, og du har intet yderligere til gode.",
   "mail.M8_RECEIVED.subject": "Vi har modtaget din fortrydelse",
   "mail.M8_RECEIVED.received": "Vi modtog din fortrydelse af dit {plan}-abonnement den {withdrawalDate}. Dit abonnement er afsluttet.",
   "mail.M8_RECEIVED.refunding": "Vi refunderer {refundAmount} til dit kort og skriver til dig igen, når det er gjort.",

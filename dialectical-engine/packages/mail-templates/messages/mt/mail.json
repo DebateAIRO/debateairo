@@ -43,6 +43,7 @@
   "mail.M8.subject": "L-irtirar tiegħek huwa kkonfermat",
   "mail.M8.refunded": "Il-pjan {plan} tiegħek intemm, u rrifondejna {refundAmount} fuq il-karta tiegħek. Il-bank tiegħek jista’ jdum ftit jiem biex juriha.",
   "mail.M8.nothingDue": "Il-pjan {plan} tiegħek intemm. Il-parti li diġà użajt tkopri l-prezz kollu, għalhekk ma kien dovut lura lilek xejn.",
+  "mail.M8.nothingMoreDue": "Il-pjan {plan} tiegħek intemm, u m’hemm xejn aktar dovut lura lilek.",
   "mail.M8_RECEIVED.subject": "Irċevejna l-irtirar tiegħek",
   "mail.M8_RECEIVED.received": "Irċevejna l-irtirar tiegħek mill-pjan {plan} fil-{withdrawalDate}. Il-pjan tiegħek intemm.",
   "mail.M8_RECEIVED.refunding": "Qed nirrifondu {refundAmount} fuq il-karta tiegħek u nerġgħu nibagħtulek email meta jkun lest.",

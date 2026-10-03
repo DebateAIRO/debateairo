@@ -43,6 +43,7 @@
   "mail.M8.subject": "撤回が確定しました",
   "mail.M8.refunded": "{plan} プランは終了し、{refundAmount} をカードに返金しました。銀行での反映には数日かかる場合があります。",
   "mail.M8.nothingDue": "{plan} プランは終了しました。すでに利用した分が料金全額に相当するため、返金される金額はありませんでした。",
+  "mail.M8.nothingMoreDue": "{plan} プランは終了しました。これ以上返金される金額はありません。",
   "mail.M8_RECEIVED.subject": "撤回を受け付けました",
   "mail.M8_RECEIVED.received": "{withdrawalDate}に {plan} プランの撤回を受け付けました。プランは終了しました。",
   "mail.M8_RECEIVED.refunding": "{refundAmount} をカードに返金する手続きを進めており、完了しましたら改めてメールでお知らせします。",

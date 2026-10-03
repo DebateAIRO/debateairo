@@ -158,8 +158,12 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   M8: define({
     catalogue: "mail", subject: "mail.M8.subject",
     // P12d: a withdrawal whose used part covers the whole price refunds 0.00, and M8 then says nothing was due back.
-    paragraphs: [{ ifParam: "refundAmount", test: "nonzero", then: "mail.M8.refunded", otherwise: "mail.M8.nothingDue" }],
-    params: { plan: "plan", refundAmount: "amount" }
+    // P2-M7: a withdrawal the owner settles at 0.00 and 0.00 (`settleOwnerWithdrawal`, the optional flag `ownerSettled`
+    // "true") usually had its money back already (a dashboard refund), so its M8 says only that nothing more is due.
+    paragraphs: [{ ifParam: "refundAmount", test: "nonzero", then: "mail.M8.refunded",
+      otherwise: { ifParam: "ownerSettled", test: "true", then: "mail.M8.nothingMoreDue", otherwise: "mail.M8.nothingDue" } }],
+    params: { plan: "plan", refundAmount: "amount" },
+    optional: { ownerSettled: "flag" }
   }),
   // W9 (P2-I11): Directive 2011/83/EU art. 11(3)'s acknowledgement of receipt on a durable medium, queued in the
   // withdrawal's own transaction (Settings and the owner's command alike). It says only what has happened: received

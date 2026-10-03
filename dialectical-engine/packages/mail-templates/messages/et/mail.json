@@ -43,6 +43,7 @@
   "mail.M8.subject": "Teie taganemine on kinnitatud",
   "mail.M8.refunded": "Teie pakett {plan} on lõppenud ja tagastasime teie kaardile {refundAmount}. Võib kuluda mõni päev, enne kui teie pank seda näitab.",
   "mail.M8.nothingDue": "Teie pakett {plan} on lõppenud. Juba kasutatud osa katab kogu hinna, seega ei kuulunud teile midagi tagastamisele.",
+  "mail.M8.nothingMoreDue": "Teie pakett {plan} on lõppenud ja teile ei kuulu enam midagi tagastamisele.",
   "mail.M8_RECEIVED.subject": "Oleme teie taganemise kätte saanud",
   "mail.M8_RECEIVED.received": "Saime teie taganemise paketist {plan} kätte {withdrawalDate}. Teie pakett on lõppenud.",
   "mail.M8_RECEIVED.refunding": "Tagastame teie kaardile {refundAmount} ja kirjutame teile uuesti, kui see on tehtud.",

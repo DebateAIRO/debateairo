@@ -43,6 +43,7 @@
   "mail.M8.subject": "Uw herroeping is bevestigd",
   "mail.M8.refunded": "Uw {plan}-abonnement is beëindigd en wij hebben {refundAmount} terugbetaald op uw kaart. Het kan enkele dagen duren voordat uw bank dit toont.",
   "mail.M8.nothingDue": "Uw {plan}-abonnement is beëindigd. Het deel dat u al hebt gebruikt, dekt de volledige prijs, dus u had niets terug te krijgen.",
+  "mail.M8.nothingMoreDue": "Uw {plan}-abonnement is beëindigd en u hebt niets meer terug te krijgen.",
   "mail.M8_RECEIVED.subject": "We hebben uw herroeping ontvangen",
   "mail.M8_RECEIVED.received": "We hebben op {withdrawalDate} uw herroeping van uw {plan}-abonnement ontvangen. Uw abonnement is beëindigd.",
   "mail.M8_RECEIVED.refunding": "We betalen {refundAmount} terug op uw kaart en e-mailen u opnieuw zodra dat gebeurd is.",

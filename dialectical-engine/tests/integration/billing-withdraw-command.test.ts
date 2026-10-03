@@ -5,6 +5,7 @@ import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, t
 import {
   foldSubscription, microsToDecimal, withdrawalRefundMicros, withdrawalRefundPerPaymentMicros
 } from "@debateai/billing-core";
+import { renderMail } from "@debateai/mail-templates";
 import { planById } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
@@ -53,6 +54,12 @@ const rows = () => new BillingRepository(database.pool);
 const m8Of = async (subscriptionId: string) => (await database.pool.query<{ payload: Record<string, unknown> }>(
   "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref=$1", [`M8:${subscriptionId}`]
 )).rows;
+
+/** The English text of a queued EMAIL job, rendered from its own params (`param.<name>` in the payload). */
+const renderedText = (payload: Record<string, unknown>): string => renderMail(
+  payload.template as "M8", "en", Object.fromEntries(Object.entries(payload)
+    .filter(([key]) => key.startsWith("param.")).map(([key, value]) => [key.slice("param.".length), String(value)]))
+).text;
 
 /** The EMAIL job a template queued under this ref (W9: `M8_RECEIVED:<subscription>`, `O2_WITHDRAWAL:<subscription>`). */
 const emailOf = async (template: string, ref: string) => (await database.pool.query<{ payload: Record<string, unknown> }>(
@@ -260,13 +267,17 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     expect(await runWithdrawCommand(stores(), settle)).toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 17_590_000 });
     // Nothing moves through RefundDesk, so M8 goes now, worded as refunded (D7's `mail.M8.refunded`).
     expect((await m8Of(seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "17.59", "param.plan": "PLUS" });
+    // P2-M7's control: a settlement with money due keeps today's M8, its params unchanged.
+    expect((await m8Of(seeded.subscriptionId))[0]?.payload).not.toHaveProperty("param.ownerSettled");
+    expect(renderedText((await m8Of(seeded.subscriptionId))[0]!.payload))
+      .toContain("Your Plus plan has ended, and we refunded $17.59 to your card.");
     expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([]);
     expect(await rows().withdrawalsAwaitingOwner(seeded.ownerRef)).toEqual([]);
     await expect(runWithdrawCommand(stores(), settle)).rejects.toThrow("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
     expect(await m8Of(seeded.subscriptionId)).toHaveLength(1);
   }, 10_000);
 
-  it("settles with nothing refunded by either part: M8 at once for 0.00 (the nothing-due wording), and the withdrawal leaves the owner's list", async () => {
+  it("settles with nothing refunded by either part: M8 at once for 0.00, saying only that nothing more is due (P2-M7), and the withdrawal leaves the owner's list", async () => {
     const now = new Date();
     const seeded = await seedActiveSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 2 * DAY), taxCountry: "RO"
@@ -277,7 +288,13 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     // `--refund 0.00` with no dashboard part.
     expect(await runWithdrawCommand(stores(), parseWithdrawArguments(["--owner", seeded.ownerRef, "--refund", "0.00"])))
       .toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 0 });
-    expect((await m8Of(seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "0.00" });
+    const [m8] = await m8Of(seeded.subscriptionId);
+    expect(m8?.payload).toMatchObject({ "param.refundAmount": "0.00", "param.ownerSettled": "true" });
+    // P2-M7: the money had usually gone back already (here, a dashboard refund), so M8 never says that the part already
+    // used covers the whole price; it says only what is true in both cases.
+    const text = renderedText(m8!.payload);
+    expect(text).toContain("Your Plus plan has ended, and nothing more is due back to you.");
+    expect(text).not.toContain("covers the whole price");
     expect(await rows().withdrawalsAwaitingOwner(seeded.ownerRef)).toEqual([]);
   }, 10_000);
 });

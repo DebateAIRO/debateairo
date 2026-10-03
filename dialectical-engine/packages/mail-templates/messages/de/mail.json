@@ -43,6 +43,7 @@
   "mail.M8.subject": "Ihr Widerruf ist bestätigt",
   "mail.M8.refunded": "Ihr Tarif {plan} ist beendet, und wir haben {refundAmount} auf Ihre Karte erstattet. Es kann einige Tage dauern, bis Ihre Bank den Betrag anzeigt.",
   "mail.M8.nothingDue": "Ihr Tarif {plan} ist beendet. Der bereits genutzte Teil deckt den gesamten Preis, daher steht Ihnen keine Rückzahlung zu.",
+  "mail.M8.nothingMoreDue": "Ihr Tarif {plan} ist beendet, und Ihnen steht keine weitere Rückzahlung zu.",
   "mail.M8_RECEIVED.subject": "Wir haben Ihren Widerruf erhalten",
   "mail.M8_RECEIVED.received": "Wir haben Ihren Widerruf Ihres Tarifs {plan} am {withdrawalDate} erhalten. Ihr Tarif ist beendet.",
   "mail.M8_RECEIVED.refunding": "Wir erstatten {refundAmount} auf Ihre Karte und schreiben Ihnen erneut per E-Mail, sobald das erledigt ist.",

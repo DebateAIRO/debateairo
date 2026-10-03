@@ -43,6 +43,7 @@
   "mail.M8.subject": "Your withdrawal is confirmed",
   "mail.M8.refunded": "Your {plan} plan has ended, and we refunded {refundAmount} to your card. Your bank may take a few days to show it.",
   "mail.M8.nothingDue": "Your {plan} plan has ended. The part you already used covers the whole price, so nothing was due back to you.",
+  "mail.M8.nothingMoreDue": "Your {plan} plan has ended, and nothing more is due back to you.",
   "mail.M8_RECEIVED.subject": "We've received your withdrawal",
   "mail.M8_RECEIVED.received": "We received your withdrawal from your {plan} plan on {withdrawalDate}. Your plan has ended.",
   "mail.M8_RECEIVED.refunding": "We're refunding {refundAmount} to your card and will email you again when it's done.",

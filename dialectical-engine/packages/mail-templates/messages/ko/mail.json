@@ -43,6 +43,7 @@
   "mail.M8.subject": "철회가 확인되었습니다",
   "mail.M8.refunded": "{plan} 요금제가 종료되었으며 {refundAmount}를 카드로 환불해 드렸습니다. 은행에 표시되기까지 며칠이 걸릴 수 있습니다.",
   "mail.M8.nothingDue": "{plan} 요금제가 종료되었습니다. 이미 사용하신 부분이 전체 가격에 해당하므로 돌려드릴 금액이 없었습니다.",
+  "mail.M8.nothingMoreDue": "{plan} 요금제가 종료되었으며, 더 돌려드릴 금액은 없습니다.",
   "mail.M8_RECEIVED.subject": "철회 요청을 받았습니다",
   "mail.M8_RECEIVED.received": "{withdrawalDate}에 {plan} 요금제 철회 요청을 받았습니다. 요금제가 종료되었습니다.",
   "mail.M8_RECEIVED.refunding": "{refundAmount}를 카드로 환불하는 중이며, 완료되면 다시 이메일로 알려 드리겠습니다.",

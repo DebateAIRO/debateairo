@@ -43,6 +43,7 @@
   "mail.M8.subject": "Il suo recesso è confermato",
   "mail.M8.refunded": "Il suo piano {plan} è terminato e le abbiamo rimborsato {refundAmount} sulla carta. La sua banca potrebbe impiegare alcuni giorni per mostrarlo.",
   "mail.M8.nothingDue": "Il suo piano {plan} è terminato. La parte già utilizzata copre l’intero prezzo, quindi non le spettava alcun rimborso.",
+  "mail.M8.nothingMoreDue": "Il suo piano {plan} è terminato e non le spetta nessun ulteriore rimborso.",
   "mail.M8_RECEIVED.subject": "Abbiamo ricevuto il suo recesso",
   "mail.M8_RECEIVED.received": "Abbiamo ricevuto il suo recesso dal piano {plan} il {withdrawalDate}. Il suo piano è terminato.",
   "mail.M8_RECEIVED.refunding": "Le stiamo rimborsando {refundAmount} sulla carta e le scriveremo di nuovo via e-mail quando sarà fatto.",

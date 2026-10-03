@@ -43,6 +43,7 @@
   "mail.M8.subject": "Penarikan Anda telah dikonfirmasi",
   "mail.M8.refunded": "Paket {plan} Anda telah berakhir, dan kami telah mengembalikan {refundAmount} ke kartu Anda. Bank Anda mungkin memerlukan beberapa hari untuk menampilkannya.",
   "mail.M8.nothingDue": "Paket {plan} Anda telah berakhir. Bagian yang sudah Anda gunakan menutupi seluruh harga, sehingga tidak ada yang perlu dikembalikan kepada Anda.",
+  "mail.M8.nothingMoreDue": "Paket {plan} Anda telah berakhir, dan tidak ada lagi yang perlu dikembalikan kepada Anda.",
   "mail.M8_RECEIVED.subject": "Kami telah menerima penarikan Anda",
   "mail.M8_RECEIVED.received": "Kami menerima penarikan Anda dari paket {plan} pada {withdrawalDate}. Paket Anda telah berakhir.",
   "mail.M8_RECEIVED.refunding": "Kami sedang mengembalikan {refundAmount} ke kartu Anda dan akan mengirim email lagi kepada Anda setelah selesai.",

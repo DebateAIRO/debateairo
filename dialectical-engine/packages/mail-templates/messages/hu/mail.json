@@ -43,6 +43,7 @@
   "mail.M8.subject": "Elállását megerősítettük",
   "mail.M8.refunded": "A(z) {plan} csomagja véget ért, és {refundAmount} összeget visszatérítettünk a kártyájára. Néhány napig tarthat, amíg bankja megjeleníti.",
   "mail.M8.nothingDue": "A(z) {plan} csomagja véget ért. A már felhasznált rész fedezi a teljes árat, ezért Önnek nem járt vissza semmi.",
+  "mail.M8.nothingMoreDue": "A(z) {plan} csomagja véget ért, és Önnek nem jár vissza több összeg.",
   "mail.M8_RECEIVED.subject": "Megkaptuk elállását",
   "mail.M8_RECEIVED.received": "{withdrawalDate} napon megkaptuk elállását a(z) {plan} csomagtól. A csomagja véget ért.",
   "mail.M8_RECEIVED.refunding": "{refundAmount} összeget visszatérítünk a kártyájára, és ha elkészült, újra írunk Önnek e-mailben.",

@@ -43,6 +43,7 @@
   "mail.M8.subject": "Jūsu atteikums ir apstiprināts",
   "mail.M8.refunded": "Jūsu plāns {plan} ir beidzies, un mēs atmaksājām {refundAmount} uz jūsu karti. Jūsu bankai var būt nepieciešamas dažas dienas, lai to parādītu.",
   "mail.M8.nothingDue": "Jūsu plāns {plan} ir beidzies. Jau izmantotā daļa sedz visu cenu, tāpēc jums nekas nepienācās atpakaļ.",
+  "mail.M8.nothingMoreDue": "Jūsu plāns {plan} ir beidzies, un jums vairs nekas nepienākas atpakaļ.",
   "mail.M8_RECEIVED.subject": "Esam saņēmuši jūsu atteikumu",
   "mail.M8_RECEIVED.received": "Mēs saņēmām jūsu atteikumu no plāna {plan} {withdrawalDate}. Jūsu plāns ir beidzies.",
   "mail.M8_RECEIVED.refunding": "Mēs atmaksājam {refundAmount} uz jūsu karti un, kad tas būs izdarīts, jums atkal uzrakstīsim e-pastu.",

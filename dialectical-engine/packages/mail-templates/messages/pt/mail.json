@@ -43,6 +43,7 @@
   "mail.M8.subject": "A sua livre resolução está confirmada",
   "mail.M8.refunded": "O seu plano {plan} terminou e reembolsámos {refundAmount} no seu cartão. O seu banco pode demorar alguns dias a apresentá-lo.",
   "mail.M8.nothingDue": "O seu plano {plan} terminou. A parte que já utilizou cobre o preço total, pelo que não lhe era devido qualquer reembolso.",
+  "mail.M8.nothingMoreDue": "O seu plano {plan} terminou e não lhe é devido mais nenhum reembolso.",
   "mail.M8_RECEIVED.subject": "Recebemos a sua livre resolução",
   "mail.M8_RECEIVED.received": "Recebemos a sua livre resolução do plano {plan} em {withdrawalDate}. O seu plano terminou.",
   "mail.M8_RECEIVED.refunding": "Estamos a reembolsar {refundAmount} no seu cartão e voltaremos a enviar-lhe um e-mail quando estiver concluído.",

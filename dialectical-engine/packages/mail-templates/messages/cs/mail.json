@@ -43,6 +43,7 @@
   "mail.M8.subject": "Vaše odstoupení od smlouvy je potvrzeno",
   "mail.M8.refunded": "Váš tarif {plan} skončil a vrátili jsme {refundAmount} na vaši kartu. Zobrazení u vaší banky může trvat několik dní.",
   "mail.M8.nothingDue": "Váš tarif {plan} skončil. Již využitá část pokrývá celou cenu, takže vám nic nenáleželo zpět.",
+  "mail.M8.nothingMoreDue": "Váš tarif {plan} skončil a nic dalšího vám již nenáleží zpět.",
   "mail.M8_RECEIVED.subject": "Vaše odstoupení od smlouvy jsme obdrželi",
   "mail.M8_RECEIVED.received": "Dne {withdrawalDate} jsme obdrželi vaše odstoupení od tarifu {plan}. Váš tarif skončil.",
   "mail.M8_RECEIVED.refunding": "Vracíme {refundAmount} na vaši kartu, a až to bude hotové, znovu vám napíšeme e-mail.",

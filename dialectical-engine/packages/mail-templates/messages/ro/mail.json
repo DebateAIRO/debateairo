@@ -43,6 +43,7 @@
   "mail.M8.subject": "Retragerea dumneavoastră este confirmată",
   "mail.M8.refunded": "Abonamentul dumneavoastră {plan} s-a încheiat, iar noi v-am rambursat {refundAmount} pe card. Banca dumneavoastră poate avea nevoie de câteva zile pentru a afișa suma.",
   "mail.M8.nothingDue": "Abonamentul dumneavoastră {plan} s-a încheiat. Partea pe care ați folosit-o deja acoperă întregul preț, așa că nu vi se cuvine nicio sumă înapoi.",
+  "mail.M8.nothingMoreDue": "Abonamentul dumneavoastră {plan} s-a încheiat și nu vi se mai cuvine nicio sumă înapoi.",
   "mail.M8_RECEIVED.subject": "Am primit retragerea dumneavoastră",
   "mail.M8_RECEIVED.received": "Am primit pe {withdrawalDate} retragerea dumneavoastră din abonamentul {plan}. Abonamentul dumneavoastră s-a încheiat.",
   "mail.M8_RECEIVED.refunding": "Vă rambursăm {refundAmount} pe card și vă vom scrie din nou pe e-mail când rambursarea este finalizată.",

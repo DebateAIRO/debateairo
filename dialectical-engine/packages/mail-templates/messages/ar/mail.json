@@ -43,6 +43,7 @@
   "mail.M8.subject": "تم تأكيد انسحابك",
   "mail.M8.refunded": "انتهت خطتك {plan}، وأعدنا {refundAmount} إلى بطاقتك. قد يستغرق ظهور المبلغ لدى البنك بضعة أيام.",
   "mail.M8.nothingDue": "انتهت خطتك {plan}. الجزء الذي استخدمته بالفعل يغطي السعر كاملًا، لذا لم يكن هناك ما يُستحق ردّه إليك.",
+  "mail.M8.nothingMoreDue": "انتهت خطتك {plan}، ولم يعد هناك أي مبلغ مستحق ردّه إليك.",
   "mail.M8_RECEIVED.subject": "تلقّينا انسحابك",
   "mail.M8_RECEIVED.received": "تلقّينا انسحابك من خطتك {plan} في {withdrawalDate}. انتهت خطتك.",
   "mail.M8_RECEIVED.refunding": "نحن بصدد ردّ {refundAmount} إلى بطاقتك، وسنراسلك مجددًا عبر البريد الإلكتروني عند اكتمال ذلك.",

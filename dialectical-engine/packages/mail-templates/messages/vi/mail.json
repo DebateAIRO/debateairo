@@ -43,6 +43,7 @@
   "mail.M8.subject": "Việc rút lại của quý vị đã được xác nhận",
   "mail.M8.refunded": "Gói {plan} của quý vị đã kết thúc và chúng tôi đã hoàn {refundAmount} vào thẻ của quý vị. Ngân hàng có thể mất vài ngày để hiển thị khoản này.",
   "mail.M8.nothingDue": "Gói {plan} của quý vị đã kết thúc. Phần quý vị đã dùng bao trọn toàn bộ giá, vì vậy không có khoản nào phải hoàn lại cho quý vị.",
+  "mail.M8.nothingMoreDue": "Gói {plan} của quý vị đã kết thúc và không còn khoản nào phải hoàn lại cho quý vị.",
   "mail.M8_RECEIVED.subject": "Chúng tôi đã nhận được yêu cầu rút lại của quý vị",
   "mail.M8_RECEIVED.received": "Chúng tôi đã nhận được yêu cầu rút lại gói {plan} của quý vị vào {withdrawalDate}. Gói của quý vị đã kết thúc.",
   "mail.M8_RECEIVED.refunding": "Chúng tôi đang hoàn {refundAmount} vào thẻ của quý vị và sẽ gửi email lại cho quý vị khi hoàn tất.",

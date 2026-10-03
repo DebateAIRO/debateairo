@@ -43,6 +43,7 @@
   "mail.M8.subject": "Votre rétractation est confirmée",
   "mail.M8.refunded": "Votre formule {plan} a pris fin et nous avons remboursé {refundAmount} sur votre carte. Votre banque peut mettre quelques jours à l’afficher.",
   "mail.M8.nothingDue": "Votre formule {plan} a pris fin. La part déjà utilisée couvre la totalité du prix ; aucun montant ne vous était donc dû.",
+  "mail.M8.nothingMoreDue": "Votre formule {plan} a pris fin et plus aucun montant ne vous est dû.",
   "mail.M8_RECEIVED.subject": "Nous avons reçu votre rétractation",
   "mail.M8_RECEIVED.received": "Nous avons reçu votre rétractation de votre formule {plan} le {withdrawalDate}. Votre formule a pris fin.",
   "mail.M8_RECEIVED.refunding": "Nous vous remboursons {refundAmount} sur votre carte et vous écrirons de nouveau par e-mail une fois que ce sera fait.",

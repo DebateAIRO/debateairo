@@ -35,6 +35,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   withdrawalDays: "14",
   canUndo: "true",
   paused: "true",
+  ownerSettled: "true",
   notRequested: "true",
   otherSystem: "true",
   bankDeclined: "true",
@@ -228,11 +229,34 @@ describe("P17 renderMail", () => {
   });
 
   it("says a withdrawal with nothing due back refunded nothing, and never shows $0.00 as a refund", () => {
-    expect(renderMail("M8", "en", paramsFor("M8")).text).toContain("we refunded $12.10 to your card");
-    const nothing = renderMail("M8", "en", { ...paramsFor("M8"), refundAmount: "0.00" }).text;
+    // RefundDesk's and P12d's M8 carry no `ownerSettled` (P2-M7's flag is the owner's 0.00/0.00 settlement's alone).
+    const { ownerSettled: _settled, ...withdrawal } = paramsFor("M8");
+    expect(renderMail("M8", "en", withdrawal).text).toContain("we refunded $12.10 to your card");
+    const nothing = renderMail("M8", "en", { ...withdrawal, refundAmount: "0.00" }).text;
     expect(nothing).toContain("Your Plus plan has ended. The part you already used covers the whole price, so nothing was due back to you.");
     expect(nothing).not.toContain("refunded");
     expect(nothing).not.toContain("$0.00");
+  });
+
+  it("says only that nothing more is due when the owner settles a withdrawal at 0.00 and 0.00, in every locale (P2-M7)", () => {
+    const settled = renderMail("M8", "en", { plan: "PLUS", refundAmount: "0.00", ownerSettled: "true" }).text;
+    expect(settled).toContain("Your Plus plan has ended, and nothing more is due back to you.");
+    // The money had usually gone back already (a dashboard refund): never "the part you already used covers it".
+    expect(settled).not.toContain("covers the whole price");
+    expect(settled).not.toContain("$0.00");
+    // A settlement with money due keeps today's sentence; so does every M8 the flag is not given to.
+    expect(renderMail("M8", "en", { plan: "PLUS", refundAmount: "12.10", ownerSettled: "true" }).text)
+      .toContain("Your Plus plan has ended, and we refunded $12.10 to your card.");
+    expect(renderMail("M8", "en", { plan: "PLUS", refundAmount: "0.00", ownerSettled: "false" }).text)
+      .toContain("The part you already used covers the whole price");
+    expect(MAIL_TEMPLATES.M8.optional).toEqual({ ownerSettled: "flag" });
+    const catalogues = loadMailCatalogues();
+    for (const locale of MAIL_LOCALES) {
+      const text = renderMail("M8", locale, { plan: "PLUS", refundAmount: "0.00", ownerSettled: "true" }).text;
+      expect(text, locale).not.toMatch(/\{[A-Za-z][A-Za-z0-9_]*\}/u);
+      expect(text, `${locale} nothingMoreDue`).toContain(longestFixedPart(catalogues[locale]["mail.M8.nothingMoreDue"]!));
+      expect(text, `${locale} nothingDue`).not.toContain(longestFixedPart(catalogues[locale]["mail.M8.nothingDue"]!));
+    }
   });
 
   it("says the Romanian invoice is attached only when the PDF is, and otherwise where to find it", () => {
