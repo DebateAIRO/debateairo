@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Neplaťte prosím znovu. Váš plán se objeví v Nastavení, jakmile ho vaše banka potvrdí.",
   "billing.checkout.cardCountryRefused": "Nemůžeme přijímat karty vydané v zemi této karty. Veškeré stržené peníze se vám vrátí v plné výši na kartu.",
   "billing.checkout.refunded": "Tuto platbu jsme vám vrátili v plné výši. E-mail, který jsme poslali, vysvětluje proč.",
+  "billing.checkout.refundedBeforeStart": "Tato platba vám byla v plné výši vrácena na kartu a váš plán nezačal. Můžete to zkusit znovu.",
   "billing.checkout.succeeded": "Váš plán {plan} je aktivní. Potvrzovací e-mail je na cestě.",
   "billing.checkout.failed": "Platba neprošla a nebyly strženy žádné peníze. Můžete to zkusit znovu nebo použít jinou kartu.",
   "billing.checkout.tryAgain": "Zkusit znovu",

@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Veuillez ne pas payer à nouveau. Votre formule apparaîtra dans les Paramètres dès que votre banque aura confirmé.",
   "billing.checkout.cardCountryRefused": "Nous ne pouvons pas accepter les cartes émises dans le pays de cette carte. Toute somme prélevée vous est intégralement restituée sur votre carte.",
   "billing.checkout.refunded": "Nous avons intégralement remboursé ce paiement. L’e-mail que nous vous avons envoyé en explique la raison.",
+  "billing.checkout.refundedBeforeStart": "Ce paiement a été intégralement remboursé sur votre carte et votre formule n’a pas démarré. Vous pouvez réessayer.",
   "billing.checkout.succeeded": "Votre formule {plan} est active. Un e-mail de confirmation est en route.",
   "billing.checkout.failed": "Le paiement n’a pas abouti et aucun montant n’a été prélevé. Vous pouvez réessayer ou utiliser une autre carte.",
   "billing.checkout.tryAgain": "Réessayer",

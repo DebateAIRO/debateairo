@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Betaal niet opnieuw. Uw abonnement verschijnt in Instellingen zodra uw bank bevestigt.",
   "billing.checkout.cardCountryRefused": "Wij kunnen geen kaarten accepteren die zijn uitgegeven in het land van die kaart. Eventueel afgeschreven geld gaat volledig terug naar uw kaart.",
   "billing.checkout.refunded": "We hebben deze betaling volledig terugbetaald. De e-mail die we hebben gestuurd, legt uit waarom.",
+  "billing.checkout.refundedBeforeStart": "Deze betaling is volledig teruggestort op uw kaart en uw abonnement is niet gestart. U kunt het opnieuw proberen.",
   "billing.checkout.succeeded": "Uw {plan}-abonnement is actief. Er is een bevestigingsmail onderweg.",
   "billing.checkout.failed": "De betaling is niet gelukt en er is geen geld afgeschreven. U kunt het opnieuw proberen of een andere kaart gebruiken.",
   "billing.checkout.tryAgain": "Opnieuw proberen",

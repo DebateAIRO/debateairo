@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Vă rugăm să nu plătiți din nou. Abonamentul dvs. apare în Setări imediat ce banca dvs. confirmă.",
   "billing.checkout.cardCountryRefused": "Nu putem accepta carduri emise în țara acestui card. Orice sumă încasată se întoarce integral pe cardul dvs.",
   "billing.checkout.refunded": "Am rambursat integral această plată. E-mailul pe care vi l-am trimis explică de ce.",
+  "billing.checkout.refundedBeforeStart": "Această plată a fost rambursată integral pe cardul dvs., iar abonamentul nu a început. Puteți încerca din nou.",
   "billing.checkout.succeeded": "Abonamentul dvs. {plan} este activ. Un e-mail de confirmare este pe drum.",
   "billing.checkout.failed": "Plata nu a trecut și nu s-au luat bani. Puteți încerca din nou sau puteți folosi alt card.",
   "billing.checkout.tryAgain": "Încercați din nou",

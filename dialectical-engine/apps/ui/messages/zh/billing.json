@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "请不要重复付款。银行确认后，您的方案将显示在“设置”中。",
   "billing.checkout.cardCountryRefused": "我们无法接受在该卡发卡国签发的银行卡。已扣取的任何款项都会全额退回您的卡。",
   "billing.checkout.refunded": "我们已全额退还这笔付款。我们发送的邮件说明了原因。",
+  "billing.checkout.refundedBeforeStart": "这笔付款已全额退回您的银行卡，您的方案未开始。您可以重试。",
   "billing.checkout.succeeded": "您的 {plan} 方案已生效。确认邮件正在发送中。",
   "billing.checkout.failed": "付款未成功，未扣取任何款项。您可以重试或使用其他银行卡。",
   "billing.checkout.tryAgain": "重试",

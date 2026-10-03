@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Kérjük, ne fizessen újra. A csomagja megjelenik a Beállításokban, amint a bankja megerősíti.",
   "billing.checkout.cardCountryRefused": "Nem fogadhatunk el olyan kártyát, amelyet az adott kártya országában bocsátottak ki. Minden levont összeg teljes egészében visszakerül a kártyájára.",
   "billing.checkout.refunded": "Ezt a fizetést teljes egészében visszatérítettük. Az elküldött e-mailünk elmagyarázza, miért.",
+  "billing.checkout.refundedBeforeStart": "Ezt a fizetést teljes egészében visszatérítették a kártyájára, és a csomagja nem indult el. Megpróbálhatja újra.",
   "billing.checkout.succeeded": "A(z) {plan} csomagja aktív. A visszaigazoló e-mail úton van.",
   "billing.checkout.failed": "A fizetés nem sikerült, és nem vontunk le pénzt. Próbálja újra, vagy használjon másik kártyát.",
   "billing.checkout.tryAgain": "Próbálja újra",

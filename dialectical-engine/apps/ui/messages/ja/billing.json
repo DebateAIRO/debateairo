@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "再度お支払いにならないでください。銀行の確認が取れ次第、プランが設定に表示されます。",
   "billing.checkout.cardCountryRefused": "このカードの発行国で発行されたカードはお受けできません。引き落とされた金額は全額カードに戻ります。",
   "billing.checkout.refunded": "このお支払いは全額返金しました。理由はお送りしたメールに記載しています。",
+  "billing.checkout.refundedBeforeStart": "このお支払いはカードに全額返金され、プランは開始されていません。もう一度お試しいただけます。",
   "billing.checkout.succeeded": "{plan} プランが有効になりました。確認メールをお送りしています。",
   "billing.checkout.failed": "お支払いは完了せず、料金は引き落とされていません。もう一度お試しいただくか、別のカードをご利用ください。",
   "billing.checkout.tryAgain": "もう一度試す",

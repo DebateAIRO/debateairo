@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Non pagare di nuovo. Il tuo piano compare nelle Impostazioni non appena la tua banca conferma.",
   "billing.checkout.cardCountryRefused": "Non possiamo accettare carte emesse nel paese di quella carta. Ogni importo addebitato torna interamente sulla tua carta.",
   "billing.checkout.refunded": "Abbiamo rimborsato interamente questo pagamento. L’e-mail che ti abbiamo inviato spiega il motivo.",
+  "billing.checkout.refundedBeforeStart": "Questo pagamento è stato rimborsato interamente sulla tua carta e il tuo piano non è iniziato. Puoi riprovare.",
   "billing.checkout.succeeded": "Il tuo piano {plan} è attivo. Un’e-mail di conferma è in arrivo.",
   "billing.checkout.failed": "Il pagamento non è andato a buon fine e non è stato addebitato nulla. Puoi riprovare o usare un’altra carta.",
   "billing.checkout.tryAgain": "Riprova",

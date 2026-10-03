@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Bitte zahlen Sie nicht erneut. Ihr Tarif erscheint in den Einstellungen, sobald Ihre Bank bestätigt.",
   "billing.checkout.cardCountryRefused": "Wir können keine Karten aus dem Ausstellungsland dieser Karte akzeptieren. Jeder abgebuchte Betrag wird vollständig auf Ihre Karte zurückgebucht.",
   "billing.checkout.refunded": "Wir haben diese Zahlung vollständig erstattet. Die E-Mail, die wir Ihnen geschickt haben, erklärt den Grund.",
+  "billing.checkout.refundedBeforeStart": "Diese Zahlung wurde vollständig auf Ihre Karte erstattet, und Ihr Tarif hat nicht begonnen. Sie können es erneut versuchen.",
   "billing.checkout.succeeded": "Ihr Tarif {plan} ist aktiv. Eine Bestätigung per E-Mail ist unterwegs.",
   "billing.checkout.failed": "Die Zahlung ist nicht durchgegangen, und es wurde kein Geld abgebucht. Sie können es erneut versuchen oder eine andere Karte verwenden.",
   "billing.checkout.tryAgain": "Erneut versuchen",

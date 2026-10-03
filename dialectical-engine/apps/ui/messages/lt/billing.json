@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Nemokėkite dar kartą. Jūsų planas atsiras nustatymuose, kai tik bankas patvirtins.",
   "billing.checkout.cardCountryRefused": "Negalime priimti kortelių, išduotų tos kortelės šalyje. Visi nuskaičiuoti pinigai visiškai grąžinami į jūsų kortelę.",
   "billing.checkout.refunded": "Šį mokėjimą grąžinome visiškai. Mūsų atsiųstame el. laiške paaiškinta kodėl.",
+  "billing.checkout.refundedBeforeStart": "Šis mokėjimas visiškai grąžintas į jūsų kortelę, o jūsų planas neprasidėjo. Galite bandyti dar kartą.",
   "billing.checkout.succeeded": "Jūsų planas {plan} aktyvus. Patvirtinimo el. laiškas jau siunčiamas.",
   "billing.checkout.failed": "Mokėjimas nepavyko ir pinigai nebuvo nuskaičiuoti. Galite bandyti dar kartą arba naudoti kitą kortelę.",
   "billing.checkout.tryAgain": "Bandyti dar kartą",

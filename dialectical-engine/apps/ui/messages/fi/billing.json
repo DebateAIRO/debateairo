@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Älä maksa uudelleen. Tilauksesi näkyy Asetuksissa, kun pankkisi on vahvistanut sen.",
   "billing.checkout.cardCountryRefused": "Emme voi hyväksyä kortteja, jotka on myönnetty kyseisen kortin maassa. Kaikki veloitettu raha palautuu kokonaan kortillesi.",
   "billing.checkout.refunded": "Palautimme tämän maksun kokonaan. Lähettämämme sähköposti kertoo syyn.",
+  "billing.checkout.refundedBeforeStart": "Tämä maksu palautettiin kokonaan kortillesi, eikä tilauksesi alkanut. Voit yrittää uudelleen.",
   "billing.checkout.succeeded": "{plan}-tilauksesi on aktiivinen. Vahvistusviesti on tulossa sähköpostiisi.",
   "billing.checkout.failed": "Maksu ei mennyt läpi, eikä rahaa veloitettu. Voit yrittää uudelleen tai käyttää toista korttia.",
   "billing.checkout.tryAgain": "Yritä uudelleen",

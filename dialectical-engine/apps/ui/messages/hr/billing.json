@@ -67,6 +67,7 @@
   "billing.checkout.doNotPayAgain": "Nemojte ponovno plaćati. Vaš plan pojavit će se u Postavkama čim vaša banka potvrdi.",
   "billing.checkout.cardCountryRefused": "Ne možemo prihvatiti kartice izdane u zemlji te kartice. Sav naplaćeni novac u cijelosti se vraća na vašu karticu.",
   "billing.checkout.refunded": "Ovo plaćanje vratili smo u cijelosti. E-poruka koju smo poslali objašnjava zašto.",
+  "billing.checkout.refundedBeforeStart": "Ovo plaćanje vraćeno je u cijelosti na vašu karticu i vaš plan nije započeo. Možete pokušati ponovno.",
   "billing.checkout.succeeded": "Vaš plan {plan} je aktivan. E-poruka s potvrdom je na putu.",
   "billing.checkout.failed": "Plaćanje nije prošlo i novac nije naplaćen. Možete pokušati ponovno ili upotrijebiti drugu karticu.",
   "billing.checkout.tryAgain": "Pokušajte ponovno",
