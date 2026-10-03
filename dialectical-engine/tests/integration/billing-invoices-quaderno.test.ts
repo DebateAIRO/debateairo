@@ -45,7 +45,7 @@ describe("P10a Quaderno invoices", () => {
     expect(sales).toHaveLength(1);
     expect(sales[0]).toMatchObject({
       transactionId: paid.transaction.transactionId, taxCode: "saas",
-      customer: { email: `buyer-${paid.userId.slice(0, 8)}@example.test`, country: "DE", city: "Bucuresti", street: null, taxId: null, locale: "en" },
+      customer: { email: `buyer-${paid.userId.slice(0, 8)}@example.test`, country: "DE", city: "Sector 1", street: null, taxId: null, locale: "en" },
       lines: [{ netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1_900 }],
       evidence: { billingCountry: "DE", ipAddress: "198.51.100.7", bankCountry: "DE" }
     });

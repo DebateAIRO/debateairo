@@ -219,10 +219,12 @@ export class BillingJobQueries {
           AND (
             (SELECT count(*) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') < 2
             OR (c.attempt = 1 AND GREATEST(c.period_start, COALESCE((
-                  SELECT max((p.data ->> 'until')::timestamptz) FROM billing.subscription_event p
-                   WHERE p.subscription_id = c.subscription_id AND p.kind = 'RENEWAL_POSTPONED'
-                     AND p.data ->> 'until' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$'
-                     AND (p.data ->> 'until')::timestamptz > c.period_start
+                  SELECT max(postponed.until) FROM (
+                    SELECT CASE WHEN p.data ->> 'until' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$'
+                                THEN (p.data ->> 'until')::timestamptz END AS until
+                      FROM billing.subscription_event p
+                     WHERE p.subscription_id = c.subscription_id AND p.kind = 'RENEWAL_POSTPONED'
+                  ) AS postponed WHERE postponed.until > c.period_start
                 ), c.period_start)) <= $6)
             OR (c.attempt > 1
                 AND (SELECT max(u.at) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') <= $5)
