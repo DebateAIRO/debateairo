@@ -12,7 +12,9 @@ import {
   type ModelScorecardReadResult
 } from "@debateai/register";
 import {
+  freeCapsFollowPaidSiteRule,
   planCapsFollowPaidSiteRule,
+  SCORECARD_FREE_CAPS_INVALID,
   SCORECARD_PLAN_CAPS_INVALID,
   type ReachableTarget,
   type RoleAssignment,
@@ -31,7 +33,10 @@ import type { BootCustody } from "./boot-custody.js";
  *    roster order (what the roster filter seats today), then every other
  *    healthy discovered target in discovery order — so a role the scorecard
  *    does not cover falls back to the model today's roster would seat (debate
- *    roles; the answer roles keep their sealed refs);
+ *    roles; the answer roles keep their sealed refs). Paid plans S4b: on a site
+ *    that sells plans (`plansSold`) a FREE ask's reachable targets are the Free
+ *    roster's models only, so its seats, runner-ups and fallbacks all come from
+ *    the Free roster (the owner's ruling of 3 October 2026);
  *  - SEAT DEMAND — how many debaters the plan seats (its roster's LENGTH,
  *    capped by the distinct makers reachable) and a seat per debater in every
  *    debate role; one each for the two answer roles;
@@ -135,6 +140,11 @@ export interface AskModelPickerSettings {
   readonly runMaximumMicros?: number | null;
   /** Final review I3: each debate job's sealed answer bound, which the picker adds to a typical call's input. */
   readonly answerTokenCeilings: Readonly<Record<DebateRole, number>>;
+  /**
+   * Paid plans S4b: the site sells plans (hosted, billing on). Only then is a Free ask held to Free's
+   * own caps and to the Free roster; absent or false (billing off, local mode), nothing changes.
+   */
+  readonly plansSold?: boolean;
   /** Operator lines (stderr in production): picker notes, estimates, refusal details. */
   readonly log?: (line: string) => void;
 }
@@ -203,6 +213,12 @@ export function askModelPickerSettings(input: Readonly<{
     && !planCapsFollowPaidSiteRule(input.scorecard.scorecard.pickerSettings.planStrengthCaps)) {
     throw new TypeError(SCORECARD_PLAN_CAPS_INVALID);
   }
+  // Paid plans S4b (final review P3-I2): the same backstop for Free's own caps —
+  // every role's Free money cap set, and at or below that role's Economy cap.
+  if (hosted && input.billingEnabled === true && input.scorecard.state === "VALID"
+    && !freeCapsFollowPaidSiteRule(input.scorecard.scorecard.pickerSettings)) {
+    throw new TypeError(SCORECARD_FREE_CAPS_INVALID);
+  }
   const moneyPolicy = !hosted ? null : input.moneyPolicy ?? Object.freeze({ perRunCeilingMicros: input.perRunCeilingMicros as number });
   if (moneyPolicy !== null && moneyPolicy.perRunCeilingMicros !== input.perRunCeilingMicros) {
     // One ceiling, two spellings: the boot passes the same policy both ways, so a mismatch is a composition defect.
@@ -217,6 +233,7 @@ export function askModelPickerSettings(input: Readonly<{
     moneyPolicy,
     runMaximumMicros: moneyPolicy === null ? null : mostOneRunMaySpendMicros(moneyPolicy),
     answerTokenCeilings,
+    plansSold: hosted && input.billingEnabled === true,
     ...(input.log === undefined ? {} : { log: input.log })
   });
 }
@@ -309,19 +326,23 @@ export function describeModelScorecard(
 /**
  * Today's order: the first discovered target serving each roster id, in roster
  * order (exactly what the roster filter seats), then every other healthy
- * target in discovery order.
+ * target in discovery order. Paid plans S4b: with `rosterOnly`, only the
+ * targets serving a roster model, in that same order — a Free ask on a site
+ * that sells plans is seated, backed up and fallen back from its roster alone.
  */
 export function reachableInTodaysOrder(
   discovered: readonly DiscoveredPanelMember[],
   rosterModelIds: readonly string[],
-  facts: ReadonlyMap<string, AskTargetFacts>
+  facts: ReadonlyMap<string, AskTargetFacts>,
+  rosterOnly = false
 ): readonly ReachableTarget[] {
   const rosterFirst = rosterModelIds.flatMap((modelId) => {
     const member = discovered.find((candidate) => candidate.model_id === modelId);
     return member === undefined ? [] : [member];
   });
   const seated = new Set(rosterFirst.map((member) => member.provider_ref));
-  const ordered = [...rosterFirst, ...discovered.filter((member) => !seated.has(member.provider_ref))];
+  const ordered = [...rosterFirst, ...discovered.filter((member) => !seated.has(member.provider_ref))]
+    .filter((member) => !rosterOnly || rosterModelIds.includes(member.model_id));
   return Object.freeze(ordered.map((member) => {
     const fact = facts.get(member.provider_ref);
     return Object.freeze({

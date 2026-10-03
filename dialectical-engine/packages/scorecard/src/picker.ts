@@ -26,6 +26,7 @@ import { estimateRunCost, estimateRunCostByPhase, typicalCallMicros, type PhaseC
  *   SEATS_SHORT:<role>:<filled>/<asked>       fewer eligible makers or routes than seats
  *   CONTEXT_WINDOW_SKIP:<role>:<candidateId>  the role's typical input (× 4) plus its answer bound does not fit the window
  *   ECONOMY_CAP_UNMET:<role>                  nothing was under the cap; the cheapest sits
+ *   FREE_CAPS                                 a Free ask on a site that sells plans: the ECONOMY rule read Free's own caps (paid plans S4b)
  *   PRICE_UNUSABLE:<providerRef>              a hosted route without a usable price
  *   ESTIMATE_UNAVAILABLE                      a called seat has no typical call or no price
  *   PERSON_ROOM_BELOW_ECONOMY                 nothing fitted the person's room; the cheapest plan that fits the site's ceiling (paid plans A5, P3-I1)
@@ -115,6 +116,13 @@ export type PickerInput = Readonly<{
    */
   moneyLimits?: PickerMoneyLimits | null;
   prices: ReadonlyMap<string, TargetPrice>;
+  /**
+   * Paid plans S4b (final review P3-I2): the site sells plans — HOSTED with billing on. Only then
+   * is a Free ask (`planTier: "free"`) held to Free's own per-role money cap
+   * (`pickerSettings.freeCap`, see `economyRuleCap`). Absent or false — billing off, local mode —
+   * nothing changes. The caller also keeps such an ask's `reachable` to the Free roster.
+   */
+  plansSold?: boolean;
   /**
    * Final review I3: the sealed per-call answer bound (`CallBound.tokenCeiling`) of the calls each
    * role makes — what the gateway's window wall adds to a prompt. A role without a positive whole
@@ -320,6 +328,32 @@ function fallbackCandidateFrom(target: ReachableTarget): SeatCandidate {
   });
 }
 
+/**
+ * Paid plans S4b (final review P3-I2; the owner's ruling of 3 October 2026): a Free ask on a site
+ * that sells plans. Its ECONOMY pick reads Free's own caps.
+ */
+function freeCapsApply(input: PickerInput): boolean {
+  return input.mode === "HOSTED" && input.plansSold === true && input.planTier === "free";
+}
+
+/**
+ * The cost cap the ECONOMY rule (`pickByStrength`) reads for `role`: seconds in LOCAL mode, the
+ * Economy money cap in HOSTED mode — and, for a Free ask on a site that sells plans
+ * (`freeCapsApply`), Free's own money cap, never looser than Economy's. Publish and boot refuse a
+ * billing-on scorecard whose Free caps break the owners' Free rule (`freeCapsFollowPaidSiteRule`);
+ * the picker still holds the line on its own, so an unchecked input cannot loosen Free: an unset Free cap reads as
+ * Economy's, a Free cap above Economy's is lowered to it, and an unset Economy cap (Economy seats
+ * the cheapest) keeps Free on the cheapest too.
+ */
+function economyRuleCap(input: PickerInput, settings: PickerSettings, role: DebateRole): number | null {
+  const economyCap = settings.economyCap[role];
+  if (input.mode !== "HOSTED") return economyCap.secondsPerCall;
+  const economy = economyCap.moneyMicrosPerCall;
+  if (!freeCapsApply(input) || economy === null) return economy;
+  const free = settings.freeCap?.[role].moneyMicrosPerCall ?? null;
+  return free === null ? economy : Math.min(free, economy);
+}
+
 function seatDemandOf(input: PickerInput, role: DebateRole): number {
   const demand = input.seatDemand[role];
   return Number.isSafeInteger(demand) && demand > 0 ? demand : 0;
@@ -477,8 +511,7 @@ function assignAtStrength(input: PickerInput, strength: ModelStrength): Readonly
     if (count === 0) return Object.freeze([]);
     if (scorecard === null) return fallbackSeats(input.reachable, count, rule.fallback);
     const settings = scorecard.pickerSettings;
-    const economyCap = settings.economyCap[role];
-    const cap = input.mode === "HOSTED" ? economyCap.moneyMicrosPerCall : economyCap.secondsPerCall;
+    const cap = economyRuleCap(input, settings, role);
     const pool = eligiblePool(input, scorecard, role, notes, role === "POSITION" && crossExchangeDemanded);
     const mains = chooseMains(pool, count, strength, settings, cap, rule);
     if (mains.length === 0) {
@@ -556,6 +589,7 @@ function assignAtStrength(input: PickerInput, strength: ModelStrength): Readonly
     coverage: null,
     fallback: { kind: "SINGLE", avoidMaker: writerMaker }
   });
+  if (scorecard !== null && strength === "ECONOMY" && freeCapsApply(input)) notes.push("FREE_CAPS");
   const roles: Record<DebateRole, readonly RoleSeat[]> = {
     POSITION: position,
     SUPPORT_ATTACK: supportAttack,

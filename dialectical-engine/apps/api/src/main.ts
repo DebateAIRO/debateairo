@@ -518,8 +518,11 @@ const askRoom = askRoomComposition?.room;
  * Paid plans S2: composed below B6b's room, because billing is on exactly when
  * the room's composition carries the plans; the picker's money limits are cut
  * from the guard's policy, and with billing on a scorecard that breaks the
- * owners' plan-cap rule refuses this stage (SCORECARD_PLAN_CAPS_INVALID).
+ * owners' plan-cap rule refuses this stage (SCORECARD_PLAN_CAPS_INVALID), and
+ * so does one whose Free caps are unset or above Economy's
+ * (SCORECARD_FREE_CAPS_INVALID, paid plans S4b).
  */
+const billingEnabled = (askRoomComposition?.billingPlans ?? null) !== null;
 const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));
 const modelPicker = await composeAskModelPicker({
   boot,
@@ -530,7 +533,7 @@ const modelPicker = await composeAskModelPicker({
   perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,
   callTokenCeilings,
   moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,
-  billingEnabled: (askRoomComposition?.billingPlans ?? null) !== null,
+  billingEnabled,
   log: (line) => console.error(line)
 });
 /**
@@ -541,7 +544,9 @@ const modelPicker = await composeAskModelPicker({
  * and only with the row's three band members (the same `costEnvelopeBand`
  * question B6b's room asks); the boot ledger names the stage when it refuses.
  * The row is not read a second time. Paid plans S2: with a VALID scorecard every
- * ask is the picker's, which seats each plan from every configured model.
+ * ask is the picker's, which seats each plan from every configured model —
+ * except Free while billing is on, which the picker seats from the Free roster
+ * only (paid plans S4b), so Free is priced on its own roster then.
  */
 await boot.run("run-ceiling-covers-one-call", async () => {
   if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
@@ -557,7 +562,8 @@ await boot.run("run-ceiling-covers-one-call", async () => {
       rosters: firstCallPlanModels({
         scorecardInForce: modelPicker.scorecard.state === "VALID",
         rosters: PLAN_TIER_ROSTERS,
-        models: firstCalls.map((call) => call.model)
+        models: firstCalls.map((call) => call.model),
+        ownRosterOnly: billingEnabled ? ["free"] : []
       })
     })
   });
