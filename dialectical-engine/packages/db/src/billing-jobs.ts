@@ -195,9 +195,11 @@ export class BillingJobQueries {
    * outcome yet: one keyset page after `after`, oldest first (D6b: paged like P14a's `adoptionCandidates`, so old
    * charges never starve fresh ones). A charge holding two or more SUBMIT_UNKNOWN events has spent A2's one extra
    * submission and is only adopted (P14a's daily pass does that too): it is left out until its close can be due,
-   * when P11a lists it once more and closes it — a renewal's own charge (attempt 1) once it was created at or before
-   * `renewalCloseBefore` (Q-1: 72 hours; P11a's `renewalPendingUntil` decides the exact instant, which a notice
-   * postponement can make later), a dunning retry once its latest SUBMIT_UNKNOWN is at or before `closeBefore`.
+   * when P11a lists it once more and closes it — a renewal's own charge (attempt 1) once the earliest instant its
+   * window can end is at or before `renewalCloseBefore` (now − Q-1's 72 hours): P2-M11, its due instant, which is the
+   * period start or the end of a notice postponement past it, never the instant the charge was made (a charge made
+   * late, after a tax outage, is closed when its hold lapses); P11a's `renewalPendingUntil` decides the exact instant.
+   * A dunning retry is listed once its latest SUBMIT_UNKNOWN is at or before `closeBefore`.
    */
   async openCharges(input: Readonly<{
     environment: CustomerXMoneyEnvironment;
@@ -215,7 +217,12 @@ export class BillingJobQueries {
                            WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUCCEEDED', 'FAILED'))
           AND (
             (SELECT count(*) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') < 2
-            OR (c.attempt = 1 AND c.created_at <= $6)
+            OR (c.attempt = 1 AND GREATEST(c.period_start, COALESCE((
+                  SELECT max((p.data ->> 'until')::timestamptz) FROM billing.subscription_event p
+                   WHERE p.subscription_id = c.subscription_id AND p.kind = 'RENEWAL_POSTPONED'
+                     AND p.data ->> 'until' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$'
+                     AND (p.data ->> 'until')::timestamptz > c.period_start
+                ), c.period_start)) <= $6)
             OR (c.attempt > 1
                 AND (SELECT max(u.at) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') <= $5)
           )

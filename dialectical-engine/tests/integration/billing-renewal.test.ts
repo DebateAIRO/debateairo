@@ -263,6 +263,65 @@ describe("P11a monthly renewal", () => {
     expect(h.auditLines).toContainEqual({ event: "billing.renewal.stuck", attempt: 1, code: "REBILL_OUTCOME_UNKNOWN" });
   });
 
+  /** Two blind unknowns on the renewal's rebill (A2's one resubmission spent), from now on, as the test above makes them. */
+  async function twoLostAnswers(paid: Readonly<{ transaction: Readonly<{ orderId: string }> }>) {
+    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
+    await h.renewal.runOnce();
+    h.clock.advance(5 * MINUTE);
+    await h.renewal.runOnce();
+    h.clock.advance(26 * MINUTE);
+    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
+    await h.renewal.runOnce();
+    h.clock.advance(31 * MINUTE);
+    await h.renewal.runOnce();
+    expect(rebills(paid)).toBe(2);
+  }
+
+  it("lists a renewal charged late with two lost answers from 72 hours past its due instant, not its making (P2-M11)", async () => {
+    const { paid, end } = await dueNow();
+    // The tax service is down at the due instant (Q-1): no charge yet, and the plan is held to 72 hours past the end.
+    h.tax.failNext("TAX_SERVICE_UNAVAILABLE");
+    await expect(h.renewal.renew(paid.subscriptionId)).rejects.toMatchObject({ code: "TAX_SERVICE_UNAVAILABLE" });
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({
+      cause: "RENEWAL_PENDING", paidThrough: new Date(end.getTime() + 72 * HOUR)
+    });
+    // It is charged 50 hours late, and both answers are lost.
+    h.clock.now = new Date(end.getTime() + 50 * HOUR);
+    await twoLostAnswers(paid);
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect(await unknownCodes(charge!.chargeId)).toEqual(["REBILL_OUTCOME_UNKNOWN", "REBILL_OUTCOME_UNKNOWN"]);
+    expect(await openChargeIds()).not.toContain(charge!.chargeId);
+    // The hold lapses 72 hours past the due instant, so the close is due then, not 72 hours after the charge was made.
+    h.clock.now = new Date(end.getTime() + 72 * HOUR + MINUTE);
+    expect(await openChargeIds()).toContain(charge!.chargeId);
+    await h.renewal.runOnce();
+    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED"))
+      .toMatchObject({ errorCode: "NO_TRANSACTION" });
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
+    expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
+  });
+
+  it("lists a postponed renewal with two lost answers only from 72 hours past the postponement's end (P2-M11)", async () => {
+    const { paid, end } = await dueNow();
+    h.tax.rateOverride.set("RO", 1_900);
+    await h.renewal.runOnce();
+    const until = addBusinessDays(h.clock.now, 7);
+    await h.mail.drain();
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "RENEWAL_NOTICE_SENT" });
+    h.clock.now = new Date(until.getTime() + MINUTE);
+    await twoLostAnswers(paid);
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect(charge).toMatchObject({ periodStart: end, totalMicros: 23_800_000 });
+    // Well past the period start's 72 hours, but the window runs from the postponement's end: no listing every tick.
+    expect(h.clock.now.getTime()).toBeGreaterThan(end.getTime() + 72 * HOUR);
+    expect(await openChargeIds()).not.toContain(charge!.chargeId);
+    h.clock.now = new Date(until.getTime() + 72 * HOUR + MINUTE);
+    expect(await openChargeIds()).toContain(charge!.chargeId);
+    await h.renewal.runOnce();
+    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED"))
+      .toMatchObject({ errorCode: "NO_TRANSACTION" });
+  });
+
   it("keeps the plan through an xMoney outage for 72 hours past the period end, then starts the normal dunning (Q-1)", async () => {
     const { paid, end } = await dueNow();
     const pendingUntil = new Date(end.getTime() + 72 * HOUR);
