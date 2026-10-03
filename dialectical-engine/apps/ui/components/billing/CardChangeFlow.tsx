@@ -71,6 +71,8 @@ export function CardChangeFlow({
         : code === "CARD_CHANGE_NOT_AVAILABLE_NOW" ? "billing.card.tryAgainShortly"
         // P12e (D6b, 403): the updated Terms come first, as at checkout.
         : code === "LEGAL_REACCEPTANCE_REQUIRED" ? "billing.checkout.reacceptRequired"
+        // W10 (P2-M19, 429): the hourly budget the card change shares with quotes, downgrades and undos is spent.
+        : code === "ADMISSION_RATE_LIMITED" ? "billing.checkout.rateLimited"
         : "billing.checkout.genericError");
     } finally {
       setBusy(false);

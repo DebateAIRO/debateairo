@@ -457,6 +457,37 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).not.toContain("That didn't work.");
   });
 
+  it("words the hourly limit with its own sentence on the upgrade quote, the downgrade and the undo (W10, P2-M19)", async () => {
+    const limited = "Too many tries in the last hour. Please try again later.";
+    const refusal = () => new ContractHttpError("RATE_LIMITED", 429, "x", "ADMISSION_RATE_LIMITED");
+    client.quoteSubscriptionUpgrade.mockRejectedValueOnce(refusal());
+    await render();
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    expect(text()).toContain(limited);
+    expect(text()).not.toContain("That didn't work.");
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.getBillingSubscription.mockResolvedValue({ subscription: subscription({ plan_id: "MAX" }) });
+    client.downgradeSubscription.mockRejectedValueOnce(refusal());
+    await render();
+    await click("Change plan");
+    await click("Move to Pro at renewal");
+    await click("Yes, move to Pro");
+    expect(text()).toContain(limited);
+    expect(text()).not.toContain("That didn't work.");
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })
+    });
+    client.revokeSubscriptionCancel.mockRejectedValueOnce(refusal());
+    await render();
+    await click("Undo cancellation");
+    expect(text()).toContain(limited);
+    expect(text()).not.toContain("That didn't work.");
+  });
+
   it("W7: an undo refused while the account deletion is pending says so, never 'try again'", async () => {
     client.getBillingSubscription.mockResolvedValue({
       subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })

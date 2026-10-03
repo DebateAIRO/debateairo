@@ -11,7 +11,10 @@ const KEY_BY_SERVER_CODE: Readonly<Record<string, string>> = Object.freeze({
   PAYMENT_PROVIDER_UNAVAILABLE: "billing.checkout.serviceUnavailable",
   ALREADY_SUBSCRIBED: "billing.checkout.alreadySubscribed",
   QUOTE_EXPIRED: "billing.checkout.quoteExpired",
+  // CheckoutFlow shows this sentence as a link to the accept screen (W10, P2-M20).
   LEGAL_REACCEPTANCE_REQUIRED: "billing.checkout.reacceptRequired",
+  // W10 (P2-M19, 429): the hourly budget of quotes (shared with plan and card changes) or of checkouts is spent.
+  ADMISSION_RATE_LIMITED: "billing.checkout.rateLimited",
   // P8c compares the consent pair with the reader's locale's manifest entry: a page older than a sentence edit.
   LEGAL_DOCUMENT_STALE: "billing.checkout.pageOutdated",
   // G3: the server wants the "Yes, I live there" confirmation first.

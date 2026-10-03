@@ -38,6 +38,11 @@ const STILL_CONFIRMING: FailureWords = Object.freeze({ key: "billing.subscriptio
 const REACCEPT_REQUIRED: FailureWords = Object.freeze({ key: "billing.checkout.reacceptRequired", reload: false });
 /** P15 (409 ACCOUNT_ERASURE_PENDING): an account deletion is pending; cancelling it in Settings comes first. */
 const ERASURE_PENDING: FailureWords = Object.freeze({ key: "billing.checkout.erasurePending", reload: false });
+/**
+ * W10 (P2-M19, 429 ADMISSION_RATE_LIMITED): the upgrade quote, the downgrade, the undo of a cancel and the card change
+ * share one hourly budget with the checkout's quote. The route refuses before anything is read, so nothing moved.
+ */
+const RATE_LIMITED: FailureWords = Object.freeze({ key: "billing.checkout.rateLimited", reload: false });
 
 /**
  * P12c's and P15's refusals of an upgrade quote or an upgrade, each with its own sentence (P18). `reload`: read the
@@ -50,7 +55,8 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   UPGRADE_NOT_AVAILABLE_NOW: Object.freeze({ key: "billing.subscription.upgradeNotAvailableNow", reload: false }),
   UPGRADE_IN_PROGRESS: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
   ACCOUNT_ERASURE_PENDING: ERASURE_PENDING,
-  LEGAL_REACCEPTANCE_REQUIRED: REACCEPT_REQUIRED
+  LEGAL_REACCEPTANCE_REQUIRED: REACCEPT_REQUIRED,
+  ADMISSION_RATE_LIMITED: RATE_LIMITED
 });
 
 /** A request that may have reached the payment side: a network failure, a 5xx, or anything that is not an answer. */
@@ -83,6 +89,7 @@ function quoteFailureWords(failure: unknown): FailureWords {
 function downgradeFailureWords(failure: unknown): FailureWords {
   const code = refusalOf(failure);
   if (code === "LEGAL_REACCEPTANCE_REQUIRED") return REACCEPT_REQUIRED;
+  if (code === "ADMISSION_RATE_LIMITED") return RATE_LIMITED;
   if (code === "DOWNGRADE_NOT_AVAILABLE_NOW") {
     return Object.freeze({ key: "billing.subscription.downgradeNotAvailableNow", reload: false });
   }
@@ -98,6 +105,7 @@ function downgradeFailureWords(failure: unknown): FailureWords {
 function revokeFailureWords(failure: unknown): FailureWords {
   const code = refusalOf(failure);
   if (code === "LEGAL_REACCEPTANCE_REQUIRED") return REACCEPT_REQUIRED;
+  if (code === "ADMISSION_RATE_LIMITED") return RATE_LIMITED;
   return code === "ACCOUNT_ERASURE_PENDING" ? ERASURE_PENDING : ACTION_FAILED;
 }
 

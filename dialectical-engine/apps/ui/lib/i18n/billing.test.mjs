@@ -107,7 +107,7 @@ const REQUIRED = [
   "billing.checkout.startDebate",
   "billing.checkout.goToSettings", "billing.checkout.taxIdInvalid", "billing.checkout.serviceUnavailable",
   "billing.checkout.alreadySubscribed", "billing.checkout.quoteExpired", "billing.checkout.reacceptRequired",
-  "billing.checkout.pageOutdated", "billing.checkout.erasurePending",
+  "billing.checkout.pageOutdated", "billing.checkout.erasurePending", "billing.checkout.rateLimited",
   "billing.checkout.genericError", "billing.checkout.formUnavailable", "billing.checkout.unknownPlan",
   "billing.checkout.pricingLink", "billing.checkout.returnTitle", "billing.checkout.returnSucceeded",
   "billing.subscription.title", "billing.subscription.free", "billing.subscription.choosePlan",
@@ -136,6 +136,7 @@ const REQUIRED = [
   "billing.cancelPage.title", "billing.cancelPage.lede", "billing.cancelPage.email", "billing.cancelPage.send",
   "billing.cancelPage.sent", "billing.cancelPage.confirmTitle", "billing.cancelPage.confirmLede", "billing.cancelPage.confirm",
   "billing.cancelPage.done", "billing.cancelPage.linkInvalid", "billing.cancelPage.signedInHint",
+  "billing.cancelPage.nothingToCancel",
   "billing.withdrawPage.title", "billing.withdrawPage.who", "billing.withdrawPage.refund", "billing.withdrawPage.how",
   "billing.withdrawPage.byEmail", "billing.withdrawPage.signIn", "billing.withdrawPage.settings"
 ];
@@ -198,7 +199,12 @@ test("each refusal D6b's routes answer is worded as the server means it, in Engl
     // the new card is not saved and the hold is released; never worded as success.
     "billing.card.tryAgainShortly": "We couldn't save your new card just now because a payment on your plan is still being confirmed. Your current card stays in use; please try again in an hour.",
     // LEGAL_REACCEPTANCE_REQUIRED (403) from the checkout, and from D6b's upgrade, downgrade, undo and card routes.
-    "billing.checkout.reacceptRequired": "Please accept the updated Terms first, then come back to this page."
+    "billing.checkout.reacceptRequired": "Please accept the updated Terms first, then come back to this page.",
+    // W10 (P2-M19): 429 ADMISSION_RATE_LIMITED, the hourly budgets of quotes, checkouts, plan changes, card changes
+    // and the cancel link.
+    "billing.checkout.rateLimited": "Too many tries in the last hour. Please try again later.",
+    // W10 (P2-M18): 409 NOTHING_TO_CANCEL from the emailed cancel link; nothing was cancelled.
+    "billing.cancelPage.nothingToCancel": "There is no plan left to cancel on this account."
   };
   for (const [key, value] of Object.entries(expected)) assert.equal(english[key], value, key);
   // None of them may blame the password: only a refused step-up asks to check it (billing.subscription.withdrawRefused).

@@ -52,6 +52,11 @@ export type BillingRefusalCode =
   /** P13 (A25): the emailed cancel link's token is unknown, already spent or past its 24 hours (404). */
   | "CANCEL_LINK_INVALID"
   /**
+   * W10 (P2-M18): the emailed cancel link's token was valid and is now spent, but its plan had nothing left to cancel
+   * (a cancel already pending, the plan ended or SUSPENDED, or a newer plan in its place); nothing changed (409).
+   */
+  | "NOTHING_TO_CANCEL"
+  /**
    * P15: an account erasure is pending (the person stays signed in for the 7-day grace): no new money is taken (409).
    */
   | "ACCOUNT_ERASURE_PENDING";

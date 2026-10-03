@@ -187,7 +187,11 @@ export function installSubscriptionRoutes(
       return reply;
     }
     return answer(reply, async () => {
-      if (await deps.cancelLinks.cancelByToken(parsed.data.token) === "INVALID") refuse(404, "CANCEL_LINK_INVALID");
+      const outcome = await deps.cancelLinks.cancelByToken(parsed.data.token);
+      if (outcome === "INVALID") refuse(404, "CANCEL_LINK_INVALID");
+      // W10 (P2-M18): the token was spent but nothing was cancelled (already cancelled, ended, paused by a dispute,
+      // or replaced by a newer plan), so the page never says "your plan is cancelled" for it.
+      if (outcome === "NOTHING_TO_CANCEL") refuse(409, "NOTHING_TO_CANCEL");
       return reply.status(204).send();
     });
   });
