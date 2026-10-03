@@ -129,5 +129,5 @@ it('keeps recorded fresh Staff migration replay inert, including exact function/
   migrations:(await database.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows,
   lineage:(await database.pool.query('SELECT lineage_id,staff_id FROM staff.owner_lineage ORDER BY lineage_id')).rows
  });
- const before=await catalog();expect(before.migrations).toHaveLength(100);await migrate(database.pool);expect(await catalog()).toEqual(before);
+ const before=await catalog();expect(before.migrations).toHaveLength(101);await migrate(database.pool);expect(await catalog()).toEqual(before);
 });
