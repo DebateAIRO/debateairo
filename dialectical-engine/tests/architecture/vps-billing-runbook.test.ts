@@ -255,10 +255,10 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–38 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–53 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
-    expect(rows).toEqual(Array.from({ length: 38 }, (_unused, index) => index + 1));
+    expect(rows).toEqual(Array.from({ length: 53 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
@@ -296,10 +296,68 @@ describe("P22 the Billing runbook", () => {
       // P24 (2026-10-02): billing stays off until every item of Part 2's final review is closed.
       "PART2-FINAL-REVIEW-OPEN-ITEMS.md",
       // W2 (P2-I2): row 15's proof includes the dispute fake stack.
-      "billing-dispute-fake-stack.test.ts"
+      "billing-dispute-fake-stack.test.ts",
+      // W16 (the W7, W10 and W15 judges' notes): row 36's reader also reads the keys Part 2b wrote.
+      "`settings.erasure.paidPlan`", "`billing.checkout.rateLimited`", "`billing.cancelPage.nothingToCancel`",
+      "`billing.checkout.refundedBeforeStart`",
+      // W16 (P2-M34): the card marks are copied before the website's last start.
+      "restart `debateai-ui`"
     ]) {
       expect(table, needle).toContain(needle);
     }
+    // W16: every item of Part 2's final review that a ruling, X0 or a vendor fact still decides has its own row, which
+    // names who decides and how it is proven (rows 39–53, after row 38's "every item closed").
+    const row = (number: number): string => table.split("\n").find((line) => line.startsWith(`| ${number} |`)) ?? "";
+    for (const [number, needles] of [
+      [39, ["P2-I3", "A12 (the card change)", "`transaction-rebill-auth-order-released` reads `void-ok`"]],
+      [40, ["P2-I5", "billing-only database role", "`runner-runtime`", "`scheduler-liveness`", "`email_ciphertext`",
+        "(a) to (c)"]],
+      [41, ["P2-I8", "Terms §13", "how an upgrade's own days are counted", "CRD art. 14(3)"]],
+      [42, ["P2-I9", "public holiday", "Regulation 1182/71 art. 3(4)", "withdrawal-deadline.ts"]],
+      [43, ["P2-I13", "`withdrawal_days`", "`billing.consent.immediateStart`", "country-neutral", "generate:legal:check"]],
+      [44, ["P2-I15", "never took money", "`billing.purge_expired_records`", "Privacy Policy"]],
+      [45, ["P2-M2", "refund transaction", "verify-payment.ts", "refunds.ts", "reconcile.ts", "`refund-ok`"]],
+      [46, ["P2-M17", "`billing.checkout.total`", "31 January", "anchor day"]],
+      [47, ["P2-M21", "the buyer's language", "packages/tax-quaderno/src/index.ts", "tax-quaderno-recorded-fixtures.test.ts"]],
+      [48, ["P2-M25", "`mentions`", "debateai-charge:", "accountant"]],
+      [49, ["P2-M26", "`taxAuthorities`", "`tax_statuses: null`", "REVERSE_CHARGE", "row 16"]],
+      [50, ["P2-M28", "credit note gives back the VAT", "tests/unit/tax-quaderno-recorded-fixtures.test.ts"]],
+      [51, ["P2-M36", "support@dezbatere.ro", "`COMPANY.emails.general`", "`SELLER_COMPANY`"]],
+      [52, ["P2-M37", "PricingCards.tsx", "`home.pricingCopy`", "counsel"]],
+      [53, ["PART2-FINAL-REVIEW-OPEN-ITEMS.md", "P2-M4, P2-M6, P2-M7, P2-M13, P2-M22, P2-M23, P2-M29, P2-M30, P2-M33, "
+        + "P2-M39, P2-M40, P2-M41, P2-M43"]]
+    ] as const) {
+      const line = row(number);
+      for (const needle of ["**Decided by:**", "**Proven by:**", ...needles]) expect(line, `row ${number}: ${needle}`).toContain(needle);
+      expect(line, `row ${number} is open`).toMatch(/\| — \|$/u);
+    }
+  });
+
+  it("the final review's open items say, for each row, whether Part 2b fixed it or which go-live row holds it (W16)", () => {
+    const items = read("docs/missions/paid-plans/PART2-FINAL-REVIEW-OPEN-ITEMS.md");
+    const rows = items.split("\n").filter((line) => /^\| (P2-|Minors|Later)/u.test(line))
+      .map((line) => line.slice(2, -2).split(" | "));
+    expect(rows.length).toBeGreaterThanOrEqual(39);
+    // A status is never a bare "open": it names who fixed it or where it is held, so row 38 can be read row by row.
+    for (const cells of rows) {
+      const status = cells.at(-1) ?? "";
+      expect(status, cells[0]).toMatch(/^(fixed in Part 2b \(W\d+(, W\d+)*\)|open: go-live rows? \d+)/u);
+    }
+    const statusOf = (id: string): string => rows.find((cells) => cells[0] === id)?.at(-1) ?? `no row ${id}`;
+    for (const [id, needle] of [
+      ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 39"], ["P2-I5 (part 3)", "go-live row 40"],
+      ["P2-I8", "go-live rows 24 and 41"], ["P2-I9", "go-live row 42"], ["P2-I13", "go-live row 43"],
+      ["P2-I15", "go-live row 44"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 53"]
+    ] as const) {
+      expect(statusOf(id), id).toContain(needle);
+    }
+    const ruled = rows.find((cells) => cells[0] === "Minors" && cells[1]!.startsWith("P2-M2 "))?.at(-1) ?? "";
+    for (const needle of ["45 (P2-M2)", "46 (P2-M17)", "47 (P2-M21)", "48 (P2-M25)", "49 (P2-M26)", "50 (P2-M28)",
+      "51 (P2-M36)", "52 (P2-M37)"]) {
+      expect(ruled, needle).toContain(needle);
+    }
+    // The controller's note on the role split (the W8 judge): the API principal keeps the two reads billing mail needs.
+    expect(items).toContain("the API principal keeps SELECT on `billing.customer` and on `identity.\"user\"` (`user_id`, `owner_ref`, `email_ciphertext`)");
   });
 
   it("§14.9 gives the owner the sandbox run: the test cards, the stage clock and the fake-stack proof", () => {
