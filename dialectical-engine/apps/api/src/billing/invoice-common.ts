@@ -138,9 +138,9 @@ export function invoiceLine(
 /**
  * Spec §2.5.4 invoice jobs: the customer, one line with the tax rate, and the three pieces of location evidence.
  * P2-M30: the buyer is the charge's own, from the location its quote sealed (the checkout's; a renewal's and an
- * upgrade's quote seal the subscription's checkout location again, `storedTaxContext`), so a late invoice or a
- * partial credit note of an old charge never names the details of a later checkout. Only the address the document is
- * sent to and its language come from the profile.
+ * upgrade's quote seal the subscription's checkout location again, `storedTaxContext`, and later quotes price with
+ * that same company's VAT id), so a late invoice or a partial credit note of an old charge never names the details of
+ * a later checkout. Only the address the document is sent to and its language come from the profile.
  */
 export function saleRecordOf(
   paid: PaidCharge, payload: OutboxJob["payload"], taxCode: BillingPolicy["taxCode"], text: BillingOrderText = englishOrderText
