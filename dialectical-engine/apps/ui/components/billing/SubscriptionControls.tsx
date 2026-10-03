@@ -240,6 +240,8 @@ export function SubscriptionControls({
   // The server's own rule (P12's requestCancelLocked accessEndsAt, revokeCancelForOwner's refusal): once the paid
   // period's end has passed there is nothing left to promise, a cancel ends the plan today, and it cannot be undone.
   const periodOver = live !== null && live.current_period_end !== null && Date.parse(live.current_period_end) <= nowMs;
+  // A plan paused by a card dispute (spec §1.3): its paid features are off until the dispute is decided.
+  const paused = live !== null && live.status === "SUSPENDED";
   // Ruling Q-1: an outage at renewal keeps the plan ACTIVE while the renewal is retried for up to 72 h, so renews_on
   // is already past. A price-notice postponement (RENEWAL_POSTPONED) keeps renews_on in the future and shows it.
   const renewalOverdue = live !== null && live.renews_on !== null && Date.parse(live.renews_on) <= nowMs;
@@ -314,7 +316,10 @@ export function SubscriptionControls({
           <p className="setCardHint">{t(catalog, "billing.subscription.plan", { plan: planName(catalog, live.plan_id) })}</p>
           {live.status === "PAST_DUE" ? <p className="setCardNote">{t(catalog, "billing.subscription.pastDue")}</p> : null}
           {live.status === "SUSPENDED" ? <p className="setCardNote">{t(catalog, "billing.subscription.suspended")}</p> : null}
-          {live.cancel_requested && live.current_period_end !== null
+          {live.cancel_requested && paused
+            // P2-W10: the paid features are paused, so no "ends on {date}" promise; only that it won't renew.
+            ? <p className="setStatus">{t(catalog, "billing.subscription.wontRenew")}</p>
+            : live.cancel_requested && live.current_period_end !== null
             ? <p className="setStatus">{t(catalog, "billing.subscription.endsOn", { date: periodOver ? today : date(live.current_period_end) })}</p>
             : renewalOverdue && live.status === "ACTIVE"
               // Ruling Q-1: no past date is promised while the renewal is retried; nothing has failed.
@@ -336,17 +341,20 @@ export function SubscriptionControls({
             {live.can_change_card
               ? <a className="setBtn" href="/settings/card">{t(catalog, "billing.subscription.updateCard")}</a>
               : null}
-            {/* After the period end the server refuses the undo (NOT_SUBSCRIBED) and the sweep ends the plan: offer neither. */}
-            {live.cancel_requested ? (periodOver ? null : (
+            {/* After the period end the server refuses the undo (NOT_SUBSCRIBED) and the sweep ends the plan: offer neither.
+                While SUSPENDED it refuses the undo too, whatever wrote the cancel (P2-W10, the W7 review's item 3); a won
+                dispute resumes the plan, and the undo comes back until the period end (C5). P2-W10: a plan paused by a
+                dispute can be cancelled; nothing ends at once. */}
+            {live.cancel_requested ? (periodOver || paused ? null : (
               <button type="button" className="setBtn" disabled={busy}
                 onClick={() => { void run(async () => { await client.revokeSubscriptionCancel(); await reload(); }, revokeFailureWords); }}>
                 {t(catalog, "billing.subscription.revoke")}
               </button>
-            )) : live.status !== "SUSPENDED" ? (
+            )) : (
               <button type="button" className="setBtn" disabled={busy} onClick={() => setPanel("CANCEL")}>
                 {t(catalog, "billing.subscription.cancel")}
               </button>
-            ) : null}
+            )}
             {withdrawOpen ? (
               <button type="button" className="setBtn" disabled={busy} onClick={() => setPanel("WITHDRAW")}>
                 {t(catalog, "billing.subscription.withdraw")}
@@ -424,7 +432,10 @@ export function SubscriptionControls({
                   too, as M7 says; before that, it runs to the next renewal. */}
               <p className="setCardNote">{live.status === "PAST_DUE"
                 ? t(catalog, "billing.subscription.cancelConfirmPastDue")
-                : t(catalog, "billing.subscription.cancelConfirm", { date: periodOver ? today : date(nextRenewal) })}</p>
+                : paused
+                  // P2-W10: no "you keep it until": its paid features stay paused while the dispute is open.
+                  ? t(catalog, "billing.subscription.cancelConfirmSuspended")
+                  : t(catalog, "billing.subscription.cancelConfirm", { date: periodOver ? today : date(nextRenewal) })}</p>
               <div className="setCardRow">
                 <button type="button" className="setBtn" disabled={busy}
                   onClick={() => { void run(async () => { await client.cancelSubscription(); setPanel("NONE"); await reload(); }); }}>

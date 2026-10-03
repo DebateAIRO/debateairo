@@ -53,7 +53,7 @@ export type BillingRefusalCode =
   | "CANCEL_LINK_INVALID"
   /**
    * W10 (P2-M18): the emailed cancel link's token was valid and is now spent, but its plan had nothing left to cancel
-   * (a cancel already pending, the plan ended or SUSPENDED, or a newer plan in its place); nothing changed (409).
+   * (a cancel already pending, the plan ended, or a newer plan in its place); nothing changed (409).
    */
   | "NOTHING_TO_CANCEL"
   /**

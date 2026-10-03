@@ -121,6 +121,7 @@ const REQUIRED = [
   "billing.subscription.downgradeNotAvailableNow", "billing.subscription.downgradeConfirm", "billing.subscription.downgradeYes",
   "billing.subscription.downgraded", "billing.subscription.downgradedNoTotal", "billing.subscription.updateCard",
   "billing.subscription.cancel", "billing.subscription.cancelConfirm", "billing.subscription.cancelConfirmPastDue",
+  "billing.subscription.cancelConfirmSuspended", "billing.subscription.wontRenew",
   "billing.subscription.cancelYes", "billing.subscription.keep",
   "billing.subscription.revoke", "billing.subscription.withdraw", "billing.subscription.withdrawHint",
   "billing.subscription.stepUpHint", "billing.subscription.password", "billing.subscription.code",
@@ -209,6 +210,20 @@ test("each refusal D6b's routes answer is worded as the server means it, in Engl
   for (const [key, value] of Object.entries(expected)) assert.equal(english[key], value, key);
   // None of them may blame the password: only a refused step-up asks to check it (billing.subscription.withdrawRefused).
   for (const key of Object.keys(expected)) assert.doesNotMatch(english[key], /password|code/iu, key);
+});
+
+test("a plan paused by a payment dispute is cancelled with true words, in English exactly (P2-W10)", () => {
+  const english = catalogue("en");
+  // Its paid features stay paused: no sentence may promise them until a date, or offer an undo the server refuses.
+  assert.equal(english["billing.subscription.cancelConfirmSuspended"],
+    "Cancel your plan? It won't renew. Its paid features stay paused while the payment dispute is open.");
+  assert.equal(english["billing.subscription.wontRenew"], "Your plan won't renew. You won't be charged again.");
+  for (const code of LOCALES.map(({ code: locale }) => locale)) {
+    const billing = catalogue(code);
+    for (const key of ["billing.subscription.cancelConfirmSuspended", "billing.subscription.wontRenew"]) {
+      assert.doesNotMatch(billing[key], /\{date\}/u, `${code}: ${key} names no date`);
+    }
+  }
 });
 
 test("each plan carries one name in every locale: the billing pages', /new's and the emails' (P17 ruling (c)1)", () => {

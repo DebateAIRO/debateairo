@@ -39,6 +39,7 @@
   "mail.M7.undo": "¿Ha cambiado de opinión? Puede deshacer la cancelación en Configuración antes de esa fecha: {settingsUrl}",
   "mail.M7.endedNow": "Su plan {plan} terminó el {accessEndDate}. No se le volverá a cobrar.",
   "mail.M7.again": "Puede volver a elegir un plan en cualquier momento en Configuración: {settingsUrl}",
+  "mail.M7.paused": "Su plan {plan} no se renovará y no se le volverá a cobrar. Sus funciones de pago siguen en pausa mientras la disputa del pago siga abierta. Si la disputa se resuelve a su favor, podrá usarlas hasta el {accessEndDate}.",
   "mail.M8.subject": "Su desistimiento está confirmado",
   "mail.M8.refunded": "Su plan {plan} ha terminado y le hemos reembolsado {refundAmount} en su tarjeta. Su banco puede tardar unos días en mostrarlo.",
   "mail.M8.nothingDue": "Su plan {plan} ha terminado. La parte que ya utilizó cubre el precio completo, por lo que no le correspondía ninguna devolución.",

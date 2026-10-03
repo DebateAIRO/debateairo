@@ -39,6 +39,7 @@
   "mail.M7.undo": "V-ați răzgândit? Puteți reveni asupra anulării din Setări înainte de această dată: {settingsUrl}",
   "mail.M7.endedNow": "Abonamentul dumneavoastră {plan} s-a încheiat pe {accessEndDate}. Nu veți mai fi taxat.",
   "mail.M7.again": "Puteți alege din nou un abonament oricând, din Setări: {settingsUrl}",
+  "mail.M7.paused": "Abonamentul dumneavoastră {plan} nu se va reînnoi și nu veți mai fi taxat. Funcțiile plătite rămân suspendate cât timp contestația plății este deschisă. Dacă contestația se încheie în favoarea dumneavoastră, le puteți folosi până pe {accessEndDate}.",
   "mail.M8.subject": "Retragerea dumneavoastră este confirmată",
   "mail.M8.refunded": "Abonamentul dumneavoastră {plan} s-a încheiat, iar noi v-am rambursat {refundAmount} pe card. Banca dumneavoastră poate avea nevoie de câteva zile pentru a afișa suma.",
   "mail.M8.nothingDue": "Abonamentul dumneavoastră {plan} s-a încheiat. Partea pe care ați folosit-o deja acoperă întregul preț, așa că nu vi se cuvine nicio sumă înapoi.",

@@ -11,6 +11,7 @@ import {
   recordingAudit,
   seedActiveSubscription,
   subscriptionDeps,
+  suspendForChargeback,
   TEST_PUBLIC_APP_URL
 } from "../support/billingSubscriptionFixtures.js";
 import { recurringNetOf } from "../../apps/api/src/billing/renewal-rules.js";
@@ -152,6 +153,59 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     expect(foldSubscription(after).cancelRequested).toBe(true);
     expect(audit.events.map(({ event }) => event)).toEqual(["billing.cancel"]);
     await api.close();
+  });
+
+  it("cancels a plan paused by a card dispute: no renewal, nothing ends now, and M7's paused words (P2-W10)", async () => {
+    const identity = testHttpIdentity("p2w10-suspended");
+    const audit = recordingAudit();
+    const now = new Date();
+    const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { audit, clock: () => now }), identity);
+    const headers = { "x-test-session": identity.rawSessionToken };
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: identity.authenticated.ownerRef, planId: "PRO", activatedAt: new Date(now.getTime() - 3 * DAY), taxCountry: "DE"
+    });
+    await suspendForChargeback(database.pool, seeded, new Date(now.getTime() - DAY));
+    const entitlementRows = async () => (await database.pool.query(
+      "SELECT count(*)::int AS n FROM billing.entitlement_event WHERE owner_ref=$1", [seeded.ownerRef]
+    )).rows[0].n as number;
+    const rowsBefore = await entitlementRows();
+    expect((await api.inject({ method: "POST", url: "/v1/billing/subscription/cancel", headers })).statusCode).toBe(204);
+    const written = await events(seeded.subscriptionId);
+    expect(written.at(-1)).toMatchObject({ kind: "CANCEL_REQUESTED", data: { source: "SETTINGS" } });
+    // Nothing ends at once: the suspension already wrote Free, and the dispute or the period-end sweep decides the end.
+    expect(written.map((event) => event.kind)).not.toContain("ENDED");
+    expect(foldSubscription(written)).toMatchObject({ status: "SUSPENDED", cancelRequested: true });
+    expect(await entitlementRows()).toBe(rowsBefore);
+    expect(await new EntitlementRepository(database.pool).current(seeded.ownerRef, now)).toMatchObject({
+      planId: "FREE", cause: "SUSPENDED_CHARGEBACK"
+    });
+    // M7's paused variant: no undo line (the undo is refused while paused) and the period end as the latest date.
+    expect(await outbox("EMAIL", `M7:${seeded.subscriptionId}`)).toEqual([{
+      ref: `M7:${seeded.subscriptionId}:${seeded.periodEnd.toISOString()}`,
+      payload: expect.objectContaining({
+        template: "M7", "param.plan": "PRO", "param.accessEndDate": seeded.periodEnd.toISOString().slice(0, 10),
+        "param.canUndo": "false", "param.paused": "true"
+      })
+    }]);
+    expect(audit.events.map(({ event }) => event)).toEqual(["billing.cancel"]);
+    // A second press is a quiet success; the undo stays refused while the plan is paused (C5).
+    expect((await api.inject({ method: "POST", url: "/v1/billing/subscription/cancel", headers })).statusCode).toBe(204);
+    expect((await events(seeded.subscriptionId)).filter((event) => event.kind === "CANCEL_REQUESTED")).toHaveLength(1);
+    const revoke = await api.inject({ method: "POST", url: "/v1/billing/subscription/cancel-revoke", headers });
+    expect(revoke.statusCode).toBe(409);
+    expect(revoke.json().error).toBe("NOT_SUBSCRIBED");
+    expect(foldSubscription(await events(seeded.subscriptionId)).cancelRequested).toBe(true);
+    await api.close();
+  });
+
+  it("never marks an ACTIVE plan's M7 as paused (P2-W10 control)", async () => {
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
+    });
+    await cancelForOwner(subscriptionDeps(database.pool), seeded.ownerRef);
+    const [m7] = await outbox("EMAIL", `M7:${seeded.subscriptionId}`);
+    expect(m7?.payload).toMatchObject({ "param.canUndo": "true" });
+    expect(m7?.payload).not.toHaveProperty("param.paused");
   });
 
   it("refuses cancel and revoke with NOT_SUBSCRIBED when there is nothing to cancel", async () => {

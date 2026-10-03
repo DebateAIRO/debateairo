@@ -39,6 +39,7 @@
   "mail.M7.undo": "Changed your mind? You can undo this in Settings before that date: {settingsUrl}",
   "mail.M7.endedNow": "Your {plan} plan ended on {accessEndDate}. You will not be charged again.",
   "mail.M7.again": "You can choose a plan again at any time in Settings: {settingsUrl}",
+  "mail.M7.paused": "Your {plan} plan won't renew, and you won't be charged again. Its paid features stay paused while the payment dispute is open. If the dispute ends in your favour, you can use them until {accessEndDate}.",
   "mail.M8.subject": "Your withdrawal is confirmed",
   "mail.M8.refunded": "Your {plan} plan has ended, and we refunded {refundAmount} to your card. Your bank may take a few days to show it.",
   "mail.M8.nothingDue": "Your {plan} plan has ended. The part you already used covers the whole price, so nothing was due back to you.",

@@ -39,6 +39,7 @@
   "mail.M7.undo": "Rozmysleli ste si to? Zrušenie môžete pred týmto dátumom vrátiť v Nastaveniach: {settingsUrl}",
   "mail.M7.endedNow": "Váš program {plan} sa skončil {accessEndDate}. Nič ďalšie vám nebude účtované.",
   "mail.M7.again": "Program si môžete kedykoľvek znova vybrať v Nastaveniach: {settingsUrl}",
+  "mail.M7.paused": "Váš program {plan} sa neobnoví a nič ďalšie vám nebude účtované. Jeho platené funkcie zostávajú pozastavené, kým je spor o platbu otvorený. Ak sa spor skončí vo váš prospech, môžete ich používať do {accessEndDate}.",
   "mail.M8.subject": "Vaše odstúpenie od zmluvy je potvrdené",
   "mail.M8.refunded": "Váš program {plan} sa skončil a vrátili sme {refundAmount} na vašu kartu. Zobrazenie vo vašej banke môže trvať niekoľko dní.",
   "mail.M8.nothingDue": "Váš program {plan} sa skončil. Už využitá časť pokrýva celú cenu, takže vám nič nepatrilo späť.",

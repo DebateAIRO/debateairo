@@ -39,6 +39,7 @@
   "mail.M7.undo": "Persigalvojote? Iki šios datos atšaukimą galite panaikinti nustatymuose: {settingsUrl}",
   "mail.M7.endedNow": "Jūsų planas {plan} baigėsi {accessEndDate}. Mokestis daugiau nebus nuskaičiuotas.",
   "mail.M7.again": "Bet kada galite vėl pasirinkti planą nustatymuose: {settingsUrl}",
+  "mail.M7.paused": "Jūsų planas {plan} nebus pratęstas, ir mokestis daugiau nebus nuskaičiuotas. Jo mokamos funkcijos lieka sustabdytos, kol vyksta mokėjimo ginčas. Jei ginčas baigsis jūsų naudai, galėsite jomis naudotis iki {accessEndDate}.",
   "mail.M8.subject": "Jūsų sutarties atsisakymas patvirtintas",
   "mail.M8.refunded": "Jūsų planas {plan} baigėsi, o mes grąžinome {refundAmount} į jūsų kortelę. Gali praeiti kelios dienos, kol bankas tai parodys.",
   "mail.M8.nothingDue": "Jūsų planas {plan} baigėsi. Jau panaudota dalis padengia visą kainą, todėl jums nieko nebuvo priklausę grąžinti.",

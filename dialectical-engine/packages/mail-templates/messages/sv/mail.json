@@ -39,6 +39,7 @@
   "mail.M7.undo": "Ångrat dig? Du kan häva uppsägningen i Inställningar före det datumet: {settingsUrl}",
   "mail.M7.endedNow": "Ditt {plan}-abonnemang upphörde den {accessEndDate}. Du debiteras inte igen.",
   "mail.M7.again": "Du kan välja ett abonnemang igen när som helst i Inställningar: {settingsUrl}",
+  "mail.M7.paused": "Ditt {plan}-abonnemang förnyas inte, och du debiteras inte igen. Dess betalfunktioner förblir pausade så länge betalningstvisten pågår. Om tvisten avgörs till din fördel kan du använda dem till och med {accessEndDate}.",
   "mail.M8.subject": "Ditt utnyttjande av ångerrätten är bekräftat",
   "mail.M8.refunded": "Ditt {plan}-abonnemang har upphört och vi har återbetalat {refundAmount} till ditt kort. Det kan ta några dagar innan din bank visar det.",
   "mail.M8.nothingDue": "Ditt {plan}-abonnemang har upphört. Den del du redan har använt täcker hela priset, så du hade inget att få tillbaka.",

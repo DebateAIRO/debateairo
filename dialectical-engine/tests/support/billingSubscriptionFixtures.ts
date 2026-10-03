@@ -142,6 +142,25 @@ export async function seedActiveSubscription(pool: Pool, input: Readonly<{
   });
 }
 
+/**
+ * What VERIFY_PAYMENT (P9c, A9) leaves after the first payment of `seeded` is charged back: CHARGEBACK on the charge,
+ * SUSPENDED, and a FREE entitlement effective `at` (paid features paused while the dispute is open).
+ */
+export async function suspendForChargeback(pool: Pool, seeded: SeededSubscription, at: Date = new Date()): Promise<void> {
+  const billing = new BillingRepository(pool);
+  await billing.withTransaction(async (client) => {
+    await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", at, {
+      xmoneyTransactionId: seeded.initialTransactionId, amountMicros: seeded.totalMicros, errorCode: null
+    }));
+    const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId, client));
+    await billing.appendSubscriptionEvent(client, subscriptionEvent(state, "SUSPENDED", at, { charge_id: seeded.initialChargeId }));
+    await new EntitlementRepository(pool).append(client, {
+      ownerRef: seeded.ownerRef, planId: "FREE", periodAnchorAt: at, cause: "SUSPENDED_CHARGEBACK",
+      effectiveAt: at, subscriptionId: seeded.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
+    });
+  });
+}
+
 const TEST_PASSWORD_HASH =
   "$argon2id$v=19$m=65536,t=3,p=1$c2FsdHNhbHRzYWx0c2FsdA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 

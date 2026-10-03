@@ -39,6 +39,7 @@
   "mail.M7.undo": "Rozmysleli jste si to? Zrušení můžete před tímto datem vrátit v Nastavení: {settingsUrl}",
   "mail.M7.endedNow": "Váš tarif {plan} skončil {accessEndDate}. Nic dalšího vám nebude účtováno.",
   "mail.M7.again": "Tarif si můžete kdykoli znovu vybrat v Nastavení: {settingsUrl}",
+  "mail.M7.paused": "Váš tarif {plan} se neobnoví a nic dalšího vám nebude účtováno. Jeho placené funkce zůstávají pozastaveny, dokud je spor o platbu otevřený. Pokud spor skončí ve váš prospěch, můžete je používat do {accessEndDate}.",
   "mail.M8.subject": "Vaše odstoupení od smlouvy je potvrzeno",
   "mail.M8.refunded": "Váš tarif {plan} skončil a vrátili jsme {refundAmount} na vaši kartu. Zobrazení u vaší banky může trvat několik dní.",
   "mail.M8.nothingDue": "Váš tarif {plan} skončil. Již využitá část pokrývá celou cenu, takže vám nic nenáleželo zpět.",

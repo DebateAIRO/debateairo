@@ -78,9 +78,9 @@ describe("P21 /cancel without signing in (Terms §12, A25)", () => {
   });
 
   it("a link that cancelled nothing says only that, points to Settings and keeps the email form (W10, P2-M18)", async () => {
-    // NOTHING_TO_CANCEL folds four states: a cancel already pending, a plan that ended, a plan SUSPENDED by a dispute
-    // (it comes back if we win) and a newer plan in the token's place. The sentence must hold for all four, so it
-    // never says the account has no plan.
+    // NOTHING_TO_CANCEL folds three states: a cancel already pending (on an ACTIVE, PAST_DUE or, since P2-W10, a
+    // SUSPENDED plan), a plan that ended and a newer plan in the token's place. The sentence must hold for all three, so
+    // it never says the account has no plan.
     client.cancelByToken.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 409, "x", "NOTHING_TO_CANCEL"));
     window.history.replaceState(null, "", `/cancel#token=${TOKEN}`);
     await render();

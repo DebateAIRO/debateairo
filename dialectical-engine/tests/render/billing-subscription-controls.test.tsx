@@ -285,6 +285,45 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).not.toContain("September 28, 2026");
   });
 
+  it("offers Cancel on a plan paused by a payment dispute, with the paused confirm text (P2-W10)", async () => {
+    // SUSPENDED: the server writes the cancel (no renewal) and ends nothing; the dispute or the sweep decides the end.
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ status: "SUSPENDED", renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false })
+    });
+    await render();
+    expect(text()).toContain("Paid features are paused while a payment dispute is open.");
+    expect(button("Undo cancellation")).toBeUndefined();
+    await click("Cancel");
+    expect(text()).toContain("Cancel your plan? It won't renew. Its paid features stay paused while the payment dispute is open.");
+    // Never a promise of access the paused plan does not give.
+    expect(text()).not.toContain("You keep it until");
+    client.getBillingSubscription.mockResolvedValueOnce({
+      subscription: subscription({
+        status: "SUSPENDED", cancel_requested: true, renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false
+      })
+    });
+    await click("Yes, cancel");
+    expect(client.cancelSubscription).toHaveBeenCalledTimes(1);
+    expect(text()).toContain("Your plan won't renew. You won't be charged again.");
+  });
+
+  it("never offers Undo while a plan is paused by a dispute, and says it won't renew (P2-W10, the W7 review's item 3)", async () => {
+    // A cancel then a charge-back, a person's own cancel while paused, or a deletion scheduled while paused: the server
+    // refuses the undo while SUSPENDED (once a won dispute resumes the plan, the undo comes back until the period end).
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({
+        status: "SUSPENDED", cancel_requested: true, renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false
+      })
+    });
+    await render();
+    expect(button("Undo cancellation")).toBeUndefined();
+    expect(button("Cancel")).toBeUndefined();
+    expect(text()).toContain("Your plan won't renew. You won't be charged again.");
+    // "Your plan ends on {date}" would promise the paid features until then; they are paused.
+    expect(text()).not.toContain("Your plan ends on");
+    expect(client.revokeSubscriptionCancel).not.toHaveBeenCalled();
+  });
+
   it("during an outage at renewal (ruling Q-1) promises no past date, and a downgrade or a cancel names today", async () => {
     // NOW is October 3; the period ended on October 2 and the renewal is being retried quietly (up to 72 h).
     client.getBillingSubscription.mockResolvedValue({

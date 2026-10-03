@@ -39,6 +39,7 @@
   "mail.M7.undo": "Van gedachten veranderd? U kunt dit vóór die datum ongedaan maken in Instellingen: {settingsUrl}",
   "mail.M7.endedNow": "Uw {plan}-abonnement is beëindigd op {accessEndDate}. Er wordt niets meer in rekening gebracht.",
   "mail.M7.again": "U kunt op elk moment opnieuw een abonnement kiezen in Instellingen: {settingsUrl}",
+  "mail.M7.paused": "Uw {plan}-abonnement wordt niet verlengd en er wordt niets meer in rekening gebracht. De betaalde functies blijven gepauzeerd zolang het betalingsgeschil loopt. Als het geschil in uw voordeel eindigt, kunt u ze gebruiken tot {accessEndDate}.",
   "mail.M8.subject": "Uw herroeping is bevestigd",
   "mail.M8.refunded": "Uw {plan}-abonnement is beëindigd en wij hebben {refundAmount} terugbetaald op uw kaart. Het kan enkele dagen duren voordat uw bank dit toont.",
   "mail.M8.nothingDue": "Uw {plan}-abonnement is beëindigd. Het deel dat u al hebt gebruikt, dekt de volledige prijs, dus u had niets terug te krijgen.",

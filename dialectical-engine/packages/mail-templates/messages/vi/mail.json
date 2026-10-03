@@ -39,6 +39,7 @@
   "mail.M7.undo": "Quý vị đổi ý? Quý vị có thể hoàn tác việc này trong Cài đặt trước ngày đó: {settingsUrl}",
   "mail.M7.endedNow": "Gói {plan} của quý vị đã kết thúc vào {accessEndDate}. Quý vị sẽ không bị tính phí thêm.",
   "mail.M7.again": "Quý vị có thể chọn lại một gói bất cứ lúc nào trong Cài đặt: {settingsUrl}",
+  "mail.M7.paused": "Gói {plan} của quý vị sẽ không được gia hạn và quý vị sẽ không bị tính phí thêm. Các tính năng trả phí của gói vẫn bị tạm dừng trong khi tranh chấp thanh toán còn mở. Nếu tranh chấp kết thúc có lợi cho quý vị, quý vị có thể dùng các tính năng này đến {accessEndDate}.",
   "mail.M8.subject": "Việc rút lại của quý vị đã được xác nhận",
   "mail.M8.refunded": "Gói {plan} của quý vị đã kết thúc và chúng tôi đã hoàn {refundAmount} vào thẻ của quý vị. Ngân hàng có thể mất vài ngày để hiển thị khoản này.",
   "mail.M8.nothingDue": "Gói {plan} của quý vị đã kết thúc. Phần quý vị đã dùng bao trọn toàn bộ giá, vì vậy không có khoản nào phải hoàn lại cho quý vị.",

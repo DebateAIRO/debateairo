@@ -145,11 +145,15 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
       // P12: a cancel that ends the plan at once (accessEndDate = today) has no "until" to promise and no undo to
       // offer; the sender says so with canUndo "false". That is a cancel while a payment is failing, one after the
       // paid month's end (ruling Q-1's quiet retry), or one inside the renewal's 5-minute lead, so "ended on" names
-      // no reason.
-      { ifParam: "canUndo", test: "true", then: "mail.M7.until", otherwise: "mail.M7.endedNow" },
+      // no reason. P2-W10: a plan paused by a card dispute (SUSPENDED) can be cancelled too; its M7 carries the optional
+      // flag `paused` "true" (with canUndo "false"): it won't renew, its features stay paused while the dispute is open,
+      // and a dispute won gives them back until {accessEndDate}, its period end. Left out, M7 reads as before.
+      { ifParam: "paused", test: "true", then: "mail.M7.paused",
+        otherwise: { ifParam: "canUndo", test: "true", then: "mail.M7.until", otherwise: "mail.M7.endedNow" } },
       { ifParam: "canUndo", test: "true", then: "mail.M7.undo", otherwise: "mail.M7.again" }
     ],
-    params: { plan: "plan", accessEndDate: "date", settingsUrl: "url", canUndo: "flag" }
+    params: { plan: "plan", accessEndDate: "date", settingsUrl: "url", canUndo: "flag" },
+    optional: { paused: "flag" }
   }),
   M8: define({
     catalogue: "mail", subject: "mail.M8.subject",

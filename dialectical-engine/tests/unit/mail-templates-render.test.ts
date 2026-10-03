@@ -34,6 +34,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   cancelLinkUrl: `https://dezbatere.ro/cancel#token=${"A".repeat(43)}`,
   withdrawalDays: "14",
   canUndo: "true",
+  paused: "true",
   notRequested: "true",
   otherSystem: "true",
   bankDeclined: "true",
@@ -79,6 +80,10 @@ function codeOf(run: () => unknown): string {
   }
   throw new Error("expected a MailTemplateError");
 }
+
+/** A catalogue sentence's longest stretch without a placeholder: what a rendered email must (or must not) contain. */
+const longestFixedPart = (sentence: string): string =>
+  sentence.split(/\{[A-Za-z][A-Za-z0-9_]*\}/u).map((part) => part.trim()).sort((a, b) => b.length - a.length)[0]!;
 
 const NOTHING: ReadonlySet<MailAttachmentFact> = new Set();
 const EVERYTHING: ReadonlySet<MailAttachmentFact> = new Set(MAIL_ATTACHMENT_FACTS);
@@ -138,10 +143,12 @@ describe("P17 renderMail", () => {
   });
 
   it("offers the undo only while the plan still runs (a cancel while a payment is failing ends it at once)", () => {
-    const running = renderMail("M7", "en", paramsFor("M7")).text;
+    // A plan that is not paused: M7 as it was before P2-W10's optional flag (an M7 queued before it carries none).
+    const { paused: _paused, ...notPaused } = paramsFor("M7");
+    const running = renderMail("M7", "en", notPaused).text;
     expect(running).toContain("You keep your Plus plan until October 29, 2026. You will not be charged again.");
     expect(running).toContain("Changed your mind? You can undo this in Settings before that date: https://dezbatere.ro/settings");
-    const ended = renderMail("M7", "en", { ...paramsFor("M7"), canUndo: "false" }).text;
+    const ended = renderMail("M7", "en", { ...notPaused, canUndo: "false" }).text;
     expect(ended).toContain("Your Plus plan ended on October 29, 2026. You will not be charged again.");
     expect(ended).toContain("You can choose a plan again at any time in Settings: https://dezbatere.ro/settings");
     expect(ended).not.toContain("undo");
@@ -149,9 +156,37 @@ describe("P17 renderMail", () => {
     // D6b's P12b also ends an ACTIVE plan at once (after the paid month's end, or inside the renewal's lead): the
     // sentence names no reason, so it never claims a payment failed.
     expect(ended).not.toMatch(/fail|renew/iu);
-    expect(codeOf(() => renderMail("M7", "en", { ...paramsFor("M7"), canUndo: "yes" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
-    const { canUndo: _flag, ...withoutFlag } = paramsFor("M7");
+    expect(codeOf(() => renderMail("M7", "en", { ...notPaused, canUndo: "yes" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+    const { canUndo: _flag, ...withoutFlag } = notPaused;
     expect(codeOf(() => renderMail("M7", "en", withoutFlag))).toBe("MAIL_TEMPLATE_PARAM_MISSING");
+    expect(renderMail("M7", "en", { ...notPaused, paused: "false" }).text).toBe(running);
+  });
+
+  it("tells a person who cancels a plan paused by a dispute that it won't renew, with no undo line, in every locale (P2-W10)", () => {
+    const paused = { ...paramsFor("M7"), paused: "true", canUndo: "false" };
+    const english = renderMail("M7", "en", paused).text;
+    expect(english).toContain(
+      "Your Plus plan won't renew, and you won't be charged again. Its paid features stay paused while the payment"
+      + " dispute is open. If the dispute ends in your favour, you can use them until October 29, 2026."
+    );
+    expect(english).not.toContain("undo");
+    expect(english).not.toContain("You keep your");
+    expect(english).not.toContain("ended on");
+    expect(MAIL_TEMPLATES.M7.optional).toEqual({ paused: "flag" });
+    // In every locale: the paused sentence first, then the "choose a plan" line; never the undo, "until" or "ended"
+    // sentence. The text is the greeting, the paragraphs, the sign-off and the footer, one blank line apart.
+    const catalogues = loadMailCatalogues();
+    const { paused: _flag, ...notPaused } = paused;
+    for (const locale of MAIL_LOCALES) {
+      const [, first, second] = renderMail("M7", locale, paused).text.split("\n\n");
+      const [, until, undo] = renderMail("M7", locale, { ...notPaused, canUndo: "true" }).text.split("\n\n");
+      const [, endedNow, again] = renderMail("M7", locale, notPaused).text.split("\n\n");
+      expect(first, `${locale} paused`).toContain(longestFixedPart(catalogues[locale]["mail.M7.paused"]!));
+      expect(first, locale).not.toMatch(/\{[A-Za-z][A-Za-z0-9_]*\}/u);
+      expect([until, endedNow], `${locale} first paragraph`).not.toContain(first);
+      expect(second, `${locale} no undo line`).not.toBe(undo);
+      expect(second, `${locale} second paragraph`).toBe(again);
+    }
   });
 
   it("opens M5A–C with a sentence true in every case, and names the bank only when the bank declined (W10, P2-I21)", () => {

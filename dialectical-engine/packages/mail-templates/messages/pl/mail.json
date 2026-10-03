@@ -39,6 +39,7 @@
   "mail.M7.undo": "Zmienili Państwo zdanie? Przed tą datą mogą Państwo cofnąć anulowanie w Ustawieniach: {settingsUrl}",
   "mail.M7.endedNow": "Państwa plan {plan} zakończył się {accessEndDate}. Nie zostaną Państwo ponownie obciążeni.",
   "mail.M7.again": "W każdej chwili mogą Państwo ponownie wybrać plan w Ustawieniach: {settingsUrl}",
+  "mail.M7.paused": "Państwa plan {plan} nie zostanie odnowiony i nie zostaną Państwo ponownie obciążeni. Jego płatne funkcje pozostają wstrzymane, dopóki trwa spór dotyczący płatności. Jeśli spór zakończy się na Państwa korzyść, mogą Państwo z nich korzystać do {accessEndDate}.",
   "mail.M8.subject": "Państwa odstąpienie od umowy zostało potwierdzone",
   "mail.M8.refunded": "Państwa plan {plan} zakończył się, a my zwróciliśmy {refundAmount} na Państwa kartę. Bank może potrzebować kilku dni, aby to wykazać.",
   "mail.M8.nothingDue": "Państwa plan {plan} zakończył się. Już wykorzystana część pokrywa całą cenę, więc nie przysługiwał Państwu żaden zwrot.",
