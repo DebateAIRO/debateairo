@@ -256,12 +256,54 @@ describe("P22 the Billing runbook", () => {
       // W13's rows, kept.
       "billing.renewal.report", "billing.reconcile.listing_failed", "billing.outbox.dead", "billing.outbox.alert_failed",
       "billing.outbox.settle_failed", "billing.xmoney.credentials_refused", "billing.quote.refused",
-      "billing.invoice.unknown", "billing.payment.mismatch"
+      "billing.invoice.unknown", "billing.payment.mismatch",
+      // P4-H fix round 1 (finding 4): a renewal REBILL_REFUSED on more than one renewal is reported at once.
+      "billing.payment.failed"
     ]) {
       expect(rowEvents, alarm).toContain(alarm);
     }
-    // Each row says what to do: the third cell is never empty.
-    for (const line of tableLines.slice(2)) expect((line.split(" | ")[2] ?? "").trim(), line).not.toBe("");
+    // Each row says what to do: the third cell is never empty. The row's closing pipe is stripped first, so an empty
+    // last cell ("| sig | meaning |  |") reads as empty, never as "|" (P4-H fix round 1, finding 3).
+    for (const line of tableLines.slice(2)) {
+      expect((line.replace(/\s*\|\s*$/u, "").split(" | ")[2] ?? "").trim(), line).not.toBe("");
+    }
+
+    // P4-H fix round 1: the rows whose wording the code settles, cell by cell.
+    const rowOf = (event: string): string[] => {
+      const line = tableLines.find((candidate) => firstCell(candidate).includes(`\`"event":"${event}"\``)) ?? "";
+      return line.replace(/\s*\|\s*$/u, "").split(" | ").map((cell) => cell.replace(/\s+/gu, " "));
+    };
+    // Finding 1: RenewalService.holdUnverified holds a renewal whose rebill xMoney answered but whose payment check
+    // has not settled it, under its own code, with the same pending line.
+    const [, pendingMeans = "", pendingDo = ""] = rowOf("billing.renewal.pending");
+    for (const needle of ["`PAYMENT_NOT_VERIFIED`", "its payment check has not settled it yet", "still in 3-D Secure"]) {
+      expect(pendingMeans, needle).toContain(needle);
+    }
+    for (const needle of ["Nothing on its own", "`PAYMENT_NOT_VERIFIED`: its payment check settles it",
+      "still without an outcome 30 days after it was made is counted by `billing.reconcile.expired`"]) {
+      expect(pendingDo, needle).toContain(needle);
+    }
+    // Finding 2: the owner summary lists a stuck renewal only when a call may have reached xMoney (a SUBMIT_UNKNOWN,
+    // BillingRepository.stuckRenewals), which is exactly closeStuck's REBILL_OUTCOME_UNKNOWN.
+    const [, stuckMeans = ""] = rowOf("billing.renewal.stuck");
+    for (const needle of ["Only with `REBILL_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`",
+      "A `REBILL_NOT_SENT` one charged nothing and is not listed there"]) {
+      expect(stuckMeans, needle).toContain(needle);
+    }
+    expect(stuckMeans).not.toContain("moves to Free. The owner summary lists it as `RENEWAL_STUCK`.");
+    // Finding 4: a failed payment has its own row; REBILL_REFUSED is xMoney refusing the request, not the card.
+    const [failedSignal = "", failedMeans = "", failedDo = ""] = rowOf("billing.payment.failed");
+    expect(failedSignal).toBe("| `\"event\":\"billing.payment.failed\"`, with `chargeKind` and `code`");
+    for (const needle of ["From a payment check", "`PAYMENT_DECLINED`", "`VOIDED`", "From a renewal or a payment retry",
+      "`REBILL_REFUSED`: xMoney refused the renewal request itself, not the card", "`NO_TRANSACTION`",
+      "follows a `billing.renewal.stuck` line"]) {
+      expect(failedMeans, needle).toContain(needle);
+    }
+    for (const needle of ["A decline: nothing", "`REBILL_REFUSED` on more than one renewal: report it at once, with the code",
+      "every renewal falls into the failed-payment path", "`NO_TRANSACTION`: the `billing.renewal.stuck` row"]) {
+      expect(failedDo, needle).toContain(needle);
+    }
+    expect(read("packages/payments-xmoney/src/client.ts")).toContain("throw new TypedDomainError(\"XMONEY_REFUSED\"");
 
     // The rows the brief's sources ask for, word for word where the action matters.
     for (const needle of [
@@ -321,6 +363,34 @@ describe("P22 the Billing runbook", () => {
     ]) {
       expect(paragraph, needle).toContain(needle);
     }
+  });
+
+  it("P4-H fix round 1 (the P4-F judge's route (a)): no paid question waits in line when billing goes on", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    // The check sits in "Switching billing on", before the step that publishes the version switching billing on.
+    const from = flat.indexOf("**Switching billing on.**");
+    const publish = flat.indexOf("Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4.");
+    expect(from).toBeGreaterThan(0);
+    expect(publish).toBeGreaterThan(from);
+    const before = flat.slice(from, publish);
+    for (const needle of [
+      "**No paid question may be waiting when billing goes on.**",
+      "sudo -u postgres psql -d debateai -c \"SELECT count(*) AS waiting_premium FROM core.run_waiting_v WHERE owner_ref IS NOT NULL AND plan_tier IS DISTINCT FROM 'free'\"",
+      "It must print 0", "A question with no recorded plan counts as a paid one",
+      // Why, in plain words.
+      "the server takes the plan the browser sends", "everyone is on Free, because nobody could pay before",
+      "`RUN_SETUP_FAILED:PLAN_CHANGED`", "Your paid plan ended or was paused while this question waited",
+      "which is false for someone who never paid",
+      "If the count is not 0, wait for the line to empty, check again, then publish",
+      // The two alternatives the judge allowed: §11's stricter whole-line count, or the band in the same version.
+      "`SELECT count(*) FROM core.run_waiting_v`", "in the same version that switches billing on"
+    ]) {
+      expect(before, needle).toContain(needle);
+    }
+    // The claims the paragraph makes stay true of the code: a NULL tier is premium to the waker's plan guard, and the
+    // asker reads that sentence.
+    expect(read("apps/api/src/ask-room.ts")).toContain("(run.planTier ?? \"premium\") === \"premium\"");
+    expect(read("apps/ui/messages/en/home.json")).toContain("\"runFailure.PLAN_ENDED\": \"Your paid plan ended or was paused while this question waited");
   });
 
   it("P4-H (§4.3's optional notes): the runner's looser Free check, and what §14.9's journal filter prints", () => {
