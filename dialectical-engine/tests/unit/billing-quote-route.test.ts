@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { buildApi } from "@debateai/api";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import type { BillingRouteOptions } from "../../apps/api/src/billing/index.js";
-import type { QuoteResult, QuoteServicePort } from "../../apps/api/src/billing/quote.js";
+import { addressRequired, type QuoteResult, type QuoteServicePort } from "../../apps/api/src/billing/quote.js";
 import { BillingRefusal } from "../../apps/api/src/billing/refusal.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
-import { testBillingPlans, unusedAskApplication } from "../support/billingFixtures.js";
+import { testBillingPlans, testBillingPolicy, unusedAskApplication } from "../support/billingFixtures.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
 const OWNER = testHttpIdentity("billing-quote-owner");
@@ -102,5 +102,21 @@ describe("P8b POST /v1/billing/quote", () => {
     expect(decide).toHaveBeenCalledWith("billingQuote", OWNER.authenticated.ownerRef, expect.any(Date));
     expect(quotes.create).not.toHaveBeenCalled();
     await limited.close();
+  });
+});
+
+describe("P2-M29 a US or Canadian buyer gives the postal code (spec §1.3)", () => {
+  const at = (country: string, region: string | null, postalCode: string | null) => addressRequired({
+    name: null, country, region, postalCode, city: null, street: null, ip: null, ipCountry: country, company: null
+  }, country, testBillingPolicy);
+
+  it.each(["US", "CA"])("asks %s for the postal code even when a state is given, since Quaderno is sent no region", (country) => {
+    expect(at(country, null, null)).toBe(true);
+    expect(at(country, country === "US" ? "NY" : "ON", null)).toBe(true);
+    expect(at(country, null, country === "US" ? "10001" : "K1A 0B1")).toBe(false);
+  });
+
+  it("asks nothing of a buyer elsewhere outside Romania", () => {
+    expect(at("DE", null, null)).toBe(false);
   });
 });

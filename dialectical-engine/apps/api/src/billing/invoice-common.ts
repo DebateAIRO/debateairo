@@ -53,7 +53,10 @@ export type PaidCharge = Readonly<{
   customerId: string;
   quote: QuoteRow;
   location: QuoteLocation;
-  /** The latest billing profile, its `email` replaced by the account's current address (W8) while the account exists. */
+  /**
+   * The latest billing profile, its `email` replaced by the account's current address (W8) while the account exists.
+   * P2-M30: a document takes only the email and the locale from it; the buyer is `location`, the charge's own.
+   */
   profile: BillingProfile;
   /** The service period the payment bought: the invoice prints it (see "What the invoice says"). */
   period: Readonly<{ start: Date; end: Date }>;
@@ -132,20 +135,27 @@ export function invoiceLine(
   });
 }
 
-/** Spec §2.5.4 invoice jobs: the customer, one line with the tax rate, and the three pieces of location evidence. */
+/**
+ * Spec §2.5.4 invoice jobs: the customer, one line with the tax rate, and the three pieces of location evidence.
+ * P2-M30: the buyer is the charge's own, from the location its quote sealed (the checkout's; a renewal's and an
+ * upgrade's quote seal the subscription's checkout location again, `storedTaxContext`), so a late invoice or a
+ * partial credit note of an old charge never names the details of a later checkout. Only the address the document is
+ * sent to and its language come from the profile.
+ */
 export function saleRecordOf(
   paid: PaidCharge, payload: OutboxJob["payload"], taxCode: BillingPolicy["taxCode"], text: BillingOrderText = englishOrderText
 ): SaleRecord {
-  const company = paid.profile.company;
+  const buyer = paid.location;
+  const company = buyer.company;
   return Object.freeze({
     chargeId: paid.charge.chargeId,
     transactionId: paid.paid.xmoneyTransactionId!,
     issuedOn: paid.paid.at,
     customer: Object.freeze({
-      name: company?.name ?? paid.profile.name, email: paid.profile.email, country: paid.profile.country,
-      region: paid.profile.region, postalCode: paid.profile.postalCode, city: paid.profile.city,
+      name: company?.name ?? buyer.name, email: paid.profile.email, country: buyer.country,
+      region: buyer.region, postalCode: buyer.postalCode, city: buyer.city,
       // Spec §2.5.4: "the client is the person or company" — a company is invoiced at its own address.
-      street: company?.address ?? paid.profile.street,
+      street: company?.address ?? buyer.street,
       taxId: company !== null && company.vatValidated ? company.vatId : null, locale: paid.profile.locale
     }),
     lines: Object.freeze([Object.freeze({

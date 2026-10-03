@@ -64,13 +64,12 @@ export function taxRefusalDetail(error: unknown): string {
  * R-15: the issuer the rules give this tax country (SmartBill for Romania) refuses an invoice without the buyer's
  * name, city and county. A company's name is the buyer's name. P2-M15: the county must be one SmartBill names and, in
  * Bucharest, the city a sector (`isRomanianInvoiceLocality`, the same lists the checkout offers), or SPV will not
- * validate the e-Factura. Spec §1.3: US and Canadian sales tax is decided by the state or the ZIP code, so a buyer
- * there gives at least one of the two.
+ * validate the e-Factura. Spec §1.3: Quaderno prices the US and Canada by the postal code, and P4 never sends it a
+ * region, so a buyer there gives the postal code (P2-M29); a state alone would be priced with no state at all. The
+ * checkout page already requires it; the checkout's 422 BILLING_ADDRESS_REQUIRED holds a crafted request to it too.
  */
 export function addressRequired(location: QuoteLocation, taxCountry: string, policy: BillingPolicy): boolean {
-  if ((location.country === "US" || location.country === "CA") && location.region === null && location.postalCode === null) {
-    return true;
-  }
+  if ((location.country === "US" || location.country === "CA") && location.postalCode === null) return true;
   if (invoiceIssuerFor(taxCountry, policy.invoiceIssuerRules) !== "SMARTBILL") return false;
   const name = location.company?.name ?? location.name;
   return name === null || location.city === null || location.region === null

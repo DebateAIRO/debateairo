@@ -80,7 +80,8 @@ export async function recordSmartBillDocument(
       template: "M2_INVOICE_ATTACHED", recipient: { kind: "CUSTOMER", customerId: charge.customerId }, dedupeRef: charge.chargeId,
       params: {
         plan: charge.planId, totalAmount: microsToDecimal(charge.chargeTotalMicros), chargeDate: charge.paidAt.toISOString(),
-        invoiceNumber: `${document.series} ${document.number}`
+        // P2-M33: one number in one form, `<series>-<number>`, as Settings, the owner's summary and commands show it.
+        invoiceNumber: `${document.series}-${document.number}`
       },
       ...(input.attachPdf ? {
         attachments: [{ kind: "SMARTBILL_INVOICE_PDF" as const, fields: { series: document.series, number: document.number } }]

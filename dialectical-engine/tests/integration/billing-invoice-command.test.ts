@@ -107,7 +107,7 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     // W12 fix F6: the receipt names the number typed by hand but never fetches a PDF by it (two swapped numbers would
     // mail one customer another's invoice); M2 then says where the invoice is listed and how to ask for a copy.
     const receipt = (await h.outboxRows(paid.chargeId)).find((row) => row.ref === `M2_INVOICE_ATTACHED:${paid.chargeId}`)?.payload;
-    expect(receipt).toMatchObject({ template: "M2_INVOICE_ATTACHED", "param.invoiceNumber": "DBAI 0700" });
+    expect(receipt).toMatchObject({ template: "M2_INVOICE_ATTACHED", "param.invoiceNumber": "DBAI-0700" });
     expect(receipt?.attachments).toBe("");
     expect(await listed(paid.chargeId)).toEqual([]);
     // Once only, and never a document SmartBill already numbered for another charge.

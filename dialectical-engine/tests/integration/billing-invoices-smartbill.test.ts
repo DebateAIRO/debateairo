@@ -5,6 +5,7 @@ import {
   createSmartBillInvoiceHandler, createSmartBillStornoHandler, parseSmartBillReference, recordEfacturaStatus,
   smartBillPdfResolver, type SmartBillPort
 } from "../../apps/api/src/billing/invoice-smartbill.js";
+import { sealBillingProfile } from "../../apps/api/src/billing/records.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { enqueueCreditNote } from "../../apps/api/src/billing/settlement.js";
 import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
@@ -97,7 +98,9 @@ describe("P10b SmartBill invoices for Romania", () => {
     const mail = (await h.outboxRows(paid.chargeId)).find((row) => row.ref === `M2_INVOICE_ATTACHED:${paid.chargeId}`);
     expect(mail?.payload).toMatchObject({
       attachments: "SMARTBILL_INVOICE_PDF", "attach.SMARTBILL_INVOICE_PDF.series": "DBAI",
-      "attach.SMARTBILL_INVOICE_PDF.number": invoice!.number, "param.invoiceNumber": `DBAI ${invoice!.number}`
+      "attach.SMARTBILL_INVOICE_PDF.number": invoice!.number,
+      // P2-M33: the receipt names the number as Settings, the summary and the owner's commands do, `<series>-<number>`.
+      "param.invoiceNumber": `DBAI-${invoice!.number}`
     });
     const attachment = await smartBillPdfResolver({ issuer: smartbill.port() })({ series: "DBAI", number: invoice!.number }, "ro");
     expect(attachment).toMatchObject({ filename: `DBAI-${invoice!.number}.pdf`, contentType: "application/pdf" });
@@ -217,6 +220,41 @@ describe("P10b SmartBill invoices for Romania", () => {
     const person = await h.activate();
     await h.worker.drain(10);
     expect(smartbill.issued.find((sale) => sale.chargeId === person.chargeId)?.customer.street).toBeNull();
+  });
+
+  it("credits an old charge to that charge's own buyer, not to the details of a later checkout (P2-M30)", async () => {
+    const paid = await h.activate();
+    await h.worker.drain(10);
+    expect(smartbill.issued.find((sale) => sale.chargeId === paid.chargeId)?.customer)
+      .toMatchObject({ name: "Test Buyer", city: "Sector 1", region: "Bucuresti", street: null, taxId: null });
+    // The person later checks out under other details (a company in Cluj): that writes the newest billing profile.
+    const customer = (await h.repository.customerByOwner(paid.ownerRef))!;
+    const later = sealBillingProfile(h.recordsKey, customer.customerId, {
+      email: "later-buyer@example.test", locale: "ro", name: "SC Alta SRL", country: "RO", region: "Cluj",
+      postalCode: "400001", city: "Cluj-Napoca", street: "Str. Noua 2",
+      company: { name: "SC Alta SRL", vatId: "RO999VALID", address: "Str. Noua 2, Cluj-Napoca", vatValidated: true }
+    });
+    h.clock.advance(60_000);
+    await h.repository.withTransaction((client) => h.repository.appendProfile(client, {
+      customerId: customer.customerId, at: h.clock.now, locale: "ro", profileCiphertext: later.ciphertext, keyId: later.keyId
+    }));
+    const charge = (await h.repository.charge(paid.chargeId))!;
+    const quote = (await h.repository.quote(charge.quoteId!, paid.ownerRef))!;
+    await h.repository.withTransaction(async (client) => {
+      const fields = { xmoneyTransactionId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
+      await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUND_REQUESTED", h.clock.now, fields));
+      await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUNDED", h.clock.now, fields));
+      await enqueueCreditNote(h.repository, client, {
+        charge, quote, policy: testBillingPolicy, transactionId: paid.transaction.transactionId, refundMicros: 12_100_000, now: h.clock.now
+      });
+    });
+    await h.worker.drain(10);
+    // The buyer is the one the charge's own quote sealed; only the address it is sent to and its language follow the
+    // newest profile (W8: the account's current address, here the profile's own).
+    expect(smartbill.credits.find((refund) => refund.chargeId === paid.chargeId)?.customer).toEqual({
+      name: "Test Buyer", email: "later-buyer@example.test", country: "RO", region: "Bucuresti", postalCode: null,
+      city: "Sector 1", street: null, taxId: null, locale: "ro"
+    });
   });
 
   it("stornos a full refund, credits a partial one, and hands a partial one to the owner without creditPartial", async () => {

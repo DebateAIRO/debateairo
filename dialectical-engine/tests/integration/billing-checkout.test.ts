@@ -212,15 +212,17 @@ describe("P8c the checkout", () => {
     expect(SELLER_COMPANY.tradingNames[0]).toBe("DebateAI");
   });
 
-  it("refuses a US checkout that names neither a state nor a postal code (spec §1.3)", async () => {
+  it("refuses a US checkout that names no postal code, with or without a state (spec §1.3, P2-M29)", async () => {
     h.geo.country = "US";
-    const ownerRef = randomUUID();
-    const quoted = await h.quotes.create({
-      ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "US", name: null, region: null, postalCode: null,
-      city: null, company: null, now: h.clock.now
-    });
-    await expect(startWith(ownerRef, quoted.quote.quoteId)).rejects.toMatchObject({ status: 422, code: "BILLING_ADDRESS_REQUIRED" });
-    expect(await h.repository.subscriptionForOwner(ownerRef)).toBeNull();
+    for (const region of [null, "NY"]) {
+      const ownerRef = randomUUID();
+      const quoted = await h.quotes.create({
+        ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "US", name: null, region, postalCode: null,
+        city: null, company: null, now: h.clock.now
+      });
+      await expect(startWith(ownerRef, quoted.quote.quoteId)).rejects.toMatchObject({ status: 422, code: "BILLING_ADDRESS_REQUIRED" });
+      expect(await h.repository.subscriptionForOwner(ownerRef)).toBeNull();
+    }
   });
 
   it("names its xMoney system on CREATED and on the charge (D5 5h)", async () => {

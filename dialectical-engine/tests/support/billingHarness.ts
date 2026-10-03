@@ -471,10 +471,13 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     async buy(input = {}) {
       const ownerRef = input.ownerRef ?? randomUUID();
       const userId = input.userId ?? randomUUID();
-      // A Romanian buyer carries the name, city and county SmartBill needs (R-15).
+      // A Romanian buyer carries the name, city and county SmartBill needs (R-15); a US or Canadian buyer the postal
+      // code Quaderno prices by (P2-M29; New York's and Ottawa's, where the fakes are not registered).
+      const country = input.country ?? "RO";
+      const postalCode = country === "US" ? "10001" : country === "CA" ? "K1A 0B1" : null;
       const quoted = await quotes.create({
-        ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country: input.country ?? "RO",
-        name: "Test Buyer", region: "Bucuresti", postalCode: null, city: "Sector 1", company: input.company ?? null, now: clock.now
+        ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country,
+        name: "Test Buyer", region: "Bucuresti", postalCode, city: "Sector 1", company: input.company ?? null, now: clock.now
       });
       const chargeId = input.chargeId;
       const service = chargeId === undefined ? checkout : checkoutWith({ chargeIds: () => chargeId });
