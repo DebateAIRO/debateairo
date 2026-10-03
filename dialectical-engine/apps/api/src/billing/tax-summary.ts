@@ -452,8 +452,11 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " accountant decides):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} USD, on ${isoDay(item.at)}`);
   section(summary.unknownRefunds, "Refunds made in the xMoney dashboard, amount unknown: none.",
-    "Refunds made in the xMoney dashboard, amount unknown (not subtracted above; read the amount in the dashboard and"
-      + " adjust that country's net sales and tax by hand, at most the amount shown):",
+    // P4-K (P2-W12): once the owner records the credit note with its amount, `quarterSummaryRows` subtracts it.
+    "Refunds made in the xMoney dashboard, amount unknown (not subtracted above; read the amount in the dashboard,"
+      + " issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as its line under"
+      + " the invoices and credit notes to check by hand says), and the summary then subtracts it at that amount; until"
+      + " then, adjust that country's net sales and tax by hand, at most the amount shown):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}${item.taxRegion === null ? "" : `, ${item.taxRegion}`},`
       + ` up to ${microsToDecimal(item.upToMicros)} USD, on ${isoDay(item.at)}`);
   // W12 (P2-I16, P2-I17): every dead document job, whatever its code; what to do once per job kind and code (fix I-1).

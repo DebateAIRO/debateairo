@@ -146,9 +146,12 @@ describe("P22 the Billing runbook", () => {
       "billing:invoice --charge \"$CHARGE_REF\" --kind \"$KIND\" --requeue --confirm-not-issued",
       "that the document was NOT issued", "CREDIT_NOTE_REFUND_MISSING",
       "The changed amount is never charged until that notice has gone out",
-      // W12 fix F5: a dashboard refund's line is one the command cannot settle, said where the refusal is explained.
-      "A `DASHBOARD_REFUND` line (a refund made in the xMoney dashboard, amount unknown) has no\n  job, so this command"
-        + " cannot settle it",
+      // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): a dashboard refund's line is settled by
+      // recording the hand-made credit note with its amount; the quarter then subtracts it; one credit note per charge.
+      "billing:invoice --charge \"$CHARGE_REF\" --kind CREDIT_NOTE --record \"$DOCUMENT\" --amount \"$AMOUNT\"",
+      "- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only",
+      "tax summary subtracts the refund at that amount",
+      "goes to your accountant",
       // §14.2 (ruling Q-12): the records key is escrowed with the other five secrets.
       "sixth secret", "RESTORE_DRILL_RECORDS_KEY bytes=32",
       // §14.7 (ruling Q-3): the Terms archive M1 attaches from is never pruned.
@@ -168,6 +171,9 @@ describe("P22 the Billing runbook", () => {
     expect(printed.length).toBeGreaterThanOrEqual(15);
     for (const code of printed) expect(billing, code).toContain(`- \`${code}\``);
     expect(billing).not.toContain("(no such line for\nthat charge)");
+    // P4-K: the command now settles a DASHBOARD_REFUND line; the runbook no longer says it cannot.
+    expect(billing.replace(/\s+/gu, " ")).not.toContain("so this command cannot settle it");
+    expect(billing.replace(/\s+/gu, " ")).not.toContain("has no job to record it on");
     // W13 (P2-I18): every bare marker billing can print has its row in the journal table.
     const markers = ["apps/api/src/billing/runtime.ts", "apps/api/src/billing/erasure-hook.ts"]
       .flatMap((path) => [...read(path).matchAll(/reportPending\("(BILLING_[A-Z_]+)"\)/gu)].map((match) => match[1]!));

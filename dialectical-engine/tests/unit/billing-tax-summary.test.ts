@@ -210,6 +210,10 @@ describe("P16b the summary", () => {
     expect(text).toContain("Net sales 20.00 USD, tax collected 4.20 USD, from 1 sale and 0 refunds.");
     expect(text).toContain("Not subtracted: 1 refund made in the xMoney dashboard, amount unknown (listed below).");
     expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown (not subtracted above;");
+    // P4-K (P2-W12): the owner records the hand-made credit note with its amount, and the summary then subtracts it.
+    expect(text).toContain("issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as"
+      + " its line under the invoices and credit notes to check by hand says), and the summary then subtracts it at that"
+      + " amount; until then, adjust that country's net sales and tax by hand, at most the amount shown):");
     expect(text).toContain(`charge ${"a".repeat(32)}, RO, up to 24.20 USD, on 2026-11-20`);
     // A refund whose amount is known (ours, or one xMoney reported as its own transaction) is still subtracted.
     const known = row({ chargeId: "a".repeat(32), type: "REFUND", amountMicros: 12_100_000, amountKnown: true });

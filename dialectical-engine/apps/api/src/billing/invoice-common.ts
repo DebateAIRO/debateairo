@@ -187,13 +187,15 @@ export function refundJobOf(job: Pick<OutboxJob, "payload">): Readonly<{ chargeI
  * or on a refund transaction naming it (D5 5g), gives the amount and the date. A job naming any other transaction (a
  * duplicate payment's refund was never a sale), or one with no such REFUNDED row, is MISSING. P9c's dashboard refund
  * recorded on the payment itself (PROVIDER_REFUND, no refund transaction) holds only an upper bound: xMoney's read
- * named no amount (`quarterSummaryRows` marks it amountKnown=false), so it is AMOUNT_UNKNOWN. A D5 5g PROVIDER_REFUND
- * on its own refund transaction, and a PROVIDER_VOID, carry their true amount.
+ * named no amount (`quarterSummaryRows` marks it amountKnown=false until its credit note is recorded), so it is
+ * AMOUNT_UNKNOWN, with that row (`upToMicros`, what was left of the payment, bounds the credit note P4-K's
+ * `pnpm billing:invoice --record --amount` records). A D5 5g PROVIDER_REFUND on its own refund transaction, and a
+ * PROVIDER_VOID, carry their true amount.
  */
 export type SaleRefund =
   | Readonly<{ kind: "BACKED"; refunded: ChargeEventRow; amountMicros: number }>
   | Readonly<{ kind: "MISSING" }>
-  | Readonly<{ kind: "AMOUNT_UNKNOWN" }>;
+  | Readonly<{ kind: "AMOUNT_UNKNOWN"; refunded: ChargeEventRow; upToMicros: number }>;
 
 export function saleRefundOf(
   charge: Readonly<{ events: readonly ChargeEventRow[] }>, paid: ChargeEventRow, transactionId: string
@@ -205,7 +207,7 @@ export function saleRefundOf(
     return Object.freeze({ kind: "MISSING" as const });
   }
   if (refunded.errorCode === "PROVIDER_REFUND" && refunded.refundsTransactionId === null) {
-    return Object.freeze({ kind: "AMOUNT_UNKNOWN" as const });
+    return Object.freeze({ kind: "AMOUNT_UNKNOWN" as const, refunded, upToMicros: refunded.amountMicros });
   }
   return Object.freeze({ kind: "BACKED" as const, refunded, amountMicros: refunded.amountMicros });
 }

@@ -2451,7 +2451,7 @@ its other fields, and never a person, an email address or an amount. The signals
 | `"event":"billing.outbox.settle_failed"`, with `kind`, `outcome` and `attempts` | A job ran, but its result could not be saved (usually the database connection was lost). The job runs again after 5 minutes, so an email may arrive twice. | One: nothing. Many, or the same kind again and again: check the database, and report it if the database is fine. |
 | `"event":"billing.xmoney.credentials_refused"`, with `operation` | xMoney refused our key (`operation` says on what: `checkout`, `verify`, `rebill`, `refund` or `list`). xMoney processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose rebill is refused this way is kept, as in an xMoney outage, for up to 3 days past its due time (a payment retry: 24 hours). After that it is closed as failed (`NO_TRANSACTION`, with a `"event":"billing.renewal.stuck"` line), and the failed-payment path starts, with its emails. A refund keeps being tried; a payment check stops after its last try (`billing.outbox.dead`, above). New checkouts fail while it lasts. | At once: check the key file `XMONEY_PRIVATE_KEY_PATH` names and the xMoney account (a revoked or replaced key, or a sandbox key beside the live address, or the reverse, §14.2). Fix it and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
 | `"event":"billing.quote.refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price a purchase. That is not an outage: most often the Quaderno key is wrong or revoked (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or Quaderno rejects the request (`QUADERNO_HTTP_422`). The person is told to try again in a minute, and nothing is charged. The same event with `code` `TAX_SERVICE_UNAVAILABLE` is an outage of the tax service; with any other code it is one person's own refusal (for example `ALREADY_SUBSCRIBED` or `TAX_ID_INVALID`). | `TAX_SERVICE_REFUSED`: every purchase fails until it is fixed. Check the Quaderno key file and the Quaderno account at once; fix the key and restart `debateai-api`. `TAX_SERVICE_UNAVAILABLE`: nothing, unless it lasts; then check Quaderno's status page. |
-| `"event":"billing.invoice.unknown"`, with `issuer`, `kind` and `code` | A legal document the site could not settle itself. `INVOICE_UNKNOWN`: SmartBill did not say whether it issued a Romanian invoice or credit note, and cannot be asked afterwards, so it may exist. `CREDIT_NOTE_MANUAL`: a credit note the site cannot issue itself (a second refund of one sale, or a refund made in the xMoney dashboard whose amount the site does not know). The owner summary lists it under "Invoices and credit notes to check by hand". | `INVOICE_UNKNOWN`: look in SmartBill the same day, because a Romanian document must reach e-Factura in time (your accountant knows the deadline). If it was issued, record it with `pnpm billing:invoice --record`; if not, re-queue it with `--requeue --confirm-not-issued` (**An invoice, a credit note or an email that was never sent**, below). `CREDIT_NOTE_MANUAL`: issue it by hand in SmartBill or Quaderno and record it with `--record`; a `DASHBOARD_REFUND` line has no job to record it on (see `BILLING_INVOICE_NOTHING_LISTED` below), so give its amount to your accountant. |
+| `"event":"billing.invoice.unknown"`, with `issuer`, `kind` and `code` | A legal document the site could not settle itself. `INVOICE_UNKNOWN`: SmartBill did not say whether it issued a Romanian invoice or credit note, and cannot be asked afterwards, so it may exist. `CREDIT_NOTE_MANUAL`: a credit note the site cannot issue itself (a second refund of one sale, or a refund made in the xMoney dashboard whose amount the site does not know). The owner summary lists it under "Invoices and credit notes to check by hand". | `INVOICE_UNKNOWN`: look in SmartBill the same day, because a Romanian document must reach e-Factura in time (your accountant knows the deadline). If it was issued, record it with `pnpm billing:invoice --record`; if not, re-queue it with `--requeue --confirm-not-issued` (**An invoice, a credit note or an email that was never sent**, below). `CREDIT_NOTE_MANUAL`: issue it by hand in SmartBill or Quaderno and record it with `--record`; for a `DASHBOARD_REFUND` line, record it with `--record` and the amount you refunded, `--amount` (**An invoice, a credit note or an email that was never sent**, below). |
 | `"event":"billing.payment.mismatch"`, with `code` or `chargeKind` | A payment check found a payment that does not belong to the charge it was matched with, so nothing was recorded and nothing moved. `code` `CUSTOMER_MISMATCH`: the payment was made by another xMoney customer than the one our checkout created; the card **is** charged, and nothing refunds it. `code` `ORDER_REF_MISMATCH`: xMoney's order names another charge than the notice did. A line with `chargeKind` instead: the payment's amount or currency differs from the charge's. | Find the payment: the notices whose check ended this way are listed by the command below (a check the daily money check queued has no notice; look in the xMoney dashboard for a payment that gave nobody a plan). Look the payment up in the xMoney dashboard and, if no plan was given for it, refund it there by hand. Report every such line. `CUSTOMER_MISMATCH` on every first payment means xMoney makes embedded payments from another customer than X0 showed: stop sales (**Stopping sales, and switching billing off**, above) and report it at once. |
 
 The payment notices whose check ended as a mismatch, newest first. Act only on rows of this host's xMoney system (`live` on the live host, `stage` on the sandbox host):
@@ -2489,13 +2489,21 @@ SmartBill not saying whether it issued an invoice (`INVOICE_UNKNOWN`: SmartBill 
 invoice may be there already).
 
 For an invoice or a credit note, settle the line with `pnpm billing:invoice`, giving the charge reference with
-`--charge`, the document with `--kind INVOICE` or `--kind CREDIT_NOTE`, and one of two actions:
+`--charge`, the document with `--kind INVOICE` or `--kind CREDIT_NOTE`, and one of these actions:
 
 - `--record` with a document you issued or found by hand: for SmartBill (a Romanian sale) its series and number
   joined by a dash, as SmartBill prints it (for example `DBAI-0042`); for Quaderno its document id. The site stores
   it and, for an invoice, emails the customer the receipt (M2); a SmartBill document also joins the e-Factura list.
   A SmartBill receipt recorded this way names the invoice number but does not attach the PDF (a number typed by hand
   is never used to fetch a document for a customer); it tells the customer to write to you for a copy.
+- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only: a refund made in the xMoney dashboard that xMoney
+  reported on the payment itself, so the site does not know its amount and queued no credit note. Issue the credit
+  note by hand in SmartBill (a Romanian sale) or Quaderno, then record it with `--kind CREDIT_NOTE`, its document as
+  above, and the amount you refunded in dollars and cents (for example `12.10`). The amount can be at most what the
+  payment held (the "up to" figure the tax summary gives for that charge). The line then leaves the list, and the
+  quarter's tax summary subtracts the refund at that amount instead of listing it as "amount unknown". A charge has
+  one credit note at most: if it already has one, the command refuses (`BILLING_INVOICE_ALREADY_RECORDED`), and that
+  refund goes to your accountant.
 - `--requeue` to let the site try the job again once the cause is fixed (the Quaderno key replaced, Quaderno or
   SmartBill answering again). A SmartBill job also needs `--confirm-not-issued`: add it only after you have checked
   in SmartBill that the document was NOT issued, because SmartBill would issue a second one. A Quaderno job needs no
@@ -2509,6 +2517,13 @@ and you tell whoever runs the server. The command asks for the values at the pro
 ```sh
 # Paste the charge reference as the summary prints it and press Enter; type INVOICE or CREDIT_NOTE and press Enter; then paste the document (for example DBAI-0042, or the Quaderno document id) and press Enter.
 read -r CHARGE_REF && read -r KIND && read -r DOCUMENT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind "$KIND" --record "$DOCUMENT"
+```
+
+To record a dashboard refund's credit note with its amount (`DASHBOARD_REFUND` lines only):
+
+```sh
+# Paste the charge reference as the summary prints it and press Enter; paste the credit note (for example DBAI-0042, or the Quaderno document id) and press Enter; then type the amount you refunded in the xMoney dashboard, in dollars and cents (for example 12.10), and press Enter.
+read -r CHARGE_REF && read -r DOCUMENT && read -r AMOUNT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind CREDIT_NOTE --record "$DOCUMENT" --amount "$AMOUNT"
 ```
 
 To re-queue a Quaderno job:
@@ -2529,18 +2544,20 @@ It prints one line saying what it recorded or queued; a re-queued job that fails
 A refusal is one code and nothing is written. What each code means, and what to do:
 
 - `BILLING_INVOICE_USAGE`: the command line is not one of the forms above (a missing or repeated value, a kind other
-  than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither). Run it again as shown.
+  than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither, or an `--amount` that is not dollars and
+  cents above zero, such as `12.10`, or that comes without `--record` and `--kind CREDIT_NOTE`). Run it again as shown.
 - `BILLING_INVOICE_CHARGE_UNKNOWN`: no charge has that reference. Paste it again exactly as the summary prints it.
 - `BILLING_INVOICE_OTHER_XMONEY_SYSTEM`: the charge was paid in the other xMoney system (sandbox or live) than the one
   this host's `XMONEY_API_BASE_URL` names. It owes no document here: nothing to do on this host.
 - `BILLING_INVOICE_CHARGE_NOT_PAID`: our records hold no payment for that charge, so no document is owed. If the
   xMoney dashboard shows it paid, tell whoever runs the server.
-- `BILLING_INVOICE_ALREADY_RECORDED`: the charge already has that document. Nothing more to do.
+- `BILLING_INVOICE_ALREADY_RECORDED`: the charge already has that document. Nothing more to do. A charge has one
+  credit note at most, so a credit note for a further refund of the same charge (for example a dashboard refund after
+  one already credited) goes to your accountant.
 - `BILLING_INVOICE_JOB_OPEN`: the job is already queued. Wait for it; if it fails again, it is listed and emailed again.
 - `BILLING_INVOICE_NOTHING_LISTED`: no dead job of that kind is listed for that charge. Check the charge and the kind
   against the summary's line. A `DASHBOARD_REFUND` line (a refund made in the xMoney dashboard, amount unknown) has no
-  job, so this command cannot settle it: issue its credit note by hand in SmartBill or Quaderno and give its amount to
-  your accountant; the line stays on the list.
+  job to re-queue: issue its credit note by hand and record it with `--record` and `--amount` (above).
 - `BILLING_INVOICE_NOTHING_TO_ISSUE`: our records do not back the job (no refund is recorded for the sale, the job is
   malformed, or no payment is recorded), so there is no document to make. Tell whoever runs the server.
 - `BILLING_INVOICE_CONFIRM_NOT_ISSUED_REQUIRED`: a SmartBill job is re-queued only with `--confirm-not-issued`. Check in
@@ -2551,9 +2568,13 @@ A refusal is one code and nothing is written. What each code means, and what to 
   example `DBAI-0042`), Quaderno its document id.
 - `BILLING_INVOICE_DOCUMENT_TAKEN`: that document is already recorded for another charge. Check the number in SmartBill
   or Quaderno and type the right one.
-- `BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`: the credit note would be for a refund made in the xMoney dashboard whose
-  amount our records do not hold. Issue it by hand, give its amount to your accountant, and tell whoever runs the
-  server: the site queues no job for such a refund.
+- `BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`: the credit note is for a refund made in the xMoney dashboard whose amount
+  our records do not hold. Run the command again with `--amount` and the amount you refunded (above).
+- `BILLING_INVOICE_NO_DASHBOARD_REFUND`: `--amount` is only for a `DASHBOARD_REFUND` line, and that charge holds no
+  refund made in the xMoney dashboard of unknown amount. For any other credit note leave `--amount` out: the site
+  credits the refund it recorded.
+- `BILLING_INVOICE_AMOUNT_ABOVE_PAYMENT`: the amount is more than the payment held (the "up to" figure the tax summary
+  gives for that charge). Check the refund in the xMoney dashboard and type its amount again.
 - `BILLING_INVOICE_DATA_MISSING`: a paid charge without its quote or customer. Tell whoever runs the server.
 - `BILLING_INVOICE_FAILED`, or any other code: the command could not finish (for example, the database did not
   answer) and wrote nothing. Run it again later; if it repeats, tell whoever runs the server and give the code.

@@ -104,8 +104,9 @@ export type OutboxJob = Readonly<{
  * charge, the verdict from its location evidence (null when none). `amountKnown` is false on exactly one shape: a
  * REFUND that D6a's P9c recorded for a refund made in the xMoney dashboard on the payment itself (error code
  * `PROVIDER_REFUND`, no `refunds_transaction_id`), because xMoney's read named no amount and P9c wrote what was left
- * of the charge, an upper bound — P16b lists such a row instead of subtracting it. Every other row is true, a
- * `PROVIDER_REFUND` on xMoney's own refund transaction and a `PROVIDER_VOID` included.
+ * of the charge, an upper bound — P16b lists such a row instead of subtracting it — until the owner records its credit
+ * note (P4-K, P2-W12: `pnpm billing:invoice --record --amount`): the row then carries the credit note's amount and is
+ * known. Every other row is true, a `PROVIDER_REFUND` on xMoney's own refund transaction and a `PROVIDER_VOID` included.
  */
 export type TaxSummaryRow = Readonly<{
   type: "SALE" | "REFUND" | "CHARGEBACK"; chargeId: string; at: Date;
@@ -979,17 +980,27 @@ export class BillingRepository {
       SELECT CASE dated.kind WHEN 'SUCCEEDED' THEN 'SALE' WHEN 'REFUNDED' THEN 'REFUND' ELSE 'CHARGEBACK' END AS type,
         charge.charge_id, dated.money_at AS at, quote.tax_country, quote.tax_region, quote.tax_status,
         charge.net_micros, charge.tax_micros, charge.total_micros,
-        CASE dated.kind WHEN 'SUCCEEDED' THEN charge.total_micros WHEN 'REFUNDED' THEN dated.amount_micros
+        CASE dated.kind WHEN 'SUCCEEDED' THEN charge.total_micros
+          WHEN 'REFUNDED' THEN COALESCE(dashboard_note.total_micros, dated.amount_micros)
           ELSE COALESCE(dated.amount_micros, charge.total_micros) END AS amount_micros,
-        -- False only for P9c's dashboard refund recorded on the payment itself, whose amount is an upper bound.
-        -- IS NOT DISTINCT FROM keeps a NULL error code a plain false here, so the column is never NULL.
-        NOT (dated.kind = 'REFUNDED' AND dated.error_code IS NOT DISTINCT FROM 'PROVIDER_REFUND'
-          AND dated.refunds_transaction_id IS NULL) AS amount_known,
+        -- False only for P9c's dashboard refund recorded on the payment itself, whose amount is an upper bound, while
+        -- its credit note is not recorded. IS NOT DISTINCT FROM keeps a NULL error code a plain false here, so the
+        -- column is never NULL.
+        dashboard_note.invoice_id IS NOT NULL
+          OR NOT (dated.kind = 'REFUNDED' AND dated.error_code IS NOT DISTINCT FROM 'PROVIDER_REFUND'
+            AND dated.refunds_transaction_id IS NULL) AS amount_known,
         evidence.verdict
       FROM dated
       JOIN billing.charge AS charge ON charge.charge_id = dated.charge_id
       JOIN billing.quote AS quote ON quote.quote_id = charge.quote_id
       LEFT JOIN billing.location_evidence AS evidence ON evidence.charge_id = charge.charge_id
+      -- P4-K (P2-W12): that dashboard refund's credit note, recorded by the owner's command at the owner's amount. A
+      -- charge holds one sale refund and one credit note at most (0086's invoice_one_per_intent; P16b's ruling on
+      -- invoiceUnknownItems), so the charge's credit note is this refund's own; every other refund keeps its amount.
+      LEFT JOIN billing.invoice AS dashboard_note
+        ON dated.kind = 'REFUNDED' AND dated.error_code IS NOT DISTINCT FROM 'PROVIDER_REFUND'
+          AND dated.refunds_transaction_id IS NULL
+          AND dashboard_note.charge_id = dated.charge_id AND dashboard_note.kind = 'CREDIT_NOTE'
       WHERE dated.money_at >= $1 AND dated.money_at < $2
         -- Only that xMoney system's charges; the event inherits the charge's system through its foreign key.
         AND charge.xmoney_environment = $3

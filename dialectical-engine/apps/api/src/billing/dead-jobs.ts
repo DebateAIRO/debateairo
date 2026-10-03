@@ -53,11 +53,15 @@ export function unbackedDocumentCode(code: string): boolean {
  */
 export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: string; code: string }>): string {
   if (item.jobKind === "DASHBOARD_REFUND") {
-    // F5 (review M-2): say plainly what the command cannot settle. P9c queued no job for this refund, so
-    // `pnpm billing:invoice` has nothing to record it against (a job naming it can only be forged, and is refused).
+    // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): P9c queued no job for this refund, so the
+    // owner issues the credit note by hand and records it with its amount (`--amount`, at most what the payment held).
+    // One credit note per charge (0086's invoice_one_per_intent): the command refuses a second one.
     return "a refund made in the xMoney dashboard, whose amount only the dashboard shows: issue its credit note by hand"
-      + " in SmartBill (a Romanian sale) or Quaderno, and give its amount to the accountant; pnpm billing:invoice cannot"
-      + " record this credit note, because no job was queued for it, so the line stays on the list";
+      + " in SmartBill (a Romanian sale) or Quaderno, then record it with its amount: pnpm billing:invoice --charge"
+      + ` ${item.chargeId} --kind CREDIT_NOTE --record <series>-<number> (SmartBill) or <Quaderno id> --amount <the amount`
+      + " refunded, for example 12.10>, at most what the payment held; the line then leaves this list and the quarter's"
+      + " tax summary subtracts that amount; the command refuses a second credit note of one charge, so give that one to"
+      + " the accountant";
   }
   if (item.code === "CREDIT_NOTE_REFUND_MISSING") {
     return "no refund is recorded for this sale: nothing to issue or re-queue; tell whoever runs the server";
@@ -99,7 +103,8 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
       + ` line), then ${requeue}`;
   }
   if (item.code === "CREDIT_NOTE_MANUAL") {
-    // F5: a refund made in the dashboard of unknown amount has no job; its line is DASHBOARD_REFUND, above.
+    // F5: a refund made in the dashboard of unknown amount has no job; its line is DASHBOARD_REFUND, above (P4-K's
+    // `--amount` records its credit note).
     return `a credit note ${issuer} cannot make by itself (a partial refund, or a second refund of one charge): issue it`
       + ` by hand in ${issuer} and record it with ${record}; the command refuses a second credit note of one charge, so`
       + " give that one to the accountant";
