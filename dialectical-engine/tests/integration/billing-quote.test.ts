@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { BillingRepository, migrate } from "@debateai/db";
 import { computeWindows } from "@debateai/billing-core";
+import { TypedDomainError } from "@debateai/kernel";
 import { QuoteService, type QuoteInput } from "../../apps/api/src/billing/quote.js";
 import { openQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -108,6 +109,21 @@ describe("P8b the quote", () => {
     await expect(service().create(input(ownerRef))).rejects.toMatchObject({ status: 503, code: "TAX_SERVICE_UNAVAILABLE" });
     const rows = await database.pool.query("SELECT 1 FROM billing.quote WHERE owner_ref=$1", [ownerRef]);
     expect(rows.rowCount).toBe(0);
+    expect(audit).toEqual([{ event: "billing.quote.refused", code: "TAX_SERVICE_UNAVAILABLE" }]);
+  });
+
+  it("audits a quote the tax service refuses as that refusal, with its detail, and still answers the one 503 (P2-M27)", async () => {
+    // P4's client on a wrong or revoked Quaderno key: TAX_SERVICE_REFUSED with the detail QUADERNO_HTTP_401.
+    const refusing = {
+      quote: async (): Promise<never> => { throw new TypedDomainError("TAX_SERVICE_REFUSED", "QUADERNO_HTTP_401"); },
+      validateTaxId: (country: string, taxId: string) => tax.validateTaxId(country, taxId)
+    };
+    const quotes = new QuoteService({
+      repository, tax: refusing, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy, plans: testBillingPlans,
+      recordsKey: KEY, audit: (event, fields) => { audit.push({ event, ...fields }); }
+    });
+    await expect(quotes.create(input(randomUUID()))).rejects.toMatchObject({ status: 503, code: "TAX_SERVICE_UNAVAILABLE" });
+    expect(audit).toEqual([{ event: "billing.quote.refused", code: "TAX_SERVICE_REFUSED", reason: "QUADERNO_HTTP_401" }]);
   });
 
   it("refuses ALREADY_SUBSCRIBED while the owner has a live subscription", async () => {

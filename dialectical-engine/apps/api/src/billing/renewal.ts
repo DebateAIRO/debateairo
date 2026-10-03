@@ -12,6 +12,7 @@ import { XMoneyPaymentFailedError, type XMoneyClient } from "@debateai/payments-
 import type { BillingPlans, BillingPolicy, PlanId } from "@debateai/register";
 import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
+import { taxRefusalDetail } from "./quote.js";
 import { openQuoteLocation, sealQuoteLocation, type QuoteLocation } from "./records.js";
 import {
   dunningProgress, ordersHoldingCharge, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingMs,
@@ -137,11 +138,6 @@ export function codeOf(error: unknown): string | null {
 export function failureCode(error: unknown): string {
   const code = codeOf(error);
   return code !== null && /^[A-Z0-9][A-Z0-9_]{2,63}$/.test(code) ? code : "UNKNOWN";
-}
-
-/** P4's detail on a tax refusal (`QUADERNO_HTTP_401`, `QUADERNO_HTTP_422`, …), content-free; anything else is UNKNOWN. */
-function refusalDetail(error: unknown): string {
-  return error instanceof TypedDomainError && /^QUADERNO_[A-Z0-9_]{1,48}$/.test(error.message) ? error.message : "UNKNOWN";
 }
 
 /** Spec §2.5.5 and A2: our own scheduler charges the saved card of the managed order, once per period. */
@@ -443,7 +439,7 @@ export class RenewalService {
     const key = `${state.subscriptionId}:${periodStart.toISOString()}`;
     if (!this.taxRefusalsSeen.has(key)) {
       this.taxRefusalsSeen.add(key);
-      this.deps.audit("billing.renewal.tax_refused", { code: "TAX_SERVICE_REFUSED", reason: refusalDetail(error) });
+      this.deps.audit("billing.renewal.tax_refused", { code: "TAX_SERVICE_REFUSED", reason: taxRefusalDetail(error) });
     }
     await this.holdPending(state, periodStart, now, "TAX_SERVICE_REFUSED");
   }

@@ -107,6 +107,8 @@ describe("P22 the Billing runbook", () => {
       "| `\"event\":\"billing.outbox.alert_failed\"`, with `kind` and `code` |",
       "| `\"event\":\"billing.outbox.settle_failed\"`, with `kind`, `outcome` and `attempts` |",
       "| `\"event\":\"billing.xmoney.credentials_refused\"`, with `operation` |",
+      // P2-M27: a quote the tax service refuses is its own signal (a wrong Quaderno key), never read as an outage.
+      "| `\"event\":\"billing.quote.refused\"`, with `code` `TAX_SERVICE_REFUSED` and `reason` |",
       "| `\"event\":\"billing.invoice.unknown\"`, with `issuer`, `kind` and `code` |",
       "| `\"event\":\"billing.payment.mismatch\"`, with `code` or `chargeKind` |",
       "this one is asked again on its own every hour", "A list xMoney refuses never causes it",
