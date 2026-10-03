@@ -102,6 +102,9 @@ describe("P22 the Billing runbook", () => {
       "billing:invoice --charge \"$CHARGE_REF\" --kind \"$KIND\" --requeue --confirm-not-issued",
       "that the document was NOT issued", "CREDIT_NOTE_REFUND_MISSING",
       "The changed amount is never charged until that notice has gone out",
+      // W12 fix F5: a dashboard refund's line is one the command cannot settle, said where the refusal is explained.
+      "A `DASHBOARD_REFUND` line (a refund made in the xMoney dashboard, amount unknown) has no\n  job, so this command"
+        + " cannot settle it",
       // §14.2 (ruling Q-12): the records key is escrowed with the other five secrets.
       "sixth secret", "RESTORE_DRILL_RECORDS_KEY bytes=32",
       // §14.7 (ruling Q-3): the Terms archive M1 attaches from is never pruned.
@@ -115,6 +118,12 @@ describe("P22 the Billing runbook", () => {
     ]) {
       expect(billing, needle).toContain(needle);
     }
+    // W12 fix F5: every code pnpm billing:invoice can print is explained, with what to do.
+    const invoiceCli = read("apps/api/src/billing/invoice-cli.ts");
+    const printed = [...new Set(invoiceCli.match(/BILLING_INVOICE_[A-Z_]+/gu) ?? [])];
+    expect(printed.length).toBeGreaterThanOrEqual(15);
+    for (const code of printed) expect(billing, code).toContain(`- \`${code}\``);
+    expect(billing).not.toContain("(no such line for\nthat charge)");
     // W9 fix round 1 (F1): a dead refund is never settled with "at least" its amount.
     expect(billing).not.toContain("Refund at least");
     // R-7: the public origin is the existing PUBLIC_APP_URL; no second setting names it.

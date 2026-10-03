@@ -135,6 +135,12 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).toContain(`--kind CREDIT_NOTE --record <series>-<number>`);
     expect(say("QUADERNO_RECORD_SALE", "INVOICE_UNKNOWN")).toContain("--record <Quaderno id>");
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("only the dashboard shows");
+    // F5 (review M-2): what the command cannot settle is said plainly, and the dashboard case is no CREDIT_NOTE_MANUAL job.
+    expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("pnpm billing:invoice cannot record this credit note,"
+      + " because no job was queued for it, so the line stays on the list");
+    expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).not.toContain("--record");
+    expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).toContain("(a partial refund, or a second refund of one charge)");
+    expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("dashboard");
     // A SmartBill job is re-queued only after the owner checked SmartBill: it has no lookup (X1 row 8).
     expect(say("SMARTBILL_INVOICE", "OUTBOX_HANDLER_FAILED")).toContain("--requeue --confirm-not-issued");
     expect(say("SMARTBILL_INVOICE", "OUTBOX_HANDLER_FAILED")).toContain("checked in SmartBill that nothing was issued");

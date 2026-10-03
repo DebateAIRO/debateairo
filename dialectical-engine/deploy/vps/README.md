@@ -2364,11 +2364,37 @@ read -r CHARGE_REF && read -r KIND && systemd-run --pipe --wait --collect --uid=
 ```
 
 It prints one line saying what it recorded or queued; a re-queued job that fails again is listed and emailed again.
-A refusal is one code and nothing is written: `BILLING_INVOICE_ALREADY_RECORDED` (the charge already has that
-document), `BILLING_INVOICE_JOB_OPEN` (the job is already queued), `BILLING_INVOICE_NOTHING_LISTED` (no such line for
-that charge), `BILLING_INVOICE_NOTHING_TO_ISSUE`, `BILLING_INVOICE_CONFIRM_NOT_ISSUED_REQUIRED`,
-`BILLING_INVOICE_ORIGINAL_MISSING` (settle the invoice first) or `BILLING_INVOICE_DOCUMENT_TAKEN` (that document is
-already recorded for another charge).
+A refusal is one code and nothing is written. What each code means, and what to do:
+
+- `BILLING_INVOICE_USAGE`: the command line is not one of the forms above (a missing or repeated value, a kind other
+  than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither). Run it again as shown.
+- `BILLING_INVOICE_CHARGE_UNKNOWN`: no charge has that reference. Paste it again exactly as the summary prints it.
+- `BILLING_INVOICE_OTHER_XMONEY_SYSTEM`: the charge was paid in the other xMoney system (sandbox or live) than the one
+  this host's `XMONEY_API_BASE_URL` names. It owes no document here: nothing to do on this host.
+- `BILLING_INVOICE_CHARGE_NOT_PAID`: our records hold no payment for that charge, so no document is owed. If the
+  xMoney dashboard shows it paid, tell whoever runs the server.
+- `BILLING_INVOICE_ALREADY_RECORDED`: the charge already has that document. Nothing more to do.
+- `BILLING_INVOICE_JOB_OPEN`: the job is already queued. Wait for it; if it fails again, it is listed and emailed again.
+- `BILLING_INVOICE_NOTHING_LISTED`: no dead job of that kind is listed for that charge. Check the charge and the kind
+  against the summary's line. A `DASHBOARD_REFUND` line (a refund made in the xMoney dashboard, amount unknown) has no
+  job, so this command cannot settle it: issue its credit note by hand in SmartBill or Quaderno and give its amount to
+  your accountant; the line stays on the list.
+- `BILLING_INVOICE_NOTHING_TO_ISSUE`: our records do not back the job (no refund is recorded for the sale, the job is
+  malformed, or no payment is recorded), so there is no document to make. Tell whoever runs the server.
+- `BILLING_INVOICE_CONFIRM_NOT_ISSUED_REQUIRED`: a SmartBill job is re-queued only with `--confirm-not-issued`. Check in
+  SmartBill first; if the document is there, record it with `--record` instead.
+- `BILLING_INVOICE_ORIGINAL_MISSING`: a credit note needs its invoice recorded first. Settle the invoice's own line,
+  then the credit note.
+- `BILLING_INVOICE_REFERENCE_INVALID`: the document does not fit the issuer. SmartBill takes `<series>-<number>` (for
+  example `DBAI-0042`), Quaderno its document id.
+- `BILLING_INVOICE_DOCUMENT_TAKEN`: that document is already recorded for another charge. Check the number in SmartBill
+  or Quaderno and type the right one.
+- `BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`: the credit note would be for a refund made in the xMoney dashboard whose
+  amount our records do not hold. Issue it by hand, give its amount to your accountant, and tell whoever runs the
+  server: the site queues no job for such a refund.
+- `BILLING_INVOICE_DATA_MISSING`: a paid charge without its quote or customer. Tell whoever runs the server.
+- `BILLING_INVOICE_FAILED`, or any other code: the command could not finish (for example, the database did not
+  answer) and wrote nothing. Run it again later; if it repeats, tell whoever runs the server and give the code.
 
 An email that never went out is not sent again by itself, with one exception: the notice of a changed renewal amount
 (M3). The changed amount is never charged until that notice has gone out; the renewal waits and sends it again when

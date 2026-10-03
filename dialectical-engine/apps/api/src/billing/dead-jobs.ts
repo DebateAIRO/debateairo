@@ -53,8 +53,11 @@ export function unbackedDocumentCode(code: string): boolean {
  */
 export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: string; code: string }>): string {
   if (item.jobKind === "DASHBOARD_REFUND") {
+    // F5 (review M-2): say plainly what the command cannot settle. P9c queued no job for this refund, so
+    // `pnpm billing:invoice` has nothing to record it against (a job naming it can only be forged, and is refused).
     return "a refund made in the xMoney dashboard, whose amount only the dashboard shows: issue its credit note by hand"
-      + " in SmartBill (a Romanian sale) or Quaderno, and give its amount to the accountant";
+      + " in SmartBill (a Romanian sale) or Quaderno, and give its amount to the accountant; pnpm billing:invoice cannot"
+      + " record this credit note, because no job was queued for it, so the line stays on the list";
   }
   if (item.code === "CREDIT_NOTE_REFUND_MISSING") {
     return "no refund is recorded for this sale: nothing to issue or re-queue; tell whoever runs the server";
@@ -96,9 +99,10 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
       + ` line), then ${requeue}`;
   }
   if (item.code === "CREDIT_NOTE_MANUAL") {
-    return `a credit note ${issuer} cannot make by itself (a partial refund, a second refund of one charge, or a refund`
-      + ` made in the dashboard): issue it by hand in ${issuer} and record it with ${record}; the command refuses a`
-      + " second credit note of one charge, so give that one to the accountant";
+    // F5: a refund made in the dashboard of unknown amount has no job; its line is DASHBOARD_REFUND, above.
+    return `a credit note ${issuer} cannot make by itself (a partial refund, or a second refund of one charge): issue it`
+      + ` by hand in ${issuer} and record it with ${record}; the command refuses a second credit note of one charge, so`
+      + " give that one to the accountant";
   }
   return `the job failed on our side: tell whoever runs the server; once the cause is fixed, ${requeue}; ${byHand}`;
 }
