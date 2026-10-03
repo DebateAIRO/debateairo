@@ -94,6 +94,28 @@ describe("P4 — the connector recorder and its scrubber", () => {
     expect(scrubConnectorValue(once, [])).toEqual(once);
   });
 
+  it("replaces every document link, whose path or query carries the document's access token (P2-M31)", () => {
+    const token = "Zx9tok3nSECRET";
+    const links = {
+      // SmartBill (no sandbox: its recording is a real invoice of the company).
+      url: `https://ws.smartbill.ro/invoice/view?token=${token}`,
+      documentUrl: `https://cloud.smartbill.ro/core/factura/${token}`,
+      documentViewUrl: `https://cloud.smartbill.ro/view/${token}?h=1`,
+      // Quaderno.
+      permalink: `https://owner-account.sandbox-quadernoapp.com/invoice/${token}`,
+      pdf: `https://owner-account.sandbox-quadernoapp.com/invoice/${token}.pdf`,
+      number: "0042", status: "ok"
+    };
+    const once = scrubConnectorValue({ data: [links] }, []);
+    expect(JSON.stringify(once)).not.toContain(token);
+    expect(once).toEqual({ data: [{
+      url: "https://document.test/SCRUBBED", documentUrl: "https://document.test/SCRUBBED",
+      documentViewUrl: "https://document.test/SCRUBBED", permalink: "https://document.test/SCRUBBED",
+      pdf: "https://document.test/SCRUBBED", number: "0042", status: "ok"
+    }] });
+    expect(scrubConnectorValue(once, [])).toEqual(once);
+  });
+
   it("erases a secret inside a longer text and a VAT id without its country letters, and a second pass changes nothing", () => {
     const echoed = {
       notes: "Reverse charge: customer VAT number DE811569869", tax_id: "811569869",
