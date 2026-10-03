@@ -29666,7 +29666,7 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    `… refund --transaction <transaction id> --order <order id> --as extra --amount 0.01`
    `… fetch --what transaction-list --date-type refund`
    `… fetch --what transaction-list --date-type charge-back`
-   Write down the four printed lines. They answer: after each partial refund, does the payment stay `complete-ok` or
+   Write down the printed lines. They answer: after each partial refund, does the payment stay `complete-ok` or
    already say `refund-ok`, and does its `amount` stay `1.00` or shrink (`amount=…`)? Is there a separate refund
    transaction (`linked=yes`)? Does the refund listing show a row for each partial refund, and after how long
    (`refundRows=1@35s` means one linked row after 35 seconds; `refundRows=0@timeout-600s` means none came in ten

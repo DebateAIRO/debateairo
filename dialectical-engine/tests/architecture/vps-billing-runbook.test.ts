@@ -81,8 +81,8 @@ describe("P22 the Billing runbook", () => {
       "When xMoney or the tax service is down at a renewal", "retried quietly for up to 3 days",
       // §14.8 (P11a judge, carried): the renewal pass's two journal signals, and what each means.
       "\"event\":\"billing.renewal.report\"", "taxRefused", "[BILLING_RENEWAL_PENDING]",
-      // §14.8 (W13, P2-I18): every billing failure signal is in the journal table, each with what to do; the three
-      // daily listings fail on their own; a CUSTOMER_MISMATCH reaches the operator with the hand refund.
+      // §14.8 (W13, P2-I18): the brief's eight signals and the listing line are in the journal table, each with what to
+      // do; the three daily listings fail on their own; a CUSTOMER_MISMATCH reaches the operator with the hand refund.
       "What billing writes to the API's journal",
       "| `\"event\":\"billing.reconcile.listing_failed\"`, with `listing` and `code` |",
       "| `[BILLING_RECONCILIATION_PENDING]` (a bare marker) |", "| `[BILLING_OUTBOX_PENDING]` (a bare marker) |",
@@ -96,6 +96,13 @@ describe("P22 the Billing runbook", () => {
       "this one is asked again on its own every hour", "A list xMoney refuses never causes it",
       "`REFUND_NOT_REQUESTED` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
       "WHERE o.outcome = 'MISMATCH'", "refund it there by hand",
+      // W13 fix round 1: the alert promise is exact (O3 never for a dead O3; O2 comes from the refund itself, not for
+      // REFUND_PAYLOAD_INVALID or a refund the queue stopped), a refused key keeps a renewal only for its window, any
+      // other listing code is reported, and only this host's xMoney system's mismatches are acted on.
+      "except when the email that died is O3 itself", "(`REFUND_PAYLOAD_INVALID`)", "usually `OUTBOX_HANDLER_FAILED`",
+      "lists every dead refund job whatever its code", "for up to 3 days past its due time (a payment retry: 24 hours)",
+      "Fixing the key within that time", "Any other code (for example `UNKNOWN`",
+      "SELECT n.received_at, n.xmoney_environment,", "Act only on rows of this host's xMoney system",
       // §14.8 (ruling Q-5): a refund that could not be completed reaches the owner at once.
       "A refund that could not be completed", "O2",
       // §14.8 (W9, P2-I11, P2-M8): the acknowledgement of receipt, the owner's alert for a withdrawal settled by hand,
@@ -298,6 +305,8 @@ describe("P22 the Billing runbook", () => {
       "**Before step 1: read the journal of the first start with billing on.**",
       "_SYSTEMD_INVOCATION_ID=\"$(systemctl show --property=InvocationID --value debateai-api)\"",
       "run the journal command from **Before step 1** again; it should print nothing",
+      // W13 fix round 1: the step says what the filter really prints.
+      "the lines that say a list failed or our key was refused, and billing's bracketed\nmarkers", "Any other line it prints:",
       // W2 (P2-I2, P2-M39): the dispute case is part of the owner's proof, run after the whole-flow suite.
       "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
       "a card dispute found by the daily money check: the plan paused once, with one email, counted",
