@@ -1052,7 +1052,8 @@ describe("A19 · the model scorecard, published beside the register file", () =>
 describe("A19 fix round 1 · a field the scorecard format does not define is never sealed", () => {
   const SECRET = "private-evaluator-note-must-never-print";
   /** Secret-shaped, and entirely inside the printable code alphabet, so no sanitising could hide it. */
-  const SECRET_KEY = "sk-live-4f9c2a7e1b8d6f3a0c5e9b2d7a4f1c8e";
+  // Built from pieces so the secret scan does not read this made-up value as a key (owner's ruling, PR #70).
+  const SECRET_KEY = ["sk-live-", "4f9c2a7e1b8d6f3a", "0c5e9b2d7a4f1c8e"].join("");
   type Mutable = Record<string, any>;
 
   async function codeAndText(value: unknown): Promise<{ code: string; text: string }> {
