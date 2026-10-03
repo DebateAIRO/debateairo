@@ -29686,21 +29686,27 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    It prints `XMONEY_RELEASE=<status before>-><HTTP status>-><status after>`, e.g. `complete-ok->200->void-ok`. Then
    rebill the `auth` payment's ORDER once, the way every renewal after a card change will:
    `… rebill --order <its order id> --customer <its customer id> --amount 1.00 --as auth-order`
-   and write down the printed line (`NO_TRANSACTION` means a changed card could never be charged again — tell the
-   builders at once; it changes A12's design).
+   and write down the printed line, e.g. `XMONEY_REBILL=auth-order:200:complete-ok:transaction=<the rebill's
+   transaction id>` (`NO_TRANSACTION` means a changed card could never be charged again — tell the builders at once;
+   it changes A12's design).
    **Did that rebill take the money? (W14, P2-I3; required.)** A rebill that only holds the money reads
    `complete-ok` exactly like one that took it, so only its release tells them apart. First open the rebill's
    transaction in the stage dashboard and write down what it shows about capture (a "captured" or "authorized"
-   status, a capture column or date, or nothing of the kind). Then release it as a whole:
-   `… release --transaction <the rebill's transaction id> --as auth-order-rebill`
+   status, a capture column or date, or nothing of the kind). Then release it as a whole, giving exactly the
+   transaction id the `rebill --as auth-order` line printed after `transaction=` (never the renewal rebill of item 6,
+   the refunded payment of item 7 or the card check's hold above: they are 1.00 payments too, and their release
+   answers nothing about this rebill):
+   `… release --transaction <the id after transaction= in the auth-order rebill's line> --as auth-order-rebill`
    It prints `XMONEY_RELEASE=auth-order-rebill:<status before>-><HTTP status>-><status after>:capture=<answer>`,
-   e.g. `complete-ok->200->refund-ok:capture=captured`; write the line down. `capture=captured` (the status after is
-   `refund-ok`: the rebill took the money, which came back as a refund) is what A12 assumes. `capture=hold` (`void-ok`:
-   only a hold, now released) means that every renewal and upgrade after a card change would be renewed, invoiced and
-   receipted but never collected: tell the builders at once, because A12 changes before billing is on (go-live row
-   14). `capture=unknown` (any other status, or a refused release) settles nothing: send the builders the line. Keep
-   the `transaction-rebill-auth-order-released-….json` it wrote either way: it is a required fixture, and P3b's
-   recorded suite fails unless it reads `refund-ok`.
+   e.g. `complete-ok->200->refund-ok:capture=captured`; write the line down. The answer is `captured` or `hold` only
+   when the status before was `complete-ok` and xMoney accepted the release (an HTTP status from 200 to 299).
+   `capture=captured` (the status after is `refund-ok`: the rebill took the money, which came back as a refund) is
+   what A12 assumes. `capture=hold` (`void-ok`: only a hold, now released) means that every renewal and upgrade after
+   a card change would be renewed, invoiced and receipted but never collected: tell the builders at once, because A12
+   changes before billing is on (go-live row 14). `capture=unknown` (any other status after, a status before other
+   than `complete-ok`, or a refused release) settles nothing: send the builders the line. Keep the
+   `transaction-rebill-auth-order-released-….json` it wrote either way: it is a required fixture, and P3b's recorded
+   suite fails unless it reads `refund-ok` and names the same transaction as `transaction-rebill-auth-order-….json`.
    **xMoney's own emails (W8, P2-I12; required).** Give `--email` an inbox you can read in item 2 and item 3. Through
    items 3 to 8, write down every email xMoney itself sends to that address: after which item (the payments of item 3,
    the rebills of item 6, the refunds of item 7, the release of item 8), its subject, and the address it was sent

@@ -263,6 +263,19 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
   // that is never collected. X0 releases that rebill: `refund-ok` means it took the money, `void-ok` a hold. Any
   // answer but CAPTURED keeps billing off until A12 changes (for example, a card check paid in full, then refunded) and
   // this expectation changes with it (go-live row 14).
+  // W14 fix 1 (P2-I3): the release the A12 answer below reads must be of the auth-order rebill itself. The status after
+  // a release of any other 1.00 payment of the run (item 6's renewal rebill, the refunded frictionless payment, the card
+  // check's voided hold) would answer a question nobody asked; item 6's renewal rebill would even read as a capture.
+  // `rebill --as auth-order` prints the transaction it made, item 8 releases exactly that one, and one scrub run keeps
+  // the two ids equal, as it does for the order and the customer above.
+  it("the released auth-order rebill is the rebill `rebill --as auth-order` made (W14, P2-I3)", () => {
+    const rebilled = dataOf("transaction-rebill-auth-order").id;
+    expect(rebilled === undefined || rebilled === null, "the auth-order rebill names its transaction").toBe(false);
+    expect(dataOf("transaction-rebill-auth-order-released").id,
+      "the release must be of the auth-order rebill: run `release --as auth-order-rebill` with the transaction id `rebill --as auth-order` printed")
+      .toBe(rebilled);
+  });
+
   it("A12's card check leaves an order whose rebills take the money (W14, P2-I3)", () => {
     const status = String(recordedStatus("transaction-rebill-auth-order-released"));
     expect(authOrderRebillAnswer(status), `a rebill of the auth-mode order released as ${status}: A12 changes before billing is on`)

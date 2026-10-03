@@ -7,7 +7,9 @@ import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { XMoneyClient, signOrderPayload } from "@debateai/payments-xmoney";
 import { XMONEY_REQUIRED_FIXTURE_KINDS } from "../../tools/billing/scrub-xmoney-fixture.js";
-import { authOrderRebillAnswer, releaseCapture } from "../../tools/billing/xmoney-sandbox.js";
+import {
+  authOrderRebillAnswer, authOrderRebillReleaseAnswer, rebillLine, releaseCapture, releaseLine
+} from "../../tools/billing/xmoney-sandbox.js";
 import { startFakeXMoney, type FakeXMoneyOptions } from "../support/fake-xmoney.js";
 
 describe("W14 X0 (h) records whether a rebill of the card check's order captures money (P2-I3)", () => {
@@ -29,6 +31,49 @@ describe("W14 X0 (h) records whether a rebill of the card check's order captures
       expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[], kind).toContain(kind);
     }
     expect(() => releaseCapture("renewal")).toThrow("XMONEY_ARGUMENT_REQUIRED:--as");
+  });
+
+  // W14 fix 1: X0 item 8 releases exactly the transaction `rebill --as auth-order` printed, never item 6's renewal
+  // rebill (also a captured 1.00 complete-ok rebill) or another 1.00 payment of the run.
+  it("names the auth-order rebill's transaction in the line it prints, so the owner releases exactly that one", () => {
+    expect(rebillLine("auth-order", 200, "complete-ok", "4242"))
+      .toBe("XMONEY_REBILL=auth-order:200:complete-ok:transaction=4242");
+    // The other rebills keep their lines: nothing in X0 releases them.
+    expect(rebillLine("renewal", 200, "complete-ok", "4243")).toBe("XMONEY_REBILL=renewal:200:complete-ok");
+    expect(rebillLine("declined", 402, "complete-failed", "4244")).toBe("XMONEY_REBILL=declined:402:complete-failed");
+  });
+
+  it("answers captured or hold only for an accepted release of a payment that read complete-ok before it", () => {
+    expect(releaseLine("auth-order-rebill", "complete-ok", 200, "refund-ok"))
+      .toBe("XMONEY_RELEASE=auth-order-rebill:complete-ok->200->refund-ok:capture=captured");
+    expect(releaseLine("auth-order-rebill", "complete-ok", 200, "void-ok"))
+      .toBe("XMONEY_RELEASE=auth-order-rebill:complete-ok->200->void-ok:capture=hold");
+    expect(authOrderRebillReleaseAnswer({ before: "complete-ok", httpStatus: 204, after: "refund-ok" })).toBe("CAPTURED");
+    // The card check's line is unchanged.
+    expect(releaseLine("card-check", "complete-ok", 200, "void-ok")).toBe("XMONEY_RELEASE=complete-ok->200->void-ok");
+  });
+
+  it("reads a refused release as unknown, whatever the status after says", () => {
+    // A second release of the card check's voided hold, or of the refunded frictionless payment: xMoney refuses it and
+    // the status after is the old one. It must never read as a hold or a capture.
+    expect(releaseLine("auth-order-rebill", "void-ok", 400, "void-ok"))
+      .toBe("XMONEY_RELEASE=auth-order-rebill:void-ok->400->void-ok:capture=unknown");
+    expect(releaseLine("auth-order-rebill", "refund-ok", 400, "refund-ok"))
+      .toBe("XMONEY_RELEASE=auth-order-rebill:refund-ok->400->refund-ok:capture=unknown");
+    for (const httpStatus of [199, 300, 400, 404, 409, 500, 502]) {
+      for (const after of ["refund-ok", "void-ok"]) {
+        expect(authOrderRebillReleaseAnswer({ before: "complete-ok", httpStatus, after }), `${httpStatus} ${after}`).toBe("UNKNOWN");
+      }
+    }
+  });
+
+  it("reads a release of a payment that was not complete-ok before it as unknown, even when xMoney accepted it", () => {
+    for (const before of ["void-ok", "refund-ok", "in-progress", "complete-failed", "cancel-ok", "charge-back", "NONE", ""]) {
+      for (const after of ["refund-ok", "void-ok"]) {
+        expect(authOrderRebillReleaseAnswer({ before, httpStatus: 200, after }), `${before} -> ${after}`).toBe("UNKNOWN");
+        expect(releaseLine("auth-order-rebill", before, 200, after), `${before} -> ${after}`).toMatch(/:capture=unknown$/u);
+      }
+    }
   });
 });
 

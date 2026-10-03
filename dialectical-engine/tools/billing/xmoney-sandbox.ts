@@ -342,6 +342,40 @@ export function authOrderRebillAnswer(statusAfterRelease: string): "CAPTURED" | 
   return "UNKNOWN";
 }
 
+/**
+ * W14 fix 1 (P2-I3): the answer `release --as auth-order-rebill` prints. Only a release of a payment that read
+ * `complete-ok` before it, and that xMoney accepted (HTTP 2xx), can say what the rebill did. A refused release, or a
+ * payment already refunded or voided (another payment of the run, released by mistake), settles nothing and reads
+ * UNKNOWN, as X0 item 8 says for a refused release.
+ */
+export function authOrderRebillReleaseAnswer(
+  release: Readonly<{ before: string; httpStatus: number; after: string }>
+): "CAPTURED" | "HOLD" | "UNKNOWN" {
+  if (release.before !== "complete-ok" || release.httpStatus < 200 || release.httpStatus > 299) return "UNKNOWN";
+  return authOrderRebillAnswer(release.after);
+}
+
+/**
+ * The line `release` prints. `card-check` keeps its line; `auth-order-rebill` adds the answer, read from the status
+ * before, the HTTP status and the status after (`authOrderRebillReleaseAnswer`).
+ */
+export function releaseLine(step: string, before: string, httpStatus: number, after: string): string {
+  const line = `${before}->${httpStatus}->${after}`;
+  if (step === "card-check") return `XMONEY_RELEASE=${line}`;
+  const answer = authOrderRebillReleaseAnswer({ before, httpStatus, after });
+  return `XMONEY_RELEASE=${step}:${line}:capture=${answer.toLowerCase()}`;
+}
+
+/**
+ * W14 fix 1 (P2-I3): the line `rebill` prints once its transaction is read. `--as auth-order` also names the rebill's
+ * transaction id, so X0 item 8 releases exactly that payment, and never the renewal rebill of item 6 or another 1.00
+ * payment of the run.
+ */
+export function rebillLine(step: string, httpStatus: number, status: string, transactionId: string): string {
+  const line = `XMONEY_REBILL=${step}:${httpStatus}:${status}`;
+  return step === "auth-order" ? `${line}:transaction=${transactionId}` : line;
+}
+
 const statusOf = (body: unknown): string => String(dataOf(body)?.transactionStatus ?? "NONE");
 const amountOf = (body: unknown): string => String(dataOf(body)?.amount ?? "NONE");
 
@@ -451,7 +485,7 @@ async function main(argv: readonly string[]): Promise<void> {
       }
       const after = await stageRequest(key, "GET", `/transaction/${encodeURIComponent(String(transactionId))}`);
       capture(captureDir, transactionKind, after.body);
-      console.log(`XMONEY_REBILL=${step}:${reply.httpStatus}:${statusOf(after.body)}`);
+      console.log(rebillLine(step, reply.httpStatus, statusOf(after.body), String(transactionId)));
       return;
     }
     if (command === "refund") {
@@ -520,12 +554,7 @@ async function main(argv: readonly string[]): Promise<void> {
       }));
       const after = await stageRequest(key, "GET", path);
       capture(captureDir, kinds.after, after.body);
-      const line = `${statusOf(before.body)}->${reply.httpStatus}->${statusOf(after.body)}`;
-      if (step === "card-check") {
-        console.log(`XMONEY_RELEASE=${line}`);
-      } else {
-        console.log(`XMONEY_RELEASE=${step}:${line}:capture=${authOrderRebillAnswer(statusOf(after.body)).toLowerCase()}`);
-      }
+      console.log(releaseLine(step, statusOf(before.body), reply.httpStatus, statusOf(after.body)));
       return;
     }
     if (command === "serve") {
