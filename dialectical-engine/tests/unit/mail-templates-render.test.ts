@@ -35,6 +35,8 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   withdrawalDays: "14",
   canUndo: "true",
   notRequested: "true",
+  bankDeclined: "true",
+  endedPlan: "PRO",
   invoiceNumber: "DBAI 0042",
   quarter: "2026-Q4",
   summaryText: "RO  net 100.00  tax 21.00\nDE  net 50.00  tax 9.50",
@@ -147,6 +149,44 @@ describe("P17 renderMail", () => {
     expect(codeOf(() => renderMail("M7", "en", withoutFlag))).toBe("MAIL_TEMPLATE_PARAM_MISSING");
   });
 
+  it("opens M5A–C with a sentence true in every case, and names the bank only when the bank declined (W10, P2-I21)", () => {
+    const first = "We couldn't take this month's payment for your Plus plan. You keep your plan while we try again.";
+    for (const id of ["M5A", "M5B", "M5C"] as const) {
+      // An outage past Q-1's 72 hours, our own refused key, an unknown outcome or a tax service that stayed down: no
+      // bank was asked, so no sentence blames one.
+      const ours = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "false" }).text;
+      expect(ours, id).toContain(`Hello,\n\n${first}\n\n`);
+      expect(ours, id).not.toMatch(/bank/iu);
+      // PAYMENT_DECLINED: the same first sentence, then the bank's refusal.
+      const declined = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "true" }).text;
+      expect(declined, id).toContain(`Hello,\n\n${first}\n\nYour bank refused the payment.\n\n`);
+      expect(MAIL_TEMPLATES[id].params.bankDeclined, id).toBe("flag");
+      const { bankDeclined: _flag, ...withoutFlag } = paramsFor(id);
+      expect(codeOf(() => renderMail(id, "en", withoutFlag)), id).toBe("MAIL_TEMPLATE_PARAM_MISSING");
+    }
+    // In every locale the bank's refusal is a sentence of its own, never folded into the first one.
+    const catalogues = loadMailCatalogues();
+    for (const locale of MAIL_LOCALES) {
+      const catalogue = catalogues[locale];
+      expect(catalogue["mail.M5.refused"], locale).toBeUndefined();
+      expect(catalogue["mail.M5.notTaken"], locale).toBeDefined();
+      expect(catalogue["mail.M5.notTaken"], locale).not.toContain(catalogue["mail.M5.bankRefused"]!);
+    }
+  });
+
+  it("says in M11 that the plan ended only when a refused renewal or upgrade ended it (W10, P2-M9)", () => {
+    const refunded = "We can't accept cards issued in that card's country, so the $12.10 taken or held on it goes back to your card in full.";
+    const ended = renderMail("M11", "en", { refundAmount: "12.10", endedPlan: "PRO" }).text;
+    expect(ended).toContain(
+      `${refunded}\n\nBecause of this, your Pro plan has ended and your account is now on the Free plan. Your debates are kept.`
+    );
+    // A checkout's payment (its plan never started) and an older queued M11 carry no endedPlan: the email as before.
+    const checkout = renderMail("M11", "en", { refundAmount: "12.10" }).text;
+    expect(checkout).toContain(refunded);
+    expect(checkout).not.toMatch(/ended|Free/u);
+    expect(MAIL_TEMPLATES.M11.optional).toEqual({ endedPlan: "plan" });
+  });
+
   it("says a withdrawal with nothing due back refunded nothing, and never shows $0.00 as a refund", () => {
     expect(renderMail("M8", "en", paramsFor("M8")).text).toContain("we refunded $12.10 to your card");
     const nothing = renderMail("M8", "en", { ...paramsFor("M8"), refundAmount: "0.00" }).text;
@@ -175,7 +215,7 @@ describe("P17 renderMail", () => {
     expect([...mailAttachmentFactsOf([{ filename: TERMS_ATTACHMENT_FILENAME, contentType: "application/pdf" }])]).toEqual(["INVOICE_PDF"]);
   });
 
-  it("M11 never names a plan or the Free plan (a refused card change keeps the paid plan), and M11_DUPLICATE keeps its own subject", () => {
+  it("M11's subject and refund sentence never name a plan or the Free plan (a checkout's plan never started), and M11_DUPLICATE keeps its own subject", () => {
     const catalogues = loadMailCatalogues();
     for (const locale of MAIL_LOCALES) {
       const catalogue = catalogues[locale];

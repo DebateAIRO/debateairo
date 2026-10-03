@@ -476,7 +476,7 @@ export class RefundDesk {
   private async followUp(intent: RefundIntent): Promise<FollowUp> {
     switch (intent.reason) {
       case "CARD_COUNTRY_BLOCKED":
-        return this.mail(intent, "M11", intent.chargeId);
+        return this.mail(intent, "M11", intent.chargeId, await this.planEndedByRefusal(intent));
       case "ALREADY_SUBSCRIBED":
       case "SUBSCRIPTION_ENDED":
         return this.mail(intent, "M11_DUPLICATE", intent.chargeId);
@@ -499,13 +499,34 @@ export class RefundDesk {
     }
   }
 
-  private async mail(intent: RefundIntent, template: BillingMailTemplateId, dedupeRef: string): Promise<FollowUp> {
+  /**
+   * W10 (P2-M9): the plan a refused renewal or upgrade payment ended. VERIFY_PAYMENT's `endRefusedPayment` ends a live
+   * plan paid with a card from an always-blocked country at once (ENDED, cause CANCEL, reason CARD_COUNTRY_BLOCKED) in
+   * the transaction that records this payment's SUCCEEDED and requests this refund, both at that transaction's
+   * instant; so an ENDED of that cause at the payment's own instant is the end this refusal caused, and M11 then says
+   * the plan ended. A checkout's payment (INITIAL, its plan never started), a payment on a plan that had already
+   * ended, and any other refusal of the same plan name none.
+   */
+  private async planEndedByRefusal(intent: RefundIntent): Promise<string | null> {
+    const charge = await this.deps.repository.charge(intent.chargeId);
+    if (charge === null || (charge.kind !== "RENEWAL" && charge.kind !== "UPGRADE")) return null;
+    const paidAt = charge.events.find((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === intent.transactionId)?.at;
+    if (paidAt === undefined) return null;
+    const ended = (await this.deps.repository.subscriptionEvents(charge.subscriptionId)).find((event) =>
+      event.kind === "ENDED" && event.data.cause === "CANCEL" && event.data.reason === "CARD_COUNTRY_BLOCKED"
+      && event.at.getTime() === paidAt.getTime());
+    return ended?.planId ?? null;
+  }
+
+  private async mail(
+    intent: RefundIntent, template: BillingMailTemplateId, dedupeRef: string, endedPlan: string | null = null
+  ): Promise<FollowUp> {
     const customer = await this.deps.repository.customerByOwner(intent.ownerRef);
     if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a refund without its customer");
+    const params = { refundAmount: microsToDecimal(intent.amountMicros), ...(endedPlan === null ? {} : { endedPlan }) };
     return async (client, at) => {
       await enqueueEmail(this.deps.repository, client, {
-        template, recipient: { kind: "CUSTOMER", customerId: customer.customerId }, dedupeRef,
-        params: { refundAmount: microsToDecimal(intent.amountMicros) }, notBefore: at
+        template, recipient: { kind: "CUSTOMER", customerId: customer.customerId }, dedupeRef, params, notBefore: at
       });
     };
   }

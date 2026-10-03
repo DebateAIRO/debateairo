@@ -20,6 +20,12 @@ const renewalCharges = async (subscriptionId: string) =>
   (await h.repository.chargesForSubscription(subscriptionId)).filter((charge) => charge.kind === "RENEWAL");
 /** Q-1: the M5 emails queued for a charge (none may go out while an outage is waited out). */
 const m5Refs = async (chargeId: string) => (await h.outboxRows(chargeId)).map((row) => row.ref).filter((ref) => ref.startsWith("M5"));
+/**
+ * W10 (P2-I21): one param of the queued EMAIL job `jobRef`. M5's `bankDeclined` is "true" only for PAYMENT_DECLINED:
+ * no other failed attempt asked a bank, so its email never says one refused.
+ */
+const emailParam = async (jobRef: string, name: string) =>
+  (await h.outboxRows(jobRef)).find((row) => row.kind === "EMAIL" && row.ref === jobRef)?.payload[`param.${name}`];
 const subscriptionKinds = async (subscriptionId: string) =>
   (await h.repository.subscriptionEvents(subscriptionId)).map((event) => event.kind);
 /** Rebills of this subscription's own order: earlier tests' subscriptions may fall due on the same clock. */
@@ -217,6 +223,8 @@ describe("P11a monthly renewal", () => {
       cause: "PAST_DUE_GRACE", paidThrough: new Date(h.clock.now.getTime() + 8 * DAY)
     });
     expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
+    // W10 (P2-I21): an outcome that stayed unknown asked no bank we know of, so M5A never says a bank refused.
+    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
     expect(h.auditLines).toContainEqual({ event: "billing.renewal.stuck", attempt: 1, code: "REBILL_OUTCOME_UNKNOWN" });
   });
 
@@ -248,6 +256,8 @@ describe("P11a monthly renewal", () => {
       cause: "PAST_DUE_GRACE", paidThrough: new Date(h.clock.now.getTime() + 8 * DAY)
     });
     expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
+    // W10 (P2-I21): 72 hours of our own outage reached no bank, so M5A never says a bank refused.
+    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
     expect(h.auditLines).toContainEqual({ event: "billing.renewal.stuck", attempt: 1, code: "REBILL_NOT_SENT" });
   });
 
@@ -406,6 +416,8 @@ describe("P11a monthly renewal", () => {
     expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "PLUS", lapsed: false });
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref).filter((ref) => ref.startsWith("M5")))
       .toEqual([`M5A:${paid.subscriptionId}:${end.toISOString()}:1`]);
+    // W10 (P2-I21): the card was never asked, so M5A never says a bank refused.
+    expect(await emailParam(`M5A:${paid.subscriptionId}:${end.toISOString()}:1`, "bankDeclined")).toBe("false");
     expect(h.auditLines).toContainEqual({ event: "billing.renewal.dunning_unpriced", attempt: 1, code: "TAX_SERVICE_UNAVAILABLE" });
     // From here the retries are P11b's, each priced afresh: the renewal leaves a PAST_DUE plan alone.
     expect(await h.renewal.renew(paid.subscriptionId)).toBe("skipped");
@@ -580,6 +592,33 @@ describe("P11a monthly renewal", () => {
       planId: "PLUS", cause: "PAST_DUE_GRACE", paidThrough: new Date(h.clock.now.getTime() + 8 * 86_400_000)
     });
     expect((await h.outboxRows(charge!.chargeId)).map((row) => row.ref)).toContain(`M5A:${charge!.chargeId}`);
+    // W10 (P2-I21): the bank declined (PAYMENT_DECLINED), so M5A says so after its first sentence.
+    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("true");
+  });
+
+  it("never says a bank refused when xMoney refused the rebill request itself (REBILL_REFUSED, W10 P2-I21)", async () => {
+    const { paid } = await dueNow();
+    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_REFUSED");
+    await h.renewal.runOnce();
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED")).toMatchObject({ errorCode: "REBILL_REFUSED" });
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
+    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
+  });
+
+  it("says in M11 that the plan ended when a renewal is refused for the card's country (W10, P2-M9)", async () => {
+    const { paid } = await dueNow();
+    // The saved card's country moved onto the always-blocked list after activation (P2-M9's narrowing).
+    h.xmoney.cards.set(paid.transaction.cardId!, "RU");
+    await h.renewal.runOnce();
+    await h.worker.drain(10);
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect(await h.eventKinds(charge!.chargeId)).toEqual(expect.arrayContaining(["SUCCEEDED", "REFUND_REQUESTED", "REFUNDED"]));
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "CANCEL", reason: "CARD_COUNTRY_BLOCKED" } });
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "FREE", cause: "ENDED_CANCEL" });
+    expect(await emailParam(`M11:${charge!.chargeId}`, "refundAmount")).toBe("24.20");
+    expect(await emailParam(`M11:${charge!.chargeId}`, "endedPlan")).toBe("PLUS");
   });
 
   it("applies a scheduled downgrade at the renewal: DOWNGRADED, then RENEWED at the lower plan (R-34)", async () => {

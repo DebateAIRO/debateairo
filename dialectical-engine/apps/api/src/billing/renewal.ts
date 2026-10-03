@@ -585,8 +585,8 @@ export class RenewalService {
       const customer = await this.deps.repository.customerByOwner(fresh.ownerRef, undefined, client);
       if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a subscription without its customer");
       await writeDunningAttempt(this.deps, client, {
-        subscription: fresh, customerId: customer.customerId, attempt, chargeId: null, reason: code, periodStart,
-        firstFailedAt, now
+        subscription: fresh, customerId: customer.customerId, attempt, chargeId: null, reason: code, chargeErrorCode: null,
+        periodStart, firstFailedAt, now
       });
       return true;
     });

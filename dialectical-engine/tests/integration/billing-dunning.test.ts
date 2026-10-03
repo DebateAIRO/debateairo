@@ -16,6 +16,9 @@ const DAY = 86_400_000;
 const kinds = async (subscriptionId: string) => (await h.repository.subscriptionEvents(subscriptionId)).map((event) => event.kind);
 const renewals = async (subscriptionId: string) => (await h.repository.chargesForSubscription(subscriptionId))
   .filter((charge) => charge.kind === "RENEWAL").sort((left, right) => left.attempt - right.attempt);
+/** W10 (P2-I21): one param of the queued EMAIL job `jobRef` (M5's `bankDeclined` is "true" only for PAYMENT_DECLINED). */
+const emailParam = async (jobRef: string, name: string) =>
+  (await h.outboxRows(jobRef)).find((row) => row.kind === "EMAIL" && row.ref === jobRef)?.payload[`param.${name}`];
 const append = async (subscriptionId: string, kind: Parameters<typeof subscriptionEvent>[1], data: Record<string, string>) => {
   const state = foldSubscription(await h.repository.subscriptionEvents(subscriptionId));
   await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client, subscriptionEvent(state, kind, h.clock.now, data)));
@@ -55,6 +58,8 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
       await h.maintenance.runOnce();
       const latest = (await renewals(paid.subscriptionId)).at(-1)!;
       expect((await h.outboxRows(latest.chargeId)).map((row) => row.ref)).toContain(`${template}:${latest.chargeId}`);
+      // W10 (P2-I21): each retry the bank declined says so.
+      expect(await emailParam(`${template}:${latest.chargeId}`, "bankDeclined")).toBe("true");
     }
     h.clock.now = new Date(failedAt.getTime() + 7 * DAY + MINUTE);
     h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_PAYMENT_FAILED");
@@ -299,6 +304,8 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
       kind: "PAST_DUE", data: { attempt: 2, reason: "RETRY_TOTAL_CHANGED", first_failed_at: failedAt.toISOString() }
     });
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`M5B:${paid.subscriptionId}:${end.toISOString()}:2`);
+    // W10 (P2-I21, the W5 judge's forward): no charge was made, so M5B never says a bank refused.
+    expect(await emailParam(`M5B:${paid.subscriptionId}:${end.toISOString()}:2`, "bankDeclined")).toBe("false");
     // A second pass the same day records nothing more.
     h.clock.advance(11 * MINUTE);
     await h.maintenance.runOnce();
@@ -315,6 +322,8 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
       });
       expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref))
         .toContain(`${template}:${paid.subscriptionId}:${end.toISOString()}:${attempt}`);
+      // W10 (P2-I21): the tax service was down, no card was asked.
+      expect(await emailParam(`${template}:${paid.subscriptionId}:${end.toISOString()}:${attempt}`, "bankDeclined")).toBe("false");
       // Once per retry day: a second pass the same day records nothing more.
       h.clock.advance(11 * MINUTE);
       await h.maintenance.runOnce();

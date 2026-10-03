@@ -234,6 +234,8 @@ describe("P9b VERIFY_PAYMENT", () => {
       payload: { charge_id: bought.chargeId, transaction_id: paid.transactionId, amount_micros: 24_200_000, whole: true, reason: "CARD_COUNTRY_BLOCKED" }
     });
     expect(jobs.map((row) => row.ref)).toContain(`M11:${bought.chargeId}`);
+    // W10 (P2-M9): a checkout's plan never started, so M11 names no plan that ended.
+    expect(jobs.find((row) => row.ref === `M11:${bought.chargeId}`)?.payload).not.toHaveProperty("param.endedPlan");
     expect(await h.entitlementRows(bought.ownerRef)).toEqual([]);
     expect(await status(bought.chargeId, bought.ownerRef)).toEqual({ state: "FAILED", reasonCode: "CARD_COUNTRY_BLOCKED" });
   });

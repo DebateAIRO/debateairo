@@ -71,7 +71,17 @@ export type MailTemplateDefinition = Readonly<{
 export const RESERVED_MAIL_PARAMS = Object.freeze(["merchantName", "merchantAddress", "merchantEmail"] as const);
 
 const define = (template: MailTemplateDefinition): MailTemplateDefinition => Object.freeze(template);
-const retry = Object.freeze({ plan: "plan", retryDate: "date", cardPageUrl: "url" } as const);
+/**
+ * W10 (P2-I21): `bankDeclined` is "true" only for a charge the bank declined (PAYMENT_DECLINED); every other failed
+ * attempt (an outage past Q-1's 72 hours, our refused key, an unknown outcome, xMoney's own refusal, a tax service
+ * that stayed down, a retry whose total changed) asked no bank, so its email never says one refused.
+ */
+const retry = Object.freeze({ plan: "plan", retryDate: "date", cardPageUrl: "url", bankDeclined: "flag" } as const);
+/** W10 (P2-I21): the first M5 sentence is true in every case; the bank's refusal follows only when there was one. */
+const notTaken: ReadonlyArray<MailParagraph> = Object.freeze([
+  "mail.M5.notTaken",
+  { ifParam: "bankDeclined", test: "true", then: "mail.M5.bankRefused", otherwise: null }
+]);
 const charged = Object.freeze({ plan: "plan", totalAmount: "amount", chargeDate: "date" } as const);
 
 export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinition>> = Object.freeze({
@@ -113,9 +123,9 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     paragraphs: ["mail.M4.reminder", "mail.M4.cancel"],
     params: { plan: "plan", totalAmount: "amount", renewDate: "date", cancelPageUrl: "url" }
   }),
-  M5A: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: ["mail.M5.refused", "mail.M5.retry"], params: retry }),
-  M5B: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: ["mail.M5.refused", "mail.M5.secondTry"], params: retry }),
-  M5C: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: ["mail.M5.refused", "mail.M5.lastTry"], params: retry }),
+  M5A: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.retry"], params: retry }),
+  M5B: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.secondTry"], params: retry }),
+  M5C: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.lastTry"], params: retry }),
   M6: define({
     catalogue: "mail", subject: "mail.M6.subject",
     paragraphs: ["mail.M6.moved", "mail.M6.again"],
@@ -163,12 +173,16 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     paragraphs: ["mail.M10.paused", "mail.M10.contact"],
     params: { plan: "plan" }
   }),
-  // M11 follows a checkout payment refused for the card's country. A refused card change (P12e, CARD_CHECK_REFUSED)
-  // sends no email, but the wording still names no plan and says "taken or held", so it would stay true there too.
+  // M11 follows a payment refused for the card's country. A refused card change (P12e, CARD_CHECK_REFUSED) sends no
+  // email, but the wording still names no plan and says "taken or held", so it would stay true there too. W10
+  // (P2-M9): a refused renewal or upgrade ends the plan at once (VERIFY_PAYMENT's endRefusedPayment), and RefundDesk
+  // then names it (`endedPlan`); a checkout's payment, whose plan never started, and an M11 queued before W10 carry
+  // none, so they read as before.
   M11: define({
     catalogue: "mail", subject: "mail.M11.subject",
-    paragraphs: ["mail.M11.refunded"],
-    params: { refundAmount: "amount" }
+    paragraphs: ["mail.M11.refunded", { ifParam: "endedPlan", test: "present", then: "mail.M11.planEnded", otherwise: null }],
+    params: { refundAmount: "amount" },
+    optional: { endedPlan: "plan" }
   }),
   M11_DUPLICATE: define({
     catalogue: "mail", subject: "mail.M11_DUPLICATE.subject",

@@ -29,6 +29,11 @@ export type DunningAttempt = Readonly<{
    * `RETRY_TOTAL_CHANGED` (W5, P2-M10: a fresh price differs from the announced total); null with a charge.
    */
   reason: string | null;
+  /**
+   * W10 (P2-I21): the failed charge's code (`PAYMENT_DECLINED`, `VOIDED`, `REBILL_REFUSED` or `NO_TRANSACTION`); null
+   * for a charge-less attempt. Only `PAYMENT_DECLINED` means a bank refused, so only it puts the bank's refusal in M5.
+   */
+  chargeErrorCode: string | null;
   periodStart: Date;
   firstFailedAt: Date;
   now: Date;
@@ -37,7 +42,8 @@ export type DunningAttempt = Readonly<{
 /**
  * THE failed-attempt writer (spec §2.5.5, A8a, Q-1), in the caller's transaction under the owner lock: PAST_DUE with
  * the next retry at `first failure + dunning_retry_days[attempt - 1]`, on attempt 1 the PAST_DUE_GRACE (paid through
- * the first failure plus the last retry day plus 1), and M5A/M5B/M5C; past the last retry day ENDED(DUNNING), Free
+ * the first failure plus the last retry day plus 1), and M5A/M5B/M5C (whose bank sentence only a PAYMENT_DECLINED
+ * charge gets, W10); past the last retry day ENDED(DUNNING), Free
  * and M6. A charge-less attempt names its `reason` where a charged one names its `charge_id`, and its M5 is
  * deduplicated on the subscription, the period and the attempt. The settlement's `failed` (a charge) and P11a's
  * `failUnpricedAttempt` (no charge) both write through here, so the two can never drift apart.
@@ -68,7 +74,10 @@ export async function writeDunningAttempt(
     await enqueueEmail(deps.repository, client, {
       template: templates[Math.min(input.attempt, templates.length) - 1]!, recipient,
       dedupeRef: input.chargeId ?? `${subscription.subscriptionId}:${input.periodStart.toISOString()}:${input.attempt}`,
-      params: { plan: subscription.planId, retryDate: nextRetryAt.toISOString(), cardPageUrl: page("/settings/card") },
+      params: {
+        plan: subscription.planId, retryDate: nextRetryAt.toISOString(), cardPageUrl: page("/settings/card"),
+        bankDeclined: String(input.chargeId !== null && input.chargeErrorCode === "PAYMENT_DECLINED")
+      },
       notBefore: now
     });
     return "PAST_DUE";
@@ -135,7 +144,7 @@ export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSett
       const firstFailedAt = charge.attempt === 1 ? now : dunningProgress(context.events, subscription)?.firstFailedAt ?? now;
       await writeDunningAttempt(deps, client, {
         subscription, customerId: context.customerId, attempt: charge.attempt, chargeId: charge.chargeId, reason: null,
-        periodStart: charge.periodStart, firstFailedAt, now
+        chargeErrorCode: context.errorCode, periodStart: charge.periodStart, firstFailedAt, now
       });
     }
   });
