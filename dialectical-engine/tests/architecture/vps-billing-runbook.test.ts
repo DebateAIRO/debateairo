@@ -116,7 +116,9 @@ describe("P22 the Billing runbook", () => {
       "| `\"event\":\"billing.invoice.unknown\"`, with `issuer`, `kind` and `code` |",
       "| `\"event\":\"billing.payment.mismatch\"`, with `code` or `chargeKind` |",
       "this one is asked again on its own every hour", "A list xMoney refuses never causes it",
-      "`REFUND_NOT_REQUESTED` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
+      // P4-H (the P4-B judge's forward, progress.md: P2-W4): REFUND_CHARGE_MISSING is backed by no record either.
+      "`REFUND_NOT_REQUESTED`, `REFUND_CHARGE_MISSING` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
+      "`OTHER_XMONEY_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host",
       "WHERE o.outcome = 'MISMATCH'", "refund it there by hand",
       // W13 fix round 1: the alert promise is exact (O3 never for a dead O3; O2 comes from the refund itself, not for
       // REFUND_PAYLOAD_INVALID or a refund the queue stopped), a refused key keeps a renewal only for its window, any
@@ -274,6 +276,32 @@ describe("P22 the Billing runbook", () => {
       "The page had already said a link is on its way"
     ]) {
       expect(billing.replace(/\s+/gu, " "), needle).toContain(needle);
+    }
+  });
+
+  it("P4-H (the P4-B and P4-C judges' forwards): a refund's three no-refund codes, and C1 in the hand calculation", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const section = (from: string, to: string): string => flat.slice(flat.indexOf(from), flat.indexOf(to, flat.indexOf(from)));
+    // P2-W4: O2 for REFUND_CHARGE_MISSING carries the not-requested sentences; OTHER_XMONEY_SYSTEM has its own.
+    const refund = section("**A refund that could not be completed.**", "**When xMoney or the tax service is down at a renewal.**");
+    for (const needle of [
+      "`REFUND_CHARGE_MISSING`: the job names a charge we do not have",
+      "the owner summary lists both as `REFUND_NOT_REQUESTED`",
+      "The reason code `OTHER_XMONEY_SYSTEM`", "nothing was sent and nothing is owed on this host",
+      "no refund reason and no deadline", "lists it as `REFUND_OTHER_SYSTEM`",
+      "refund it in that system's dashboard; a sandbox test payment needs nothing"
+    ]) {
+      expect(refund, needle).toContain(needle);
+    }
+    expect(refund).not.toContain("The one exception is the reason code `REFUND_NOT_REQUESTED`");
+    // C1 (P2-W6): a payment made after the withdrawal takes no share, and a later upgrade does not set the credit.
+    const withdrawal = section("**A withdrawal sent by email or on the model form.**", "**A refund that could not be completed.**");
+    for (const needle of [
+      "takes no share: it gives back all it still holds",
+      "its `SUCCEEDED` row in `billing.charge_event` is dated after",
+      "an upgrade paid after that moment does not set it"
+    ]) {
+      expect(withdrawal, needle).toContain(needle);
     }
   });
 
