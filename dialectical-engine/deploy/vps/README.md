@@ -2116,7 +2116,7 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- the go-live checklist's budget and billing rows are proven (rows 13–38);
+- the go-live checklist's budget and billing rows are proven (rows 13–54);
 - the sandbox run of §14.9 passed, on its own throwaway server, never on this host.
 
 **Going from xMoney's sandbox to live on the same host.** Skip this if this host never ran with
