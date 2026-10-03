@@ -50,18 +50,20 @@ describe("a FAILED run whose reason is the site's day reads as stopped partway (
 });
 
 /**
- * Part 3's final review, P3-M18: the scorecard's claim-time refusal (the role
- * assignment pinned at the ask cannot seat a debate when the runner claims it)
- * reads as "the models it needs were unavailable", in both the form the runner
- * writes and the form its job catch overwrites it with.
+ * Part 3's final review, P3-M18: the scorecard's claim-time refusal (the
+ * runner, claiming the debate, found the role assignment pinned at the ask
+ * corrupt or unable to seat a debate, before any model was asked) reads as
+ * "something went wrong on our side before this debate began", in both the
+ * form the runner writes and the form its job catch overwrites it with.
  */
-describe("a FAILED run the scorecard's pinned models could not seat reads as models unavailable (P3-M18)", () => {
+describe("a FAILED run whose pinned role assignment the runner refused at claim reads as not started (P3-M18)", () => {
   for (const reason of ["RUN_ROLE_ASSIGNMENT_INVALID", "RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID"]) {
-    it(`renders ${reason} as the models-unavailable sentence`, () => {
+    it(`renders ${reason} as the not-started sentence`, () => {
       const html = renderToStaticMarkup(
         <DebatesBuffer debates={debateSummariesFromIndex(failedWith(reason))} catalog={homeEnglish} timeCatalog={timeEnglish} locale="en" />
       );
-      expect(html).toContain(homeEnglish["runFailure.MODELS_UNAVAILABLE"]);
+      expect(html).toContain(homeEnglish["runFailure.NOT_STARTED"]);
+      expect(html).not.toContain(homeEnglish["runFailure.MODELS_UNAVAILABLE"]);
       expect(html).not.toContain(homeEnglish["runFailure.STOPPED"]);
       expect(html).not.toContain("ASSIGNMENT");
     });

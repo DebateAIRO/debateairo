@@ -55,10 +55,11 @@ test("every code family lands in its group, whether or not the runner wrapped it
     ["SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:EVALUATOR", "MODELS_UNAVAILABLE"],
     ["RUNNER_EXECUTION_FAILED:SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM", "MODELS_UNAVAILABLE"],
     // Part 3's final review, P3-M18: the model scorecard's claim-time refusal.
-    // The role assignment pinned at the ask cannot seat a debate when the runner
-    // claims it, so the models chosen for it were not usable and it never began.
-    ["RUN_ROLE_ASSIGNMENT_INVALID", "MODELS_UNAVAILABLE"],
-    ["RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID", "MODELS_UNAVAILABLE"],
+    // The runner's claim check found the role assignment pinned at the ask
+    // corrupt or unable to seat a debate before any model was asked, so the
+    // debate never began.
+    ["RUN_ROLE_ASSIGNMENT_INVALID", "NOT_STARTED"],
+    ["RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID", "NOT_STARTED"],
     ["RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL", "RUN_LIMIT_REACHED"],
     // Budget spec 2026-09-28 §2.11: group 4 is retired. The shared wall stops
     // only the arguing, so these never end a debate; a stray one is STOPPED.
@@ -238,11 +239,11 @@ test("a debate the site's day stopped is told the group-5 sentence (budget spec 
   }
 });
 
-test("a debate whose pinned models could not be seated at claim is told the models sentence (P3-M18)", () => {
+test("a debate whose pinned role assignment the runner refused at claim is told the not-started sentence (P3-M18)", () => {
   for (const reason of ["RUN_ROLE_ASSIGNMENT_INVALID", "RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID"]) {
     for (const namespace of NAMESPACES) {
       assert.equal(
-        runFailureMessage(reason, catalogue("en", namespace)), ENGLISH.MODELS_UNAVAILABLE, `en/${namespace} ${reason}`
+        runFailureMessage(reason, catalogue("en", namespace)), ENGLISH.NOT_STARTED, `en/${namespace} ${reason}`
       );
     }
   }

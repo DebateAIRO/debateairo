@@ -18,13 +18,13 @@ import { t,type MessageCatalog } from "../i18n/translate.js";
  */
 
 export const RUN_FAILURE_KINDS = Object.freeze([
-  /** The API created the run, then could not finish setting it up (`RUN_SETUP_FAILED:<step>`). */
-  "NOT_STARTED",
   /**
-   * The models pinned when the question was asked were gone when the runner
-   * claimed it, or (the model scorecard's role assignment) could not seat a
-   * debate when it claimed it.
+   * The API created the run, then could not finish setting it up
+   * (`RUN_SETUP_FAILED:<step>`), or the runner, claiming it, refused its pinned
+   * role assignment (RUN_ROLE_ASSIGNMENT_INVALID).
    */
+  "NOT_STARTED",
+  /** The models pinned when the question was asked were gone when the runner claimed it. */
   "MODELS_UNAVAILABLE",
   /** The run's own ceiling refused its very first call. */
   "RUN_LIMIT_REACHED",
@@ -57,10 +57,12 @@ export const RUN_FAILURE_CODES: Readonly<Record<string, RunFailureKind>> = Objec
   SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM: "MODELS_UNAVAILABLE",
   /**
    * Part 3's final review, P3-M18: the model scorecard's claim-time refusal. The
-   * role assignment pinned at the ask cannot seat a debate when the runner
-   * claims it, so the models chosen for it were not usable and it never began.
+   * role assignment stored at the ask was refused by its schema or its seat
+   * count when the runner claimed the debate, before any model was probed, so
+   * the debate never began; a new ask repairs it. (A pinned model that is gone
+   * at claim fails later, with one of the two codes above.)
    */
-  RUN_ROLE_ASSIGNMENT_INVALID: "MODELS_UNAVAILABLE",
+  RUN_ROLE_ASSIGNMENT_INVALID: "NOT_STARTED",
   RUN_CEILING_BELOW_FIRST_CALL: "RUN_LIMIT_REACHED"
 });
 
