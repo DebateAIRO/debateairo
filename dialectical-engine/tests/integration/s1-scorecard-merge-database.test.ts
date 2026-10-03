@@ -30,7 +30,7 @@ afterAll(async () => {
 const fromDev0075 = (name: string): boolean => Number(name.slice(0, 4)) >= 75;
 
 describe("S1a · 0090_model_scorecard.sql", () => {
-  it("applies last, after every Part 1–2 migration, under its new name only", async () => {
+  it("applies after every Part 1–2 migration, under its new name only", async () => {
     const onDisk = (await readdir(new URL("../../migrations/", import.meta.url)))
       .filter((name) => name.endsWith(".sql") && fromDev0075(name))
       .sort();
@@ -40,8 +40,12 @@ describe("S1a · 0090_model_scorecard.sql", () => {
       .sort();
     // Every file from 0075 on is applied, and nothing else is: the Part 1–2 files and any file dev added.
     expect(applied).toEqual(onDisk);
-    // The scorecard's file sorts last (RULINGS-R3 R3-1's number), and there is exactly one of it.
-    expect(applied[applied.length - 1]).toBe("0090_model_scorecard.sql");
+    // The scorecard's file applies after every Part 1–2 file (0080-0089; RULINGS-R3 R3-1's number), and there is
+    // exactly one of it. Files numbered after it (Part 2b's 0091 on) are later work and apply after it.
+    const scorecardAt = applied.indexOf("0090_model_scorecard.sql");
+    expect(scorecardAt).toBeGreaterThan(applied.indexOf("0089_billing_erasure_hook.sql"));
+    expect(applied.indexOf("0089_billing_erasure_hook.sql")).toBeGreaterThanOrEqual(0);
+    expect(applied.slice(scorecardAt + 1).every((name) => name.slice(0, 4) > "0090")).toBe(true);
     expect(applied.filter((name) => name.endsWith("_model_scorecard.sql"))).toEqual(["0090_model_scorecard.sql"]);
     const old = await database.pool.query<{ n: number }>(
       "SELECT count(*)::int AS n FROM public.debateai_schema_migration WHERE name = '0072_model_scorecard.sql'"

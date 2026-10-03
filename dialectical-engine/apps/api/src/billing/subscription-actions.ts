@@ -6,7 +6,11 @@ import { quoteTax, storedTaxContext } from "./stored-tax-context.js";
 import { appendChecked, lockedAfter, lockedSubscription, refuse, type LockedSubscription } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
-export type CancelSource = "SETTINGS" | "EMAIL_LINK";
+/**
+ * Who stopped the renewal. ACCOUNT_ERASURE (W7, P2-I10): scheduling an account deletion stops the renewal at once
+ * and leaves the paid plan running until the erasure commits (P15's hook, `erasure-hook.ts`).
+ */
+export type CancelSource = "SETTINGS" | "EMAIL_LINK" | "ACCOUNT_ERASURE";
 export type CancelOutcome = "REQUESTED" | "ALREADY_REQUESTED" | "NOT_CANCELLABLE";
 
 /**
@@ -40,11 +44,50 @@ export async function requestCancelLocked(
     entitlements: Pick<EntitlementRepository, "append">;
     publicAppUrl: string;
   }>,
-  client: PoolClient, locked: LockedSubscription, now: Date, source: CancelSource
+  client: PoolClient, locked: LockedSubscription, now: Date, source: "SETTINGS" | "EMAIL_LINK"
 ): Promise<CancelOutcome> {
+  const written = await writeCancelLocked(deps, client, locked, now, source);
+  if (written.outcome !== "REQUESTED") return written.outcome;
   const { state } = locked;
-  if (state.status !== "ACTIVE" && state.status !== "PAST_DUE") return "NOT_CANCELLABLE";
-  if (state.cancelRequested) return "ALREADY_REQUESTED";
+  const { accessEndsAt } = written;
+  const canUndo = accessEndsAt.getTime() > now.getTime();
+  const customer = await deps.billing.customerByOwner(state.ownerRef, undefined, client);
+  if (customer !== null) {
+    await enqueueEmail(deps.billing, client, {
+      template: "M7",
+      recipient: { kind: "CUSTOMER", customerId: customer.customerId },
+      dedupeRef: `${state.subscriptionId}:${accessEndsAt.toISOString()}`,
+      params: {
+        plan: state.planId,
+        accessEndDate: accessEndsAt.toISOString().slice(0, 10),
+        settingsUrl: new URL("/settings", deps.publicAppUrl).toString(),
+        canUndo: canUndo ? "true" : "false"
+      },
+      notBefore: now
+    });
+  }
+  return "REQUESTED";
+}
+
+/**
+ * `requestCancelLocked`'s records without its email: CANCEL_REQUESTED, and the immediate end (ENDED(CANCEL) with a
+ * FREE entitlement effective now) when the plan is PAST_DUE or its renewal has been reached. W7 (P2-I10): P15's hook
+ * writes an account deletion's renewal stop through it (`ACCOUNT_ERASURE`), with no M7, since the deletion screen
+ * already said what happens to the plan; for that source alone a SUSPENDED plan is stopped too (no end: the dispute
+ * decides it), so a plan resumed after the deletion was cancelled is not renewed either. `accessEndsAt`: the end of
+ * the paid access the cancel leaves.
+ */
+export async function writeCancelLocked(
+  deps: Readonly<{
+    billing: Pick<SubscriptionRouteDeps["billing"], "appendSubscriptionEvent" | "chargesForSubscription">;
+    entitlements: Pick<EntitlementRepository, "append">;
+  }>,
+  client: PoolClient, locked: LockedSubscription, now: Date, source: CancelSource
+): Promise<Readonly<{ outcome: "REQUESTED"; accessEndsAt: Date }> | Readonly<{ outcome: Exclude<CancelOutcome, "REQUESTED"> }>> {
+  const { state } = locked;
+  const suspendedStop = source === "ACCOUNT_ERASURE" && state.status === "SUSPENDED";
+  if (state.status !== "ACTIVE" && state.status !== "PAST_DUE" && !suspendedStop) return { outcome: "NOT_CANCELLABLE" };
+  if (state.cancelRequested) return { outcome: "ALREADY_REQUESTED" };
   const periodEnd = state.currentPeriodEnd;
   // Read on the lock's own connection (P12b's one-connection rule): a RENEWAL charge whose period starts at this
   // period's end means the renewal is under way, and no flag can call it back.
@@ -70,23 +113,7 @@ export async function requestCancelLocked(
     });
   }
   const accessEndsAt = endsNow || periodEnd === null || periodEnd.getTime() <= now.getTime() ? now : periodEnd;
-  const canUndo = accessEndsAt.getTime() > now.getTime();
-  const customer = await deps.billing.customerByOwner(state.ownerRef, undefined, client);
-  if (customer !== null) {
-    await enqueueEmail(deps.billing, client, {
-      template: "M7",
-      recipient: { kind: "CUSTOMER", customerId: customer.customerId },
-      dedupeRef: `${state.subscriptionId}:${accessEndsAt.toISOString()}`,
-      params: {
-        plan: state.planId,
-        accessEndDate: accessEndsAt.toISOString().slice(0, 10),
-        settingsUrl: new URL("/settings", deps.publicAppUrl).toString(),
-        canUndo: canUndo ? "true" : "false"
-      },
-      notBefore: now
-    });
-  }
-  return "REQUESTED";
+  return { outcome: "REQUESTED", accessEndsAt };
 }
 
 /**
@@ -94,10 +121,11 @@ export async function requestCancelLocked(
  * cancel of Terms §12 must work whatever the person has or has not accepted, and it commits them to nothing new.
  */
 export async function cancelForOwner(deps: SubscriptionRouteDeps, ownerRef: string): Promise<void> {
-  const now = deps.clock();
   const outcome = await deps.billing.withTransaction(async (client) => {
     const locked = await lockedSubscription(deps, client, ownerRef);
-    return locked === null ? "NOT_CANCELLABLE" as const : requestCancelLocked(deps, client, locked, now, "SETTINGS");
+    // P2-M12: the clock is read once the lock is held, so a grace or hold row a writer dated while this waited for
+    // the lock never outranks the cancel's FREE row (`billing.entitlement_at` takes the latest `effective_at`).
+    return locked === null ? "NOT_CANCELLABLE" as const : requestCancelLocked(deps, client, locked, deps.clock(), "SETTINGS");
   });
   if (outcome === "NOT_CANCELLABLE") refuse(409, "NOT_SUBSCRIBED");
   if (outcome === "REQUESTED") deps.audit("billing.cancel", { source: "SETTINGS" });
@@ -106,7 +134,10 @@ export async function cancelForOwner(deps: SubscriptionRouteDeps, ownerRef: stri
 /**
  * CANCEL_REVOKED, allowed before the period ends; with nothing to revoke it is a quiet success. Gated on the Terms
  * re-acceptance (spec §2.3.2, R2 Q-10: the server's refusal is the real guard): a revoke commits the person to
- * renewing under the Terms in force, so it waits until they have accepted the current version.
+ * renewing under the Terms in force, so it waits until they have accepted the current version. W7 (P2-I10): refused
+ * ACCOUNT_ERASURE_PENDING while an account deletion is pending (read under the owner lock): P11a's guard would never
+ * renew the plan then, so an undone cancel would keep a paid plan ACTIVE past its paid month. Once the person cancels
+ * the deletion, the undo works as always.
  */
 export async function revokeCancelForOwner(deps: SubscriptionRouteDeps, ownerRef: string): Promise<void> {
   const now = deps.clock();
@@ -116,14 +147,19 @@ export async function revokeCancelForOwner(deps: SubscriptionRouteDeps, ownerRef
     if (locked === null) return "NOT_SUBSCRIBED" as const;
     const { state } = locked;
     if (state.status !== "ACTIVE" && state.status !== "PAST_DUE") return "NOT_SUBSCRIBED" as const;
+    // D5 5h (P2-I4): a plan of the other xMoney system is never renewed here, so its cancel stands (a sandbox plan
+    // revoked on live would stay ACTIVE for ever and refuse the next live start, BILLING_STAGE_RECORDS_OPEN).
+    if (state.xmoneyEnvironment !== deps.xmoneyEnvironment) return "NOT_SUBSCRIBED" as const;
     if (!state.cancelRequested) return "NOTHING" as const;
     if (state.currentPeriodEnd !== null && now.getTime() >= state.currentPeriodEnd.getTime()) {
       return "NOT_SUBSCRIBED" as const;
     }
+    if (await deps.billing.ownerErasurePending(ownerRef, client)) return "ERASURE_PENDING" as const;
     await appendChecked(deps.billing, client, locked, { kind: "CANCEL_REVOKED", at: now });
     return "REVOKED" as const;
   });
   if (outcome === "NOT_SUBSCRIBED") refuse(409, "NOT_SUBSCRIBED");
+  if (outcome === "ERASURE_PENDING") refuse(409, "ACCOUNT_ERASURE_PENDING");
   if (outcome === "REVOKED") deps.audit("billing.cancel.revoked", {});
 }
 

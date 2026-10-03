@@ -45,6 +45,7 @@
   "settings.erasure.title": "Ștergeți contul",
   "settings.erasure.hint": "Ștergerea începe după șapte zile complete. O puteți anula înainte să înceapă. Notificările privind programarea, anularea și finalizarea sunt trimise la fiecare adresă de e-mail principală sau de recuperare asociată; este necesar cel puțin un canal verificat.",
   "settings.erasure.dataWarning": "Conținutul privat criptat devine definitiv ilizibil după distrugerea cheilor sale. Instantaneele publice actuale rămân publice sub un pseudonim retras, iar copiile descărcate, citate, memorate în cache, indexate sau păstrate de furnizori pot persista. Textul simplu din dezbaterile vechi revendicate este raportat drept reziduu păstrat, nu drept conținut curățat integral.",
+  "settings.erasure.paidPlan": "Programarea ștergerii oprește reînnoirea abonamentului plătit, dar abonamentul funcționează în continuare până la efectuarea ștergerii sau până la sfârșitul lunii pentru care ați plătit; dacă anulați ștergerea, abonamentul durează până la sfârșitul acelei luni și se reînnoiește doar dacă renunțați la anulare, iar dacă vă mai puteți retrage în cele 14 zile de la cumpărare, o puteți face până la efectuarea ștergerii.",
   "settings.erasure.checking": "Se verifică starea ștergerii contului…",
   "settings.erasure.status": "Stare: {status}. Ora programată pentru ștergere: {time}.",
   "settings.erasure.processing": "Ștergerea ireversibilă este în curs. Programarea și anularea nu mai sunt disponibile.",

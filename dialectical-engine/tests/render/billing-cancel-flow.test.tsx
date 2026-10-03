@@ -77,6 +77,51 @@ describe("P21 /cancel without signing in (Terms §12, A25)", () => {
     expect(container.querySelector("#cancel-email")).not.toBeNull();
   });
 
+  it("a link that cancelled nothing says only that, points to Settings and keeps the email form (W10, P2-M18)", async () => {
+    // NOTHING_TO_CANCEL folds four states: a cancel already pending, a plan that ended, a plan SUSPENDED by a dispute
+    // (it comes back if we win) and a newer plan in the token's place. The sentence must hold for all four, so it
+    // never says the account has no plan.
+    client.cancelByToken.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 409, "x", "NOTHING_TO_CANCEL"));
+    window.history.replaceState(null, "", `/cancel#token=${TOKEN}`);
+    await render();
+    await act(async () => { button("Cancel my plan")!.click(); });
+    await settle();
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert?.textContent).toBe("This link didn't cancel anything. Check your plan in Settings.");
+    expect(container.textContent).not.toContain("no plan left");
+    expect(container.querySelector("#cancel-email")).not.toBeNull();
+    expect(container.querySelector('a[href="/settings"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Your plan is cancelled");
+    expect(container.textContent).not.toContain("won't be charged again");
+    // The token is spent: no button to press again.
+    expect(button("Cancel my plan")).toBeUndefined();
+  });
+
+  it("words the hourly limit with its own sentence, for the link and for the button (W10, P2-M19)", async () => {
+    const limited = () => new ContractHttpError("RATE_LIMITED", 429, "x", "ADMISSION_RATE_LIMITED");
+    client.requestCancelLink.mockRejectedValueOnce(limited());
+    await render();
+    const input = container.querySelector<HTMLInputElement>("#cancel-email")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "person@example.test");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => { button("Send the link")!.click(); });
+    await settle();
+    expect(container.textContent).toContain("Too many tries in the last hour. Please try again later.");
+    expect(container.textContent).not.toContain("Something went wrong");
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.cancelByToken.mockRejectedValueOnce(limited());
+    window.history.replaceState(null, "", `/cancel#token=${TOKEN}`);
+    await render();
+    await act(async () => { button("Cancel my plan")!.click(); });
+    await settle();
+    expect(container.textContent).toContain("Too many tries in the last hour. Please try again later.");
+    // Nothing was spent: the same button may be pressed again later.
+    expect(button("Cancel my plan")).toBeDefined();
+  });
+
   it("a failure that is not the link's keeps the button, so the person can press it again", async () => {
     client.cancelByToken.mockRejectedValueOnce(new ContractHttpError("NETWORK_FAILURE", 0, "x"));
     window.history.replaceState(null, "", `/cancel#token=${TOKEN}`);

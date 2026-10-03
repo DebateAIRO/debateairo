@@ -70,17 +70,25 @@ describe("P16b the summary", () => {
       { chargeId: "a".repeat(32), jobKind: "SMARTBILL_INVOICE", code: "INVOICE_UNKNOWN", since: new Date("2026-11-04T00:00:00.000Z") },
       { chargeId: "b".repeat(32), jobKind: "SMARTBILL_STORNO", code: "CREDIT_NOTE_MANUAL", since: new Date("2026-11-05T00:00:00.000Z") },
       { chargeId: "c".repeat(32), jobKind: "SMARTBILL_INVOICE", code: "INVOICE_SERVICE_REFUSED", since: new Date("2026-11-07T00:00:00.000Z") },
-      { chargeId: "e".repeat(32), jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL", since: new Date("2026-11-08T00:00:00.000Z") }
+      { chargeId: "e".repeat(32), jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL", since: new Date("2026-11-08T00:00:00.000Z") },
+      // W12 (P2-I16): every code is listed, with what to do.
+      { chargeId: "d".repeat(32), jobKind: "QUADERNO_RECORD_SALE", code: "TAX_SERVICE_REFUSED", since: new Date("2026-11-09T00:00:00.000Z") },
+      { chargeId: "f".repeat(32), jobKind: "QUADERNO_RECORD_REFUND", code: "CREDIT_NOTE_REFUND_MISSING", since: new Date("2026-11-10T00:00:00.000Z") }
+    ],
+    deadEmails: [
+      { ref: `M1:${"a".repeat(32)}`, template: "M1", recipient: "CUSTOMER", code: "BILLING_PROFILE_UNREADABLE", since: new Date("2026-11-19T00:00:00.000Z") }
     ],
     paymentsToCheck: [
       { what: "REFUND_REFUSED", ref: "7".repeat(32), reason: null, since: new Date("2026-11-06T00:00:00.000Z") },
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: new Date("2026-11-09T00:00:00.000Z") },
+      { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: new Date("2026-11-17T00:00:00.000Z") },
       { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: new Date("2026-11-11T00:00:00.000Z") },
       { what: "WITHDRAWAL_BY_OWNER", ref: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", reason: null, since: new Date("2026-11-10T00:00:00.000Z") },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: new Date("2026-11-12T00:00:00.000Z") },
       { what: "PAYMENT_UNSETTLED", ref: "8".repeat(32), reason: null, since: new Date("2026-10-02T00:00:00.000Z") },
       { what: "DUNNING_UNPRICED", ref: "5b8e1f2a-3c4d-4e5f-8a6b-7c8d9e0f1a2b", reason: "TAX_SERVICE_UNAVAILABLE", since: new Date("2026-11-14T00:00:00.000Z") },
       { what: "ENDED_UNPRICED", ref: "6c9f2a3b-4d5e-4f6a-9b7c-8d9e0f1a2b3c", reason: "TAX_SERVICE_UNAVAILABLE", since: new Date("2026-11-15T00:00:00.000Z") },
+      { what: "DUNNING_UNPRICED", ref: "8e1a4b5c-6d7e-4f8a-9b0c-1d2e3f4a5b6c", reason: "RETRY_TOTAL_CHANGED", since: new Date("2026-11-18T00:00:00.000Z") },
       { what: "RENEWAL_BLOCKED", ref: "7d0a3b4c-5e6f-4a7b-8c8d-9e0f1a2b3c4d", reason: null, since: new Date("2026-11-16T00:00:00.000Z") },
       { what: "SUBSCRIPTION_HISTORY_INVALID", ref: "3c9d2b1a-5e4f-4a6b-8c7d-9e0f1a2b3c4d", reason: null, since: new Date("2026-11-13T00:00:00.000Z") }
     ]
@@ -120,8 +128,40 @@ describe("P16b the summary", () => {
     expect(text).toContain(`charge ${"b".repeat(32)}: SMARTBILL_STORNO (CREDIT_NOTE_MANUAL), since 2026-11-05`);
     expect(text).toContain(`charge ${"c".repeat(32)}: SMARTBILL_INVOICE (INVOICE_SERVICE_REFUSED), since 2026-11-07`);
     expect(text).toContain(`charge ${"e".repeat(32)}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since 2026-11-08`);
+    // W12 (P2-I16, P2-I17): what to do is said once per job kind and code below the list (fix I-1), with the command
+    // to copy (<charge> for the line's charge); a job our records do not back is nothing to issue or re-queue (the W4
+    // judge's forward).
+    expect(text).toContain(`charge ${"a".repeat(32)}: SMARTBILL_INVOICE (INVOICE_UNKNOWN), since 2026-11-04\n`);
+    expect(text).toContain(`charge ${"d".repeat(32)}: QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED), since 2026-11-09\n`);
+    expect(text).toContain(`charge ${"f".repeat(32)}: QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING), since 2026-11-10\n`);
+    expect(text).toContain("where <charge> stands for the line's charge");
+    expect(text).toContain("  What to do:\n  * SMARTBILL_INVOICE (INVOICE_UNKNOWN): SmartBill never confirmed it: look for it in"
+      + " SmartBill; if it is there, record it with pnpm billing:invoice --charge <charge> --kind INVOICE --record"
+      + " <series>-<number>;");
+    expect(text).toContain("  * QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED): Quaderno refused it");
+    expect(text).toContain("pnpm billing:invoice --charge <charge> --kind INVOICE --requeue");
+    expect(text).toContain("  * QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING): no refund is recorded for this sale:"
+      + " nothing to issue or re-queue; tell whoever runs the server");
+    // F4: the job itself is not tried again; only M3 is sent again, by the renewal.
+    expect(text).toContain("Emails that never went out (the last 120 days; a dead email job is not tried again, and only the"
+      + " notice of a changed renewal amount, M3, is sent again, by the renewal; what each one means is said once for each"
+      + " email below the list):");
+    expect(text).not.toContain("nothing sends them again by itself");
+    expect(text).toContain(`M1 (job M1:${"a".repeat(32)}): BILLING_PROFILE_UNREADABLE, since 2026-11-19\n`);
+    expect(text).toContain("  * M1 to the customer: the customer never got the confirmation with the Terms and the model"
+      + " withdrawal form");
     expect(text).toContain(`charge ${"7".repeat(32)}: REFUND_REFUSED, since 2026-11-06`);
     expect(text).toContain(`charge ${"6".repeat(32)}: REFUND_OUTCOME_UNKNOWN (WITHDRAWAL), since 2026-11-09`);
+    // P2-I5: a refund job the charge records no request for moved no money; the help text says it is no refund to make.
+    expect(text).toContain(`charge ${"4".repeat(32)}: REFUND_NOT_REQUESTED, since 2026-11-17`);
+    expect(text).toContain("REFUND_NOT_REQUESTED: a refund job that matches no refund request our records hold for this"
+      + " payment, so nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to"
+      + " the billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
+      + " (one never refunded is still owed);");
+    // The two real dead ends keep their own words.
+    expect(text).toContain("(REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund it from the dashboard;"
+      + " REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the dashboard before refunding again;"
+      + " a WITHDRAWAL refund is due within 14 days of the withdrawal; REFUND_NOT_REQUESTED:");
     // P9c's second refund made elsewhere: named by the xMoney transaction the owner opens in the dashboard.
     expect(text).toContain("xMoney transaction 9912345: REFUND_UNRECORDED, since 2026-11-11");
     expect(text).toContain("REFUND_UNRECORDED: a second refund made in the xMoney dashboard");
@@ -132,6 +172,13 @@ describe("P16b the summary", () => {
     // R2 Q-1's renewals with no charge (D6a's 4b): named by subscription, with the code that stopped the pricing.
     expect(text).toContain("subscription 5b8e1f2a-3c4d-4e5f-8a6b-7c8d9e0f1a2b: DUNNING_UNPRICED (TAX_SERVICE_UNAVAILABLE), since 2026-11-14");
     expect(text).toContain("subscription 6c9f2a3b-4d5e-4f6a-9b7c-8d9e0f1a2b3c: ENDED_UNPRICED (TAX_SERVICE_UNAVAILABLE), since 2026-11-15");
+    // W5 (P2-M10): a retry priced afresh at a total the person was never told about is charged nothing; the help text
+    // says why, and that the tax service needs no fix.
+    expect(text).toContain("subscription 8e1a4b5c-6d7e-4f8a-9b0c-1d2e3f4a5b6c: DUNNING_UNPRICED (RETRY_TOTAL_CHANGED), since 2026-11-18");
+    expect(text).toContain("RETRY_TOTAL_CHANGED (named after DUNNING_UNPRICED or ENDED_UNPRICED): the tax service priced a"
+      + " retry again, but at a total the person was never told about (a tax change), so nothing is charged and the plan"
+      + " ends after its last retry day unless a later retry prices at the announced total again; there is nothing to fix"
+      + " in the tax service, and the person can subscribe again at the new price;");
     expect(text).toContain("subscription 7d0a3b4c-5e6f-4a7b-8c8d-9e0f1a2b3c4d: RENEWAL_BLOCKED, since 2026-11-16");
     expect(text).toContain("pnpm billing:withdraw --owner <ref> --refund <amount>");
     expect(text).toContain("Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV");
@@ -147,7 +194,7 @@ describe("P16b the summary", () => {
     const unknown = row({ chargeId: "a".repeat(32), type: "REFUND", amountMicros: 24_200_000, amountKnown: false,
       at: new Date("2026-11-20T09:00:00.000Z") });
     const alone = buildTaxSummary({
-      quarter: Q4, rows: [sale, unknown], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: []
+      quarter: Q4, rows: [sale, unknown], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
     });
     const ro = alone.lines.find((line) => line.taxCountry === "RO")!;
     expect(ro).toMatchObject({ netMicros: 20_000_000, taxMicros: 4_200_000, sales: 1, refunds: 0, unknownRefunds: 1 });
@@ -162,16 +209,31 @@ describe("P16b the summary", () => {
     // A refund whose amount is known (ours, or one xMoney reported as its own transaction) is still subtracted.
     const known = row({ chargeId: "a".repeat(32), type: "REFUND", amountMicros: 12_100_000, amountKnown: true });
     const both = buildTaxSummary({
-      quarter: Q4, rows: [sale, unknown, known], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: []
+      quarter: Q4, rows: [sale, unknown, known], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
     });
     expect(both.lines.find((line) => line.taxCountry === "RO")).toMatchObject({
       netMicros: 10_000_000, taxMicros: 2_100_000, refunds: 1, unknownRefunds: 1
     });
   });
 
+  it("caps each list and cuts the whole text at a line boundary only when a limit is given (O1; W12 fix I-1)", () => {
+    const full = renderTaxSummary(summary);
+    expect(full).not.toContain("more: run pnpm billing:tax-summary");
+    const capped = renderTaxSummary(summary, { itemsPerSection: 2, maxChars: 1_000_000 });
+    expect(capped).toContain(`charge ${"b".repeat(32)}: SMARTBILL_STORNO (CREDIT_NOTE_MANUAL), since 2026-11-05\n`
+      + "  - and 4 more: run pnpm billing:tax-summary --quarter 2026-Q4 on the host for the whole list\n  What to do:");
+    // The legend names only what the printed lines need.
+    expect(capped).not.toContain("  * QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED):");
+    const cut = renderTaxSummary(summary, { itemsPerSection: 40, maxChars: 2_000 });
+    expect(cut.length).toBeLessThanOrEqual(2_000);
+    expect(cut.endsWith("The summary is cut here: it is longer than one email holds. Run pnpm billing:tax-summary --quarter"
+      + " 2026-Q4 on the host for the whole of it.\n")).toBe(true);
+    expect(full.startsWith(cut.slice(0, cut.lastIndexOf("\nThe summary is cut here")))).toBe(true);
+  });
+
   it("prints the fallback for a country the row does not cover, and says when there is nothing to list", () => {
     const text = renderTaxSummary(buildTaxSummary({
-      quarter: Q4, rows: [row({ taxCountry: "CH" })], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: []
+      quarter: Q4, rows: [row({ taxCountry: "CH" })], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
     }));
     expect(text).toContain("Switzerland");
     expect(text).toContain("No entry for this place yet: ask the accountant before paying anything.");
@@ -181,6 +243,7 @@ describe("P16b the summary", () => {
     expect(text).toContain("Charge-backs this quarter: none.");
     expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown: none.");
     expect(text).toContain("Invoices and credit notes to check by hand: none.");
+    expect(text).toContain("Emails that never went out: none.");
     expect(text).toContain("Romanian e-Factura documents to confirm: none.");
     expect(text).toContain("Payments to check by hand in xMoney: none.");
   });
@@ -191,7 +254,9 @@ describe("P16b the summary", () => {
     const items = await paymentsToCheckFrom({
       deadRefunds: async () => [
         { chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED", since: now },
-        { chargeId: "6".repeat(32), transactionId: "2", reason: "WITHDRAWAL", code: "REFUND_OUTCOME_UNKNOWN", since: now }
+        { chargeId: "6".repeat(32), transactionId: "2", reason: "WITHDRAWAL", code: "REFUND_OUTCOME_UNKNOWN", since: now },
+        // P2-I5: a forged job's payload reason is only its claim, so the line carries none.
+        { chargeId: "4".repeat(32), transactionId: "3", reason: "CARD_CHECK_RELEASE", code: "REFUND_NOT_REQUESTED", since: now }
       ],
       unrecordedRefunds: async (since) => {
         // P9c's second refunds made elsewhere, as far back as A10's refund listing reaches.
@@ -226,6 +291,7 @@ describe("P16b the summary", () => {
     expect(items).toEqual([
       { what: "REFUND_REFUSED", ref: "7".repeat(32), reason: "WITHDRAWAL", since: now },
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: now },
+      { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: now },
       { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: now },
       { what: "WITHDRAWAL_BY_OWNER", ref: owner, reason: null, since: now },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: now },
@@ -252,10 +318,10 @@ describe("P16b the rows it reads", () => {
       { invoiceId: "1c5f3b0d-7a2e-4d4f-8b8c-3e6a9f2d1b04", chargeId: "b".repeat(32), kind: "CREDIT_NOTE" as const,
         series: null, number: "0043", at, status: "REJECTED" }
     ]);
-    expect(await efacturaChecksFrom({ smartBillDocumentsNotAccepted }, Q4.from, Q4.to)).toEqual([
+    expect(await efacturaChecksFrom({ smartBillDocumentsNotAccepted }, Q4.to)).toEqual([
       { document: "DBAI-0042", kind: "INVOICE", chargeId: "a".repeat(32), issuedAt: at, status: null },
       { document: "0043", kind: "CREDIT_NOTE", chargeId: "b".repeat(32), issuedAt: at, status: "REJECTED" }
     ]);
-    expect(smartBillDocumentsNotAccepted).toHaveBeenCalledWith(Q4.from, Q4.to);
+    expect(smartBillDocumentsNotAccepted).toHaveBeenCalledWith(Q4.to);
   });
 });

@@ -113,6 +113,8 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(await stack.subscriptionStatus(person.ownerRef)).toBe("WITHDRAWN");
     expect(await stack.entitlementPlan(person.ownerRef)).toBe("FREE");
     expect(ids(stack.mailsTo(person.email))).toContain("M8");
+    // W9 (P2-I11): the acknowledgement of receipt, rendered and sent before the refund ran, then M8 once it did.
+    expect(ids(stack.mailsTo(person.email)).filter((id) => id === "M8_RECEIVED" || id === "M8")).toEqual(["M8_RECEIVED", "M8"]);
     // The plan is already withdrawn, so a replay is refused before its grant is read. The grant itself was spent
     // inside the withdrawal's own transaction by billing.consume_withdrawal_grant (P12a).
     const replay = await stack.post(person, "/v1/billing/subscription/withdraw", { step_up_grant: grant });
@@ -228,5 +230,36 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     // With no acceptance row at all, M1 carried the withdrawal form only.
     const m1 = stack.mailsTo(person.email).find((mail) => mail.templateId === "M1")!;
     expect((m1.attachments ?? []).map((attachment) => attachment.filename)).toEqual(["withdrawal-form.txt"]);
+  });
+});
+
+describe("W12 the runtime's own dead-letter alert, on the fake stack", () => {
+  // After the A2 case on purpose: this plan stays ACTIVE, and the A2 case must be the only order renewing.
+  it("a Quaderno sale the tax service refuses dies and emails the owner O3 at once, through the runtime's own hook (W12 fix F3)", async () => {
+    const person = await stack.signUp("o3.alert@example.test", "DE");
+    const quote = await stack.quote(person, "PLUS");
+    const checkout = await stack.checkout(person, String(quote.body.quote_ref));
+    const chargeRef = String(checkout.body.charge_ref);
+    const notice = await stack.pay(checkout, "DE");
+    // A revoked Quaderno key: the sale's record is refused (createBillingRuntime's onDead: createDeadJobAlert).
+    stack.tax.failNext("TAX_SERVICE_REFUSED");
+    await stack.notify(notice.opensslResult);
+    await stack.runJobs();
+    const sale = await stack.database.pool.query<{ dead: boolean; code: string | null }>(
+      "SELECT dead_at IS NOT NULL AS dead, last_error_code AS code FROM billing.outbox WHERE kind = 'QUADERNO_RECORD_SALE' AND ref = $1",
+      [chargeRef]
+    );
+    expect(sale.rows).toEqual([{ dead: true, code: "TAX_SERVICE_REFUSED" }]);
+    expect(stack.mailsTo("owner@example.test").filter((mail) => mail.templateId === "O3")).toEqual([
+      expect.objectContaining({
+        locale: "en",
+        params: expect.objectContaining({
+          jobKind: "QUADERNO_RECORD_SALE", reference: `charge ${chargeRef}`, reasonCode: "TAX_SERVICE_REFUSED",
+          nextSteps: expect.stringContaining(`pnpm billing:invoice --charge ${chargeRef} --kind INVOICE --requeue`)
+        })
+      })
+    ]);
+    // The plan itself is unaffected: the payment was taken and the plan is live.
+    expect(await stack.entitlementPlan(person.ownerRef)).toBe("PLUS");
   });
 });

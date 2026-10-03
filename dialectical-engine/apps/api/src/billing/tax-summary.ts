@@ -8,26 +8,39 @@ import {
   type TaxAuthorityRegistration,
   type TaxDueRule
 } from "@debateai/register";
+import { deadEmailAction, documentJobAction } from "./dead-jobs.js";
 
 export type TaxQuarter = Readonly<{ year: number; quarter: 1 | 2 | 3 | 4; from: Date; to: Date; label: string }>;
-export type InvoiceUnknownCode =
-  | "INVOICE_UNKNOWN" | "CREDIT_NOTE_MANUAL" | "INVOICE_SERVICE_REFUSED" | "INVOICE_SERVICE_UNAVAILABLE";
+/**
+ * W12 (P2-I16): the dead job's own code, whatever it is (P16b's four were INVOICE_UNKNOWN, CREDIT_NOTE_MANUAL,
+ * INVOICE_SERVICE_REFUSED and INVOICE_SERVICE_UNAVAILABLE); `documentJobAction` says what each one asks of the owner.
+ */
+export type InvoiceUnknownCode = string;
 export type InvoiceUnknownItem = Readonly<{ chargeId: string; jobKind: string; code: InvoiceUnknownCode; since: Date }>;
-/** A Romanian SmartBill document of the quarter whose e-Factura acceptance is not recorded (`status`: the latest one). */
+/** W12 (P2-I16): an EMAIL job that died (P1b's `deadEmails`): its ref, template, recipient kind and code. */
+export type DeadEmailItem = Readonly<{
+  ref: string; template: string | null; recipient: string | null; code: string; since: Date;
+}>;
+/**
+ * A Romanian SmartBill document issued by the quarter's end, in it or earlier (P2-M24), whose e-Factura acceptance is
+ * not recorded (`status`: the latest one).
+ */
 export type EFacturaCheckItem = Readonly<{
   document: string; kind: "INVOICE" | "CREDIT_NOTE"; chargeId: string; issuedAt: Date; status: string | null;
 }>;
 /**
  * What the owner checks in xMoney or at the tax service: a refund xMoney refused (still owed) or one whose outcome is
- * unknown; a second refund made elsewhere on one payment, which our records cannot hold (P9c's REFUND_UNRECORDED:
- * its amount is in no line of the summary); a withdrawal handed to the owner; a renewal closed with its outcome
- * unknown; a charge with no outcome after 30 days; R2 Q-1's renewals with no charge (a dunning the tax service could
- * not price, a plan such a dunning ended, a renewal a tax refusal blocks); a subscription whose history does not fold
- * (renewals skip it: what was its subscriber charged?).
+ * unknown; a refund job the charge records no request for (P2-I5's REFUND_NOT_REQUESTED: nothing was sent, it is no
+ * refund to make, and whoever runs the server checks who queued it); a second refund made elsewhere on one payment,
+ * which our records cannot hold (P9c's REFUND_UNRECORDED: its amount is in no line of the summary); a withdrawal
+ * handed to the owner; a renewal closed with its outcome unknown; a charge with no outcome after 30 days; R2 Q-1's
+ * renewals with no charge (a dunning the tax service could not price, a plan such a dunning ended, a renewal a tax
+ * refusal blocks); a subscription whose history does not fold (renewals skip it: what was its subscriber charged?).
  */
 export type PaymentCheck =
-  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_UNRECORDED" | "WITHDRAWAL_BY_OWNER" | "RENEWAL_STUCK"
-  | "PAYMENT_UNSETTLED" | "DUNNING_UNPRICED" | "ENDED_UNPRICED" | "RENEWAL_BLOCKED" | "SUBSCRIPTION_HISTORY_INVALID";
+  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_UNRECORDED" | "WITHDRAWAL_BY_OWNER"
+  | "RENEWAL_STUCK" | "PAYMENT_UNSETTLED" | "DUNNING_UNPRICED" | "ENDED_UNPRICED" | "RENEWAL_BLOCKED"
+  | "SUBSCRIPTION_HISTORY_INVALID";
 export type PaymentToCheckItem = Readonly<{
   what: PaymentCheck;
   /**
@@ -38,7 +51,9 @@ export type PaymentToCheckItem = Readonly<{
   ref: string;
   /**
    * A dead refund's reason (a WITHDRAWAL refund is due within 14 days of the withdrawal), or the code a charge-less
-   * attempt names (TAX_SERVICE_UNAVAILABLE); else null.
+   * attempt names (TAX_SERVICE_UNAVAILABLE: the tax service could not price it; RETRY_TOTAL_CHANGED: P2-M10's retry
+   * priced afresh at a total other than the announced one, so nothing was charged); else null. Null for
+   * REFUND_NOT_REQUESTED: its payload's reason is only what the job claimed.
    */
   reason: string | null;
   since: Date;
@@ -73,6 +88,7 @@ export type TaxSummary = Readonly<{
   invoiceUnknown: ReadonlyArray<InvoiceUnknownItem>;
   efactura: ReadonlyArray<EFacturaCheckItem>;
   paymentsToCheck: ReadonlyArray<PaymentToCheckItem>;
+  deadEmails: ReadonlyArray<DeadEmailItem>;
   sales: number;
   refunds: number;
 }>;
@@ -127,14 +143,16 @@ export function liveQuarterSummaryRows(
 }
 
 /**
- * The quarter's Romanian e-Factura documents ANAF has not accepted (P10b's `smartBillDocumentsNotAccepted`: the
- * latest status is not ACCEPTED), each named by the series and number SmartBill printed on it — what the owner types
- * into `pnpm billing:efactura-status --invoice`.
+ * The Romanian e-Factura documents ANAF has not accepted (P10b's `smartBillDocumentsNotAccepted`: the latest status is
+ * not ACCEPTED) issued before `before`, the quarter's end: P2-M24, the quarter's and every earlier quarter's, so a
+ * document rejected or unanswered in one quarter stays on the next summary until its ACCEPTED is recorded. Each is
+ * named by the series and number SmartBill printed on it — what the owner types into
+ * `pnpm billing:efactura-status --invoice`.
  */
 export async function efacturaChecksFrom(
-  jobs: Pick<BillingJobQueries, "smartBillDocumentsNotAccepted">, from: Date, to: Date
+  jobs: Pick<BillingJobQueries, "smartBillDocumentsNotAccepted">, before: Date
 ): Promise<EFacturaCheckItem[]> {
-  return (await jobs.smartBillDocumentsNotAccepted(from, to)).map((document): EFacturaCheckItem => Object.freeze({
+  return (await jobs.smartBillDocumentsNotAccepted(before)).map((document): EFacturaCheckItem => Object.freeze({
     document: document.series === null ? document.number : `${document.series}-${document.number}`,
     kind: document.kind, chargeId: document.chargeId, issuedAt: document.at, status: document.status
   }));
@@ -156,10 +174,10 @@ export async function paymentsToCheckFrom(
 ): Promise<PaymentToCheckItem[]> {
   const dayMs = 86_400_000;
   const lookBack = new Date(now.getTime() - 120 * dayMs);
-  const refunds = (await billing.deadRefunds()).map((item): PaymentToCheckItem => Object.freeze({
-    what: item.code === "REFUND_OUTCOME_UNKNOWN" ? "REFUND_OUTCOME_UNKNOWN" : "REFUND_REFUSED",
-    ref: item.chargeId, reason: item.reason, since: item.since
-  }));
+  const refunds = (await billing.deadRefunds()).map((item): PaymentToCheckItem => {
+    const what = deadRefundCheck(item.code);
+    return Object.freeze({ what, ref: item.chargeId, reason: what === "REFUND_NOT_REQUESTED" ? null : item.reason, since: item.since });
+  });
   const unrecorded = (await billing.unrecordedRefunds(lookBack)).map((item): PaymentToCheckItem => Object.freeze({
     what: "REFUND_UNRECORDED", ref: item.transactionId, reason: null, since: item.since
   }));
@@ -185,6 +203,28 @@ export async function paymentsToCheckFrom(
   return [...refunds, ...unrecorded, ...withdrawals, ...stuck, ...unsettled, ...chargeless, ...blocked, ...unfoldable];
 }
 
+/** W12 (P2-I16): the emails that died in the last 120 days (the same reach as the payment lists above). */
+export async function deadEmailsFrom(
+  billing: Pick<BillingRepository, "deadEmails">, now: Date
+): Promise<DeadEmailItem[]> {
+  return (await billing.deadEmails(new Date(now.getTime() - 120 * 86_400_000))).map((item) => Object.freeze({ ...item }));
+}
+
+/**
+ * Which list a dead XMONEY_REFUND job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
+ * (P2-I5) moved no money and is no refund to make; every other dead end leaves the money owed.
+ */
+function deadRefundCheck(code: string | null): "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" {
+  switch (code) {
+    case "REFUND_OUTCOME_UNKNOWN":
+      return "REFUND_OUTCOME_UNKNOWN";
+    case "REFUND_NOT_REQUESTED":
+      return "REFUND_NOT_REQUESTED";
+    default:
+      return "REFUND_REFUSED";
+  }
+}
+
 /** How a payment line names what the owner looks up. */
 function subjectOf(item: PaymentToCheckItem): string {
   switch (item.what) {
@@ -199,6 +239,7 @@ function subjectOf(item: PaymentToCheckItem): string {
       return `subscription ${item.ref}`;
     case "REFUND_REFUSED":
     case "REFUND_OUTCOME_UNKNOWN":
+    case "REFUND_NOT_REQUESTED":
     case "RENEWAL_STUCK":
     case "PAYMENT_UNSETTLED":
       return `charge ${item.ref}`;
@@ -219,7 +260,7 @@ const zeroCounts = (): Record<TaxStatus, number> => ({ TAXABLE: 0, NON_TAXABLE: 
 export function buildTaxSummary(input: Readonly<{
   quarter: TaxQuarter; rows: ReadonlyArray<TaxSummaryRow>; invoiceUnknown: ReadonlyArray<InvoiceUnknownItem>;
   efactura: ReadonlyArray<EFacturaCheckItem>; paymentsToCheck: ReadonlyArray<PaymentToCheckItem>;
-  authorities: TaxAuthorities;
+  deadEmails: ReadonlyArray<DeadEmailItem>; authorities: TaxAuthorities;
 }>): TaxSummary {
   type Working = { taxCountry: string; taxRegion: string | null; authority: TaxAuthorityEntry | null;
     netMicros: number; taxMicros: number; sales: number; refunds: number; unknownRefunds: number;
@@ -283,7 +324,8 @@ export function buildTaxSummary(input: Readonly<{
     conflicting: Object.freeze(conflicting), notRegistered: Object.freeze(notRegistered),
     chargebacks: Object.freeze(chargebacks), unknownRefunds: Object.freeze(unknownRefunds),
     invoiceUnknown: Object.freeze([...input.invoiceUnknown]),
-    efactura: Object.freeze([...input.efactura]), paymentsToCheck: Object.freeze([...input.paymentsToCheck]), sales, refunds
+    efactura: Object.freeze([...input.efactura]), paymentsToCheck: Object.freeze([...input.paymentsToCheck]),
+    deadEmails: Object.freeze([...input.deadEmails]), sales, refunds
   });
 }
 
@@ -318,8 +360,18 @@ function listOf(parts: readonly string[]): string {
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)!}`;
 }
 
+/**
+ * W12 fix I-1: how much of the summary one email holds. O1 is one `block` param, and a block holds at most 65,536
+ * characters (packages/mail-templates/src/render.ts), so a text over it makes the send throw and O1 die, in exactly
+ * the mass failure (a Quaderno outage, a revoked key, a relay outage) whose lines it should carry. O1 prints at most
+ * `itemsPerSection` lines of each list (then "and N more", with the command that prints them all), and as the last
+ * bound cuts the whole text at a line boundary under `maxChars` with a closing line saying so. The command prints
+ * everything (no limit).
+ */
+export type TaxSummaryLimit = Readonly<{ itemsPerSection: number; maxChars: number }>;
+
 /** The O1 text and the command's output: amounts, countries, codes and our own charge ids; never a person. */
-export function renderTaxSummary(summary: TaxSummary): string {
+export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | null = null): string {
   const { quarter } = summary;
   const countryName = new Intl.DisplayNames(["en"], { type: "region" });
   const out: string[] = [
@@ -347,13 +399,34 @@ export function renderTaxSummary(summary: TaxSummary): string {
     if (dates.length > 0) out.push(`  For ${quarter.label}: ${listOf(dates.map(longDate))}.`);
     out.push("");
   }
-  const section = <T>(items: ReadonlyArray<T>, empty: string, heading: string, lineOf: (item: T) => string): void => {
+  const fullCommand = `pnpm billing:tax-summary --quarter ${quarter.label}`;
+  /** Prints a list's lines (at most `limit.itemsPerSection` of them) and hands back the lines it printed. */
+  const section = <T>(items: ReadonlyArray<T>, empty: string, heading: string, lineOf: (item: T) => string): ReadonlyArray<T> => {
     if (items.length === 0) {
       out.push(empty);
-      return;
+      return items;
     }
     out.push(heading);
-    for (const item of items) out.push(`  - ${lineOf(item)}`);
+    const shown = limit === null ? items : items.slice(0, limit.itemsPerSection);
+    for (const item of shown) out.push(`  - ${lineOf(item)}`);
+    if (shown.length < items.length) {
+      out.push(`  - and ${String(items.length - shown.length)} more: run ${fullCommand} on the host for the whole list`);
+    }
+    return shown;
+  };
+  /**
+   * W12 fix I-1: what to do is said once per kind of line, below its list, never on every line (a mass failure lists
+   * hundreds of lines of one kind; each action is about 400 characters with its command lines).
+   */
+  const legend = <T>(shown: ReadonlyArray<T>, keyOf: (item: T) => string, actionOf: (item: T) => string): void => {
+    const actions = new Map<string, string>();
+    for (const item of shown) {
+      const key = keyOf(item);
+      if (!actions.has(key)) actions.set(key, actionOf(item));
+    }
+    if (actions.size === 0) return;
+    out.push("  What to do:");
+    for (const [key, action] of actions) out.push(`  * ${key}: ${action}`);
   };
   section(summary.conflicting, "Charges with conflicting location evidence: none.",
     "Charges with conflicting location evidence (taxed at the declared country; for the accountant):",
@@ -370,22 +443,40 @@ export function renderTaxSummary(summary: TaxSummary): string {
       + " adjust that country's net sales and tax by hand, at most the amount shown):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}${item.taxRegion === null ? "" : `, ${item.taxRegion}`},`
       + ` up to ${microsToDecimal(item.upToMicros)} USD, on ${isoDay(item.at)}`);
-  section(summary.invoiceUnknown, "Invoices and credit notes to check by hand: none.",
-    "Invoices and credit notes to check by hand in SmartBill or Quaderno (INVOICE_UNKNOWN: the issuer never"
-      + " confirmed it; INVOICE_SERVICE_REFUSED / INVOICE_SERVICE_UNAVAILABLE: SmartBill never issued the Romanian"
-      + " invoice or storno, issue it by hand; CREDIT_NOTE_MANUAL: a partial credit note to issue by hand, and for"
-      + " DASHBOARD_REFUND the refund made in the xMoney dashboard, whose amount only the dashboard shows):",
-    (item) => `charge ${item.chargeId}: ${item.jobKind} (${item.code}), since ${isoDay(item.since)}`);
+  // W12 (P2-I16, P2-I17): every dead document job, whatever its code; what to do once per job kind and code (fix I-1).
+  // `pnpm billing:invoice` records a document issued or found by hand, or re-queues the job, and the line then leaves
+  // the list.
+  const documentKey = (item: InvoiceUnknownItem): string => `${item.jobKind} (${item.code})`;
+  legend(section(summary.invoiceUnknown, "Invoices and credit notes to check by hand: none.",
+    "Invoices and credit notes to check by hand in SmartBill or Quaderno (a legal document that was never issued, or"
+      + " whose issuing was never confirmed; what to do is said once for each job kind and code below the list, where"
+      + " <charge> stands for the line's charge; pnpm billing:invoice records a document you issued or found by hand, or"
+      + " re-queues the job; the line stays until the document is recorded):",
+    (item) => `charge ${item.chargeId}: ${documentKey(item)}, since ${isoDay(item.since)}`),
+  documentKey, (item) => documentJobAction({ chargeId: "<charge>", jobKind: item.jobKind, code: item.code }));
+  // F4: the job itself is never tried again; only M3 is sent again, by the renewal (deadEmailAction says so for M3).
+  const emailKey = (item: DeadEmailItem): string =>
+    `${item.template ?? "unknown template"} ${item.recipient === "OWNER" ? "to you" : "to the customer"}`;
+  legend(section(summary.deadEmails, "Emails that never went out: none.",
+    "Emails that never went out (the last 120 days; a dead email job is not tried again, and only the notice of a"
+      + " changed renewal amount, M3, is sent again, by the renewal; what each one means is said once for each email"
+      + " below the list):",
+    (item) => `${item.template ?? "unknown template"} (job ${item.ref}): ${item.code}, since ${isoDay(item.since)}`),
+  emailKey, (item) => deadEmailAction(item.template, item.recipient));
   section(summary.efactura, "Romanian e-Factura documents to confirm: none.",
-    "Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV (issued this quarter, and no ACCEPTED status"
-      + " recorded yet; record ANAF's answer with pnpm billing:efactura-status --invoice <series>-<number> --status"
-      + " ACCEPTED|REJECTED):",
+    "Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV (issued this quarter or earlier, and no"
+      + " ACCEPTED status recorded yet; record ANAF's answer with pnpm billing:efactura-status --invoice"
+      + " <series>-<number> --status ACCEPTED|REJECTED):",
     (item) => `${item.kind === "INVOICE" ? "invoice" : "credit note"} ${item.document} (charge ${item.chargeId}),`
       + ` issued ${isoDay(item.issuedAt)}: ${item.status === null ? "no status recorded" : `last status ${item.status}`}`);
   section(summary.paymentsToCheck, "Payments to check by hand in xMoney: none.",
     "Payments to check by hand in xMoney (REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund"
       + " it from the dashboard; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the"
       + " dashboard before refunding again; a WITHDRAWAL refund is due within 14 days of the withdrawal;"
+      + " REFUND_NOT_REQUESTED: a refund job that matches no refund request our records hold for this payment, so"
+      + " nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to the"
+      + " billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
+      + " (one never refunded is still owed);"
       + " REFUND_UNRECORDED: a second refund made in the xMoney dashboard on a payment that already had one, which our"
       + " records cannot hold, so it is in no figure above: read its amount on that transaction in the dashboard and"
       + " take it off that country's net sales and tax by hand;"
@@ -395,11 +486,31 @@ export function renderTaxSummary(summary: TaxSummary): string {
       + " unknown, check whether the card was charged; PAYMENT_UNSETTLED: no outcome after 30 days;"
       + " DUNNING_UNPRICED: a renewal the tax service could not price within the 3-day quiet retry, so the payment"
       + " reminders run with nothing charged, check the tax service; ENDED_UNPRICED: such a plan ended after its last"
-      + " retry day, nothing was charged; RENEWAL_BLOCKED: the tax service refuses to price a renewal (a revoked"
+      + " retry day, nothing was charged; RETRY_TOTAL_CHANGED (named after DUNNING_UNPRICED or ENDED_UNPRICED): the"
+      + " tax service priced a retry again, but at a total the person was never told about (a tax change), so nothing"
+      + " is charged and the plan ends after its last retry day unless a later retry prices at the announced total"
+      + " again; there is nothing to fix in the tax service, and the person can subscribe again at the new price;"
+      + " RENEWAL_BLOCKED: the tax service refuses to price a renewal (a revoked"
       + " Quaderno key or a refused request), so nothing is charged and the person is on Free until it prices again,"
       + " fix the tax service;"
       + " SUBSCRIPTION_HISTORY_INVALID: a subscription whose records do not add up, so renewals skip it, check what its"
       + " subscriber was charged and ask the developer):",
     (item) => `${subjectOf(item)}: ${item.what}${item.reason === null ? "" : ` (${item.reason})`}, since ${isoDay(item.since)}`);
-  return `${out.join("\n")}\n`;
+  return fitted(out, limit, fullCommand);
+}
+
+/** The text, cut at a line boundary under `limit.maxChars` with a closing line when it is longer (fix I-1). */
+function fitted(lines: readonly string[], limit: TaxSummaryLimit | null, fullCommand: string): string {
+  const text = `${lines.join("\n")}\n`;
+  if (limit === null || text.length <= limit.maxChars) return text;
+  const closing = `The summary is cut here: it is longer than one email holds. Run ${fullCommand} on the host for the whole`
+    + " of it.\n";
+  const kept: string[] = [];
+  let length = closing.length;
+  for (const line of lines) {
+    if (length + line.length + 1 > limit.maxChars) break;
+    kept.push(line);
+    length += line.length + 1;
+  }
+  return `${kept.join("\n")}\n${closing}`;
 }

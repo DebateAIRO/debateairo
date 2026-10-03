@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   FormEvent,
   MouseEvent as ReactMouseEvent,
@@ -528,8 +527,12 @@ export function SignUpFlow({
           {busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}
         </button>
 
+        {/* A plain <a>, never next/link: /login sends a signed-in visitor on to its ?next, which can
+            be a card page (/checkout?plan=…). A client-side move would carry that redirect out inside
+            this document, under the strict policy that blocks the card form's frame; a full page load
+            makes the card page a new document with its own policy. */}
         <p className="authPanelFooter">
-          {t(catalog, "auth.signUp.alreadyHaveOne")} <Link href={loginHref}>{t(catalog, "auth.signUp.logIn")}</Link>
+          {t(catalog, "auth.signUp.alreadyHaveOne")} <a href={loginHref}>{t(catalog, "auth.signUp.logIn")}</a>
         </p>
 
         {sent && messageKey !== null ? (

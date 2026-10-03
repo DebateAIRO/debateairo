@@ -24,25 +24,34 @@ function asJob(request: ReturnType<typeof emailJob>, attempts = 1): OutboxJob {
   return { jobId: JOB_ID, kind: "EMAIL", ref: request.ref, notBefore: NOW, attempts, payload: request.payload } as unknown as OutboxJob;
 }
 
-function harness(current: BillingProfile | null, attachments = new Map<BillingAttachmentKind, AttachmentResolver>()) {
+/**
+ * W8 (P2-I12): `account` is what the live account answers at send time (null = the account is erased, so the billing
+ * profile's address is used). The cases that test something else keep the account's address equal to the profile's.
+ */
+function harness(
+  current: BillingProfile | null, attachments = new Map<BillingAttachmentKind, AttachmentResolver>(),
+  account: string | null = current?.email ?? null
+) {
   const sent: BillingMail[] = [];
   const sealed = current === null ? null : sealBillingProfile(KEY, CUSTOMER, current);
   // P1b's `latestProfile` row carries the profile's locale beside the ciphertext.
   const row = current === null || sealed === null ? null
     : { profileCiphertext: sealed.ciphertext, keyId: sealed.keyId, at: NOW, locale: current.locale };
   const latestProfile = vi.fn(async () => row);
+  const currentAddress = vi.fn(async (_customerId: string) => account);
   const handler = createEmailJobHandler({
     repository: { latestProfile },
+    recipients: { currentAddress },
     recordsKey: KEY,
     ownerReportEmail: "owner@example.test",
     mail: { sendTemplated: vi.fn(async (mail: BillingMail) => { sent.push(mail); }) },
     attachments
   });
-  return { handler, sent, latestProfile };
+  return { handler, sent, latestProfile, currentAddress };
 }
 
 describe("P7 the EMAIL job", () => {
-  it("keeps no address in the queue and reads it from the latest billing profile at send time", async () => {
+  it("keeps no address in the queue and resolves it at send time", async () => {
     const request = emailJob({
       template: "M1", recipient: { kind: "CUSTOMER", customerId: CUSTOMER }, dedupeRef: "sub-1",
       params: { plan: "PLUS", totalAmount: "24.20" }, notBefore: NOW
@@ -57,26 +66,74 @@ describe("P7 the EMAIL job", () => {
     }]);
   });
 
+  it("W8: sends a customer's mail to the account's CURRENT address, read at send time, in the profile's locale", async () => {
+    const request = emailJob({
+      template: "M3", recipient: { kind: "CUSTOMER", customerId: CUSTOMER }, dedupeRef: "sub-1:2026-11",
+      params: { plan: "PLUS", totalAmount: "24.20" }, notBefore: NOW
+    });
+    const { handler, sent, currentAddress } = harness(
+      profile("address-at-checkout@example.test", "ro"), new Map(), "address-now@example.test"
+    );
+    expect(await handler(asJob(request), NOW)).toEqual({ kind: "DONE" });
+    expect(currentAddress).toHaveBeenCalledWith(CUSTOMER);
+    expect(sent).toEqual([expect.objectContaining({ to: "address-now@example.test", locale: "ro", templateId: "M3" })]);
+  });
+
+  it("W8: uses the billing profile's address once the account is erased", async () => {
+    const request = emailJob({
+      template: "M2_INVOICE_LINK", recipient: { kind: "CUSTOMER", customerId: CUSTOMER }, dedupeRef: "charge-9",
+      params: { plan: "PLUS", totalAmount: "24.20" }, notBefore: NOW
+    });
+    const { handler, sent } = harness(profile("kept-with-the-invoices@example.test", "de"), new Map(), null);
+    expect(await handler(asJob(request), NOW)).toEqual({ kind: "DONE" });
+    expect(sent).toEqual([expect.objectContaining({ to: "kept-with-the-invoices@example.test", locale: "de" })]);
+  });
+
+  it("W8: lets a failed read of the account's address retry, sending nothing to the old one", async () => {
+    const request = emailJob({
+      template: "M5A", recipient: { kind: "CUSTOMER", customerId: CUSTOMER }, dedupeRef: "charge-10",
+      params: { plan: "PLUS" }, notBefore: NOW
+    });
+    const sent: BillingMail[] = [];
+    const sealed = sealBillingProfile(KEY, CUSTOMER, profile("old@example.test", "en"));
+    const handler = createEmailJobHandler({
+      repository: { latestProfile: async () => ({ profileCiphertext: sealed.ciphertext, keyId: sealed.keyId, at: NOW, locale: "en" }) },
+      recipients: { currentAddress: async () => { throw new TypedDomainError("BILLING_ACCOUNT_EMAIL_UNAVAILABLE", "key store down"); } },
+      recordsKey: KEY, ownerReportEmail: "owner@example.test",
+      mail: { sendTemplated: async (mail) => { sent.push(mail); } },
+      attachments: new Map()
+    });
+    await expect(handler(asJob(request), NOW)).rejects.toMatchObject({ code: "BILLING_ACCOUNT_EMAIL_UNAVAILABLE" });
+    expect(sent).toEqual([]);
+  });
+
   it("sends the owner's mail to the owner's custody address in English", async () => {
     const request = emailJob({
       template: "O1", recipient: { kind: "OWNER" }, dedupeRef: "2026-Q4",
       params: { quarter: "2026-Q4", summaryText: "RO net 1.00" }, notBefore: NOW
     });
-    const { handler, sent, latestProfile } = harness(null);
+    const { handler, sent, latestProfile, currentAddress } = harness(null);
     await handler(asJob(request), NOW);
     expect(latestProfile).not.toHaveBeenCalled();
+    expect(currentAddress).not.toHaveBeenCalled();
     expect(sent[0]).toMatchObject({ to: "owner@example.test", locale: "en", templateId: "O1" });
     // Q-5: the refund that could not be completed reaches the owner the same way (RefundDesk queues it, P9b).
     const deadRefund = emailJob({
       template: "O2", recipient: { kind: "OWNER" }, dedupeRef: "0123456789abcdef0123456789abcdef:7700001",
-      params: { chargeRef: "0123456789abcdef0123456789abcdef", refundAmount: "12.10", reasonCode: "REFUND_OUTCOME_UNKNOWN" },
+      params: {
+        chargeRef: "0123456789abcdef0123456789abcdef", refundAmount: "12.10", reasonCode: "REFUND_OUTCOME_UNKNOWN",
+        notRequested: "false"
+      },
       notBefore: NOW
     });
     expect(deadRefund.ref).toBe("O2:0123456789abcdef0123456789abcdef:7700001");
     await handler(asJob(deadRefund), NOW);
     expect(sent[1]).toMatchObject({
       to: "owner@example.test", locale: "en", templateId: "O2",
-      params: { chargeRef: "0123456789abcdef0123456789abcdef", refundAmount: "12.10", reasonCode: "REFUND_OUTCOME_UNKNOWN" }
+      params: {
+        chargeRef: "0123456789abcdef0123456789abcdef", refundAmount: "12.10", reasonCode: "REFUND_OUTCOME_UNKNOWN",
+        notRequested: "false"
+      }
     });
   });
 
@@ -117,6 +174,7 @@ describe("P7 the EMAIL job", () => {
         const sealed = sealBillingProfile(KEY, CUSTOMER, profile("p@example.test", "en"));
         return { profileCiphertext: sealed.ciphertext, keyId: sealed.keyId, at: NOW, locale: "en" };
       } },
+      recipients: { currentAddress: async () => "p@example.test" },
       recordsKey: KEY, ownerReportEmail: "owner@example.test",
       mail: { sendTemplated: async () => { throw new MailDeliveryError("SENDMAIL_TIMEOUT"); } },
       attachments: new Map()

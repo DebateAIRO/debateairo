@@ -20,6 +20,12 @@ const renewalCharges = async (subscriptionId: string) =>
   (await h.repository.chargesForSubscription(subscriptionId)).filter((charge) => charge.kind === "RENEWAL");
 /** Q-1: the M5 emails queued for a charge (none may go out while an outage is waited out). */
 const m5Refs = async (chargeId: string) => (await h.outboxRows(chargeId)).map((row) => row.ref).filter((ref) => ref.startsWith("M5"));
+/**
+ * W10 (P2-I21): one param of the queued EMAIL job `jobRef`. M5's `bankDeclined` is "true" only for PAYMENT_DECLINED:
+ * no other failed attempt asked a bank, so its email never says one refused.
+ */
+const emailParam = async (jobRef: string, name: string) =>
+  (await h.outboxRows(jobRef)).find((row) => row.kind === "EMAIL" && row.ref === jobRef)?.payload[`param.${name}`];
 const subscriptionKinds = async (subscriptionId: string) =>
   (await h.repository.subscriptionEvents(subscriptionId)).map((event) => event.kind);
 /** Rebills of this subscription's own order: earlier tests' subscriptions may fall due on the same clock. */
@@ -75,18 +81,53 @@ describe("P11a monthly renewal", () => {
     h.tax.rateOverride.set("RO", 1_900);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(0);
-    const events = await h.repository.subscriptionEvents(paid.subscriptionId);
     const until = addBusinessDays(h.clock.now, 7);
-    expect(events.slice(-2).map((event) => [event.kind, event.data])).toEqual([
-      ["RENEWAL_NOTICE_SENT", { announced_total_micros: 23_800_000, sent_at: h.clock.now.toISOString() }],
-      ["RENEWAL_POSTPONED", { until: until.toISOString(), reason: "NOTICE_PERIOD" }]
-    ]);
+    // W12 (the controller's ruling on P2-I16, A7): M3 is queued, but nothing counts as a notice until it went out.
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({
+      kind: "RENEWAL_POSTPONED", data: { until: until.toISOString(), reason: "NOTICE_PERIOD" }
+    });
+    expect(await subscriptionKinds(paid.subscriptionId)).not.toContain("RENEWAL_NOTICE_SENT");
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`M3:${paid.subscriptionId}:${end.toISOString()}:23800000`);
     expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ cause: "RENEWAL_POSTPONED", paidThrough: until });
+    await h.mail.drain();
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({
+      kind: "RENEWAL_NOTICE_SENT", data: { announced_total_micros: 23_800_000, sent_at: h.clock.now.toISOString() }
+    });
     h.clock.advance(MINUTE);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(0);
     h.clock.now = new Date(until.getTime() + MINUTE);
+    await h.renewal.runOnce();
+    expect(rebills(paid)).toBe(1);
+    expect((await renewalCharges(paid.subscriptionId))[0]).toMatchObject({ periodStart: end, totalMicros: 23_800_000 });
+  });
+
+  it("never charges a changed total on a notice that never went out: it sends M3 again and waits again (W12, A7)", async () => {
+    const { paid, end } = await dueNow();
+    h.tax.rateOverride.set("RO", 1_900);
+    await h.renewal.runOnce();
+    const noticeRef = `M3:${paid.subscriptionId}:${end.toISOString()}:23800000`;
+    // The notice's email dies (an unreadable profile, a relay that never answered): its job is dead-lettered.
+    await h.database.pool.query(
+      "UPDATE billing.outbox SET dead_at = $2, last_error_code = 'BILLING_PROFILE_UNREADABLE' WHERE kind = 'EMAIL' AND ref = $1 AND dead_at IS NULL",
+      [noticeRef, h.clock.now]
+    );
+    const firstUntil = addBusinessDays(h.clock.now, 7);
+    h.clock.now = new Date(firstUntil.getTime() + MINUTE);
+    await h.renewal.runOnce();
+    // No charge on the unsent notice: a new M3 under the same ref, and a new 7-business-day wait from now.
+    expect(rebills(paid)).toBe(0);
+    expect(await subscriptionKinds(paid.subscriptionId)).not.toContain("RENEWAL_NOTICE_SENT");
+    expect((await h.outboxRows(noticeRef)).filter((row) => row.ref === noticeRef).map((row) => `dead=${row.dead} done=${row.done}`).sort())
+      .toEqual(["dead=false done=false", "dead=true done=false"]);
+    const secondUntil = addBusinessDays(h.clock.now, 7);
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({
+      kind: "RENEWAL_POSTPONED", data: { until: secondUntil.toISOString() }
+    });
+    // This one goes out, so the changed total is charged once its own wait is over.
+    await h.mail.drain();
+    expect(h.mail.sent.filter((mail) => mail.templateId === "M3" && mail.params.totalAmount === "23.80").length).toBeGreaterThan(0);
+    h.clock.now = new Date(secondUntil.getTime() + MINUTE);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(1);
     expect((await renewalCharges(paid.subscriptionId))[0]).toMatchObject({ periodStart: end, totalMicros: 23_800_000 });
@@ -217,7 +258,68 @@ describe("P11a monthly renewal", () => {
       cause: "PAST_DUE_GRACE", paidThrough: new Date(h.clock.now.getTime() + 8 * DAY)
     });
     expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
+    // W10 (P2-I21): an outcome that stayed unknown asked no bank we know of, so M5A never says a bank refused.
+    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
     expect(h.auditLines).toContainEqual({ event: "billing.renewal.stuck", attempt: 1, code: "REBILL_OUTCOME_UNKNOWN" });
+  });
+
+  /** Two blind unknowns on the renewal's rebill (A2's one resubmission spent), from now on, as the test above makes them. */
+  async function twoLostAnswers(paid: Readonly<{ transaction: Readonly<{ orderId: string }> }>) {
+    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
+    await h.renewal.runOnce();
+    h.clock.advance(5 * MINUTE);
+    await h.renewal.runOnce();
+    h.clock.advance(26 * MINUTE);
+    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
+    await h.renewal.runOnce();
+    h.clock.advance(31 * MINUTE);
+    await h.renewal.runOnce();
+    expect(rebills(paid)).toBe(2);
+  }
+
+  it("lists a renewal charged late with two lost answers from 72 hours past its due instant, not its making (P2-M11)", async () => {
+    const { paid, end } = await dueNow();
+    // The tax service is down at the due instant (Q-1): no charge yet, and the plan is held to 72 hours past the end.
+    h.tax.failNext("TAX_SERVICE_UNAVAILABLE");
+    await expect(h.renewal.renew(paid.subscriptionId)).rejects.toMatchObject({ code: "TAX_SERVICE_UNAVAILABLE" });
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({
+      cause: "RENEWAL_PENDING", paidThrough: new Date(end.getTime() + 72 * HOUR)
+    });
+    // It is charged 50 hours late, and both answers are lost.
+    h.clock.now = new Date(end.getTime() + 50 * HOUR);
+    await twoLostAnswers(paid);
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect(await unknownCodes(charge!.chargeId)).toEqual(["REBILL_OUTCOME_UNKNOWN", "REBILL_OUTCOME_UNKNOWN"]);
+    expect(await openChargeIds()).not.toContain(charge!.chargeId);
+    // The hold lapses 72 hours past the due instant, so the close is due then, not 72 hours after the charge was made.
+    h.clock.now = new Date(end.getTime() + 72 * HOUR + MINUTE);
+    expect(await openChargeIds()).toContain(charge!.chargeId);
+    await h.renewal.runOnce();
+    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED"))
+      .toMatchObject({ errorCode: "NO_TRANSACTION" });
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
+    expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
+  });
+
+  it("lists a postponed renewal with two lost answers only from 72 hours past the postponement's end (P2-M11)", async () => {
+    const { paid, end } = await dueNow();
+    h.tax.rateOverride.set("RO", 1_900);
+    await h.renewal.runOnce();
+    const until = addBusinessDays(h.clock.now, 7);
+    await h.mail.drain();
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "RENEWAL_NOTICE_SENT" });
+    h.clock.now = new Date(until.getTime() + MINUTE);
+    await twoLostAnswers(paid);
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect(charge).toMatchObject({ periodStart: end, totalMicros: 23_800_000 });
+    // Well past the period start's 72 hours, but the window runs from the postponement's end: no listing every tick.
+    expect(h.clock.now.getTime()).toBeGreaterThan(end.getTime() + 72 * HOUR);
+    expect(await openChargeIds()).not.toContain(charge!.chargeId);
+    h.clock.now = new Date(until.getTime() + 72 * HOUR + MINUTE);
+    expect(await openChargeIds()).toContain(charge!.chargeId);
+    await h.renewal.runOnce();
+    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED"))
+      .toMatchObject({ errorCode: "NO_TRANSACTION" });
   });
 
   it("keeps the plan through an xMoney outage for 72 hours past the period end, then starts the normal dunning (Q-1)", async () => {
@@ -248,6 +350,8 @@ describe("P11a monthly renewal", () => {
       cause: "PAST_DUE_GRACE", paidThrough: new Date(h.clock.now.getTime() + 8 * DAY)
     });
     expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
+    // W10 (P2-I21): 72 hours of our own outage reached no bank, so M5A never says a bank refused.
+    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
     expect(h.auditLines).toContainEqual({ event: "billing.renewal.stuck", attempt: 1, code: "REBILL_NOT_SENT" });
   });
 
@@ -318,8 +422,8 @@ describe("P11a monthly renewal", () => {
     expect(rebills(paid)).toBe(1);
     // A new checkout under the same version pays the new price.
     const quoted = await h.quotesWith(plusAt25).create({
-      ownerRef: randomUUID(), ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Test Buyer", region: "B",
-      postalCode: null, city: "Bucuresti", company: null, now: h.clock.now
+      ownerRef: randomUUID(), ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Test Buyer", region: "Bucuresti",
+      postalCode: null, city: "Sector 1", company: null, now: h.clock.now
     });
     expect(quoted.quote).toMatchObject({ netMicros: 25_000_000, taxMicros: 5_250_000, totalMicros: 30_250_000 });
   });
@@ -406,6 +510,8 @@ describe("P11a monthly renewal", () => {
     expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "PLUS", lapsed: false });
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref).filter((ref) => ref.startsWith("M5")))
       .toEqual([`M5A:${paid.subscriptionId}:${end.toISOString()}:1`]);
+    // W10 (P2-I21): the card was never asked, so M5A never says a bank refused.
+    expect(await emailParam(`M5A:${paid.subscriptionId}:${end.toISOString()}:1`, "bankDeclined")).toBe("false");
     expect(h.auditLines).toContainEqual({ event: "billing.renewal.dunning_unpriced", attempt: 1, code: "TAX_SERVICE_UNAVAILABLE" });
     // From here the retries are P11b's, each priced afresh: the renewal leaves a PAST_DUE plan alone.
     expect(await h.renewal.renew(paid.subscriptionId)).toBe("skipped");
@@ -580,6 +686,33 @@ describe("P11a monthly renewal", () => {
       planId: "PLUS", cause: "PAST_DUE_GRACE", paidThrough: new Date(h.clock.now.getTime() + 8 * 86_400_000)
     });
     expect((await h.outboxRows(charge!.chargeId)).map((row) => row.ref)).toContain(`M5A:${charge!.chargeId}`);
+    // W10 (P2-I21): the bank declined (PAYMENT_DECLINED), so M5A says so after its first sentence.
+    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("true");
+  });
+
+  it("never says a bank refused when xMoney refused the rebill request itself (REBILL_REFUSED, W10 P2-I21)", async () => {
+    const { paid } = await dueNow();
+    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_REFUSED");
+    await h.renewal.runOnce();
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED")).toMatchObject({ errorCode: "REBILL_REFUSED" });
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
+    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
+  });
+
+  it("says in M11 that the plan ended when a renewal is refused for the card's country (W10, P2-M9)", async () => {
+    const { paid } = await dueNow();
+    // The saved card's country moved onto the always-blocked list after activation (P2-M9's narrowing).
+    h.xmoney.cards.set(paid.transaction.cardId!, "RU");
+    await h.renewal.runOnce();
+    await h.worker.drain(10);
+    const [charge] = await renewalCharges(paid.subscriptionId);
+    expect(await h.eventKinds(charge!.chargeId)).toEqual(expect.arrayContaining(["SUCCEEDED", "REFUND_REQUESTED", "REFUNDED"]));
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "CANCEL", reason: "CARD_COUNTRY_BLOCKED" } });
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "FREE", cause: "ENDED_CANCEL" });
+    expect(await emailParam(`M11:${charge!.chargeId}`, "refundAmount")).toBe("24.20");
+    expect(await emailParam(`M11:${charge!.chargeId}`, "endedPlan")).toBe("PLUS");
   });
 
   it("applies a scheduled downgrade at the renewal: DOWNGRADED, then RENEWED at the lower plan (R-34)", async () => {

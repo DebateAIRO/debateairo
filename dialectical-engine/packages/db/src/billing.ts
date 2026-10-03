@@ -329,6 +329,17 @@ export class BillingRepository {
     return result.rows.map((row) => row.owner_ref);
   }
 
+  /**
+   * W7 (P2-I10): whether this owner's account erasure has committed (0091: a `legal.account_closure` row, written in
+   * the finalize's own transaction). A pending deletion answers false: it stops only the renewal, never the plan.
+   */
+  async ownerErasureCommitted(ownerRef: string, executor: BillingReadExecutor = this.pool): Promise<boolean> {
+    const result = await executor.query<{ committed: boolean }>(
+      "SELECT billing.owner_erasure_committed($1) AS committed", [ownerRef]
+    );
+    return result.rows[0]?.committed === true;
+  }
+
   /** P15 (R3-2): whether this owner's account is age_frozen; the stop reads it under the owner lock (`executor`). */
   async ownerAgeFrozen(ownerRef: string, executor: BillingReadExecutor = this.pool): Promise<boolean> {
     const result = await executor.query<{ frozen: boolean }>(
@@ -601,10 +612,15 @@ export class BillingRepository {
 
   /**
    * What is still open in one xMoney system: subscriptions not ENDED/WITHDRAWN and not ACTIVE with a cancel pending
-   * (one whose history does not fold counts as open), and charges with no SUCCEEDED/FAILED event whose subscription
-   * is not ENDED/WITHDRAWN. P6a refuses a live boot while anything stage is open.
+   * (one whose history does not fold counts as open), charges with no SUCCEEDED/FAILED event whose subscription
+   * is not ENDED/WITHDRAWN, and (P2-I4) outbox jobs neither done nor dead that name one of its charges: the refund,
+   * credit-note and payment-check jobs by their payload's `charge_id`, the two invoice jobs by their ref. P6a refuses
+   * a live boot while anything stage is open, so no sandbox job queued up to a month ahead (the stage clock) is ever
+   * claimed by the live outbox.
    */
-  async openRecordCounts(environment: CustomerXMoneyEnvironment): Promise<{ subscriptions: number; charges: number }> {
+  async openRecordCounts(
+    environment: CustomerXMoneyEnvironment
+  ): Promise<{ subscriptions: number; charges: number; jobs: number }> {
     const rows = (await this.pool.query<SubscriptionEventRaw>(`
       SELECT ${SUBSCRIPTION_EVENT_COLUMNS} FROM billing.subscription_event AS event
       WHERE event.subscription_id IN (
@@ -627,7 +643,45 @@ export class BillingRepository {
           WHERE final.charge_id = charge.charge_id AND final.kind IN ('SUCCEEDED','FAILED')
         )
     `, [environment])).rows;
-    return { subscriptions, charges: open.filter((row) => !settled.has(row.subscription_id)).length };
+    const jobs = (await this.pool.query<{ open_jobs: string }>(`
+      SELECT count(*) AS open_jobs FROM billing.outbox AS job
+      WHERE job.done_at IS NULL AND job.dead_at IS NULL
+        AND EXISTS (
+          SELECT 1 FROM billing.charge AS charge
+          WHERE charge.xmoney_environment = $1
+            AND (charge.charge_id = job.payload ->> 'charge_id'
+              OR (job.kind IN ('QUADERNO_RECORD_SALE','SMARTBILL_INVOICE') AND charge.charge_id = job.ref))
+        )
+    `, [environment])).rows[0]?.open_jobs ?? "0";
+    return {
+      subscriptions, charges: open.filter((row) => !settled.has(row.subscription_id)).length, jobs: Number(jobs)
+    };
+  }
+
+  /**
+   * W14 (P2-I19): what lies more than a day ahead of `now`, the API's real clock at a live boot. `rows`: the billing
+   * changes, whichever xMoney system, by the time they record (every writer stamps them with the billing clock's
+   * `now`, so only a moved stage clock dates one ahead): subscription events (`at`), entitlement events
+   * (`effective_at`), charges (`created_at`) and charge events (`at`). `jobs`: outbox jobs neither done nor dead whose
+   * `not_before` is ahead (their `created_at` is the database's own clock, so a job queued on a moved clock shows only
+   * here). Every retry is due within a day (outbox.ts: 12 h for a failure, 24 h for a payment not yet final); the one
+   * job due later by design, the quarter's tax summary (06:00 on the 5th day after its quarter ends, at most four days
+   * and six hours ahead), counts only past five days.
+   */
+  async recordsDatedAhead(now: Date): Promise<{ rows: number; jobs: number }> {
+    const counted = (await this.pool.query<{ rows: string; jobs: string }>(`
+      WITH edge AS (SELECT $1::timestamptz + interval '1 day' AS at)
+      SELECT
+        (SELECT count(*) FROM billing.subscription_event AS event, edge WHERE event.at > edge.at)
+        + (SELECT count(*) FROM billing.entitlement_event AS event, edge WHERE event.effective_at > edge.at)
+        + (SELECT count(*) FROM billing.charge AS charge, edge WHERE charge.created_at > edge.at)
+        + (SELECT count(*) FROM billing.charge_event AS event, edge WHERE event.at > edge.at) AS rows,
+        (SELECT count(*) FROM billing.outbox AS job
+          WHERE job.done_at IS NULL AND job.dead_at IS NULL
+            AND job.not_before > $1::timestamptz
+              + CASE WHEN job.kind = 'OWNER_TAX_SUMMARY' THEN interval '5 days' ELSE interval '1 day' END) AS jobs
+    `, [now])).rows[0];
+    return { rows: Number(counted?.rows ?? "0"), jobs: Number(counted?.jobs ?? "0") };
   }
 
   async insertCharge(c: PoolClient, ch: ChargeRow): Promise<void> {
@@ -781,6 +835,25 @@ export class BillingRepository {
       if (live !== undefined) return live.job_id;
     }
     throw new TypedDomainError("BILLING_OUTBOX_ENQUEUE_RACED", "the live job changed twice while it was enqueued");
+  }
+
+  /**
+   * W12 (P2-I17): `pnpm billing:invoice --requeue` — a new job of a dead job's kind, ref and payload, due at
+   * `notBefore`. `stage` is written as the new job's `last_error_code` in the same INSERT (P10b's stage column: a
+   * SmartBill job re-queued after the owner confirmed nothing was issued carries `INVOICE_CONFIRMED_NOT_ISSUED`, so
+   * its first attempt may call `issue` although the intent exists). Null when a live job of that kind and ref already
+   * exists (A3e): nothing is written then.
+   */
+  async requeue(c: PoolClient, j: Readonly<{
+    kind: OutboxKind; ref: string; payload: OutboxPayload; notBefore: Date; stage: string | null;
+  }>): Promise<string | null> {
+    const inserted = await c.query<{ job_id: string }>(`
+      INSERT INTO billing.outbox (job_id, kind, ref, payload, created_at, not_before, last_error_code)
+      VALUES ($1, $2, $3, $4::jsonb, clock_timestamp(), $5, $6)
+      ON CONFLICT (kind, ref) WHERE done_at IS NULL AND dead_at IS NULL DO NOTHING
+      RETURNING job_id
+    `, [randomUUID(), j.kind, j.ref, JSON.stringify(j.payload), j.notBefore, j.stage]);
+    return inserted.rows[0]?.job_id ?? null;
   }
 
   async claim(kinds: ReadonlyArray<OutboxKind>, limit: number, workerId: string, now: Date): Promise<OutboxJob[]> {
@@ -967,6 +1040,31 @@ export class BillingRepository {
   }
 
   /**
+   * P2-M1: the amounts (micros) of the REFUNDED rows written on each of these paid transactions' own rows, in one
+   * xMoney system: our refunds recorded when their call answered, and a provider refund read from the payment's own
+   * status. A refund xMoney lists as its own transaction is settled through its payment only by one of these of the
+   * same amount; any other is a refund made elsewhere, for VERIFY_PAYMENT to record or hand to the owner.
+   */
+  async refundedAmountsByPayment(
+    paymentIds: readonly string[], environment: CustomerXMoneyEnvironment
+  ): Promise<ReadonlyMap<string, ReadonlyArray<number>>> {
+    const amounts = new Map<string, number[]>();
+    if (paymentIds.length === 0) return amounts;
+    const result = await this.pool.query<{ transaction_id: string; amount_micros: string | null }>(`
+      SELECT xmoney_transaction_id::text AS transaction_id, amount_micros
+      FROM billing.charge_event
+      WHERE kind = 'REFUNDED' AND xmoney_environment = $2 AND xmoney_transaction_id::text = ANY($1::text[])
+    `, [[...new Set(paymentIds)], environment]);
+    for (const row of result.rows) {
+      if (row.amount_micros === null) continue;
+      const seen = amounts.get(row.transaction_id) ?? [];
+      seen.push(micros(row.amount_micros));
+      amounts.set(row.transaction_id, seen);
+    }
+    return amounts;
+  }
+
+  /**
    * P14a: charges of these kinds in one xMoney system with neither SUCCEEDED nor FAILED, created before
    * `createdBefore`, oldest first.
    */
@@ -1079,34 +1177,30 @@ export class BillingRepository {
   }
 
   /**
-   * P16b (A17b, D5 5j, P9c): the documents to check by hand, while no invoice row of that kind exists for the charge —
-   * invoice jobs P10 gave up on (INVOICE_UNKNOWN: the issuer's answer never came and no lookup could settle it;
-   * CREDIT_NOTE_MANUAL: a partial credit note the issuer cannot make; and for SmartBill, the Romanian legal document,
-   * INVOICE_SERVICE_REFUSED / INVOICE_SERVICE_UNAVAILABLE: never issued), and every dashboard refund P9c recorded on
-   * the payment itself (PROVIDER_REFUND REFUNDED with no `refunds_transaction_id`, job kind DASHBOARD_REFUND) whose
-   * charge has no credit note: its amount is unknown (the rows `quarterSummaryRows` marks `amountKnown: false`), so
-   * P9c issues none automatically. A dashboard refund xMoney reports as its own transaction (D5 5g) names its amount
-   * and gets its credit-note job automatically (none for a second payment, which was never a sale); it reaches this
-   * list only through that job, and only if the job dies with one of the codes above.
+   * P16b (A17b, D5 5j, P9c), widened by W12 (P2-I16, the controller's ruling): the documents to check by hand, while no
+   * invoice row of that kind exists for the charge. Every dead QUADERNO_RECORD_SALE, QUADERNO_RECORD_REFUND,
+   * SMARTBILL_INVOICE or SMARTBILL_STORNO job, whatever its code (the job's own code is returned: INVOICE_UNKNOWN, a
+   * Quaderno TAX_SERVICE_REFUSED after a revoked key, a TAX_SERVICE_UNAVAILABLE outage longer than the retries, a
+   * credit note's INVOICE_ORIGINAL_MISSING, CREDIT_NOTE_MANUAL, BILLING_INVOICE_DATA_MISSING, ...), when it is the
+   * latest job of its kind and ref: one re-queued with `pnpm billing:invoice --requeue` (a newer job, open or done)
+   * replaces it, and only that one is listed if it dies too. Also every dashboard refund P9c recorded on the payment
+   * itself (PROVIDER_REFUND REFUNDED with no `refunds_transaction_id`, job kind DASHBOARD_REFUND) whose charge has no
+   * credit note: its amount is unknown (the rows `quarterSummaryRows` marks `amountKnown: false`), so P9c issues none
+   * automatically. A dashboard refund xMoney reports as its own transaction (D5 5g) names its amount and gets its
+   * credit-note job automatically (none for a second payment, which was never a sale); it reaches this list only
+   * through that job, if the job dies.
    */
-  async invoiceUnknownItems(): Promise<Array<{
-    chargeId: string; jobKind: string;
-    code: "INVOICE_UNKNOWN" | "CREDIT_NOTE_MANUAL" | "INVOICE_SERVICE_REFUSED" | "INVOICE_SERVICE_UNAVAILABLE";
-    since: Date;
-  }>> {
-    const result = await this.pool.query<{
-      charge_id: string; kind: string;
-      code: "INVOICE_UNKNOWN" | "CREDIT_NOTE_MANUAL" | "INVOICE_SERVICE_REFUSED" | "INVOICE_SERVICE_UNAVAILABLE";
-      since: Date;
-    }>(`
+  async invoiceUnknownItems(): Promise<Array<{ chargeId: string; jobKind: string; code: string; since: Date }>> {
+    const result = await this.pool.query<{ charge_id: string; kind: string; code: string | null; since: Date }>(`
       SELECT split_part(outbox.ref, ':', 1) AS charge_id, outbox.kind, outbox.last_error_code AS code,
         COALESCE(outbox.claimed_at, outbox.not_before) AS since
       FROM billing.outbox AS outbox
       WHERE outbox.kind IN ('SMARTBILL_INVOICE','SMARTBILL_STORNO','QUADERNO_RECORD_SALE','QUADERNO_RECORD_REFUND')
         AND outbox.dead_at IS NOT NULL
-        AND (outbox.last_error_code IN ('INVOICE_UNKNOWN','CREDIT_NOTE_MANUAL')
-          OR (outbox.kind IN ('SMARTBILL_INVOICE','SMARTBILL_STORNO')
-            AND outbox.last_error_code IN ('INVOICE_SERVICE_REFUSED','INVOICE_SERVICE_UNAVAILABLE')))
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.outbox AS newer
+          WHERE newer.kind = outbox.kind AND newer.ref = outbox.ref AND newer.created_at > outbox.created_at
+        )
         AND NOT EXISTS (
           SELECT 1 FROM billing.invoice AS invoice
           WHERE invoice.charge_id = split_part(outbox.ref, ':', 1)
@@ -1124,7 +1218,37 @@ export class BillingRepository {
         )
       ORDER BY since
     `);
-    return result.rows.map((row) => ({ chargeId: row.charge_id, jobKind: row.kind, code: row.code, since: row.since }));
+    return result.rows.map((row) => ({
+      chargeId: row.charge_id, jobKind: row.kind, code: row.code ?? "OUTBOX_HANDLER_FAILED", since: row.since
+    }));
+  }
+
+  /**
+   * W12 (P2-I16, the controller's ruling): EMAIL jobs that died since `since` and are the latest job of their ref (a
+   * later copy, open or done, replaces a dead one: the renewal queues M3 again under the same ref), whatever their
+   * template and code: the customer, or the owner, never got that email. Content-free: the job's ref (the template
+   * and our own ids), the template, the recipient kind and the code.
+   */
+  async deadEmails(since: Date): Promise<Array<{
+    ref: string; template: string | null; recipient: string | null; code: string; since: Date;
+  }>> {
+    const result = await this.pool.query<{
+      ref: string; template: string | null; recipient: string | null; code: string | null; since: Date;
+    }>(`
+      SELECT outbox.ref, outbox.payload ->> 'template' AS template, outbox.payload ->> 'recipient' AS recipient,
+        outbox.last_error_code AS code, outbox.dead_at AS since
+      FROM billing.outbox AS outbox
+      WHERE outbox.kind = 'EMAIL' AND outbox.dead_at IS NOT NULL AND outbox.dead_at >= $1
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.outbox AS newer
+          WHERE newer.kind = outbox.kind AND newer.ref = outbox.ref AND newer.created_at > outbox.created_at
+        )
+      ORDER BY outbox.dead_at, outbox.ref
+    `, [since]);
+    return result.rows.map((row) => ({
+      ref: row.ref, template: row.template, recipient: row.recipient, code: row.code ?? "OUTBOX_HANDLER_FAILED",
+      since: row.since
+    }));
   }
 
   /**
@@ -1149,9 +1273,11 @@ export class BillingRepository {
 
   /**
    * P16b (R2 Q-1, D6a's 4b): subscriptions whose dunning runs, or ended, with no charge. P11a's `failUnpricedAttempt`
-   * writes an attempt the tax service could not price through `writeDunningAttempt`, whose PAST_DUE / ENDED data
-   * then name a `reason` (`TAX_SERVICE_UNAVAILABLE`) where a charged attempt names its `charge_id`. The latest
-   * status event of each subscription decides: a PAST_DUE still in force, or an ENDED(DUNNING) since `since`.
+   * writes a charge-less attempt through `writeDunningAttempt`, whose PAST_DUE / ENDED data then name a `reason`
+   * where a charged attempt names its `charge_id`: `TAX_SERVICE_UNAVAILABLE` (the tax service could not price it),
+   * or `RETRY_TOTAL_CHANGED` (W5, P2-M10: a retry with no priced attempt to copy was priced afresh at a total other
+   * than the announced one, which A7 forbids charging). The latest status event of each subscription decides: a
+   * PAST_DUE still in force, or an ENDED(DUNNING) since `since`.
    * Nothing was charged; the person got M5A–C (and M6 at the end). Content-free: ids, codes and times.
    */
   async chargelessDunning(since: Date): Promise<Array<{

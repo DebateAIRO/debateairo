@@ -10,6 +10,12 @@ export type CancelClient = Pick<ContractClient, "requestCancelLink" | "cancelByT
 
 const TOKEN_FRAGMENT = /^#token=([A-Za-z0-9_-]{43})$/;
 
+/** W10 (P2-M19, 429): both public routes share A25's hourly per-network budget; anything else is "try again". */
+function failureKey(failure: unknown): string {
+  return failure instanceof ContractHttpError && failure.serverCode === "ADMISSION_RATE_LIMITED"
+    ? "billing.checkout.rateLimited" : "billing.checkout.genericError";
+}
+
 /** Reads the one-time token from the fragment (never the query) and takes it out of the address bar at once. */
 export function readCancelToken(
   location: Pick<Location, "hash" | "pathname" | "search">,
@@ -46,8 +52,8 @@ export function CancelFlow({
     try {
       await client.requestCancelLink(email.trim());
       setStage("SENT");
-    } catch {
-      setMessageKey("billing.checkout.genericError");
+    } catch (failure) {
+      setMessageKey(failureKey(failure));
     } finally {
       setBusy(false);
     }
@@ -67,9 +73,16 @@ export function CancelFlow({
         setToken(null);
         setStage("EMAIL");
         setMessageKey("billing.cancelPage.linkInvalid");
+      } else if (failure instanceof ContractHttpError && failure.serverCode === "NOTHING_TO_CANCEL") {
+        // W10 (P2-M18): the token is spent, but its plan was already cancelled, ended, paused by a dispute or
+        // replaced by a newer one; nothing changed. The page never says "your plan is cancelled" nor that the account
+        // has no plan: it says only what this link did and keeps the email form with its Settings link.
+        setToken(null);
+        setStage("EMAIL");
+        setMessageKey("billing.cancelPage.nothingToCancel");
       } else {
-        // A network or server failure spends nothing: the same button may be pressed again.
-        setMessageKey("billing.checkout.genericError");
+        // A network or server failure, or the hourly limit, spends nothing: the same button may be pressed again.
+        setMessageKey(failureKey(failure));
       }
     } finally {
       setBusy(false);

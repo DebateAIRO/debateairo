@@ -8,13 +8,14 @@ import { TypedDomainError } from "@debateai/kernel";
 import { decryptNotice } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy, TaxAuthorities } from "@debateai/register";
 import { createSingleFlightErasureReconciler } from "../account-erasure.js";
-import { DekAccountEmailReader } from "./account-email.js";
+import { DekAccountEmailReader, DekBillingRecipientReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
 import { CancelLinkService } from "./cancel-link.js";
 import { createCardCheckSettlement } from "./card-change.js";
 import { ChargeStatusReader } from "./charge-status.js";
 import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
+import { createDeadJobAlert } from "./dead-jobs.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
 import { BillingErasureHook, erasurePendingOf, reconcileWork } from "./erasure-hook.js";
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
@@ -89,8 +90,9 @@ export type BillingRuntime = Readonly<{
    */
   maintenance: BillingMaintenance;
   /**
-   * P15: stops an owner's billing when an account erasure is scheduled (the route's hook) and, on the reconciler's
-   * 10-minute tick, sweeps every owner whose erasure is pending or finished, or whose account the age gate froze.
+   * P15, W7: stops an owner's renewal when an account erasure is scheduled (the route's hook) and, on the reconciler's
+   * 10-minute tick, sweeps every owner whose erasure is pending (the renewal stop again) or finished (the plan ends),
+   * or whose account the age gate froze (the plan ends).
    */
   erasure: BillingErasureHook;
   kick(): void;
@@ -111,13 +113,17 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   const jobs = new BillingJobQueries(deps.pool);
   // P9b's INITIAL settlement reads the accepted Terms from the same repository.
   const acceptances = new AcceptanceRepository(deps.pool);
+  // W12 (P2-I16, the controller's ruling): a dead invoice or credit-note job, and a dead email, email the owner O3 at
+  // once; the owner summary and O1 list them until they are settled.
   const outbox = new BillingOutboxWorker({
     repository, workerId: `billing-api-${process.pid}-${randomUUID()}`, clock: deps.clock, audit: deps.audit,
-    batchSize: 20
+    batchSize: 20, onDead: createDeadJobAlert({ repository })
   });
   const entitlements = new EntitlementRepository(deps.pool);
+  // P2-I4 (D5 5h): a refund of a charge paid in the other xMoney system ends DEAD before any call.
   const refunds = new RefundDesk({
-    repository, jobs, xmoney: deps.connectors.xmoney, policy: deps.policy, audit: deps.audit, clock: deps.clock
+    repository, jobs, xmoney: deps.connectors.xmoney, policy: deps.policy, audit: deps.audit, clock: deps.clock,
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
   });
   outbox.register("XMONEY_REFUND", refunds.handle);
   const verify = new VerifyPaymentHandler({
@@ -168,10 +174,16 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   outbox.register("VERIFY_PAYMENT", verify.handle);
   // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). P17 (D6a F29): the invoice line in the buyer's
   // locale, from the catalogue, as for the checkout below.
+  // P2-I4 (D5 5h): no document is issued for a charge paid in the other xMoney system.
+  // W8 (P2-I12, the owner's ruling of 2 October 2026): every billing email, the cancel link's M9 and every invoice go
+  // to the account's CURRENT address at the time of sending; the billing profile's only after the account is erased.
+  const recipients = new DekBillingRecipientReader(deps.pool, deps.dekStore);
   const invoiceDeps = {
-    repository, recordsKey: deps.connectors.recordsKey, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
+    repository, recordsKey: deps.connectors.recordsKey, recipients, policy: deps.policy,
+    publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit,
-    orderText: catalogueOrderText
+    orderText: catalogueOrderText,
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
   };
   outbox.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
   outbox.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
@@ -183,9 +195,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   outbox.register("SMARTBILL_STORNO", createSmartBillStornoHandler(smartbill));
   attachments.set("SMARTBILL_INVOICE_PDF", smartBillPdfResolver({ issuer: smartbill.issuer }));
   if (deps.mail !== undefined) {
+    // W12 (A7, the controller's ruling on P2-I16): M3's notice is recorded only once the email went out.
     outbox.register("EMAIL", createEmailJobHandler({
-      repository, recordsKey: deps.connectors.recordsKey, ownerReportEmail: deps.connectors.ownerReportEmail,
-      mail: deps.mail.sender, attachments
+      repository, recipients, recordsKey: deps.connectors.recordsKey, ownerReportEmail: deps.connectors.ownerReportEmail,
+      mail: deps.mail.sender, attachments, sent: (job, now) => renewal.noticeMailSent(job, now)
     }));
   }
   const checkout = new CheckoutService({
@@ -203,7 +216,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     billing: repository, jobs, entitlements,
     identities: required(deps.identities, "identities"),
     blindIndexKey: required(deps.blindIndexKey, "blindIndexKey"),
-    recordsKey: deps.connectors.recordsKey, mail: deps.mail?.sender,
+    recordsKey: deps.connectors.recordsKey, recipients, mail: deps.mail?.sender,
     // R-7/A22: the one origin, P6a's `BillingConnectors.publicAppUrl`.
     publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit, clock: deps.clock

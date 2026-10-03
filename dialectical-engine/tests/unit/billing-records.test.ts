@@ -15,10 +15,10 @@ const CUSTOMER = randomUUID();
 const QUOTE = randomUUID();
 const PROFILE: BillingProfile = Object.freeze({
   email: "person@example.test", locale: "ro", name: null, country: "RO", region: null,
-  postalCode: "010101", city: "Bucuresti", street: null, company: null
+  postalCode: "010101", city: "Sector 1", street: null, company: null
 });
 const LOCATION: QuoteLocation = Object.freeze({
-  name: "Ana Pop", country: "RO", region: "B", postalCode: "010101", city: "Bucuresti", street: null,
+  name: "Ana Pop", country: "RO", region: "Bucuresti", postalCode: "010101", city: "Sector 1", street: null,
   ip: "198.51.100.7", ipCountry: "RO", company: { name: "SC Test SRL", vatId: "RO123VALID", address: "Str. 1", vatValidated: true }
 });
 
@@ -36,7 +36,7 @@ describe("P7 billing records under the records key", () => {
     expect(openQuoteLocation(KEY, QUOTE, sealed.ciphertext)).toEqual(LOCATION);
     expect(() => openQuoteLocation(KEY, randomUUID(), sealed.ciphertext)).toThrow();
     expect(taxLocationOf(LOCATION)).toEqual({
-      country: "RO", region: "B", postalCode: "010101", city: "Bucuresti", street: null, ip: "198.51.100.7"
+      country: "RO", region: "Bucuresti", postalCode: "010101", city: "Sector 1", street: null, ip: "198.51.100.7"
     });
   });
 

@@ -45,6 +45,7 @@
   "settings.erasure.title": "Radera konto",
   "settings.erasure.hint": "Raderingen påbörjas efter sju hela dagar. Du kan avbryta den innan den börjar. Meddelanden om att raderingen schemaläggs, avbryts eller slutförs skickas till varje e-postadress eller återställningsadress som är knuten till kontot; minst en verifierad adress krävs.",
   "settings.erasure.dataWarning": "Krypterat privat innehåll blir permanent oläsbart när dess nycklar förstörs. Befintliga offentliga ögonblicksbilder förblir offentliga under en avvecklad pseudonym, och kopior som har laddats ned, citerats, cachelagrats, indexerats eller sparats av en leverantör kan finnas kvar. Övertagen äldre klartext redovisas som en kvarvarande rest, inte som fullständigt rensat innehåll.",
+  "settings.erasure.paidPlan": "När du schemalägger raderingen slutar din betalda plan att förnyas, men planen fortsätter att fungera tills raderingen genomförs eller den månad du har betalat för tar slut; om du avbryter raderingen gäller planen till slutet av den månaden och förnyas bara om du ångrar uppsägningen, och om du fortfarande kan ångra köpet inom 14 dagar från köpet kan du göra det tills raderingen genomförs.",
   "settings.erasure.checking": "Kontrollerar statusen för kontoraderingen…",
   "settings.erasure.status": "Status: {status}. Schemalagd tid för radering: {time}.",
   "settings.erasure.processing": "Den oåterkalleliga raderingen pågår. Det går inte längre att schemalägga eller avbryta den.",

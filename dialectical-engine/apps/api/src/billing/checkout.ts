@@ -76,8 +76,11 @@ export type CheckoutDeps = Readonly<{
     | "insertCharge" | "appendChargeEvent" | "customerByOwner" | "ownerErasurePending">;
   jobs: Pick<BillingJobQueries, "lockOwner" | "checkoutPaymentSignals">;
   acceptances: Pick<AcceptanceRepository, "record">;
-  /** `listTransactions`: whether the open checkout's charge already has a payment on its way (D7 #5). */
-  xmoney: Pick<XMoneyClient, "createCustomer" | "listTransactions">;
+  /**
+   * `listTransactions` and `getOrder`: whether the open checkout's charge already has a payment on its way (D7 #5,
+   * A1: the charge id lives on the order).
+   */
+  xmoney: Pick<XMoneyClient, "createCustomer" | "listTransactions" | "getOrder">;
   accountEmail: AccountEmailReader;
   geo: GeoLookup;
   countryPolicy: CountryPolicy;
@@ -135,6 +138,8 @@ function samePurchaser(a: QuoteLocation, b: QuoteLocation): boolean {
 }
 
 type Prepared = Readonly<{ chargeId: string; customerId: string; totalMicros: number; planId: PlanId; reused: boolean }>;
+/** The open checkout xMoney lists a payment on its way for, as read before the owner lock (D7 #5, P2-I6). */
+type ListedUnderway = Readonly<{ subscriptionId: string }> | null;
 
 export class CheckoutService implements CheckoutServicePort {
   constructor(private readonly deps: CheckoutDeps) {}
@@ -164,6 +169,9 @@ export class CheckoutService implements CheckoutServicePort {
     this.assertCurrentConsent("CONSENT_RENEWAL", input.locale, input.consents.renewal);
     this.assertCurrentConsent("CONSENT_IMMEDIATE_START", input.locale, input.consents.immediateStart);
     const email = await this.deps.accountEmail.read(input.userId);
+    // P2-I6: xMoney's listing is read before the owner lock (it pages the site's transactions and may answer slowly);
+    // our own rows are re-read under it.
+    const listed = await this.listedPaymentUnderway(input.ownerRef, input.now);
 
     const prepared = await this.deps.repository.withTransaction(async (client): Promise<Prepared> => {
       await this.deps.jobs.lockOwner(client, input.ownerRef);
@@ -179,7 +187,7 @@ export class CheckoutService implements CheckoutServicePort {
       }
       if (existing !== null && existing.status === "CREATED") {
         // D7 #5: a fresh payment on its way is answered CHECKOUT_PENDING, before any reuse or abandonment.
-        await this.assertNoPaymentUnderway(client, existing, input.now);
+        await this.assertNoPaymentUnderway(client, existing, input.now, listed);
         const reusable = await this.reusableCharge(client, existing, quote, location, input.now);
         const known = reusable === null ? null : await this.deps.repository.customerByOwner(input.ownerRef, undefined, client);
         if (reusable !== null && known !== null) {
@@ -332,14 +340,13 @@ export class CheckoutService implements CheckoutServicePort {
    * D7 #5 (narrowed): whether a payment for the open checkout's INITIAL charge may still be on its way (paid in
    * another tab, or still in 3-D Secure). Signing that order again would let the person pay twice; abandoning it
    * would refund a plan they bought. Evidence, cheapest first: a stored notice naming the charge, or an open
-   * VERIFY_PAYMENT job for it (`checkoutPaymentSignals`), then an xMoney transaction for it (listed by creation date
-   * from the charge's `created_at`, matched on `externalOrderId`) that is not `complete-failed`. A transaction the
-   * charge already recorded as FAILED (a decline, a void) is not on its way. A not-final attempt (a notice, a check
-   * retried as PAYMENT_NOT_FINAL, a listed `start` / `in-progress` / `3d-pending` transaction) counts only while
-   * `inFlightAttemptFresh`: a person who closed the bank's window must not be locked out until xMoney finalises it.
-   * Any evidence: 409 CHECKOUT_PENDING naming the charge. Every read goes through the checkout's `client`.
+   * VERIFY_PAYMENT job for it (`checkoutPaymentSignals`, read here under the owner lock), then what xMoney listed for
+   * it before the lock (`listedPaymentUnderway`), when that was this same open checkout. Any evidence: 409
+   * CHECKOUT_PENDING naming the charge. Every read goes through the checkout's `client`.
    */
-  private async assertNoPaymentUnderway(client: PoolClient, existing: SubscriptionState, now: Date): Promise<void> {
+  private async assertNoPaymentUnderway(
+    client: PoolClient, existing: SubscriptionState, now: Date, listed: ListedUnderway
+  ): Promise<void> {
     const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId, client))
       .find((charge) => charge.kind === "INITIAL");
     if (initial === undefined) return;
@@ -348,9 +355,31 @@ export class CheckoutService implements CheckoutServicePort {
     if (await this.deps.jobs.checkoutPaymentSignals(client, initial.chargeId, initial.xmoneyEnvironment, notFinalSince)) {
       throw pending;
     }
+    // Another open checkout than the one listed was made by a concurrent request after this one's read: its order was
+    // signed only moments ago, and anything stored for it since is what the re-check above reads.
+    if (listed !== null && listed.subscriptionId === existing.subscriptionId) throw pending;
+  }
+
+  /**
+   * D7 #5 / P2-I6, read before the owner lock: the open CREATED checkout whose INITIAL charge xMoney lists a payment
+   * for. A1: a transaction carries no id of ours, so the listed deposits (created since the charge, by creation date)
+   * are first matched on the CREATED event's xMoney customer, then each one's order is confirmed with GET /order
+   * (asked once per order) to hold the charge id. A transaction that is `complete-failed`, or that the charge already
+   * recorded as FAILED (a decline, a void), is not on its way; a not-final one (`start` / `in-progress` /
+   * `3d-pending`) counts only while `inFlightAttemptFresh`, so a person who closed the bank's window is not locked
+   * out until xMoney finalises it. Null: no open checkout, or nothing on its way. An xMoney failure is the 503.
+   */
+  private async listedPaymentUnderway(ownerRef: string, now: Date): Promise<ListedUnderway> {
+    const existing = await this.deps.repository.subscriptionForOwner(ownerRef);
+    if (existing === null || existing.status !== "CREATED") return null;
+    const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId))
+      .find((charge) => charge.kind === "INITIAL");
     // The xMoney this API talks to lists only its own system's transactions.
-    if (initial.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return;
-    const failed = new Set(((await this.deps.repository.charge(initial.chargeId, client))?.events ?? [])
+    if (initial === undefined || initial.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return null;
+    const created = (await this.deps.repository.subscriptionEvents(existing.subscriptionId)).find((event) => event.kind === "CREATED");
+    const customer = created?.xmoneyCustomerId ?? null;
+    if (customer === null) return null;
+    const failed = new Set(((await this.deps.repository.charge(initial.chargeId))?.events ?? [])
       .filter((event) => event.kind === "FAILED" && event.xmoneyTransactionId !== null)
       .map((event) => event.xmoneyTransactionId));
     const rejected = rejectedRows(this.deps.audit, "checkout");
@@ -358,10 +387,23 @@ export class CheckoutService implements CheckoutServicePort {
       from: initial.createdAt, to: now, dateType: "creation", onRejected: rejected.onRejected
     }).catch((error: unknown) => this.providerRefusal(error));
     rejected.report();
-    if (listed.some((transaction) => transaction.externalOrderId === initial.chargeId
-      && transaction.status !== "complete-failed" && !failed.has(transaction.transactionId)
-      && (!NOT_FINAL_STATUSES.has(transaction.status) || inFlightAttemptFresh(transaction.createdAt, now)))) {
-      throw pending;
+    const orders = new Map<string, Promise<string | null>>();
+    const merchantOrderId = (orderId: string): Promise<string | null> => {
+      let known = orders.get(orderId);
+      if (known === undefined) {
+        known = this.deps.xmoney.getOrder(orderId).then((order) => order.externalOrderId)
+          .catch((error: unknown) => this.providerRefusal(error));
+        orders.set(orderId, known);
+      }
+      return known;
+    };
+    for (const transaction of listed) {
+      if (transaction.transactionType !== null && transaction.transactionType !== "deposit") continue;
+      if (transaction.customerId !== customer || transaction.status === "complete-failed" || failed.has(transaction.transactionId)) continue;
+      if (NOT_FINAL_STATUSES.has(transaction.status) && !inFlightAttemptFresh(transaction.createdAt, now)) continue;
+      const external = transaction.externalOrderId ?? await merchantOrderId(transaction.orderId);
+      if (external === initial.chargeId) return Object.freeze({ subscriptionId: existing.subscriptionId });
     }
+    return null;
   }
 }

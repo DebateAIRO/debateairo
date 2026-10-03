@@ -29579,8 +29579,13 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    `bytes` number and ask xMoney: "Which 32 bytes key the AES-256-CBC notice encryption for this key?" (their docs
    pass the key string straight to `createDecipheriv`, which only accepts 32 bytes). Tell the builders the answer;
    P3a's `aesKeyFromPrivateKey` is the one place that changes.
+   **The customer (W1).** `… customer --site-id <id> --email <your email> --country RO` creates your test customer the
+   way our checkout does and prints `XMONEY_CUSTOMER=<HTTP status>:identifier=<identifier>`; write the identifier down
+   and give `--identifier <that identifier>` to every `serve` command of items 3 and 9, so each payment is made by that
+   customer. Then run `… customer --repeat --identifier <that identifier> --site-id <id> --email <your email> --country RO`
+   once and write down its line: it shows what xMoney answers when the same customer is created twice.
 3. **(e) Card form, security policy and Payment Request.**
-   `… serve --public-key <pk…> --site-id <id> --email <your email> --country RO --amount 1.00 --mode authAndCapture`
+   `… serve --public-key <pk…> --site-id <id> --email <your email> --country RO --amount 1.00 --mode authAndCapture --identifier <identifier>`
    and open the printed `http://127.0.0.1:8780/` in Chrome with DevTools open (Console tab). **No box offering to save
    the card should appear** (production hides it; if one appears, write that down — it would skew step 6). The form
    has no pay button of its own (production hides xMoney's and presses it from our page): type the card, then press
@@ -29660,7 +29665,8 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    `… refund --transaction <transaction id> --order <order id> --as full --amount 0.30`
    `… refund --transaction <transaction id> --order <order id> --as extra --amount 0.01`
    `… fetch --what transaction-list --date-type refund`
-   Write down the four printed lines. They answer: after each partial refund, does the payment stay `complete-ok` or
+   `… fetch --what transaction-list --date-type charge-back`
+   Write down the printed lines. They answer: after each partial refund, does the payment stay `complete-ok` or
    already say `refund-ok`, and does its `amount` stay `1.00` or shrink (`amount=…`)? Is there a separate refund
    transaction (`linked=yes`)? Does the refund listing show a row for each partial refund, and after how long
    (`refundRows=1@35s` means one linked row after 35 seconds; `refundRows=0@timeout-600s` means none came in ten
@@ -29668,13 +29674,44 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    `refund-refused-….json` file)? Open the two `transaction-list-refund-after-…` files and write down, for each
    row that names the payment in `relatedTransactionIds`, its `transactionType`, `amount` and `transactionStatus`
    (not its id).
+   **The charge-back listing (W13, P2-I18).** The last command asks xMoney for its dispute listing exactly as our
+   daily money check does (`dateType=charge-back`, the last 120 days up to now) and prints
+   `XMONEY_FETCHED=transaction-list:charge-back:<HTTP status>`; write the line down. `:200` means xMoney accepts it
+   (the list may well be empty: the sandbox run makes no dispute). Anything else means xMoney refuses the listing our
+   daily check relies on to find disputes: tell the builders at once, because the request changes before billing is
+   on. Keep the `transaction-list-charge-back-….json` it wrote either way: it is a required fixture, and P3b's
+   recorded suite fails on a refusal, so X0 cannot pass with this answer missing.
 8. **(h) The card-check hold and its release (A12).** On the 1.00 `auth` payment of step 3:
    `… release --transaction <its transaction id>`
    It prints `XMONEY_RELEASE=<status before>-><HTTP status>-><status after>`, e.g. `complete-ok->200->void-ok`. Then
    rebill the `auth` payment's ORDER once, the way every renewal after a card change will:
    `… rebill --order <its order id> --customer <its customer id> --amount 1.00 --as auth-order`
-   and write down the printed line (`NO_TRANSACTION` means a changed card could never be charged again — tell the
-   builders at once; it changes A12's design).
+   and write down the printed line, e.g. `XMONEY_REBILL=auth-order:200:complete-ok:transaction=<the rebill's
+   transaction id>` (`NO_TRANSACTION` means a changed card could never be charged again — tell the builders at once;
+   it changes A12's design).
+   **Did that rebill take the money? (W14, P2-I3; required.)** A rebill that only holds the money reads
+   `complete-ok` exactly like one that took it, so only its release tells them apart. First open the rebill's
+   transaction in the stage dashboard and write down what it shows about capture (a "captured" or "authorized"
+   status, a capture column or date, or nothing of the kind). Then release it as a whole, giving exactly the
+   transaction id the `rebill --as auth-order` line printed after `transaction=` (never the renewal rebill of item 6,
+   the refunded payment of item 7 or the card check's hold above: they are 1.00 payments too, and their release
+   answers nothing about this rebill):
+   `… release --transaction <the id after transaction= in the auth-order rebill's line> --as auth-order-rebill`
+   It prints `XMONEY_RELEASE=auth-order-rebill:<status before>-><HTTP status>-><status after>:capture=<answer>`,
+   e.g. `complete-ok->200->refund-ok:capture=captured`; write the line down. The answer is `captured` or `hold` only
+   when the status before was `complete-ok` and xMoney accepted the release (an HTTP status from 200 to 299).
+   `capture=captured` (the status after is `refund-ok`: the rebill took the money, which came back as a refund) is
+   what A12 assumes. `capture=hold` (`void-ok`: only a hold, now released) means that every renewal and upgrade after
+   a card change would be renewed, invoiced and receipted but never collected: tell the builders at once, because A12
+   changes before billing is on (go-live row 14). `capture=unknown` (any other status after, a status before other
+   than `complete-ok`, or a refused release) settles nothing: send the builders the line. Keep the
+   `transaction-rebill-auth-order-released-….json` it wrote either way: it is a required fixture, and P3b's recorded
+   suite fails unless it reads `refund-ok` and names the same transaction as `transaction-rebill-auth-order-….json`.
+   **xMoney's own emails (W8, P2-I12; required).** Give `--email` an inbox you can read in item 2 and item 3. Through
+   items 3 to 8, write down every email xMoney itself sends to that address: after which item (the payments of item 3,
+   the rebills of item 6, the refunds of item 7, the release of item 8), its subject, and the address it was sent
+   to. "None" is an answer too. It decides whether billing must tell xMoney when a person changes their email (open
+   item P2-I12 (X0, owner)).
 9. **(e, continued) The bank check nobody answers (D6a's ask 4c).** This measures how long xMoney keeps a 3-D Secure
    payment open when the person closes the bank check without answering; our checkout refuses to start a second
    payment while the first may still finish, and this sets for how long. It writes no fixture file.
@@ -29682,7 +29719,7 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    give it as `--capture-dir` to every command of this item INSTEAD of your capture folder, so none of its files can
    mix with the fixture captures. Stop any other `serve` first (items 6–8 are done, so their notices are in), then run
    the `serve` command of item 3 again (same `--public-key`, `--site-id`, `--email`, `--country RO --amount 1.00
-   --mode authAndCapture`) with `--capture-dir <your in-flight folder>`, open the printed page, and pay with the
+   --mode authAndCapture --identifier <identifier>`) with `--capture-dir <your in-flight folder>`, open the printed page, and pay with the
    3-D Secure test card `5555 5555 5555 5599`,
    12/34, CVV 123. When the bank check opens, close it without answering (close its window, or its frame's close
    button). Write down the time you pressed Pay. Find the attempt's transaction id in the stage dashboard's
@@ -29690,7 +29727,9 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    folder. Leave this `serve` running for the first hour (with item 4 (i), a notice xMoney sends for the attempt lands
    in the in-flight folder as a `notice-….raw` file, and no other payment of yours is running to confuse it). Run
    `… fetch --what transaction --id <that transaction id> --capture-dir <your in-flight folder>`
-   1, 5, 15, 30 and 60 minutes after you pressed Pay, then stop the `serve` with Ctrl-C, and run the same `fetch` once
+   1, 5, 15, 30 and 60 minutes after you pressed Pay. At the 1-minute run only, add `--list-order`: it also prints
+   `XMONEY_IN_FLIGHT_LISTED=<HTTP status>:listed=<yes|no>:customerId=<yes|no>`; write it down (our checkout sees a
+   payment on its way only when both say yes). Then stop the `serve` with Ctrl-C, and run the same `fetch` once
    more 24 hours after you pressed Pay. Each run prints `XMONEY_FETCHED=transaction-initial:200:<status>` (the label is
    fixed; only the status matters here). Write down, for each of the six runs, the time and the status; between which
    two runs the status first changed; and every notice received for this attempt, with the time its file appeared
@@ -29715,9 +29754,11 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    yours remains. Then **delete the capture folder**. Hand the builders the fixture files and your written answers to
    (a), (d), (e) (the page's last line with the SDK names, where the bank check opened and whether the page still
    completed, any `form-action` row, and the Payment Request and the referrer comparisons), (f), (g) (including the refund
-   listing's rows and delays), (h), (i) (the test amounts xMoney names and the declined rebill's line), the 0.00
-   question, and the `outerFields` of `notice-success.json` (which fields besides `opensslResult` a notice carries —
-   e.g. a `signature` of 128 hex characters); P3a's and P3b's recorded-fixture tests start running as soon as the
+   listing's rows and delays), (h) (with the dashboard's capture note and the `auth-order-rebill` release line), xMoney's
+   own emails (item 8's list, or "none"), (i) (the test amounts xMoney names and the declined rebill's line), the 0.00
+   question, the two `customer` lines, item 7's charge-back listing line, item 9's `--list-order` line, and the `outerFields` of `notice-success.json`
+   (which fields besides `opensslResult` a notice carries — e.g. a `signature` of 128 hex characters — and, for the
+   `signature`, its `construction`: the name of the scrubber's candidate it matched, or `null`); P3a's and P3b's recorded-fixture tests start running as soon as the
    files are in the repository. Hand over item 9's notes (the six times and statuses, where the status first changed,
    and any notice) once its 24-hour run is done, even if the fixtures went in the day before.
 

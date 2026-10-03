@@ -36,6 +36,13 @@ const STILL_CONFIRMING: FailureWords = Object.freeze({ key: "billing.subscriptio
  * the updated Terms come first. The route refuses before any read or quote, so nothing moved: the checkout's sentence.
  */
 const REACCEPT_REQUIRED: FailureWords = Object.freeze({ key: "billing.checkout.reacceptRequired", reload: false });
+/** P15 (409 ACCOUNT_ERASURE_PENDING): an account deletion is pending; cancelling it in Settings comes first. */
+const ERASURE_PENDING: FailureWords = Object.freeze({ key: "billing.checkout.erasurePending", reload: false });
+/**
+ * W10 (P2-M19, 429 ADMISSION_RATE_LIMITED): the upgrade quote, the downgrade, the undo of a cancel and the card change
+ * share one hourly budget with the checkout's quote. The route refuses before anything is read, so nothing moved.
+ */
+const RATE_LIMITED: FailureWords = Object.freeze({ key: "billing.checkout.rateLimited", reload: false });
 
 /**
  * P12c's and P15's refusals of an upgrade quote or an upgrade, each with its own sentence (P18). `reload`: read the
@@ -47,8 +54,9 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   UPGRADE_NOT_HIGHER: Object.freeze({ key: "billing.subscription.upgradeNotHigher", reload: true }),
   UPGRADE_NOT_AVAILABLE_NOW: Object.freeze({ key: "billing.subscription.upgradeNotAvailableNow", reload: false }),
   UPGRADE_IN_PROGRESS: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
-  ACCOUNT_ERASURE_PENDING: Object.freeze({ key: "billing.checkout.erasurePending", reload: false }),
-  LEGAL_REACCEPTANCE_REQUIRED: REACCEPT_REQUIRED
+  ACCOUNT_ERASURE_PENDING: ERASURE_PENDING,
+  LEGAL_REACCEPTANCE_REQUIRED: REACCEPT_REQUIRED,
+  ADMISSION_RATE_LIMITED: RATE_LIMITED
 });
 
 /** A request that may have reached the payment side: a network failure, a 5xx, or anything that is not an answer. */
@@ -81,6 +89,7 @@ function quoteFailureWords(failure: unknown): FailureWords {
 function downgradeFailureWords(failure: unknown): FailureWords {
   const code = refusalOf(failure);
   if (code === "LEGAL_REACCEPTANCE_REQUIRED") return REACCEPT_REQUIRED;
+  if (code === "ADMISSION_RATE_LIMITED") return RATE_LIMITED;
   if (code === "DOWNGRADE_NOT_AVAILABLE_NOW") {
     return Object.freeze({ key: "billing.subscription.downgradeNotAvailableNow", reload: false });
   }
@@ -89,9 +98,15 @@ function downgradeFailureWords(failure: unknown): FailureWords {
     : ACTION_FAILED;
 }
 
-/** P12b's undo of a cancel: gated on the Terms (D6b); any other refusal keeps the plain "try again". */
+/**
+ * P12b's undo of a cancel: gated on the Terms (D6b), and (W7, P2-I10) refused while an account deletion is pending,
+ * whose renewal stop it would undo; any other refusal keeps the plain "try again".
+ */
 function revokeFailureWords(failure: unknown): FailureWords {
-  return refusalOf(failure) === "LEGAL_REACCEPTANCE_REQUIRED" ? REACCEPT_REQUIRED : ACTION_FAILED;
+  const code = refusalOf(failure);
+  if (code === "LEGAL_REACCEPTANCE_REQUIRED") return REACCEPT_REQUIRED;
+  if (code === "ADMISSION_RATE_LIMITED") return RATE_LIMITED;
+  return code === "ACCOUNT_ERASURE_PENDING" ? ERASURE_PENDING : ACTION_FAILED;
 }
 
 /** Ruling Q-7: the confirm needs the lower plan's price; without the plans list it offers no confirm at all. */
@@ -151,7 +166,12 @@ export function SubscriptionControls({
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  // `linksHome`: W10 (P2-M20) the updated-Terms sentence is a plain link to the signed-in home page, whose accept
+  // screen L4 shows (a full page load, never a client-side move). Every other sentence is plain text.
+  const [message, setMessageState] = useState<Readonly<{ text: string; linksHome: boolean }> | null>(null);
+  const setMessage = useCallback((text: string | null, linksHome = false): void => {
+    setMessageState(text === null ? null : { text, linksHome });
+  }, []);
 
   /**
    * Reads the subscription, then the invoices. One after the other on purpose: with billing off (local mode, or
@@ -184,7 +204,7 @@ export function SubscriptionControls({
       setMessage(t(catalog, "billing.subscription.actionFailed"));
     }
     return current.subscription;
-  }, [catalog, client]);
+  }, [catalog, client, setMessage]);
 
   useEffect(() => { void reload(); }, [reload]);
 
@@ -200,7 +220,7 @@ export function SubscriptionControls({
     } catch (failure) {
       const chosen = words(failure);
       if (chosen.reload) await reload();
-      setMessage(t(catalog, chosen.key));
+      setMessage(t(catalog, chosen.key), chosen === REACCEPT_REQUIRED);
     } finally {
       setBusy(false);
     }
@@ -439,7 +459,9 @@ export function SubscriptionControls({
           ) : null}
         </>
       ) : null}
-      {message !== null ? <p className="setStatus" role="status">{message}</p> : null}
+      {message !== null ? (
+        <p className="setStatus" role="status">{message.linksHome ? <a href="/">{message.text}</a> : message.text}</p>
+      ) : null}
       {invoices !== null ? (
         <div>
           <h3 className="setCardTitle">{t(catalog, "billing.subscription.invoices")}</h3>

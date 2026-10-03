@@ -30,10 +30,17 @@ describe("P22 the Billing runbook", () => {
       "BILLING_CONFIGURATION_INCOMPLETE", "BILLING_REQUIRES_ENVELOPE_MEMBERS", "same-origin-allow-popups",
       // §14.2 and §14.7 (ruling R3-4, D5's R3-A): one source of the company facts, COMPANY, and its one mirror for
       // the API and the emails, SELLER_COMPANY; the CUI as digits only; the refusals while a tax code is bracketed.
-      "apps/ui/public/payment-marks/visa.svg", "apps/ui/lib/legal/pages.ts", "COMPANY", "[RO…]",
+      "apps/ui/public/payment-marks/visa.svg",
+      // P2-M34 (W16 fix): the website reads the marks folder only at start, so copying the marks in needs a restart.
+      "the list of files in that folder only when it starts, so after copying the files in, restart it with",
+      "`systemctl restart debateai-ui`. Until then the footer shows them as broken images. No rebuild is needed.",
+      "apps/ui/lib/legal/pages.ts", "COMPANY", "[RO…]",
       "packages/billing-core/src/company.ts", "SELLER_COMPANY", "BILLING_COMPANY_FACTS_UNVERIFIED",
       "The company's tax codes are not `api.env` settings", "as digits only, never with `RO`",
       "tests/unit/billing-seller-company.test.tsx",
+      // P2-M35: the facts every billing email prints are refused while bracketed, like the CUI.
+      "BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice", "BILLING_COMPANY_FACTS_UNVERIFIED:emails.general",
+      "BILLING_COMPANY_FACTS_UNVERIFIED:legalName",
       // §14.8: billing off is only for a host with nothing live and nothing queued (the rule cannot silently go).
       "billing.subscription_latest_v", "open_billing_jobs", "Stopping sales, and switching billing off",
       // §14.8 (P14c judge, carried): a withdrawal handed to the owner and not settled yet also blocks billing off.
@@ -44,9 +51,40 @@ describe("P22 the Billing runbook", () => {
       // second payment's charge-back is marked DUPLICATE_PAYMENT, and the command's two newer answers are named.
       "r.xmoney_transaction_id = e.xmoney_transaction_id", "e.error_code", "DUPLICATE_PAYMENT",
       "STILL_DISPUTED", "BILLING_DISPUTE_AMBIGUOUS",
+      // §14.8 (W2, P2-I2): a dispute xMoney reports as its own transaction is listed under the payment it names.
+      "the list shows the xMoney transaction id of the payment the dispute is about",
+      "is recorded under the payment it names, so match that payment's id, not the",
       // §14.8 (D5 5h): no sandbox plan or charge left open when the host moves to live.
       "Going from xMoney's sandbox to live on the same host", "BILLING_STAGE_RECORDS_OPEN",
       "open_sandbox_subscriptions", "open_sandbox_charges",
+      // §14.8 (P2-I4): and no sandbox refund, invoice or credit-note job still queued (the start-up check counts them).
+      "open_sandbox_jobs",
+      // §14.8 (W14, P2-I19): never on a host whose billing clock moved; the live start's safety net and its limit.
+      "**Never take this path on a host that has ever run with `BILLING_STAGE_CLOCK_OFFSET_DAYS`**",
+      "BILLING_RECORDS_DATED_AHEAD", "That is only a safety net: a month after such a",
+      // §14.8 step 4 (W14, P2-I20): the live site's id, public key and key files too, then the live notice address.
+      "`XMONEY_SITE_ID` and\n     `XMONEY_PUBLIC_KEY` to the live site's id and public key",
+      "remove `xmoney-private-key` and `quaderno-api-key` on purpose",
+      "rm /etc/debateai/api/billing/xmoney-private-key", "rm /etc/debateai/api/billing/quaderno-api-key",
+      "Finally, set the notification URL in the **live** xMoney dashboard",
+      // §14.8 (W14, go-live rows 19 and 23): the read-back on the day, and the first live notice.
+      "**Read the settings back before switching on.**",
+      "grep -E '^(XMONEY_API_BASE_URL|XMONEY_SITE_ID|XMONEY_PUBLIC_KEY|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env",
+      "stat -c '%y %n' /etc/debateai/api/billing/xmoney-private-key",
+      "FROM billing.xmoney_notice WHERE xmoney_environment = 'live'",
+      // §14.8 (W3 fix round 1): a sandbox withdrawal handed to the owner is settled before the switch, which refuses it.
+      "If a sandbox withdrawal was handed to you", "while the host still points at the sandbox, with `pnpm billing:withdraw --owner",
+      "After the switch the command refuses a sandbox plan (`NOT_SUBSCRIBED`), and the summary would list it for ever.",
+      // §14.8 (W3 fix round 1): what closes by itself, and when; the refund that never closes without the sandbox key.
+      "An invoice or credit note that keeps failing is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, and then given up.",
+      "A payment check is given up after at most about 31 hours.",
+      "A refund that xMoney's sandbox could not be reached for, or that it refused the sandbox key for, is never given up: it is tried again every 12 hours.",
+      "The API's journal shows the line `billing.xmoney.credentials_refused` each time the key is refused.",
+      "Such a refund closes only once the sandbox key and xMoney's sandbox work, so leave the sandbox key in place until the switch is done.",
+      // §14.8 (W3 fix round 1): the third query counts the payment checks that name a sandbox charge, which the site
+      // refuses beside a refund, invoice or credit note of the other system.
+      "payment checks that name a sandbox charge",
+      "(the site refuses a refund, invoice, credit note or payment check of the other xMoney system)",
       // §14.8: sandbox records stay but are never sales (P1b's quarter summary reads live charges only).
       "they never count as sales", "the quarterly tax summary and its email read only live charges",
       // §14.5 (ruling Q-2): the notice address's two non-200 answers, and the card pages' Payment Request policy.
@@ -63,13 +101,54 @@ describe("P22 the Billing runbook", () => {
       "When xMoney or the tax service is down at a renewal", "retried quietly for up to 3 days",
       // §14.8 (P11a judge, carried): the renewal pass's two journal signals, and what each means.
       "\"event\":\"billing.renewal.report\"", "taxRefused", "[BILLING_RENEWAL_PENDING]",
+      // §14.8 (W13, P2-I18): the brief's eight signals and the listing line are in the journal table, each with what to
+      // do; the three daily listings fail on their own; a CUSTOMER_MISMATCH reaches the operator with the hand refund.
+      "What billing writes to the API's journal",
+      "| `\"event\":\"billing.reconcile.listing_failed\"`, with `listing` and `code` |",
+      "| `[BILLING_RECONCILIATION_PENDING]` (a bare marker) |", "| `[BILLING_OUTBOX_PENDING]` (a bare marker) |",
+      "| `[BILLING_ERASURE_SWEEP_PENDING]` (a bare marker) |", "| `[BILLING_OWNER_JOBS_PENDING]` (a bare marker) |",
+      "| `\"event\":\"billing.outbox.dead\"`, with `kind`, `code` and `attempts` |",
+      "| `\"event\":\"billing.outbox.alert_failed\"`, with `kind` and `code` |",
+      "| `\"event\":\"billing.outbox.settle_failed\"`, with `kind`, `outcome` and `attempts` |",
+      "| `\"event\":\"billing.xmoney.credentials_refused\"`, with `operation` |",
+      // P2-M27: a quote the tax service refuses is its own signal (a wrong Quaderno key), never read as an outage.
+      "| `\"event\":\"billing.quote.refused\"`, with `code` `TAX_SERVICE_REFUSED` and `reason` |",
+      "| `\"event\":\"billing.invoice.unknown\"`, with `issuer`, `kind` and `code` |",
+      "| `\"event\":\"billing.payment.mismatch\"`, with `code` or `chargeKind` |",
+      "this one is asked again on its own every hour", "A list xMoney refuses never causes it",
+      "`REFUND_NOT_REQUESTED` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
+      "WHERE o.outcome = 'MISMATCH'", "refund it there by hand",
+      // W13 fix round 1: the alert promise is exact (O3 never for a dead O3; O2 comes from the refund itself, not for
+      // REFUND_PAYLOAD_INVALID or a refund the queue stopped), a refused key keeps a renewal only for its window, any
+      // other listing code is reported, and only this host's xMoney system's mismatches are acted on.
+      "except when the email that died is O3 itself", "(`REFUND_PAYLOAD_INVALID`)", "usually `OUTBOX_HANDLER_FAILED`",
+      "lists every dead refund job whatever its code", "for up to 3 days past its due time (a payment retry: 24 hours)",
+      "Fixing the key within that time", "Any other code (for example `UNKNOWN`",
+      "SELECT n.received_at, n.xmoney_environment,", "Act only on rows of this host's xMoney system",
       // §14.8 (ruling Q-5): a refund that could not be completed reaches the owner at once.
       "A refund that could not be completed", "O2",
+      // §14.8 (W9, P2-I11, P2-M8): the acknowledgement of receipt, the owner's alert for a withdrawal settled by hand,
+      // and a dead withdrawal refund's deadline and one-refund rule.
+      "M8_RECEIVED", "O2_WITHDRAWAL", "the date the refund is due by", "in one refund",
+      // W9 fix round 1 (F1): look first, never refund twice, and refund exactly the named amount; a smaller or split
+      // refund is not recorded (REFUND_UNRECORDED), so the owner confirms it and tells the accountant.
+      "Look at that payment in the xMoney dashboard first", "never refund it again",
+      "refund exactly the amount the email names", "is not recorded at all", "give its amount to the accountant",
       // §14.4 (D6a's recurring net): a new price reaches only new subscriptions.
       "reaches only new subscriptions",
       // §14.8 (D6a P10b, D6b P16b): nobody reads the e-Factura status for you; the summary lists what to check,
       // and the owner records ANAF's answer with P16b's command.
       "e-Factura", "Romanian e-Factura documents to confirm", "pnpm billing:efactura-status --invoice",
+      // §14.8 (W12, P2-I16, P2-I17): a dead invoice, credit note or email emails the owner (O3) and is listed; the
+      // owner records a document found or issued by hand, or re-queues the job (SmartBill only once checked).
+      "An invoice, a credit note or an email that was never sent", "O3", "Emails that never went out",
+      "billing:invoice --charge \"$CHARGE_REF\" --kind \"$KIND\" --record \"$DOCUMENT\"",
+      "billing:invoice --charge \"$CHARGE_REF\" --kind \"$KIND\" --requeue --confirm-not-issued",
+      "that the document was NOT issued", "CREDIT_NOTE_REFUND_MISSING",
+      "The changed amount is never charged until that notice has gone out",
+      // W12 fix F5: a dashboard refund's line is one the command cannot settle, said where the refusal is explained.
+      "A `DASHBOARD_REFUND` line (a refund made in the xMoney dashboard, amount unknown) has no\n  job, so this command"
+        + " cannot settle it",
       // §14.2 (ruling Q-12): the records key is escrowed with the other five secrets.
       "sixth secret", "RESTORE_DRILL_RECORDS_KEY bytes=32",
       // §14.7 (ruling Q-3): the Terms archive M1 attaches from is never pruned.
@@ -83,6 +162,19 @@ describe("P22 the Billing runbook", () => {
     ]) {
       expect(billing, needle).toContain(needle);
     }
+    // W12 fix F5: every code pnpm billing:invoice can print is explained, with what to do.
+    const invoiceCli = read("apps/api/src/billing/invoice-cli.ts");
+    const printed = [...new Set(invoiceCli.match(/BILLING_INVOICE_[A-Z_]+/gu) ?? [])];
+    expect(printed.length).toBeGreaterThanOrEqual(15);
+    for (const code of printed) expect(billing, code).toContain(`- \`${code}\``);
+    expect(billing).not.toContain("(no such line for\nthat charge)");
+    // W13 (P2-I18): every bare marker billing can print has its row in the journal table.
+    const markers = ["apps/api/src/billing/runtime.ts", "apps/api/src/billing/erasure-hook.ts"]
+      .flatMap((path) => [...read(path).matchAll(/reportPending\("(BILLING_[A-Z_]+)"\)/gu)].map((match) => match[1]!));
+    expect(new Set(markers).size).toBeGreaterThanOrEqual(5);
+    for (const marker of markers) expect(billing, marker).toContain(`| \`[${marker}]\` (a bare marker) |`);
+    // W9 fix round 1 (F1): a dead refund is never settled with "at least" its amount.
+    expect(billing).not.toContain("Refund at least");
     // R-7: the public origin is the existing PUBLIC_APP_URL; no second setting names it.
     expect(billing).not.toContain("PUBLIC_SITE_ORIGIN");
     // R3-4: the company facts have one source and one mirror; no _merchant.json, no second copy for the emails, no
@@ -167,10 +259,10 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–39 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–54 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
-    expect(rows).toEqual(Array.from({ length: 39 }, (_unused, index) => index + 1));
+    expect(rows).toEqual(Array.from({ length: 54 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
@@ -179,7 +271,14 @@ describe("P22 the Billing runbook", () => {
       "payment-marks", "SELLER_COMPANY", "notice URL", "same-origin-allow-popups", "records key",
       "daily ceiling covers the subscribers", "XMONEY_SDK_ORIGIN", "Terms §13", "counsel",
       // D5 5k: the recorded suites cannot stay skipped by accident.
-      "all 25 required X0 kinds present and the X0 suites green", "Permissions-Policy",
+      "all 28 required X0 kinds present", "the X0 suites green", "Permissions-Policy",
+      // W14 (P2-I3): X0 shows whether the card check's order's rebill takes the money; a hold changes A12 first.
+      "transaction-rebill-auth-order-released", "only holds the money, A12 (the card change) is changed before billing is on",
+      // W14 (P2-I20): row 19 needs a LIVE notice, row 23 the live site's id, public key and key files.
+      "`xmoney_environment = 'live'`", "`XMONEY_SITE_ID` and `XMONEY_PUBLIC_KEY` are the live site's",
+      "`xmoney-private-key`, `quaderno-api-key` and `smartbill-credentials` files hold the live keys",
+      // W13 (P2-I18): X0 confirms the daily money check's dispute listing.
+      "`dateType=charge-back` listing is accepted", "transaction-list-charge-back",
       "Quaderno and SmartBill fixtures committed and their recorded-fixture suites green",
       "tests/unit/invoice-smartbill-recorded-fixtures.test.ts", "partial-credit shapes are still ⚠",
       // Ruling Q-12: the records key's proof is the drill line.
@@ -200,11 +299,100 @@ describe("P22 the Billing runbook", () => {
       "SMARTBILL_API_BASE_URL",
       // P24 (2026-10-02): billing stays off until every item of Part 2's final review is closed.
       "PART2-FINAL-REVIEW-OPEN-ITEMS.md",
+      // W2 (P2-I2): row 15's proof includes the dispute fake stack.
+      "billing-dispute-fake-stack.test.ts",
+      // W16 (the W7, W10 and W15 judges' notes): row 36's reader also reads the keys Part 2b wrote.
+      "`settings.erasure.paidPlan`", "`billing.checkout.rateLimited`", "`billing.cancelPage.nothingToCancel`",
+      "`billing.checkout.refundedBeforeStart`",
+      // W16 (P2-M34): the card marks are copied before the website's last start.
+      "restart `debateai-ui`",
       // Part 3's final review (2026-10-03): billing stays off until every item of Part 3's final review is closed.
       "PART3-FINAL-REVIEW-OPEN-ITEMS.md"
     ]) {
       expect(table, needle).toContain(needle);
     }
+    // W16: rows 40–54 hold the items the final review deferred to a ruling or a vendor fact that Part 2b did not build,
+    // plus the "later" Minors (row 54); each names who decides and how it is proven. Every other open item is a row of
+    // the open-items file whose status names the go-live rows that share its work, and row 38 holds them all.
+    const row = (number: number): string => table.split("\n").find((line) => line.startsWith(`| ${number} |`)) ?? "";
+    for (const [number, needles] of [
+      [40, ["P2-I3", "A12 (the card change)", "`transaction-rebill-auth-order-released` reads `void-ok`"]],
+      [41, ["P2-I5", "billing-only database role", "`runner-runtime`", "`scheduler-liveness`", "`email_ciphertext`",
+        "(a) to (c)"]],
+      [42, ["P2-I8", "Terms §13", "how an upgrade's own days are counted", "CRD art. 14(3)"]],
+      [43, ["P2-I9", "public holiday", "Regulation 1182/71 art. 3(4)", "withdrawal-deadline.ts"]],
+      [44, ["P2-I13", "`withdrawal_days`", "`billing.consent.immediateStart`", "country-neutral", "generate:legal:check"]],
+      [45, ["P2-I15", "never took money", "`billing.purge_expired_records`", "Privacy Policy"]],
+      [46, ["P2-M2", "refund transaction", "verify-payment.ts", "refunds.ts", "reconcile.ts", "`refund-ok`"]],
+      [47, ["P2-M17", "`billing.checkout.total`", "31 January", "anchor day"]],
+      [48, ["P2-M21", "the buyer's language", "packages/tax-quaderno/src/index.ts", "tax-quaderno-recorded-fixtures.test.ts"]],
+      [49, ["P2-M25", "`mentions`", "debateai-charge:", "accountant"]],
+      [50, ["P2-M26", "`taxAuthorities`", "`tax_statuses: null`", "REVERSE_CHARGE", "row 16"]],
+      [51, ["P2-M28", "credit note gives back the VAT", "tests/unit/tax-quaderno-recorded-fixtures.test.ts"]],
+      [52, ["P2-M36", "support@dezbatere.ro", "`COMPANY.emails.general`", "`SELLER_COMPANY`"]],
+      [53, ["P2-M37", "PricingCards.tsx", "`home.pricingCopy`", "counsel"]],
+      [54, ["Before billing is switched on", "PART2-FINAL-REVIEW-OPEN-ITEMS.md", "P2-M4, P2-M6, P2-M7, P2-M13, P2-M22, P2-M23, P2-M29, P2-M30, P2-M33, "
+        + "P2-M39, P2-M40, P2-M41, P2-M43"]]
+    ] as const) {
+      const line = row(number);
+      for (const needle of ["**Decided by:**", "**Proven by:**", ...needles]) expect(line, `row ${number}: ${needle}`).toContain(needle);
+      expect(line, `row ${number} is open`).toMatch(/\| — \|$/u);
+    }
+    // W16 fix F1: the "later" Minors gate switching billing on, each fixed or accepted in writing.
+    expect(row(54)).not.toContain("None blocks switching billing on alone");
+  });
+
+  it("the final review's open items say, for each row, whether Part 2b fixed it or which go-live row holds it (W16)", () => {
+    const items = read("docs/missions/paid-plans/PART2-FINAL-REVIEW-OPEN-ITEMS.md");
+    const rows = items.split("\n").filter((line) => /^\| (P2-|Minors|Later|Owner items)/u.test(line))
+      .map((line) => line.slice(2, -2).split(" | "));
+    expect(rows.length).toBeGreaterThanOrEqual(40);
+    // A status is never a bare "open": it names who fixed it or where it is held, so row 38 can be read row by row.
+    // "closed" is the end state go-live row 38 and the file's intro ask for (the controller writes it at the merge).
+    for (const cells of rows) {
+      const status = cells.at(-1) ?? "";
+      expect(status, cells[0]).toMatch(/^(fixed in Part 2b \(W\d+(, W\d+)*\)|open: go-live rows? \d+|closed)/u);
+    }
+    // The mappings below describe rows still open; a row the controller has closed has done its job, but a missing
+    // row is still a failure.
+    const rowOf = (id: string): string[] | undefined => rows.find((cells) => cells[0] === id);
+    const isClosed = (cells: readonly string[]): boolean => (cells.at(-1) ?? "").startsWith("closed");
+    for (const [id, needle] of [
+      ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 40"], ["P2-I5 (part 3)", "go-live row 41"],
+      ["P2-I8", "go-live rows 24 and 42"], ["P2-I9", "go-live row 43"], ["P2-I13", "go-live row 44"],
+      ["P2-I15", "go-live row 45"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 54"],
+      ["Owner items", "go-live rows 14, 16, 24 and 38"]
+    ] as const) {
+      const cells = rowOf(id);
+      expect(cells, `no row ${id}`).toBeDefined();
+      if (!isClosed(cells!)) expect(cells!.at(-1), id).toContain(needle);
+    }
+    const ruled = rows.find((cells) => cells[0] === "Minors" && cells[1]!.startsWith("P2-M2 "));
+    expect(ruled, "no ruled Minors row").toBeDefined();
+    if (!isClosed(ruled!)) {
+      for (const needle of ["46 (P2-M2)", "47 (P2-M17)", "48 (P2-M21)", "49 (P2-M25)", "50 (P2-M26)", "51 (P2-M28)",
+        "52 (P2-M36)", "53 (P2-M37)"]) {
+        expect(ruled!.at(-1), needle).toContain(needle);
+      }
+    }
+    // W16 fix F1: the "later" Minors are a billing-on gate, each fixed by a later task or accepted in writing.
+    expect(rowOf("Later")?.[2]).toBe(
+      "the owner, before billing is switched on (go-live row 38), each fixed by a later task or accepted in writing");
+    // W16 fix G1: the final review's owner items that no other row holds, each with who decides it.
+    const owner = rowOf("Owner items") ?? [];
+    expect(owner[1]).toMatch(/^The final review's owner items that no other row holds\. /u);
+    for (const needle of ["P2-I1's source order", "`--environment`", "429", "sandbox and live transaction ids can collide",
+      "company buyers must be offered the withdrawal", "D390", "not registered for VAT", "outside the EU",
+      "change their billing country or address", "before billing is switched on"]) {
+      expect(owner[1], needle).toContain(needle);
+    }
+    expect(owner[2]).toBe("owner; xMoney (through the owner); counsel (go-live row 24); accountant (go-live row 16)");
+    // W16 fix G1: the deletion screen's sentence is one of the owner's wording picks.
+    const erasure = rowOf("P2-I10 (owner, accountant)") ?? [];
+    expect(erasure[1]).toContain("(4) The owner picks the final wording of the deletion screen's sentence (`settings.erasure.paidPlan`)");
+    expect(erasure[2]).toContain("the wording pick of the deletion screen's sentence");
+    // The controller's note on the role split (the W8 judge): the API principal keeps the two reads billing mail needs.
+    expect(items).toContain("the API principal keeps SELECT on `billing.customer` and on `identity.\"user\"` (`user_id`, `owner_ref`, `email_ciphertext`)");
   });
 
   it("§14.9 gives the owner the sandbox run: the test cards, the stage clock and the fake-stack proof", () => {
@@ -227,11 +415,34 @@ describe("P22 the Billing runbook", () => {
       "beside anything but", "Quaderno's sandbox and a `.invalid` SmartBill address",
       // P23 fix F2: what the moved clock does not reach.
       "its usage bars and a withdrawal's credit-used share", "the fake stack in step 6 proves the bars and the share",
-      "`billing:efactura-status`) also run on the real clock", "so do not run them on this host while the line is set"
+      "`billing:efactura-status`, `billing:invoice`) also\nrun on the real clock", "so do not run them on this host while the line is set",
+      // W13 (P2-I18): the first start with billing on is read for the billing failure lines, before step 1 and after
+      // step 2's restart.
+      "**Before step 1: read the journal of the first start with billing on.**",
+      "_SYSTEMD_INVOCATION_ID=\"$(systemctl show --property=InvocationID --value debateai-api)\"",
+      "run the journal command from **Before step 1** again; it should print nothing",
+      // W13 fix round 1: the step says what the filter really prints.
+      "the lines that say a list failed or our key was refused, and billing's bracketed\nmarkers", "Any other line it prints:",
+      // W2 (P2-I2, P2-M39): the dispute case is part of the owner's proof, run after the whole-flow suite.
+      "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
+      "a card dispute found by the daily money check: the plan paused once, with one email, counted",
+      "Start the second only after the first has finished",
+      // W14 (P2-I19, the owner's ruling of 2 October 2026): a separate throwaway server, with what it needs of its own.
+      "Do this on a **separate, throwaway server**", "**Domain and `PUBLIC_APP_URL`**",
+      "notification URL to the sandbox domain followed by `/api/v1/billing/xmoney/notify`",
+      "**Register version with `countryPolicy`**", "`sandbox@example.invalid:not-a-token`",
+      "7. **Destroy the sandbox server.**", "The line never comes out",
+      // P2-M38: pay before the emailed cancel; the closing check lists each charge left with an unknown outcome.
+      "pay for Plus first: a cancel link is\n   sent only for a plan that is paid",
+      "u.kind = 'SUBMIT_UNKNOWN') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED'))"
     ]) {
       expect(billing, needle).toContain(needle);
     }
     // Lowering the offset mid-run would stall jobs scheduled on the moved clock for a month.
     expect(billing).not.toContain("Remove the line and restart the API again");
+    // W14 (P2-I19): no "stage host" that is rebuilt and could then go live, and no billing switch-on without countryPolicy.
+    expect(billing).not.toContain("rebuild the stage host");
+    expect(billing).not.toContain("on a **stage** host");
+    expect(billing).not.toContain("Publish\n`billingPolicy` with `enabled: true` on that host only");
   });
 });

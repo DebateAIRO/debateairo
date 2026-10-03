@@ -45,6 +45,7 @@
   "settings.erasure.title": "Slet konto",
   "settings.erasure.hint": "Sletningen begynder efter syv hele dage. Du kan annullere, før den begynder. Meddelelser om planlægning, annullering og fuldførelse sendes til hver tilknyttet e-mail eller gendannelsesmail; mindst én bekræftet kanal er påkrævet.",
   "settings.erasure.dataWarning": "Krypteret privat indhold bliver permanent ulæseligt, når dets nøgler ødelægges. Aktuelle offentlige snapshots forbliver offentlige under et udfaset pseudonym, og downloadede, citerede, cachelagrede, indekserede eller leverandørbevarede kopier kan bestå. Ældre klartekst, der er gjort krav på, rapporteres som en bevaret rest, ikke som fuldt ryddet indhold.",
+  "settings.erasure.paidPlan": "Når du planlægger sletningen, stopper fornyelsen af dit betalte abonnement, men abonnementet virker fortsat, indtil sletningen gennemføres, eller den måned, du har betalt for, slutter; hvis du annullerer sletningen, varer abonnementet til udgangen af den måned og fornyes kun, hvis du fortryder opsigelsen, og hvis du stadig kan fortryde købet inden for 14 dage efter købet, kan du gøre det, indtil sletningen gennemføres.",
   "settings.erasure.checking": "Kontrollerer status for kontosletning…",
   "settings.erasure.status": "Status: {status}. Planlagt sletningstidspunkt: {time}.",
   "settings.erasure.processing": "Den irreversible sletning behandles. Planlægning og annullering er ikke længere tilgængelige.",

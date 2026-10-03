@@ -362,7 +362,10 @@ export function CheckoutFlow({
         </div>
       </form>
       {busy && quote === null ? <p className="billingStatus" role="status">{t(catalog, "billing.checkout.quoting")}</p> : null}
-      {messageKey !== null ? <p className="billingError" role="alert">{t(catalog, messageKey)}</p> : null}
+      {messageKey === null ? null : messageKey === "billing.checkout.reacceptRequired" ? (
+        // W10 (P2-M20): the accept screen covers the signed-in home page (L4); /checkout has none of its own.
+        <p className="billingError" role="alert"><a href="/">{t(catalog, messageKey)}</a></p>
+      ) : <p className="billingError" role="alert">{t(catalog, messageKey)}</p>}
       {messageKey === "billing.checkout.alreadySubscribed" ? (
         <p><a href="/settings">{t(catalog, "billing.checkout.goToSettings")}</a></p>
       ) : null}

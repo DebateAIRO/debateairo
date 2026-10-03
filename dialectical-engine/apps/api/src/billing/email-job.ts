@@ -1,5 +1,6 @@
 import type { BillingRepository, OutboxJob } from "@debateai/db";
 import type { PoolClient } from "pg";
+import type { BillingRecipientReader } from "./account-email.js";
 import type { OutboxHandler, OutboxOutcome } from "./outbox.js";
 import { DONE, failureRetryAt } from "./outbox.js";
 import { openBillingProfile, type BillingProfile } from "./records.js";
@@ -7,16 +8,20 @@ import { openBillingProfile, type BillingProfile } from "./records.js";
 /**
  * The same ids as P17's `MailTemplateId` (packages/mail-templates/src/templates.ts); P17 is built later and pins the
  * two lists equal. R-8's sixteen, plus Q-5's owner template `O2` ("A refund could not be completed and needs your
- * attention", English only, params `chargeRef`, `refundAmount`, `reasonCode`), which RefundDesk's dead-letter path
- * queues (P9b).
+ * attention", English only, params `chargeRef`, `refundAmount`, `reasonCode` and the flag `notRequested`, P2-I5; W9
+ * adds the optional `refundReason` and `refundDeadline`), which RefundDesk's dead-letter path queues (P9b), plus W9's
+ * (P2-I11) `M8_RECEIVED` (a withdrawal's acknowledgement of receipt) and `O2_WITHDRAWAL` (a withdrawal the owner
+ * settles by hand), both queued by `recordWithdrawal`, plus W12's (P2-I16) `O3` (a legal document or an email that
+ * was never sent, English only, params `jobKind`, `reference`, `reasonCode` and `nextSteps`), which the outbox
+ * worker's dead-letter hook queues (`createDeadJobAlert`).
  */
 export type BillingMailTemplateId =
   | "M1" | "M2_INVOICE_LINK" | "M2_INVOICE_ATTACHED" | "M3" | "M4" | "M5A" | "M5B" | "M5C"
-  | "M6" | "M7" | "M8" | "M9" | "M10" | "M11" | "M11_DUPLICATE" | "O1" | "O2";
+  | "M6" | "M7" | "M8" | "M8_RECEIVED" | "M9" | "M10" | "M11" | "M11_DUPLICATE" | "O1" | "O2" | "O2_WITHDRAWAL" | "O3";
 
 const TEMPLATE_IDS: ReadonlySet<string> = new Set<BillingMailTemplateId>([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3"
 ]);
 
 /** Structurally P17's `MailAttachment` (apps/api/src/mail-mime.ts). */
@@ -59,6 +64,12 @@ export type BillingEmailRequest = Readonly<{
   params: Readonly<Record<string, string>>;
   attachments?: ReadonlyArray<Readonly<{ kind: BillingAttachmentKind; fields: Readonly<Record<string, string>> }>>;
   notBefore: Date;
+  /**
+   * W12 (A7, the controller's ruling on P2-I16): M3's notice, recorded only once the email went out
+   * (`RenewalService.noticeMailSent`, through the EMAIL handler's `sent` hook): the subscription, the period it
+   * announces and the announced total. Ids and an amount, no personal text.
+   */
+  notice?: Readonly<{ subscriptionId: string; periodEnd: Date; announcedTotalMicros: number }>;
 }>;
 
 type EmailOutboxJob = Readonly<{
@@ -69,9 +80,9 @@ type EmailOutboxJob = Readonly<{
 }>;
 
 /**
- * The queue never holds an address (spec: "the EMAIL job resolves the address from the billing profile at send
- * time"). It holds the template, the customer id and the params; params are amounts, dates, plan ids and our own
- * URLs, never personal text.
+ * The queue never holds an address: the EMAIL job resolves it at send time (W8, P2-I12: the account's current address,
+ * the billing profile's only after the account is erased). It holds the template, the customer id and the params;
+ * params are amounts, dates, plan ids and our own URLs, never personal text.
  */
 export function emailJob(request: BillingEmailRequest): EmailOutboxJob {
   const payload: Record<string, string | number | boolean | null> = {
@@ -81,6 +92,11 @@ export function emailJob(request: BillingEmailRequest): EmailOutboxJob {
     attachments: (request.attachments ?? []).map((attachment) => attachment.kind).join(",")
   };
   for (const [name, value] of Object.entries(request.params)) payload[`param.${name}`] = value;
+  if (request.notice !== undefined) {
+    payload["notice.subscription_id"] = request.notice.subscriptionId;
+    payload["notice.period_end"] = request.notice.periodEnd.toISOString();
+    payload["notice.announced_total_micros"] = request.notice.announcedTotalMicros;
+  }
   for (const attachment of request.attachments ?? []) {
     for (const [name, value] of Object.entries(attachment.fields)) payload[`attach.${attachment.kind}.${name}`] = value;
   }
@@ -110,10 +126,19 @@ function fieldsWithPrefix(payload: OutboxJob["payload"], prefix: string): Record
 
 export function createEmailJobHandler(deps: Readonly<{
   repository: Pick<BillingRepository, "latestProfile">;
+  /** W8 (P2-I12): the account's current address at send time; the profile's once the account is erased. */
+  recipients: BillingRecipientReader;
   recordsKey: Buffer;
   ownerReportEmail: string;
   mail: BillingMailPort;
   attachments: ReadonlyMap<BillingAttachmentKind, AttachmentResolver>;
+  /**
+   * W12 (the controller's ruling on P2-I16): runs once the message was handed to the mail channel, before the job is
+   * done. The runtime writes M3's notice record here (`RenewalService.noticeMailSent`), so a changed amount is never
+   * charged on a notice that was not sent (A7). A failure retries the job, so the email may go out twice
+   * (delivery is at-least-once).
+   */
+  sent?: (job: OutboxJob, now: Date) => Promise<void>;
 }>): OutboxHandler {
   return async (job, now) => {
     const { template, recipient, customer_id: customerId, attachments } = job.payload;
@@ -132,7 +157,10 @@ export function createEmailJobHandler(deps: Readonly<{
       } catch {
         return dead("BILLING_PROFILE_UNREADABLE");
       }
-      to = profile.email;
+      // W8 (P2-I12, the owner's ruling): the account's CURRENT address, so a change in Settings reaches every billing
+      // email; the address kept with the profile only once the account is erased. A failed read throws: the worker
+      // retries rather than send to an address the account may no longer have.
+      to = (await deps.recipients.currentAddress(customerId)) ?? profile.email;
       locale = profile.locale;
     } else {
       return dead("EMAIL_PAYLOAD_INVALID");
@@ -160,6 +188,7 @@ export function createEmailJobHandler(deps: Readonly<{
       params: Object.freeze(fieldsWithPrefix(job.payload, "param.")),
       attachments: Object.freeze(resolved)
     }));
+    if (deps.sent !== undefined) await deps.sent(job, now);
     return DONE;
   };
 }

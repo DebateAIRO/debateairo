@@ -44,6 +44,12 @@ function bucharestDate(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Bucharest", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
+/** A validated Romanian VAT number as SmartBill writes it: no spaces, upper case, `RO` before bare digits. */
+function romanianVatCode(taxId: string): string {
+  const compact = taxId.replace(/\s+/gu, "").toUpperCase();
+  return /^[0-9]+$/u.test(compact) ? `RO${compact}` : compact;
+}
+
 function clientOf(customer: SaleRecord["customer"]): Record<string, unknown> {
   if (customer.name === null || customer.name.trim() === "") refused("CLIENT_NAME_REQUIRED");
   // R-15: e-Factura refuses a Romanian buyer without a city and a county, so we do before SmartBill does.
@@ -53,8 +59,10 @@ function clientOf(customer: SaleRecord["customer"]): Record<string, unknown> {
   const taxId = customer.taxId;
   return {
     name: customer.name,
-    vatCode: taxId ?? CONSUMER_VAT_CODE,
-    isTaxPayer: taxId !== null && /^RO/iu.test(taxId),
+    vatCode: taxId === null ? CONSUMER_VAT_CODE : romanianVatCode(taxId),
+    // P2-M32: a buyer's tax id reaches an invoice only once it was validated as a VAT number (the billing profile's
+    // `vatValidated`, P10a's `saleRecordOf`), so a buyer with one is a VAT payer, whatever prefix they typed.
+    isTaxPayer: taxId !== null,
     address: customer.street ?? "",
     city: customer.city,
     county: customer.region,

@@ -131,7 +131,8 @@ describe("P9b VERIFY_PAYMENT", () => {
 
   it("retries a notice that arrives before its charge row, then applies it", async () => {
     const chargeId = newChargeId();
-    const paid = h.xmoney.pay({ externalOrderId: chargeId, amountDecimal: "24.20", cardCountry: "RO" });
+    // Paid by the xMoney customer the checkout below creates (its signed order names that customer).
+    const paid = h.xmoney.pay({ externalOrderId: chargeId, amountDecimal: "24.20", cardCountry: "RO", customerId: h.xmoney.reserveCustomer() });
     await h.notices.receive(h.noticeFor(paid));
     await h.worker.drain(10);
     const [waiting] = (await h.outboxRows(paid.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT");
@@ -171,6 +172,76 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(await status(declined.chargeId, declined.ownerRef)).toEqual({ state: "NEEDS_ACTION", reasonCode: "PAYMENT_DECLINED" });
   });
 
+  it("ends MISMATCH and moves nothing for a forged notice naming another open charge; the payer's own notice still applies (P2-I1)", async () => {
+    // Spec §2.7: "The browser never decides a payment, and neither does a notice." Two open checkouts of one price; a
+    // notice decrypts under our key (it has no MAC) and names the payer's transaction with the other person's charge.
+    const payer = await h.buy();
+    const other = await h.buy();
+    const paid = h.xmoney.pay({ externalOrderId: payer.chargeId, amountDecimal: payer.totalDecimal, cardCountry: "RO" });
+    const before = h.auditLines.length;
+    expect(await h.notices.receive(h.noticeFor(paid, { externalOrderId: other.chargeId }))).toBe("STORED");
+    await h.worker.drain(10);
+    expect(await h.eventKinds(other.chargeId)).toEqual(kindsOf("REQUESTED"));
+    expect(await subscriptionKinds(other.subscriptionId)).toEqual(["CREATED"]);
+    expect(await h.entitlementRows(other.ownerRef)).toEqual([]);
+    expect(await h.eventKinds(payer.chargeId)).toEqual(kindsOf("REQUESTED"));
+    expect((await h.outboxRows(paid.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT").map((row) => [row.done, row.dead]))
+      .toEqual([[true, false]]);
+    const outcomes = await h.database.pool.query(
+      "SELECT o.outcome FROM billing.xmoney_notice_outcome o JOIN billing.xmoney_notice n USING (notice_id) WHERE n.transaction_id=$1",
+      [paid.transactionId]
+    );
+    expect(outcomes.rows).toEqual([{ outcome: "MISMATCH" }]);
+    // One content-free line: no id of either person, no amount.
+    expect(h.auditLines.slice(before)).toEqual([{ event: "billing.payment.mismatch", code: "ORDER_REF_MISMATCH" }]);
+    // The forged notice does not hold the other person's checkout: their young open charge is simply reused.
+    expect(await h.buy({ ownerRef: other.ownerRef })).toMatchObject({ chargeId: other.chargeId, reused: true });
+    // The payer's own notice (xMoney's order reference) activates the payer's plan with the payer's payment.
+    expect(await h.notices.receive(h.noticeFor(paid))).toBe("STORED");
+    await h.worker.drain(10);
+    expect(await h.eventKinds(payer.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED"));
+    expect(await subscriptionKinds(payer.subscriptionId)).toEqual(["CREATED", "ACTIVATED"]);
+    expect(foldSubscription(await h.repository.subscriptionEvents(payer.subscriptionId)))
+      .toMatchObject({ xmoneyOrderId: paid.orderId, xmoneyCustomerId: paid.customerId, cardRef: paid.cardId });
+  });
+
+  it("ends MISMATCH when a first payment's customer is not the checkout's xMoney customer (P2-I1)", async () => {
+    const bought = await h.buy();
+    const stranger = h.xmoney.pay({
+      externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO", customerId: "4040404"
+    });
+    const before = h.auditLines.length;
+    await h.notices.receive(h.noticeFor(stranger));
+    await h.worker.drain(10);
+    expect(await h.eventKinds(bought.chargeId)).toEqual(kindsOf("REQUESTED"));
+    expect(await subscriptionKinds(bought.subscriptionId)).toEqual(["CREATED"]);
+    expect(h.auditLines.slice(before)).toEqual([{ event: "billing.payment.mismatch", code: "CUSTOMER_MISMATCH" }]);
+  });
+
+  it("ends the checkout ABANDONED and reads FAILED when the owner refunded its payment before we verified it (P2-M5)", async () => {
+    const bought = await h.buy();
+    // Refunded in the xMoney dashboard before any check of ours ran: the payment's own status is already refund-ok.
+    const refunded = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO", status: "refund-ok" });
+    await h.settle(refunded.transactionId);
+    // The money came and went: recorded as such, with no plan, no invoice and no M1.
+    expect(await h.eventKinds(bought.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED", "REFUND_REQUESTED", "REFUNDED"));
+    expect((await h.repository.subscriptionEvents(bought.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED", reason: "PROVIDER_REFUND" } });
+    expect(await subscriptionKinds(bought.subscriptionId)).not.toContain("ACTIVATED");
+    // The waiting screen never says "Your plan is active", and the person can buy again at once (no CHECKOUT_PENDING).
+    expect(await status(bought.chargeId, bought.ownerRef)).toEqual({ state: "FAILED", reasonCode: "PROVIDER_REFUND" });
+    const again = await h.buy({ ownerRef: bought.ownerRef });
+    expect(again.chargeId).not.toBe(bought.chargeId);
+  });
+
+  it("answers no one but the charge's owner about its status (P2-M16)", async () => {
+    const paid = await h.activate();
+    expect(await status(paid.chargeId, paid.ownerRef)).toEqual({ state: "SUCCEEDED", reasonCode: null });
+    // Another signed-in person who learned the charge reference reads nothing, as for a reference that does not exist.
+    expect(await status(paid.chargeId, randomUUID())).toBeNull();
+    expect(await status("0".repeat(32), paid.ownerRef)).toBeNull();
+  });
+
   it("refunds a card from a blocked country through the refund job: intent first, one call, no invoice, M11", async () => {
     const bought = await h.buy();
     const paid = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RU" });
@@ -187,6 +258,8 @@ describe("P9b VERIFY_PAYMENT", () => {
       payload: { charge_id: bought.chargeId, transaction_id: paid.transactionId, amount_micros: 24_200_000, whole: true, reason: "CARD_COUNTRY_BLOCKED" }
     });
     expect(jobs.map((row) => row.ref)).toContain(`M11:${bought.chargeId}`);
+    // W10 (P2-M9): a checkout's plan never started, so M11 names no plan that ended.
+    expect(jobs.find((row) => row.ref === `M11:${bought.chargeId}`)?.payload).not.toHaveProperty("param.endedPlan");
     expect(await h.entitlementRows(bought.ownerRef)).toEqual([]);
     expect(await status(bought.chargeId, bought.ownerRef)).toEqual({ state: "FAILED", reasonCode: "CARD_COUNTRY_BLOCKED" });
   });
@@ -393,6 +466,31 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "REFUNDED")).toHaveLength(1);
   });
 
+  it("hands the owner a dashboard refund of the same amount as our landed refund, never reading it as ours (P2-M1)", async () => {
+    const paid = await h.activate();
+    h.xmoney.refundLostResponses = 1;
+    await h.repository.withTransaction((client) => h.refunds.requestAll(client, {
+      ownerRef: paid.ownerRef, reason: "WITHDRAWAL", at: h.clock.now,
+      allocations: [{ chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 12_100_000 }]
+    }));
+    await h.worker.drain(10);
+    h.clock.advance(61_000);
+    await h.worker.drain(10);
+    // Ours landed and is recorded on its own refund transaction (the payment still reads complete-ok: a partial refund).
+    const [ours] = h.xmoney.refundTransactionsOf(paid.transaction.transactionId);
+    expect((await h.repository.charge(paid.chargeId))!.events.find((event) => event.kind === "REFUNDED"))
+      .toMatchObject({ xmoneyTransactionId: ours!.transactionId, amountMicros: 12_100_000 });
+    // The owner then refunds the same 12.10 again in the dashboard: another refund transaction, not ours.
+    await h.xmoney.refund({ transactionId: paid.transaction.transactionId, amountDecimal: "12.10", reason: "customer-demand", message: "dashboard" });
+    const dashboard = h.xmoney.refundTransactionsOf(paid.transaction.transactionId).find((row) => row.transactionId !== ours!.transactionId);
+    const linesBefore = h.auditLines.length;
+    await h.settle(dashboard!.transactionId);
+    expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "REFUNDED")).toHaveLength(1);
+    expect((await h.outboxRows(dashboard!.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === dashboard!.transactionId))
+      .toEqual([expect.objectContaining({ dead: true, lastErrorCode: "REFUND_UNRECORDED" })]);
+    expect(h.auditLines.slice(linesBefore)).toContainEqual({ event: "billing.refund.unrecorded", reason: "PROVIDER_REFUND" });
+  });
+
   it("never sends a partial refund twice when its answer was lost and xMoney shows no refund row; the owner gets it (A4c)", async () => {
     const paid = await h.activate();
     const before = h.xmoney.refunds.length;
@@ -429,9 +527,10 @@ describe("P9b VERIFY_PAYMENT", () => {
       listTransactions: (query: Parameters<typeof h.xmoney.listTransactions>[0]) => h.xmoney.listTransactions(query),
       refund: async (): Promise<void> => { throw new TypedDomainError("XMONEY_REFUSED", "XMONEY_REFUSED:1402"); }
     };
-    const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refusing, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read });
+    const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refusing, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read, xmoneyEnvironment: "stage" });
+    // A withdrawal refund is always a named amount (P12d, P2-I5: never `whole`); here it is the whole 24.20.
     await h.repository.withTransaction((client) => desk.request(client, {
-      chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: true,
+      chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: false,
       ownerRef: paid.ownerRef, reason: "WITHDRAWAL"
     }, h.clock.now));
     const [job] = (await h.outboxRows(`${paid.chargeId}:${paid.transaction.transactionId}`)).filter((row) => row.kind === "XMONEY_REFUND");
@@ -439,8 +538,10 @@ describe("P9b VERIFY_PAYMENT", () => {
       notBefore: h.clock.now, createdAt: h.clock.now, claimedBy: "test", claimedAt: h.clock.now } as unknown as Parameters<typeof desk.handle>[0];
     expect(await desk.handle(claimed, h.clock.now)).toEqual({ kind: "DEAD", code: "XMONEY_REFUSED" });
     const ownerMail = (await h.outboxRows(`O2:${paid.chargeId}:${paid.transaction.transactionId}`)).find((row) => row.kind === "EMAIL");
+    expect(ownerMail?.ref).toBe(`O2:${paid.chargeId}:${paid.transaction.transactionId}`);
     expect(ownerMail?.payload).toMatchObject({
-      template: "O2", recipient: "OWNER", "param.refundAmount": "24.20", "param.reasonCode": "XMONEY_REFUSED"
+      template: "O2", recipient: "OWNER", "param.refundAmount": "24.20", "param.reasonCode": "XMONEY_REFUSED",
+      "param.notRequested": "false"
     });
     expect(await h.eventKinds(paid.chargeId)).not.toContain("REFUNDED");
   });
@@ -452,9 +553,9 @@ describe("P9b VERIFY_PAYMENT", () => {
       listTransactions: (query: Parameters<typeof h.xmoney.listTransactions>[0]) => h.xmoney.listTransactions(query),
       refund: async (): Promise<void> => { throw new TypedDomainError("XMONEY_CREDENTIALS_REFUSED", "XMONEY_CREDENTIALS_REFUSED:401"); }
     };
-    const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refused, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read });
+    const desk = new RefundDesk({ repository: h.repository, jobs: h.jobs, xmoney: refused, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read, xmoneyEnvironment: "stage" });
     await h.repository.withTransaction((client) => desk.request(client, {
-      chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: true,
+      chargeId: paid.chargeId, transactionId: paid.transaction.transactionId, amountMicros: 24_200_000, whole: false,
       ownerRef: paid.ownerRef, reason: "WITHDRAWAL"
     }, h.clock.now));
     const [job] = (await h.outboxRows(`${paid.chargeId}:${paid.transaction.transactionId}`)).filter((row) => row.kind === "XMONEY_REFUND");
@@ -464,6 +565,28 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(outcome).toEqual({ kind: "RETRY", code: "XMONEY_CREDENTIALS_REFUSED", retryAt: new Date(h.clock.now.getTime() + 12 * 3_600_000) });
     expect(h.auditLines).toContainEqual({ event: "billing.xmoney.credentials_refused", operation: "refund" });
     expect(await h.eventKinds(paid.chargeId)).not.toContain("REFUNDED");
+  });
+
+  it("moves no money for a forged XMONEY_REFUND row the charge records no request for, and tells the owner (P2-I5)", async () => {
+    const paid = await h.activate();
+    const ref = `${paid.chargeId}:${paid.transaction.transactionId}`;
+    // What a process holding the runtime role could insert: the whole payment back as a quiet card-check release.
+    await h.repository.withTransaction((client) => h.repository.enqueue(client, {
+      kind: "XMONEY_REFUND", ref, notBefore: h.clock.now,
+      payload: {
+        charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, amount_micros: 24_200_000, whole: true,
+        owner_ref: paid.ownerRef, reason: "CARD_CHECK_RELEASE"
+      }
+    }));
+    await h.worker.drain(10);
+    expect(h.xmoney.refunds.filter((refund) => refund.transactionId === paid.transaction.transactionId)).toEqual([]);
+    expect(await h.eventKinds(paid.chargeId)).not.toContain("REFUNDED");
+    expect((await h.outboxRows(ref)).find((row) => row.kind === "XMONEY_REFUND"))
+      .toMatchObject({ dead: true, lastErrorCode: "REFUND_NOT_REQUESTED" });
+    // Its own O2 (P2-I5): the "no refund to make" sentences, under a ref no real refund's O2 for this payment uses.
+    expect((await h.outboxRows(`O2:${ref}:not-requested`)).find((row) => row.kind === "EMAIL" && row.ref === `O2:${ref}:not-requested`)?.payload)
+      .toMatchObject({ template: "O2", recipient: "OWNER", "param.reasonCode": "REFUND_NOT_REQUESTED", "param.notRequested": "true" });
+    expect((await h.outboxRows(`O2:${ref}`)).filter((row) => row.ref === `O2:${ref}`)).toEqual([]);
   });
 
   it("releases a refused new card's hold and keeps the plan, its card and its order (P12e's path through VERIFY_PAYMENT)", async () => {
@@ -490,7 +613,8 @@ describe("P9b VERIFY_PAYMENT", () => {
       succeeded: async (context) => context.cardCountry === "RU" ? { kind: "REFUND", reason: "CARD_CHECK_REFUSED" } : APPLIED,
       failed: async () => undefined
     });
-    const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RU" });
+    // The card-change order is the subscription's own xMoney customer's (P2-I1).
+    const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RU", customerId: paid.transaction.customerId });
     await verifier.handle({ jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: hold.transactionId, payload: {}, attempts: 1,
       notBefore: h.clock.now, createdAt: h.clock.now, claimedBy: "test", claimedAt: h.clock.now } as unknown as Parameters<typeof verifier.handle>[0], h.clock.now);
     await h.worker.drain(10);
@@ -610,7 +734,7 @@ describe("P9b VERIFY_PAYMENT", () => {
         xmoneyTransactionId: null, amountMicros: 1_000_000, errorCode: null
       }));
     });
-    const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RO" });
+    const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RO", customerId: paid.transaction.customerId });
     const state = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));
     await h.repository.withTransaction(async (client) => {
       await h.repository.appendChargeEvent(client, chargeEvent(holdCharge, "SUCCEEDED", h.clock.now, {
@@ -747,7 +871,9 @@ describe("P9b VERIFY_PAYMENT", () => {
       const verifier = new VerifyPaymentHandler({
         repository, jobs, xmoney: h.xmoney, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
         recordsKey: h.recordsKey, audit: h.audit, xmoneyEnvironment: "stage",
-        refunds: new RefundDesk({ repository, jobs, xmoney: h.xmoney, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read })
+        refunds: new RefundDesk({
+          repository, jobs, xmoney: h.xmoney, policy: testBillingPolicy, audit: h.audit, clock: h.clock.read, xmoneyEnvironment: "stage"
+        })
       });
       verifier.registerSettlement("INITIAL", createInitialSettlement({
         repository, entitlements, acceptances: new AcceptanceRepository(narrow), policy: testBillingPolicy,

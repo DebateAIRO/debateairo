@@ -1,7 +1,7 @@
 // tests/unit/payments-xmoney-recorded-fixtures.test.ts
 // X0's recorded stage fixtures, run through the REAL client and the real notice decoder. Until the owner records
 // them this suite is skipped BY NAME (the describe says so) — the one test here that can be inert, and the go-live
-// checklist's row 14 (written by P22) lists "all 25 required X0 kinds present and the X0 suites green" so the skip
+// checklist's row 14 (written by P22) lists "all 28 required X0 kinds present and the X0 suites green" so the skip
 // cannot be forgotten.
 // Once any fixture exists, every required kind must: a missing one fails loudly, never silently passes.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -18,13 +18,17 @@ import {
   XMONEY_OPTIONAL_FIXTURE_KINDS,
   XMONEY_REQUIRED_FIXTURE_KINDS
 } from "../../tools/billing/scrub-xmoney-fixture.js";
+import { authOrderRebillAnswer } from "../../tools/billing/xmoney-sandbox.js";
+import { transactionRoute } from "../../apps/api/src/billing/rows.js";
 import { startFakeXMoney } from "../support/fake-xmoney.js";
 
 const DIRECTORY = resolve(import.meta.dirname, "../fixtures/xmoney");
 const FORMAT = "debateai.xmoney-fixture.v1";
 const TEST_KEY = Buffer.from("0123456789abcdef0123456789abcdef", "latin1");
 type Framing = { ivBytes: number; alphabet: string; padded: boolean; lineBreaks: boolean; plusArrivedAsSpace: boolean };
-type Fixture = { format: string; kind: string; body: unknown; testKeyOpensslResult: string | null; framing: Framing | null };
+type Fixture = {
+  format: string; kind: string; recordedOn: string; body: unknown; testKeyOpensslResult: string | null; framing: Framing | null;
+};
 const fixtures: Fixture[] = existsSync(DIRECTORY)
   ? readdirSync(DIRECTORY).filter((name) => name.endsWith(".json"))
     .map((name) => JSON.parse(readFileSync(join(DIRECTORY, name), "utf8")) as Fixture)
@@ -37,6 +41,20 @@ function fixture(kind: string): Fixture {
 }
 const dataOf = (kind: string): Record<string, unknown> => (fixture(kind).body as { data: Record<string, unknown> }).data;
 const recordedStatus = (kind: string): unknown => dataOf(kind).transactionStatus;
+
+/**
+ * P2-M3 (W15 G1): a creation time the client read is not proof enough. A millisecond `creationTimestamp` read as
+ * seconds, or a time read in the wrong zone, still parses; only a time near the day the owner recorded the fixture
+ * proves the zone and the unit. 400 days either side of `recordedOn` allows a listing's older rows and nothing more.
+ */
+const RECORDED_WINDOW_MS = 400 * 86_400_000;
+function expectNearRecording(createdAt: Date | null, kind: string, label: string): void {
+  expect(createdAt, `${label}: creation time with its zone`).not.toBeNull();
+  const recordedOn = Date.parse(`${fixture(kind).recordedOn}T00:00:00Z`);
+  expect(Number.isFinite(recordedOn), `${kind}: recordedOn is a date`).toBe(true);
+  expect(Math.abs(createdAt!.getTime() - recordedOn), `${label}: within 400 days of recordedOn (zone and unit right)`)
+    .toBeLessThanOrEqual(RECORDED_WINDOW_MS);
+}
 
 /**
  * Runs `use` against a real XMoneyClient whose every call is answered with `body` (a later page with an empty
@@ -68,11 +86,14 @@ async function answeredWith<T>(
 const SINGLE_TRANSACTION_KINDS = [
   "transaction-initial", "transaction-rebill", "transaction-auth", "transaction-auth-released",
   "transaction-refund-partial", "transaction-refund-second-partial", "transaction-refund-full",
-  "transaction-rebill-auth-order"
+  "transaction-rebill-auth-order", "transaction-rebill-auth-order-released"
 ] as const;
 const LIST_KINDS = [
   "transaction-list", "transaction-list-after-refund", "transaction-list-refund-after-partial",
-  "transaction-list-refund-after-second-partial", "transaction-list-refund"
+  "transaction-list-refund-after-second-partial", "transaction-list-refund",
+  // W13 (P2-I18): the daily money check's dispute listing; a refused dateType=charge-back records xMoney's error reply,
+  // which fails here (no pagination, no rows), so X0 can never pass with the listing unconfirmed.
+  "transaction-list-charge-back"
 ] as const;
 
 describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)", () => {
@@ -101,6 +122,11 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
     expect(decryptNotice(fixture("notice-success").testKeyOpensslResult!, TEST_KEY).externalOrderId).not.toBeNull();
   });
 
+  // W2 (P2-I2) also depends on these reads: only `deposit` (or no type) routes as a payment, `refund` and
+  // `representment` keep their own paths, and every other type is a dispute of the payment it names. A real payment
+  // that xMoney typed anything else would never activate or renew. Every single-transaction kind and the optional
+  // second payment and declined rebill are GET /transaction reads of a payment (also after its refunds and its
+  // release); the optional refund is the refund itself. If this fails, `transactionRoute` changes before billing is on.
   it("parse as transactions through the real client", async () => {
     const optional = XMONEY_OPTIONAL_FIXTURE_KINDS.filter((kind) => kind.startsWith("transaction-")
       && fixtures.some((candidate) => candidate.kind === kind));
@@ -108,6 +134,10 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
       const parsed = await answeredWith(fixture(kind).body, { method: "GET", path: /^\/transaction\/[0-9]+$/u },
         (client) => client.getTransaction("1"));
       expect((XMONEY_STATUSES as ReadonlyArray<string>).includes(parsed.status), kind).toBe(true);
+      expect(transactionRoute(parsed.transactionType), kind).toBe(kind === "transaction-refund" ? "REFUND" : "PAYMENT");
+      // P2-M3: xMoney's time is read with its zone (an offset in creationDate, or creationTimestamp in seconds), never
+      // in this host's zone; it anchors plans, dates the tax rows and bounds A2's windows. If this fails, the parse changes.
+      expectNearRecording(parsed.createdAt, kind, kind);
     }
   });
 
@@ -134,6 +164,7 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
         (client) => client.listTransactions({ from: new Date(0), to: new Date(), onRejected: (transactionId) => rejected.push(transactionId) }));
       expect(rejected, kind).toEqual([]);
       expect(listed.length, kind).toBe(((fixture(kind).body as { data: unknown[] }).data).length);
+      for (const row of listed) expectNearRecording(row.createdAt, kind, `${kind} row ${row.transactionId}`);
     }
   });
 
@@ -142,8 +173,44 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
     expect(dataOf("rebill-response").id).toBe(dataOf("order").id);
   });
 
+  // W1 (P2-I1, P2-I6) depends on this fact: VERIFY_PAYMENT's CUSTOMER_MISMATCH check requires a first payment's
+  // customerId to be the subscription's CREATED xmoneyCustomerId (POST /customer's reply), and the checkout's listing
+  // matches deposits by that customer. X0 creates the customer the way production does and pays for it (`serve
+  // --identifier`); one scrub run keeps the equality. If this fails, both checks change before billing is on.
+  it("W1's customer check: the frictionless payment is made by the customer POST /customer created", async () => {
+    const created = await answeredWith(fixture("customer-response").body, { method: "POST", path: /^\/customer$/u },
+      (client) => client.createCustomer({ identifier: "x0-recorded", email: "person@example.test", country: "RO" }));
+    const paid = await answeredWith(fixture("transaction-initial").body, { method: "GET", path: /^\/transaction\/[0-9]+$/u },
+      (client) => client.getTransaction("1"));
+    expect(paid.customerId, "the paying customer is the created one").toBe(created.customerId);
+    expect(String(dataOf("transaction-initial").customerId)).toBe(String(dataOf("customer-response").id));
+  });
+
+  // Optional: what a second POST /customer with the same identifier answers, and the lookup by identifier after it.
+  // The CREATED customer and createCustomer's adopt-by-identifier path depend on it: the client must end with the
+  // customer the first POST created, whether xMoney answers the repeat itself or refuses it and lists the original.
+  it.runIf(fixtures.some((candidate) => candidate.kind === "customer-response-repeat"))(
+    "adopt the customer the first POST created when the same identifier is posted again (W1)", async () => {
+      const recorded = fixture("customer-response-repeat").body as {
+        httpStatus: number; reply: unknown; lookup: { httpStatus: number; reply: unknown };
+      };
+      const identifier = (fixture("order-payload").body as { order: { customer: { identifier: string } } }).order.customer.identifier;
+      const replay = new XMoneyClient({
+        baseUrl: "https://stage.invalid", privateKey: Buffer.alloc(32, 1), siteId: "1",
+        fetch: async (_input, init) => (init?.method === "POST"
+          ? new Response(JSON.stringify(recorded.reply), { status: recorded.httpStatus })
+          : new Response(JSON.stringify(recorded.lookup.reply), { status: recorded.lookup.httpStatus }))
+      });
+      const again = await replay.createCustomer({ identifier, email: "person@example.test", country: "RO" });
+      expect(again.customerId, "a repeated identifier keeps its first customer").toBe(String(dataOf("customer-response").id));
+    }
+  );
+
   it("the fake answers each recorded step as xMoney did: refunds, the hold, its release and the auth-order rebill", async () => {
-    const fake = await startFakeXMoney();
+    // W14 (P2-I3): the fake books a rebill of the auth-mode order the way X0 recorded it (a hold or a capture), and
+    // the release below must then read exactly as xMoney's did.
+    const recordedRebill = authOrderRebillAnswer(String(recordedStatus("transaction-rebill-auth-order-released")));
+    const fake = await startFakeXMoney({ authOrderRebill: recordedRebill === "HOLD" ? "hold" : "capture" });
     try {
       const client = new XMoneyClient({ baseUrl: fake.baseUrl, privateKey: fake.privateKey, siteId: fake.siteId });
       const from = new Date(Date.now() - 3_600_000);
@@ -202,9 +269,37 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
       const rebilled = await client.rebill({ orderId: held.notice.orderId, customerId: held.customerId, amountDecimal: "1.00" });
       expect(recordedStatus("transaction-rebill-auth-order"), "a rebill of the auth-mode order")
         .toBe((await client.getTransaction(rebilled.transactionId)).status);
+      // X0 item (h), W14: the same rebill released as a whole, as `release --as auth-order-rebill` did.
+      await client.refund({ transactionId: rebilled.transactionId, amountDecimal: null, reason: "customer-demand", message: "x0" });
+      expect(recordedStatus("transaction-rebill-auth-order-released"), "the auth-mode order's rebill, released")
+        .toBe((await client.getTransaction(rebilled.transactionId)).status);
     } finally {
       await fake.stop();
     }
+  });
+
+  // W14 (P2-I3): A12 makes the card check's `auth` order the subscription's order, and every later renewal and upgrade
+  // rebills it. A hold and a capture both read complete-ok, so VERIFY_PAYMENT would renew, invoice and receipt a hold
+  // that is never collected. X0 releases that rebill: `refund-ok` means it took the money, `void-ok` a hold. Any
+  // answer but CAPTURED keeps billing off until A12 changes (for example, a card check paid in full, then refunded) and
+  // this expectation changes with it (go-live row 14).
+  // W14 fix 1 (P2-I3): the release the A12 answer below reads must be of the auth-order rebill itself. The status after
+  // a release of any other 1.00 payment of the run (item 6's renewal rebill, the refunded frictionless payment, the card
+  // check's voided hold) would answer a question nobody asked; item 6's renewal rebill would even read as a capture.
+  // `rebill --as auth-order` prints the transaction it made, item 8 releases exactly that one, and one scrub run keeps
+  // the two ids equal, as it does for the order and the customer above.
+  it("the released auth-order rebill is the rebill `rebill --as auth-order` made (W14, P2-I3)", () => {
+    const rebilled = dataOf("transaction-rebill-auth-order").id;
+    expect(rebilled === undefined || rebilled === null, "the auth-order rebill names its transaction").toBe(false);
+    expect(dataOf("transaction-rebill-auth-order-released").id,
+      "the release must be of the auth-order rebill: run `release --as auth-order-rebill` with the transaction id `rebill --as auth-order` printed")
+      .toBe(rebilled);
+  });
+
+  it("A12's card check leaves an order whose rebills take the money (W14, P2-I3)", () => {
+    const status = String(recordedStatus("transaction-rebill-auth-order-released"));
+    expect(authOrderRebillAnswer(status), `a rebill of the auth-mode order released as ${status}: A12 changes before billing is on`)
+      .toBe("CAPTURED");
   });
 
   // X0 (i) is optional: xMoney may name no test amount that declines a rebill. When it was recorded, the real reply

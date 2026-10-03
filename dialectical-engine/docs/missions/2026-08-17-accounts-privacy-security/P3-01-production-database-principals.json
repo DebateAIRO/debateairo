@@ -441,6 +441,14 @@
           "purpose": "BILLING_EFACTURA_STATUS_OPERATOR_COMMAND",
           "binding": "WIRED",
           "condition": "package script billing:efactura-status"
+        },
+        {
+          "component": "apps/api:billing-invoice-cli",
+          "sourceFile": "apps/api/src/billing/invoice-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_INVOICE_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:invoice"
         }
       ]
     },

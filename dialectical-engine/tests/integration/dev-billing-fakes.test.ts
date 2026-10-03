@@ -20,9 +20,14 @@ import { SELLER_COMPANY, type SellerCompany } from "@debateai/billing-core";
  */
 function companyAnswering(companyCif: string): SellerCompany {
   const digits = companyCif.replace(/^RO/u, "");
+  // P2-M35: the facts every email prints are filled in too, as the owner fills them before billing starts.
+  const mailed = {
+    ...SELLER_COMPANY, registeredOffice: "Str. Exemplu 1, București, România",
+    emails: { ...SELLER_COMPANY.emails, general: "hello@dezbatere.ro" }
+  };
   return SMARTBILL_CIF_FORM === "ro"
-    ? { ...SELLER_COMPANY, cui: digits, vat: { kind: "registered", number: companyCif } }
-    : { ...SELLER_COMPANY, cui: digits };
+    ? { ...mailed, cui: digits, vat: { kind: "registered", number: companyCif } }
+    : { ...mailed, cui: digits };
 }
 
 const roots: string[] = [];

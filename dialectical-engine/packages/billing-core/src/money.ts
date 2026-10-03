@@ -68,25 +68,68 @@ export function upgradeProrationMicros(i: Readonly<{
   return floorToCents((BigInt(i.newNetMicros - i.oldNetMicros) * remaining) / BigInt(end - start));
 }
 
+/** One paid transaction a withdrawal pays back from, with the stretch of the period that payment bought. */
+export type WithdrawalPayment = Readonly<{
+  /** What the transaction took, less what already went back from it (whole cents). */
+  paidMicros: number;
+  /** The charge's own coverage: the period start for the first payment, the quote's creation for an upgrade. */
+  coverageStart: Date;
+  coverageEnd: Date;
+}>;
+
+/** An exact non-negative fraction of micros; every withdrawal share is summed as one before the single floor. */
+type Share = Readonly<{ numerator: bigint; denominator: bigint }>;
+
+const smaller = (left: Share, right: Share): Share =>
+  left.numerator * right.denominator <= right.numerator * left.denominator ? left : right;
+
+/**
+ * W6 (P2-I8, the owner's formula applied per paid transaction): each payment i gives back
+ * `paid_i × (1 − max(elapsed_i ÷ span_i, credit spent ÷ monthly credit))`, where span_i is the stretch that payment
+ * covered (an UPGRADE charge covers its quote's creation to the period end) and elapsed_i is the part of it before
+ * `now`, clamped to it. The credit share is the same for every payment. The exact shares are summed and the sum is
+ * floored to cents once (the company's favour by under a cent, as before). With one payment that covers the period,
+ * this is `withdrawalRefundMicros`.
+ */
+export function withdrawalRefundPerPaymentMicros(i: Readonly<{
+  payments: ReadonlyArray<WithdrawalPayment>; now: Date; creditSpentMicros: number; monthlyCreditMicros: number;
+}>): number {
+  assertMicros(i.creditSpentMicros);
+  assertMicros(i.monthlyCreditMicros);
+  const now = assertDate(i.now);
+  const credit = BigInt(i.monthlyCreditMicros);
+  const creditLeft = i.monthlyCreditMicros === 0 || i.creditSpentMicros >= i.monthlyCreditMicros
+    ? 0n : BigInt(i.monthlyCreditMicros - i.creditSpentMicros);
+  let total: Share = { numerator: 0n, denominator: 1n };
+  for (const payment of i.payments) {
+    assertCents(payment.paidMicros);
+    const start = assertDate(payment.coverageStart);
+    const end = assertDate(payment.coverageEnd);
+    if (end <= start) throw new TypedDomainError("BILLING_PERIOD_INVALID", "a billing period must end after it starts");
+    const span = end - start;
+    const elapsed = Math.min(Math.max(now - start, 0), span);
+    const paid = BigInt(payment.paidMicros);
+    // The days share is exact, like the proration: a withdrawal one second into a day keeps one second's price.
+    const byDays: Share = { numerator: paid * BigInt(span - elapsed), denominator: BigInt(span) };
+    const byCredit: Share = i.monthlyCreditMicros === 0
+      ? { numerator: paid, denominator: 1n }
+      : { numerator: paid * creditLeft, denominator: credit };
+    const share = smaller(byDays, byCredit);
+    total = {
+      numerator: total.numerator * share.denominator + share.numerator * total.denominator,
+      denominator: total.denominator * share.denominator
+    };
+  }
+  return floorToCents(total.numerator / total.denominator);
+}
+
+/** The one-payment case (a payment covering the whole period): spec §2.5.6's formula over `paidTotalMicros`. */
 export function withdrawalRefundMicros(i: Readonly<{
   paidTotalMicros: number; periodStart: Date; periodEnd: Date; now: Date;
   creditSpentMicros: number; monthlyCreditMicros: number;
 }>): number {
-  assertCents(i.paidTotalMicros);
-  assertMicros(i.creditSpentMicros);
-  assertMicros(i.monthlyCreditMicros);
-  const start = assertDate(i.periodStart);
-  const end = assertDate(i.periodEnd);
-  if (end <= start) throw new TypedDomainError("BILLING_PERIOD_INVALID", "a billing period must end after it starts");
-  const span = end - start;
-  const elapsed = Math.min(Math.max(assertDate(i.now) - start, 0), span);
-  const paid = BigInt(i.paidTotalMicros);
-  // The days share is exact, like the proration: a withdrawal one second into a day keeps one second's price.
-  const byDays = (paid * BigInt(span - elapsed)) / BigInt(span);
-  const byCredit = i.monthlyCreditMicros === 0
-    ? paid
-    : i.creditSpentMicros >= i.monthlyCreditMicros
-      ? 0n
-      : (paid * BigInt(i.monthlyCreditMicros - i.creditSpentMicros)) / BigInt(i.monthlyCreditMicros);
-  return floorToCents(byDays < byCredit ? byDays : byCredit);
+  return withdrawalRefundPerPaymentMicros({
+    payments: [{ paidMicros: i.paidTotalMicros, coverageStart: i.periodStart, coverageEnd: i.periodEnd }],
+    now: i.now, creditSpentMicros: i.creditSpentMicros, monthlyCreditMicros: i.monthlyCreditMicros
+  });
 }

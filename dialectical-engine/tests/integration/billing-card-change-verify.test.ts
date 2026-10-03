@@ -78,6 +78,22 @@ describe("P12e the card change through VERIFY_PAYMENT", () => {
     });
   });
 
+  it("ends MISMATCH and moves no card when the hold's customer is not the subscription's xMoney customer (P2-I1)", async () => {
+    const paid = await h.activate();
+    const before = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));
+    const started = await startCardChange(cardDeps(), { ownerRef: paid.ownerRef, userId: paid.userId, ip: IP, now: h.clock.now });
+    const hold = h.xmoney.pay({ externalOrderId: started.charge_ref, amountDecimal: "1.00", cardCountry: "RO", customerId: "4040405" });
+    const lines = h.auditLines.length;
+    await h.settle(hold.transactionId);
+    expect((await h.repository.charge(started.charge_ref))!.events.map((event) => event.kind)).toEqual(["REQUESTED"]);
+    const events = await h.repository.subscriptionEvents(paid.subscriptionId);
+    expect(events.some((event) => event.kind === "CARD_CHANGED")).toBe(false);
+    expect(foldSubscription(events)).toMatchObject({
+      cardRef: before.cardRef, xmoneyOrderId: before.xmoneyOrderId, xmoneyCustomerId: before.xmoneyCustomerId
+    });
+    expect(h.auditLines.slice(lines)).toEqual([{ event: "billing.payment.mismatch", code: "CUSTOMER_MISMATCH" }]);
+  });
+
   it("retries a past-due renewal at once on the NEW order after the card changed (R-34)", async () => {
     const paid = await h.activate();
     h.clock.now = new Date((await h.periodEndOf(paid.subscriptionId)).getTime() + MINUTE);

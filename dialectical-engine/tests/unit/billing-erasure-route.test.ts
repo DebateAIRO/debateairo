@@ -34,9 +34,9 @@ const headers = { cookie: `${SESSION_COOKIE_NAME}=${SESSION_TOKEN}; ${CSRF_COOKI
 const payload = { confirmation: "DELETE MY ACCOUNT", step_up_grant: GRANT_TOKEN };
 const scheduled = async () => ({ status: "SCHEDULED" as const, executeAt: new Date("2026-10-08T00:00:00.000Z"), cancellationRef: "55555555-5555-4555-8555-555555555555" });
 
-describe("P15 scheduling an erasure stops billing", () => {
-  it("stops the owner's billing after the erasure is scheduled, and answers 202 even when the stop fails", async () => {
-    const stop = vi.fn(async (_ownerRef: string) => "STOPPED" as const);
+describe("P15 scheduling an erasure stops billing (W7: the renewal; the plan ends at the commit)", () => {
+  it("stops the owner's renewal after the erasure is scheduled, and answers 202 even when the stop fails", async () => {
+    const stop = vi.fn(async (_ownerRef: string) => "RENEWAL_STOPPED" as const);
     const api = buildApi({
       application: unusedAskApplication(), sessions: sessions(), allowedOrigin: ORIGIN,
       accountErasure: erasure(scheduled), billingErasure: { stop }
@@ -46,7 +46,7 @@ describe("P15 scheduling an erasure stops billing", () => {
     expect(stop).toHaveBeenCalledWith(authenticated.ownerRef);
     await api.close();
 
-    const failing = vi.fn(async (): Promise<"STOPPED"> => { throw new Error("database down"); });
+    const failing = vi.fn(async (): Promise<"RENEWAL_STOPPED"> => { throw new Error("database down"); });
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const degraded = buildApi({
       application: unusedAskApplication(), sessions: sessions(), allowedOrigin: ORIGIN,
@@ -59,7 +59,7 @@ describe("P15 scheduling an erasure stops billing", () => {
   });
 
   it("does not touch billing when nothing was scheduled", async () => {
-    const stop = vi.fn(async () => "STOPPED" as const);
+    const stop = vi.fn(async () => "RENEWAL_STOPPED" as const);
     const api = buildApi({
       application: unusedAskApplication(), sessions: sessions(), allowedOrigin: ORIGIN,
       accountErasure: erasure(async () => null), billingErasure: { stop }

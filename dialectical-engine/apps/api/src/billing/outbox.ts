@@ -19,6 +19,20 @@ export const DONE: OutboxOutcome = Object.freeze({ kind: "DONE" as const });
 
 const DECLARED_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 
+/**
+ * P2-I4 (D5 5h): the two xMoney systems number their transactions separately, and the database keeps the sandbox's
+ * records across README §14.8's same-host switch. A refund, invoice or credit-note job, or a payment check
+ * (VERIFY_PAYMENT) that names its own charge, whose charge was paid in the other system ends here, DEAD before any
+ * vendor call, with this one content-free code and one audit line (the kind and the code). The caller compares
+ * `charge.xmoneyEnvironment` with the connectors' system.
+ */
+export function otherXMoneySystem(
+  audit: BillingAudit, kind: OutboxKind
+): Readonly<{ kind: "DEAD"; code: "OTHER_XMONEY_SYSTEM" }> {
+  audit("billing.outbox.other_system", { kind, code: "OTHER_XMONEY_SYSTEM" });
+  return Object.freeze({ kind: "DEAD" as const, code: "OTHER_XMONEY_SYSTEM" as const });
+}
+
 /** `attempts` counts the attempt that just failed (the claim increments it). 1m, 5m, 30m, 2h, 12h, then dead. */
 export function failureRetryAt(attempts: number, now: Date): Date | null {
   const delaysMs = [60_000, 300_000, 1_800_000, 7_200_000, 43_200_000];
@@ -75,6 +89,12 @@ export class BillingOutboxWorker {
     clock: () => Date;
     audit: BillingAudit;
     batchSize: number;
+    /**
+     * W12 (P2-I16): called once a job's dead-letter has landed (never for a retry, nor when P1b's fence refused it).
+     * The runtime queues the owner's O3 here (`createDeadJobAlert`). A failure leaves the job dead and writes one
+     * content-free line; the owner summary still lists the job.
+     */
+    onDead?: (job: OutboxJob, code: string, now: Date) => Promise<void>;
   }>) {}
 
   register(kind: OutboxKind, handler: OutboxHandler): void {
@@ -170,6 +190,13 @@ export class BillingOutboxWorker {
   private async dead(job: OutboxJob, code: string, now: Date): Promise<"DEAD" | null> {
     if (!await this.options.repository.fail(job.jobId, code, null, now, this.fence(job))) return null;
     this.options.audit("billing.outbox.dead", { kind: job.kind, code, attempts: job.attempts });
+    if (this.options.onDead !== undefined) {
+      try {
+        await this.options.onDead(job, code, now);
+      } catch {
+        this.options.audit("billing.outbox.alert_failed", { kind: job.kind, code });
+      }
+    }
     return "DEAD";
   }
 }

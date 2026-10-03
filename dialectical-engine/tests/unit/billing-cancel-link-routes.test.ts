@@ -44,7 +44,7 @@ describe("P13 the public cancel routes", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  it("maps the token's outcome: invalid is 404, cancelled or nothing to cancel is 204", async () => {
+  it("maps the token's outcome: invalid is 404, cancelled is 204, nothing left to cancel is its own 409 (W10, P2-M18)", async () => {
     const cancelByToken = vi.fn(async (token: string) =>
       token.startsWith("A") ? "INVALID" as const : token.startsWith("B") ? "CANCELLED" as const : "NOTHING_TO_CANCEL" as const);
     const api = await mountSubscriptionRoutes(withLinks({ request: vi.fn(), cancelByToken }), null);
@@ -53,7 +53,11 @@ describe("P13 the public cancel routes", () => {
     expect(invalid.statusCode).toBe(404);
     expect(invalid.json()).toEqual({ error: "CANCEL_LINK_INVALID", message: "CANCEL_LINK_INVALID" });
     expect((await call("B".repeat(43))).statusCode).toBe(204);
-    expect((await call("C".repeat(43))).statusCode).toBe(204);
+    // A plan already cancelled, ended, paused by a dispute or replaced by a newer one: the page must never say "your
+    // plan is cancelled" for it, so the answer differs from a real cancel's.
+    const nothing = await call("C".repeat(43));
+    expect(nothing.statusCode).toBe(409);
+    expect(nothing.json()).toEqual({ error: "NOTHING_TO_CANCEL", message: "NOTHING_TO_CANCEL" });
     expect((await call("short")).statusCode).toBe(400);
     await api.close();
   });

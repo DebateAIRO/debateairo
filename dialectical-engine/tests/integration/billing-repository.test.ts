@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   BillingRepository,
+  EntitlementRepository,
   migrate,
   type ChargeRow,
   type CustomerXMoneyEnvironment,
@@ -384,7 +385,7 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     expect(liveDue.every((state) => state.xmoneyEnvironment === "live")).toBe(true);
     expect((await billing.dueRenewals(now, 0, 10_000, { environment: "stage" })).map((state) => state.subscriptionId))
       .not.toContain(live);
-    expect(await billing.openRecordCounts("live")).toEqual({ subscriptions: before.subscriptions + 1, charges: before.charges });
+    expect(await billing.openRecordCounts("live")).toEqual({ ...before, subscriptions: before.subscriptions + 1 });
     const charge = await quoteAndCharge(ownerRef, live, "INITIAL", anchor, "live");
     expect((await billing.openRecordCounts("live")).charges).toBe(before.charges + 1);
     await billing.withTransaction((c) => billing.appendChargeEvent(c, {
@@ -392,6 +393,97 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     }));
     await billing.withTransaction((c) => billing.appendSubscriptionEvent(c, subscriptionEvent(live, ownerRef, "CANCEL_REQUESTED")));
     expect(await billing.openRecordCounts("live")).toEqual(before);
+  });
+
+  it("counts the refund, invoice and credit-note jobs still open on each system's charges (P2-I4)", async () => {
+    const ownerRef = randomUUID();
+    const subscription = await activeSubscription(ownerRef, anchor, "live");
+    const charge = await quoteAndCharge(ownerRef, subscription, "INITIAL", anchor, "live");
+    await billing.withTransaction((c) => billing.appendChargeEvent(c, {
+      chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(), xmoneyTransactionId: "61002", amountMicros: 24_200_000, errorCode: null
+    }));
+    await billing.withTransaction((c) => billing.appendSubscriptionEvent(c, subscriptionEvent(subscription, ownerRef, "CANCEL_REQUESTED")));
+    const live = await billing.openRecordCounts("live");
+    const stage = await billing.openRecordCounts("stage");
+    // The plan (a cancel pending) and its paid charge count as closed; what they still queue does not.
+    const [invoice, refund] = await billing.withTransaction(async (c) => [
+      await billing.enqueue(c, { kind: "SMARTBILL_INVOICE", ref: charge.chargeId, notBefore: anchor, payload: { card_country: "RO" } }),
+      await billing.enqueue(c, {
+        kind: "XMONEY_REFUND", ref: `${charge.chargeId}:61002`, notBefore: new Date(anchor.getTime() + 30 * 86_400_000),
+        payload: { charge_id: charge.chargeId, transaction_id: "61002", amount_micros: 5_000_000, whole: false, owner_ref: ownerRef, reason: "WITHDRAWAL" }
+      }),
+      await billing.enqueue(c, {
+        kind: "QUADERNO_RECORD_REFUND", ref: `${charge.chargeId}:61002`, notBefore: anchor,
+        payload: { charge_id: charge.chargeId, transaction_id: "61002", refund_micros: 5_000_000 }
+      }),
+      // A job naming no charge (an owner email) is not this count's.
+      await billing.enqueue(c, { kind: "EMAIL", ref: `O2:${charge.chargeId}`, notBefore: anchor, payload: {} })
+    ]);
+    expect(await billing.openRecordCounts("live")).toEqual({ ...live, jobs: live.jobs + 3 });
+    expect(await billing.openRecordCounts("stage")).toEqual(stage);
+    // A job that is done or dead is closed.
+    await billing.complete(invoice!, new Date());
+    await billing.fail(refund!, "XMONEY_REFUSED", null, new Date());
+    expect((await billing.openRecordCounts("live")).jobs).toBe(live.jobs + 1);
+  });
+
+  it("counts the billing rows and open jobs dated more than a day ahead of the real clock (W14, P2-I19)", async () => {
+    const now = new Date();
+    const before = await billing.recordsDatedAhead(now);
+    const entitlements = new EntitlementRepository(database.pool);
+    const ownerRef = randomUUID();
+    // Written on the real clock, or within the day's margin: never counted, on either system.
+    const today = await activeSubscription(ownerRef, now, "live");
+    const todayCharge = await quoteAndCharge(ownerRef, today, "INITIAL", now, "live");
+    const soon = new Date(now.getTime() + 23 * 3_600_000);
+    await billing.withTransaction(async (c) => {
+      await billing.appendChargeEvent(c, {
+        chargeId: todayCharge.chargeId, kind: "SUCCEEDED", at: soon, xmoneyTransactionId: "62001", amountMicros: 24_200_000, errorCode: null
+      });
+      await billing.enqueue(c, { kind: "SMARTBILL_INVOICE", ref: todayCharge.chargeId, notBefore: soon, payload: { card_country: "RO" } });
+      // The quarter's summary is due at 06:00 on the 5th day after its quarter ends (owner-jobs.ts), so up to four
+      // days and six hours ahead by design: not counted.
+      await billing.enqueue(c, {
+        kind: "OWNER_TAX_SUMMARY", ref: `w14-summary-${randomUUID()}`, notBefore: new Date(now.getTime() + 4 * 86_400_000), payload: {}
+      });
+    });
+    expect(await billing.recordsDatedAhead(now)).toEqual(before);
+    // A stage host's moved clock (BILLING_STAGE_CLOCK_OFFSET_DAYS=31) dates every billing change it records a month ahead.
+    const moved = new Date(now.getTime() + 31 * 86_400_000);
+    const sandboxOwner = randomUUID();
+    const sandbox = await activeSubscription(sandboxOwner, moved, "stage");
+    expect(await billing.recordsDatedAhead(now)).toEqual({ rows: before.rows + 2, jobs: before.jobs });
+    const sandboxCharge = await quoteAndCharge(sandboxOwner, sandbox, "RENEWAL", moved, "stage");
+    await billing.withTransaction(async (c) => {
+      await billing.appendChargeEvent(c, {
+        chargeId: sandboxCharge.chargeId, kind: "SUCCEEDED", at: moved, xmoneyTransactionId: "62002", amountMicros: 24_200_000, errorCode: null
+      });
+      await entitlements.append(c, {
+        ownerRef: sandboxOwner, planId: "PLUS", periodAnchorAt: moved, cause: "RENEWED", effectiveAt: moved,
+        subscriptionId: sandbox, paidThrough: new Date(moved.getTime() + 30 * 86_400_000), monthCreditOverrideMicros: null
+      });
+    });
+    // quoteAndCharge stamps the charge itself on the real clock; its SUCCEEDED and the entitlement are moved.
+    expect(await billing.recordsDatedAhead(now)).toEqual({ rows: before.rows + 4, jobs: before.jobs });
+    const [movedJob, rescheduled] = await billing.withTransaction(async (c) => [
+      // A job queued on the moved clock (its creation is always the database's real clock).
+      await billing.enqueue(c, {
+        kind: "XMONEY_REFUND", ref: `${sandboxCharge.chargeId}:62002`, notBefore: moved, payload: { charge_id: sandboxCharge.chargeId }
+      }),
+      // A job retried on the moved clock, just past the day's margin.
+      await billing.enqueue(c, {
+        kind: "QUADERNO_RECORD_SALE", ref: sandboxCharge.chargeId, notBefore: new Date(now.getTime() + 25 * 3_600_000), payload: {}
+      }),
+      // The quarter's summary queued on the moved clock is past even its own margin.
+      await billing.enqueue(c, {
+        kind: "OWNER_TAX_SUMMARY", ref: `w14-summary-${randomUUID()}`, notBefore: moved, payload: {}
+      })
+    ]);
+    expect(await billing.recordsDatedAhead(now)).toEqual({ rows: before.rows + 4, jobs: before.jobs + 3 });
+    // A job that is done or dead is not open.
+    await billing.complete(movedJob!, now);
+    await billing.fail(rescheduled!, "XMONEY_REFUSED", null, now);
+    expect(await billing.recordsDatedAhead(now)).toEqual({ rows: before.rows + 4, jobs: before.jobs + 1 });
   });
 });
 

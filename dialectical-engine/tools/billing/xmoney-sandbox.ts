@@ -3,18 +3,19 @@
 // from a 0600 file and never prints it; outputs go to --capture-dir as RAW captures for
 // scrub-xmoney-fixture.ts, each named `<fixture kind>-<stamp>.json`. Stage only: the base URLs below are fixed.
 //   key-shape --key-file F [--capture-dir D]
+//   customer  --key-file F --capture-dir D --site-id S --email E --country RO [--repeat --identifier I]
 //   serve     --key-file F --public-key P --site-id S --email E --country RO --amount 1.00
-//             --mode authAndCapture|auth --capture-dir D [--port 8780] [--locale en]
+//             --mode authAndCapture|auth --capture-dir D [--port 8780] [--locale en] [--identifier I]
 //             [--permissions-policy production|none] [--referrer-policy production|strict-origin]
 //   fetch     --key-file F --capture-dir D --what transaction|order|card|transaction-list
-//             [--id N] [--customer C] [--as initial|second-payment|refund] [--date-type creation|refund]
-//             [--from ISO] [--to ISO]
+//             [--id N] [--customer C] [--as initial|second-payment|refund] [--date-type creation|refund|charge-back]
+//             [--from ISO] [--to ISO] [--list-order]
 //   rebill    --key-file F --capture-dir D --order O --customer C --amount 1.00
 //             [--as renewal|auth-order|declined]
 //   refund    --key-file F --capture-dir D --transaction T --order O --as partial|second-partial|full|extra
 //             [--amount A] [--wait-seconds 600]
-//   release   --key-file F --capture-dir D --transaction T
-import { createHmac, randomBytes } from "node:crypto";
+//   release   --key-file F --capture-dir D --transaction T [--as card-check|auth-order-rebill]
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path";
@@ -116,6 +117,34 @@ export function signRecordingOrder(order: unknown, key: Buffer): Readonly<{ payl
   };
 }
 
+/**
+ * X0's customer step: the form P3b's XMoneyClient.createCustomer posts to `POST /customer`, field for field
+ * (identifier, email, siteId, then country when there is one) — tests/unit/payments-xmoney-signing.test.ts pins the
+ * two together. Production creates the customer first, under billing.customer's UUID, and only then signs the order
+ * naming that identifier; the recording does the same, so X0 shows which customer an embedded payment is made by.
+ */
+export function customerForm(i: Readonly<{
+  identifier: string; email: string; siteId: string; country: string | null;
+}>): URLSearchParams {
+  const form = new URLSearchParams({ identifier: i.identifier, email: i.email, siteId: i.siteId });
+  if (i.country !== null) form.set("country", i.country);
+  return form;
+}
+
+/**
+ * X0 item 9: whether the creation-date listing of the attempt's order lists the not-final attempt, and whether the
+ * listed row carries a customerId. P2-I6's checkout filter matches a listed deposit by its customer, and
+ * parseXMoneyTransaction rejects a row without one, so both must hold on a `3d-pending` row. Only yes/no is printed.
+ */
+export function inFlightListing(body: unknown, transactionId: string): Readonly<{ listed: boolean; customerId: boolean }> {
+  const row = listed(body).find((entry) => String(entry.id) === transactionId);
+  const customer = row?.customerId;
+  return Object.freeze({
+    listed: row !== undefined,
+    customerId: (typeof customer === "number" || typeof customer === "string") && /^[0-9]+$/u.test(String(customer))
+  });
+}
+
 function scriptValue(value: string): string {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
@@ -185,10 +214,37 @@ function stageIso(milliseconds: number): string {
   return new Date(milliseconds).toISOString().replace(/\.\d{3}Z$/u, "+00:00");
 }
 
+/**
+ * X0: what `fetch --what transaction-list --date-type <t>` records, by `t`, each a required fixture kind, and the window
+ * it asks when no `--from`/`--to` is given. W13 (P2-I18): `charge-back` is the daily money check's dispute listing
+ * (apps/api/src/billing/reconcile.ts), asked over the same window the check asks (the last 120 days, up to now), so
+ * the recording shows whether xMoney accepts exactly that request.
+ */
+export function transactionListCapture(dateType: string): TransactionListCapture {
+  const capture = Object.hasOwn(TRANSACTION_LIST_CAPTURES, dateType) ? TRANSACTION_LIST_CAPTURES[dateType] : undefined;
+  if (capture === undefined) throw new TypeError("XMONEY_ARGUMENT_REQUIRED:--date-type");
+  return capture;
+}
+
+type TransactionListCapture = Readonly<{
+  kind: "transaction-list" | "transaction-list-refund" | "transaction-list-charge-back";
+  defaultWindow: (now: number) => Readonly<{ from: string; to: string }>;
+}>;
+
+const lastWeek = (now: number) => Object.freeze({ from: stageIso(now - 7 * DAY_MS), to: stageIso(now + DAY_MS) });
+const TRANSACTION_LIST_CAPTURES: Readonly<Record<string, TransactionListCapture>> = Object.freeze({
+  creation: Object.freeze({ kind: "transaction-list", defaultWindow: lastWeek }),
+  refund: Object.freeze({ kind: "transaction-list-refund", defaultWindow: lastWeek }),
+  "charge-back": Object.freeze({
+    kind: "transaction-list-charge-back",
+    defaultWindow: (now: number) => Object.freeze({ from: stageIso(now - 120 * DAY_MS), to: stageIso(now) })
+  })
+});
+
 type StageReply = Readonly<{ httpStatus: number; body: unknown }>;
 
 async function stageRequest(
-  key: Buffer, method: "GET" | "PATCH" | "DELETE", path: string, body?: URLSearchParams
+  key: Buffer, method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: URLSearchParams
 ): Promise<StageReply> {
   const response = await fetch(`${STAGE_API}${path}`, {
     method,
@@ -263,6 +319,63 @@ async function waitForRefundRows(
   }
 }
 
+/**
+ * X0 (h): what `release` records, by `--as`. `card-check` (the default) releases the 1.00 `auth` payment of step 3 and
+ * keeps its read before and after. `auth-order-rebill` (W14, P2-I3) releases the transaction `rebill --as auth-order`
+ * made; that command already captured its read, so only the status after the release is new.
+ */
+export function releaseCapture(step: string): Readonly<{ before: string | null; after: string }> {
+  if (step === "card-check") return Object.freeze({ before: "transaction-auth", after: "transaction-auth-released" });
+  if (step === "auth-order-rebill") return Object.freeze({ before: null, after: "transaction-rebill-auth-order-released" });
+  throw new TypeError("XMONEY_ARGUMENT_REQUIRED:--as");
+}
+
+/**
+ * W14 (P2-I3): whether a rebill of the card check's `auth` order took the money, read from its status after the
+ * release. A hold and a capture both read `complete-ok` before, so only the release tells them apart: a released
+ * hold reads `void-ok` (no money moved), a captured payment is refunded and reads `refund-ok`. Every other status
+ * settles nothing. A12 assumes CAPTURED; HOLD means A12 changes before billing is on.
+ */
+export function authOrderRebillAnswer(statusAfterRelease: string): "CAPTURED" | "HOLD" | "UNKNOWN" {
+  if (statusAfterRelease === "refund-ok") return "CAPTURED";
+  if (statusAfterRelease === "void-ok") return "HOLD";
+  return "UNKNOWN";
+}
+
+/**
+ * W14 fix 1 (P2-I3): the answer `release --as auth-order-rebill` prints. Only a release of a payment that read
+ * `complete-ok` before it, and that xMoney accepted (HTTP 2xx), can say what the rebill did. A refused release, or a
+ * payment already refunded or voided (another payment of the run, released by mistake), settles nothing and reads
+ * UNKNOWN, as X0 item 8 says for a refused release.
+ */
+export function authOrderRebillReleaseAnswer(
+  release: Readonly<{ before: string; httpStatus: number; after: string }>
+): "CAPTURED" | "HOLD" | "UNKNOWN" {
+  if (release.before !== "complete-ok" || release.httpStatus < 200 || release.httpStatus > 299) return "UNKNOWN";
+  return authOrderRebillAnswer(release.after);
+}
+
+/**
+ * The line `release` prints. `card-check` keeps its line; `auth-order-rebill` adds the answer, read from the status
+ * before, the HTTP status and the status after (`authOrderRebillReleaseAnswer`).
+ */
+export function releaseLine(step: string, before: string, httpStatus: number, after: string): string {
+  const line = `${before}->${httpStatus}->${after}`;
+  if (step === "card-check") return `XMONEY_RELEASE=${line}`;
+  const answer = authOrderRebillReleaseAnswer({ before, httpStatus, after });
+  return `XMONEY_RELEASE=${step}:${line}:capture=${answer.toLowerCase()}`;
+}
+
+/**
+ * W14 fix 1 (P2-I3): the line `rebill` prints once its transaction is read. `--as auth-order` also names the rebill's
+ * transaction id, so X0 item 8 releases exactly that payment, and never the renewal rebill of item 6 or another 1.00
+ * payment of the run.
+ */
+export function rebillLine(step: string, httpStatus: number, status: string, transactionId: string): string {
+  const line = `XMONEY_REBILL=${step}:${httpStatus}:${status}`;
+  return step === "auth-order" ? `${line}:transaction=${transactionId}` : line;
+}
+
 const statusOf = (body: unknown): string => String(dataOf(body)?.transactionStatus ?? "NONE");
 const amountOf = (body: unknown): string => String(dataOf(body)?.amount ?? "NONE");
 
@@ -279,19 +392,43 @@ async function main(argv: readonly string[]): Promise<void> {
       return;
     }
     const captureDir = argument(argv, "--capture-dir");
+    if (command === "customer") {
+      // W1 (P2-I1, P2-I6): the customer every recorded payment is made by, created the way production creates it.
+      const repeat = argv.includes("--repeat");
+      const identifier = repeat ? argument(argv, "--identifier") : randomUUID();
+      const reply = await stageRequest(key, "POST", "/customer", customerForm({
+        identifier, email: argument(argv, "--email"), siteId: argument(argv, "--site-id"), country: argument(argv, "--country")
+      }));
+      if (!repeat) {
+        capture(captureDir, "customer-response", reply.body);
+        console.log(`XMONEY_CUSTOMER=${reply.httpStatus}:identifier=${identifier}`);
+        return;
+      }
+      // The same identifier posted again (what a checkout whose first reply was lost does), and the lookup by
+      // identifier that createCustomer's adopt path makes after a refusal: the CREATED customer depends on both.
+      const lookup = await stageRequest(key, "GET", `/customer?${new URLSearchParams({ identifier }).toString()}`);
+      capture(captureDir, "customer-response-repeat", {
+        httpStatus: reply.httpStatus, reply: reply.body, lookup: { httpStatus: lookup.httpStatus, reply: lookup.body }
+      });
+      console.log(`XMONEY_CUSTOMER=repeat:${reply.httpStatus}:lookup=${lookup.httpStatus}`);
+      return;
+    }
     if (command === "fetch") {
       const what = argument(argv, "--what");
       if (what === "transaction-list") {
         const dateType = argument(argv, "--date-type", "creation");
-        if (dateType !== "creation" && dateType !== "refund") throw new TypeError("XMONEY_ARGUMENT_REQUIRED:--date-type");
+        const listing = transactionListCapture(dateType);
+        const window = listing.defaultWindow(Date.now());
         const query = new URLSearchParams({
           dateType,
-          createdAtFrom: argument(argv, "--from", stageIso(Date.now() - 7 * DAY_MS)),
-          createdAtTo: argument(argv, "--to", stageIso(Date.now() + DAY_MS))
+          createdAtFrom: argument(argv, "--from", window.from),
+          createdAtTo: argument(argv, "--to", window.to)
         });
         if (argv.includes("--id")) query.set("orderId", argument(argv, "--id"));
         const reply = await stageRequest(key, "GET", `/transaction?${query.toString()}`);
-        capture(captureDir, dateType === "refund" ? "transaction-list-refund" : "transaction-list", reply.body);
+        // Kept whatever xMoney answers: a refused charge-back listing is recorded as its error reply, which P3b's
+        // recorded suite then fails on (W13), so the answer can never go unnoticed.
+        capture(captureDir, listing.kind, reply.body);
         console.log(`XMONEY_FETCHED=transaction-list:${dateType}:${reply.httpStatus}`);
         return;
       }
@@ -302,6 +439,18 @@ async function main(argv: readonly string[]): Promise<void> {
         const reply = await stageRequest(key, "GET", `/transaction/${id}`);
         capture(captureDir, `transaction-${step}`, reply.body);
         console.log(`XMONEY_FETCHED=transaction-${step}:${reply.httpStatus}:${statusOf(reply.body)}`);
+        if (argv.includes("--list-order")) {
+          // Item 9's first in-flight read: the attempt's order listed the way P3b's listTransactions asks.
+          const query = new URLSearchParams({
+            dateType: "creation", orderId: String(dataOf(reply.body)?.orderId ?? ""),
+            createdAtFrom: stageIso(Date.now() - DAY_MS), createdAtTo: stageIso(Date.now() + DAY_MS),
+            page: "1", perPage: "100", reverseSorting: "0"
+          });
+          const list = await stageRequest(key, "GET", `/transaction?${query.toString()}`);
+          const seen = inFlightListing(list.body, argument(argv, "--id"));
+          console.log(`XMONEY_IN_FLIGHT_LISTED=${list.httpStatus}:listed=${seen.listed ? "yes" : "no"}`
+            + `:customerId=${seen.customerId ? "yes" : "no"}`);
+        }
         return;
       }
       const path = what === "order" ? `/order/${id}`
@@ -336,7 +485,7 @@ async function main(argv: readonly string[]): Promise<void> {
       }
       const after = await stageRequest(key, "GET", `/transaction/${encodeURIComponent(String(transactionId))}`);
       capture(captureDir, transactionKind, after.body);
-      console.log(`XMONEY_REBILL=${step}:${reply.httpStatus}:${statusOf(after.body)}`);
+      console.log(rebillLine(step, reply.httpStatus, statusOf(after.body), String(transactionId)));
       return;
     }
     if (command === "refund") {
@@ -394,15 +543,18 @@ async function main(argv: readonly string[]): Promise<void> {
       return;
     }
     if (command === "release") {
+      const step = argument(argv, "--as", "card-check");
+      const kinds = releaseCapture(step);
       const path = `/transaction/${encodeURIComponent(argument(argv, "--transaction"))}`;
       const before = await stageRequest(key, "GET", path);
-      capture(captureDir, "transaction-auth", before.body);
+      if (kinds.before !== null) capture(captureDir, kinds.before, before.body);
+      // No amount: the whole transaction, as A12's release of the card check and RefundDesk's whole refunds send it.
       const reply = await stageRequest(key, "DELETE", path, new URLSearchParams({
         reason: "customer-demand", message: RECORDING_MESSAGE
       }));
       const after = await stageRequest(key, "GET", path);
-      capture(captureDir, "transaction-auth-released", after.body);
-      console.log(`XMONEY_RELEASE=${statusOf(before.body)}->${reply.httpStatus}->${statusOf(after.body)}`);
+      capture(captureDir, kinds.after, after.body);
+      console.log(releaseLine(step, statusOf(before.body), reply.httpStatus, statusOf(after.body)));
       return;
     }
     if (command === "serve") {
@@ -421,7 +573,8 @@ async function main(argv: readonly string[]): Promise<void> {
       const chargeId = randomBytes(16).toString("hex");
       const publicKey = argument(argv, "--public-key");
       const order = recordingOrder({
-        publicKey, siteId: argument(argv, "--site-id"), identifier: randomBytes(16).toString("hex"),
+        // `--identifier`: the customer step's identifier, so the payment is made the way production makes it.
+        publicKey, siteId: argument(argv, "--site-id"), identifier: argument(argv, "--identifier", randomBytes(16).toString("hex")),
         email: argument(argv, "--email"), country: argument(argv, "--country"), chargeId,
         amount: argument(argv, "--amount"), mode, description: RECORDING_MESSAGE,
         backUrl: `http://127.0.0.1:${port}/return?charge=${chargeId}`
