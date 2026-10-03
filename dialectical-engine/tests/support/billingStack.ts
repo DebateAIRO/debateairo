@@ -10,21 +10,27 @@ import {
   hashToken,
   normalizeEmailForBlindIndex,
   sealRecord,
+  type AuditContextHasher,
   type KeyDestroyResult,
   type ReadableUserDekStore
 } from "@debateai/crypto";
-import { AcceptanceRepository, BillingRepository, EntitlementRepository, RunRepository, migrate } from "@debateai/db";
+import {
+  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, PostgresEmailChangeRepository,
+  RunRepository, migrate
+} from "@debateai/db";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { currentDocument } from "@debateai/legal-manifest";
 import { XMoneyClient } from "@debateai/payments-xmoney";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue, type PlanId } from "@debateai/register";
 import { buildApi } from "../../apps/api/src/index.js";
 import type { BillingConnectors } from "../../apps/api/src/billing/connectors.js";
+import { BillingReconciler, type ReconcileReport } from "../../apps/api/src/billing/reconcile.js";
 import { createBillingRuntime, type BillingRuntime, type BillingRuntimeDeps } from "../../apps/api/src/billing/runtime.js";
 import { StageShiftedXMoneyClient } from "../../apps/api/src/billing/stage-clock.js";
 import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
 import { billingMailAttachmentResolvers } from "../../apps/api/src/mail-attachments.js";
-import { MemoryTemplatedMailSender, type TemplatedMail } from "../../apps/api/src/mail-channel.js";
+import { EmailChangeService } from "../../apps/api/src/email-change.js";
+import { MemoryEmailChangeMailSender, MemoryTemplatedMailSender, type TemplatedMail } from "../../apps/api/src/mail-channel.js";
 import type { SessionApplication } from "../../apps/api/src/sessions.js";
 import { testBillingPlans, testBillingPolicy, testCountryPolicy, unusedAskApplication } from "./billingFixtures.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "./discoveredPanel.js";
@@ -77,6 +83,12 @@ export interface BillingStack {
    * enrolment. `age: "OWED"` leaves out the age record, as for an account made before the age gate.
    */
   signUp(email: string, ipCountry: keyof typeof TEST_IPS, terms?: AcceptedTerms, age?: AgeRecord): Promise<BillingPerson>;
+  /**
+   * W8 (P2-I12): the account's email change exactly as Settings runs it (turn 14's EmailChangeService over its real
+   * repository): a CHANGE_EMAIL step-up grant as the real rotation mints it, the request, then the link opened from the
+   * new address. Billing is told nothing; it must follow the account by itself.
+   */
+  changeEmail(person: BillingPerson, newEmail: string): Promise<void>;
   /** The xMoney order the person's subscription rebills (A1). */
   xmoneyOrderOf(ownerRef: string): Promise<string | null>;
   get(person: BillingPerson | null, url: string, ip?: string): Promise<HttpAnswer>;
@@ -94,6 +106,11 @@ export interface BillingStack {
   runJobs(): Promise<number>;
   /** P11a's renewal pass, then P11b's maintenance (the period-end sweep), then every job they queued. */
   runRenewals(): Promise<void>;
+  /**
+   * P14a's daily money check (A10's listings and A2's adoption) over the stack's xMoney, built from the same members as
+   * runtime.ts builds its own (which the runtime does not expose), then every job it queued.
+   */
+  reconcileDaily(): Promise<ReconcileReport>;
   subscriptionStatus(ownerRef: string): Promise<string | null>;
   cancelRequested(ownerRef: string): Promise<boolean>;
   entitlementPlan(ownerRef: string): Promise<PlanId>;
@@ -201,6 +218,19 @@ export async function startBillingStack(): Promise<BillingStack> {
   const now = (): Date => new Date(Date.now() + advancedMs);
   const acceptances = new AcceptanceRepository(database.pool);
 
+  // Turn 14's change-email service on the stack's own database, DEKs and blind-index key. Its mail is kept apart from
+  // billing's, so a test reads the confirmation link from here.
+  const emailChangeMail = new MemoryEmailChangeMailSender();
+  const emailChanges = new EmailChangeService({
+    repository: new PostgresEmailChangeRepository(database.pool, Object.freeze({
+      hashSourceIp: async () => "33".repeat(32),
+      hashUserAgent: async () => "44".repeat(32)
+    }) as unknown as AuditContextHasher),
+    // Real time, not the stack's: the database bounds a link's expiry by its own clock.
+    users: deks, blindIndexKey, mail: emailChangeMail, tokenTtlMs: 24 * 3_600_000, resendCooldownMs: 60_000
+  });
+  const emailChangeSource = Object.freeze({ ip: TEST_IPS.RO, userAgent: "billing-stack", requestId: "request:w8" });
+
   const identities: TestHttpIdentity[] = [];
   const byToken = (presented: string) => identities.find((identity) => identity.rawSessionToken === presented);
   const sessions: SessionApplication = {
@@ -267,6 +297,10 @@ export async function startBillingStack(): Promise<BillingStack> {
   const spendStore = new PostgresModelSpendStore(database.pool);
   const billingRepository = new BillingRepository(database.pool);
   const entitlements = new EntitlementRepository(database.pool);
+  const reconciler = new BillingReconciler({
+    billing: billingRepository, jobs: new BillingJobQueries(database.pool), xmoney: connectors.xmoney,
+    environment: connectors.xmoneyEnvironment, audit: () => undefined, clock: now, kick: () => undefined
+  });
   const runtime = createBillingRuntime({
     pool: database.pool,
     connectors,
@@ -348,6 +382,20 @@ export async function startBillingStack(): Promise<BillingStack> {
       identities.push(identity);
       return Object.freeze({ email, userId: account.userId, ownerRef: account.ownerRef, ip: TEST_IPS[ipCountry], identity });
     },
+    async changeEmail(person, newEmail) {
+      const grantToken = randomBytes(32).toString("base64url");
+      await database.pool.query(`
+        INSERT INTO identity.step_up_grant(
+          step_up_grant_id,token_hash,session_id,user_id,action,target_run_id,target_account_id,issued_at,expires_at
+        ) VALUES ($1,$2,$3,$4,'CHANGE_EMAIL',NULL,$4,clock_timestamp()-interval '1 second',
+          clock_timestamp()+interval '2 minutes')
+      `, [randomUUID(), hashToken("step-up-grant", grantToken), person.identity.authenticated.session.session_id, person.userId]);
+      const session = { userId: person.userId, sessionId: person.identity.authenticated.session.session_id };
+      await emailChanges.request(session, { newEmail, grantToken }, emailChangeSource);
+      const link = [...emailChangeMail.messages].reverse().find((message) => message.kind === "confirmation");
+      if (link === undefined || link.kind !== "confirmation") throw new Error("BILLING_STACK_EMAIL_CHANGE_NOT_SENT");
+      await emailChanges.confirm(link.token, emailChangeSource);
+    },
     async xmoneyOrderOf(ownerRef) {
       return (await billingRepository.subscriptionForOwner(ownerRef))?.xmoneyOrderId ?? null;
     },
@@ -420,6 +468,17 @@ export async function startBillingStack(): Promise<BillingStack> {
       await runtime.renewal.runOnce();
       await runtime.maintenance.runOnce();
       await stack.runJobs();
+    },
+    async reconcileDaily() {
+      // The client sends the listing window to whole seconds (P3b), so a transaction xMoney made in this very second is
+      // listed only from the next one: the stack lets that second end first, as a daily pass always has.
+      await new Promise((resolve) => setTimeout(resolve, 1_000 - (Date.now() % 1_000) + 5));
+      const report = await reconciler.runDaily(now());
+      // W13 (P2-I18): a refused listing no longer fails the pass, so a fake that stopped answering one would otherwise
+      // go unnoticed here; the fake answers all three, and any refusal is the stack's error.
+      if (report.refusedListings.length > 0) throw new Error(`BILLING_STACK_LISTING_REFUSED:${report.refusedListings.join(",")}`);
+      await stack.runJobs();
+      return report;
     },
 
     async subscriptionStatus(ownerRef) {

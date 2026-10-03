@@ -92,6 +92,20 @@ export function smartBillCompanyCif(company: SellerCompany, form: SmartBillCifFo
   return vat.number;
 }
 
+/**
+ * P2-M35: the company facts every billing email prints, in each footer and in the model withdrawal form's "To:" line
+ * (packages/mail-templates/src/render.ts): the legal name, the registered office and the general address. A bracketed
+ * value is the legal notice's placeholder, and billing cannot start until the owner has filled it in, as for the CUI.
+ */
+export function assertMailedCompanyFacts(company: SellerCompany): void {
+  const printed: ReadonlyArray<readonly [string, string]> = [
+    ["legalName", company.legalName], ["registeredOffice", company.registeredOffice], ["emails.general", company.emails.general]
+  ];
+  for (const [name, value] of printed) {
+    if (isUnverifiedCompanyFact(value)) throw new TypeError(`BILLING_COMPANY_FACTS_UNVERIFIED:${name}`);
+  }
+}
+
 /** The public key goes to every browser; if it were the private key, anyone could sign orders and read notices. */
 function refuseTheSecretAsPublic(publicKey: string, privateKey: Buffer): void {
   const candidate = Buffer.from(publicKey, "latin1");
@@ -103,11 +117,30 @@ function refuseTheSecretAsPublic(publicKey: string, privateKey: Buffer): void {
 /**
  * Going from stage to live (P1b `openRecordCounts("stage")`): a live boot is refused while any stage subscription or
  * charge is still open — the live renewal pass never rebills a stage order, so such a subscription would otherwise
- * stay ACTIVE for ever. The runbook's switch-on step cancels or withdraws every sandbox subscription first.
+ * stay ACTIVE for ever — and (P2-I4) while any outbox job of a stage charge is still queued: the live outbox would
+ * claim it and run it against live xMoney, SmartBill or Quaderno (each handler also refuses it, DEAD
+ * OTHER_XMONEY_SYSTEM). The runbook's switch-on step cancels or withdraws every sandbox subscription first.
  */
-export function assertStageRecordsClosed(counts: Readonly<{ subscriptions: number; charges: number }>): void {
-  if (counts.subscriptions > 0 || counts.charges > 0) {
-    throw new TypeError(`BILLING_STAGE_RECORDS_OPEN:subscriptions=${counts.subscriptions}:charges=${counts.charges}`);
+export function assertStageRecordsClosed(
+  counts: Readonly<{ subscriptions: number; charges: number; jobs: number }>
+): void {
+  if (counts.subscriptions > 0 || counts.charges > 0 || counts.jobs > 0) {
+    throw new TypeError(
+      `BILLING_STAGE_RECORDS_OPEN:subscriptions=${counts.subscriptions}:charges=${counts.charges}:jobs=${counts.jobs}`
+    );
+  }
+}
+
+/**
+ * W14 (P2-I19): a live boot is also refused while any billing row or open outbox job is dated more than a day ahead
+ * (`BillingRepository.recordsDatedAhead`). Only a host that ran the sandbox with `BILLING_STAGE_CLOCK_OFFSET_DAYS`
+ * writes such rows, and its jobs would wait up to a month and then run against the live services. The runbook keeps
+ * that run on its own throwaway server; this is the guard for a host that took the same-host path anyway. It is
+ * only a guard: a month after such a run its rows are no longer ahead. The counts are content-free.
+ */
+export function assertNoRecordsDatedAhead(counts: Readonly<{ rows: number; jobs: number }>): void {
+  if (counts.rows > 0 || counts.jobs > 0) {
+    throw new TypeError(`BILLING_RECORDS_DATED_AHEAD:rows=${counts.rows}:jobs=${counts.jobs}`);
   }
 }
 
@@ -115,7 +148,8 @@ export function assertStageRecordsClosed(counts: Readonly<{ subscriptions: numbe
  * Builds every billing connector from the custody files. Called under boot.runSync, so a refusal
  * closes the boot ledger (DL7-F7). SmartBill's code is built from the company's facts first, before any
  * secret is read (smartBillCompanyCif; main.ts passes SELLER_COMPANY, tests and the development fakes
- * pass the mirror filled with their fake's code). The private key
+ * pass the mirror filled with their fake's code), and the facts every email prints must be filled in too
+ * (assertMailedCompanyFacts, P2-M35). The private key
  * (L1's text-secret loader, A23) is handed to `hold` the moment it exists; Quaderno's key, SmartBill's
  * `user:token` and the owner's address are text credentials read like provider keys
  * (`readCustodyAuthorizationHeader`).
@@ -129,6 +163,7 @@ export function loadBillingConnectors(input: Readonly<{
 }>): BillingConnectors {
   const environment = input.environment;
   const companyCif = smartBillCompanyCif(input.company);
+  assertMailedCompanyFacts(input.company);
   const xmoneyPrivateKey = readCustodyTextSecretBytes(environment.xmoneyPrivateKeyPath);
   input.hold({ end: async () => { xmoneyPrivateKey.fill(0); } });
   aesKeyFromPrivateKey(xmoneyPrivateKey).fill(0);

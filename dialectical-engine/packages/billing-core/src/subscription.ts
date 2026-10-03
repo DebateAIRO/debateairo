@@ -178,7 +178,9 @@ function apply(state: Working, event: SubscriptionEvent): void {
       state.scheduledDowngradePlanId = event.planId;
       return;
     case "CANCEL_REQUESTED":
-      requireStatus(state, event, ["ACTIVE", "PAST_DUE"]);
+      // W7 (P2-I10): SUSPENDED too, for an account deletion's renewal stop (a person's own cancel never reaches it:
+      // `requestCancelLocked` refuses a suspended plan). RESUMED keeps the flag, so the plan then ends at its period end.
+      requireStatus(state, event, ["ACTIVE", "PAST_DUE", "SUSPENDED"]);
       if (state.cancelRequested) illegal("CANCEL_REQUESTED twice");
       state.cancelRequested = true;
       return;

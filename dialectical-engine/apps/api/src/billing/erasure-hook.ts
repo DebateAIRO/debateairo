@@ -1,6 +1,7 @@
 import type { BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
 import type { BillingAudit } from "./audit.js";
 import type { BillingReconciler, ReconcileReport } from "./reconcile.js";
+import { writeCancelLocked } from "./subscription-actions.js";
 import { appendChecked, lockedSubscription } from "./subscription-core.js";
 
 export type BillingErasureDeps = Readonly<{
@@ -19,6 +20,12 @@ const ERASURE_STOP: Readonly<Record<string, string>> = Object.freeze({});
 const AGE_FROZEN_STOP: Readonly<Record<string, string>> = Object.freeze({ stopped_for: "AGE_FROZEN" });
 
 /**
+ * What one stop did: STOPPED ended the plan (ERASURE_STOPPED and FREE: the erasure committed, or the age gate froze
+ * the account), RENEWAL_STOPPED wrote a pending deletion's renewal stop (W7), NOTHING found nothing left to do.
+ */
+export type BillingErasureStop = "STOPPED" | "RENEWAL_STOPPED" | "NOTHING";
+
+/**
  * R-34: the `erasurePending` port of P11a's `RenewalService` (its `erasureBlocks` guards every renewal charge, every
  * resubmission and P11b's dunning retry), answered by `billing.owner_erasure_pending` — true while an erasure is
  * pending and after it finished, so no rebill ever reaches an erased account, and (R3-2) while the account is
@@ -31,40 +38,64 @@ export function erasurePendingOf(
 }
 
 /**
- * Spec §2.5.6 "Erasure": scheduling an erasure stops renewals at once. It writes ERASURE_STOPPED and the FREE
- * entitlement; it never calls xMoney (A4d) and never refunds (a payment arriving during the grace is refunded by the
- * settlement itself). Idempotent: an owner with nothing live left is NOTHING. R3-2: the sweep stops an account the
- * age gate froze the same way; read under the owner lock, the freeze marks the row `stopped_for: "AGE_FROZEN"` and
- * the audit line `billing.age_frozen.stopped` (P2's fold has one stop kind, so the mark lives on the row), so it is
- * never read as an erasure. Whether its money goes back is the owner's question, not this hook's.
+ * Spec §2.5.6 "Erasure", as the owner ruled on 2 October 2026 (W7, P2-I10; spec A29 (j)). Read under the owner lock,
+ * one of three things happens:
+ * - The erasure has committed (0091's `billing.owner_erasure_committed`), or (R3-2) the age gate froze the account:
+ *   the plan ends as P15 ended it at scheduling before: ERASURE_STOPPED and the FREE entitlement, never an xMoney call
+ *   (A4d), never a refund. A freeze marks the row `stopped_for: "AGE_FROZEN"` and the audit line
+ *   `billing.age_frozen.stopped` (P2's fold has one stop kind, so the mark lives on the row), so it is never read as
+ *   an erasure. Whether its money goes back is the owner's question, not this hook's.
+ * - A deletion is scheduled and has not run: only the renewal stops, at once — CANCEL_REQUESTED with
+ *   `source: "ACCOUNT_ERASURE"` (`writeCancelLocked`, no M7) — and the paid plan goes on until the commit, with its
+ *   14-day withdrawal still open. A PAST_DUE plan (whose next charge would be a dunning retry) or one whose renewal is
+ *   already under way ends now, exactly as the person's own cancel ends it. Cancelling the deletion leaves that stop
+ *   standing: the plan runs to the end of its paid month and renews only if the person undoes the cancel (refused
+ *   while the deletion is pending). P11a's guard (`owner_erasure_pending`) also refuses every rebill meanwhile.
+ * - Otherwise (no deletion, or it was cancelled): nothing.
+ * Idempotent: an owner with nothing left to stop is NOTHING. A payment arriving during the grace is refunded by the
+ * settlement itself.
  */
 export class BillingErasureHook {
   constructor(private readonly deps: BillingErasureDeps) {}
 
-  async stop(ownerRef: string): Promise<"STOPPED" | "NOTHING"> {
+  async stop(ownerRef: string): Promise<BillingErasureStop> {
     const now = this.deps.clock();
-    const stopped = await this.deps.billing.withTransaction(async (client) => {
+    const { billing } = this.deps;
+    const done = await billing.withTransaction(async (client) => {
       const locked = await lockedSubscription(this.deps, client, ownerRef);
-      if (locked === null || !STOPPABLE.has(locked.state.status)) return null;
-      const frozen = await this.deps.billing.ownerAgeFrozen(ownerRef, client);
-      await appendChecked(this.deps.billing, client, locked, {
-        kind: "ERASURE_STOPPED", at: now, data: frozen ? AGE_FROZEN_STOP : ERASURE_STOP
-      });
-      await this.deps.entitlements.append(client, {
-        ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ERASURE_STOPPED", effectiveAt: now,
-        subscriptionId: locked.state.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
-      });
-      return Object.freeze({ frozen });
+      if (locked === null) return null;
+      const frozen = await billing.ownerAgeFrozen(ownerRef, client);
+      if (frozen || await billing.ownerErasureCommitted(ownerRef, client)) {
+        if (!STOPPABLE.has(locked.state.status)) return null;
+        await appendChecked(billing, client, locked, {
+          kind: "ERASURE_STOPPED", at: now, data: frozen ? AGE_FROZEN_STOP : ERASURE_STOP
+        });
+        await this.deps.entitlements.append(client, {
+          ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ERASURE_STOPPED", effectiveAt: now,
+          subscriptionId: locked.state.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
+        });
+        return Object.freeze({ kind: "STOPPED" as const, frozen });
+      }
+      // Neither committed nor frozen, so this is a deletion still scheduled (and not cancelled), or none at all.
+      if (!await billing.ownerErasurePending(ownerRef, client)) return null;
+      const written = await writeCancelLocked(this.deps, client, locked, now, "ACCOUNT_ERASURE");
+      return written.outcome === "REQUESTED" ? Object.freeze({ kind: "RENEWAL_STOPPED" as const, frozen: false }) : null;
     });
-    if (stopped === null) return "NOTHING";
-    this.deps.audit(stopped.frozen ? "billing.age_frozen.stopped" : "billing.erasure.stopped", {});
+    if (done === null) return "NOTHING";
+    if (done.kind === "RENEWAL_STOPPED") {
+      this.deps.audit("billing.cancel", { source: "ACCOUNT_ERASURE" });
+      return "RENEWAL_STOPPED";
+    }
+    this.deps.audit(done.frozen ? "billing.age_frozen.stopped" : "billing.erasure.stopped", {});
     return "STOPPED";
   }
 
   /**
-   * The durable second line: every owner whose erasure is pending or finished, or whose account the age gate froze
-   * (R3-2: the only line that ends such a plan), and who still has a live plan is stopped, page after page, until a
-   * page comes back empty. One failing owner does not stop the others; the first failure is thrown at the end, so the
+   * The durable second line, and (W7) the line that ends a plan at the erasure's commit: every owner whose erasure is
+   * pending or finished, or whose account the age gate froze (R3-2: the only line that ends such a plan), and who
+   * still has a live plan goes through `stop`, page after page, until a page comes back empty: a pending deletion's
+   * renewal stop is repeated (the route's own call may have failed), a committed one's plan is ended. The count is the
+   * owners `stop` changed. One failing owner does not stop the others; the first failure is thrown at the end, so the
    * single-flight reports the sweep as pending.
    */
   async sweep(pageSize: number): Promise<number> {
@@ -76,7 +107,7 @@ export class BillingErasureHook {
       if (page.length === 0) break;
       for (const ownerRef of page) {
         try {
-          if (await this.stop(ownerRef) === "STOPPED") stopped += 1;
+          if (await this.stop(ownerRef) !== "NOTHING") stopped += 1;
         } catch (error) {
           failure ??= error;
         }

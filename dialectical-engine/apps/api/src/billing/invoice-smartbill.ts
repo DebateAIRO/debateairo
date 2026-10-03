@@ -5,7 +5,8 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { BillingAudit } from "./audit.js";
 import { enqueueEmail, type AttachmentResolver } from "./email-job.js";
 import {
-  creditNoteContext, invoicesOfCharge, loadPaidCharge, saleRecordOf, type InvoiceJobDeps, type PaidCharge
+  creditNoteContext, invoicesOfCharge, loadPaidCharge, otherSystemOutcome, recordedChargeOf, saleRecordOf,
+  type InvoiceJobDeps, type PaidCharge, type RecordedCharge
 } from "./invoice-common.js";
 import { DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 
@@ -33,6 +34,15 @@ type SmartBillDeps = InvoiceJobDeps & Readonly<{
 }>;
 
 const CALL_STARTED = "INVOICE_CALL_STARTED";
+/**
+ * W12 (P2-I17): the stage `pnpm billing:invoice --requeue --confirm-not-issued` gives a re-queued SmartBill job: the
+ * owner checked SmartBill and nothing was issued, which proves what INVOICE_SERVICE_UNAVAILABLE proves (A17b). Only
+ * the new job's first attempt carries it: the attempt overwrites it with CALL_STARTED before calling `issue`.
+ */
+export const INVOICE_CONFIRMED_NOT_ISSUED = "INVOICE_CONFIRMED_NOT_ISSUED";
+/** A17(b): the stages that prove an earlier attempt created nothing, so `issue` may be called despite the intent. */
+const provenNothingIssued = (stage: string | null): boolean =>
+  stage === "INVOICE_SERVICE_UNAVAILABLE" || stage === INVOICE_CONFIRMED_NOT_ISSUED;
 const dead = (code: string): OutboxOutcome => Object.freeze({ kind: "DEAD" as const, code });
 const retry = (code: string, attempts: number, now: Date): OutboxOutcome =>
   Object.freeze({ kind: "RETRY" as const, code, retryAt: failureRetryAt(attempts, now) });
@@ -43,36 +53,55 @@ function unknownOutcome(deps: SmartBillDeps, kind: "INVOICE" | "CREDIT_NOTE"): O
   return dead("INVOICE_UNKNOWN");
 }
 
-async function record(
-  deps: SmartBillDeps, paid: PaidCharge, kind: "INVOICE" | "CREDIT_NOTE", document: SmartBillDocument, totalMicros: number, now: Date
+/**
+ * The one way a SmartBill document is stored (P10b; W12's `pnpm billing:invoice --record` too): the invoice row, its
+ * SENT_BY_ACCOUNT_SETTING status (A21), and for an invoice M2 with SmartBill's PDF when the issuer offers one
+ * (`attachPdf`), in one transaction. The intent must already exist (0086's `invoice_names_its_intent`).
+ */
+export async function recordSmartBillDocument(
+  repository: Pick<BillingRepository, "withTransaction" | "insertInvoice" | "appendInvoiceStatus" | "enqueue">,
+  input: Readonly<{
+    charge: RecordedCharge; kind: "INVOICE" | "CREDIT_NOTE"; document: SmartBillDocument; totalMicros: number; now: Date;
+    attachPdf: boolean;
+  }>
 ): Promise<void> {
-  await deps.repository.withTransaction(async (client) => {
+  const { charge, kind, document, totalMicros, now } = input;
+  await repository.withTransaction(async (client) => {
     const invoiceId = randomUUID();
-    await deps.repository.insertInvoice(client, Object.freeze({
-      invoiceId, chargeId: paid.charge.chargeId, issuer: "SMARTBILL", kind,
+    await repository.insertInvoice(client, Object.freeze({
+      invoiceId, chargeId: charge.chargeId, issuer: "SMARTBILL", kind,
       externalRef: document.externalRef, series: document.series, number: document.number, url: null, totalMicros, at: now
     }) satisfies InvoiceRow);
     // A21 / X1 row 10: SmartBill sends every document (invoice or credit) to ANAF by the account setting.
     const sent: EfacturaStatus = "SENT_BY_ACCOUNT_SETTING";
-    await deps.repository.appendInvoiceStatus(client, { invoiceId, at: now, efacturaStatus: sent });
+    await repository.appendInvoiceStatus(client, { invoiceId, at: now, efacturaStatus: sent });
     if (kind !== "INVOICE") return;
-    await enqueueEmail(deps.repository, client, {
-      template: "M2_INVOICE_ATTACHED", recipient: { kind: "CUSTOMER", customerId: paid.customerId }, dedupeRef: paid.charge.chargeId,
+    await enqueueEmail(repository, client, {
+      template: "M2_INVOICE_ATTACHED", recipient: { kind: "CUSTOMER", customerId: charge.customerId }, dedupeRef: charge.chargeId,
       params: {
-        plan: paid.quote.planId, totalAmount: microsToDecimal(paid.charge.totalMicros), chargeDate: paid.paid.at.toISOString(),
+        plan: charge.planId, totalAmount: microsToDecimal(charge.chargeTotalMicros), chargeDate: charge.paidAt.toISOString(),
         invoiceNumber: `${document.series} ${document.number}`
       },
-      ...(deps.issuer.pdf === undefined ? {} : {
+      ...(input.attachPdf ? {
         attachments: [{ kind: "SMARTBILL_INVOICE_PDF" as const, fields: { series: document.series, number: document.number } }]
-      }),
+      } : {}),
       notBefore: now
     });
   });
 }
 
+async function record(
+  deps: SmartBillDeps, paid: PaidCharge, kind: "INVOICE" | "CREDIT_NOTE", document: SmartBillDocument, totalMicros: number, now: Date
+): Promise<void> {
+  await recordSmartBillDocument(deps.repository, {
+    charge: recordedChargeOf(paid), kind, document, totalMicros, now, attachPdf: deps.issuer.pdf !== undefined
+  });
+}
+
 /**
  * A17(b): calls `issue` only when no earlier attempt can have created the document: the intent is new, or the
- * previous attempt proved nothing was created (INVOICE_SERVICE_UNAVAILABLE), or SmartBill's own lookup says so.
+ * previous attempt proved nothing was created (INVOICE_SERVICE_UNAVAILABLE), or the owner confirmed it when
+ * re-queueing the job (W12's INVOICE_CONFIRMED_NOT_ISSUED), or SmartBill's own lookup says so.
  */
 async function issueOnce(
   deps: SmartBillDeps, job: Parameters<OutboxHandler>[0], now: Date, paid: PaidCharge, kind: "INVOICE" | "CREDIT_NOTE",
@@ -81,7 +110,7 @@ async function issueOnce(
   const intent = await deps.repository.withTransaction((client) => deps.repository.insertInvoiceIntent(client, {
     chargeId: paid.charge.chargeId, kind, issuer: "SMARTBILL", requestedAt: now
   }));
-  if (intent === "DUPLICATE" && await deps.jobs.jobStage(job.jobId) !== "INVOICE_SERVICE_UNAVAILABLE") {
+  if (intent === "DUPLICATE" && !provenNothingIssued(await deps.jobs.jobStage(job.jobId))) {
     if (deps.issuer.lookup === undefined) return unknownOutcome(deps, kind);
     let found: SmartBillDocument | null;
     try {
@@ -117,6 +146,8 @@ async function issueOnce(
 
 export function createSmartBillInvoiceHandler(deps: SmartBillDeps): OutboxHandler {
   return async (job, now) => {
+    const other = await otherSystemOutcome(deps, job, job.ref);
+    if (other !== null) return other;
     const paid = await loadPaidCharge(deps, job.ref);
     if (paid === null) return dead("INVOICE_CHARGE_NOT_PAID");
     if ((await invoicesOfCharge(deps.repository, paid)).some((invoice) => invoice.kind === "INVOICE")) return DONE;

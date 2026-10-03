@@ -3,7 +3,7 @@ import { buildApi } from "@debateai/api";
 import { BillingCheckoutPendingErrorSchema, createContractClient } from "@debateai/contract";
 import type { ChargeEventRow } from "@debateai/db";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
-import { chargeStatusOf, type ChargeStatusPort } from "../../apps/api/src/billing/charge-status.js";
+import { ChargeStatusReader, chargeStatusOf, type ChargeStatusPort } from "../../apps/api/src/billing/charge-status.js";
 import type { CheckoutResult, CheckoutServicePort } from "../../apps/api/src/billing/checkout.js";
 import type { BillingRouteOptions } from "../../apps/api/src/billing/index.js";
 import { BillingRefusal } from "../../apps/api/src/billing/refusal.js";
@@ -194,5 +194,37 @@ describe("P8c GET /v1/billing/charges/{chargeRef}", () => {
     // P12e's refused new card: the hold is released and the card change reads FAILED.
     expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("REFUND_REQUESTED", "CARD_CHECK_REFUSED")]))
       .toEqual({ state: "FAILED", reasonCode: "CARD_CHECK_REFUSED" });
+    // P2-M5: a checkout whose plan never started, its payment refunded or voided at xMoney first, bought nothing.
+    for (const reason of ["PROVIDER_REFUND", "PROVIDER_VOID"]) {
+      expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("REFUND_REQUESTED", reason)], false), reason)
+        .toEqual({ state: "FAILED", reasonCode: reason });
+    }
+    expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED")], false)).toEqual({ state: "SUCCEEDED", reasonCode: null });
+  });
+
+  it("reads a charge's status through the real reader for its owner only: another person's is not found (P2-M16)", async () => {
+    const stranger = testHttpIdentity("billing-checkout-stranger");
+    const rows = new Map([[CHARGE, {
+      chargeId: CHARGE, ownerRef: stranger.authenticated.ownerRef, kind: "INITIAL", subscriptionId: "s",
+      events: [event("REQUESTED"), event("SUCCEEDED")]
+    }]]);
+    const repository = {
+      charge: async (ref: string) => (rows.get(ref) ?? null) as never,
+      subscriptionEvents: async () => [{ kind: "CREATED" }, { kind: "ACTIVATED" }] as never
+    };
+    const billing: BillingRouteOptions = {
+      plans: testBillingPlans, clock: () => NOW, legal: { requiresReacceptance: async () => false },
+      checkout: { start: vi.fn() }, charges: new ChargeStatusReader(repository),
+      quotes: { create: async () => { throw new Error("NOT_REACHED"); } }
+    };
+    const api = buildApi({
+      application: unusedAskApplication(), sessions: testSessionApplication([OWNER, stranger]), allowedOrigin: TEST_APP_ORIGIN, billing
+    });
+    const theirs = await api.inject({ method: "GET", url: `/v1/billing/charges/${CHARGE}`, headers: testSessionHeaders(stranger) });
+    expect([theirs.statusCode, theirs.json()]).toEqual([200, { state: "SUCCEEDED", reason_code: null }]);
+    // The same reference, asked by another signed-in person: the answer for a charge that does not exist.
+    const mine = await api.inject({ method: "GET", url: `/v1/billing/charges/${CHARGE}`, headers: testSessionHeaders(OWNER) });
+    expect(mine.statusCode).toBe(404);
+    await api.close();
   });
 });

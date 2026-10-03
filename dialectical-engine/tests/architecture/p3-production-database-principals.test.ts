@@ -433,6 +433,13 @@ describe("P3-01 production database-principal manifest", () => {
         // appends one billing.invoice_status_event, on which 0086 grants SELECT,
         // INSERT to debateai_runtime; no privilege is added.
         { component: "apps/api:billing-efactura-status-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_EFACTURA_STATUS_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:efactura-status" },
+        // Paid plans, Task W12 (P2-I17): the owner's invoice command
+        // (`pnpm billing:invoice`) runs as the API under systemd-run and writes
+        // only billing rows that principal already writes (billing.invoice_intent,
+        // billing.invoice and billing.invoice_status_event, on which 0086 grants
+        // SELECT, INSERT, and billing.outbox, on which 0087 grants SELECT, INSERT);
+        // no privilege is added.
+        { component: "apps/api:billing-invoice-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_INVOICE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:invoice" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },

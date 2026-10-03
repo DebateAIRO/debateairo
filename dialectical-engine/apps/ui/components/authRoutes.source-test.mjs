@@ -109,6 +109,13 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(login, /href=\{signUpHref\}/);
   assert.match(signUp, /useState\("\/login"\)/);
   assert.match(signUp, /href=\{loginHref\}/);
+  // W11 fix 1: /login redirects a signed-in visitor to its ?next, which can be a card page
+  // (/checkout?plan=…). A client-side <Link> would carry that redirect out inside the /sign-up
+  // document, under the strict policy that blocks xMoney's frame. A plain <a> makes /login a
+  // full page load, so the card page arrives as a new document with its own policy.
+  assert.match(signUp, /<a href=\{loginHref\}>/);
+  assert.doesNotMatch(signUp, /<Link\b/);
+  assert.doesNotMatch(signUp, /from "next\/link"/);
   assert.match(gate, /window\.location\.replace\("\/login"\)/);
 });
 

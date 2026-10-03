@@ -6,6 +6,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { testHttpIdentity } from "../support/httpSession.js";
 import { AdjustableTaxEngine, testBillingPolicy } from "../support/billingFixtures.js";
 import {
+  holdOwnerLock,
   mountSubscriptionRoutes,
   recordingAudit,
   seedActiveSubscription,
@@ -109,6 +110,47 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     expect((await cancel()).statusCode).toBe(204);
     expect((await events(seeded.subscriptionId)).filter((event) => event.kind === "CANCEL_REQUESTED")).toHaveLength(2);
     expect((await outbox("EMAIL", `M7:${seeded.subscriptionId}`)).map((row) => row.ref)).toEqual([m7Ref]);
+    await api.close();
+  });
+
+  it("dates the cancel after the owner lock it waited for, never before a row written meanwhile (P2-M12)", async () => {
+    const ownerRef = randomUUID();
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE"
+    });
+    const clock = { now: new Date() };
+    const deps = subscriptionDeps(database.pool, { clock: () => clock.now });
+    // A renewal settlement (or any owner-locked writer) holds the lock; the cancel waits for it.
+    const lock = await holdOwnerLock(database.pool, ownerRef);
+    const cancelled = cancelForOwner(deps, ownerRef);
+    await lock.waiter();
+    clock.now = new Date(clock.now.getTime() + 60_000);
+    await lock.release();
+    await cancelled;
+    // Dated after the wait: a grace or hold row the lock holder wrote meanwhile can never outrank its FREE row.
+    expect((await events(seeded.subscriptionId)).find((event) => event.kind === "CANCEL_REQUESTED")?.at).toEqual(clock.now);
+  });
+
+  it("lets a plan of the other xMoney system be cancelled, but never revoked or offered a withdrawal (P2-I4)", async () => {
+    const identity = testHttpIdentity("p2i4-other-system");
+    const audit = recordingAudit();
+    // The fixture's connectors talk to stage; this plan was created in live (or the other way round after §14.8).
+    const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { audit }), identity);
+    const headers = { "x-test-session": identity.rawSessionToken };
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef: identity.authenticated.ownerRef, planId: "PRO",
+      activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE", xmoneyEnvironment: "live"
+    });
+    const read = await api.inject({ method: "GET", url: "/v1/billing/subscription", headers });
+    expect(read.json().subscription).toMatchObject({ status: "ACTIVE", withdrawal_open_until: null, withdrawal_last_day: null });
+    expect((await api.inject({ method: "POST", url: "/v1/billing/subscription/cancel", headers })).statusCode).toBe(204);
+    const revoke = await api.inject({ method: "POST", url: "/v1/billing/subscription/cancel-revoke", headers });
+    expect(revoke.statusCode).toBe(409);
+    expect(revoke.json()).toEqual({ error: "NOT_SUBSCRIBED", message: "NOT_SUBSCRIBED" });
+    const after = await events(seeded.subscriptionId);
+    expect(after.at(-1)?.kind).toBe("CANCEL_REQUESTED");
+    expect(foldSubscription(after).cancelRequested).toBe(true);
+    expect(audit.events.map(({ event }) => event)).toEqual(["billing.cancel"]);
     await api.close();
   });
 

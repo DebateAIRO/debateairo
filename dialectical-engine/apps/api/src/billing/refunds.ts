@@ -1,13 +1,15 @@
 import type { PoolClient } from "pg";
-import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
-import type { BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, OutboxJob } from "@debateai/db";
+import { decimalToMicros, microsToDecimal, withdrawalRefundDeadline } from "@debateai/billing-core";
+import type {
+  BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, CustomerXMoneyEnvironment, OutboxJob
+} from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import type { XMoneyClient, XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPolicy } from "@debateai/register";
 import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js";
 import type { RequestedRefundReason } from "./codes.js";
 import { enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
-import { DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
+import { DONE, failureRetryAt, otherXMoneySystem, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 import { chargeEvent, refundTarget } from "./rows.js";
 import { enqueueCreditNote } from "./settlement.js";
 
@@ -160,6 +162,46 @@ export function refundIntentOf(charge: ChargeRow, event: ChargeEventRow): Refund
   });
 }
 
+/**
+ * Whether a refund for `reason` gives a whole payment back (P9b's refused or duplicate payments and card-check holds,
+ * requested with `whole: true` at the payment's own amount). A withdrawal's refund is always a named amount (P12d).
+ */
+function refundsWholePayment(reason: RequestedRefundReason): boolean {
+  switch (reason) {
+    case "WITHDRAWAL":
+      return false;
+    case "CARD_COUNTRY_BLOCKED":
+    case "ALREADY_SUBSCRIBED":
+    case "SUBSCRIPTION_ENDED":
+    case "DUPLICATE_PAYMENT":
+    case "CARD_CHECK_RELEASE":
+    case "CARD_CHECK_REFUSED":
+    case "CARD_CHECK_DEFERRED":
+    case "CARD_CHECK_NOT_LIVE":
+      return true;
+    default:
+      return exhaustive(reason);
+  }
+}
+
+/**
+ * P2-I5 (1): whether a job's intent is the one the charge itself records. The outbox can be written by any process
+ * holding the runtime role, so the job is only a pointer: its charge must hold OUR REFUND_REQUESTED for this
+ * transaction (`refundIntentOf`: never a provider refund's row) with the same owner, amount and reason. `whole` (the
+ * call without an amount) is allowed only for a reason that refunds a whole payment, and only at that payment's full
+ * amount as its SUCCEEDED or DUPLICATE_PAYMENT row records it.
+ */
+function isRequested(charge: ChargeWithEvents, intent: RefundIntent): boolean {
+  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.xmoneyTransactionId === intent.transactionId);
+  const recorded = requested === undefined ? null : refundIntentOf(charge, requested);
+  if (recorded === null || recorded.chargeId !== intent.chargeId || recorded.ownerRef !== intent.ownerRef
+    || recorded.amountMicros !== intent.amountMicros || recorded.reason !== intent.reason) return false;
+  if (!intent.whole) return true;
+  const paid = charge.events.find((event) => (event.kind === "SUCCEEDED" || event.kind === "DUPLICATE_PAYMENT")
+    && event.xmoneyTransactionId === intent.transactionId);
+  return refundsWholePayment(intent.reason) && paid !== undefined && paid.amountMicros === intent.amountMicros;
+}
+
 function intentOfJob(job: OutboxJob): RefundIntent | null {
   const { charge_id: chargeId, transaction_id: transactionId, amount_micros: amountMicros, whole, owner_ref: ownerRef, reason } = job.payload;
   if (typeof chargeId !== "string" || typeof transactionId !== "string" || typeof ownerRef !== "string"
@@ -186,6 +228,12 @@ export class RefundDesk {
     policy: BillingPolicy;
     audit: BillingAudit;
     clock: () => Date;
+    /**
+     * P2-I4 (D5 5h): the xMoney system `xmoney` talks to (`connectors.xmoneyEnvironment`). A job whose charge was
+     * paid in the other one (a sandbox refund still queued after README §14.8's switch to live) ends DEAD before any
+     * call, with O2: a sandbox transaction id is never sent to live xMoney.
+     */
+    xmoneyEnvironment: CustomerXMoneyEnvironment;
   }>) {}
 
   /** A4(a), inside the caller's transaction: the intent is on record, and its job queued, before money moves. */
@@ -237,7 +285,15 @@ export class RefundDesk {
   private async moveMoney(job: OutboxJob, intent: RefundIntent, now: Date): Promise<OutboxOutcome> {
     const charge = await this.deps.repository.charge(intent.chargeId);
     if (charge === null) return this.deadLetter(intent, "REFUND_CHARGE_MISSING", now);
+    // A refund already recorded has nothing left to do in either system (a job that died between its REFUNDED row and
+    // its completion): it ends DONE quietly. Any other job of the other system ends here, before any lookup or call.
     if (refundedAlready(charge, intent.transactionId)) return DONE;
+    if (charge.xmoneyEnvironment !== this.deps.xmoneyEnvironment) {
+      return this.deadLetter(intent, otherXMoneySystem(this.deps.audit, job.kind).code, now);
+    }
+    // P2-I5 (1): a job its charge records no request for (a forged or corrupted outbox row) moves no money; it ends
+    // here, before any lookup or call, and the owner is told (O2). The 0086 guard would fire only on REFUNDED, after.
+    if (!isRequested(charge, intent)) return this.deadLetter(intent, "REFUND_NOT_REQUESTED", now);
     if (job.attempts > 1) {
       // The stage the last CALL left, read once, inside the lease: XMONEY_UNAVAILABLE / XMONEY_CREDENTIALS_REFUSED
       // prove it sent nothing; REFUND_CALL_STARTED (a process died during it) or any other code proves nothing.
@@ -302,14 +358,47 @@ export class RefundDesk {
    * deadline, so the dead end queues O2 to the owner's custody address at once (English only; the charge, the amount
    * and the dead-letter code), beside the worker's `billing.outbox.dead` line and P16b's daily list. The ref is the
    * refund job's own, so while one O2 is still waiting a second dead end of the same refund queues no other.
+   * P2-I5: REFUND_NOT_REQUESTED is no refund to make (the job matches no request the charge records, and nothing was
+   * sent), so its O2 says so (`notRequested`) and has a ref of its own: it never absorbs, and is never absorbed by, a
+   * real refund's O2 for the same payment.
+   * W9 (P2-M8): a real refund's O2 also names what it was for (`refundReason`, the intent's reason), and a withdrawal
+   * refund's its legal deadline, 14 days after the person withdrew (`withdrawalRefundDeadline` of the WITHDRAWN row's
+   * `withdrew_at`), with how to refund it by hand so that M8 still follows. A forged job's O2 carries neither: its
+   * reason is only the job's claim.
    */
   private async deadLetter(intent: RefundIntent, code: string, now: Date): Promise<OutboxOutcome> {
+    const notRequested = code === "REFUND_NOT_REQUESTED";
+    const ref = `${intent.chargeId}:${intent.transactionId}`;
+    const deadline = notRequested ? null : await this.withdrawalDeadlineOf(intent);
     await this.deps.repository.withTransaction((client) => enqueueEmail(this.deps.repository, client, {
-      template: "O2", recipient: { kind: "OWNER" }, dedupeRef: `${intent.chargeId}:${intent.transactionId}`,
-      params: { chargeRef: intent.chargeId, refundAmount: microsToDecimal(intent.amountMicros), reasonCode: code },
+      template: "O2", recipient: { kind: "OWNER" }, dedupeRef: notRequested ? `${ref}:not-requested` : ref,
+      params: {
+        chargeRef: intent.chargeId, refundAmount: microsToDecimal(intent.amountMicros), reasonCode: code,
+        notRequested: notRequested ? "true" : "false",
+        ...(notRequested ? {} : { refundReason: intent.reason }),
+        ...(deadline === null ? {} : { refundDeadline: deadline.toISOString() })
+      },
       notBefore: now
     }));
     return dead(code);
+  }
+
+  /**
+   * W9 (P2-M8): when a WITHDRAWAL refund's money is due at the latest, from the withdrawal its charge's subscription
+   * records (`withdrew_at`: the Settings click, or the arrival of the statement the owner recorded; the row's own time
+   * for a row written before it carried one). Null for any other reason, or when the charge or its WITHDRAWN row
+   * cannot be found (O2 then names the reason without a date).
+   */
+  private async withdrawalDeadlineOf(intent: RefundIntent): Promise<Date | null> {
+    if (intent.reason !== "WITHDRAWAL") return null;
+    const charge = await this.deps.repository.charge(intent.chargeId);
+    if (charge === null) return null;
+    const withdrawn = (await this.deps.repository.subscriptionEvents(charge.subscriptionId))
+      .find((event) => event.kind === "WITHDRAWN");
+    if (withdrawn === undefined) return null;
+    const recorded = withdrawn.data.withdrew_at;
+    const withdrewAt = typeof recorded === "string" ? new Date(recorded) : withdrawn.at;
+    return withdrawalRefundDeadline(Number.isFinite(withdrewAt.getTime()) ? withdrewAt : withdrawn.at);
   }
 
   /**
@@ -387,7 +476,7 @@ export class RefundDesk {
   private async followUp(intent: RefundIntent): Promise<FollowUp> {
     switch (intent.reason) {
       case "CARD_COUNTRY_BLOCKED":
-        return this.mail(intent, "M11", intent.chargeId);
+        return this.mail(intent, "M11", intent.chargeId, await this.planEndedByRefusal(intent));
       case "ALREADY_SUBSCRIBED":
       case "SUBSCRIPTION_ENDED":
         return this.mail(intent, "M11_DUPLICATE", intent.chargeId);
@@ -410,13 +499,34 @@ export class RefundDesk {
     }
   }
 
-  private async mail(intent: RefundIntent, template: BillingMailTemplateId, dedupeRef: string): Promise<FollowUp> {
+  /**
+   * W10 (P2-M9): the plan a refused renewal or upgrade payment ended. VERIFY_PAYMENT's `endRefusedPayment` ends a live
+   * plan paid with a card from an always-blocked country at once (ENDED, cause CANCEL, reason CARD_COUNTRY_BLOCKED) in
+   * the transaction that records this payment's SUCCEEDED and requests this refund, both at that transaction's
+   * instant; so an ENDED of that cause at the payment's own instant is the end this refusal caused, and M11 then says
+   * the plan ended. A checkout's payment (INITIAL, its plan never started), a payment on a plan that had already
+   * ended, and any other refusal of the same plan name none.
+   */
+  private async planEndedByRefusal(intent: RefundIntent): Promise<string | null> {
+    const charge = await this.deps.repository.charge(intent.chargeId);
+    if (charge === null || (charge.kind !== "RENEWAL" && charge.kind !== "UPGRADE")) return null;
+    const paidAt = charge.events.find((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === intent.transactionId)?.at;
+    if (paidAt === undefined) return null;
+    const ended = (await this.deps.repository.subscriptionEvents(charge.subscriptionId)).find((event) =>
+      event.kind === "ENDED" && event.data.cause === "CANCEL" && event.data.reason === "CARD_COUNTRY_BLOCKED"
+      && event.at.getTime() === paidAt.getTime());
+    return ended?.planId ?? null;
+  }
+
+  private async mail(
+    intent: RefundIntent, template: BillingMailTemplateId, dedupeRef: string, endedPlan: string | null = null
+  ): Promise<FollowUp> {
     const customer = await this.deps.repository.customerByOwner(intent.ownerRef);
     if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a refund without its customer");
+    const params = { refundAmount: microsToDecimal(intent.amountMicros), ...(endedPlan === null ? {} : { endedPlan }) };
     return async (client, at) => {
       await enqueueEmail(this.deps.repository, client, {
-        template, recipient: { kind: "CUSTOMER", customerId: customer.customerId }, dedupeRef,
-        params: { refundAmount: microsToDecimal(intent.amountMicros) }, notBefore: at
+        template, recipient: { kind: "CUSTOMER", customerId: customer.customerId }, dedupeRef, params, notBefore: at
       });
     };
   }

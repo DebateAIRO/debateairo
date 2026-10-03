@@ -7,7 +7,7 @@ import {
 } from "../../apps/api/src/billing/invoice-smartbill.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { enqueueCreditNote } from "../../apps/api/src/billing/settlement.js";
-import { testBillingPolicy } from "../support/billingFixtures.js";
+import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
 import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
 
 type Document = { series: string; number: string; externalRef: string };
@@ -68,8 +68,9 @@ beforeAll(async () => {
   h = await startBillingHarness();
   smartbill = new RecordingSmartBill();
   const deps = () => ({
-    repository: h.repository, jobs: h.jobs, issuer: smartbill.port(), recordsKey: h.recordsKey, policy: testBillingPolicy,
-    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit
+    repository: h.repository, jobs: h.jobs, issuer: smartbill.port(), recordsKey: h.recordsKey,
+    recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy,
+    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const
   });
   h.worker.register("SMARTBILL_INVOICE", async (job, now) => createSmartBillInvoiceHandler(deps())(job, now));
   h.worker.register("SMARTBILL_STORNO", async (job, now) => createSmartBillStornoHandler(deps())(job, now));
@@ -90,7 +91,7 @@ describe("P10b SmartBill invoices for Romania", () => {
     const paid = await h.activate();
     await h.worker.drain(10);
     expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
-    expect(smartbill.issued.find((sale) => sale.chargeId === paid.chargeId)?.customer).toMatchObject({ name: "Test Buyer", city: "Bucuresti", region: "B" });
+    expect(smartbill.issued.find((sale) => sale.chargeId === paid.chargeId)?.customer).toMatchObject({ name: "Test Buyer", city: "Sector 1", region: "Bucuresti" });
     const [invoice] = await invoices(paid.chargeId);
     expect(invoice).toMatchObject({ issuer: "SMARTBILL", kind: "INVOICE", series: "DBAI" });
     const mail = (await h.outboxRows(paid.chargeId)).find((row) => row.ref === `M2_INVOICE_ATTACHED:${paid.chargeId}`);
@@ -123,7 +124,7 @@ describe("P10b SmartBill invoices for Romania", () => {
     expect(await statuses(accepted.chargeId)).toEqual([
       { kind: "INVOICE", efactura_status: "SENT_BY_ACCOUNT_SETTING" }, { kind: "INVOICE", efactura_status: "ACCEPTED" }
     ]);
-    const open = await h.jobs.smartBillDocumentsNotAccepted(new Date(h.clock.now.getTime() - 86_400_000), h.clock.now);
+    const open = await h.jobs.smartBillDocumentsNotAccepted(new Date(h.clock.now.getTime() + 1));
     const listed = open.map((document) => document.chargeId);
     expect(listed).toContain(rejected.chargeId);
     expect(listed).toContain(waiting.chargeId);

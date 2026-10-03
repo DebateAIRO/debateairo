@@ -31,6 +31,13 @@ const NAME_KEYS: ReadonlyMap<string, string> = new Map([
 const SCRUBBED_KEYS: ReadonlySet<string> = new Set([
   "street_line_1", "street_line_2", "address", "phone", "phone_1", "business_name", "legal_name", "company_name", "web"
 ]);
+/**
+ * P2-M31: a document's own link (SmartBill's `url`, `documentUrl` and `documentViewUrl`; Quaderno's `permalink` and
+ * `pdf`) carries the document's access token in its path or query, so rewriting the host is not enough: the whole
+ * link becomes one neutral https address (still a link, so a client that reads it reads one on replay too).
+ */
+const DOCUMENT_LINK_KEYS: ReadonlySet<string> = new Set(["url", "documenturl", "documentviewurl", "permalink", "pdf"]);
+const DOCUMENT_LINK_PLACEHOLDER = "https://document.test/SCRUBBED";
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
 const IPV4 = /^\d{1,3}(?:\.\d{1,3}){3}$/u;
 /** An account's own host (https://<account>.quadernoapp.com, *.smartbill.ro) is rewritten to a neutral one. */
@@ -90,6 +97,7 @@ function scrubWith(value: unknown, forms: ReadonlyArray<string>, key: string): u
   const text = eraseSecrets(value, forms);
   if (NAME_KEYS.has(name)) return NAME_KEYS.get(name)!;
   if (SCRUBBED_KEYS.has(name)) return "SCRUBBED";
+  if (DOCUMENT_LINK_KEYS.has(name)) return DOCUMENT_LINK_PLACEHOLDER;
   if (EMAIL.test(text)) return text.endsWith("@example.test") ? text : "person@example.test";
   if (IPV4.test(text)) return "203.0.113.10";
   for (const host of ACCOUNT_HOSTS) {

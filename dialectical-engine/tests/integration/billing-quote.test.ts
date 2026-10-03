@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { BillingRepository, migrate } from "@debateai/db";
 import { computeWindows } from "@debateai/billing-core";
+import { TypedDomainError } from "@debateai/kernel";
 import { QuoteService, type QuoteInput } from "../../apps/api/src/billing/quote.js";
 import { openQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -30,8 +31,8 @@ const service = () => new QuoteService({
   recordsKey: KEY, audit: (event, fields) => { audit.push({ event, ...fields }); }
 });
 const input = (ownerRef: string, overrides: Partial<QuoteInput> = {}): QuoteInput => ({
-  ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Ana Pop", region: "B", postalCode: "010101",
-  city: "Bucuresti", company: null, now: NOW, ...overrides
+  ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Ana Pop", region: "Bucuresti", postalCode: "010101",
+  city: "Sector 1", company: null, now: NOW, ...overrides
 });
 
 describe("P8b the quote", () => {
@@ -46,7 +47,7 @@ describe("P8b the quote", () => {
       taxCountry: "RO", taxRateBasisPoints: 2_100, taxStatus: "TAXABLE", expiresAt: new Date(NOW.getTime() + 1_800_000)
     });
     expect(openQuoteLocation(KEY, result.quote.quoteId, stored!.locationCiphertext)).toEqual({
-      name: "Ana Pop", country: "RO", region: "B", postalCode: "010101", city: "Bucuresti", street: null,
+      name: "Ana Pop", country: "RO", region: "Bucuresti", postalCode: "010101", city: "Sector 1", street: null,
       ip: "198.51.100.7", ipCountry: "RO", company: null
     });
     expect(await repository.quote(result.quote.quoteId, randomUUID())).toBeNull();
@@ -64,6 +65,21 @@ describe("P8b the quote", () => {
     expect(result).toMatchObject({ addressRequired: true, quote: { totalMicros: 24_200_000 } });
     const company = { name: "SC Test SRL", vatId: "RO123VALID", address: "Str. Test 1" };
     expect((await service().create(input(randomUUID(), { name: null, company }))).addressRequired).toBe(false);
+  });
+
+  it("asks for a county SmartBill knows and, in Bucharest, a sector, or ANAF refuses the e-Factura (P2-M15)", async () => {
+    const asks = async (region: string, city: string) =>
+      (await service().create(input(randomUUID(), { region, city }))).addressRequired;
+    expect(await asks("Bucuresti", "Sector 3")).toBe(false);
+    expect(await asks("Cluj", "Cluj-Napoca")).toBe(false);
+    // SPV validates a Bucharest buyer only with a city of Sector 1 to Sector 6 (smartbill-api-facts.md row 3).
+    expect(await asks("B", "Bucuresti")).toBe(true);
+    expect(await asks("Bucuresti", "Bucuresti")).toBe(true);
+    expect(await asks("Atlantis", "Poseidonia")).toBe(true);
+    // A company is invoiced at the same county and city.
+    const company = { name: "SC Test SRL", vatId: "RO123VALID", address: "Str. Test 1" };
+    expect((await service().create(input(randomUUID(), { name: null, company, region: "B", city: "Bucuresti" }))).addressRequired)
+      .toBe(true);
   });
 
   it("asks a US or Canadian buyer for a state or a postal code before the checkout (spec §1.3)", async () => {
@@ -108,6 +124,21 @@ describe("P8b the quote", () => {
     await expect(service().create(input(ownerRef))).rejects.toMatchObject({ status: 503, code: "TAX_SERVICE_UNAVAILABLE" });
     const rows = await database.pool.query("SELECT 1 FROM billing.quote WHERE owner_ref=$1", [ownerRef]);
     expect(rows.rowCount).toBe(0);
+    expect(audit).toEqual([{ event: "billing.quote.refused", code: "TAX_SERVICE_UNAVAILABLE" }]);
+  });
+
+  it("audits a quote the tax service refuses as that refusal, with its detail, and still answers the one 503 (P2-M27)", async () => {
+    // P4's client on a wrong or revoked Quaderno key: TAX_SERVICE_REFUSED with the detail QUADERNO_HTTP_401.
+    const refusing = {
+      quote: async (): Promise<never> => { throw new TypedDomainError("TAX_SERVICE_REFUSED", "QUADERNO_HTTP_401"); },
+      validateTaxId: (country: string, taxId: string) => tax.validateTaxId(country, taxId)
+    };
+    const quotes = new QuoteService({
+      repository, tax: refusing, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy, plans: testBillingPlans,
+      recordsKey: KEY, audit: (event, fields) => { audit.push({ event, ...fields }); }
+    });
+    await expect(quotes.create(input(randomUUID()))).rejects.toMatchObject({ status: 503, code: "TAX_SERVICE_UNAVAILABLE" });
+    expect(audit).toEqual([{ event: "billing.quote.refused", code: "TAX_SERVICE_REFUSED", reason: "QUADERNO_HTTP_401" }]);
   });
 
   it("refuses ALREADY_SUBSCRIBED while the owner has a live subscription", async () => {

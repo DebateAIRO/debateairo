@@ -191,9 +191,53 @@ describe("P14a reconciliation on real PostgreSQL", () => {
     const stuck = await openCharge(seeded, { kind: "UPGRADE", createdAt: new Date(now.getTime() - 35 * 60_000), totalMicros: 7_000_000, last: "REQUESTED" });
     const xmoney = fakeXMoney();
     xmoney.state.refusedDateTypes.add("charge-back");
-    // The tick fails (the pending line is still reported) yet the upgrade is settled on it.
-    await expect(reconciler(xmoney, now).tick()).rejects.toMatchObject({ code: "XMONEY_REFUSED" });
+    // W13 (P2-I18): the refused listing is named in the report and its own line, and the upgrade is settled on it.
+    await expect(reconciler(xmoney, now).tick()).resolves.toMatchObject({ refusedListings: ["charge-back"] });
     expect((await kindsOf(stuck)).at(-1)).toEqual(["FAILED", "NO_TRANSACTION"]);
+  });
+
+  it("reads the creation and refund listings when xMoney refuses the charge-back one, and acts on both (W13, P2-I18)", async () => {
+    const now = new Date();
+    const seeded = await seed(now);
+    // A checkout left REQUESTED for 25 hours with nothing on its order, and a first payment whose notice was lost.
+    const abandoned = await openCharge(seeded, { kind: "INITIAL", createdAt: new Date(now.getTime() - 25 * 3_600_000), totalMicros: 24_200_000, last: "REQUESTED" });
+    const lostNotice = await openCharge(seeded, { kind: "INITIAL", createdAt: new Date(now.getTime() - 26 * 3_600_000), totalMicros: 24_200_000, last: "REQUESTED" });
+    const xmoney = fakeXMoney();
+    xmoney.state.refusedDateTypes.add("charge-back");
+    xmoney.state.byDateType.set("creation", [tx("995001", "779001", "complete-ok", "24.20")]);
+    xmoney.state.externalOrderIds.set("779001", lostNotice);
+    // A refund made in the xMoney dashboard, naming the seeded payment.
+    xmoney.state.byDateType.set("refund", [tx("995002", seeded.xmoneyOrderId, "complete-ok", "5.00", "refund", null, [seeded.initialTransactionId])]);
+    const audit = recordingAudit();
+    const report = await reconciler(xmoney, now, audit).runDaily(now);
+    expect(report).toMatchObject({ refusedListings: ["charge-back"], uncertain: false });
+    expect(xmoney.state.calls.filter((call) => call.orderId === undefined).map((call) => call.dateType))
+      .toEqual(["creation", "charge-back", "refund"]);
+    // The backstop for the lost notice, the dashboard refund's check and the 24-hour checkout all happened.
+    expect(await verifyJobs("995001")).toBe(1);
+    expect(await verifyJobs("995002")).toBe(1);
+    expect((await kindsOf(lostNotice)).at(-1)).toEqual(["REQUESTED", null]);
+    expect((await kindsOf(abandoned)).at(-1)).toEqual(["FAILED", "NO_TRANSACTION"]);
+    expect(audit.events.filter(({ event }) => event === "billing.reconcile.listing_failed"))
+      .toEqual([{ event: "billing.reconcile.listing_failed", fields: { listing: "charge-back", code: "XMONEY_REFUSED" } }]);
+  });
+
+  it("fails no checkout charge while the creation listing is refused, and still reads the other two (W13, P2-I18)", async () => {
+    const now = new Date();
+    const seeded = await seed(now);
+    const waiting = await openCharge(seeded, { kind: "INITIAL", createdAt: new Date(now.getTime() - 25 * 3_600_000), totalMicros: 24_200_000, last: "REQUESTED" });
+    const xmoney = fakeXMoney();
+    xmoney.state.refusedDateTypes.add("creation");
+    xmoney.state.byDateType.set("charge-back", [tx(seeded.initialTransactionId, seeded.xmoneyOrderId, "charge-back", "24.20")]);
+    const audit = recordingAudit();
+    const report = await reconciler(xmoney, now, audit).runDaily(now);
+    expect(report).toMatchObject({ refusedListings: ["creation"] });
+    // Its payment may be in the listing that could not be read: the charge waits for a day the listing is read.
+    expect((await kindsOf(waiting)).at(-1)).toEqual(["REQUESTED", null]);
+    expect(xmoney.state.orderLookups).toEqual([]);
+    expect(await verifyJobs(seeded.initialTransactionId)).toBe(1);
+    expect(audit.events.filter(({ event }) => event === "billing.reconcile.listing_failed"))
+      .toEqual([{ event: "billing.reconcile.listing_failed", fields: { listing: "creation", code: "XMONEY_REFUSED" } }]);
   });
 
   it("fails a checkout charge left REQUESTED for 24 hours, unless its order has a transaction or the lookup failed", async () => {
@@ -301,6 +345,40 @@ describe("P14a reconciliation on real PostgreSQL", () => {
     });
     const adoptionLine = audit.events.find(({ event, fields }) => event === "billing.reconcile.rows_rejected" && fields.pass === "ADOPTION");
     expect(adoptionLine?.fields.count).toBeGreaterThanOrEqual(1);
+  });
+
+  it("looks at a second refund of a payment we refunded in part: only a same-amount REFUNDED settles it (P2-M1)", async () => {
+    const now = new Date();
+    const billing = new BillingRepository(database.pool);
+    const partly = await seed(now);
+    const whole = await seed(now);
+    await billing.withTransaction(async (client) => {
+      // Our withdrawal refund of 2.00, recorded on the payment's own row when its call answered.
+      for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
+        await billing.appendChargeEvent(client, chargeEvent(partly.initialChargeId, kind, now, {
+          xmoneyTransactionId: partly.initialTransactionId, amountMicros: 2_000_000, errorCode: "WITHDRAWAL"
+        }));
+      }
+      // A full dashboard refund read from the payment's own refund-ok (P9c's PROVIDER_REFUND on the payment's row).
+      for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
+        await billing.appendChargeEvent(client, chargeEvent(whole.initialChargeId, kind, now, {
+          xmoneyTransactionId: whole.initialTransactionId, amountMicros: whole.totalMicros, errorCode: "PROVIDER_REFUND"
+        }));
+      }
+    });
+    const xmoney = fakeXMoney();
+    xmoney.state.byDateType.set("refund", [
+      // Our 2.00, reported as its own transaction: settled through the payment.
+      tx("997001", partly.xmoneyOrderId, "complete-ok", "2.00", "refund", null, [partly.initialTransactionId]),
+      // 3.00 more, refunded by the owner in the dashboard: nothing of ours records it, so VERIFY_PAYMENT must look.
+      tx("997002", partly.xmoneyOrderId, "complete-ok", "3.00", "refund", null, [partly.initialTransactionId]),
+      // The full dashboard refund's own transaction: the same refund the payment's refund-ok already recorded.
+      tx("997003", whole.xmoneyOrderId, "complete-ok", "24.20", "refund", null, [whole.initialTransactionId])
+    ]);
+    await reconciler(xmoney, now).runDaily(now);
+    expect(await verifyJobs("997001")).toBe(0);
+    expect(await verifyJobs("997002")).toBe(1);
+    expect(await verifyJobs("997003")).toBe(0);
   });
 
   it("never lets old unknowns hide a fresh one: the frequent pass skips double unknowns, the daily pass pages through all", async () => {

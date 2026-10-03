@@ -22,6 +22,17 @@ export type BillingAuditEvent =
   | "billing.notice.undecryptable"
   | "billing.outbox.dead"
   /**
+   * W12 (P2-I16): a job died but the owner's alert (O3) could not be queued (the dead-letter hook threw); the job stays
+   * dead and the owner summary still lists it. The job kind and its dead-letter code only.
+   */
+  | "billing.outbox.alert_failed"
+  /**
+   * P2-I4 (D5 5h): a refund, invoice or credit-note job, or a payment check naming its own charge, whose charge was
+   * paid in the other xMoney system (a sandbox record after the same-host switch to live, README §14.8) ended DEAD
+   * before any vendor call. The job kind and the code OTHER_XMONEY_SYSTEM only.
+   */
+  | "billing.outbox.other_system"
+  /**
    * P7: the worker could not record a handled job's outcome because complete/fail threw (a lost connection, or a
    * code that billing.outbox's last_error_code CHECK '^[A-Z0-9_:-]{1,96}$' refuses); the job runs again after its
    * lease; the fields are the kind, the handler's outcome and attempts only.
@@ -105,6 +116,12 @@ export type BillingAuditEvent =
   | "billing.reconcile.expired"
   /** P14a (D5 5i): listed rows the parser refused in one pass; the count and the pass (LISTING or ADOPTION) only. */
   | "billing.reconcile.rows_rejected"
+  /**
+   * W13 (P2-I18): one of A10's daily listings failed (xMoney refused its `dateType`, an outage, a refused key); the
+   * other listings and the rest of the pass went on, and this one is tried again alone an hour later. The listing
+   * (`creation`, `charge-back` or `refund`) and its code only.
+   */
+  | "billing.reconcile.listing_failed"
   /**
    * P14a: charges one reconcile loop could not handle (a history that does not fold, an owner lock that timed out),
    * skipped so the pass goes on for every other charge. The pass (FREQUENT, DAILY or CHECKOUT), the count and the

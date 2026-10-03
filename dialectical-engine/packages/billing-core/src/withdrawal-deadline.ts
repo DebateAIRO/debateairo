@@ -57,9 +57,12 @@ function localMidnight(civilUtcMidnight: number, zone: string): Date {
 /**
  * Spec §2.5.6 "within withdrawal_days of the first ACTIVATED", counted as the owner ruled (R2 Q-6): 14 calendar days
  * from the first activation — the activation's own day is not counted, so the first day is the next one — in the
- * consumer's time zone (the tax country's calendar), ending at the end of the last day. No weekend and no
- * public-holiday roll: business days are used only for xMoney's notice rules (A7). This function is the one place
- * the counting lives, so a later ruling changes it here alone.
+ * consumer's time zone (the tax country's calendar), ending at the end of the last day. W6 (P2-I9, superseding Q-6
+ * for weekends only): a last day that falls on a Saturday or a Sunday moves to the next Monday, as Regulation (EEC,
+ * Euratom) No 1182/71 art. 3(4) ends such a period (Directive 2011/83/EU recital 41 applies it). Public holidays do
+ * not move it yet: they need a per-country table and counsel, a recorded go-live blocker. Business days are used
+ * otherwise only for xMoney's notice rules (A7). This function is the one place the counting lives, so a later
+ * ruling changes it here alone.
  */
 export function withdrawalDeadline(input: Readonly<{
   activatedAt: Date; taxCountry: string; withdrawalDays: number;
@@ -73,9 +76,29 @@ export function withdrawalDeadline(input: Readonly<{
   const dayMs = 86_400_000;
   const { dateZone, closeZone } = consumerZones(input.taxCountry);
   const start = localCalendarDate(input.activatedAt, dateZone);
-  const lastDay = Date.UTC(start.year, start.month - 1, start.day + input.withdrawalDays);
+  const lastCounted = Date.UTC(start.year, start.month - 1, start.day + input.withdrawalDays);
+  // A civil date's weekday is the same in every zone; Saturday (6) moves two days, Sunday (0) one.
+  const weekday = new Date(lastCounted).getUTCDay();
+  const lastDay = lastCounted + (weekday === 6 ? 2 : weekday === 0 ? 1 : 0) * dayMs;
   return Object.freeze({
     lastDay: new Date(lastDay).toISOString().slice(0, 10),
     closesAt: localMidnight(lastDay + dayMs, closeZone)
   });
+}
+
+/** Directive 2011/83/EU art. 13(1) (RO: OUG 34/2014 art. 13(1)): the refund is due within 14 days of the withdrawal. */
+const WITHDRAWAL_REFUND_DAYS = 14;
+
+/**
+ * W9 (P2-I11, P2-M8): the latest instant the refund of a withdrawal is due, told to the owner when it must be made by
+ * hand (O2_WITHDRAWAL, and O2 for a dead withdrawal refund): 14 days of 24 hours after `withdrewAt` (when the person
+ * withdrew: the Settings click, or the arrival of the email or form). It is the law's fixed period, not the register's
+ * `withdrawalDays` (the length of the window to withdraw), and it never moves to a later weekday: an owner refunding
+ * by it is never late.
+ */
+export function withdrawalRefundDeadline(withdrewAt: Date): Date {
+  if (!Number.isFinite(withdrewAt.getTime())) {
+    throw new TypedDomainError("BILLING_PERIOD_INVALID", "The withdrawal instant is not a date");
+  }
+  return new Date(withdrewAt.getTime() + WITHDRAWAL_REFUND_DAYS * 86_400_000);
 }

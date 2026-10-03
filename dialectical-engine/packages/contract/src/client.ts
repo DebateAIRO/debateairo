@@ -436,7 +436,10 @@ export interface ContractClient {
   startCardChange(): Promise<BillingCardChangeResponse>;
   /** P13 (A25): always `{status: "ACCEPTED"}`; a link reaches the billing address only if there is a plan to cancel. */
   requestCancelLink(email: string): Promise<{ status: "ACCEPTED" }>;
-  /** P13: spends the emailed link's token once; 404 CANCEL_LINK_INVALID when it is unknown, spent or expired. */
+  /**
+   * P13: spends the emailed link's token once; 404 CANCEL_LINK_INVALID when it is unknown, spent or expired; 409
+   * NOTHING_TO_CANCEL (W10) when the token was good but its plan had nothing left to cancel.
+   */
   cancelByToken(token: string): Promise<void>;
   readSession(): Promise<Session>;
   readDeployment(): Promise<Deployment>;

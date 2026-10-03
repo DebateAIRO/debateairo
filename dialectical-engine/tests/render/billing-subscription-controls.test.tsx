@@ -144,7 +144,9 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Withdraw and refund");
     expect(client.stepUp).toHaveBeenCalledWith("correct horse", "123456", { action: "WITHDRAW_SUBSCRIPTION" });
     expect(client.withdrawSubscription).toHaveBeenCalledWith("G".repeat(43));
-    expect(text()).toContain("Done. We refunded $18.00 to your card.");
+    // W9 (P2-I11): only what has happened; the refund is on its way, and M8 says when it is done.
+    expect(text()).toContain("We've received your withdrawal. We're refunding $18.00 to your card and will email you when it's done.");
+    expect(text()).not.toContain("We refunded");
   });
 
   it("words P12d's two other withdrawal answers: nothing due back, and a refund the owner settles (refund: null)", async () => {
@@ -409,12 +411,19 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("asks for the updated Terms first when D6b's routes answer LEGAL_REACCEPTANCE_REQUIRED, never 'try again'", async () => {
     const reaccept = "Please accept the updated Terms first, then come back to this page.";
     const refusal = () => new ContractHttpError("FORBIDDEN", 403, "x", "LEGAL_REACCEPTANCE_REQUIRED");
+    // W10 (P2-M20): the sentence is a plain link to the signed-in home page, whose accept screen L4 shows.
+    const expectReacceptLink = (): void => {
+      const link = container.querySelector<HTMLAnchorElement>('.setStatus[role="status"] a');
+      expect(link?.textContent).toBe(reaccept);
+      expect(link?.getAttribute("href")).toBe("/");
+    };
     // The upgrade quote (refused before any quote is priced).
     client.quoteSubscriptionUpgrade.mockRejectedValueOnce(refusal());
     await render();
     await click("Change plan");
     await click("Upgrade to Pro");
     expect(text()).toContain(reaccept);
+    expectReacceptLink();
     expect(button("Upgrade and pay")).toBeUndefined();
     // The upgrade itself.
     act(() => root.unmount());
@@ -430,6 +439,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Upgrade to Pro");
     await click("Upgrade and pay");
     expect(text()).toContain(reaccept);
+    expectReacceptLink();
     expect(text()).not.toContain("still confirming");
     // The downgrade, after its price confirm.
     act(() => root.unmount());
@@ -441,6 +451,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Move to Pro at renewal");
     await click("Yes, move to Pro");
     expect(text()).toContain(reaccept);
+    expectReacceptLink();
     expect(text()).not.toContain("That didn't work.");
     // The undo of a cancel (P12b gates it: an undo commits the person to renew under the Terms in force).
     act(() => root.unmount());
@@ -452,6 +463,51 @@ describe("P20 SubscriptionControls (S1)", () => {
     await render();
     await click("Undo cancellation");
     expect(text()).toContain(reaccept);
+    expectReacceptLink();
+    expect(text()).not.toContain("That didn't work.");
+  });
+
+  it("words the hourly limit with its own sentence on the upgrade quote, the downgrade and the undo (W10, P2-M19)", async () => {
+    const limited = "Too many tries in the last hour. Please try again later.";
+    const refusal = () => new ContractHttpError("RATE_LIMITED", 429, "x", "ADMISSION_RATE_LIMITED");
+    client.quoteSubscriptionUpgrade.mockRejectedValueOnce(refusal());
+    await render();
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    expect(text()).toContain(limited);
+    expect(text()).not.toContain("That didn't work.");
+    // Only the updated-Terms sentence is a link; every other sentence stays plain text.
+    expect(container.querySelector('.setStatus[role="status"] a')).toBeNull();
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.getBillingSubscription.mockResolvedValue({ subscription: subscription({ plan_id: "MAX" }) });
+    client.downgradeSubscription.mockRejectedValueOnce(refusal());
+    await render();
+    await click("Change plan");
+    await click("Move to Pro at renewal");
+    await click("Yes, move to Pro");
+    expect(text()).toContain(limited);
+    expect(text()).not.toContain("That didn't work.");
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })
+    });
+    client.revokeSubscriptionCancel.mockRejectedValueOnce(refusal());
+    await render();
+    await click("Undo cancellation");
+    expect(text()).toContain(limited);
+    expect(text()).not.toContain("That didn't work.");
+  });
+
+  it("W7: an undo refused while the account deletion is pending says so, never 'try again'", async () => {
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })
+    });
+    client.revokeSubscriptionCancel.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"));
+    await render();
+    await click("Undo cancellation");
+    expect(text()).toContain(billingEnglish["billing.checkout.erasurePending"]);
     expect(text()).not.toContain("That didn't work.");
   });
 

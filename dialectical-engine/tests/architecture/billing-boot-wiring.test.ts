@@ -35,4 +35,30 @@ describe("P6a — the API boot wires billing only when hosted and switched on", 
     expect(main.slice(connectors, stage)).toContain('billingConnectors?.xmoneyEnvironment === "live"');
     expect(main.slice(stage, stage + 240)).toContain('assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"))');
   });
+
+  it("refuses a live boot while billing rows or open jobs are dated more than a day ahead (W14, P2-I19)", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const stage = main.indexOf('boot.run("billing-stage-records"');
+    const ahead = main.indexOf('boot.run("billing-records-dated-ahead"');
+    const live = main.lastIndexOf('if (billingConnectors?.xmoneyEnvironment === "live") {', stage);
+    expect(ahead).toBeGreaterThan(stage);
+    expect(live).toBeGreaterThan(0);
+    // Inside the same live-only block as the stage check: a stage boot runs on its moved clock by design.
+    expect(main.slice(live, ahead)).not.toContain("\n}\n");
+    expect(main.slice(ahead, ahead + 240)).toContain("assertNoRecordsDatedAhead(await new BillingRepository(pool).recordsDatedAhead(new Date()))");
+  });
+
+  it("asks the retention purge once right after the API listens, then daily, in every mode (A15, P2-M42)", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    // A service restarted more often than daily (every deploy) must still reach a check: the first is at start.
+    const daily = main.indexOf("setInterval(triggerRetentionPurge,86_400_000)");
+    const listen = main.indexOf('await startup.run("listen"');
+    const first = main.indexOf("\ntriggerRetentionPurge();\n");
+    expect(daily).toBeGreaterThan(0);
+    expect(listen).toBeGreaterThan(daily);
+    expect(first).toBeGreaterThan(listen);
+    // At the top level, beside the erasure reconciliation's first call: never behind a billing or mode switch.
+    expect(main.slice(listen, first)).toContain("\ntriggerErasureReconciliation();\n");
+    expect(main.slice(listen, first)).not.toContain("billingPolicy");
+  });
 });

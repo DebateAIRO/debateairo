@@ -440,6 +440,42 @@ describe("P19 CheckoutFlow", () => {
     expect(container.querySelector("#checkout-name")).not.toBeNull();
   });
 
+  it("words the hourly limit with its own sentence, never 'try again' (W10, P2-M19)", async () => {
+    const limited = () => new ContractHttpError("RATE_LIMITED", 429, "x", "ADMISSION_RATE_LIMITED");
+    // The quote made when /checkout loads spends the shared hourly budget (10 an hour per person).
+    client.createBillingQuote.mockRejectedValueOnce(limited());
+    await render();
+    expect(text()).toContain("Too many tries in the last hour. Please try again later.");
+    expect(text()).not.toContain("Something went wrong");
+    // The checkout's own budget.
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.createBillingQuote.mockResolvedValue(quote());
+    client.startBillingCheckout.mockRejectedValueOnce(limited());
+    await render();
+    await click(checkbox(0));
+    await click(checkbox(1));
+    await click(button("Continue to card details"));
+    expect(text()).toContain("Too many tries in the last hour. Please try again later.");
+    expect(text()).not.toContain("Something went wrong");
+    expect(mounted).toHaveLength(0);
+  });
+
+  it("links the updated-Terms sentence to the accept screen (W10, P2-M20)", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("FORBIDDEN", 403, "x", "LEGAL_REACCEPTANCE_REQUIRED"));
+    await render();
+    await click(checkbox(0));
+    await click(checkbox(1));
+    await click(button("Continue to card details"));
+    // The accept screen covers the signed-in home page (L4); /checkout itself has none.
+    const link = [...container.querySelectorAll("a")]
+      .find((candidate) => candidate.textContent === "Please accept the updated Terms first, then come back to this page.");
+    expect(link?.getAttribute("href")).toBe("/");
+    expect(link?.closest('[role="alert"]')).not.toBeNull();
+    expect(mounted).toHaveLength(0);
+  });
+
   it("sends an account the server says still owes its age check to the age gate, and says 'try again' when the check cannot be read (P8c, R3-2)", async () => {
     // The page's own read fails open; P8c's checkout guard fails closed and has the last word.
     client.createBillingQuote.mockResolvedValue(quote());

@@ -2,13 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadPaidCharge, saleRecordOf } from "../../apps/api/src/billing/invoice-common.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "../../apps/api/src/billing/invoice-quaderno.js";
 import { englishOrderText, invoiceDate, type BillingOrderText } from "../../apps/api/src/billing/order-text.js";
-import { testBillingPolicy } from "../support/billingFixtures.js";
+import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
 import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
 
 let h: BillingHarness;
 beforeAll(async () => {
   h = await startBillingHarness();
-  const deps = { repository: h.repository, tax: h.tax, recordsKey: h.recordsKey, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit };
+  const deps = { repository: h.repository, tax: h.tax, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const };
   h.worker.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler(deps));
   h.worker.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler(deps));
 });
@@ -45,7 +45,7 @@ describe("P10a Quaderno invoices", () => {
     expect(sales).toHaveLength(1);
     expect(sales[0]).toMatchObject({
       transactionId: paid.transaction.transactionId, taxCode: "saas",
-      customer: { email: `buyer-${paid.userId.slice(0, 8)}@example.test`, country: "DE", city: "Bucuresti", street: null, taxId: null, locale: "en" },
+      customer: { email: `buyer-${paid.userId.slice(0, 8)}@example.test`, country: "DE", city: "Sector 1", street: null, taxId: null, locale: "en" },
       lines: [{ netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1_900 }],
       evidence: { billingCountry: "DE", ipAddress: "198.51.100.7", bankCountry: "DE" }
     });
@@ -125,7 +125,7 @@ describe("P10a Quaderno invoices", () => {
     const refund = h.tax.refunds.find((recorded) => recorded.chargeId === paid.chargeId);
     // `invoices` sorts by kind, so once the credit note exists it comes first: pick the INVOICE row itself.
     const original = (await invoices(paid.chargeId)).find((row) => row.kind === "INVOICE");
-    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey }, paid.chargeId))!;
+    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY }, paid.chargeId))!;
     expect(refund).toMatchObject({
       transactionId: paid.transaction.transactionId, refundTotalMicros: 23_800_000,
       original: { documentId: original!.external_ref, number: original!.number },
@@ -133,6 +133,28 @@ describe("P10a Quaderno invoices", () => {
       description: `DebateAI Plus plan, ${invoiceDate(loaded.period.start, "en")} to ${invoiceDate(loaded.period.end, "en")}`
     });
     expect((await invoices(paid.chargeId)).map((row) => row.kind)).toEqual(["CREDIT_NOTE", "INVOICE"]);
+  });
+
+  it("issues no credit note for a forged QUADERNO_RECORD_REFUND row of a payment never refunded (P2-I5)", async () => {
+    const paid = await activateInGermany();
+    const ref = `${paid.chargeId}:${paid.transaction.transactionId}`;
+    // What a process holding the runtime role could insert: a credit note for the whole sale, with no refund behind it.
+    await h.repository.withTransaction((client) => h.repository.enqueue(client, {
+      kind: "QUADERNO_RECORD_REFUND", ref, notBefore: h.clock.now,
+      payload: { charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, refund_micros: 23_800_000 }
+    }));
+    await h.worker.drain(5);
+    const forged = async () => (await h.outboxRows(ref)).find((row) => row.kind === "QUADERNO_RECORD_REFUND");
+    expect(await forged()).toMatchObject({ done: false, dead: false, lastErrorCode: "CREDIT_NOTE_REFUND_MISSING" });
+    // It waits through the failure schedule (1m, 5m, 30m, 2h, 12h), then dies, and nothing is ever issued.
+    for (const delayMs of [60_000, 300_000, 1_800_000, 7_200_000, 43_200_000]) {
+      h.clock.advance(delayMs + 1_000);
+      await h.worker.drain(5);
+    }
+    expect(await forged()).toMatchObject({ dead: true, lastErrorCode: "CREDIT_NOTE_REFUND_MISSING" });
+    expect(h.tax.refunds.filter((recorded) => recorded.chargeId === paid.chargeId)).toEqual([]);
+    expect((await invoices(paid.chargeId)).map((row) => row.kind)).toEqual(["INVOICE"]);
+    expect(await intents(paid.chargeId)).toEqual([{ kind: "INVOICE", issuer: "QUADERNO" }]);
   });
 
   it("invoices a company under its own name and address; a person's street stays their own", async () => {
@@ -153,7 +175,7 @@ describe("P10a Quaderno invoices", () => {
     h.clock.advance(3 * 86_400_000);
     const paying = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "DE" });
     await h.settle(paying.transactionId);
-    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey }, bought.chargeId))!;
+    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY }, bought.chargeId))!;
     expect(loaded.period.start).toEqual(paying.createdAt);
     expect(loaded.period.start.getTime()).toBeGreaterThan(loaded.charge.periodStart.getTime());
     const romanian: BillingOrderText = (kind, locale, params) => kind === "INVOICE_LINE" && locale === "ro"

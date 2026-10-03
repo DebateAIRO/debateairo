@@ -75,6 +75,13 @@ describe("P5 — SmartBill invoices against the fake", () => {
   it("marks a Romanian VAT payer and refuses an invoice without a buyer name", async () => {
     const issued = await issuer.issue(sale("b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2", { name: "Firma SRL", taxId: "RO12345678" }));
     expect(fake.invoices.get(issued.externalRef)!.body).toMatchObject({ client: { vatCode: "RO12345678", isTaxPayer: true } });
+    // P2-M32: a tax id reaches the invoice only once it was validated as a VAT number (the billing profile's
+    // vatValidated), so every such buyer is a VAT payer, whatever prefix or spacing they typed; the code is sent as
+    // SmartBill writes it, RO + the digits.
+    for (const [typed, chargeId] of [["12345678", "b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5"], [" ro 1234 5678 ", "b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6"]] as const) {
+      const bare = await issuer.issue(sale(chargeId, { name: "Firma SRL", taxId: typed }));
+      expect(fake.invoices.get(bare.externalRef)!.body, typed).toMatchObject({ client: { vatCode: "RO12345678", isTaxPayer: true } });
+    }
     await expect(issuer.issue(sale("c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3", { name: null })))
       .rejects.toMatchObject({ code: "INVOICE_SERVICE_REFUSED", message: "SMARTBILL_CLIENT_NAME_REQUIRED" });
     // R-15: e-Factura also needs the buyer's city and county.

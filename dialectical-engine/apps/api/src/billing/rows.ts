@@ -30,6 +30,20 @@ export function refundTarget(event: Readonly<{ xmoneyTransactionId: string | nul
   return event.refundsTransactionId ?? event.xmoneyTransactionId;
 }
 
+/**
+ * What an xMoney transaction is to us, by its `transactionType` (A9, D5 5g, P2-I2): a payment (`deposit`, or no type
+ * at all), a refund or a representment (each with its own path), or a dispute: every other type (`chargeback`, and
+ * `credit` or one we do not know yet), which belongs to the payment it names (`relatedTransactionIds`) and is never
+ * matched as a payment of its order. VERIFY_PAYMENT and the reconciler route by this one rule.
+ */
+export type TransactionRoute = "PAYMENT" | "REFUND" | "REPRESENTMENT" | "DISPUTE";
+export function transactionRoute(transactionType: string | null): TransactionRoute {
+  if (transactionType === null || transactionType === "deposit") return "PAYMENT";
+  if (transactionType === "refund") return "REFUND";
+  if (transactionType === "representment") return "REPRESENTMENT";
+  return "DISPUTE";
+}
+
 type SubscriptionIdentity = Pick<SubscriptionState,
   "subscriptionId" | "ownerRef" | "planId" | "periodAnchorAt" | "xmoneyOrderId" | "xmoneyCustomerId" | "cardRef">;
 

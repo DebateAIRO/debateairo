@@ -472,7 +472,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // encrypted prompt carrier and the pinned role assignment. Written as 0072 on its
         // branch; renamed to 0090, the next free prefix after the billing migrations
         // 0084-0089, when it merged (paid plans S1a, rulings R-31 and R3-1). No pair.
-        "0090_model_scorecard.sql"
+        "0090_model_scorecard.sql",
+        // Paid plans Part 2b W7 (P2-I10): billing tells a committed erasure from a pending one (the plan now ends
+        // at the commit). 0090 is Part 3's scorecard; the next free prefix, no pair.
+        "0091_billing_erasure_commit.sql"
       ]);
   });
 });

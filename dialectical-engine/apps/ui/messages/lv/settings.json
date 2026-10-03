@@ -45,6 +45,7 @@
   "settings.erasure.title": "Dzēst kontu",
   "settings.erasure.hint": "Dzēšana sākas pēc septiņām pilnām dienām. Līdz tās sākumam varat to atcelt. Paziņojumi par ieplānošanu, atcelšanu un pabeigšanu tiek nosūtīti uz visām piesaistītajām e-pasta un atkopšanas e-pasta adresēm; nepieciešama vismaz viena verificēta adrese.",
   "settings.erasure.dataWarning": "Iznīcinot atslēgas, šifrētais privātais saturs kļūst neatgriezeniski nelasāms. Pašreizējie publiskie momentuzņēmumi ar vairs neizmantotu pseidonīmu paliek publiski, un lejupielādētās, citētās, kešatmiņā saglabātās, indeksētās vai pakalpojumu sniedzēja paturētās kopijas var saglabāties. Pieprasītais mantotais atklātais teksts tiek uzrādīts kā saglabāts atlikums, nevis pilnībā iztīrīts saturs.",
+  "settings.erasure.paidPlan": "Ieplānojot dzēšanu, maksas plāna atjaunošana tiek apturēta, taču plāns darbojas līdz dzēšanas izpildei vai apmaksātā mēneša beigām; ja atcelsiet dzēšanu, plāns būs spēkā līdz šī mēneša beigām un tiks atjaunots tikai tad, ja atsauksiet atcelšanu, un, ja vēl varat atteikties 14 dienu laikā no pirkuma, to var izdarīt līdz dzēšanas izpildei.",
   "settings.erasure.checking": "Pārbauda konta dzēšanas statusu…",
   "settings.erasure.status": "Statuss: {status}. Plānotais dzēšanas laiks: {time}.",
   "settings.erasure.processing": "Notiek neatgriezeniska dzēšana. Plānošana un atcelšana vairs nav pieejamas.",

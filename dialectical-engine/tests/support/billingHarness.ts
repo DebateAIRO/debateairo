@@ -5,7 +5,12 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { XMoneyNotice, XMoneyStatus, XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPlans } from "@debateai/register";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
-import { CheckoutService, type CheckoutDeps, type ConsentKind } from "../../apps/api/src/billing/checkout.js";
+import {
+  CheckoutService, type CheckoutDeps, type ConsentKind, type EmbeddedOrderInput, type SignedEmbeddedOrder
+} from "../../apps/api/src/billing/checkout.js";
+import {
+  createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMail
+} from "../../apps/api/src/billing/email-job.js";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { NoticeIntake } from "../../apps/api/src/billing/notice-intake.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
@@ -18,7 +23,9 @@ import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-r
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { consentDocument } from "../../apps/ui/scripts/legal-consent-manifest.mjs";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
-import { AdjustableTaxEngine, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy } from "./billingFixtures.js";
+import {
+  AdjustableTaxEngine, PROFILE_ADDRESS_ONLY, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy
+} from "./billingFixtures.js";
 
 /** The origin PUBLIC_APP_URL stands for in these tests (R-7). */
 export const TEST_PUBLIC_APP_URL = "https://dezbatere.test";
@@ -68,6 +75,10 @@ const wholeSecond = (value: Date): Date => new Date(Math.floor(value.getTime() /
  * one (D5): every refund is its own `transactionType: "refund"` transaction (`complete-ok`, its own amount,
  * `relatedTransactionIds: [payment]`); a PARTIAL refund leaves the payment `complete-ok`, and only the refund that
  * leaves nothing turns it `refund-ok`. `refundRowsHidden` models the other reading X0 may record: no refund row.
+ * A1 (P2-I6): our charge id lives on the ORDER only. Every transaction carries `externalOrderId: null`, as P3b's
+ * protocol fake and the OpenAPI copy have it, so a match goes through `getOrder` exactly as it must against xMoney.
+ * A payment is made by the customer its signed order names (`signed`, which the harness's checkout calls): the
+ * xMoney customer `createCustomer` made for that identifier.
  */
 export class StubXMoney {
   readonly transactions = new Map<string, XMoneyTransaction>();
@@ -92,6 +103,13 @@ export class StubXMoney {
   private readonly refundedMicros = new Map<string, number>();
   /** Reads of one transaction that fail before any byte is sent (P3b's XMONEY_UNAVAILABLE), per transaction id. */
   private readonly lookupFailures = new Map<string, number>();
+  /** xMoney's customer per our identifier (`createCustomer`), and the identifier each signed order names. */
+  private readonly customersByIdentifier = new Map<string, string>();
+  private readonly signedOrders = new Map<string, string>();
+  /** Ids `createCustomer` answers next, reserved by a test that pays before its checkout exists. */
+  private readonly reservedCustomers: string[] = [];
+  /** `getOrder` calls so far (the checkout's look asks once per order). */
+  getOrderCalls = 0;
   private sequence = 1_000;
 
   constructor(private readonly clock: () => Date) {}
@@ -122,7 +140,30 @@ export class StubXMoney {
       transaction.transactionType === "refund" && transaction.relatedTransactionIds.includes(paymentId));
   }
 
-  async createCustomer(): Promise<{ customerId: string }> { this.customers += 1; return { customerId: this.next() }; }
+  async createCustomer(input?: Readonly<{ identifier: string }>): Promise<{ customerId: string }> {
+    this.customers += 1;
+    const customerId = this.reservedCustomers.shift() ?? this.next();
+    if (input !== undefined) this.customersByIdentifier.set(input.identifier, customerId);
+    return { customerId };
+  }
+
+  /** The id the next `createCustomer` answers: a payment made before its checkout's customer exists names it. */
+  reserveCustomer(): string {
+    const customerId = this.next();
+    this.reservedCustomers.push(customerId);
+    return customerId;
+  }
+
+  /** An embedded order was signed for this merchant id and customer identifier (the harness's checkout reports it). */
+  signed(externalOrderId: string, customerIdentifier: string): void {
+    this.signedOrders.set(externalOrderId, customerIdentifier);
+  }
+
+  /** The xMoney customer whose signed order has this merchant id, when the stub created that customer. */
+  private customerOfOrder(externalOrderId: string): string | null {
+    const identifier = this.signedOrders.get(externalOrderId);
+    return identifier === undefined ? null : this.customersByIdentifier.get(identifier) ?? null;
+  }
 
   async getTransaction(transactionId: string): Promise<XMoneyTransaction> {
     const failing = this.lookupFailures.get(transactionId) ?? 0;
@@ -136,6 +177,7 @@ export class StubXMoney {
   }
 
   async getOrder(orderId: string): Promise<{ orderId: string; externalOrderId: string | null }> {
+    this.getOrderCalls += 1;
     const found = this.orders.get(orderId);
     if (found === undefined) throw new TypedDomainError("XMONEY_REFUSED", "unknown order");
     return found;
@@ -152,8 +194,7 @@ export class StubXMoney {
     this.rebillFailures.delete(input.orderId);
     if (failure !== null && !failure.afterCreate) throw new TypedDomainError(failure.code, failure.code);
     const transaction = this.add({
-      orderId: input.orderId, externalOrderId: this.orders.get(input.orderId)?.externalOrderId ?? null,
-      customerId: input.customerId, cardId: this.orderCards.get(input.orderId) ?? null, status: "complete-ok",
+      orderId: input.orderId, externalOrderId: null, customerId: input.customerId, cardId: this.orderCards.get(input.orderId) ?? null, status: "complete-ok",
       amountDecimal: input.amountDecimal, transactionSource: "re-bill"
     });
     if (failure !== null) throw new TypedDomainError(failure.code, failure.code);
@@ -178,7 +219,7 @@ export class StubXMoney {
       this.refundedMicros.set(found.transactionId, before + amount);
       if (!this.refundRowsHidden) {
         this.add({
-          orderId: found.orderId, externalOrderId: found.externalOrderId, customerId: found.customerId, cardId: found.cardId,
+          orderId: found.orderId, externalOrderId: null, customerId: found.customerId, cardId: found.cardId,
           status: "complete-ok", amountDecimal: microsToDecimal(amount), transactionType: "refund", transactionSource: null,
           relatedTransactionIds: Object.freeze([found.transactionId])
         });
@@ -205,7 +246,10 @@ export class StubXMoney {
     });
   }
 
-  /** A person paying in the embedded form for the order whose merchant id is `externalOrderId`. */
+  /**
+   * A person paying in the embedded form for the order whose merchant id is `externalOrderId`. The transaction carries
+   * no merchant id (A1); its customer is `customerId`, else the one the signed order names, else a stranger.
+   */
   pay(input: Readonly<{
     externalOrderId: string; amountDecimal: string; cardCountry: string | null; status?: XMoneyStatus;
     customerId?: string; transactionType?: string;
@@ -219,9 +263,24 @@ export class StubXMoney {
     this.cards.set(cardId, input.cardCountry);
     this.orderCards.set(order.orderId, cardId);
     return this.add({
-      orderId: order.orderId, externalOrderId: input.externalOrderId, customerId: input.customerId ?? "9999",
+      orderId: order.orderId, externalOrderId: null,
+      customerId: input.customerId ?? this.customerOfOrder(input.externalOrderId) ?? "9999",
       cardId, status: input.status ?? "complete-ok", amountDecimal: input.amountDecimal,
       ...(input.transactionType === undefined ? {} : { transactionType: input.transactionType })
+    });
+  }
+
+  /**
+   * A dispute xMoney reports as its own `chargeback` transaction naming the payment (P3b's fake's model, P2-I2), on
+   * the payment's order, customer and card, for its amount. Only the new transaction: the payment's own status is
+   * left as it is (`setStatus` it to `charge-back` for the case where xMoney reports both).
+   */
+  dispute(paymentId: string, status: XMoneyStatus = "charge-back", transactionType = "chargeback"): XMoneyTransaction {
+    const payment = this.transactions.get(paymentId);
+    if (payment === undefined) throw new Error("STUB_TRANSACTION_UNKNOWN");
+    return this.add({
+      orderId: payment.orderId, externalOrderId: null, customerId: payment.customerId, cardId: payment.cardId, status,
+      amountDecimal: payment.amountDecimal, transactionType, relatedTransactionIds: Object.freeze([paymentId])
     });
   }
 
@@ -239,6 +298,16 @@ export class StubXMoney {
    */
   failNextRebill(orderId: string, code: string, afterCreate = false): void {
     this.rebillFailures.set(orderId, Object.freeze({ code, afterCreate }));
+  }
+}
+
+/** P8c's checkout, reporting every order it signs to the stub: the order's customer is who pays it (A1). */
+class HarnessCheckout extends CheckoutService {
+  constructor(deps: CheckoutDeps, private readonly stub: StubXMoney) { super(deps); }
+
+  override signEmbeddedOrder(input: EmbeddedOrderInput): SignedEmbeddedOrder {
+    this.stub.signed(input.chargeId, input.customerIdentifier);
+    return super.signEmbeddedOrder(input);
   }
 }
 
@@ -272,8 +341,11 @@ export type BillingHarness = Readonly<{
   verify: VerifyPaymentHandler;
   worker: BillingOutboxWorker;
   notices: NoticeIntake;
-  /** An opaque "opensslResult" that the harness's notice intake decrypts to this transaction's notice. */
-  noticeFor(transaction: XMoneyTransaction): string;
+  /**
+   * An opaque "opensslResult" that the harness's notice intake decrypts to this transaction's notice. Like xMoney's,
+   * the notice names the order's merchant id; `overrides` forge fields (a notice is not authenticated, spec §2.1).
+   */
+  noticeFor(transaction: XMoneyTransaction, overrides?: Partial<XMoneyNotice>): string;
   /** Enqueues VERIFY_PAYMENT for a transaction, as a notice or a rebill would, and drains the worker. */
   settle(transactionId: string, payload?: Readonly<Record<string, string | null>>): Promise<void>;
   activate(input?: Parameters<BillingHarness["buy"]>[0] & Readonly<{ cardCountry?: string }>): Promise<Purchase & Readonly<{ transaction: XMoneyTransaction }>>;
@@ -282,6 +354,12 @@ export type BillingHarness = Readonly<{
   /** The charge's event kinds as a sorted multiset: events written in one transaction share one instant. */
   eventKinds(chargeId: string): Promise<string[]>;
   renewal: RenewalService;
+  /**
+   * W12 (A7): the EMAIL jobs, sent only when a test drains them (the main `worker` leaves them queued), through P7's
+   * handler with the runtime's `sent` hook, so M3's notice record is written once M3 went out. `sent` holds every
+   * message; attachments resolve to nothing.
+   */
+  mail: Readonly<{ sent: BillingMail[]; drain(): Promise<number> }>;
   /** P11b: the maintenance pass (dunning retries, period-end endings, the yearly reminder, the look-ahead notice). */
   maintenance: BillingMaintenance;
   /** A renewal service on its own pool: a second API process sharing the database. */
@@ -323,9 +401,12 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     consentDocuments: testConsentDocuments, recordsKey, xmoneyPrivateKey, xmoneyPublicKey: "pk_test_harness",
     siteId: "site-test", publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "stage", audit
   };
-  const checkoutWith = (overrides: Partial<CheckoutDeps>): CheckoutService => new CheckoutService({ ...checkoutDeps, ...overrides } as CheckoutDeps);
+  const checkoutWith = (overrides: Partial<CheckoutDeps>): CheckoutService =>
+    new HarnessCheckout({ ...checkoutDeps, ...overrides } as CheckoutDeps, xmoney);
   const checkout = checkoutWith({});
-  const refunds = new RefundDesk({ repository, jobs, xmoney, policy: testBillingPolicy, audit, clock: clock.read });
+  const refunds = new RefundDesk({
+    repository, jobs, xmoney, policy: testBillingPolicy, audit, clock: clock.read, xmoneyEnvironment: "stage"
+  });
   const verify = new VerifyPaymentHandler({
     repository, jobs, xmoney, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy, recordsKey, audit,
     xmoneyEnvironment: "stage"
@@ -357,6 +438,18 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     xmoneyEnvironment: "stage", audit, clock: clock.read
   });
   worker.register("RENEWAL_NOTICE", createRenewalNoticeHandler({ repository, jobs, renewal, policy: testBillingPolicy }));
+  const sentMail: BillingMail[] = [];
+  const mailWorker = new BillingOutboxWorker({ repository, workerId: "harness-mail", clock: clock.read, audit, batchSize: 20 });
+  const nothingAttached: AttachmentResolver = async () => null;
+  mailWorker.register("EMAIL", createEmailJobHandler({
+    repository, recipients: PROFILE_ADDRESS_ONLY, recordsKey, ownerReportEmail: "owner@example.test",
+    mail: { sendTemplated: async (message) => { sentMail.push(message); } },
+    attachments: new Map<BillingAttachmentKind, AttachmentResolver>([
+      ["ACCEPTED_TERMS", nothingAttached], ["WITHDRAWAL_FORM", nothingAttached], ["SMARTBILL_INVOICE_PDF", nothingAttached]
+    ]),
+    sent: (job, now) => renewal.noticeMailSent(job, now)
+  }));
+  const mail = Object.freeze({ sent: sentMail, drain: () => mailWorker.drain(10) });
   const noticeTokens = new Map<string, XMoneyNotice>();
   const notices = new NoticeIntake({
     repository, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
@@ -379,7 +472,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       // A Romanian buyer carries the name, city and county SmartBill needs (R-15).
       const quoted = await quotes.create({
         ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country: input.country ?? "RO",
-        name: "Test Buyer", region: "B", postalCode: null, city: "Bucuresti", company: input.company ?? null, now: clock.now
+        name: "Test Buyer", region: "Bucuresti", postalCode: null, city: "Sector 1", company: input.company ?? null, now: clock.now
       });
       const chargeId = input.chargeId;
       const service = chargeId === undefined ? checkout : checkoutWith({ chargeIds: () => chargeId });
@@ -398,7 +491,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
         orderChecksum: started.orderChecksum, reused: started.reused
       });
     },
-    refunds, verify, worker, notices,
+    refunds, verify, worker, notices, mail,
     renewal, maintenance, erasures, frozen,
     renewalFor: (pool) => renewalOn(pool),
     renewalWith: (overrides) => new RenewalService({ ...renewalDeps(null), ...overrides }),
@@ -407,12 +500,13 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       if (end === null) throw new Error("HARNESS_NO_PERIOD");
       return end;
     },
-    noticeFor(transaction) {
+    noticeFor(transaction, overrides = {}) {
       const token = `notice-${randomUUID()}`;
       noticeTokens.set(token, Object.freeze({
-        transactionStatus: transaction.status, orderId: transaction.orderId, externalOrderId: transaction.externalOrderId,
+        transactionStatus: transaction.status, orderId: transaction.orderId,
+        externalOrderId: xmoney.orders.get(transaction.orderId)?.externalOrderId ?? null,
         transactionId: transaction.transactionId, customerId: transaction.customerId, amountDecimal: transaction.amountDecimal,
-        currency: transaction.currency, cardId: transaction.cardId, timestamp: null
+        currency: transaction.currency, cardId: transaction.cardId, timestamp: null, ...overrides
       }));
       return token;
     },

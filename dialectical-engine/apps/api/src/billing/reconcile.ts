@@ -12,7 +12,7 @@ import type { XMoneyClient, XMoneyStatus, XMoneyTransaction, XMoneyTransactionLi
 import { credentialsRefused, type BillingAudit } from "./audit.js";
 import { failureCode } from "./renewal.js";
 import { ordersHoldingCharge } from "./renewal-rules.js";
-import { chargeEvent } from "./rows.js";
+import { chargeEvent, transactionRoute } from "./rows.js";
 
 type OpenCharge = ChargeRow & { events: ChargeEventRow[] };
 
@@ -41,7 +41,20 @@ export type ReconcileReport = Readonly<{
   expired: number;
   /** Listed rows the parser refused and skipped (D5 5i), over the listings and the adoption look-ups. */
   rejected: number;
+  /**
+   * W13 (P2-I18): the daily listings that failed on this pass, each also written as its own
+   * `billing.reconcile.listing_failed` line; the others were read and acted on. Retried alone, hourly.
+   */
+  refusedListings: ReadonlyArray<DailyListing>;
 }>;
+
+/**
+ * A10's three daily listings, by xMoney's `dateType`. W13 (P2-I18): each runs on its own, so one xMoney refuses (or an
+ * outage of one) never stops the other two or the rest of the daily pass.
+ */
+export type DailyListing = "creation" | "charge-back" | "refund";
+const DAILY_LISTINGS: ReadonlyArray<DailyListing> = Object.freeze(["creation", "charge-back", "refund"]);
+const NO_LISTINGS: ReadonlyArray<DailyListing> = Object.freeze([]);
 
 /**
  * FREQUENT: every 10 minutes, leaving out renewals with two unknowns (P11a has stopped with those). DAILY: every
@@ -74,16 +87,50 @@ function refundTransactionKinds(status: XMoneyStatus): readonly ChargeEventKind[
 }
 
 /**
+ * A dispute that is its own xMoney transaction (P2-I2): only the CHARGEBACK of the payment it names can settle it,
+ * once it is final and happened. A dispute still in flight, or one that failed or was withdrawn, records nothing.
+ */
+function disputeTransactionKinds(status: XMoneyStatus): readonly ChargeEventKind[] | null {
+  switch (status) {
+    case "charge-back":
+    case "complete-ok":
+    case "refund-ok":
+      return ["CHARGEBACK"];
+    case "start":
+    case "in-progress":
+    case "3d-pending":
+    case "complete-failed":
+    case "void-ok":
+    case "cancel-ok":
+      return null;
+    default:
+      return exhaustive(status);
+  }
+}
+
+/**
  * The event kinds of ours that already settle a listed transaction (A9's status table, which VERIFY_PAYMENT
- * applies). `null`: nothing of ours is expected (yet): the payment is not final, or the refund did not happen.
+ * applies). `null`: nothing of ours is expected (yet): the payment is not final, or the refund or the dispute did not
+ * happen.
  */
 export function expectedChargeEventKinds(
   transaction: Pick<XMoneyTransaction, "status" | "transactionType">
 ): readonly ChargeEventKind[] | null {
-  if (transaction.transactionType === "representment") return ["CHARGEBACK_REPRESENTED"];
-  if (transaction.transactionType === "chargeback") return ["CHARGEBACK"];
-  // D5 5g: never SUCCEEDED for a refund, whatever status xMoney reports it with.
-  if (transaction.transactionType === "refund") return refundTransactionKinds(transaction.status);
+  const route = transactionRoute(transaction.transactionType);
+  switch (route) {
+    case "REPRESENTMENT":
+      return ["CHARGEBACK_REPRESENTED"];
+    // P2-I2: never SUCCEEDED for a dispute, whatever status xMoney reports it with.
+    case "DISPUTE":
+      return disputeTransactionKinds(transaction.status);
+    // D5 5g: never SUCCEEDED for a refund, whatever status xMoney reports it with.
+    case "REFUND":
+      return refundTransactionKinds(transaction.status);
+    case "PAYMENT":
+      break;
+    default:
+      return exhaustive(route);
+  }
   switch (transaction.status) {
     case "start":
     case "in-progress":
@@ -108,27 +155,39 @@ export function expectedChargeEventKinds(
 
 /**
  * Whether our rows already hold this transaction's final outcome. A refund that is its own transaction is also
- * settled by the REFUNDED on a payment it names (`relatedTransactionIds`, D5 5g): RefundDesk records our own refund
- * on the payment it refunded. `recorded` holds the kinds by transaction id, the related payments' included.
+ * settled by a REFUNDED of the same amount on a payment it names (`relatedTransactionIds`, D5 5g): RefundDesk records
+ * our own refund on the payment it refunded, and P9c a provider refund read from the payment's own status. P2-M1: a
+ * REFUNDED of another amount never settles it (a dashboard refund after our partial one would go unrecorded, with
+ * no credit note and no owner item); VERIFY_PAYMENT then records it or hands it to the owner. `refunded` holds those
+ * amounts by payment id. A dispute that is its own transaction is settled by the CHARGEBACK of a payment it names
+ * (P2-I2): VERIFY_PAYMENT records one dispute once, under the payment's id. `recorded` holds the kinds by transaction
+ * id, the related payments' included.
  */
 export function transactionSettled(
-  transaction: Pick<XMoneyTransaction, "transactionId" | "status" | "transactionType" | "relatedTransactionIds">,
-  recorded: ReadonlyMap<string, ReadonlySet<ChargeEventKind>>
+  transaction: Pick<XMoneyTransaction, "transactionId" | "status" | "transactionType" | "relatedTransactionIds" | "amountDecimal">,
+  recorded: ReadonlyMap<string, ReadonlySet<ChargeEventKind>>,
+  refunded: ReadonlyMap<string, ReadonlyArray<number>>
 ): boolean {
   const expected = expectedChargeEventKinds(transaction);
   if (expected === null) return false;
   const own = recorded.get(transaction.transactionId);
   if (own !== undefined && expected.some((kind) => own.has(kind))) return true;
-  return transaction.transactionType === "refund"
-    && transaction.relatedTransactionIds.some((paymentId) => recorded.get(paymentId)?.has("REFUNDED") ?? false);
+  const route = transactionRoute(transaction.transactionType);
+  if (route === "REFUND") {
+    const amount = amountOf(transaction);
+    return amount !== null
+      && transaction.relatedTransactionIds.some((paymentId) => refunded.get(paymentId)?.includes(amount) ?? false);
+  }
+  return route === "DISPUTE"
+    && transaction.relatedTransactionIds.some((paymentId) => recorded.get(paymentId)?.has("CHARGEBACK") ?? false);
 }
 
-/** A payment that can be a rebill's: never a refund, a charge-back or a representment (D5 5g). */
+/** A payment that can be a rebill's: never a refund, a dispute or a representment (D5 5g, P2-I2). */
 function isPayment(transaction: XMoneyTransaction): boolean {
-  return transaction.transactionType === null || transaction.transactionType === "deposit";
+  return transactionRoute(transaction.transactionType) === "PAYMENT";
 }
 
-function amountOf(transaction: XMoneyTransaction): number | null {
+function amountOf(transaction: Pick<XMoneyTransaction, "amountDecimal">): number | null {
   try {
     return decimalToMicros(transaction.amountDecimal);
   } catch {
@@ -156,14 +215,19 @@ export class BillingReconciler {
   /** The last daily pass that COMPLETED; a failed one never counts, or the money check would be silent for a day. */
   private lastDailyAt: number | null = null;
   private lastDailyAttemptAt: number | null = null;
+  /** W13: the listings the last daily pass (or its last retry) could not read; retried alone after `DAILY_RETRY_MS`. */
+  private pendingListings: ReadonlyArray<DailyListing> = NO_LISTINGS;
   private readonly cursors = new Map<AdoptionScope, Readonly<{ createdAt: Date; chargeId: string }>>();
 
   constructor(private readonly deps: ReconcileDeps) {}
 
   /**
    * The timer's one entry point: the full pass once a day, the frequent adoption pass on the ticks between. A daily
-   * pass that fails (a listing xMoney keeps refusing, A10) is retried after `DAILY_RETRY_MS`, and never stops A2: the
-   * frequent adoption pass runs in its place, then the daily error goes on to the single-flight's pending report.
+   * pass that fails (the database, a charge loop that could not start) is retried after `DAILY_RETRY_MS`, and never
+   * stops A2: the frequent adoption pass runs in its place, then the daily error goes on to the single-flight's pending
+   * report. W13 (P2-I18): a listing xMoney refuses no longer fails the pass. The pass completes with the other
+   * listings, and the refused ones alone are retried after `DAILY_RETRY_MS`, beside the frequent pass, until each is
+   * read or the next full pass comes.
    */
   async tick(): Promise<ReconcileReport> {
     const now = this.deps.clock();
@@ -172,22 +236,36 @@ export class BillingReconciler {
     const retryOpen = this.lastDailyAttemptAt === null || at - this.lastDailyAttemptAt >= DAILY_RETRY_MS;
     if (due && retryOpen) {
       this.lastDailyAttemptAt = at;
-      try {
-        const report = await this.runDaily(now);
-        this.lastDailyAt = at;
-        return report;
-      } catch (dailyError) {
-        // A2 does not wait for A10: unknown and never-sent charges are still adopted or settled on this tick.
-        try {
-          await this.runAdoption(now, "FREQUENT");
-        } catch {
-          // The daily error is the one reported; the adoption pass is tried again on the next tick.
-        }
-        throw dailyError;
-      }
+      const report = await this.withAdoptionOnFailure(now, () => this.runDaily(now));
+      this.lastDailyAt = at;
+      this.pendingListings = report.refusedListings;
+      return report;
+    }
+    if (this.pendingListings.length > 0 && retryOpen) {
+      this.lastDailyAttemptAt = at;
+      const listings = this.pendingListings;
+      const report = await this.withAdoptionOnFailure(now, () => this.runListings(now, listings, "FREQUENT"));
+      this.pendingListings = report.refusedListings;
+      return report;
     }
     const adoption = await this.runAdoption(now, "FREQUENT");
-    return Object.freeze({ listed: 0, enqueued: 0, ...adoption, uncertain: false, deadRefunds: 0, expired: 0 });
+    return Object.freeze({
+      listed: 0, enqueued: 0, ...adoption, uncertain: false, deadRefunds: 0, expired: 0, refusedListings: NO_LISTINGS
+    });
+  }
+
+  /** A2 does not wait for A10: when `pass` throws, the frequent adoption pass still runs on this tick. */
+  private async withAdoptionOnFailure(now: Date, pass: () => Promise<ReconcileReport>): Promise<ReconcileReport> {
+    try {
+      return await pass();
+    } catch (dailyError) {
+      try {
+        await this.runAdoption(now, "FREQUENT");
+      } catch {
+        // The daily error is the one reported; the adoption pass is tried again on the next tick.
+      }
+      throw dailyError;
+    }
   }
 
   /**
@@ -241,35 +319,77 @@ export class BillingReconciler {
     }
   }
 
+  /**
+   * One daily listing, on its own (W13, P2-I18): a failure is written as `billing.reconcile.listing_failed` with the
+   * listing and its code (content-free), recorded in `refused`, and read as no rows, so the pass goes on.
+   */
+  private async dailyListing(
+    listing: DailyListing, from: Date, to: Date, rejected: { count: number }, refused: DailyListing[]
+  ): Promise<ReadonlyArray<XMoneyTransaction>> {
+    try {
+      return await this.listed({ dateType: listing, from, to }, rejected);
+    } catch (error) {
+      refused.push(listing);
+      this.deps.audit("billing.reconcile.listing_failed", { listing, code: failureCode(error) });
+      return [];
+    }
+  }
+
+  /** The full pass: the three listings, A2's daily adoption, the 24-hour checkouts and the owner's counts. */
   async runDaily(now: Date): Promise<ReconcileReport> {
+    return this.runListings(now, DAILY_LISTINGS, "DAILY");
+  }
+
+  /**
+   * `listings` (all three on the full pass; on an hourly retry, only those the last try could not read), then the
+   * adoption pass of `scope`. The 24-hour checkouts are failed only when this pass READ the creation listing: without
+   * it, a checkout whose payment exists cannot be told from an abandoned one. The owner's counts belong to the full
+   * pass alone.
+   */
+  private async runListings(
+    now: Date, listings: ReadonlyArray<DailyListing>, scope: AdoptionScope
+  ): Promise<ReconcileReport> {
     const environment = this.deps.environment;
-    const stale = await this.deps.billing.unsettledCharges(
-      ["INITIAL", "CARD_CHECK"], new Date(now.getTime() - 24 * HOUR_MS), 500, environment
-    );
+    const withCreation = listings.includes("creation");
+    const stale = withCreation
+      ? await this.deps.billing.unsettledCharges(
+        ["INITIAL", "CARD_CHECK"], new Date(now.getTime() - 24 * HOUR_MS), 500, environment
+      )
+      : [];
     const oldest = stale.reduce((earliest, charge) => Math.min(earliest, charge.createdAt.getTime()), now.getTime() - 72 * HOUR_MS);
-    const creationFrom = new Date(Math.max(now.getTime() - 30 * 24 * HOUR_MS, oldest));
-    const disputeFrom = new Date(now.getTime() - 120 * 24 * HOUR_MS);
+    const windowFrom: Readonly<Record<DailyListing, Date>> = {
+      creation: new Date(Math.max(now.getTime() - 30 * 24 * HOUR_MS, oldest)),
+      "charge-back": new Date(now.getTime() - 120 * 24 * HOUR_MS),
+      refund: new Date(now.getTime() - 120 * 24 * HOUR_MS)
+    };
     const rejected = { count: 0 };
-    const listings = [
-      await this.listed({ dateType: "creation", from: creationFrom, to: now }, rejected),
-      await this.listed({ dateType: "charge-back", from: disputeFrom, to: now }, rejected),
-      await this.listed({ dateType: "refund", from: disputeFrom, to: now }, rejected)
-    ];
+    const refused: DailyListing[] = [];
+    const read: Array<ReadonlyArray<XMoneyTransaction>> = [];
+    for (const listing of DAILY_LISTINGS) {
+      if (!listings.includes(listing)) continue;
+      read.push(await this.dailyListing(listing, windowFrom[listing], now, rejected, refused));
+    }
     this.reportRejected(rejected, "LISTING");
+    const decideCheckouts = withCreation && !refused.includes("creation") && stale.length > 0;
     const byId = new Map<string, XMoneyTransaction>();
-    for (const listing of listings) for (const transaction of listing) byId.set(transaction.transactionId, transaction);
+    for (const listing of read) for (const transaction of listing) byId.set(transaction.transactionId, transaction);
     // The kinds of every listed transaction and of every payment a listed refund names.
     const ids = [...byId.values()].flatMap((transaction) => [transaction.transactionId, ...transaction.relatedTransactionIds]);
     const recorded = await this.deps.billing.chargeEventKindsByTransaction(ids, environment);
+    const refunded = await this.deps.billing.refundedAmountsByPayment(
+      [...byId.values()].filter((transaction) => transactionRoute(transaction.transactionType) === "REFUND")
+        .flatMap((transaction) => transaction.relatedTransactionIds),
+      environment
+    );
     const touched = new Set<string>();
     let enqueued = 0;
     let uncertain = false;
     for (const transaction of byId.values()) {
-      const settled = transactionSettled(transaction, recorded);
+      const settled = transactionSettled(transaction, recorded, refunded);
       // Any payment not yet settled on our side — final or still in flight — marks its order as reached, so its
       // checkout charge is never failed as "no transaction". The lookups run only when a charge could be failed. A
       // refund is matched through the payment it names, never through its order (D5 5g).
-      if (!settled && stale.length > 0 && transaction.transactionType !== "refund") {
+      if (!settled && decideCheckouts && transaction.transactionType !== "refund") {
         const external = await this.externalOrderOf(transaction);
         if (external === "UNKNOWN") uncertain = true;
         else if (external !== null) touched.add(external);
@@ -280,9 +400,9 @@ export class BillingReconciler {
       }));
       enqueued += 1;
     }
-    const adoption = await this.runAdoption(now, "DAILY");
+    const adoption = await this.runAdoption(now, scope);
     let failed = adoption.failed;
-    if (!uncertain) {
+    if (decideCheckouts && !uncertain) {
       const errors: ChargeErrors = { count: 0, codes: new Set() };
       for (const charge of stale) {
         if (touched.has(charge.chargeId) || charge.events.some((event) => event.xmoneyTransactionId !== null)) continue;
@@ -290,17 +410,21 @@ export class BillingReconciler {
       }
       this.reportErrors(errors, "CHECKOUT");
     }
-    // For the owner, content-free: counts only; P16b's summary lists the charges.
-    const deadRefunds = (await this.deps.billing.deadRefunds()).length;
-    if (deadRefunds > 0) this.deps.audit("billing.refund.dead", { count: deadRefunds });
-    const expired = (await this.deps.billing.longUnsettledCharges(
-      ["UPGRADE", "RENEWAL"], new Date(now.getTime() - 30 * 24 * HOUR_MS), environment
-    )).length;
-    if (expired > 0) this.deps.audit("billing.reconcile.expired", { count: expired });
+    // For the owner, content-free: counts only, once a day; P16b's summary lists the charges.
+    let deadRefunds = 0;
+    let expired = 0;
+    if (scope === "DAILY") {
+      deadRefunds = (await this.deps.billing.deadRefunds()).length;
+      if (deadRefunds > 0) this.deps.audit("billing.refund.dead", { count: deadRefunds });
+      expired = (await this.deps.billing.longUnsettledCharges(
+        ["UPGRADE", "RENEWAL"], new Date(now.getTime() - 30 * 24 * HOUR_MS), environment
+      )).length;
+      if (expired > 0) this.deps.audit("billing.reconcile.expired", { count: expired });
+    }
     if (enqueued > 0 || adoption.adopted > 0) this.deps.kick();
     return Object.freeze({
       listed: byId.size, enqueued, adopted: adoption.adopted, failed, uncertain, deadRefunds, expired,
-      rejected: rejected.count + adoption.rejected
+      rejected: rejected.count + adoption.rejected, refusedListings: Object.freeze(refused)
     });
   }
 

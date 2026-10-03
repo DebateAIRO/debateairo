@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { computeWindows, invoiceIssuerFor, type TaxEngine } from "@debateai/billing-core";
+import { isRomanianInvoiceLocality } from "@debateai/contract";
 import type { BillingRepository, QuoteRow } from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
 import { TypedDomainError } from "@debateai/kernel";
@@ -52,9 +53,19 @@ export function taxServiceRefusal(error: unknown): BillingRefusal | null {
 }
 
 /**
+ * The content-free detail of P4's TAX_SERVICE_REFUSED (Quaderno's status, as `QUADERNO_HTTP_401`), for an audit line;
+ * anything else reads `UNKNOWN`.
+ */
+export function taxRefusalDetail(error: unknown): string {
+  return error instanceof TypedDomainError && /^QUADERNO_[A-Z0-9_]{1,48}$/.test(error.message) ? error.message : "UNKNOWN";
+}
+
+/**
  * R-15: the issuer the rules give this tax country (SmartBill for Romania) refuses an invoice without the buyer's
- * name, city and county. A company's name is the buyer's name. Spec §1.3: US and Canadian sales tax is decided by the
- * state or the ZIP code, so a buyer there gives at least one of the two.
+ * name, city and county. A company's name is the buyer's name. P2-M15: the county must be one SmartBill names and, in
+ * Bucharest, the city a sector (`isRomanianInvoiceLocality`, the same lists the checkout offers), or SPV will not
+ * validate the e-Factura. Spec §1.3: US and Canadian sales tax is decided by the state or the ZIP code, so a buyer
+ * there gives at least one of the two.
  */
 export function addressRequired(location: QuoteLocation, taxCountry: string, policy: BillingPolicy): boolean {
   if ((location.country === "US" || location.country === "CA") && location.region === null && location.postalCode === null) {
@@ -62,7 +73,8 @@ export function addressRequired(location: QuoteLocation, taxCountry: string, pol
   }
   if (invoiceIssuerFor(taxCountry, policy.invoiceIssuerRules) !== "SMARTBILL") return false;
   const name = location.company?.name ?? location.name;
-  return name === null || location.city === null || location.region === null;
+  return name === null || location.city === null || location.region === null
+    || !isRomanianInvoiceLocality(location.region, location.city);
 }
 
 export class QuoteService implements QuoteServicePort {
@@ -82,10 +94,20 @@ export class QuoteService implements QuoteServicePort {
     return refusal;
   }
 
+  /**
+   * The person always gets the one 503 (`taxServiceRefusal`). P2-M27: the audit line names what really happened, so a
+   * wrong or revoked Quaderno key (TAX_SERVICE_REFUSED, with P4's detail) is never read as an outage, as the
+   * renewal's `billing.renewal.tax_refused` line does.
+   */
   private taxCall<T>(call: Promise<T>): Promise<T> {
     return call.catch((error: unknown) => {
       const refusal = taxServiceRefusal(error);
-      throw refusal === null ? error : this.refused(refusal);
+      if (refusal === null) throw error;
+      if (error instanceof TypedDomainError && error.code === "TAX_SERVICE_REFUSED") {
+        this.deps.audit("billing.quote.refused", { code: "TAX_SERVICE_REFUSED", reason: taxRefusalDetail(error) });
+        throw refusal;
+      }
+      throw this.refused(refusal);
     });
   }
 

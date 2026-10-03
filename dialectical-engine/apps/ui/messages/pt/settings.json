@@ -45,6 +45,7 @@
   "settings.erasure.title": "Eliminar conta",
   "settings.erasure.hint": "A eliminação começa após sete dias completos. Pode cancelá-la antes do início. Os avisos de agendamento, cancelamento e conclusão são enviados para todos os e-mails ou e-mails de recuperação associados; é necessário pelo menos um endereço verificado.",
   "settings.erasure.dataWarning": "O conteúdo privado cifrado torna-se permanentemente ilegível quando as respetivas chaves são destruídas. As versões publicadas atuais permanecem públicas sob um pseudónimo desativado, e podem subsistir cópias descarregadas, citadas, armazenadas em cache, indexadas ou conservadas por fornecedores. O texto simples antigo reivindicado é comunicado como resíduo conservado, não como conteúdo totalmente limpo.",
+  "settings.erasure.paidPlan": "Agendar a eliminação impede a renovação do seu plano pago, mas o plano continua a funcionar até a eliminação ser efetuada ou até ao fim do mês pago; se cancelar a eliminação, o plano dura até ao fim desse mês e só é renovado se anular o cancelamento e, se ainda puder exercer a livre resolução nos 14 dias após a compra, pode fazê-lo até a eliminação ser efetuada.",
   "settings.erasure.checking": "A verificar o estado da eliminação da conta…",
   "settings.erasure.status": "Estado: {status}. Hora agendada para a eliminação: {time}.",
   "settings.erasure.processing": "A eliminação irreversível está em curso. Já não é possível agendá-la nem cancelá-la.",

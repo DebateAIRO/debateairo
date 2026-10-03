@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { paidTransactions } from "../../apps/api/src/billing/refunds.js";
+import { recordDisputeOutcome, type DisputeStores } from "../../apps/api/src/billing/dispute-cli.js";
 import { refundTarget } from "../../apps/api/src/billing/rows.js";
 import { kindsOf, startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
 
@@ -170,6 +171,31 @@ describe("P9c reversals of a verified payment", () => {
     expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED", "SUSPENDED"]);
   });
 
+  it("ends MISMATCH for a representment notice that names another charged-back charge (P2-I1)", async () => {
+    const mine = await h.activate();
+    const theirs = await h.activate();
+    for (const paid of [mine, theirs]) {
+      h.xmoney.setStatus(paid.transaction.transactionId, "charge-back");
+      await h.settle(paid.transaction.transactionId);
+    }
+    const representment = h.xmoney.pay({
+      externalOrderId: mine.chargeId, amountDecimal: "24.20", cardCountry: "RO", transactionType: "representment"
+    });
+    const lines = h.auditLines.length;
+    await h.notices.receive(h.noticeFor(representment, { externalOrderId: theirs.chargeId }));
+    await h.worker.drain(10);
+    for (const paid of [mine, theirs]) {
+      expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "CHARGEBACK_REPRESENTED")).toEqual([]);
+    }
+    expect(await noticeOutcomes(representment.transactionId)).toEqual([{ outcome: "MISMATCH" }]);
+    expect(h.auditLines.slice(lines)).toEqual([{ event: "billing.payment.mismatch", code: "ORDER_REF_MISMATCH" }]);
+    // xMoney's own reference (the notice without the forged field) records it on the right charge.
+    await h.notices.receive(h.noticeFor(representment));
+    await h.worker.drain(10);
+    expect((await h.eventKinds(mine.chargeId)).filter((kind) => kind === "CHARGEBACK_REPRESENTED")).toHaveLength(1);
+    expect((await h.eventKinds(theirs.chargeId)).filter((kind) => kind === "CHARGEBACK_REPRESENTED")).toEqual([]);
+  });
+
   it("records a dashboard refund of the first payment in full when the charge also holds a duplicate payment's refund", async () => {
     // The duplicate's refund is only requested yet (its call found xMoney down): it still never counts against A.
     const { paid } = await paidTwice(false);
@@ -215,5 +241,111 @@ describe("P9c reversals of a verified payment", () => {
       ]);
       expect(await noticeOutcomes(first)).toEqual([{ outcome: "REFUNDED" }]);
     }
+  });
+});
+
+describe("P2-I2 a dispute xMoney reports as its own transaction", () => {
+  const chargebacksOf = async (chargeId: string) => ((await h.repository.charge(chargeId))?.events ?? [])
+    .filter((event) => event.kind === "CHARGEBACK").map((event) => [event.xmoneyTransactionId, event.errorCode, event.amountMicros]);
+  const disputeStores = (): DisputeStores => Object.freeze({
+    billing: h.repository, jobs: h.jobs, entitlements: h.entitlements, clock: () => h.clock.now
+  });
+
+  it("records it once, under the payment it names, on that payment's charge, whichever report comes first", async () => {
+    for (const disputeFirst of [true, false]) {
+      const paid = await h.activate();
+      const payment = paid.transaction.transactionId;
+      // xMoney reports both, as P3b's fake models it: the payment turns charge-back and a chargeback transaction names it.
+      const dispute = h.xmoney.dispute(payment);
+      h.xmoney.setStatus(payment, "charge-back");
+      for (const transactionId of disputeFirst ? [dispute.transactionId, payment] : [payment, dispute.transactionId]) {
+        await h.settle(transactionId);
+      }
+      await h.settle(dispute.transactionId);
+      expect(await chargebacksOf(paid.chargeId), `dispute first: ${disputeFirst}`).toEqual([[payment, null, 24_200_000]]);
+      expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED", "SUSPENDED"]);
+      expect((await h.outboxRows(paid.chargeId)).filter((row) => row.ref === `M10:${paid.chargeId}`)).toHaveLength(1);
+      expect((await h.outboxRows(dispute.transactionId))
+        .filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === dispute.transactionId)
+        .map((row) => [row.done, row.dead])).toEqual([[true, false], [true, false]]);
+      // One dispute is one charge-back: the owner's "won" resumes the plan at once.
+      expect(await recordDisputeOutcome(disputeStores(), { chargeRef: paid.chargeId, outcome: "won" })).toBe("RESUMED");
+    }
+  });
+
+  it("suspends the plan when xMoney reports only the dispute transaction", async () => {
+    const paid = await h.activate();
+    const payment = paid.transaction.transactionId;
+    const dispute = h.xmoney.dispute(payment);
+    await h.notices.receive(h.noticeFor(dispute));
+    await h.worker.drain(10);
+    expect(await chargebacksOf(paid.chargeId)).toEqual([[payment, null, 24_200_000]]);
+    expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED", "SUSPENDED"]);
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "FREE", cause: "SUSPENDED_CHARGEBACK" });
+    expect(await noticeOutcomes(dispute.transactionId)).toEqual([{ outcome: "CHARGEBACK" }]);
+    // The payment's own later charge-back status is the same dispute.
+    h.xmoney.setStatus(payment, "charge-back");
+    await h.settle(payment);
+    expect(await chargebacksOf(paid.chargeId)).toEqual([[payment, null, 24_200_000]]);
+    expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED", "SUSPENDED"]);
+  });
+
+  it("never reads a dispute transaction as a payment, whatever status xMoney gives it", async () => {
+    const paid = await h.activate();
+    const payment = paid.transaction.transactionId;
+    // Still in flight: nothing is written, and the check comes back later.
+    const pending = h.xmoney.dispute(payment, "in-progress");
+    await h.settle(pending.transactionId);
+    expect(await chargebacksOf(paid.chargeId)).toEqual([]);
+    expect((await h.outboxRows(pending.transactionId)).find((row) => row.kind === "VERIFY_PAYMENT" && row.ref === pending.transactionId))
+      .toMatchObject({ done: false, dead: false, lastErrorCode: "PAYMENT_NOT_FINAL" });
+    // A dispute that did not happen moves nothing.
+    const failed = h.xmoney.dispute(payment, "complete-failed");
+    await h.settle(failed.transactionId);
+    expect(await chargebacksOf(paid.chargeId)).toEqual([]);
+    // `complete-ok` on a chargeback transaction is the dispute, never a second payment to refund.
+    const complete = h.xmoney.dispute(payment, "complete-ok");
+    await h.settle(complete.transactionId);
+    expect(await h.eventKinds(paid.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED", "CHARGEBACK"));
+    expect(await chargebacksOf(paid.chargeId)).toEqual([[payment, null, 24_200_000]]);
+    expect((await h.outboxRows(paid.chargeId)).filter((row) => row.kind === "XMONEY_REFUND")).toEqual([]);
+    expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED", "SUSPENDED"]);
+  });
+
+  it("changes nothing when it is first seen after its payment's dispute was won", async () => {
+    const paid = await h.activate();
+    const payment = paid.transaction.transactionId;
+    h.xmoney.setStatus(payment, "charge-back");
+    await h.settle(payment);
+    expect(await recordDisputeOutcome(disputeStores(), { chargeRef: paid.chargeId, outcome: "won" })).toBe("RESUMED");
+    const dispute = h.xmoney.dispute(payment);
+    await h.settle(dispute.transactionId);
+    expect(await chargebacksOf(paid.chargeId)).toEqual([[payment, null, 24_200_000]]);
+    expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED", "SUSPENDED", "RESUMED"]);
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "PLUS", cause: "RESUMED" });
+    expect((await h.outboxRows(paid.chargeId)).filter((row) => row.ref === `M10:${paid.chargeId}`)).toHaveLength(1);
+  });
+
+  it("records a dispute of a second payment on that payment, without touching the plan", async () => {
+    const { paid, again } = await paidTwice(true);
+    const dispute = h.xmoney.dispute(again.transactionId);
+    await h.settle(dispute.transactionId);
+    expect(await chargebacksOf(paid.chargeId)).toEqual([[again.transactionId, "DUPLICATE_PAYMENT", 24_200_000]]);
+    expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED"]);
+    h.xmoney.setStatus(again.transactionId, "charge-back");
+    await h.settle(again.transactionId);
+    expect(await chargebacksOf(paid.chargeId)).toEqual([[again.transactionId, "DUPLICATE_PAYMENT", 24_200_000]]);
+  });
+
+  it("waits for a payment it does not know yet, and never falls back to the order", async () => {
+    const paid = await h.activate();
+    // A payment of this order that VERIFY_PAYMENT has not recorded: the dispute names only it.
+    const unseen = h.xmoney.pay({ externalOrderId: paid.chargeId, amountDecimal: paid.totalDecimal, cardCountry: "RO" });
+    const dispute = h.xmoney.dispute(unseen.transactionId);
+    await h.settle(dispute.transactionId);
+    expect(await chargebacksOf(paid.chargeId)).toEqual([]);
+    expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED"]);
+    expect((await h.outboxRows(dispute.transactionId)).find((row) => row.kind === "VERIFY_PAYMENT" && row.ref === dispute.transactionId))
+      .toMatchObject({ done: false, dead: false, lastErrorCode: "CHARGE_NOT_FOUND" });
   });
 });

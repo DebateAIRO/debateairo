@@ -37,6 +37,8 @@ describe("P11a renewal dates clamp to the month's end and never skip or double a
 
     await renewOnce(monthly.subscriptionId);
     await expectPaidThrough(monthly, "2027-03-31T10:00:00.000Z");
+    // W12 (A7): the postponed plan's M3 goes out now, so its notice counts from now.
+    await h.mail.drain();
     const until = foldSubscription(await h.repository.subscriptionEvents(postponed.subscriptionId)).renewalPostponedUntil!;
     expect(until.getTime()).toBeGreaterThan(at("2027-03-05T00:00:00.000Z").getTime());
     h.clock.now = new Date(until.getTime() + MINUTE);

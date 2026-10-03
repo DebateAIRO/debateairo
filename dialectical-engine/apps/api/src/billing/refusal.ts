@@ -41,8 +41,8 @@ export type BillingRefusalCode =
   /** P12c: the renewal of this period is due, postponed or already charging; upgrade in the new period (409). */
   | "UPGRADE_NOT_AVAILABLE_NOW"
   /**
-   * P12d: the withdrawal right is not open: past the 14 calendar days from the first activation, or a tax country
-   * outside `withdrawalCountries` (409).
+   * P12d: the withdrawal right is not open: past the 14 calendar days from the first activation (a last day on a
+   * Saturday or Sunday moves to the Monday, W6), or a tax country outside `withdrawalCountries` (409).
    */
   | "WITHDRAWAL_WINDOW_CLOSED"
   /** P12d: no live WITHDRAW_SUBSCRIPTION step-up grant for this session (403); nothing was written. */
@@ -51,6 +51,11 @@ export type BillingRefusalCode =
   | "CARD_CHANGE_NOT_AVAILABLE_NOW"
   /** P13 (A25): the emailed cancel link's token is unknown, already spent or past its 24 hours (404). */
   | "CANCEL_LINK_INVALID"
+  /**
+   * W10 (P2-M18): the emailed cancel link's token was valid and is now spent, but its plan had nothing left to cancel
+   * (a cancel already pending, the plan ended or SUSPENDED, or a newer plan in its place); nothing changed (409).
+   */
+  | "NOTHING_TO_CANCEL"
   /**
    * P15: an account erasure is pending (the person stays signed in for the 7-day grace): no new money is taken (409).
    */

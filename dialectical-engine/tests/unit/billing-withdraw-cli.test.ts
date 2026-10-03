@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { parseBillingWithdrawEnvironment } from "@debateai/register";
 import { BillingRefusal } from "../../apps/api/src/billing/refusal.js";
 import {
   parseWithdrawArguments,
@@ -72,5 +73,14 @@ describe("P14c the withdrawal command", () => {
     expect(await runBillingWithdrawCli(["--owner", OWNER, "--received", RECEIVED], done.sink, ok)).toBe(0);
     expect(done.lines.out).toContain(OWNER);
     expect(done.lines.err).toBe("");
+  });
+
+  it("reads the API's xMoney address too, and refuses to start without it (P2-I4: the system it may refund in)", () => {
+    const base = {
+      DATABASE_URL: "postgresql://debateai_prod_api_runtime:x@localhost/debateai", REGISTER_VERSION: "7", NODE_ENV: "test"
+    };
+    expect(parseBillingWithdrawEnvironment({ ...base, XMONEY_API_BASE_URL: "https://api-stage.xmoney.com" }))
+      .toMatchObject({ REGISTER_VERSION: 7, XMONEY_API_BASE_URL: "https://api-stage.xmoney.com" });
+    expect(() => parseBillingWithdrawEnvironment(base)).toThrow();
   });
 });

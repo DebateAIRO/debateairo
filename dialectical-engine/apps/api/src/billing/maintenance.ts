@@ -5,7 +5,7 @@ import type { BillingPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import { emailJob } from "./email-job.js";
 import { enqueueOnce } from "./outbox.js";
-import { codeOf, failureCode, type PricedRenewal, type RenewalService } from "./renewal.js";
+import { codeOf, failureCode, type RenewalService, type RetryPrice } from "./renewal.js";
 import { addDays, anniversaryDue, dunningProgress } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
 
@@ -13,7 +13,7 @@ export type MaintenanceDeps = Readonly<{
   repository: BillingRepository;
   jobs: Pick<BillingJobQueries, "lockOwner" | "withSubscriptionLease" | "liveSubscriptionIds" | "outboxJobExists">;
   entitlements: Pick<EntitlementRepository, "append">;
-  renewal: Pick<RenewalService, "submit" | "createRetryCharge" | "freshQuote" | "failUnpricedAttempt" | "taxRefused" | "erasureBlocks">;
+  renewal: Pick<RenewalService, "submit" | "createRetryCharge" | "retryPrice" | "failUnpricedAttempt" | "taxRefused" | "erasureBlocks">;
   policy: BillingPolicy;
   /** R-7: PUBLIC_APP_URL. */
   publicAppUrl: string;
@@ -90,7 +90,7 @@ export class BillingMaintenance {
           await this.end(state, now, "CANCEL", report);
           return;
         }
-        await this.retry(subscriptionId, now, report);
+        await this.retry(subscriptionId, report);
         return;
       case "SUSPENDED":
         if (periodOver) await this.end(state, now, "DISPUTE", report);
@@ -139,13 +139,17 @@ export class BillingMaintenance {
    * A2: the next dunning attempt, started once `dunning_retry_days[n-1]` has passed since the first failure, or at
    * once after a card change that asked for it (R-34). Where the dunning stands is read from the history
    * (`dunningProgress`), never from FAILED charge rows: an attempt the tax service could not price has none (Q-1).
-   * The attempt is priced afresh and written as a new charge row with its own quote; while that attempt's charge is
-   * still open, its own outcome decides and nothing more is made. A retry the tax service cannot price is itself a
-   * failed attempt with no charge (`failUnpricedAttempt`). An owner the stop port names (a pending or finished
-   * erasure, or an account the age gate froze) is never retried (R-34, R3-2).
+   * The attempt charges the failed attempt's own total (P2-M10, `retryPrice`: never re-priced) and is written as a new
+   * charge row with its own quote; while that attempt's charge is still open, its own outcome decides and nothing more
+   * is made. A retry with no priced attempt to reuse that the tax service cannot price, or whose fresh total is one
+   * the person was never told about (A7), is itself a failed attempt with no charge (`failUnpricedAttempt`). An owner
+   * the stop port names (a pending or finished erasure, or an account the age gate froze) is never retried (R-34,
+   * R3-2). P2-I7: the clock is read inside the lease, never taken from the pass, so the retry's charge and its
+   * REQUESTED are dated when it really runs (`submit` dates the call's outcome when the call returns).
    */
-  private async retry(subscriptionId: string, now: Date, report: MaintenanceReport): Promise<void> {
+  private async retry(subscriptionId: string, report: MaintenanceReport): Promise<void> {
     const leased = await this.deps.jobs.withSubscriptionLease(subscriptionId, async () => {
+      const now = this.deps.clock();
       const events = await this.deps.repository.subscriptionEvents(subscriptionId);
       const state = foldSubscription(events);
       if (state.status !== "PAST_DUE" || state.cancelRequested || state.currentPeriodEnd === null) return false;
@@ -164,11 +168,11 @@ export class BillingMaintenance {
         && event.at.getTime() > progress.lastFailedAt.getTime());
       if (!cardChangedSince && now.getTime() < addDays(progress.firstFailedAt, retryDay).getTime()) return false;
       if (await this.deps.renewal.erasureBlocks(state.ownerRef)) return false;
-      let priced: PricedRenewal;
+      let price: RetryPrice;
       try {
-        priced = await this.deps.renewal.freshQuote(state, now);
+        price = await this.deps.renewal.retryPrice(state, periodStart, next, now);
       } catch (error) {
-        // Q-1: no charge without a fresh quote. An outage still going is this attempt failing (M5B, M5C, or the end);
+        // Q-1: no charge without a quote. An outage still going is this attempt failing (M5B, M5C, or the end);
         // a refusal is P11a's operator alarm (once per period) and writes nothing else: the retry is tried again on the
         // next pass, and the grace ends access on time.
         const code = codeOf(error);
@@ -179,10 +183,14 @@ export class BillingMaintenance {
         if (code !== "TAX_SERVICE_UNAVAILABLE") throw error;
         return this.deps.renewal.failUnpricedAttempt(state, periodStart, next, progress.firstFailedAt, now, code);
       }
+      // P2-M10: a total the person was never told about is never charged; the attempt fails with no charge.
+      if (price.kind === "CHANGED") {
+        return this.deps.renewal.failUnpricedAttempt(state, periodStart, next, progress.firstFailedAt, now, "RETRY_TOTAL_CHANGED");
+      }
       // Written only if the owner lock's fresh fold still allows it (still PAST_DUE here, no cancel, no erasure).
-      const created = await this.deps.renewal.createRetryCharge(state, periodStart, next, priced, now);
+      const created = await this.deps.renewal.createRetryCharge(state, periodStart, next, price.priced, now);
       if (created === null) return false;
-      await this.deps.renewal.submit(created.charge, created.state, now);
+      await this.deps.renewal.submit(created.charge, created.state);
       return true;
     });
     if (leased.kind === "RAN" && leased.value) report.retried += 1;
@@ -197,7 +205,8 @@ export class BillingMaintenance {
     const job = emailJob({
       template: "M4", recipient: { kind: "CUSTOMER", customerId: customer.customerId }, dedupeRef: `${state.subscriptionId}:${years}`,
       params: {
-        plan: state.planId, totalAmount: microsToDecimal(state.announcedTotalMicros ?? 0),
+        // P2-M14: the price is the next renewal's (a scheduled downgrade announces the lower plan's), so is the plan.
+        plan: state.scheduledDowngradePlanId ?? state.planId, totalAmount: microsToDecimal(state.announcedTotalMicros ?? 0),
         renewDate: state.currentPeriodEnd.toISOString(), cancelPageUrl: new URL("/cancel", this.deps.publicAppUrl).toString()
       },
       notBefore: now

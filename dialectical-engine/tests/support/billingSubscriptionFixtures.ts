@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import {
@@ -174,7 +175,12 @@ export async function seedWithdrawalGrant(pool: Pool, identity: TestHttpIdentity
 /** A paid UPGRADE on a seeded subscription, as P12c + the UPGRADE settlement leave it (quote, charge, UPGRADED, entitlement). */
 export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, input: Readonly<{
   at: Date; netMicros: number; taxMicros: number; transactionId: string; monthCreditOverrideMicros: number;
+  /** The plan upgraded to (PRO by default); its full price, with Romania's 21 %, is the next renewal's. */
+  planId?: "PRO" | "MAX";
 }>): Promise<Readonly<{ chargeId: string; quoteId: string }>> {
+  const planId = input.planId ?? "PRO";
+  const recurringNetMicros = planById(testBillingPlans, planId).netPriceMicros;
+  const recurringTotalMicros = recurringNetMicros + Math.floor(recurringNetMicros * 2_100 / 10_000 / 10_000) * 10_000;
   const billing = new BillingRepository(pool);
   const quoteId = randomUUID();
   const chargeId = randomUUID().replaceAll("-", "");
@@ -185,15 +191,16 @@ export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, in
   });
   await billing.withTransaction(async (client) => {
     await billing.insertQuote(client, {
-      quoteId, ownerRef: seeded.ownerRef, planId: "PRO", kind: "UPGRADE", netMicros: input.netMicros,
+      quoteId, ownerRef: seeded.ownerRef, planId, kind: "UPGRADE", netMicros: input.netMicros,
       taxMicros: input.taxMicros, totalMicros, taxCountry: "RO", taxRegion: null, taxRateBasisPoints: 2_100,
       taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null, createdAt: quotedAt,
       expiresAt: new Date(quotedAt.getTime() + 1_800_000), locationCiphertext: location.ciphertext, keyId: location.keyId,
-      recurringTotalMicros: 60_500_000
+      recurringTotalMicros
     });
+    // As upgrade.ts writes it: the UPGRADE charge covers its quote's creation to the period end (W6's coverage).
     await billing.insertCharge(client, {
       chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "UPGRADE", attempt: 1,
-      periodStart: seeded.periodStart, periodEnd: seeded.periodEnd, quoteId, netMicros: input.netMicros,
+      periodStart: quotedAt, periodEnd: seeded.periodEnd, quoteId, netMicros: input.netMicros,
       taxMicros: input.taxMicros, totalMicros, currency: "USD", createdAt: new Date(input.at.getTime() - 30_000),
       xmoneyEnvironment: seeded.xmoneyEnvironment
     });
@@ -205,9 +212,9 @@ export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, in
     }
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
     await billing.appendSubscriptionEvent(client, subscriptionEvent(state, "UPGRADED", input.at,
-      { announced_total_micros: 60_500_000, quote_ref: quoteId, recurring_net_micros: 50_000_000 }, { planId: "PRO" }));
+      { announced_total_micros: recurringTotalMicros, quote_ref: quoteId, recurring_net_micros: recurringNetMicros }, { planId }));
     await new EntitlementRepository(pool).append(client, {
-      ownerRef: seeded.ownerRef, planId: "PRO", periodAnchorAt: seeded.periodStart, cause: "UPGRADED",
+      ownerRef: seeded.ownerRef, planId, periodAnchorAt: seeded.periodStart, cause: "UPGRADED",
       effectiveAt: input.at, subscriptionId: seeded.subscriptionId, paidThrough: seeded.periodEnd,
       monthCreditOverrideMicros: input.monthCreditOverrideMicros
     });
@@ -222,9 +229,9 @@ const unconfigured = async (): Promise<never> => {
 const UNCONFIGURED_XMONEY: Pick<XMoneyClient, "rebill" | "refund" | "getTransaction" | "listTransactions"> = Object.freeze({
   rebill: unconfigured, refund: unconfigured, getTransaction: unconfigured, listTransactions: unconfigured
 });
-/** The stand-in for both methods P8c's `CheckoutDeps.xmoney` picks (`listTransactions`: D7 #5's look). */
-const UNCONFIGURED_XMONEY_CUSTOMERS: Pick<XMoneyClient, "createCustomer" | "listTransactions"> = Object.freeze({
-  createCustomer: unconfigured, listTransactions: unconfigured
+/** The stand-in for the methods P8c's `CheckoutDeps.xmoney` picks (`listTransactions`, `getOrder`: D7 #5's look). */
+const UNCONFIGURED_XMONEY_CUSTOMERS: Pick<XMoneyClient, "createCustomer" | "listTransactions" | "getOrder"> = Object.freeze({
+  createCustomer: unconfigured, listTransactions: unconfigured, getOrder: unconfigured
 });
 
 /**
@@ -280,7 +287,8 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     checkout: cardCheckoutFor(pool),
     accountEmail: { read: async () => "p12@example.test" },
     refunds: new RefundDesk({
-      repository: billing, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date()
+      repository: billing, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date(),
+      xmoneyEnvironment: "stage"
     }),
     cancelLinks: { request: async () => "SILENT" as const, cancelByToken: async () => "INVALID" as const },
     ...overrides
@@ -322,4 +330,36 @@ export async function mountSubscriptionRoutes(
   );
   await api.ready();
   return api;
+}
+
+/**
+ * P2-M12: holds `ownerRef`'s billing owner lock (P8c's `lockOwner`) on a connection of its own until `release`, so a
+ * test can start a writer, see it wait for the lock (`waiter`: an advisory lock not granted, polled for up to 5 s),
+ * move its clock meanwhile, and only then let it in.
+ */
+export async function holdOwnerLock(pool: Pool, ownerRef: string): Promise<Readonly<{
+  waiter(): Promise<void>; release(): Promise<void>;
+}>> {
+  const holder = await pool.connect();
+  await holder.query("BEGIN");
+  await new BillingJobQueries(pool).lockOwner(holder, ownerRef);
+  return Object.freeze({
+    async waiter() {
+      for (let tries = 0; tries < 100; tries += 1) {
+        const waiting = await pool.query<{ n: number }>(
+          "SELECT count(*)::int AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted"
+        );
+        if ((waiting.rows[0]?.n ?? 0) > 0) return;
+        await delay(50);
+      }
+      throw new Error("no writer waited for the owner lock within 5 s");
+    },
+    async release() {
+      try {
+        await holder.query("COMMIT");
+      } finally {
+        holder.release();
+      }
+    }
+  });
 }

@@ -4,8 +4,16 @@ import type { SubscriptionEvent } from "@debateai/billing-core";
 import type { GeoLookup } from "@debateai/geo";
 import { TypedDomainError } from "@debateai/kernel";
 import type { BillingPlans, BillingPolicy, CountryPolicy, CountryRule } from "@debateai/register";
+import type { BillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
 // R-16: tests import the fakes through tests/support/ (P4's fake-tax-engine.ts re-exports the tax rules).
 import { FakeTaxEngine, fakeTaxMicros } from "./fake-tax-engine.js";
+
+/**
+ * W8 (P2-I12): the account-address port for suites about something else. Their accounts hold no readable address, so
+ * it answers as for an erased account and billing uses the billing profile's address. The address rule itself is
+ * tests/integration/billing-email-change.test.ts's and billing-cancel-link.test.ts's.
+ */
+export const PROFILE_ADDRESS_ONLY: BillingRecipientReader = Object.freeze({ currentAddress: async () => null });
 
 export const testBillingPlans: BillingPlans = Object.freeze({
   currency: "USD",

@@ -5,7 +5,7 @@ import type { ReconcileReport } from "../../apps/api/src/billing/reconcile.js";
 import { createCoalescingSingleFlight } from "../../apps/api/src/billing/single-flight.js";
 
 const REPORT: ReconcileReport = Object.freeze({
-  listed: 0, enqueued: 0, adopted: 0, failed: 0, uncertain: false, deadRefunds: 0, expired: 0, rejected: 0
+  listed: 0, enqueued: 0, adopted: 0, failed: 0, uncertain: false, deadRefunds: 0, expired: 0, rejected: 0, refusedListings: []
 });
 
 /** The runtime's composition (P15's `runtime.ts`), with fakes, run once through the real single-flight. */

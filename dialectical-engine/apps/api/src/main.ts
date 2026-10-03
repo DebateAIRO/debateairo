@@ -94,7 +94,7 @@ import {
 } from "./billing/stage-clock.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import {
-  assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
+  assertNoRecordsDatedAhead, assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
 } from "./billing/connectors.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
@@ -588,7 +588,8 @@ const askBilling: AskBilling | undefined = askRoomComposition === undefined
  * Billing on must pass B4a's one readiness question (plans row + the three budget members), and only then is the
  * billing group of the environment validated, by name (BILLING_CONFIGURATION_INCOMPLETE:<KEY>), and SmartBill's
  * code built from the legal notice's facts before any secret is read (BILLING_COMPANY_FACTS_UNVERIFIED:cui while the
- * CUI is still bracketed, and :vat in SMARTBILL_CIF_FORM's "ro" form while the RO VAT code is; RULINGS-R3 R3-4).
+ * CUI is still bracketed, and :vat in SMARTBILL_CIF_FORM's "ro" form while the RO VAT code is; RULINGS-R3 R3-4), and
+ * the facts every email prints checked the same way (:legalName, :registeredOffice, :emails.general; P2-M35).
  */
 const billingPolicy: BillingPolicy | null = environment.DEPLOYMENT_MODE === "hosted"
   ? await boot.run("billing-policy", () => readBillingPolicy(pool, environment.REGISTER_VERSION))
@@ -616,6 +617,10 @@ const billingConnectors: BillingConnectors | null = billingPolicy?.enabled === t
 if (billingConnectors?.xmoneyEnvironment === "live") {
   await boot.run("billing-stage-records", async () => {
     assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"));
+  });
+  // W14 (P2-I19): nor while billing rows or open jobs are dated more than a day ahead (a moved stage clock's leftovers).
+  await boot.run("billing-records-dated-ahead", async () => {
+    assertNoRecordsDatedAhead(await new BillingRepository(pool).recordsDatedAhead(new Date()));
   });
 }
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
@@ -860,7 +865,8 @@ const authenticationRiskCleanupTimer=setInterval(
 );
 authenticationRiskCleanupTimer.unref();
 // A15 (P16c): the retention purge runs wherever the API runs, whatever DEPLOYMENT_MODE and billingPolicy say —
-// acceptance records exist in every mode (A14). Asked daily; it purges once per UTC year, from 2 January.
+// acceptance records exist in every mode (A14). Asked once right after listen (below), so a service restarted more
+// often than daily still reaches a check (P2-M42), then daily; it purges once per UTC year, from 2 January.
 const retentionPurge = createRetentionPurge({ pool, clock: () => new Date(), log: (line) => console.error(line) });
 const triggerRetentionPurge=createSingleFlightErasureReconciler(
   async ()=>{ await retentionPurge.runIfDue(); },
@@ -1197,7 +1203,8 @@ const api = buildApi({
   ...(askRoom === undefined ? {} : { askRoom }),
   ...(askBilling === undefined ? {} : { askBilling }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
-  // P15: scheduling an account erasure stops the owner's billing at once (the reconciler's sweep repeats it).
+  // P15, W7: scheduling an account erasure stops the owner's renewal at once (the reconciler's sweep repeats it, and
+  // ends the plan once the erasure commits).
   ...(billingRuntime === undefined ? {} : { billingErasure: billingRuntime.erasure }),
   ...(countryGate === undefined ? {} : { countryGate }),
   support: {

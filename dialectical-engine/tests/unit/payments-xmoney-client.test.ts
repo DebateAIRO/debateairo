@@ -6,6 +6,7 @@ import {
   XMoneyClient,
   XMoneyPaymentFailedError,
   decryptNotice,
+  parseXMoneyTransaction,
   signOrderPayload
 } from "@debateai/payments-xmoney";
 import { startFakeXMoney, type FakeXMoney } from "../support/fake-xmoney.js";
@@ -269,5 +270,30 @@ describe("P3b — xMoney client against the fake", () => {
     expect(await listing(both).refundsOf({ ...window, onRejected: (id) => rejected.push(id) })).toBeNull();
     expect(rejected).toEqual(["12"]);
     expect(await listing(both).refundsOf(window)).toBeNull();
+  });
+
+  it("reads a transaction's time only with its zone: an offset-less creationDate falls back to creationTimestamp (P2-M3)", () => {
+    const row = (dates: Readonly<Record<string, unknown>>) => parseXMoneyTransaction({
+      id: "11", orderId: "1", customerId: "1", transactionType: "deposit", transactionStatus: "complete-ok", amount: "24.20",
+      currency: "USD", ...dates
+    }).createdAt;
+    const instant = new Date("2026-10-02T10:00:00.000Z");
+    expect(row({ creationDate: "2026-10-02T10:00:00Z" })).toEqual(instant);
+    expect(row({ creationDate: "2026-10-02T13:00:00+03:00" })).toEqual(instant);
+    expect(row({ creationDate: "2026-10-02 10:00:00+00:00" })).toEqual(instant);
+    // Offset-less, it would be read in the server's own zone: never taken. The unambiguous timestamp is read instead.
+    expect(row({ creationDate: "2026-10-02 13:00:00" })).toBeNull();
+    expect(row({ creationDate: "2026-10-02T13:00:00" })).toBeNull();
+    expect(row({ creationDate: "2026-10-02 13:00:00", creationTimestamp: instant.getTime() / 1_000 })).toEqual(instant);
+    expect(row({ creationTimestamp: String(instant.getTime() / 1_000) })).toEqual(instant);
+    expect(row({ creationTimestamp: "soon" })).toBeNull();
+    expect(row({ creationTimestamp: -5 })).toBeNull();
+    expect(row({})).toBeNull();
+    // A millisecond timestamp, read as seconds, would anchor a plan in year 58722: refused in both forms, never taken.
+    expect(row({ creationDate: "2026-10-02 10:00:00", creationTimestamp: instant.getTime() })).toBeNull();
+    expect(row({ creationTimestamp: String(instant.getTime()) })).toBeNull();
+    expect(row({ creationTimestamp: String(instant.getTime()).slice(0, 12) })).toBeNull();
+    // Control: the same instant in seconds, numeric, is still read.
+    expect(row({ creationDate: "2026-10-02 10:00:00", creationTimestamp: 1_759_399_200 })).toEqual(new Date(1_759_399_200_000));
   });
 });
