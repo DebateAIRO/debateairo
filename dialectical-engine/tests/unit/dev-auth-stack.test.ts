@@ -16,6 +16,7 @@ import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderP
 import { createDevelopmentDeploymentRegisterMachineReceipt } from "../../apps/runner/src/dev-deployment-register.js";
 import { parseRegisterVersionText } from "../../packages/register/src/index.js";
 import { SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE } from "../../apps/runner/src/dev-auth-stack-profile.js";
+import { parseDevelopmentProviderPanelTargets } from "../../apps/runner/src/dev-provider-panel.js";
 
 const REGISTER_RECEIPT = createDevelopmentDeploymentRegisterMachineReceipt({
   registerVersion: parseRegisterVersionText("424242"),
@@ -243,6 +244,22 @@ describe("DEV-10F bounded local auth stack supervisor", () => {
 
     expect(code).not.toContain("SYNTHETIC_PW_42");
     expect(code).toBe("DEV_AUTH_STACK_TLS_FAILED:DEV_TLS_PUBLIC_PROBE_FAILED_TIMEOUT");
+  });
+
+  it("names the dev panel's thinking-parameter refusal instead of DEV_UNRECOGNIZED (model scorecard §2.2)", () => {
+    // The refusal is the one the panel parser really throws, not a spelled copy.
+    const rows = JSON.parse(TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson) as Record<string, unknown>[];
+    let refusal: unknown;
+    try {
+      parseDevelopmentProviderPanelTargets(JSON.stringify(rows.map((row, index) => index === 0
+        ? { ...row, thinking_parameter: "reasoning_effort", thinking_levels: ["low"] }
+        : row)));
+    } catch (error) {
+      refusal = error;
+    }
+
+    expect(developmentAuthStackErrorCode(new Error("DEV_AUTH_STACK_PROVIDER_PANEL_FAILED", { cause: refusal })))
+      .toBe("DEV_AUTH_STACK_PROVIDER_PANEL_FAILED:DEV_CLI_PROVIDER_PANEL_THINKING_PARAMETER_INVALID");
   });
 
   it("control — a known chain still joins in the same order, to full depth", () => {

@@ -167,6 +167,16 @@ the Terms, sanctions, or an AI provider's rules.
 Signing in is allowed everywhere, so people can always reach their own data. A subscriber travelling in a blocked
 country can read their debates but cannot start new ones.
 
+**Amendment 2026-10-01 (V, owner decision):** Saudi Arabia, India, the UAE, Mexico, Argentina, Colombia, Chile,
+Thailand and the Philippines move to Terms-excluded (sign-up off, pay off, reason `TERMS_EXCLUDED`, not blocked) —
+high risk, low benefit — until each has its own compliance work and an annex in the Terms. Only the UK and South
+Korea keep "sign up on, pay off until the tax registration is done". The tax tables above keep listing the nine for
+later; only the sign-up switch changes.
+
+**Amendment 2026-10-01 (V, owner decision):** Switzerland, Israel, Taiwan and Moldova open for sign-up; payment stays
+off until each country's tax registration is checked. Ukraine stays closed until the occupied regions can be
+blocked.
+
 ### 1.6 The money check
 
 Your own calculation: 1,000 people on Plus bring $20,000 a month. The API credit is $5,000 and the fixed costs are

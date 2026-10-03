@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { persistTerminalAnswer, persistTerminalRun } from "../support/settledRun.js";
 import { createServer, type Server } from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { once } from "node:events";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -21,7 +23,15 @@ import {
   type ProviderTargetPrice,
   type SharedWallApplication
 } from "@debateai/budget";
-import { ProviderProbeRepository, RunCostSubstitutionRepository, RunRepository, ServeDisclosureRepository, migrate, type StoredServeDisclosure } from "@debateai/db";
+import {
+  ProviderProbeRepository,
+  RunCostSubstitutionRepository,
+  RunRepository,
+  ServeDisclosureRepository,
+  migrate,
+  readCallPrompt,
+  type StoredServeDisclosure
+} from "@debateai/db";
 import { GraphRepository } from "@debateai/graph";
 import { JUDGE_LEG_KINDS, JudgementRepository } from "@debateai/judgement";
 import {
@@ -51,6 +61,7 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import {
   applySingleLineageBandCap,
+  BACKUP_MODEL_USED_WORDING,
   catchUpFloorWouldMove,
   createPostgresProviderGateway,
   createPostgresReviewCatchUpDependencies,
@@ -59,7 +70,11 @@ import {
   FIRST_POSITION_CALL_SITE_KEY,
   projectJudgedStanding,
   reviewCatchUpCallSiteKey,
+  rotateSeats,
+  rotatedSeatSelection,
   runnerTerminalFailureReason,
+  seatRotationOffset,
+  seatSiteOrdinal,
   WalkingSkeletonRunner,
   type HoldProgressEvent,
   type WalkingSkeletonSettings
@@ -81,7 +96,18 @@ import {
   type AskRequest,
   type Session
 } from "@debateai/contract";
-import { argumentLanguageDirective, TypedDomainError, type ServedRootRuleHistory } from "@debateai/kernel";
+import {
+  argumentLanguageDirective,
+  DEBATE_ROLES,
+  debateRoleFromCallSiteKey,
+  TypedDomainError,
+  type DebateRole,
+  type ServedRootRuleHistory
+} from "@debateai/kernel";
+import { canonicalPromptFingerprint, selectSeatCandidate, type RoleSeat } from "@debateai/scorecard";
+import { createPostgresMomentSource, exportRunMoments, momentFileNameFor } from "../../acceptance/export-moment.js";
+import { captureMomentPacket, parseMomentBuilder, writePrivateJsonFile } from "../../acceptance/moment-tools.js";
+import { readMomentFile, replayMoment } from "../../acceptance/replay-moment.js";
 import { LivenessRepository } from "@debateai/liveness";
 import {
   buildApi,
@@ -312,7 +338,9 @@ async function createRun(
   agentCount = 1,
   depth = 1,
   askerId = `asker:${questionLine}`,
-  envelopeBasis: Readonly<Record<string, unknown>> = fixtureStructuralCeiling(maxModelAttempts, agentCount, Math.min(depth, 5))
+  envelopeBasis: Readonly<Record<string, unknown>> = fixtureStructuralCeiling(maxModelAttempts, agentCount, Math.min(depth, 5)),
+  // Paid plans S1a: the question's language as `submit` pins it (dev's RunRepository.startRun takes both).
+  language: Readonly<{ tag: string; name: string }> | null = null
 ): Promise<string> {
   return new RunRepository(database.pool).startRun({
     questionLine, principal: { kind: "legacy", legacyAskerId: askerId },
@@ -321,6 +349,7 @@ async function createRun(
     tierSource: "ASKER", tierProvenanceRef: `asker-declaration:${questionLine}`, compositionBudgetTier: "low",
     depthParams: { depth }, discoveredPanel: fixtureDiscoveredPanel(agentCount), strangerSampleRate: 1,
     envelopeBasis,
+    ...(language === null ? {} : { argumentLanguageTag: language.tag, argumentLanguageName: language.name }),
     registerVersion: 1, batteryVersion: "s00", batteryRows
   });
 }
@@ -461,7 +490,9 @@ function requestedModel(body: string): string | undefined {
 
 async function startProviderDouble(
   contents: readonly ProviderDoubleResponse[],
-  panelAssessment: string = DEFAULT_PANEL_ASSESSMENT
+  panelAssessment: string = DEFAULT_PANEL_ASSESSMENT,
+  // A16a fix round 1: the first N panel calls this route answers fail at the transport (503).
+  panelFailures = 0
 ): Promise<{
   endpoint: string; calls(): number; bodies(): readonly string[]; stop(): Promise<void>;
 }> {
@@ -540,6 +571,12 @@ async function startProviderDouble(
       // encoding that defeats a quoted fragment (T3 N4, below).
       if (primaryContract.includes("fatalFlags") && !primaryContract.includes("restatement_text")) {
         calls += 1;
+        if (panelFailures > 0) {
+          panelFailures -= 1;
+          response.writeHead(503, { "content-type": "application/json" })
+            .end(JSON.stringify({ error: "test-layer panel transport failure" }));
+          return;
+        }
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
           id: `panel-assess-${calls}`,
           model: askedModel,
@@ -9599,4 +9636,3052 @@ describe("B9c — a cheaper maker while arguing, the first call's try, the owner
       }
     }
   }, 1_200_000);
+});
+
+describe("A13 · the ledger names the debate role of every model call", () => {
+  it("writes model_role on every MODEL_CALL row, equal to the role its call site names, for all seven roles", async () => {
+    const scenario = await executeResil01Scenario({
+      label: "a13-model-role",
+      primary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary A13 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Primary A13 review ${index + 1}`)),
+        resil01Composition,
+        evaluatorSatisfied()
+      ],
+      secondary: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary A13 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Secondary A13 review ${index + 1}`))
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+
+    const rows = await database.pool.query<{ call_site_key: string; model_role: string | null }>(
+      `SELECT DISTINCT call_site_key, model_role FROM ledger.ledger_entry
+        WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY call_site_key`,
+      [scenario.runId]
+    );
+    expect(rows.rows.length).toBeGreaterThan(0);
+    for (const row of rows.rows) {
+      expect({ key: row.call_site_key, role: row.model_role })
+        .toEqual({ key: row.call_site_key, role: debateRoleFromCallSiteKey(row.call_site_key) });
+    }
+    // Every family the runner opens is in this one run: roots, legs, the
+    // cross-exchange, the panel, the review, the writer and the checker.
+    expect(new Set(rows.rows.map((row) => row.model_role))).toEqual(new Set(DEBATE_ROLES));
+    // Non-debate rows (JUDGEMENT_SCHEDULED, PROPAGATION, SERVE) carry no role.
+    const other = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM ledger.ledger_entry
+        WHERE run_id=$1 AND action_kind <> 'MODEL_CALL' AND model_role IS NOT NULL`,
+      [scenario.runId]
+    );
+    expect(other.rows[0]?.count).toBe("0");
+  });
+});
+
+/**
+ * Model scorecard A15/A16 — a two-debater run with a PINNED role assignment and
+ * a third configured route (a judge, reviewer and runner-up that is not
+ * debating), driven through the same provider doubles as every scenario above.
+ * Gateway makers equal the configured makers, so the review rotation's
+ * `raw_artifact.maker` reads and the seats' fairness rules name one identity.
+ */
+const SEAT_ROUTES = Object.freeze({
+  primary: Object.freeze({ providerRef: "provider:test-layer", maker: "test-layer", model: "test-layer/primary-model" }),
+  secondary: Object.freeze({
+    providerRef: "provider:test-layer:secondary", maker: "Secondary test maker", model: "test-layer/secondary-model"
+  }),
+  third: Object.freeze({ providerRef: "provider:test-layer:third", maker: "Third test maker", model: "test-layer/third-model" })
+});
+type SeatRoute = keyof typeof SEAT_ROUTES;
+
+/**
+ * A15d carry 9: a SECOND route of the primary's maker (the one a deployment may
+ * configure, or a picker may seat as a runner-up). It is served by the primary
+ * double, so it answers panel calls from the contract like every other member.
+ */
+const SEAT_TWIN = Object.freeze({
+  providerRef: "provider:test-layer:twin", maker: SEAT_ROUTES.primary.maker, model: SEAT_ROUTES.primary.model
+});
+
+/**
+ * Final review I2: routes that only judge and review — they neither debate nor write a leg, so
+ * every node's author differs from them and the panel cap is what decides who judges. Served by
+ * the third double, which answers panel calls from the contract and reviews from its queue.
+ * `fourthTwin` is a second route of the fourth route's maker: two reviewer seats of one maker.
+ */
+const SEAT_JUDGE_ONLY = Object.freeze({
+  fourth: Object.freeze({ providerRef: "provider:test-layer:fourth", maker: "Fourth test maker", model: "test-layer/fourth-model" }),
+  fifth: Object.freeze({ providerRef: "provider:test-layer:fifth", maker: "Fifth test maker", model: "test-layer/fifth-model" }),
+  fourthTwin: Object.freeze({
+    providerRef: "provider:test-layer:fourth-twin", maker: "Fourth test maker", model: "test-layer/fourth-model"
+  })
+});
+type JudgeOnlyRoute = keyof typeof SEAT_JUDGE_ONLY;
+
+function judgeOnlySeat(seatIndex: number, route: JudgeOnlyRoute): RoleSeat {
+  const target = SEAT_JUDGE_ONLY[route];
+  return {
+    seatIndex,
+    main: {
+      candidateId: `candidate:${route}`, providerRef: target.providerRef, maker: target.maker,
+      modelId: target.model, thinkingLevel: "DEFAULT_ONLY"
+    },
+    runnerUp: null,
+    diversityShare: 0,
+    source: "SCORECARD"
+  };
+}
+
+/**
+ * Final review I2: the seats one node's panel calls — `rotatedSeatSelection` from the node's
+ * site-pure `seatRotationOffset` — as indexes into the role's seats, in pinned order.
+ */
+function predictedSeats(runId: string, role: "JUDGE" | "REVIEWER", baseKey: string, eligible: readonly boolean[], cap: number): readonly number[] {
+  return rotatedSeatSelection(eligible, cap, seatRotationOffset({ runId, role, callSiteKey: baseKey }))
+    .flatMap((chosen, index) => (chosen ? [index] : []));
+}
+
+/** A panel row's node key: its call-site key without the member's route and seat marker. */
+function panelBaseKey(call: { readonly call_site_key: string; readonly actor_ref: string }): string {
+  const at = call.call_site_key.indexOf(`:${call.actor_ref}:seat:`);
+  if (at < 0) throw new Error(`not a seat-marked panel key: ${call.call_site_key}`);
+  return call.call_site_key.slice(0, at);
+}
+
+function seatCandidateOf(route: SeatRoute) {
+  return {
+    candidateId: `candidate:${route}`,
+    providerRef: SEAT_ROUTES[route].providerRef,
+    maker: SEAT_ROUTES[route].maker,
+    modelId: SEAT_ROUTES[route].model,
+    thinkingLevel: "DEFAULT_ONLY"
+  };
+}
+
+function pinnedSeat(
+  seatIndex: number,
+  main: SeatRoute,
+  runnerUp: SeatRoute | null = null,
+  // RoleAssignmentSchema's law: no runner-up, no share (pre-flight fix F2). A
+  // share of 0.2 on a seat without a runner-up is refused as
+  // RUN_ROLE_ASSIGNMENT_INVALID before any seat is filled. A seat WITH a
+  // runner-up may pass 0: the runner-up is then its backup only.
+  diversityShare: number = runnerUp === null ? 0 : 0.2
+) {
+  return {
+    seatIndex,
+    main: seatCandidateOf(main),
+    runnerUp: runnerUp === null ? null : seatCandidateOf(runnerUp),
+    diversityShare,
+    source: "SCORECARD" as const
+  };
+}
+
+// A15d: the pinned shape itself, so a FALLBACK seat and the twin's seat can be
+// pinned beside the scorecard seats `pinnedSeat` builds.
+type PinnedSeat = RoleSeat;
+
+function pinnedAssignment(roles: Readonly<Record<DebateRole, readonly PinnedSeat[]>>) {
+  return { scorecardVersion: 7, strength: "BALANCED" as const, roles };
+}
+
+async function pinRoleAssignment(runId: string, assignment: ReturnType<typeof pinnedAssignment>): Promise<void> {
+  await database.pool.query(
+    `INSERT INTO core.run_role_assignment (run_id, assignment, strength, stepped_down, created_at)
+     VALUES ($1, $2::jsonb, 'BALANCED', false, now())`,
+    [runId, JSON.stringify(assignment)]
+  );
+}
+
+async function executeSeatScenario(input: {
+  readonly label: string;
+  readonly assignment: ReturnType<typeof pinnedAssignment>;
+  readonly primary: readonly ProviderDoubleResponse[];
+  readonly secondary: readonly ProviderDoubleResponse[];
+  readonly third: readonly ProviderDoubleResponse[];
+  /** A15d carries: a judge bound above 1, so a site an earlier pass used still has an attempt. */
+  readonly judgeMaxAttempts?: number;
+  /** A15d carry 9: configure SEAT_TWIN beside the three routes. */
+  readonly twin?: boolean;
+  /** Final review I2: configure the judge-only routes (SEAT_JUDGE_ONLY) beside the three routes. */
+  readonly judgeOnlyRoutes?: boolean;
+  /** A15d carries: the ledger an earlier pass of this work item left behind. */
+  readonly beforeExecute?: (context: { readonly runId: string; readonly workItemId: string }) => Promise<void>;
+  readonly settings?: Partial<WalkingSkeletonSettings>;
+  /** A16a fix round 1: how many of each route's first panel calls fail at the transport. */
+  readonly panelFailures?: Partial<Record<SeatRoute, number>>;
+  /** Paid plans S1a: the run's question language (dev's argument-language rule). */
+  readonly language?: Readonly<{ tag: string; name: string }>;
+  /** Paid plans S1a: every request a route's gateway is handed, before its seam (dev's `observe`). */
+  readonly observe?: (route: string, request: ProviderCallRequest) => void;
+  /** Paid plans S1a: a route's money seam, as a hosted runner builds one per call (dev's `moneySeam(…).build`). */
+  readonly costEnvelopes?: Readonly<Partial<Record<SeatRoute | JudgeOnlyRoute, (runId: string, phase: CostEnvelopePhase) => ProviderCostEnvelopeSeam>>>;
+}) {
+  const doubles = {
+    primary: await startProviderDouble(input.primary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.primary ?? 0),
+    secondary: await startProviderDouble(input.secondary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.secondary ?? 0),
+    third: await startProviderDouble(input.third, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.third ?? 0)
+  };
+  const observed = (route: string, gateway: ProviderGateway): ProviderGateway => input.observe === undefined
+    ? gateway
+    : { call: (request) => { input.observe!(route, request); return gateway.call(request); } };
+  const seamOf = (route: SeatRoute | JudgeOnlyRoute) => {
+    const build = input.costEnvelopes?.[route];
+    return build === undefined ? {} : { buildCostEnvelopeSeam: build };
+  };
+  const gatewayFor = (route: SeatRoute) => observed(route, createPostgresProviderGateway(database.pool, {
+    endpoint: doubles[route].endpoint, model: SEAT_ROUTES[route].model, maker: SEAT_ROUTES[route].maker, ...seamOf(route)
+  }));
+  try {
+    const question = `${input.label}-${randomUUID()}`;
+    const runId = await createRun(question, 100, 2, 1, `asker:${question}`, undefined, input.language ?? null);
+    await pinRoleAssignment(runId, input.assignment);
+    const workItemId = await new WorkItemRepository(database.pool).enqueue({
+      runId, batteryRowId: "Q1", nodeSet: [], commandKey: `${input.label}:${runId}`
+    });
+    await input.beforeExecute?.({ runId, workItemId });
+    const runRepository = new RunRepository(database.pool);
+    const baseSettings = runnerSettings();
+    const runner = new WalkingSkeletonRunner(database.pool, gatewayFor("primary"), {
+      ...baseSettings,
+      ...(input.judgeMaxAttempts === undefined ? {} : {
+        judgeBound: { ...baseSettings.judgeBound, maxAttempts: input.judgeMaxAttempts }
+      }),
+      providerRef: SEAT_ROUTES.primary.providerRef,
+      maker: SEAT_ROUTES.primary.maker,
+      claimMs: 1_204_000,
+      runDeathPolicy: { cooldownMs: 600_000, finalRetryAttempts: 1, maxCooldownHoldsPerRun: 2 },
+      hiddenNodeScoreThreshold: { value: 0.35, sourceRef: "acceptance:DR-176:V-approved" },
+      holdRecorder: {
+        countCooldownHolds: (candidateRunId) => runRepository.countCooldownHolds(candidateRunId),
+        record: (event) => runRepository.recordRunLifecycleEvent({
+          runId: event.runId,
+          kind: event.kind,
+          value: {
+            state: event.state, call_site_key: event.callSiteKey, parent_node_ref: event.parentNodeId,
+            hold_ms: event.holdMs, hold_until: event.holdUntil, attempts_spent: event.attemptsSpent,
+            transport_outcome: event.transportOutcome, planned_leg_count: event.plannedLegCount
+          }
+        }),
+        wait: async () => undefined
+      },
+      critique: {
+        provider: gatewayFor("secondary"), providerRef: SEAT_ROUTES.secondary.providerRef, maker: SEAT_ROUTES.secondary.maker
+      },
+      additionalMakers: [{
+        provider: gatewayFor("third"), providerRef: SEAT_ROUTES.third.providerRef, maker: SEAT_ROUTES.third.maker
+      }, ...(input.twin === true ? [{
+        provider: createPostgresProviderGateway(database.pool, {
+          endpoint: doubles.primary.endpoint, model: SEAT_TWIN.model, maker: SEAT_TWIN.maker
+        }),
+        providerRef: SEAT_TWIN.providerRef,
+        maker: SEAT_TWIN.maker
+      }] : []), ...(input.judgeOnlyRoutes === true ? (Object.keys(SEAT_JUDGE_ONLY) as JudgeOnlyRoute[]).map((name) => ({
+        provider: observed(name, createPostgresProviderGateway(database.pool, {
+          endpoint: doubles.third.endpoint, model: SEAT_JUDGE_ONLY[name].model, maker: SEAT_JUDGE_ONLY[name].maker, ...seamOf(name)
+        })),
+        providerRef: SEAT_JUDGE_ONLY[name].providerRef,
+        maker: SEAT_JUDGE_ONLY[name].maker
+      })) : [])],
+      scoringOperator: { deploymentRowValue: "accumulate", registerRef: "test-layer:DR-144" },
+      ...input.settings
+    });
+    let result: Awaited<ReturnType<WalkingSkeletonRunner["executeWorkItem"]>> | null = null;
+    let error: unknown = null;
+    try {
+      result = await runner.executeWorkItem(workItemId);
+    } catch (candidate) {
+      error = candidate;
+    }
+    const answer = result?.kind === "COMPLETED"
+      ? await new ServeRepository(database.pool).readAnswerProjection(result.answerId, `asker:${question}`)
+      : null;
+    const calls = await database.pool.query<{
+      call_site_key: string; outcome: string; actor_ref: string;
+      candidate_id: string | null; scorecard_version: number | null; thinking_level: string | null;
+    }>(
+      `SELECT call_site_key, outcome, actor_ref, candidate_id, scorecard_version, thinking_level
+         FROM ledger.ledger_entry WHERE run_id=$1 AND action_kind='MODEL_CALL' ORDER BY sequence`,
+      [runId]
+    );
+    // A16c: the hold/halt/refusal stream every earlier scenario pins. A backup
+    // switch rides the same `ledger.could_not_do` kind, so its events are read
+    // on their own below (`switchEvents`) rather than joining this list.
+    const lifecycle = await database.pool.query<{
+      state: string; call_site_key: string; attempts_spent: number;
+    }>(
+      `SELECT value_json->>'state' AS state, value_json->>'call_site_key' AS call_site_key,
+              (value_json->>'attempts_spent')::integer AS attempts_spent
+         FROM core.run_progress_event
+        WHERE run_id=$1 AND kind IN ('node.retrying', 'ledger.could_not_do')
+          AND value_json->>'state' NOT IN ('BACKUP_MODEL_ENGAGED', 'ROLE_FELL_BACK_TO_DEBATERS')
+        ORDER BY at_seq`,
+      [runId]
+    );
+    const switchEvents = await database.pool.query<{ value_json: Record<string, unknown> }>(
+      `SELECT value_json FROM core.run_progress_event
+        WHERE run_id=$1 AND kind='ledger.could_not_do'
+          AND value_json->>'state' IN ('BACKUP_MODEL_ENGAGED', 'ROLE_FELL_BACK_TO_DEBATERS')
+        ORDER BY at_seq`,
+      [runId]
+    );
+    return {
+      runId, workItemId, result, error, answer, calls: calls.rows, lifecycle: lifecycle.rows,
+      switchEvents: switchEvents.rows.map((row) => row.value_json)
+    };
+  } finally {
+    await doubles.third.stop();
+    await doubles.secondary.stop();
+    await doubles.primary.stop();
+  }
+}
+
+describe("A15 · a pinned role assignment seats the run", () => {
+  it("routes every role to its seats, marks every key with its seat and keeps 0049's prefix counts", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15-seats",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A15 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15 position ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A15 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const actorOf = (key: string): readonly string[] =>
+      scenario.calls.filter((call) => call.call_site_key === key).map((call) => call.actor_ref);
+
+    // (1) Every key carries its seat; no seat has a runner-up, so every call is a main.
+    expect(scenario.calls.length).toBeGreaterThan(0);
+    expect(scenario.calls.filter((call) => !call.call_site_key.endsWith(":seat:main"))).toEqual([]);
+    // (2) Roots from the POSITION seats, in pinned order.
+    expect(actorOf("JUDGE:seat:main")).toEqual([SEAT_ROUTES.primary.providerRef]);
+    expect(actorOf("JUDGE:root:secondary:seat:main")).toEqual([SEAT_ROUTES.secondary.providerRef]);
+    // (3) Every support/attack leg from the one SUPPORT_ATTACK seat.
+    const legs = scenario.calls.filter((call) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+:seat:main$/u.test(call.call_site_key));
+    expect(legs).toHaveLength(4);
+    expect(new Set(legs.map((call) => call.actor_ref))).toEqual(new Set([SEAT_ROUTES.third.providerRef]));
+    // (4) A cross-exchange is written by the member that wrote its root (R5).
+    expect(actorOf("JUDGE:cross-root:0->1:seat:main")).toEqual([SEAT_ROUTES.primary.providerRef]);
+    expect(actorOf("JUDGE:cross-root:1->0:seat:main")).toEqual([SEAT_ROUTES.secondary.providerRef]);
+    // (5) One judge per node — the ceiling's panel basis — and never the author. Final review
+    //     I2: where both judge seats may judge a node (the secondary's root and exchange), the
+    //     one called is the seat that node's site-pure rotation starts at, not always the first.
+    const panel = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
+    expect(panel).toHaveLength(8);
+    expect(panel.every((call) => call.call_site_key.endsWith(`:${call.actor_ref}:seat:main`))).toBe(true);
+    expect(new Set(panel.map(panelBaseKey)).size).toBe(8);
+    const judgeSeats = [SEAT_ROUTES.third.providerRef, SEAT_ROUTES.primary.providerRef];
+    const expectedJudge = (baseKey: string): string => {
+      // The primary's nodes: only the third may judge them. The third's legs: only the primary.
+      if (baseKey === "PANEL:root" || baseKey === "PANEL:JUDGE:cross-root:0->1") return SEAT_ROUTES.third.providerRef;
+      if (/^PANEL:JUDGE:(?:defender|critic):/u.test(baseKey)) return SEAT_ROUTES.primary.providerRef;
+      return judgeSeats[predictedSeats(scenario.runId, "JUDGE", baseKey, [true, true], 1)[0]!]!;
+    };
+    expect(panel.map((call) => [panelBaseKey(call), call.actor_ref]))
+      .toEqual(panel.map((call) => [panelBaseKey(call), expectedJudge(panelBaseKey(call))]));
+    // (6) One review per node, never by the author's maker (the database refuses
+    //     that too); the secondary holds no REVIEWER seat and reviews nothing.
+    const reviews = scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:review:"));
+    expect(reviews).toHaveLength(8);
+    expect(reviews.some((call) => call.actor_ref === SEAT_ROUTES.secondary.providerRef)).toBe(false);
+    const sameMaker = await database.pool.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM ledger.node_review AS review
+         JOIN ledger.raw_artifact AS reviewer ON reviewer.raw_artifact_id = review.review_raw_artifact_ref
+         JOIN ledger.raw_artifact AS author ON author.raw_artifact_id = review.author_raw_artifact_ref
+        WHERE review.run_id = $1 AND reviewer.maker = author.maker`,
+      [scenario.runId]
+    );
+    expect(sameMaker.rows[0]?.count).toBe("0");
+    // (7) The two synthesis roles from their own seats.
+    expect(actorOf("COMPOSER:SYNTHESIZER:INITIAL:1:seat:main")).toEqual([SEAT_ROUTES.secondary.providerRef]);
+    expect(actorOf("POST_COMPOSE_R9:EVALUATOR:1:seat:main")).toEqual([SEAT_ROUTES.third.providerRef]);
+    // (8) Every call names the candidate that answered it.
+    for (const call of scenario.calls) {
+      const route = (Object.keys(SEAT_ROUTES) as SeatRoute[]).find((key) => SEAT_ROUTES[key].providerRef === call.actor_ref)!;
+      expect({ key: call.call_site_key, candidate: call.candidate_id, version: call.scorecard_version, level: call.thinking_level })
+        .toEqual({ key: call.call_site_key, candidate: `candidate:${route}`, version: 7, level: "DEFAULT_ONLY" });
+    }
+    // (9) 0049's prefix counts still see the seat-marked synthesis calls; its
+    //     exact `JUDGE` count does not (no predicate reads it — fragment note 3).
+    const facts = await readTerminalRecordedFacts(database.pool, scenario.runId);
+    expect(facts.ledger.composerCallCount).toBeGreaterThanOrEqual(1);
+    expect(facts.ledger.postComposeR9CallCount).toBeGreaterThanOrEqual(1);
+    expect(facts.ledger.judgeCallCount).toBe(0);
+  });
+
+  it("refuses an assignment that cannot seat a debate, terminally, before any model call", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15-unseatable",
+      assignment: pinnedAssignment({
+        POSITION: [], SUPPORT_ATTACK: [], CROSS_EXCHANGE: [], JUDGE: [], REVIEWER: [],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")], ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toMatchObject({ code: "RUN_ROLE_ASSIGNMENT_INVALID" });
+    expect(scenario.calls).toEqual([]);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE run_id=$1", [scenario.runId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "RUN_ROLE_ASSIGNMENT_INVALID" }]);
+  });
+});
+
+/**
+ * Final review I2 — every judge seat the drawer lists can judge. Two NON-DEBATING judge seats
+ * (fourth, fifth): neither debates nor writes a leg, so both may judge every one of the eight
+ * nodes and the panel's cap of M - 1 = 1 binds at each. The old rule called the first seat at
+ * every node, so the second — listed in the drawer under "Judging the arguments" — never judged.
+ * The two reviewer seats share a maker (fourth, fourthTwin): the maker rotation alone would leave
+ * the second idle all run, so its start is site-pure as well.
+ *
+ * The rotation hashes the run's own id, so a run is drawn until its four root and exchange nodes
+ * already use both judge seats (seven runs in eight do); a redrawn run is failed before any call.
+ */
+class RotationRedraw extends Error {}
+
+describe("final review I2 · every judge seat the drawer lists can judge", () => {
+  const knownNodes = ["PANEL:root", "PANEL:JUDGE:root:secondary", "PANEL:JUDGE:cross-root:0->1", "PANEL:JUDGE:cross-root:1->0"];
+  const judgeRoutes = [SEAT_JUDGE_ONLY.fourth.providerRef, SEAT_JUDGE_ONLY.fifth.providerRef];
+  const assignment = () => {
+    const position = [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")];
+    return pinnedAssignment({
+      POSITION: position,
+      SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+      CROSS_EXCHANGE: position,
+      JUDGE: [judgeOnlySeat(0, "fourth"), judgeOnlySeat(1, "fifth")],
+      REVIEWER: [judgeOnlySeat(0, "fourth"), judgeOnlySeat(1, "fourthTwin")],
+      ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+      ANSWER_CHECKER: [pinnedSeat(0, "third")]
+    });
+  };
+  const doubles = (label: string) => ({
+    primary: Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+    secondary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Judge-only ${label} review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  });
+  const drawRunUsingBothJudges = async (
+    execute: (beforeExecute: (context: { readonly runId: string; readonly workItemId: string }) => Promise<void>) =>
+      ReturnType<typeof executeSeatScenario>,
+    seed: (context: { readonly runId: string; readonly workItemId: string }) => Promise<void> = async () => undefined
+  ): ReturnType<typeof executeSeatScenario> => {
+    for (let draw = 0; draw < 12; draw += 1) {
+      try {
+        return await execute(async (context) => {
+          const seats = new Set(knownNodes.map((key) => predictedSeats(context.runId, "JUDGE", key, [true, true], 1)[0]));
+          if (seats.size < 2) {
+            await new WorkItemRepository(database.pool).recordTerminalFailure({
+              runId: context.runId, workItemId: context.workItemId, reason: "TEST_ROTATION_REDRAW"
+            });
+            throw new RotationRedraw();
+          }
+          await seed(context);
+        });
+      } catch (error) {
+        if (!(error instanceof RotationRedraw)) throw error;
+      }
+    }
+    throw new Error("twelve runs in a row put all four root and exchange nodes on one judge seat");
+  };
+
+  it("calls each node's site-pure pick among the judge seats, so both seats judge across the run", async () => {
+    const scenario = await drawRunUsingBothJudges((beforeExecute) => executeSeatScenario({
+      label: "i2-every-judge-seat", judgeOnlyRoutes: true, assignment: assignment(), beforeExecute, ...doubles("I2 rotation")
+    }));
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const panel = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
+    // One judge per node (DR-184-v5's per-node count is unchanged) ...
+    expect(panel).toHaveLength(8);
+    expect(new Set(panel.map(panelBaseKey)).size).toBe(8);
+    // ... and it is the seat the node's rotation starts at, never simply the first seat.
+    expect(panel.map((call) => [panelBaseKey(call), call.actor_ref])).toEqual(panel.map((call) => [
+      panelBaseKey(call), judgeRoutes[predictedSeats(scenario.runId, "JUDGE", panelBaseKey(call), [true, true], 1)[0]!]
+    ]));
+    // Across the run, every judge seat the drawer lists judged.
+    expect(new Set(panel.map((call) => call.actor_ref))).toEqual(new Set(judgeRoutes));
+  });
+
+  it("reviews each node with the reviewer seat its site-pure rotation puts first, even where two seats share a maker", async () => {
+    const scenario = await drawRunUsingBothJudges((beforeExecute) => executeSeatScenario({
+      label: "i2-reviewer-rotation", judgeOnlyRoutes: true, assignment: assignment(), beforeExecute, ...doubles("I2 review")
+    }));
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const reviewerRoutes = [SEAT_JUDGE_ONLY.fourth.providerRef, SEAT_JUDGE_ONLY.fourthTwin.providerRef];
+    const reviews = scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:review:"));
+    expect(reviews).toHaveLength(8);
+    // Both seats are of one maker, so the maker rotation never moves off the first seat it is
+    // handed: the reviewer is exactly the seat the review site's own offset puts first.
+    expect(reviews.map((call) => call.actor_ref)).toEqual(reviews.map((call) => reviewerRoutes[
+      rotateSeats([0, 1], seatRotationOffset({
+        runId: scenario.runId, role: "REVIEWER", callSiteKey: call.call_site_key.replace(/:seat:main$/u, "")
+      }))[0]!
+    ]));
+  });
+
+  it("calls the same judge seat at every node on a resumed pass as the earlier pass did (restart determinism)", async () => {
+    const predicted = (runId: string, key: string): string =>
+      judgeRoutes[predictedSeats(runId, "JUDGE", key, [true, true], 1)[0]!]!;
+    const scenario = await drawRunUsingBothJudges((beforeExecute) => executeSeatScenario({
+      label: "i2-restart", judgeOnlyRoutes: true, judgeMaxAttempts: 2, assignment: assignment(), beforeExecute,
+      ...doubles("I2 restart")
+    }), async (context) => {
+      // The earlier pass judged the four root and exchange nodes, each with its own pick.
+      for (const key of knownNodes) {
+        const route = predicted(context.runId, key);
+        await appendEarlierPassCall(context, `${key}:${route}:seat:main`, "OK", route);
+      }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    for (const key of knownNodes) {
+      const rows = scenario.calls.filter((call) => call.call_site_key.startsWith(`${key}:`));
+      // The earlier pass's row and this pass's call: ONE seat at the node across both passes,
+      // so the node never spends above the per-node count on a seat the earlier pass left idle.
+      expect(rows.map((call) => call.actor_ref), key).toEqual([predicted(scenario.runId, key), predicted(scenario.runId, key)]);
+    }
+  });
+});
+
+/**
+ * A15d — the controller's binding carries, measured on the real ledger. Each
+ * scenario below seeds the ledger an EARLIER pass of the same work item left
+ * behind (the way the RESIL-01 T11/T12 rows above do), then runs the resumed
+ * pass: a resumed run re-authors every site, and the gateway counts attempts
+ * per exact key off the ledger, so what the earlier pass spent is what the
+ * resumed pass must respect (DR-184-v5, ruling A14).
+ */
+async function appendEarlierPassCall(context: {
+  readonly runId: string; readonly workItemId: string;
+}, callSiteKey: string, outcome: "OK" | "FAILED" | "TIMED_OUT", actorRef: string,
+// A16a: a synthesis row names its own contract (runnerSettings' composer or conformance hash).
+contractHash = "contract:judge:test-layer"): Promise<void> {
+  const now = new Date();
+  await new LedgerRepository(database.pool).append({
+    runId: context.runId, attemptId: randomUUID(), actionKind: "MODEL_CALL", callSiteKey,
+    subjectItemId: context.workItemId, stanceAtAction: "UNASSIGNED", outcome,
+    actorRef, inputHash: `input:earlier-pass:${randomUUID()}`,
+    contractHash, rawArtifactRef: null,
+    startedAt: now, finishedAt: now
+  });
+}
+
+/** POSITION seat 1 pins the third route as its runner-up (share 0: backup only). */
+function runnerUpAssignment(overrides: Partial<Record<DebateRole, readonly PinnedSeat[]>> = {}) {
+  const position = [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary", "third", 0)];
+  return pinnedAssignment({
+    POSITION: position,
+    SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+    CROSS_EXCHANGE: position,
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+    ANSWER_CHECKER: [pinnedSeat(0, "third")],
+    ...overrides
+  });
+}
+
+/** The doubles when root 1 is written by the third route (its runner-up). */
+const THIRD_WRITES_ROOT_ONE = Object.freeze({
+  primary: [
+    ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A15d position ${index + 1}`, 0.5)),
+    ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d review ${index + 1}`))
+  ],
+  secondary: [resil01Composition],
+  third: [
+    ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Third A15d node ${index + 1}`, 0.5)),
+    ...Array.from({ length: 4 }, (_, index) => reviewDouble("agree", `Third A15d review ${index + 1}`)),
+    evaluatorSatisfied()
+  ]
+});
+
+describe("A15d · controller carries — restart determinism, resume, fairness", () => {
+  it("carries 1, 2, 8, 11: a resumed root is written again by the member the ledger says answered it, its cross-exchange follows, and its panel excludes that member", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15d-restored-root",
+      judgeMaxAttempts: 2,
+      assignment: runnerUpAssignment(),
+      beforeExecute: async (context) => {
+        // The earlier pass: root 1 was answered by its runner-up.
+        await appendEarlierPassCall(context, "JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef);
+      },
+      ...THIRD_WRITES_ROOT_ONE
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const actorOf = (key: string): readonly string[] =>
+      scenario.calls.filter((call) => call.call_site_key === key).map((call) => call.actor_ref);
+    // Root 1 stays with the runner-up (the earlier pass's row, then this pass's).
+    expect(actorOf("JUDGE:root:secondary:seat:runnerUp")).toEqual([
+      SEAT_ROUTES.third.providerRef, SEAT_ROUTES.third.providerRef
+    ]);
+    expect(actorOf("JUDGE:root:secondary:seat:main")).toEqual([]);
+    // Its cross-exchange is written by that member, under that member's marker.
+    expect(actorOf("JUDGE:cross-root:1->0:seat:runnerUp")).toEqual([SEAT_ROUTES.third.providerRef]);
+    expect(actorOf("JUDGE:cross-root:1->0:seat:main")).toEqual([]);
+    expect(actorOf("JUDGE:cross-root:0->1:seat:main")).toEqual([SEAT_ROUTES.primary.providerRef]);
+    // Carry 8: the panel's author is the route that WROTE root 1 — the third
+    // route never grades it, and the primary (never its writer) does.
+    const rootOnePanel = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:JUDGE:root:secondary:"));
+    expect(rootOnePanel.map((call) => [call.call_site_key, call.actor_ref])).toEqual([[
+      `PANEL:JUDGE:root:secondary:${SEAT_ROUTES.primary.providerRef}:seat:main`, SEAT_ROUTES.primary.providerRef
+    ]]);
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
+  });
+
+  it("carry 2: a cross-exchange site keeps the ONE key the ledger already holds for it, whoever writes its root now", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15d-cross-exchange-key",
+      judgeMaxAttempts: 2,
+      assignment: runnerUpAssignment(),
+      beforeExecute: async (context) => {
+        // An earlier pass tried cross-exchange 1->0 under the main's key; a later
+        // one answered root 1 with the runner-up.
+        await appendEarlierPassCall(context, "JUDGE:cross-root:1->0:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef);
+        await appendEarlierPassCall(context, "JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef);
+      },
+      ...THIRD_WRITES_ROOT_ONE
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const crossExchange = scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:1->0"));
+    // One key for the site across passes; the row still names who answered.
+    expect(crossExchange.map((call) => [call.call_site_key, call.actor_ref])).toEqual([
+      ["JUDGE:cross-root:1->0:seat:main", SEAT_ROUTES.secondary.providerRef],
+      ["JUDGE:cross-root:1->0:seat:main", SEAT_ROUTES.third.providerRef]
+    ]);
+  });
+
+  it("carry 6: an exhausted root main whose runner-up was never tried is answered by the runner-up on resume, not failed terminally", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15d-resume-root-runner-up",
+      assignment: runnerUpAssignment(),
+      beforeExecute: async (context) => {
+        // judge 1 + final retry 1: the main's key is at its site allowance.
+        for (let index = 0; index < 2; index += 1) {
+          await appendEarlierPassCall(context, "JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef);
+        }
+      },
+      ...THIRD_WRITES_ROOT_ONE
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const rootOne = scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:secondary:"));
+    expect(rootOne.map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef],
+      ["JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef],
+      ["JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef]
+    ]);
+    const work = await database.pool.query<{ state: string }>(
+      "SELECT state FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows[0]?.state).toBe("DONE");
+  });
+
+  it("carries 3 and 4: the resumed runner-up gets no final retry once the other seat key spent one, and the halt names the bare site", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15d-final-retry-withheld",
+      assignment: runnerUpAssignment(),
+      beforeExecute: async (context) => {
+        for (let index = 0; index < 2; index += 1) {
+          await appendEarlierPassCall(context, "JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef);
+        }
+      },
+      primary: THIRD_WRITES_ROOT_ONE.primary,
+      secondary: THIRD_WRITES_ROOT_ONE.secondary,
+      // The runner-up's first sequence dies; a final retry would have landed.
+      third: [{ status: 503 }, ...THIRD_WRITES_ROOT_ONE.third]
+    });
+    expect(scenario.result).toBeNull();
+    expect(scenario.error).toMatchObject({ code: "MAKER_POSITION_UNAVAILABLE" });
+    // v5's cooldown site is 2j + f: j + f on the main's key, j on the runner-up's.
+    expect(scenario.calls.filter((call) => call.call_site_key === "JUDGE:root:secondary:seat:runnerUp")).toHaveLength(1);
+    // A16a (controller ruling): the halt reports the SITE's true attempts, both seat keys off the
+    // ledger — the main's 2 from the earlier pass and the runner-up's 1 — not this sequence's 1.
+    expect(scenario.lifecycle).toEqual([
+      { state: "MAKER_POSITION_HALTED", call_site_key: "JUDGE:root:secondary", attempts_spent: 3 }
+    ]);
+  });
+
+  it("carries 4, 5 and 6: an exhausted leg main with no runner-up halts as today, recorded under the bare site key", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a15d-leg-halted",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      beforeExecute: async (context) => {
+        for (let index = 0; index < 2; index += 1) {
+          await appendEarlierPassCall(context, `${callSiteKey}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef);
+        }
+      },
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A15d halt ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d halt review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15d halt ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A15d halt leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15d halt review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(2);
+    expect(scenario.lifecycle).toContainEqual({ state: "EXPANSION_HALTED", call_site_key: callSiteKey, attempts_spent: 2 });
+    expect(scenario.lifecycle.every((event) => !event.call_site_key.includes(":seat:"))).toBe(true);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
+  });
+
+  it("carry 9: a judge seat's member of the AUTHOR'S MAKER on another route is passed over for its runner-up", async () => {
+    const twinSeat: PinnedSeat = {
+      seatIndex: 0,
+      main: {
+        candidateId: "candidate:twin", providerRef: SEAT_TWIN.providerRef, maker: SEAT_TWIN.maker,
+        modelId: SEAT_TWIN.model, thinkingLevel: "DEFAULT_ONLY"
+      },
+      runnerUp: seatCandidateOf("third"),
+      diversityShare: 0,
+      source: "SCORECARD"
+    };
+    const scenario = await executeSeatScenario({
+      label: "a15d-twin-maker",
+      twin: true,
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [twinSeat],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A15d twin ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d twin review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15d twin ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A15d twin leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15d twin review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const panel = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
+    // Root 0 is the primary's: the twin shares its maker, so the runner-up judges.
+    expect(panel.filter((call) => call.call_site_key.startsWith("PANEL:root:")).map((call) => [call.call_site_key, call.actor_ref]))
+      .toEqual([[`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:runnerUp`, SEAT_ROUTES.third.providerRef]]);
+    // The primary's two nodes go to the runner-up; the other six to the twin.
+    expect(panel.filter((call) => call.actor_ref === SEAT_ROUTES.third.providerRef)).toHaveLength(2);
+    expect(panel.filter((call) => call.actor_ref === SEAT_TWIN.providerRef)).toHaveLength(6);
+    // No node lost its one non-author voice to the maker check.
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
+  });
+
+  it("keeps J24 for a FALLBACK synthesis seat: its sealed ref is probed at claim and refused without substitution", async () => {
+    const baseSettings = runnerSettings();
+    const fallbackChecker: PinnedSeat = {
+      seatIndex: 0,
+      main: {
+        candidateId: null, providerRef: SEAT_ROUTES.primary.providerRef, maker: SEAT_ROUTES.primary.maker,
+        modelId: SEAT_ROUTES.primary.model, thinkingLevel: "DEFAULT_ONLY"
+      },
+      runnerUp: null,
+      diversityShare: 0,
+      source: "FALLBACK"
+    };
+    const scenario = await executeSeatScenario({
+      label: "a15d-fallback-synthesis-j24",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "primary")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        REVIEWER: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [fallbackChecker]
+      }),
+      settings: {
+        // The sealed checker ref names a configured route OUTSIDE the debate panel.
+        synthesisRolePolicy: {
+          ...baseSettings.synthesisRolePolicy!,
+          evaluatorRoleRef: SEAT_ROUTES.third.providerRef,
+          identicalRoleRefs: false
+        },
+        claimTimeSynthesisRoleProbe: async (providerRef) => providerRef === SEAT_ROUTES.third.providerRef
+          ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+          : { state: "HEALTHY", modelId: "model:healthy", failureCode: null }
+      },
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(scenario.calls).toEqual([]);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE run_id=$1", [scenario.runId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:EVALUATOR" }]);
+  });
+});
+
+/** A15d fix round 1: the SUPPORT_ATTACK seat pins the primary route as the third's runner-up (backup only). */
+function legRunnerUpAssignment() {
+  return pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third", "primary", 0)],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+    ANSWER_CHECKER: [pinnedSeat(0, "third")]
+  });
+}
+
+async function seedEarlierPass(
+  context: { readonly runId: string; readonly workItemId: string },
+  rows: readonly (readonly [key: string, outcome: "OK" | "FAILED" | "TIMED_OUT", count: number, actorRef: string])[]
+): Promise<void> {
+  for (const [key, outcome, count, actorRef] of rows) {
+    for (let index = 0; index < count; index += 1) await appendEarlierPassCall(context, key, outcome, actorRef);
+  }
+}
+
+describe("A15d fix round 1 · a rescued site stays rescued; both keys spent keeps today's rule", () => {
+  // judge 2 + final 1: a key at 3 attempts has spent the site's final retry.
+  const judgeMaxAttempts = 2;
+
+  it("hands a spent root main to its runner-up AGAIN on the next resume, after the runner-up already answered", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-root-rescued-twice",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 3, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      ...THIRD_WRITES_ROOT_ONE
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const rootOne = scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:secondary:"));
+    expect(rootOne.map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ...Array.from({ length: 3 }, () => ["JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef]),
+      ["JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef],
+      ["JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef]
+    ]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:1->0"))
+      .map((call) => [call.call_site_key, call.actor_ref]))
+      .toEqual([["JUDGE:cross-root:1->0:seat:runnerUp", SEAT_ROUTES.third.providerRef]]);
+  });
+
+  it("hands a spent LEG main to its runner-up again on the next resume, with no halt", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-leg-rescued-twice",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 3, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary A15d fx1 node ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d fx1 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15d fx1 node ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A15d fx1 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15d fx1 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.lifecycle.filter((event) => event.state.endsWith("_HALTED"))).toEqual([]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${callSiteKey}:seat:runnerUp`))
+      .map((call) => [call.outcome, call.actor_ref]))
+      .toEqual([["OK", SEAT_ROUTES.primary.providerRef], ["OK", SEAT_ROUTES.primary.providerRef]]);
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("UNAUTHORED-BRANCH-HALTED");
+  });
+
+  it("fails a root terminally, as today, when BOTH of its seat keys are spent (carry 5: the exemption reads the bare site)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-root-both-spent",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 3, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "FAILED", 3, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("TERMINAL_FAILED");
+    // Nothing beyond the earlier pass's six rows: the refusal spends nothing.
+    expect(scenario.calls).toHaveLength(6);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" }]);
+  });
+
+  it("halts a leg, as today and under its bare site key, when BOTH of its seat keys are spent (carry 5)", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-leg-both-spent",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 3, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 3, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A15d fx1 halt ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d fx1 halt review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15d fx1 halt ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A15d fx1 halt leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15d fx1 halt review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(6);
+    // A16a (controller ruling): the site's true attempts — both seat keys, as the ledger holds them.
+    expect(scenario.lifecycle).toContainEqual({ state: "EXPANSION_HALTED", call_site_key: callSiteKey, attempts_spent: 6 });
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
+  });
+});
+
+describe("A15d fix round 1 · the panel's family discount and the claim's probes", () => {
+  it("E9: discounts the member by the family of the ROUTE that answered, not of a debater sharing its maker", async () => {
+    const baseSettings = runnerSettings();
+    const twinSeat: PinnedSeat = {
+      seatIndex: 0,
+      main: {
+        candidateId: "candidate:twin", providerRef: SEAT_TWIN.providerRef, maker: SEAT_TWIN.maker,
+        modelId: SEAT_TWIN.model, thinkingLevel: "DEFAULT_ONLY"
+      },
+      runnerUp: seatCandidateOf("third"),
+      diversityShare: 0,
+      source: "SCORECARD"
+    };
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-family-by-route",
+      twin: true,
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [twinSeat],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      settings: {
+        // The twin shares the PRIMARY's maker but sits in the SECONDARY's family.
+        panelPolicy: {
+          ...baseSettings.panelPolicy!,
+          providerFamilies: [
+            { familyRef: "test-layer:family:primary", providerRefs: [SEAT_ROUTES.primary.providerRef] },
+            { familyRef: "test-layer:family:secondary", providerRefs: [SEAT_ROUTES.secondary.providerRef, SEAT_TWIN.providerRef] }
+          ]
+        }
+      },
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A15d family ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A15d family review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A15d family ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A15d family leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A15d family review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const receipts = await database.pool.query<{
+      disagreement: { readonly panel: { readonly members: readonly Readonly<Record<string, unknown>>[] } };
+    }>(
+      `SELECT disagreement FROM ledger.reduced_judgement
+        WHERE run_id=$1 AND disagreement->'panel'->>'authorProviderRef' = $2 ORDER BY at_seq`,
+      [scenario.runId, SEAT_ROUTES.secondary.providerRef]
+    );
+    // Root 1 and cross-exchange 1->0: the author, then the twin — the SAME family,
+    // so the twin's voice is discounted. Looked up by maker, the twin would have
+    // been the primary's family and kept its full weight.
+    expect(receipts.rows).toHaveLength(2);
+    for (const row of receipts.rows) {
+      expect(row.disagreement.panel.members.map((member) => [
+        member.memberRole, member.familyRef, member.familyOrdinal, member.effectiveWeight
+      ])).toEqual([
+        [SEAT_ROUTES.secondary.maker, "test-layer:family:secondary", 1, 1],
+        [SEAT_TWIN.maker, "test-layer:family:secondary", 2, 0.5]
+      ]);
+    }
+  });
+
+  it("probes a sealed ref the assignment also names ONCE per claim, and the claim keeps that one verdict", async () => {
+    const baseSettings = runnerSettings();
+    const fallbackChecker: PinnedSeat = {
+      seatIndex: 0,
+      main: {
+        candidateId: null, providerRef: SEAT_ROUTES.primary.providerRef, maker: SEAT_ROUTES.primary.maker,
+        modelId: SEAT_ROUTES.primary.model, thinkingLevel: "DEFAULT_ONLY"
+      },
+      runnerUp: null,
+      diversityShare: 0,
+      source: "FALLBACK"
+    };
+    const probed: string[] = [];
+    const scenario = await executeSeatScenario({
+      label: "a15d-fx1-one-probe",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "primary")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        // The judge seat names the sealed checker's route, outside the debate panel.
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [fallbackChecker]
+      }),
+      settings: {
+        synthesisRolePolicy: {
+          ...baseSettings.synthesisRolePolicy!,
+          evaluatorRoleRef: SEAT_ROUTES.third.providerRef,
+          identicalRoleRefs: false
+        },
+        // A route that is absent on the first look and healthy on a second: a
+        // claim that looked twice would disagree with itself.
+        claimTimeSynthesisRoleProbe: async (providerRef) => {
+          probed.push(providerRef);
+          return probed.filter((ref) => ref === providerRef).length === 1
+            ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+            : { state: "HEALTHY", modelId: SEAT_ROUTES.third.model, failureCode: null };
+        }
+      },
+      primary: [], secondary: [], third: []
+    });
+    expect(probed).toEqual([SEAT_ROUTES.third.providerRef]);
+    expect(scenario.error).toMatchObject({ code: "SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM" });
+    expect(scenario.calls).toEqual([]);
+    expect(scenario.lifecycle).toContainEqual(expect.objectContaining({
+      state: "SYNTHESIS_ROLE_PROVIDER_ABSENT", call_site_key: `EVALUATOR:${SEAT_ROUTES.third.providerRef}`
+    }));
+  });
+});
+
+/**
+ * Model scorecard A16a — the seat caller's backup (R4) on the real ledger, and
+ * the resume boundary A15d argued for (controller carry 7).
+ */
+describe("A16a · carry 7 — a partner at EXACTLY judge attempts next to a spent main keeps today's rule", () => {
+  // judge 2 + final 1: the main's key at 3 has spent the site's final retry; the
+  // partner's at 2 has no first sequence left, so it can never answer the site.
+  const judgeMaxAttempts = 2;
+
+  it("fails a root terminally, as today, instead of crashing on CALL_BUDGET_EXHAUSTED", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-root-partner-at-judge",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 3, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "FAILED", 2, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("TERMINAL_FAILED");
+    // Nothing beyond the earlier pass's five rows: the refusal spends nothing.
+    expect(scenario.calls).toHaveLength(5);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" }]);
+  });
+
+  it("halts a leg, as today and under its bare site key, and the run goes on", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-partner-at-judge",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // A16c (controller carry 14d): the main's LAST row is a timeout and the partner's rows are
+      // failures recorded after it, so the halt's cited outcome is pinned to the exhausted key's own.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:main`, "TIMED_OUT", 1, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 2, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a boundary ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a boundary review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a boundary ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A16a boundary leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a boundary review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(5);
+    // The site's true attempts: both seat keys, 3 + 2, as the ledger holds them.
+    expect(scenario.lifecycle).toContainEqual({ state: "EXPANSION_HALTED", call_site_key: callSiteKey, attempts_spent: 5 });
+    expect(scenario.lifecycle.every((event) => !event.call_site_key.includes(":seat:"))).toBe(true);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
+    // A16c (carry 14d): the halt cites the exhausted main's own last outcome — TIMED_OUT — never
+    // the partner's later FAILED rows and never a flattened FAILED.
+    const halted = await database.pool.query<{ outcome: string }>(
+      `SELECT value_json->>'transport_outcome' AS outcome FROM core.run_progress_event
+        WHERE run_id=$1 AND value_json->>'state'='EXPANSION_HALTED' AND value_json->>'call_site_key'=$2`,
+      [scenario.runId, callSiteKey]
+    );
+    expect(halted.rows.map((row) => row.outcome)).toEqual(["TIMED_OUT"]);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey, terminal_transport_outcome: "TIMED_OUT"
+    }));
+  });
+});
+
+describe("A16a · the backup on the real ledger (R4; carries 5 and 6)", () => {
+  const legs = (calls: readonly { readonly call_site_key: string }[]): readonly string[] => [...new Set(calls
+    .map((call) => call.call_site_key.replace(/:seat:(?:main|runnerUp)$/u, ""))
+    .filter((site) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+$/u.test(site)))];
+
+  it("answers a leg from the runner-up in the same call after the main's transport failure, and keeps the main down", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-backup",
+      assignment: legRunnerUpAssignment(),
+      primary: [
+        judgementDouble("Primary A16a root", 0.5),
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary A16a backup leg ${index + 1}`, 0.5)),
+        judgementDouble("Primary A16a cross-exchange", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a node ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        { status: 503 },
+        judgementDouble("Third A16a never", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const sites = legs(scenario.calls);
+    expect(sites).toHaveLength(4);
+    const rowsAt = (site: string) => scenario.calls.filter((call) => call.call_site_key.startsWith(`${site}:seat:`)).map((call) => ({
+      key: call.call_site_key, outcome: call.outcome, actor: call.actor_ref,
+      candidate: call.candidate_id, version: call.scorecard_version, level: call.thinking_level
+    }));
+    const [first, ...later] = sites;
+    // The main's sequence (judge 1) fails, and the runner-up answers the SAME site under its own key,
+    // stamped as its own candidate (carry 6).
+    expect(rowsAt(first!)).toEqual([
+      {
+        key: `${first!}:seat:main`, outcome: "FAILED", actor: SEAT_ROUTES.third.providerRef,
+        candidate: "candidate:third", version: 7, level: "DEFAULT_ONLY"
+      },
+      {
+        key: `${first!}:seat:runnerUp`, outcome: "OK", actor: SEAT_ROUTES.primary.providerRef,
+        candidate: "candidate:primary", version: 7, level: "DEFAULT_ONLY"
+      }
+    ]);
+    // The main stays down for the rest of the run: every later leg goes straight to the runner-up.
+    for (const site of later) {
+      expect(rowsAt(site).map((row) => [row.key, row.outcome, row.actor]))
+        .toEqual([[`${site}:seat:runnerUp`, "OK", SEAT_ROUTES.primary.providerRef]]);
+    }
+    // No cooldown and no halt: the backup answered inside the first sequence.
+    expect(scenario.lifecycle).toEqual([]);
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("UNAUTHORED-BRANCH-HALTED");
+  });
+
+  it("holds a leg whose main AND runner-up fail under its bare key, retries the main's own key once, and halts at 2j + f", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-both-down",
+      assignment: legRunnerUpAssignment(),
+      primary: [
+        judgementDouble("Primary A16a both-down root", 0.5),
+        { status: 503 },
+        judgementDouble("Primary A16a both-down cross-exchange", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a both-down review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a both-down ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        { status: 503 },
+        { status: 503 },
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A16a both-down leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a both-down review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const [first, ...later] = legs(scenario.calls);
+    // judge 1, final 1: the main's key j + f, the runner-up's j — v5's cooldown site, 2j + f = 3.
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${first!}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      [`${first!}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef],
+      [`${first!}:seat:runnerUp`, "FAILED", SEAT_ROUTES.primary.providerRef],
+      [`${first!}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef]
+    ]);
+    // Holds, the retry and the halt name the BARE site (carry 6; migration 0069), and each reports
+    // the site's TRUE attempts at that moment — both seat keys, off the ledger: 2 at the hold, 3 at the halt.
+    expect(scenario.lifecycle.filter((event) => event.call_site_key === first)
+      .map((event) => [event.state, event.attempts_spent])).toEqual([
+      ["COOLDOWN_HOLD", 2], ["COOLDOWN_RETRY", 2], ["EXPANSION_HALTED", 3]
+    ]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${first!}:seat:`))).toHaveLength(3);
+    expect(scenario.lifecycle.every((event) => !event.call_site_key.includes(":seat:"))).toBe(true);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: first
+    }));
+    // Both members are down, so every later leg calls the preferred member again under its own key.
+    for (const site of later) {
+      expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${site}:seat:`))
+        .map((call) => [call.call_site_key, call.outcome])).toEqual([[`${site}:seat:main`, "OK"]]);
+    }
+  });
+});
+
+describe("A16a · R3's 80-20 split on the real ledger (carry 1)", () => {
+  it("sends every leg and every panel call to the member its SITE's ordinal names, with the run's own id", async () => {
+    const legSeat = pinnedSeat(0, "third", "primary", 0.2);
+    const judgeSeat = pinnedSeat(0, "third", "secondary", 0.2);
+    const scenario = await executeSeatScenario({
+      label: "a16a-live-split",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [legSeat],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [judgeSeat],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      // Either member may author any leg, so each holds a leg answer for every leg.
+      primary: [
+        ...Array.from({ length: 6 }, (_, index) => judgementDouble(`Primary A16a split ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a split review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a split ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a split leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a split review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const routeOf = (slot: "MAIN" | "RUNNER_UP", seat: RoleSeat): string =>
+      (slot === "MAIN" ? seat.main : seat.runnerUp!).providerRef;
+    const via = (seat: RoleSeat, role: DebateRole, callSiteKey: string) =>
+      selectSeatCandidate(seat, seatSiteOrdinal({ runId: scenario.runId, role, pinnedSeatIndex: 0, callSiteKey })).via;
+    const makerOf = (providerRef: string): string =>
+      Object.values(SEAT_ROUTES).find((route) => route.providerRef === providerRef)!.maker;
+    // (1) Legs: no fairness rule narrows the SUPPORT_ATTACK seat, so its site's ordinal alone decides.
+    const legRows = scenario.calls.filter((call) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+:seat:/u.test(call.call_site_key));
+    expect(legRows).toHaveLength(4);
+    const writerOf = new Map<string, string>([
+      ["PANEL:root", SEAT_ROUTES.primary.providerRef],
+      ["PANEL:JUDGE:root:secondary", SEAT_ROUTES.secondary.providerRef],
+      ["PANEL:JUDGE:cross-root:0->1", SEAT_ROUTES.primary.providerRef],
+      ["PANEL:JUDGE:cross-root:1->0", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    for (const row of legRows) {
+      const site = row.call_site_key.replace(/:seat:(?:main|runnerUp)$/u, "");
+      const slot = via(legSeat, "SUPPORT_ATTACK", site);
+      expect([row.call_site_key, row.outcome, row.actor_ref])
+        .toEqual([`${site}:seat:${slot === "MAIN" ? "main" : "runnerUp"}`, "OK", routeOf(slot, legSeat)]);
+      writerOf.set(`PANEL:${site}`, row.actor_ref);
+    }
+    // (2) Panel: the site's ordinal decides unless it names the author's own maker (FX-HR-H6), then the other.
+    const panelRows = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
+    expect(panelRows).toHaveLength(8);
+    for (const row of panelRows) {
+      const site = row.call_site_key.replace(/:seat:(?:main|runnerUp)$/u, "").replace(`:${row.actor_ref}`, "");
+      const author = makerOf(writerOf.get(site)!);
+      const named = via(judgeSeat, "JUDGE", site);
+      const other = named === "MAIN" ? "RUNNER_UP" : "MAIN";
+      const slot = makerOf(routeOf(named, judgeSeat)) === author ? other : named;
+      expect([row.call_site_key, row.actor_ref])
+        .toEqual([`${site}:${routeOf(slot, judgeSeat)}:seat:${slot === "MAIN" ? "main" : "runnerUp"}`, routeOf(slot, judgeSeat)]);
+    }
+    // A split is not a switch: nothing failed, so no hold, no halt.
+    expect(scenario.lifecycle).toEqual([]);
+  });
+});
+
+/**
+ * A16a pre-review ruling on carry 1 — a resumed pass seats every judge seat
+ * site the way the ledger says an earlier pass did. The seat caller's down
+ * marks live in memory only, so without the ledger a resumed pass would try the
+ * main first again after its runner-up had taken the site over.
+ */
+describe("A16a · carry 1 on resume — a site an earlier pass switched stays with the member the ledger names", () => {
+  const judgeMaxAttempts = 2;
+  const callSiteKey = "JUDGE:defender:root0:r1:p0";
+  const legDoubles = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  });
+
+  it("plans a LEG the runner-up answered to the runner-up again: no CALL_BUDGET_EXHAUSTED, the run completes", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-resume-leg-answered",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // The earlier pass: the main spent its first sequence (judge = 2), the runner-up answered.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      ...legDoubles("A16a resume answered")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${callSiteKey}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ...Array.from({ length: 2 }, () => [`${callSiteKey}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef]),
+      [`${callSiteKey}:seat:runnerUp`, "OK", SEAT_ROUTES.primary.providerRef],
+      [`${callSiteKey}:seat:runnerUp`, "OK", SEAT_ROUTES.primary.providerRef]
+    ]);
+    expect(scenario.lifecycle).toEqual([]);
+  });
+
+  it("never tries a spent slot again at a site whose switch finished without an answer", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-resume-leg-switched",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // The earlier pass switched: the main spent its first sequence, the runner-up was tried once
+      // (a usage cap, say) and the pass ended. The runner-up can still answer; the main cannot.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      ...legDoubles("A16a resume switched")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${callSiteKey}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome])).toEqual([
+      [`${callSiteKey}:seat:main`, "FAILED"], [`${callSiteKey}:seat:main`, "FAILED"],
+      [`${callSiteKey}:seat:runnerUp`, "FAILED"],
+      [`${callSiteKey}:seat:runnerUp`, "OK"]
+    ]);
+    expect(scenario.lifecycle).toEqual([]);
+  });
+
+  it("plans a PANEL site the runner-up answered to the runner-up again: the node keeps its voice", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-resume-panel-answered",
+      judgeMaxAttempts,
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third", "secondary", 0)],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      // Root 0's panel on the earlier pass: the main spent its sequence, the runner-up judged.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.secondary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a panel ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a panel review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a panel ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a panel leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a panel review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:root:"))
+      .map((call) => [call.call_site_key, call.outcome])).toEqual([
+      [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "FAILED"],
+      [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "FAILED"],
+      [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "OK"],
+      [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "OK"]
+    ]);
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-PARTIAL");
+  });
+});
+
+/**
+ * A16a controller rulings on the resume gaps — (1) a synthesis seat that
+ * switched is answered again by a slot that can still be called, never failed
+ * off its spent main alone; (2) a site whose every usable key is spent reaches
+ * today's clean halt or terminal, never a CALL_BUDGET_EXHAUSTED crash.
+ */
+describe("A16a · resume gap 1 — a synthesis seat keeps a slot that can still answer", () => {
+  const SYNTHESIZER_SITE = "COMPOSER:SYNTHESIZER:INITIAL:1";
+  const COMPOSER_CONTRACT = "contract:composer:test-layer";
+  // The synthesizer's sealed bound at 2, so a slot that answered once can be asked again.
+  const synthesisSettings = (): Partial<WalkingSkeletonSettings> => {
+    const base = runnerSettings();
+    return {
+      synthesisRolePolicy: {
+        ...base.synthesisRolePolicy!,
+        synthesizerBound: { ...base.synthesisRolePolicy!.synthesizerBound, maxAttempts: 2 }
+      }
+    };
+  };
+  const writerRunnerUpAssignment = () => pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    // The writer's runner-up is the third route (share 0: backup only).
+    ANSWER_WRITER: [pinnedSeat(0, "secondary", "third", 0)],
+    ANSWER_CHECKER: [pinnedSeat(0, "third")]
+  });
+  // The main (secondary) holds NO composition: were it asked, the run would fail on its answer.
+  const doubles = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+    third: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`)),
+      resil01Composition,
+      evaluatorSatisfied()
+    ]
+  });
+  const composerRows = (calls: readonly { readonly call_site_key: string; readonly outcome: string; readonly actor_ref: string }[]) =>
+    calls.filter((call) => call.call_site_key.startsWith(`${SYNTHESIZER_SITE}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref]);
+  const seedSynthesis = (rows: readonly (readonly [slot: "main" | "runnerUp", outcome: "OK" | "FAILED", count: number])[]) =>
+    async (context: { readonly runId: string; readonly workItemId: string }): Promise<void> => {
+      for (const [slot, outcome, count] of rows) {
+        for (let index = 0; index < count; index += 1) {
+          await appendEarlierPassCall(context, `${SYNTHESIZER_SITE}:seat:${slot}`, outcome,
+            slot === "main" ? SEAT_ROUTES.secondary.providerRef : SEAT_ROUTES.third.providerRef, COMPOSER_CONTRACT);
+        }
+      }
+    };
+  const MAIN_FAILED = [`${SYNTHESIZER_SITE}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef];
+  const BACKUP_OK = [`${SYNTHESIZER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef];
+
+  it("asks the backup that answered the synthesis on the earlier pass again, never the spent main, and completes", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-synthesis-backup-answered",
+      assignment: writerRunnerUpAssignment(),
+      settings: synthesisSettings(),
+      beforeExecute: seedSynthesis([["main", "FAILED", 2], ["runnerUp", "OK", 1]]),
+      ...doubles("A16a synth answered")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(composerRows(scenario.calls)).toEqual([MAIN_FAILED, MAIN_FAILED, BACKUP_OK, BACKUP_OK]);
+  });
+
+  it("hands a spent main's synthesis to its untried backup (carry 6's hand-off)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-synthesis-backup-untried",
+      assignment: writerRunnerUpAssignment(),
+      settings: synthesisSettings(),
+      beforeExecute: seedSynthesis([["main", "FAILED", 2]]),
+      ...doubles("A16a synth untried")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(composerRows(scenario.calls)).toEqual([MAIN_FAILED, MAIN_FAILED, BACKUP_OK]);
+  });
+
+  it("fails the work item terminally, as today and before any call, when BOTH synthesis slots are spent", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-synthesis-both-spent",
+      assignment: writerRunnerUpAssignment(),
+      settings: synthesisSettings(),
+      beforeExecute: seedSynthesis([["main", "FAILED", 2], ["runnerUp", "FAILED", 2]]),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("TERMINAL_FAILED");
+    expect(scenario.calls).toHaveLength(4);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" }]);
+  });
+
+  it("S1a: a resumed pass's hand-off to the slot the ledger prefers is disclosed as planned = served, never as money", async () => {
+    const events: string[] = [];
+    const scenario = await executeSeatScenario({
+      label: "s1a-synthesis-resumed-disclosure",
+      assignment: writerRunnerUpAssignment(),
+      settings: { ...synthesisSettings(), serveDisclosure: { log: (event: string) => { events.push(event); } } },
+      beforeExecute: seedSynthesis([["main", "FAILED", 2], ["runnerUp", "OK", 1]]),
+      ...doubles("S1a resumed disclosure")
+    });
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(await disclosureRowOf(answerIdOf(scenario))).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.third.providerRef, writerServedRef: SEAT_ROUTES.third.providerRef,
+      writerFallback: false, fallbackReason: null
+    });
+    expect(events).toEqual([]);
+  });
+});
+
+/**
+ * Paid plans S1a — THE ANSWER'S SEATS INSIDE DEV'S MONEY FALLBACK AND DISCLOSURE
+ * (silent conflicts 3 and 4). The seat caller chooses who answers (main, runner-up,
+ * the backup on a cap now or an outage after retries); dev's money fallback takes
+ * only a MONEY refusal to a cheaper claim-eligible maker; and the owner's disclosure
+ * row calls only that a fallback. Every row reads serve.serve_disclosure itself: its
+ * writer never throws, so the run's outcome alone proves nothing.
+ */
+describe("S1a · the answer's seats inside dev's money fallback and disclosure", () => {
+  const debate = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+    third: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`))
+    ]
+  });
+  // A15's debate; the two answer seats are the row's own.
+  const seats = (writer: readonly PinnedSeat[], checker: readonly PinnedSeat[]) => pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    ANSWER_WRITER: [...writer],
+    ANSWER_CHECKER: [...checker]
+  });
+  const USAGE_CAP = { status: 429, body: JSON.stringify({ x_cli_relay_error: "CLI_RELAY_USAGE_CAP" }) } as const;
+  const logged = () => {
+    const events: string[] = [];
+    return { events, settings: { serveDisclosure: { log: (event: string) => { events.push(event); } } } };
+  };
+  const rowsAt = (calls: readonly { call_site_key: string; outcome: string; actor_ref: string }[], prefix: string) =>
+    calls.filter((call) => call.call_site_key.startsWith(prefix))
+      .map((call): readonly [string, string, string] => [call.call_site_key, call.outcome, call.actor_ref]);
+
+  it("writes the answer with writer and checker seats OUTSIDE the debaters, and calls nothing a fallback", async () => {
+    const log = logged();
+    const base = debate("S1a outside");
+    const scenario = await executeSeatScenario({
+      label: "s1a-seats-outside-debaters",
+      assignment: seats([pinnedSeat(0, "third")], [judgeOnlySeat(0, "fourth")]),
+      judgeOnlyRoutes: true,
+      settings: log.settings,
+      ...base,
+      // The fourth route is served by the third double: the writer's draft and the checker's verdict both queue there.
+      third: [...base.third, resil01Composition, evaluatorSatisfied()]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(rowsAt(scenario.calls, "COMPOSER:SYNTHESIZER:")).toEqual([
+      ["COMPOSER:SYNTHESIZER:INITIAL:1:seat:main", "OK", SEAT_ROUTES.third.providerRef]
+    ]);
+    expect(rowsAt(scenario.calls, "POST_COMPOSE_R9:EVALUATOR:")).toEqual([
+      ["POST_COMPOSE_R9:EVALUATOR:1:seat:main", "OK", SEAT_JUDGE_ONLY.fourth.providerRef]
+    ]);
+    expect(await disclosureRowOf(answerIdOf(scenario))).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.third.providerRef, writerServedRef: SEAT_ROUTES.third.providerRef,
+      checkerPlannedRef: SEAT_JUDGE_ONLY.fourth.providerRef, checkerServedRef: SEAT_JUDGE_ONLY.fourth.providerRef,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false
+    });
+    expect(log.events).toEqual([]);
+  });
+
+  it("a usage cap hands the writer's round to its runner-up: planned = served = the runner-up, never MONEY", async () => {
+    const log = logged();
+    const base = debate("S1a writer cap");
+    const scenario = await executeSeatScenario({
+      label: "s1a-writer-usage-cap",
+      // Share 0: the runner-up is the backup only, so the main is always asked first.
+      assignment: seats([pinnedSeat(0, "secondary", "third", 0)], [pinnedSeat(0, "third")]),
+      settings: log.settings,
+      ...base,
+      // The main's draft is refused by a cap; the entry after it only types the failure.
+      secondary: [...base.secondary, USAGE_CAP, resil01Composition],
+      third: [...base.third, resil01Composition, evaluatorSatisfied()]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const composer = rowsAt(scenario.calls, "COMPOSER:SYNTHESIZER:INITIAL:1:");
+    expect(composer.filter(([, outcome]) => outcome === "OK"))
+      .toEqual([["COMPOSER:SYNTHESIZER:INITIAL:1:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef]]);
+    expect(composer.some(([key, outcome, actor]) => key.endsWith(":seat:main") && outcome !== "OK" && actor === SEAT_ROUTES.secondary.providerRef)).toBe(true);
+    expect(scenario.switchEvents).toContainEqual(expect.objectContaining({
+      state: "BACKUP_MODEL_ENGAGED", role: "ANSWER_WRITER", cause: "USAGE_CAP",
+      from_provider_ref: SEAT_ROUTES.secondary.providerRef, to_provider_ref: SEAT_ROUTES.third.providerRef
+    }));
+    expect(scenario.answer?.condition_marks).toContain("BACKUP-MODEL-USED");
+    expect(await disclosureRowOf(answerIdOf(scenario))).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.third.providerRef, writerServedRef: SEAT_ROUTES.third.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEAT_ROUTES.third.providerRef,
+      writerFallback: false, checkerFallback: false, fallbackReason: null,
+      // Computed from the members that ANSWERED: the runner-up wrote, the checker's main checked.
+      checkerSameAsWriter: true
+    });
+    expect(log.events).toEqual([]);
+  });
+
+  it("an outage hands the checker's round to its runner-up: planned = served = the runner-up, and the diversity flag reads who answered", async () => {
+    const log = logged();
+    const base = debate("S1a checker outage");
+    const scenario = await executeSeatScenario({
+      label: "s1a-checker-outage",
+      assignment: seats([pinnedSeat(0, "secondary")], [pinnedSeat(0, "third", "primary", 0)]),
+      settings: log.settings,
+      ...base,
+      primary: [...base.primary, evaluatorSatisfied()],
+      secondary: [...base.secondary, resil01Composition],
+      // The checker's main fails at the transport (one attempt: the sealed evaluator bound); the entry after it only types it.
+      third: [...base.third, { status: 503 }, evaluatorSatisfied()]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(rowsAt(scenario.calls, "POST_COMPOSE_R9:EVALUATOR:1:").filter(([, outcome]) => outcome === "OK"))
+      .toEqual([["POST_COMPOSE_R9:EVALUATOR:1:seat:runnerUp", "OK", SEAT_ROUTES.primary.providerRef]]);
+    expect(scenario.answer?.condition_marks).toContain("BACKUP-MODEL-USED");
+    expect(await disclosureRowOf(answerIdOf(scenario))).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.secondary.providerRef, writerServedRef: SEAT_ROUTES.secondary.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.primary.providerRef, checkerServedRef: SEAT_ROUTES.primary.providerRef,
+      writerFallback: false, checkerFallback: false, fallbackReason: null, checkerSameAsWriter: false
+    });
+    expect(log.events).toEqual([]);
+  });
+
+  it("a MONEY refusal of the seat's own call moves the SAME request to a claim-eligible debater, and says MONEY", async () => {
+    const log = logged();
+    const base = debate("S1a money");
+    const thirdSeam = moneySeam({ refuseServe: [1] });
+    const seen: { route: string; request: ProviderCallRequest }[] = [];
+    const scenario = await executeSeatScenario({
+      label: "s1a-writer-money",
+      assignment: seats([pinnedSeat(0, "third")], [pinnedSeat(0, "third")]),
+      settings: log.settings,
+      costEnvelopes: { third: thirdSeam.build },
+      observe: (route, request) => { if (request.role === "SYNTHESIZER") seen.push({ route, request }); },
+      ...base,
+      // The fallback order is the claim-eligible debaters, roster order with no prices: the primary first.
+      primary: [...base.primary, resil01Composition],
+      third: [...base.third, evaluatorSatisfied()]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // The seat member was asked first and refused before sending; the debater then answered the same framed prompt.
+    expect(seen.map((entry) => [entry.route, entry.request.callSiteKey, entry.request.providerRef])).toEqual([
+      ["third", "COMPOSER:SYNTHESIZER:INITIAL:1:seat:main", SEAT_ROUTES.third.providerRef],
+      ["primary", "COMPOSER:SYNTHESIZER:INITIAL:1", SEAT_ROUTES.primary.providerRef]
+    ]);
+    expect(JSON.stringify(seen[1]!.request.packet)).toBe(JSON.stringify(seen[0]!.request.packet));
+    expect(await serveLedger(scenario.runId)).toEqual([
+      { call_site_key: "COMPOSER:SYNTHESIZER:INITIAL:1", actor_ref: SEAT_ROUTES.primary.providerRef, outcome: "OK" },
+      { call_site_key: "POST_COMPOSE_R9:EVALUATOR:1:seat:main", actor_ref: SEAT_ROUTES.third.providerRef, outcome: "OK" }
+    ]);
+    expect(await disclosureRowOf(answerIdOf(scenario))).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.third.providerRef, writerServedRef: SEAT_ROUTES.primary.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEAT_ROUTES.third.providerRef,
+      writerFallback: true, checkerFallback: false, fallbackReason: "MONEY", checkerSameAsWriter: false
+    });
+    expect(log.events).toEqual([]);
+  });
+
+  it("after a backup switch, the checker's money fallback avoids the member that REALLY wrote the draft", async () => {
+    const log = logged();
+    const base = debate("S1a prefer-not");
+    const scenario = await executeSeatScenario({
+      label: "s1a-checker-prefers-not-the-real-writer",
+      // The writer's main (secondary) is capped, so its runner-up (primary) writes; the checker's seat (third) is refused for money.
+      assignment: seats([pinnedSeat(0, "secondary", "primary", 0)], [pinnedSeat(0, "third")]),
+      settings: log.settings,
+      costEnvelopes: { third: moneySeam({ refuseServe: [1] }).build },
+      ...base,
+      primary: [...base.primary, resil01Composition],
+      // The capped draft, the entry that only types it, and the verdict the fallback checker gives.
+      secondary: [...base.secondary, USAGE_CAP, resil01Composition, evaluatorSatisfied()]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // Roster order with no prices would try the primary first; `preferNot` names the REAL writer (the
+    // primary, after the switch), so the secondary checks. Naming the planned writer would pick the primary.
+    expect(await disclosureRowOf(answerIdOf(scenario))).toMatchObject({
+      writerPlannedRef: SEAT_ROUTES.primary.providerRef, writerServedRef: SEAT_ROUTES.primary.providerRef,
+      checkerPlannedRef: SEAT_ROUTES.third.providerRef, checkerServedRef: SEAT_ROUTES.secondary.providerRef,
+      writerFallback: false, checkerFallback: true, fallbackReason: "MONEY", checkerSameAsWriter: false
+    });
+    expect(log.events).toEqual([]);
+  });
+
+  it("asks every seat-marked call in the question's language (Romanian), never the default", async () => {
+    const seen: ProviderCallRequest[] = [];
+    const scenario = await executeSeatScenario({
+      label: "s1a-romanian-seats",
+      language: { tag: "ro", name: "Romanian" },
+      assignment: seats([pinnedSeat(0, "secondary")], [pinnedSeat(0, "third")]),
+      observe: (_route, request) => { seen.push(request); },
+      ...debate("S1a Romanian"),
+      secondary: [...debate("S1a Romanian").secondary, resil01Composition],
+      third: [...debate("S1a Romanian").third, evaluatorSatisfied()]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const families: Readonly<Record<string, (key: string) => boolean>> = {
+      judge: (key) => key.startsWith("JUDGE:") && !key.startsWith("JUDGE:review:"),
+      review: (key) => key.startsWith("JUDGE:review:"),
+      panel: (key) => key.startsWith("PANEL:"),
+      writer: (key) => key.startsWith("COMPOSER:SYNTHESIZER:"),
+      checker: (key) => key.startsWith("POST_COMPOSE_R9:EVALUATOR:")
+    };
+    for (const [family, inFamily] of Object.entries(families)) {
+      const requests = seen.filter((request) => inFamily(request.callSiteKey));
+      // Never vacuous: every family made at least one call in this debate.
+      expect(requests.length, family).toBeGreaterThan(0);
+      for (const request of requests) {
+        const text = request.packet.messages.map((message) => message.content).join("\n");
+        expect(text, `${family} ${request.callSiteKey}`).toContain(argumentLanguageDirective("Romanian"));
+        expect(text, `${family} ${request.callSiteKey}`).not.toContain(argumentLanguageDirective("the same language as the question"));
+      }
+    }
+  });
+
+  it("exports a Romanian run's moments in Romanian, and replays every one as the recorded prompt", async () => {
+    const scenario = await executeSeatScenario({
+      label: "s1a-romanian-moments",
+      language: { tag: "ro", name: "Romanian" },
+      assignment: seats([pinnedSeat(0, "secondary")], [pinnedSeat(0, "third")]),
+      ...debate("S1a Romanian moments"),
+      secondary: [...debate("S1a Romanian moments").secondary, resil01Composition],
+      third: [...debate("S1a Romanian moments").third, evaluatorSatisfied()]
+    });
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const exported = await exportRunMoments(createPostgresMomentSource(database.pool), {
+      runId: scenario.runId, exportedAt: new Date().toISOString(), engineCommit: null
+    });
+    expect(exported.skipped).toEqual([]);
+    expect(new Set(exported.moments.map((moment) => moment.role))).toEqual(new Set(DEBATE_ROLES));
+    expect(exported.moments.filter((moment) =>
+      (moment.builder.inputs as { argumentLanguageName?: unknown }).argumentLanguageName !== "Romanian"
+    ).map((moment) => moment.source.callSiteKey)).toEqual([]);
+    const wire: string[] = [];
+    const refusing = (async (_input: unknown, init?: { readonly body?: unknown }) => {
+      wire.push(String(init?.body));
+      return new Response(JSON.stringify({ error: "CLI_RELAY_FAILED" }), { status: 502 });
+    }) as typeof fetch;
+    const momentDirectory = await mkdtemp(join(tmpdir(), "s1a-ro-moments-"));
+    try {
+      for (const exportedMoment of exported.moments) {
+        const momentPath = join(momentDirectory, momentFileNameFor(exportedMoment));
+        await writePrivateJsonFile(momentPath, exportedMoment);
+        const moment = await readMomentFile(momentPath);
+        const offline = await captureMomentPacket(parseMomentBuilder(moment.builder, moment.role));
+        wire.length = 0;
+        const replayed = await replayMoment({
+          moment,
+          thinkingLevel: "DEFAULT_ONLY",
+          bound: { maxAttempts: 1, tokenCeiling: 512, deadlineMs: 5_000 },
+          endpoint: {
+            providerRef: "replay:refusing", maker: "Refusing relay", tool: "claude", modelId: "refusing-model",
+            baseUrl: "http://127.0.0.1:9/v1", bearerToken: "r".repeat(43), thinkingLevels: [], contextWindowTokens: null
+          },
+          fetchImplementation: refusing,
+          sleepImplementation: async () => undefined
+        });
+        const onWire = JSON.parse(wire[0] ?? "{}") as { readonly messages?: readonly { readonly role: string; readonly content: string }[] };
+        // Fingerprints, never raw prompts: a framed prompt carries a random fence and canary. The prompt is
+        // compared as it LEFT the gateway (one request, the relay's 502 is the FAILED), as the A18 row does.
+        expect({
+          key: moment.source.callSiteKey,
+          requests: wire.length,
+          onWire: canonicalPromptFingerprint(onWire.messages ?? []),
+          offline: canonicalPromptFingerprint(offline.messages),
+          sent: replayed.promptFingerprint,
+          same: replayed.fingerprintMatchesRecorded,
+          outcome: replayed.outcome
+        }).toEqual({
+          key: exportedMoment.source.callSiteKey,
+          requests: 1,
+          onWire: exportedMoment.recorded?.promptFingerprint,
+          offline: exportedMoment.recorded?.promptFingerprint,
+          sent: exportedMoment.recorded?.promptFingerprint,
+          same: true,
+          outcome: "FAILED"
+        });
+      }
+    } finally {
+      await rm(momentDirectory, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("A16a · resume gap 2 — a site with no slot left to call halts or ends cleanly, never CALL_BUDGET_EXHAUSTED", () => {
+  const judgeMaxAttempts = 2;
+  const callSiteKey = "JUDGE:defender:root0:r1:p0";
+
+  it("halts a leg whose two slots both spent their first sequence (a pass that died in the cooldown)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-both-first-sequences",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 2, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a gap2 ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a gap2 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a gap2 ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A16a gap2 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a gap2 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // No new call at the site; the halt names the bare site and the ledger's true count.
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(4);
+    expect(scenario.lifecycle).toContainEqual({ state: "EXPANSION_HALTED", call_site_key: callSiteKey, attempts_spent: 4 });
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey
+    }));
+  });
+
+  it("fails root 1 terminally, as today and before any call, when its two slots both spent their first sequence", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-root-both-first-sequences",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 2, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "FAILED", 2, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("TERMINAL_FAILED");
+    expect(scenario.calls).toHaveLength(4);
+    const work = await database.pool.query<{ state: string; terminal_reason: string | null }>(
+      "SELECT state, terminal_reason FROM core.work_item WHERE work_item_id=$1", [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED" }]);
+  });
+
+  it("hands a leg whose answering slot has no attempt left to the slot that still has one", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-leg-answered-at-bound",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // The main answered on its last allowed attempt; the runner-up was never tried.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 1, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:main`, "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary A16a bound ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a bound review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a bound ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third A16a bound leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a bound review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${callSiteKey}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome])).toEqual([
+      [`${callSiteKey}:seat:main`, "FAILED"], [`${callSiteKey}:seat:main`, "OK"], [`${callSiteKey}:seat:runnerUp`, "OK"]
+    ]);
+    expect(scenario.lifecycle).toEqual([]);
+  });
+});
+
+/**
+ * A16a fix round 1 — a slot a resumed pass restores is a PREFERENCE: the seat
+ * keeps its backup, so an outage on the restored slot moves the site to the
+ * other member (R4), on every kind of seat site. Each earlier pass below
+ * switched on a usage cap (the main's one capped attempt), so both keys can
+ * still be called.
+ */
+describe("A16a fix round 1 · a restored slot keeps its backup on resume", () => {
+  const judgeMaxAttempts = 2;
+
+  it("a LEG: the runner-up that answered fails with an outage, the main answers in the same call", async () => {
+    const callSiteKey = "JUDGE:defender:root0:r1:p0";
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-leg-restored-backup",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 1, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      primary: [
+        judgementDouble("Primary A16a fx1 root", 0.5),
+        { status: 503 },
+        judgementDouble("Primary A16a fx1 cross-exchange", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a fx1 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a fx1 ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a fx1 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a fx1 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${callSiteKey}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      [`${callSiteKey}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef],
+      [`${callSiteKey}:seat:runnerUp`, "OK", SEAT_ROUTES.primary.providerRef],
+      [`${callSiteKey}:seat:runnerUp`, "FAILED", SEAT_ROUTES.primary.providerRef],
+      [`${callSiteKey}:seat:main`, "OK", SEAT_ROUTES.third.providerRef]
+    ]);
+    // Switched inside the first sequence: no cooldown, no halt.
+    expect(scenario.lifecycle).toEqual([]);
+  });
+
+  it("ROOT 1: the runner-up that wrote it fails with an outage, the main writes it, and its cross-exchange follows", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-root-restored-backup",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 1, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a fx1 root ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a fx1 root review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a fx1 root ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        { status: 503 },
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a fx1 root leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a fx1 root review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:root:secondary:"))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      ["JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef],
+      ["JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef],
+      ["JUDGE:root:secondary:seat:runnerUp", "FAILED", SEAT_ROUTES.third.providerRef],
+      ["JUDGE:root:secondary:seat:main", "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:1->0"))
+      .map((call) => [call.call_site_key, call.actor_ref]))
+      .toEqual([["JUDGE:cross-root:1->0:seat:main", SEAT_ROUTES.secondary.providerRef]]);
+    expect(scenario.lifecycle).toEqual([]);
+  });
+
+  it("a PANEL member: the runner-up that judged fails with an outage, the main judges, the node keeps its voice", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-panel-restored-backup",
+      judgeMaxAttempts,
+      panelFailures: { secondary: 1 },
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third", "secondary", 0)],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "FAILED", 1, SEAT_ROUTES.third.providerRef],
+        [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.secondary.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a fx1 panel ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a fx1 panel review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a fx1 panel ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a fx1 panel leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a fx1 panel review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:root:"))
+      .map((call) => [call.call_site_key, call.outcome])).toEqual([
+      [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "FAILED"],
+      [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "OK"],
+      [`PANEL:root:${SEAT_ROUTES.secondary.providerRef}:seat:runnerUp`, "FAILED"],
+      [`PANEL:root:${SEAT_ROUTES.third.providerRef}:seat:main`, "OK"]
+    ]);
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-DEGRADED-SINGLE-VOICE");
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("PANEL-PARTIAL");
+  });
+
+  it("a SYNTHESIS seat: the backup that answered fails with an outage, the main answers", async () => {
+    const site = "COMPOSER:SYNTHESIZER:INITIAL:1";
+    const base = runnerSettings();
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-synthesis-restored-backup",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary", "third", 0)],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      settings: {
+        synthesisRolePolicy: {
+          ...base.synthesisRolePolicy!,
+          synthesizerBound: { ...base.synthesisRolePolicy!.synthesizerBound, maxAttempts: 2 }
+        }
+      },
+      beforeExecute: async (context) => {
+        await appendEarlierPassCall(context, `${site}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef, "contract:composer:test-layer");
+        await appendEarlierPassCall(context, `${site}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef, "contract:composer:test-layer");
+      },
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16a fx1 synth ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16a fx1 synth review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16a fx1 synth ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16a fx1 synth leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16a fx1 synth review ${index + 1}`)),
+        // The backup's composition fails at the transport; the entry after it only types the failure.
+        { status: 503 },
+        resil01Composition,
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(`${site}:seat:`))
+      .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+      [`${site}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef],
+      [`${site}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef],
+      [`${site}:seat:runnerUp`, "FAILED", SEAT_ROUTES.third.providerRef],
+      [`${site}:seat:main`, "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+  });
+});
+
+describe("A16a fix round 1 · a spent site's halt cites its ledger truthfully", () => {
+  const judgeMaxAttempts = 2;
+  const callSiteKey = "JUDGE:defender:root0:r1:p0";
+  const doubles = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  });
+  const haltOutcome = async (runId: string) => (await database.pool.query<{ outcome: string }>(
+    `SELECT value_json->>'transport_outcome' AS outcome FROM core.run_progress_event
+      WHERE run_id=$1 AND value_json->>'state'='EXPANSION_HALTED' AND value_json->>'call_site_key'=$2`,
+    [runId, callSiteKey]
+  )).rows.map((row) => row.outcome);
+
+  it("names the site's latest failure with its OWN outcome (a timeout stays a timeout)", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-halt-timed-out",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "FAILED", 1, SEAT_ROUTES.primary.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "TIMED_OUT", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      ...doubles("A16a fx1 halt timeout")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(await haltOutcome(scenario.runId)).toEqual(["TIMED_OUT"]);
+    expect(scenario.answer?.condition_mark_records).toContainEqual(expect.objectContaining({
+      mark: "UNAUTHORED-BRANCH-HALTED", call_site_key: callSiteKey, terminal_transport_outcome: "TIMED_OUT"
+    }));
+  });
+
+  it("never halts on a made-up outcome: a site whose spent keys only ever answered keeps the gateway's refusal", async () => {
+    // Every attempt at the site answered, so there is no transport outcome to name, and the database
+    // admits only TIMED_OUT or FAILED for a halt. The site is not halted as FAILED.
+    const scenario = await executeSeatScenario({
+      label: "a16a-fx1-halt-no-failure",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "OK", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 2, SEAT_ROUTES.primary.providerRef]
+      ]),
+      ...doubles("A16a fx1 halt no failure")
+    });
+    expect(await haltOutcome(scenario.runId)).toEqual([]);
+    expect(scenario.error).toMatchObject({ code: "CALL_BUDGET_EXHAUSTED" });
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith(callSiteKey))).toHaveLength(4);
+  });
+});
+
+/**
+ * Model scorecard A16c — every switch to a backup is DISCLOSED: on the answer, in
+ * plain words (controller carry 15: the answer drawer shows a record's scope,
+ * subject, reason and lift path to END USERS), and on the progress stream, where
+ * the internals — role, seat, both routes, the cause, the failed key — live for
+ * the owners. DEGRADED-DIVERSITY follows the writer and checker that ACTUALLY
+ * answered, read off the ledger rows the answer's rounds cite.
+ */
+const A16C_INTERNALS = [
+  /provider:/u, /candidate:/u, /seat/iu, /runner-?up/iu, /\bmain\b/iu, /\brole\b/iu,
+  /POSITION|SUPPORT_ATTACK|CROSS_EXCHANGE|JUDGE|REVIEWER|ANSWER_WRITER|ANSWER_CHECKER/u,
+  /TRANSPORT_FAILURE|USAGE_CAP|ABSENT_AT_CLAIM|SPENT_ON_EARLIER_PASS/u, /[A-Z]+_[A-Z_]+/u
+] as const;
+
+type A16cAnswer = Awaited<ReturnType<typeof executeSeatScenario>>["answer"];
+
+/** The answer's BACKUP-MODEL-USED records, each checked for plain words and NULL internals columns. */
+function plainBackupRecords(answer: A16cAnswer) {
+  const records = (answer?.condition_mark_records ?? []).filter((record) => record.mark === "BACKUP-MODEL-USED");
+  for (const record of records) {
+    expect(record).toMatchObject({ scope: "answer", call_site_key: null, terminal_transport_outcome: null });
+    for (const text of [record.scope, record.subject_ref, record.reason, record.lift_path ?? ""]) {
+      for (const forbidden of A16C_INTERNALS) expect(text).not.toMatch(forbidden);
+    }
+  }
+  return records.map((record) => [record.subject_ref, record.reason, record.lift_path]);
+}
+
+/** The two plain records the answer may carry (read lazily, so the file loads before the runner exports them). */
+const standInRecord = () => [
+  BACKUP_MODEL_USED_WORDING.STAND_IN.subject, BACKUP_MODEL_USED_WORDING.STAND_IN.reason, BACKUP_MODEL_USED_WORDING.STAND_IN.liftPath
+];
+const usualRecord = () => [
+  BACKUP_MODEL_USED_WORDING.USUAL.subject, BACKUP_MODEL_USED_WORDING.USUAL.reason, BACKUP_MODEL_USED_WORDING.USUAL.liftPath
+];
+
+/** A route no deployment configures: absent at every claim (CLAIM_GATEWAY_UNRESOLVED). */
+const SEAT_GHOST = Object.freeze({
+  candidateId: "candidate:ghost", providerRef: "provider:test-layer:ghost", maker: "Ghost test maker",
+  modelId: "test-layer/ghost-model", thinkingLevel: "DEFAULT_ONLY"
+});
+
+/** A15's two-debater doubles: roots and cross-exchanges by the debaters, legs by the third route. */
+const A15_DOUBLES = Object.freeze({
+  primary: [
+    ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16c position ${index + 1}`, 0.5)),
+    ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16c review ${index + 1}`))
+  ],
+  secondary: [
+    ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c position ${index + 1}`, 0.5)),
+    resil01Composition
+  ],
+  third: [
+    ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c leg ${index + 1}`, 0.5)),
+    ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c review ${index + 1}`)),
+    evaluatorSatisfied()
+  ]
+});
+
+describe("A16 · a seat whose main fails is answered by its runner-up, and the answer says so", () => {
+  // Share 0 on POSITION seat 0 (and its aligned CROSS_EXCHANGE seat): the runner-up is the BACKUP only, so root 0
+  // always tries the main first (carry 16: with a share, the site's own ordinal would start root 0 on the runner-up
+  // in about one run in five, and a random run id would make these scenarios flaky).
+  const assignment = pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary", "third", 0), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third"), pinnedSeat(1, "secondary")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary", "third", 0), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "secondary"), pinnedSeat(1, "third")],
+    REVIEWER: [pinnedSeat(0, "secondary"), pinnedSeat(1, "third")],
+    ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+    ANSWER_CHECKER: [pinnedSeat(0, "third")]
+  });
+  const debaterDoubles = {
+    secondary: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Secondary A16 node ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Secondary A16 review ${index + 1}`)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16 node ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16 review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  };
+
+  it("8a: switches root 0 to its runner-up on a dead transport, marks the answer in plain words and tells the progress stream", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16-backup-engaged",
+      assignment,
+      primary: [{ status: 500 }],
+      ...debaterDoubles
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const rowsAt = (key: string) => scenario.calls.filter((call) => call.call_site_key === key)
+      .map((call) => [call.outcome, call.actor_ref, call.candidate_id]);
+    // The main's one attempt failed under ITS key; the runner-up answered under its own.
+    expect(rowsAt("JUDGE:seat:main")).toEqual([["FAILED", SEAT_ROUTES.primary.providerRef, "candidate:primary"]]);
+    expect(rowsAt("JUDGE:seat:runnerUp")).toEqual([["OK", SEAT_ROUTES.third.providerRef, "candidate:third"]]);
+    // R5: the root's cross-exchange is written by the member that wrote the root.
+    expect(rowsAt("JUDGE:cross-root:0->1:seat:runnerUp")).toEqual([["OK", SEAT_ROUTES.third.providerRef, "candidate:third"]]);
+    // R6 + carry 15: the mark, with exactly one record, in plain words.
+    expect(scenario.answer?.condition_marks).toContain("BACKUP-MODEL-USED");
+    expect(scenario.answer?.condition_marks).not.toContain("DEGRADED-DIVERSITY");
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+    // The internals ride the progress stream (this run is not content-encrypted).
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "POSITION", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.primary.providerRef, to_provider_ref: SEAT_ROUTES.third.providerRef,
+      cause: "TRANSPORT_FAILURE", call_site_key: "JUDGE:seat:main"
+    }]);
+  });
+
+  it("keeps today's behaviour when the runner-up fails too: the retry goes back to the main's own key and the position halts", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16-backup-exhausted",
+      assignment,
+      // A16a: the post-cooldown retry never switches; it returns to the member that ran the site's
+      // first sequence (the main), so the main's key holds j + f and the runner-up's j (2j + f).
+      primary: [{ status: 500 }, { status: 500 }],
+      secondary: [],
+      third: [{ status: 500 }]
+    });
+    expect(scenario.error).toMatchObject({ code: "MAKER_POSITION_UNAVAILABLE" });
+    const outcomesAt = (key: string) => scenario.calls.filter((call) => call.call_site_key === key).map((call) => call.outcome);
+    expect(outcomesAt("JUDGE:seat:main")).toEqual(["FAILED", "FAILED"]);
+    expect(outcomesAt("JUDGE:seat:runnerUp")).toEqual(["FAILED"]);
+    const events = await database.pool.query<{ state: string; call_site_key: string | null }>(
+      `SELECT value_json->>'state' AS state, value_json->>'call_site_key' AS call_site_key
+         FROM core.run_progress_event WHERE run_id=$1 AND kind IN ('node.retrying','ledger.could_not_do') ORDER BY at_seq`,
+      [scenario.runId]
+    );
+    // One switch, announced before the runner-up was called; the cooldown and the halt name the SITE by its bare key.
+    expect(events.rows).toEqual([
+      { state: "BACKUP_MODEL_ENGAGED", call_site_key: "JUDGE:seat:main" },
+      { state: "COOLDOWN_HOLD", call_site_key: "JUDGE" },
+      { state: "COOLDOWN_RETRY", call_site_key: "JUDGE" },
+      { state: "MAKER_POSITION_HALTED", call_site_key: "JUDGE" }
+    ]);
+  });
+
+  it("8b: a main absent at claim is replaced by its runner-up at claim — announced once, disclosed on the answer", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-claim-switch",
+      assignment,
+      settings: {
+        claimTimeProbe: async (member) => member.provider_ref === SEAT_ROUTES.primary.providerRef
+          ? { state: "ABSENT", modelId: null, failureCode: "CLAIM_PROVIDER_ABSENT" }
+          : { state: "HEALTHY", modelId: member.model_id, failureCode: null }
+      },
+      primary: [],
+      ...debaterDoubles
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.actor_ref === SEAT_ROUTES.primary.providerRef)).toEqual([]);
+    expect(scenario.calls.filter((call) => call.call_site_key === "JUDGE:seat:runnerUp").map((call) => call.actor_ref))
+      .toEqual([SEAT_ROUTES.third.providerRef]);
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "POSITION", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.primary.providerRef, to_provider_ref: SEAT_ROUTES.third.providerRef,
+      cause: "ABSENT_AT_CLAIM", call_site_key: null
+    }]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+    // The runner-up SAVED the seat, so no maker position was lost at claim.
+    expect(scenario.answer?.condition_marks).not.toContain("CRITIQUE-UNAVAILABLE");
+  });
+
+  it("8a: a usage cap moves a leg to its runner-up at once — the cap's own cause on the stream", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-leg-usage-cap",
+      assignment: legRunnerUpAssignment(),
+      primary: [
+        judgementDouble("Primary A16c cap root", 0.5),
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Primary A16c cap leg ${index + 1}`, 0.5)),
+        judgementDouble("Primary A16c cap cross-exchange", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16c cap review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c cap ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        { status: 429, body: JSON.stringify({ x_cli_relay_error: "CLI_RELAY_USAGE_CAP" }) },
+        judgementDouble("Third A16c never", 0.5),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c cap review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    const capped = scenario.calls.find((call) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+:seat:main$/u.test(call.call_site_key));
+    expect(capped).toMatchObject({ outcome: "FAILED", actor_ref: SEAT_ROUTES.third.providerRef });
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "SUPPORT_ATTACK", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.primary.providerRef,
+      cause: "USAGE_CAP", call_site_key: capped!.call_site_key
+    }]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+});
+
+describe("A16c · switches a RESUMED pass makes or inherits (carries 8c, 9, 13)", () => {
+  const judgeMaxAttempts = 2;
+  const callSiteKey = "JUDGE:defender:root0:r1:p0";
+  const legDoubles = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+      resil01Composition
+    ],
+    third: [
+      ...Array.from({ length: 3 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`)),
+      evaluatorSatisfied()
+    ]
+  });
+
+  it("8c/13: a leg whose answering main has no attempt left goes to its runner-up — a NEW switch, announced once, with the ledger's key", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-resume-new-switch",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // The main answered on its last allowed attempt; the runner-up never ran at the site.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 1, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:main`, "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      ...legDoubles("A16c resume new")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key === `${callSiteKey}:seat:runnerUp`).map((call) => [call.outcome, call.actor_ref]))
+      .toEqual([["OK", SEAT_ROUTES.primary.providerRef]]);
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "SUPPORT_ATTACK", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.primary.providerRef,
+      cause: "SPENT_ON_EARLIER_PASS", call_site_key: `${callSiteKey}:seat:main`
+    }]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("fix round 1 (Minor 1): an outage switch whose pass died during the runner-up's first call is announced ONCE across the resume", async () => {
+    const passOneEvent = {
+      state: "BACKUP_MODEL_ENGAGED" as const, role: "SUPPORT_ATTACK", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.primary.providerRef,
+      cause: "TRANSPORT_FAILURE" as const, call_site_key: `${callSiteKey}:seat:main`
+    };
+    const scenario = await executeSeatScenario({
+      label: "a16c-outage-announced-once",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // Pass 1: the main failed its `judge` attempts, the switch was announced (TRANSPORT_FAILURE, the main's
+      // key), and the pass died while the runner-up's first call was in flight — no runner-up row exists.
+      beforeExecute: async (context) => {
+        await seedEarlierPass(context, [[`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef]]);
+        await expect(new RunRepository(database.pool).recordBackupSwitchEvent({ runId: context.runId, value: passOneEvent }))
+          .resolves.toBe("RECORDED");
+      },
+      ...legDoubles("A16c outage once")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // Pass 2 hands the site to the runner-up through the ledger (the main is at its bound). That is the SAME
+    // switch pass 1 already told — same run, role, seat and failed key; only the cause it would name differs.
+    expect(scenario.calls.filter((call) => call.call_site_key === `${callSiteKey}:seat:runnerUp`).map((call) => [call.outcome, call.actor_ref]))
+      .toEqual([["OK", SEAT_ROUTES.primary.providerRef]]);
+    expect(scenario.switchEvents).toEqual([passOneEvent]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("9/13: a site an EARLIER pass switched is disclosed on the answer from the ledger — and never announced a second time", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-resume-carried-switch",
+      judgeMaxAttempts,
+      assignment: legRunnerUpAssignment(),
+      // The earlier pass switched in-call (and told the stream then): the main spent its first sequence,
+      // the runner-up answered. Nothing in THIS pass's memory says so.
+      beforeExecute: (context) => seedEarlierPass(context, [
+        [`${callSiteKey}:seat:main`, "FAILED", 2, SEAT_ROUTES.third.providerRef],
+        [`${callSiteKey}:seat:runnerUp`, "OK", 1, SEAT_ROUTES.primary.providerRef]
+      ]),
+      ...legDoubles("A16c resume carried")
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.calls.filter((call) => call.call_site_key === `${callSiteKey}:seat:runnerUp`).map((call) => call.outcome))
+      .toEqual(["OK", "OK"]);
+    expect(scenario.switchEvents).toEqual([]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("14a: disclosure reads who ANSWERED, never the key's marker — a cross-exchange kept under the runner-up's marker but written by the main discloses nothing", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-actor-not-marker",
+      judgeMaxAttempts,
+      assignment: runnerUpAssignment(),
+      // The earlier pass: root 1 and its cross-exchange were written by the runner-up (third).
+      beforeExecute: (context) => seedEarlierPass(context, [
+        ["JUDGE:root:secondary:seat:main", "FAILED", 1, SEAT_ROUTES.secondary.providerRef],
+        ["JUDGE:root:secondary:seat:runnerUp", "OK", 1, SEAT_ROUTES.third.providerRef],
+        ["JUDGE:cross-root:1->0:seat:runnerUp", "OK", 1, SEAT_ROUTES.third.providerRef]
+      ]),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A16c marker ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A16c marker review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c marker ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        // The preferred runner-up has an outage on this pass; the main writes root 1.
+        { status: 503 },
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c marker leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c marker review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // The cross-exchange site keeps the ONE key it holds (DR-184-v5), so its marker still says runnerUp —
+    // while the row's actor is the main's route, the member that wrote root 1 on this pass.
+    expect(scenario.calls.filter((call) => call.call_site_key.startsWith("JUDGE:cross-root:1->0"))
+      .map((call) => [call.call_site_key, call.actor_ref])).toEqual([
+      ["JUDGE:cross-root:1->0:seat:runnerUp", SEAT_ROUTES.third.providerRef],
+      ["JUDGE:cross-root:1->0:seat:runnerUp", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    // Every node of this answer was written by the member planned for it, so the answer owes no disclosure.
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("BACKUP-MODEL-USED");
+    // The call-level switch (runner-up -> main) is still announced, owner/admin side.
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "POSITION", seat_index: 1,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.secondary.providerRef,
+      cause: "TRANSPORT_FAILURE", call_site_key: "JUDGE:root:secondary:seat:runnerUp"
+    }]);
+  });
+});
+
+describe("A16c · roles and directions (carries 8d and 12)", () => {
+  it("8d: a role whose planned models are all absent at claim falls back to the debaters — announced, and disclosed on the answer", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-fallback-role",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [{ seatIndex: 0, main: SEAT_GHOST, runnerUp: null, diversityShare: 0, source: "SCORECARD" }],
+        // A role the assignment left EMPTY planned no model: the debaters sit in it as today, and
+        // that is not a stand-in — it is neither announced nor disclosed.
+        REVIEWER: [],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      primary: A15_DOUBLES.primary,
+      secondary: [
+        ...A15_DOUBLES.secondary,
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Secondary A16c fallback review ${index + 1}`))
+      ],
+      third: A15_DOUBLES.third
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // The debaters judge instead: every panel call is answered by a POSITION route.
+    const panel = scenario.calls.filter((call) => call.call_site_key.startsWith("PANEL:"));
+    expect(panel.length).toBeGreaterThan(0);
+    expect(new Set(panel.map((call) => call.actor_ref))).toEqual(new Set([SEAT_ROUTES.primary.providerRef, SEAT_ROUTES.secondary.providerRef]));
+    expect(scenario.switchEvents).toEqual([{
+      state: "ROLE_FELL_BACK_TO_DEBATERS", role: "JUDGE",
+      from_provider_refs: [SEAT_GHOST.providerRef],
+      to_provider_refs: [SEAT_ROUTES.primary.providerRef, SEAT_ROUTES.secondary.providerRef],
+      cause: "ABSENT_AT_CLAIM"
+    }]);
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("12: a runner-up the split planned for a site is absent, so its main answers there — the answer's own wording for that direction", async () => {
+    const legSeat: RoleSeat = {
+      seatIndex: 0, main: seatCandidateOf("third"), runnerUp: SEAT_GHOST, diversityShare: 0.5, source: "SCORECARD"
+    };
+    // The run id is random, so which legs the split plans for the runner-up is too (share 0.5: each leg
+    // one time in two). Every run is checked EXACTLY both ways, and runs repeat until one planned the
+    // runner-up somewhere, so the USUAL path is always exercised (four runs all missing it: ~1.5e-5).
+    const observed: boolean[] = [];
+    for (let run = 0; run < 4 && !observed.includes(true); run += 1) {
+      const scenario = await executeSeatScenario({
+        label: `a16c-variety-absent-${String(run)}`,
+        assignment: pinnedAssignment({
+          POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+          SUPPORT_ATTACK: [legSeat],
+          CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+          JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+          REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+          ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+          ANSWER_CHECKER: [pinnedSeat(0, "third")]
+        }),
+        ...A15_DOUBLES
+      });
+      expect(scenario.error).toBeNull();
+      expect(scenario.result?.kind).toBe("COMPLETED");
+      const legSites = scenario.calls
+        .filter((call) => /^JUDGE:(?:defender|critic):root\d+:r\d+:p\d+:seat:main$/u.test(call.call_site_key))
+        .map((call) => call.call_site_key.replace(/:seat:main$/u, ""));
+      expect(legSites).toHaveLength(4);
+      // Exact either way: the USUAL record appears iff some leg's own site ordinal planned the (absent) runner-up.
+      const plannedRunnerUp = legSites.some((site) => selectSeatCandidate(legSeat, seatSiteOrdinal({
+        runId: scenario.runId, role: "SUPPORT_ATTACK", pinnedSeatIndex: 0, callSiteKey: site
+      })).via === "RUNNER_UP");
+      expect(plainBackupRecords(scenario.answer)).toEqual(plannedRunnerUp ? [usualRecord()] : []);
+      // Nothing moved during a call and no main was absent: the stream has no switch to tell.
+      expect(scenario.switchEvents).toEqual([]);
+      observed.push(plannedRunnerUp);
+    }
+    expect(observed).toContain(true);
+  });
+});
+
+describe("A16c · DEGRADED-DIVERSITY follows the writer and checker that ACTUALLY answered (carry 9)", () => {
+  const COMPOSER_SITE = "COMPOSER:SYNTHESIZER:INITIAL:1";
+  const synthesisAssignment = (writer: PinnedSeat, checker: PinnedSeat) => pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    ANSWER_WRITER: [writer],
+    ANSWER_CHECKER: [checker]
+  });
+  const composerRows = (calls: readonly { readonly call_site_key: string; readonly outcome: string; readonly actor_ref: string }[]) =>
+    calls.filter((call) => call.call_site_key.startsWith(`${COMPOSER_SITE}:seat:`)).map((call) => [call.call_site_key, call.outcome, call.actor_ref]);
+
+  it("adds the mark when the writer's backup IS the checker's route — a collapse the plan did not predict", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-diversity-collapsed",
+      assignment: synthesisAssignment(pinnedSeat(0, "secondary", "third", 0), pinnedSeat(0, "third")),
+      primary: A15_DOUBLES.primary,
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c collapse ${index + 1}`, 0.5)),
+        { status: 503 },
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c collapse leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c collapse review ${index + 1}`)),
+        resil01Composition,
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(composerRows(scenario.calls)).toEqual([
+      [`${COMPOSER_SITE}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef],
+      [`${COMPOSER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef]
+    ]);
+    expect(scenario.answer?.condition_marks).toContain("DEGRADED-DIVERSITY");
+    expect(scenario.answer?.condition_marks).toContain("BACKUP-MODEL-USED");
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "ANSWER_WRITER", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.secondary.providerRef, to_provider_ref: SEAT_ROUTES.third.providerRef,
+      cause: "TRANSPORT_FAILURE", call_site_key: `${COMPOSER_SITE}:seat:main`
+    }]);
+  });
+
+  it("removes a collapse the plan predicted when the writer's backup answered instead", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-diversity-restored",
+      assignment: synthesisAssignment(pinnedSeat(0, "third", "secondary", 0), pinnedSeat(0, "third")),
+      primary: A15_DOUBLES.primary,
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c restored ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c restored leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c restored review ${index + 1}`)),
+        { status: 503 },
+        resil01Composition,
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(composerRows(scenario.calls)).toEqual([
+      [`${COMPOSER_SITE}:seat:main`, "FAILED", SEAT_ROUTES.third.providerRef],
+      [`${COMPOSER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    // The plan named the third route for both roles; the writer that answered was the secondary.
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("DEGRADED-DIVERSITY");
+    expect(scenario.answer?.condition_marks).toContain("BACKUP-MODEL-USED");
+  });
+
+  it("9: a resumed pass that asks the earlier pass's backup writer again derives the collapse from the ledger's rows", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-diversity-resumed",
+      assignment: synthesisAssignment(pinnedSeat(0, "secondary", "third", 0), pinnedSeat(0, "third")),
+      settings: {
+        synthesisRolePolicy: {
+          ...runnerSettings().synthesisRolePolicy!,
+          synthesizerBound: { ...runnerSettings().synthesisRolePolicy!.synthesizerBound, maxAttempts: 2 }
+        }
+      },
+      beforeExecute: async (context) => {
+        await appendEarlierPassCall(context, `${COMPOSER_SITE}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef, "contract:composer:test-layer");
+        await appendEarlierPassCall(context, `${COMPOSER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef, "contract:composer:test-layer");
+      },
+      primary: A15_DOUBLES.primary,
+      secondary: Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c resumed ${index + 1}`, 0.5)),
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c resumed leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c resumed review ${index + 1}`)),
+        resil01Composition,
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // This pass made no switch (the backup was preferred from the ledger), yet the answer knows who wrote it.
+    expect(scenario.switchEvents).toEqual([]);
+    expect(scenario.answer?.condition_marks).toContain("DEGRADED-DIVERSITY");
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("9/8c: a discarded earlier pass's writer never counts, and a spent main's synthesis handed to its backup is a new switch", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a16c-diversity-discarded-pass",
+      // The plan collapses the writer onto the checker's route (third/third)...
+      assignment: synthesisAssignment(pinnedSeat(0, "third", "secondary", 0), pinnedSeat(0, "third")),
+      beforeExecute: async (context) => {
+        // ...and an earlier pass's writer (the third route, on the synthesizer's one allowed attempt)
+        // answered round 1 before that pass died: its composition was never served.
+        await appendEarlierPassArtifactCall(context, `${COMPOSER_SITE}:seat:main`, "OK", SEAT_ROUTES.third.providerRef, "contract:composer:test-layer");
+      },
+      primary: A15_DOUBLES.primary,
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c discarded ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c discarded leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c discarded review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // The main's key is at its allowance, so this pass hands the writer's site to the backup — a switch
+    // THIS pass makes through the ledger (carry 8c), told once with the main's key.
+    expect(composerRows(scenario.calls)).toEqual([
+      [`${COMPOSER_SITE}:seat:main`, "OK", SEAT_ROUTES.third.providerRef],
+      [`${COMPOSER_SITE}:seat:runnerUp`, "OK", SEAT_ROUTES.secondary.providerRef]
+    ]);
+    expect(scenario.switchEvents).toEqual([{
+      state: "BACKUP_MODEL_ENGAGED", role: "ANSWER_WRITER", seat_index: 0,
+      from_provider_ref: SEAT_ROUTES.third.providerRef, to_provider_ref: SEAT_ROUTES.secondary.providerRef,
+      cause: "SPENT_ON_EARLIER_PASS", call_site_key: `${COMPOSER_SITE}:seat:main`
+    }]);
+    // The served rounds were written by the secondary and checked by the third: no collapse. The earlier
+    // pass's third-route writer is in the ledger too, but no round of THIS answer cites it (carry 9).
+    expect(scenario.answer?.condition_marks ?? []).not.toContain("DEGRADED-DIVERSITY");
+    expect(plainBackupRecords(scenario.answer)).toEqual([standInRecord()]);
+  });
+
+  it("carry 16: a synthesis seat takes part in the split with ONE site-pure ordinal per run and role", async () => {
+    // Share 0.5 (the schema's maximum): each run's writer is the runner-up one time in two. Every run is
+    // checked EXACTLY against the formula, and runs repeat until one sent the writer to its runner-up,
+    // so both members are always exercised (twelve runs all on the main: ~2.4e-4). The evaluator objects
+    // once, so the writer is called in TWO rounds — under two different keys — and must be the same
+    // member both times: one ordinal per run and role, never one per round (R3).
+    const writer = pinnedSeat(0, "secondary", "third", 0.5);
+    const evaluatorObjecting = JSON.stringify({
+      satisfied: false,
+      objection: "Restate the served position so a stranger could check it.",
+      criteria: {
+        fairness_to_losers: true, statement_label_agreement: true,
+        no_overstatement: true, restatement: false, citation_tracing: true
+      }
+    });
+    const observed: ("MAIN" | "RUNNER_UP")[] = [];
+    for (let run = 0; run < 12 && !observed.includes("RUNNER_UP"); run += 1) {
+      const scenario = await executeSeatScenario({
+        label: `a16c-synthesis-split-${String(run)}`,
+        assignment: synthesisAssignment(writer, pinnedSeat(0, "primary")),
+        primary: [...A15_DOUBLES.primary, evaluatorObjecting, evaluatorSatisfied()],
+        secondary: [
+          ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A16c split ${index + 1}`, 0.5)),
+          resil01Composition,
+          resil01Composition
+        ],
+        third: [
+          ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A16c split leg ${index + 1}`, 0.5)),
+          ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A16c split review ${index + 1}`)),
+          resil01Composition,
+          resil01Composition
+        ]
+      });
+      expect(scenario.error).toBeNull();
+      expect(scenario.result?.kind).toBe("COMPLETED");
+      const via = selectSeatCandidate(writer, seatSiteOrdinal({
+        runId: scenario.runId, role: "ANSWER_WRITER", pinnedSeatIndex: 0, callSiteKey: "COMPOSER:SYNTHESIZER"
+      })).via;
+      const route = via === "MAIN" ? SEAT_ROUTES.secondary.providerRef : SEAT_ROUTES.third.providerRef;
+      const marker = via === "MAIN" ? "main" : "runnerUp";
+      expect(scenario.calls.filter((call) => call.call_site_key.startsWith("COMPOSER:SYNTHESIZER:"))
+        .map((call) => [call.call_site_key, call.outcome, call.actor_ref])).toEqual([
+        [`${COMPOSER_SITE}:seat:${marker}`, "OK", route],
+        [`COMPOSER:SYNTHESIZER:RETRY:2:seat:${marker}`, "OK", route]
+      ]);
+      // A split is not a stand-in.
+      expect(scenario.answer?.condition_marks ?? []).not.toContain("BACKUP-MODEL-USED");
+      expect(scenario.switchEvents).toEqual([]);
+      observed.push(via);
+    }
+    expect(observed).toContain("RUNNER_UP");
+  });
+});
+
+/** An earlier pass's MODEL_CALL row WITH its raw artifact, so a terminal that cites it is observable. */
+async function appendEarlierPassArtifactCall(
+  context: { readonly runId: string; readonly workItemId: string },
+  callSiteKey: string,
+  outcome: "OK" | "FAILED" | "TIMED_OUT",
+  actorRef: string,
+  contractHash = "contract:judge:test-layer"
+): Promise<{ readonly attemptId: string; readonly artifactRef: string }> {
+  const ledger = new LedgerRepository(database.pool);
+  const attemptId = randomUUID();
+  const artifactRef = randomUUID();
+  await ledger.appendRawArtifact({
+    artifactId: artifactRef, attemptId, runId: context.runId, providerRef: actorRef,
+    provider: "test", model: "model:a16c", maker: "maker:a16c", modelVersion: "v1",
+    rawText: "a16c earlier pass", metadata: { fixture: "A16c" }, parseStatus: "PARSED",
+    inputHash: "a".repeat(64), contractHash: "b".repeat(64), contentHash: "c".repeat(64)
+  });
+  const now = new Date();
+  await ledger.append({
+    runId: context.runId, attemptId, actionKind: "MODEL_CALL", callSiteKey,
+    subjectItemId: context.workItemId, stanceAtAction: "UNASSIGNED", outcome,
+    actorRef, inputHash: `input:earlier-pass:${randomUUID()}`, contractHash, rawArtifactRef: artifactRef,
+    startedAt: now, finishedAt: now
+  });
+  return { attemptId, artifactRef };
+}
+
+describe("A16c · carry 14c — a site no slot can answer fails terminally citing its FAILURE, never an answer", () => {
+  it("a root: the latest row is an OK answer, yet the work item cites the site's latest failure", async () => {
+    let failure: { readonly attemptId: string; readonly artifactRef: string } | undefined;
+    const scenario = await executeSeatScenario({
+      label: "a16c-root-cites-failure",
+      judgeMaxAttempts: 2,
+      assignment: runnerUpAssignment(),
+      beforeExecute: async (context) => {
+        for (let index = 0; index < 2; index += 1) {
+          await appendEarlierPassArtifactCall(context, "JUDGE:root:secondary:seat:main", "FAILED", SEAT_ROUTES.secondary.providerRef);
+        }
+        failure = await appendEarlierPassArtifactCall(context, "JUDGE:root:secondary:seat:runnerUp", "FAILED", SEAT_ROUTES.third.providerRef);
+        await appendEarlierPassArtifactCall(context, "JUDGE:root:secondary:seat:runnerUp", "OK", SEAT_ROUTES.third.providerRef);
+      },
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result).toEqual({ kind: "TERMINAL_FAILED", artifactRef: failure!.artifactRef });
+    expect(scenario.calls).toHaveLength(4);
+    const work = await database.pool.query<{ state: string; terminal_reason: string; settled_attempt_id: string; settled_artifact_ref: string }>(
+      "SELECT state, terminal_reason, settled_attempt_id::text, settled_artifact_ref::text FROM core.work_item WHERE work_item_id=$1",
+      [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{
+      state: "FAILED", terminal_reason: "CALL_BUDGET_EXHAUSTED",
+      settled_attempt_id: failure!.attemptId, settled_artifact_ref: failure!.artifactRef
+    }]);
+  });
+
+  it("a synthesis site: the same rule", async () => {
+    const COMPOSER_CONTRACT = "contract:composer:test-layer";
+    const site = "COMPOSER:SYNTHESIZER:INITIAL:1";
+    let failure: { readonly attemptId: string; readonly artifactRef: string } | undefined;
+    const base = runnerSettings();
+    const scenario = await executeSeatScenario({
+      label: "a16c-synthesis-cites-failure",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary", "third", 0)],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      settings: {
+        synthesisRolePolicy: {
+          ...base.synthesisRolePolicy!,
+          synthesizerBound: { ...base.synthesisRolePolicy!.synthesizerBound, maxAttempts: 2 }
+        }
+      },
+      beforeExecute: async (context) => {
+        for (let index = 0; index < 2; index += 1) {
+          await appendEarlierPassArtifactCall(context, `${site}:seat:main`, "FAILED", SEAT_ROUTES.secondary.providerRef, COMPOSER_CONTRACT);
+        }
+        failure = await appendEarlierPassArtifactCall(context, `${site}:seat:runnerUp`, "FAILED", SEAT_ROUTES.third.providerRef, COMPOSER_CONTRACT);
+        await appendEarlierPassArtifactCall(context, `${site}:seat:runnerUp`, "OK", SEAT_ROUTES.third.providerRef, COMPOSER_CONTRACT);
+      },
+      primary: [], secondary: [], third: []
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result).toEqual({ kind: "TERMINAL_FAILED", artifactRef: failure!.artifactRef });
+    const work = await database.pool.query<{ settled_attempt_id: string; settled_artifact_ref: string }>(
+      "SELECT settled_attempt_id::text, settled_artifact_ref::text FROM core.work_item WHERE work_item_id=$1",
+      [scenario.workItemId]
+    );
+    expect(work.rows).toEqual([{ settled_attempt_id: failure!.attemptId, settled_artifact_ref: failure!.artifactRef }]);
+  });
+});
+
+describe("A18 · every recorded call of a run is a moment, and replays as the same prompt", () => {
+  it("exports all seven roles of a real run and sends each one's recorded prompt again", async () => {
+    const scenario = await executeSeatScenario({
+      label: "a18-moments",
+      assignment: pinnedAssignment({
+        POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+        CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+        JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+        ANSWER_WRITER: [pinnedSeat(0, "secondary")],
+        ANSWER_CHECKER: [pinnedSeat(0, "third")]
+      }),
+      primary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary A18 position ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary A18 review ${index + 1}`))
+      ],
+      secondary: [
+        ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary A18 position ${index + 1}`, 0.5)),
+        resil01Composition
+      ],
+      third: [
+        ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third A18 leg ${index + 1}`, 0.5)),
+        ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third A18 review ${index + 1}`)),
+        evaluatorSatisfied()
+      ]
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+
+    const exported = await exportRunMoments(createPostgresMomentSource(database.pool), {
+      runId: scenario.runId, exportedAt: new Date().toISOString(), engineCommit: null
+    });
+    // Every model call of this run is a debate role's call with a prompt record, and an answer.
+    expect(exported.skipped).toEqual([]);
+    expect(new Set(exported.moments.map((moment) => moment.role))).toEqual(new Set(DEBATE_ROLES));
+    expect(exported.moments.filter((moment) => moment.recorded === null).map((moment) => moment.source.callSiteKey))
+      .toEqual([]);
+
+    // (1) Each moment carries the fingerprint the GATEWAY recorded for its key's first prompt record. That
+    //     is carry 1's sequence (the one that holds the first answer) because every key answered on its
+    //     first sequence: no call of this scenario failed. Pinned here, so a scenario that adds a failure
+    //     says why check (1) no longer applies.
+    expect(scenario.calls.filter((call) => call.outcome !== "OK").map((call) => [call.call_site_key, call.outcome]))
+      .toEqual([]);
+    const firstAttempts = await database.pool.query<{ call_site_key: string; attempt_id: string }>(
+      `SELECT DISTINCT ON (entry.call_site_key) entry.call_site_key, entry.attempt_id::text AS attempt_id
+         FROM ledger.ledger_entry AS entry
+        WHERE entry.run_id=$1 AND entry.action_kind='MODEL_CALL'
+          AND EXISTS (SELECT 1 FROM ledger.call_prompt AS prompt WHERE prompt.attempt_id = entry.attempt_id)
+        ORDER BY entry.call_site_key, entry.sequence`,
+      [scenario.runId]
+    );
+    const gatewayRecorded: Record<string, string> = {};
+    for (const row of firstAttempts.rows) {
+      const record = await readCallPrompt(database.pool, row.attempt_id);
+      expect(record, row.call_site_key).not.toBeNull();
+      gatewayRecorded[row.call_site_key] = record!.promptFingerprint;
+    }
+    expect(Object.fromEntries(exported.moments.map((moment) => [moment.source.callSiteKey, moment.recorded?.promptFingerprint])))
+      .toEqual(gatewayRecorded);
+
+    // (2) Replay sends that same prompt, for every role, the way the evaluator reads it: from an
+    //     owner-only moment file. The relay records each request it receives and refuses it with a
+    //     502, so no model answers: what is compared is the prompt alone, as it LEFT the gateway, and
+    //     FAILED is the relay's refusal, never a refusal before the wire.
+    const wire: string[] = [];
+    const refusing = (async (_input: unknown, init?: { readonly body?: unknown }) => {
+      wire.push(String(init?.body));
+      return new Response(JSON.stringify({ error: "CLI_RELAY_FAILED" }), { status: 502 });
+    }) as typeof fetch;
+    const momentDirectory = await mkdtemp(join(tmpdir(), "a18-moments-"));
+    try {
+      for (const exportedMoment of exported.moments) {
+        const momentPath = join(momentDirectory, momentFileNameFor(exportedMoment));
+        await writePrivateJsonFile(momentPath, exportedMoment);
+        const moment = await readMomentFile(momentPath);
+        const offline = await captureMomentPacket(parseMomentBuilder(moment.builder, moment.role));
+        wire.length = 0;
+        const replayed = await replayMoment({
+          moment,
+          thinkingLevel: "DEFAULT_ONLY",
+          bound: { maxAttempts: 1, tokenCeiling: 512, deadlineMs: 5_000 },
+          endpoint: {
+            providerRef: "replay:refusing", maker: "Refusing relay", tool: "claude", modelId: "refusing-model",
+            baseUrl: "http://127.0.0.1:9/v1", bearerToken: "r".repeat(43), thinkingLevels: [], contextWindowTokens: null
+          },
+          fetchImplementation: refusing,
+          sleepImplementation: async () => undefined
+        });
+        const onWire = JSON.parse(wire[0] ?? "{}") as { readonly messages?: readonly { readonly role: string; readonly content: string }[] };
+        expect({
+          key: moment.source.callSiteKey,
+          requests: wire.length,
+          onWire: canonicalPromptFingerprint(onWire.messages ?? []),
+          offline: canonicalPromptFingerprint(offline.messages),
+          sent: replayed.promptFingerprint,
+          same: replayed.fingerprintMatchesRecorded,
+          outcome: replayed.outcome
+        }).toEqual({
+          key: exportedMoment.source.callSiteKey,
+          requests: 1,
+          onWire: exportedMoment.recorded?.promptFingerprint,
+          offline: exportedMoment.recorded?.promptFingerprint,
+          sent: exportedMoment.recorded?.promptFingerprint,
+          same: true,
+          outcome: "FAILED"
+        });
+      }
+    } finally {
+      await rm(momentDirectory, { recursive: true, force: true });
+    }
+  });
 });

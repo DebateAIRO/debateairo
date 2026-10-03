@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Voltar à biblioteca",
   "debateChrome.loading": "A carregar…",
   "debateChrome.error.claimGenerationFailed": "Falha ao gerar a alegação",
-  "debateChrome.error.debateGenerationFailed": "Falha na geração do debate: {reason}",
+  "runFailure.NOT_STARTED": "Algo correu mal do nosso lado antes de este debate começar. Por favor, pergunte novamente.",
+  "runFailure.MODELS_UNAVAILABLE": "Não foi possível iniciar este debate porque os modelos de IA necessários não estavam disponíveis. Por favor, tente novamente daqui a algum tempo.",
+  "runFailure.RUN_LIMIT_REACHED": "Este debate atingiu o seu limite antes de conseguir chegar a uma resposta.",
+  "runFailure.DAILY_LIMIT_REACHED": "O limite de hoje para debates esgotou-se enquanto este debate estava a começar. Por favor, pergunte novamente amanhã.",
+  "runFailure.STOPPED": "Este debate parou a meio devido a um problema do nosso lado. Por favor, volte a fazer a sua pergunta.",
   "debateChrome.error.unableToLoadDebate": "Não foi possível carregar o debate",
   "debateChrome.error.unableToLoadScoring": "Não foi possível carregar a pontuação",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Não foi possível carregar a simulação de profundidade adaptativa",
@@ -287,5 +291,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "O coordenador recusou a escolha do plano. Escolha Gratuito ou Premium e tente novamente.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "O coordenador recusou o pedido: um modelo necessário para este plano não está disponível neste momento. Tente novamente mais tarde ou escolha o outro plano.",
   "requestFailure.kind.ALREADY_WAITING": "Só uma pergunta pode aguardar de cada vez. Faça esta depois de o seu debate em espera ter começado.",
-  "requestFailure.kind.UNCLASSIFIED": "A falha ocorreu antes de ser recebida qualquer resposta, pelo que se desconhece o resultado. Não se trata de uma decisão tomada pelo coordenador."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Este debate custaria mais do que este sítio permite para um debate.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "O coordenador recusou o pedido: uma das tarefas do debate não tem nenhum modelo de IA acessível neste momento. Tente novamente mais tarde.",
+  "requestFailure.kind.UNCLASSIFIED": "A falha ocorreu antes de ser recebida qualquer resposta, pelo que se desconhece o resultado. Não se trata de uma decisão tomada pelo coordenador.",
+  "debateChrome.condition.backupModelUsed": "Onde não foi possível usar um modelo de IA previsto, outro tomou o seu lugar"
 }

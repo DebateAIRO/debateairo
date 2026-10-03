@@ -2,6 +2,7 @@
   "name": "debateai-v3",
   "version": "0.1.0",
   "private": true,
+  "license": "FSL-1.1-ALv2",
   "type": "module",
   "packageManager": "pnpm@11.20.0",
   "engines": {
@@ -13,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:s00": "vitest run tests/unit tests/integration tests/architecture",
-    "test:ci-gate": "node tools/ci-known-red.mjs tests/unit tests/architecture",
+    "test:ci-gate": "node tools/ci-known-red.mjs tests/unit tests/architecture tests/render",
     "lint": "pnpm run audit:architecture && pnpm run audit:source",
     "audit:architecture": "tsx tools/orphan-audit/src/cli.ts architecture",
     "audit:source": "tsx tools/orphan-audit/src/cli.ts source",
@@ -65,7 +66,10 @@
     "eval:roles": "tsx acceptance/eval-harness-cli.ts",
     "hs:accept-s01": "NODE_OPTIONS=--use-system-ca tsx acceptance/hs-s01-accept-cli.ts",
     "hs:eval-s02": "tsx acceptance/hs-eval-s02.ts",
-    "pes:accept-hosted": "tsx --no-cache acceptance/pes-s02-hosted-cli.ts"
+    "pes:accept-hosted": "tsx --no-cache acceptance/pes-s02-hosted-cli.ts",
+    "relays:serve": "tsx acceptance/relay-host.ts",
+    "moment:export": "tsx acceptance/export-moment.ts",
+    "moment:replay": "tsx acceptance/replay-moment.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
@@ -100,6 +104,7 @@
     "@debateai/published-arithmetic": "workspace:*",
     "@debateai/register": "workspace:*",
     "@debateai/runner": "workspace:*",
+    "@debateai/scorecard": "workspace:*",
     "@debateai/serve": "workspace:*",
     "@debateai/settlement": "workspace:*",
     "@debateai/story": "workspace:*",

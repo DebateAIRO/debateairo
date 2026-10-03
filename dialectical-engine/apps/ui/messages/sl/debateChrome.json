@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Nazaj v knjižnico",
   "debateChrome.loading": "Nalaganje …",
   "debateChrome.error.claimGenerationFailed": "Ustvarjanje trditve ni uspelo",
-  "debateChrome.error.debateGenerationFailed": "Ustvarjanje razprave ni uspelo: {reason}",
+  "runFailure.NOT_STARTED": "Še preden se je ta razprava začela, je na naši strani šlo nekaj narobe. Prosimo, vprašajte znova.",
+  "runFailure.MODELS_UNAVAILABLE": "Te razprave ni bilo mogoče začeti, ker modeli UI, ki jih potrebuje, niso bili na voljo. Prosimo, poskusite znova čez nekaj časa.",
+  "runFailure.RUN_LIMIT_REACHED": "Ta razprava je dosegla svojo omejitev, preden je lahko podala odgovor.",
+  "runFailure.DAILY_LIMIT_REACHED": "Današnja omejitev za razprave je bila dosežena, medtem ko se je ta razprava začenjala. Prosimo, vprašajte znova jutri.",
+  "runFailure.STOPPED": "Ta razprava se je sredi poteka ustavila zaradi težave na naši strani. Prosimo, znova zastavite svoje vprašanje.",
   "debateChrome.error.unableToLoadDebate": "Razprave ni mogoče naložiti",
   "debateChrome.error.unableToLoadScoring": "Ocenjevanja ni mogoče naložiti",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Poskusnega zagona prilagodljive globine ni mogoče naložiti",
@@ -294,5 +298,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator je zavrnil izbiro paketa. Izberite Brezplačno ali Premium in nato poskusite znova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator je zahtevo zavrnil: model, ki ga ta paket potrebuje, trenutno ni na voljo. Poskusite pozneje ali izberite drug paket.",
   "requestFailure.kind.ALREADY_WAITING": "Hkrati lahko čaka le eno vprašanje. To vprašanje zastavite, ko se vaša čakajoča razprava začne.",
-  "requestFailure.kind.UNCLASSIFIED": "Postopek ni uspel, še preden je prispel odgovor, zato izid ni znan. Te odločitve ni sprejel koordinator."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ta razprava bi stala več, kot to spletno mesto dovoli za eno razpravo.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinator je zahtevo zavrnil: za eno od nalog razprave trenutno ni dosegljiv noben model UI. Poskusite pozneje.",
+  "requestFailure.kind.UNCLASSIFIED": "Postopek ni uspel, še preden je prispel odgovor, zato izid ni znan. Te odločitve ni sprejel koordinator.",
+  "debateChrome.condition.backupModelUsed": "Kjer načrtovanega modela UI ni bilo mogoče uporabiti, ga je nadomestil drug"
 }

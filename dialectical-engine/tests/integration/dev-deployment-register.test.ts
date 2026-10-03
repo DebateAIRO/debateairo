@@ -19,6 +19,7 @@ import {
   parseCanonicalRegisterJson,
   persistBootstrapRegister,
   readAuthPolicy,
+  readCallTokenCeilings,
   readDeploymentRiskTier,
   readMfaPolicy,
   readLivenessPolicy,
@@ -437,7 +438,7 @@ describe("DEV-05 complete development deployment register", () => {
 
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
     const registerVersion = registerVersionToSafeLegacyNumber(first.registerVersion);
-    const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk] = await Promise.all([
+    const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk, callTokenCeilings] = await Promise.all([
       readAuthPolicy(database.pool, registerVersion),
       readMfaPolicy(database.pool, registerVersion),
       readSessionPolicy(database.pool, registerVersion),
@@ -446,8 +447,11 @@ describe("DEV-05 complete development deployment register", () => {
       readDeploymentMakerCapability(database.pool, registerVersion),
       readPanelDiscoveryPolicy(database.pool, registerVersion),
       readStructuralCeilingPolicyInputs(database.pool, registerVersion),
-      readDeploymentRiskTier(database.pool, registerVersion)
+      readDeploymentRiskTier(database.pool, registerVersion),
+      // Final review I3: the API's "call-token-ceilings" boot stage resolves on the sealed rows.
+      readCallTokenCeilings(database.pool, registerVersion)
     ]);
+    expect(callTokenCeilings).toEqual({ judge: 2048, synthesizer: 2048, evaluator: 2048 });
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);
     expect(mfa.totp.algorithm).toBe("SHA1");
     expect(session.absoluteTtlMs).toBeGreaterThan(session.idleTtlMs);
@@ -463,13 +467,15 @@ describe("DEV-05 complete development deployment register", () => {
     expect(roles.roles.slice(2).every((role) => role.grants.length === 0)).toBe(true);
     expect(makers).toMatchObject({
       deploymentMakerCapability: true,
-      configuredMakers: ["Anthropic", "OpenAI", "xAI"],
+      configuredMakers: ["Anthropic", "Google", "OpenAI", "Z.AI", "xAI"],
       configuredProviders: [
         { providerRef: "development:codex-cli", maker: "OpenAI" },
         { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
         { providerRef: "development:claude-cli", maker: "Anthropic" },
         { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
-        { providerRef: "development:grok-cli", maker: "xAI" }
+        { providerRef: "development:grok-cli", maker: "xAI" },
+        { providerRef: "development:agy-cli", maker: "Google" },
+        { providerRef: "development:pi-glm-cli", maker: "Z.AI" }
       ]
     });
     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });

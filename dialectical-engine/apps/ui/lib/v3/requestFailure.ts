@@ -63,6 +63,10 @@ export type RequestFailureKind =
    * banner only when neither carries a time.
    */
   | "ALREADY_WAITING"
+  /** A21: the ask was refused (422): its estimated cost is over this site's limit for one debate. */
+  | "MODEL_BUDGET_TOO_SMALL"
+  /** A21: the coordinator refused the ask: no model is reachable for one of the debate's jobs (422). */
+  | "MODEL_UNAVAILABLE"
   /** Something failed that this seam cannot classify; say exactly that. */
   | "UNCLASSIFIED";
 
@@ -93,6 +97,14 @@ const KIND_CLAUSE: Readonly<Record<RequestFailureKind, string>> = Object.freeze(
     "The coordinator refused it: a model this plan needs is not available right now. "
     + "Retry later, or choose the other plan.",
   ALREADY_WAITING: "One question can wait at a time. Ask this one after your waiting debate has started.",
+  // A21.3 carry 12: constant clauses the page owns. Fix rounds 1-2: the budget clause says only that
+  // the debate WOULD cost more than this site allows (the refusal rests on an estimate): no remedy
+  // (Free fixes the tree depth) and no claim about the cheapest models. It is visitor copy, separate
+  // from the server's English API sentence (apps/api ASK_MODEL_REFUSALS). Paid plans S1b: each
+  // locale words both in `requestFailure.kind.*` of newDebate.json and debateChrome.json.
+  MODEL_BUDGET_TOO_SMALL: "This debate would cost more than this site allows for one debate.",
+  MODEL_UNAVAILABLE:
+    "The coordinator refused it: one of the debate's jobs has no AI model it can reach right now. Retry later.",
   UNCLASSIFIED:
     "It failed before any answer arrived, so the outcome is unknown. "
     + "This is not a decision the coordinator made."
@@ -128,11 +140,21 @@ const ROOM_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.freez
   ASK_ALREADY_WAITING: "ALREADY_WAITING"
 });
 
+/** A21: the model picker's ask refusals (apps/api ASK_MODEL_REFUSALS), named as refusals in constant clauses. */
+const MODEL_STRENGTH_REFUSALS: Readonly<Record<string, RequestFailureKind>> = Object.freeze({
+  ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL: "MODEL_BUDGET_TOO_SMALL",
+  ASK_MODEL_CANDIDATE_UNAVAILABLE: "MODEL_UNAVAILABLE"
+});
+
 function kindOf(error: unknown): RequestFailureKind {
   if (!(error instanceof ContractHttpError)) return "UNCLASSIFIED";
   if (error.status === 422 && error.serverCode !== null
     && Object.hasOwn(PLAN_TIER_REFUSALS, error.serverCode)) {
     return PLAN_TIER_REFUSALS[error.serverCode]!;
+  }
+  if (error.status === 422 && error.serverCode !== null
+    && Object.hasOwn(MODEL_STRENGTH_REFUSALS, error.serverCode)) {
+    return MODEL_STRENGTH_REFUSALS[error.serverCode]!;
   }
   if (error.status === 422 && error.serverCode !== null
     && Object.hasOwn(ROOM_REFUSALS, error.serverCode)) {

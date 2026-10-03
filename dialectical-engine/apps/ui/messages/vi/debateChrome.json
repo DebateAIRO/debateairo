@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Quay lại thư viện",
   "debateChrome.loading": "Đang tải…",
   "debateChrome.error.claimGenerationFailed": "Không thể tạo luận đề",
-  "debateChrome.error.debateGenerationFailed": "Không thể tạo cuộc tranh luận: {reason}",
+  "runFailure.NOT_STARTED": "Đã có sự cố từ phía chúng tôi trước khi cuộc tranh luận này bắt đầu. Vui lòng hỏi lại.",
+  "runFailure.MODELS_UNAVAILABLE": "Cuộc tranh luận này không thể bắt đầu vì các mô hình AI cần thiết không khả dụng. Vui lòng thử lại sau một lúc.",
+  "runFailure.RUN_LIMIT_REACHED": "Cuộc tranh luận này đã chạm giới hạn trước khi kịp đưa ra câu trả lời.",
+  "runFailure.DAILY_LIMIT_REACHED": "Giới hạn số cuộc tranh luận của hôm nay đã hết trong lúc cuộc tranh luận này đang bắt đầu. Vui lòng hỏi lại vào ngày mai.",
+  "runFailure.STOPPED": "Cuộc tranh luận này đã dừng giữa chừng do sự cố từ phía chúng tôi. Vui lòng đặt lại câu hỏi của bạn.",
   "debateChrome.error.unableToLoadDebate": "Không thể tải cuộc tranh luận",
   "debateChrome.error.unableToLoadScoring": "Không thể tải dữ liệu chấm điểm",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Không thể tải bản chạy thử độ sâu thích ứng",
@@ -273,5 +277,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Bộ điều phối đã từ chối gói được chọn. Hãy chọn Miễn phí hoặc Cao cấp rồi thử lại.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Bộ điều phối đã từ chối yêu cầu: hiện không có mô hình mà gói này cần. Hãy thử lại sau hoặc chọn gói còn lại.",
   "requestFailure.kind.ALREADY_WAITING": "Mỗi lần chỉ một câu hỏi được chờ. Hãy đặt câu hỏi này sau khi cuộc tranh luận đang chờ của bạn đã bắt đầu.",
-  "requestFailure.kind.UNCLASSIFIED": "Thao tác thất bại trước khi nhận được phản hồi nên chưa xác định được kết quả. Đây không phải là quyết định của bộ điều phối."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Cuộc tranh luận này sẽ tốn nhiều hơn mức trang này cho phép đối với một cuộc tranh luận.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Bộ điều phối đã từ chối yêu cầu: một trong các việc của cuộc tranh luận hiện không có mô hình AI nào truy cập được. Hãy thử lại sau.",
+  "requestFailure.kind.UNCLASSIFIED": "Thao tác thất bại trước khi nhận được phản hồi nên chưa xác định được kết quả. Đây không phải là quyết định của bộ điều phối.",
+  "debateChrome.condition.backupModelUsed": "Ở nơi không thể dùng mô hình AI dự kiến, một mô hình khác đã thay thế"
 }

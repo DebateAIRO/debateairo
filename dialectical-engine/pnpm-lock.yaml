@@ -113,6 +113,9 @@ importers:
       '@debateai/runner':
         specifier: workspace:*
         version: link:apps/runner
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:packages/scorecard
       '@debateai/serve':
         specifier: workspace:*
         version: link:packages/serve
@@ -218,6 +221,9 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../../packages/register
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../../packages/scorecard
       '@debateai/serve':
         specifier: workspace:*
         version: link:../../packages/serve
@@ -330,6 +336,9 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../../packages/register
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../../packages/scorecard
       '@debateai/serve':
         specifier: workspace:*
         version: link:../../packages/serve
@@ -760,6 +769,18 @@ importers:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../scorecard
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+
+  packages/scorecard:
+    dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -796,6 +817,9 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../scorecard
       '@debateai/valuation':
         specifier: workspace:*
         version: link:../valuation

@@ -1,0 +1,21 @@
+# Model scorecards
+
+`current.json` in this folder is the public model scorecard the engine reads in **local mode**
+(spec `docs/superpowers/specs/2026-09-26-model-scorecard-and-picker-design.md` §2.8). It is one
+version behind the website's.
+
+- It is **absent until the owners approve the first scorecard**. While it is absent, every ask
+  keeps the plan rosters (`PLAN_TIER_ROSTERS`), exactly as before scorecards existed.
+- The file may be at most **64 KiB** (65,536 bytes), and so may the scorecard as the register stores it. That is the
+  same limit the hosted site publishes under, so on SIZE one file gets the same answer in both modes.
+- A scorecard with a field the format does not define works here (the field is ignored), but hosted publishing
+  refuses it, because a published scorecard can never be edited.
+- A file that fails validation is **refused, never half-applied**. The API prints
+  `MODEL_SCORECARD state=REFUSED reason=…` when it starts and also keeps the plan rosters.
+- The **hosted site never reads this file**. It reads the sealed `modelScorecard` register row,
+  published with `pnpm register:publish-hosted --scorecard <file>` (`deploy/vps/register/README.md`).
+- Every change to this file is a new approved scorecard with a higher `scorecardVersion`, committed
+  on its own. Because it changes how every local ask chooses its models, that commit runs the
+  acceptance, render and integration suites.
+
+**Plan caps on a site that sells plans (paid plans).** The scorecard's `pickerSettings.planStrengthCaps` is keyed by plan TIER: `free` caps the Free plan and `premium` every paid plan — with billing on, the engine sets each ask's tier from the person's plan in the `billingPlans` row. The owners' rule (29 September 2026) is Free → Economy and every paid plan → Best: set `"planStrengthCaps": { "free": "ECONOMY" }` in the evaluator's `config/evaluator.config.json` before `scorecard:approve` (the evaluator's own default, `{ "free": "BALANCED" }`, breaks the rule). With billing on, a scorecard whose `free` cap is not `ECONOMY`, or whose `premium` cap is not `BEST` (leaving it out is fine), is refused `SCORECARD_PLAN_CAPS_INVALID`, by `register:publish-hosted --scorecard` before anything is sealed and again when the API starts. On the website each debate is planned inside the asking person's remaining allowance, never past it: when even Economy does not fit it, the debate still starts at Economy; a question waits only when one of the person's limits is full, and if it is started after all when its turn is decided, it starts with the plan made for that moment. While a scorecard is in force, a paid ask is never moved to the Free models to fit (that interim rule applies only without a scorecard).

@@ -27,3 +27,7 @@ requirements through architecture to programming.
 V2 remains in DebateAIRO as prototype reference only (DR-047). Next phase:
 the ARCHITECTURE mission, which consumes this pack and proposes the stack and
 module design for V's ratification (DR-005/DR-024).
+
+## License
+
+The code in this repository is released under the Functional Source License, version 1.1, with the Apache 2.0 future license (FSL-1.1-ALv2). In plain words: anyone may read, change, run and self-host it, including for their own internal use, education and research; nobody may offer it as a product or service that competes with the software or with any service we offer using it, under whatever name or domain; and each version becomes Apache 2.0 two years after it is released. The full text is in the LICENSE file at the repository root.

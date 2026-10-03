@@ -413,7 +413,8 @@ function assertRunBodyStopWiring(source: string): void {
   expect(statementOccurrences(source, FIRST_CALL_FAILURE), FIRST_CALL_FAILURE).toBe(1);
   const firstCallAt = source.indexOf(FIRST_CALL_FAILURE);
   expect(firstCallAt, "on the author's first call").toBeGreaterThan(source.indexOf(ROOT_0_AUTHOR));
-  expect(firstCallAt, "before root 0 is judged").toBeLessThan(source.indexOf("const judged = primaryAttempt.value;"));
+  // Paid plans S1a: the seat caller's answer carries its value and the member that answered.
+  expect(firstCallAt, "before root 0 is judged").toBeLessThan(source.indexOf("const judged = primaryAttempt.value.value;"));
 
   // 5. THE SERVE GATE NEVER FORCES A HARD STOP FROM A STOP WHILE ARGUING. The
   //    gate — from the envelope question's definition to the answer-writer's

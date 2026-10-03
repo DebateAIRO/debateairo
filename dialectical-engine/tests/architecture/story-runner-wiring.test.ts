@@ -55,9 +55,11 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(runner).toContain("stepLease: (use) => this.#memory.withDisclosureContentLease([run.runId], use)");
   });
 
-  it("keeps the runner's framed-prompt builders at two: the story builds its prompts in packages/story", async () => {
+  it("keeps the runner's framed-prompt builders at one: the story builds its prompts in packages/story", async () => {
     const runner = await read("apps/runner/src/index.ts");
-    expect(runner.split(/\bbuildFramedPrompt\(/u).length - 1).toBe(2);
+    // Paid plans S1a: dev's two synthesis framings became the scorecard's ONE
+    // builder, `buildSynthesisRolePrompt` (A17), which both roles and moment:replay use.
+    expect(runner.split(/\bbuildFramedPrompt\(/u).length - 1).toBe(1);
   });
 
   it("loads the pack and the optional policy at boot and hands the writer to the runner", async () => {

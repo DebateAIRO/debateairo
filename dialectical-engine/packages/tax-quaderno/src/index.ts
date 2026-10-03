@@ -45,11 +45,25 @@ function parseKeepingNumberText(text: string): unknown {
 }
 
 /** Exact decimal text → micros; a trailing zero past two places is dropped; finer than a cent is refused. */
+/** Drops every trailing "/" in one backward pass (CodeQL js/polynomial-redos: `/\/+$/` is quadratic on many "/"). */
+export function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === 47) end -= 1;
+  return url.slice(0, end);
+}
+
+/** Drops every trailing "0" in one backward pass (CodeQL js/polynomial-redos: `/0+$/` is quadratic on many "0"). */
+function trimTrailingZeros(digits: string): string {
+  let end = digits.length;
+  while (end > 0 && digits.charCodeAt(end - 1) === 48) end -= 1;
+  return digits.slice(0, end);
+}
+
 export function quadernoAmountMicros(text: unknown): number {
   if (typeof text !== "string") refused("AMOUNT_INVALID");
   const match = /^(-?[0-9]+)(?:\.([0-9]+))?$/u.exec(text);
   if (match === null) refused("AMOUNT_INVALID");
-  const fraction = (match[2] ?? "").replace(/0+$/u, "");
+  const fraction = trimTrailingZeros(match[2] ?? "");
   if (fraction.length > 2) refused("AMOUNT_NOT_CENTS");
   try {
     return decimalToMicros(fraction.length === 0 ? match[1]! : `${match[1]!}.${fraction}`);
@@ -108,7 +122,7 @@ export class QuadernoTaxEngine implements TaxEngine {
   readonly #now: () => Date;
 
   constructor(o: Readonly<{ baseUrl: string; apiKey: string; fetch?: typeof fetch; timeoutMs?: number; now?: () => Date }>) {
-    this.#baseUrl = o.baseUrl.replace(/\/+$/u, "");
+    this.#baseUrl = trimTrailingSlashes(o.baseUrl);
     this.#authorization = `Basic ${Buffer.from(`${o.apiKey}:`, "utf8").toString("base64")}`;
     this.#fetch = o.fetch ?? fetch;
     this.#timeoutMs = o.timeoutMs ?? DEFAULT_TIMEOUT_MS;

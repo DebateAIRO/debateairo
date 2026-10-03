@@ -77,6 +77,11 @@ export interface ModelSpendEntry {
    * STORY charges, and on every row written before the migration.
    */
   readonly spendPhase?: CostEnvelopePhase;
+  /**
+   * Model scorecard §2.3 (migration 0090): the gateway attempt this charge paid
+   * for. `null` or absent for a charge recorded outside the gateway.
+   */
+  readonly attemptId?: string | null;
 }
 
 /**
@@ -131,6 +136,8 @@ export interface ProviderCostSeam {
     providerRef: string;
     usage: unknown;
     projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
+    /** Model scorecard §2.3: the gateway attempt this charge pays for. */
+    attemptId?: string;
   }>): Promise<void>;
   /** I4: the hosted requirement, asked only of a successful completion. */
   assertUsageReported(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
@@ -605,7 +612,8 @@ export class CostEnvelopeGuard {
           inputTokens: usage.promptTokens,
           outputTokens: usage.completionTokens,
           // Task M1 (R12): a RUN charge says which part of the run spent it.
-          ...(phase === null ? {} : { spendPhase: phase })
+          ...(phase === null ? {} : { spendPhase: phase }),
+          attemptId: observed.attemptId ?? null
         }));
       },
       assertUsageReported: async (observed) => {
@@ -765,12 +773,12 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     await this.pool.query(
       `INSERT INTO ledger.model_spend (
          spend_id, spend_source, run_id, provider_ref,
-         charged_on, charge_micros, input_tokens, output_tokens, spend_phase
-       ) VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9)`,
+         charged_on, charge_micros, input_tokens, output_tokens, spend_phase, attempt_id
+       ) VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10)`,
       [
         entry.spendId, entry.spendSource, entry.runId, entry.providerRef,
         entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens,
-        entry.spendPhase ?? null
+        entry.spendPhase ?? null, entry.attemptId ?? null
       ]
     );
   }

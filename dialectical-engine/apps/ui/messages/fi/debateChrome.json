@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Takaisin kirjastoon",
   "debateChrome.loading": "Ladataan…",
   "debateChrome.error.claimGenerationFailed": "Väitteen luonti epäonnistui",
-  "debateChrome.error.debateGenerationFailed": "Väittelyn luonti epäonnistui: {reason}",
+  "runFailure.NOT_STARTED": "Jotain meni vikaan meidän päässämme ennen kuin tämä väittely alkoi. Kysythän uudelleen.",
+  "runFailure.MODELS_UNAVAILABLE": "Tätä väittelyä ei voitu aloittaa, koska sen tarvitsemat tekoälymallit eivät olleet käytettävissä. Yritäthän uudelleen hetken kuluttua.",
+  "runFailure.RUN_LIMIT_REACHED": "Tämä väittely saavutti rajansa ennen kuin se ehti antaa vastauksen.",
+  "runFailure.DAILY_LIMIT_REACHED": "Tämän päivän raja väittelyille täyttyi juuri, kun tämä väittely oli alkamassa. Esitäthän kysymyksesi uudelleen huomenna.",
+  "runFailure.STOPPED": "Tämä väittely pysähtyi kesken meidän päässämme olleen ongelman vuoksi. Esitäthän kysymyksesi uudelleen.",
   "debateChrome.error.unableToLoadDebate": "Väittelyä ei voitu ladata",
   "debateChrome.error.unableToLoadScoring": "Pisteytystä ei voitu ladata",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Mukautuvan syvyyden koesuoritusta ei voitu ladata",
@@ -280,5 +284,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinaattori hylkäsi tilaustason valinnan. Valitse Maksuton tai Premium ja yritä sitten uudelleen.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinaattori hylkäsi pyynnön: tämän tilaustason tarvitsema malli ei ole juuri nyt saatavilla. Yritä myöhemmin uudelleen tai valitse toinen tilaustaso.",
   "requestFailure.kind.ALREADY_WAITING": "Vain yksi kysymys voi odottaa kerrallaan. Esitä tämä, kun odottava väittelysi on alkanut.",
-  "requestFailure.kind.UNCLASSIFIED": "Pyyntö epäonnistui ennen vastauksen saapumista, joten lopputulos ei ole tiedossa. Tämä ei ole koordinaattorin tekemä päätös."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Tämä väittely maksaisi enemmän kuin sivusto sallii yhdelle väittelylle.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinaattori hylkäsi pyynnön: yhdelle väittelyn tehtävistä ei juuri nyt tavoiteta yhtään tekoälymallia. Yritä myöhemmin uudelleen.",
+  "requestFailure.kind.UNCLASSIFIED": "Pyyntö epäonnistui ennen vastauksen saapumista, joten lopputulos ei ole tiedossa. Tämä ei ole koordinaattorin tekemä päätös.",
+  "debateChrome.condition.backupModelUsed": "Kun suunniteltua tekoälymallia ei voitu käyttää, toinen tuli sen tilalle"
 }

@@ -1083,4 +1083,60 @@ describe("V-6 — the remaining readable debate text is encrypted for encrypted 
       ]);
     }
   }, 240_000);
+
+  it("A16: withholds — never refuses — a backup-switch event on an encrypted run, and records it once on a legacy run", async () => {
+    const marker = randomUUID();
+    const runs = new RunRepository(database.pool);
+    const value = {
+      state: "BACKUP_MODEL_ENGAGED" as const, role: "POSITION", seat_index: 0,
+      from_provider_ref: "provider:a", to_provider_ref: "provider:b",
+      cause: "TRANSPORT_FAILURE" as const, call_site_key: "JUDGE:seat:main"
+    };
+    const fallback = {
+      state: "ROLE_FELL_BACK_TO_DEBATERS" as const, role: "JUDGE" as const,
+      from_provider_refs: ["provider:x"], to_provider_refs: ["provider:a", "provider:b"], cause: "ABSENT_AT_CLAIM" as const
+    };
+    const encryptedRunId = await createEncryptedRun(`v6 backup switch ${marker}`);
+    await expect(runs.recordBackupSwitchEvent({ runId: encryptedRunId, value })).resolves.toBe("WITHHELD_ENCRYPTED_RUN");
+    await expect(runs.recordBackupSwitchEvent({ runId: encryptedRunId, value: fallback })).resolves.toBe("WITHHELD_ENCRYPTED_RUN");
+    // …because 0069's closed progress shapes would refuse either outright:
+    for (const shape of [value, fallback]) {
+      await expect(database.pool.query(
+        `INSERT INTO core.run_progress_event (run_id,at_seq,kind,value_json)
+         VALUES ($1,ledger.allocate_sequence(),'ledger.could_not_do',$2::jsonb)`,
+        [encryptedRunId, JSON.stringify(shape)]
+      )).rejects.toThrow("PROGRESS_EVENT_VALUE_NOT_CODE_SHAPED: ledger.could_not_do");
+    }
+    expect((await database.pool.query(
+      "SELECT 1 FROM core.run_progress_event WHERE run_id=$1 AND kind='ledger.could_not_do'", [encryptedRunId]
+    )).rowCount).toBe(0);
+
+    const legacyRunId = await createLegacyRun(`v6 backup switch legacy ${marker}`, `legacy-v6-${randomUUID()}`);
+    await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value })).resolves.toBe("RECORDED");
+    // One disclosure per real switch: the same switch told again (a resumed pass's claim) is not a second event…
+    await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value })).resolves.toBe("ALREADY_RECORDED");
+    // …nor is it when a later pass would name another CAUSE for it (A16c fix round 1: the outage switch a
+    // resumed pass hands over through the ledger). The cause is the ONE field the match ignores.
+    await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value: { ...value, cause: "SPENT_ON_EARLIER_PASS" } }))
+      .resolves.toBe("ALREADY_RECORDED");
+    // A16c fix round 2: how NARROW the match is — every other field names a different switch, recorded.
+    const distinct = [
+      { ...value, call_site_key: "JUDGE:seat:runnerUp" },
+      { ...value, seat_index: 1 },
+      { ...value, role: "SUPPORT_ATTACK" },
+      { ...value, call_site_key: null },
+      { ...value, from_provider_ref: "provider:c" },
+      { ...value, to_provider_ref: "provider:c" }
+    ];
+    for (const other of distinct) {
+      await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value: other })).resolves.toBe("RECORDED");
+    }
+    await expect(runs.recordBackupSwitchEvent({ runId: legacyRunId, value: fallback })).resolves.toBe("RECORDED");
+    expect((await database.pool.query<{ value_json: unknown }>(
+      "SELECT value_json FROM core.run_progress_event WHERE run_id=$1 AND kind='ledger.could_not_do' ORDER BY at_seq", [legacyRunId]
+    )).rows.map((row) => row.value_json)).toEqual([value, ...distinct, fallback]);
+    // …and the same switch in ANOTHER run is that run's own event.
+    const otherLegacyRunId = await createLegacyRun(`v6 backup switch legacy other ${marker}`, `legacy-v6-${randomUUID()}`);
+    await expect(runs.recordBackupSwitchEvent({ runId: otherLegacyRunId, value })).resolves.toBe("RECORDED");
+  });
 });

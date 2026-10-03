@@ -183,11 +183,14 @@ export interface AcceptanceRuntimePolicy {
 export function computeAcceptanceStructuralCeiling(
   policy: Pick<AcceptanceRuntimePolicy, "bounds" | "runDeathPolicy" | "envelopeFormulaInputs">,
   panelSize: number,
-  depth: number
+  depth: number,
+  // A14/A20 (pre-flight ruling F17): 1 only for a run whose pinned assignment has a runner-up.
+  backupSequencesProvisioned: 0 | 1 = 0
 ): ReturnType<typeof computeStructuralCeilingBasis> {
   return computeStructuralCeilingBasis({
     panelSize,
     depth,
+    backupSequencesProvisioned,
     judgeMaxAttempts: policy.bounds.JUDGE.maxAttempts,
     organMaxAttempts: Math.max(policy.bounds.COMPOSER.maxAttempts, policy.bounds.CONFORMANCE.maxAttempts),
     maxCooldownHoldsPerRun: policy.runDeathPolicy.maxCooldownHoldsPerRun,

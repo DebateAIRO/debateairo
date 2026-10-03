@@ -13,7 +13,9 @@ const ownedFiles = [
   "components/AnswerHonestyDrawer.tsx",
   "components/ModelPresentation.tsx",
   "components/ScoringErrorBoundary.tsx",
-  "components/Toast.tsx"
+  "components/Toast.tsx",
+  // S1b: the drawer's "Models chosen" job keys are literal here (MODEL_ASSIGNMENT_KEYS).
+  "lib/modelStrength.ts"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const sourceEntries = ownedFiles.map((path) => [path, source(path)]);
@@ -101,7 +103,12 @@ test("misc components contain no hard-coded user-visible English", () => {
 });
 
 test("safe English fallbacks and existing component behavior remain intact", () => {
-  for (const path of ownedFiles.slice(0, 3)) {
+  // Named, not sliced from ownedFiles, so a later entry cannot move which files are checked.
+  for (const path of [
+    "components/AnswerHonestyDrawer.tsx",
+    "components/ModelPresentation.tsx",
+    "components/ScoringErrorBoundary.tsx"
+  ]) {
     assert.match(source(path), /import miscEnglish from "@\/messages\/en\/misc\.json"/);
   }
 

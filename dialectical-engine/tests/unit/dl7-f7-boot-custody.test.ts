@@ -221,6 +221,9 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
       "assertPricedProviderTargets(",
       "resolveProviderTargetCredentials(",
       "parseSupportModelTargetJson(",
+      // Model scorecard A20.4 / final review I5: the picker settings refuse a hosted
+      // boot without a usable per-run ceiling (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED)
+      // inside `composeAskModelPicker`, whose own stages are pinned in the test below.
       // Every key load and every store construction: each one refuses a
       // mis-provisioned file, and the refusal must reach the ledger.
       "loadKekRing(",
@@ -237,6 +240,36 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
           .toMatch(/boot\.run(?:Sync)?\(/u);
       }
     }
+  });
+
+  /**
+   * Final review I5: the API's "model-scorecard" and "model-picker" stages are one exported
+   * function, `composeAskModelPicker`, and main.ts hands it the boot's OWN ledger. Its every
+   * await is a `boot.run` stage and its throwing decision a `boot.runSync` one, so the ledger
+   * sees both exactly as it did when they were written out in main.ts.
+   */
+  it("runs the extracted model-picker stages under the ledger main.ts hands them", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const from = main.indexOf("const boot = installBootCustody(");
+    const until = main.indexOf("boot.release()");
+    const call = main.indexOf("const modelPicker = await composeAskModelPicker({\n  boot,\n");
+    expect(call).toBeGreaterThan(from);
+    expect(call).toBeLessThan(until);
+    const source = await readFile("apps/api/src/ask-model-picker.ts", "utf8");
+    const start = source.indexOf("export async function composeAskModelPicker(");
+    expect(start).toBeGreaterThan(-1);
+    const body = source.slice(start, source.indexOf("\n}\n", start) + 3);
+    const awaits = [...body.matchAll(/\bawait\s/gu)].map((match) => statementOf(body, match.index ?? 0)
+      + body.slice(match.index ?? 0, body.indexOf("\n", match.index ?? 0)));
+    expect(awaits.length).toBeGreaterThan(0);
+    for (const statement of awaits) {
+      // The one await OUTSIDE a callback is the stage itself; the reads inside it are its body.
+      if (!/input\.boot\.run\(/u.test(statement)) expect(definesACallback(statement), statement).toBe(true);
+    }
+    expect(body).toContain('await input.boot.run("model-scorecard", async () => {');
+    const decisions = [...body.matchAll(literal("askModelPickerSettings("))].map((match) => match.index ?? 0);
+    expect(decisions).toHaveLength(1);
+    for (const at of decisions) expect(statementOf(body, at)).toMatch(/input\.boot\.runSync\("model-picker", /u);
   });
 });
 
@@ -265,6 +298,9 @@ describe("DL7-F7 every awaited boot stage runs under an owner", () => {
       const lineEnd = source.indexOf("\n", at);
       const line = source.slice(at, lineEnd === -1 ? source.length : lineEnd).trim();
       if (/(?:boot|startup)\.run(?:Sync)?\(/u.test(statement + line)) continue;
+      // Final review I5: the model-picker stages run inside `composeAskModelPicker`, under the
+      // ledger this statement hands it (its own stages are pinned in the scan above).
+      if (source.startsWith("await composeAskModelPicker({\n  boot,\n", at)) continue;
       if (definesACallback(statement)) continue;
       unguarded.push(`${lineOf(source, at)}: ${line}`);
     }

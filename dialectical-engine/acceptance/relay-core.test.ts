@@ -1,21 +1,42 @@
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, isAbsolute, join, relative } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, relative } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { resolveClaudeBinary } from "./claude-relay.js";
 import { resolveGrokBinary } from "./grok-relay.js";
 import { resolveHermesBinary } from "./hermes-relay.js";
 import { resolveCodexBinary } from "./model-shim.js";
+import { resolveAgyBinary } from "./agy-relay.js";
+import { resolvePiBinary } from "./pi-relay.js";
 import { afterEach, describe, expect, it } from "vitest";
+import { estimatePromptTokens, estimateWindowTokens } from "@debateai/providers";
 import {
+  CLI_RELAY_INSTRUCTIONS_FILE_MISSING,
+  CLI_RELAY_INSTRUCTIONS_FILE_NAME,
+  CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES,
+  CLI_RELAY_STDOUT_LINE_DECISION_BYTES,
   CLI_RELAY_STDOUT_MAX_BYTES,
+  CLI_RELAY_USAGE_CAP_CODE_TOKEN,
   RELAY_MESSAGE_MAX_UTF8_BYTES,
+  RELAY_MINIMAL_SYSTEM_PROMPT,
+  RELAY_PROMPT_CHARACTERS_PER_TOKEN,
   RELAY_REQUEST_MAX_BYTES,
   RELAY_REQUEST_MAX_MESSAGES,
+  buildCliUsage,
+  createStdoutLineFilter,
+  harnessOverheadLine,
+  invokeCli,
+  isRelayHandshakeReply,
+  measureHarnessOverhead,
+  openRelayWorkspace,
+  renderPromptTranscript,
+  reportHarnessOverhead,
   resolveConfiguredBinary,
   startCliRelayServer,
+  type CliCompletion,
+  type CliFailureEvidence,
   type CliRelayAdapter,
   type CliRelayHandle
 } from "./relay-core.js";
@@ -740,8 +761,13 @@ describe("D10 maker CLI binary resolution", () => {
     }
 
     expect(sources).toContain("relay-core.ts");
+    expect(sources).toContain("agy-relay.ts");
+    expect(sources).toContain("pi-relay.ts");
+    expect(sources).toContain("relay-host.ts");
     expect(sources).toContain(join("test-fixtures", "evaluator-double.ts"));
     expect(sources).toContain(join("test-fixtures", "fake-claude-cli.mjs"));
+    expect(sources).toContain(join("test-fixtures", "fake-agy-cli.mjs"));
+    expect(sources).toContain(join("test-fixtures", "fake-pi-cli.mjs"));
     expect(offenders).toEqual([]);
   });
 });
@@ -759,10 +785,12 @@ describe("D10 every maker resolves to an ABSOLUTE path", () => {
     { name: "claude", key: "ACCEPTANCE_CLAUDE_BINARY", resolve: resolveClaudeBinary },
     { name: "grok", key: "ACCEPTANCE_GROK_BINARY", resolve: resolveGrokBinary },
     { name: "codex", key: "ACCEPTANCE_CODEX_BINARY", resolve: resolveCodexBinary },
-    { name: "hermes", key: "ACCEPTANCE_HERMES_BINARY", resolve: resolveHermesBinary }
+    { name: "hermes", key: "ACCEPTANCE_HERMES_BINARY", resolve: resolveHermesBinary },
+    { name: "agy", key: "ACCEPTANCE_AGY_BINARY", resolve: resolveAgyBinary },
+    { name: "pi", key: "ACCEPTANCE_PI_BINARY", resolve: resolvePiBinary }
   ] as const;
 
-  it("from PATH discovery and from a relative key alike, for all four", async () => {
+  it("from PATH discovery and from a relative key alike, for every maker", async () => {
     for (const maker of makers) {
       const directory = await pathDirectory();
       const program = await place(directory, SHEBANG, 0o755, maker.name);
@@ -776,4 +804,1200 @@ describe("D10 every maker resolves to an ABSOLUTE path", () => {
       expect(viaKey).toBe(program);
     }
   });
+});
+
+/**
+ * Model scorecard (2026-09-26): the shared core's new laws — prompt transport
+ * (§2.10), thinking level (§2.2), declared context window (§2.10), reasoning
+ * tokens (§2.3) and usage caps (R4) — each proven on a fixture adapter so no
+ * maker's parser is involved. W6: none of these probes echoes the environment;
+ * they report argv, stdin, a file's mode and a directory listing only.
+ */
+interface RelayBody {
+  readonly x_thinking_level?: string;
+  readonly usage?: unknown;
+  readonly choices: readonly { readonly message: { readonly content: string } }[];
+}
+
+function fixtureAdapter(maker: string, overrides: Partial<CliRelayAdapter> = {}): CliRelayAdapter {
+  return {
+    maker,
+    authEnvironmentKeys: [],
+    testEnvironmentKeys: [],
+    failureCode: "FIXTURE_FAILED",
+    timeoutCode: "FIXTURE_TIMEOUT",
+    buildArguments: () => [],
+    parseCompletion: (stdout: string) => ({ content: stdout, model: "fixture-model", usage: null }),
+    ...overrides
+  };
+}
+
+async function startFixtureRelay(
+  adapter: CliRelayAdapter,
+  probe: string,
+  timeoutMs = 5_000
+): Promise<CliRelayHandle> {
+  const handle = await startCliRelayServer({
+    port: 0,
+    timeoutMs,
+    command: { binary: process.execPath, prefixArguments: ["-e", probe, "--"] },
+    adapter
+  });
+  handles.push(handle);
+  return handle;
+}
+
+function postRelay(handle: CliRelayHandle, body: Readonly<Record<string, unknown>>): Promise<Response> {
+  return fetch(`${handle.baseUrl}/v1/chat/completions`, {
+    method: "POST",
+    headers: relayHeaders(handle),
+    body: JSON.stringify(body)
+  });
+}
+
+function userTurn(
+  content: string,
+  extra: Readonly<Record<string, unknown>> = {}
+): Readonly<Record<string, unknown>> {
+  return { model: "fixture-model", messages: [{ role: "user", content }], ...extra };
+}
+
+async function spawnMarker(): Promise<{ readonly marker: string; readonly probe: string }> {
+  const marker = join(await pathDirectory(), "spawned");
+  return {
+    marker,
+    probe: `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "spawned"); process.stdout.write("OK");`
+  };
+}
+
+// Read as a stream to EOF (not readFileSync(0), which can hit EAGAIN on a
+// non-blocking pipe): the probe answers only once the relay has CLOSED stdin.
+const STDIN_PROBE = [
+  'let stdin = "";',
+  'process.stdin.setEncoding("utf8");',
+  'process.stdin.on("data", (chunk) => { stdin += chunk; });',
+  'process.stdin.on("end", () => process.stdout.write(JSON.stringify({ argv: process.argv.slice(1), stdin })));'
+].join("");
+
+const FILE_PROBE = [
+  'const { readFileSync, readdirSync, statSync } = require("node:fs");',
+  "const promptFile = process.argv[process.argv.length - 1];",
+  "process.stdout.write(JSON.stringify({",
+  "  argv: process.argv.slice(1),",
+  "  promptFile,",
+  "  mode: (statSync(promptFile).mode & 0o777).toString(8),",
+  '  prompt: readFileSync(promptFile, "utf8"),',
+  "  cwd: process.cwd(),",
+  "  cwdEntries: readdirSync(process.cwd())",
+  "}));"
+].join("");
+
+const ARGV_PROBE = "process.stdout.write(JSON.stringify(process.argv.slice(1)));";
+
+describe("§2.10 prompt transport", () => {
+  it("stdin: delivers the transcript on stdin, closes it, and keeps it off argv", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("stdin-fixture", {
+      promptTransport: "stdin",
+      buildArguments: () => ["--fixture-flag"]
+    }), STDIN_PROBE);
+
+    const response = await postRelay(handle, userTurn("Transport canary 41c7."));
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as RelayBody;
+    const observed = JSON.parse(body.choices[0]!.message.content) as { argv: string[]; stdin: string };
+    expect(observed.stdin).toBe(renderPromptTranscript([{ role: "user", content: "Transport canary 41c7." }]));
+    expect(observed.argv).toEqual(["--fixture-flag"]);
+    expect(JSON.stringify(observed.argv)).not.toContain("Transport canary 41c7.");
+  });
+
+  it("stdin: writes the adapter's own framing when it declares one", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("stdin-framing-fixture", {
+      promptTransport: "stdin",
+      stdinPayload: (prompt) => `${JSON.stringify({ type: "user", text: prompt })}\n`
+    }), STDIN_PROBE);
+
+    const body = await (await postRelay(handle, userTurn("Framed canary 9b20."))).json() as RelayBody;
+
+    const observed = JSON.parse(body.choices[0]!.message.content) as { stdin: string };
+    expect(observed.stdin).toBe(`${JSON.stringify({
+      type: "user",
+      text: renderPromptTranscript([{ role: "user", content: "Framed canary 9b20." }])
+    })}\n`);
+  });
+
+  it("file: a 0600 prompt file outside the child's empty cwd, only its path on argv, reaped after the call", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("file-fixture", {
+      promptTransport: "file",
+      buildArguments: (_prompt, invocation) => {
+        if (invocation?.promptFile === undefined) throw new Error("FIXTURE_PROMPT_FILE_MISSING");
+        return ["--attach", invocation.promptFile];
+      }
+    }), FILE_PROBE);
+
+    const response = await postRelay(handle, userTurn("File canary 77ad."));
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as RelayBody;
+    const observed = JSON.parse(body.choices[0]!.message.content) as {
+      argv: string[];
+      promptFile: string;
+      mode: string;
+      prompt: string;
+      cwd: string;
+      cwdEntries: string[];
+    };
+    expect(isAbsolute(observed.promptFile)).toBe(true);
+    expect(observed.argv).toEqual(["--attach", observed.promptFile]);
+    expect(observed.mode).toBe("600");
+    expect(observed.prompt).toBe(renderPromptTranscript([{ role: "user", content: "File canary 77ad." }]));
+    expect(observed.cwdEntries).toEqual([]);
+    expect(dirname(observed.promptFile)).not.toBe(observed.cwd);
+    expect(basename(dirname(observed.promptFile))).toMatch(/^relay-file-fixture-prompt-/u);
+    expect(existsSync(observed.promptFile)).toBe(false);
+    expect(existsSync(dirname(observed.promptFile))).toBe(false);
+  });
+
+  it("stdin: an adapter framing that throws is refused before any child exists, and its scratch is reaped", async () => {
+    const { marker, probe } = await spawnMarker();
+    const handle = await startFixtureRelay(fixtureAdapter("stdin-throwing-fixture", {
+      promptTransport: "stdin",
+      stdinPayload: () => {
+        throw new Error("FIXTURE_FRAMING_FAILED");
+      }
+    }), probe);
+
+    const response = await postRelay(handle, userTurn("Framing canary 5e3a."));
+
+    // The same answer a throwing argument builder has always had.
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "MALFORMED_REQUEST" });
+    // The refusal does not wait on a child, so give a wrongly spawned one time to show itself.
+    await delay(500);
+    expect(existsSync(marker)).toBe(false);
+    expect(await relayLeftovers("stdin-throwing-fixture")).toEqual([]);
+  });
+});
+
+describe("§2.2 thinking level at the relay", () => {
+  const levelled = (maker: string, overrides: Partial<CliRelayAdapter> = {}): CliRelayAdapter =>
+    fixtureAdapter(maker, {
+      thinkingLevels: ["low", "high"],
+      buildArguments: (_prompt, invocation) =>
+        invocation?.thinkingLevel === undefined ? [] : ["--level", invocation.thinkingLevel],
+      ...overrides
+    });
+
+  it("passes a declared level to the argument builder and echoes it as x_thinking_level", async () => {
+    const handle = await startFixtureRelay(levelled("level-fixture"), ARGV_PROBE);
+
+    const response = await postRelay(handle, userTurn("Level probe.", { x_thinking_level: "high" }));
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as RelayBody;
+    expect(JSON.parse(body.choices[0]!.message.content)).toEqual(["--level", "high"]);
+    expect(body.x_thinking_level).toBe("high");
+  });
+
+  it("puts no level on argv and echoes DEFAULT_ONLY when none is asked and none is the default", async () => {
+    const handle = await startFixtureRelay(levelled("unasked-level-fixture"), ARGV_PROBE);
+
+    const body = await (await postRelay(handle, userTurn("Level probe."))).json() as RelayBody;
+
+    expect(JSON.parse(body.choices[0]!.message.content)).toEqual([]);
+    expect(body.x_thinking_level).toBe("DEFAULT_ONLY");
+  });
+
+  it("runs an unasked call at the adapter's explicit default and still records DEFAULT_ONLY", async () => {
+    const handle = await startFixtureRelay(
+      levelled("default-level-fixture", { defaultThinkingLevel: "low" }),
+      ARGV_PROBE
+    );
+
+    const body = await (await postRelay(handle, userTurn("Level probe."))).json() as RelayBody;
+
+    expect(JSON.parse(body.choices[0]!.message.content)).toEqual(["--level", "low"]);
+    // DEFAULT_ONLY = "no level was asked; the connection ran at its own
+    // default" — exactly what the gateway sent. Only an ASKED level is echoed.
+    expect(body.x_thinking_level).toBe("DEFAULT_ONLY");
+  });
+
+  it("refuses an undeclared level with 400 before any child exists", async () => {
+    const { marker, probe } = await spawnMarker();
+    const declared = await startFixtureRelay(levelled("refusing-level-fixture"), probe);
+    const undeclared = await startFixtureRelay(fixtureAdapter("no-level-fixture"), probe);
+
+    for (const [handle, level] of [[declared, "medium"], [undeclared, "low"]] as const) {
+      const response = await postRelay(handle, userTurn("Level probe.", { x_thinking_level: level }));
+      expect(response.status, level).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED",
+        x_cli_relay_error: "CLI_RELAY_THINKING_LEVEL_UNSUPPORTED"
+      });
+    }
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it("refuses a level that is not one lower-case token as a malformed request, before spawn", async () => {
+    const { marker, probe } = await spawnMarker();
+    const handle = await startFixtureRelay(levelled("token-level-fixture"), probe);
+
+    for (const level of ["HIGH", "--effort", "high low", "DEFAULT_ONLY", ""]) {
+      const response = await postRelay(handle, userTurn("Level probe.", { x_thinking_level: level }));
+      expect(response.status, level).toBe(400);
+      expect(await response.json()).toEqual({ error: "MALFORMED_REQUEST" });
+    }
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  it("refuses to start an adapter whose own declarations are inconsistent", async () => {
+    for (const overrides of [
+      { defaultThinkingLevel: "medium" },
+      { thinkingLevels: ["High"] },
+      { thinkingLevels: ["low", "low"] },
+      { contextWindowTokens: 0 }
+    ] satisfies readonly Partial<CliRelayAdapter>[]) {
+      await expect(startCliRelayServer({
+        port: 0,
+        timeoutMs: 1_000,
+        command: { binary: process.execPath, prefixArguments: [] },
+        adapter: levelled("inconsistent-fixture", overrides)
+      })).rejects.toThrow("CLI_RELAY_ADAPTER_DECLARATION_INVALID");
+    }
+  });
+});
+
+describe("pre-flight fix F37: a CLI's own length stop reaches the gateway as a truncation", () => {
+  it("answers 200 with finish_reason \"length\" when the adapter reports it, and \"stop\" otherwise", async () => {
+    for (const [finishReason, expected] of [["length", "length"], [undefined, "stop"]] as const) {
+      const handle = await startFixtureRelay(fixtureAdapter(`finish-${expected}-fixture`, {
+        parseCompletion: (stdout: string) => ({
+          content: stdout,
+          model: "fixture-model",
+          usage: null,
+          ...(finishReason === undefined ? {} : { finishReason })
+        })
+      }), 'process.stdout.write("OK");');
+      const response = await postRelay(handle, userTurn("Finish probe."));
+      expect(response.status).toBe(200);
+      const body = await response.json() as { readonly choices: readonly { readonly finish_reason: string }[] };
+      expect(body.choices[0]?.finish_reason).toBe(expected);
+    }
+  });
+});
+
+describe("§2.10 declared context window at the relay", () => {
+  const WINDOW = 1_000;
+  const MAX_TOKENS = 100;
+  // ceil(content bytes / 2) + max_tokens <= window  ⇔  content bytes <= 2 × (window − max_tokens).
+  // R1 (pre-flight fix F1): the message CONTENT is counted, exactly as the gateway counts it.
+  const fitting = (): string => "a".repeat(2 * (WINDOW - MAX_TOKENS));
+
+  it("answers 413 before spawning when the prompt plus the output bound cannot fit, and admits the exact boundary", async () => {
+    const { marker, probe } = await spawnMarker();
+    const handle = await startFixtureRelay(
+      fixtureAdapter("window-fixture", { contextWindowTokens: WINDOW }),
+      probe
+    );
+
+    const over = await postRelay(handle, userTurn(`${fitting()}a`, { max_tokens: MAX_TOKENS }));
+    expect(over.status).toBe(413);
+    expect(await over.json()).toEqual({
+      error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED",
+      x_cli_relay_error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED"
+    });
+    expect(existsSync(marker)).toBe(false);
+
+    const boundary = await postRelay(handle, userTurn(fitting(), { max_tokens: MAX_TOKENS }));
+    expect(boundary.status).toBe(200);
+    expect(existsSync(marker)).toBe(true);
+  });
+
+  it("agrees with the gateway's wall to the token on a Romanian, quote- and newline-heavy packet (R1)", async () => {
+    const handle = await startFixtureRelay(
+      fixtureAdapter("window-agreement-fixture", { contextWindowTokens: WINDOW }),
+      'process.stdout.write("OK");'
+    );
+    // Each line is 22 content bytes, and far more once escaped into the JSON transcript
+    // (two quotes, a backslash and a newline each gain a byte, plus the envelope): a relay
+    // that counted the transcript would refuse what the gateway sends.
+    const line = 'Țară "ăîșțâ"\\n\n';
+    const messages = [
+      { role: "system", content: line.repeat(20) },
+      { role: "user", content: line.repeat(20) }
+    ] as const;
+    expect(estimateWindowTokens(messages)).toBe(440);
+    const gatewayBound = WINDOW - estimateWindowTokens(messages);
+    const post = (maxTokens: number): Promise<Response> =>
+      postRelay(handle, { model: "fixture-model", messages, max_tokens: maxTokens });
+
+    // The largest bound the gateway sends is admitted; one more token is refused by both.
+    expect((await post(gatewayBound)).status).toBe(200);
+    const over = await post(gatewayBound + 1);
+    expect(over.status).toBe(413);
+    expect(await over.json()).toEqual({
+      error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED",
+      x_cli_relay_error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED"
+    });
+  });
+
+  it("halves the SUM of the content bytes once, as the gateway does, on messages of odd byte counts (R1)", async () => {
+    const handle = await startFixtureRelay(
+      fixtureAdapter("window-odd-fixture", { contextWindowTokens: WINDOW }),
+      'process.stdout.write("OK");'
+    );
+    // "Țara" is 5 UTF-8 bytes (Ț is 2) and "ăîșa" is 7. Halving the sum gives 6 tokens;
+    // halving each message and adding gives 3 + 4 = 7. Only the first is the gateway's count,
+    // and the even-sized packet above cannot tell the two apart.
+    const messages = [
+      { role: "system", content: "Țara" },
+      { role: "user", content: "ăîșa" }
+    ] as const;
+    expect(messages.map((message) => Buffer.byteLength(message.content, "utf8"))).toEqual([5, 7]);
+    expect(estimateWindowTokens(messages)).toBe(6);
+    const gatewayBound = WINDOW - estimateWindowTokens(messages);
+    const post = (maxTokens: number): Promise<Response> =>
+      postRelay(handle, { model: "fixture-model", messages, max_tokens: maxTokens });
+
+    expect((await post(gatewayBound)).status).toBe(200);
+    const over = await post(gatewayBound + 1);
+    expect(over.status).toBe(413);
+    expect(await over.json()).toEqual({
+      error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED",
+      x_cli_relay_error: "CLI_RELAY_CONTEXT_WINDOW_EXCEEDED"
+    });
+  });
+
+  it("counts max_tokens only when it is a positive integer", async () => {
+    const handle = await startFixtureRelay(
+      fixtureAdapter("window-bound-fixture", { contextWindowTokens: WINDOW }),
+      'process.stdout.write("OK");'
+    );
+
+    for (const extra of [{}, { max_tokens: "100" }, { max_tokens: -5 }, { max_tokens: 1.5 }]) {
+      const response = await postRelay(handle, userTurn(`${fitting()}a`, extra));
+      expect(response.status, JSON.stringify(extra)).toBe(200);
+    }
+  });
+
+  it("never checks a window an adapter does not declare", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("windowless-fixture"), 'process.stdout.write("OK");');
+
+    const response = await postRelay(
+      handle,
+      userTurn("a".repeat(RELAY_MESSAGE_MAX_UTF8_BYTES), { max_tokens: 1_000_000 })
+    );
+
+    expect(response.status).toBe(200);
+  });
+});
+
+describe("§2.3 reasoning tokens at the relay", () => {
+  it("echoes completion_tokens_details.reasoning_tokens only when the CLI reported thinking tokens", async () => {
+    const reporting = await startFixtureRelay(fixtureAdapter("reasoning-fixture", {
+      parseCompletion: () => ({
+        content: "OK",
+        model: "fixture-model",
+        usage: buildCliUsage({ promptTokens: 10, completionTokens: 4, reasoningTokens: 3 })
+      })
+    }), 'process.stdout.write("OK");');
+    const silent = await startFixtureRelay(fixtureAdapter("silent-reasoning-fixture", {
+      parseCompletion: () => ({
+        content: "OK",
+        model: "fixture-model",
+        usage: buildCliUsage({ promptTokens: 10, completionTokens: 4 })
+      })
+    }), 'process.stdout.write("OK");');
+
+    const reported = await (await postRelay(reporting, userTurn("Usage probe."))).json() as RelayBody;
+    expect(reported.usage).toEqual({
+      prompt_tokens: 10,
+      completion_tokens: 4,
+      total_tokens: 14,
+      completion_tokens_details: { reasoning_tokens: 3 }
+    });
+    const unreported = await (await postRelay(silent, userTurn("Usage probe."))).json() as RelayBody;
+    expect(unreported.usage).toEqual({ prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 });
+    expect(unreported.usage).not.toHaveProperty("completion_tokens_details");
+  });
+
+  it("builds usage only from the counters a CLI printed, and never invents a zero", () => {
+    expect(buildCliUsage({})).toBeNull();
+    expect(buildCliUsage({ promptTokens: 5 })).toEqual({ promptTokens: 5 });
+    expect(buildCliUsage({ promptTokens: 5, completionTokens: 2 }))
+      .toEqual({ promptTokens: 5, completionTokens: 2, totalTokens: 7 });
+    expect(buildCliUsage({ promptTokens: 5, completionTokens: 2, totalTokens: 9 }))
+      .toEqual({ promptTokens: 5, completionTokens: 2, totalTokens: 9 });
+    expect(buildCliUsage({ reasoningTokens: 0 })).toEqual({ reasoningTokens: 0 });
+  });
+});
+
+describe("R4 usage cap at the relay", () => {
+  const CAP_PROBE = 'process.stderr.write("fixture: QUOTA-EXHAUSTED\\n"); process.exitCode = 3;';
+  const capAdapter = (maker: string, seen: CliFailureEvidence[]): CliRelayAdapter => fixtureAdapter(maker, {
+    classifyUsageCap: (evidence) => {
+      seen.push(evidence);
+      return evidence.exitCode === 3 && evidence.stderr.includes("QUOTA-EXHAUSTED")
+        ? "FIXTURE_USAGE_CAP"
+        : null;
+    }
+  });
+
+  it("answers a recognised cap with 429 and the stable x_cli_relay_error, so the runner can switch at once", async () => {
+    const seen: CliFailureEvidence[] = [];
+    const handle = await startFixtureRelay(capAdapter("cap-fixture", seen), CAP_PROBE);
+
+    const response = await postRelay(handle, userTurn("Cap probe."));
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({
+      error: "FIXTURE_USAGE_CAP",
+      x_cli_relay_error: "CLI_RELAY_USAGE_CAP"
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ exitCode: 3, stdout: "", stderr: "fixture: QUOTA-EXHAUSTED\n" });
+  });
+
+  it("keeps every unrecognised non-zero exit a plain FAILED — the conservative default", async () => {
+    const seen: CliFailureEvidence[] = [];
+    const other = await startFixtureRelay(
+      capAdapter("other-failure-fixture", seen),
+      'process.stderr.write("fixture: other\\n"); process.exitCode = 3;'
+    );
+    const unclassified = await startFixtureRelay(fixtureAdapter("no-classifier-fixture"), CAP_PROBE);
+
+    for (const handle of [other, unclassified]) {
+      const response = await postRelay(handle, userTurn("Cap probe."));
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({ error: "FIXTURE_FAILED" });
+    }
+  });
+
+  it("shows the classifier at most CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES of stderr", async () => {
+    const seen: CliFailureEvidence[] = [];
+    const flood = `process.stderr.write("x".repeat(${CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES}) + "QUOTA-EXHAUSTED\\n"); process.exitCode = 3;`;
+    const handle = await startFixtureRelay(capAdapter("flood-fixture", seen), flood);
+
+    const response = await postRelay(handle, userTurn("Cap probe."));
+
+    expect(response.status).toBe(502);
+    expect(seen[0]!.stderr).toHaveLength(CLI_RELAY_STDERR_EVIDENCE_MAX_BYTES);
+    expect(seen[0]!.stderr).not.toContain("QUOTA-EXHAUSTED");
+  });
+
+  it("never classifies a deadline kill: a timeout stays 504", async () => {
+    const seen: CliFailureEvidence[] = [];
+    const handle = await startFixtureRelay(
+      capAdapter("deadline-fixture", seen),
+      "setTimeout(() => undefined, 2_000);",
+      300
+    );
+
+    const response = await postRelay(handle, userTurn("Cap probe."));
+
+    expect(response.status).toBe(504);
+    expect(seen).toEqual([]);
+  });
+
+  it("never lets a classifier carry evidence out: a code that is not one upper-case token stays FAILED", async () => {
+    // The probe prints its last argument — the prompt, on argv — to stderr, and
+    // the classifier hands the evidence straight back as its "code".
+    const handle = await startFixtureRelay(fixtureAdapter("leaky-classifier-fixture", {
+      buildArguments: (prompt) => [prompt],
+      classifyUsageCap: (evidence) => evidence.stderr
+    }), "process.stderr.write(process.argv[process.argv.length - 1]); process.exitCode = 3;");
+
+    const response = await postRelay(handle, userTurn("Evidence canary 3f9d."));
+
+    expect(response.status).toBe(502);
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({ error: "FIXTURE_FAILED" });
+    expect(text).not.toContain("Evidence canary 3f9d.");
+  });
+});
+
+describe("R1: the relay speaks the gateway's own markers", () => {
+  it("every refusal marker, the level token and DEFAULT_ONLY are the gateway's exact values", async () => {
+    const gateway = await import("@debateai/providers");
+    const kernel = await import("@debateai/kernel");
+    const relay = await import("./relay-core.js");
+
+    expect(relay.CLI_RELAY_USAGE_CAP).toBe(gateway.CLI_RELAY_USAGE_CAP);
+    expect(relay.CLI_RELAY_CONTEXT_WINDOW_EXCEEDED).toBe(gateway.CLI_RELAY_CONTEXT_WINDOW_EXCEEDED);
+    expect(relay.CLI_RELAY_THINKING_LEVEL_UNSUPPORTED).toBe(gateway.CLI_RELAY_THINKING_LEVEL_UNSUPPORTED);
+    expect(relay.CLI_RELAY_THINKING_LEVEL_TOKEN.source).toBe(gateway.THINKING_LEVEL_TOKEN.source);
+    expect(relay.CLI_RELAY_THINKING_LEVEL_TOKEN.flags).toBe(gateway.THINKING_LEVEL_TOKEN.flags);
+    expect(gateway.THINKING_PARAMETERS).toContain("x_thinking_level");
+    expect(kernel.THINKING_LEVEL_DEFAULT_ONLY).toBe("DEFAULT_ONLY");
+  });
+});
+
+/**
+ * Task A8 fix round 1 (review of a9ec7b5d). Every relay directory this core
+ * makes starts `relay-<maker slug>-`, the prompt directory included, so a
+ * maker name no other test's name begins with makes "nothing left behind" one
+ * exact listing. No probe here echoes the environment.
+ *
+ * D8 (Task A12b): a SERVED call's directories now sit inside its relay's open
+ * workspace (`relay-<maker slug>-workspace-…`, removed at stop), so the listing
+ * looks inside every such workspace. Whatever a call left there is still named;
+ * the relay's own workspace, alive until close(), is not a call's leftover.
+ */
+async function relayLeftovers(maker: string): Promise<string[]> {
+  const root = tmpdir();
+  const leftovers: string[] = [];
+  for (const entry of await readdir(root)) {
+    if (!entry.startsWith(`relay-${maker}-`)) continue;
+    if (!entry.startsWith(`relay-${maker}-workspace-`)) {
+      leftovers.push(entry);
+      continue;
+    }
+    const inside = await readdir(join(root, entry)).catch((): string[] => []);
+    leftovers.push(...inside.map((inner) => join(entry, inner)));
+  }
+  return leftovers;
+}
+
+describe("fix round 1: a spawn that throws synchronously is a CLI failure, and nothing is left behind", () => {
+  it("answers 502 with the adapter's failure code and reaps the prompt directory (a NUL argument; nothing runs)", async () => {
+    const seen: string[] = [];
+    const handle = await startFixtureRelay(fixtureAdapter("nul-argument-fixture", {
+      promptTransport: "file",
+      buildArguments: (_prompt, invocation) => {
+        const promptFile = invocation?.promptFile;
+        if (promptFile === undefined) throw new Error("FIXTURE_PROMPT_FILE_MISSING");
+        seen.push(promptFile);
+        return ["--attach", promptFile, "bad\u0000argument"];
+      }
+    }), ARGV_PROBE);
+
+    const response = await postRelay(handle, userTurn("Spawn canary 1d04."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "FIXTURE_FAILED" });
+    expect(seen).toHaveLength(1);
+    expect(existsSync(dirname(seen[0]!))).toBe(false);
+    expect(await relayLeftovers("nul-argument-fixture")).toEqual([]);
+  });
+});
+
+describe("fix round 1: invokeCli checks an adapter's declarations itself", () => {
+  it("refuses an inconsistent adapter before any directory or child exists, whoever calls it", async () => {
+    const { marker, probe } = await spawnMarker();
+
+    for (const overrides of [
+      { thinkingLevels: ["low", "high"], defaultThinkingLevel: "medium" },
+      { thinkingLevels: ["High"] },
+      { thinkingLevels: ["low", "low"] },
+      { contextWindowTokens: 0 }
+    ] satisfies readonly Partial<CliRelayAdapter>[]) {
+      await expect(invokeCli(
+        { binary: process.execPath, prefixArguments: ["-e", probe, "--"] },
+        fixtureAdapter("declaration-check-fixture", overrides),
+        renderPromptTranscript([{ role: "user", content: "Declaration probe." }]),
+        1_000
+      ), JSON.stringify(overrides)).rejects.toThrow("CLI_RELAY_ADAPTER_DECLARATION_INVALID");
+    }
+    expect(existsSync(marker)).toBe(false);
+    expect(await relayLeftovers("declaration-check-fixture")).toEqual([]);
+  });
+});
+
+describe("fix round 1: the file transport's prompt directory is reaped on every failure path", () => {
+  const recordingFileAdapter = (
+    maker: string,
+    seen: string[],
+    overrides: Partial<CliRelayAdapter> = {}
+  ): CliRelayAdapter => fixtureAdapter(maker, {
+    promptTransport: "file",
+    buildArguments: (_prompt, invocation) => {
+      const promptFile = invocation?.promptFile;
+      if (promptFile === undefined) throw new Error("FIXTURE_PROMPT_FILE_MISSING");
+      seen.push(promptFile);
+      return ["--attach", promptFile];
+    },
+    ...overrides
+  });
+  const expectReaped = async (maker: string, seen: readonly string[]): Promise<void> => {
+    expect(seen).toHaveLength(1);
+    expect(existsSync(seen[0]!)).toBe(false);
+    expect(existsSync(dirname(seen[0]!))).toBe(false);
+    expect(await relayLeftovers(maker)).toEqual([]);
+  };
+
+  it("after a deadline kill (504)", async () => {
+    const seen: string[] = [];
+    const handle = await startFixtureRelay(
+      recordingFileAdapter("reap-timeout-fixture", seen),
+      "setTimeout(() => undefined, 2_000);",
+      300
+    );
+
+    const response = await postRelay(handle, userTurn("Reap probe."));
+
+    expect(response.status).toBe(504);
+    await expectReaped("reap-timeout-fixture", seen);
+  });
+
+  it("after a non-zero exit (502)", async () => {
+    const seen: string[] = [];
+    const handle = await startFixtureRelay(recordingFileAdapter("reap-exit-fixture", seen), "process.exitCode = 3;");
+
+    const response = await postRelay(handle, userTurn("Reap probe."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "FIXTURE_FAILED" });
+    await expectReaped("reap-exit-fixture", seen);
+  });
+
+  it("after a spawn error for a program that does not exist (502; nothing runs)", async () => {
+    const seen: string[] = [];
+    const handle = await startCliRelayServer({
+      port: 0,
+      timeoutMs: 5_000,
+      command: { binary: join(await pathDirectory(), "absent-cli"), prefixArguments: [] },
+      adapter: recordingFileAdapter("reap-enoent-fixture", seen)
+    });
+    handles.push(handle);
+
+    const response = await postRelay(handle, userTurn("Reap probe."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "FIXTURE_FAILED" });
+    await expectReaped("reap-enoent-fixture", seen);
+  });
+
+  it("after the argument builder throws (400, as a throwing builder has always answered)", async () => {
+    const seen: string[] = [];
+    const handle = await startFixtureRelay(recordingFileAdapter("reap-builder-fixture", seen, {
+      buildArguments: (_prompt, invocation) => {
+        if (invocation?.promptFile !== undefined) seen.push(invocation.promptFile);
+        throw new Error("FIXTURE_ARGUMENTS_FAILED");
+      }
+    }), 'process.stdout.write("OK");');
+
+    const response = await postRelay(handle, userTurn("Reap probe."));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "MALFORMED_REQUEST" });
+    await expectReaped("reap-builder-fixture", seen);
+  });
+});
+
+describe("fix round 1: the usage-cap code pattern is exported for adapter authors", () => {
+  it("accepts one upper-case code token of at most 64 characters, and nothing else", () => {
+    for (const code of ["FIXTURE_USAGE_CAP", "CLAUDE_CLI_USAGE_CAP", "A", `A${"B".repeat(63)}`]) {
+      expect(CLI_RELAY_USAGE_CAP_CODE_TOKEN.test(code), code).toBe(true);
+    }
+    for (const code of [
+      "", "fixture_usage_cap", "_USAGE_CAP", "1USAGE_CAP", "USAGE CAP", "USAGE-CAP", "USAGE_CAP\n", `A${"B".repeat(64)}`
+    ]) {
+      expect(CLI_RELAY_USAGE_CAP_CODE_TOKEN.test(code), JSON.stringify(code)).toBe(false);
+    }
+  });
+});
+
+describe("fix round 1: a stdin or file transport never puts the prompt on argv", () => {
+  it("refuses, before spawning and with cleanup, an argument list that carries the prompt", async () => {
+    for (const transport of ["stdin", "file"] as const) {
+      const maker = `argv-law-${transport}-fixture`;
+      const { marker, probe } = await spawnMarker();
+      const seen: string[] = [];
+      const handle = await startFixtureRelay(fixtureAdapter(maker, {
+        promptTransport: transport,
+        buildArguments: (prompt, invocation) => {
+          if (invocation?.promptFile !== undefined) seen.push(invocation.promptFile);
+          return [`--prompt=${prompt}`];
+        }
+      }), probe);
+
+      const response = await postRelay(handle, userTurn("Argv canary 6c1e."));
+
+      expect(response.status, transport).toBe(502);
+      const text = await response.text();
+      expect(JSON.parse(text), transport).toEqual({ error: "CLI_RELAY_PROMPT_ON_ARGV" });
+      expect(text).not.toContain("Argv canary 6c1e.");
+      expect(existsSync(marker), transport).toBe(false);
+      expect(await relayLeftovers(maker), transport).toEqual([]);
+      if (transport === "file") {
+        expect(seen).toHaveLength(1);
+        expect(existsSync(dirname(seen[0]!))).toBe(false);
+      }
+    }
+  });
+
+  it("never counts an empty prompt as present in every argument (fix round 2)", async () => {
+    for (const transport of ["stdin", "file"] as const) {
+      const maker = `empty-prompt-${transport}-fixture`;
+      const completion = await invokeCli(
+        { binary: process.execPath, prefixArguments: ["-e", 'process.stdout.write("OK");', "--"] },
+        fixtureAdapter(maker, { promptTransport: transport, buildArguments: () => ["--fixture-flag"] }),
+        "",
+        5_000
+      );
+
+      expect(completion.content, transport).toBe("OK");
+      expect(await relayLeftovers(maker), transport).toEqual([]);
+    }
+  });
+
+  it("leaves the argv transport (the four original makers) free to pass the prompt as an argument", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("argv-law-argv-fixture", {
+      buildArguments: (prompt) => [prompt]
+    }), ARGV_PROBE);
+
+    const response = await postRelay(handle, userTurn("Argv canary 6c1e."));
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as RelayBody;
+    expect(JSON.parse(body.choices[0]!.message.content))
+      .toEqual([renderPromptTranscript([{ role: "user", content: "Argv canary 6c1e." }])]);
+  });
+});
+
+describe("the shared handshake reply rule (Task A10 fix round 1, shared from Task A11)", () => {
+  it("accepts only ok: trimmed, in any case, with trailing punctuation dropped", () => {
+    // A relay whose CLI ignored the prompt still answers — generically. Only a
+    // CLI that READ the handshake prompt replies "ok", so the agy and pi relays
+    // refuse to start on any other reply.
+    for (const reply of ["OK", "ok", "Ok", "OK.", "ok!", "  OK. ", "OK\n", "OK …"]) {
+      expect(isRelayHandshakeReply(reply), JSON.stringify(reply)).toBe(true);
+    }
+    for (const reply of [
+      "", "Hello! How can I help you today?", "okay", "not ok", "OK OK", "OK, but", "\"OK", "no"
+    ]) {
+      expect(isRelayHandshakeReply(reply), JSON.stringify(reply)).toBe(false);
+    }
+  });
+});
+
+/**
+ * A11 fix round 1 (review of dee85930). pi repeats the whole prompt in its own
+ * JSON events and may stream the growing partial answer, so its stdout can be
+ * many times the 1 MiB bound while the one line its parser reads is small. An
+ * adapter may therefore declare `keepStdoutLine`: each line is decided from its
+ * first CLI_RELAY_STDOUT_LINE_DECISION_BYTES bytes, a dropped line is discarded
+ * as it arrives and never counted, and a kept line counts toward the bound like
+ * any output does. An adapter without the hook is read exactly as before.
+ */
+describe("A11 fix round 1: an adapter's stdout line filter", () => {
+  const DECISION = CLI_RELAY_STDOUT_LINE_DECISION_BYTES;
+  const keepK = (lineStart: string): boolean => lineStart.startsWith("K");
+  const lines = [
+    "K first kept line",
+    `D${"d".repeat(DECISION * 2)}`,
+    "",
+    `K${"k".repeat(DECISION + 10)}`,
+    "D dropped",
+    "K last, unterminated"
+  ];
+  const stream = Buffer.from(lines.join("\n"), "utf8");
+  const expected = lines.filter(keepK).join("\n");
+
+  function filtered(chunks: readonly Buffer[], keep: (lineStart: string) => boolean = keepK): string {
+    const filter = createStdoutLineFilter(keep);
+    const kept = chunks.flatMap((chunk) => filter.accept(chunk));
+    kept.push(...filter.finish());
+    return Buffer.concat(kept).toString("utf8");
+  }
+
+  function splitAt(buffer: Buffer, positions: readonly number[]): Buffer[] {
+    const edges = [0, ...positions, buffer.byteLength];
+    return edges.slice(1).map((end, index) => buffer.subarray(edges[index], end));
+  }
+
+  it("assembles lines across chunk boundaries: one chunk, one-byte chunks and every two-chunk split agree", () => {
+    expect(filtered([stream])).toBe(expected);
+    expect(filtered(Array.from(stream, (byte) => Buffer.of(byte)))).toBe(expected);
+    for (let position = 0; position <= stream.byteLength; position += 7) {
+      expect(filtered(splitAt(stream, [position])), `split at ${position}`).toBe(expected);
+    }
+    for (const position of [DECISION - 1, DECISION, DECISION + 1, DECISION + 2]) {
+      expect(filtered(splitAt(stream, [position, position + DECISION])), `split at ${position}`).toBe(expected);
+    }
+  });
+
+  it("hands the hook at most the decision bytes of each line, never its newline", () => {
+    const seen: string[] = [];
+    filtered(Array.from(stream, (byte) => Buffer.of(byte)), (lineStart) => {
+      seen.push(lineStart);
+      return keepK(lineStart);
+    });
+
+    expect(seen).toEqual(lines.map((line) => line.slice(0, DECISION)));
+  });
+
+  it("holds at most the decision bytes of an undecided line, then returns a kept line's bytes as they arrive", () => {
+    const filter = createStdoutLineFilter(keepK);
+
+    expect(filter.accept(Buffer.from(`K${"k".repeat(99)}`, "utf8"))).toEqual([]);
+    const rest = filter.accept(Buffer.alloc(DECISION * 3, 0x6b));
+    expect(Buffer.concat(rest).byteLength).toBe(100 + DECISION * 3);
+    expect(filter.finish()).toEqual([]);
+
+    const dropping = createStdoutLineFilter(keepK);
+    expect(dropping.accept(Buffer.alloc(DECISION * 10, 0x64))).toEqual([]);
+    expect(dropping.finish()).toEqual([]);
+  });
+
+  it("returns copies, so a few kept bytes never keep a large, mostly dropped chunk alive", () => {
+    const chunk = Buffer.from(`K kept\nD${"d".repeat(65_536)}\nK${"k".repeat(DECISION)}\n`, "utf8");
+    const filter = createStdoutLineFilter(keepK);
+
+    const kept = filter.accept(chunk);
+
+    expect(Buffer.concat(kept).toString("utf8")).toBe(`K kept\nK${"k".repeat(DECISION)}\n`);
+    for (const piece of kept) expect(piece.buffer).not.toBe(chunk.buffer);
+  });
+
+  it("keeps a line when the hook throws or answers anything but false", () => {
+    expect(filtered([Buffer.from("D a\nD b", "utf8")], () => {
+      throw new Error("fixture hook failure");
+    })).toBe("D a\nD b");
+    expect(filtered([Buffer.from("D a\nD b", "utf8")], () => undefined as unknown as boolean)).toBe("D a\nD b");
+  });
+
+  // About 4.5 MiB of lines to drop, then the one line a parser reads.
+  const OVERSIZED_PROBE = [
+    'const dropped = "D".repeat(1_572_864) + "\\n";',
+    "process.stdout.write(dropped);",
+    "process.stdout.write(dropped);",
+    "process.stdout.write(dropped);",
+    'process.stdout.write("KEEP answer\\n");'
+  ].join("");
+  const keepKeep = (lineStart: string): boolean => lineStart.startsWith("KEEP");
+
+  it("without the hook, oversized output is still CLI_RELAY_STDOUT_LIMIT: the core is unchanged", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("line-filter-absent-fixture"), OVERSIZED_PROBE);
+
+    const response = await postRelay(handle, userTurn("Bound stdout."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "CLI_RELAY_STDOUT_LIMIT" });
+  });
+
+  it("with the hook, dropped lines never count toward the bound and the kept line is answered", async () => {
+    let parsed: string | undefined;
+    const handle = await startFixtureRelay(fixtureAdapter("line-filter-present-fixture", {
+      keepStdoutLine: keepKeep,
+      parseCompletion: (stdout: string) => {
+        parsed = stdout;
+        return { content: stdout, model: "fixture-model", usage: null };
+      }
+    }), OVERSIZED_PROBE);
+
+    const response = await postRelay(handle, userTurn("Filter stdout."));
+
+    expect(response.status).toBe(200);
+    expect(parsed).toBe("KEEP answer\n");
+  });
+
+  it("with the hook, a single kept line past the bound, unterminated, is still refused", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("line-filter-oversized-fixture", {
+      keepStdoutLine: keepKeep
+    }), `process.stdout.write("KEEP" + "k".repeat(${CLI_RELAY_STDOUT_MAX_BYTES}));`);
+
+    const response = await postRelay(handle, userTurn("Bound one line."));
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "CLI_RELAY_STDOUT_LIMIT" });
+  });
+
+  it("with the hook, lines written in pieces across separate chunks are reassembled end to end", async () => {
+    let parsed: string | undefined;
+    const handle = await startFixtureRelay(fixtureAdapter("line-filter-pieces-fixture", {
+      keepStdoutLine: keepKeep,
+      parseCompletion: (stdout: string) => {
+        parsed = stdout;
+        return { content: stdout, model: "fixture-model", usage: null };
+      }
+    }), [
+      "const write = (text) => new Promise((done) => setTimeout(() => process.stdout.write(text, done), 30));",
+      "(async () => {",
+      '  await write("KE");',
+      '  await write("EP one\\nDRO");',
+      '  await write("P " + "x".repeat(8_192) + "\\nKEEP");',
+      '  await write(" two");',
+      "})();"
+    ].join(""));
+
+    const response = await postRelay(handle, userTurn("Reassemble stdout."));
+
+    expect(response.status).toBe(200);
+    expect(parsed).toBe("KEEP one\nKEEP two");
+  });
+});
+
+/**
+ * D8 lean calls (owner ruling 2026-09-26, Task A12b): one private workspace per
+ * relay, the one minimal system sentence, the instructions file a codex-style
+ * CLI reads, and the informational harness-overhead line — each proven on a
+ * fixture adapter. W6: the probes report paths, modes and listings only.
+ */
+const WORKSPACE_PROBE = [
+  'const { readdirSync, statSync } = require("node:fs");',
+  "process.stdout.write(JSON.stringify({",
+  "  cwd: process.cwd(),",
+  "  cwdMode: (statSync(process.cwd()).mode & 0o777).toString(8),",
+  "  cwdEntries: readdirSync(process.cwd())",
+  "}));"
+].join("");
+
+const INSTRUCTIONS_PROBE = [
+  'const { readFileSync, readdirSync, statSync } = require("node:fs");',
+  "const instructionsFile = process.argv[process.argv.length - 1];",
+  "process.stdout.write(JSON.stringify({",
+  "  instructionsFile,",
+  "  instructionsMode: (statSync(instructionsFile).mode & 0o777).toString(8),",
+  '  instructions: readFileSync(instructionsFile, "utf8"),',
+  "  cwd: process.cwd(),",
+  "  cwdMode: (statSync(process.cwd()).mode & 0o777).toString(8),",
+  "  cwdEntries: readdirSync(process.cwd())",
+  "}));"
+].join("");
+
+interface WorkspaceObservation {
+  readonly cwd: string;
+  readonly cwdMode: string;
+  readonly cwdEntries: readonly string[];
+}
+
+interface InstructionsObservation extends WorkspaceObservation {
+  readonly instructionsFile: string;
+  readonly instructionsMode: string;
+  readonly instructions: string;
+}
+
+async function observeRelay<T>(handle: CliRelayHandle, content: string): Promise<T> {
+  const body = await (await postRelay(handle, userTurn(content))).json() as RelayBody;
+  return JSON.parse(body.choices[0]!.message.content) as T;
+}
+
+describe("D8 the relay's private workspace", () => {
+  it("allows one short neutral sentence as the only system text a relay gives a CLI", () => {
+    expect(RELAY_MINIMAL_SYSTEM_PROMPT).toBe("Follow the instructions in the user message exactly.");
+  });
+
+  it("runs every call in its own empty 0700 directory inside ONE 0700 workspace per relay, removed at stop", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("cwd-fixture"), WORKSPACE_PROBE);
+
+    const first = await observeRelay<WorkspaceObservation>(handle, "Workspace probe one.");
+    const second = await observeRelay<WorkspaceObservation>(handle, "Workspace probe two.");
+
+    const workspace = dirname(first.cwd);
+    expect(dirname(second.cwd)).toBe(workspace);
+    // CONT-01 / STATE-01 unchanged: a fresh directory per call, reaped after it.
+    expect(second.cwd).not.toBe(first.cwd);
+    for (const observed of [first, second]) {
+      expect(observed.cwdEntries).toEqual([]);
+      expect(observed.cwdMode).toBe("700");
+      expect(basename(observed.cwd)).toMatch(/^relay-cwd-fixture-/u);
+      await expect.poll(() => existsSync(observed.cwd)).toBe(false);
+    }
+    expect(basename(workspace)).toMatch(/^relay-cwd-fixture-workspace-/u);
+    expect(((await stat(workspace)).mode & 0o777).toString(8)).toBe("700");
+    const fromProject = relative(process.cwd(), workspace);
+    expect(fromProject.startsWith("..") || isAbsolute(fromProject)).toBe(true);
+
+    await handle.close();
+
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("writes the sentence ONCE per start to a 0600 file for an adapter that reads it from a file, beside every cwd and never in one", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("instructions-fixture", {
+      readsInstructionsFile: true,
+      buildArguments: (_prompt, invocation) => {
+        if (invocation?.instructionsFile === undefined) throw new Error("FIXTURE_INSTRUCTIONS_FILE_MISSING");
+        return [invocation.instructionsFile];
+      }
+    }), INSTRUCTIONS_PROBE);
+
+    const first = await observeRelay<InstructionsObservation>(handle, "Instructions probe one.");
+    const second = await observeRelay<InstructionsObservation>(handle, "Instructions probe two.");
+
+    expect(second.instructionsFile).toBe(first.instructionsFile);
+    expect(isAbsolute(first.instructionsFile)).toBe(true);
+    expect(basename(first.instructionsFile)).toBe(CLI_RELAY_INSTRUCTIONS_FILE_NAME);
+    expect(first.instructionsMode).toBe("600");
+    expect(first.instructions).toBe(RELAY_MINIMAL_SYSTEM_PROMPT);
+    expect(dirname(first.instructionsFile)).toBe(dirname(first.cwd));
+    expect(first.cwdEntries).toEqual([]);
+
+    await handle.close();
+
+    expect(existsSync(first.instructionsFile)).toBe(false);
+  });
+
+  it("never runs such an adapter without its file: refused before any directory or child exists", async () => {
+    const { marker, probe } = await spawnMarker();
+    const adapter = fixtureAdapter("no-instructions-fixture", { readsInstructionsFile: true });
+
+    await expect(invokeCli(
+      { binary: process.execPath, prefixArguments: ["-e", probe, "--"] },
+      adapter,
+      "Instructions probe.",
+      1_000
+    )).rejects.toThrow(CLI_RELAY_INSTRUCTIONS_FILE_MISSING);
+    expect(existsSync(marker)).toBe(false);
+    expect(await relayLeftovers("no-instructions-fixture")).toEqual([]);
+  });
+
+  it("serves in the workspace its caller opened for the handshake, and stop removes it", async () => {
+    const adapter = fixtureAdapter("lent-workspace-fixture");
+    const command = { binary: process.execPath, prefixArguments: ["-e", WORKSPACE_PROBE, "--"] };
+    const workspace = await openRelayWorkspace(adapter);
+    const handshake = JSON.parse(
+      (await invokeCli(command, adapter, "Handshake probe.", 5_000, { workspace })).content
+    ) as WorkspaceObservation;
+    const handle = await startCliRelayServer({ port: 0, timeoutMs: 5_000, command, adapter, workspace });
+    handles.push(handle);
+
+    const served = await observeRelay<WorkspaceObservation>(handle, "Served probe.");
+
+    expect(dirname(handshake.cwd)).toBe(workspace.directory);
+    expect(dirname(served.cwd)).toBe(workspace.directory);
+    expect(served.cwd).not.toBe(handshake.cwd);
+    await handle.close();
+    expect(existsSync(workspace.directory)).toBe(false);
+  });
+
+  it("leaves a call made outside any relay (discovery) where it always ran: its own empty directory in the system temp root", async () => {
+    const observed = JSON.parse((await invokeCli(
+      { binary: process.execPath, prefixArguments: ["-e", WORKSPACE_PROBE, "--"] },
+      fixtureAdapter("bare-call-fixture"),
+      "Bare probe.",
+      5_000
+    )).content) as WorkspaceObservation;
+
+    expect(dirname(observed.cwd)).toBe(await realpath(tmpdir()));
+    expect(observed.cwdEntries).toEqual([]);
+  });
+});
+
+describe("D8 harness overhead, measured once at start and only reported", () => {
+  const reported = (promptTokens: number): CliCompletion =>
+    ({ content: "OK", model: "fixture-model", usage: { promptTokens } });
+  const unreported: CliCompletion = { content: "OK", model: "fixture-model", usage: null };
+  const PROMPT = "a".repeat(41); // ⌈41 ÷ 4⌉ = 11
+
+  it("is the CLI-reported input minus our own characters ÷ 4 count of the handshake prompt", () => {
+    expect(measureHarnessOverhead("Fixture", PROMPT, reported(700))).toEqual({
+      maker: "Fixture", reportedInputTokens: 700, promptTokensEstimate: 11, overheadTokens: 689
+    });
+    // A CLI that counts cached input apart (Claude Code) reports everything it read.
+    expect(measureHarnessOverhead("Fixture", PROMPT, { ...reported(2), reportedInputTokens: 687 }))
+      .toMatchObject({ reportedInputTokens: 687, overheadTokens: 676 });
+    expect(measureHarnessOverhead("Fixture", PROMPT, unreported)).toEqual({
+      maker: "Fixture", reportedInputTokens: null, promptTokensEstimate: 11, overheadTokens: null
+    });
+  });
+
+  it("counts exactly as @debateai/providers' estimatePromptTokens does", () => {
+    expect(RELAY_PROMPT_CHARACTERS_PER_TOKEN).toBe(4);
+    for (const prompt of [
+      "",
+      "a",
+      "Ce urmează din aceste dovezi?",
+      renderPromptTranscript([{ role: "user", content: "Handshake." }])
+    ]) {
+      expect(measureHarnessOverhead("Fixture", prompt, unreported).promptTokensEstimate, prompt)
+        .toBe(estimatePromptTokens([{ role: "user", content: prompt }]));
+    }
+  });
+
+  it("prints one informational line, and a line that cannot be written never refuses a start", () => {
+    const lines: string[] = [];
+
+    const overhead = reportHarnessOverhead("Fixture", PROMPT, reported(700), (line) => { lines.push(line); });
+
+    expect(lines).toEqual(["RELAY OVERHEAD Fixture reported=700 own=11 overhead=689"]);
+    expect(harnessOverheadLine(overhead)).toBe(lines[0]);
+    // F37: the relay host's attributed form names the candidate.
+    expect(harnessOverheadLine(overhead, "local:fixture"))
+      .toBe("RELAY OVERHEAD Fixture local:fixture reported=700 own=11 overhead=689");
+    expect(harnessOverheadLine(measureHarnessOverhead("Fixture", "", unreported)))
+      .toBe("RELAY OVERHEAD Fixture reported=none own=0 overhead=unknown");
+    expect(() => reportHarnessOverhead("Fixture", PROMPT, unreported, () => { throw new Error("EPIPE"); }))
+      .not.toThrow();
+  });
+});
+
+describe("D8 the workspace also holds the file transport's prompt, and a failed start leaves nothing", () => {
+  it("makes the prompt directory in the relay's workspace, beside the call's empty directory, and reaps both", async () => {
+    const handle = await startFixtureRelay(fixtureAdapter("workspace-file-fixture", {
+      promptTransport: "file",
+      buildArguments: (_prompt, invocation) => {
+        if (invocation?.promptFile === undefined) throw new Error("FIXTURE_PROMPT_FILE_MISSING");
+        return ["--attach", invocation.promptFile];
+      }
+    }), FILE_PROBE);
+
+    const observed = await observeRelay<{
+      readonly promptFile: string;
+      readonly mode: string;
+      readonly cwd: string;
+      readonly cwdEntries: readonly string[];
+    }>(handle, "Workspace file probe.");
+
+    const workspace = dirname(observed.cwd);
+    expect(basename(workspace)).toMatch(/^relay-workspace-file-fixture-workspace-/u);
+    expect(dirname(dirname(observed.promptFile))).toBe(workspace);
+    expect(basename(dirname(observed.promptFile))).toMatch(/^relay-workspace-file-fixture-prompt-/u);
+    expect(observed.mode).toBe("600");
+    expect(observed.cwdEntries).toEqual([]);
+    expect(existsSync(dirname(observed.promptFile))).toBe(false);
+    expect(await relayLeftovers("workspace-file-fixture")).toEqual([]);
+
+    await handle.close();
+
+    expect(existsSync(workspace)).toBe(false);
+  });
+
+  it("removes the workspace a server opened when it cannot listen", async () => {
+    const occupying = await startFixtureRelay(fixtureAdapter("occupying-fixture"), WORKSPACE_PROBE);
+
+    await expect(startCliRelayServer({
+      port: occupying.port,
+      timeoutMs: 1_000,
+      command: { binary: process.execPath, prefixArguments: ["-e", WORKSPACE_PROBE, "--"] },
+      adapter: fixtureAdapter("listen-failure-fixture")
+    })).rejects.toThrow("EADDRINUSE");
+    expect((await readdir(tmpdir())).filter((entry) => entry.startsWith("relay-listen-failure-fixture-")))
+      .toEqual([]);
+  });
+});
+
+describe("D8 fix round 1: close() is one close, however many callers ask", () => {
+  it("removes the workspace only after an in-flight call has finished, when two closes race it", async () => {
+    const markerDirectory = await pathDirectory();
+    const started = join(markerDirectory, "started");
+    const probe = [
+      'const { existsSync, writeFileSync } = require("node:fs");',
+      "const cwd = process.cwd();",
+      `writeFileSync(${JSON.stringify(started)}, cwd);`,
+      "setTimeout(() => process.stdout.write(JSON.stringify({ cwd, cwdStillThere: existsSync(cwd) })), 400);"
+    ].join("");
+    const handle = await startFixtureRelay(fixtureAdapter("racing-close-fixture"), probe);
+
+    const inFlight = postRelay(handle, userTurn("Racing close probe."));
+    await expect.poll(() => existsSync(started)).toBe(true);
+    const workspace = dirname(await readFile(started, "utf8"));
+    const first = handle.close();
+    const second = handle.close();
+
+    // One close for every caller: the second never races ahead of the first.
+    expect(second).toBe(first);
+    const response = await inFlight;
+    expect(response.status).toBe(200);
+    const observed = JSON.parse((await response.json() as RelayBody).choices[0]!.message.content) as {
+      readonly cwd: string;
+      readonly cwdStillThere: boolean;
+    };
+    expect(observed.cwdStillThere).toBe(true);
+    await Promise.all([first, second]);
+    expect(existsSync(workspace)).toBe(false);
+    // The first close waits for the caller's kept-alive connection to go (seconds, as
+    // before this fix), so this case gets more than the default five-second budget.
+  }, 15_000);
 });

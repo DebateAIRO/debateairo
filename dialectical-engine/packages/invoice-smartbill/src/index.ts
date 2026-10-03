@@ -76,6 +76,13 @@ function clientOf(customer: SaleRecord["customer"]): Record<string, unknown> {
  * SmartBill (Romania). Implements the optional `creditPartial` and `pdf`; deliberately has NO `lookup` (X1 row 8),
  * so a call whose outcome is unknown is never repeated (A17b, R-24).
  */
+/** Drops every trailing "/" in one backward pass (CodeQL js/polynomial-redos: `/\/+$/` is quadratic on many "/"). */
+export function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === 47) end -= 1;
+  return url.slice(0, end);
+}
+
 export class SmartBillInvoiceIssuer implements InvoiceIssuer {
   readonly #baseUrl: string;
   readonly #authorization: string;
@@ -95,7 +102,7 @@ export class SmartBillInvoiceIssuer implements InvoiceIssuer {
     /** Drafts only (`isDraft: true`): P5 Step 9's recording when the accountant allows no real test invoice. */
     draft?: boolean;
   }>) {
-    this.#baseUrl = o.baseUrl.replace(/\/+$/u, "");
+    this.#baseUrl = trimTrailingSlashes(o.baseUrl);
     this.#authorization = `Basic ${Buffer.from(`${o.username}:${o.token}`, "utf8").toString("base64")}`;
     this.#companyCif = o.companyCif;
     this.#series = o.series;

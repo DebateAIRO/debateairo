@@ -416,6 +416,10 @@ function pointNote(mark: ConditionMark): PointNote | null {
     case "DERIVED-STANDING-UNREVIEWED":
     case "HIDDEN-LOW-SCORE":
     case "UNAUTHORED-BRANCH-HALTED":
+    // Model scorecard A16 (merged by paid plans S1a): a planned AI model that
+    // could not be used and a backup that answered instead is said once for the
+    // whole answer (its record names the served root), not about one point.
+    case "BACKUP-MODEL-USED":
       return null;
   }
 }

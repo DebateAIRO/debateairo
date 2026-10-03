@@ -483,12 +483,18 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // may serialise the request whole. A third call site added later is caught
     // by the same two counts, in either direction.
     expect(occurrences(runner, "JSON.stringify(request)")).toBe(0);
-    expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(SYNTHESIS_CALL_SITES);
+    // A17: both call sites build through the ONE exported synthesis builder,
+    // which `moment:replay` (`replayMoment`) also calls, through
+    // `captureMomentPacket` and `invokeMomentBuilder` in
+    // acceptance/moment-tools.ts, and that builder is the only place the
+    // projection is applied.
+    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName)")).toBe(SYNTHESIS_CALL_SITES);
+    expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
     // ...and there is exactly ONE projection, so the allow-list cannot be forked
     // into a second copy that quietly readmits a field.
     expect(occurrences(readFileSync(SYNTHESIS_SRC, "utf8"), "export function toSynthesisPromptMaterial")).toBe(1);
-    // RUN1: and both sites build the packet with the ONE frame builder.
-    expect(occurrences(runner, "buildFramedPrompt({")).toBe(SYNTHESIS_CALL_SITES);
+    // RUN1: and the one builder frames the packet with the ONE frame builder.
+    expect(occurrences(runner, "buildFramedPrompt({")).toBe(1);
   });
 
   it.each(SYNTHESIS_PAYLOADS.map(({ name }) => name))(

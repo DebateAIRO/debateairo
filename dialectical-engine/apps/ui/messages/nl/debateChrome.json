@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Terug naar bibliotheek",
   "debateChrome.loading": "Laden…",
   "debateChrome.error.claimGenerationFailed": "Genereren van stelling mislukt",
-  "debateChrome.error.debateGenerationFailed": "Genereren van het debat mislukt: {reason}",
+  "runFailure.NOT_STARTED": "Er ging aan onze kant iets mis voordat dit debat begon. Stel uw vraag alstublieft nog een keer.",
+  "runFailure.MODELS_UNAVAILABLE": "Dit debat kon niet starten omdat de benodigde AI-modellen niet beschikbaar waren. Probeer het over een tijdje alstublieft opnieuw.",
+  "runFailure.RUN_LIMIT_REACHED": "Dit debat heeft zijn limiet bereikt voordat het een antwoord kon geven.",
+  "runFailure.DAILY_LIMIT_REACHED": "De limiet van vandaag voor debatten werd bereikt terwijl dit debat startte. Stel uw vraag morgen alstublieft opnieuw.",
+  "runFailure.STOPPED": "Dit debat is halverwege gestopt door een probleem aan onze kant. Stel uw vraag alstublieft opnieuw.",
   "debateChrome.error.unableToLoadDebate": "Debat kon niet worden geladen",
   "debateChrome.error.unableToLoadScoring": "Scores konden niet worden geladen",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Proefuitvoering voor adaptieve diepte kon niet worden geladen",
@@ -280,5 +284,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "De coördinator heeft de abonnementskeuze afgewezen. Kies Gratis of Premium en probeer het opnieuw.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "De coördinator heeft het verzoek afgewezen: een model dat voor dit abonnement nodig is, is momenteel niet beschikbaar. Probeer het later opnieuw of kies het andere abonnement.",
   "requestFailure.kind.ALREADY_WAITING": "Er kan maar één vraag tegelijk wachten. Stel deze vraag zodra uw wachtende debat is gestart.",
-  "requestFailure.kind.UNCLASSIFIED": "Het verzoek is mislukt voordat er een antwoord is ontvangen, waardoor de uitkomst onbekend is. De coördinator heeft hierover geen beslissing genomen."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Dit debat zou meer kosten dan deze site voor één debat toestaat.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "De coördinator heeft het verzoek afgewezen: voor een van de taken in het debat is momenteel geen AI-model bereikbaar. Probeer het later opnieuw.",
+  "requestFailure.kind.UNCLASSIFIED": "Het verzoek is mislukt voordat er een antwoord is ontvangen, waardoor de uitkomst onbekend is. De coördinator heeft hierover geen beslissing genomen.",
+  "debateChrome.condition.backupModelUsed": "Waar een gepland AI-model niet kon worden gebruikt, nam een ander het over"
 }

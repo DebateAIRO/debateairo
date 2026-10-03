@@ -12,6 +12,7 @@ import {
 import {
   TypedDomainError,
   classifyLedgerActionKind,
+  type DebateRole,
   type LedgerOutcome,
   type OperatorSupplyingLevel,
   type ScoringOperator,
@@ -32,6 +33,16 @@ export interface AppendLedgerInput {
   readonly rawArtifactRef?: string | null;
   readonly startedAt: Date;
   readonly finishedAt: Date;
+  /**
+   * Model scorecard §2.1–§2.3 (migration 0090): the debate job, the scorecard
+   * candidate, the scorecard version and the thinking level of a MODEL_CALL
+   * attempt. Absent means NULL: every other writer (settlement, evaluator,
+   * budget) is unchanged, and the database refuses them on any other action.
+   */
+  readonly modelRole?: DebateRole | null;
+  readonly candidateId?: string | null;
+  readonly scorecardVersion?: number | null;
+  readonly thinkingLevel?: string | null;
 }
 
 export interface LedgerEntryRecord {
@@ -58,6 +69,8 @@ export interface AppendRawArtifactInput {
   readonly inputHash: string;
   readonly contractHash: string;
   readonly contentHash: string;
+  /** Model scorecard §2.3 (migration 0090): the vendor-reported thinking tokens; null when not reported. */
+  readonly thinkingTokens?: number | null;
 }
 
 interface ScheduledArtifactRow {
@@ -195,14 +208,17 @@ export class LedgerRepository {
         `INSERT INTO ledger.ledger_entry (
           ledger_entry_id, sequence, run_id, attempt_id, action_kind, call_site_key, subject_item_id,
           stance_at_action, outcome, actor_ref, input_hash, contract_hash,
-          input_hash_version, raw_artifact_ref, started_at, finished_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+          input_hash_version, raw_artifact_ref, started_at, finished_at,
+          model_role, candidate_id, scorecard_version, thinking_level
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
         RETURNING ledger_entry_id, subject_item_id, stance_at_action, outcome`,
         [
           ledgerEntryId, sequence, input.runId, input.attemptId ?? null, actionKind, callSiteKey,
           input.subjectItemId, input.stanceAtAction, input.outcome, input.actorRef,input.inputHash,
           input.contractHash,1,input.rawArtifactRef ?? null,
-          input.startedAt, input.finishedAt
+          input.startedAt, input.finishedAt,
+          input.modelRole ?? null, input.candidateId ?? null,
+          input.scorecardVersion ?? null, input.thinkingLevel ?? null
         ]
       );
       const row = result.rows[0]!;
@@ -244,8 +260,8 @@ export class LedgerRepository {
           model_id, maker, model_version, raw_text, metadata_json,
           parse_status, parse_error, input_hash, contract_hash, content_hash, at_seq,
           input_hash_version,content_hash_version,
-          content_ciphertext,content_attestation
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20)
+          content_ciphertext,content_attestation,thinking_tokens
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb,$20,$21)
         RETURNING raw_artifact_id`,
         [
           input.artifactId, input.attemptId, input.runId, input.providerRef, input.provider,
@@ -255,7 +271,8 @@ export class LedgerRepository {
           content === null ? input.inputHash : null,input.contractHash,
           content === null ? input.contentHash : null,sequence,
           content === null ? 1 : 2,content === null ? 1 : 2,
-          content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null
+          content === null ? null : JSON.stringify(content.envelope),content?.attestation ?? null,
+          input.thinkingTokens ?? null
         ]
       );
       return result.rows[0]!.raw_artifact_id;
@@ -574,6 +591,68 @@ export class LedgerRepository {
       callSiteKey: row.call_site_key,
       outcome: row.outcome
     };
+  }
+
+  /**
+   * Model scorecard A15 — the seat-marked MODEL_CALL rows of one work item
+   * (`…:seat:main` / `…:seat:runnerUp`, A15a), in ledger order. A RESUMED pass
+   * re-authors every site, so it reads what earlier passes recorded here to
+   * seat each root and each cross-exchange exactly as they were seated: who
+   * answered a root, and which marker a cross-exchange site already holds
+   * (controller ruling A14 — DR-184-v5 is exact only if both hold across
+   * restarts). A run without a pinned assignment records no such key.
+   */
+  async readSeatMarkedModelCalls(input: {
+    readonly runId: string;
+    readonly workItemId: string;
+    readonly contractHash: string;
+  }): Promise<readonly {
+    readonly callSiteKey: string;
+    readonly outcome: "OK" | "FAILED" | "TIMED_OUT";
+    /**
+     * Model scorecard A16a: the row itself, so a resumed pass that finds a
+     * site's every seat key spent can halt it, or fail the work item, citing
+     * the ledger's own record (as the preflight does for an exhausted key).
+     */
+    readonly ledgerEntryRef: string;
+    readonly attemptId: string | null;
+    readonly artifactRef: string | null;
+    /**
+     * Model scorecard A16c (controller carry 14a): WHO answered — the route and
+     * the candidate on the row. A site's `:seat:` marker is the KEY it is
+     * counted under, and a cross-exchange keeps the one key it already holds
+     * even when its root's writer changed, so the marker is never read as the
+     * answerer.
+     */
+    readonly actorRef: string;
+    readonly candidateId: string | null;
+  }[]> {
+    const result = await this.pool.query<{
+      call_site_key: string;
+      outcome: "OK" | "FAILED" | "TIMED_OUT";
+      ledger_entry_id: string;
+      attempt_id: string | null;
+      raw_artifact_ref: string | null;
+      actor_ref: string;
+      candidate_id: string | null;
+    }>(
+      `SELECT call_site_key, outcome, ledger_entry_id, attempt_id, raw_artifact_ref, actor_ref, candidate_id
+       FROM ledger.ledger_entry
+       WHERE run_id = $1 AND subject_item_id = $2
+         AND action_kind = 'MODEL_CALL' AND contract_hash = $3
+         AND (call_site_key LIKE '%:seat:main' OR call_site_key LIKE '%:seat:runnerUp')
+       ORDER BY sequence`,
+      [input.runId, input.workItemId, input.contractHash]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      callSiteKey: row.call_site_key,
+      outcome: row.outcome,
+      ledgerEntryRef: row.ledger_entry_id,
+      attemptId: row.attempt_id,
+      artifactRef: row.raw_artifact_ref,
+      actorRef: row.actor_ref,
+      candidateId: row.candidate_id
+    })));
   }
 
   async countModelAttempts(input: {

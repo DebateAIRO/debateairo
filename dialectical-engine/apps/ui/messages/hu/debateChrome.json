@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Vissza a könyvtárhoz",
   "debateChrome.loading": "Betöltés…",
   "debateChrome.error.claimGenerationFailed": "Az állítás létrehozása sikertelen",
-  "debateChrome.error.debateGenerationFailed": "A vita létrehozása sikertelen: {reason}",
+  "runFailure.NOT_STARTED": "Valami hiba történt nálunk, mielőtt ez a vita elkezdődött volna. Kérjük, kérdezzen újra.",
+  "runFailure.MODELS_UNAVAILABLE": "Ez a vita nem tudott elindulni, mert a szükséges MI-modellek nem voltak elérhetők. Kérjük, próbálja újra egy kis idő múlva.",
+  "runFailure.RUN_LIMIT_REACHED": "Ez a vita elérte a korlátját, mielőtt választ adhatott volna.",
+  "runFailure.DAILY_LIMIT_REACHED": "A viták mai korlátja kimerült, miközben ez a vita indult. Kérjük, kérdezzen újra holnap.",
+  "runFailure.STOPPED": "Ez a vita félúton leállt egy nálunk történt hiba miatt. Kérjük, tegye fel újra a kérdését.",
   "debateChrome.error.unableToLoadDebate": "A vita nem tölthető be",
   "debateChrome.error.unableToLoadScoring": "A pontozás nem tölthető be",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Az adaptív mélység próbafuttatása nem tölthető be",
@@ -280,5 +284,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "A koordinátor elutasította az előfizetési szint kiválasztását. Válassza az Ingyenes vagy a Prémium lehetőséget, majd próbálja újra.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "A koordinátor elutasította a kérést: az ehhez az előfizetési szinthez szükséges egyik modell jelenleg nem érhető el. Próbálja újra később, vagy válassza a másik előfizetési szintet.",
   "requestFailure.kind.ALREADY_WAITING": "Egyszerre csak egy kérdés várakozhat. Ezt a kérdést azután tegye fel, hogy a várakozó vitája elindult.",
-  "requestFailure.kind.UNCLASSIFIED": "A kérés még azelőtt meghiúsult, hogy válasz érkezett volna, ezért a kimenetele ismeretlen. Erről nem a koordinátor döntött."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ez a vita többe kerülne, mint amennyit ez az oldal egy vitára enged.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "A koordinátor elutasította a kérést: a vita egyik feladatához jelenleg egyetlen MI-modell sem érhető el. Próbálja újra később.",
+  "requestFailure.kind.UNCLASSIFIED": "A kérés még azelőtt meghiúsult, hogy válasz érkezett volna, ezért a kimenetele ismeretlen. Erről nem a koordinátor döntött.",
+  "debateChrome.condition.backupModelUsed": "Ahol egy tervezett MI-modellt nem lehetett használni, egy másik lépett a helyére"
 }

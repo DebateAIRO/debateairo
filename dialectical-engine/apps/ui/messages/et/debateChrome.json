@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Tagasi raamatukokku",
   "debateChrome.loading": "Laadimine…",
   "debateChrome.error.claimGenerationFailed": "Väite genereerimine nurjus",
-  "debateChrome.error.debateGenerationFailed": "Väitluse genereerimine nurjus: {reason}",
+  "runFailure.NOT_STARTED": "Enne selle väitluse algust läks meie poolel midagi valesti. Palun küsige uuesti.",
+  "runFailure.MODELS_UNAVAILABLE": "Seda väitlust ei saanud alustada, sest selleks vajalikud tehisintellektimudelid polnud saadaval. Palun proovige mõne aja pärast uuesti.",
+  "runFailure.RUN_LIMIT_REACHED": "See väitlus jõudis oma piirini enne, kui suutis vastuse anda.",
+  "runFailure.DAILY_LIMIT_REACHED": "Väitluste tänane piir sai täis ajal, mil see väitlus käivitus. Palun esitage oma küsimus homme uuesti.",
+  "runFailure.STOPPED": "See väitlus katkes poole pealt meiepoolse probleemi tõttu. Palun esitage oma küsimus uuesti.",
   "debateChrome.error.unableToLoadDebate": "Väitlust ei saanud laadida",
   "debateChrome.error.unableToLoadScoring": "Hindamist ei saanud laadida",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Kohanduva sügavuse proovikäitust ei saanud laadida",
@@ -280,5 +284,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinaator lükkas paketi valiku tagasi. Valige Tasuta või Premium ja proovige seejärel uuesti.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinaator lükkas taotluse tagasi: üks selle paketi jaoks vajalik mudel pole praegu saadaval. Proovige hiljem uuesti või valige teine pakett.",
   "requestFailure.kind.ALREADY_WAITING": "Korraga saab oodata ainult üks küsimus. Esitage see küsimus, kui teie ootel väitlus on alanud.",
-  "requestFailure.kind.UNCLASSIFIED": "Taotlus nurjus enne vastuse saabumist, mistõttu tulemus pole teada. Koordinaator ei teinud seda otsust."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "See väitlus maksaks rohkem, kui see sait ühe väitluse jaoks lubab.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinaator lükkas taotluse tagasi: ühe väitluse ülesande jaoks pole praegu ühtegi kättesaadavat tehisintellektimudelit. Proovige hiljem uuesti.",
+  "requestFailure.kind.UNCLASSIFIED": "Taotlus nurjus enne vastuse saabumist, mistõttu tulemus pole teada. Koordinaator ei teinud seda otsust.",
+  "debateChrome.condition.backupModelUsed": "Kui kavandatud tehisintellektimudelit ei saanud kasutada, asendas selle teine"
 }

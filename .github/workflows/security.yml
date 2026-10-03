@@ -25,8 +25,9 @@ jobs:
       - run: pnpm run generate:contract
       - run: pnpm run typecheck
       # B31: the recorded known-red gate (tools/ci-known-red.mjs + tests/ci-known-red.txt).
-      # It runs the same two directories under vitest but fails only on failures that are not
-      # on the recorded list, and warns when a listed test starts passing.
+      # It runs tests/unit, tests/architecture and tests/render (V, 2026-09-28) under vitest but
+      # fails only on failures that are not on the recorded list; a listed test that passes three
+      # runs in a row fails the gate until its entry is deleted (V-4).
       - run: pnpm run test:ci-gate
       - run: pnpm audit --audit-level=moderate
   secrets:

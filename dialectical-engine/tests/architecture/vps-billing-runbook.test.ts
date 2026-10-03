@@ -259,10 +259,10 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–53 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–54 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
-    expect(rows).toEqual(Array.from({ length: 53 }, (_unused, index) => index + 1));
+    expect(rows).toEqual(Array.from({ length: 54 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
@@ -305,12 +305,14 @@ describe("P22 the Billing runbook", () => {
       "`settings.erasure.paidPlan`", "`billing.checkout.rateLimited`", "`billing.cancelPage.nothingToCancel`",
       "`billing.checkout.refundedBeforeStart`",
       // W16 (P2-M34): the card marks are copied before the website's last start.
-      "restart `debateai-ui`"
+      "restart `debateai-ui`",
+      // Part 3's final review (2026-10-03): billing stays off until every item of Part 3's final review is closed.
+      "PART3-FINAL-REVIEW-OPEN-ITEMS.md"
     ]) {
       expect(table, needle).toContain(needle);
     }
-    // W16: rows 39–53 hold the items the final review deferred to a ruling or a vendor fact that Part 2b did not build,
-    // plus the "later" Minors (row 53); each names who decides and how it is proven. Every other open item is a row of
+    // W16: rows 40–54 hold the items the final review deferred to a ruling or a vendor fact that Part 2b did not build,
+    // plus the "later" Minors (row 54); each names who decides and how it is proven. Every other open item is a row of
     // the open-items file whose status names the go-live rows that share its work, and row 38 holds them all.
     const row = (number: number): string => table.split("\n").find((line) => line.startsWith(`| ${number} |`)) ?? "";
     for (const [number, needles] of [
@@ -356,9 +358,9 @@ describe("P22 the Billing runbook", () => {
     const rowOf = (id: string): string[] | undefined => rows.find((cells) => cells[0] === id);
     const isClosed = (cells: readonly string[]): boolean => (cells.at(-1) ?? "").startsWith("closed");
     for (const [id, needle] of [
-      ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 39"], ["P2-I5 (part 3)", "go-live row 40"],
-      ["P2-I8", "go-live rows 24 and 41"], ["P2-I9", "go-live row 42"], ["P2-I13", "go-live row 43"],
-      ["P2-I15", "go-live row 44"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 53"],
+      ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 39"], ["P2-I5 (part 3)", "go-live row 41"],
+      ["P2-I8", "go-live rows 24 and 41"], ["P2-I9", "go-live row 43"], ["P2-I13", "go-live row 44"],
+      ["P2-I15", "go-live row 45"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 54"],
       ["Owner items", "go-live rows 14, 16, 24 and 38"]
     ] as const) {
       const cells = rowOf(id);

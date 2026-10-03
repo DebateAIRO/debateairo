@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Grįžti į biblioteką",
   "debateChrome.loading": "Įkeliama…",
   "debateChrome.error.claimGenerationFailed": "Nepavyko sugeneruoti teiginio",
-  "debateChrome.error.debateGenerationFailed": "Nepavyko sugeneruoti debatų: {reason}",
+  "runFailure.NOT_STARTED": "Prieš prasidedant šiems debatams, mūsų pusėje įvyko klaida. Prašome paklausti dar kartą.",
+  "runFailure.MODELS_UNAVAILABLE": "Šie debatai negalėjo prasidėti, nes jiems reikalingi DI modeliai buvo nepasiekiami. Prašome pabandyti dar kartą šiek tiek vėliau.",
+  "runFailure.RUN_LIMIT_REACHED": "Šie debatai pasiekė savo ribą anksčiau, nei spėjo pateikti atsakymą.",
+  "runFailure.DAILY_LIMIT_REACHED": "Šiandienos debatų riba buvo išnaudota, kol šie debatai buvo pradedami. Prašome paklausti dar kartą rytoj.",
+  "runFailure.STOPPED": "Šie debatai sustojo pusiaukelėje dėl problemos mūsų pusėje. Prašome užduoti savo klausimą dar kartą.",
   "debateChrome.error.unableToLoadDebate": "Nepavyko įkelti debatų",
   "debateChrome.error.unableToLoadScoring": "Nepavyko įkelti vertinimo",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Nepavyko įkelti adaptyviojo gylio bandomojo vykdymo",
@@ -294,5 +298,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinatorius atmetė plano pasirinkimą. Pasirinkite „Nemokamas“ arba „Premium“ ir bandykite dar kartą.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatorius atmetė užklausą: šiam planui reikalingas modelis šiuo metu nepasiekiamas. Bandykite vėliau arba pasirinkite kitą planą.",
   "requestFailure.kind.ALREADY_WAITING": "Vienu metu laukti gali tik vienas klausimas. Šį klausimą užduokite, kai prasidės jūsų laukiantys debatai.",
-  "requestFailure.kind.UNCLASSIFIED": "Užklausos įvykdyti nepavyko dar negavus jokio atsakymo, todėl jos baigtis nežinoma. Tai ne koordinatoriaus sprendimas."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Šie debatai kainuotų daugiau, nei ši svetainė leidžia vieniems debatams.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatorius atmetė užklausą: vienai iš debatų užduočių šiuo metu nepasiekiamas nė vienas DI modelis. Bandykite vėliau.",
+  "requestFailure.kind.UNCLASSIFIED": "Užklausos įvykdyti nepavyko dar negavus jokio atsakymo, todėl jos baigtis nežinoma. Tai ne koordinatoriaus sprendimas.",
+  "debateChrome.condition.backupModelUsed": "Kai suplanuoto DI modelio nepavyko panaudoti, jį pakeitė kitas"
 }

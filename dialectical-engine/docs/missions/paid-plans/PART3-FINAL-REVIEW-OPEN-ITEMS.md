@@ -1,0 +1,20 @@
+# Paid plans Part 3 — the final review's open items
+
+Part 3 ("models that fit the budget": the model scorecard merged into the paid-plans line, its texts in 35
+languages, and each debate planned inside the asking person's remaining allowance) merged into `dev` with billing
+switched **off**. Its final whole-part review (four area reviewers and a consolidating reviewer, 3 October 2026)
+found no Critical defect and nothing that matters while billing is off: no person's allowance is measured then, and
+no plan's cap on model strength is checked. The rows below must read **closed before billing is switched on**.
+Go-live checklist row 39 points here: billing stays off until every row below reads **closed**.
+
+"Part 3b" is the follow-up pull request that fixes the code, the two test gaps and the pricing page's wording; "the
+owner" decides or does the rest.
+
+| Id | What | Who closes it | Status |
+|---|---|---|---|
+| P3-I1 | When a person's remaining allowance is too small even for Economy, the debate starts at Economy, but Economy is not always the cheapest choice: the person can then be refused with the site's own sentence ("This debate would cost more than this site allows for one debate"), refused instead of waiting, or started on a dearer plan than needed | Part 3b, under the controller's ruling of 3 October 2026: spec A5's "the cheapest choice" governs, so each strength is planned from the cheapest up against the site's limits, the smallest estimate that fits is kept, and the debate is refused only when none fits | open |
+| P3-I2 | Free is not kept on the models it was promised: capped at Economy, which means "the best model under a cost cap", it can run on a paid person's default models, or on the top ones | Part 3b, as the owner ruled on 3 October 2026: Free gets almost the cheapest models — the best value inside a strict per-role cost cap of its own, at or below Economy's; paid Economy keeps the scorecard's meaning (the best model under the Economy cap); the exact caps are the owner's to set when approving the scorecard; /pricing's Free line says what is true | open |
+| Free backups (P3-I2) | When one of Free's models is unavailable, its backup comes only from the Free roster (the owner's ruling, 3 October 2026) | Part 3b | open |
+| P3-M3, P3-M4 | Two test gaps: no test runs the "no debate fails for money" rule on a debate whose models were picked, or checks the runner line that gives such a debate the cheaper-model fallback (P3-M3); no test checks that the API's start-up hands the model picker its money limits and the billing switch (P3-M4) | Part 3b | open |
+| P3-M12 | /pricing's paid line promises "the best models" while Balanced is the default: it is reworded (the owner's ruling, 3 October 2026; Balanced stays the default) | Part 3b | open |
+| Owner items 4–12 | (4) whether the cheaper-model fallback on a debate with picked models may use every model of that debate, or only its debaters (P3-M5); (5) whether backup-switch details may reach the asker's own browser (P3-M17); (6) the wording picks, among them the cross-exchange sentence (P3-M15) and the remedy label (P3-M11), keeping each old backup-record subject as a key (P3-M10); (7) a help article on Model strength and "Models chosen", signed by V (P3-M13); (8) plain sentences for the two new failure codes when the plain-failure-reasons branch lands (P3-M18); (9) S1a's eight owner-run steps, among them the evaluator pilot, `scorecard:approve` and publishing the new hosted register version; (10) before the hosted upgrade, confirming that xAI's API serves `grok-4.7-build`; (11) the native-speaker check of the 33 machine-translated languages; (12) the billing fakes' moved development ports, which the owner may reverse (development only) | the owner | open |

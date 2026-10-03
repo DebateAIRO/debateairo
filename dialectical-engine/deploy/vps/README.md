@@ -758,7 +758,7 @@ order in both directions:
 - **The runner is never older than the API.** The API now writes a new member,
   `serve_reserve_attempts` (the calls held back for the answer), into every new debate's cost
   receipt (`envelope_basis`). An older runner reads that receipt strictly and fails the debate
-  with `RUN_COST_ENVELOPE_UNRESOLVED`. To upgrade, update the runner first (or both together), then
+  with `RUN_ENVELOPE_BASIS_INVALID`. To upgrade, update the runner first (or both together), then
   the API. To roll back, roll the API back first.
 - **Never roll the runner back on its own while debates admitted by the new API are still
   queued or running.** Their receipts carry the new member. Roll the API back first. Right after,
@@ -779,6 +779,54 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created
   counts them) until you roll forward again. Nothing is deleted.
 - After the upgrade, every story is stored as failed with `STORY_NOT_CONFIGURED` until the next
   hosted register publish (§11, "What the runner's log says about answers and stories").
+
+### Upgrading to the model-scorecard release
+
+This release adds the per-role model picker (spec 2026-09-26 "model scorecard"). The picker chooses no model until a
+model scorecard is sealed into the hosted register with `--scorecard`, but two things act from the first restart on
+this code, with or without a scorecard and with billing off: every model call's prompt is kept ("The prompt record"
+below), and the Premium plan's roster names `grok-4.7-build` instead of `grok-4.6-build`, for every Premium ask.
+Five things change at once. Do them in this order:
+
+- **Install and migrate first.** Put the new checkout in place with its dependencies installed (`pnpm install
+  --frozen-lockfile`; this release adds the workspace package `@debateai/scorecard`). Open the migrator window (§4
+  step 2), run `pnpm db:migrate` — it applies `migrations/0090_model_scorecard.sql` and any other pending migration
+  — then `hardening.sql` (§4 step 3), and close the window (§4 step 5). The API and runner already running keep
+  working on the migrated database, because every new column is nullable. So do this before either service is
+  updated; neither may start on this code without it. A runner started on this code without it records every debate
+  it picks up as failed, for good, and an API started without it fails to open every answer page, older debates
+  included, until the migration runs.
+- **Change the xAI target to `grok-4.7-build` in the same restart that brings the API onto this release.** The id is
+  the `model` of the xAI entry in `PROVIDER_DISCOVERY_TARGETS_JSON`, in both `runner.env` and `api.env` (§11 "Adding a
+  vendor", step 3), and in the `providerTargets` of `/etc/debateai/register/hosted-register.json`, which must stay
+  equal to them. The sealed provider-set row names no model, so no new provider-set version is needed. The older
+  API's Premium roster names `grok-4.6-build` and this release's names `grok-4.7-build`, so an API whose target
+  serves the other id refuses every Premium ask with `ASK_PLAN_TIER_MODEL_UNAVAILABLE`: with billing on, every paying
+  customer's, because every paying plan (Plus, Pro, Max) asks as Premium, on the roster path until a scorecard is
+  sealed. Edit the three places before the restart of the next bullet, which reads them.
+- **Publish a new hosted register version.** The release edits `packages/serve/src/index.ts`, whose digest is the
+  code-owned row `serveContractHash`. Publish the same `/etc/debateai/register/hosted-register.json` again with
+  `pnpm register:publish-hosted` (§11): the command rebuilds the code-owned rows from this checkout and seals a
+  new version. Pin it in both `EnvironmentFile`s and restart both units. Until then, answer-writing calls are
+  recorded under the old fingerprint.
+- **The runner is never older than the API.** Debates admitted with a runner-up carry a `DR-184-v5` cost receipt
+  and a pinned model assignment; an older runner fails such a debate with `RUN_ENVELOPE_BASIS_INVALID`. Update the
+  runner first, or both together. To roll back, roll the API back first, and the runner only once no debate the
+  newer API admitted is still queued or running: right after the API goes back, run the command in the
+  verdict-story section above and note `newest`, then roll the runner back once `unfinished` is 0, or `oldest` is
+  above the number you noted.
+- **The website ships with, or before, the API.** The session answer gains `model_scorecard_in_force`, which an
+  older website's strict reader refuses. To roll back, the website goes back after the API, never before.
+
+**Rolling the API back past this release** makes every answer a backup model helped write fail to open. Such an
+answer carries the mark `BACKUP-MODEL-USED` (possible only while a scorecard is in force), which the older API does
+not know, so it cannot read the answer until you roll forward again. Nothing is deleted. Put the xAI target back to
+`grok-4.6-build` in the same restart that rolls the API back, for the reason in the second bullet.
+
+**The prompt record.** From the first restart on this code, the runner writes the whole prompt of every model call
+(up to 256 KiB) to `ledger.call_prompt` before it sends the call: one row per attempt sent, a failed one included,
+never changed and never purged (an encrypted debate's prompts are stored encrypted). The database and every nightly
+backup grow by roughly the size of every prompt sent; plan disk and backup space by it (§9).
 
 ### Upgrading an existing host (paid plans Part 1a)
 
@@ -1053,6 +1101,11 @@ Retention 14 daily / 8 weekly, then an off-host copy (`rclone copy`, or `scp` �
 one in `backup.conf`). Encrypted before it leaves the box, so the remote is untrusted by
 construction. Receipt: `BACKUP_OK <sha256> <bytes> <utc>`.
 
+**The prompt record makes every backup grow.** Since the model-scorecard release (§5), the database
+keeps the whole prompt of every model call a debate makes (`ledger.call_prompt`: one row per call
+attempt sent, up to 256 KiB each, never changed or purged), so the dump, every nightly artefact and
+the off-host copy grow by roughly the size of every prompt sent: plan disk and remote space by it.
+
 ### Restore drill — **quarterly**, and it is not optional
 
 Mount the removable media, then give the drill the two identity files' paths when asked:
@@ -1255,6 +1308,8 @@ The paid-vendor probe spends `max_tokens: 8` per target per staleness window; th
 | `PROVIDER_TARGET_PRICE_REQUIRED:` and the provider ref | a debate target declares no price. Both `input_price_micros_per_million` and `output_price_micros_per_million` are required in hosted mode. |
 | `PROVIDER_TARGET_PRICE_ZERO:` and the provider ref | a declared price of zero, which would bound nothing. The floor is 1. |
 | `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` | a price that is not an integer from 0 through `Number.MAX_SAFE_INTEGER`, or only one of the two price members. |
+| `PROVIDER_DISCOVERY_TARGET_THINKING_INVALID` | only one of `thinking_parameter` and `thinking_levels` is written, the parameter is not one of the two names below, or the level list is empty, longer than 16, repeats a name, or holds a name that is not one short lower-case word. |
+| `PROVIDER_DISCOVERY_TARGET_CONTEXT_WINDOW_INVALID` | a `context_window_tokens` that is not a whole number of at least 1 (and at most 2 147 483 647). |
 | `RUNNER_PRIMARY_PROVIDER_REF_DRIFT` | `PROVIDER_REF` does not name the FIRST entry of `PROVIDER_DISCOVERY_TARGETS_JSON`. |
 | `SUPPORT_MODEL_CREDENTIAL_ABSENT` | the support chat's target names a vendor API and declares no credential at all — no `authorization_file`. Every row above applies to `SUPPORT_MODEL_TARGET_JSON` as well; these last two are the support chat's own. |
 | `SUPPORT_MODEL_PATH_NOT_RATIFIED` | `SUPPORT_MODEL_TARGET_JSON` is neither of the two lawful shapes: a vendor API (`https:`, path ending in `/v1`) or, in LOCAL mode only, the ratified loopback relay. A target that IS an API target but is malformed refuses with the matching `PROVIDER_DISCOVERY_*` code instead, so this one means "this is not a target". |
@@ -1325,6 +1380,9 @@ JSON array; add one object to it. Its members:
 | `authorization_file` | the absolute path from step 2 — **that service's own copy**: the runner's path in `runner.env`, the API's in `api.env` |
 | `input_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million input tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
 | `output_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million output tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
+| `thinking_parameter` | optional, and only with `thinking_levels`: how this vendor's API takes a "thinking level" (how long the model may reason before it answers). `reasoning_effort` for a vendor API; `x_thinking_level` is the local command-line relays' own and has no place on this host. Leave both out and the target runs at its default level only — a model the scorecard wants at a named level is then never seated on it |
+| `thinking_levels` | the level names this vendor accepts, in its own words (for example `["low","medium","high"]`): 1 to 16 short lower-case words, no repeats. A call is refused before it is sent if it asks for a level not listed here, never quietly run at another |
+| `context_window_tokens` | optional: the most tokens this model can take in one call, prompt and answer together, from the vendor's documentation. A prompt that would not fit is refused before it is sent, and the model picker never seats this vendor for a job whose typical call would not fit. Leave it out if the vendor publishes no limit |
 
 For a vendor whose short name was `acme`, the `runner.env` entry reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000}`,
 and in `api.env` it reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/api/providers/acme.header","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000}`. The prices are the
@@ -1432,9 +1490,9 @@ Publish them only on a build that runs the whole rule. The waiting line, holds, 
 - the judge's output token ceiling (the runner policy's `JUDGE` bound);
 - the cheapest price among each plan's models; every plan's cheapest must fit (a plan takes part only when every model on its roster is configured).
 
-A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
+While a model scorecard is sealed into the register version both services run, every configured model counts for every plan (the model picker may choose any of them), so the check prices the cheapest configured model; without one, each plan is priced on its own models. A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
 
-The publish command asks the same question before anything is sealed, a dry run included: it prices the opening call on the file's `providerTargets` (which must equal `PROVIDER_DISCOVERY_TARGETS_JSON`) and on the judge bound it is about to seal, and refuses with the same `RUN_CEILING_BELOW_ONE_CALL`. Both units still ask at start-up, because the environment can differ from the file.
+The publish command asks the same question before anything is sealed, a dry run included: it prices the opening call on the file's `providerTargets` (which must equal `PROVIDER_DISCOVERY_TARGETS_JSON`) and on the judge bound it is about to seal, and refuses with the same `RUN_CEILING_BELOW_ONE_CALL`. With `--scorecard`, every configured model counts for every plan, as both services count them while that scorecard is in force; without it, each plan is priced on its own models. Both units still ask at start-up, because the environment can differ from the file.
 
 #### Each person's windows (billing)
 
@@ -1537,8 +1595,8 @@ journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DIS
 | Signal | What it means | What to do |
 |---|---|---|
 | `"kind":"DEBATEAI_SERVE_DISCLOSURE"`, `"event":"SERVE_DISCLOSURE_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `answerId` | The answer's owner-side record (above) could not be written. The answer itself is exactly what it would have been. What is lost is the record. **When no model could write the answer, its floor is lost**: the pages say the verdict is unavailable instead of showing "Our best answer:", the answer gets no story, and `pnpm ops:serve-disclosure` answers `SERVE_DISCLOSURE_NOT_FOUND`. For a written answer, the owner's record and the PDF's lower-cost note are missing. | Nothing writes the row later: it is written once, right after the answer. Keep the line. A typed `code` (for example `SERVE_DISCLOSURE_RECORD_INVALID`) is a defect to report. `UNTYPED` with a `sqlState` is the database refusing (for example `23503`) or a lost connection. More than one in a day is worth investigating. |
-| A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, shown on the owner's page as "Debate generation failed: …" and kept in `core.work_item.terminal_reason` | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
-| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, shown the same way | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
+| A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, kept in `core.work_item.terminal_reason` (the asker sees "This debate reached its limit…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
+| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MODEL_ASSIGNMENT`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees "Something went wrong on our side before this debate began…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), saving the AI models chosen for the debate (`MODEL_ASSIGNMENT`, only while a model scorecard is in force), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
 | `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
 | `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
 | `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
@@ -1567,6 +1625,27 @@ are read from. Left unset, the runner finds `story-shapes/` in its own checkout,
 `/opt/debateai/dialectical-engine/story-shapes`. A value that names no directory holding
 `pack.json` is refused when the runner starts: `STORY_PACK_INVALID` with the reason
 `STORY_PACK_DIR_UNRESOLVED`. Stories then fail; debates do not.
+
+#### What the asker sees when a debate fails
+
+A failed debate's reason code is for operators. It stays in `core.work_item.terminal_reason`, in
+the `terminal_reason` field of `GET /v1/runs/:id` and in the logs above. The pages never show it.
+They show one of five fixed sentences in the reader's language instead, picked by the code's
+group (`apps/ui/lib/v3/runFailure.ts`, words in `apps/ui/messages/<locale>/home.json` and
+`debateChrome.json` under `runFailure.*`). When an asker quotes a sentence, this table gives the codes
+to look for:
+
+| The asker sees (English) | Group | Reason codes |
+|---|---|---|
+| "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, any step (see the row above) |
+| "This debate could not start because the AI models it needs were unavailable. Please try again in a while." | `MODELS_UNAVAILABLE` | `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM` and `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:<role>`. The runner writes these first, then its job catch overwrites them with `RUNNER_EXECUTION_FAILED:<the same code>` (the role is lost there). Both forms read the same. |
+| "This debate reached its limit before it could produce an answer." | `RUN_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL` (see the row above) |
+| "Today's limit for debates ran out while this one was starting. Please ask again tomorrow." | `DAILY_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:DAILY_COST_ENVELOPE_REACHED`. **Not reachable today**: the day's limit is checked only when a question is asked, and a refused question never becomes a debate (the asker sees "We've reached today's limit for new debates…" instead). The runner keeps the code as a stop of its own, so it keeps its sentence here too. |
+| "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
+
+A code added to the engine lands in `STOPPED` until it is given a group of its own. The UI's test
+(`apps/ui/lib/v3/runFailure.test.mjs`) reads each code's write site in the runner and the API, and
+fails if one named in this table is renamed or stops being written there.
 
 ### Publishing the settings register on this host
 

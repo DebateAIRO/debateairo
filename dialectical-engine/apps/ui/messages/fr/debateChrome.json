@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Retour à la bibliothèque",
   "debateChrome.loading": "Chargement…",
   "debateChrome.error.claimGenerationFailed": "Échec de la génération de l’affirmation",
-  "debateChrome.error.debateGenerationFailed": "Échec de la génération du débat : {reason}",
+  "runFailure.NOT_STARTED": "Un problème est survenu de notre côté avant le début de ce débat. Veuillez poser votre question à nouveau.",
+  "runFailure.MODELS_UNAVAILABLE": "Ce débat n’a pas pu démarrer, car les modèles d’IA dont il a besoin étaient indisponibles. Veuillez réessayer un peu plus tard.",
+  "runFailure.RUN_LIMIT_REACHED": "Ce débat a atteint sa limite avant de pouvoir apporter une réponse.",
+  "runFailure.DAILY_LIMIT_REACHED": "La limite du jour pour les débats a été atteinte pendant le lancement de celui-ci. Veuillez reposer votre question demain.",
+  "runFailure.STOPPED": "Ce débat s’est interrompu en cours de route à cause d’un problème de notre côté. Veuillez reposer votre question.",
   "debateChrome.error.unableToLoadDebate": "Impossible de charger le débat",
   "debateChrome.error.unableToLoadScoring": "Impossible de charger les scores",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Impossible de charger la simulation de profondeur adaptative",
@@ -287,5 +291,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Le coordinateur a refusé la formule choisie. Choisissez Gratuite ou Premium, puis réessayez.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Le coordinateur a refusé la demande : un modèle nécessaire à cette formule est actuellement indisponible. Réessayez plus tard ou choisissez l’autre formule.",
   "requestFailure.kind.ALREADY_WAITING": "Une seule question peut attendre à la fois. Posez celle-ci une fois votre débat en attente démarré.",
-  "requestFailure.kind.UNCLASSIFIED": "La demande a échoué avant qu’une réponse ne soit reçue ; son issue est donc inconnue. Il ne s’agit pas d’une décision prise par le coordinateur."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ce débat coûterait plus que ce que ce site autorise pour un débat.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Le coordinateur a refusé la demande : l’une des tâches du débat n’a aucun modèle d’IA joignable pour le moment. Réessayez plus tard.",
+  "requestFailure.kind.UNCLASSIFIED": "La demande a échoué avant qu’une réponse ne soit reçue ; son issue est donc inconnue. Il ne s’agit pas d’une décision prise par le coordinateur.",
+  "debateChrome.condition.backupModelUsed": "Là où un modèle d’IA prévu n’a pas pu être utilisé, un autre a pris le relais"
 }

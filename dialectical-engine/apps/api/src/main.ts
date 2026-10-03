@@ -41,6 +41,7 @@ import {
   readCountryPolicy,
   readStoryPolicyFromRegister,
   readAuthPolicy,
+  readCallTokenCeilings,
   readJudgeTokenCeiling,
   readMfaPolicy,
   readProductRolePolicy,
@@ -63,6 +64,7 @@ import {
   mostOneRunMaySpendMicros
 } from "@debateai/budget";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
+import { firstCallPlanModels } from "@debateai/scorecard";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { SELLER_COMPANY } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
@@ -125,6 +127,7 @@ import {
   resolveProviderTargetCredentials
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
+import { composeAskModelPicker } from "./ask-model-picker.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
 import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
@@ -428,29 +431,6 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
   assertPricedProviderTargets(declared, environment.DEPLOYMENT_MODE);
   return declared;
 });
-/**
- * B9 (budget spec §2.10) — the API refuses to boot, like the runner, when the
- * run's ceiling for arguing is below the first position's own call at the
- * cheapest price among each plan's models — every plan's cheapest must fit —
- * (RUN_CEILING_BELOW_ONE_CALL). Hosted (B6b read the policy row only there),
- * and only with the row's three band members (the same `costEnvelopeBand`
- * question B6b's room asks); the boot ledger names the stage when it refuses.
- * The row is not read a second time.
- */
-await boot.run("run-ceiling-covers-one-call", async () => {
-  if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
-  assertRunCeilingCoversOneCall({
-    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,
-    firstCallsByRoster: firstCallsByPlanRoster({
-      projections: firstPositionCallProjections({
-        targets: declaredProviderTargets,
-        judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),
-        questionMaxBytes: askQuestionMaxBytes()
-      }),
-      rosters: PLAN_TIER_ROSTERS
-    })
-  });
-});
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
@@ -522,6 +502,66 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
     })
   : undefined;
 const askRoom = askRoomComposition?.room;
+/**
+ * A20 — THE MODEL SCORECARD IN FORCE and the per-role model picker, read and
+ * built once, as the boot stages "model-scorecard" and "model-picker" under this
+ * boot's own ledger (DL7-F7). Final review I5: both stages are one function,
+ * `composeAskModelPicker` (./ask-model-picker.ts), so the hosted path is tested
+ * without Postgres. Hosted: the sealed `modelScorecard` row at REGISTER_VERSION,
+ * and a boot without a positive per-run ceiling is refused
+ * (ASK_MODEL_PICKER_PER_RUN_CEILING_REQUIRED). Local: the bundled public file
+ * (scorecards/current.json). ABSENT or REFUSED never stops the boot — asks keep
+ * the plan rosters — and one line on stderr says which. The targets are the
+ * DECLARED ones: levels, windows and prices, no credential. Final review I3:
+ * the sealed per-call answer bounds are read first, in their own stage, so the
+ * picker never seats a model whose window the gateway would refuse.
+ * Paid plans S2: composed below B6b's room, because billing is on exactly when
+ * the room's composition carries the plans; the picker's money limits are cut
+ * from the guard's policy, and with billing on a scorecard that breaks the
+ * owners' plan-cap rule refuses this stage (SCORECARD_PLAN_CAPS_INVALID).
+ */
+const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));
+const modelPicker = await composeAskModelPicker({
+  boot,
+  pool,
+  deploymentMode: environment.DEPLOYMENT_MODE,
+  registerVersion: environment.REGISTER_VERSION,
+  targets: declaredProviderTargets,
+  perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,
+  callTokenCeilings,
+  moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,
+  billingEnabled: (askRoomComposition?.billingPlans ?? null) !== null,
+  log: (line) => console.error(line)
+});
+/**
+ * B9 (budget spec §2.10) — the API refuses to boot, like the runner, when the
+ * run's ceiling for arguing is below the first position's own call at the
+ * cheapest price among each plan's models — every plan's cheapest must fit —
+ * (RUN_CEILING_BELOW_ONE_CALL). Hosted (B6b read the policy row only there),
+ * and only with the row's three band members (the same `costEnvelopeBand`
+ * question B6b's room asks); the boot ledger names the stage when it refuses.
+ * The row is not read a second time. Paid plans S2: with a VALID scorecard every
+ * ask is the picker's, which seats each plan from every configured model.
+ */
+await boot.run("run-ceiling-covers-one-call", async () => {
+  if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
+  const firstCalls = firstPositionCallProjections({
+    targets: declaredProviderTargets,
+    judgeTokenCeiling: await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION),
+    questionMaxBytes: askQuestionMaxBytes()
+  });
+  assertRunCeilingCoversOneCall({
+    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,
+    firstCallsByRoster: firstCallsByPlanRoster({
+      projections: firstCalls,
+      rosters: firstCallPlanModels({
+        scorecardInForce: modelPicker.scorecard.state === "VALID",
+        rosters: PLAN_TIER_ROSTERS,
+        models: firstCalls.map((call) => call.model)
+      })
+    })
+  });
+});
 /**
  * Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; rulings R-5, R-28):
  * the server decides the ask ONLY when the room's composition carries billing —
@@ -704,6 +744,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
       }),
   ...(askBilling === undefined ? {} : { billing: askBilling }),
   resolveDiscoveredPanel: resolveProviderPanel,
+  // A20: the per-role model picker (built above, under the boot ledger).
+  modelPicker,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
     panelSize: input.panelSize,
@@ -715,7 +757,9 @@ const application = new PostgresAskApplication(pool, dispatcher, {
     reviewerCallsPerNode: envelopeFormulaInputs.reviewerCallsPerNode,
     synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
     evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
-    maxDepth: envelopeFormulaInputs.maxDepth
+    maxDepth: envelopeFormulaInputs.maxDepth,
+    // A14/A20 (F17): DR-184-v5 only when the pinned assignment has a runner-up.
+    backupSequencesProvisioned: input.backupSequencesProvisioned
   }),
   resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
     const resolved = resolveEffectiveRiskTier({
@@ -1141,6 +1185,9 @@ const api = buildApi({
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
   // the content-free disclosure record, on the same runtime pool.
   disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pool)),
+  // A21 (owner decision O4): /new's yes/no, from the very picker admission asks — the
+  // same test `evaluateAskAdmission` makes before it lets the scorecard choose.
+  modelScorecardInForce: modelPicker.scorecard.state === "VALID",
   accountErasure:erasureApplication,
   registration,
   recovery,

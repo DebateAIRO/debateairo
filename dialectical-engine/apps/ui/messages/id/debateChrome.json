@@ -5,7 +5,11 @@
   "debateChrome.backToLibrary": "← Kembali ke pustaka",
   "debateChrome.loading": "Memuat…",
   "debateChrome.error.claimGenerationFailed": "Pembuatan klaim gagal",
-  "debateChrome.error.debateGenerationFailed": "Pembuatan debat gagal: {reason}",
+  "runFailure.NOT_STARTED": "Terjadi masalah di pihak kami sebelum debat ini dimulai. Silakan bertanya lagi.",
+  "runFailure.MODELS_UNAVAILABLE": "Debat ini tidak dapat dimulai karena model AI yang diperlukan sedang tidak tersedia. Silakan coba lagi nanti.",
+  "runFailure.RUN_LIMIT_REACHED": "Debat ini mencapai batasnya sebelum sempat memberikan jawaban.",
+  "runFailure.DAILY_LIMIT_REACHED": "Batas debat untuk hari ini habis saat debat ini sedang dimulai. Silakan bertanya lagi besok.",
+  "runFailure.STOPPED": "Debat ini terhenti di tengah jalan karena masalah di pihak kami. Silakan ajukan pertanyaan Anda lagi.",
   "debateChrome.error.unableToLoadDebate": "Tidak dapat memuat debat",
   "debateChrome.error.unableToLoadScoring": "Tidak dapat memuat penilaian",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Tidak dapat memuat simulasi kedalaman adaptif",
@@ -273,5 +277,8 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator menolak pilihan paket. Pilih Gratis atau Premium, lalu coba lagi.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator menolak permintaan tersebut: model yang diperlukan paket ini sedang tidak tersedia. Coba lagi nanti, atau pilih paket lain.",
   "requestFailure.kind.ALREADY_WAITING": "Hanya satu pertanyaan yang dapat menunggu dalam satu waktu. Ajukan pertanyaan ini setelah debat Anda yang menunggu dimulai.",
-  "requestFailure.kind.UNCLASSIFIED": "Permintaan gagal sebelum balasan diterima sehingga hasilnya tidak diketahui. Ini bukan keputusan yang dibuat oleh koordinator."
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Debat ini akan memakan biaya lebih besar daripada yang diizinkan situs ini untuk satu debat.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinator menolak permintaan tersebut: salah satu tugas debat tidak memiliki model AI yang dapat dijangkau saat ini. Coba lagi nanti.",
+  "requestFailure.kind.UNCLASSIFIED": "Permintaan gagal sebelum balasan diterima sehingga hasilnya tidak diketahui. Ini bukan keputusan yang dibuat oleh koordinator.",
+  "debateChrome.condition.backupModelUsed": "Jika model AI yang direncanakan tidak dapat digunakan, model lain menggantikannya"
 }

@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "DEBATEAI_MOMENT"
+    },
+    "formatVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "momentId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "POSITION",
+        "SUPPORT_ATTACK",
+        "CROSS_EXCHANGE",
+        "JUDGE",
+        "REVIEWER",
+        "ANSWER_WRITER",
+        "ANSWER_CHECKER"
+      ]
+    },
+    "language": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "ro",
+            "en"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "contractHash": {
+      "type": "string",
+      "minLength": 1
+    },
+    "builder": {
+      "type": "object",
+      "properties": {
+        "family": {
+          "type": "string",
+          "enum": [
+            "JUDGE_JUDGE",
+            "JUDGE_REVIEW",
+            "JUDGE_ASSESS",
+            "SYNTHESIS_WRITER",
+            "SYNTHESIS_CHECKER"
+          ]
+        },
+        "inputs": {}
+      },
+      "required": [
+        "family",
+        "inputs"
+      ],
+      "additionalProperties": false
+    },
+    "graderContext": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "excerpts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "question",
+        "excerpts"
+      ],
+      "additionalProperties": false
+    },
+    "recorded": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "providerRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maker": {
+              "type": "string",
+              "minLength": 1
+            },
+            "modelId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "thinkingLevel": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "replyText": {
+              "type": "string"
+            },
+            "promptFingerprint": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "providerRef",
+            "maker",
+            "modelId",
+            "thinkingLevel",
+            "replyText",
+            "promptFingerprint"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "callSiteKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exportedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        },
+        "engineCommit": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{7,64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "runId",
+        "callSiteKey",
+        "exportedAt",
+        "engineCommit"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "kind",
+    "formatVersion",
+    "momentId",
+    "role",
+    "language",
+    "contractHash",
+    "builder",
+    "graderContext",
+    "recorded",
+    "source"
+  ],
+  "additionalProperties": false
+}
