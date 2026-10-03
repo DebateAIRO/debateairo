@@ -28,8 +28,9 @@ export type BillingAuditEvent =
   | "billing.outbox.alert_failed"
   /**
    * P2-I4 (D5 5h): a refund, invoice or credit-note job, or a payment check naming its own charge, whose charge was
-   * paid in the other xMoney system (a sandbox record after the same-host switch to live, README §14.8) ended DEAD
-   * before any vendor call. The job kind and the code OTHER_XMONEY_SYSTEM only.
+   * paid in the other xMoney system (a sandbox record after the same-host switch to live, README §14.8), or
+   * (P2-W3 (b)) a RENEWAL_NOTICE whose plan belongs to the other system (the subscription's `xmoneyEnvironment`, not a
+   * charge's), ended DEAD before any vendor call or quote. The job kind and the code OTHER_XMONEY_SYSTEM only.
    */
   | "billing.outbox.other_system"
   /**
@@ -128,7 +129,12 @@ export type BillingAuditEvent =
    * distinct codes only.
    */
   | "billing.reconcile.errors"
-  /** P14a: refunds xMoney refused (dead XMONEY_REFUND jobs) with no REFUNDED since: money still owed. The count only. */
+  /**
+   * P14a: dead XMONEY_REFUND jobs with no REFUNDED since, whatever their code (`deadRefunds()`). Not every one is
+   * owed: the owner summary reads each code. REFUND_NOT_REQUESTED, REFUND_CHARGE_MISSING and OTHER_XMONEY_SYSTEM owe
+   * nothing on this server; REFUND_OUTCOME_UNKNOWN is checked in the dashboard; every other code is still owed. The
+   * count only.
+   */
   | "billing.refund.dead"
   /** P15: an account erasure stopped the owner's plan (ERASURE_STOPPED and the FREE entitlement). No field. */
   | "billing.erasure.stopped"

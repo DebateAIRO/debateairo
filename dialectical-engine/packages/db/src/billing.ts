@@ -1151,12 +1151,12 @@ export class BillingRepository {
    * P14a/P16b: refund jobs that ended without a refund — dead `XMONEY_REFUND` jobs (ref
    * `${chargeId}:${transactionId}`, P9b) whatever their code, while no REFUNDED exists for that charge and paid
    * transaction (read as P8c's `refundTarget`: a REFUNDED on xMoney's own refund transaction names the payment in
-   * `refunds_transaction_id`, D5 5g). Not every one leaves money owed: the summary reads the code (`deadRefundCheck`).
-   * A job that stopped before any xMoney call owes nothing here (REFUND_NOT_REQUESTED and REFUND_CHARGE_MISSING: no
-   * request of ours backs it; OTHER_XMONEY_SYSTEM: the payment was taken in the other xMoney system). For
-   * REFUND_OUTCOME_UNKNOWN the dashboard says whether it landed, and for every other code (xMoney refused it, and the
-   * like) the money is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once; this list
-   * is the daily and quarterly reminder.)
+   * `refunds_transaction_id`, D5 5g). Not every one leaves money owed: the summary reads each code (`deadRefundCheck`).
+   * Three codes owe nothing on this server: REFUND_NOT_REQUESTED and REFUND_CHARGE_MISSING (no request of ours backs
+   * it) and OTHER_XMONEY_SYSTEM (the payment was taken in the other xMoney system). For REFUND_OUTCOME_UNKNOWN the
+   * dashboard says whether it landed, and every other code (xMoney refused it, a payload that failed its check, and the
+   * like) is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once; this list is the
+   * daily and quarterly reminder.)
    */
   async deadRefunds(): Promise<Array<{
     chargeId: string; transactionId: string; reason: string | null; code: string | null; since: Date;

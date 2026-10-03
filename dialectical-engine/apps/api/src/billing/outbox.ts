@@ -22,9 +22,11 @@ const DECLARED_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 /**
  * P2-I4 (D5 5h): the two xMoney systems number their transactions separately, and the database keeps the sandbox's
  * records across README §14.8's same-host switch. A refund, invoice or credit-note job, or a payment check
- * (VERIFY_PAYMENT) that names its own charge, whose charge was paid in the other system ends here, DEAD before any
- * vendor call, with this one content-free code and one audit line (the kind and the code). The caller compares
- * `charge.xmoneyEnvironment` with the connectors' system.
+ * (VERIFY_PAYMENT) that names its own charge, whose charge was paid in the other system, and (P2-W3 (b)) a
+ * still-due RENEWAL_NOTICE whose plan belongs to the other system end here, DEAD before any vendor call or quote,
+ * with this one content-free code and one audit line (the kind and the code). The charge jobs' callers compare
+ * `charge.xmoneyEnvironment` with the connectors' system; the RENEWAL_NOTICE handler compares the subscription's
+ * `xmoneyEnvironment` (its folded state) instead, since a notice names no charge.
  */
 export function otherXMoneySystem(
   audit: BillingAudit, kind: OutboxKind
