@@ -2381,8 +2381,8 @@ sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.xmoney_environment
 
 **e-Factura.** SmartBill sends each Romanian invoice to ANAF itself, through a setting in your SmartBill account. The
 site does not read the e-Factura status back, so check it in SmartBill or in ANAF's SPV, as your accountant advises.
-The quarterly summary lists the quarter's Romanian invoices and credit notes under
-"Romanian e-Factura documents to confirm", as the list to check. Each line names the document as its series and
+The quarterly summary lists every Romanian invoice and credit note whose acceptance by ANAF is not recorded yet, the
+quarter's and any earlier quarter's, under "Romanian e-Factura documents to confirm", as the list to check. Each line names the document as its series and
 number joined by a dash (for example `DBAI-0042`).
 
 When you have ANAF's answer for a document, record it with `pnpm billing:efactura-status`, giving the document with

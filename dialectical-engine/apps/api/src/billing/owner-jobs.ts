@@ -70,7 +70,7 @@ export class OwnerJobs {
     const text = renderTaxSummary(buildTaxSummary({
       quarter, rows: await liveQuarterSummaryRows(this.deps.billing, quarter.from, quarter.to),
       invoiceUnknown: await this.deps.billing.invoiceUnknownItems(),
-      efactura: await efacturaChecksFrom(this.deps.jobs, quarter.from, quarter.to),
+      efactura: await efacturaChecksFrom(this.deps.jobs, quarter.to),
       paymentsToCheck: await paymentsToCheckFrom(this.deps.billing, now),
       deadEmails: await deadEmailsFrom(this.deps.billing, now),
       authorities: this.deps.taxAuthorities

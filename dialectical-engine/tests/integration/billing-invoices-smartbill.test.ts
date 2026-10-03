@@ -124,7 +124,7 @@ describe("P10b SmartBill invoices for Romania", () => {
     expect(await statuses(accepted.chargeId)).toEqual([
       { kind: "INVOICE", efactura_status: "SENT_BY_ACCOUNT_SETTING" }, { kind: "INVOICE", efactura_status: "ACCEPTED" }
     ]);
-    const open = await h.jobs.smartBillDocumentsNotAccepted(new Date(h.clock.now.getTime() - 86_400_000), h.clock.now);
+    const open = await h.jobs.smartBillDocumentsNotAccepted(new Date(h.clock.now.getTime() + 1));
     const listed = open.map((document) => document.chargeId);
     expect(listed).toContain(rejected.chargeId);
     expect(listed).toContain(waiting.chargeId);

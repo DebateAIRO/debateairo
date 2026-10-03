@@ -318,10 +318,10 @@ describe("P16b the rows it reads", () => {
       { invoiceId: "1c5f3b0d-7a2e-4d4f-8b8c-3e6a9f2d1b04", chargeId: "b".repeat(32), kind: "CREDIT_NOTE" as const,
         series: null, number: "0043", at, status: "REJECTED" }
     ]);
-    expect(await efacturaChecksFrom({ smartBillDocumentsNotAccepted }, Q4.from, Q4.to)).toEqual([
+    expect(await efacturaChecksFrom({ smartBillDocumentsNotAccepted }, Q4.to)).toEqual([
       { document: "DBAI-0042", kind: "INVOICE", chargeId: "a".repeat(32), issuedAt: at, status: null },
       { document: "0043", kind: "CREDIT_NOTE", chargeId: "b".repeat(32), issuedAt: at, status: "REJECTED" }
     ]);
-    expect(smartBillDocumentsNotAccepted).toHaveBeenCalledWith(Q4.from, Q4.to);
+    expect(smartBillDocumentsNotAccepted).toHaveBeenCalledWith(Q4.to);
   });
 });

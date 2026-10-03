@@ -31,7 +31,8 @@ export type TaxSummaryCliOutput = Readonly<{ stdout(text: string): void; stderr(
 export type OpenTaxSummaryReader = () => Promise<Readonly<{
   rows(from: Date, to: Date): Promise<ReadonlyArray<TaxSummaryRow>>;
   invoiceUnknown(): Promise<ReadonlyArray<InvoiceUnknownItem>>;
-  efactura(from: Date, to: Date): Promise<ReadonlyArray<EFacturaCheckItem>>;
+  /** P2-M24: every SmartBill document issued before `before` (the quarter's end) that ANAF has not accepted. */
+  efactura(before: Date): Promise<ReadonlyArray<EFacturaCheckItem>>;
   paymentsToCheck(): Promise<ReadonlyArray<PaymentToCheckItem>>;
   /** W12 (P2-I16): the emails that never went out, of the last 120 days. */
   deadEmails(): Promise<ReadonlyArray<DeadEmailItem>>;
@@ -63,7 +64,7 @@ export async function runBillingTaxSummaryCli(
       if (authorities === null) throw new TypeError("TAX_AUTHORITIES_UNRESOLVED");
       output.stdout(renderTaxSummary(buildTaxSummary({
         quarter, rows: await reader.rows(quarter.from, quarter.to),
-        invoiceUnknown: await reader.invoiceUnknown(), efactura: await reader.efactura(quarter.from, quarter.to),
+        invoiceUnknown: await reader.invoiceUnknown(), efactura: await reader.efactura(quarter.to),
         paymentsToCheck: await reader.paymentsToCheck(), deadEmails: await reader.deadEmails(), authorities
       })));
       return 0;
@@ -92,7 +93,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     return Object.freeze({
       rows: (from: Date, to: Date) => liveQuarterSummaryRows(billing, from, to),
       invoiceUnknown: () => billing.invoiceUnknownItems(),
-      efactura: (from: Date, to: Date) => efacturaChecksFrom(jobs, from, to),
+      efactura: (before: Date) => efacturaChecksFrom(jobs, before),
       paymentsToCheck: () => paymentsToCheckFrom(billing, new Date()),
       deadEmails: () => deadEmailsFrom(billing, new Date()),
       authorities: () => readTaxAuthorities(pool, environment.REGISTER_VERSION),

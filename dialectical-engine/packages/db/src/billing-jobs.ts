@@ -144,11 +144,12 @@ export class BillingJobQueries {
   }
 
   /**
-   * Spec §2.5.4 / A21: the SmartBill documents issued in [from, to) whose latest e-Factura status is not ACCEPTED
-   * (none recorded, SENT_BY_ACCOUNT_SETTING, or REJECTED), oldest first. P16b's owner summary lists them, so a Romanian
-   * legal document ANAF has not accepted always reaches the owner.
+   * Spec §2.5.4 / A21: the SmartBill documents issued before `before` whose latest e-Factura status is not ACCEPTED
+   * (none recorded, SENT_BY_ACCOUNT_SETTING, or REJECTED), oldest first, whatever quarter issued them (P2-M24: a
+   * document stays on the list until ANAF accepts it, as `pnpm billing:efactura-status` promises). P16b's owner
+   * summary lists them, so a Romanian legal document ANAF has not accepted always reaches the owner.
    */
-  async smartBillDocumentsNotAccepted(from: Date, to: Date): Promise<Array<Readonly<{
+  async smartBillDocumentsNotAccepted(before: Date): Promise<Array<Readonly<{
     invoiceId: string; chargeId: string; kind: "INVOICE" | "CREDIT_NOTE"; series: string | null; number: string;
     at: Date; status: string | null;
   }>>> {
@@ -162,10 +163,10 @@ export class BillingJobQueries {
            SELECT s.efactura_status FROM billing.invoice_status_event AS s
             WHERE s.invoice_id = i.invoice_id ORDER BY s.at DESC, s.status_event_id DESC LIMIT 1
          ) AS latest ON true
-        WHERE i.issuer = 'SMARTBILL' AND i.at >= $1 AND i.at < $2
+        WHERE i.issuer = 'SMARTBILL' AND i.at < $1
           AND (latest.efactura_status IS NULL OR latest.efactura_status <> 'ACCEPTED')
         ORDER BY i.at, i.invoice_id`,
-      [from, to]
+      [before]
     );
     return result.rows.map((row) => Object.freeze({
       invoiceId: row.invoice_id, chargeId: row.charge_id, kind: row.kind, series: row.series, number: row.number,

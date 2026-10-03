@@ -21,7 +21,10 @@ export type InvoiceUnknownItem = Readonly<{ chargeId: string; jobKind: string; c
 export type DeadEmailItem = Readonly<{
   ref: string; template: string | null; recipient: string | null; code: string; since: Date;
 }>;
-/** A Romanian SmartBill document of the quarter whose e-Factura acceptance is not recorded (`status`: the latest one). */
+/**
+ * A Romanian SmartBill document issued by the quarter's end, in it or earlier (P2-M24), whose e-Factura acceptance is
+ * not recorded (`status`: the latest one).
+ */
 export type EFacturaCheckItem = Readonly<{
   document: string; kind: "INVOICE" | "CREDIT_NOTE"; chargeId: string; issuedAt: Date; status: string | null;
 }>;
@@ -140,14 +143,16 @@ export function liveQuarterSummaryRows(
 }
 
 /**
- * The quarter's Romanian e-Factura documents ANAF has not accepted (P10b's `smartBillDocumentsNotAccepted`: the
- * latest status is not ACCEPTED), each named by the series and number SmartBill printed on it — what the owner types
- * into `pnpm billing:efactura-status --invoice`.
+ * The Romanian e-Factura documents ANAF has not accepted (P10b's `smartBillDocumentsNotAccepted`: the latest status is
+ * not ACCEPTED) issued before `before`, the quarter's end: P2-M24, the quarter's and every earlier quarter's, so a
+ * document rejected or unanswered in one quarter stays on the next summary until its ACCEPTED is recorded. Each is
+ * named by the series and number SmartBill printed on it — what the owner types into
+ * `pnpm billing:efactura-status --invoice`.
  */
 export async function efacturaChecksFrom(
-  jobs: Pick<BillingJobQueries, "smartBillDocumentsNotAccepted">, from: Date, to: Date
+  jobs: Pick<BillingJobQueries, "smartBillDocumentsNotAccepted">, before: Date
 ): Promise<EFacturaCheckItem[]> {
-  return (await jobs.smartBillDocumentsNotAccepted(from, to)).map((document): EFacturaCheckItem => Object.freeze({
+  return (await jobs.smartBillDocumentsNotAccepted(before)).map((document): EFacturaCheckItem => Object.freeze({
     document: document.series === null ? document.number : `${document.series}-${document.number}`,
     kind: document.kind, chargeId: document.chargeId, issuedAt: document.at, status: document.status
   }));
@@ -459,9 +464,9 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     (item) => `${item.template ?? "unknown template"} (job ${item.ref}): ${item.code}, since ${isoDay(item.since)}`),
   emailKey, (item) => deadEmailAction(item.template, item.recipient));
   section(summary.efactura, "Romanian e-Factura documents to confirm: none.",
-    "Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV (issued this quarter, and no ACCEPTED status"
-      + " recorded yet; record ANAF's answer with pnpm billing:efactura-status --invoice <series>-<number> --status"
-      + " ACCEPTED|REJECTED):",
+    "Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV (issued this quarter or earlier, and no"
+      + " ACCEPTED status recorded yet; record ANAF's answer with pnpm billing:efactura-status --invoice"
+      + " <series>-<number> --status ACCEPTED|REJECTED):",
     (item) => `${item.kind === "INVOICE" ? "invoice" : "credit note"} ${item.document} (charge ${item.chargeId}),`
       + ` issued ${isoDay(item.issuedAt)}: ${item.status === null ? "no status recorded" : `last status ${item.status}`}`);
   section(summary.paymentsToCheck, "Payments to check by hand in xMoney: none.",

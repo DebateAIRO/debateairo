@@ -207,7 +207,7 @@ describe("P16b the summary reads our own rows", () => {
     expect((await billing.stuckRenewals(now)).map((item) => item.chargeId)).not.toContain(renewal);
   });
 
-  it("lists the quarter's SmartBill documents until the owner's command records ANAF's ACCEPTED (P10b's reads)", async () => {
+  it("lists every SmartBill document, this quarter's or earlier, until the owner's command records ANAF's ACCEPTED (P10b's reads, P2-M24)", async () => {
     const quarter = currentQuarter(new Date());
     const billing = new BillingRepository(database.pool);
     const jobs = new BillingJobQueries(database.pool);
@@ -228,7 +228,7 @@ describe("P16b the summary reads our own rows", () => {
     };
     const accepted = await seedInvoice();
     const rejected = await seedInvoice();
-    const listed = async (chargeId: string) => (await efacturaChecksFrom(jobs, quarter.from, quarter.to))
+    const listed = async (chargeId: string) => (await efacturaChecksFrom(jobs, quarter.to))
       .filter((item) => item.chargeId === chargeId);
     expect(await listed(accepted.chargeId)).toEqual([{
       document: `DBAI-${accepted.number}`, kind: "INVOICE", chargeId: accepted.chargeId, issuedAt, status: null
@@ -245,9 +245,13 @@ describe("P16b the summary reads our own rows", () => {
     // A number SmartBill never printed is refused with P10b's code, and nothing is written.
     expect(await runBillingEfacturaStatusCli(["--invoice", "DBAI-9999999", "--status", "ACCEPTED"], output, open)).toBe(1);
     expect(lines.err).toBe("EFACTURA_DOCUMENT_UNKNOWN\n");
-    // Another quarter never lists them.
-    expect((await efacturaChecksFrom(jobs, quarter.to, new Date(quarter.to.getTime() + 86_400_000)))
-      .filter((item) => item.chargeId === rejected.chargeId)).toEqual([]);
+    // P2-M24: the next quarter's summary still lists the rejected one (it stays until ANAF accepts it, as the
+    // command promises), never the accepted one; a summary of a quarter that ended before it was issued never does.
+    const nextQuarterEnd = new Date(Date.UTC(quarter.to.getUTCFullYear(), quarter.to.getUTCMonth() + 3, 1));
+    const later = (await efacturaChecksFrom(jobs, nextQuarterEnd)).map((item) => item.chargeId);
+    expect(later).toContain(rejected.chargeId);
+    expect(later).not.toContain(accepted.chargeId);
+    expect((await efacturaChecksFrom(jobs, quarter.from)).map((item) => item.chargeId)).not.toContain(rejected.chargeId);
   });
 
   it("lists a dunning the tax service could not price and a plan it ended, never a charged dunning (R2 Q-1)", async () => {
