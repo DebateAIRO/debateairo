@@ -135,7 +135,11 @@ describe("S4b · a Free ask on a site that sells plans takes Free's own, stricte
   });
 
   it("is never looser than Economy, even on an unchecked scorecard (Free above Economy, Free unset, Economy unset)", () => {
-    expect(writerMain(writerPick({ planTier: "free", plansSold: true }, writerScorecard({ freeCap: freeCaps(500) })))).toBe("good");
+    // Free above Economy (Part 3b re-review M-1): a cap of 700 reaches `top` (600), as a paid Economy cap
+    // of 700 shows, so only the clamp to Economy's 300 keeps the Free ask on `good` (250).
+    const aboveEconomy = 700;
+    expect(writerMain(writerPick({ planTier: "premium", plansSold: true, strength: "ECONOMY" }, writerScorecard({ economyCap: everyRole(aboveEconomy) })))).toBe("top");
+    expect(writerMain(writerPick({ planTier: "free", plansSold: true }, writerScorecard({ freeCap: freeCaps(aboveEconomy) })))).toBe("good");
     expect(writerMain(writerPick({ planTier: "free", plansSold: true }, writerScorecard({ freeCap: freeCaps(null) })))).toBe("good");
     expect(writerMain(writerPick({ planTier: "free", plansSold: true }, writerScorecard({ freeCap: undefined })))).toBe("good");
     expect(writerMain(writerPick({ planTier: "free", plansSold: true }, writerScorecard({ economyCap: everyRole(null) })))).toBe("cheap");
@@ -361,6 +365,21 @@ describe("S4b · a Free ask's seats and fallbacks come only from the Free roster
     freeCap: freeCaps(EXAMPLE_FREE_CAP_MICROS)
   });
 
+  // Part 3b re-review M-3: SCORECARD, which also scores the Free roster's first model as the best answer
+  // writer of all (quality 99; in no other role). Only a Free ask is kept to its roster.
+  const freeWriter = freeCandidates.filter((candidate) => candidate.modelId === FREE_OPENAI);
+  const SCORECARD_WITH_FREE_BEST_WRITER = testScorecard([...candidates, ...freeWriter], Object.fromEntries(DEBATE_ROLES.map((role) => [
+    role, [
+      ...candidates.map((candidate, index) => testEntry(candidate.candidateId, 95 - index, 10)),
+      ...(role === "ANSWER_WRITER" ? freeWriter.map((candidate) => testEntry(candidate.candidateId, 99, 10)) : [])
+    ]
+  ])), {
+    diversityShare: 0.2,
+    planStrengthCaps: { free: "ECONOMY" },
+    economyCap: everyRole(EXAMPLE_ECONOMY_CAP_MICROS),
+    freeCap: freeCaps(EXAMPLE_FREE_CAP_MICROS)
+  });
+
   function hostedPicker(plansSold: boolean, scorecard: Scorecard = SCORECARD): AskModelPickerSettings {
     return Object.freeze({
       scorecard: Object.freeze({ state: "VALID" as const, scorecard, sourceRef: "test:s4b" }),
@@ -403,6 +422,20 @@ describe("S4b · a Free ask's seats and fallbacks come only from the Free roster
   it("with billing on, a paid ask still seats the scored models", async () => {
     const admitted = await evaluateAskAdmission(settingsWith(hostedPicker(true)), ask("premium", "ECONOMY"));
     expect(seatedModels(admitted.modelAssignment!.assignment.roles)).toContain(PAID_OPENAI);
+  });
+
+  // Part 3b re-review M-3: with a scorecard in force every paid plan seats from every configured model
+  // (spec S2). Cut to the premium roster, the paid ask's writer would be a premium model, and its debaters
+  // would lose the model on no roster.
+  it("with billing on, a paid ask is not kept to its own roster: a Free-roster model the scorecard ranks best writes its answer, and the model on no roster debates", async () => {
+    const admitted = await evaluateAskAdmission(settingsWith(hostedPicker(true, SCORECARD_WITH_FREE_BEST_WRITER)), ask("premium", "ECONOMY"));
+    expect({
+      writer: admitted.modelAssignment!.assignment.roles.ANSWER_WRITER.map((seat) => [seat.source, seat.main.modelId]),
+      debaters: admitted.discoveredPanel.map((entry) => entry.model_id)
+    }).toEqual({
+      writer: [["SCORECARD", FREE_OPENAI]],
+      debaters: [PAID_OPENAI, PAID_ANTHROPIC, "gemini-3.8-flash"]
+    });
   });
 
   it("with billing off nothing changes: the same Free ask is seated from every reachable model, as before", async () => {

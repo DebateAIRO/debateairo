@@ -105,6 +105,27 @@ describe("S2 · both hosted boots hand the check the picker's lists", () => {
     expect(main).toContain("models: firstCalls.map((call) => call.model)");
   });
 
+  // Paid plans S4b (Part 3b re-review M-2): with billing on the picker seats a Free ask from the Free
+  // roster only, so the API's boot prices Free on that roster then, and only then. Without the member,
+  // a billing-on boot could pass a ceiling below every Free-roster first call; hard-coded to ["free"], a
+  // billing-off boot with a scorecard could refuse a ceiling that the picker's cheaper models fit. The
+  // hosted publish's twin is guarded in tests/unit/hosted-register-publish.test.ts.
+  it("the API, keeping Free to the Free roster exactly when billing is on (paid plans S4b)", async () => {
+    const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    const start = main.indexOf("await boot.run(\"run-ceiling-covers-one-call\", async () => {");
+    expect(start).toBeGreaterThan(-1);
+    const end = main.indexOf("\n});\n", start);
+    expect(end).toBeGreaterThan(start);
+    expect(main.slice(start, end)).toContain(
+      "      rosters: firstCallPlanModels({\n"
+      + "        scorecardInForce: modelPicker.scorecard.state === \"VALID\",\n"
+      + "        rosters: PLAN_TIER_ROSTERS,\n"
+      + "        models: firstCalls.map((call) => call.model),\n"
+      + "        ownRosterOnly: billingEnabled ? [\"free\"] : []\n"
+      + "      })\n"
+    );
+  });
+
   it("the runner, asking the sealed scorecard row at its own register version", async () => {
     const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
     const block = main.indexOf("if (costEnvelopePolicy !== null && envelopeBand !== null) {");
