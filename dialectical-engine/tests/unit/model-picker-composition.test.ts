@@ -25,6 +25,14 @@ describe("A20 · the picker is composed where runs are created", () => {
       'const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));'
     );
     expect(source).toContain("  perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,\n  callTokenCeilings,\n");
+    // Paid plans S4c (final review P3-M4): the picker's money terms are B6b's guard policy, and billing is on
+    // exactly when the room's composition carries the plans. Dropped, the picker would silently fall back to the
+    // bare per-run ceiling, and a scorecard capping Free above ECONOMY would boot with billing on.
+    expect(source).toContain("const billingEnabled = (askRoomComposition?.billingPlans ?? null) !== null;\n");
+    expect(source).toContain(
+      "  callTokenCeilings,\n  moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,\n  billingEnabled,\n  log: (line) => console.error(line)\n});"
+    );
+    expect(source.indexOf("const billingEnabled = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source.indexOf('boot.run("call-token-ceilings"')).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source).toMatch(/\n {2}resolveDiscoveredPanel: resolveProviderPanel,\n(?: {2}\/\/[^\n]*\n)* {2}modelPicker,\n/u);
     expect(source.indexOf("const declaredProviderTargets = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
@@ -55,6 +63,9 @@ describe("A20 · the picker is composed where runs are created", () => {
     );
     expect(body).toContain("    perRunCeilingMicros: input.perRunCeilingMicros,");
     expect(body).toContain("    callTokenCeilings: input.callTokenCeilings,");
+    // Paid plans S4c (final review P3-M4): both members reach the settings the stage builds.
+    expect(body).toContain("    ...(input.moneyPolicy === undefined ? {} : { moneyPolicy: input.moneyPolicy }),");
+    expect(body).toContain("    ...(input.billingEnabled === undefined ? {} : { billingEnabled: input.billingEnabled }),");
     expect(body.indexOf('input.boot.run("model-scorecard"')).toBeLessThan(body.indexOf('input.boot.runSync("model-picker"'));
   });
 
