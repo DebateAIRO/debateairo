@@ -474,6 +474,9 @@ export async function startBillingStack(): Promise<BillingStack> {
       // listed only from the next one: the stack lets that second end first, as a daily pass always has.
       await new Promise((resolve) => setTimeout(resolve, 1_000 - (Date.now() % 1_000) + 5));
       const report = await reconciler.runDaily(now());
+      // W13 (P2-I18): a refused listing no longer fails the pass, so a fake that stopped answering one would otherwise
+      // go unnoticed here; the fake answers all three, and any refusal is the stack's error.
+      if (report.refusedListings.length > 0) throw new Error(`BILLING_STACK_LISTING_REFUSED:${report.refusedListings.join(",")}`);
       await stack.runJobs();
       return report;
     },

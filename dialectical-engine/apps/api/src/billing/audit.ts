@@ -117,6 +117,12 @@ export type BillingAuditEvent =
   /** P14a (D5 5i): listed rows the parser refused in one pass; the count and the pass (LISTING or ADOPTION) only. */
   | "billing.reconcile.rows_rejected"
   /**
+   * W13 (P2-I18): one of A10's daily listings failed (xMoney refused its `dateType`, an outage, a refused key); the
+   * other listings and the rest of the pass went on, and this one is tried again alone an hour later. The listing
+   * (`creation`, `charge-back` or `refund`) and its code only.
+   */
+  | "billing.reconcile.listing_failed"
+  /**
    * P14a: charges one reconcile loop could not handle (a history that does not fold, an owner lock that timed out),
    * skipped so the pass goes on for every other charge. The pass (FREQUENT, DAILY or CHECKOUT), the count and the
    * distinct codes only.

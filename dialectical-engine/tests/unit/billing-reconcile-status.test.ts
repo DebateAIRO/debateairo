@@ -91,7 +91,8 @@ describe("P14a what a listed transaction should already have left in our rows", 
       clock: () => now, kick: () => undefined
     });
     const daily = vi.spyOn(reconciler, "runDaily").mockResolvedValue({
-      listed: 0, enqueued: 0, adopted: 0, failed: 0, uncertain: false, deadRefunds: 0, expired: 0, rejected: 0
+      listed: 0, enqueued: 0, adopted: 0, failed: 0, uncertain: false, deadRefunds: 0, expired: 0, rejected: 0,
+      refusedListings: []
     });
     const adoption = vi.spyOn(reconciler, "runAdoption").mockResolvedValue({ adopted: 0, failed: 0, rejected: 0 });
     await reconciler.tick();
@@ -110,10 +111,11 @@ describe("P14a what a listed transaction should already have left in our rows", 
       billing: {} as never, jobs: {} as never, xmoney: {} as never, environment: "stage", audit: () => undefined,
       clock: () => now, kick: () => undefined
     });
-    const daily = vi.spyOn(reconciler, "runDaily").mockRejectedValue(new Error("XMONEY_REFUSED"));
+    // A pass that fails as a whole (the database did not answer); W13 keeps a refused listing from doing this.
+    const daily = vi.spyOn(reconciler, "runDaily").mockRejectedValue(new Error("DATABASE_UNAVAILABLE"));
     const adoption = vi.spyOn(reconciler, "runAdoption").mockResolvedValue({ adopted: 0, failed: 0, rejected: 0 });
     // The daily error still reaches the single-flight (BILLING_RECONCILIATION_PENDING), after the frequent pass ran.
-    await expect(reconciler.tick()).rejects.toThrow("XMONEY_REFUSED");
+    await expect(reconciler.tick()).rejects.toThrow("DATABASE_UNAVAILABLE");
     expect(daily).toHaveBeenCalledTimes(1);
     expect(adoption).toHaveBeenCalledTimes(1);
     expect(adoption).toHaveBeenLastCalledWith(expect.any(Date), "FREQUENT");
@@ -124,12 +126,13 @@ describe("P14a what a listed transaction should already have left in our rows", 
     expect(adoption).toHaveBeenCalledTimes(2);
     // More than an hour after the failed attempt: the daily pass is tried again (and adoption runs once more).
     now = new Date(now.getTime() + 55 * 60_000);
-    await expect(reconciler.tick()).rejects.toThrow("XMONEY_REFUSED");
+    await expect(reconciler.tick()).rejects.toThrow("DATABASE_UNAVAILABLE");
     expect(daily).toHaveBeenCalledTimes(2);
     expect(adoption).toHaveBeenCalledTimes(3);
     // Once it completes, the next daily pass is a day later.
     daily.mockResolvedValue({
-      listed: 0, enqueued: 0, adopted: 0, failed: 0, uncertain: false, deadRefunds: 0, expired: 0, rejected: 0
+      listed: 0, enqueued: 0, adopted: 0, failed: 0, uncertain: false, deadRefunds: 0, expired: 0, rejected: 0,
+      refusedListings: []
     });
     now = new Date(now.getTime() + 61 * 60_000);
     await reconciler.tick();
@@ -179,6 +182,8 @@ function stubbedReconciler(input: Readonly<{
   histories?: ReadonlyMap<string, () => Promise<SubscriptionEvent[]>>;
   list?: (query: XMoneyTransactionListQuery) => Promise<never[]>;
   lockOwner?: (ownerRef: string) => Promise<void>;
+  /** A moving clock, for the tick tests; `now` otherwise. */
+  clock?: () => Date;
 }>) {
   const audit: AuditLine[] = [];
   const appended: ChargeEventInput[] = [];
@@ -210,7 +215,8 @@ function stubbedReconciler(input: Readonly<{
   };
   const reconciler = new BillingReconciler({
     billing: billing as never, jobs: jobs as never, xmoney: xmoney as never, environment: "stage",
-    audit: (event, fields) => { audit.push({ event, fields }); }, clock: () => input.now, kick: () => undefined
+    audit: (event, fields) => { audit.push({ event, fields }); }, clock: input.clock ?? (() => input.now),
+    kick: () => undefined
   });
   return { reconciler, audit, appended };
 }
@@ -264,14 +270,17 @@ describe("P14a one charge that throws never stops the pass for the others", () =
 describe("P14a a refused xMoney key (D5 5i)", () => {
   const refused = () => new TypedDomainError("XMONEY_CREDENTIALS_REFUSED", "fake: 401");
 
-  it("raises the operator alarm with exactly {operation: 'list'} on a daily listing, and the error still goes on", async () => {
+  it("raises the operator alarm with exactly {operation: 'list'} on a daily listing, and that listing's own failure line", async () => {
     const now = new Date("2026-10-10T12:00:00.000Z");
     const { reconciler, audit } = stubbedReconciler({
       now, list: async (query) => { if (query.dateType === "creation") throw refused(); return []; }
     });
-    await expect(reconciler.runDaily(now)).rejects.toMatchObject({ code: "XMONEY_CREDENTIALS_REFUSED" });
+    // W13 (P2-I18): the refused listing no longer throws the pass away; it is named in the report and its own line.
+    await expect(reconciler.runDaily(now)).resolves.toMatchObject({ refusedListings: ["creation"] });
     expect(audit.filter((line) => line.event === "billing.xmoney.credentials_refused"))
       .toEqual([{ event: "billing.xmoney.credentials_refused", fields: { operation: "list" } }]);
+    expect(audit.filter((line) => line.event === "billing.reconcile.listing_failed"))
+      .toEqual([{ event: "billing.reconcile.listing_failed", fields: { listing: "creation", code: "XMONEY_CREDENTIALS_REFUSED" } }]);
   });
 
   it("raises the same alarm on an adoption look-up and leaves the charge as it is", async () => {
@@ -286,5 +295,95 @@ describe("P14a a refused xMoney key (D5 5i)", () => {
     await expect(reconciler.runAdoption(now, "FREQUENT")).resolves.toEqual({ adopted: 0, failed: 0, rejected: 0 });
     expect(appended).toEqual([]);
     expect(audit).toEqual([{ event: "billing.xmoney.credentials_refused", fields: { operation: "list" } }]);
+  });
+});
+
+describe("W13 the three daily listings run independently (P2-I18)", () => {
+  const refusedListing = () => new TypedDomainError("XMONEY_REFUSED", "fake: this dateType is refused");
+
+  it("reads the other two listings when one is refused, and names each refused listing in its own line", async () => {
+    const now = new Date("2026-10-10T12:00:00.000Z");
+    const asked: string[] = [];
+    const { reconciler, audit } = stubbedReconciler({
+      now, list: async (query) => {
+        asked.push(query.dateType ?? "none");
+        if (query.dateType === "charge-back" || query.dateType === "refund") throw refusedListing();
+        return [];
+      }
+    });
+    const report = await reconciler.runDaily(now);
+    expect(asked).toEqual(["creation", "charge-back", "refund"]);
+    expect(report.refusedListings).toEqual(["charge-back", "refund"]);
+    expect(audit.filter((line) => line.event === "billing.reconcile.listing_failed")).toEqual([
+      { event: "billing.reconcile.listing_failed", fields: { listing: "charge-back", code: "XMONEY_REFUSED" } },
+      { event: "billing.reconcile.listing_failed", fields: { listing: "refund", code: "XMONEY_REFUSED" } }
+    ]);
+    // A refused key is not a listing refusal: no credentials alarm here.
+    expect(audit.some((line) => line.event === "billing.xmoney.credentials_refused")).toBe(false);
+  });
+
+  it("fails no checkout charge while the creation listing is refused", async () => {
+    const now = new Date("2026-10-10T12:00:00.000Z");
+    const stale = openUpgrade("f".repeat(32), "sub-stale", new Date(now.getTime() - 25 * 3_600_000), "INITIAL");
+    const histories = new Map<string, () => Promise<SubscriptionEvent[]>>([
+      ["sub-stale", async () => [subscriptionEventAt("sub-stale", "CREATED", new Date(now.getTime() - 5 * 86_400_000), "505")]]
+    ]);
+    const { reconciler, audit, appended } = stubbedReconciler({
+      now, stale: [stale], histories,
+      list: async (query) => { if (query.dateType === "creation") throw refusedListing(); return []; }
+    });
+    const report = await reconciler.runDaily(now);
+    // Without the creation listing a paid checkout cannot be told from an abandoned one: nothing is failed.
+    expect(report).toMatchObject({ failed: 0, refusedListings: ["creation"] });
+    expect(appended).toEqual([]);
+    expect(audit).toContainEqual({ event: "billing.reconcile.listing_failed", fields: { listing: "creation", code: "XMONEY_REFUSED" } });
+    // The day the creation listing is read again, the same charge is failed as before.
+    const next = stubbedReconciler({ now, stale: [stale], histories });
+    expect((await next.reconciler.runDaily(now)).failed).toBe(1);
+    expect(next.appended.map((row) => [row.chargeId, row.kind, row.errorCode])).toEqual([[stale.chargeId, "FAILED", "NO_TRANSACTION"]]);
+  });
+
+  it("retries only the refused listing hourly, beside the frequent pass, and keeps the full pass daily", async () => {
+    let now = new Date("2026-10-10T00:00:00.000Z");
+    let chargeBackRefused = true;
+    const asked: string[] = [];
+    const { reconciler, audit } = stubbedReconciler({
+      now, clock: () => now, list: async (query) => {
+        asked.push(query.dateType ?? "none");
+        if (query.dateType === "charge-back" && chargeBackRefused) throw refusedListing();
+        return [];
+      }
+    });
+    const adoption = vi.spyOn(reconciler, "runAdoption");
+    const failedLines = () => audit.filter((line) => line.event === "billing.reconcile.listing_failed").length;
+
+    expect((await reconciler.tick()).refusedListings).toEqual(["charge-back"]);
+    expect(asked.splice(0)).toEqual(["creation", "charge-back", "refund"]);
+    expect(adoption).toHaveBeenLastCalledWith(expect.any(Date), "DAILY");
+    expect(failedLines()).toBe(1);
+    // Ten minutes on: inside the hour, only the frequent adoption pass.
+    now = new Date(now.getTime() + 10 * 60_000);
+    expect((await reconciler.tick()).refusedListings).toEqual([]);
+    expect(asked.splice(0)).toEqual([]);
+    expect(adoption).toHaveBeenLastCalledWith(expect.any(Date), "FREQUENT");
+    // An hour after the attempt: the refused listing alone is tried again, and fails again with its own line.
+    now = new Date(now.getTime() + 51 * 60_000);
+    expect((await reconciler.tick()).refusedListings).toEqual(["charge-back"]);
+    expect(asked.splice(0)).toEqual(["charge-back"]);
+    expect(adoption).toHaveBeenLastCalledWith(expect.any(Date), "FREQUENT");
+    expect(failedLines()).toBe(2);
+    // xMoney accepts it again: the next hourly retry reads it, and no retry follows.
+    chargeBackRefused = false;
+    now = new Date(now.getTime() + 61 * 60_000);
+    expect((await reconciler.tick()).refusedListings).toEqual([]);
+    expect(asked.splice(0)).toEqual(["charge-back"]);
+    now = new Date(now.getTime() + 61 * 60_000);
+    await reconciler.tick();
+    expect(asked.splice(0)).toEqual([]);
+    expect(failedLines()).toBe(2);
+    // The full pass still comes a day after the first one.
+    now = new Date("2026-10-11T00:00:00.000Z");
+    await reconciler.tick();
+    expect(asked.splice(0)).toEqual(["creation", "charge-back", "refund"]);
   });
 });

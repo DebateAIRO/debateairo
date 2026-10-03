@@ -41,7 +41,20 @@ export type ReconcileReport = Readonly<{
   expired: number;
   /** Listed rows the parser refused and skipped (D5 5i), over the listings and the adoption look-ups. */
   rejected: number;
+  /**
+   * W13 (P2-I18): the daily listings that failed on this pass, each also written as its own
+   * `billing.reconcile.listing_failed` line; the others were read and acted on. Retried alone, hourly.
+   */
+  refusedListings: ReadonlyArray<DailyListing>;
 }>;
+
+/**
+ * A10's three daily listings, by xMoney's `dateType`. W13 (P2-I18): each runs on its own, so one xMoney refuses (or an
+ * outage of one) never stops the other two or the rest of the daily pass.
+ */
+export type DailyListing = "creation" | "charge-back" | "refund";
+const DAILY_LISTINGS: ReadonlyArray<DailyListing> = Object.freeze(["creation", "charge-back", "refund"]);
+const NO_LISTINGS: ReadonlyArray<DailyListing> = Object.freeze([]);
 
 /**
  * FREQUENT: every 10 minutes, leaving out renewals with two unknowns (P11a has stopped with those). DAILY: every
@@ -194,14 +207,19 @@ export class BillingReconciler {
   /** The last daily pass that COMPLETED; a failed one never counts, or the money check would be silent for a day. */
   private lastDailyAt: number | null = null;
   private lastDailyAttemptAt: number | null = null;
+  /** W13: the listings the last daily pass (or its last retry) could not read; retried alone after `DAILY_RETRY_MS`. */
+  private pendingListings: ReadonlyArray<DailyListing> = NO_LISTINGS;
   private readonly cursors = new Map<AdoptionScope, Readonly<{ createdAt: Date; chargeId: string }>>();
 
   constructor(private readonly deps: ReconcileDeps) {}
 
   /**
    * The timer's one entry point: the full pass once a day, the frequent adoption pass on the ticks between. A daily
-   * pass that fails (a listing xMoney keeps refusing, A10) is retried after `DAILY_RETRY_MS`, and never stops A2: the
-   * frequent adoption pass runs in its place, then the daily error goes on to the single-flight's pending report.
+   * pass that fails (the database, a charge loop that could not start) is retried after `DAILY_RETRY_MS`, and never
+   * stops A2: the frequent adoption pass runs in its place, then the daily error goes on to the single-flight's pending
+   * report. W13 (P2-I18): a listing xMoney refuses no longer fails the pass. The pass completes with the other
+   * listings, and the refused ones alone are retried after `DAILY_RETRY_MS`, beside the frequent pass, until each is
+   * read or the next full pass comes.
    */
   async tick(): Promise<ReconcileReport> {
     const now = this.deps.clock();
@@ -210,22 +228,36 @@ export class BillingReconciler {
     const retryOpen = this.lastDailyAttemptAt === null || at - this.lastDailyAttemptAt >= DAILY_RETRY_MS;
     if (due && retryOpen) {
       this.lastDailyAttemptAt = at;
-      try {
-        const report = await this.runDaily(now);
-        this.lastDailyAt = at;
-        return report;
-      } catch (dailyError) {
-        // A2 does not wait for A10: unknown and never-sent charges are still adopted or settled on this tick.
-        try {
-          await this.runAdoption(now, "FREQUENT");
-        } catch {
-          // The daily error is the one reported; the adoption pass is tried again on the next tick.
-        }
-        throw dailyError;
-      }
+      const report = await this.withAdoptionOnFailure(now, () => this.runDaily(now));
+      this.lastDailyAt = at;
+      this.pendingListings = report.refusedListings;
+      return report;
+    }
+    if (this.pendingListings.length > 0 && retryOpen) {
+      this.lastDailyAttemptAt = at;
+      const listings = this.pendingListings;
+      const report = await this.withAdoptionOnFailure(now, () => this.runListings(now, listings, "FREQUENT"));
+      this.pendingListings = report.refusedListings;
+      return report;
     }
     const adoption = await this.runAdoption(now, "FREQUENT");
-    return Object.freeze({ listed: 0, enqueued: 0, ...adoption, uncertain: false, deadRefunds: 0, expired: 0 });
+    return Object.freeze({
+      listed: 0, enqueued: 0, ...adoption, uncertain: false, deadRefunds: 0, expired: 0, refusedListings: NO_LISTINGS
+    });
+  }
+
+  /** A2 does not wait for A10: when `pass` throws, the frequent adoption pass still runs on this tick. */
+  private async withAdoptionOnFailure(now: Date, pass: () => Promise<ReconcileReport>): Promise<ReconcileReport> {
+    try {
+      return await pass();
+    } catch (dailyError) {
+      try {
+        await this.runAdoption(now, "FREQUENT");
+      } catch {
+        // The daily error is the one reported; the adoption pass is tried again on the next tick.
+      }
+      throw dailyError;
+    }
   }
 
   /**
@@ -279,23 +311,60 @@ export class BillingReconciler {
     }
   }
 
+  /**
+   * One daily listing, on its own (W13, P2-I18): a failure is written as `billing.reconcile.listing_failed` with the
+   * listing and its code (content-free), recorded in `refused`, and read as no rows, so the pass goes on.
+   */
+  private async dailyListing(
+    listing: DailyListing, from: Date, to: Date, rejected: { count: number }, refused: DailyListing[]
+  ): Promise<ReadonlyArray<XMoneyTransaction>> {
+    try {
+      return await this.listed({ dateType: listing, from, to }, rejected);
+    } catch (error) {
+      refused.push(listing);
+      this.deps.audit("billing.reconcile.listing_failed", { listing, code: failureCode(error) });
+      return [];
+    }
+  }
+
+  /** The full pass: the three listings, A2's daily adoption, the 24-hour checkouts and the owner's counts. */
   async runDaily(now: Date): Promise<ReconcileReport> {
+    return this.runListings(now, DAILY_LISTINGS, "DAILY");
+  }
+
+  /**
+   * `listings` (all three on the full pass; on an hourly retry, only those the last try could not read), then the
+   * adoption pass of `scope`. The 24-hour checkouts are failed only when this pass READ the creation listing: without
+   * it, a checkout whose payment exists cannot be told from an abandoned one. The owner's counts belong to the full
+   * pass alone.
+   */
+  private async runListings(
+    now: Date, listings: ReadonlyArray<DailyListing>, scope: AdoptionScope
+  ): Promise<ReconcileReport> {
     const environment = this.deps.environment;
-    const stale = await this.deps.billing.unsettledCharges(
-      ["INITIAL", "CARD_CHECK"], new Date(now.getTime() - 24 * HOUR_MS), 500, environment
-    );
+    const withCreation = listings.includes("creation");
+    const stale = withCreation
+      ? await this.deps.billing.unsettledCharges(
+        ["INITIAL", "CARD_CHECK"], new Date(now.getTime() - 24 * HOUR_MS), 500, environment
+      )
+      : [];
     const oldest = stale.reduce((earliest, charge) => Math.min(earliest, charge.createdAt.getTime()), now.getTime() - 72 * HOUR_MS);
-    const creationFrom = new Date(Math.max(now.getTime() - 30 * 24 * HOUR_MS, oldest));
-    const disputeFrom = new Date(now.getTime() - 120 * 24 * HOUR_MS);
+    const windowFrom: Readonly<Record<DailyListing, Date>> = {
+      creation: new Date(Math.max(now.getTime() - 30 * 24 * HOUR_MS, oldest)),
+      "charge-back": new Date(now.getTime() - 120 * 24 * HOUR_MS),
+      refund: new Date(now.getTime() - 120 * 24 * HOUR_MS)
+    };
     const rejected = { count: 0 };
-    const listings = [
-      await this.listed({ dateType: "creation", from: creationFrom, to: now }, rejected),
-      await this.listed({ dateType: "charge-back", from: disputeFrom, to: now }, rejected),
-      await this.listed({ dateType: "refund", from: disputeFrom, to: now }, rejected)
-    ];
+    const refused: DailyListing[] = [];
+    const read: Array<ReadonlyArray<XMoneyTransaction>> = [];
+    for (const listing of DAILY_LISTINGS) {
+      if (!listings.includes(listing)) continue;
+      read.push(await this.dailyListing(listing, windowFrom[listing], now, rejected, refused));
+    }
     this.reportRejected(rejected, "LISTING");
+    const decideCheckouts = withCreation && !refused.includes("creation") && stale.length > 0;
     const byId = new Map<string, XMoneyTransaction>();
-    for (const listing of listings) for (const transaction of listing) byId.set(transaction.transactionId, transaction);
+    for (const listing of read) for (const transaction of listing) byId.set(transaction.transactionId, transaction);
     // The kinds of every listed transaction and of every payment a listed refund names.
     const ids = [...byId.values()].flatMap((transaction) => [transaction.transactionId, ...transaction.relatedTransactionIds]);
     const recorded = await this.deps.billing.chargeEventKindsByTransaction(ids, environment);
@@ -307,7 +376,7 @@ export class BillingReconciler {
       // Any payment not yet settled on our side — final or still in flight — marks its order as reached, so its
       // checkout charge is never failed as "no transaction". The lookups run only when a charge could be failed. A
       // refund is matched through the payment it names, never through its order (D5 5g).
-      if (!settled && stale.length > 0 && transaction.transactionType !== "refund") {
+      if (!settled && decideCheckouts && transaction.transactionType !== "refund") {
         const external = await this.externalOrderOf(transaction);
         if (external === "UNKNOWN") uncertain = true;
         else if (external !== null) touched.add(external);
@@ -318,9 +387,9 @@ export class BillingReconciler {
       }));
       enqueued += 1;
     }
-    const adoption = await this.runAdoption(now, "DAILY");
+    const adoption = await this.runAdoption(now, scope);
     let failed = adoption.failed;
-    if (!uncertain) {
+    if (decideCheckouts && !uncertain) {
       const errors: ChargeErrors = { count: 0, codes: new Set() };
       for (const charge of stale) {
         if (touched.has(charge.chargeId) || charge.events.some((event) => event.xmoneyTransactionId !== null)) continue;
@@ -328,17 +397,21 @@ export class BillingReconciler {
       }
       this.reportErrors(errors, "CHECKOUT");
     }
-    // For the owner, content-free: counts only; P16b's summary lists the charges.
-    const deadRefunds = (await this.deps.billing.deadRefunds()).length;
-    if (deadRefunds > 0) this.deps.audit("billing.refund.dead", { count: deadRefunds });
-    const expired = (await this.deps.billing.longUnsettledCharges(
-      ["UPGRADE", "RENEWAL"], new Date(now.getTime() - 30 * 24 * HOUR_MS), environment
-    )).length;
-    if (expired > 0) this.deps.audit("billing.reconcile.expired", { count: expired });
+    // For the owner, content-free: counts only, once a day; P16b's summary lists the charges.
+    let deadRefunds = 0;
+    let expired = 0;
+    if (scope === "DAILY") {
+      deadRefunds = (await this.deps.billing.deadRefunds()).length;
+      if (deadRefunds > 0) this.deps.audit("billing.refund.dead", { count: deadRefunds });
+      expired = (await this.deps.billing.longUnsettledCharges(
+        ["UPGRADE", "RENEWAL"], new Date(now.getTime() - 30 * 24 * HOUR_MS), environment
+      )).length;
+      if (expired > 0) this.deps.audit("billing.reconcile.expired", { count: expired });
+    }
     if (enqueued > 0 || adoption.adopted > 0) this.deps.kick();
     return Object.freeze({
       listed: byId.size, enqueued, adopted: adoption.adopted, failed, uncertain, deadRefunds, expired,
-      rejected: rejected.count + adoption.rejected
+      rejected: rejected.count + adoption.rejected, refusedListings: Object.freeze(refused)
     });
   }
 
