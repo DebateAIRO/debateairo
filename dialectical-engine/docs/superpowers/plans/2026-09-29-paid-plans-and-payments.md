@@ -29688,6 +29688,24 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    `… rebill --order <its order id> --customer <its customer id> --amount 1.00 --as auth-order`
    and write down the printed line (`NO_TRANSACTION` means a changed card could never be charged again — tell the
    builders at once; it changes A12's design).
+   **Did that rebill take the money? (W14, P2-I3; required.)** A rebill that only holds the money reads
+   `complete-ok` exactly like one that took it, so only its release tells them apart. First open the rebill's
+   transaction in the stage dashboard and write down what it shows about capture (a "captured" or "authorized"
+   status, a capture column or date, or nothing of the kind). Then release it as a whole:
+   `… release --transaction <the rebill's transaction id> --as auth-order-rebill`
+   It prints `XMONEY_RELEASE=auth-order-rebill:<status before>-><HTTP status>-><status after>:capture=<answer>`,
+   e.g. `complete-ok->200->refund-ok:capture=captured`; write the line down. `capture=captured` (the status after is
+   `refund-ok`: the rebill took the money, which came back as a refund) is what A12 assumes. `capture=hold` (`void-ok`:
+   only a hold, now released) means that every renewal and upgrade after a card change would be renewed, invoiced and
+   receipted but never collected: tell the builders at once, because A12 changes before billing is on (go-live row
+   14). `capture=unknown` (any other status, or a refused release) settles nothing: send the builders the line. Keep
+   the `transaction-rebill-auth-order-released-….json` it wrote either way: it is a required fixture, and P3b's
+   recorded suite fails unless it reads `refund-ok`.
+   **xMoney's own emails (W8, P2-I12; required).** Give `--email` an inbox you can read in item 2 and item 3. Through
+   items 3 to 8, write down every email xMoney itself sends to that address: after which item (the payments of item 3,
+   the rebills of item 6, the refunds of item 7, the release of item 8), its subject, and the address it was sent
+   to. "None" is an answer too. It decides whether billing must tell xMoney when a person changes their email (open
+   item P2-I12 (X0, owner)).
 9. **(e, continued) The bank check nobody answers (D6a's ask 4c).** This measures how long xMoney keeps a 3-D Secure
    payment open when the person closes the bank check without answering; our checkout refuses to start a second
    payment while the first may still finish, and this sets for how long. It writes no fixture file.
@@ -29730,7 +29748,8 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    yours remains. Then **delete the capture folder**. Hand the builders the fixture files and your written answers to
    (a), (d), (e) (the page's last line with the SDK names, where the bank check opened and whether the page still
    completed, any `form-action` row, and the Payment Request and the referrer comparisons), (f), (g) (including the refund
-   listing's rows and delays), (h), (i) (the test amounts xMoney names and the declined rebill's line), the 0.00
+   listing's rows and delays), (h) (with the dashboard's capture note and the `auth-order-rebill` release line), xMoney's
+   own emails (item 8's list, or "none"), (i) (the test amounts xMoney names and the declined rebill's line), the 0.00
    question, the two `customer` lines, item 7's charge-back listing line, item 9's `--list-order` line, and the `outerFields` of `notice-success.json`
    (which fields besides `opensslResult` a notice carries — e.g. a `signature` of 128 hex characters — and, for the
    `signature`, its `construction`: the name of the scrubber's candidate it matched, or `null`); P3a's and P3b's recorded-fixture tests start running as soon as the

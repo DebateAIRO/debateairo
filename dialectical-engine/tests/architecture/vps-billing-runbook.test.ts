@@ -52,6 +52,19 @@ describe("P22 the Billing runbook", () => {
       "open_sandbox_subscriptions", "open_sandbox_charges",
       // §14.8 (P2-I4): and no sandbox refund, invoice or credit-note job still queued (the start-up check counts them).
       "open_sandbox_jobs",
+      // §14.8 (W14, P2-I19): never on a host whose billing clock moved; the live start's safety net and its limit.
+      "**Never take this path on a host that has ever run with `BILLING_STAGE_CLOCK_OFFSET_DAYS`**",
+      "BILLING_RECORDS_DATED_AHEAD", "That is only a safety net: a month after such a",
+      // §14.8 step 4 (W14, P2-I20): the live site's id, public key and key files too, then the live notice address.
+      "`XMONEY_SITE_ID` and\n     `XMONEY_PUBLIC_KEY` to the live site's id and public key",
+      "remove `xmoney-private-key` and `quaderno-api-key` on purpose",
+      "rm /etc/debateai/api/billing/xmoney-private-key", "rm /etc/debateai/api/billing/quaderno-api-key",
+      "Finally, set the notification URL in the **live** xMoney dashboard",
+      // §14.8 (W14, go-live rows 19 and 23): the read-back on the day, and the first live notice.
+      "**Read the settings back before switching on.**",
+      "grep -E '^(XMONEY_API_BASE_URL|XMONEY_SITE_ID|XMONEY_PUBLIC_KEY|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env",
+      "stat -c '%y %n' /etc/debateai/api/billing/xmoney-private-key",
+      "FROM billing.xmoney_notice WHERE xmoney_environment = 'live'",
       // §14.8 (W3 fix round 1): a sandbox withdrawal handed to the owner is settled before the switch, which refuses it.
       "If a sandbox withdrawal was handed to you", "while the host still points at the sandbox, with `pnpm billing:withdraw --owner",
       "After the switch the command refuses a sandbox plan (`NOT_SUBSCRIBED`), and the summary would list it for ever.",
@@ -249,7 +262,12 @@ describe("P22 the Billing runbook", () => {
       "payment-marks", "SELLER_COMPANY", "notice URL", "same-origin-allow-popups", "records key",
       "daily ceiling covers the subscribers", "XMONEY_SDK_ORIGIN", "Terms §13", "counsel",
       // D5 5k: the recorded suites cannot stay skipped by accident.
-      "all 27 required X0 kinds present", "the X0 suites green", "Permissions-Policy",
+      "all 28 required X0 kinds present", "the X0 suites green", "Permissions-Policy",
+      // W14 (P2-I3): X0 shows whether the card check's order's rebill takes the money; a hold changes A12 first.
+      "transaction-rebill-auth-order-released", "only holds the money, A12 (the card change) is changed before billing is on",
+      // W14 (P2-I20): row 19 needs a LIVE notice, row 23 the live site's id, public key and key files.
+      "`xmoney_environment = 'live'`", "`XMONEY_SITE_ID` and `XMONEY_PUBLIC_KEY` are the live site's",
+      "`xmoney-private-key`, `quaderno-api-key` and `smartbill-credentials` files hold the live keys",
       // W13 (P2-I18): X0 confirms the daily money check's dispute listing.
       "`dateType=charge-back` listing is accepted", "transaction-list-charge-back",
       "Quaderno and SmartBill fixtures committed and their recorded-fixture suites green",
@@ -310,11 +328,23 @@ describe("P22 the Billing runbook", () => {
       // W2 (P2-I2, P2-M39): the dispute case is part of the owner's proof, run after the whole-flow suite.
       "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
       "a card dispute found by the daily money check: the plan paused once, with one email, counted",
-      "Start the second only after the first has finished"
+      "Start the second only after the first has finished",
+      // W14 (P2-I19, the owner's ruling of 2 October 2026): a separate throwaway server, with what it needs of its own.
+      "Do this on a **separate, throwaway server**", "**Domain and `PUBLIC_APP_URL`**",
+      "notification URL to the sandbox domain followed by `/api/v1/billing/xmoney/notify`",
+      "**Register version with `countryPolicy`**", "`sandbox@example.invalid:not-a-token`",
+      "7. **Destroy the sandbox server.**", "The line never comes out",
+      // P2-M38: pay before the emailed cancel; the closing check lists each charge left with an unknown outcome.
+      "pay for Plus first: a cancel link is\n   sent only for a plan that is paid",
+      "u.kind = 'SUBMIT_UNKNOWN') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED'))"
     ]) {
       expect(billing, needle).toContain(needle);
     }
     // Lowering the offset mid-run would stall jobs scheduled on the moved clock for a month.
     expect(billing).not.toContain("Remove the line and restart the API again");
+    // W14 (P2-I19): no "stage host" that is rebuilt and could then go live, and no billing switch-on without countryPolicy.
+    expect(billing).not.toContain("rebuild the stage host");
+    expect(billing).not.toContain("on a **stage** host");
+    expect(billing).not.toContain("Publish\n`billingPolicy` with `enabled: true` on that host only");
   });
 });

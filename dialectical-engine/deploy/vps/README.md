@@ -2030,11 +2030,21 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- the go-live checklist's budget and billing rows are proven (rows 13–37);
-- the sandbox run of §14.9 passed.
+- the go-live checklist's budget and billing rows are proven (rows 13–38);
+- the sandbox run of §14.9 passed, on its own throwaway server, never on this host.
 
 **Going from xMoney's sandbox to live on the same host.** Skip this if this host never ran with
-`XMONEY_API_BASE_URL=https://api-stage.xmoney.com`. The sandbox and live are two separate xMoney systems, and the live
+`XMONEY_API_BASE_URL=https://api-stage.xmoney.com`.
+**Never take this path on a host that has ever run with `BILLING_STAGE_CLOCK_OFFSET_DAYS`** (the sandbox run of §14.9
+sets it, which is why that run has a server of its own). Such a host holds billing rows and queued jobs dated up to a
+month ahead, and once it pointed at live those jobs would wait and then run against the live services. Destroy that
+server instead (§14.9, step 7), and go live on a host whose billing clock never moved. The API refuses to start
+pointed at live while any billing row or open billing job is dated more than one day ahead, and prints
+`BILLING_RECORDS_DATED_AHEAD` with two counts (`rows=` and `jobs=`). That is only a safety net: a month after such a
+run nothing is ahead any more, so the check cannot replace this rule.
+
+The path is for a host that used xMoney's sandbox on the real clock only, for example a quick look at the card form
+before go-live. The sandbox and live are two separate xMoney systems, and the live
 site never renews a sandbox plan, so a sandbox plan left open would stay active for ever. So, while the host still
 points at the sandbox:
 
@@ -2073,11 +2083,31 @@ would end it without calling any service
 but the start-up check below still refuses to start while any is left, so the switch is never made with sandbox work
 waiting.
 
-4. Only then change `XMONEY_API_BASE_URL` to `https://api.xmoney.com` and `XMONEY_SDK_ORIGIN` to
-   `https://secure.xmoney.com`, and, in the same edit, `QUADERNO_API_BASE_URL` to your Quaderno account's live address
-   and `SMARTBILL_API_BASE_URL` to SmartBill's own address (§14.2; §14.9 set it to `https://smartbill.invalid`). Then
-   restart both services. Pointed at live beside Quaderno's sandbox or a `.invalid` SmartBill address, the API refuses
-   to start with `BILLING_LIVE_SANDBOX_INVOICER_REFUSED`.
+4. Only then move every billing setting and key from the sandbox to live, in one sitting. The sandbox and live are
+   two xMoney sites with their own id and keys, and Quaderno's sandbox has its own key:
+   - In `api.env` (§14.2): `XMONEY_API_BASE_URL` to `https://api.xmoney.com`; `XMONEY_SITE_ID` and
+     `XMONEY_PUBLIC_KEY` to the live site's id and public key (the live xMoney dashboard, under Sites);
+     `QUADERNO_API_BASE_URL` to your Quaderno account's live address; and `SMARTBILL_API_BASE_URL` to SmartBill's own
+     address (a host that copied §14.9's settings has `https://smartbill.invalid` there).
+   - In `ui.env`: `XMONEY_SDK_ORIGIN` to `https://secure.xmoney.com`.
+   - The key files: remove `xmoney-private-key` and `quaderno-api-key` on purpose (the two lines below), then run
+     their two lines of §14.2 again and paste the live site's private key and the live Quaderno key at the prompts.
+     A key file that exists is never replaced, so this is the only way in. If `smartbill-credentials` holds a dummy
+     line rather than your SmartBill user and token, replace it the same way.
+   Then restart both services. Pointed at live beside Quaderno's sandbox or a `.invalid` SmartBill address, the API
+   refuses to start with `BILLING_LIVE_SANDBOX_INVOICER_REFUSED`. With a sandbox key left in place, every checkout is
+   refused (`billing.xmoney.credentials_refused` in the journal) or every price quote fails.
+   Finally, set the notification URL in the **live** xMoney dashboard, as §14.5 says. The sandbox dashboard's setting
+   does not carry over, and without it every first payment waits for the daily money check, up to a day, before its
+   plan is active.
+
+```sh
+rm /etc/debateai/api/billing/xmoney-private-key
+```
+
+```sh
+rm /etc/debateai/api/billing/quaderno-api-key
+```
 
 The API checks this itself at start-up: pointed at live while a sandbox plan, charge or queued job is still open, it
 refuses to start and prints `BILLING_STAGE_RECORDS_OPEN` with the three counts. The first query can count a cancelled
@@ -2086,6 +2116,24 @@ the sandbox address back, restart, close what is left, and try again.
 
 The sandbox plans and charges stay in the database, but they never count as sales:
 the quarterly tax summary and its email read only live charges.
+
+**Read the settings back before switching on.** On every host, the same-host path or not, read back the billing
+lines and the key files' dates on the day (go-live row 23). The site id and the public key must be the live site's,
+as the live xMoney dashboard shows them, and the addresses the live ones above. Each key file must have been written
+for live: after the host's last use of the sandbox, if it ever had one. The two `grep` lines print the lines; the
+`stat` line prints each key file's last change, never its content:
+
+```sh
+grep -E '^(XMONEY_API_BASE_URL|XMONEY_SITE_ID|XMONEY_PUBLIC_KEY|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env
+```
+
+```sh
+grep -E '^XMONEY_SDK_ORIGIN=' /etc/debateai/ui.env
+```
+
+```sh
+stat -c '%y %n' /etc/debateai/api/billing/xmoney-private-key /etc/debateai/api/billing/quaderno-api-key /etc/debateai/api/billing/smartbill-credentials
+```
 
 Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4. The version that switches billing
 on must also carry the `countryPolicy` member, from `deploy/vps/register/country-policy.example.json` with the
@@ -2097,6 +2145,13 @@ error output. Pin nothing, add the member and publish again (§11). While billin
 the published `costEnvelopePolicy` has real per-run and daily ceilings. The site's daily ceiling protects the company: it must be
 at least the expected daily spend of all subscribers. A first estimate is subscribers × day cap × 0.3; better, use
 the figure measured after the first paid debates.
+
+After the first live payment, check that its notice reached the site (go-live row 19). The newest row must say
+`live`; no row means the live dashboard's notification URL is missing or wrong (§14.5):
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT received_at, status, xmoney_environment FROM billing.xmoney_notice WHERE xmoney_environment = 'live' ORDER BY received_at DESC LIMIT 1"
+```
 
 **Stopping sales, and switching billing off.** These are two different things. Almost always, you want the first.
 
@@ -2424,7 +2479,30 @@ whoever runs the server for the account's address and report the code.
 
 ### 14.9 The sandbox run, end to end (OWNER-RUN)
 
-Do this on a **stage** host before switching billing on for real, with billing data you will throw away afterwards.
+Do this on a **separate, throwaway server** before switching billing on for real, never on the production host
+(the owner's ruling of 2 October 2026). The run moves the billing clock a month ahead, and a host that ever ran with
+that line must never go live (§14.8). Build the server from this kit like a new host, with its own database and no
+real accounts, and destroy it at the end (step 7). It needs its own:
+
+- **Domain and `PUBLIC_APP_URL`**: for example a `sandbox.` name of your domain pointing at it, with its own Caddy
+  site (§6). xMoney's return link and every emailed link are built from `PUBLIC_APP_URL` (§14.2), so the sandbox's
+  links lead to the sandbox server, never to the live site.
+- **Notice address in xMoney's sandbox dashboard**: in the stage dashboard (Sites → Payment Page), set the
+  notification URL to the sandbox domain followed by `/api/v1/billing/xmoney/notify` (§14.5). The live dashboard is
+  set only when the live site goes on (§14.8).
+- **Sandbox keys**: the stage site's id, public key and private key (the stage dashboard, under Sites) and the
+  Quaderno sandbox key, in the files and lines of §14.2.
+- **Dummy SmartBill line**: the API still reads `smartbill-credentials`, and it refuses a line that is not an
+  email-like user, a colon and a token. Type a dummy line of that shape at §14.2's prompt, for example
+  `sandbox@example.invalid:not-a-token`. With the `.invalid` address below nothing is ever sent, so your real SmartBill
+  token never sits on a throwaway server.
+- **Register version with `countryPolicy`**: publish (§14.4) a version that carries `billingPolicy` with
+  `enabled: true` and the `countryPolicy` member, from `deploy/vps/register/country-policy.example.json`. Without the
+  member the publish seals the version and refuses it
+  (`HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE`, §14.8), and the server cannot start billing.
+  Whether §5's four conditions for that member ("Country data") must hold on a throwaway server that only you use is
+  your call; they do hold for the live site.
+
 In `api.env` set:
 
 - `XMONEY_API_BASE_URL` to `https://api-stage.xmoney.com`;
@@ -2434,10 +2512,10 @@ In `api.env` set:
   accidental Romanian purchase fails harmlessly and issues nothing.
 
 The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if the stage API sits beside anything but
-Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): a stage host builds
-the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the CUI is
-still in square brackets. In `ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Publish
-`billingPolicy` with `enabled: true` on that host only. Write down what you see at each step; go-live row 15 needs your notes.
+Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
+builds the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the CUI is
+still in square brackets. In `ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Write down what
+you see at each step; go-live row 15 needs your notes.
 
 **Before step 1: read the journal of the first start with billing on.** At each start the API runs the daily money
 check at once, so its first start against xMoney's sandbox shows whether xMoney accepts the three lists the check
@@ -2466,9 +2544,10 @@ sandbox invoices carry the moved dates (harmless in a sandbox), and debates are 
 recorded, on the real clock, so the new plan's debate limits, its usage bars and a withdrawal's credit-used share are
 not part of this run (the fake stack in step 6 proves the bars and the share). The owner commands
 (`billing:withdraw`, `billing:dispute`, `billing:tax-summary`, `billing:efactura-status`, `billing:invoice`) also
-run on the real clock, so do not run them on this host while the line is set. The line comes out only when the stage billing data is thrown
-away at the end: rebuild the stage host, then remove the line. A host must never go live holding rows written on a
-moved clock.
+run on the real clock, so do not run them on this host while the line is set. The line never comes out: at the
+end the whole server is destroyed, its database with it (step 7).
+A host must never go live holding rows written on a moved clock; a live start refuses while any is still dated ahead
+(`BILLING_RECORDS_DATED_AHEAD`, §14.8).
 
 1. **Pay.** Sign up from the pricing page, choose Plus, pick Germany as your country, confirm it, and pay with
    xMoney's test card 4111 1111 1111 1111 (expiry 12/26, any CVV).
@@ -2500,7 +2579,8 @@ systemctl restart debateai-api
 4. **Withdraw.** On a fresh test account (Germany again), pay for Plus, then in Settings press Withdraw within 14 days
    and confirm with your password and authenticator code.
    - Expect a partial refund in the xMoney stage dashboard, the refund email (M8), and the Free plan.
-5. **Cancel through the emailed link.** On another test account, open `/cancel` signed out and enter the account's
+5. **Cancel through the emailed link.** On another test account (Germany again), pay for Plus first: a cancel link is
+   sent only for a plan that is paid and not cancelled yet. Then open `/cancel` signed out and enter the account's
    email.
    - Open the link in the email (M9) and press the button.
    - Expect the cancellation email (M7), and Settings saying when the plan ends.
@@ -2520,9 +2600,22 @@ pnpm exec vitest run tests/integration/billing-whole-flow.test.ts
 pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts
 ```
 
-After the run, count what the stage database recorded. You should see one `SUCCEEDED` per paid charge and one
-`REFUNDED` per refund, and no `SUBMIT_UNKNOWN` left without a `SUCCEEDED` or `FAILED` after it:
+After the run, count what the sandbox server's database recorded. You should see one `SUCCEEDED` per paid charge and
+one `REFUNDED` per refund:
 
 ```sh
 sudo -u postgres psql -d debateai -c "SELECT kind, count(*) FROM billing.charge_event GROUP BY kind ORDER BY kind"
 ```
+
+No charge may be left with an unknown outcome. This lists each charge that has a `SUBMIT_UNKNOWN` and neither a
+`SUCCEEDED` nor a `FAILED`; it should print no row:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT c.charge_id, c.kind, c.created_at FROM billing.charge c WHERE EXISTS (SELECT 1 FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) ORDER BY c.created_at"
+```
+
+7. **Destroy the sandbox server.** Once your notes are written and both fake-stack runs have passed, delete the server
+   and its disks at your hosting provider, remove the sandbox domain's DNS record, and clear the notification URL in
+   xMoney's stage dashboard. If you set up its nightly backup (§9), it must have had its own storage: delete that
+   too. Never copy its database, a backup of it or its `api.env` to the live host, and never point the sandbox
+   server at live: go live on the production host, as §14.8 says.
