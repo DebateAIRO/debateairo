@@ -60,6 +60,8 @@ export const StaffEnrollmentResponseSchema = z.object({
         verified_credential_count: RevisionSchema, owner_credential_requirement_met: z.boolean(), delegated_credential_requirement_met: z.boolean()
     }).strict()
 }).strict();
+export const FundedStaffEnrollmentResponseSchema = StaffEnrollmentResponseSchema.extend({funding_policy_version:z.literal(1)}).strict();
+export const SelectedStaffEnrollmentResponseSchema = z.union([StaffEnrollmentResponseSchema,FundedStaffEnrollmentResponseSchema]);
 const TransportSchema = z.enum(["ble", "cable", "hybrid", "internal", "nfc", "smart-card", "usb"]);
 const TransportsSchema = z.array(TransportSchema).max(7).refine((values) => new Set(values).size === values.length);
 const EncodedCeremonyValueSchema = z.string().min(1).max(32768).regex(/^[A-Za-z0-9_-]+$/u);
@@ -259,7 +261,7 @@ export type FundedStaffActionIntent = z.infer<typeof FundedStaffActionIntentSche
 export const fundedStaffContractInventory = Object.freeze({
     fundingPolicyVersion: 1 as const,
     routes: Object.freeze(["POST /v1/admin/internal-allowances", "DELETE /v1/admin/internal-allowances/{grantId}"] as const),
-    resources: Object.freeze({ FundedActiveStaffCapabilitiesSchema, FundedStaffActionSchema, FundedActionBindingSchema,
+    resources: Object.freeze({ FundedStaffEnrollmentResponseSchema, SelectedStaffEnrollmentResponseSchema, FundedActiveStaffCapabilitiesSchema, FundedStaffActionSchema, FundedActionBindingSchema,
         FundedStaffElevationResponseSchema, FundedStaffTeamMemberSchema, FundedStaffTeamPageSchema,
         FundedStaffActionIntentSchema, FundedStaffActionOptionsRequestSchema, FundedStaffActionVerifyRequestSchema,
         InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, InternalAllowanceTargetParamsSchema })

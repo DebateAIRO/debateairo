@@ -5,5 +5,12 @@
   "billing.usage.day": "Azi",
   "billing.usage.week": "Săptămâna aceasta",
   "billing.usage.month": "Luna aceasta",
-  "billing.usage.resets": "Se resetează: {time}"
+  "billing.usage.resets": "Se resetează: {time}",
+  "billing.usage.internalTitle": "Finanțare internă",
+  "billing.usage.internalLine": "Finanțare internă · Azi {dayPct}% · Săptămâna aceasta {weekPct}% · Total grant {grantPct}%",
+  "billing.usage.grant": "Total grant",
+  "billing.usage.expires": "Expiră {time}",
+  "newDebate.room.internalGrantFull": "Alocația grantului intern este epuizată. Expiră {time}.",
+  "newDebate.room.internalWindowFull": "Fereastra finanțării interne este plină. Verifică din nou {time}.",
+  "newDebate.room.internalClose": "Finanțarea internă se apropie de limita finită."
 }

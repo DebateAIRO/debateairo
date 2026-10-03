@@ -5,5 +5,12 @@
   "billing.usage.day": "Hari ini",
   "billing.usage.week": "Minggu ini",
   "billing.usage.month": "Bulan ini",
-  "billing.usage.resets": "Diatur ulang pada {time}"
+  "billing.usage.resets": "Diatur ulang pada {time}",
+  "billing.usage.internalTitle": "Pendanaan internal",
+  "billing.usage.internalLine": "Pendanaan internal · Hari ini {dayPct}% · Minggu ini {weekPct}% · Total hibah {grantPct}%",
+  "billing.usage.grant": "Total hibah",
+  "billing.usage.expires": "Berakhir {time}",
+  "newDebate.room.internalGrantFull": "Alokasi hibah internal telah habis. Berakhir {time}.",
+  "newDebate.room.internalWindowFull": "Batas periode pendanaan internal telah tercapai. Periksa lagi {time}.",
+  "newDebate.room.internalClose": "Pendanaan internal Anda mendekati batas yang ditetapkan."
 }

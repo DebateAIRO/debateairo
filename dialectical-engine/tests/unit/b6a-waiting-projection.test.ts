@@ -45,7 +45,7 @@ describe("B6a the contract carries WAITING with its expected start (budget spec 
 
   it("names the same four scopes as SpendScope in @debateai/budget", () => {
     const budgetScopes = {
-      SITE_DAY: true, PERSON_DAY: true, PERSON_WEEK: true, PERSON_MONTH: true
+      SITE_DAY: true, PERSON_DAY: true, PERSON_WEEK: true, PERSON_MONTH: true, PERSON_GRANT: true
     } satisfies Record<SpendScope, true>;
     expect([...SpendScopeSchema.options].sort()).toEqual(Object.keys(budgetScopes).sort());
   });

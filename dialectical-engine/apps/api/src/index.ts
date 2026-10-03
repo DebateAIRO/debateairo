@@ -1,3 +1,4 @@
+import type { FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -2812,6 +2813,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       resets_at: answer.resetsAt?.toISOString() ?? null,
       waiting_run_ref: answer.waitingRunRef,
       plan_id: answer.planId,
+      ...(answer.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:answer.funding.expiresAt.toISOString()}}),
       ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor })
     }));
   });
@@ -3516,6 +3518,7 @@ export class PostgresAskApplication implements AskApplication {
     let plannedAsk: AskRequest = requestedAsk;
     let applied: AskApplied | null = null;
     let substitutedAt: Date | null = null;
+    let fundingBasis: FundingBasis | undefined;
     const billing = this.settings.billing;
     if (billing !== undefined) {
       if (principal.kind !== "server") {
@@ -3523,6 +3526,7 @@ export class PostgresAskApplication implements AskApplication {
       }
       const now = billing.clock();
       const resolved = await resolveBillingAsk(requestedAsk, principal.ownerRef, billing, now);
+      fundingBasis = resolved.fundingBasis;
       ask = resolved.ask;
       plannedAsk = resolved.ask;
       applied = appliedAskOf(resolved.ask);
@@ -3541,7 +3545,7 @@ export class PostgresAskApplication implements AskApplication {
     // the reply carries what the server applied (QUEUED or WAITING).
     if (this.settings.room !== undefined) {
       const accepted = await this.#submitWithRoom(
-        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt
+        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt, fundingBasis
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
@@ -3642,7 +3646,7 @@ export class PostgresAskApplication implements AskApplication {
    * most likely the same outage — the run keeps reading QUEUED, so the one
    * line that names it goes to the operator's log (ids and codes only).
    */
-  async #recordRunSetupFailure(runId: string, step: RunSetupStep): Promise<void> {
+  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED"): Promise<void> {
     const reason = `RUN_SETUP_FAILED:${step}`;
     try {
       await this.#work.recordSetupFailure({ runId, ...firstRunJob(runId), reason });
@@ -3716,12 +3720,13 @@ export class PostgresAskApplication implements AskApplication {
     principal: AskPrincipal,
     ownership: RunOwnershipAccess,
     room: AskRoomPort,
-    substitutedAt: Date | null
+    substitutedAt: Date | null,
+    fundingBasis?: FundingBasis
   ): Promise<AskAccepted> {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
     }
-    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask) });
+    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
@@ -3752,7 +3757,7 @@ export class PostgresAskApplication implements AskApplication {
           startAsk = plannedAsk;
           swappedAt = null;
           swappedEvaluation = plannedEvaluation;
-          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk) });
+          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
           await room.precheck(decisionQuestion);
         }
         if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;
@@ -3917,6 +3922,9 @@ export class PostgresAskApplication implements AskApplication {
         if (outcome.kind === "SITE_FULL") {
           stopped = true;
           break;
+        }
+        if (outcome.kind === "FUNDING_FAILED") {
+          failed+=1;await this.#recordRunSetupFailure(run.runId,"FUNDING_ENDED");continue;
         }
         if (outcome.kind === "PLAN_CHANGED") {
           failed += 1;

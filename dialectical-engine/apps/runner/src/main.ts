@@ -8,8 +8,9 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, EntitlementRepository, RunRepository } from "@debateai/db";
+import { configureContentEncryption, createPool, EntitlementRepository, PostgresInternalAllowanceRepository, RunRepository } from "@debateai/db";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
+import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -224,13 +225,22 @@ const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans
 if (costEnvelopePolicy !== null && billingPlans === null) {
   console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
 }
+const fundingEntitlements = new EntitlementRepository(pool);
+const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
+const selectedFunding = await allowances.readPolicy();
+if (selectedFunding !== null && (environment.DEPLOYMENT_MODE !== "hosted" || envelopeBand === null || billingPlans === null))
+  throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing and finite envelope members");
+const fundingAllowance = selectedFunding === null || billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
+  allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
+  plans:billingPlans,registerVersion:environment.REGISTER_VERSION,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
+});
 const sharedWallTerms = costEnvelopePolicy === null
   ? null
   : Object.freeze({
       finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints,
       persons: billingPlans === null
         ? plansUnresolvedPersonAllowance()
-        : new BillingPersonAllowanceSource({
+        : fundingAllowance ?? new BillingPersonAllowanceSource({
             entitlements: new EntitlementRepository(pool).readOnlyPort(),
             plans: billingPlans,
             closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints
@@ -246,7 +256,8 @@ const costEnvelopeGuard = costEnvelopePolicy === null
       // BOTH money rows, which refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT)
       // when the day cannot hold one full run plus its story.
       policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy),
-      ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms })
+      ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
+      ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance})
     });
 /**
  * B9 (budget spec §2.10) — A LIMIT BELOW ONE CALL REFUSES THIS BOOT

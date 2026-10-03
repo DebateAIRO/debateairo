@@ -5,5 +5,12 @@
   "billing.usage.day": "Dziś",
   "billing.usage.week": "W tym tygodniu",
   "billing.usage.month": "W tym miesiącu",
-  "billing.usage.resets": "Odnawia się: {time}"
+  "billing.usage.resets": "Odnawia się: {time}",
+  "billing.usage.internalTitle": "Finansowanie wewnętrzne",
+  "billing.usage.internalLine": "Finansowanie wewnętrzne · Dziś {dayPct}% · W tym tygodniu {weekPct}% · Całkowity grant {grantPct}%",
+  "billing.usage.grant": "Całkowity grant",
+  "billing.usage.expires": "Wygasa {time}",
+  "newDebate.room.internalGrantFull": "Środki z grantu wewnętrznego zostały wykorzystane. Wygasa {time}.",
+  "newDebate.room.internalWindowFull": "Osiągnięto limit okresu finansowania wewnętrznego. Sprawdź ponownie {time}.",
+  "newDebate.room.internalClose": "Twoje finansowanie wewnętrzne zbliża się do ustalonego limitu."
 }

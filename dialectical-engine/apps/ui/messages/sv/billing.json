@@ -5,5 +5,12 @@
   "billing.usage.day": "I dag",
   "billing.usage.week": "Den här veckan",
   "billing.usage.month": "Den här månaden",
-  "billing.usage.resets": "Återställs: {time}"
+  "billing.usage.resets": "Återställs: {time}",
+  "billing.usage.internalTitle": "Intern finansiering",
+  "billing.usage.internalLine": "Intern finansiering · I dag {dayPct}% · Den här veckan {weekPct}% · Totalt bidrag {grantPct}%",
+  "billing.usage.grant": "Totalt bidrag",
+  "billing.usage.expires": "Upphör {time}",
+  "newDebate.room.internalGrantFull": "Det interna bidraget är förbrukat. Det upphör {time}.",
+  "newDebate.room.internalWindowFull": "Gränsen för den interna finansieringsperioden har nåtts. Kontrollera igen {time}.",
+  "newDebate.room.internalClose": "Din interna finansiering närmar sig sin fastställda gräns."
 }

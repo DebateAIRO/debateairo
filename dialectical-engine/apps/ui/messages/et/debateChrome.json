@@ -280,5 +280,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinaator lükkas paketi valiku tagasi. Valige Tasuta või Premium ja proovige seejärel uuesti.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinaator lükkas taotluse tagasi: üks selle paketi jaoks vajalik mudel pole praegu saadaval. Proovige hiljem uuesti või valige teine pakett.",
   "requestFailure.kind.ALREADY_WAITING": "Korraga saab oodata ainult üks küsimus. Esitage see küsimus, kui teie ootel väitlus on alanud.",
-  "requestFailure.kind.UNCLASSIFIED": "Taotlus nurjus enne vastuse saabumist, mistõttu tulemus pole teada. Koordinaator ei teinud seda otsust."
+  "requestFailure.kind.UNCLASSIFIED": "Taotlus nurjus enne vastuse saabumist, mistõttu tulemus pole teada. Koordinaator ei teinud seda otsust.",
+  "debateChrome.error.fundingEnded": "Selle ootel arutelu sisemine rahastus lõppes. Küsi uuesti, et kasutada oma praegust limiiti."
 }

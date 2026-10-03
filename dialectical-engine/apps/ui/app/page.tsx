@@ -53,7 +53,7 @@ export default async function HomePage({
   // debates in the words /new uses, so it reads that catalogue too — only the
   // two values that message prints, as the composer's props ship to the browser.
   const newDebateCatalog = dailyLimitMessageCatalog(await loadNamespace(locale, "newDebate"));
-  const roomCatalog = composerRoomCatalog(await loadNamespace(locale, "newDebate"));
+  const roomCatalog = composerRoomCatalog(await loadNamespace(locale, "newDebate"),await loadNamespace(locale,"billing"));
   let debates: DebateSummary[] = [];
   let error: string | null = null;
   let sessionConfirmed = false;

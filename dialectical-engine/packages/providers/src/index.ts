@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { z } from "zod";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
 
@@ -885,7 +885,7 @@ export interface ProviderCostEnvelopeSeam {
     requestBytes: number;
     /** This attempt's `max_tokens`, which a length retry raises (W10/2). */
     completionTokenCeiling: number;
-  }>) => void | Promise<void>;
+  }>) => void | ProviderCallAdmission | Promise<void | ProviderCallAdmission>;
   /**
    * CHARGE what the vendor billed. Called for every attempt that produced a
    * response body, whatever the engine then decides about it, and it NEVER
@@ -894,6 +894,7 @@ export interface ProviderCostEnvelopeSeam {
    */
   readonly recordCall: (observed: Readonly<{
     providerRef: string;
+    admission?: ProviderCallAdmission;
     /**
      * The vendor's usage block EXACTLY as it arrived — not the strict parse.
      * A malformed count does not make a billed call free (Important 1), so the
@@ -945,6 +946,8 @@ export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
   // HERE, inside the attempt loop, and a retry would be a second billed call
   // for the same unrepresentable number.
   "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "INTERNAL_PROVIDER_FRAME_INVALID",
+  "INTERNAL_PROVIDER_SETTLEMENT_UNCERTAIN",
   // B9 (budget spec §2.9): the seam's shared wall raises the day mid-run under
   // the new settings, before sending; retrying a day that is spent would be as
   // pointless as retrying a run that is.
@@ -1191,7 +1194,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
        * no ledger row and burns nothing of the attempt ceiling, exactly as
        * `assertAttemptAllowed` above does.
        */
-      await request.costEnvelope?.assertCallAllowed({
+      const costAdmission = await request.costEnvelope?.assertCallAllowed({
         requestBytes: Buffer.byteLength(body, "utf8"),
         completionTokenCeiling: attemptTokenCeiling
       });
@@ -1334,6 +1337,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         await request.costEnvelope?.recordCall({
           providerRef: request.providerRef,
           usage: rawUsage,
+          ...(costAdmission === undefined ? {} : {admission:costAdmission}),
           // The SAME two facts `assertCallAllowed` decided against above, so a
           // charge that falls back to the projection can never exceed what the
           // per-run gate already admitted for this attempt.

@@ -47,19 +47,23 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
     catalog?: MessageCatalog;
     locale?: LocaleCode;
 }) {
-    const api = useMemo(() => client ?? createStaffApiClient(), [client]);
+    const baseApi = useMemo(() => client ?? createStaffApiClient(), [client]);
     const generation = useRef(0);
-    const [enrollment, setEnrollment] = useState<StaffEnrollmentResponse | null>(null);
+    const [enrollment, setEnrollment] = useState<Awaited<ReturnType<StaffApiClient["enrollment"]>> | null>(null);
+    const selectedVersion = enrollment !== null && "funding_policy_version" in enrollment ? enrollment.funding_policy_version : undefined;
+    const api = useMemo(() => baseApi.withFundingPolicyVersion(selectedVersion),[baseApi,selectedVersion]);
+    const activeApi = useRef(api); activeApi.current=api;
+    useEffect(()=>()=>api.cancel(),[api]);
     const [self, setSelf] = useState<StaffElevationResponse | null>(null);
     const [team, setTeam] = useState<StaffTeamPage | null>(null);
     const [audit, setAudit] = useState<StaffAuditPage | null>(null);
     const [status, setStatus] = useState<string | null>(null);
     const [credentialId, setCredentialId] = useState<string | null>(null);
     const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
-    function clearAuthority() { generation.current++; api.cancel(); setSelf(null); setTeam(null); setAudit(null); }
+    function clearAuthority() { generation.current++; activeApi.current.cancel(); baseApi.cancel(); setSelf(null); setTeam(null); setAudit(null); }
     useEffect(() => {
         let active = true;
-        void api.enrollment().then((value) => {
+        void baseApi.enrollment().then((value) => {
             if (active)
                 setEnrollment(value);
         }, (failure: unknown) => {
@@ -74,7 +78,7 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
         const ended = () => { clearAuthority(); setEnrollment(null); setCredentialId(null); setStatus("staff.signIn"); };
         window.addEventListener("debateai:staff-session-ended", ended);
         return () => { active = false; generation.current++; api.cancel(); window.removeEventListener("debateai:staff-session-ended", ended); };
-    }, [api]);
+    }, [baseApi]);
     useEffect(() => {
         if (self === null)
             return;

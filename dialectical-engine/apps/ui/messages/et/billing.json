@@ -5,5 +5,12 @@
   "billing.usage.day": "Täna",
   "billing.usage.week": "Sel nädalal",
   "billing.usage.month": "Sel kuul",
-  "billing.usage.resets": "Lähtestub: {time}"
+  "billing.usage.resets": "Lähtestub: {time}",
+  "billing.usage.internalTitle": "Sisemine rahastus",
+  "billing.usage.internalLine": "Sisemine rahastus · Täna {dayPct}% · Sel nädalal {weekPct}% · Toetuse kogusumma {grantPct}%",
+  "billing.usage.grant": "Toetuse kogusumma",
+  "billing.usage.expires": "Aegub {time}",
+  "newDebate.room.internalGrantFull": "Sisemise toetuse maht on kasutatud. See aegub {time}.",
+  "newDebate.room.internalWindowFull": "Sisemise rahastuse perioodi piir on saavutatud. Kontrolli uuesti {time}.",
+  "newDebate.room.internalClose": "Sisemine rahastus läheneb oma määratud piirile."
 }

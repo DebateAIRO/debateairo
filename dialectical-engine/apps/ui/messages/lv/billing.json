@@ -5,5 +5,12 @@
   "billing.usage.day": "Šodien",
   "billing.usage.week": "Šonedēļ",
   "billing.usage.month": "Šomēnes",
-  "billing.usage.resets": "Atiestatās: {time}"
+  "billing.usage.resets": "Atiestatās: {time}",
+  "billing.usage.internalTitle": "Iekšējais finansējums",
+  "billing.usage.internalLine": "Iekšējais finansējums · Šodien {dayPct}% · Šonedēļ {weekPct}% · Kopējā dotācija {grantPct}%",
+  "billing.usage.grant": "Kopējā dotācija",
+  "billing.usage.expires": "Beidzas {time}",
+  "newDebate.room.internalGrantFull": "Iekšējās dotācijas līdzekļi ir izlietoti. Tā beidzas {time}.",
+  "newDebate.room.internalWindowFull": "Sasniegts iekšējā finansējuma perioda limits. Pārbaudiet vēlreiz {time}.",
+  "newDebate.room.internalClose": "Jūsu iekšējais finansējums tuvojas noteiktajam limitam."
 }

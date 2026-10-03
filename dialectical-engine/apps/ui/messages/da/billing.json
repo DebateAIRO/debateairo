@@ -5,5 +5,12 @@
   "billing.usage.day": "I dag",
   "billing.usage.week": "Denne uge",
   "billing.usage.month": "Denne måned",
-  "billing.usage.resets": "Nulstilles: {time}"
+  "billing.usage.resets": "Nulstilles: {time}",
+  "billing.usage.internalTitle": "Intern finansiering",
+  "billing.usage.internalLine": "Intern finansiering · I dag {dayPct}% · Denne uge {weekPct}% · Tilskud i alt {grantPct}%",
+  "billing.usage.grant": "Tilskud i alt",
+  "billing.usage.expires": "Udløber {time}",
+  "newDebate.room.internalGrantFull": "Det interne tilskud er brugt op. Det udløber {time}.",
+  "newDebate.room.internalWindowFull": "Grænsen for den interne finansieringsperiode er nået. Tjek igen {time}.",
+  "newDebate.room.internalClose": "Din interne finansiering nærmer sig sin fastsatte grænse."
 }

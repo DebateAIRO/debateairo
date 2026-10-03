@@ -294,5 +294,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordynator odrzucił wybór planu. Wybierz Bezpłatny lub Premium, a następnie ponów próbę.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordynator odrzucił żądanie: model wymagany przez ten plan jest obecnie niedostępny. Ponów próbę później lub wybierz inny plan.",
   "requestFailure.kind.ALREADY_WAITING": "Naraz może czekać tylko jedno pytanie. Zadaj to pytanie, gdy rozpocznie się Twoja oczekująca debata.",
-  "requestFailure.kind.UNCLASSIFIED": "Błąd wystąpił przed nadejściem odpowiedzi, dlatego nie wiadomo, jaki jest wynik żądania. Nie jest to decyzja koordynatora."
+  "requestFailure.kind.UNCLASSIFIED": "Błąd wystąpił przed nadejściem odpowiedzi, dlatego nie wiadomo, jaki jest wynik żądania. Nie jest to decyzja koordynatora.",
+  "debateChrome.error.fundingEnded": "Finansowanie wewnętrzne tej oczekującej debaty zakończyło się. Zadaj pytanie ponownie, aby skorzystać z obecnego limitu."
 }

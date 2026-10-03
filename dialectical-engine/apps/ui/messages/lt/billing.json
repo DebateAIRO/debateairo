@@ -5,5 +5,12 @@
   "billing.usage.day": "Šiandien",
   "billing.usage.week": "Šią savaitę",
   "billing.usage.month": "Šį mėnesį",
-  "billing.usage.resets": "Atsinaujina: {time}"
+  "billing.usage.resets": "Atsinaujina: {time}",
+  "billing.usage.internalTitle": "Vidinis finansavimas",
+  "billing.usage.internalLine": "Vidinis finansavimas · Šiandien {dayPct}% · Šią savaitę {weekPct}% · Visa dotacija {grantPct}%",
+  "billing.usage.grant": "Visa dotacija",
+  "billing.usage.expires": "Galioja iki {time}",
+  "newDebate.room.internalGrantFull": "Vidinės dotacijos lėšos išnaudotos. Galioja iki {time}.",
+  "newDebate.room.internalWindowFull": "Pasiekta vidinio finansavimo laikotarpio riba. Patikrinkite dar kartą {time}.",
+  "newDebate.room.internalClose": "Jūsų vidinis finansavimas artėja prie nustatytos ribos."
 }

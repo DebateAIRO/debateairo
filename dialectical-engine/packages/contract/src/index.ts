@@ -168,7 +168,7 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
  * The same four words as `SpendScope` in @debateai/budget (the contract cannot
  * import it); tests/unit/b6a-waiting-projection.test.ts reads both.
  */
-export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]);
 
 /**
  * Final review Part 1b, Important 1 — WHY A QUESTION WAITS when no reset is
@@ -181,7 +181,7 @@ export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK",
  * tests/unit/b6a-waiting-projection.test.ts reads both.
  */
 export const WaitsForSchema = z.enum(["OWN_DEBATES"]);
-const PERSON_SCOPES: ReadonlySet<string> = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+const PERSON_SCOPES: ReadonlySet<string> = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]);
 
 /**
  * Paid plans (spec 2026-09-29 §2.3.4): the gauges the SERVER decided for an
@@ -262,9 +262,9 @@ export const AskRoomQuerySchema = z.object({
  * about, when that limit resets or the waiting question starts, the person's own
  * waiting run, and their plan. Never a figure (I6: figures are a capacity oracle).
  */
-export const AskRoomResponseSchema = z.object({
+const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
-  scope: SpendScopeSchema.nullable(),
+  scope: z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]).nullable(),
   resets_at: z.iso.datetime().nullable(),
   waiting_run_ref: z.string().min(1).nullable(),
   plan_id: PlanIdSchema.nullable(),
@@ -288,10 +288,22 @@ export const AskRoomResponseSchema = z.object({
     context.addIssue({ code: "custom", message: "a question that would wait says when it would start" });
   }
 });
+const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
+const InternalAskRoomResponseSchema = z.object({
+  room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
+  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional()
+}).strict().superRefine((answer,context)=>{
+  if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
+    || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))
+    || ((answer.room==="FULL" || answer.room==="ALREADY_WAITING") && answer.resets_at===null)
+    || (answer.waits_for!==undefined && (!(answer.room==="FULL" || answer.room==="ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope??""))))
+    context.addIssue({code:"custom",message:"Internal room state is inconsistent"});
+});
+export const AskRoomResponseSchema = z.union([CustomerAskRoomResponseSchema,InternalAskRoomResponseSchema]);
 export type AskRoomResponse = z.infer<typeof AskRoomResponseSchema>;
 
 /** Paid-plans spec §1.2 (U1): GET /v1/billing/usage — whole percentages per window, never an amount. */
-export const BillingUsageResponseSchema = z.object({
+const CustomerBillingUsageResponseSchema = z.object({
   plan_id: PlanIdSchema,
   windows: z.array(z.object({
     scope: z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]),
@@ -299,6 +311,10 @@ export const BillingUsageResponseSchema = z.object({
     resets_at: z.iso.datetime()
   }).strict()).max(3)
 }).strict();
+const InternalBillingUsageResponseSchema = z.object({
+ plan_id:z.null(),funding:InternalFundingUsageSchema,windows:z.array(z.object({scope:z.enum(["PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]),percent:z.number().int().min(0).max(100),resets_at:z.iso.datetime()}).strict()).min(1).max(3)
+}).strict();
+export const BillingUsageResponseSchema = z.union([CustomerBillingUsageResponseSchema,InternalBillingUsageResponseSchema]);
 export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
 
 /**

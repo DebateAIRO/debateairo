@@ -1,7 +1,7 @@
 import type { Pool } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import type { InternalAllowanceConfigure, InternalAllowancePolicy, InternalAllowanceReadPort, InternalAllowanceRevoke,
-  InternalGrant, SecurityReceipt, StaffContext } from "@debateai/kernel";
+  InternalGrant, InternalRunFundingState, SecurityReceipt, StaffContext } from "@debateai/kernel";
 import { guardedAuthorityQuery } from "./staff-access.js";
 import type { StaffMutation } from "./staff-access.js";
 
@@ -14,6 +14,7 @@ export type InternalAllowanceConfigureCommand = StaffMutation & InternalAllowanc
 export type InternalAllowanceRevokeCommand = StaffMutation & InternalAllowanceRevoke;
 export interface InternalAllowancePort extends InternalAllowanceReadPort {
   readPolicy(): Promise<SelectedInternalAllowancePolicy | null>;
+  readRunState(runId:string):Promise<InternalRunFundingState>;
   readSelfCommand(context: StaffContext, ordinaryTokenHash: string, grantId: string | null): Promise<InternalAllowanceCommandState>;
   configure(input: InternalAllowanceConfigureCommand): Promise<SecurityReceipt>;
   revoke(input: InternalAllowanceRevokeCommand): Promise<SecurityReceipt>;
@@ -96,6 +97,12 @@ export class PostgresInternalAllowanceRepository implements InternalAllowancePor
   async forRun(runId: string, now: Date): Promise<InternalGrant | null> {
     const result = await this.pool.query<{ value: unknown }>("SELECT billing.read_internal_allowance_for_run($1::uuid,$2::timestamptz) AS value", [identifier(runId), instant(now)]);
     return grantFrom(result.rows[0]?.value, this.registerVersion);
+  }
+  async readRunState(runId:string):Promise<InternalRunFundingState> {
+    const result=await this.pool.query<{state:unknown}>("SELECT billing.read_internal_run_state($1::uuid) AS state",[identifier(runId)]);
+    const state=result.rows[0]?.state;
+    if(typeof state!=="string" || !["ACTIVE","HELD","EXPIRED","REVOKED","REPLACED","ERASED","UNAVAILABLE"].includes(state))throw refusal();
+    return state as InternalRunFundingState;
   }
   async configure(input: InternalAllowanceConfigureCommand): Promise<SecurityReceipt> {
     if (input.policyRegisterVersion !== this.registerVersion) throw refusal();

@@ -310,7 +310,8 @@ describe("the run's charge scope", () => {
     await expect(database.pool.query("DELETE FROM billing.entitlement_event")).rejects.toThrowError(/append-only/u);
     await expect(database.pool.query("UPDATE billing.run_charge_scope SET plan_id='MAX'")).rejects.toThrowError(/append-only/u);
     await expect(database.pool.query("TRUNCATE billing.entitlement_event")).rejects.toThrowError(/TRUNCATE_REJECTED/u);
-    await expect(database.pool.query("TRUNCATE billing.run_charge_scope")).rejects.toThrowError(/TRUNCATE_REJECTED/u);
+    await expect(database.pool.query("TRUNCATE billing.run_charge_scope")).rejects.toThrowError("cannot truncate a table referenced in a foreign key constraint");
+    await expect(database.pool.query("TRUNCATE billing.run_charge_scope CASCADE")).rejects.toThrowError(/TRUNCATE_REJECTED/u);
   });
 
   it("opens DELETE only to the retention purge's flag, never UPDATE, and never to the runtime role (A15, R-13)", async () => {

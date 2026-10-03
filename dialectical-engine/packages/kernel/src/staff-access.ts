@@ -201,3 +201,6 @@ export interface InternalAllowanceReadPort {
 export type StaffAccessEnvironment =
   | Readonly<{ policyVersion: 1 }>
   | Readonly<{ policyVersion: 2; origin: string; rpId: string; independentAlertConfigPath: string; operatorModulePath: string; operatorModuleSha256: string; internalAllowancePolicy?: Extract<InternalAllowancePolicy, { enabled: true }> }>;
+
+/** A run-scoped queue hint, never provider admission authority. */
+export type InternalRunFundingState = "ACTIVE" | "HELD" | "EXPIRED" | "REVOKED" | "REPLACED" | "ERASED" | "UNAVAILABLE";

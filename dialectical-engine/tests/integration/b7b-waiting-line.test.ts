@@ -337,7 +337,7 @@ describe("B7b the waiting line, woken", () => {
     now = new Date("2031-09-15T10:02:00.000Z");
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 2 });
     expect(dispatched).toEqual([waitingRunId, late.run_ref]);
-    expect(await chargeScopeOf(waitingRunId)).toBe("PLUS");
+    expect(await chargeScopeOf(waitingRunId)).toBe("FREE");
   });
 
   it("keeps the line across a restart: a new process wakes what the old one queued", async () => {
@@ -596,7 +596,7 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
     return { owner, entitlements, subscriptionId, anchor, waitingRunId, application, dispatched };
   }
 
-  it("records it FAILED as PLAN_CHANGED after a withdrawal, with no job, hold or charge scope, and it leaves the line", async () => {
+  it("records it FAILED as PLAN_CHANGED after withdrawal, retaining its original pin with no hold or admitted work, and it leaves the line", async () => {
     const { owner, entitlements, subscriptionId, waitingRunId, application } = await plusOwnerWaiting(new Date("2031-11-15T10:00:00.000Z"));
     const withdrawnAt = new Date("2031-10-15T12:00:40.000Z");
     await inTransaction((client) => entitlements.append(client, {
@@ -606,7 +606,7 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
     now = new Date("2031-10-15T12:01:00.000Z");
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 0, failed: 1 });
     expect(await jobsOf(waitingRunId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:PLAN_CHANGED" }]);
-    expect(await chargeScopeOf(waitingRunId)).toBeNull();
+    expect(await chargeScopeOf(waitingRunId)).toBe("PLUS");
     expect(await holdOf(waitingRunId)).toBeNull();
     expect(await waitingIds()).not.toContain(waitingRunId);
   });
@@ -620,7 +620,7 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
     expect(await jobsOf(waitingRunId)).toEqual([{ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:PLAN_CHANGED" }]);
   });
 
-  it("still starts it on a move between paid plans (PLUS → PRO), pinned to the new plan", async () => {
+  it("still starts it on a move between paid plans (PLUS → PRO), retaining its original PLUS pin", async () => {
     const { owner, entitlements, subscriptionId, anchor, waitingRunId, application, dispatched } =
       await plusOwnerWaiting(new Date("2031-11-15T10:00:00.000Z"));
     const upgradedAt = new Date("2031-10-15T12:00:40.000Z");
@@ -631,10 +631,10 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
     now = new Date("2031-10-15T12:01:00.000Z");
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
     expect(dispatched).toEqual([waitingRunId]);
-    expect(await chargeScopeOf(waitingRunId)).toBe("PRO");
+    expect(await chargeScopeOf(waitingRunId)).toBe("PLUS");
   });
 
-  it("still starts a Free question once its owner subscribes (FREE → PLUS)", async () => {
+  it("still starts a Free question once its owner subscribes (FREE → PLUS), retaining its original FREE pin", async () => {
     now = new Date("2031-10-20T12:00:00.000Z");
     estimate = 1_000;
     const owner = await activeOwner();
@@ -660,6 +660,6 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
     now = new Date("2031-10-20T12:01:00.000Z");
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1 });
     expect(dispatched).toEqual([waitingRunId]);
-    expect(await chargeScopeOf(waitingRunId)).toBe("PLUS");
+    expect(await chargeScopeOf(waitingRunId)).toBe("FREE");
   });
 });

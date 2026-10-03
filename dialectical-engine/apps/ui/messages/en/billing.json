@@ -5,5 +5,12 @@
   "billing.usage.day": "Today",
   "billing.usage.week": "This week",
   "billing.usage.month": "This month",
-  "billing.usage.resets": "Resets {time}"
+  "billing.usage.resets": "Resets {time}",
+  "billing.usage.internalTitle": "Internal funding",
+  "billing.usage.internalLine": "Internal funding · Today {dayPct}% · This week {weekPct}% · Grant total {grantPct}%",
+  "billing.usage.grant": "Grant total",
+  "billing.usage.expires": "Expires {time}",
+  "newDebate.room.internalGrantFull": "Internal grant allowance is used up. It expires {time}.",
+  "newDebate.room.internalWindowFull": "Your internal funding window is full. Recheck {time}.",
+  "newDebate.room.internalClose": "Your internal funding is close to its finite limit."
 }

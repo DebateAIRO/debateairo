@@ -273,5 +273,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinator menolak pilihan paket. Pilih Gratis atau Premium, lalu coba lagi.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator menolak permintaan tersebut: model yang diperlukan paket ini sedang tidak tersedia. Coba lagi nanti, atau pilih paket lain.",
   "requestFailure.kind.ALREADY_WAITING": "Hanya satu pertanyaan yang dapat menunggu dalam satu waktu. Ajukan pertanyaan ini setelah debat Anda yang menunggu dimulai.",
-  "requestFailure.kind.UNCLASSIFIED": "Permintaan gagal sebelum balasan diterima sehingga hasilnya tidak diketahui. Ini bukan keputusan yang dibuat oleh koordinator."
+  "requestFailure.kind.UNCLASSIFIED": "Permintaan gagal sebelum balasan diterima sehingga hasilnya tidak diketahui. Ini bukan keputusan yang dibuat oleh koordinator.",
+  "debateChrome.error.fundingEnded": "Pendanaan internal untuk debat yang menunggu ini telah berakhir. Ajukan kembali pertanyaan untuk menggunakan alokasi Anda saat ini."
 }

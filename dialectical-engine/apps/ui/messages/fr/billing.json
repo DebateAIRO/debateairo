@@ -5,5 +5,12 @@
   "billing.usage.day": "Aujourd’hui",
   "billing.usage.week": "Cette semaine",
   "billing.usage.month": "Ce mois-ci",
-  "billing.usage.resets": "Réinitialisation : {time}"
+  "billing.usage.resets": "Réinitialisation : {time}",
+  "billing.usage.internalTitle": "Financement interne",
+  "billing.usage.internalLine": "Financement interne · Aujourd’hui {dayPct}% · Cette semaine {weekPct}% · Total de la dotation {grantPct}%",
+  "billing.usage.grant": "Total de la dotation",
+  "billing.usage.expires": "Expire {time}",
+  "newDebate.room.internalGrantFull": "La dotation interne est épuisée. Elle expire {time}.",
+  "newDebate.room.internalWindowFull": "La limite de la période de financement interne est atteinte. Vérifiez à nouveau {time}.",
+  "newDebate.room.internalClose": "Votre financement interne approche de sa limite définie."
 }

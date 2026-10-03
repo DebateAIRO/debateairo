@@ -292,7 +292,8 @@
         "staff.owner_recovery_operation",
         "staff.funding_policy_selection",
         "billing.internal_grant",
-        "billing.internal_grant_event"
+        "billing.internal_grant_event",
+        "billing.internal_provider_admission"
       ],
       "ownsFunctions": [
         "staff.require_alert_readiness_jit",
@@ -351,7 +352,12 @@
         "billing.read_internal_allowance_for_run",
         "billing.guard_internal_charge_scope",
         "billing.record_internal_charge_scope",
-        "billing.read_run_funding_basis"
+        "billing.read_run_funding_basis",
+        "billing.read_internal_grant_spent",
+        "billing.read_internal_grant_commitments",
+        "billing.reserve_internal_provider_call",
+        "billing.settle_internal_provider_call",
+        "billing.read_internal_run_state"
       ]
     }
   ],
@@ -1904,6 +1910,27 @@
         "EXECUTE ON FUNCTION billing.read_internal_allowance_for_run(uuid,timestamptz)",
         "EXECUTE ON FUNCTION billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)",
         "EXECUTE ON FUNCTION billing.read_run_funding_basis(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0093_internal_provider_admission.sql",
+      "grants": [
+        "USAGE ON SCHEMA core,ledger",
+        "SELECT(run_id,register_version) ON core.run",
+        "SELECT(run_id,owner_ref,at_seq) ON core.run_ownership_event",
+        "SELECT(run_id,state) ON core.work_item",
+        "SELECT(run_id,held_micros) ON ledger.model_spend_hold",
+        "SELECT(spend_id,run_id,spend_source,provider_ref,charged_on,charge_micros,input_tokens,output_tokens,spend_phase,recorded_at), INSERT(spend_id,run_id,spend_source,provider_ref,charged_on,charge_micros,input_tokens,output_tokens,spend_phase) ON ledger.model_spend"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0093_internal_provider_admission.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean),billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)",
+        "EXECUTE ON FUNCTION billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text),billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION billing.read_internal_run_state(uuid)"
       ]
     }
   ],

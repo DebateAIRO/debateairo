@@ -80,7 +80,7 @@ export function createStaffApiClient({ fetchImplementation = fetch, apiBase = AP
         assertCurrent(epoch);
         return value;
     }
-    const enrollment = () => request("/enrollment", contract.StaffEnrollmentResponseSchema);
+    const enrollment = () => request("/enrollment", contract.SelectedStaffEnrollmentResponseSchema);
     const prerequisite = async (input: contract.StaffPrerequisiteStepUpRequest) => request("/prerequisites/step-up", contract.StaffPrerequisiteResponseSchema, "POST", checked(contract.StaffPrerequisiteStepUpRequestSchema, input));
     const beginRegistration = async (input: RegistrationInput) => {
         const value = checked(contract.StaffRegistrationOptionsRequestSchema, input);
@@ -132,7 +132,11 @@ export function createStaffApiClient({ fetchImplementation = fetch, apiBase = AP
             ? request(`${path}/grants`, contract.SecurityReceiptSchema, "PATCH", checked(contract.StaffGrantRequestSchema, mutation), true)
             : request(`${path}/disable`, contract.SecurityReceiptSchema, "POST", checked(contract.StaffDisableRequestSchema, mutation), true);
     }
-    return Object.freeze({ enrollment, prerequisite, beginRegistration, finishRegistration, beginElevation, finishElevation,
+    return Object.freeze({
+        withFundingPolicyVersion(version?: 1): StaffApiClient {
+            if (version !== undefined && version !== 1) throw new contract.ContractHttpError("INVALID_RESPONSE",200,"STAFF_RESPONSE_INVALID");
+            return createStaffApiClient({fetchImplementation,apiBase,browser,...(version === undefined ? {} : {fundingPolicyVersion:version})});
+        }, enrollment, prerequisite, beginRegistration, finishRegistration, beginElevation, finishElevation,
         beginAction, finishAction, beginInvitation, finishInvitation, acceptInvitation, beginPossession, finishPossession, proveAction, mutate,
         cancel,
         async register(input: RegistrationInput) {

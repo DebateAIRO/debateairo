@@ -1,4 +1,5 @@
 "use client";
+import { fundingFailureMessage } from "@/lib/billing/fundingFailure";
 
 import { AiNotice } from "@/components/AiNotice";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
@@ -760,7 +761,7 @@ export default function DebatePageClient({
       // poll). Without this, a debate that arrives after a transient failure
       // would stay stuck behind an old error (see the `error && !debate` gate).
       setError(bundle.kind === "failed"
-        ? t(debateChromeCatalog, "debateChrome.error.debateGenerationFailed", {
+        ? fundingFailureMessage(bundle.run.terminal_reason,debateChromeCatalog) ?? t(debateChromeCatalog, "debateChrome.error.debateGenerationFailed", {
             reason: bundle.run.terminal_reason ?? ""
           })
         : null);

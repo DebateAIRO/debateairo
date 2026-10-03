@@ -287,5 +287,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Koordinators noraidīja plāna izvēli. Izvēlieties Bezmaksas vai Premium un pēc tam mēģiniet vēlreiz.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinators pieprasījumu noraidīja: kāds no šim plānam nepieciešamajiem modeļiem pašlaik nav pieejams. Mēģiniet vēlreiz vēlāk vai izvēlieties otru plānu.",
   "requestFailure.kind.ALREADY_WAITING": "Vienlaikus gaidīt var tikai viens jautājums. Uzdodiet šo jautājumu, kad būs sākušās jūsu gaidošās debates.",
-  "requestFailure.kind.UNCLASSIFIED": "Darbība neizdevās, pirms tika saņemta atbilde, tāpēc iznākums nav zināms. Koordinators šādu lēmumu nepieņēma."
+  "requestFailure.kind.UNCLASSIFIED": "Darbība neizdevās, pirms tika saņemta atbilde, tāpēc iznākums nav zināms. Koordinators šādu lēmumu nepieņēma.",
+  "debateChrome.error.fundingEnded": "Šīs gaidošās diskusijas iekšējais finansējums ir beidzies. Uzdodiet jautājumu vēlreiz, lai izmantotu pašreizējo kvotu."
 }

@@ -5,5 +5,12 @@
   "billing.usage.day": "Illum",
   "billing.usage.week": "Din il-ġimgħa",
   "billing.usage.month": "Dan ix-xahar",
-  "billing.usage.resets": "Jerġa’ jibda: {time}"
+  "billing.usage.resets": "Jerġa’ jibda: {time}",
+  "billing.usage.internalTitle": "Finanzjament intern",
+  "billing.usage.internalLine": "Finanzjament intern · Illum {dayPct}% · Din il-ġimgħa {weekPct}% · Għotja totali {grantPct}%",
+  "billing.usage.grant": "Għotja totali",
+  "billing.usage.expires": "Jiskadi {time}",
+  "newDebate.room.internalGrantFull": "L-allokazzjoni tal-għotja interna ntużat kollha. Tiskadi {time}.",
+  "newDebate.room.internalWindowFull": "Intlaħaq il-limitu tal-perjodu tal-finanzjament intern. Iċċekkja mill-ġdid {time}.",
+  "newDebate.room.internalClose": "Il-finanzjament intern tiegħek qed joqrob lejn il-limitu stabbilit."
 }

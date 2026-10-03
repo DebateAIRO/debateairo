@@ -5,5 +5,12 @@
   "billing.usage.day": "Сегодня",
   "billing.usage.week": "На этой неделе",
   "billing.usage.month": "В этом месяце",
-  "billing.usage.resets": "Сброс: {time}"
+  "billing.usage.resets": "Сброс: {time}",
+  "billing.usage.internalTitle": "Внутреннее финансирование",
+  "billing.usage.internalLine": "Внутреннее финансирование · Сегодня {dayPct}% · На этой неделе {weekPct}% · Всего по гранту {grantPct}%",
+  "billing.usage.grant": "Всего по гранту",
+  "billing.usage.expires": "Истекает {time}",
+  "newDebate.room.internalGrantFull": "Средства внутреннего гранта исчерпаны. Срок истекает {time}.",
+  "newDebate.room.internalWindowFull": "Достигнут лимит периода внутреннего финансирования. Проверьте снова {time}.",
+  "newDebate.room.internalClose": "Ваше внутреннее финансирование приближается к установленному лимиту."
 }

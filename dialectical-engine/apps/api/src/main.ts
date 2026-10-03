@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -61,6 +61,7 @@ import {
 } from "@debateai/budget";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
+import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
@@ -480,9 +481,16 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
       }
       const spend = new PostgresModelSpendStore(pool);
       const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
+      const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
+      const selectedFunding = await allowances.readPolicy();
+      const configuredFunding = environment.STAFF_ACCESS.policyVersion === 2 ? environment.STAFF_ACCESS.internalAllowancePolicy : undefined;
+      if ((selectedFunding === null) !== (configuredFunding === undefined)) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
+      const fundedAllowance = selectedFunding === null ? undefined : entitlements === null || billingPlans === null
+        ? (()=>{throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing");})()
+        : new FundingAwarePersonAllowanceSource({allowances,entitlements,plans:billingPlans,registerVersion:environment.REGISTER_VERSION,closeBasisPoints:band.closeBasisPoints});
       const personAllowance = entitlements === null || billingPlans === null
         ? NO_PERSON_ALLOWANCE
-        : new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
+        : fundedAllowance ?? new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
       const estimator = new RecentRunsCostEstimator({
         source: new PostgresRecentRunUsageSource(pool),
         prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
@@ -496,6 +504,7 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
         personAllowance,
         entitlements,
         billingPlans,
+        ...(fundedAllowance === undefined ? {} : {funding:fundedAllowance}),
         dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
         closeBasisPoints: band.closeBasisPoints,
         waitingLinePerPerson: band.waitingLinePerPerson
@@ -518,6 +527,7 @@ const askBilling: AskBilling | undefined = askRoomComposition === undefined
   ? undefined
   : Object.freeze({
       plans: askRoomComposition.billingPlans,
+      ...(askRoomComposition.personAllowance instanceof FundingAwarePersonAllowanceSource ? {funding:askRoomComposition.personAllowance} : {}),
       entitlements: askRoomComposition.entitlements,
       coarseFit: Object.freeze({
         personAllowance: askRoomComposition.personAllowance,
@@ -983,6 +993,7 @@ const billingRouteOptions: BillingRouteOptions | undefined =
         usage: new PersonUsageReader({
           entitlements: askRoomComposition.entitlements,
           allowance: askRoomComposition.personAllowance,
+          ...(askRoomComposition.personAllowance instanceof FundingAwarePersonAllowanceSource ? {funding:askRoomComposition.personAllowance} : {}),
           spend: askRoomComposition.spend
         })
       });

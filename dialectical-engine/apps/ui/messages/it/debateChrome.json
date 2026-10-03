@@ -287,5 +287,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Il coordinatore ha rifiutato il piano selezionato. Scegli Gratuito o Premium, quindi riprova.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Il coordinatore ha rifiutato la richiesta: un modello necessario per questo piano non è al momento disponibile. Riprova più tardi oppure scegli l’altro piano.",
   "requestFailure.kind.ALREADY_WAITING": "Può restare in attesa una sola domanda alla volta. Fai questa domanda dopo l’avvio del tuo dibattito in attesa.",
-  "requestFailure.kind.UNCLASSIFIED": "Si è verificato un errore prima che arrivasse una risposta, quindi l’esito è sconosciuto. Non si tratta di una decisione del coordinatore."
+  "requestFailure.kind.UNCLASSIFIED": "Si è verificato un errore prima che arrivasse una risposta, quindi l’esito è sconosciuto. Non si tratta di una decisione del coordinatore.",
+  "debateChrome.error.fundingEnded": "Il finanziamento interno per questo dibattito in attesa è terminato. Ripeti la domanda per usare la tua disponibilità attuale."
 }

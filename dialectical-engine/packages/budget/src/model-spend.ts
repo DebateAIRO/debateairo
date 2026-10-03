@@ -48,6 +48,8 @@ import {
   type ProviderTargetPrice,
   type RunCostEnvelopeDecision
 } from "./cost-envelope.js";
+import type { FundingBasis, ProviderCallAdmission } from "@debateai/kernel";
+import type { SpendScope } from "./person-allowance.js";
 import type { PersonAllowanceSource } from "./person-allowance.js";
 import { decideSharedWall } from "./room.js";
 
@@ -86,6 +88,8 @@ export interface ModelSpendEntry {
  */
 export interface ModelSpendStore {
   recordSpend(entry: ModelSpendEntry): Promise<void>;
+  reserveInternalCall?(input: Readonly<{ callId: string; runId: string; projectedMicros: number; spendSource: "RUN" | "STORY"; spendPhase: CostEnvelopePhase | null }>): Promise<boolean>;
+  settleInternalCall?(callId: string, entry: ModelSpendEntry): Promise<void>;
   /**
    * Everything this ONE run's DEBATE has been charged, across every vendor it
    * touched. STORY charges are excluded: the story has its own envelope.
@@ -121,7 +125,7 @@ export interface ProviderCostSeam {
   assertCallAllowed(projection: Readonly<{
     requestBytes: number;
     completionTokenCeiling: number;
-  }>): Promise<void>;
+  }>): Promise<void | ProviderCallAdmission>;
   /**
    * I4: charges what the vendor billed, and never refuses. `projection` is the
    * call's own pre-send maximum, used for a count the vendor's block carries
@@ -130,6 +134,7 @@ export interface ProviderCostSeam {
   recordCall(observed: Readonly<{
     providerRef: string;
     usage: unknown;
+    admission?: ProviderCallAdmission;
     projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
   }>): Promise<void>;
   /** I4: the hosted requirement, asked only of a successful completion. */
@@ -148,7 +153,7 @@ export interface ProviderCostSeam {
  */
 export interface RunOwnerSpendReader {
   readRunChargeOwnerRef(runId: string): Promise<string | null>;
-  readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number>;
+  readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: SpendScope): Promise<number>;
 }
 
 /**
@@ -254,6 +259,7 @@ export interface CostEnvelopeGuardInput {
    * way is held to its own ceiling alone.
    */
   readonly sharedWall?: SharedWallInput;
+  readonly fundingAdmission?: Readonly<{ assertProviderFundingAdmission(runId: string, now: Date): Promise<void> }>;
 }
 
 export const DEFAULT_RESERVATION_TTL_MS = 1_800_000 as const;
@@ -426,12 +432,17 @@ export class CostEnvelopeGuard {
   readonly #clock: () => Date;
   readonly #reservationTtlMs: number;
   readonly #sharedWall: SharedWallInput | null;
+  readonly #fundingAdmission: CostEnvelopeGuardInput["fundingAdmission"];
 
   constructor(input: CostEnvelopeGuardInput) {
     if (input?.store === undefined || input?.policy === undefined) {
       throw new TypeError("COST_ENVELOPE_GUARD_INPUT_INVALID");
     }
     this.#store = input.store;
+    this.#fundingAdmission = input.fundingAdmission;
+    if ((input.fundingAdmission !== undefined || input.store.reserveInternalCall !== undefined || input.store.settleInternalCall !== undefined)
+      && (typeof input.store.reserveInternalCall !== "function" || typeof input.store.settleInternalCall !== "function"))
+      throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Finite provider funding requires both atomic accounting adapters");
     this.#policy = input.policy;
     const storyCeiling = input.policy.perStoryCeilingMicros;
     if (storyCeiling !== undefined && (!Number.isSafeInteger(storyCeiling) || storyCeiling < 1)) {
@@ -550,6 +561,7 @@ export class CostEnvelopeGuard {
         "A metered provider seam needs a price of at least one micro-unit per million tokens"
       );
     }
+    const admissions = new WeakSet<ProviderCallAdmission>();
     return {
       assertCallAllowed: async (projection) => {
         const projectedMicros = projectedCallCeilingMicros(input.price, projection);
@@ -563,6 +575,14 @@ export class CostEnvelopeGuard {
         if (walled && this.#sharedWall !== null) {
           await this.#assertSharedWall(this.#sharedWall, input.runId, projectedMicros);
         }
+        await this.#fundingAdmission?.assertProviderFundingAdmission(input.runId, this.#clock());
+        const callId = randomUUID();
+        if (this.#store.reserveInternalCall === undefined) return;
+        const internal = await this.#store.reserveInternalCall({ callId, runId: input.runId, projectedMicros, spendSource, spendPhase: phase });
+        if (typeof internal !== "boolean") throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Provider funding admission returned no decision");
+        const admission: ProviderCallAdmission = Object.freeze({kind:internal ? "INTERNAL" : "ORDINARY",callId});
+        admissions.add(admission);
+        return admission;
       },
       // I4: charging never refuses. Nothing is written for a call whose vendor
       // said nothing at all about usage — a zero row would read as "this call
@@ -571,6 +591,9 @@ export class CostEnvelopeGuard {
       // cannot read is charged at the call's own projected maximum, because the
       // vendor billed for it either way.
       recordCall: async (observed) => {
+        const admission = observed.admission;
+        if (this.#store.reserveInternalCall !== undefined && (admission === undefined || !admissions.has(admission)))
+          throw new TypedDomainError("INTERNAL_PROVIDER_FRAME_INVALID","Settlement requires this seam's immutable admitted frame");
         /**
          * Round 2, Critical B — THE CHARGE COMPUTATION MAY ONLY FAIL TYPED.
          *
@@ -595,8 +618,8 @@ export class CostEnvelopeGuard {
               + ` ${error instanceof Error ? error.message : String(error)}`
           );
         }
-        await this.#store.recordSpend(Object.freeze({
-          spendId: randomUUID(),
+        const entry = Object.freeze({
+          spendId: admission?.kind === "INTERNAL" ? admission.callId : randomUUID(),
           spendSource: envelope.spendSource,
           runId: input.runId,
           providerRef: observed.providerRef,
@@ -606,7 +629,15 @@ export class CostEnvelopeGuard {
           outputTokens: usage.completionTokens,
           // Task M1 (R12): a RUN charge says which part of the run spent it.
           ...(phase === null ? {} : { spendPhase: phase })
-        }));
+        });
+        if (admission?.kind === "INTERNAL") {
+          try { await this.#store.settleInternalCall!(admission.callId, entry); }
+          catch {
+            // The provider already ran. Unknown commit outcome can only replay
+            // this same immutable settlement; retrying provider bytes would pay twice.
+            throw new TypedDomainError("INTERNAL_PROVIDER_SETTLEMENT_UNCERTAIN","The admitted internal provider settlement needs reconciliation");
+          }
+        } else await this.#store.recordSpend(entry);
       },
       assertUsageReported: async (observed) => {
         if (!input.requireReportedUsage) return;
@@ -692,9 +723,9 @@ export class CostEnvelopeGuard {
     }
     const ownerRef = await wall.owners.readRunChargeOwnerRef(runId);
     if (ownerRef === null) return;
-    for (const window of await wall.persons.read(ownerRef, now)) {
+    for (const window of await wall.persons.read(ownerRef, now, { runId })) {
       if (decideSharedWall({
-        spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt),
+        spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope),
         projectedMicros,
         limitMicros: window.limitMicros,
         finishBasisPoints: window.finishBasisPoints
@@ -749,6 +780,17 @@ export class CostEnvelopeGuard {
  */
 export class PostgresModelSpendStore implements ModelSpendStore {
   constructor(private readonly pool: Pool) {}
+
+  async reserveInternalCall(input: Readonly<{ callId: string; runId: string; projectedMicros: number; spendSource: "RUN" | "STORY"; spendPhase: CostEnvelopePhase | null }>): Promise<boolean> {
+    const result = await this.pool.query<{ internal: unknown }>("SELECT billing.reserve_internal_provider_call($1::uuid,$2::uuid,$3::bigint,$4::text,$5::text) AS internal",
+      [input.callId,input.runId,input.projectedMicros,input.spendSource,input.spendPhase]);
+    if (typeof result.rows[0]?.internal !== "boolean") throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE", "Provider funding admission returned no decision");
+    return result.rows[0].internal;
+  }
+  async settleInternalCall(callId: string, entry: ModelSpendEntry): Promise<void> {
+    await this.pool.query("SELECT billing.settle_internal_provider_call($1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::bigint,$7::bigint,$8::bigint)",
+      [callId,entry.runId,entry.spendSource,entry.spendPhase ?? null,entry.providerRef,entry.chargeMicros,entry.inputTokens,entry.outputTokens]);
+  }
 
   async recordSpend(entry: ModelSpendEntry): Promise<void> {
     if ((entry.spendSource === "RUN" || entry.spendSource === "STORY") && entry.runId === null) {
@@ -855,12 +897,18 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * and STORY charges of the runs `billing.run_charge_scope` pins to them whose
    * `recorded_at` falls in `[from, to)`. One indexed query per window.
    */
-  async readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> {
+  async readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: SpendScope): Promise<number> {
+    if (funding?.kind === "INTERNAL") {
+      const result = await this.pool.query<{ total: string }>(
+        "SELECT billing.read_internal_grant_spent($1::uuid,$4::uuid,$5::uuid,$2::timestamptz,$3::timestamptz,$6::boolean)::text AS total",
+        [ownerRef,from,to,funding.grantId,funding.grantEventId,scope === "PERSON_GRANT"]);
+      return this.#total(result.rows[0]?.total);
+    }
     const result = await this.pool.query<{ total: string }>(
       `SELECT coalesce(sum(spend.charge_micros),0)::text AS total
        FROM billing.run_charge_scope AS scope
        JOIN ledger.model_spend AS spend ON spend.run_id = scope.run_id
-       WHERE scope.owner_ref = $1::uuid
+       WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
          AND scope.admitted_at < $3
          AND spend.spend_source IN ('RUN','STORY')
          AND spend.recorded_at >= $2 AND spend.recorded_at < $3`,
@@ -873,7 +921,12 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * Paid-plans spec §2.4.2 (B6) — ONE PERSON'S COUNTED HOLDS: the unspent part
    * of each hold whose run is pinned to them and still has a READY or CLAIMED job.
    */
-  async readOwnerCountedHoldsMicros(ownerRef: string): Promise<number> {
+  async readOwnerCountedHoldsMicros(ownerRef: string, funding?: FundingBasis): Promise<number> {
+    if (funding?.kind === "INTERNAL") {
+      const result = await this.pool.query<{total:string}>("SELECT billing.read_internal_grant_commitments($1::uuid,$2::uuid,$3::uuid,NULL::uuid)::text AS total",
+        [ownerRef,funding.grantId,funding.grantEventId]);
+      return this.#total(result.rows[0]?.total);
+    }
     const result = await this.pool.query<{ total: string }>(
       `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
        FROM billing.run_charge_scope AS scope
@@ -882,7 +935,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
          SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
          WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
        ) AS spent ON true
-       WHERE scope.owner_ref = $1::uuid
+       WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
          AND EXISTS (
            SELECT 1 FROM core.work_item AS work
            WHERE work.run_id = hold.run_id AND work.state IN ('READY','CLAIMED')

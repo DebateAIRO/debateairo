@@ -5,5 +5,12 @@
   "billing.usage.day": "Tänään",
   "billing.usage.week": "Tällä viikolla",
   "billing.usage.month": "Tässä kuussa",
-  "billing.usage.resets": "Nollautuu: {time}"
+  "billing.usage.resets": "Nollautuu: {time}",
+  "billing.usage.internalTitle": "Sisäinen rahoitus",
+  "billing.usage.internalLine": "Sisäinen rahoitus · Tänään {dayPct}% · Tällä viikolla {weekPct}% · Avustus yhteensä {grantPct}%",
+  "billing.usage.grant": "Avustus yhteensä",
+  "billing.usage.expires": "Vanhenee {time}",
+  "newDebate.room.internalGrantFull": "Sisäinen avustus on käytetty loppuun. Se vanhenee {time}.",
+  "newDebate.room.internalWindowFull": "Sisäisen rahoitusjakson raja on saavutettu. Tarkista uudelleen {time}.",
+  "newDebate.room.internalClose": "Sisäinen rahoituksesi lähestyy määritettyä rajaansa."
 }

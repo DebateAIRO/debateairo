@@ -5,5 +5,12 @@
   "billing.usage.day": "今天",
   "billing.usage.week": "本周",
   "billing.usage.month": "本月",
-  "billing.usage.resets": "重置时间：{time}"
+  "billing.usage.resets": "重置时间：{time}",
+  "billing.usage.internalTitle": "内部资助",
+  "billing.usage.internalLine": "内部资助 · 今天 {dayPct}% · 本周 {weekPct}% · 资助总额 {grantPct}%",
+  "billing.usage.grant": "资助总额",
+  "billing.usage.expires": "到期时间 {time}",
+  "newDebate.room.internalGrantFull": "内部资助额度已用尽，到期时间为 {time}。",
+  "newDebate.room.internalWindowFull": "已达到内部资助周期上限，请在 {time} 再次查看。",
+  "newDebate.room.internalClose": "您的内部资助接近设定的上限。"
 }

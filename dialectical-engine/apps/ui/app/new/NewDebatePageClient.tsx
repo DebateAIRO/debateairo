@@ -156,13 +156,21 @@ function NewDebateForm({
   // is remembered once known: a later failed or plan-less read never clears it,
   // so the chooser below never comes back. Null with billing off or locally.
   const [decidedPlan, setDecidedPlan] = useState<DecidedPlan | null>(null);
+  const [internalFunding,setInternalFunding]=useState<Readonly<{kind:"INTERNAL";expires_at:string}>|null>(null);
+  const rememberFunding=useCallback((funding:Readonly<{kind:"INTERNAL";expires_at:string}>|null)=>setInternalFunding(funding),[]);
+  useEffect(()=>{
+    if(internalFunding===null)return;
+    let timer:ReturnType<typeof setTimeout>;
+    const expire=()=>{const remaining=Date.parse(internalFunding.expires_at)-Date.now();if(remaining<=0)setInternalFunding(null);else timer=setTimeout(expire,Math.min(2147483647,remaining));};
+    expire();return()=>clearTimeout(timer);
+  },[internalFunding]);
   const rememberPlan = useCallback((planId: DecidedPlan | null) => {
     if (planId !== null) setDecidedPlan(planId);
   }, []);
   useEffect(() => {
-    if (room !== null) rememberPlan(room.plan_id);
-  }, [room, rememberPlan]);
-  const decidedTier: PlanTier | null = decidedPlan === null ? null : decidedPlan === "FREE" ? "free" : "premium";
+    if (room !== null) { rememberPlan(room.plan_id); rememberFunding("funding" in room ? room.funding : null); }
+  }, [room, rememberPlan, rememberFunding]);
+  const decidedTier: PlanTier | null = internalFunding !== null ? "premium" : decidedPlan === null ? null : decidedPlan === "FREE" ? "free" : "premium";
   // Follow the decided tier ONCE per decision. Moving the form's tier changes
   // the room query and the room is read again; the guard keeps that re-read
   // from moving it a second time (or undoing what the person set since).
@@ -289,14 +297,14 @@ function NewDebateForm({
         <p className="ndEyebrow">{t(catalog, "newDebate.eyebrow")}</p>
         <h1 className="ndTitle">{t(catalog, "newDebate.title")}</h1>
         <div className="ndAiDisclosure"><AiNotice catalog={noticeCatalog} body={t(catalog, "newDebate.aiNotice")} /></div>
-        <UsageBars catalog={billingCatalog} locale={locale} onPlan={rememberPlan} />
+        <UsageBars catalog={billingCatalog} locale={locale} onPlan={rememberPlan} onFunding={rememberFunding} />
         <form onSubmit={submit} onKeyDown={onKeyDown}>
           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
           {consent.declined ? (
             <p className="sensitiveConsentDeclined" role="status">{t(homeCatalog, "home.sensitiveConsent.declined")}</p>
           ) : null}
 
-          {decidedPlan === null ? (
+          {decidedPlan === null && internalFunding === null ? (
             <div className="ndTier" role="radiogroup" aria-label={t(catalog, "newDebate.planTier")}>
               {PLAN_TIER_OPTIONS.map((option) => (
                 <button
@@ -332,7 +340,7 @@ function NewDebateForm({
             // decides the tier (B8), so there is nothing to choose. The page names
             // the person's plan; Free's settings below stay disabled, a paid
             // plan's stay editable.
-            <p className="ndPlanCurrent" data-plan={decidedPlan}>{t(catalog, CURRENT_PLAN_KEYS[decidedPlan])}</p>
+            <p className="ndPlanCurrent" data-plan={decidedPlan} data-funding={internalFunding?.kind}>{internalFunding === null ? t(catalog,CURRENT_PLAN_KEYS[decidedPlan!]) : t(billingCatalog,"billing.usage.internalTitle")}</p>
           )}
 
           <label className="srOnly" htmlFor="topic">
@@ -493,7 +501,7 @@ function NewDebateForm({
             </div>
           ) : null}
 
-          <RoomNotice room={room} catalog={catalog} locale={locale} />
+          <RoomNotice room={room} catalog={{...catalog,...billingCatalog}} locale={locale} />
           <div className="ndActions">
             <button data-support-primary-control type="submit" className="ndStart" disabled={!(ready || crisis.flags(topic)) || submitting || (room?.room === "ALREADY_WAITING" && !crisis.flags(topic))}>
               {t(catalog, submitting ? "newDebate.starting" : "newDebate.startRun")} <span aria-hidden>→</span>

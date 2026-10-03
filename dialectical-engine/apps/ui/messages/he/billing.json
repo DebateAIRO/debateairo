@@ -5,5 +5,12 @@
   "billing.usage.day": "היום",
   "billing.usage.week": "השבוע",
   "billing.usage.month": "החודש",
-  "billing.usage.resets": "מתאפס ב־{time}"
+  "billing.usage.resets": "מתאפס ב־{time}",
+  "billing.usage.internalTitle": "מימון פנימי",
+  "billing.usage.internalLine": "מימון פנימי · היום {dayPct}% · השבוע {weekPct}% · סך המענק {grantPct}%",
+  "billing.usage.grant": "סך המענק",
+  "billing.usage.expires": "יפוג בתאריך {time}",
+  "newDebate.room.internalGrantFull": "הקצבת המענק הפנימי נוצלה. היא תפוג בתאריך {time}.",
+  "newDebate.room.internalWindowFull": "הגעת למגבלת תקופת המימון הפנימי. יש לבדוק שוב בתאריך {time}.",
+  "newDebate.room.internalClose": "המימון הפנימי שלך מתקרב למגבלה שהוגדרה."
 }

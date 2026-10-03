@@ -5,5 +5,12 @@
   "billing.usage.day": "Сьогодні",
   "billing.usage.week": "Цього тижня",
   "billing.usage.month": "Цього місяця",
-  "billing.usage.resets": "Скидання: {time}"
+  "billing.usage.resets": "Скидання: {time}",
+  "billing.usage.internalTitle": "Внутрішнє фінансування",
+  "billing.usage.internalLine": "Внутрішнє фінансування · Сьогодні {dayPct}% · Цього тижня {weekPct}% · Усього за грантом {grantPct}%",
+  "billing.usage.grant": "Усього за грантом",
+  "billing.usage.expires": "Спливає {time}",
+  "newDebate.room.internalGrantFull": "Кошти внутрішнього гранту вичерпано. Термін спливає {time}.",
+  "newDebate.room.internalWindowFull": "Досягнуто ліміту періоду внутрішнього фінансування. Перевірте знову {time}.",
+  "newDebate.room.internalClose": "Ваше внутрішнє фінансування наближається до встановленого ліміту."
 }

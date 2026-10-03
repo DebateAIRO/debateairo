@@ -5,5 +5,12 @@
   "billing.usage.day": "Heute",
   "billing.usage.week": "Diese Woche",
   "billing.usage.month": "Dieser Monat",
-  "billing.usage.resets": "Wird zurückgesetzt: {time}"
+  "billing.usage.resets": "Wird zurückgesetzt: {time}",
+  "billing.usage.internalTitle": "Interne Finanzierung",
+  "billing.usage.internalLine": "Interne Finanzierung · Heute {dayPct}% · Diese Woche {weekPct}% · Zuschuss insgesamt {grantPct}%",
+  "billing.usage.grant": "Zuschuss insgesamt",
+  "billing.usage.expires": "Läuft ab {time}",
+  "newDebate.room.internalGrantFull": "Das interne Zuschussbudget ist aufgebraucht. Es läuft ab {time}.",
+  "newDebate.room.internalWindowFull": "Die Grenze des internen Finanzierungszeitraums ist erreicht. Erneut prüfen: {time}.",
+  "newDebate.room.internalClose": "Ihre interne Finanzierung nähert sich ihrer festgelegten Grenze."
 }

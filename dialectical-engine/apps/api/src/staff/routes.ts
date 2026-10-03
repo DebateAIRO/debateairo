@@ -169,7 +169,8 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         const base = request.authenticatedSession!, value = await application!.repository.readEnrollment({ ...ordinary(base), ordinaryTokenHash: base.tokenHash });
         if (value === null || value.user_id !== base.userId)
             refuse();
-        return project(contract.StaffEnrollmentResponseSchema, value);
+        return application!.funding === undefined ? project(contract.StaffEnrollmentResponseSchema, value)
+          : project(contract.FundedStaffEnrollmentResponseSchema, {...value,funding_policy_version:1});
     });
     route('POST', '/v1/admin/prerequisites/step-up', async (request, reply) => {
         const input = parse(contract.StaffPrerequisiteStepUpRequestSchema, request.body);

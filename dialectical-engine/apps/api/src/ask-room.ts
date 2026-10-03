@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import { PLAN_TIER_ROSTERS, type AskRequest } from "@debateai/contract";
-import { exhaustive, TypedDomainError } from "@debateai/kernel";
+import { exhaustive, TypedDomainError, type FundingBasis, type InternalGrant, type InternalRunFundingState } from "@debateai/kernel";
 import {
   costEnvelopeDay,
   decideAdmission,
@@ -51,7 +51,7 @@ export class AskAlreadyWaitingError extends TypedDomainError {
   }
 }
 
-export type RoomQuestion = Readonly<{ access: RunOwnershipAccess; settingsClass: RunSettingsClass }>;
+export type RoomQuestion = Readonly<{ access: RunOwnershipAccess; settingsClass: RunSettingsClass; fundingBasis?: FundingBasis }>;
 export type RoomDecision = Extract<Admission, { kind: "START" | "WAIT" }>;
 export type RoomDecisionContext = Readonly<{
   admission: RoomDecision;
@@ -92,8 +92,8 @@ export type RoomPreview = Readonly<{
 export interface AskRoomSpend {
   readDaySpentMicros(day: string): Promise<number>;
   readSiteCountedHoldsMicros(day: string): Promise<number>;
-  readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number>;
-  readOwnerCountedHoldsMicros(ownerRef: string): Promise<number>;
+  readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: SpendScope): Promise<number>;
+  readOwnerCountedHoldsMicros(ownerRef: string, funding?: FundingBasis): Promise<number>;
   openHold(client: PoolClient, input: Readonly<{ runId: string; heldMicros: number }>): Promise<void>;
 }
 
@@ -120,13 +120,9 @@ export interface AskRoomLine {
 /** B5's `EntitlementRepository`, the two methods the room needs. Null while billing is off. */
 export interface AskRoomEntitlements {
   current(ownerRef: string, now: Date): Promise<Readonly<{ planId: PlanId; eventId: string }>>;
-  recordRunChargeScope(client: PoolClient, input: Readonly<{
-    runId: string;
-    ownerRef: string;
-    planId: PlanId;
-    entitlementEventId: string;
-    admittedAt: Date;
-  }>): Promise<void>;
+  readRunFundingBasis?(runId: string): Promise<FundingBasis | null>;
+  recordRunChargeScope(client: PoolClient, input: Readonly<{runId: string; ownerRef: string; admittedAt: Date}> &
+    (Readonly<{planId: PlanId; entitlementEventId: string}> | Readonly<{basis: FundingBasis}>)): Promise<void>;
 }
 
 export type AskRoomOptions = Readonly<{
@@ -143,6 +139,13 @@ export type AskRoomOptions = Readonly<{
    * is never started for a person whose plan has dropped to Free.
    */
   billingPlans?: BillingPlans | null;
+  funding?: Readonly<{
+    resolveAskFunding(ownerRef: string, now: Date): Promise<FundingBasis>;
+    readGrant(ownerRef: string, now: Date, context?: Readonly<{runId: string}>): Promise<InternalGrant | null>;
+    assertProviderFundingAdmission(runId: string, now: Date): Promise<void>;
+    readRunFundingState(runId:string):Promise<InternalRunFundingState>;
+    readSubscriptionWindows(ownerRef: string, now: Date): Promise<readonly PersonWindow[]>;
+  }>;
   dailyCeilingMicros: number;
   closeBasisPoints: number;
   waitingLinePerPerson: number;
@@ -178,6 +181,7 @@ export type AskRoomAnswer = Readonly<{
   resetsAt: Date | null;
   waitingRunRef: string | null;
   planId: PlanId | null;
+  funding?: Readonly<{kind:"INTERNAL"; expiresAt:Date}>;
   waitsFor?: WaitsFor;
 }>;
 
@@ -188,7 +192,7 @@ export interface AskRoomReader {
 /** B7b: what trying to start one waiting run came to. */
 export type WaitingStart<T> =
   | Readonly<{ kind: "STARTED"; value: T }>
-  | Readonly<{ kind: "SITE_FULL" | "PERSON_FULL" | "GONE" | "PLAN_CHANGED" }>;
+  | Readonly<{ kind: "SITE_FULL" | "PERSON_FULL" | "GONE" | "PLAN_CHANGED" | "FUNDING_FAILED" | "ACCOUNT_HELD" }>;
 
 /** What the waker asks of the room (B7b). */
 export interface AskWaitingLinePort {
@@ -307,6 +311,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   readonly #clock: () => Date;
   /** Why the decision on each open transaction would make its question wait; set and cleared by `decide`. */
   readonly #waitReasons = new WeakMap<PoolClient, WaitReason>();
+  readonly #fundingDecisions = new WeakMap<PoolClient, Readonly<{ownerRef: string; basis: FundingBasis}>>();
 
   constructor(options: AskRoomOptions) {
     for (const value of [options.dailyCeilingMicros, options.closeBasisPoints, options.waitingLinePerPerson]) {
@@ -341,10 +346,18 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       const admission = evaluation.admission;
       if (admission.kind === "REFUSE_ALREADY_WAITING") throw alreadyWaiting(evaluation);
       this.#waitReasons.set(tx, evaluation.waitReason);
+      const ownerRef = question.access.ownerRef;
+      if (ownerRef !== null && this.#options.entitlements !== null) {
+        const basis = this.#options.funding === undefined ? this.#subscriptionBasis(await this.#options.entitlements.current(ownerRef, now))
+          : await this.#options.funding.resolveAskFunding(ownerRef, now);
+        if (question.fundingBasis !== undefined && !this.#sameFunding(question.fundingBasis, basis)) throw new TypedDomainError("RUN_FUNDING_BASIS_CONFLICT", "Funding changed before admission");
+        this.#fundingDecisions.set(tx, {ownerRef, basis});
+      }
       try {
         return await apply(Object.freeze({ admission, estimateMicros: evaluation.estimateMicros, now, tx }));
       } finally {
         this.#waitReasons.delete(tx);
+        this.#fundingDecisions.delete(tx);
       }
     });
   }
@@ -358,6 +371,8 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   async enterWait(tx: PoolClient, runId: string, at: Date): Promise<void> {
     const reason = this.#waitReasons.get(tx);
     if (reason === undefined) throw new TypeError("ASK_ROOM_WAIT_OUTSIDE_DECISION");
+    const funding = this.#fundingDecisions.get(tx);
+    if (funding !== undefined) await this.#pin(tx, runId, funding.ownerRef, funding.basis, at);
     await this.#options.line.enterWait(tx, runId, at);
     await this.#options.line.recordReason(tx, runId, Object.freeze({ ...reason, at }));
   }
@@ -376,7 +391,10 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const entitlements = this.#options.entitlements;
     const ownerRef = input.access.ownerRef;
     const entitlement = entitlements === null || ownerRef === null ? null : await entitlements.current(ownerRef, input.now);
-    await this.#openStartWith(tx, input, entitlement);
+    const decided = this.#fundingDecisions.get(tx);
+    const basis = decided?.basis ?? (this.#options.funding !== undefined && ownerRef !== null
+      ? await this.#options.funding.resolveAskFunding(ownerRef,input.now) : null);
+    await this.#openStartWith(tx, input, entitlement, basis);
   }
 
   /** A waiting run's expected start, recomputed on every read (budget spec §2.7), and why when no reset is what it waits for. */
@@ -385,7 +403,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     if (run === null) return null;
     const now = this.#clock();
     const estimateMicros = await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run));
-    const { rooms } = await this.#measure(accessOfWaitingRun(run), estimateMicros, now);
+    const { rooms } = await this.#measure(accessOfWaitingRun(run), estimateMicros, now, run.runId);
     const until = waitingUntil({ rooms, nextTickAt: nextWholeMinute(now) });
     return Object.freeze({ waitsUntil: until.waitsUntil, scope: until.worstScope, ...waitsForOf(until) });
   }
@@ -395,9 +413,10 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const now = this.#clock();
     const evaluation = await this.#evaluate(question, now);
     const ownerRef = question.access.ownerRef;
-    const planId = this.#options.entitlements === null || ownerRef === null
-      ? null
+    const grant = this.#options.funding === undefined || ownerRef === null ? null : await this.#options.funding.readGrant(ownerRef,now);
+    const planId = grant !== null || this.#options.entitlements === null || ownerRef === null ? null
       : (await this.#options.entitlements.current(ownerRef, now)).planId;
+    const funding = grant === null ? {} : {funding: Object.freeze({kind:"INTERNAL" as const, expiresAt:grant.expiresAt})};
     const admission = evaluation.admission;
     switch (admission.kind) {
       case "REFUSE_ALREADY_WAITING":
@@ -406,25 +425,25 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
           scope: evaluation.expected.worstScope,
           resetsAt: evaluation.expected.waitsUntil,
           waitingRunRef: evaluation.waiting[0]?.runId ?? null,
-          planId,
+          planId, ...funding,
           ...waitsForOf(evaluation.expected)
         });
       case "WAIT":
         return Object.freeze({
-          room: "FULL" as const, scope: admission.worstScope, resetsAt: admission.waitsUntil, waitingRunRef: null, planId,
+          room: "FULL" as const, scope: admission.worstScope, resetsAt: admission.waitsUntil, waitingRunRef: null, planId, ...funding,
           ...waitsForOf(admission)
         });
       case "START": {
         const scope = admission.worstScope;
         if (admission.worst === "FITS" || scope === null) {
-          return Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId });
+          return Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId, ...funding });
         }
         return Object.freeze({
           room: "CLOSE" as const,
           scope,
           resetsAt: evaluation.rooms.find((entry) => entry.scope === scope)?.resetsAt ?? null,
           waitingRunRef: null,
-          planId
+          planId, ...funding
         });
       }
       default:
@@ -456,14 +475,29 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const access = accessOfWaitingRun(run);
     return this.#locked(run.ownerRef, async (tx, now): Promise<WaitingStart<T>> => {
       if (!(await this.#options.line.isWaiting(tx, run.runId))) return Object.freeze({ kind: "GONE" as const });
-      const entitlement = await this.#entitlementOf(run.ownerRef, now);
+      const basis = await this.#options.entitlements?.readRunFundingBasis?.(run.runId) ?? null;
+      if (basis?.kind === "INTERNAL") {
+        if (this.#options.funding === undefined) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE", "The pinned internal funding consumer is unavailable");
+        try { await this.#options.funding.assertProviderFundingAdmission(run.runId,now); }
+        catch(error){
+          let state:InternalRunFundingState;
+          try{state=await this.#options.funding.readRunFundingState(run.runId);}catch{throw error;}
+          if(["EXPIRED","REVOKED","REPLACED","ERASED"].includes(state))return Object.freeze({kind:"FUNDING_FAILED" as const});
+          if(state==="HELD"){
+            await this.#options.line.recordReason(tx,run.runId,{waitsFor:"PERSON",personRecheckAt:nextWholeMinute(now),at:now});
+            return Object.freeze({kind:"ACCOUNT_HELD" as const});
+          }
+          throw error;
+        }
+      }
+      const entitlement = basis?.kind === "INTERNAL" ? null : await this.#entitlementOf(run.ownerRef, now);
       if (entitlement !== null && this.#tierOf(entitlement.planId) === "free" && (run.planTier ?? "premium") === "premium") {
         return Object.freeze({ kind: "PLAN_CHANGED" as const });
       }
       // RULINGS-R2 Q-11: the hold is B2's estimate for the run's settings class; the
       // waker never re-picks the run's models (a known limit, bounded by B9's wall).
       const estimateMicros = await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run));
-      const { rooms, waitReason } = await this.#measure(access, estimateMicros, now);
+      const { rooms, waitReason } = await this.#measure(access, estimateMicros, now, run.runId);
       const admission = decideAdmission({
         rooms,
         siteLineBlocking: false,
@@ -479,7 +513,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
         const siteFull = rooms.some((entry) => entry.scope === "SITE_DAY" && entry.room === "FULL");
         return Object.freeze({ kind: siteFull ? "SITE_FULL" as const : "PERSON_FULL" as const });
       }
-      await this.#openStartWith(tx, { runId: run.runId, access, heldMicros: estimateMicros, now }, entitlement);
+      await this.#openStartWith(tx, { runId: run.runId, access, heldMicros: estimateMicros, now }, entitlement, basis);
       await this.#options.line.markStarted(tx, run.runId, now);
       const value = await enqueue(tx);
       return Object.freeze({ kind: "STARTED" as const, value });
@@ -529,11 +563,14 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     access: RunOwnershipAccess;
     heldMicros: number;
     now: Date;
-  }>, entitlement: PinnedEntitlement | null): Promise<void> {
+  }>, entitlement: PinnedEntitlement | null, basis: FundingBasis | null = null): Promise<void> {
     await this.#options.spend.openHold(tx, { runId: input.runId, heldMicros: input.heldMicros });
     const entitlements = this.#options.entitlements;
     const ownerRef = input.access.ownerRef;
-    if (entitlements === null || ownerRef === null || entitlement === null) return;
+    if (entitlements === null || ownerRef === null) return;
+    if (await entitlements.readRunFundingBasis?.(input.runId) !== null && entitlements.readRunFundingBasis !== undefined) return;
+    if (basis !== null) { await this.#pin(tx,input.runId,ownerRef,basis,input.now); return; }
+    if (entitlement === null) return;
     await entitlements.recordRunChargeScope(tx, {
       runId: input.runId,
       ownerRef,
@@ -541,6 +578,15 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       entitlementEventId: entitlement.eventId,
       admittedAt: input.now
     });
+  }
+
+  #subscriptionBasis(entitlement: PinnedEntitlement): FundingBasis { return {kind:"SUBSCRIPTION",planId:entitlement.planId,entitlementEventId:entitlement.eventId}; }
+  #sameFunding(left: FundingBasis, right: FundingBasis): boolean {
+    return left.kind === right.kind && (left.kind === "SUBSCRIPTION" || (right.kind === "INTERNAL" && left.grantId === right.grantId && left.grantEventId === right.grantEventId));
+  }
+  async #pin(tx: PoolClient, runId: string, ownerRef: string, basis: FundingBasis, admittedAt: Date): Promise<void> {
+    if (this.#options.entitlements === null) throw new TypedDomainError("RUN_FUNDING_BASIS_INVALID", "Funding pin persistence is unavailable");
+    await this.#options.entitlements.recordRunChargeScope(tx,{runId,ownerRef,basis,admittedAt});
   }
 
   async #evaluate(question: RoomQuestion, now: Date): Promise<RoomEvaluation> {
@@ -578,7 +624,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * tick, by the same rule, and the answers say the person's own debates are
    * what the question waits for.
    */
-  async #measure(access: RunOwnershipAccess, estimateMicros: number, now: Date): Promise<RoomMeasure> {
+  async #measure(access: RunOwnershipAccess, estimateMicros: number, now: Date, runId?: string): Promise<RoomMeasure> {
     const day = costEnvelopeDay(now);
     const [daySpent, siteHolds] = await Promise.all([
       this.#options.spend.readDaySpentMicros(day),
@@ -598,11 +644,14 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     let personFull = false;
     let fullOnSpendUntil: Date | null = null;
     const ownerRef = access.ownerRef;
-    const windows = ownerRef === null ? [] : await this.#options.personAllowance.read(ownerRef, now);
+    const pinned = runId === undefined ? null : await this.#options.entitlements?.readRunFundingBasis?.(runId) ?? null;
+    const windows = ownerRef === null ? [] : runId !== undefined && pinned === null && this.#options.funding !== undefined
+      ? await this.#options.funding.readSubscriptionWindows(ownerRef,now)
+      : await this.#options.personAllowance.read(ownerRef, now, runId === undefined ? undefined : {runId});
     if (ownerRef !== null && windows.length > 0) {
-      const holds = await this.#options.spend.readOwnerCountedHoldsMicros(ownerRef);
+      const holds = await this.#options.spend.readOwnerCountedHoldsMicros(ownerRef, windows[0]?.funding);
       for (const window of windows) {
-        const spent = await this.#options.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt);
+        const spent = await this.#options.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope);
         const usedMicros = spent + holds;
         const room = decideRoom({
           usedMicros,

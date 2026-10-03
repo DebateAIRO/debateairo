@@ -273,5 +273,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "Bộ điều phối đã từ chối gói được chọn. Hãy chọn Miễn phí hoặc Cao cấp rồi thử lại.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Bộ điều phối đã từ chối yêu cầu: hiện không có mô hình mà gói này cần. Hãy thử lại sau hoặc chọn gói còn lại.",
   "requestFailure.kind.ALREADY_WAITING": "Mỗi lần chỉ một câu hỏi được chờ. Hãy đặt câu hỏi này sau khi cuộc tranh luận đang chờ của bạn đã bắt đầu.",
-  "requestFailure.kind.UNCLASSIFIED": "Thao tác thất bại trước khi nhận được phản hồi nên chưa xác định được kết quả. Đây không phải là quyết định của bộ điều phối."
+  "requestFailure.kind.UNCLASSIFIED": "Thao tác thất bại trước khi nhận được phản hồi nên chưa xác định được kết quả. Đây không phải là quyết định của bộ điều phối.",
+  "debateChrome.error.fundingEnded": "Kinh phí nội bộ cho cuộc tranh luận đang chờ này đã kết thúc. Hãy hỏi lại để dùng hạn mức hiện tại của bạn."
 }

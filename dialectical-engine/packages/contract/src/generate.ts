@@ -2,12 +2,16 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { contractInventory, staffContractInventory, fundedStaffContractInventory,
+  BillingUsageResponseSchema, AskRoomResponseSchema,
+  StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
   StaffActionOptionsRequestSchema, FundedStaffActionOptionsRequestSchema, StaffActionVerifyRequestSchema, FundedStaffActionVerifyRequestSchema,
   StaffAuthenticationOptionsResponseSchema, StaffActionProofResponseSchema,
   InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema } from "./index.js";
 
 const staffEndpointSchemas = {
+  BillingUsageResponseSchema, AskRoomResponseSchema,
+  StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
   StaffActionOptionsRequestSchema, FundedStaffActionOptionsRequestSchema, StaffActionVerifyRequestSchema, FundedStaffActionVerifyRequestSchema,
   StaffAuthenticationOptionsResponseSchema, StaffActionProofResponseSchema,
@@ -19,6 +23,9 @@ const variants = (...names: StaffEndpointSchemaName[]) => ({ anyOf: names.map(re
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
 const response = (schema: unknown) => ({ responses: { "200": { description: "Current selected policy response", content: { "application/json": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
+  "GET /v1/billing/usage": response(reference("BillingUsageResponseSchema")),
+  "GET /v1/asks/room": response(reference("AskRoomResponseSchema")),
+  "GET /v1/admin/enrollment": response(variants("StaffEnrollmentResponseSchema","FundedStaffEnrollmentResponseSchema")),
   "POST /v1/admin/webauthn/elevation/verify": response(variants("StaffElevationResponseSchema", "FundedStaffElevationResponseSchema")),
   "GET /v1/admin/team": response(variants("StaffTeamPageSchema", "FundedStaffTeamPageSchema")),
   "POST /v1/admin/webauthn/action/options": { ...request(variants("StaffActionOptionsRequestSchema", "FundedStaffActionOptionsRequestSchema")), ...response(reference("StaffAuthenticationOptionsResponseSchema")) },
@@ -60,7 +67,7 @@ await writeFile(
         ...(staffContractInventory.routes.includes(route) || fundedStaffContractInventory.routes.some(funded => funded === route)
           ? { "x-required-product-role-policy-version": staffContractInventory.policyVersion } : {}),
         ...(fundedStaffContractInventory.routes.some(funded => funded === route) ? { "x-required-internal-funding-policy-version": 1 } : {}),
-        ...(staffEndpointContracts[route] !== undefined && !fundedStaffContractInventory.routes.some(funded => funded === route)
+        ...(staffEndpointContracts[route] !== undefined && staffContractInventory.routes.includes(route) && !fundedStaffContractInventory.routes.some(funded => funded === route)
           ? { "x-staff-policy-variants": { coreA: { internalFunding: "DISABLED" }, fundedV2: { internalFundingPolicyVersion: 1, sealedSelectionRequired: true } } } : {})
       };
       return paths;

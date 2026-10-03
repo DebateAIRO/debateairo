@@ -287,5 +287,6 @@
   "requestFailure.kind.PLAN_TIER_INVALID": "El coordinador rechazó la elección del plan. Elija Gratuito o Premium y vuelva a intentarlo.",
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "El coordinador rechazó la solicitud: un modelo que necesita este plan no está disponible en este momento. Inténtelo de nuevo más tarde o elija el otro plan.",
   "requestFailure.kind.ALREADY_WAITING": "Solo una pregunta puede esperar a la vez. Haga esta cuando haya empezado su debate en espera.",
-  "requestFailure.kind.UNCLASSIFIED": "La solicitud falló antes de que llegara ninguna respuesta, por lo que se desconoce el resultado. No se trata de una decisión del coordinador."
+  "requestFailure.kind.UNCLASSIFIED": "La solicitud falló antes de que llegara ninguna respuesta, por lo que se desconoce el resultado. No se trata de una decisión del coordinador.",
+  "debateChrome.error.fundingEnded": "La financiación interna de este debate en espera ha terminado. Vuelve a preguntar para usar tu asignación actual."
 }
