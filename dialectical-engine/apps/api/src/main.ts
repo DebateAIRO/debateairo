@@ -21,6 +21,7 @@ import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debate
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
+  assertAskRoomAdmissionSealed,
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
@@ -474,6 +475,10 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
         }
         return undefined;
       }
+      // Paid plans P4-G, ruling C7 (go-live row 31): with the band the room read is a real computation on
+      // every call, so the version in force must seal its askRoomReads budget (ASK_ROOM_ADMISSION_UNSEALED).
+      // The hosted publish asks the same question in its plan and in verifyHostedRegisterBootReadiness.
+      assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
       const spend = new PostgresModelSpendStore(pool);
       const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
       const personAllowance = entitlements === null || billingPlans === null

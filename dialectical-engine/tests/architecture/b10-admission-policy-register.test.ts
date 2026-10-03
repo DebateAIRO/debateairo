@@ -39,6 +39,8 @@ describe("B10 sealed admission-policy register row", () => {
       billingCheckout: null,
       billingNotify: null,
       billingCancelLink: null,
+      // P4-G: the room read's budget is sealed only from the operator's hosted file (ruling C7).
+      askRoomReads: null,
       sourceRef: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     });
     expect(Object.isFrozen(policy)).toBe(true);

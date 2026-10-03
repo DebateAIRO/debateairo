@@ -32,6 +32,7 @@ import {
 import { runHostedRegisterPublishCli } from "../../apps/runner/src/hosted-register-publish-cli.js";
 import { PLAN_TIER_ROSTERS } from "../../packages/contract/src/index.js";
 import {
+  ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
@@ -57,6 +58,9 @@ const temporaryRoots: string[] = [];
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
+
+/** P4-G: a room-read admission budget, which every file that seals the budget band must carry (ruling C7). */
+const ROOM_READS_FIXTURE = Object.freeze({ key: "owner", limit: 60, window_ms: 60_000, capacity: 65_536 });
 
 /** A file the operator would publish: two vendors on real-looking public names. */
 function validFile(): Record<string, unknown> {
@@ -712,6 +716,8 @@ describe("Paid plans · the billing rows and the budget band in the hosted regis
     Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
       admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)));
     expect(plan.billingPolicy?.enabled).toBe(true);
@@ -750,6 +756,8 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
       serve_reserve_basis_points: 3_000,
       ...(band ? { admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1 } : {})
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    if (band) file.askRoomReads = ROOM_READS_FIXTURE;
     return file;
   }
 
@@ -768,6 +776,8 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
       serve_reserve_basis_points: 3_000, admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500,
       waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     for (const target of file.providerTargets as Array<Record<string, unknown>>) {
       target.input_price_micros_per_million = 5_000_000;
       target.output_price_micros_per_million = 25_000_000;
@@ -792,6 +802,8 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
       serve_reserve_basis_points: 3_000, admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500,
       waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     for (const target of file.providerTargets as Array<Record<string, unknown>>) {
       target.input_price_micros_per_million = 5_000_000;
       target.output_price_micros_per_million = 25_000_000;
@@ -1215,6 +1227,8 @@ describe("Paid plans S2 · the plan caps of a scorecard published with billing o
     Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
       admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
     return file;
   };
@@ -1288,6 +1302,8 @@ describe("Paid plans P4-E · a scorecard published with billing on can seat Free
     Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
       admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
     return file;
   };
@@ -1424,3 +1440,74 @@ function exampleFreeCaps(pickerSettings: Record<string, unknown>, share: number)
     role, { moneyMicrosPerCall: Math.floor(cap.moneyMicrosPerCall * share) }
   ]));
 }
+
+/**
+ * Paid plans P4-G, ruling C7 (go-live row 31). The room read GET /v1/asks/room charges its own owner-keyed
+ * admission budget, `ask_room_reads`. No code-owned row carries it: the operator's file supplies it as the
+ * optional `askRoomReads` member, which the plan adds to the code-owned admission row, and a version that
+ * seals the budget band without it is refused before anything is sealed (ASK_ROOM_ADMISSION_UNSEALED), as
+ * the API's boot refuses it. The example carries an example budget; the owner sets the real value.
+ */
+describe("Paid plans P4-G · the room read's admission budget (ruling C7)", () => {
+  const ROOM_READS = Object.freeze({ key: "owner", limit: 30, window_ms: 60_000, capacity: 65_536 });
+  const BAND = Object.freeze({
+    admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
+  });
+  function bandedFile(): Record<string, unknown> {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, BAND);
+    return file;
+  }
+  const admissionOf = (plan: Awaited<ReturnType<typeof planHostedRegisterPublication>>) =>
+    plan.rows.find((row) => row.rowKey === "admissionPolicy")!;
+
+  it("refuses a version that seals the band without askRoomReads, and accepts it with the member", async () => {
+    expect(await planCode(bandedFile())).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+    expect(await planCode({ ...bandedFile(), askRoomReads: ROOM_READS })).toBe("NO_REFUSAL");
+    // Billing on needs the band, so it needs the member too.
+    const billingOn = { ...bandedFile(), billingPolicy: { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true } };
+    expect(await planCode(billingOn)).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+    expect(await planCode({ ...billingOn, askRoomReads: ROOM_READS })).toBe("NO_REFUSAL");
+  });
+
+  it("changes nothing without the band: the code-owned admission row is sealed as it is", async () => {
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    const admission = admissionOf(plan);
+    expect(admission.sourceRef).toBe(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef);
+    expect(JSON.parse(admission.valueJsonText)).toEqual(JSON.parse(JSON.stringify(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value)));
+    expect(plan.askRoomReads).toBeNull();
+    expect(renderHostedRegisterPlan(plan)).toContain("ask_room_reads absent\n");
+  });
+
+  it("adds the owner's budget to the code-owned admission row, every other member as it was, and says so in the plan", async () => {
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...bandedFile(), askRoomReads: ROOM_READS })));
+    const admission = admissionOf(plan);
+    expect(JSON.parse(admission.valueJsonText)).toEqual({
+      ...JSON.parse(JSON.stringify(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value)), ask_room_reads: ROOM_READS
+    });
+    expect(admission.sourceRef.startsWith(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef)).toBe(true);
+    expect(admission.sourceRef).toContain("P4-G ask_room_reads");
+    expect(admission.sourceRef.length).toBeLessThanOrEqual(1_024);
+    expect(plan.askRoomReads).toEqual({ key: "owner", limit: 30, windowMs: 60_000, capacity: 65_536 });
+    expect(renderHostedRegisterPlan(plan)).toContain("ask_room_reads key=owner limit=30 window_ms=60000 capacity=65536\n");
+  });
+
+  it.each([
+    ["a source-keyed budget", { ...ROOM_READS, key: "source" }],
+    ["a zero limit", { ...ROOM_READS, limit: 0 }],
+    ["an unknown field", { ...ROOM_READS, extra: true }],
+    ["the JSON value null", null]
+  ])("refuses %s by the register's own code", async (_name, value) => {
+    expect(await planCode({ ...bandedFile(), askRoomReads: value })).toBe("ADMISSION_POLICY_INVALID");
+  });
+
+  it("ships an example that seals the band with an example room-read budget", async () => {
+    const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
+    expect(example.askRoomReads).toEqual({ key: "owner", limit: 60, window_ms: 60_000, capacity: 65_536 });
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
+    expect(renderHostedRegisterPlan(plan)).toContain("ask_room_reads key=owner limit=60 window_ms=60000 capacity=65536\n");
+    // Without the member the example itself is refused: the band is sealed.
+    delete example.askRoomReads;
+    expect(await planCode(example)).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+  });
+});

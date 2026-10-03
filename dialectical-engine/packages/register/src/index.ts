@@ -1149,6 +1149,7 @@ export {
   SESSION_POLICY_REGISTER_ROW,
   SESSION_POLICY_ROW_KEY,
   admissionPolicyFromValue,
+  assertAskRoomAdmissionSealed,
   readAdmissionPolicy,
   readSessionPolicy,
   sessionPolicyFromValue,

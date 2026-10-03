@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import { TypedDomainError } from "@debateai/kernel";
+import { costEnvelopeBand, type CostEnvelopePolicy } from "./cost-envelope-policy.js";
 import { canonicalDecimal, canonicalRegisterJson } from "./register-publication.js";
 
 export const SESSION_POLICY_ROW_KEY = "sessionPolicy" as const;
@@ -138,7 +139,10 @@ const admissionPolicyValueSchema = z.object({
   billing_quote: admissionScopeValueSchema("owner").optional(),
   billing_checkout: admissionScopeValueSchema("owner").optional(),
   billing_notify: admissionScopeValueSchema("source").optional(),
-  billing_cancel_link: admissionScopeValueSchema("source").optional()
+  billing_cancel_link: admissionScopeValueSchema("source").optional(),
+  // Paid plans P4-G (go-live row 31): the room read, per owner. No code-owned row carries it: the owner seals
+  // its value in the hosted operator's file, in the same version as the budget band (ruling C7).
+  ask_room_reads: admissionScopeValueSchema("owner").optional()
 }).strict();
 
 export type AdmissionPolicyValue = z.infer<typeof admissionPolicyValueSchema>;
@@ -169,6 +173,8 @@ export type AdmissionPolicy = Readonly<{
   billingNotify: AdmissionScopePolicy<"source"> | null;
   /** P13 (A25): the public cancel link, per source network. */
   billingCancelLink: AdmissionScopePolicy<"source"> | null;
+  /** P4-G (go-live row 31): GET /v1/asks/room, per owner; required with the budget band (ruling C7). */
+  askRoomReads: AdmissionScopePolicy<"owner"> | null;
   sourceRef: string;
 }>;
 
@@ -346,8 +352,34 @@ export function admissionPolicyFromValue(value: unknown, sourceRef: string): Adm
       windowMs: policy.billing_cancel_link.window_ms,
       capacity: policy.billing_cancel_link.capacity
     }),
+    askRoomReads: policy.ask_room_reads === undefined ? null : Object.freeze({
+      key: policy.ask_room_reads.key,
+      limit: policy.ask_room_reads.limit,
+      windowMs: policy.ask_room_reads.window_ms,
+      capacity: policy.ask_room_reads.capacity
+    }),
     sourceRef
   });
+}
+
+/**
+ * Paid plans P4-G, ruling C7 (go-live row 31). With the budget band sealed, the room read
+ * (GET /v1/asks/room) is a real computation on every call, so a version that seals the band must
+ * also seal its own admission scope, `ask_room_reads`. Asked at the API's boot (the `ask-room`
+ * stage, of the row in force) and by the hosted publish command (its plan and its boot-readiness
+ * check), the way `BILLING_ADMISSION_UNSEALED` is. A version without the band is not asked.
+ */
+export function assertAskRoomAdmissionSealed(input: Readonly<{
+  envelope: Pick<CostEnvelopePolicy, "closeBasisPoints" | "finishBasisPoints" | "waitingLinePerPerson">;
+  admission: Pick<AdmissionPolicy, "askRoomReads">;
+}>): void {
+  if (costEnvelopeBand(input.envelope) === null) return;
+  if (input.admission.askRoomReads === null) {
+    throw new TypedDomainError(
+      "ASK_ROOM_ADMISSION_UNSEALED",
+      "The budget band is sealed, so the register must also seal the askRoomReads admission scope"
+    );
+  }
 }
 
 export async function readAdmissionPolicy(pool: Pool, registerVersion: number): Promise<AdmissionPolicy> {
