@@ -704,6 +704,7 @@ describe("P9b VERIFY_PAYMENT", () => {
     // B, the current holder, still moves it.
     expect(await h.jobs.markJobStage(current, "REFUND_CALL_STARTED")).toBe(true);
     expect(await h.jobs.jobStage(current.jobId)).toBe("REFUND_CALL_STARTED");
+    expect(await h.repository.complete(current.jobId, h.clock.now, { workerId: "process-b", attempts: current.attempts })).toBe(true);
   });
 
   it("calls a full-amount refund again after a failure that moved nothing, and refunds exactly once", async () => {

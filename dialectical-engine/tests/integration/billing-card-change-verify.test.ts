@@ -75,7 +75,6 @@ describe("P12e the card change through VERIFY_PAYMENT", () => {
     }
   });
 
-
   it("releases a blocked-country card's hold with no email, keeps the old card, and reads FAILED(CARD_CHECK_REFUSED)", async () => {
     const paid = await h.activate();
     const before = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));
