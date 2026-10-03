@@ -11,7 +11,7 @@
   "owner.O2.notRequestedAmount": "Amount the job named: {refundAmount}. This is only the job's own figure, not a refund to make.",
   "owner.O2.notRequestedNext": "Do not refund anything for this job. Something able to write to the billing database queued it, so tell whoever runs the server. They check this charge's own refund requests: a request that was never refunded is still owed.",
   "owner.O2.refundReason": "Refund reason: {refundReason}",
-  "owner.O2.withdrawalDeadline": "This is a withdrawal refund: the law requires it to be made by {refundDeadline} at the latest (14 days after the withdrawal). Refund at least {refundAmount} on this payment, in one refund, so the site records it and the customer's refund email (M8) follows by itself.",
+  "owner.O2.withdrawalDeadline": "This is a withdrawal refund: the law requires it to be made by {refundDeadline} at the latest (14 days after the withdrawal). First look at this payment in the xMoney dashboard. If it already shows a refund of {refundAmount}, an earlier attempt went through: do not refund again; the site records it at its daily check, and the customer's refund email (M8) follows by itself. If it shows none, refund exactly {refundAmount} on this payment, in one refund, so the site records it and M8 follows by itself.",
   "owner.O2_WITHDRAWAL.subject": "A withdrawal needs you to settle its refund by hand",
   "owner.O2_WITHDRAWAL.intro": "A customer withdrew from their plan, and the plan has ended. A refund made in the xMoney dashboard, or an earlier refund request, already touched one of their payments, so the site could not work out what is still due. Nothing has been refunded for this withdrawal yet.",
   "owner.O2_WITHDRAWAL.owner": "Owner reference: {ownerRef}",

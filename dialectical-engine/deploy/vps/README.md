@@ -2270,10 +2270,15 @@ unknown after every retry, you get an email at once (O2, "A refund could not be 
 attention") with the charge reference, the amount, the reason code and what the refund was for (the refund reason,
 for example `WITHDRAWAL`). No more tries are made by themselves: look the charge up in the xMoney dashboard and
 settle the refund there by hand. The owner summary lists it until then. For a withdrawal's refund the email also says
-the date the law requires it to be made by (14 days after the person withdrew). Refund at least the amount it names,
-on that payment, in one refund: once xMoney reports it, the site records it as this refund, and the person's
-confirmation (M8) follows by itself (after the last refund, when the withdrawal refunds two payments). A smaller refund, or one split into several, may be recorded only as a refund made at xMoney; then no
-M8 follows, and you confirm the refund to the person yourself.
+the date the law requires it to be made by (14 days after the person withdrew).
+Look at that payment in the xMoney dashboard first. If it already shows a refund of the amount the email names, an
+earlier attempt went through: never refund it again. The site's daily check records it as this refund, and the
+person's confirmation (M8) follows by itself. If it shows no such refund, refund exactly the amount the email names,
+on that payment, in one refund: once xMoney reports it, the site records it as this refund, and M8 follows by itself
+(after the last refund, when the withdrawal refunds two payments). The site records the amount it asked for, so any
+extra refunded over it is in no record. A smaller refund, or one split into several, is not recorded at all: its
+payment check ends as `REFUND_UNRECORDED`, and the owner summary lists it under that code. Then neither M8 nor a
+credit note follows, so you confirm the refund to the person yourself and give its amount to the accountant.
 The one exception is the reason code `REFUND_NOT_REQUESTED`: that refund job matches no refund request our records
 hold for the payment, and nothing was sent to xMoney. Do not refund it, and do not treat its amount as owed.
 Something able to write to the billing database queued it, so tell whoever runs the server; they check that charge's

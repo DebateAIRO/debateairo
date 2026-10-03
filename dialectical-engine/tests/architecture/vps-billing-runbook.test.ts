@@ -86,6 +86,10 @@ describe("P22 the Billing runbook", () => {
       // §14.8 (W9, P2-I11, P2-M8): the acknowledgement of receipt, the owner's alert for a withdrawal settled by hand,
       // and a dead withdrawal refund's deadline and one-refund rule.
       "M8_RECEIVED", "O2_WITHDRAWAL", "the date the refund is due by", "in one refund",
+      // W9 fix round 1 (F1): look first, never refund twice, and refund exactly the named amount; a smaller or split
+      // refund is not recorded (REFUND_UNRECORDED), so the owner confirms it and tells the accountant.
+      "Look at that payment in the xMoney dashboard first", "never refund it again",
+      "refund exactly the amount the email names", "is not recorded at all", "give its amount to the accountant",
       // §14.4 (D6a's recurring net): a new price reaches only new subscriptions.
       "reaches only new subscriptions",
       // §14.8 (D6a P10b, D6b P16b): nobody reads the e-Factura status for you; the summary lists what to check,
@@ -104,6 +108,8 @@ describe("P22 the Billing runbook", () => {
     ]) {
       expect(billing, needle).toContain(needle);
     }
+    // W9 fix round 1 (F1): a dead refund is never settled with "at least" its amount.
+    expect(billing).not.toContain("Refund at least");
     // R-7: the public origin is the existing PUBLIC_APP_URL; no second setting names it.
     expect(billing).not.toContain("PUBLIC_SITE_ORIGIN");
     // R3-4: the company facts have one source and one mirror; no _merchant.json, no second copy for the emails, no

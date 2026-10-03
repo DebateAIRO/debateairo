@@ -256,9 +256,15 @@ describe("P17 renderMail", () => {
     expect(dead.text).toContain("Reason code: XMONEY_REFUSED\n\nRefund reason: WITHDRAWAL\n\n");
     expect(dead.text).toContain(
       "This is a withdrawal refund: the law requires it to be made by October 26, 2026 at the latest (14 days after"
-      + " the withdrawal). Refund at least $12.10 on this payment, in one refund, so the site records it and the"
-      + " customer's refund email (M8) follows by itself."
+      + " the withdrawal). First look at this payment in the xMoney dashboard. If it already shows a refund of"
+      + " $12.10, an earlier attempt went through: do not refund again; the site records it at its daily check, and"
+      + " the customer's refund email (M8) follows by itself. If it shows none, refund exactly $12.10 on this payment,"
+      + " in one refund, so the site records it and M8 follows by itself."
     );
+    // W9 fix round 1 (F1): the dashboard is checked first, and the amount is exact: a refund over it is in no record
+    // (recordRefunded records the request's amount), so the email never asks for "at least" an amount.
+    expect(dead.text).not.toContain("at least");
+    expect(dead.html).not.toContain("at least");
     // The reason alone (another refund than a withdrawal's): no deadline sentence.
     const { refundDeadline: _deadline, ...other } = paramsFor("O2");
     const refusedCard = renderMail("O2", "en", { ...other, refundReason: "CARD_COUNTRY_BLOCKED", notRequested: "false" }).text;
