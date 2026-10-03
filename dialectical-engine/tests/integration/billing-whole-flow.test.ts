@@ -1,11 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { microsToDecimal, upgradeMonthCreditOverrideMicros, upgradeProrationMicros } from "@debateai/billing-core";
+import { BillingRepository, EntitlementRepository } from "@debateai/db";
+import { taxSummaryJobFor } from "../../apps/api/src/billing/owner-jobs.js";
 import { startBillingStack, type BillingStack } from "../support/billingStack.js";
+import { fakeTaxMicros } from "../support/fake-tax-engine.js";
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 
 /**
  * P23 — the paid-plans whole flow on the fake stack (spec 2026-09-29 §2.8; R-26): embedded Postgres, fake xMoney,
  * FakeTaxEngine, FakeInvoiceIssuer, and the real routes and jobs of P7–P16. CI skips integration suites: run this
- * before every merge that touches billing.
+ * before every merge that touches billing. P2-M39: it proves what README §14.9 step 6 says it proves (the amounts at
+ * the fakes, the Romanian invoice's line and PDF), plus an upgrade, an account deletion, the daily money check and the
+ * owner's jobs. The cases share one stack and one clock, so their order matters; each says why it sits where it does.
  */
 let stack: BillingStack;
 
@@ -13,6 +19,49 @@ beforeAll(async () => { stack = await startBillingStack(); }, 600_000);
 afterAll(async () => { await stack?.stop(); });
 
 const ids = (stackMails: ReadonlyArray<{ templateId: string }>): string[] => stackMails.map((mail) => mail.templateId);
+const DAY_MS = 86_400_000;
+/** The bytes FakeInvoiceIssuer.pdf returns for every invoice (tests/support/fake-invoice-issuer.ts). */
+const FAKE_PDF = "%PDF-1.4\n% fake\n";
+
+type ChargeAmounts = Readonly<{
+  chargeId: string; net: string; tax: string; total: string; createdAt: Date; quoteKind: string; quoteCreatedAt: Date; rate: string;
+}>;
+
+/** The person's charges of one kind, oldest first, with the quote that priced each (micros as text). */
+async function chargesOf(ownerRef: string, kind: "INITIAL" | "RENEWAL" | "UPGRADE"): Promise<ChargeAmounts[]> {
+  const found = await stack.database.pool.query<{
+    charge_id: string; net: string; tax: string; total: string; created_at: Date; quote_kind: string; quote_created_at: Date; rate: string;
+  }>(`
+    SELECT c.charge_id, c.net_micros::text AS net, c.tax_micros::text AS tax, c.total_micros::text AS total, c.created_at,
+      q.kind AS quote_kind, q.created_at AS quote_created_at, q.tax_rate_bp::text AS rate
+    FROM billing.charge c JOIN billing.quote q ON q.quote_id = c.quote_id
+    WHERE c.owner_ref = $1 AND c.kind = $2 ORDER BY c.created_at
+  `, [ownerRef, kind]);
+  return found.rows.map((row) => ({
+    chargeId: row.charge_id, net: row.net, tax: row.tax, total: row.total, createdAt: row.created_at,
+    quoteKind: row.quote_kind, quoteCreatedAt: row.quote_created_at, rate: row.rate
+  }));
+}
+
+/** The fake xMoney transaction that paid this charge (its one SUCCEEDED). */
+async function paymentOf(chargeId: string) {
+  const found = await stack.database.pool.query<{ id: string }>(
+    "SELECT xmoney_transaction_id AS id FROM billing.charge_event WHERE charge_id = $1 AND kind = 'SUCCEEDED'", [chargeId]
+  );
+  expect(found.rows).toHaveLength(1);
+  const transaction = stack.xmoney.transactions.get(found.rows[0]!.id);
+  expect(transaction).toBeDefined();
+  return transaction!;
+}
+
+/** The refund transactions the fake xMoney made against one payment, in cents. */
+const refundsAtXMoney = (paymentId: number): number[] => [...stack.xmoney.transactions.values()]
+  .filter((transaction) => transaction.transactionType === "refund" && transaction.relatedTransactionIds.includes(paymentId))
+  .map((transaction) => transaction.amountCents);
+
+/** The lines of every sale the fake SmartBill issued an invoice for, for one charge. */
+const invoiceLinesOf = (chargeId: string) =>
+  stack.invoices.sales.filter((sale) => sale.chargeId === chargeId).map((sale) => sale.lines);
 
 describe("P23 paid plans, end to end on the fake stack", () => {
   it("Free → Plus → usage → renewal → a failing card through the retries → Free", async () => {
@@ -42,6 +91,18 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     // hash) and the model withdrawal form (A26b, P17's resolvers fed by P9b's fields from the acceptance row).
     const m1 = stack.mailsTo(person.email).find((mail) => mail.templateId === "M1")!;
     expect((m1.attachments ?? []).map((attachment) => attachment.filename)).toEqual(["terms-of-service.txt", "withdrawal-form.txt"]);
+    // P2-M39, the Romanian invoice: the fake SmartBill issued ONE invoice for this charge, for the name and place the
+    // quote recorded (R-15), with the sale's one line at Romania's 21 %; M2 carries the PDF made for that number.
+    const invoices = stack.invoices.issued.filter((document) => document.chargeId === chargeRef);
+    expect(invoices.map((document) => document.kind)).toEqual(["INVOICE"]);
+    expect(stack.invoices.sales.filter((sale) => sale.chargeId === chargeRef)).toEqual([expect.objectContaining({
+      customer: expect.objectContaining({ name: "Ana Pop", email: person.email, country: "RO", city: "Cluj-Napoca" }),
+      lines: [{ description: expect.stringMatching(/\S/u), netMicros: 20_000_000, taxMicros: 4_200_000, taxRateBasisPoints: 2_100 }]
+    })]);
+    const m2 = stack.mailsTo(person.email).find((mail) => mail.templateId === "M2_INVOICE_ATTACHED")!;
+    expect((m2.attachments ?? []).map((attachment) => [
+      attachment.filename, attachment.contentType, Buffer.from(attachment.content).toString("latin1")
+    ])).toEqual([[`${invoices[0]!.externalRef}.pdf`, "application/pdf", FAKE_PDF]]);
     const again = await stack.notify(notice.opensslResult);
     expect(again.status).toBe(200);
     await stack.runJobs();
@@ -63,6 +124,19 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     await stack.runRenewals();
     expect(await stack.subscriptionStatus(person.ownerRef)).toBe("ACTIVE");
     expect(ids(stack.mailsTo(person.email)).filter((id) => id === "M2_INVOICE_ATTACHED")).toHaveLength(2);
+    // P2-M39, the renewal's amount: the recurring net (Plus's 20.00) plus tax priced afresh by the tax service at the
+    // renewal's own (moved) time, in the renewal's own RENEWAL quote; that total is what the fake xMoney rebilled, and
+    // the renewal's invoice carries the same line.
+    const [initial] = await chargesOf(person.ownerRef, "INITIAL");
+    const renewals = await chargesOf(person.ownerRef, "RENEWAL");
+    expect(renewals).toHaveLength(1);
+    expect(renewals[0]).toMatchObject({ net: "20000000", tax: "4200000", total: "24200000", quoteKind: "RENEWAL", rate: "2100.00" });
+    expect(renewals[0]!.quoteCreatedAt.getTime() - initial!.createdAt.getTime()).toBeGreaterThan(30 * DAY_MS);
+    const rebill = await paymentOf(renewals[0]!.chargeId);
+    expect([rebill.transactionSource, rebill.amountCents]).toEqual(["re-bill", 2_420]);
+    expect(invoiceLinesOf(renewals[0]!.chargeId)).toEqual([
+      [{ description: expect.stringMatching(/\S/u), netMicros: 20_000_000, taxMicros: 4_200_000, taxRateBasisPoints: 2_100 }]
+    ]);
 
     // The next renewal fails (xMoney declines the rebill: HTTP 402), and each retry fails: +1, +3, +7 days after the
     // first failure (testBillingPolicy.dunningRetryDays), then Free. The clock steps just past each retry time.
@@ -115,6 +189,13 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(ids(stack.mailsTo(person.email))).toContain("M8");
     // W9 (P2-I11): the acknowledgement of receipt, rendered and sent before the refund ran, then M8 once it did.
     expect(ids(stack.mailsTo(person.email)).filter((id) => id === "M8_RECEIVED" || id === "M8")).toEqual(["M8_RECEIVED", "M8"]);
+    // P2-M39, the withdrawal's money: the fake xMoney refunded exactly that amount from the payment, as one refund
+    // transaction (a partial refund leaves the payment complete-ok), and M8 names the same amount.
+    const payment = await paymentOf(chargeRef);
+    expect([payment.refundedCents, payment.transactionStatus]).toEqual([expectedCents, "complete-ok"]);
+    expect(refundsAtXMoney(payment.id)).toEqual([expectedCents]);
+    const m8 = stack.mailsTo(person.email).find((mail) => mail.templateId === "M8")!;
+    expect(m8.params.refundAmount).toBe((expectedCents / 100).toFixed(2));
     // The plan is already withdrawn, so a replay is refused before its grant is read. The grant itself was spent
     // inside the withdrawal's own transaction by billing.consume_withdrawal_grant (P12a).
     const replay = await stack.post(person, "/v1/billing/subscription/withdraw", { step_up_grant: grant });
@@ -171,8 +252,18 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     await stack.runJobs();
     expect(stack.xmoney.transactions.get(notice.transactionId)?.transactionStatus).toBe("refund-ok");
     expect(await stack.entitlementPlan(person.ownerRef)).toBe("FREE");
-    expect(await stack.subscriptionStatus(person.ownerRef)).not.toBe("ACTIVE");
+    // P2-M39: the checkout it paid for ends (abandoned, the card's country named), not merely "not active".
+    const billing = new BillingRepository(stack.database.pool);
+    const ended = await billing.subscriptionForOwner(person.ownerRef);
+    expect(ended).toMatchObject({ status: "ENDED", endedCause: "ABANDONED" });
+    expect((await billing.subscriptionEvents(ended!.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED", reason: "CARD_COUNTRY_BLOCKED" } });
     expect(ids(stack.mailsTo(person.email))).toContain("M11");
+    // The whole payment went back at the fake xMoney, and M11 names that amount.
+    const payment = stack.xmoney.transactions.get(notice.transactionId)!;
+    expect([payment.amountCents, payment.refundedCents]).toEqual([2_420, 2_420]);
+    expect(refundsAtXMoney(payment.id)).toEqual([2_420]);
+    expect(stack.mailsTo(person.email).find((mail) => mail.templateId === "M11")!.params.refundAmount).toBe("24.20");
     // What P19's waiting screen reads: a refused card, refunded, never "no money was taken".
     expect((await stack.get(person, `/v1/billing/charges/${chargeRef}`)).body)
       .toEqual({ state: "FAILED", reason_code: "CARD_COUNTRY_BLOCKED" });
@@ -261,5 +352,162 @@ describe("W12 the runtime's own dead-letter alert, on the fake stack", () => {
     ]);
     // The plan itself is unaffected: the payment was taken and the plan is live.
     expect(await stack.entitlementPlan(person.ownerRef)).toBe("PLUS");
+  });
+});
+
+describe("P2-M39 four more journeys on the fake stack", () => {
+  // After the W12 case on purpose: the plans these cases leave live must not renew under an earlier case's clock moves,
+  // and the A2 case must stay the only order renewing there. None of these cases moves the clock except the last.
+  it("an upgrade charges the prorated difference with fresh tax and adds the new plan's credit for the rest of the period", async () => {
+    const person = await stack.signUp("upgrade.person@example.test", "DE");
+    await stack.subscribe(person, "PLUS", "DE");
+    const billing = new BillingRepository(stack.database.pool);
+    const before = (await billing.subscriptionForOwner(person.ownerRef))!;
+    const quoted = await stack.post(person, "/v1/billing/subscription/upgrade-quote", { plan_id: "PRO" });
+    expect(quoted.status).toBe(200);
+    const quoteRef = String(quoted.body.quote_ref);
+    const quote = (await billing.quote(quoteRef, person.ownerRef))!;
+    // Pro's 50.00 less the Plus price paid (20.00), for the part of the period still to run, then Germany's 19 %.
+    const net = upgradeProrationMicros({
+      oldNetMicros: 20_000_000, newNetMicros: 50_000_000,
+      periodStart: before.currentPeriodStart!, periodEnd: before.currentPeriodEnd!, now: quote.createdAt
+    });
+    const tax = fakeTaxMicros(net, 1_900);
+    expect(net).toBeGreaterThan(0);
+    expect(net).toBeLessThanOrEqual(30_000_000);
+    expect(quoted.body).toMatchObject({
+      plan_id: "PRO", net: microsToDecimal(net), tax: microsToDecimal(tax), total: microsToDecimal(net + tax),
+      tax_country: "DE", tax_rate_basis_points: 1_900, recurring_total: "59.50",
+      renews_on: before.currentPeriodEnd!.toISOString()
+    });
+
+    const upgraded = await stack.post(person, "/v1/billing/subscription/upgrade", { plan_id: "PRO", quote_ref: quoteRef });
+    expect(upgraded.status).toBe(200);
+    const chargeRef = String(upgraded.body.charge_ref);
+    await stack.runJobs();
+    expect((await stack.get(person, `/v1/billing/charges/${chargeRef}`)).body).toEqual({ state: "SUCCEEDED", reason_code: null });
+    // The prorated total is what the fake xMoney rebilled on the saved order, and what the tax service recorded.
+    const [charge] = await chargesOf(person.ownerRef, "UPGRADE");
+    expect(charge).toMatchObject({ chargeId: chargeRef, net: String(net), tax: String(tax), total: String(net + tax), quoteKind: "UPGRADE" });
+    const rebill = await paymentOf(chargeRef);
+    expect([rebill.transactionSource, rebill.amountCents, String(rebill.orderId)])
+      .toEqual(["re-bill", (net + tax) / 10_000, before.xmoneyOrderId]);
+    expect(stack.tax.sales.filter((sale) => sale.chargeId === chargeRef).map((sale) => sale.lines.map((line) => [line.netMicros, line.taxMicros])))
+      .toEqual([[[net, tax]]]);
+
+    // The plan is Pro at once, in the same period, with the new total announced; the month credit is Plus's 5.00
+    // plus Pro's extra 15.00 for the part of the period still to run when the quote was made (A6).
+    const after = (await billing.subscriptionForOwner(person.ownerRef))!;
+    expect(after).toMatchObject({
+      status: "ACTIVE", planId: "PRO", currentPeriodStart: before.currentPeriodStart, currentPeriodEnd: before.currentPeriodEnd,
+      announcedTotalMicros: 59_500_000
+    });
+    const credit = upgradeMonthCreditOverrideMicros({
+      currentMonthCreditMicros: 5_000_000, oldPlanCreditMicros: 5_000_000, newPlanCreditMicros: 20_000_000,
+      periodStart: before.currentPeriodStart!, periodEnd: before.currentPeriodEnd!, at: quote.createdAt
+    });
+    expect(credit).toBeGreaterThan(5_000_000);
+    expect(credit).toBeLessThan(20_000_000);
+    expect(await new EntitlementRepository(stack.database.pool).current(person.ownerRef, stack.now())).toMatchObject({
+      planId: "PRO", cause: "UPGRADED", paidThrough: before.currentPeriodEnd, monthCreditOverrideMicros: credit
+    });
+  });
+
+  it("a payment whose notice never came is found by one daily money check and settles the plan", async () => {
+    const person = await stack.signUp("lost.notice@example.test", "DE");
+    const quote = await stack.quote(person, "PLUS");
+    const checkout = await stack.checkout(person, String(quote.body.quote_ref));
+    const chargeRef = String(checkout.body.charge_ref);
+    // xMoney took the money; its notice is lost on the way.
+    const paid = await stack.pay(checkout, "DE");
+    await stack.runJobs();
+    expect(await stack.subscriptionStatus(person.ownerRef)).toBe("CREATED");
+    expect(await stack.entitlementPlan(person.ownerRef)).toBe("FREE");
+    const verifications = async () => (await stack.database.pool.query<{ done: boolean; dead: boolean }>(
+      "SELECT done_at IS NOT NULL AS done, dead_at IS NOT NULL AS dead FROM billing.outbox WHERE kind = 'VERIFY_PAYMENT' AND ref = $1",
+      [paid.transactionId]
+    )).rows;
+    expect(await verifications()).toEqual([]);
+
+    const report = await stack.reconcileDaily();
+    expect(report.enqueued).toBeGreaterThanOrEqual(1);
+    expect(await verifications()).toEqual([{ done: true, dead: false }]);
+    expect((await stack.get(person, `/v1/billing/charges/${chargeRef}`)).body).toEqual({ state: "SUCCEEDED", reason_code: null });
+    expect(await stack.subscriptionStatus(person.ownerRef)).toBe("ACTIVE");
+    expect(await stack.entitlementPlan(person.ownerRef)).toBe("PLUS");
+    expect(ids(stack.mailsTo(person.email))).toContain("M1");
+    expect((await paymentOf(chargeRef)).id).toBe(Number(paid.transactionId));
+    // Settled: the next daily check lists the payment again and queues nothing for it.
+    await stack.reconcileDaily();
+    expect(await verifications()).toEqual([{ done: true, dead: false }]);
+    expect(ids(stack.mailsTo(person.email)).filter((id) => id === "M1")).toHaveLength(1);
+  });
+
+  it("W7: deleting the account stops the renewal, keeps the paid plan until the erasure, then ends it", async () => {
+    const person = await stack.signUp("erasure.person@example.test", "RO");
+    await stack.subscribe(person, "PLUS", "RO");
+    const order = await stack.xmoneyOrderOf(person.ownerRef);
+    const rebills = () => [...stack.xmoney.transactions.values()]
+      .filter((transaction) => String(transaction.orderId) === order && transaction.transactionSource === "re-bill");
+    await stack.addEmailChannel(person);
+    const stepped = await stack.post(person, "/v1/auth/step-up", {
+      password: "not-checked-by-the-stack", code: "000000", authorization: { action: "DELETE_ACCOUNT" }
+    });
+    expect(stepped.status).toBe(200);
+    const grant = (stepped.body.step_up_grant as { token: string }).token;
+    const scheduled = await stack.delete(person, "/v1/account", { confirmation: "DELETE MY ACCOUNT", step_up_grant: grant });
+    expect([scheduled.status, scheduled.body.status]).toEqual([202, "SCHEDULED"]);
+
+    // Scheduled: the renewal is stopped at once (the route's billing hook); the paid plan goes on.
+    const billing = new BillingRepository(stack.database.pool);
+    const subscription = (await billing.subscriptionForOwner(person.ownerRef))!;
+    expect(subscription).toMatchObject({ status: "ACTIVE", planId: "PLUS", cancelRequested: true });
+    expect((await billing.subscriptionEvents(subscription.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "CANCEL_REQUESTED", data: { source: "ACCOUNT_ERASURE" } });
+    expect(await billing.ownerErasurePending(person.ownerRef)).toBe(true);
+    // The renewal and maintenance passes and the erasure sweep keep it while the deletion is pending; no M7 is mailed.
+    await stack.runRenewals();
+    await stack.runtime.erasure.sweep(100);
+    await stack.runJobs();
+    expect(await stack.subscriptionStatus(person.ownerRef)).toBe("ACTIVE");
+    expect(await stack.entitlementPlan(person.ownerRef)).toBe("PLUS");
+    expect(ids(stack.mailsTo(person.email))).not.toContain("M7");
+
+    // The erasure runs (its week has passed); the runtime's 10-minute sweep then ends the plan.
+    expect(await stack.commitErasure(person)).toBe("COMMITTED");
+    await stack.runtime.erasure.sweep(100);
+    await stack.runJobs();
+    const ended = (await billing.subscriptionForOwner(person.ownerRef))!;
+    expect(ended).toMatchObject({ status: "ENDED", endedCause: "ERASURE" });
+    expect((await billing.subscriptionEvents(ended.subscriptionId)).at(-1)).toMatchObject({ kind: "ERASURE_STOPPED" });
+    expect(await new EntitlementRepository(stack.database.pool).current(person.ownerRef, stack.now()))
+      .toMatchObject({ planId: "FREE", cause: "ERASURE_STOPPED" });
+    // Nothing was ever rebilled on the order.
+    expect(rebills()).toHaveLength(0);
+  });
+
+  it("the owner jobs: a dead SmartBill invoice emails O3 at once, and the quarter's summary O1 lists it, once", async () => {
+    // Last on purpose: it may move the clock to the summary's due time.
+    const person = await stack.signUp("o1.summary@example.test", "RO");
+    stack.invoices.failNext("INVOICE_SERVICE_REFUSED");
+    const chargeRef = await stack.subscribe(person, "PLUS", "RO");
+    expect(await stack.entitlementPlan(person.ownerRef)).toBe("PLUS");
+    expect(stack.mailsTo("owner@example.test").filter((mail) => mail.templateId === "O3" && mail.params.reference === `charge ${chargeRef}`))
+      .toEqual([expect.objectContaining({
+        params: expect.objectContaining({
+          jobKind: "SMARTBILL_INVOICE", reasonCode: "INVOICE_SERVICE_REFUSED",
+          nextSteps: expect.stringContaining(`pnpm billing:invoice --charge ${chargeRef} --kind INVOICE`)
+        })
+      })]);
+
+    // The quarter's summary is due at 06:00 UTC on the 5th day after the quarter ended (spec §2.5.9).
+    const due = taxSummaryJobFor(stack.now());
+    if (stack.now() < due.notBefore) stack.advanceDays((due.notBefore.getTime() - stack.now().getTime()) / DAY_MS + 1 / 24);
+    expect(await stack.runOwnerJobs()).toBe(1);
+    expect(await stack.runOwnerJobs()).toBe(0);
+    const summaries = stack.mailsTo("owner@example.test").filter((mail) => mail.templateId === "O1");
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]!.params.quarter).toBe(due.quarter.label);
+    expect(summaries[0]!.params.summaryText).toContain(chargeRef);
   });
 });

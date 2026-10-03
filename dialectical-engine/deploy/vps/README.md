@@ -2776,8 +2776,14 @@ systemctl restart debateai-api
    - Open the link in the email (M9) and press the button.
    - Expect the cancellation email (M7), and Settings saying when the plan ends.
 6. **What the sandbox cannot show.** The fake stack proves the rest: a failing card through the retries to Free, a
-   card from a blocked country refunded, a rebill whose answer was lost adopted without a second charge, the
-   Romanian invoice, and a card dispute found by the daily money check: the plan paused once, with one email, counted
+   card from a blocked country refunded in full and its checkout ended, a rebill whose answer was lost adopted without
+   a second charge, the Romanian invoice (its line at 21 % and its PDF attached to the receipt), the amount a renewal
+   charges (the plan's price plus tax worked out again on the day) and the amount a withdrawal refunds, both checked at
+   the fake xMoney, an upgrade (the part-month price difference charged, and the new plan's extra debate credit for the
+   rest of the month), an account deletion (the renewal stopped at once, the paid plan kept until the deletion runs,
+   then ended), a payment whose notice never arrived found and settled by the daily money check, the quarter's summary
+   email to you and the email you get at once when an invoice job fails,
+   and a card dispute found by the daily money check: the plan paused once, with one email, counted
    once in the quarter summary, and given back by `billing:dispute --outcome won`. Run both commands below from the
    repository's `dialectical-engine` folder on your own computer, not on the host (each starts its own database and
    fakes, and never touches the stage keys). Start the second only after the first has finished, because each starts
