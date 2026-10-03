@@ -25,6 +25,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Dan id-dibattitu ma setax jibda għax il-mudelli tal-IA li għandu bżonn ma kinux disponibbli. Jekk jogħġbok, erġa’ pprova wara ftit.",
   "runFailure.RUN_LIMIT_REACHED": "Dan id-dibattitu laħaq il-limitu tiegħu qabel ma seta’ jagħti tweġiba.",
   "runFailure.STOPPED": "Dan id-dibattitu waqaf f’nofs it-triq minħabba problema min-naħa tagħna. Jekk jogħġbok, erġa’ agħmel il-mistoqsija tiegħek.",
+  "runFailure.PLAN_ENDED": "Il-pjan bi ħlas tiegħek spiċċa jew ġie sospiż waqt li din il-mistoqsija kienet qed tistenna, għalhekk id-dibattitu ma bediex. Tista’ terġa’ tistaqsiha.",
   "home.status.waiting": "Qed jistenna biex jibda. Id-dibattitu tiegħek jibda waħdu fi {time}.",
   "home.status.waitingOwnDebates": "Id-dibattiti l-oħra tiegħek qed jużaw il-bqija tal-limitu tiegħek għalissa. Dan id-dibattitu jibda waħdu hekk kif jispiċċa wieħed minnhom.",
   "home.noPublishedDebates": "Għadu ma ġie ppubblikat l-ebda dibattitu.",

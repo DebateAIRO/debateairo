@@ -25,6 +25,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Tätä väittelyä ei voitu aloittaa, koska sen tarvitsemat tekoälymallit eivät olleet käytettävissä. Yritäthän uudelleen hetken kuluttua.",
   "runFailure.RUN_LIMIT_REACHED": "Tämä väittely saavutti rajansa ennen kuin se ehti antaa vastauksen.",
   "runFailure.STOPPED": "Tämä väittely pysähtyi kesken meidän päässämme olleen ongelman vuoksi. Esitäthän kysymyksesi uudelleen.",
+  "runFailure.PLAN_ENDED": "Maksullinen tilauksesi päättyi tai keskeytettiin tämän kysymyksen odottaessa, joten väittely ei alkanut. Voit esittää sen uudelleen.",
   "home.status.waiting": "Odottaa alkamista. Väittelysi alkaa itsestään {time}.",
   "home.status.waitingOwnDebates": "Muut väittelysi käyttävät toistaiseksi loput rajastasi. Tämä väittely alkaa itsestään heti, kun yksi niistä päättyy.",
   "home.noPublishedDebates": "Väittelyjä ei ole vielä julkaistu.",

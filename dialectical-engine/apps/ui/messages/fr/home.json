@@ -25,6 +25,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Ce débat n’a pas pu démarrer, car les modèles d’IA dont il a besoin étaient indisponibles. Veuillez réessayer un peu plus tard.",
   "runFailure.RUN_LIMIT_REACHED": "Ce débat a atteint sa limite avant de pouvoir apporter une réponse.",
   "runFailure.STOPPED": "Ce débat s’est interrompu en cours de route à cause d’un problème de notre côté. Veuillez reposer votre question.",
+  "runFailure.PLAN_ENDED": "Votre formule payante a pris fin ou a été suspendue pendant que cette question attendait, le débat n’a donc pas commencé. Vous pouvez la poser à nouveau.",
   "home.status.waiting": "En attente de démarrage. Votre débat démarrera de lui-même à {time}.",
   "home.status.waitingOwnDebates": "Vos autres débats utilisent pour l’instant le reste de votre limite. Celui-ci démarrera de lui-même dès que l’un d’eux sera terminé.",
   "home.noPublishedDebates": "Aucun débat n’a encore été publié.",

@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Debat ini tidak dapat dimulai karena model AI yang diperlukan sedang tidak tersedia. Silakan coba lagi nanti.",
   "runFailure.RUN_LIMIT_REACHED": "Debat ini mencapai batasnya sebelum sempat memberikan jawaban.",
   "runFailure.STOPPED": "Debat ini terhenti di tengah jalan karena masalah di pihak kami. Silakan ajukan pertanyaan Anda lagi.",
+  "runFailure.PLAN_ENDED": "Paket berbayar Anda berakhir atau dijeda saat pertanyaan ini menunggu, sehingga debat tidak dimulai. Anda dapat menanyakannya lagi.",
   "debateChrome.error.unableToLoadDebate": "Tidak dapat memuat debat",
   "debateChrome.error.unableToLoadScoring": "Tidak dapat memuat penilaian",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Tidak dapat memuat simulasi kedalaman adaptif",

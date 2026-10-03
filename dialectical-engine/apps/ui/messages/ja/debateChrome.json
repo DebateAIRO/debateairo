@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "必要なAIモデルが利用できなかったため、このディベートを開始できませんでした。しばらくしてから、もう一度お試しください。",
   "runFailure.RUN_LIMIT_REACHED": "このディベートは、回答を出す前に上限に達しました。",
   "runFailure.STOPPED": "こちら側の問題により、このディベートは途中で止まりました。もう一度ご質問ください。",
+  "runFailure.PLAN_ENDED": "この質問が待っている間に有料プランが終了したか一時停止されたため、ディベートは始まりませんでした。もう一度ご質問いただけます。",
   "debateChrome.error.unableToLoadDebate": "ディベートを読み込めません",
   "debateChrome.error.unableToLoadScoring": "採点を読み込めません",
   "debateChrome.error.unableToLoadAdaptiveDepth": "適応型深度のドライランを読み込めません",

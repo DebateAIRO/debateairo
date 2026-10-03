@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Tätä väittelyä ei voitu aloittaa, koska sen tarvitsemat tekoälymallit eivät olleet käytettävissä. Yritäthän uudelleen hetken kuluttua.",
   "runFailure.RUN_LIMIT_REACHED": "Tämä väittely saavutti rajansa ennen kuin se ehti antaa vastauksen.",
   "runFailure.STOPPED": "Tämä väittely pysähtyi kesken meidän päässämme olleen ongelman vuoksi. Esitäthän kysymyksesi uudelleen.",
+  "runFailure.PLAN_ENDED": "Maksullinen tilauksesi päättyi tai keskeytettiin tämän kysymyksen odottaessa, joten väittely ei alkanut. Voit esittää sen uudelleen.",
   "debateChrome.error.unableToLoadDebate": "Väittelyä ei voitu ladata",
   "debateChrome.error.unableToLoadScoring": "Pisteytystä ei voitu ladata",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Mukautuvan syvyyden koesuoritusta ei voitu ladata",

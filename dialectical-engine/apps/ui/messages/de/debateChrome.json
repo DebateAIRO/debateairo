@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Diese Debatte konnte nicht starten, weil die benötigten KI-Modelle nicht verfügbar waren. Bitte versuchen Sie es etwas später erneut.",
   "runFailure.RUN_LIMIT_REACHED": "Diese Debatte hat ihr Limit erreicht, bevor sie eine Antwort liefern konnte.",
   "runFailure.STOPPED": "Diese Debatte ist wegen eines Problems bei uns vorzeitig abgebrochen. Bitte stellen Sie Ihre Frage erneut.",
+  "runFailure.PLAN_ENDED": "Ihr kostenpflichtiger Tarif ist abgelaufen oder wurde pausiert, während diese Frage wartete, daher hat die Debatte nicht begonnen. Sie können sie noch einmal stellen.",
   "debateChrome.error.unableToLoadDebate": "Debatte konnte nicht geladen werden",
   "debateChrome.error.unableToLoadScoring": "Bewertung konnte nicht geladen werden",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Testlauf für adaptive Tiefe konnte nicht geladen werden",

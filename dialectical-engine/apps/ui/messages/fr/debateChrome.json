@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Ce débat n’a pas pu démarrer, car les modèles d’IA dont il a besoin étaient indisponibles. Veuillez réessayer un peu plus tard.",
   "runFailure.RUN_LIMIT_REACHED": "Ce débat a atteint sa limite avant de pouvoir apporter une réponse.",
   "runFailure.STOPPED": "Ce débat s’est interrompu en cours de route à cause d’un problème de notre côté. Veuillez reposer votre question.",
+  "runFailure.PLAN_ENDED": "Votre formule payante a pris fin ou a été suspendue pendant que cette question attendait, le débat n’a donc pas commencé. Vous pouvez la poser à nouveau.",
   "debateChrome.error.unableToLoadDebate": "Impossible de charger le débat",
   "debateChrome.error.unableToLoadScoring": "Impossible de charger les scores",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Impossible de charger la simulation de profondeur adaptative",
