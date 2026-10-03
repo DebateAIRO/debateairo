@@ -2,7 +2,9 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
-import { foldSubscription, microsToDecimal, withdrawalRefundMicros } from "@debateai/billing-core";
+import {
+  foldSubscription, microsToDecimal, withdrawalRefundMicros, withdrawalRefundPerPaymentMicros
+} from "@debateai/billing-core";
 import { planById } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
@@ -334,6 +336,64 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
       // A4(b) unchanged: the newest payment (the upgrade) gives back first, the rest comes from Plus.
       expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([[seeded.initialTransactionId, expected - 123_420_000]]);
     }
+  }, 20_000);
+
+  it("refunds in full a payment made after the statement arrived; one made before it keeps its share (P2-W6, C1)", async () => {
+    // The W6 judge's example: Romania, Plus from 1 April 2026 09:00 UTC (24.20), the emailed statement arrives on
+    // day 13 with 2.50 of Plus's 5.00 credit spent, and a Max upgrade is paid on day 14 ((200 − 20) × 16/30 = 96.00
+    // net, 116.16 with VAT) before the owner runs the command.
+    const activatedAt = new Date("2026-04-01T09:00:00.000Z");
+    const day13 = new Date(activatedAt.getTime() + 13 * DAY);
+    let transaction = 7_740_000;
+    const upgradedToMax = async (upgrade: Readonly<{ at: Date; netMicros: number; taxMicros: number; monthCreditOverrideMicros: number }>) => {
+      const seeded = await seedActiveSubscription(database.pool, {
+        ownerRef: randomUUID(), planId: "PLUS", activatedAt, taxCountry: "RO"
+      });
+      expect(seeded.totalMicros).toBe(24_200_000);
+      const paid = await seedPaidUpgrade(database.pool, seeded, { ...upgrade, planId: "MAX", transactionId: String(transaction += 1) });
+      return { seeded, upgradeChargeId: paid.chargeId, upgradeTransactionId: String(transaction) };
+    };
+    const command = (seeded: SeededSubscription, receivedAt: Date) =>
+      recordOwnerWithdrawal({ ...stores(), ownerSpend: spending(2_500_000) }, { ownerRef: seeded.ownerRef, receivedAt });
+
+    // Plus gives back its credit share, 24.20 × (1 − 2.50/5.00) = 12.10 (smaller than its 17 of 30 days), and the
+    // upgrade, paid after the person had withdrawn, goes back whole: 128.26. Before C1 it kept the same credit share
+    // of the upgrade (58.08), and the refund was 70.18 of 140.36.
+    const after = await upgradedToMax({
+      at: new Date(activatedAt.getTime() + 14 * DAY), netMicros: 96_000_000, taxMicros: 20_160_000,
+      monthCreditOverrideMicros: 82_333_333
+    });
+    expect(await command(after.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: 128_260_000 });
+    expect((await rows().subscriptionEvents(after.seeded.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: 128_260_000, withdrew_at: day13.toISOString() } });
+    // A4(b) unchanged, newest first: the upgrade's payment goes back whole, then Plus's 12.10.
+    expect(await withdrawalRequests(after.upgradeChargeId)).toEqual([[after.upgradeTransactionId, 116_160_000]]);
+    expect(await withdrawalRequests(after.seeded.initialChargeId)).toEqual([[after.seeded.initialTransactionId, 12_100_000]]);
+    expect((await emailOf("M8_RECEIVED", after.seeded.subscriptionId)).map((row) => row.payload)).toEqual([expect.objectContaining({
+      template: "M8_RECEIVED", "param.withdrawalDate": day13.toISOString(), "param.refundAmount": "128.26"
+    })]);
+
+    // Control: a statement received after the upgrade is measured as before. Max paid half a day earlier, on day 12.5
+    // ((200 − 20) × 17.5/30 = 105.00 net, 127.05 with VAT), so at day 13 each payment gives back its own share, with
+    // Max's credit (A6's override, 89.58) in force.
+    const upgradeAt = new Date(activatedAt.getTime() + 12.5 * DAY);
+    const before = await upgradedToMax({
+      at: upgradeAt, netMicros: 105_000_000, taxMicros: 22_050_000, monthCreditOverrideMicros: 89_583_333
+    });
+    const expected = withdrawalRefundPerPaymentMicros({
+      payments: [
+        { paidMicros: 24_200_000, coverageStart: before.seeded.periodStart, coverageEnd: before.seeded.periodEnd },
+        // seedPaidUpgrade quotes one minute before the payment: the upgrade's coverage starts there.
+        { paidMicros: 127_050_000, coverageStart: new Date(upgradeAt.getTime() - 60_000), coverageEnd: before.seeded.periodEnd }
+      ],
+      now: day13, creditSpentMicros: 2_500_000, monthlyCreditMicros: 89_583_333
+    });
+    // Plus 24.20 × 17/30 = 13.71 (its days), Max 127.05 × 17 days of its 17.5 days and a minute = 123.41: 137.12.
+    expect(expected).toBe(137_120_000);
+    expect(await command(before.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: expected });
+    expect(await withdrawalRequests(before.upgradeChargeId)).toEqual([[before.upgradeTransactionId, 127_050_000]]);
+    expect(await withdrawalRequests(before.seeded.initialChargeId))
+      .toEqual([[before.seeded.initialTransactionId, expected - 127_050_000]]);
   }, 20_000);
 
   it("keeps a window whose 14th day is a Saturday open through Monday, in Settings and by the command", async () => {
