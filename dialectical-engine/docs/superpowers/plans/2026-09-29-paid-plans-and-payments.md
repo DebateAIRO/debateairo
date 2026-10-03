@@ -29665,6 +29665,7 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    `… refund --transaction <transaction id> --order <order id> --as full --amount 0.30`
    `… refund --transaction <transaction id> --order <order id> --as extra --amount 0.01`
    `… fetch --what transaction-list --date-type refund`
+   `… fetch --what transaction-list --date-type charge-back`
    Write down the four printed lines. They answer: after each partial refund, does the payment stay `complete-ok` or
    already say `refund-ok`, and does its `amount` stay `1.00` or shrink (`amount=…`)? Is there a separate refund
    transaction (`linked=yes`)? Does the refund listing show a row for each partial refund, and after how long
@@ -29673,6 +29674,13 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    `refund-refused-….json` file)? Open the two `transaction-list-refund-after-…` files and write down, for each
    row that names the payment in `relatedTransactionIds`, its `transactionType`, `amount` and `transactionStatus`
    (not its id).
+   **The charge-back listing (W13, P2-I18).** The last command asks xMoney for its dispute listing exactly as our
+   daily money check does (`dateType=charge-back`, the last 120 days up to now) and prints
+   `XMONEY_FETCHED=transaction-list:charge-back:<HTTP status>`; write the line down. `:200` means xMoney accepts it
+   (the list may well be empty: the sandbox run makes no dispute). Anything else means xMoney refuses the listing our
+   daily check relies on to find disputes: tell the builders at once, because the request changes before billing is
+   on. Keep the `transaction-list-charge-back-….json` it wrote either way: it is a required fixture, and P3b's
+   recorded suite fails on a refusal, so X0 cannot pass with this answer missing.
 8. **(h) The card-check hold and its release (A12).** On the 1.00 `auth` payment of step 3:
    `… release --transaction <its transaction id>`
    It prints `XMONEY_RELEASE=<status before>-><HTTP status>-><status after>`, e.g. `complete-ok->200->void-ok`. Then
@@ -29723,7 +29731,7 @@ your notes. Write down the ids the steps name (transaction, order, card, custome
    (a), (d), (e) (the page's last line with the SDK names, where the bank check opened and whether the page still
    completed, any `form-action` row, and the Payment Request and the referrer comparisons), (f), (g) (including the refund
    listing's rows and delays), (h), (i) (the test amounts xMoney names and the declined rebill's line), the 0.00
-   question, the two `customer` lines, item 9's `--list-order` line, and the `outerFields` of `notice-success.json`
+   question, the two `customer` lines, item 7's charge-back listing line, item 9's `--list-order` line, and the `outerFields` of `notice-success.json`
    (which fields besides `opensslResult` a notice carries — e.g. a `signature` of 128 hex characters — and, for the
    `signature`, its `construction`: the name of the scrubber's candidate it matched, or `null`); P3a's and P3b's recorded-fixture tests start running as soon as the
    files are in the repository. Hand over item 9's notes (the six times and statuses, where the status first changed,

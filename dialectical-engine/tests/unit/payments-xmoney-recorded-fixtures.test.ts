@@ -1,7 +1,7 @@
 // tests/unit/payments-xmoney-recorded-fixtures.test.ts
 // X0's recorded stage fixtures, run through the REAL client and the real notice decoder. Until the owner records
 // them this suite is skipped BY NAME (the describe says so) — the one test here that can be inert, and the go-live
-// checklist's row 14 (written by P22) lists "all 26 required X0 kinds present and the X0 suites green" so the skip
+// checklist's row 14 (written by P22) lists "all 27 required X0 kinds present and the X0 suites green" so the skip
 // cannot be forgotten.
 // Once any fixture exists, every required kind must: a missing one fails loudly, never silently passes.
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -73,7 +73,10 @@ const SINGLE_TRANSACTION_KINDS = [
 ] as const;
 const LIST_KINDS = [
   "transaction-list", "transaction-list-after-refund", "transaction-list-refund-after-partial",
-  "transaction-list-refund-after-second-partial", "transaction-list-refund"
+  "transaction-list-refund-after-second-partial", "transaction-list-refund",
+  // W13 (P2-I18): the daily money check's dispute listing; a refused dateType=charge-back records xMoney's error reply,
+  // which fails here (no pagination, no rows), so X0 can never pass with the listing unconfirmed.
+  "transaction-list-charge-back"
 ] as const;
 
 describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)", () => {

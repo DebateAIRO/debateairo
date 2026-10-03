@@ -26,7 +26,8 @@ import {
   recordingHeaders,
   recordingOrder,
   recordingPage,
-  signRecordingOrder
+  signRecordingOrder,
+  transactionListCapture
 } from "../../tools/billing/xmoney-sandbox.js";
 
 const roots: string[] = [];
@@ -306,10 +307,12 @@ describe("X0 — xMoney fixture scrubbing", () => {
   });
 
   it("refuses a key file other users can read, a capture it cannot classify, and two captures of one kind", () => {
-    expect(XMONEY_REQUIRED_FIXTURE_KINDS).toHaveLength(26);
+    expect(XMONEY_REQUIRED_FIXTURE_KINDS).toHaveLength(27);
     expect(XMONEY_OPTIONAL_FIXTURE_KINDS).toHaveLength(7);
     // W1 (P2-I1, P2-I6): the customer POST /customer created is required; a second POST of it is optional.
     expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[]).toContain("customer-response");
+    // W13 (P2-I18): the daily money check's charge-back listing, which X0 must show xMoney accepts.
+    expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[]).toContain("transaction-list-charge-back");
     expect(XMONEY_OPTIONAL_FIXTURE_KINDS as readonly string[]).toContain("customer-response-repeat");
     for (const kind of ["transaction-list-refund-after-partial", "transaction-refund-second-partial",
       "transaction-list-refund-after-second-partial"]) {
@@ -491,5 +494,29 @@ describe("X0 — xMoney fixture scrubbing", () => {
     expect(linkedRefundRows(listing, "7").map((row) => row.id)).toEqual([8, 9]);
     expect(linkedRefundRows({ code: 200, message: "Success", data: {} }, "7")).toEqual([]);
     expect(linkedRefundRows(null, "7")).toEqual([]);
+  });
+});
+
+describe("W13 X0 records each daily listing the money check asks for (P2-I18)", () => {
+  it("names a required kind for every --date-type it takes, and refuses any other", () => {
+    for (const dateType of ["creation", "refund", "charge-back"]) {
+      const { kind } = transactionListCapture(dateType);
+      expect(XMONEY_REQUIRED_FIXTURE_KINDS as readonly string[], dateType).toContain(kind);
+    }
+    expect(transactionListCapture("creation").kind).toBe("transaction-list");
+    expect(transactionListCapture("refund").kind).toBe("transaction-list-refund");
+    expect(transactionListCapture("charge-back").kind).toBe("transaction-list-charge-back");
+    for (const dateType of ["approval", "cancellation", "chargeback", ""]) {
+      expect(() => transactionListCapture(dateType), dateType).toThrow("XMONEY_ARGUMENT_REQUIRED:--date-type");
+    }
+  });
+
+  it("asks the charge-back listing over the daily check's own window: the last 120 days, up to now", () => {
+    const now = Date.parse("2026-10-10T12:00:00.000Z");
+    const window = transactionListCapture("charge-back").defaultWindow(now);
+    expect(window).toEqual({ from: "2026-06-12T12:00:00+00:00", to: "2026-10-10T12:00:00+00:00" });
+    // The creation and refund listings keep X0's first window: a week back, a day ahead.
+    expect(transactionListCapture("refund").defaultWindow(now))
+      .toEqual({ from: "2026-10-03T12:00:00+00:00", to: "2026-10-11T12:00:00+00:00" });
   });
 });

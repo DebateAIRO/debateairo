@@ -8,7 +8,7 @@
 //             --mode authAndCapture|auth --capture-dir D [--port 8780] [--locale en] [--identifier I]
 //             [--permissions-policy production|none] [--referrer-policy production|strict-origin]
 //   fetch     --key-file F --capture-dir D --what transaction|order|card|transaction-list
-//             [--id N] [--customer C] [--as initial|second-payment|refund] [--date-type creation|refund]
+//             [--id N] [--customer C] [--as initial|second-payment|refund] [--date-type creation|refund|charge-back]
 //             [--from ISO] [--to ISO] [--list-order]
 //   rebill    --key-file F --capture-dir D --order O --customer C --amount 1.00
 //             [--as renewal|auth-order|declined]
@@ -214,6 +214,33 @@ function stageIso(milliseconds: number): string {
   return new Date(milliseconds).toISOString().replace(/\.\d{3}Z$/u, "+00:00");
 }
 
+/**
+ * X0: what `fetch --what transaction-list --date-type <t>` records, by `t`, each a required fixture kind, and the window
+ * it asks when no `--from`/`--to` is given. W13 (P2-I18): `charge-back` is the daily money check's dispute listing
+ * (apps/api/src/billing/reconcile.ts), asked over the same window the check asks (the last 120 days, up to now), so
+ * the recording shows whether xMoney accepts exactly that request.
+ */
+export function transactionListCapture(dateType: string): TransactionListCapture {
+  const capture = Object.hasOwn(TRANSACTION_LIST_CAPTURES, dateType) ? TRANSACTION_LIST_CAPTURES[dateType] : undefined;
+  if (capture === undefined) throw new TypeError("XMONEY_ARGUMENT_REQUIRED:--date-type");
+  return capture;
+}
+
+type TransactionListCapture = Readonly<{
+  kind: "transaction-list" | "transaction-list-refund" | "transaction-list-charge-back";
+  defaultWindow: (now: number) => Readonly<{ from: string; to: string }>;
+}>;
+
+const lastWeek = (now: number) => Object.freeze({ from: stageIso(now - 7 * DAY_MS), to: stageIso(now + DAY_MS) });
+const TRANSACTION_LIST_CAPTURES: Readonly<Record<string, TransactionListCapture>> = Object.freeze({
+  creation: Object.freeze({ kind: "transaction-list", defaultWindow: lastWeek }),
+  refund: Object.freeze({ kind: "transaction-list-refund", defaultWindow: lastWeek }),
+  "charge-back": Object.freeze({
+    kind: "transaction-list-charge-back",
+    defaultWindow: (now: number) => Object.freeze({ from: stageIso(now - 120 * DAY_MS), to: stageIso(now) })
+  })
+});
+
 type StageReply = Readonly<{ httpStatus: number; body: unknown }>;
 
 async function stageRequest(
@@ -333,15 +360,18 @@ async function main(argv: readonly string[]): Promise<void> {
       const what = argument(argv, "--what");
       if (what === "transaction-list") {
         const dateType = argument(argv, "--date-type", "creation");
-        if (dateType !== "creation" && dateType !== "refund") throw new TypeError("XMONEY_ARGUMENT_REQUIRED:--date-type");
+        const listing = transactionListCapture(dateType);
+        const window = listing.defaultWindow(Date.now());
         const query = new URLSearchParams({
           dateType,
-          createdAtFrom: argument(argv, "--from", stageIso(Date.now() - 7 * DAY_MS)),
-          createdAtTo: argument(argv, "--to", stageIso(Date.now() + DAY_MS))
+          createdAtFrom: argument(argv, "--from", window.from),
+          createdAtTo: argument(argv, "--to", window.to)
         });
         if (argv.includes("--id")) query.set("orderId", argument(argv, "--id"));
         const reply = await stageRequest(key, "GET", `/transaction?${query.toString()}`);
-        capture(captureDir, dateType === "refund" ? "transaction-list-refund" : "transaction-list", reply.body);
+        // Kept whatever xMoney answers: a refused charge-back listing is recorded as its error reply, which P3b's
+        // recorded suite then fails on (W13), so the answer can never go unnoticed.
+        capture(captureDir, listing.kind, reply.body);
         console.log(`XMONEY_FETCHED=transaction-list:${dateType}:${reply.httpStatus}`);
         return;
       }

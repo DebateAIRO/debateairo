@@ -28,7 +28,9 @@ export const XMONEY_REQUIRED_FIXTURE_KINDS = Object.freeze([
   // X0 (g), second half: how (and how soon) the refund listing shows a partial refund, and a second one.
   "transaction-list-refund-after-partial", "transaction-refund-second-partial",
   "transaction-list-refund-after-second-partial",
-  "transaction-refund-full", "refund-refused", "transaction-list-refund"
+  "transaction-refund-full", "refund-refused", "transaction-list-refund",
+  // W13 (P2-I18): the daily money check's dispute listing (`dateType=charge-back`), over its own 120 days.
+  "transaction-list-charge-back"
 ] as const);
 /**
  * Recorded only when xMoney produces them: a refund's or a release's notice, a separate refund transaction, a second

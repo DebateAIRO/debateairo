@@ -81,6 +81,21 @@ describe("P22 the Billing runbook", () => {
       "When xMoney or the tax service is down at a renewal", "retried quietly for up to 3 days",
       // §14.8 (P11a judge, carried): the renewal pass's two journal signals, and what each means.
       "\"event\":\"billing.renewal.report\"", "taxRefused", "[BILLING_RENEWAL_PENDING]",
+      // §14.8 (W13, P2-I18): every billing failure signal is in the journal table, each with what to do; the three
+      // daily listings fail on their own; a CUSTOMER_MISMATCH reaches the operator with the hand refund.
+      "What billing writes to the API's journal",
+      "| `\"event\":\"billing.reconcile.listing_failed\"`, with `listing` and `code` |",
+      "| `[BILLING_RECONCILIATION_PENDING]` (a bare marker) |", "| `[BILLING_OUTBOX_PENDING]` (a bare marker) |",
+      "| `[BILLING_ERASURE_SWEEP_PENDING]` (a bare marker) |", "| `[BILLING_OWNER_JOBS_PENDING]` (a bare marker) |",
+      "| `\"event\":\"billing.outbox.dead\"`, with `kind`, `code` and `attempts` |",
+      "| `\"event\":\"billing.outbox.alert_failed\"`, with `kind` and `code` |",
+      "| `\"event\":\"billing.outbox.settle_failed\"`, with `kind`, `outcome` and `attempts` |",
+      "| `\"event\":\"billing.xmoney.credentials_refused\"`, with `operation` |",
+      "| `\"event\":\"billing.invoice.unknown\"`, with `issuer`, `kind` and `code` |",
+      "| `\"event\":\"billing.payment.mismatch\"`, with `code` or `chargeKind` |",
+      "this one is asked again on its own every hour", "A list xMoney refuses never causes it",
+      "`REFUND_NOT_REQUESTED` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
+      "WHERE o.outcome = 'MISMATCH'", "refund it there by hand",
       // §14.8 (ruling Q-5): a refund that could not be completed reaches the owner at once.
       "A refund that could not be completed", "O2",
       // §14.8 (W9, P2-I11, P2-M8): the acknowledgement of receipt, the owner's alert for a withdrawal settled by hand,
@@ -124,6 +139,11 @@ describe("P22 the Billing runbook", () => {
     expect(printed.length).toBeGreaterThanOrEqual(15);
     for (const code of printed) expect(billing, code).toContain(`- \`${code}\``);
     expect(billing).not.toContain("(no such line for\nthat charge)");
+    // W13 (P2-I18): every bare marker billing can print has its row in the journal table.
+    const markers = ["apps/api/src/billing/runtime.ts", "apps/api/src/billing/erasure-hook.ts"]
+      .flatMap((path) => [...read(path).matchAll(/reportPending\("(BILLING_[A-Z_]+)"\)/gu)].map((match) => match[1]!));
+    expect(new Set(markers).size).toBeGreaterThanOrEqual(5);
+    for (const marker of markers) expect(billing, marker).toContain(`| \`[${marker}]\` (a bare marker) |`);
     // W9 fix round 1 (F1): a dead refund is never settled with "at least" its amount.
     expect(billing).not.toContain("Refund at least");
     // R-7: the public origin is the existing PUBLIC_APP_URL; no second setting names it.
@@ -222,7 +242,9 @@ describe("P22 the Billing runbook", () => {
       "payment-marks", "SELLER_COMPANY", "notice URL", "same-origin-allow-popups", "records key",
       "daily ceiling covers the subscribers", "XMONEY_SDK_ORIGIN", "Terms §13", "counsel",
       // D5 5k: the recorded suites cannot stay skipped by accident.
-      "all 26 required X0 kinds present and the X0 suites green", "Permissions-Policy",
+      "all 27 required X0 kinds present", "the X0 suites green", "Permissions-Policy",
+      // W13 (P2-I18): X0 confirms the daily money check's dispute listing.
+      "`dateType=charge-back` listing is accepted", "transaction-list-charge-back",
       "Quaderno and SmartBill fixtures committed and their recorded-fixture suites green",
       "tests/unit/invoice-smartbill-recorded-fixtures.test.ts", "partial-credit shapes are still ⚠",
       // Ruling Q-12: the records key's proof is the drill line.
@@ -271,6 +293,11 @@ describe("P22 the Billing runbook", () => {
       // P23 fix F2: what the moved clock does not reach.
       "its usage bars and a withdrawal's credit-used share", "the fake stack in step 6 proves the bars and the share",
       "`billing:efactura-status`, `billing:invoice`) also\nrun on the real clock", "so do not run them on this host while the line is set",
+      // W13 (P2-I18): the first start with billing on is read for the billing failure lines, before step 1 and after
+      // step 2's restart.
+      "**Before step 1: read the journal of the first start with billing on.**",
+      "_SYSTEMD_INVOCATION_ID=\"$(systemctl show --property=InvocationID --value debateai-api)\"",
+      "run the journal command from **Before step 1** again; it should print nothing",
       // W2 (P2-I2, P2-M39): the dispute case is part of the owner's proof, run after the whole-flow suite.
       "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
       "a card dispute found by the daily money check: the plan paused once, with one email, counted",
