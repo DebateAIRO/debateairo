@@ -2449,12 +2449,13 @@ and the renewal is retried quietly for up to 3 days (72 hours from the end of th
 without a fresh price, and no "payment failed" email goes out. Only if there is still no answer after 3 days does the
 normal failed-payment path start: retries on days 1, 3 and 7, each with its email, and then the Free plan.
 
-**What billing writes to the API's journal** (`journalctl -u debateai-api`). The renewal pass runs every minute, the money check against xMoney every 10 minutes (its full check once
-a day, and once at each start of the API), and the job queue (payment checks, refunds, invoices, credit notes and
-emails) every 5 seconds. A marker in square brackets carries no detail; a line with `"event"` names what happened in
-its other fields, and never a person, an email address or an amount. Each line below asks you to look, or to act, at
-least sometimes; a row says so when its line also comes in normal running. The billing lines this table leaves out
-record normal events (they are listed after it). The signals that matter:
+**What billing writes to the API's journal** (`journalctl -u debateai-api`). The renewal pass runs every minute, the
+money check against xMoney every 10 minutes (its full check once a day, and once at each start of the API), and the
+job queue (payment checks, refunds, invoices, credit notes and emails) every 5 seconds. A marker in square brackets
+carries no detail; a line with `"event"` names what happened in its other fields, and never a person, an email address
+or an amount. Each line below asks you to look, or to act, at least sometimes; a row says so when its line also comes
+in normal running. The billing lines this table leaves out record normal events (they are listed after it). The
+signals that matter:
 
 | Signal | What it means | What to do |
 |---|---|---|
@@ -2695,7 +2696,7 @@ journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show -
 A `billing.reconcile.listing_failed` line with `"listing":"charge-back"` (or another list) and `XMONEY_REFUSED`
 means xMoney does not accept that list as the site asks for it: stop here, write the line down, and report it, because
 billing must not go on for real until the request is changed. Any other line it prints: look it up in the journal table of
-§14.8 and do what it says before going on. This filter prints nothing else: billing's other lines (a stopped job, a
+§14.8 and do what it says before going on. This filter prints nothing else: billing's other lines (a job that died, a
 payment mismatch, a notice the key cannot open, and the rest of the table) never reach it. To read every billing line of
 that start, run the command below as well, and look each line up in the same table; a line the table leaves out is in
 its sentence "Every other billing line records a normal event", and needs nothing:
