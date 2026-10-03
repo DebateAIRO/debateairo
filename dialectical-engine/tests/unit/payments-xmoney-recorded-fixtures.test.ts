@@ -119,6 +119,9 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
         (client) => client.getTransaction("1"));
       expect((XMONEY_STATUSES as ReadonlyArray<string>).includes(parsed.status), kind).toBe(true);
       expect(transactionRoute(parsed.transactionType), kind).toBe(kind === "transaction-refund" ? "REFUND" : "PAYMENT");
+      // P2-M3: xMoney's time is read with its zone (an offset in creationDate, or creationTimestamp), never in this
+      // host's zone; it anchors plans, dates the tax rows and bounds A2's windows. If this fails, the parse changes.
+      expect(parsed.createdAt, `${kind}: creation time with its zone`).not.toBeNull();
     }
   });
 
@@ -145,6 +148,7 @@ describe.runIf(fixtures.length > 0)("P3b — recorded xMoney stage fixtures (X0)
         (client) => client.listTransactions({ from: new Date(0), to: new Date(), onRejected: (transactionId) => rejected.push(transactionId) }));
       expect(rejected, kind).toEqual([]);
       expect(listed.length, kind).toBe(((fixture(kind).body as { data: unknown[] }).data).length);
+      expect(listed.filter((row) => row.createdAt === null).map((row) => row.transactionId), `${kind}: rows with no zoned time`).toEqual([]);
     }
   });
 

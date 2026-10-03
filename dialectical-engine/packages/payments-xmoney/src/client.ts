@@ -105,6 +105,26 @@ function relatedIds(value: unknown): ReadonlyArray<string> {
   return Object.freeze(value.map(requiredId));
 }
 
+/** An ISO 8601 date and time that names its own zone: `Z` or an explicit offset. */
+const ZONED_DATE_TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:?\d{2})$/u;
+
+/**
+ * P2-M3: when xMoney created a transaction. `creationDate` is taken only with its zone: written without one
+ * ("2026-10-02 10:00:00"), `Date` would read it in this server's own zone, and that instant anchors plans, dates the
+ * tax rows and bounds A2's adoption windows. Otherwise `creationTimestamp` (Unix seconds, unambiguous) is read; with
+ * neither, the time is unknown (null), as for a row with no date at all.
+ */
+function creationInstant(value: Readonly<Record<string, unknown>>): Date | null {
+  const date = value.creationDate;
+  if (typeof date === "string" && ZONED_DATE_TIME.test(date)) {
+    const parsed = new Date(date);
+    if (Number.isFinite(parsed.getTime())) return parsed;
+  }
+  const stamp = value.creationTimestamp;
+  const seconds = typeof stamp === "number" ? stamp : typeof stamp === "string" && /^[0-9]{1,12}$/u.test(stamp) ? Number(stamp) : Number.NaN;
+  return Number.isSafeInteger(seconds) && seconds > 0 ? new Date(seconds * 1_000) : null;
+}
+
 export function parseXMoneyTransaction(value: unknown): XMoneyTransaction {
   if (!isRecord(value)) invalidResponse();
   const status = value.transactionStatus;
@@ -114,7 +134,6 @@ export function parseXMoneyTransaction(value: unknown): XMoneyTransaction {
   const currency = value.currency;
   if (typeof currency !== "string" || !/^[A-Z]{3}$/u.test(currency)) invalidResponse();
   const external = value.externalOrderId;
-  const created = typeof value.creationDate === "string" ? new Date(value.creationDate) : null;
   return Object.freeze({
     transactionId: requiredId(value.id),
     orderId: requiredId(value.orderId),
@@ -127,7 +146,7 @@ export function parseXMoneyTransaction(value: unknown): XMoneyTransaction {
     ip: optionalText(value.ip),
     transactionSource: optionalText(value.transactionSource),
     transactionType: optionalText(value.transactionType),
-    createdAt: created !== null && Number.isFinite(created.getTime()) ? created : null,
+    createdAt: creationInstant(value),
     relatedTransactionIds: relatedIds(value.relatedTransactionIds)
   });
 }
