@@ -53,8 +53,19 @@ import {
   parseRegisterVersionText,
   persistBootstrapRegister,
   readClaimTypeCompositionMap,
-  registerVersionToSafeLegacyNumber
+  registerVersionToSafeLegacyNumber,
+  type StoryPolicy
 } from "@debateai/register";
+import {
+  STORY_CHECKER_CONTRACT_ID,
+  STORYTELLER_CONTRACT_ID,
+  StoryRepository,
+  StoryWriter,
+  loadStoryPack,
+  resolveStoryPackDir,
+  type StoryRecordInput,
+  type StoryWriteInput
+} from "@debateai/story";
 import {
   createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
 } from "../support/testDatabase.js";
@@ -493,7 +504,9 @@ async function startProviderDouble(
   contents: readonly ProviderDoubleResponse[],
   panelAssessment: string = DEFAULT_PANEL_ASSESSMENT,
   // A16a fix round 1: the first N panel calls this route answers fail at the transport (503).
-  panelFailures = 0
+  panelFailures = 0,
+  // Part 4, P4-D: the verdict story's two answers, handed out by the request's story contract (never the queue).
+  storyAnswers?: Readonly<{ storyteller: string; checker: string }>
 ): Promise<{
   endpoint: string; calls(): number; bodies(): readonly string[]; stop(): Promise<void>;
 }> {
@@ -546,6 +559,19 @@ async function startProviderDouble(
       const body = Buffer.concat(chunks).toString("utf8");
       bodies.push(body);
       const askedModel = requestedModel(body);
+      if (storyAnswers !== undefined) {
+        let contractId: string | null = null;
+        try { contractId = readFramedMaterial(wirePacket(body)).contractId; } catch { /* not a framed story request */ }
+        const storyContent = contractId === STORYTELLER_CONTRACT_ID ? storyAnswers.storyteller
+          : contractId === STORY_CHECKER_CONTRACT_ID ? storyAnswers.checker : null;
+        if (storyContent !== null) {
+          calls += 1;
+          response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+            id: `story-${calls}`, model: askedModel, choices: [{ message: { content: storyContent } }]
+          }));
+          return;
+        }
+      }
       // S-LANG: every packet's instruction now ends with the argument-language
       // directive, which NAMES the machine-consumed identifiers it protects
       // (`fatalFlags[].type`, `served_number_refs`, …). Those bare identifiers are
@@ -9839,18 +9865,28 @@ async function executeSeatScenario(input: {
     SeatRoute | JudgeOnlyRoute,
     (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => ProviderCostEnvelopeSeam
   >>>;
+  /** Part 4, P4-D: a route's STORY money seam, as a hosted runner builds one per story call (`buildStoryCostEnvelopeSeam`). */
+  readonly storyCostEnvelopes?: Readonly<Partial<Record<SeatRoute | JudgeOnlyRoute, (runId: string) => ProviderCostEnvelopeSeam>>>;
+  /** Part 4, P4-D: the doubles that answer the verdict story (the third double also serves the judge-only routes). */
+  readonly storyAnswers?: Readonly<Partial<Record<SeatRoute, Readonly<{ storyteller: string; checker: string }>>>>;
 }) {
   const doubles = {
-    primary: await startProviderDouble(input.primary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.primary ?? 0),
-    secondary: await startProviderDouble(input.secondary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.secondary ?? 0),
-    third: await startProviderDouble(input.third, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.third ?? 0)
+    primary: await startProviderDouble(input.primary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.primary ?? 0, input.storyAnswers?.primary),
+    secondary: await startProviderDouble(
+      input.secondary, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.secondary ?? 0, input.storyAnswers?.secondary
+    ),
+    third: await startProviderDouble(input.third, DEFAULT_PANEL_ASSESSMENT, input.panelFailures?.third ?? 0, input.storyAnswers?.third)
   };
   const observed = (route: string, gateway: ProviderGateway): ProviderGateway => input.observe === undefined
     ? gateway
     : { call: (request) => { input.observe!(route, request); return gateway.call(request); } };
   const seamOf = (route: SeatRoute | JudgeOnlyRoute) => {
     const build = input.costEnvelopes?.[route];
-    return build === undefined ? {} : { buildCostEnvelopeSeam: build };
+    const story = input.storyCostEnvelopes?.[route];
+    return {
+      ...(build === undefined ? {} : { buildCostEnvelopeSeam: build }),
+      ...(story === undefined ? {} : { buildStoryCostEnvelopeSeam: story })
+    };
   };
   const gatewayFor = (route: SeatRoute) => observed(route, createPostgresProviderGateway(database.pool, {
     endpoint: doubles[route].endpoint, model: SEAT_ROUTES[route].model, maker: SEAT_ROUTES[route].maker, ...seamOf(route)
@@ -11534,6 +11570,339 @@ describe("S1a · the answer's seats inside dev's money fallback and disclosure",
     } finally {
       await rm(momentDirectory, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * Part 4, P4-D (P3-N1; the controller's ruling and C3 of 3 October 2026) — on a
+ * debate whose models the scorecard picked, the verdict story is written and
+ * checked by that debate's OWN answer writer and answer checker: the seat member
+ * that answered the served round (main or runner-up), or the seat's main when no
+ * round answered. A FALLBACK answer seat keeps the register's ref, and a legacy
+ * run does not change. Before the fix, the story resolved only the register's two
+ * refs against the run's claim-eligible debaters, so every assigned run whose
+ * debaters did not include them stored FAILED/STORY_ROLE_UNAVAILABLE.
+ *
+ * The register's synthesis refs (and the story rows built from them) name the
+ * judge-only fifth route: configured, so the J24 pre-claim check passes, but
+ * neither a debater nor a seat, so it can never answer a story by accident.
+ * Only the doubles a row names in `storyAnswers` answer a story request, by its
+ * story contract; any other double hands it the head of its debate queue, which
+ * is never a story, so a story sent to the wrong route fails loudly.
+ */
+const SEAT_STORY_PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
+const SEAT_STORY_SEALED_REF = SEAT_JUDGE_ONLY.fifth.providerRef;
+
+/** A two-position story in short refs: the seat harness's debate has two roots, P1 and P2. */
+const seatHarnessStory = (): string => {
+  const paragraph = (text: string) => ({ text, node_refs: ["P1"] });
+  return JSON.stringify({
+    shape_id: SEAT_STORY_PACK.defaultShape,
+    short: {
+      headline: "Both positions were argued, and one held up better.",
+      summary: "You asked a question with two answers on the table; the debate weighed both.",
+      confidence: "Fairly sure, until a sourced objection turns up.",
+      paths: [
+        { position_ref: "P1", fate: "HELD_UP", line: "The first position held up.", node_refs: ["P1"] },
+        { position_ref: "P2", fate: "HELD_UP", line: "The second position held up too.", node_refs: ["P2"] }
+      ],
+      change: paragraph("A stronger, sourced objection would change the answer.")
+    },
+    why: { reasons: [paragraph("The first position held up against its strongest objection.")] },
+    long: {
+      sections: ["What you are deciding", "The verdict", "What would change it"].map((title) => ({
+        title, paragraphs: [paragraph(`${title}, in the debate's own terms.`)]
+      }))
+    },
+    reviewer_note: null
+  });
+};
+
+const SEAT_STORY_CHECKER_SATISFIED = JSON.stringify({
+  satisfied: true, objection: null,
+  criteria: {
+    faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true,
+    no_overstatement: true, citations_correct: true, reviewer_note_separate: true,
+    goal_marked_as_reading: true, speaks_to_the_person: true
+  }
+});
+const SEAT_STORY_ANSWERS = Object.freeze({ storyteller: seatHarnessStory(), checker: SEAT_STORY_CHECKER_SATISFIED });
+
+/** A real story writer over this database whose policy names `sealedRef` for both roles, as the register's rows do. */
+function seatStoryWriter(sealedRef: string = SEAT_STORY_SEALED_REF) {
+  const records: StoryRecordInput[] = [];
+  const stored: string[] = [];
+  const repository = new StoryRepository(database.pool);
+  const policy: StoryPolicy = Object.freeze({
+    storytellerRoleRef: sealedRef,
+    storyCheckerRoleRef: sealedRef,
+    loopMaxRounds: 1,
+    storytellerBound: Object.freeze({ maxAttempts: 1, tokenCeiling: 4_096, deadlineMs: 5_000 }),
+    checkerBound: Object.freeze({ maxAttempts: 1, tokenCeiling: 1_024, deadlineMs: 5_000 }),
+    materialBudget: Object.freeze({ low: 40_000, medium: 80_000, high: 120_000 }),
+    perStoryCeilingMicros: null,
+    perStoryOverrunBasisPoints: 0,
+    registerVersion: 1
+  });
+  // The boot resolver knows nobody: only what the runner hands the story can answer it.
+  const writer = new StoryWriter({
+    pool: database.pool, pack: SEAT_STORY_PACK, policy, hosted: false, resolveProvider: () => null, log: () => undefined,
+    repository: {
+      insert: async (record) => {
+        records.push(record);
+        const outcome = await repository.insert(record);
+        stored.push(outcome);
+        return outcome;
+      }
+    }
+  });
+  return { writer, records, stored };
+}
+
+/** The register's synthesis refs on the judge-only fifth route (configured; neither a debater nor a seat). */
+function sealedRefsOnFifth(): Partial<WalkingSkeletonSettings> {
+  return {
+    synthesisRolePolicy: {
+      ...runnerSettings().synthesisRolePolicy!,
+      synthesizerRoleRef: SEAT_STORY_SEALED_REF,
+      evaluatorRoleRef: SEAT_STORY_SEALED_REF
+    }
+  };
+}
+
+/** A story seam that refuses every story call for money before it is sent: the seam's own STORY_COST_ENVELOPE_REACHED. */
+const storyMoneyRefused = (): ProviderCostEnvelopeSeam => ({
+  assertCallAllowed: () => {
+    throw new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "test-layer: the story call does not fit");
+  },
+  recordCall: () => undefined,
+  assertUsageReported: () => undefined
+});
+
+describe("P4-D · a scorecard-picked debate's story is written and checked by its own answer models (P3-N1)", () => {
+  const debate = (label: string) => ({
+    primary: [
+      ...Array.from({ length: 2 }, (_, index) => judgementDouble(`Primary ${label} ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Primary ${label} review ${index + 1}`))
+    ],
+    secondary: Array.from({ length: 2 }, (_, index) => judgementDouble(`Secondary ${label} ${index + 1}`, 0.5)),
+    third: [
+      ...Array.from({ length: 4 }, (_, index) => judgementDouble(`Third ${label} leg ${index + 1}`, 0.5)),
+      ...Array.from({ length: 8 }, (_, index) => reviewDouble("agree", `Third ${label} review ${index + 1}`))
+    ]
+  });
+  // A15's debate: the debaters are the primary and the secondary; the row picks the two answer seats.
+  const seats = (writer: readonly PinnedSeat[], checker: readonly PinnedSeat[]) => pinnedAssignment({
+    POSITION: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    SUPPORT_ATTACK: [pinnedSeat(0, "third")],
+    CROSS_EXCHANGE: [pinnedSeat(0, "primary"), pinnedSeat(1, "secondary")],
+    JUDGE: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    REVIEWER: [pinnedSeat(0, "third"), pinnedSeat(1, "primary")],
+    ANSWER_WRITER: [...writer],
+    ANSWER_CHECKER: [...checker]
+  });
+  const USAGE_CAP = { status: 429, body: JSON.stringify({ x_cli_relay_error: "CLI_RELAY_USAGE_CAP" }) } as const;
+  const storyRows = (calls: readonly {
+    call_site_key: string; outcome: string; actor_ref: string; candidate_id: string | null; scorecard_version: number | null;
+  }[]) => calls.filter((call) => call.call_site_key.startsWith("STORY:"))
+    .map((call) => [call.call_site_key, call.outcome, call.actor_ref, call.candidate_id, call.scorecard_version] as const);
+
+  it("an assigned run whose SCORECARD answer seats are neither the register's refs nor debaters is READY, written and checked on the seats' routes", async () => {
+    const story = seatStoryWriter();
+    const base = debate("P4-D outside");
+    const scenario = await executeSeatScenario({
+      label: "p4d-story-seats-outside",
+      assignment: seats([pinnedSeat(0, "third")], [judgeOnlySeat(0, "fourth")]),
+      judgeOnlyRoutes: true,
+      settings: { ...sealedRefsOnFifth(), story: story.writer },
+      ...base,
+      // The fourth route is served by the third double: the answer's draft and verdict, and the story.
+      third: [...base.third, resil01Composition, evaluatorSatisfied()],
+      storyAnswers: { third: SEAT_STORY_ANSWERS }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY", failureCode: null, rounds: 1,
+      // The stored story names who wrote it and who checked it.
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.third.providerRef, maker: SEAT_ROUTES.third.maker }),
+      checkerLineage: expect.objectContaining({
+        provider_ref: SEAT_JUDGE_ONLY.fourth.providerRef, maker: SEAT_JUDGE_ONLY.fourth.maker
+      })
+    })]);
+    expect(story.stored).toEqual(["INSERTED"]);
+    // On the seats' own gateways: each story row carries the seat's candidate and the scorecard's version.
+    expect(storyRows(scenario.calls)).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.third.providerRef, "candidate:third", 7],
+      ["STORY:CHECKER:1", "OK", SEAT_JUDGE_ONLY.fourth.providerRef, "candidate:fourth", 7]
+    ]);
+  });
+
+  it("a backup switch: the story is written by the member that answered the served round, the runner-up", async () => {
+    const story = seatStoryWriter();
+    const base = debate("P4-D writer cap");
+    const scenario = await executeSeatScenario({
+      label: "p4d-story-writer-runner-up",
+      // Share 0: the main is always asked first; a usage cap hands the round to the runner-up.
+      assignment: seats([pinnedSeat(0, "secondary", "third", 0)], [pinnedSeat(0, "third")]),
+      judgeOnlyRoutes: true,
+      settings: { ...sealedRefsOnFifth(), story: story.writer },
+      ...base,
+      // The main's draft is refused by a cap; the entry after it only types the failure (and is never served).
+      secondary: [...base.secondary, USAGE_CAP, resil01Composition],
+      third: [...base.third, resil01Composition, evaluatorSatisfied()],
+      storyAnswers: { third: SEAT_STORY_ANSWERS }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(scenario.switchEvents).toContainEqual(expect.objectContaining({
+      state: "BACKUP_MODEL_ENGAGED", role: "ANSWER_WRITER", to_provider_ref: SEAT_ROUTES.third.providerRef
+    }));
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY",
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.third.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.third.providerRef })
+    })]);
+    // The runner-up answers as itself: its own candidate, never the main's.
+    expect(storyRows(scenario.calls)).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.third.providerRef, "candidate:third", 7],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.third.providerRef, "candidate:third", 7]
+    ]);
+  });
+
+  it("a Free-shaped run (the two debaters are the answer seats): story calls go only to those two routes, and its cost fallback stays among them", async () => {
+    const story = seatStoryWriter();
+    const storyRequests: string[] = [];
+    const base = debate("P4-D free-shaped");
+    const scenario = await executeSeatScenario({
+      label: "p4d-story-free-shaped",
+      assignment: seats([pinnedSeat(0, "primary")], [pinnedSeat(0, "secondary")]),
+      judgeOnlyRoutes: true,
+      settings: { ...sealedRefsOnFifth(), story: story.writer },
+      // The planned storyteller (the primary) cannot pay for the story: the cost fallback must move it.
+      storyCostEnvelopes: { primary: storyMoneyRefused },
+      observe: (route, request) => { if (request.lane === "story") storyRequests.push(`${route}:${request.callSiteKey}`); },
+      ...base,
+      primary: [...base.primary, resil01Composition],
+      secondary: [...base.secondary, evaluatorSatisfied()],
+      // Both of the run's models could write the story: only the primary's money seam keeps it from doing so.
+      storyAnswers: { primary: SEAT_STORY_ANSWERS, secondary: SEAT_STORY_ANSWERS }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    // Every story request went to one of the run's two models: the planned seat first, then the other debater.
+    expect(storyRequests).toEqual(["primary:STORY:STORYTELLER:1", "secondary:STORY:STORYTELLER:1", "secondary:STORY:CHECKER:1"]);
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY",
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.secondary.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.secondary.providerRef })
+    })]);
+    // The refused try was never sent; the fallback writer answers on the debater's own route (no candidate),
+    // and the checker on its seat.
+    expect(storyRows(scenario.calls)).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.secondary.providerRef, null, null],
+      ["STORY:CHECKER:1", "OK", SEAT_ROUTES.secondary.providerRef, "candidate:secondary", 7]
+    ]);
+  });
+
+  it("a FALLBACK answer seat keeps the register's ref: the story's storyteller is the sealed ref, its checker the SCORECARD seat", async () => {
+    const story = seatStoryWriter(SEAT_ROUTES.primary.providerRef);
+    const fallbackWriter: PinnedSeat = {
+      seatIndex: 0,
+      main: {
+        candidateId: null, providerRef: SEAT_ROUTES.primary.providerRef, maker: SEAT_ROUTES.primary.maker,
+        modelId: SEAT_ROUTES.primary.model, thinkingLevel: "DEFAULT_ONLY"
+      },
+      runnerUp: null,
+      diversityShare: 0,
+      source: "FALLBACK"
+    };
+    const base = debate("P4-D fallback writer");
+    const scenario = await executeSeatScenario({
+      label: "p4d-story-fallback-writer",
+      assignment: seats([fallbackWriter], [judgeOnlySeat(0, "fourth")]),
+      judgeOnlyRoutes: true,
+      // The register's refs are this harness's own: the primary, a debater, so it is claim-eligible.
+      settings: { story: story.writer },
+      ...base,
+      primary: [...base.primary, resil01Composition],
+      third: [...base.third, evaluatorSatisfied()],
+      // Either double could answer either story call: the ledger says who was asked.
+      storyAnswers: { primary: SEAT_STORY_ANSWERS, third: SEAT_STORY_ANSWERS }
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.result?.kind).toBe("COMPLETED");
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY",
+      storytellerLineage: expect.objectContaining({ provider_ref: SEAT_ROUTES.primary.providerRef }),
+      checkerLineage: expect.objectContaining({ provider_ref: SEAT_JUDGE_ONLY.fourth.providerRef })
+    })]);
+    expect(storyRows(scenario.calls)).toEqual([
+      ["STORY:STORYTELLER:1", "OK", SEAT_ROUTES.primary.providerRef, null, null],
+      ["STORY:CHECKER:1", "OK", SEAT_JUDGE_ONLY.fourth.providerRef, "candidate:fourth", 7]
+    ]);
+  });
+
+  it("a floor answer with no answered round hands the story each SCORECARD seat's main", async () => {
+    const handed: StoryWriteInput[] = [];
+    const base = debate("P4-D floor");
+    const refuseServe = () => moneySeam({ refuseServe: "ALL" }).build;
+    const scenario = await executeSeatScenario({
+      label: "p4d-story-floor-main",
+      assignment: seats([pinnedSeat(0, "third", "secondary", 0)], [judgeOnlySeat(0, "fourth")]),
+      judgeOnlyRoutes: true,
+      settings: {
+        ...sealedRefsOnFifth(),
+        story: { writeAfterSettle: async (input) => { handed.push(input); }, reportSnapshotFailure: () => undefined }
+      },
+      // No model can pay for the answer: round 1's writer is refused on every route, so the answer is a floor.
+      costEnvelopes: { primary: refuseServe(), secondary: refuseServe(), third: refuseServe(), fourth: refuseServe() },
+      ...base
+    });
+    expect(scenario.error).toBeNull();
+    expect(scenario.answer?.terminal).toBe("COMPONENTS_ONLY");
+    expect(handed).toHaveLength(1);
+    expect(handed[0]?.roleMakers?.storyteller?.providerRef).toBe(SEAT_ROUTES.third.providerRef);
+    expect(handed[0]?.roleMakers?.checker?.providerRef).toBe(SEAT_JUDGE_ONLY.fourth.providerRef);
+  });
+});
+
+describe("P4-D · control: a legacy run's story keeps the register's refs", () => {
+  it("writes the story on the register's ref, with no role makers and no candidate on its rows", async () => {
+    const story = seatStoryWriter(PRIMARY_REF);
+    const handed: (StoryWriteInput["roleMakers"])[] = [];
+    const primaryDebate = fullDebate("Primary P4-D legacy");
+    const secondaryDebate = fullDebate("Secondary P4-D legacy");
+    const scenario = await executeResil01Scenario({
+      label: "p4d-story-legacy",
+      primary: [
+        ...primaryDebate.judgements, ...primaryDebate.reviews, resil01Composition, evaluatorSatisfied(),
+        seatHarnessStory(), SEAT_STORY_CHECKER_SATISFIED
+      ],
+      secondary: [...secondaryDebate.judgements, ...secondaryDebate.reviews],
+      settings: {
+        story: {
+          writeAfterSettle: async (input) => { handed.push(input.roleMakers); await story.writer.writeAfterSettle(input); },
+          reportSnapshotFailure: () => undefined
+        }
+      }
+    });
+    expect(scenario.error).toBeNull();
+    expect(handed).toEqual([undefined]);
+    expect(story.records).toEqual([expect.objectContaining({
+      outcome: "READY",
+      storytellerLineage: expect.objectContaining({ provider_ref: PRIMARY_REF }),
+      checkerLineage: expect.objectContaining({ provider_ref: PRIMARY_REF })
+    })]);
+    const rows = await database.pool.query<{ call_site_key: string; actor_ref: string; candidate_id: string | null }>(
+      `SELECT call_site_key, actor_ref, candidate_id FROM ledger.ledger_entry
+        WHERE run_id=$1 AND action_kind='MODEL_CALL' AND call_site_key LIKE 'STORY:%' ORDER BY sequence`,
+      [scenario.runId]
+    );
+    expect(rows.rows).toEqual([
+      { call_site_key: "STORY:STORYTELLER:1", actor_ref: PRIMARY_REF, candidate_id: null },
+      { call_site_key: "STORY:CHECKER:1", actor_ref: PRIMARY_REF, candidate_id: null }
+    ]);
   });
 });
 

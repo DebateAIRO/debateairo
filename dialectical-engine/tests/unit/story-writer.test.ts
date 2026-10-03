@@ -778,3 +778,93 @@ describe("StoryWriter — fix round 1 minors", () => {
     expect(inserted).toEqual([expect.objectContaining({ failureCode: "STORY_UNEXPECTED_ERROR" })]);
   });
 });
+
+/**
+ * Part 4, P4-D (P3-N1; the controller's ruling of 3 October 2026): on a debate
+ * whose models the scorecard picked, the story is written and checked by that
+ * debate's OWN answer writer and answer checker. The runner hands them over as
+ * per-run role makers; each one present REPLACES the policy's ref for that run,
+ * and a role left null keeps the policy's ref, resolved exactly as before.
+ */
+describe("StoryWriter — per-run role makers (P4-D, P3-N1)", () => {
+  const SEAT_WRITER = "provider:seat-writer";
+  const SEAT_CHECKER = "provider:seat-checker";
+
+  it("writes a story whose policy refs nobody can answer on the run's role makers, and the calls and the record name them", async () => {
+    const writerDouble = scripted(byContract);
+    const checkerDouble = scripted(byContract);
+    // Neither the boot resolver nor the run's own resolver can answer the policy's refs.
+    const { writer, inserted } = harness({ resolveProvider: () => null });
+    await writer.writeAfterSettle({
+      ...SNAPSHOT,
+      resolveProvider: () => null,
+      roleMakers: {
+        storyteller: { provider: writerDouble.provider, providerRef: SEAT_WRITER },
+        checker: { provider: checkerDouble.provider, providerRef: SEAT_CHECKER }
+      }
+    });
+    expect(inserted).toEqual([expect.objectContaining({ outcome: "READY", failureCode: null, rounds: 1 })]);
+    expect(writerDouble.calls.map((call) => [call.callSiteKey, call.lane, call.providerRef]))
+      .toEqual([["STORY:STORYTELLER:1", "story", SEAT_WRITER]]);
+    expect(checkerDouble.calls.map((call) => [call.callSiteKey, call.lane, call.providerRef]))
+      .toEqual([["STORY:CHECKER:1", "story", SEAT_CHECKER]]);
+    // The stored story names who wrote it and who checked it.
+    expect(inserted[0]?.storytellerLineage).toMatchObject({ provider_ref: SEAT_WRITER });
+    expect(inserted[0]?.checkerLineage).toMatchObject({ provider_ref: SEAT_CHECKER });
+  });
+
+  it("control: without them, the same story is FAILED/STORY_ROLE_UNAVAILABLE and nothing is called", async () => {
+    const writerDouble = scripted(byContract);
+    const { writer, inserted } = harness({ resolveProvider: () => null });
+    await writer.writeAfterSettle({ ...SNAPSHOT, resolveProvider: () => null });
+    expect(inserted).toEqual([expect.objectContaining({ outcome: "FAILED", failureCode: "STORY_ROLE_UNAVAILABLE", rounds: 0 })]);
+    expect(writerDouble.calls).toEqual([]);
+  });
+
+  it("a role left null keeps the policy's ref, resolved by the run's own resolver; unresolvable, the story is refused", async () => {
+    const seat = scripted(byContract);
+    const sealed = scripted(byContract);
+    const { writer, inserted } = harness();
+    await writer.writeAfterSettle({
+      ...SNAPSHOT,
+      resolveProvider: (roleRef) => (roleRef === POLICY.storyCheckerRoleRef ? { provider: sealed.provider, providerRef: roleRef } : null),
+      roleMakers: { storyteller: { provider: seat.provider, providerRef: SEAT_WRITER }, checker: null }
+    });
+    expect(inserted[0]).toMatchObject({
+      outcome: "READY",
+      storytellerLineage: { provider_ref: SEAT_WRITER },
+      checkerLineage: { provider_ref: POLICY.storyCheckerRoleRef }
+    });
+    expect(seat.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1"]);
+    expect(sealed.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:1"]);
+
+    const refused = harness();
+    await refused.writer.writeAfterSettle({
+      ...SNAPSHOT,
+      resolveProvider: () => null,
+      roleMakers: { storyteller: { provider: seat.provider, providerRef: SEAT_WRITER }, checker: null }
+    });
+    expect(refused.inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_ROLE_UNAVAILABLE" });
+    expect(seat.calls).toHaveLength(1);
+  });
+
+  it("a story call refused for money on a role maker goes to the run's cost fallback with that maker planned", async () => {
+    const seat = scripted(byContract);
+    const planned: string[] = [];
+    const { writer, inserted } = harness();
+    await writer.writeAfterSettle({
+      ...SNAPSHOT,
+      resolveProvider: () => null,
+      roleMakers: {
+        storyteller: { provider: seat.provider, providerRef: SEAT_WRITER },
+        checker: { provider: seat.provider, providerRef: SEAT_CHECKER }
+      },
+      costFallback: async ({ planned: maker, request, call }) => {
+        planned.push(maker.providerRef);
+        return { result: await call(maker, request), servedBy: maker };
+      }
+    });
+    expect(inserted[0]).toMatchObject({ outcome: "READY" });
+    expect(planned).toEqual([SEAT_WRITER, SEAT_CHECKER]);
+  });
+});

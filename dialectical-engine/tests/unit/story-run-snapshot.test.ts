@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderGateway } from "@debateai/providers";
 import type { StoryCostFallback, StoryStepLease } from "@debateai/story";
-import { buildStoryRunSnapshot, type StorySnapshotSource } from "../../apps/runner/src/story-snapshot.js";
+import { buildStoryRunSnapshot, storySeatRoleMaker, type StorySnapshotSource } from "../../apps/runner/src/story-snapshot.js";
 
 /**
  * Verdict story, Task 9 — the runner's in-memory material, projected for the
@@ -210,5 +210,38 @@ describe("buildStoryRunSnapshot", () => {
     expect(snapshot.resolveProvider?.("provider:b")).toBeNull();
     // Task M7: and the run's cost fallback over the same makers, untouched.
     expect(snapshot.costFallback).toBe(costFallback);
+  });
+});
+
+/**
+ * Part 4, P4-D (P3-N1; controller C3): the story's per-run role makers travel
+ * through the snapshot untouched, and each role takes the seat member the
+ * served round recorded — main or runner-up — or the seat's main when no round
+ * answered (a floor). No seat (legacy, or a FALLBACK seat): null, so the
+ * register's ref decides.
+ */
+describe("the story's per-run role makers (P4-D)", () => {
+  const member = (providerRef: string) => ({ provider, providerRef });
+  const seat = { main: member("provider:main"), runnerUp: member("provider:runner-up") };
+
+  it("passes the role makers through untouched, and leaves them out when the runner set none", () => {
+    const roleMakers = { storyteller: member("provider:w"), checker: null };
+    expect(buildStoryRunSnapshot({ ...source(), roleMakers }).roleMakers).toBe(roleMakers);
+    expect(buildStoryRunSnapshot(source()).roleMakers).toBeUndefined();
+  });
+
+  it("takes the member the served round recorded, main or runner-up", () => {
+    expect(storySeatRoleMaker(seat, "provider:runner-up")).toEqual({ provider, providerRef: "provider:runner-up" });
+    expect(storySeatRoleMaker(seat, "provider:main")).toEqual({ provider, providerRef: "provider:main" });
+  });
+
+  it("takes the seat's main when no round answered, or the recorded ref is neither member", () => {
+    expect(storySeatRoleMaker(seat, undefined)).toEqual({ provider, providerRef: "provider:main" });
+    expect(storySeatRoleMaker({ main: member("provider:main"), runnerUp: null }, "provider:elsewhere"))
+      .toEqual({ provider, providerRef: "provider:main" });
+  });
+
+  it("keeps the register's ref (null) for a role with no scorecard seat", () => {
+    expect(storySeatRoleMaker(null, "provider:main")).toBeNull();
   });
 });

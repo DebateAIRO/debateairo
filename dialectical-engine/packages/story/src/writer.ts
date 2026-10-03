@@ -150,7 +150,23 @@ export type StoryWriteInput = StoryRunSnapshot & {
   readonly resolveProvider?: StoryRoleResolver;
   readonly stepLease?: StoryStepLease;
   readonly costFallback?: StoryCostFallback;
+  /** P4-D: the run's own story roles (`StoryRunRoleMakers`); absent on every other run. */
+  readonly roleMakers?: StoryRunRoleMakers;
 };
+
+/**
+ * Part 4, P4-D (P3-N1; the controller's ruling of 3 October 2026): the run's
+ * OWN story roles. On a debate whose models the scorecard picked, the story is
+ * written and checked by that debate's own answer writer and answer checker,
+ * so the runner hands their seat members over here. Each one present REPLACES
+ * the policy's ref for this run; a role left null keeps the policy's ref,
+ * resolved exactly as before. A role maker never widens the money rule: a call
+ * refused for money still goes to the run's cost fallback, with it planned.
+ */
+export interface StoryRunRoleMakers {
+  readonly storyteller: StoryRoleMaker | null;
+  readonly checker: StoryRoleMaker | null;
+}
 
 /** What the runner reports when it could not even build the snapshot. */
 export interface StorySnapshotFailure {
@@ -436,8 +452,9 @@ export class StoryWriter {
     }
     const resolve: StoryRoleResolver = input.resolveProvider
       ?? ((roleRef) => this.#deps.resolveProvider(roleRef));
-    const storyteller = resolve(policy.storytellerRoleRef);
-    const checker = resolve(policy.storyCheckerRoleRef);
+    // P4-D: a run's own role maker replaces the policy's ref for that run only.
+    const storyteller = input.roleMakers?.storyteller ?? resolve(policy.storytellerRoleRef);
+    const checker = input.roleMakers?.checker ?? resolve(policy.storyCheckerRoleRef);
     if (storyteller === null || checker === null) return failedRecord(input, "STORY_ROLE_UNAVAILABLE", pack);
 
     const snapshot: StoryRunSnapshot = {
