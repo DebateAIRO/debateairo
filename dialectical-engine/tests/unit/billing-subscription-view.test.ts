@@ -112,6 +112,19 @@ describe("P12b the subscription as the person sees it", () => {
     expect(view({}, "RO", new Date(insideLead.getTime() - 1)).can_upgrade).toBe(true);
   });
 
+  it("offers no upgrade and no card change for a plan of the other xMoney system (P2-W3 (a), D5 5h)", () => {
+    // README §14.8's same-host switch: a sandbox plan still open, read by the live API. Both routes would refuse it
+    // NOT_SUBSCRIBED (upgrade.ts, card-change.ts), so Settings never offers them.
+    const read = (api: "stage" | "live", overrides: Partial<SubscriptionState> = {}) =>
+      subscriptionView({ state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now: NOW, xmoneyEnvironment: api });
+    expect(read("live")).toMatchObject({ can_upgrade: false, can_change_card: false });
+    expect(read("live", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: false });
+    // Control: the plan's own system offers both, and a live plan on the live API too.
+    expect(read("stage")).toMatchObject({ can_upgrade: true, can_change_card: true });
+    expect(read("stage", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: true });
+    expect(read("live", { xmoneyEnvironment: "live" })).toMatchObject({ can_upgrade: true, can_change_card: true });
+  });
+
   it("names only paid plans, every one of them a PlanIdSchema member, and never shows Free as a subscription", () => {
     expect(SubscribedPlanIdSchema.options).toEqual(["PLUS", "PRO", "MAX"]);
     expect(PlanIdSchema.options).toEqual(expect.arrayContaining([...SubscribedPlanIdSchema.options]));

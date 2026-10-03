@@ -19,7 +19,7 @@ export type MaintenanceDeps = Readonly<{
   publicAppUrl: string;
   /**
    * D5 5h: P6a's connectors.xmoneyEnvironment; a subscription created in the other xMoney system is never retried here,
-   * nor its renewal announced.
+   * nor its renewal announced, nor its yearly reminder (M4) sent.
    */
   xmoneyEnvironment: CustomerXMoneyEnvironment;
   audit: BillingAudit;
@@ -198,6 +198,8 @@ export class BillingMaintenance {
 
   private async remind(state: SubscriptionState, now: Date, report: MaintenanceReport): Promise<void> {
     if (state.activatedAt === null || state.cancelRequested || state.currentPeriodEnd === null) return;
+    // D5 5h (P2-W3 (b)'s sibling): the other xMoney system's plan is never renewed here, so it is never reminded either.
+    if (state.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return;
     const years = anniversaryDue(state.activatedAt, now, 7);
     if (years === null) return;
     const customer = await this.deps.repository.customerByOwner(state.ownerRef);

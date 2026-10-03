@@ -437,7 +437,9 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     repository, jobs, entitlements, renewal, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL,
     xmoneyEnvironment: "stage", audit, clock: clock.read
   });
-  worker.register("RENEWAL_NOTICE", createRenewalNoticeHandler({ repository, jobs, renewal, policy: testBillingPolicy }));
+  worker.register("RENEWAL_NOTICE", createRenewalNoticeHandler({
+    repository, jobs, renewal, policy: testBillingPolicy, xmoneyEnvironment: "stage", audit
+  }));
   const sentMail: BillingMail[] = [];
   const mailWorker = new BillingOutboxWorker({ repository, workerId: "harness-mail", clock: clock.read, audit, batchSize: 20 });
   const nothingAttached: AttachmentResolver = async () => null;

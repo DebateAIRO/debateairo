@@ -1,7 +1,8 @@
 import { addBusinessDays, foldSubscription, type SubscriptionState } from "@debateai/billing-core";
-import type { BillingJobQueries, BillingRepository } from "@debateai/db";
+import type { BillingJobQueries, BillingRepository, CustomerXMoneyEnvironment } from "@debateai/db";
 import type { BillingPolicy } from "@debateai/register";
-import { DONE, type OutboxHandler } from "./outbox.js";
+import type { BillingAudit } from "./audit.js";
+import { DONE, otherXMoneySystem, type OutboxHandler } from "./outbox.js";
 import type { RenewalService } from "./renewal.js";
 
 const stillDue = (state: SubscriptionState, periodEnd: string): boolean =>
@@ -11,12 +12,18 @@ const stillDue = (state: SubscriptionState, periodEnd: string): boolean =>
  * P11b look-ahead: the job ref is `${subscriptionId}:${periodEnd ISO}`; a stale or unchanged renewal is done. M3's
  * charge date is the day the renewal will really charge: the period end, or 7 business days after this notice when
  * that is later (the renewal waits out the notice period, P11a's `renewalNoticeDecision`).
+ * P2-W3 (b) (D5 5h): the look-ahead never queues a notice for the other xMoney system's plan, but one queued before the
+ * host changed system would be priced with the other system's tax engine and email a real person. A due notice of a
+ * plan of the other system therefore ends DEAD `OTHER_XMONEY_SYSTEM` (one content-free audit line) before any quote.
  */
 export function createRenewalNoticeHandler(deps: Readonly<{
   repository: Pick<BillingRepository, "subscriptionEvents" | "withTransaction">;
   jobs: Pick<BillingJobQueries, "lockOwner">;
   renewal: Pick<RenewalService, "freshQuote" | "writeNotice">;
   policy: BillingPolicy;
+  /** P6a's connectors.xmoneyEnvironment: the xMoney system this API talks to. */
+  xmoneyEnvironment: CustomerXMoneyEnvironment;
+  audit: BillingAudit;
 }>): OutboxHandler {
   return async (job, now) => {
     const split = job.ref.indexOf(":");
@@ -24,6 +31,7 @@ export function createRenewalNoticeHandler(deps: Readonly<{
     const periodEnd = job.ref.slice(split + 1);
     const state = foldSubscription(await deps.repository.subscriptionEvents(subscriptionId));
     if (!stillDue(state, periodEnd)) return DONE;
+    if (state.xmoneyEnvironment !== deps.xmoneyEnvironment) return otherXMoneySystem(deps.audit, job.kind);
     const priced = await deps.renewal.freshQuote(state, now);
     if (priced.tax.totalMicros === state.announcedTotalMicros) return DONE;
     const noticeEnds = addBusinessDays(now, deps.policy.renewalNoticeBusinessDays);

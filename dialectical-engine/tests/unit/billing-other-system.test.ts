@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { SubscriptionState } from "@debateai/billing-core";
-import type { ChargeEventRow, ChargeRow, OutboxJob } from "@debateai/db";
+import type { SubscriptionEvent, SubscriptionState } from "@debateai/billing-core";
+import type { BillingRepository, ChargeEventRow, ChargeRow, OutboxJob } from "@debateai/db";
 import type { BillingAuditEvent } from "../../apps/api/src/billing/audit.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "../../apps/api/src/billing/invoice-quaderno.js";
 import { createSmartBillInvoiceHandler, createSmartBillStornoHandler } from "../../apps/api/src/billing/invoice-smartbill.js";
+import { BillingMaintenance, type MaintenanceDeps } from "../../apps/api/src/billing/maintenance.js";
 import type { OutboxHandler } from "../../apps/api/src/billing/outbox.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
+import { createRenewalNoticeHandler } from "../../apps/api/src/billing/renewal-notice-job.js";
 import { subscriptionView, withdrawalOpenUntil } from "../../apps/api/src/billing/subscription-view.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { recordWithdrawal, type WithdrawalDeps } from "../../apps/api/src/billing/withdrawal.js";
-import { testBillingPolicy } from "../support/billingFixtures.js";
+import { activeSubscriptionEvents, testBillingPolicy } from "../support/billingFixtures.js";
 
 /*
  * P2-I4 (D5 5h): after §14.8's same-host switch, the database still holds the sandbox's records. Every refund,
@@ -163,5 +165,93 @@ describe("P2-I4 a plan of the other xMoney system offers no withdrawal and canno
     await expect(recordWithdrawal(deps, {
       ownerRef: state().ownerRef, withdrewAt: NOW, source: "SETTINGS", authorize: async () => undefined
     })).rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+  });
+});
+
+/** A sandbox plan (activeSubscriptionEvents names "stage"), activated at `at`, folded by the handlers below. */
+function stageSubscription(at: Date): Readonly<{ events: SubscriptionEvent[]; subscriptionId: string; ownerRef: string }> {
+  const events = activeSubscriptionEvents("0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", at);
+  return { events, subscriptionId: events[0]!.subscriptionId, ownerRef: events[0]!.ownerRef };
+}
+
+describe("P2-W3 (b) a renewal notice or yearly reminder of the other xMoney system is never priced or sent", () => {
+  // Activated 1 October: the period ends 1 November, inside the 10-business-day look-ahead from 20 October.
+  const activated = new Date("2026-10-01T09:00:00.000Z");
+  const periodEnd = "2026-11-01T09:00:00.000Z";
+  const noticeAt = new Date("2026-10-20T12:00:00.000Z");
+
+  function noticeRun(api: "stage" | "live") {
+    const { lines, audit } = recorder();
+    const subscription = stageSubscription(activated);
+    const priced: string[] = [];
+    const written: string[] = [];
+    const handler = createRenewalNoticeHandler({
+      repository: only({
+        subscriptionEvents: async () => subscription.events,
+        withTransaction: async (work: (client: unknown) => Promise<unknown>) => work({})
+      }, "repository"),
+      jobs: only({ lockOwner: async () => undefined }, "jobs"),
+      renewal: only({
+        freshQuote: async () => { priced.push("quote"); return { tax: { totalMicros: 30_000_000 } }; },
+        writeNotice: async () => { written.push("notice"); }
+      }, "renewal"),
+      policy: testBillingPolicy, xmoneyEnvironment: api, audit
+    });
+    const notice = job("RENEWAL_NOTICE", `${subscription.subscriptionId}:${periodEnd}`, {});
+    return { run: () => handler(notice, noticeAt), lines, priced, written };
+  }
+
+  it("ends a sandbox plan's RENEWAL_NOTICE on a live API DEAD OTHER_XMONEY_SYSTEM before any quote, with one audit line", async () => {
+    const live = noticeRun("live");
+    expect(await live.run()).toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
+    expect(live.priced).toEqual([]);
+    expect(live.written).toEqual([]);
+    expect(live.lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "RENEWAL_NOTICE", code: "OTHER_XMONEY_SYSTEM" } }]);
+  });
+
+  it("still prices and writes the notice in the plan's own system (control)", async () => {
+    const stage = noticeRun("stage");
+    expect(await stage.run()).toEqual({ kind: "DONE" });
+    expect(stage.priced).toEqual(["quote"]);
+    expect(stage.written).toEqual(["notice"]);
+    expect(stage.lines).toEqual([]);
+  });
+
+  async function reminderPass(api: "stage" | "live") {
+    // M4: a plan activated a year ago, visited inside the 7 days after its anniversary.
+    const subscription = stageSubscription(new Date("2025-10-01T09:00:00.000Z"));
+    const enqueued: Array<Readonly<{ kind: string; ref: string; payload: Readonly<Record<string, unknown>> }>> = [];
+    const maintenance = new BillingMaintenance({
+      repository: only<BillingRepository>({
+        subscriptionEvents: async () => subscription.events,
+        customerByOwner: async () => ({ customerId: "7e6d5c4b-3a29-4180-9f7e-6d5c4b3a2918" }),
+        withTransaction: async (work: (client: unknown) => Promise<unknown>) => work({}),
+        enqueue: async (_client: unknown, queued: Readonly<{ kind: string; ref: string; payload: Readonly<Record<string, unknown>> }>) => {
+          enqueued.push(queued);
+          return "queued";
+        }
+      }, "repository"),
+      jobs: only<MaintenanceDeps["jobs"]>({
+        liveSubscriptionIds: async (after: string | null) => after === null ? [subscription.subscriptionId] : [],
+        outboxJobExists: async () => false
+      }, "jobs"),
+      entitlements: only({}, "entitlements"), renewal: only({}, "renewal"),
+      policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", xmoneyEnvironment: api,
+      audit: () => undefined, clock: () => new Date("2026-10-03T12:00:00.000Z")
+    });
+    const report = await maintenance.runOnce();
+    return { report, enqueued };
+  }
+
+  it("sends no yearly reminder (M4) for a sandbox plan on a live API", async () => {
+    const live = await reminderPass("live");
+    expect(live.enqueued).toEqual([]);
+    expect(live.report).toMatchObject({ visited: 1, reminded: 0, failed: 0 });
+  });
+
+  it("sends the yearly reminder in the plan's own system (control)", async () => {
+    const stage = await reminderPass("stage");
+    expect(stage.enqueued).toEqual([expect.objectContaining({ kind: "EMAIL", payload: expect.objectContaining({ template: "M4" }) })]);
+    expect(stage.report).toMatchObject({ visited: 1, reminded: 1, failed: 0 });
   });
 });
