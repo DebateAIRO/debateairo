@@ -2023,7 +2023,9 @@ the company's name (`legalName`), its registered office (`registeredOffice`) and
 `BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice` or `BILLING_COMPANY_FACTS_UNVERIFIED:emails.general`.
 
 **The card marks.** Put the official Visa and Mastercard artwork at `apps/ui/public/payment-marks/visa.svg` and
-`apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only when its file is there.
+`apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only when its file is there. The website reads
+the list of files in that folder only when it starts, so after copying the files in, restart it with
+`systemctl restart debateai-ui`. Until then the footer shows them as broken images. No rebuild is needed.
 
 **The Terms archive.** Every published Terms and Privacy version is kept, by its fingerprint, under
 `apps/ui/legal/archive/` (one folder per language). `pnpm run generate:legal` adds the file for each new version.

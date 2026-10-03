@@ -30,7 +30,11 @@ describe("P22 the Billing runbook", () => {
       "BILLING_CONFIGURATION_INCOMPLETE", "BILLING_REQUIRES_ENVELOPE_MEMBERS", "same-origin-allow-popups",
       // §14.2 and §14.7 (ruling R3-4, D5's R3-A): one source of the company facts, COMPANY, and its one mirror for
       // the API and the emails, SELLER_COMPANY; the CUI as digits only; the refusals while a tax code is bracketed.
-      "apps/ui/public/payment-marks/visa.svg", "apps/ui/lib/legal/pages.ts", "COMPANY", "[RO…]",
+      "apps/ui/public/payment-marks/visa.svg",
+      // P2-M34 (W16 fix): the website reads the marks folder only at start, so copying the marks in needs a restart.
+      "the list of files in that folder only when it starts, so after copying the files in, restart it with",
+      "`systemctl restart debateai-ui`. Until then the footer shows them as broken images. No rebuild is needed.",
+      "apps/ui/lib/legal/pages.ts", "COMPANY", "[RO…]",
       "packages/billing-core/src/company.ts", "SELLER_COMPANY", "BILLING_COMPANY_FACTS_UNVERIFIED",
       "The company's tax codes are not `api.env` settings", "as digits only, never with `RO`",
       "tests/unit/billing-seller-company.test.tsx",
@@ -305,8 +309,9 @@ describe("P22 the Billing runbook", () => {
     ]) {
       expect(table, needle).toContain(needle);
     }
-    // W16: every item of Part 2's final review that a ruling, X0 or a vendor fact still decides has its own row, which
-    // names who decides and how it is proven (rows 39–53, after row 38's "every item closed").
+    // W16: rows 39–53 hold the items the final review deferred to a ruling or a vendor fact that Part 2b did not build,
+    // plus the "later" Minors (row 53); each names who decides and how it is proven. Every other open item is a row of
+    // the open-items file whose status names the go-live rows that share its work, and row 38 holds them all.
     const row = (number: number): string => table.split("\n").find((line) => line.startsWith(`| ${number} |`)) ?? "";
     for (const [number, needles] of [
       [39, ["P2-I3", "A12 (the card change)", "`transaction-rebill-auth-order-released` reads `void-ok`"]],
@@ -324,38 +329,66 @@ describe("P22 the Billing runbook", () => {
       [50, ["P2-M28", "credit note gives back the VAT", "tests/unit/tax-quaderno-recorded-fixtures.test.ts"]],
       [51, ["P2-M36", "support@dezbatere.ro", "`COMPANY.emails.general`", "`SELLER_COMPANY`"]],
       [52, ["P2-M37", "PricingCards.tsx", "`home.pricingCopy`", "counsel"]],
-      [53, ["PART2-FINAL-REVIEW-OPEN-ITEMS.md", "P2-M4, P2-M6, P2-M7, P2-M13, P2-M22, P2-M23, P2-M29, P2-M30, P2-M33, "
+      [53, ["Before billing is switched on", "PART2-FINAL-REVIEW-OPEN-ITEMS.md", "P2-M4, P2-M6, P2-M7, P2-M13, P2-M22, P2-M23, P2-M29, P2-M30, P2-M33, "
         + "P2-M39, P2-M40, P2-M41, P2-M43"]]
     ] as const) {
       const line = row(number);
       for (const needle of ["**Decided by:**", "**Proven by:**", ...needles]) expect(line, `row ${number}: ${needle}`).toContain(needle);
       expect(line, `row ${number} is open`).toMatch(/\| — \|$/u);
     }
+    // W16 fix F1: the "later" Minors gate switching billing on, each fixed or accepted in writing.
+    expect(row(53)).not.toContain("None blocks switching billing on alone");
   });
 
   it("the final review's open items say, for each row, whether Part 2b fixed it or which go-live row holds it (W16)", () => {
     const items = read("docs/missions/paid-plans/PART2-FINAL-REVIEW-OPEN-ITEMS.md");
-    const rows = items.split("\n").filter((line) => /^\| (P2-|Minors|Later)/u.test(line))
+    const rows = items.split("\n").filter((line) => /^\| (P2-|Minors|Later|Owner items)/u.test(line))
       .map((line) => line.slice(2, -2).split(" | "));
-    expect(rows.length).toBeGreaterThanOrEqual(39);
+    expect(rows.length).toBeGreaterThanOrEqual(40);
     // A status is never a bare "open": it names who fixed it or where it is held, so row 38 can be read row by row.
+    // "closed" is the end state go-live row 38 and the file's intro ask for (the controller writes it at the merge).
     for (const cells of rows) {
       const status = cells.at(-1) ?? "";
-      expect(status, cells[0]).toMatch(/^(fixed in Part 2b \(W\d+(, W\d+)*\)|open: go-live rows? \d+)/u);
+      expect(status, cells[0]).toMatch(/^(fixed in Part 2b \(W\d+(, W\d+)*\)|open: go-live rows? \d+|closed)/u);
     }
-    const statusOf = (id: string): string => rows.find((cells) => cells[0] === id)?.at(-1) ?? `no row ${id}`;
+    // The mappings below describe rows still open; a row the controller has closed has done its job, but a missing
+    // row is still a failure.
+    const rowOf = (id: string): string[] | undefined => rows.find((cells) => cells[0] === id);
+    const isClosed = (cells: readonly string[]): boolean => (cells.at(-1) ?? "").startsWith("closed");
     for (const [id, needle] of [
       ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 39"], ["P2-I5 (part 3)", "go-live row 40"],
       ["P2-I8", "go-live rows 24 and 41"], ["P2-I9", "go-live row 42"], ["P2-I13", "go-live row 43"],
-      ["P2-I15", "go-live row 44"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 53"]
+      ["P2-I15", "go-live row 44"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 53"],
+      ["Owner items", "go-live rows 14, 16, 24 and 38"]
     ] as const) {
-      expect(statusOf(id), id).toContain(needle);
+      const cells = rowOf(id);
+      expect(cells, `no row ${id}`).toBeDefined();
+      if (!isClosed(cells!)) expect(cells!.at(-1), id).toContain(needle);
     }
-    const ruled = rows.find((cells) => cells[0] === "Minors" && cells[1]!.startsWith("P2-M2 "))?.at(-1) ?? "";
-    for (const needle of ["45 (P2-M2)", "46 (P2-M17)", "47 (P2-M21)", "48 (P2-M25)", "49 (P2-M26)", "50 (P2-M28)",
-      "51 (P2-M36)", "52 (P2-M37)"]) {
-      expect(ruled, needle).toContain(needle);
+    const ruled = rows.find((cells) => cells[0] === "Minors" && cells[1]!.startsWith("P2-M2 "));
+    expect(ruled, "no ruled Minors row").toBeDefined();
+    if (!isClosed(ruled!)) {
+      for (const needle of ["45 (P2-M2)", "46 (P2-M17)", "47 (P2-M21)", "48 (P2-M25)", "49 (P2-M26)", "50 (P2-M28)",
+        "51 (P2-M36)", "52 (P2-M37)"]) {
+        expect(ruled!.at(-1), needle).toContain(needle);
+      }
     }
+    // W16 fix F1: the "later" Minors are a billing-on gate, each fixed by a later task or accepted in writing.
+    expect(rowOf("Later")?.[2]).toBe(
+      "the owner, before billing is switched on (go-live row 38), each fixed by a later task or accepted in writing");
+    // W16 fix G1: the final review's owner items that no other row holds, each with who decides it.
+    const owner = rowOf("Owner items") ?? [];
+    expect(owner[1]).toMatch(/^The final review's owner items that no other row holds\. /u);
+    for (const needle of ["P2-I1's source order", "`--environment`", "429", "sandbox and live transaction ids can collide",
+      "company buyers must be offered the withdrawal", "D390", "not registered for VAT", "outside the EU",
+      "change their billing country or address", "before billing is switched on"]) {
+      expect(owner[1], needle).toContain(needle);
+    }
+    expect(owner[2]).toBe("owner; xMoney (through the owner); counsel (go-live row 24); accountant (go-live row 16)");
+    // W16 fix G1: the deletion screen's sentence is one of the owner's wording picks.
+    const erasure = rowOf("P2-I10 (owner, accountant)") ?? [];
+    expect(erasure[1]).toContain("(4) The owner picks the final wording of the deletion screen's sentence (`settings.erasure.paidPlan`)");
+    expect(erasure[2]).toContain("the wording pick of the deletion screen's sentence");
     // The controller's note on the role split (the W8 judge): the API principal keeps the two reads billing mail needs.
     expect(items).toContain("the API principal keeps SELECT on `billing.customer` and on `identity.\"user\"` (`user_id`, `owner_ref`, `email_ciphertext`)");
   });
