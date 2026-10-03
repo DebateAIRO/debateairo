@@ -95,6 +95,13 @@ describe("P22 the Billing runbook", () => {
       // §14.8 (D6a P10b, D6b P16b): nobody reads the e-Factura status for you; the summary lists what to check,
       // and the owner records ANAF's answer with P16b's command.
       "e-Factura", "Romanian e-Factura documents to confirm", "pnpm billing:efactura-status --invoice",
+      // §14.8 (W12, P2-I16, P2-I17): a dead invoice, credit note or email emails the owner (O3) and is listed; the
+      // owner records a document found or issued by hand, or re-queues the job (SmartBill only once checked).
+      "An invoice, a credit note or an email that was never sent", "O3", "Emails that never went out",
+      "billing:invoice --charge \"$CHARGE_REF\" --kind \"$KIND\" --record \"$DOCUMENT\"",
+      "billing:invoice --charge \"$CHARGE_REF\" --kind \"$KIND\" --requeue --confirm-not-issued",
+      "that the document was NOT issued", "CREDIT_NOTE_REFUND_MISSING",
+      "The changed amount is never charged until that notice has gone out",
       // §14.2 (ruling Q-12): the records key is escrowed with the other five secrets.
       "sixth secret", "RESTORE_DRILL_RECORDS_KEY bytes=32",
       // §14.7 (ruling Q-3): the Terms archive M1 attaches from is never pruned.
@@ -254,7 +261,7 @@ describe("P22 the Billing runbook", () => {
       "beside anything but", "Quaderno's sandbox and a `.invalid` SmartBill address",
       // P23 fix F2: what the moved clock does not reach.
       "its usage bars and a withdrawal's credit-used share", "the fake stack in step 6 proves the bars and the share",
-      "`billing:efactura-status`) also run on the real clock", "so do not run them on this host while the line is set",
+      "`billing:efactura-status`, `billing:invoice`) also\nrun on the real clock", "so do not run them on this host while the line is set",
       // W2 (P2-I2, P2-M39): the dispute case is part of the owner's proof, run after the whole-flow suite.
       "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
       "a card dispute found by the daily money check: the plan paused once, with one email, counted",

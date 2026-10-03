@@ -339,3 +339,59 @@ describe("P16b the summary reads our own rows", () => {
     expect(await listed(new Date(Date.now() + 60_000))).toEqual([]);
   });
 });
+
+describe("W12 every dead legal document and every dead email reaches the owner's lists (P2-I16)", () => {
+  /** Queues one job and kills it with `code`, as the worker's dead-letter does. */
+  async function deadJob(billing: BillingRepository, kind: "QUADERNO_RECORD_SALE" | "QUADERNO_RECORD_REFUND" | "SMARTBILL_INVOICE" | "SMARTBILL_STORNO" | "EMAIL",
+    ref: string, code: string, payload: Readonly<Record<string, string | number | null>> = {}): Promise<string> {
+    const jobId = await billing.withTransaction((client) => billing.enqueue(client, { kind, ref, notBefore: new Date(0), payload }));
+    expect(await billing.fail(jobId, code, null, new Date())).toBe(true);
+    return jobId;
+  }
+
+  it("lists a dead invoice or credit-note job whatever its code, with its own code, and only the latest job of its ref", async () => {
+    const billing = new BillingRepository(database.pool);
+    const quaderno = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "DE", taxRateBasisPoints: 1_900 });
+    const smartbill = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
+    // A revoked Quaderno key kills the sale on its first attempt; a SmartBill storno waits for an invoice that never
+    // came; a Quaderno outage longer than the retries.
+    await deadJob(billing, "QUADERNO_RECORD_SALE", quaderno.initialChargeId, "TAX_SERVICE_REFUSED", { card_country: "DE" });
+    const stornoRef = `${smartbill.initialChargeId}:${smartbill.initialTransactionId}`;
+    await deadJob(billing, "SMARTBILL_STORNO", stornoRef, "INVOICE_ORIGINAL_MISSING", {
+      charge_id: smartbill.initialChargeId, transaction_id: smartbill.initialTransactionId, refund_micros: 5_000_000
+    });
+    const mine = async () => (await billing.invoiceUnknownItems())
+      .filter((item) => item.chargeId === quaderno.initialChargeId || item.chargeId === smartbill.initialChargeId)
+      .map((item) => [item.chargeId, item.jobKind, item.code]);
+    expect(await mine()).toEqual(expect.arrayContaining([
+      [quaderno.initialChargeId, "QUADERNO_RECORD_SALE", "TAX_SERVICE_REFUSED"],
+      [smartbill.initialChargeId, "SMARTBILL_STORNO", "INVOICE_ORIGINAL_MISSING"]
+    ]));
+    expect(await mine()).toHaveLength(2);
+    // Re-queued (`pnpm billing:invoice --requeue`): the newer job replaces the dead one while it runs ...
+    const again = await billing.withTransaction((client) => billing.enqueue(client, {
+      kind: "QUADERNO_RECORD_SALE", ref: quaderno.initialChargeId, notBefore: new Date(0), payload: { card_country: "DE" }
+    }));
+    expect((await mine()).filter(([chargeId]) => chargeId === quaderno.initialChargeId)).toEqual([]);
+    // ... and if it dies too, only it is listed, with its own code.
+    expect(await billing.fail(again, "TAX_SERVICE_UNAVAILABLE", null, new Date())).toBe(true);
+    expect((await mine()).filter(([chargeId]) => chargeId === quaderno.initialChargeId)).toEqual([
+      [quaderno.initialChargeId, "QUADERNO_RECORD_SALE", "TAX_SERVICE_UNAVAILABLE"]
+    ]);
+  });
+
+  it("lists every dead email of the window, the latest job of its ref only, with its template and code", async () => {
+    const billing = new BillingRepository(database.pool);
+    const tag = randomUUID().replaceAll("-", "");
+    await deadJob(billing, "EMAIL", `M1:${tag}`, "BILLING_PROFILE_UNREADABLE", { template: "M1", recipient: "CUSTOMER", customer_id: randomUUID() });
+    await deadJob(billing, "EMAIL", `M3:${tag}`, "OUTBOX_HANDLER_FAILED", { template: "M3", recipient: "CUSTOMER", customer_id: randomUUID() });
+    // The renewal queued M3 again under the same ref: the dead copy is no longer listed.
+    await billing.withTransaction((client) => billing.enqueue(client, {
+      kind: "EMAIL", ref: `M3:${tag}`, notBefore: new Date(0), payload: { template: "M3", recipient: "CUSTOMER" }
+    }));
+    const listed = async (since: Date) => (await billing.deadEmails(since)).filter((item) => item.ref.endsWith(tag));
+    expect((await listed(new Date(Date.now() - 120 * 86_400_000))).map((item) => [item.ref, item.template, item.recipient, item.code]))
+      .toEqual([[`M1:${tag}`, "M1", "CUSTOMER", "BILLING_PROFILE_UNREADABLE"]]);
+    expect(await listed(new Date(Date.now() + 60_000))).toEqual([]);
+  });
+});

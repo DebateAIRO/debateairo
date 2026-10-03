@@ -22,6 +22,11 @@ export type BillingAuditEvent =
   | "billing.notice.undecryptable"
   | "billing.outbox.dead"
   /**
+   * W12 (P2-I16): a job died but the owner's alert (O3) could not be queued (the dead-letter hook threw); the job stays
+   * dead and the owner summary still lists it. The job kind and its dead-letter code only.
+   */
+  | "billing.outbox.alert_failed"
+  /**
    * P2-I4 (D5 5h): a refund, invoice or credit-note job, or a payment check naming its own charge, whose charge was
    * paid in the other xMoney system (a sandbox record after the same-host switch to live, README §14.8) ended DEAD
    * before any vendor call. The job kind and the code OTHER_XMONEY_SYSTEM only.

@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { CustomerXMoneyEnvironment } from "./billing.js";
+import type { CustomerXMoneyEnvironment, OutboxKind, OutboxPayload } from "./billing.js";
 
 const SUBSCRIPTION_LEASE_NAMESPACE = "debateai.billing.subscription:";
 
@@ -96,6 +96,51 @@ export class BillingJobQueries {
     );
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({ invoiceId: row.invoice_id, chargeId: row.charge_id, kind: row.kind });
+  }
+
+  /**
+   * W12 (P2-I17): the jobs of one charge that issue `kind` (INVOICE: QUADERNO_RECORD_SALE / SMARTBILL_INVOICE, ref =
+   * the charge; CREDIT_NOTE: QUADERNO_RECORD_REFUND / SMARTBILL_STORNO, ref = `${chargeId}:${transactionId}`), as
+   * `pnpm billing:invoice` needs them: whether one is still open (queued or running), and the dead job the owner
+   * summary lists (the latest job of its kind and ref, P1b's `invoiceUnknownItems`; the most recently dead one when
+   * several refs are listed), with its payload and code.
+   */
+  async documentJobsOfCharge(chargeId: string, kind: "INVOICE" | "CREDIT_NOTE"): Promise<Readonly<{
+    open: boolean;
+    dead: Readonly<{ jobId: string; kind: OutboxKind; ref: string; payload: OutboxPayload; code: string }> | null;
+  }>> {
+    const kinds = kind === "INVOICE" ? ["QUADERNO_RECORD_SALE", "SMARTBILL_INVOICE"] : ["QUADERNO_RECORD_REFUND", "SMARTBILL_STORNO"];
+    const result = await this.pool.query<{
+      job_id: string; kind: OutboxKind; ref: string; payload: OutboxPayload; last_error_code: string | null;
+      done_at: Date | null; dead_at: Date | null; latest: boolean;
+    }>(`
+      SELECT job.job_id, job.kind, job.ref, job.payload, job.last_error_code, job.done_at, job.dead_at,
+        NOT EXISTS (
+          SELECT 1 FROM billing.outbox AS newer
+          WHERE newer.kind = job.kind AND newer.ref = job.ref AND newer.created_at > job.created_at
+        ) AS latest
+      FROM billing.outbox AS job
+      WHERE job.kind = ANY($2::text[])
+        AND (CASE WHEN $3::boolean THEN job.ref = $1 ELSE split_part(job.ref, ':', 1) = $1 AND job.ref LIKE '%:%' END)
+      ORDER BY job.dead_at DESC NULLS LAST, job.job_id
+    `, [chargeId, kinds, kind === "INVOICE"]);
+    const open = result.rows.some((row) => row.done_at === null && row.dead_at === null);
+    const dead = result.rows.find((row) => row.dead_at !== null && row.latest);
+    return Object.freeze({
+      open,
+      dead: dead === undefined ? null : Object.freeze({
+        jobId: dead.job_id, kind: dead.kind, ref: dead.ref, payload: dead.payload,
+        code: dead.last_error_code ?? "OUTBOX_HANDLER_FAILED"
+      })
+    });
+  }
+
+  /** W12 (P2-I17): whether an issuer's document reference is already recorded (0086's `invoice_external_ref_unique`). */
+  async documentByExternalRef(issuer: "QUADERNO" | "SMARTBILL", externalRef: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "SELECT 1 FROM billing.invoice WHERE issuer = $1 AND external_ref = $2 LIMIT 1", [issuer, externalRef]
+    );
+    return result.rowCount !== null && result.rowCount > 0;
   }
 
   /**

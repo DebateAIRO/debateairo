@@ -45,7 +45,11 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   withdrawalDate: "2026-10-12T08:30:00.000Z",
   refundDeadline: "2026-10-26T08:30:00.000Z",
   refundReason: "WITHDRAWAL",
-  ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93"
+  ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93",
+  jobKind: "SMARTBILL_INVOICE",
+  reference: "charge 0123456789abcdef0123456789abcdef",
+  nextSteps: "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
+    + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>"
 });
 
 /** Every param a template declares, the optional ones included. */
@@ -335,6 +339,27 @@ describe("P17 renderMail", () => {
     // Owner-facing: the owner reference, the code and two dates; never a customer's name, email or card.
     expect(Object.keys(MAIL_TEMPLATES.O2_WITHDRAWAL.params).sort())
       .toEqual(["ownerRef", "reasonCode", "refundDeadline", "withdrawalDate"]);
+  });
+
+  it("tells the owner at once of a legal document or an email that was never sent, and what to do (W12, P2-I16)", () => {
+    const owner = renderMail("O3", "de", { ...paramsFor("O3"), reasonCode: "INVOICE_UNKNOWN" });
+    expect(owner.subject).toBe("A legal document or a required email was not sent and needs your attention");
+    expect(owner.html).toContain('<html lang="en" dir="ltr">');
+    expect(owner.html).toContain("<pre");
+    expect(owner.text.startsWith([
+      "Hello,",
+      "A job that issues an invoice or a credit note, or that sends an email, stopped after its last try. Nothing more"
+        + " is tried by itself.",
+      "Job: SMARTBILL_INVOICE",
+      "Reference: charge 0123456789abcdef0123456789abcdef",
+      "Reason code: INVOICE_UNKNOWN",
+      "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
+        + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>",
+      "The owner summary (pnpm billing:tax-summary, and the quarterly email) lists it until it is settled.",
+      "The DebateAI team"
+    ].join("\n\n"))).toBe(true);
+    // Owner-facing: a job kind, our own reference, a code and the steps; never a customer's name, email or card.
+    expect(Object.keys(MAIL_TEMPLATES.O3.params).sort()).toEqual(["jobKind", "nextSteps", "reasonCode", "reference"]);
   });
 
   it("acknowledges a withdrawal at once, saying only what has happened (W9, P2-I11's M8_RECEIVED)", () => {

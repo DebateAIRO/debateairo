@@ -8,7 +8,8 @@ const sink = () => {
 };
 const authorities = taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test");
 const reader = (found: typeof authorities | null, rows = vi.fn(async () => []), efactura = vi.fn(async () => [])) => vi.fn(async () => ({
-  rows, invoiceUnknown: async () => [], efactura, paymentsToCheck: async () => [], authorities: async () => found,
+  rows, invoiceUnknown: async () => [], efactura, paymentsToCheck: async () => [], deadEmails: async () => [],
+  authorities: async () => found,
   close: async () => undefined
 }));
 
@@ -30,6 +31,7 @@ describe("P16b pnpm billing:tax-summary", () => {
     expect(efactura).toHaveBeenCalledWith(new Date("2026-10-01T00:00:00.000Z"), new Date("2027-01-01T00:00:00.000Z"));
     expect(ok.lines.out).toContain("DebateAI tax summary for 2026-Q4");
     expect(ok.lines.out).toContain("Payments to check by hand in xMoney: none.");
+    expect(ok.lines.out).toContain("Emails that never went out: none.");
     const missing = sink();
     expect(await runBillingTaxSummaryCli(["--quarter", "2026-Q4"], missing.output, reader(null))).toBe(1);
     expect(missing.lines.err).toBe("TAX_AUTHORITIES_UNRESOLVED\n");

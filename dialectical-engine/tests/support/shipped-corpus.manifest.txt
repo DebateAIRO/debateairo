@@ -22,11 +22,13 @@ apps/api/src/billing/charge-status.ts
 apps/api/src/billing/checkout.ts
 apps/api/src/billing/codes.ts
 apps/api/src/billing/connectors.ts
+apps/api/src/billing/dead-jobs.ts
 apps/api/src/billing/dispute-cli.ts
 apps/api/src/billing/efactura-status-cli.ts
 apps/api/src/billing/email-job.ts
 apps/api/src/billing/erasure-hook.ts
 apps/api/src/billing/index.ts
+apps/api/src/billing/invoice-cli.ts
 apps/api/src/billing/invoice-common.ts
 apps/api/src/billing/invoice-quaderno.ts
 apps/api/src/billing/invoice-smartbill.ts

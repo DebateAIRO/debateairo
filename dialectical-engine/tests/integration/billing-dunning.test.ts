@@ -185,6 +185,9 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     await h.maintenance.runOnce();
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`${paid.subscriptionId}:${end.toISOString()}`);
     await h.worker.drain(5);
+    // W12 (A7): the notice counts once its email went out.
+    expect(await kinds(paid.subscriptionId)).not.toContain("RENEWAL_NOTICE_SENT");
+    await h.mail.drain();
     const noticed = (await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1);
     expect(noticed).toMatchObject({ kind: "RENEWAL_NOTICE_SENT", data: { announced_total_micros: 23_800_000 } });
     h.clock.now = new Date(end.getTime() + MINUTE);

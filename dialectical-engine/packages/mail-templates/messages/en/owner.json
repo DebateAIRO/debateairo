@@ -16,5 +16,10 @@
   "owner.O2_WITHDRAWAL.intro": "A customer withdrew from their plan, and the plan has ended. A refund made in the xMoney dashboard, or an earlier refund request, already touched one of their payments, so the site could not work out what is still due. Nothing has been refunded for this withdrawal yet.",
   "owner.O2_WITHDRAWAL.owner": "Owner reference: {ownerRef}",
   "owner.O2_WITHDRAWAL.deadline": "Withdrawn on {withdrawalDate}. The law requires the refund to be made by {refundDeadline} at the latest (14 days after the withdrawal).",
-  "owner.O2_WITHDRAWAL.next": "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"), refund in the xMoney dashboard what the site cannot, then record the settlement with pnpm billing:withdraw --owner {ownerRef} --refund <amount> --dashboard <amount>. The customer's refund email (M8) follows. The owner summary lists it as WITHDRAWAL_BY_OWNER until then."
+  "owner.O2_WITHDRAWAL.next": "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"), refund in the xMoney dashboard what the site cannot, then record the settlement with pnpm billing:withdraw --owner {ownerRef} --refund <amount> --dashboard <amount>. The customer's refund email (M8) follows. The owner summary lists it as WITHDRAWAL_BY_OWNER until then.",
+  "owner.O3.subject": "A legal document or a required email was not sent and needs your attention",
+  "owner.O3.intro": "A job that issues an invoice or a credit note, or that sends an email, stopped after its last try. Nothing more is tried by itself.",
+  "owner.O3.job": "Job: {jobKind}",
+  "owner.O3.reference": "Reference: {reference}",
+  "owner.O3.listed": "The owner summary (pnpm billing:tax-summary, and the quarterly email) lists it until it is settled."
 }

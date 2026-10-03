@@ -18,6 +18,11 @@ function fakes(rows: TaxSummaryRow[] = []) {
     },
     quarterSummaryRows: vi.fn(async () => rows),
     invoiceUnknownItems: async () => [],
+    // W12 (P2-I16): the dead emails of the last 120 days.
+    deadEmails: vi.fn(async (_since: Date) => [{
+      ref: `M3:${"5".repeat(32)}`, template: "M3", recipient: "CUSTOMER", code: "OUTBOX_HANDLER_FAILED",
+      since: new Date("2026-12-21T00:00:00.000Z")
+    }]),
     deadRefunds: async () => [{
       chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED",
       since: new Date("2026-12-20T00:00:00.000Z")
@@ -74,6 +79,9 @@ describe("P16c the owner's tax-summary job", () => {
       .toContain(`charge ${"7".repeat(32)}: REFUND_REFUSED (WITHDRAWAL), since 2026-12-20`);
     expect(String(o1!.payload["param.summaryText"]))
       .toContain(`invoice DBAI-0042 (charge ${"a".repeat(32)}), issued 2026-11-03: no status recorded`);
+    expect(String(o1!.payload["param.summaryText"]))
+      .toContain(`M3 (job M3:${"5".repeat(32)}): OUTBOX_HANDLER_FAILED, since 2026-12-21`);
+    expect(billing.deadEmails).toHaveBeenCalledWith(new Date(new Date("2027-01-05T06:00:00.000Z").getTime() - 120 * 86_400_000));
     expect(await owner.taxSummary(job("OWNER_TAX_SUMMARY", "tax-summary:not-a-quarter"), new Date()))
       .toEqual({ kind: "DEAD", code: "BILLING_TAX_SUMMARY_USAGE" });
   });

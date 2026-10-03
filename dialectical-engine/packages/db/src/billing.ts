@@ -811,6 +811,25 @@ export class BillingRepository {
     throw new TypedDomainError("BILLING_OUTBOX_ENQUEUE_RACED", "the live job changed twice while it was enqueued");
   }
 
+  /**
+   * W12 (P2-I17): `pnpm billing:invoice --requeue` — a new job of a dead job's kind, ref and payload, due at
+   * `notBefore`. `stage` is written as the new job's `last_error_code` in the same INSERT (P10b's stage column: a
+   * SmartBill job re-queued after the owner confirmed nothing was issued carries `INVOICE_CONFIRMED_NOT_ISSUED`, so
+   * its first attempt may call `issue` although the intent exists). Null when a live job of that kind and ref already
+   * exists (A3e): nothing is written then.
+   */
+  async requeue(c: PoolClient, j: Readonly<{
+    kind: OutboxKind; ref: string; payload: OutboxPayload; notBefore: Date; stage: string | null;
+  }>): Promise<string | null> {
+    const inserted = await c.query<{ job_id: string }>(`
+      INSERT INTO billing.outbox (job_id, kind, ref, payload, created_at, not_before, last_error_code)
+      VALUES ($1, $2, $3, $4::jsonb, clock_timestamp(), $5, $6)
+      ON CONFLICT (kind, ref) WHERE done_at IS NULL AND dead_at IS NULL DO NOTHING
+      RETURNING job_id
+    `, [randomUUID(), j.kind, j.ref, JSON.stringify(j.payload), j.notBefore, j.stage]);
+    return inserted.rows[0]?.job_id ?? null;
+  }
+
   async claim(kinds: ReadonlyArray<OutboxKind>, limit: number, workerId: string, now: Date): Promise<OutboxJob[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       throw new TypedDomainError("BILLING_OUTBOX_LIMIT_INVALID", "a claim takes between 1 and 100 jobs");
@@ -1107,34 +1126,30 @@ export class BillingRepository {
   }
 
   /**
-   * P16b (A17b, D5 5j, P9c): the documents to check by hand, while no invoice row of that kind exists for the charge —
-   * invoice jobs P10 gave up on (INVOICE_UNKNOWN: the issuer's answer never came and no lookup could settle it;
-   * CREDIT_NOTE_MANUAL: a partial credit note the issuer cannot make; and for SmartBill, the Romanian legal document,
-   * INVOICE_SERVICE_REFUSED / INVOICE_SERVICE_UNAVAILABLE: never issued), and every dashboard refund P9c recorded on
-   * the payment itself (PROVIDER_REFUND REFUNDED with no `refunds_transaction_id`, job kind DASHBOARD_REFUND) whose
-   * charge has no credit note: its amount is unknown (the rows `quarterSummaryRows` marks `amountKnown: false`), so
-   * P9c issues none automatically. A dashboard refund xMoney reports as its own transaction (D5 5g) names its amount
-   * and gets its credit-note job automatically (none for a second payment, which was never a sale); it reaches this
-   * list only through that job, and only if the job dies with one of the codes above.
+   * P16b (A17b, D5 5j, P9c), widened by W12 (P2-I16, the controller's ruling): the documents to check by hand, while no
+   * invoice row of that kind exists for the charge. Every dead QUADERNO_RECORD_SALE, QUADERNO_RECORD_REFUND,
+   * SMARTBILL_INVOICE or SMARTBILL_STORNO job, whatever its code (the job's own code is returned: INVOICE_UNKNOWN, a
+   * Quaderno TAX_SERVICE_REFUSED after a revoked key, a TAX_SERVICE_UNAVAILABLE outage longer than the retries, a
+   * credit note's INVOICE_ORIGINAL_MISSING, CREDIT_NOTE_MANUAL, BILLING_INVOICE_DATA_MISSING, ...), when it is the
+   * latest job of its kind and ref: one re-queued with `pnpm billing:invoice --requeue` (a newer job, open or done)
+   * replaces it, and only that one is listed if it dies too. Also every dashboard refund P9c recorded on the payment
+   * itself (PROVIDER_REFUND REFUNDED with no `refunds_transaction_id`, job kind DASHBOARD_REFUND) whose charge has no
+   * credit note: its amount is unknown (the rows `quarterSummaryRows` marks `amountKnown: false`), so P9c issues none
+   * automatically. A dashboard refund xMoney reports as its own transaction (D5 5g) names its amount and gets its
+   * credit-note job automatically (none for a second payment, which was never a sale); it reaches this list only
+   * through that job, if the job dies.
    */
-  async invoiceUnknownItems(): Promise<Array<{
-    chargeId: string; jobKind: string;
-    code: "INVOICE_UNKNOWN" | "CREDIT_NOTE_MANUAL" | "INVOICE_SERVICE_REFUSED" | "INVOICE_SERVICE_UNAVAILABLE";
-    since: Date;
-  }>> {
-    const result = await this.pool.query<{
-      charge_id: string; kind: string;
-      code: "INVOICE_UNKNOWN" | "CREDIT_NOTE_MANUAL" | "INVOICE_SERVICE_REFUSED" | "INVOICE_SERVICE_UNAVAILABLE";
-      since: Date;
-    }>(`
+  async invoiceUnknownItems(): Promise<Array<{ chargeId: string; jobKind: string; code: string; since: Date }>> {
+    const result = await this.pool.query<{ charge_id: string; kind: string; code: string | null; since: Date }>(`
       SELECT split_part(outbox.ref, ':', 1) AS charge_id, outbox.kind, outbox.last_error_code AS code,
         COALESCE(outbox.claimed_at, outbox.not_before) AS since
       FROM billing.outbox AS outbox
       WHERE outbox.kind IN ('SMARTBILL_INVOICE','SMARTBILL_STORNO','QUADERNO_RECORD_SALE','QUADERNO_RECORD_REFUND')
         AND outbox.dead_at IS NOT NULL
-        AND (outbox.last_error_code IN ('INVOICE_UNKNOWN','CREDIT_NOTE_MANUAL')
-          OR (outbox.kind IN ('SMARTBILL_INVOICE','SMARTBILL_STORNO')
-            AND outbox.last_error_code IN ('INVOICE_SERVICE_REFUSED','INVOICE_SERVICE_UNAVAILABLE')))
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.outbox AS newer
+          WHERE newer.kind = outbox.kind AND newer.ref = outbox.ref AND newer.created_at > outbox.created_at
+        )
         AND NOT EXISTS (
           SELECT 1 FROM billing.invoice AS invoice
           WHERE invoice.charge_id = split_part(outbox.ref, ':', 1)
@@ -1152,7 +1167,37 @@ export class BillingRepository {
         )
       ORDER BY since
     `);
-    return result.rows.map((row) => ({ chargeId: row.charge_id, jobKind: row.kind, code: row.code, since: row.since }));
+    return result.rows.map((row) => ({
+      chargeId: row.charge_id, jobKind: row.kind, code: row.code ?? "OUTBOX_HANDLER_FAILED", since: row.since
+    }));
+  }
+
+  /**
+   * W12 (P2-I16, the controller's ruling): EMAIL jobs that died since `since` and are the latest job of their ref (a
+   * later copy, open or done, replaces a dead one: the renewal queues M3 again under the same ref), whatever their
+   * template and code: the customer, or the owner, never got that email. Content-free: the job's ref (the template
+   * and our own ids), the template, the recipient kind and the code.
+   */
+  async deadEmails(since: Date): Promise<Array<{
+    ref: string; template: string | null; recipient: string | null; code: string; since: Date;
+  }>> {
+    const result = await this.pool.query<{
+      ref: string; template: string | null; recipient: string | null; code: string | null; since: Date;
+    }>(`
+      SELECT outbox.ref, outbox.payload ->> 'template' AS template, outbox.payload ->> 'recipient' AS recipient,
+        outbox.last_error_code AS code, outbox.dead_at AS since
+      FROM billing.outbox AS outbox
+      WHERE outbox.kind = 'EMAIL' AND outbox.dead_at IS NOT NULL AND outbox.dead_at >= $1
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.outbox AS newer
+          WHERE newer.kind = outbox.kind AND newer.ref = outbox.ref AND newer.created_at > outbox.created_at
+        )
+      ORDER BY outbox.dead_at, outbox.ref
+    `, [since]);
+    return result.rows.map((row) => ({
+      ref: row.ref, template: row.template, recipient: row.recipient, code: row.code ?? "OUTBOX_HANDLER_FAILED",
+      since: row.since
+    }));
   }
 
   /**

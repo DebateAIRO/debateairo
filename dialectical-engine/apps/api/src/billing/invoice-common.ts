@@ -103,6 +103,22 @@ export async function loadPaidCharge(
   });
 }
 
+/**
+ * W12 (P2-I17): what recording a document needs of its charge, read from a handler's `PaidCharge` or by
+ * `pnpm billing:invoice` from the charge's own rows (the command opens no records key): the charge, its customer,
+ * the plan it paid for, its total and when it was paid (M2's params).
+ */
+export type RecordedCharge = Readonly<{
+  chargeId: string; customerId: string; planId: PlanId; chargeTotalMicros: number; paidAt: Date;
+}>;
+
+export function recordedChargeOf(paid: PaidCharge): RecordedCharge {
+  return Object.freeze({
+    chargeId: paid.charge.chargeId, customerId: paid.customerId, planId: paid.quote.planId,
+    chargeTotalMicros: paid.charge.totalMicros, paidAt: paid.paid.at
+  });
+}
+
 export async function invoicesOfCharge(repository: Pick<BillingRepository, "invoicesForOwner">, paid: PaidCharge): Promise<InvoiceRow[]> {
   return (await repository.invoicesForOwner(paid.ownerRef)).filter((invoice) => invoice.chargeId === paid.charge.chargeId);
 }

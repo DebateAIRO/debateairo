@@ -306,8 +306,8 @@ const legacyRegisterVersion = z.string().regex(/^[1-9][0-9]*$/u).transform((valu
 ));
 
 /**
- * Paid plans P14b/P14c/P16b: the owner's billing commands (`pnpm billing:dispute`, `pnpm billing:withdraw`,
- * `pnpm billing:tax-summary`, `pnpm billing:efactura-status`). They run
+ * Paid plans P14b/P14c/P16b/W12: the owner's billing commands (`pnpm billing:dispute`, `pnpm billing:withdraw`,
+ * `pnpm billing:tax-summary`, `pnpm billing:efactura-status`, `pnpm billing:invoice`). They run
  * on the host under `systemd-run` with the API's EnvironmentFile (deploy/vps/README.md "Billing") and read only
  * the API's own database URL, the register version and the mode; the production floors hold here too.
  */
@@ -336,6 +336,22 @@ export function parseBillingWithdrawEnvironment(source: EnvironmentSource) {
 
 export function loadBillingWithdrawEnvironment() {
   return parseBillingWithdrawEnvironment(process.env);
+}
+
+/**
+ * Paid plans W12 (P2-I17): `pnpm billing:invoice` reads, from the API's EnvironmentFile, `XMONEY_API_BASE_URL` (the
+ * xMoney system the API's invoicers follow, P2-I4: it refuses a charge of the other system) and `PUBLIC_APP_URL` (the
+ * origin a recorded Quaderno receipt's M2 links to when it carries no Quaderno link, R-7). Both required.
+ */
+export function parseBillingInvoiceEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({
+    ...billingOperatorShape, XMONEY_API_BASE_URL: z.string().url(),
+    PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://"))
+  }, source));
+}
+
+export function loadBillingInvoiceEnvironment() {
+  return parseBillingInvoiceEnvironment(process.env);
 }
 
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;

@@ -89,6 +89,12 @@ export class BillingOutboxWorker {
     clock: () => Date;
     audit: BillingAudit;
     batchSize: number;
+    /**
+     * W12 (P2-I16): called once a job's dead-letter has landed (never for a retry, nor when P1b's fence refused it).
+     * The runtime queues the owner's O3 here (`createDeadJobAlert`). A failure leaves the job dead and writes one
+     * content-free line; the owner summary still lists the job.
+     */
+    onDead?: (job: OutboxJob, code: string, now: Date) => Promise<void>;
   }>) {}
 
   register(kind: OutboxKind, handler: OutboxHandler): void {
@@ -184,6 +190,13 @@ export class BillingOutboxWorker {
   private async dead(job: OutboxJob, code: string, now: Date): Promise<"DEAD" | null> {
     if (!await this.options.repository.fail(job.jobId, code, null, now, this.fence(job))) return null;
     this.options.audit("billing.outbox.dead", { kind: job.kind, code, attempts: job.attempts });
+    if (this.options.onDead !== undefined) {
+      try {
+        await this.options.onDead(job, code, now);
+      } catch {
+        this.options.audit("billing.outbox.alert_failed", { kind: job.kind, code });
+      }
+    }
     return "DEAD";
   }
 }

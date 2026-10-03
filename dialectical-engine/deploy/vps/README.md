@@ -175,7 +175,7 @@ observation agent's is set separately (§12).
 
 | `EnvironmentFile` key | Principal (P3-01) | Role | Purpose |
 |---|---|---|---|
-| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime, and the owner's four billing commands, the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only) and the e-Factura status command `pnpm billing:efactura-status`, all run as the API |
+| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime, and the owner's five billing commands, the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only), the e-Factura status command `pnpm billing:efactura-status` and the invoice command `pnpm billing:invoice`, all run as the API |
 | `api.env` `CONTENT_PROVISION_DATABASE_URL` | `api-content-provision` | `debateai_prod_api_content_provision` | run content keys, server-side ask admission |
 | `api.env` `SUPPORT_DATABASE_URL` | `api-support` | `debateai_prod_api_support` | **the support database principal**: the support chat's data plane, and the ONLY database the master-key rotation opens (it alone may rewrite the two support key columns) |
 | `api.env` `AUTHORIZATION_DATABASE_URL` | `api-authorization` | `debateai_prod_api_authorization` | step-up session rotation |
@@ -2317,6 +2317,63 @@ read -r INVOICE && read -r STATUS && systemd-run --pipe --wait --collect --uid=d
 It prints one line naming the document it recorded. A document the site never issued is refused
 (`EFACTURA_DOCUMENT_UNKNOWN`) and nothing is written.
 
+**An invoice, a credit note or an email that was never sent.** When a job that issues an invoice or a credit note,
+or that sends an email, stops after its last try, the site emails you at once (O3, "A legal document or a required
+email was not sent and needs your attention"), and the owner summary lists it until it is settled: invoices and
+credit notes under "Invoices and credit notes to check by hand", emails under "Emails that never went out". Each line,
+and the email, says what to do. Typical causes: a wrong or revoked Quaderno key (`TAX_SERVICE_REFUSED`), Quaderno or
+SmartBill not answering for more than about 15 hours (`TAX_SERVICE_UNAVAILABLE`, `INVOICE_SERVICE_UNAVAILABLE`), or
+SmartBill not saying whether it issued an invoice (`INVOICE_UNKNOWN`: SmartBill cannot be asked afterwards, so the
+invoice may be there already).
+
+For an invoice or a credit note, settle the line with `pnpm billing:invoice`, giving the charge reference with
+`--charge`, the document with `--kind INVOICE` or `--kind CREDIT_NOTE`, and one of two actions:
+
+- `--record` with a document you issued or found by hand: for SmartBill (a Romanian sale) its series and number
+  joined by a dash, as SmartBill prints it (for example `DBAI-0042`); for Quaderno its document id. The site stores
+  it and, for an invoice, emails the customer the receipt (M2); a SmartBill document also joins the e-Factura list.
+- `--requeue` to let the site try the job again once the cause is fixed (the Quaderno key replaced, Quaderno or
+  SmartBill answering again). A SmartBill job also needs `--confirm-not-issued`: add it only after you have checked
+  in SmartBill that the document was NOT issued, because SmartBill would issue a second one. A Quaderno job needs no
+  confirmation: Quaderno looks for the payment's document before it creates one.
+
+A credit note that waits for its invoice (`INVOICE_ORIGINAL_MISSING`) comes after the invoice: record or re-queue
+the invoice first, then re-queue the credit note. A line that says "nothing to issue or re-queue" (for example
+`CREDIT_NOTE_REFUND_MISSING`: no refund is recorded for that sale) is not a document to make: the command refuses it,
+and you tell whoever runs the server. The command asks for the values at the prompt. To record a document:
+
+```sh
+# Paste the charge reference as the summary prints it and press Enter; type INVOICE or CREDIT_NOTE and press Enter; then paste the document (for example DBAI-0042, or the Quaderno document id) and press Enter.
+read -r CHARGE_REF && read -r KIND && read -r DOCUMENT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind "$KIND" --record "$DOCUMENT"
+```
+
+To re-queue a Quaderno job:
+
+```sh
+# Paste the charge reference as the summary prints it and press Enter; then type INVOICE or CREDIT_NOTE and press Enter.
+read -r CHARGE_REF && read -r KIND && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind "$KIND" --requeue
+```
+
+To re-queue a SmartBill job, only after checking in SmartBill that the document was not issued:
+
+```sh
+# Paste the charge reference as the summary prints it and press Enter; then type INVOICE or CREDIT_NOTE and press Enter.
+read -r CHARGE_REF && read -r KIND && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind "$KIND" --requeue --confirm-not-issued
+```
+
+It prints one line saying what it recorded or queued; a re-queued job that fails again is listed and emailed again.
+A refusal is one code and nothing is written: `BILLING_INVOICE_ALREADY_RECORDED` (the charge already has that
+document), `BILLING_INVOICE_JOB_OPEN` (the job is already queued), `BILLING_INVOICE_NOTHING_LISTED` (no such line for
+that charge), `BILLING_INVOICE_NOTHING_TO_ISSUE`, `BILLING_INVOICE_CONFIRM_NOT_ISSUED_REQUIRED`,
+`BILLING_INVOICE_ORIGINAL_MISSING` (settle the invoice first) or `BILLING_INVOICE_DOCUMENT_TAKEN` (that document is
+already recorded for another charge).
+
+An email that never went out is not sent again by itself, with one exception: the notice of a changed renewal amount
+(M3). The changed amount is never charged until that notice has gone out; the renewal waits and sends it again when
+its 7-business-day wait ends. For the others (the confirmation M1 with the Terms and the withdrawal form, a receipt
+M2, a withdrawal's acknowledgement M8_RECEIVED or refund M8), the line says what to tell the customer yourself; ask
+whoever runs the server for the account's address and report the code.
+
 ### 14.9 The sandbox run, end to end (OWNER-RUN)
 
 Do this on a **stage** host before switching billing on for real, with billing data you will throw away afterwards.
@@ -2345,8 +2402,8 @@ set, the billing jobs record moved times, the API asks xMoney in real time (it t
 sandbox invoices carry the moved dates (harmless in a sandbox), and debates are still admitted, and their spend
 recorded, on the real clock, so the new plan's debate limits, its usage bars and a withdrawal's credit-used share are
 not part of this run (the fake stack in step 6 proves the bars and the share). The owner commands
-(`billing:withdraw`, `billing:dispute`, `billing:tax-summary`, `billing:efactura-status`) also run on the real clock,
-so do not run them on this host while the line is set. The line comes out only when the stage billing data is thrown
+(`billing:withdraw`, `billing:dispute`, `billing:tax-summary`, `billing:efactura-status`, `billing:invoice`) also
+run on the real clock, so do not run them on this host while the line is set. The line comes out only when the stage billing data is thrown
 away at the end: rebuild the stage host, then remove the line. A host must never go live holding rows written on a
 moved clock.
 

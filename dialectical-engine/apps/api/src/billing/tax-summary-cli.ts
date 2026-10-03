@@ -14,11 +14,13 @@ import { loadBillingOperatorEnvironment, readTaxAuthorities, type TaxAuthorities
 import { openBillingOperatorPool } from "./operator-connection.js";
 import {
   buildTaxSummary,
+  deadEmailsFrom,
   efacturaChecksFrom,
   liveQuarterSummaryRows,
   parseTaxQuarter,
   paymentsToCheckFrom,
   renderTaxSummary,
+  type DeadEmailItem,
   type EFacturaCheckItem,
   type InvoiceUnknownItem,
   type PaymentToCheckItem,
@@ -31,6 +33,8 @@ export type OpenTaxSummaryReader = () => Promise<Readonly<{
   invoiceUnknown(): Promise<ReadonlyArray<InvoiceUnknownItem>>;
   efactura(from: Date, to: Date): Promise<ReadonlyArray<EFacturaCheckItem>>;
   paymentsToCheck(): Promise<ReadonlyArray<PaymentToCheckItem>>;
+  /** W12 (P2-I16): the emails that never went out, of the last 120 days. */
+  deadEmails(): Promise<ReadonlyArray<DeadEmailItem>>;
   authorities(): Promise<TaxAuthorities | null>;
   close(): Promise<void>;
 }>>;
@@ -60,7 +64,7 @@ export async function runBillingTaxSummaryCli(
       output.stdout(renderTaxSummary(buildTaxSummary({
         quarter, rows: await reader.rows(quarter.from, quarter.to),
         invoiceUnknown: await reader.invoiceUnknown(), efactura: await reader.efactura(quarter.from, quarter.to),
-        paymentsToCheck: await reader.paymentsToCheck(), authorities
+        paymentsToCheck: await reader.paymentsToCheck(), deadEmails: await reader.deadEmails(), authorities
       })));
       return 0;
     } finally {
@@ -90,6 +94,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       invoiceUnknown: () => billing.invoiceUnknownItems(),
       efactura: (from: Date, to: Date) => efacturaChecksFrom(jobs, from, to),
       paymentsToCheck: () => paymentsToCheckFrom(billing, new Date()),
+      deadEmails: () => deadEmailsFrom(billing, new Date()),
       authorities: () => readTaxAuthorities(pool, environment.REGISTER_VERSION),
       close: () => pool.end()
     });

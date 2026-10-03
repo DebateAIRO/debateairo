@@ -8,6 +8,9 @@ import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
 import {
   CheckoutService, type CheckoutDeps, type ConsentKind, type EmbeddedOrderInput, type SignedEmbeddedOrder
 } from "../../apps/api/src/billing/checkout.js";
+import {
+  createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMail
+} from "../../apps/api/src/billing/email-job.js";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { NoticeIntake } from "../../apps/api/src/billing/notice-intake.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
@@ -20,7 +23,9 @@ import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-r
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { consentDocument } from "../../apps/ui/scripts/legal-consent-manifest.mjs";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
-import { AdjustableTaxEngine, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy } from "./billingFixtures.js";
+import {
+  AdjustableTaxEngine, PROFILE_ADDRESS_ONLY, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy
+} from "./billingFixtures.js";
 
 /** The origin PUBLIC_APP_URL stands for in these tests (R-7). */
 export const TEST_PUBLIC_APP_URL = "https://dezbatere.test";
@@ -349,6 +354,12 @@ export type BillingHarness = Readonly<{
   /** The charge's event kinds as a sorted multiset: events written in one transaction share one instant. */
   eventKinds(chargeId: string): Promise<string[]>;
   renewal: RenewalService;
+  /**
+   * W12 (A7): the EMAIL jobs, sent only when a test drains them (the main `worker` leaves them queued), through P7's
+   * handler with the runtime's `sent` hook, so M3's notice record is written once M3 went out. `sent` holds every
+   * message; attachments resolve to nothing.
+   */
+  mail: Readonly<{ sent: BillingMail[]; drain(): Promise<number> }>;
   /** P11b: the maintenance pass (dunning retries, period-end endings, the yearly reminder, the look-ahead notice). */
   maintenance: BillingMaintenance;
   /** A renewal service on its own pool: a second API process sharing the database. */
@@ -427,6 +438,18 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     xmoneyEnvironment: "stage", audit, clock: clock.read
   });
   worker.register("RENEWAL_NOTICE", createRenewalNoticeHandler({ repository, jobs, renewal, policy: testBillingPolicy }));
+  const sentMail: BillingMail[] = [];
+  const mailWorker = new BillingOutboxWorker({ repository, workerId: "harness-mail", clock: clock.read, audit, batchSize: 20 });
+  const nothingAttached: AttachmentResolver = async () => null;
+  mailWorker.register("EMAIL", createEmailJobHandler({
+    repository, recipients: PROFILE_ADDRESS_ONLY, recordsKey, ownerReportEmail: "owner@example.test",
+    mail: { sendTemplated: async (message) => { sentMail.push(message); } },
+    attachments: new Map<BillingAttachmentKind, AttachmentResolver>([
+      ["ACCEPTED_TERMS", nothingAttached], ["WITHDRAWAL_FORM", nothingAttached], ["SMARTBILL_INVOICE_PDF", nothingAttached]
+    ]),
+    sent: (job, now) => renewal.noticeMailSent(job, now)
+  }));
+  const mail = Object.freeze({ sent: sentMail, drain: () => mailWorker.drain(10) });
   const noticeTokens = new Map<string, XMoneyNotice>();
   const notices = new NoticeIntake({
     repository, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
@@ -468,7 +491,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
         orderChecksum: started.orderChecksum, reused: started.reused
       });
     },
-    refunds, verify, worker, notices,
+    refunds, verify, worker, notices, mail,
     renewal, maintenance, erasures, frozen,
     renewalFor: (pool) => renewalOn(pool),
     renewalWith: (overrides) => new RenewalService({ ...renewalDeps(null), ...overrides }),

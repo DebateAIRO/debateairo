@@ -5,6 +5,7 @@ import { emailJob } from "./email-job.js";
 import { DONE, enqueueOnce, type OutboxHandler } from "./outbox.js";
 import {
   buildTaxSummary,
+  deadEmailsFrom,
   efacturaChecksFrom,
   lastEndedQuarter,
   liveQuarterSummaryRows,
@@ -31,7 +32,7 @@ export type OwnerJobsDeps = Readonly<{
   billing: Pick<BillingRepository,
     | "withTransaction" | "enqueue" | "quarterSummaryRows" | "invoiceUnknownItems" | "deadRefunds"
     | "unrecordedRefunds" | "withdrawalsAwaitingOwner" | "unfoldableSubscriptions" | "stuckRenewals"
-    | "longUnsettledCharges" | "chargelessDunning" | "blockedRenewals">;
+    | "longUnsettledCharges" | "chargelessDunning" | "blockedRenewals" | "deadEmails">;
   /** P7's queries: the job's once-only check, and P10b's e-Factura read. */
   jobs: Pick<BillingJobQueries, "outboxJobExists" | "smartBillDocumentsNotAccepted">;
   taxAuthorities: TaxAuthorities;
@@ -65,6 +66,7 @@ export class OwnerJobs {
       invoiceUnknown: await this.deps.billing.invoiceUnknownItems(),
       efactura: await efacturaChecksFrom(this.deps.jobs, quarter.from, quarter.to),
       paymentsToCheck: await paymentsToCheckFrom(this.deps.billing, now),
+      deadEmails: await deadEmailsFrom(this.deps.billing, now),
       authorities: this.deps.taxAuthorities
     }));
     // O1 is queued at most once per quarter, whatever state an earlier O1 is in (a re-run after it was sent mails nobody).

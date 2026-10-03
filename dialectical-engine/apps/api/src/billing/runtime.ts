@@ -15,6 +15,7 @@ import { createCardCheckSettlement } from "./card-change.js";
 import { ChargeStatusReader } from "./charge-status.js";
 import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
+import { createDeadJobAlert } from "./dead-jobs.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
 import { BillingErasureHook, erasurePendingOf, reconcileWork } from "./erasure-hook.js";
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
@@ -112,9 +113,11 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   const jobs = new BillingJobQueries(deps.pool);
   // P9b's INITIAL settlement reads the accepted Terms from the same repository.
   const acceptances = new AcceptanceRepository(deps.pool);
+  // W12 (P2-I16, the controller's ruling): a dead invoice or credit-note job, and a dead email, email the owner O3 at
+  // once; the owner summary and O1 list them until they are settled.
   const outbox = new BillingOutboxWorker({
     repository, workerId: `billing-api-${process.pid}-${randomUUID()}`, clock: deps.clock, audit: deps.audit,
-    batchSize: 20
+    batchSize: 20, onDead: createDeadJobAlert({ repository })
   });
   const entitlements = new EntitlementRepository(deps.pool);
   // P2-I4 (D5 5h): a refund of a charge paid in the other xMoney system ends DEAD before any call.
@@ -192,9 +195,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   outbox.register("SMARTBILL_STORNO", createSmartBillStornoHandler(smartbill));
   attachments.set("SMARTBILL_INVOICE_PDF", smartBillPdfResolver({ issuer: smartbill.issuer }));
   if (deps.mail !== undefined) {
+    // W12 (A7, the controller's ruling on P2-I16): M3's notice is recorded only once the email went out.
     outbox.register("EMAIL", createEmailJobHandler({
       repository, recipients, recordsKey: deps.connectors.recordsKey, ownerReportEmail: deps.connectors.ownerReportEmail,
-      mail: deps.mail.sender, attachments
+      mail: deps.mail.sender, attachments, sent: (job, now) => renewal.noticeMailSent(job, now)
     }));
   }
   const checkout = new CheckoutService({

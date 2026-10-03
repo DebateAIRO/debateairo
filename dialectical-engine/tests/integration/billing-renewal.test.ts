@@ -81,18 +81,53 @@ describe("P11a monthly renewal", () => {
     h.tax.rateOverride.set("RO", 1_900);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(0);
-    const events = await h.repository.subscriptionEvents(paid.subscriptionId);
     const until = addBusinessDays(h.clock.now, 7);
-    expect(events.slice(-2).map((event) => [event.kind, event.data])).toEqual([
-      ["RENEWAL_NOTICE_SENT", { announced_total_micros: 23_800_000, sent_at: h.clock.now.toISOString() }],
-      ["RENEWAL_POSTPONED", { until: until.toISOString(), reason: "NOTICE_PERIOD" }]
-    ]);
+    // W12 (the controller's ruling on P2-I16, A7): M3 is queued, but nothing counts as a notice until it went out.
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({
+      kind: "RENEWAL_POSTPONED", data: { until: until.toISOString(), reason: "NOTICE_PERIOD" }
+    });
+    expect(await subscriptionKinds(paid.subscriptionId)).not.toContain("RENEWAL_NOTICE_SENT");
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`M3:${paid.subscriptionId}:${end.toISOString()}:23800000`);
     expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ cause: "RENEWAL_POSTPONED", paidThrough: until });
+    await h.mail.drain();
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({
+      kind: "RENEWAL_NOTICE_SENT", data: { announced_total_micros: 23_800_000, sent_at: h.clock.now.toISOString() }
+    });
     h.clock.advance(MINUTE);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(0);
     h.clock.now = new Date(until.getTime() + MINUTE);
+    await h.renewal.runOnce();
+    expect(rebills(paid)).toBe(1);
+    expect((await renewalCharges(paid.subscriptionId))[0]).toMatchObject({ periodStart: end, totalMicros: 23_800_000 });
+  });
+
+  it("never charges a changed total on a notice that never went out: it sends M3 again and waits again (W12, A7)", async () => {
+    const { paid, end } = await dueNow();
+    h.tax.rateOverride.set("RO", 1_900);
+    await h.renewal.runOnce();
+    const noticeRef = `M3:${paid.subscriptionId}:${end.toISOString()}:23800000`;
+    // The notice's email dies (an unreadable profile, a relay that never answered): its job is dead-lettered.
+    await h.database.pool.query(
+      "UPDATE billing.outbox SET dead_at = $2, last_error_code = 'BILLING_PROFILE_UNREADABLE' WHERE kind = 'EMAIL' AND ref = $1 AND dead_at IS NULL",
+      [noticeRef, h.clock.now]
+    );
+    const firstUntil = addBusinessDays(h.clock.now, 7);
+    h.clock.now = new Date(firstUntil.getTime() + MINUTE);
+    await h.renewal.runOnce();
+    // No charge on the unsent notice: a new M3 under the same ref, and a new 7-business-day wait from now.
+    expect(rebills(paid)).toBe(0);
+    expect(await subscriptionKinds(paid.subscriptionId)).not.toContain("RENEWAL_NOTICE_SENT");
+    expect((await h.outboxRows(noticeRef)).filter((row) => row.ref === noticeRef).map((row) => `dead=${row.dead} done=${row.done}`).sort())
+      .toEqual(["dead=false done=false", "dead=true done=false"]);
+    const secondUntil = addBusinessDays(h.clock.now, 7);
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({
+      kind: "RENEWAL_POSTPONED", data: { until: secondUntil.toISOString() }
+    });
+    // This one goes out, so the changed total is charged once its own wait is over.
+    await h.mail.drain();
+    expect(h.mail.sent.filter((mail) => mail.templateId === "M3" && mail.params.totalAmount === "23.80").length).toBeGreaterThan(0);
+    h.clock.now = new Date(secondUntil.getTime() + MINUTE);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(1);
     expect((await renewalCharges(paid.subscriptionId))[0]).toMatchObject({ periodStart: end, totalMicros: 23_800_000 });

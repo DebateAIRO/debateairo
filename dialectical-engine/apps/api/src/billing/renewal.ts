@@ -5,7 +5,7 @@ import {
 } from "@debateai/billing-core";
 import type {
   BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, CustomerXMoneyEnvironment, DueRenewalCursor,
-  EntitlementRepository, QuoteRow
+  EntitlementRepository, OutboxJob, QuoteRow
 } from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { XMoneyPaymentFailedError, type XMoneyClient } from "@debateai/payments-xmoney";
@@ -804,10 +804,14 @@ export class RenewalService {
   }
 
   /**
-   * RENEWAL_NOTICE_SENT plus M3 in the caller's transaction; also used by the look-ahead job (P11b). It takes the owner
-   * lock (re-entrant inside the caller's transaction) and folds the subscription again (D5 5d): nothing is written, and
-   * false returned, unless it is still ACTIVE, on the period `state` names, with no cancel pending. P1b's
-   * `appendSubscriptionEvent` would refuse a notice after a WITHDRAWN or an ERASURE_STOPPED and roll the caller back.
+   * M3 in the caller's transaction; also used by the look-ahead job (P11b). It takes the owner lock (re-entrant
+   * inside the caller's transaction) and folds the subscription again (D5 5d): nothing is queued, and false returned,
+   * unless it is still ACTIVE, on the period `state` names, with no cancel pending. W12 (the controller's ruling on
+   * P2-I16, A7): RENEWAL_NOTICE_SENT is NOT written here but by `noticeMailSent`, once the email went out, so a changed
+   * amount is never charged on a notice that was not sent. Until then the announced total is unchanged, so the renewal
+   * at the end of the wait finds the notice missing and queues M3 again (the same ref, a new job once a dead one
+   * ended) with a new wait. A notice that goes out late counts from when it went out (the WAIT branch of
+   * `renewalNoticeDecision`).
    */
   async writeNotice(client: PoolClient, state: SubscriptionState, priced: PricedRenewal, now: Date, chargeDate: Date): Promise<boolean> {
     await this.deps.jobs.lockOwner(client, state.ownerRef);
@@ -816,9 +820,6 @@ export class RenewalService {
       || fresh.currentPeriodEnd.getTime() !== state.currentPeriodEnd?.getTime()) return false;
     const customer = await this.deps.repository.customerByOwner(fresh.ownerRef, undefined, client);
     if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a subscription without its customer");
-    await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(fresh, "RENEWAL_NOTICE_SENT", now, {
-      announced_total_micros: priced.tax.totalMicros, sent_at: now.toISOString()
-    }));
     await enqueueEmail(this.deps.repository, client, {
       template: "M3", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
       dedupeRef: `${fresh.subscriptionId}:${fresh.currentPeriodEnd.toISOString()}:${priced.tax.totalMicros}`,
@@ -827,9 +828,37 @@ export class RenewalService {
         // A25: M3 links to the /cancel page, never to a token.
         cancelPageUrl: new URL("/cancel", this.deps.publicAppUrl).toString()
       },
+      notice: {
+        subscriptionId: fresh.subscriptionId, periodEnd: fresh.currentPeriodEnd, announcedTotalMicros: priced.tax.totalMicros
+      },
       notBefore: now
     });
     return true;
+  }
+
+  /**
+   * W12 (the controller's ruling on P2-I16, A7): the EMAIL handler's `sent` hook. Once an M3 went out, its notice is
+   * recorded (RENEWAL_NOTICE_SENT with the announced total and `sent_at` = when it was sent), under the owner lock and
+   * on the same conditions `writeNotice` queued it on: still ACTIVE, on the announced period, with no cancel pending.
+   * Otherwise nothing is recorded (an unrecorded notice is only ever re-sent, never charged on). Every other email,
+   * and an M3 queued before W12 (no notice fields), passes through untouched.
+   */
+  async noticeMailSent(job: OutboxJob, sentAt: Date): Promise<void> {
+    const {
+      template, "notice.subscription_id": subscriptionId, "notice.period_end": periodEnd,
+      "notice.announced_total_micros": announcedTotalMicros
+    } = job.payload;
+    if (template !== "M3" || typeof subscriptionId !== "string" || typeof periodEnd !== "string"
+      || typeof announcedTotalMicros !== "number") return;
+    const ownerRef = foldSubscription(await this.deps.repository.subscriptionEvents(subscriptionId)).ownerRef;
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, ownerRef);
+      const fresh = foldSubscription(await this.deps.repository.subscriptionEvents(subscriptionId, client));
+      if (fresh.status !== "ACTIVE" || fresh.cancelRequested || fresh.currentPeriodEnd?.toISOString() !== periodEnd) return;
+      await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(fresh, "RENEWAL_NOTICE_SENT", sentAt, {
+        announced_total_micros: announcedTotalMicros, sent_at: sentAt.toISOString()
+      }));
+    });
   }
 
   /**

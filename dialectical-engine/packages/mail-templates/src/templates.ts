@@ -1,10 +1,11 @@
 /**
- * R-8's sixteen ids, ruling Q-5's owner template O2 (a refund that could not be completed), and W9's (P2-I11)
- * M8_RECEIVED (a withdrawal's acknowledgement of receipt) and O2_WITHDRAWAL (a withdrawal the owner settles by hand).
+ * R-8's sixteen ids, ruling Q-5's owner template O2 (a refund that could not be completed), W9's (P2-I11)
+ * M8_RECEIVED (a withdrawal's acknowledgement of receipt) and O2_WITHDRAWAL (a withdrawal the owner settles by hand),
+ * and W12's (P2-I16) O3 (a legal document or an email that was never sent).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -226,5 +227,17 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
       "owner.O2_WITHDRAWAL.next"
     ],
     params: { ownerRef: "text", reasonCode: "text", withdrawalDate: "date", refundDeadline: "date" }
+  }),
+  // W12 (P2-I16, the controller's ruling): the outbox worker's dead-letter hook sends this to the owner at once when an
+  // invoice or credit-note job, or an email, dies (never for a dead O3 itself). The job kind, our own reference (a
+  // charge id, or the email job's ref of template and ids), the dead job's code, and the steps (`nextSteps`, the same
+  // wording the owner summary prints, with the `pnpm billing:invoice` command to copy); never a customer's name, email
+  // or card.
+  O3: define({
+    catalogue: "owner", subject: "owner.O3.subject",
+    paragraphs: [
+      "owner.O3.intro", "owner.O3.job", "owner.O3.reference", "owner.O2.reason", { block: "nextSteps" }, "owner.O3.listed"
+    ],
+    params: { jobKind: "text", reference: "text", reasonCode: "text", nextSteps: "block" }
   })
 });

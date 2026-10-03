@@ -8,11 +8,19 @@ import {
   type TaxAuthorityRegistration,
   type TaxDueRule
 } from "@debateai/register";
+import { deadEmailAction, documentJobAction } from "./dead-jobs.js";
 
 export type TaxQuarter = Readonly<{ year: number; quarter: 1 | 2 | 3 | 4; from: Date; to: Date; label: string }>;
-export type InvoiceUnknownCode =
-  | "INVOICE_UNKNOWN" | "CREDIT_NOTE_MANUAL" | "INVOICE_SERVICE_REFUSED" | "INVOICE_SERVICE_UNAVAILABLE";
+/**
+ * W12 (P2-I16): the dead job's own code, whatever it is (P16b's four were INVOICE_UNKNOWN, CREDIT_NOTE_MANUAL,
+ * INVOICE_SERVICE_REFUSED and INVOICE_SERVICE_UNAVAILABLE); `documentJobAction` says what each one asks of the owner.
+ */
+export type InvoiceUnknownCode = string;
 export type InvoiceUnknownItem = Readonly<{ chargeId: string; jobKind: string; code: InvoiceUnknownCode; since: Date }>;
+/** W12 (P2-I16): an EMAIL job that died (P1b's `deadEmails`): its ref, template, recipient kind and code. */
+export type DeadEmailItem = Readonly<{
+  ref: string; template: string | null; recipient: string | null; code: string; since: Date;
+}>;
 /** A Romanian SmartBill document of the quarter whose e-Factura acceptance is not recorded (`status`: the latest one). */
 export type EFacturaCheckItem = Readonly<{
   document: string; kind: "INVOICE" | "CREDIT_NOTE"; chargeId: string; issuedAt: Date; status: string | null;
@@ -77,6 +85,7 @@ export type TaxSummary = Readonly<{
   invoiceUnknown: ReadonlyArray<InvoiceUnknownItem>;
   efactura: ReadonlyArray<EFacturaCheckItem>;
   paymentsToCheck: ReadonlyArray<PaymentToCheckItem>;
+  deadEmails: ReadonlyArray<DeadEmailItem>;
   sales: number;
   refunds: number;
 }>;
@@ -189,6 +198,13 @@ export async function paymentsToCheckFrom(
   return [...refunds, ...unrecorded, ...withdrawals, ...stuck, ...unsettled, ...chargeless, ...blocked, ...unfoldable];
 }
 
+/** W12 (P2-I16): the emails that died in the last 120 days (the same reach as the payment lists above). */
+export async function deadEmailsFrom(
+  billing: Pick<BillingRepository, "deadEmails">, now: Date
+): Promise<DeadEmailItem[]> {
+  return (await billing.deadEmails(new Date(now.getTime() - 120 * 86_400_000))).map((item) => Object.freeze({ ...item }));
+}
+
 /**
  * Which list a dead XMONEY_REFUND job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
  * (P2-I5) moved no money and is no refund to make; every other dead end leaves the money owed.
@@ -239,7 +255,7 @@ const zeroCounts = (): Record<TaxStatus, number> => ({ TAXABLE: 0, NON_TAXABLE: 
 export function buildTaxSummary(input: Readonly<{
   quarter: TaxQuarter; rows: ReadonlyArray<TaxSummaryRow>; invoiceUnknown: ReadonlyArray<InvoiceUnknownItem>;
   efactura: ReadonlyArray<EFacturaCheckItem>; paymentsToCheck: ReadonlyArray<PaymentToCheckItem>;
-  authorities: TaxAuthorities;
+  deadEmails: ReadonlyArray<DeadEmailItem>; authorities: TaxAuthorities;
 }>): TaxSummary {
   type Working = { taxCountry: string; taxRegion: string | null; authority: TaxAuthorityEntry | null;
     netMicros: number; taxMicros: number; sales: number; refunds: number; unknownRefunds: number;
@@ -303,7 +319,8 @@ export function buildTaxSummary(input: Readonly<{
     conflicting: Object.freeze(conflicting), notRegistered: Object.freeze(notRegistered),
     chargebacks: Object.freeze(chargebacks), unknownRefunds: Object.freeze(unknownRefunds),
     invoiceUnknown: Object.freeze([...input.invoiceUnknown]),
-    efactura: Object.freeze([...input.efactura]), paymentsToCheck: Object.freeze([...input.paymentsToCheck]), sales, refunds
+    efactura: Object.freeze([...input.efactura]), paymentsToCheck: Object.freeze([...input.paymentsToCheck]),
+    deadEmails: Object.freeze([...input.deadEmails]), sales, refunds
   });
 }
 
@@ -390,12 +407,17 @@ export function renderTaxSummary(summary: TaxSummary): string {
       + " adjust that country's net sales and tax by hand, at most the amount shown):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}${item.taxRegion === null ? "" : `, ${item.taxRegion}`},`
       + ` up to ${microsToDecimal(item.upToMicros)} USD, on ${isoDay(item.at)}`);
+  // W12 (P2-I16, P2-I17): every dead document job, whatever its code, each line with what to do; `pnpm billing:invoice`
+  // records a document issued or found by hand, or re-queues the job, and the line then leaves the list.
   section(summary.invoiceUnknown, "Invoices and credit notes to check by hand: none.",
-    "Invoices and credit notes to check by hand in SmartBill or Quaderno (INVOICE_UNKNOWN: the issuer never"
-      + " confirmed it; INVOICE_SERVICE_REFUSED / INVOICE_SERVICE_UNAVAILABLE: SmartBill never issued the Romanian"
-      + " invoice or storno, issue it by hand; CREDIT_NOTE_MANUAL: a partial credit note to issue by hand, and for"
-      + " DASHBOARD_REFUND the refund made in the xMoney dashboard, whose amount only the dashboard shows):",
-    (item) => `charge ${item.chargeId}: ${item.jobKind} (${item.code}), since ${isoDay(item.since)}`);
+    "Invoices and credit notes to check by hand in SmartBill or Quaderno (a legal document that was never issued, or"
+      + " whose issuing was never confirmed; each line says what to do, and pnpm billing:invoice records a document you"
+      + " issued or found by hand, or re-queues the job; the line stays until the document is recorded):",
+    (item) => `charge ${item.chargeId}: ${item.jobKind} (${item.code}), since ${isoDay(item.since)}: ${documentJobAction(item)}`);
+  section(summary.deadEmails, "Emails that never went out: none.",
+    "Emails that never went out (the last 120 days; nothing sends them again by itself):",
+    (item) => `${item.template ?? "unknown template"} (job ${item.ref}): ${item.code}, since ${isoDay(item.since)}:`
+      + ` ${deadEmailAction(item.template, item.recipient)}`);
   section(summary.efactura, "Romanian e-Factura documents to confirm: none.",
     "Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV (issued this quarter, and no ACCEPTED status"
       + " recorded yet; record ANAF's answer with pnpm billing:efactura-status --invoice <series>-<number> --status"
