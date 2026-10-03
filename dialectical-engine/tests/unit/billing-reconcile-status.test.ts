@@ -71,21 +71,22 @@ describe("P14a what a listed transaction should already have left in our rows", 
       ["82", new Set<ChargeEventKind>(["SUCCEEDED"])],
       ["83", new Set<ChargeEventKind>(["SUCCEEDED", "CHARGEBACK", "CHARGEBACK_RESOLVED"])]
     ]);
+    const NO_REFUNDS = new Map<string, ReadonlyArray<number>>();
     const dispute = { transactionId: "90", status: "charge-back" as const, transactionType: "chargeback", relatedTransactionIds: ["81"], amountDecimal: "24.20" };
-    expect(transactionSettled(dispute, recorded)).toBe(true);
+    expect(transactionSettled(dispute, recorded, NO_REFUNDS)).toBe(true);
     // A dispute already won stays settled: its payment's CHARGEBACK is still there.
-    expect(transactionSettled({ ...dispute, relatedTransactionIds: ["83"] }, recorded)).toBe(true);
+    expect(transactionSettled({ ...dispute, relatedTransactionIds: ["83"] }, recorded, NO_REFUNDS)).toBe(true);
     // The payment it names holds no CHARGEBACK yet: VERIFY_PAYMENT records it.
-    expect(transactionSettled({ ...dispute, relatedTransactionIds: ["82"] }, recorded)).toBe(false);
-    expect(transactionSettled({ ...dispute, relatedTransactionIds: [] }, recorded)).toBe(false);
+    expect(transactionSettled({ ...dispute, relatedTransactionIds: ["82"] }, recorded, NO_REFUNDS)).toBe(false);
+    expect(transactionSettled({ ...dispute, relatedTransactionIds: [] }, recorded, NO_REFUNDS)).toBe(false);
     // Reported `complete-ok`, a dispute is still never a payment: no SUCCEEDED settles it, only its payment's CHARGEBACK.
     const complete = { ...dispute, status: "complete-ok" as const, relatedTransactionIds: ["82"] };
-    expect(transactionSettled(complete, new Map([["90", new Set<ChargeEventKind>(["SUCCEEDED"])], ...recorded]))).toBe(false);
-    expect(transactionSettled({ ...complete, relatedTransactionIds: ["81"] }, recorded)).toBe(true);
+    expect(transactionSettled(complete, new Map([["90", new Set<ChargeEventKind>(["SUCCEEDED"])], ...recorded]), NO_REFUNDS)).toBe(false);
+    expect(transactionSettled({ ...complete, relatedTransactionIds: ["81"] }, recorded, NO_REFUNDS)).toBe(true);
     // Every type that is neither a payment, a refund nor a representment takes the same route (`credit`, an unknown one).
     for (const transactionType of ["credit", "something-new"]) {
-      expect(transactionSettled({ ...dispute, transactionType }, recorded), transactionType).toBe(true);
-      expect(transactionSettled({ ...dispute, transactionType, relatedTransactionIds: ["82"] }, recorded), transactionType).toBe(false);
+      expect(transactionSettled({ ...dispute, transactionType }, recorded, NO_REFUNDS), transactionType).toBe(true);
+      expect(transactionSettled({ ...dispute, transactionType, relatedTransactionIds: ["82"] }, recorded, NO_REFUNDS), transactionType).toBe(false);
     }
   });
 
