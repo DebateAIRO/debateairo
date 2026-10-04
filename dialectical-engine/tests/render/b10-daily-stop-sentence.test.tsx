@@ -80,6 +80,16 @@ describe("a FAILED run whose pinned role assignment the runner refused at claim 
  * RUN_SETUP_FAILED:PLAN_CHANGED. Its row says the plan changed, not that
  * something went wrong on the site's side.
  */
+/** A sentence as React writes it into server-rendered HTML text (as load01-debate-page.test.tsx's escapeText). */
+function escapeText(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#x27;");
+}
+
 describe("a FAILED run whose paid plan ended while it waited reads as the plan's sentence (Part 4)", () => {
   it("renders RUN_SETUP_FAILED:PLAN_CHANGED as the plan-ended sentence", () => {
     const html = renderToStaticMarkup(
@@ -90,7 +100,7 @@ describe("a FAILED run whose paid plan ended while it waited reads as the plan's
         locale="en"
       />
     );
-    expect(html).toContain(homeEnglish["runFailure.PLAN_ENDED"].replace("'", "&#x27;"));
+    expect(html).toContain(escapeText(homeEnglish["runFailure.PLAN_ENDED"]));
     expect(html).not.toContain(homeEnglish["runFailure.NOT_STARTED"]);
     expect(html).not.toContain("PLAN_CHANGED");
     expect(html).not.toContain("RUN_SETUP_FAILED");
