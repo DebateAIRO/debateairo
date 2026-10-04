@@ -15,8 +15,13 @@ BACKUP_ESCROW_RECIPIENT=age1exampleescrowrecipientreplacewiththerealpublickey000
 # backup.sh; the off-host copy keeps whatever the remote's own policy keeps.
 BACKUP_DIR=/var/backups/debateai
 
-# Exactly one off-host destination. Encrypted before it leaves the box, so the remote is
-# untrusted by construction and needs no more than append/write access.
+# Exactly one off-host destination: backup.sh refuses to run with neither or both set. Encrypted
+# before it leaves the box, so the remote is untrusted by construction. It needs write access and
+# enough read access for backup.sh to prove tonight's files arrived before it prints BACKUP_OK:
+# listing (and hashes, where the backend keeps them) for rclone, which runs `rclone check`; reading
+# the files back for scp, which downloads them once and compares them byte for byte.
+# Upgrading: an scp account set up write-only under the earlier wording of this comment now fails
+# every night at that read-back until it is given read access.
 BACKUP_RCLONE_REMOTE=debateai-offsite:debateai
 #BACKUP_SCP_TARGET=backup@offsite.example:/srv/debateai
 
