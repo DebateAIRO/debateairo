@@ -108,7 +108,7 @@ import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
 import { billingMailAttachmentResolvers } from "./mail-attachments.js";
-import { EMAIL_CHANGE_LINK_TTL_MS, EMAIL_CHANGE_RESEND_COOLDOWN_MS, EmailChangeService } from "./email-change.js";
+import { EmailChangeService } from "./email-change.js";
 import {
   AccountErasureNotificationReconciler,
   createSingleFlightErasureReconciler,
@@ -727,9 +727,7 @@ const emailChange = new EmailChangeService({
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
     timeoutMs: authPolicy.channel.transportTimeoutMs
-  }),
-  tokenTtlMs: EMAIL_CHANGE_LINK_TTL_MS,
-  resendCooldownMs: EMAIL_CHANGE_RESEND_COOLDOWN_MS
+  })
 });
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)

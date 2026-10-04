@@ -362,7 +362,7 @@ async function fixedStage<T>(code: string, operation: () => Promise<T>): Promise
  * stop (a front door waiting on an upgraded socket) from leaving every service
  * behind it running as an orphan (L7-F1).
  */
-export const DEV_AUTH_STACK_STOP_TIMEOUT_MS = 10_000;
+const DEV_AUTH_STACK_STOP_TIMEOUT_MS = 10_000;
 
 async function stopWithinDeadline(
   resource: Stoppable,

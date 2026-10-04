@@ -27,7 +27,6 @@ import {
   type UserDekStoreFileSystem
 } from "../../packages/crypto/src/index.js";
 import {
-  AUTH_REFUSAL_DISTINCT_SOURCE_CAP,
   AUTH_RETRYABLE_UNAVAILABLE_CODE,
   AuthFlowError,
   InProcessAuthRateLimiter,
@@ -1227,6 +1226,10 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
   });
 
   it("T4 counts distinct refusal sources exactly until the fixed cap and then says it saturated", () => {
+    // The fixed cap is module-private in apps/api/src/registration.ts (the source-purity law refuses
+    // an exported numeric literal); tests/architecture/t1-argon2-worker-contract.test.ts pins its
+    // declaration to this value.
+    const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
     const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
     const limiter = new InProcessAuthRateLimiter(
       base.rateLimits,

@@ -147,7 +147,7 @@ function asAuthFlowFailure(error: unknown): unknown {
 
 type AuthRoute = "register" | "verify" | "resend";
 const AUTH_ROUTES = Object.freeze(["register", "verify", "resend"] as const);
-export const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
+const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
 
 interface RefusalAggregate {
   readonly windowStartedAt: number;
