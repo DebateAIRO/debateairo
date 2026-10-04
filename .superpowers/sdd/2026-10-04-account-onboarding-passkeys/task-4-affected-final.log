@@ -1,0 +1,139 @@
+
+ RUN  v5.0.1 /Users/stefannour/DebateAIRO/worktrees/v3-owner-team-access/dialectical-engine
+
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > allows exactly 18 today and sets no cookie 567ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > refuses 18 tomorrow with the 30-day httpOnly lockout cookie 6ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > keeps refusing while the lockout cookie is present, even for an adult date 2ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > refuses the malformed or impossible date "2001-02-31" as a bad request 2ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > refuses the malformed or impossible date "2001-02-29" as a bad request 2ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > refuses the malformed or impossible date "1890-03-14" as a bad request 1ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > refuses the malformed or impossible date "2999-01-01" as a bad request 2ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > refuses the malformed or impossible date "14/03/1998" as a bad request 2ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > refuses the malformed or impossible date "" as a bad request 1ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > refuses the malformed or impossible date 19980314 as a bad request 1ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/age-check > is held to the exact first-party Origin 1ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/register behind the age gate > passes an adult through with the canonical public acknowledgement 6ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/register behind the age gate > records the edge country when one is reported, and nothing when it is unknown 2ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/register behind the age gate > never reaches registration while the lockout cookie is set 1ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/register behind the age gate > refuses 18 tomorrow at register itself with 403 and the lockout cookie, never reaching the service 1ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/register behind the age gate > treats no date, only the old affirmation as invalid input and never reaches the service 1ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/register behind the age gate > treats an impossible date as invalid input and never reaches the service 1ms
+ ✓ tests/unit/age-gate-api.test.ts > POST /v1/auth/register behind the age gate > treats a date in the wrong shape as invalid input and never reaches the service 1ms
+ ✓ tests/unit/age-gate-api.test.ts > the one-time confirmation for existing accounts > reports required, then confirmed after a passing date 2ms
+ ✓ tests/unit/age-gate-api.test.ts > the one-time confirmation for existing accounts > freezes on an under-age date: sessions end and the lockout cookie is set 1ms
+ ✓ tests/unit/age-gate-api.test.ts > the one-time confirmation for existing accounts > needs a session and the CSRF pair 1ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > forwards the canonical manual phone with absent recovery after the server age gate 547ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field phone_source 5ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field phone_verification_status 2ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field user_id 2ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field owner_ref 2ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field audit_token 2ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field state 2ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field grants 2ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field adult_affirmed 1ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects untrusted authority or legacy recovery field recovery_email 3ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects missing or invalid phone before signup: undefined 1ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects missing or invalid phone before signup: 0722 123 456 1ms
+ ✓ tests/unit/phone-profile-http.test.ts > manual phone public signup boundary > rejects missing or invalid phone before signup: +40 722 123 456 ext. 9 1ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 API trusted-hop client address > pins only the two exact single-host UI source addresses 1ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 API trusted-hop client address > trusts one loopback UI hop without using trustProxy:true 547ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 API trusted-hop client address > stops at the first untrusted address in a multi-hop spoof 5ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 API trusted-hop client address > ignores forwarding headers from a direct untrusted peer 4ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 API trusted-hop client address > normalizes IPv4-mapped and expanded IPv6 addresses before limiter/audit use 4ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 apps/ui proxy header boundary > uses an explicit allowlist and replaces every caller forwarding header 4ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 apps/ui proxy header boundary > normalizes IP literals and refuses malformed, duplicate, or chained values 1ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 Next socket boundary > apps/ui overwrites duplicate/spoofed forwarding metadata with the socket peer 0ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 Next socket boundary > apps/ui fails closed when the socket peer is not an IP literal 0ms
+ ✓ tests/unit/t2-real-client-ip.test.ts > T2 Next socket boundary > the executable UI server replaces caller forwarding metadata before Next sees it 1ms
+ ✓ tests/unit/api-request-limits.test.ts > API request limits (F-07, L1-F4) > advertises the ruled body, request-time, and param limits 541ms
+ ✓ tests/unit/api-request-limits.test.ts > API request limits (F-07, L1-F4) > refuses a 16 KiB + 1 body on every credential, token, and management route with a typed 413 13ms
+ ✓ tests/unit/api-request-limits.test.ts > API request limits (F-07, L1-F4) > still admits a credential body at exactly the ceiling 8ms
+ ✓ tests/unit/api-request-limits.test.ts > API request limits (F-07, L1-F4) > keeps the wider free-text ceiling on POST /v1/asks and refuses 300 KiB with a typed 413 3ms
+ ✓ tests/unit/api-request-limits.test.ts > API request limits (F-07, L1-F4) > maps empty, invalid, and unsupported bodies to typed 400/415 envelopes without a failure log 3ms
+ ✓ tests/unit/api-request-limits.test.ts > API request limits (F-07, L1-F4) > bounds the password request shape at 1024 bytes before any credential work 3ms
+ ✓ tests/unit/country-gate.test.ts > the country gate (paid plans G3a, spec §2.3.3) > refuses sign-up by code and allows it where the switch is on 2ms
+ ✓ tests/unit/country-gate.test.ts > the country gate (paid plans G3a, spec §2.3.3) > refuses a new debate only from an always-blocked country 0ms
+ ✓ tests/unit/country-gate.test.ts > the country gate (paid plans G3a, spec §2.3.3) > answers availability as two booleans and nothing else 0ms
+ ✓ tests/unit/country-gate.test.ts > the country gate (paid plans G3a, spec §2.3.3) > names the country recorded with an age check, and never a Tor exit's or an unknown one (R3-3) 0ms
+ ✓ tests/unit/country-gate.test.ts > the country gate (paid plans G3a, spec §2.3.3) > audits one refusal per route, code and country per window, content-free 0ms
+ ✓ tests/unit/country-gate.test.ts > the country gate (paid plans G3a, spec §2.3.3) > still refuses when the audit write fails, and reports that by code 0ms
+stderr | tests/unit/country-gate.test.ts > the gate on the routes > answers availability publicly, rate-limited per address
+{"event":"api.admission.refused","route":"GET /v1/geo/availability","reason":"LIMIT","windowMs":60000}
+
+stderr | tests/unit/country-gate.test.ts > the gate on the routes > counts availability per /64 for IPv6: two addresses of one allocation share a bucket (DL5-F3)
+{"event":"api.admission.refused","route":"GET /v1/geo/availability","reason":"LIMIT","windowMs":60000}
+
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > refuses sign-up with 403 and the code only, before the registration service runs 560ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > refuses a closed country BEFORE the age gate judges the date, so no age lockout is ever set there 3ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > records the gate's country with the registration's age check when no Cloudflare edge reported one (R3-3) 3ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > records the gate's country with the existing-account age confirmation too, and nothing for a Tor exit (R3-3) 3ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > refuses a new debate from a blocked country and admits one from anywhere else 4ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > changes nothing when no gate is composed (local mode, or hosted without the row) 2ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > answers availability publicly, rate-limited per address 2ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > counts availability per /64 for IPv6: two addresses of one allocation share a bucket (DL5-F3) 2ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > reads the row in hosted mode only: local mode has no country gate, whatever is published (A14) 0ms
+ ✓ tests/unit/country-gate.test.ts > the gate on the routes > is composed from the row in force through that one decision, with the admission scope sealed 2ms
+ ✓ tests/unit/legal-signup.test.ts > sign-up records the Terms and Privacy pairs (paid plans L3b) > resolves the displayed pairs against the manifest, falling back to English 1ms
+ ✓ tests/unit/legal-signup.test.ts > sign-up records the Terms and Privacy pairs (paid plans L3b) > seals one evidence per row under the records key, bound to that row 1ms
+ ✓ tests/unit/legal-signup.test.ts > sign-up records the Terms and Privacy pairs (paid plans L3b) > bounds what it seals, so no header can push the evidence past 0080's 4096-byte CHECK 0ms
+ ✓ tests/unit/legal-signup.test.ts > sign-up records the Terms and Privacy pairs (paid plans L3b) > passes the three rows into the account's own transaction when the records key is composed 6ms
+ ✓ tests/unit/legal-signup.test.ts > sign-up records the Terms and Privacy pairs (paid plans L3b) > registers exactly as before, recording nothing, when no records key is composed 4ms
+ ✓ tests/unit/legal-signup.test.ts > sign-up records the Terms and Privacy pairs (paid plans L3b) > refuses a missing or stale pair with LEGAL_DOCUMENT_STALE (409) before any account work 0ms
+ ✓ tests/unit/legal-signup.test.ts > sign-up records the Terms and Privacy pairs (paid plans L3b) > carries a well-formed pair from the register body to the service's source, never into the frozen mount's input 550ms
+ ✓ tests/unit/legal-signup.test.ts > sign-up records the Terms and Privacy pairs (paid plans L3b) > is composed with the records key in the API boot 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > remote database URLs need verified TLS with a pinned CA (L5-F3) > accepts loopback and unix-socket database hosts without TLS 3ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > remote database URLs need verified TLS with a pinned CA (L5-F3) > accepts a remote database URL with sslmode=verify-full and a pinned root certificate 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > remote database URLs need verified TLS with a pinned CA (L5-F3) > refuses a remote database URL without sslmode=verify-full 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > remote database URLs need verified TLS with a pinned CA (L5-F3) > refuses verify-full without a pinned root certificate, libpq-compat mode, and ssl=0 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > remote database URLs need verified TLS with a pinned CA (L5-F3) > names the offending key for every API database URL 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > remote database URLs need verified TLS with a pinned CA (L5-F3) > floors every other database-URL loader, including the superuser migration URL 2ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > requires content encryption in production (L5-F5) 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > refuses HATCHET_TLS_STRATEGY=none against a non-loopback Hatchet (L4-F5) 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > refuses a public API bind (the edge proxy is the only public listener) 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > applies the database, encryption and Hatchet floors to the runner loader (L4-F5, L5-F5) 3ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > applies none of this outside production 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > refuses with typed TypeErrors whose message is the code 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > keeps verified TLS floors on the real API process.env loader 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production configuration floors (R2) > wires every process.env loader through its source-injecting twin 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production provider targets refuse cleartext off-box (L4-F7) > accepts loopback http targets and any https target in production 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production provider targets refuse cleartext off-box (L4-F7) > refuses a non-loopback http target and names the provider 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production provider targets refuse cleartext off-box (L4-F7) > applies nothing outside production 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production provider targets refuse cleartext off-box (L4-F7) > is applied where both process roots parse their targets, through the mode 1ms
+ ✓ tests/unit/production-environment-floors.test.ts > production floors reach the observation agent's loader (C1, L5-F3) > refuses a remote observation database without verified TLS in production 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production floors reach the observation agent's loader (C1, L5-F3) > accepts verified-TLS and loopback targets in production, and returns only the agent's own keys 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production floors reach the observation agent's loader (C1, L5-F3) > applies nothing outside production 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production floors reach the key-rotation loader (C-I7) > refuses a remote support database without verified TLS in production 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production floors reach the key-rotation loader (C-I7) > accepts a verified-TLS or unix-socket support database in production 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production floors reach the key-rotation loader (C-I7) > applies nothing outside production, and NODE_ENV stays optional 0ms
+ ✓ tests/unit/production-environment-floors.test.ts > production floors reach the key-rotation loader (C-I7) > names the variable in the line the rotation command prints 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > auth registration contract client > posts only the ruled registration and resend fields and validates the generic responses 10ms
+ ✓ tests/unit/auth-contract-client.test.ts > auth registration contract client > rejects success-shaped enumeration leaks instead of widening the public contract 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > auth registration contract client > requires the ruled 202 status even when the generic response body is exact 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > auth registration contract client > preserves the backend auth code on typed HTTP failures 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > posts the complete signup and resend objects and returns their generic retry acknowledgements 1ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > rejects uploaded adultAffirmed authority in both requests 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > rejects uploaded userId authority in both requests 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > rejects uploaded verified authority in both requests 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > requires a phone and fresh bounded anti-bot proof without accepting regional legal locales 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > rejects an operation's wrong generic message and malformed retry acknowledgement 1ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > refuses request authority before transmitting to the API 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > keeps authentication output strict and refuses raw session tokens at the client boundary 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > accepts standard browser credential JSON while rejecting uploaded credential authority and oversized bodies 1ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > uses the pinned browser JSON userHandle shape: omitted or encoded, never null 0ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > describes bounded passkey options with required user verification and discoverable authentication 1ms
+ ✓ tests/unit/auth-contract-client.test.ts > streamlined consumer auth boundary > publishes the signup/resend request fields and 202 acknowledgements in generated contracts 0ms
+ ✓ tests/architecture/vps-env-examples-match-shapes.test.ts > VPS env examples cover the strict environment shapes (Task 14 amendment) > api: every REQUIRED key of the shape is in deploy/vps/env/api.env.example 1ms
+ ✓ tests/architecture/vps-env-examples-match-shapes.test.ts > VPS env examples cover the strict environment shapes (Task 14 amendment) > runner: every REQUIRED key of the shape is in deploy/vps/env/runner.env.example 0ms
+ ✓ tests/architecture/vps-env-examples-match-shapes.test.ts > VPS env examples cover the strict environment shapes (Task 14 amendment) > observation agent: every REQUIRED key of the shape is in deploy/vps/env/observation-agent.env.ex… 0ms
+ ✓ tests/architecture/vps-env-examples-match-shapes.test.ts > VPS env examples cover the strict environment shapes (Task 14 amendment) > api: every key deploy/vps/env/api.env.example sets is known to the shape 0ms
+ ✓ tests/architecture/vps-env-examples-match-shapes.test.ts > VPS env examples cover the strict environment shapes (Task 14 amendment) > runner: every key deploy/vps/env/runner.env.example sets is known to the shape 0ms
+ ✓ tests/architecture/vps-env-examples-match-shapes.test.ts > VPS env examples cover the strict environment shapes (Task 14 amendment) > observation agent: every key deploy/vps/env/observation-agent.env.ex… sets is known to the shape 0ms
+ ✓ tests/architecture/vps-env-examples-match-shapes.test.ts > VPS env examples cover the strict environment shapes (Task 14 amendment) > the inventories are the shapes' own: a known required key and a known optional key each 0ms
+
+ Test Files  9 passed (9)
+      Tests  122 passed (122)
+   Start at  22:17:41
+   Duration  7.31s (tests 51%, import 39%, transform 9%)
+
+    Isolate  9 workers spawned · ~49ms startup each (spawn + environment, per file)
+             at least ~395ms faster with isolate: false — reuses workers across files instead of one per file

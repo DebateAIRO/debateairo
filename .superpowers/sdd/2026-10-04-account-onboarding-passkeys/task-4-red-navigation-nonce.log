@@ -1,0 +1,45 @@
+
+ RUN  v5.0.1 /Users/stefannour/DebateAIRO/worktrees/v3-owner-team-access/dialectical-engine
+
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > loads one nonced script and renders one live widget under strict effects
+ × tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > uses the loaded document nonce when a client navigation carries a newer server nonce 20ms
+   → expected 'abcdefghijklmnopqrstuv==' to be 'zyxwvutsrqponmlkjihgfe==' // Object.is equality
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > clears expiry, resets consumed proof without recreating widget, removes on unmount
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > clears proof and exposes a constant error on provider failure
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > refuses script execution without a nonce or public site key
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > fails closed for production test site keys and keeps only the public key and nonce
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > renders only after script load and ignores load after unmount
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps en-US to supported language en
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps en-GB to supported language en
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps ro-RO to supported language ro
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps zh-TW to supported language zh-tw
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps et to supported language auto
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps lv to supported language auto
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps ga to supported language auto
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps mt to supported language auto
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps pt-PT to supported language pt
+ ↓ tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > maps invalid to supported language auto
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/render/turnstile-challenge.test.tsx > managed Turnstile lifecycle > uses the loaded document nonce when a client navigation carries a newer server nonce
+AssertionError: expected 'abcdefghijklmnopqrstuv==' to be 'zyxwvutsrqponmlkjihgfe==' // Object.is equality
+
+Expected: "zyxwvutsrqponmlkjihgfe=="
+Received: "abcdefghijklmnopqrstuv=="
+
+ ❯ tests/render/turnstile-challenge.test.tsx:28:143
+     26|   it("uses the loaded document nonce when a client navigation carries …
+     27|     const bootstrap = document.createElement("script"); bootstrap.nonc…
+     28|     try { await act(async () => root.render(view())); expect(document.…
+       |                                                                                                                                               ^
+     29|     finally { bootstrap.remove(); }
+     30|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 skipped (17)
+   Start at  22:12:18
+   Duration  417ms (environment 84%, tests 6%, import 5%, transform 5%)

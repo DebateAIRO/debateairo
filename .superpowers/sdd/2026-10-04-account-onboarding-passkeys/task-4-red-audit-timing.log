@@ -1,0 +1,69 @@
+
+ RUN  v5.0.1 /Users/stefannour/DebateAIRO/worktrees/v3-owner-team-access/dialectical-engine
+
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field turnstile_token before identity
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field locale before identity
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field ui_locale before identity
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field time_zone before identity
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field phone before identity
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field terms before identity
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field privacy before identity
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override adult_affirmed
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override recovery_email
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override phone_source
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override hostname
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override action
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override url
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override secret
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend: undefined
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend:
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend:
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > maps rejected before any signup/resend identity work
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > maps unavailable before any signup/resend identity work
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > fails closed when composition omits the verifier
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > passes only canonical facts and server age/legal evidence after a valid proof
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > uses the resend action and canonical acknowledgement
+ ↓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > preserves cheap country and age refusals before verification
+ ↓ tests/unit/turnstile-http.test.ts > published source admission before proof > limits invalid-proof /v1/auth/register requests before transport without identity/password/token/mail work
+ ↓ tests/unit/turnstile-http.test.ts > published source admission before proof > limits invalid-proof /v1/auth/resend-verification requests before transport without identity/password/token/mail work
+ × tests/unit/turnstile-http.test.ts > published source admission before proof > starts expired-window audit only after the terminal refusal clamp settles 13ms
+   → expected [] to have a length of 1 but got +0
+ ↓ tests/unit/turnstile-http.test.ts > published source admission before proof > charges valid proof once and excludes proofs/secrets from operational logs
+ ↓ tests/unit/turnstile-http.test.ts > published source admission before proof > revokes a minted admission capability after rejected proof
+ ↓ tests/unit/turnstile-http.test.ts > published source admission before proof > revokes a minted admission capability after unavailable proof
+ ↓ tests/unit/turnstile-http.test.ts > published source admission before proof > refuses forged, reused or wrong-route/source capabilities before identity
+ ↓ tests/unit/turnstile-http.test.ts > published source admission before proof > preserves validated mail display separately from legal locale and source authority
+ ↓ tests/unit/turnstile-http.test.ts > direct API calls cannot bypass Siteverify decisions > refuses spoofed before account lookup/password KDF/DEK/token/mail
+ ↓ tests/unit/turnstile-http.test.ts > direct API calls cannot bypass Siteverify decisions > refuses expired before account lookup/password KDF/DEK/token/mail
+ ↓ tests/unit/turnstile-http.test.ts > direct API calls cannot bypass Siteverify decisions > refuses hostname before account lookup/password KDF/DEK/token/mail
+ ↓ tests/unit/turnstile-http.test.ts > direct API calls cannot bypass Siteverify decisions > refuses action before account lookup/password KDF/DEK/token/mail
+ ↓ tests/unit/turnstile-http.test.ts > direct API calls cannot bypass Siteverify decisions > refuses timeout before account lookup/password KDF/DEK/token/mail
+ ↓ tests/unit/turnstile-http.test.ts > direct API calls cannot bypass Siteverify decisions > refuses an already consumed proof without identity work
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/turnstile-http.test.ts > published source admission before proof > starts expired-window audit only after the terminal refusal clamp settles
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/unit/turnstile-http.test.ts:123:60
+    121|       await vi.advanceTimersByTimeAsync(61_000); expect(work).toEqual(…
+    122|       releaseClamp(); expect(await refusal).toMatchObject({ code: "AUT…
+    123|       await vi.advanceTimersByTimeAsync(0); expect(audits).toHaveLengt…
+       |                                                            ^
+    124|       await service.drainRateLimitAuditFlushes();
+    125|     } finally { vi.useRealTimers(); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 37 skipped (38)
+   Start at  22:09:36
+   Duration  993ms (transform 58%, import 40%, tests 1%)

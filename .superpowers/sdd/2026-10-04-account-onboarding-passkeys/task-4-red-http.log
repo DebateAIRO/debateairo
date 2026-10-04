@@ -1,0 +1,180 @@
+
+ RUN  v5.0.1 /Users/stefannour/DebateAIRO/worktrees/v3-owner-team-access/dialectical-engine
+
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field turnstile_token before identity 587ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field locale before identity 5ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field ui_locale before identity 2ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field time_zone before identity 2ms
+   → expected 202 to be 400 // Object.is equality
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field phone before identity 2ms
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field terms before identity 2ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field privacy before identity 2ms
+   → expected 202 to be 400 // Object.is equality
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override adult_affirmed 2ms
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override recovery_email 1ms
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override phone_source 1ms
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override hostname 1ms
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override action 3ms
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override url 1ms
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects public authority/transport override secret 1ms
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend: undefined 1ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend:  1ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend:   1ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 1ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > maps rejected before any signup/resend identity work 1ms
+   → expected 202 to be 400 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > maps unavailable before any signup/resend identity work 1ms
+   → expected 202 to be 503 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > fails closed when composition omits the verifier 1ms
+   → expected 202 to be 503 // Object.is equality
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > passes only canonical facts and server age/legal evidence after a valid proof 2ms
+   → expected { Object (message) } to deeply equal { …(2) }
+ × tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > uses the resend action and canonical acknowledgement 3ms
+   → expected { Object (message) } to deeply equal { …(2) }
+ ✓ tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > preserves cheap country and age refusals before verification 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field turnstile_token before identity
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field locale before identity
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field ui_locale before identity
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field time_zone before identity
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field terms before identity
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects missing canonical signup field privacy before identity
+AssertionError: expected 202 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 202
+
+ ❯ tests/unit/turnstile-http.test.ts:23:35
+     21|     const { api, work, proofs } = harness(); const payload: Record<str…
+     22|     try { const response = await api.inject({ method: "POST", url: "/v…
+     23|       expect(response.statusCode).toBe(400); expect(work).toEqual([]);…
+       |                                   ^
+     24|     } finally { await api.close(); }
+     25|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/15]⎯
+
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend: undefined
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend:
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend:
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > rejects absent, empty or oversized proof at resend: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+AssertionError: expected 202 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 202
+
+ ❯ tests/unit/turnstile-http.test.ts:35:35
+     33|     const { api, work, proofs } = harness();
+     34|     try { const response = await api.inject({ method: "POST", url: "/v…
+     35|       expect(response.statusCode).toBe(400); expect(work).toEqual([]);…
+       |                                   ^
+     36|     } finally { await api.close(); }
+     37|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/15]⎯
+
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > maps rejected before any signup/resend identity work
+AssertionError: expected 202 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 202
+
+ ❯ tests/unit/turnstile-http.test.ts:42:35
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/15]⎯
+
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > maps unavailable before any signup/resend identity work
+AssertionError: expected 202 to be 503 // Object.is equality
+
+- Expected
++ Received
+
+- 503
++ 202
+
+ ❯ tests/unit/turnstile-http.test.ts:42:35
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/15]⎯
+
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > fails closed when composition omits the verifier
+AssertionError: expected 202 to be 503 // Object.is equality
+
+- Expected
++ Received
+
+- 503
++ 202
+
+ ❯ tests/unit/turnstile-http.test.ts:49:137
+     47|   it("fails closed when composition omits the verifier", async () => {
+     48|     const { api, work } = harness(undefined);
+     49|     try { const response = await api.inject({ method: "POST", url: "/v…
+       |                                                                                                                                         ^
+     50|     finally { await api.close(); }
+     51|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/15]⎯
+
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > passes only canonical facts and server age/legal evidence after a valid proof
+AssertionError: expected { Object (message) } to deeply equal { …(2) }
+
+- Expected
++ Received
+
+  {
+    "message": "If this address can be registered, verification instructions will arrive. Check your spam folder.",
+-   "retry_after_seconds": 60,
+  }
+
+ ❯ tests/unit/turnstile-http.test.ts:55:70
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/15]⎯
+
+ FAIL  tests/unit/turnstile-http.test.ts > mandatory proof at the public identity boundary > uses the resend action and canonical acknowledgement
+AssertionError: expected { Object (message) } to deeply equal { …(2) }
+
+- Expected
++ Received
+
+  {
+    "message": "If this address is awaiting verification, new instructions will arrive. Check your spam folder.",
+-   "retry_after_seconds": 60,
+  }
+
+ ❯ tests/unit/turnstile-http.test.ts:64:70
+     62|     const { api, proofs } = harness();
+     63|     try { const response = await api.inject({ method: "POST", url: "/v…
+     64|       expect(response.statusCode).toBe(202); expect(response.json()).t…
+       |                                                                      ^
+     65|       expect(proofs).toEqual([{ token: "resend-proof", action: "resend…
+     66|     } finally { await api.close(); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/15]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  15 failed | 9 passed (24)
+   Start at  21:41:10
+   Duration  1.79s (tests 36%, transform 35%, import 29%)

@@ -30,11 +30,10 @@ import {
 const ROOT = process.cwd();
 const INDEX_PATH = resolve(ROOT, "apps/api/src/index.ts");
 const INDEX_SOURCE = readFileSync(INDEX_PATH, "utf8");
-// Task 2 intentionally supersedes the prior 1eb623e7 byte pin: public signup now
-// forwards required manual phone and SQL-null recovery. The controller approved
-// only this auth forwarding change. Pin its exact implementation commit while
-// retaining every semantic boundary rule and all 15 falsification mutants.
-const BASE_REF = "c49179b6b6aed5d590c3756b991ea5fc7c7d3f55";
+// Task 4 intentionally supersedes Task 2's byte pin: the canonical public acknowledgement
+// and server-owned source-admission capability now travel through the same three auth mounts.
+// The controller approved this forwarding change; all semantic rules and 15 mutants remain.
+const BASE_REF = "d5c02f8bda4b3b1c527ac87e3522ced1628512ac";
 
 function syntheticError(
   repoRelativeFrames: readonly string[],
