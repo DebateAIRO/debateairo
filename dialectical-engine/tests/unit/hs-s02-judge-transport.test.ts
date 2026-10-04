@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildFramedPrompt } from "../../packages/providers/src/prompt-frame.js";
+import { PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW } from "../../packages/register/src/publication-check-policy.js";
+
+/** D, the register's code-owned publicationCheckPolicy deadline (60 000 ms). */
+const D = PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW.value.deadline_ms;
 
 const target = { providerRef: "development:hermes-glm-5.3-flash", baseUrl: "http://127.0.0.1:8794/v1", model: "z-ai/glm-5.3-flash", authorizationHeader: "Bearer test" };
 const packet = () => buildFramedPrompt({ contract: { contractId: "publication.test", instruction: "Judge the material.", answerForm: "JSON" }, material: [{ name: "question", content: "test" }] }).packet;
@@ -11,7 +15,7 @@ describe("publication judge transport", () => {
   it("posts the framed messages and returns text", async () => {
     const { createPublicationJudgeTransport } = await import("../../apps/api/src/publication-check/judge-transport.js");
     const posted: any[] = [];
-    const judge = createPublicationJudgeTransport(target, { readAuthorizationHeader: () => "Bearer test", fetchImplementation: async (_url, init) => {
+    const judge = createPublicationJudgeTransport(target, { readAuthorizationHeader: () => "Bearer test", deadlineMs: D, fetchImplementation: async (_url, init) => {
       posted.push(JSON.parse(String(init?.body))); return response();
     } });
     const p = packet();
@@ -23,7 +27,7 @@ describe("publication judge transport", () => {
   it.each(["http", "network", "deadline", "length", "door"] as const)("maps %s failure", async kind => {
     const { createPublicationJudgeTransport } = await import("../../apps/api/src/publication-check/judge-transport.js");
     let calls = 0;
-    const judge = createPublicationJudgeTransport(target, { readAuthorizationHeader: () => "Bearer test", fetchImplementation: async (_url, init) => {
+    const judge = createPublicationJudgeTransport(target, { readAuthorizationHeader: () => "Bearer test", deadlineMs: D, fetchImplementation: async (_url, init) => {
       calls++;
       if (kind === "http") return new Response("private vendor body", { status: 500 });
       if (kind === "network") throw new Error("private transport error");
@@ -43,7 +47,7 @@ describe("publication judge transport", () => {
   it("keeps HTTP status local to each call", async () => {
     const { createPublicationJudgeTransport } = await import("../../apps/api/src/publication-check/judge-transport.js");
     let calls = 0;
-    const judge = createPublicationJudgeTransport(target, { readAuthorizationHeader: () => "Bearer test", fetchImplementation: async () => {
+    const judge = createPublicationJudgeTransport(target, { readAuthorizationHeader: () => "Bearer test", deadlineMs: D, fetchImplementation: async () => {
       if (calls++ === 0) return new Response("", { status: 500 });
       await new Promise(resolve => setTimeout(resolve, 10)); throw new Error("network");
     } });
@@ -51,27 +55,30 @@ describe("publication judge transport", () => {
     expect(results.map(r => r.status === "rejected" ? r.reason.cause : "wrong success")).toEqual(["JUDGE_HTTP_STATUS", "JUDGE_TRANSPORT_FAILED"]);
   });
   // FIX-HS2-p1 pt-N4: the only clock that can end a judge call inside D is the check's shared signal, so an expiry
-  // is always recorded as JUDGE_DEADLINE. The adapter's own timeout is a backstop strictly above D.
+  // is always recorded as JUDGE_DEADLINE. The adapter's own timeout is a backstop strictly above D, measured from the D
+  // the transport is given — the register's publicationCheckPolicy row since 2026-10-04: the code-owned 60 000 ms and
+  // a shorter operator value alike.
   it("arms no adapter timeout at or below D, and an expiry of the caller's signal is JUDGE_DEADLINE", async () => {
     const { createPublicationJudgeTransport } = await import("../../apps/api/src/publication-check/judge-transport.js");
-    const { PUBLICATION_CHECK_DEADLINE_MS } = await import("../../apps/api/src/publication-check/check.js");
     const hang = async (_url: unknown, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       if (init?.signal?.aborted) reject(new Error("aborted"));
       init?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
     });
-    const spy = vi.spyOn(AbortSignal, "timeout");
-    try {
-      const judge = createPublicationJudgeTransport(target, { readAuthorizationHeader: () => "Bearer test", fetchImplementation: hang });
-      const caller = new AbortController();
-      const timer = setTimeout(() => caller.abort(), 150);
-      await expect(judge.complete({ packet: packet(), signal: caller.signal })).rejects.toMatchObject({ cause: "JUDGE_DEADLINE" });
-      clearTimeout(timer);
-      const armed = spy.mock.calls.map(call => call[0]);
-      expect(armed.length).toBeGreaterThan(0);
-      for (const ms of armed) expect(ms).toBeGreaterThan(PUBLICATION_CHECK_DEADLINE_MS);
-      // FIX-HS2-p2 (REV p2 survivor M4c): the backstop is D + 10 s — a hung call never holds the relay much past D.
-      for (const ms of armed) expect(ms).toBeLessThanOrEqual(PUBLICATION_CHECK_DEADLINE_MS + 10_000);
-    } finally { spy.mockRestore(); }
+    for (const deadlineMs of [D, 30_000]) {
+      const spy = vi.spyOn(AbortSignal, "timeout");
+      try {
+        const judge = createPublicationJudgeTransport(target, { readAuthorizationHeader: () => "Bearer test", deadlineMs, fetchImplementation: hang });
+        const caller = new AbortController();
+        const timer = setTimeout(() => caller.abort(), 150);
+        await expect(judge.complete({ packet: packet(), signal: caller.signal })).rejects.toMatchObject({ cause: "JUDGE_DEADLINE" });
+        clearTimeout(timer);
+        const armed = spy.mock.calls.map(call => call[0]);
+        expect(armed.length, String(deadlineMs)).toBeGreaterThan(0);
+        for (const ms of armed) expect(ms, String(deadlineMs)).toBeGreaterThan(deadlineMs);
+        // FIX-HS2-p2 (REV p2 survivor M4c): the backstop is D + 10 s — a hung call never holds the relay much past D.
+        for (const ms of armed) expect(ms, String(deadlineMs)).toBeLessThanOrEqual(deadlineMs + 10_000);
+      } finally { spy.mockRestore(); }
+    }
   });
   // FIX-HS2-p1 sd-N6: the judge's diagnostics are the judge's — never reported under the support chat's names.
   it("reports every adapter diagnostic under the PUBLICATION_JUDGE: prefix", async () => {
@@ -81,7 +88,7 @@ describe("publication judge transport", () => {
     const canary = /DBAI-CANARY-[0-9a-f]+/u.exec(p.messages[0]!.content)?.[0];
     expect(canary).toBeDefined();
     const judge = createPublicationJudgeTransport(target, {
-      readAuthorizationHeader: () => "Bearer test", reportDiagnostic: (d) => { reported.push(d.code); },
+      readAuthorizationHeader: () => "Bearer test", deadlineMs: D, reportDiagnostic: (d) => { reported.push(d.code); },
       fetchImplementation: async () => new Response(JSON.stringify({ choices: [{ message: { content: `${text} ${canary}` }, finish_reason: "stop" }] }), { status: 200 })
     });
     await judge.complete({ packet: p, signal: new AbortController().signal }).catch(() => undefined);

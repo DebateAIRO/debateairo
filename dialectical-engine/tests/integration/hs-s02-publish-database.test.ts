@@ -21,6 +21,7 @@ import {
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
 import type { PublicationContentLease } from "../../apps/api/src/publications.js";
 import { PUBLICATION_CHECK_POLICY_VERSION } from "../../apps/api/src/publication-check/policy.js";
+import { PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW } from "../../packages/register/src/publication-check-policy.js";
 import { bindJudgeAnswer, createJudgeStub, createPartJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
@@ -57,6 +58,8 @@ const PUBLICATION_TABLES = [
   "serve.publication_snapshot", "serve.publication_key_provision_intent", "core.run_visibility_event"
 ] as const;
 const ATTEMPTED_AT = new Date("2026-09-29T12:00:00.000Z");
+/** D, the register's code-owned publicationCheckPolicy deadline (60 000 ms). */
+const D = PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW.value.deadline_ms;
 
 const source = Object.freeze({ ip: "192.0.2.41", userAgent: "HS S02 Publish Browser", requestId: "request:hs-s02-publish" });
 const fakeAuditHasher = Object.freeze({
@@ -204,7 +207,8 @@ async function attempt(label: string, steps: Readonly<Record<string, JudgeStubSt
   const contentCheck = createPublicationContentCheck({
     judge: () => judge,
     recorder: new PostgresPublicationCheckRecordRepository(database.pool),
-    clock: () => ATTEMPTED_AT
+    clock: () => ATTEMPTED_AT,
+    deadlineMs: D
   });
   const grantToken = await publishGrant(runId);
   const countsBefore = await tableCounts();
@@ -357,7 +361,7 @@ describe("hate-speech S02 publish path — the runtime pool under concurrent att
       }
     };
     const contentCheck = createPublicationContentCheck({
-      judge: () => judge, recorder: new PostgresPublicationCheckRecordRepository(pool), clock: () => new Date()
+      judge: () => judge, recorder: new PostgresPublicationCheckRecordRepository(pool), clock: () => new Date(), deadlineMs: D
     });
     const contentLease: PublicationContentLease = {
       run: (use) => withRunContentLease(pool, [runId], async () => use()),
@@ -410,7 +414,8 @@ describe("hate-speech S02 publish path — the runtime pool under concurrent att
     const grantToken = await publishGrant(runId);
     const judge = createJudgeStub([JSON.stringify({ verdict: "ALLOW", rules: [], parts: [], possibly_illegal: false })]);
     const contentCheck = createPublicationContentCheck({
-      judge: () => judge, recorder: new PostgresPublicationCheckRecordRepository(database.pool), clock: () => ATTEMPTED_AT
+      judge: () => judge, recorder: new PostgresPublicationCheckRecordRepository(database.pool), clock: () => ATTEMPTED_AT,
+      deadlineMs: D
     });
     const countsBefore = await tableCounts();
     await expect(withRunContentLease(database.pool, [runId], () => application.publish({

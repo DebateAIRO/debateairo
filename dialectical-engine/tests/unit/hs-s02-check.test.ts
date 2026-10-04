@@ -5,6 +5,13 @@ import { PublicDebateSchema, type PublicDebate } from "../../packages/contract/s
 import { assertFramedPrompt, buildFramedPrompt } from "../../packages/providers/src/prompt-frame.js";
 import cases from "../../acceptance/fixtures/hs-s02-cases.json" with { type: "json" };
 import type { PublicationCheckRecord, PublicationJudgePort } from "../../apps/api/src/publication-check/check.js";
+import {
+  PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+  publicationCheckPolicyFromValue
+} from "../../packages/register/src/publication-check-policy.js";
+
+/** D, the register's code-owned publicationCheckPolicy deadline (60 000 ms, SPEC-v2 R7's cap). */
+const D = PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW.value.deadline_ms;
 
 const paths = [
   ["question", "QUESTION"],
@@ -261,7 +268,7 @@ describe("R5/R7 the answer is bound to its call — a verdict the owner wrote ca
   const run = async (judge: PublicationJudgePort, snap: PublicDebate) => {
     const c = await import("../../apps/api/src/publication-check/check.js");
     const rows: PublicationCheckRecord[] = [];
-    const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => new Date(0), recorder: { async record(row) { rows.push(row); } } });
+    const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => new Date(0), deadlineMs: D, recorder: { async record(row) { rows.push(row); } } });
     return { result: await check.check({ runId: "r", snapshot: snap }), rows };
   };
   const fieldsOf = (packet: { messages: readonly { content: string }[] }) =>
@@ -339,7 +346,7 @@ describe("R5/R7 the answer is bound to its call — a verdict the owner wrote ca
       if (first === "") first = JSON.stringify({ call: callValueOf(packet), ...allow });
       return { text: first };
     } };
-    const result = await c.judgeParts({ judge, maxMaterialCodePoints: 1, maxConcurrentCalls: 1 }, [{ kind: "ARGUMENTS", text: "ab" }]);
+    const result = await c.judgeParts({ judge, deadlineMs: D, maxMaterialCodePoints: 1, maxConcurrentCalls: 1 }, [{ kind: "ARGUMENTS", text: "ab" }]);
     expect(values).toHaveLength(2);
     expect(values[0]).not.toBe(values[1]);
     expect(result.result).toEqual({ outcome: "UNAVAILABLE", cause: "JUDGE_ANSWER_SCHEMA" });
@@ -438,7 +445,7 @@ describe("R6 a part's verdict cannot be lowered by the parts packed with it (FIX
     const { judgeParts } = await import("../../apps/api/src/publication-check/check.js");
     const judge = dilutingJudge();
     const leaves = KINDS.flatMap(k => [{ kind: k, text: k === kind ? HATEFUL : REFUTING }, { kind: k, text: REFUTING }]);
-    const judged = await judgeParts({ judge }, leaves);
+    const judged = await judgeParts({ judge, deadlineMs: D }, leaves);
     expect(judged.result).toEqual({ outcome: "BLOCK", statement: { outcome: "BLOCK", parts: [kind], ground: "TERMS", automated: true, visibility: "PRIVATE" } });
     expect(judged.rules).toEqual([1]);
   });
@@ -447,7 +454,7 @@ describe("R6 a part's verdict cannot be lowered by the parts packed with it (FIX
     const { judgeParts } = await import("../../apps/api/src/publication-check/check.js");
     const judge = dilutingJudge();
     const leaves = KINDS.flatMap(k => [{ kind: k, text: k === "QUESTION" ? "Should Romania cap immigration at 50,000 people a year because of housing costs?" : REFUTING }]);
-    expect((await judgeParts({ judge }, leaves)).result).toEqual({ outcome: "ALLOW" });
+    expect((await judgeParts({ judge, deadlineMs: D }, leaves)).result).toEqual({ outcome: "ALLOW" });
     expect(judge.fieldCounts.every(n => n === 1)).toBe(true);
   });
   // Property: every judge call carries exactly ONE part kind; the leaves of a kind stay together in order, chunked
@@ -487,7 +494,7 @@ describe("R7 every call of a debate runs in ONE wave (FIX-HS2-t-r1, TEST rehears
   it("a 6-call debate sends all 6 calls at once by default", async () => {
     const { judgeParts } = await import("../../apps/api/src/publication-check/check.js");
     const judge = slowJudge(20);
-    const judged = await judgeParts({ judge, maxMaterialCodePoints: 10 }, sixCalls);
+    const judged = await judgeParts({ judge, deadlineMs: D, maxMaterialCodePoints: 10 }, sixCalls);
     expect(judged.judgeCallCount).toBe(6);
     expect(judge.peak()).toBe(6);
   });
@@ -502,7 +509,7 @@ describe("R7 every call of a debate runs in ONE wave (FIX-HS2-t-r1, TEST rehears
   it("never more than 8 calls in flight, however many calls the debate needs", async () => {
     const c = await import("../../apps/api/src/publication-check/check.js");
     const judge = slowJudge(10);
-    const judged = await c.judgeParts({ judge, maxMaterialCodePoints: 10 }, [{ kind: "ARGUMENTS", text: "x".repeat(120) }]);
+    const judged = await c.judgeParts({ judge, deadlineMs: D, maxMaterialCodePoints: 10 }, [{ kind: "ARGUMENTS", text: "x".repeat(120) }]);
     expect(judged.judgeCallCount).toBe(12);
     expect(judge.peak()).toBe(8);
   });
@@ -518,7 +525,7 @@ describe("check", () => {
     const { createPartJudgeStub } = await import("../support/hs-s02-judge-stub.js");
     const judge = createPartJudgeStub({ question: outcome === "UNAVAILABLE" ? new c.PublicationJudgeFailure("JUDGE_HTTP_STATUS") : JSON.stringify(outcome === "ALLOW" ? allow : outcome === "BLOCK" ? block : unsure) });
     const rows: unknown[] = [];
-    const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, recorder: { async record(row) { rows.push(row); } } });
+    const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, deadlineMs: D, recorder: { async record(row) { rows.push(row); } } });
     const input = snapshot(); input.question = "HSCANARY-question";
     const result = await check.check({ runId, snapshot: input });
     const refusal = outcome === "BLOCK" || outcome === "UNSURE";
@@ -553,7 +560,7 @@ describe("check", () => {
     const { createPartJudgeStub } = await import("../support/hs-s02-judge-stub.js");
     const judge = createPartJudgeStub({}, JSON.stringify({ ...unsure, parts: [] }));
     const input = snapshot(true);
-    const checker = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, recorder: { async record() {} } });
+    const checker = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, deadlineMs: D, recorder: { async record() {} } });
     expect(await checker.check({ runId, snapshot: input })).toEqual({ outcome: "UNSURE", statement: { outcome: "UNSURE", parts: kinds, ground: "TERMS", automated: true, visibility: "PRIVATE" } });
     expect(judge.packets).toHaveLength(5);
     for (const packet of judge.packets) expect(() => assertFramedPrompt(packet)).not.toThrow();
@@ -576,7 +583,7 @@ describe("check", () => {
       await new Promise(resolve => setTimeout(resolve, index === 0 ? 30 : 5)); active--;
       throw new c.PublicationJudgeFailure(index === 0 ? "JUDGE_HTTP_STATUS" : "JUDGE_TRANSPORT_FAILED");
     } };
-    const result = await c.judgeParts({ judge, maxMaterialCodePoints: 1, maxConcurrentCalls: 2 }, [{ kind: "ARGUMENTS", text: "abcdef" }]);
+    const result = await c.judgeParts({ judge, deadlineMs: D, maxMaterialCodePoints: 1, maxConcurrentCalls: 2 }, [{ kind: "ARGUMENTS", text: "abcdef" }]);
     expect(result.result).toEqual({ outcome: "UNAVAILABLE", cause: "JUDGE_HTTP_STATUS" });
     expect(result.judgeCallCount).toBe(6); expect(peak).toBe(2); expect(new Set(signals).size).toBe(1);
     let hungCalls = 0;
@@ -594,22 +601,38 @@ describe("check", () => {
     expect(result.result).toEqual({ outcome: "UNSURE", statement: { outcome: "UNSURE", parts: ["QUESTION", "ARGUMENTS"], ground: "TERMS", automated: true, visibility: "PRIVATE" } });
     expect(result.judgeCallCount).toBe(2);
   });
-  // FIX-HS2-p1 ct-B4 / pt-B1 / R-D, FIX-HS2-p2 ui-B2 / R-D2: one deadline constant, D = 60 000 ms = SPEC-v2 R7's cap, is what a composed
-  // check arms when no deadline is passed; main.ts must wire exactly that constant (composition test in the route suite).
-  it("arms D = PUBLICATION_CHECK_DEADLINE_MS = 60 000 ms by default, and the eval core shares it", async () => {
+  // FIX-HS2-p1 ct-B4 / pt-B1 / R-D, FIX-HS2-p2 ui-B2 / R-D2, and the owner's ruling of 2026-10-04: D is the register's
+  // publicationCheckPolicy row (code-owned 60 000 ms = SPEC-v2 R7's cap; a hosted file may set less). A composed check
+  // arms exactly the D it is given, one signal per attempt, and the eval core shares it; main.ts must wire the
+  // register's D (composition test in the route suite).
+  it("arms exactly the D it is given — the register's 60 000 ms included — and the eval core shares it", async () => {
     const c = await import("../../apps/api/src/publication-check/check.js");
     const { createJudgeStub } = await import("../support/hs-s02-judge-stub.js");
-    expect(c.PUBLICATION_CHECK_DEADLINE_MS).toBe(60_000);
-    expect(c.PUBLICATION_CHECK_DEADLINE_MS).toBeLessThanOrEqual(60_000);
+    const registerD = publicationCheckPolicyFromValue(
+      PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW.value, PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+    ).deadlineMs;
+    expect(registerD).toBe(60_000);
     const spy = vi.spyOn(AbortSignal, "timeout");
     try {
-      const check = c.createPublicationContentCheck({ judge: () => createJudgeStub([JSON.stringify(allow)]), clock: () => now, recorder: { async record() {} } });
+      const check = c.createPublicationContentCheck({ judge: () => createJudgeStub([JSON.stringify(allow)]), clock: () => now, deadlineMs: registerD, recorder: { async record() {} } });
       expect(await check.check({ runId, snapshot: { question: "q" } as PublicDebate })).toEqual({ outcome: "ALLOW" });
       expect(spy.mock.calls.map(call => call[0])).toEqual([60_000]);
       spy.mockClear();
-      await c.judgeParts({ judge: createJudgeStub([JSON.stringify(allow)]) }, [{ kind: "QUESTION", text: "q" }]);
-      expect(spy.mock.calls.map(call => call[0])).toEqual([60_000]);
+      await c.judgeParts({ judge: createJudgeStub([JSON.stringify(allow)]), deadlineMs: 12_345 }, [{ kind: "QUESTION", text: "q" }]);
+      expect(spy.mock.calls.map(call => call[0])).toEqual([12_345]);
     } finally { spy.mockRestore(); }
+  });
+  // The check has no deadline of its own any more: a composition that forgets D, or passes nonsense, refuses before any
+  // judge call instead of running unbounded.
+  it("refuses to judge without a usable D", async () => {
+    const c = await import("../../apps/api/src/publication-check/check.js");
+    let calls = 0;
+    const judge: PublicationJudgePort = { providerRef: "test:judge", modelId: "test-model", async complete() { calls++; return { text: JSON.stringify(allow) }; } };
+    for (const deadlineMs of [undefined, 0, -1, 1.5, Number.NaN]) {
+      await expect(c.judgeParts({ judge, deadlineMs: deadlineMs as number }, [{ kind: "QUESTION", text: "q" }]), String(deadlineMs))
+        .rejects.toThrow("Invalid judge deadline");
+    }
+    expect(calls).toBe(0);
   });
   // FIX-HS2-p1 sd-N1: a judge whose provider ref or model id is not an identifier is not a configured judge —
   // the record never carries debate text, an email or a uuid in those columns, and the judge is never called.
@@ -624,7 +647,7 @@ describe("check", () => {
     let calls = 0;
     const judge: PublicationJudgePort = { ...ids, async complete() { calls++; return { text: JSON.stringify(allow) }; } };
     const rows: PublicationCheckRecord[] = [];
-    const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, recorder: { async record(row) { rows.push(row); } } });
+    const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, deadlineMs: D, recorder: { async record(row) { rows.push(row); } } });
     expect(await check.check({ runId, snapshot: { question: "q" } as PublicDebate })).toEqual({ outcome: "UNAVAILABLE", cause: "JUDGE_NOT_CONFIGURED" });
     expect(calls).toBe(0);
     expect(rows).toMatchObject([{ failure_cause: "JUDGE_NOT_CONFIGURED", judge_provider_ref: null, judge_model_id: null, judge_call_count: 0 }]);
@@ -634,14 +657,14 @@ describe("check", () => {
       const c = await import("../../apps/api/src/publication-check/check.js");
       const { bindJudgeAnswer } = await import("../support/hs-s02-judge-stub.js");
       const judge: PublicationJudgePort = { providerRef, modelId, async complete({ packet }) { return { text: bindJudgeAnswer(JSON.stringify(allow), packet) }; } };
-      const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, recorder: { async record() {} } });
+      const check = c.createPublicationContentCheck({ judge: () => judge, clock: () => now, deadlineMs: D, recorder: { async record() {} } });
       expect(await check.check({ runId, snapshot: { question: "q" } as PublicDebate })).toEqual({ outcome: "ALLOW" });
     });
   // Property: a refused record write cannot resolve as ALLOW.
   it("propagates recorder failure", async () => {
     const c = await import("../../apps/api/src/publication-check/check.js");
     const { createJudgeStub } = await import("../support/hs-s02-judge-stub.js");
-    const check = c.createPublicationContentCheck({ judge: () => createJudgeStub([JSON.stringify(allow)]), clock: () => now, recorder: { async record() { throw new Error("record unavailable"); } } });
+    const check = c.createPublicationContentCheck({ judge: () => createJudgeStub([JSON.stringify(allow)]), clock: () => now, deadlineMs: D, recorder: { async record() { throw new Error("record unavailable"); } } });
     await expect(check.check({ runId, snapshot: { question: "q" } as PublicDebate })).rejects.toThrow("record unavailable");
   });
 });
