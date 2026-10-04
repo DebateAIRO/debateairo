@@ -5329,6 +5329,10 @@ not in 4 000 lines of prose every author skims.
   and clear a row by REMOVING the export (module-private, or a sealed register row), never by
   reshaping the literal. Reading the rule's regex is a 30-second measurement and it is the only way
   to know whether a green audit means "lawful" or "unparsed".**
+- *Fixed 2026-10-04* (`auditNumericSourceLiteralExports`, pinned by tests/architecture/scaffold.test.ts):
+  digit separators are seen now, and the six exports they had hidden were cleared by removing the export
+  (five module-private, one moved into the register as `publicationCheckPolicy`). `N as const`, a product
+  such as `24 * 3_600_000` and a type annotation are still not seen, so this entry's rule stands for those.
 
 ## Adding a row to an EXISTING register family buys the loud startup failure; a NEW family does not (2026-09-16, BUILD(CONT-T15))
 

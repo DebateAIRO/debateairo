@@ -52,10 +52,13 @@ export interface EmailChangePending {
 type Repository = Pick<PostgresEmailChangeRepository,
   "readSettings" | "request" | "resend" | "cancelOwn" | "cancelByToken" | "confirm">;
 
+// The service's own timings, used when the caller passes none (the running API passes none).
+// Module-private: the source-purity law (tools/orphan-audit auditSourceRules) refuses an exported
+// numeric literal; tests/unit/email-change-timings.test.ts pins both by behaviour.
 /** "It expires in 24 hours" (design 14C). */
-export const EMAIL_CHANGE_LINK_TTL_MS = 24 * 3_600_000;
+const EMAIL_CHANGE_LINK_TTL_MS = 24 * 3_600_000;
 /** Resend rides a signed-in session and mails only the new address. */
-export const EMAIL_CHANGE_RESEND_COOLDOWN_MS = 60_000;
+const EMAIL_CHANGE_RESEND_COOLDOWN_MS = 60_000;
 
 const BEARER = /^[A-Za-z0-9_-]{43}$/;
 const MAX_ADDRESS_LENGTH = 254;
@@ -81,21 +84,25 @@ function normalizedAddress(value: unknown): string {
 export class EmailChangeService {
   private readonly now: () => Date;
   private readonly tokenFactory: () => string;
+  private readonly tokenTtlMs: number;
+  private readonly resendCooldownMs: number;
 
   constructor(private readonly dependencies: {
     readonly repository: Repository;
     readonly users: ReadableUserDekStore;
     readonly blindIndexKey: Uint8Array;
     readonly mail: EmailChangeMailSender;
-    readonly tokenTtlMs: number;
-    readonly resendCooldownMs: number;
+    readonly tokenTtlMs?: number;
+    readonly resendCooldownMs?: number;
     readonly now?: () => Date;
     readonly tokenFactory?: () => string;
   }) {
-    if (!Number.isInteger(dependencies.tokenTtlMs) || dependencies.tokenTtlMs <= 0
-      || dependencies.tokenTtlMs > 25 * 3_600_000
-      || !Number.isInteger(dependencies.resendCooldownMs)
-      || dependencies.resendCooldownMs < 1_000 || dependencies.resendCooldownMs > 3_600_000) {
+    this.tokenTtlMs = dependencies.tokenTtlMs ?? EMAIL_CHANGE_LINK_TTL_MS;
+    this.resendCooldownMs = dependencies.resendCooldownMs ?? EMAIL_CHANGE_RESEND_COOLDOWN_MS;
+    if (!Number.isInteger(this.tokenTtlMs) || this.tokenTtlMs <= 0
+      || this.tokenTtlMs > 25 * 3_600_000
+      || !Number.isInteger(this.resendCooldownMs)
+      || this.resendCooldownMs < 1_000 || this.resendCooldownMs > 3_600_000) {
       throw new TypeError("EMAIL_CHANGE_POLICY_INVALID");
     }
     this.now = dependencies.now ?? (() => new Date());
@@ -126,7 +133,7 @@ export class EmailChangeService {
     }
     const confirmToken = this.tokenFactory();
     const cancelToken = this.tokenFactory();
-    const expiresAt = new Date(this.now().getTime() + this.dependencies.tokenTtlMs);
+    const expiresAt = new Date(this.now().getTime() + this.tokenTtlMs);
     const newEmailCiphertext = await this.withDek(session.userId, (dek) =>
       encrypt(dek, Buffer.from(newEmail, "utf8"), addressAad(session.userId, "user.email_ciphertext")));
     const outcome = await this.dependencies.repository.request({
@@ -157,8 +164,8 @@ export class EmailChangeService {
       userId: session.userId,
       sessionId: session.sessionId,
       confirmTokenHash: hashToken("email-change-confirm", confirmToken),
-      expiresAt: new Date(this.now().getTime() + this.dependencies.tokenTtlMs),
-      cooldownMs: this.dependencies.resendCooldownMs,
+      expiresAt: new Date(this.now().getTime() + this.tokenTtlMs),
+      cooldownMs: this.resendCooldownMs,
       source
     });
     if (outcome.status === "COOLDOWN") throw new EmailChangeError("RESEND_COOLDOWN");

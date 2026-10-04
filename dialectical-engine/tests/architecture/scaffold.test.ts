@@ -5,6 +5,7 @@ import {
   auditArchitecture,
   auditEdgeManifest,
   auditMigrationReplaySafety,
+  auditNumericSourceLiteralExports,
   auditOrphans,
   auditSurfaceAttachmentLiterals,
   auditSurfaceReachability,
@@ -130,6 +131,33 @@ describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
     `)).toEqual([
       expect.stringContaining("hand-authors s*Surface attachment")
     ]);
+  });
+
+  // The source-purity law's numeric arm (J10(b) in tools/orphan-audit). `30_000` is the number
+  // 30000 written with digit separators, the house style for large numbers, so a separator must
+  // not carry an export past the law. Until 2026-10-04 one did: the rule's `\d+` stopped at the
+  // `_`, and six exports written that way were never seen (.hermes/TOOLING-TRAPS.md, "The
+  // source-purity law does not see a NUMERIC SEPARATOR").
+  it("refuses an exported numeric literal written with digit separators, as it refuses one without", () => {
+    const refused = (name: string) => [`${name} exports a numeric source literal instead of a register/law carrier`];
+    expect(auditNumericSourceLiteralExports("apps/api/src/plain.ts", "export const PLAIN_MS = 30000;\n"))
+      .toEqual(refused("apps/api/src/plain.ts"));
+    for (const literal of ["30_000", "-1_000", "1_000.250_5"]) {
+      expect(auditNumericSourceLiteralExports("apps/api/src/separated.ts", `export const SEPARATED = ${literal};\n`), literal)
+        .toEqual(refused("apps/api/src/separated.ts"));
+    }
+    // Controls. The law is about EXPORTS: the same number kept module-private is lawful, so a rule
+    // that refused every file could not pass. Both exemptions hold with separators too, and the
+    // J10(b) one stays narrow: a second numeric export in that file is still refused.
+    expect(auditNumericSourceLiteralExports("apps/api/src/private.ts", "const PRIVATE_MS = 30_000;\n")).toEqual([]);
+    expect(auditNumericSourceLiteralExports("packages/published-arithmetic/src/index.ts", "export const SCALE = 1_000;\n"))
+      .toEqual([]);
+    expect(auditNumericSourceLiteralExports("packages/contract/src/index.ts", "export const EXPANSION_DEPTH_MAX = 5;\n"))
+      .toEqual([]);
+    expect(auditNumericSourceLiteralExports(
+      "packages/contract/src/index.ts",
+      "export const EXPANSION_DEPTH_MAX = 5;\nexport const OTHER_LIMIT = 1_000;\n"
+    )).toEqual(refused("packages/contract/src/index.ts"));
   });
 
   it("rejects migration DDL that is unsafe when replayed outside the ledger", () => {

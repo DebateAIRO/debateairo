@@ -46,6 +46,7 @@ import {
   readJudgeTokenCeiling,
   readMfaPolicy,
   readProductRolePolicy,
+  readPublicationCheckPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -101,7 +102,7 @@ import { createSupportCaseMaterial, createSupportCaseService, createSupportMessa
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { PostgresPublicationApplication } from "./publications.js";
-import { createPublicationContentCheck, PUBLICATION_CHECK_DEADLINE_MS } from "./publication-check/check.js";
+import { createPublicationContentCheck } from "./publication-check/check.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
@@ -109,7 +110,7 @@ import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
 import { billingMailAttachmentResolvers } from "./mail-attachments.js";
-import { EMAIL_CHANGE_LINK_TTL_MS, EMAIL_CHANGE_RESEND_COOLDOWN_MS, EmailChangeService } from "./email-change.js";
+import { EmailChangeService } from "./email-change.js";
 import {
   AccountErasureNotificationReconciler,
   createSingleFlightErasureReconciler,
@@ -734,9 +735,7 @@ const emailChange = new EmailChangeService({
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
     timeoutMs: authPolicy.channel.transportTimeoutMs
-  }),
-  tokenTtlMs: EMAIL_CHANGE_LINK_TTL_MS,
-  resendCooldownMs: EMAIL_CHANGE_RESEND_COOLDOWN_MS
+  })
 });
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
@@ -978,19 +977,24 @@ const supportModels = new Map<string,SupportModelPort>(supportModelTarget === un
 // refuse, never skip the check.
 // FIX-HS2-p1 sd-N5: only a LOCAL deployment has the switch — a flag file named by the API port (`touch` = off,
 // `rm` = on, read per attempt, so it survives a restart) and SIGUSR2, which writes the file. Hosted has neither.
-// sd-N6: the transport prefixes the judge's diagnostics `PUBLICATION_JUDGE:`. ct-B4: D is the one constant.
+// sd-N6: the transport prefixes the judge's diagnostics `PUBLICATION_JUDGE:`.
+// ct-B4, and the owner's ruling of 2026-10-04: D, the check's deadline, is the register's publicationCheckPolicy
+// row, read at start-up (a version without it refuses here, PUBLICATION_CHECK_POLICY_UNRESOLVED) and wired into the
+// check and the judge transport's backstop (D + 10 s), never a literal.
+const publicationCheckPolicy = await boot.run("publication-check-policy", () => readPublicationCheckPolicy(pool, environment.REGISTER_VERSION));
 const publicationJudgeOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : publicationJudgeOffFlagPath(environment.API_PORT);
 const publicationJudgeSwitch = createPublicationJudgeSwitch(supportModelTarget === undefined
   ? null
   : createPublicationJudgeTransport(supportModelTarget, {
     readAuthorizationHeader: readCustodyAuthorizationHeader,
-    reportDiagnostic: reportSupportDiagnostic
+    reportDiagnostic: reportSupportDiagnostic,
+    deadlineMs: publicationCheckPolicy.deadlineMs
   }), { offFlagPath: publicationJudgeOffFlag });
 const publicationContentCheck = createPublicationContentCheck({
   judge: publicationJudgeSwitch.current,
   recorder: new PostgresPublicationCheckRecordRepository(pool),
   clock: () => new Date(),
-  deadlineMs: PUBLICATION_CHECK_DEADLINE_MS
+  deadlineMs: publicationCheckPolicy.deadlineMs
 });
 if (publicationJudgeOffFlag !== null) installPublicationJudgeSwitchSignal(process, publicationJudgeSwitch);
 const supportModelReservations = new SupportModelReservationLedger({

@@ -22,7 +22,6 @@ import { PostgresPublicationApplication } from "../../apps/api/src/publications.
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
 import {
   createPublicationContentCheck,
-  PUBLICATION_CHECK_DEADLINE_MS,
   PublicationJudgeFailure,
   type PublicationCheckRecord,
   type PublicationContentCheck,
@@ -30,6 +29,10 @@ import {
 } from "../../apps/api/src/publication-check/check.js";
 import { createPublicationJudgeSwitch } from "../../apps/api/src/publication-check/judge-transport.js";
 import { extractCheckedText } from "../../apps/api/src/publication-check/material.js";
+import {
+  PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+  publicationCheckPolicyFromValue
+} from "../../packages/register/src/publication-check-policy.js";
 import { STORY_TEST_BODY } from "../support/storyApiFixtures.js";
 import { bindJudgeAnswer, createJudgeStub, createPartJudgeStub, type JudgeStubStep } from "../support/hs-s02-judge-stub.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
@@ -44,6 +47,8 @@ import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 
 const ORIGIN = "https://app.debateai.test";
 const SESSION_TOKEN = "s".repeat(43);
+/** D, the register's code-owned publicationCheckPolicy deadline (60 000 ms). */
+const D = PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW.value.deadline_ms;
 const CSRF_TOKEN = "c".repeat(43);
 const GRANT_TOKEN = "g".repeat(43);
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
@@ -139,7 +144,8 @@ function contentCheck(judge: PublicationJudgePort | null) {
   const check = createPublicationContentCheck({
     judge: () => judge,
     recorder: { record: async (row) => { records.push(row); } },
-    clock: () => new Date("2026-09-29T12:00:00.000Z")
+    clock: () => new Date("2026-09-29T12:00:00.000Z"),
+    deadlineMs: D
   });
   return { check, records };
 }
@@ -410,7 +416,8 @@ describe("hate-speech S02 publish path", () => {
       const failing = createPublicationContentCheck({
         judge: () => createPartJudgeStub({}),
         recorder: { record: async () => { throw new Error(`relation serve.publication_check_record: ${servedAnswer().question_line}`); } },
-        clock: () => new Date("2026-09-29T12:00:00.000Z")
+        clock: () => new Date("2026-09-29T12:00:00.000Z"),
+        deadlineMs: D
       });
       const lines: string[] = [];
       const spy = vi.spyOn(console, "error").mockImplementation((...values: unknown[]) => { lines.push(values.map(String).join(" ")); });
@@ -510,7 +517,8 @@ describe("hate-speech S02 publish path", () => {
       const check = createPublicationContentCheck({
         judge: current,
         recorder: { record: async (row) => { records.push(row); } },
-        clock: () => new Date("2026-09-29T12:00:00.000Z")
+        clock: () => new Date("2026-09-29T12:00:00.000Z"),
+        deadlineMs: D
       });
       const { api, publish } = routeApi({ publicationContentCheck: check });
       expect((await publish()).statusCode).toBe(201);
@@ -607,19 +615,27 @@ describe("hate-speech S02 publish path", () => {
       const start = main.indexOf("createPublicationContentCheck(");
       return main.slice(start, main.indexOf("});", start) + 3);
     }
-    // FIX-HS2-p1 ct-B4: the RUNNING deployment's D is the constant — a wired literal, or no deadline, is red.
-    it("main.ts wires D = PUBLICATION_CHECK_DEADLINE_MS into the composed check, and nothing else", () => {
+    // FIX-HS2-p1 ct-B4, and the owner's ruling of 2026-10-04: the RUNNING deployment's D is the register's
+    // publicationCheckPolicy row, read at start-up — a wired literal, or no deadline, is red. The judge transport's
+    // backstop is measured from the same D.
+    it("main.ts wires D from the register's publicationCheckPolicy row into the check and the judge transport, and nothing else", () => {
       const composition = checkComposition();
-      expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: PUBLICATION_CHECK_DEADLINE_MS"]);
-      expect(main).toMatch(/import \{[^}]*\bPUBLICATION_CHECK_DEADLINE_MS\b[^}]*\} from "\.\/publication-check\/check\.js"/u);
+      expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);
+      expect(main).toContain('const publicationCheckPolicy = await boot.run("publication-check-policy", () => readPublicationCheckPolicy(pool, environment.REGISTER_VERSION));');
+      expect(main).toMatch(/createPublicationJudgeTransport\(supportModelTarget, \{[^}]*\bdeadlineMs: publicationCheckPolicy\.deadlineMs\b/u);
       expect(composition).not.toMatch(/\b\d[\d_]*\b/u);
     });
-    // R-D: the UI proxy lifts its 30 s ceiling for the publish route ONLY, above the API's whole publish budget.
-    it("the UI proxy's publish ceiling exceeds D by at least 20 s, and every other route keeps 30 s", () => {
+    // R-D: the UI proxy lifts its 30 s ceiling for the publish route ONLY, above the API's whole publish budget. D comes
+    // from the register now, so the ceiling is held against the largest D the row accepts, probed by behaviour.
+    it("the UI proxy's publish ceiling exceeds the largest D the register accepts by at least 20 s, and every other route keeps 30 s", () => {
       const route = readFileSync(join(REPOSITORY_ROOT, "apps/ui/app/api/[...path]/route.ts"), "utf8");
       const constant = (name: string) => Number(new RegExp(`const ${name} = ([\\d_]+);`, "u").exec(route)?.[1]?.replaceAll("_", ""));
       expect(constant("UPSTREAM_TIMEOUT_MS")).toBe(30_000);
-      expect(constant("PUBLISH_UPSTREAM_TIMEOUT_MS")).toBeGreaterThanOrEqual(PUBLICATION_CHECK_DEADLINE_MS + 20_000);
+      const value = (deadline: number) => ({ kind: "PUBLICATION_CHECK_POLICY", deadline_ms: deadline });
+      const largestD = 60_000;
+      expect(publicationCheckPolicyFromValue(value(largestD), "x").deadlineMs).toBe(largestD);
+      expect(() => publicationCheckPolicyFromValue(value(largestD + 1), "x")).toThrow();
+      expect(constant("PUBLISH_UPSTREAM_TIMEOUT_MS")).toBeGreaterThanOrEqual(largestD + 20_000);
     });
 
     it("main.ts composes the check from the support target, the record repository and the local-only switch", () => {
@@ -677,7 +693,8 @@ describe("hate-speech S02 publish path", () => {
       const check = createPublicationContentCheck({
         judge: judgeSwitch.current,
         recorder: { record: async (row) => { records.push(row); } },
-        clock: () => new Date("2026-09-29T12:00:00.000Z")
+        clock: () => new Date("2026-09-29T12:00:00.000Z"),
+        deadlineMs: D
       });
       const { api, publish } = routeApi({ publicationContentCheck: check });
       signals.emit("SIGUSR2");

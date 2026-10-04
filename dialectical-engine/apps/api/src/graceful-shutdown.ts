@@ -11,14 +11,14 @@ const SHUTDOWN_ESCALATION_CODE = "API_SHUTDOWN_SIGNAL_ESCALATED" as const;
  * further SIGTERM into a no-op: at the deadline the resources are force-closed
  * and the process exits 1 with one structured line (L7-F6).
  */
-export const SHUTDOWN_DEADLINE_MS = 20_000;
+const SHUTDOWN_DEADLINE_MS = 20_000;
 
 /**
  * Signals inside this window of the first one belong to the same request and
  * coalesce into one teardown. A later signal is the operator asking again, and
  * escalates immediately.
  */
-export const SHUTDOWN_ESCALATION_GRACE_MS = 1_000;
+const SHUTDOWN_ESCALATION_GRACE_MS = 1_000;
 
 // SIGHUP included: closing the terminal window must drain, not kill silently.
 type ShutdownSignal = "SIGTERM" | "SIGINT" | "SIGHUP";

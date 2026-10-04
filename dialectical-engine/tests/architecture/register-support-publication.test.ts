@@ -429,14 +429,20 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     // PAID PLANS (spec 2026-09-29 §2.5.9, Task P16a): +1. The deployment now also seals
     // `taxAuthorities`. A DEPLOYMENT row, so `historicalRows` stays 14 and the legacy hash is untouched.
     // MEASURED: the port emits 61 with no duplicate keys, and 60 with the key removed.
+    //
+    // hate-speech S02 x THE OWNER'S RULING OF 2026-10-04: +1. The deployment now also seals `publicationCheckPolicy`
+    // (the pre-publish check's deadline; packages/register/src/publication-check-policy.ts). A DEPLOYMENT row, so
+    // `historicalRows` stays 14 and the legacy hash is untouched. MEASURED: the port emits 62 with no duplicate keys,
+    // and 61 with the key removed.
     const storyKeys: readonly string[] = STORY_ROW_KEYS;
-    expect(developmentRows).toHaveLength(61);
-    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(55);
-    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(60);
-    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(60);
-    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(60);
-    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(59);
-    expect(developmentRows.filter((row) => row.rowKey !== "taxAuthorities")).toHaveLength(60);
+    expect(developmentRows).toHaveLength(62);
+    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(56);
+    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(61);
+    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(61);
+    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(61);
+    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(60);
+    expect(developmentRows.filter((row) => row.rowKey !== "taxAuthorities")).toHaveLength(61);
+    expect(developmentRows.filter((row) => row.rowKey !== "publicationCheckPolicy")).toHaveLength(61);
     // A19 x MODEL SCORECARD: it adds no row to these counts, deliberately (paid plans S1a: +0). `modelScorecard` is NOT a
     // code-owned deployment row: local mode reads the bundled public file
     // (scorecards/current.json), and the hosted scorecard is an ADDITIVE operator
