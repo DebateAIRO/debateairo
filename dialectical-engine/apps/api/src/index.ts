@@ -1,3 +1,4 @@
+import type { ConsumerWebAuthnApplication } from "./consumer-webauthn.js";
 import type { AuthSourceAdmission } from "./registration.js";
 import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } from "./turnstile.js";
 import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
@@ -50,6 +51,7 @@ import {
   AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
   RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
   StepUpAuthorizationRequestSchema,
+  AuthenticationResponseSchema, PasskeyEnrollmentResponseSchema,
   UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
@@ -1176,6 +1178,10 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/auth/mfa/totp/verify", auth: "public", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
   { route: "POST /v1/auth/mfa/recovery-codes/confirm", auth: "public", resource: "identity", action: "confirm-recovery-code" },
+  { route: "POST /v1/auth/passkeys/enrollment/options", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "passkey-enrollment-options" },
+  { route: "POST /v1/auth/passkeys/enrollment/complete", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "passkey-enrollment-complete" },
+  { route: "POST /v1/auth/passkeys/login/options", auth: "public", origin: "trusted", resource: "identity", action: "passkey-login-options" },
+  { route: "POST /v1/auth/passkeys/login/complete", auth: "public", origin: "trusted", resource: "identity", action: "passkey-login-complete" },
   { route: "POST /v1/auth/login", auth: "public", origin: "trusted", resource: "identity", action: "login" },
   { route: "POST /v1/auth/logout", auth: "user", resource: "session-self", action: "logout" },
   { route: "GET /v1/auth/sessions", auth: "user", resource: "session-owner", action: "list" },
@@ -1455,6 +1461,7 @@ export interface ApiOptions {
   readonly recovery?: RecoveryApplication;
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
+  readonly consumerWebAuthn?: ConsumerWebAuthnApplication;
   readonly staffAccess?: StaffAccessApplication;
   readonly staffPolicyVersion?: 1 | 2;
   readonly staff?: StaffHttpApplication;
@@ -2203,6 +2210,25 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : askRefusal ? askRefusalPublicMessage(knownError.code, knownError.message) : knownError.message
     });
   });
+
+  if(options.consumerWebAuthn!==undefined){
+    const consumer=options.consumerWebAuthn;
+    api.post("/v1/auth/passkeys/enrollment/options",{...routePolicy("POST /v1/auth/passkeys/enrollment/options"),bodyLimit:32768},async(request,reply)=>
+      reply.send(await consumer.beginPasskeyEnrollment(request.body,sourceFor(request),request.authenticatedSession)));
+    api.post("/v1/auth/passkeys/enrollment/complete",{...routePolicy("POST /v1/auth/passkeys/enrollment/complete"),bodyLimit:32768},async(request,reply)=>{
+      const result=await consumer.completePasskeyEnrollment(request.body,sourceFor(request),request.authenticatedSession);
+      if(result.status==='enrolled')return reply.send(PasskeyEnrollmentResponseSchema.parse(result));
+      reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS)]);
+      return reply.send(AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session}));
+    });
+    api.post("/v1/auth/passkeys/login/options",{...routePolicy("POST /v1/auth/passkeys/login/options"),bodyLimit:32768},async(request,reply)=>
+      reply.send(await consumer.beginPasskeyLogin(request.body??{},sourceFor(request))));
+    api.post("/v1/auth/passkeys/login/complete",{...routePolicy("POST /v1/auth/passkeys/login/complete"),bodyLimit:32768},async(request,reply)=>{
+      const result=await consumer.completePasskeyLogin(request.body,sourceFor(request));
+      reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS)]);
+      return reply.send(AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session}));
+    });
+  }
 
   if (options.sessions !== undefined) {
     api.post("/v1/auth/login", credentialRoutePolicy("POST /v1/auth/login"), async (request, reply) => {

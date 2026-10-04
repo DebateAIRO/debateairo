@@ -127,15 +127,31 @@ export const ConsumerAuthenticationOptionsSchema = z.object({
 }).strict();
 export type ConsumerAuthenticationOptions = z.infer<typeof ConsumerAuthenticationOptionsSchema>;
 export const PasskeyRegistrationOptionsResponseSchema = z.object({
-  challenge_handle: HandleSchema, options: ConsumerRegistrationOptionsSchema
+  challenge_handle: HandleSchema, expires_at: z.iso.datetime(), options: ConsumerRegistrationOptionsSchema
 }).strict().superRefine(ceremonyBodyBound);
 export type PasskeyRegistrationOptionsResponse = z.infer<typeof PasskeyRegistrationOptionsResponseSchema>;
 export const PasskeyAuthenticationOptionsResponseSchema = z.object({
-  challenge_handle: HandleSchema, options: ConsumerAuthenticationOptionsSchema
+  challenge_handle: HandleSchema, expires_at: z.iso.datetime(), options: ConsumerAuthenticationOptionsSchema
 }).strict().superRefine(ceremonyBodyBound);
 export type PasskeyAuthenticationOptionsResponse = z.infer<typeof PasskeyAuthenticationOptionsResponseSchema>;
 
+export const BeginPasskeyEnrollmentRequestSchema = z.union([
+  z.object({enrollment_token:HandleSchema}).strict(), z.object({step_up_grant:HandleSchema}).strict()
+]);
+export const CompletePasskeyEnrollmentRequestSchema = z.object({
+  challenge_handle:HandleSchema, credential:ConsumerRegistrationCredentialSchema, label:z.string().trim().min(1).max(128).optional()
+}).strict().superRefine(ceremonyBodyBound);
+export const BeginPasskeyLoginRequestSchema = z.object({continuation_token:HandleSchema.optional()}).strict();
+export const CompletePasskeyLoginRequestSchema = z.object({challenge_handle:HandleSchema,credential:ConsumerAuthenticationCredentialSchema}).strict().superRefine(ceremonyBodyBound);
+export const PasskeyEnrollmentResponseSchema = z.union([AuthenticationResponseSchema,z.object({status:z.literal("enrolled")}).strict()]);
+export type BeginPasskeyEnrollmentRequest=z.infer<typeof BeginPasskeyEnrollmentRequestSchema>;
+export type CompletePasskeyEnrollmentRequest=z.infer<typeof CompletePasskeyEnrollmentRequestSchema>;
+export type BeginPasskeyLoginRequest=z.infer<typeof BeginPasskeyLoginRequestSchema>;
+export type CompletePasskeyLoginRequest=z.infer<typeof CompletePasskeyLoginRequestSchema>;
+export type PasskeyEnrollmentResponse=z.infer<typeof PasskeyEnrollmentResponseSchema>;
+
 export const consumerAuthContractSchemas = Object.freeze({
+  BeginPasskeyEnrollmentRequestSchema, CompletePasskeyEnrollmentRequestSchema, BeginPasskeyLoginRequestSchema, CompletePasskeyLoginRequestSchema, PasskeyEnrollmentResponseSchema,
   CatalogLocaleCodeSchema, LocaleCodeSchema, RegisterRequestSchema, ResendVerificationRequestSchema,
   RegistrationVerificationAckSchema, ResendVerificationAckSchema, VerificationAckSchema, AuthenticationResponseSchema,
   ConsumerRegistrationCredentialSchema, ConsumerAuthenticationCredentialSchema,

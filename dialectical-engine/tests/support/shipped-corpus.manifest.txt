@@ -21,6 +21,8 @@ apps/api/src/billing/index.ts
 apps/api/src/billing/usage.ts
 apps/api/src/boot-custody.ts
 apps/api/src/client-ip.ts
+apps/api/src/consumer-webauthn-verifier.ts
+apps/api/src/consumer-webauthn.ts
 apps/api/src/country-gate.ts
 apps/api/src/disclosures.ts
 apps/api/src/email-change.ts
@@ -625,6 +627,7 @@ packages/db/src/account-erasure.ts
 packages/db/src/account-profile.ts
 packages/db/src/auth-risk.ts
 packages/db/src/billing-entitlement.ts
+packages/db/src/consumer-auth.ts
 packages/db/src/email-change.ts
 packages/db/src/identity.ts
 packages/db/src/index.ts

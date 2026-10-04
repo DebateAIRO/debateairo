@@ -266,7 +266,7 @@ describe("streamlined consumer auth boundary", () => {
       authenticatorSelection: { userVerification: "required", residentKey: "required", requireResidentKey: true },
       excludeCredentials: [], extensions: { credProps: true }
     };
-    const registration = { challenge_handle: "h".repeat(43), options };
+    const registration = { challenge_handle: "h".repeat(43), expires_at: "2026-10-05T12:00:00.000Z", options };
     expect(contract.PasskeyRegistrationOptionsResponseSchema?.safeParse(registration).success).toBe(true);
     expect(contract.PasskeyRegistrationOptionsResponseSchema.safeParse({ ...registration, options: {
       ...options, authenticatorSelection: { userVerification: "preferred" }
@@ -274,7 +274,7 @@ describe("streamlined consumer auth boundary", () => {
     expect(contract.PasskeyRegistrationOptionsResponseSchema.safeParse({ ...registration, options: {
       ...options, excludeCredentials: Array.from({ length: 101 }, () => ({ id: "Y3JlZA", type: "public-key" }))
     } }).success).toBe(false);
-    const authentication = { challenge_handle: "h".repeat(43), options: {
+    const authentication = { challenge_handle: "h".repeat(43), expires_at: "2026-10-05T12:00:00.000Z", options: {
       challenge: "c".repeat(43), rpId: "example.test", timeout: 300000, userVerification: "required", allowCredentials: []
     } };
     expect(contract.PasskeyAuthenticationOptionsResponseSchema?.safeParse(authentication).success).toBe(true);

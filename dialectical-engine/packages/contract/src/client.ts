@@ -1,3 +1,6 @@
+import {PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsResponseSchema, PasskeyEnrollmentResponseSchema,
+ type BeginPasskeyEnrollmentRequest,type CompletePasskeyEnrollmentRequest,type BeginPasskeyLoginRequest,type CompletePasskeyLoginRequest,
+ type PasskeyRegistrationOptionsResponse,type PasskeyAuthenticationOptionsResponse,type PasskeyEnrollmentResponse} from './consumer-auth.js';
 import {
   AuthenticationResponseSchema,
   REGISTRATION_PUBLIC_MESSAGE,
@@ -302,6 +305,10 @@ export interface ContractClient {
   startRecovery(email: string): Promise<Readonly<{
     message: typeof RECOVERY_START_PUBLIC_MESSAGE;
   }>>;
+  beginPasskeyEnrollment(input:BeginPasskeyEnrollmentRequest):Promise<PasskeyRegistrationOptionsResponse>;
+  completePasskeyEnrollment(input:CompletePasskeyEnrollmentRequest):Promise<PasskeyEnrollmentResponse>;
+  beginPasskeyLogin(input?:BeginPasskeyLoginRequest):Promise<PasskeyAuthenticationOptionsResponse>;
+  completePasskeyLogin(input:CompletePasskeyLoginRequest):Promise<AuthenticationResponse>;
   beginLogin(email: string, password: string): Promise<{ status: "mfa_required"; challenge_token: string }>;
   completeLogin(challengeToken: string, code: string): Promise<AuthenticationResponse>;
   logout(): Promise<void>;
@@ -321,7 +328,7 @@ export interface ContractClient {
       action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
       target_run_id: string;
     }>
-    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" }>): Promise<{
+    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" }>): Promise<{
     status: "step_up_complete";
     csrf_token: string;
     step_up_grant?: ({
@@ -331,7 +338,7 @@ export interface ContractClient {
       expires_at: string;
     } | {
       token: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY";
       expires_at: string;
     }) | undefined;
   }>;
@@ -543,6 +550,10 @@ export function createContractClient(
       }
       if (!response.ok) throw await contractErrorForResponse(response);
     },
+    beginPasskeyEnrollment:(input:BeginPasskeyEnrollmentRequest)=>request('/v1/auth/passkeys/enrollment/options',PasskeyRegistrationOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completePasskeyEnrollment:(input:CompletePasskeyEnrollmentRequest)=>request('/v1/auth/passkeys/enrollment/complete',PasskeyEnrollmentResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    beginPasskeyLogin:(input:BeginPasskeyLoginRequest={})=>request('/v1/auth/passkeys/login/options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completePasskeyLogin:(input:CompletePasskeyLoginRequest)=>request('/v1/auth/passkeys/login/complete',AuthenticationResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     listSessions: () => request("/v1/auth/sessions", SessionListSchema),
     revokeSession: (sessionId: string) => requestNoContent(
       root.href,
@@ -559,7 +570,7 @@ export function createContractClient(
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         target_run_id: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" }>) => request(
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" }>) => request(
       "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,

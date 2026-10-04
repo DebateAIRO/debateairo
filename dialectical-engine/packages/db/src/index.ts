@@ -1930,3 +1930,4 @@ export { PostgresInternalAllowanceRepository, type InternalAllowancePort, type I
 
 export {PostgresAccountProfileRepository, type ProfileSession, type PhoneProfileRecord} from "./account-profile.js";
 export {PostgresRecoveryEmailRepository, type RecoveryEmailRecord} from "./recovery-email.js";
+export * from './consumer-auth.js';

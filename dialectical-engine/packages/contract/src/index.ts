@@ -449,7 +449,7 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
   z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
-  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL"]) }).strict()
+  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY"]) }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
@@ -465,7 +465,7 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL"]),
+    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY"]),
     expires_at: z.iso.datetime()
   }).strict()
 ]);
@@ -1051,6 +1051,10 @@ export const contractInventory = Object.freeze({
     "POST /v1/auth/mfa/totp/verify",
     "POST /v1/auth/mfa/recovery-codes/generate",
     "POST /v1/auth/mfa/recovery-codes/confirm",
+    "POST /v1/auth/passkeys/enrollment/options",
+    "POST /v1/auth/passkeys/enrollment/complete",
+    "POST /v1/auth/passkeys/login/options",
+    "POST /v1/auth/passkeys/login/complete",
     "POST /v1/auth/login",
     "POST /v1/auth/logout",
     "GET /v1/auth/sessions",

@@ -26,6 +26,10 @@ const variants = (...names: EndpointSchemaName[]) => ({ anyOf: names.map(referen
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
 const response = (schema: unknown, status = "200") => ({ responses: { [status]: { description: status === "202" ? "Generic verification acknowledgement" : "Current selected policy response", content: { "application/json": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
+  "POST /v1/auth/passkeys/enrollment/options": {...request(reference("BeginPasskeyEnrollmentRequestSchema")),...response(reference("PasskeyRegistrationOptionsResponseSchema"))},
+  "POST /v1/auth/passkeys/enrollment/complete": {...request(reference("CompletePasskeyEnrollmentRequestSchema")),...response(reference("PasskeyEnrollmentResponseSchema"))},
+  "POST /v1/auth/passkeys/login/options": {...request(reference("BeginPasskeyLoginRequestSchema")),...response(reference("PasskeyAuthenticationOptionsResponseSchema"))},
+  "POST /v1/auth/passkeys/login/complete": {...request(reference("CompletePasskeyLoginRequestSchema")),...response(reference("AuthenticationResponseSchema"))},
   "POST /v1/auth/register": { ...request(reference("RegisterRequestSchema")), ...response(reference("RegistrationVerificationAckSchema"), "202") },
   "POST /v1/auth/resend-verification": { ...request(reference("ResendVerificationRequestSchema")), ...response(reference("ResendVerificationAckSchema"), "202") },
   "GET /v1/account/profile": response(reference("AccountPhoneProfileSchema")),

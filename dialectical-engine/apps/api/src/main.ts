@@ -1,3 +1,5 @@
+import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
+import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
 import { AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailService } from "./recovery-email.js";
@@ -1029,6 +1031,7 @@ const api = buildApi({
   recovery,
   mfa,
   sessions,
+  consumerWebAuthn: new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL}),
   ...(staffAccess === undefined ? {} : { staffAccess }),
   staffPolicyVersion: environment.STAFF_ACCESS.policyVersion,
   ...(staffHttp === undefined ? {} : {staff: staffHttp}),

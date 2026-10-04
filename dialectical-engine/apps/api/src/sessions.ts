@@ -62,6 +62,19 @@ export type LoginResult = Readonly<{
   replacementRecoveryCode?: string;
 }>;
 
+/** Internal producer for verified consumer methods. Raw bearers never cross the HTTP projection. */
+export interface ConsumerSessionMaterial {
+  readonly sessionId:string; readonly sessionToken:string; readonly sessionTokenHash:string;
+  readonly csrfToken:string; readonly csrfTokenHash:string; readonly bindingHash:string;
+  readonly sessionBindingContext:Readonly<{user_agent_hash:string}>; readonly occurredAt:Date;
+  readonly idleExpiresAt:Date; readonly absoluteExpiresAt:Date;
+}
+export interface ConsumerSessionProducer {
+  bindingHash(source:AuthSourceContext):string;
+  prepare(source:AuthSourceContext):ConsumerSessionMaterial;
+  committed(material:ConsumerSessionMaterial, identity:Readonly<{userId:string;ownerRef:string}>, source:AuthSourceContext):Promise<LoginResult>;
+}
+
 export type StaffPrerequisiteRequest = Readonly<{session: AuthenticatedSession; password: string; code: string}> & (
   Readonly<{purpose: "KEY_PREREGISTRATION"}> | Readonly<{purpose: "OWNER_POSSESSION"; commandId: string; commandNonce: string}>
 );
@@ -114,7 +127,7 @@ export interface SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -421,6 +434,28 @@ export class SessionService implements SessionApplication {
     });
   }
 
+  /** Construct only from the fully initialized service so every method shares token/KDF policy. */
+  consumerProducer():ConsumerSessionProducer {
+    return Object.freeze({
+      bindingHash:(source:AuthSourceContext)=>this.bindingHash(source),
+      prepare:(source:AuthSourceContext)=>{
+        const now=this.now(), bindingHash=this.bindingHash(source);
+        const material=this.sessionMaterial(now);
+        // New consumer producer ceiling only. Historical sealed selection and old sessions are unchanged.
+        const absoluteExpiresAt=new Date(Math.min(material.absoluteExpiresAt.getTime(),now.getTime()+2592000000));
+        const idleExpiresAt=new Date(Math.min(material.idleExpiresAt.getTime(),now.getTime()+1209600000,absoluteExpiresAt.getTime()));
+        return Object.freeze({...material,absoluteExpiresAt,idleExpiresAt,bindingHash,sessionBindingContext:Object.freeze({user_agent_hash:bindingHash}),occurredAt:now});
+      },
+      committed:async (material:ConsumerSessionMaterial,identity:Readonly<{userId:string;ownerRef:string}>,source:AuthSourceContext)=>{
+        try {
+          const recorded=await this.dependencies.riskSignals.recordForSession({tokenHash:material.sessionTokenHash,bindingHash:material.bindingHash,kind:"LOGIN_SUCCESS",source});
+          if(recorded!=="recorded") throw new TypeError("LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED");
+        } catch(error){this.dependencies.onRiskSignalFailure(error);}
+        return Object.freeze({status:"authenticated" as const,sessionToken:material.sessionToken,csrfToken:material.csrfToken,session:sessionFor(identity.ownerRef,material.sessionId)});
+      }
+    });
+  }
+
   private async totpStep(challenge: LoginChallengeRecord, code: string, now: Date): Promise<number | null> {
     let dek: Buffer | undefined;
     let secret: Buffer | undefined;
@@ -624,7 +659,7 @@ export class SessionService implements SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
