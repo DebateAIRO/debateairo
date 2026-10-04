@@ -4,6 +4,8 @@ import { createServer, request } from "node:http";
 import { PassThrough } from "node:stream";
 import { EventEmitter } from "node:events";
 import { chmod, mkdtemp, rm, writeFile, symlink } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { siteverifyOutcome } from "../../deploy/turnstile/siteverify-response.mjs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
@@ -78,4 +80,35 @@ test("an API-shaped child with filesystem confinement cannot read relay-only cre
   const source = `import { loadRelaySecret } from ${JSON.stringify(moduleUrl)}; try { await loadRelaySecret(${JSON.stringify(secretPath)}, "test"); process.exitCode=2; } catch(error) { console.error(error.code); process.exitCode=1; }`;
   const child = spawnSync(process.execPath, ["--permission", `--allow-fs-read=${resolve("deploy/turnstile")}`, "--input-type=module", "--eval", source], { encoding: "utf8", env: { NODE_ENV: "production" } });
   assert.equal(child.status, 1); assert.match(child.stderr, /ERR_ACCESS_DENIED/); assert.equal(child.stderr.includes(secret), false);
+});
+
+function shippedUnitEnvironment() {
+  const unit = readFileSync("deploy/turnstile/debateai-turnstile.service", "utf8");
+  const env = { PUBLIC_APP_URL: "https://v3-preview.dezbatere.ro", CREDENTIALS_DIRECTORY: "/run/credentials/debateai-turnstile.service" };
+  for (const match of unit.matchAll(/^Environment=([^=\n]+)=(.*)$/gm)) env[match[1]] = match[2];
+  const directory = /^RuntimeDirectory=(.+)$/m.exec(unit)?.[1];
+  assert.ok(directory, "the shipped unit declares its runtime directory");
+  env.RUNTIME_DIRECTORY = `/run/${directory}`;
+  return env;
+}
+test("the shipped unit's generated environment passes the worker parser", () => {
+  const parsed = relayConfiguration(shippedUnitEnvironment());
+  assert.deepEqual(parsed, { publicAppUrl: "https://v3-preview.dezbatere.ro", socketPath: "/run/debateai-turnstile/siteverify.sock", secretPath: "/run/credentials/debateai-turnstile.service/turnstile-secret" });
+});
+test("unit-generated metadata does not allow inherited private or transport override variables", () => {
+  for (const key of ["DATABASE_URL", "KEK_PATH", "USER_DEK_STORE_PATH", "PROVIDER_DISCOVERY_TARGETS_JSON", "HTTPS_PROXY", "NODE_OPTIONS", "NODE_EXTRA_CA_CERTS"]) {
+    assert.throws(() => relayConfiguration({ ...shippedUnitEnvironment(), [key]: "controlled-forbidden-value" }), /TURNSTILE_RELAY_ENVIRONMENT_INVALID/);
+  }
+});
+for (const [timestamp, now, expected] of [
+  ["2026-02-31T12:00:00Z", "2026-03-03T12:00:01Z", "unavailable"],
+  ["2026-02-29T12:00:00Z", "2026-03-01T12:00:01Z", "unavailable"],
+  ["2024-02-30T12:00:00Z", "2024-03-01T12:00:01Z", "unavailable"],
+  ["2026-04-31T12:00:00Z", "2026-05-01T12:00:01Z", "unavailable"],
+  ["2026-13-01T12:00:00Z", "2026-12-01T12:00:01Z", "unavailable"],
+  ["2026-02-00T12:00:00Z", "2026-02-01T12:00:01Z", "unavailable"],
+  ["2024-02-29T12:00:00.1Z", "2024-02-29T12:00:01Z", "passed"],
+  ["2026-02-28T12:00:00Z", "2026-02-28T12:00:01Z", "passed"]
+]) test(`strict calendar validation of ${timestamp}`, () => {
+  assert.equal(siteverifyOutcome({ ...response, challenge_ts: timestamp }, "signup", "v3-preview.dezbatere.ro", Date.parse(now)), expected);
 });

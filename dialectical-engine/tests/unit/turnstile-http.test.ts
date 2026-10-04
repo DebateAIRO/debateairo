@@ -126,8 +126,8 @@ describe("published source admission before proof", () => {
     let releaseClamp!: () => void; const clamp = new Promise<void>(resolve => { releaseClamp = resolve; });
     const { service, work, audits } = realIdentityService(1, async () => clamp);
     try {
-      const granted = await service.admitSource("register", admittedSource); granted.release();
-      const refusal = service.admitSource("register", admittedSource).catch(error => error);
+      const granted = await service.admitSource({ route: "register", source: admittedSource, input: serviceInput }); granted.release();
+      const refusal = service.admitSource({ route: "register", source: admittedSource, input: serviceInput }).catch(error => error);
       await vi.advanceTimersByTimeAsync(61_000); expect(work).toEqual([]); expect(audits).toEqual([]);
       releaseClamp(); expect(await refusal).toMatchObject({ code: "AUTH_RATE_LIMITED" });
       await vi.advanceTimersByTimeAsync(0); expect(audits).toHaveLength(1);
@@ -152,8 +152,8 @@ describe("published source admission before proof", () => {
     const { service, work } = realIdentityService(2);
     const admit = service.admitSource.bind(service);
     let captured: Awaited<ReturnType<typeof admit>> | undefined;
-    let source: Parameters<typeof admit>[1] | undefined;
-    service.admitSource = async (route, rawSource) => { source = rawSource; captured = await admit(route, rawSource); return captured; };
+    let source: Parameters<typeof admit>[0]["source"] | undefined;
+    service.admitSource = async request => { source = request.source; captured = await admit(request); return captured; };
     const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: { verify: async () => outcome } });
     try {
       const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(outcome === "rejected" ? 400 : 503);
@@ -164,14 +164,14 @@ describe("published source admission before proof", () => {
     const { service, work } = realIdentityService(20);
     const forged = { release: () => undefined };
     await expect(service.register(serviceInput, admittedSource, forged as never)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
-    const wrongRoute = await service.admitSource("resend", admittedSource);
+    const wrongRoute = await service.admitSource({ route: "resend", source: admittedSource, input: { email: signup.email } });
     await expect(service.register(serviceInput, admittedSource, wrongRoute)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
-    const wrongSource = await service.admitSource("register", admittedSource);
+    const wrongSource = await service.admitSource({ route: "register", source: admittedSource, input: serviceInput });
     await expect(service.register(serviceInput, { ...admittedSource, requestId: "other-request" }, wrongSource)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
-    const revoked = await service.admitSource("register", admittedSource); revoked.release();
+    const revoked = await service.admitSource({ route: "register", source: admittedSource, input: serviceInput }); revoked.release();
     await expect(service.register(serviceInput, admittedSource, revoked)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
     expect(work).toEqual([]);
-    const admitted = await service.admitSource("register", admittedSource);
+    const admitted = await service.admitSource({ route: "register", source: admittedSource, input: serviceInput });
     await expect(service.register(serviceInput, admittedSource, admitted)).rejects.toMatchObject({ code: "AUTH_TEMPORARILY_UNAVAILABLE" });
     await expect(service.register(serviceInput, admittedSource, admitted)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
     expect(work).toEqual(["lookup", "password-kdf"]);

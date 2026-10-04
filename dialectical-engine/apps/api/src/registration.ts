@@ -56,9 +56,18 @@ export type RegistrationSource = VerificationMailSource & Readonly<{ legal?: Reg
 
 declare const sourceAdmissionBrand: unique symbol;
 export type AuthSourceAdmission = Readonly<{ [sourceAdmissionBrand]: true; release(): void }>;
+export type AuthSourceAdmissionRequest =
+  | Readonly<{ route: "register"; input: RegisterInput; source: RegistrationSource }>
+  | Readonly<{ route: "resend"; input: Readonly<{ email: string }>; source: VerificationMailSource }>;
+interface SourceAdmissionGrant {
+  readonly route: "register" | "resend";
+  readonly ip: string;
+  readonly requestId: string;
+  readonly releaseStructural: (() => void) | undefined;
+}
 export interface RegistrationApplication {
   /** Trusted composition port; the capability never enters public JSON or source metadata. */
-  admitSource?(route: "register" | "resend", source: VerificationMailSource): Promise<AuthSourceAdmission>;
+  admitSource?(request: AuthSourceAdmissionRequest): Promise<AuthSourceAdmission>;
   register(input: RegisterInput, source: RegistrationSource, admission?: AuthSourceAdmission): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
   verifyEmail(input: { readonly token: string }, source: AuthSourceContext): Promise<{ readonly status: "mfa_required" }>;
   resendVerification(
@@ -160,7 +169,14 @@ type AuthRoute = "register" | "verify" | "resend";
 const AUTH_ROUTES = Object.freeze(["register", "verify", "resend"] as const);
 export const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
 
+interface RefusalEligibility {
+  pending: number;
+  ready: Promise<void> | undefined;
+  settle: (() => void) | undefined;
+}
 interface RefusalAggregate {
+  /** Shared by every snapshot of this window, without retaining a list of contributors. */
+  readonly eligibility: RefusalEligibility;
   readonly windowStartedAt: number;
   readonly occurredAt: Date;
   readonly source: AuthSourceContext;
@@ -350,6 +366,7 @@ export class InProcessAuthRateLimiter {
     readonly scope: "ip" | "address";
     readonly now: Date;
     readonly source: AuthSourceContext;
+    readonly persistAfter?: Promise<void>;
   }): Readonly<{
     finalized: Readonly<RefusalAggregate> | null;
     startedWindow: boolean;
@@ -364,6 +381,7 @@ export class InProcessAuthRateLimiter {
     const aggregate = current?.windowStartedAt === windowStartedAt
       ? { ...current }
       : {
+          eligibility: { pending: 0, ready: undefined, settle: undefined },
           windowStartedAt,
           occurredAt: input.now,
           source: input.source,
@@ -373,6 +391,17 @@ export class InProcessAuthRateLimiter {
           addressCount: 0,
           distinctSourceCountSaturated: false
         };
+    if (input.persistAfter !== undefined) {
+      const gate = aggregate.eligibility;
+      if (gate.pending++ === 0) gate.ready = new Promise<void>(resolve => { gate.settle = resolve; });
+      const settled = () => {
+        if (--gate.pending === 0) {
+          const release = gate.settle; gate.settle = undefined; gate.ready = undefined; release?.();
+        }
+      };
+      // A failed clamp is also terminal; never orphan its aggregate or reject this shared barrier.
+      void input.persistAfter.then(settled, settled);
+    }
     const sourceDigest = this.refusalSourceDigest(input.route, input.source.ip);
     if (!aggregate.distinctSourceDigests.has(sourceDigest)) {
       if (aggregate.distinctSourceDigests.size < AUTH_REFUSAL_DISTINCT_SOURCE_CAP) {
@@ -626,25 +655,87 @@ export class RegistrationService implements RegistrationApplication {
    * advances. Nothing here is ever replaced or copied on rollover.
    */
   private readonly refusalAuditRoutes = new Map<AuthRoute, RefusalAuditCoordinator>();
-  private readonly sourceAdmissions = new WeakMap<AuthSourceAdmission, Readonly<{ route: "register" | "resend"; ip: string; requestId: string }>>();
+  private readonly sourceAdmissions = new WeakMap<AuthSourceAdmission, SourceAdmissionGrant>();
 
-  async admitSource(route: "register" | "resend", rawSource: VerificationMailSource): Promise<AuthSourceAdmission> {
-    const startedAt = performance.now(); const source = sourceContext(rawSource); const now = this.clock();
-    const limit = this.dependencies.limiter.consume({ route, ip: source.ip, addressKey: "", now });
-    if (!limit.allowed) {
-      // A terminal source refusal spends no Siteverify, account lookup, password KDF, token or mail.
-      // The established route-window audit starts only after that decision's opaque response clamp.
-      await this.refuseRateLimit({ route, scope: limit.scope, now, source: { ip: source.ip, userAgent: source.userAgent, requestId: source.requestId },
-        persistAfter: route === "register" ? this.holdRegistrationEnumerationClamp(startedAt) : this.holdEnumerationFloor(startedAt) });
+  private validateRegistration(input: RegisterInput, rawSource: RegistrationSource) {
+    const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
+    if (!validEmail(input.email) || (input.recoveryEmail != null && !validEmail(input.recoveryEmail))
+      || typeof input.password !== "string"
+      || input.password.length < this.dependencies.policy.password.minimumLength
+      // V-14: the ruled maximum, in the same unit as the minimum. The route
+      // keeps its own 1024-byte request-shape bound ahead of this; a
+      // register version that publishes no maximum leaves that bound alone.
+      || (maximumPasswordLength !== null && input.password.length > maximumPasswordLength)
+      || input.adultAffirmed !== true) {
+      throw new AuthFlowError("AUTH_INPUT_INVALID");
     }
-    const capability = Object.freeze({ release: () => { this.sourceAdmissions.delete(capability); } }) as AuthSourceAdmission;
-    this.sourceAdmissions.set(capability, Object.freeze({ route, ip: source.ip, requestId: source.requestId }));
-    return capability;
+    let phone: string;
+    try { phone = normalizeManualPhone(input.phone); }
+    catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+    // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
+    // recorded with the result, never decisive.
+    const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
+      ? rawSource.countryCode : null;
+    // L3b: the pairs of the documents the person read. Input validation, so it runs before
+    // the admission gate and spends no budget; the refusal still sits behind the clamp.
+    const documents = this.dependencies.legalAcceptance === undefined
+      ? null : resolveSignUpDocuments(rawSource.legal);
+    if (this.dependencies.legalAcceptance !== undefined && documents === null) {
+      throw new AuthFlowError("LEGAL_DOCUMENT_STALE");
+    }
+    const source = sourceContext(rawSource);
+    return { phone, countryCode, documents, source };
   }
-  private consumeSourceAdmission(route: "register" | "resend", source: AuthSourceContext, admission: AuthSourceAdmission): void {
+
+  async admitSource(request: AuthSourceAdmissionRequest): Promise<AuthSourceAdmission> {
+    const startedAt = performance.now();
+    let releaseStructural: (() => void) | undefined;
+    let refusalClamped = false;
+    try {
+      const { route, input, source: rawSource } = request;
+      let source: VerificationMailSource;
+      if (request.route === "register") {
+        source = this.validateRegistration(request.input, request.source).source;
+        // The existing 103-registration slot spans proof, provisioning, clamp and handoff: no async stage before it.
+        releaseStructural = this.acquireRegistrationAdmission(randomUUID());
+      } else {
+        if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+        source = sourceContext(rawSource);
+      }
+      const now = this.clock();
+      const limit = this.dependencies.limiter.consume({ route, ip: source.ip, addressKey: "", now });
+      if (!limit.allowed) {
+        const persistAfter = (route === "register" ? this.holdRegistrationEnumerationClamp(startedAt) : this.holdEnumerationFloor(startedAt))
+          .finally(() => { refusalClamped = true; });
+        await this.refuseRateLimit({ route, scope: limit.scope, now,
+          source: { ip: source.ip, userAgent: source.userAgent, requestId: source.requestId }, persistAfter });
+      }
+      const capability = Object.freeze({ release: () => { this.releaseSourceAdmission(capability); } }) as AuthSourceAdmission;
+      this.sourceAdmissions.set(capability, Object.freeze({ route, ip: source.ip, requestId: source.requestId, releaseStructural }));
+      releaseStructural = undefined; // The capability now owns this existing slot.
+      return capability;
+    } catch (error) {
+      try {
+        if (!refusalClamped) {
+          if (request.route === "register") await this.holdRegistrationEnumerationClamp(startedAt);
+          else await this.holdEnumerationFloor(startedAt);
+        }
+      } finally { releaseStructural?.(); }
+      throw error;
+    }
+  }
+  private releaseSourceAdmission(admission: AuthSourceAdmission): void {
+    const granted = this.takeSourceAdmission(admission);
+    granted?.releaseStructural?.();
+  }
+  private takeSourceAdmission(admission: AuthSourceAdmission): SourceAdmissionGrant | undefined {
     const granted = this.sourceAdmissions.get(admission);
     this.sourceAdmissions.delete(admission);
-    if (!granted || granted.route !== route || granted.ip !== source.ip || granted.requestId !== source.requestId) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    return granted;
+  }
+  private assertSourceAdmission(route: "register" | "resend", source: AuthSourceContext, granted: SourceAdmissionGrant | undefined): void {
+    if (!granted || granted.route !== route || granted.ip !== source.ip || granted.requestId !== source.requestId
+      || (route === "register" && granted.releaseStructural === undefined)) throw new AuthFlowError("AUTH_INPUT_INVALID");
   }
 
   constructor(private readonly dependencies: {
@@ -958,6 +1049,7 @@ export class RegistrationService implements RegistrationApplication {
       // that just landed, and `recordRateLimitRefusal` has no dedup key.
       while (coordinator.queue.length > 0) {
         const writing = coordinator.queue[0]!;
+        while (writing.eligibility.pending > 0) await writing.eligibility.ready;
         await this.recordRefusalAggregate(route, writing);
         const at = coordinator.queue.indexOf(writing);
         if (at >= 0) coordinator.queue.splice(at, 1);
@@ -976,7 +1068,7 @@ export class RegistrationService implements RegistrationApplication {
    */
   private scheduleRefusalAuditFlush(route: AuthRoute, windowStartedAt: number, now: Date): void {
     const coordinator = this.refusalAuditRoute(route);
-    if (coordinator.active !== undefined && coordinator.active.windowStartedAt >= windowStartedAt) return;
+    if (coordinator.active?.windowStartedAt === windowStartedAt) return;
     if (coordinator.active !== undefined) clearTimeout(coordinator.active.timer);
 
     const delay = Math.max(0,
@@ -1229,9 +1321,8 @@ export class RegistrationService implements RegistrationApplication {
       // because it is no longer the active one.
       this.enqueueRefusalAggregate(input.route, aggregate.finalized);
     }
-    if (input.persistAfter !== undefined) await input.persistAfter;
     if (aggregate.startedWindow) {
-      this.scheduleRefusalAuditFlush(input.route, aggregate.windowStartedAt, input.persistAfter === undefined ? input.now : this.clock());
+      this.scheduleRefusalAuditFlush(input.route, aggregate.windowStartedAt, input.now);
     }
     if (aggregate.finalized !== null) {
       // FIRE-AND-FORGET, never awaited. A rate-limit refusal is a public path:
@@ -1245,6 +1336,7 @@ export class RegistrationService implements RegistrationApplication {
         );
       });
     }
+    if (input.persistAfter !== undefined) await input.persistAfter;
     throw new AuthFlowError("AUTH_RATE_LIMITED");
   }
 
@@ -1450,46 +1542,25 @@ export class RegistrationService implements RegistrationApplication {
     const requestedAt = new Date(this.clock().getTime());
     const startedAt = performance.now();
     const correlationId = randomUUID();
+    let responseClamp: Promise<void> | undefined;
+    const clampResponse = () => responseClamp ??= this.holdRegistrationEnumerationClamp(startedAt);
     let pendingPostwork: RegistrationPostwork | undefined;
     let releaseMailDispatch: MailDispatchRelease | undefined;
     let mailDispatchActivatedAt: number | undefined;
     let releaseAdmission: (() => void) | undefined;
     try {
+      const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
+      releaseAdmission = granted?.releaseStructural;
       try {
-        const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
-        if (!validEmail(input.email) || (input.recoveryEmail != null && !validEmail(input.recoveryEmail))
-          || typeof input.password !== "string"
-          || input.password.length < this.dependencies.policy.password.minimumLength
-          // V-14: the ruled maximum, in the same unit as the minimum. The route
-          // keeps its own 1024-byte request-shape bound ahead of this; a
-          // register version that publishes no maximum leaves that bound alone.
-          || (maximumPasswordLength !== null && input.password.length > maximumPasswordLength)
-          || input.adultAffirmed !== true) {
-          throw new AuthFlowError("AUTH_INPUT_INVALID");
-        }
-        let phone: string;
-        try { phone = normalizeManualPhone(input.phone); }
-        catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
-        // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
-        // recorded with the result, never decisive.
-        const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
-          ? rawSource.countryCode : null;
-        // L3b: the pairs of the documents the person read. Input validation, so it runs before
-        // the admission gate and spends no budget; the refusal still sits behind the clamp.
-        const documents = this.dependencies.legalAcceptance === undefined
-          ? null : resolveSignUpDocuments(rawSource.legal);
-        if (this.dependencies.legalAcceptance !== undefined && documents === null) {
-          throw new AuthFlowError("LEGAL_DOCUMENT_STALE");
-        }
-        const source = sourceContext(rawSource);
-        if (admission !== undefined) this.consumeSourceAdmission("register", source, admission);
+        const { phone, countryCode, documents, source } = this.validateRegistration(input, rawSource);
+        if (admission !== undefined) this.assertSourceAdmission("register", source, granted);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
         // await, the limiter lookup, either KDF, the mail reservation, the token
         // mint and every mutation. Nothing above this line has touched a
         // dependency, so the 104th valid request is refused having done no work
         // at all — it only pays the response clamp, like every other arm.
-        releaseAdmission = this.acquireRegistrationAdmission(correlationId);
+        if (admission === undefined) releaseAdmission = this.acquireRegistrationAdmission(correlationId);
         const email = normalizeEmailForBlindIndex(input.email);
         const recoveryEmail = input.recoveryEmail == null ? null : normalizeEmailForBlindIndex(input.recoveryEmail);
         const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
@@ -1508,7 +1579,8 @@ export class RegistrationService implements RegistrationApplication {
             route: "register",
             scope: limit.scope,
             now: this.clock(),
-            source
+            source,
+            persistAfter: clampResponse()
           });
         }
 
@@ -1599,7 +1671,7 @@ export class RegistrationService implements RegistrationApplication {
             this.dispatchMailReservationHold(release);
           }
           await Promise.all([
-            this.holdRegistrationEnumerationClamp(startedAt),
+            clampResponse(),
             holdPostActivationFloor
               ? this.holdRegistrationPostActivationFloor(mailDispatchActivatedAt!)
               : Promise.resolve()
@@ -1620,7 +1692,7 @@ export class RegistrationService implements RegistrationApplication {
       // either given successful postwork to `dispatchVerification` or given the
       // reservation to a visible hold. Never at commit, clamp entry, or before
       // the secret/hash and mail-capacity owners have settled.
-      if (admission !== undefined) this.sourceAdmissions.delete(admission);
+      if (admission !== undefined) this.releaseSourceAdmission(admission);
       releaseAdmission?.();
     }
   }
@@ -1689,12 +1761,15 @@ export class RegistrationService implements RegistrationApplication {
   ): Promise<typeof RESEND_PUBLIC_RESPONSE> {
     const startedAt = performance.now();
     const correlationId = randomUUID();
+    let responseFloor: Promise<void> | undefined;
+    const floorResponse = () => responseFloor ??= this.holdEnumerationFloor(startedAt);
     let pendingDelivery: VerificationDelivery | undefined;
     let releaseMailDispatch: MailDispatchRelease | undefined;
+    const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
     try {
       if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
       const source = sourceContext(rawSource);
-      if (admission !== undefined) this.consumeSourceAdmission("resend", source, admission);
+      if (admission !== undefined) this.assertSourceAdmission("resend", source, granted);
       const email = normalizeEmailForBlindIndex(input.email);
       const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
       const identity = await this.dependencies.repository.findAuditIdentityByBlindIndex(emailBlindIndex);
@@ -1710,7 +1785,8 @@ export class RegistrationService implements RegistrationApplication {
           route: "resend",
           scope: limit.scope,
           now,
-          source
+          source,
+          persistAfter: floorResponse()
         });
       }
       releaseMailDispatch = await this.reserveMailDispatch(correlationId);
@@ -1739,9 +1815,9 @@ export class RegistrationService implements RegistrationApplication {
       // The resend route reaches the pool through its audit derivations.
       throw asAuthFlowFailure(error);
     } finally {
-      if (admission !== undefined) this.sourceAdmissions.delete(admission);
+      if (admission !== undefined) this.releaseSourceAdmission(admission);
       try {
-        await this.holdEnumerationFloor(startedAt);
+        await floorResponse();
       } finally {
         if (pendingDelivery !== undefined && releaseMailDispatch !== undefined) {
           const release = releaseMailDispatch;
@@ -1751,6 +1827,7 @@ export class RegistrationService implements RegistrationApplication {
         if (releaseMailDispatch !== undefined) {
           this.dispatchMailReservationHold(releaseMailDispatch, true);
         }
+        granted?.releaseStructural?.();
       }
     }
   }

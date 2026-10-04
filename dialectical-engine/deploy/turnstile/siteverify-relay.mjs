@@ -61,7 +61,7 @@ export function createSiteverifyRelay({ secret, publicAppUrl, siteverify = fixed
   return server;
 }
 const ENVIRONMENT_KEYS = new Set(["NODE_ENV", "PUBLIC_APP_URL", "TURNSTILE_SOCKET_PATH", "CREDENTIALS_DIRECTORY",
-  "PATH", "LANG", "LC_ALL", "TZ", "USER", "LOGNAME", "HOME", "SHELL", "INVOCATION_ID", "JOURNAL_STREAM", "SYSTEMD_EXEC_PID", "MEMORY_PRESSURE_WATCH", "MEMORY_PRESSURE_WRITE"]);
+  "RUNTIME_DIRECTORY", "PATH", "LANG", "LC_ALL", "TZ", "USER", "LOGNAME", "HOME", "SHELL", "INVOCATION_ID", "JOURNAL_STREAM", "SYSTEMD_EXEC_PID", "MEMORY_PRESSURE_WATCH", "MEMORY_PRESSURE_WRITE"]);
 export function relayConfiguration(source) {
   if (Object.keys(source).some(key => !ENVIRONMENT_KEYS.has(key)) || source.NODE_ENV !== "production"
     || !validSocketPath(source.TURNSTILE_SOCKET_PATH) || typeof source.CREDENTIALS_DIRECTORY !== "string"

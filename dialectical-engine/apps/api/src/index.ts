@@ -2057,8 +2057,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * Paid plans L3b (spec §2.3.2): the pairs of the documents the sign-up page displayed. The registration
    * mount region is frozen (S04), so — as the age gate does for the date — they are read here and travel to
    * the service on the source (sourceFor), separately from account profile input. The canonical hook
-   * below rejects a missing or malformed triple before proof or identity work; a well-formed stale
-   * triple still reaches the service's legal-manifest decision after valid proof. Runs after age refusal.
+   * below rejects a missing or malformed triple; the service pre-proof admission port resolves
+   * well-formed pairs against the current manifest before any budget or proof. Runs after age refusal.
    */
   api.addHook("preHandler", async (request) => {
     if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
@@ -2088,7 +2088,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
     }
     mailDisplays.set(request, Object.freeze({ locale: parsed.data.ui_locale, timeZone: parsed.data.time_zone }));
-    const admission = await options.registration?.admitSource?.(path === "/v1/auth/register" ? "register" : "resend", sourceFor(request));
+    const body = request.body as Record<string, unknown>;
+    const admission = await options.registration?.admitSource?.(path === "/v1/auth/register"
+      ? { route: "register", source: sourceFor(request), input: {
+          email: typeof body.email === "string" ? body.email : "", password: typeof body.password === "string" ? body.password : "",
+          phone: typeof body.phone === "string" ? body.phone : "", recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
+        } }
+      : { route: "resend", source: sourceFor(request), input: { email: parsed.data.email } });
     if (admission !== undefined) sourceAdmissions.set(request, admission);
     try { await requireTurnstileProof(options.turnstile, { token: parsed.data.turnstile_token, action: path === "/v1/auth/register" ? "signup" : "resend-verification" }); }
     catch (error) { admission?.release(); sourceAdmissions.delete(request); throw error; }

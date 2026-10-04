@@ -24,7 +24,7 @@ export function siteverifyOutcome(value, action, hostname, now = Date.now()) {
   if (typeof value.hostname !== "string" || typeof value.action !== "string" || typeof value.challenge_ts !== "string"
     || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/u.test(value.challenge_ts)) return "unavailable";
   const timestamp = Date.parse(value.challenge_ts);
-  if (!Number.isFinite(timestamp)) return "unavailable";
+  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 19) !== value.challenge_ts.slice(0, 19)) return "unavailable";
   if (value.hostname !== hostname || value.action !== action || timestamp > now || now - timestamp > 300_000) return "rejected";
   return "passed";
 }
