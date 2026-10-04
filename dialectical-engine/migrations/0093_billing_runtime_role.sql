@@ -20,7 +20,10 @@
 -- runner's reads: USAGE on the schema, SELECT on billing.entitlement_event, billing.run_charge_scope and
 -- billing.person_windows_v, and EXECUTE on billing.entitlement_at. Nothing else changes: no table, column, trigger or
 -- function body. The production provisioner (pnpm db:provision-principals) moves api-runtime's membership to the new
--- role; until it runs on a database, the API there cannot write billing (billing is off until go-live).
+-- role; until it runs on a database, the API there cannot write billing. That matters even while billing is off: the
+-- retention purge runs wherever the API runs (apps/api/src/retention-purge.ts), so billing.purge_expired_records is
+-- refused (42501) and the API logs [RETENTION_PURGE_PENDING] until the provisioner has run. The upgrade order is
+-- deploy/vps/README.md "Upgrading to the billing-role release": migrate, hardening.sql, the provisioner, restart.
 
 DO $billing_0093_role$
 BEGIN
@@ -82,8 +85,10 @@ GRANT EXECUTE ON FUNCTION billing.owner_age_frozen(uuid) TO debateai_billing_run
 GRANT EXECUTE ON FUNCTION billing.owner_erasure_committed(uuid) TO debateai_billing_runtime;
 
 -- The contract, checked once here so a database that drifted from it cannot finish this migration: debateai_runtime
--- (with whatever it inherits) writes nothing in billing, reads only the runner's three relations and runs only
--- billing.entitlement_at; the billing role is NOLOGIN, inherits debateai_runtime and holds every billing write.
+-- (with whatever it inherits) writes nothing in billing (no DML, TRIGGER or REFERENCES on a relation, no column write,
+-- no sequence use, no CREATE in the schema), reads only the runner's three relations and runs only
+-- billing.entitlement_at; the billing role is NOLOGIN, inherits debateai_runtime and holds SELECT and INSERT on every
+-- billing table (each checked on its own: has_table_privilege with a list is true when ANY of them is held).
 DO $billing_0093_contract$
 DECLARE
   v_runtime_writes text;
@@ -102,10 +107,15 @@ BEGIN
   SELECT pg_catalog.string_agg(relation.relname, ',' ORDER BY relation.relname) INTO v_runtime_writes
   FROM pg_catalog.pg_class AS relation
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
-  WHERE namespace.nspname = 'billing' AND relation.relkind IN ('r', 'p', 'v')
-    AND (pg_catalog.has_table_privilege('debateai_runtime', relation.oid, 'INSERT,UPDATE,DELETE,TRUNCATE')
-      OR pg_catalog.has_any_column_privilege('debateai_runtime', relation.oid, 'INSERT,UPDATE'));
-  IF v_runtime_writes IS NOT NULL THEN
+  WHERE namespace.nspname = 'billing'
+    AND ((relation.relkind IN ('r', 'p', 'v')
+        AND (pg_catalog.has_table_privilege('debateai_runtime', relation.oid,
+            'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER,REFERENCES')
+          OR pg_catalog.has_any_column_privilege('debateai_runtime', relation.oid, 'INSERT,UPDATE,REFERENCES')))
+      OR (relation.relkind = 'S'
+        AND pg_catalog.has_sequence_privilege('debateai_runtime', relation.oid, 'USAGE,UPDATE')));
+  IF v_runtime_writes IS NOT NULL
+    OR pg_catalog.has_schema_privilege('debateai_runtime', 'billing', 'CREATE') THEN
     RAISE EXCEPTION 'BILLING_0093_RUNTIME_WRITES %', v_runtime_writes;
   END IF;
 
@@ -131,8 +141,9 @@ BEGIN
   FROM pg_catalog.pg_class AS relation
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
   WHERE namespace.nspname = 'billing'
-    AND ((relation.relkind = 'r'
-        AND NOT pg_catalog.has_table_privilege('debateai_billing_runtime', relation.oid, 'SELECT,INSERT'))
+    AND ((relation.relkind IN ('r', 'p')
+        AND (NOT pg_catalog.has_table_privilege('debateai_billing_runtime', relation.oid, 'SELECT')
+          OR NOT pg_catalog.has_table_privilege('debateai_billing_runtime', relation.oid, 'INSERT')))
       OR (relation.relkind = 'v'
         AND NOT pg_catalog.has_table_privilege('debateai_billing_runtime', relation.oid, 'SELECT')));
   IF v_billing_missing IS NOT NULL
