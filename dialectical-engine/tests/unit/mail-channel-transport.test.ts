@@ -9,13 +9,17 @@ const transport = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock("node:child_process", async (original) => ({
   ...await original<typeof import("node:child_process")>(), spawn: transport.spawn
 }));
-import { SendmailEmailChangeMailSender, SendmailRecoveryEmailMailSender } from "../../apps/api/src/mail-channel.js";
+import { SendmailMailSender, SendmailSecurityNotificationSender, SendmailEmailChangeMailSender, SendmailRecoveryEmailMailSender } from "../../apps/api/src/mail-channel.js";
 
 const recipient = "candidate@example.test";
 const token = "t".repeat(43);
 const expiresAt = new Date("2026-10-05T12:00:00.000Z");
 const options = { executable: "/controlled/sendmail", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 25 };
 const senders = [
+  { name: "verification", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
+    send: (overrides: Partial<typeof options> = {}) => new SendmailMailSender({ ...options, ...overrides }).sendVerification({ attemptId: "opaque", recipient, token, expiresAt }) },
+  { name: "security notification", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
+    send: (overrides: Partial<typeof options> = {}) => new SendmailSecurityNotificationSender({ ...options, ...overrides }).sendSecurityNotification({ messageId: "11111111-1111-4111-8111-111111111111", recipient, eventKind: "SCHEDULED", executeAt: expiresAt }) },
   {
     name: "email change", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
     send: (overrides: Partial<typeof options> = {}) => new SendmailEmailChangeMailSender({ ...options, ...overrides })

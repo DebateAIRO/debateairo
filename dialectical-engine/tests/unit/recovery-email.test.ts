@@ -1,3 +1,4 @@
+import { mailAlternatives } from "../support/accountMail.js";
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,7 +29,8 @@ it("sends a purpose-limited fragment link through stdin without recipient argv",
     });
     const mail = readFileSync(capture, "utf8");
     expect(mail).toContain("To: candidate@example.test\r\n");
-    expect(mail).toContain("https://dezbatere.ro/verify-recovery-email#token=");
+    expect(mailAlternatives(mail).text).toContain("https://dezbatere.ro/verify-recovery-email#token=");
+    expect(mailAlternatives(mail).html).toContain("https://dezbatere.ro/verify-recovery-email#token=");
     expect(mail).not.toContain("?token=");
     expect(readFileSync(argv, "utf8").trim().split("\n")).toEqual(["-i", "-t", "-f", "noreply@dezbatere.ro"]);
     await expect(sender.sendRecoveryEmail({

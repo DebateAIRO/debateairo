@@ -1,3 +1,4 @@
+import { normalizeMailDisplay as normalizeAccountMailDisplay } from "./account-mail-template.mjs";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import type { PostgresIdentityRepository, AuthSourceContext } from "@debateai/db";
@@ -584,7 +585,7 @@ interface RefusalAuditCoordinator {
 
 function normalizeMailDisplay(display: NonNullable<VerificationMailSource["mailDisplay"]>): NonNullable<VerificationMailSource["mailDisplay"]> {
   if (!LocaleCodeSchema.safeParse(display.locale).success || (display.timeZone !== null && (typeof display.timeZone !== "string" || display.timeZone.length < 1 || display.timeZone.length > 128))) throw new AuthFlowError("AUTH_INPUT_INVALID");
-  return Object.freeze({ locale: display.locale, timeZone: display.timeZone });
+  return normalizeAccountMailDisplay(display);
 }
 export function sourceContext(source: VerificationMailSource): VerificationMailSource {
   if (source.ip.trim() === "" || source.requestId.trim() === "") {
@@ -1500,7 +1501,8 @@ export class RegistrationService implements RegistrationApplication {
         attemptId: input.reservationId,
         recipient: input.email,
         token: input.token,
-        expiresAt: input.expiresAt
+        expiresAt: input.expiresAt,
+        display: normalizeAccountMailDisplay(input.source.mailDisplay)
       });
     } catch (error) {
       errorCode = error instanceof MailDeliveryError ? error.operatorCode : "MAIL_DELIVERY_FAILED";

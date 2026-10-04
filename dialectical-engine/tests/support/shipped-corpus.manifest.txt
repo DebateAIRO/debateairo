@@ -11,6 +11,8 @@
 # tests/unit/s1-1-depth-contract.test.ts and are NOT duplicated here.
 
 apps/api/src/account-erasure.ts
+apps/api/src/account-mail-template.d.mts
+apps/api/src/account-mail-template.mjs
 apps/api/src/account-profile.ts
 apps/api/src/admission.ts
 apps/api/src/ask-billing.ts
@@ -69,6 +71,7 @@ apps/api/src/support/shred.ts
 apps/api/src/support/templates.ts
 apps/api/src/support/tools.ts
 apps/api/src/turnstile.ts
+apps/api/src/verification-email.ts
 apps/evaluator-worker/src/index.ts
 apps/observation-agent/src/core/custody.ts
 apps/observation-agent/src/core/database.ts
