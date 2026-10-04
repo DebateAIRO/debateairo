@@ -680,6 +680,20 @@ const GOAL_RULED_LAW_CARRIERS: ReadonlyMap<string, readonly string[]> = new Map(
   ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]]
 ]);
 
+/**
+ * The law's numeric arm for one file. A literal may carry digit separators (`30_000`), the house
+ * style for large numbers: `\d+` alone stopped at the `_`, so such an export was never seen
+ * (.hermes/TOOLING-TRAPS.md, "The source-purity law does not see a NUMERIC SEPARATOR").
+ */
+export function auditNumericSourceLiteralExports(name: string, source: string): readonly string[] {
+  if (name.startsWith("packages/published-arithmetic/")) return [];
+  const carriers = GOAL_RULED_LAW_CARRIERS.get(name) ?? [];
+  const numericExports = [...source.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?\s*[;\n]/g)]
+    .map((match) => match[1]!)
+    .filter((exported) => !carriers.includes(exported));
+  return numericExports.length > 0 ? [`${name} exports a numeric source literal instead of a register/law carrier`] : [];
+}
+
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
   const engineFiles = withoutUiSurface([
@@ -714,12 +728,7 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
-    const numericExports = [...source.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/g)]
-      .map((match) => match[1]!)
-      .filter((name) => !(GOAL_RULED_LAW_CARRIERS.get(where) ?? []).includes(name));
-    if (numericExports.length > 0 && !where.startsWith("packages/published-arithmetic/")) {
-      blocking.push(`${where} exports a numeric source literal instead of a register/law carrier`);
-    }
+    blocking.push(...auditNumericSourceLiteralExports(where, source));
   }
   const reachability = await auditSurfaceReachability();
   blocking.push(...reachability.blocking);
