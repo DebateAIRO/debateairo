@@ -344,8 +344,8 @@ export class MemoryRecoveryEmailMailSender implements RecoveryEmailMailSender {
 export function recoveryEmailLink(publicAppUrl: string, token: string): string {
   if (!EMAIL_CHANGE_BEARER.test(token))
     throw new MailDeliveryError("MAIL_INPUT_INVALID");
-  const url = new URL("/settings", publicAppUrl);
-  url.hash = `recovery-email=confirm&token=${token}`;
+  const url = new URL("/verify-recovery-email", publicAppUrl);
+  url.hash = `token=${token}`;
   return url.toString();
 }
 /** Narrow adapter; delivery remains governed by the configured mail transport. */

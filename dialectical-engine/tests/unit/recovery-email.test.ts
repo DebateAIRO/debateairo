@@ -6,9 +6,9 @@ import { recoveryEmailLink, SendmailRecoveryEmailMailSender } from "../../apps/a
 describe("recovery email confirmation link", () => {
   it("carries only the confirmation bearer in the fragment", () => {
     const link = new URL(recoveryEmailLink("https://dezbatere.ro", "t".repeat(43)));
-    expect(link.pathname).toBe("/settings");
+    expect(link.pathname).toBe("/verify-recovery-email");
     expect(link.search).toBe("");
-    expect(link.hash).toBe(`#recovery-email=confirm&token=${"t".repeat(43)}`);
+    expect(link.hash).toBe(`#token=${"t".repeat(43)}`);
   });
   it("rejects malformed bearers", () => {
     expect(() => recoveryEmailLink("https://dezbatere.ro", "bad\nrecipient")).toThrow("MAIL_INPUT_INVALID");
@@ -28,7 +28,7 @@ it("sends a purpose-limited fragment link through stdin without recipient argv",
     });
     const mail = readFileSync(capture, "utf8");
     expect(mail).toContain("To: candidate@example.test\r\n");
-    expect(mail).toContain("https://dezbatere.ro/settings#recovery-email=confirm&token=");
+    expect(mail).toContain("https://dezbatere.ro/verify-recovery-email#token=");
     expect(mail).not.toContain("?token=");
     expect(readFileSync(argv, "utf8").trim().split("\n")).toEqual(["-i", "-t", "-f", "noreply@dezbatere.ro"]);
     await expect(sender.sendRecoveryEmail({
