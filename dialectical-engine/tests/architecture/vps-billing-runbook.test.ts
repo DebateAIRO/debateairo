@@ -409,13 +409,20 @@ describe("P22 the Billing runbook", () => {
     const paragraph = flat.slice(from, publish);
     for (const needle of [
       "whatever the state of its asker's account",
-      "The second number says how many of them belong to an account that is not active (suspended, or frozen by the age check)",
+      // The second number: suspended is only an account deletion's prepared state (0040), which ends by deleting the
+      // account row, so its question drops out of the join by itself; nothing makes an age-frozen account active
+      // again (0040's only write of state='active' comes from pending_mfa), so its question stays counted.
+      "The second number counts the questions of accounts that are being deleted or were frozen by the age check.",
+      "A question of an account being deleted leaves the count by itself when the deletion finishes, without ever starting.",
+      "A frozen account's question never starts, but stays counted.",
       "it leaves out every question of an account that is not active",
-      "If only questions of accounts that are not active keep it above 0, they will not leave by waiting: do not switch billing on, and report the case.",
-      // Not atomic with the switch: the same count again, just before the restart on the new version.
-      "Run the same check again just before you restart the two services on the version that switches billing on",
-      "If it is not 0 then, do not restart yet",
-      "Wait for the line to empty, check again, then restart.",
+      "If only questions of accounts that are not active keep the count above 0, check again later (for example the next day): a deletion under way finishes by itself.",
+      "If the second number is still above 0, those questions belong to frozen accounts and never leave by waiting: do not switch billing on, and report the case.",
+      // Not atomic with the switch: the same count again after the publish, before the version is pinned. A pinned
+      // file is read by any restart (Restart=on-failure, a reboot), so nothing is pinned while the count is not 0.
+      "Run the same check again after the publish, just before you copy its `REGISTER_VERSION=` line into both files and restart the two services (§14.4)",
+      "If it is not 0 then, pin nothing yet: any restart, including systemd's own after a failure, starts the services on the version the files name.",
+      "Wait for the line to empty, check again, then pin and restart.",
       // C7: a version with the band needs the room read's budget, so the band option names it.
       "with `askRoomReads`, the room read's budget, which every version with the band needs"
     ]) {
@@ -426,6 +433,17 @@ describe("P22 the Billing runbook", () => {
     expect(query).toBe(WAITING_PREMIUM_QUERY_LINE);
     expect(query).not.toContain("run_waiting_v");
     expect(query).not.toContain("account.state = 'active'");
+    // The words this round corrected stay gone: a not-active account's question is not ended later, and the services
+    // are not said to keep their version until an operator restart.
+    expect(paragraph).not.toContain("rests until the account is active again");
+    expect(paragraph).not.toContain("they will not leave by waiting");
+    expect(paragraph).not.toContain("until you restart them, the services keep the version they run");
+    // The facts behind those words: the units read the pinned files and restart on failure by themselves.
+    for (const unit of ["api", "runner"]) {
+      const service = read(`deploy/vps/systemd/debateai-${unit}.service`);
+      expect(service).toContain(`EnvironmentFile=/etc/debateai/${unit}.env`);
+      expect(service).toContain("Restart=on-failure");
+    }
   });
 
   it("Part 4 final review C-6, C-9, C-13: the --amount bullet, the dispute states and the retry days", () => {

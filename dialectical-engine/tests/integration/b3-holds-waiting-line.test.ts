@@ -464,7 +464,10 @@ describe("Part 4 final review C-10: the runbook's billing-on count, run exactly 
     const erased = await activeOwner();
 
     // Counted: a paid question, a question with no recorded plan (a paid one to the site), and the paid questions of a
-    // suspended and an age-frozen account (they rest until the account is active again, then meet PLAN_CHANGED).
+    // suspended and an age-frozen account. Neither starts: the waker reads only core.run_waiting_v, which needs an
+    // active account. Suspended is only an account deletion's prepared state, which ends by deleting the account row,
+    // so that question leaves the count by itself; nothing makes an age-frozen account active again, so its question
+    // stays counted.
     await waiting(active, "premium");
     await waiting(active, "none");
     await waiting(suspended, "premium");

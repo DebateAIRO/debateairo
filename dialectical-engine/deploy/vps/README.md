@@ -2232,24 +2232,26 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS waiting_premium, count(
 ```
 
 It counts every signed-in person's question that waits in line, has neither started nor failed, and is not recorded
-as Free. A question with no recorded plan counts as a paid one, as it does for the site. The second number says how
-many of them belong to an account that is not active (suspended, or frozen by the age check): such a question rests
-until the account is active again, and is then ended as described below. A question whose account or private debate
-was deleted is not counted, because it never starts. §11's count of the line,
-`SELECT count(*) FROM core.run_waiting_v`, does not do here: it leaves out every question of an account that is not
-active.
+as Free. A question with no recorded plan counts as a paid one, as it does for the site. The second number counts the
+questions of accounts that are being deleted or were frozen by the age check. A question of an account being deleted
+leaves the count by itself when the deletion finishes, without ever starting. A frozen account's question never
+starts, but stays counted. A question whose account or private debate was deleted is not counted, because it never
+starts. §11's count of the line, `SELECT count(*) FROM core.run_waiting_v`, does not do here: it leaves out every
+question of an account that is not active.
 
 Why: while billing is off, the server takes the plan the browser sends, so a question can wait in line as a paid one.
 At the first start with billing on, everyone is on Free, because nobody could pay before. Each such question would
 then be ended at once (`RUN_SETUP_FAILED:PLAN_CHANGED`), and its asker would read "Your paid plan ended or was paused
 while this question waited…", which is false for someone who never paid. If the count is not 0, wait for the line to
-empty, check again, then publish. If only questions of accounts that are not active keep it above 0, they will not
-leave by waiting: do not switch billing on, and report the case.
+empty, check again, then publish. If only questions of accounts that are not active keep the count above 0, check
+again later (for example the next day): a deletion under way finishes by itself. If the second number is still above
+0, those questions belong to frozen accounts and never leave by waiting: do not switch billing on, and report the
+case.
 
-Run the same check again just before you restart the two services on the version that switches billing on (after
-the publish, once its `REGISTER_VERSION=` line is in both files, §14.4): a question can join the line in the minutes
-between. If it is not 0 then, do not restart yet: until you restart them, the services keep the version they run,
-with billing off. Wait for the line to empty, check again, then restart.
+Run the same check again after the publish, just before you copy its `REGISTER_VERSION=` line into both files and
+restart the two services (§14.4): a question can join the line in the minutes between. If it is not 0 then, pin
+nothing yet: any restart, including systemd's own after a failure, starts the services on the version the files name.
+Wait for the line to empty, check again, then pin and restart.
 
 On a host without the band, you can instead publish the band (the three members of go-live line 13, with
 `askRoomReads`, the room read's budget, which every version with the band needs) in the same version that switches
