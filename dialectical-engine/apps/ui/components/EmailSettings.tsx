@@ -131,7 +131,9 @@ export function EmailSettingsCard({
               <span className="emlVerified">{t(catalog, "settings.email.verified")}</span>
             </div>
             <p className="emlAddress">{account.email}</p>
-            <p className="emlRecovery">{t(catalog, "settings.email.recovery", { email: account.recovery_email })}</p>
+            {account.recovery_email === null ? null : (
+              <p className="emlRecovery">{t(catalog, "settings.email.recovery", { email: account.recovery_email })}</p>
+            )}
           </div>
           <button type="button" className="emlPill" onClick={() => onChange(account.email)}>
             {t(catalog, "settings.email.change")}

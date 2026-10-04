@@ -104,7 +104,7 @@ describe("POST /v1/auth/age-check", () => {
 describe("POST /v1/auth/register behind the age gate", () => {
   const body = (dateOfBirth: string) => ({
     email: "alice@example.test", password: "password-123",
-    recovery_email: "recovery@example.test", date_of_birth: dateOfBirth
+    phone: "+40722123456", date_of_birth: dateOfBirth
   });
 
   it("passes an adult through with the byte-identical public response", async () => {
@@ -122,7 +122,7 @@ describe("POST /v1/auth/register behind the age gate", () => {
       // The service learns only that the gate passed; the date goes no further than the edge.
       expect(calls[0]).toEqual({
         email: "alice@example.test", password: "password-123",
-        recoveryEmail: "recovery@example.test", adultAffirmed: true
+        phone: "+40722123456", recoveryEmail: null, adultAffirmed: true
       });
     } finally {
       await api.close();

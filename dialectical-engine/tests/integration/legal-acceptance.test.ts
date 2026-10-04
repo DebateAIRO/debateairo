@@ -73,6 +73,8 @@ function pendingInput(
     emailBlindIndex: createEmailBlindIndex(Buffer.alloc(32, 0x3c), email),
     emailCiphertext: encrypt(dek, Buffer.from(email), ["identity", "user.email_ciphertext", userId, "run:none", userId, keyId, "1"]),
     recoveryEmailCiphertext: encrypt(dek, Buffer.from(`r-${email}`), ["identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"]),
+    phoneCiphertext: encrypt(dek, Buffer.from("+40722123456"), ["identity", "user.phone_ciphertext", userId, "run:none", userId, keyId, "1"]),
+    phoneSource: "manual", phoneVerificationStatus: "unverified", phoneUpdatedAt: new Date(),
     passwordHash: `$argon2id$v=19$m=65536,t=3,p=1$${"A".repeat(22)}$${"A".repeat(43)}`,
     pseudonym: generatePseudonym(),
     adultAffirmedAt: new Date(),
@@ -143,7 +145,7 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
       "SELECT has_function_privilege($1,$2,'EXECUTE') AS ok", [role, fn]
     )).rows[0]!.ok;
     const signUpWithConsent =
-      "identity.create_pending_account_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb,smallint,text,text,jsonb)";
+      "identity.create_pending_account_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb,jsonb,text,text,timestamptz,smallint,text,text,jsonb)";
     const countryGateRefused = "identity.audit_country_gate_refused(jsonb,text)";
     for (const fn of [signUpWithConsent, countryGateRefused]) {
       expect(await can("debateai_runtime", fn), fn).toBe(true);

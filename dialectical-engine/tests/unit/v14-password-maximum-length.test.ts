@@ -170,7 +170,7 @@ describe("V-14 the password maximum length is register policy", () => {
     const error = await service.register({
       email: "alice@example.test",
       password: "p".repeat(1_025),
-      recoveryEmail: "recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "recovery@example.test",
       adultAffirmed: true
     }, SOURCE).then(
       () => { throw new Error("an over-long password was accepted"); },
@@ -189,7 +189,7 @@ describe("V-14 the password maximum length is register policy", () => {
     await service.register({
       email: "alice@example.test",
       password: "p".repeat(1_024),
-      recoveryEmail: "recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "recovery@example.test",
       adultAffirmed: true
     }, SOURCE).catch(() => undefined);
     expect(findAuditIdentityByBlindIndex).toHaveBeenCalledTimes(1);
@@ -202,7 +202,7 @@ describe("V-14 the password maximum length is register policy", () => {
     await service.register({
       email: "alice@example.test",
       password: "p".repeat(1_025),
-      recoveryEmail: "recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "recovery@example.test",
       adultAffirmed: true
     }, SOURCE).catch(() => undefined);
     expect(findAuditIdentityByBlindIndex).toHaveBeenCalledTimes(1);

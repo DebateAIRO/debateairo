@@ -104,6 +104,15 @@ describe("Turn 14 Email card (14A / 14C)", () => {
     expect(onChange).toHaveBeenCalledWith("ana.popescu@unibuc.ro");
   });
 
+  it("keeps the primary email and Change action readable when recovery is absent", async () => {
+    await mount(<EmailSettingsCard client={client({ readAccountEmail: vi.fn().mockResolvedValue({
+      email: "ana.popescu@unibuc.ro", recovery_email: null, pending: null
+    }) })} onChange={() => undefined} />);
+    expect(document.body.textContent).toContain("ana.popescu@unibuc.ro");
+    expect(document.body.textContent).not.toContain("Recovery:");
+    expect(button("Change email").disabled).toBe(false);
+  });
+
   it("shows a pending change with both addresses, and resends or cancels it", async () => {
     const api = client({
       readAccountEmail: vi.fn().mockResolvedValue({

@@ -70,6 +70,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
         AND (relation.relname,attribute.attname) IN (
           ('user','user_id'),('user','email_blind_index'),('user','email_ciphertext'),
           ('user','recovery_email_ciphertext'),('user','phone_ciphertext'),
+          ('user','phone_source'),('user','phone_verification_status'),('user','phone_updated_at'),
           ('audit_event','prev_hash'),('audit_event','this_hash'),
           ('audit_event','actor_ciphertext'),('audit_event','occurred_at'),
           ('audit_event','source_context'),('audit_event','success'),
@@ -120,6 +121,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       { table_name: "user", column_name: "email_blind_index", data_type: "bytea" },
       { table_name: "user", column_name: "email_ciphertext", data_type: "jsonb" },
       { table_name: "user", column_name: "phone_ciphertext", data_type: "jsonb" },
+      { table_name: "user", column_name: "phone_source", data_type: "text" },
+      { table_name: "user", column_name: "phone_updated_at", data_type: "timestamp with time zone" },
+      { table_name: "user", column_name: "phone_verification_status", data_type: "text" },
       { table_name: "user", column_name: "recovery_email_ciphertext", data_type: "jsonb" },
       { table_name: "user", column_name: "user_id", data_type: "uuid" }
     ]);

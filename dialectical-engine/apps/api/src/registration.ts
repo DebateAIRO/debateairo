@@ -19,6 +19,7 @@ import {
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import type { RegisterLegalDocuments } from "@debateai/contract";
 import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
+import { normalizeManualPhone } from "./phone-profile.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
 
 export const REGISTRATION_PUBLIC_RESPONSE = Object.freeze({
@@ -32,7 +33,8 @@ export const RESEND_PUBLIC_RESPONSE = Object.freeze({
 export interface RegisterInput {
   readonly email: string;
   readonly password: string;
-  readonly recoveryEmail: string;
+  readonly recoveryEmail?: string | null;
+  readonly phone: string;
   /**
    * True only when the API's age gate found a date of birth of at least MIN_AGE; the
    * date itself never reaches this service. Registration records that result.
@@ -41,8 +43,8 @@ export interface RegisterInput {
 }
 
 /**
- * Paid plans L3b: the request-scoped facts the frozen register mount cannot pass in its four input members
- * (apps/api/src/index.ts, S04 — tests/unit/obs-l2-s04-zone.test.ts hashes that region). The age gate's
+ * Paid plans L3b: legal evidence travels on the request source, separately from account profile input.
+ * The S04 gate pins the auth route region (apps/api/src/index.ts). The age gate's
  * edge country already rides here (AuthSourceContext.countryCode); the Terms and Privacy pairs the page
  * displayed ride here too, parsed by the register preHandler hook and added by sourceFor.
  */
@@ -435,7 +437,8 @@ function validEmail(value: unknown): value is string {
 
 interface PendingRegistration {
   readonly email: string;
-  readonly recoveryEmail: string;
+  readonly recoveryEmail: string | null;
+  readonly phone: string;
   readonly emailBlindIndex: Buffer;
   readonly passwordHash: string;
   readonly requestedAt: Date;
@@ -1285,13 +1288,19 @@ export class RegistrationService implements RegistrationApplication {
         input.requestedAt.getTime() + this.dependencies.policy.verification.tokenTtlMs
       );
       const dek = generateDek();
+      const emailPlaintext = Buffer.from(input.email, "utf8");
+      const recoveryPlaintext = input.recoveryEmail === null ? null : Buffer.from(input.recoveryEmail, "utf8");
+      const phonePlaintext = Buffer.from(input.phone, "utf8");
       try {
         const keyId = `user-dek:${userId}`;
-        const emailCiphertext = encrypt(dek, Buffer.from(input.email, "utf8"), [
+        const emailCiphertext = encrypt(dek, emailPlaintext, [
           "identity", "user.email_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
-        const recoveryEmailCiphertext = encrypt(dek, Buffer.from(input.recoveryEmail, "utf8"), [
+        const recoveryEmailCiphertext = recoveryPlaintext === null ? null : encrypt(dek, recoveryPlaintext, [
           "identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"
+        ]);
+        const phoneCiphertext = encrypt(dek, phonePlaintext, [
+          "identity", "user.phone_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
         const acceptances = input.documents === null || this.dependencies.legalAcceptance === undefined
           ? undefined
@@ -1305,6 +1314,10 @@ export class RegistrationService implements RegistrationApplication {
           emailBlindIndex: input.emailBlindIndex,
           emailCiphertext,
           recoveryEmailCiphertext,
+          phoneCiphertext,
+          phoneSource: "manual",
+          phoneVerificationStatus: "unverified",
+          phoneUpdatedAt: input.requestedAt,
           passwordHash: input.passwordHash,
           pseudonym,
           adultAffirmedAt: input.requestedAt,
@@ -1338,6 +1351,9 @@ export class RegistrationService implements RegistrationApplication {
           source: input.source
         });
       } finally {
+        emailPlaintext.fill(0);
+        recoveryPlaintext?.fill(0);
+        phonePlaintext.fill(0);
         dek.fill(0);
       }
     }
@@ -1405,7 +1421,7 @@ export class RegistrationService implements RegistrationApplication {
     try {
       try {
         const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
-        if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
+        if (!validEmail(input.email) || (input.recoveryEmail != null && !validEmail(input.recoveryEmail))
           || typeof input.password !== "string"
           || input.password.length < this.dependencies.policy.password.minimumLength
           // V-14: the ruled maximum, in the same unit as the minimum. The route
@@ -1415,6 +1431,9 @@ export class RegistrationService implements RegistrationApplication {
           || input.adultAffirmed !== true) {
           throw new AuthFlowError("AUTH_INPUT_INVALID");
         }
+        let phone: string;
+        try { phone = normalizeManualPhone(input.phone); }
+        catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
         // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
         // recorded with the result, never decisive.
         const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
@@ -1435,7 +1454,7 @@ export class RegistrationService implements RegistrationApplication {
         // at all — it only pays the response clamp, like every other arm.
         releaseAdmission = this.acquireRegistrationAdmission(correlationId);
         const email = normalizeEmailForBlindIndex(input.email);
-        const recoveryEmail = normalizeEmailForBlindIndex(input.recoveryEmail);
+        const recoveryEmail = input.recoveryEmail == null ? null : normalizeEmailForBlindIndex(input.recoveryEmail);
         const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
         // This lookup exists only to preserve the stable address limiter key.
         // Its account audit token never enters a refusal row: that event is a
@@ -1490,7 +1509,7 @@ export class RegistrationService implements RegistrationApplication {
         mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents
+            email, recoveryEmail, phone, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents
           }));
           const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
           if (preTransportWorkMs

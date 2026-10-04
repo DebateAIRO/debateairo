@@ -18,7 +18,11 @@ export interface PendingAccountInput {
   readonly userId: string;
   readonly emailBlindIndex: Buffer;
   readonly emailCiphertext: CryptoEnvelope;
-  readonly recoveryEmailCiphertext: CryptoEnvelope;
+  readonly recoveryEmailCiphertext: CryptoEnvelope | null;
+  readonly phoneCiphertext: CryptoEnvelope;
+  readonly phoneSource: "manual";
+  readonly phoneVerificationStatus: "unverified";
+  readonly phoneUpdatedAt: Date;
   readonly passwordHash: string;
   readonly pseudonym: string;
   readonly adultAffirmedAt: Date;
@@ -196,7 +200,7 @@ export class PostgresIdentityRepository {
         input.userId,
         input.emailBlindIndex,
         JSON.stringify(input.emailCiphertext),
-        JSON.stringify(input.recoveryEmailCiphertext),
+        input.recoveryEmailCiphertext === null ? null : JSON.stringify(input.recoveryEmailCiphertext),
         input.passwordHash,
         input.pseudonym,
         input.adultAffirmedAt,
@@ -206,7 +210,11 @@ export class PostgresIdentityRepository {
         JSON.stringify({
           ipArgon2id: prepared.ipArgon2id,
           userAgentArgon2id: prepared.userAgentArgon2id
-        })
+        }),
+        JSON.stringify(input.phoneCiphertext),
+        input.phoneSource,
+        input.phoneVerificationStatus,
+        input.phoneUpdatedAt
       ];
       const created = input.acceptances === undefined
         ? await client.query<{
@@ -214,14 +222,14 @@ export class PostgresIdentityRepository {
           user_id: string | null;
           channel_binding_id: string | null;
         }>(`SELECT * FROM identity.create_pending_account_with_audit(
-          $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb
+          $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,$15
         )`, parameters)
         : await client.query<{
           status: "CREATED" | "EMAIL_DUPLICATE" | "PSEUDONYM_COLLISION";
           user_id: string | null;
           channel_binding_id: string | null;
         }>(`SELECT * FROM identity.create_pending_account_with_consent(
-          $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::smallint,$13,$14,$15::jsonb
+          $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,$15,$16::smallint,$17,$18,$19::jsonb
         )`, [
           ...parameters,
           input.ageCheck.minAgeApplied,

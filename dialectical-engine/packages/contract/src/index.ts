@@ -536,7 +536,7 @@ export const AccountErasureCancelledSchema = z.object({
 const EmailAddressSchema = z.string().min(3).max(254);
 export const AccountEmailSchema = z.object({
   email: EmailAddressSchema,
-  recovery_email: EmailAddressSchema,
+  recovery_email: EmailAddressSchema.nullable(),
   pending: z.object({
     new_email: EmailAddressSchema,
     expires_at: z.iso.datetime()

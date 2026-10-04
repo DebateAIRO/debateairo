@@ -1,3 +1,4 @@
+import { normalizeManualPhone } from "./phone-profile.js";
 import type { FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
@@ -71,6 +72,7 @@ import {
   DateOfBirthSchema,
   PUBLICATION_CONTENT_REFUSED_MESSAGE,
   RegisterLegalDocumentsSchema,
+  RegisterRequestSchema,
   type RegisterLegalDocuments,
   LegalAcceptRequestSchema,
   LegalStatusResponseSchema,
@@ -1797,6 +1799,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * request and no request decoration is added.
    */
   const registerLegalDocuments = new WeakMap<object, RegisterLegalDocuments>();
+  const registerPublicKeys = new WeakMap<object, readonly string[]>();
+  const registerAllowedKeys = new Set(Object.keys(RegisterRequestSchema.shape));
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
@@ -2023,12 +2027,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const dateOfBirth = body === null ? null : dateOfBirthValue(body.date_of_birth);
     if (body === null || dateOfBirth === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (!meetsMinimumAge(dateOfBirth)) return ageRefused(reply);
+    registerPublicKeys.set(request, Object.keys(body));
     body.adult_affirmed = true;
   });
   /**
    * Paid plans L3b (spec §2.3.2): the pairs of the documents the sign-up page displayed. The registration
    * mount region is frozen (S04), so — as the age gate does for the date — they are read here and travel to
-   * the service on the source (sourceFor), never in the region's four input members. A missing or malformed
+   * the service on the source (sourceFor), separately from account profile input. A missing or malformed
    * triple travels as absent, which the service refuses as LEGAL_DOCUMENT_STALE when the records key is
    * composed. Runs after the age gate's hook, so a refused date never gets this far.
    */
@@ -2042,6 +2047,25 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       terms: body.terms, privacy: body.privacy, locale: body.locale
     });
     if (legal.success) registerLegalDocuments.set(request, legal.data);
+  });
+  // Task 2 stages the canonical key boundary after the existing country/age/legal hooks.
+  // Task 4 must require the full request shape and verified Turnstile proof before account work.
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    const keys = registerPublicKeys.get(request);
+    const body = request.body as Record<string, unknown>;
+    if (keys === undefined || keys.some(key => !registerAllowedKeys.has(key))) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    for (const [key, maximum] of [["locale", 16], ["ui_locale", 16], ["time_zone", 128], ["turnstile_token", 2048]] as const) {
+      const value = body[key];
+      if (value === undefined || (key === "time_zone" && value === null)) continue;
+      if (typeof value !== "string" || value.length > maximum) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+    }
+    try { body.phone = normalizeManualPhone(body.phone); }
+    catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
   });
   /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
@@ -2548,7 +2572,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const response = await options.registration!.register({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : "",
-        recoveryEmail: typeof body.recovery_email === "string" ? body.recovery_email : "",
+        recoveryEmail: null,
+        phone: typeof body.phone === "string" ? body.phone : "",
         adultAffirmed: body.adult_affirmed === true
       }, sourceFor(request));
       return reply.status(202).send(response);

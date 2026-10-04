@@ -984,7 +984,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
         method: "POST", url: "/v1/auth/register",
         payload: {
           email: "alice@example.test", password: "password-123",
-          recovery_email: "recovery@example.test", date_of_birth: "1990-01-01"
+          phone: "+40722123456", date_of_birth: "1990-01-01"
         }
       });
       const verify = await api.inject({
@@ -1438,7 +1438,7 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
     url: "/v1/auth/register",
     payload: {
       email: "alice@example.test", password: "correct horse battery staple",
-      recovery_email: "recovery@example.test", date_of_birth: "1990-01-01"
+      phone: "+40722123456", date_of_birth: "1990-01-01"
     }
   }),
   Object.freeze({
@@ -1609,7 +1609,7 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
       const attempt = occurrence.route === "register"
         ? service.register({
           email: "alice@example.test", password: "correct horse battery staple",
-          recoveryEmail: "recovery@example.test", adultAffirmed: true
+          phone: "+40722123456", recoveryEmail: "recovery@example.test", adultAffirmed: true
         }, source)
         : occurrence.route === "verify"
           ? service.verifyEmail({ token: "A".repeat(43) }, source)
@@ -1978,7 +1978,7 @@ function rework7Harness(options: {
     register: (index: number) => service.register({
       email: `rework7-${index}@example.test`,
       password: options.password ?? REWORK7_PASSWORD,
-      recoveryEmail: `rework7-${index}-recovery@example.test`,
+      phone: "+40722123456", recoveryEmail: `rework7-${index}-recovery@example.test`,
       adultAffirmed: true
     }, {
       ip: `2001:db8:7ea::${(index + 1).toString(16)}`,
@@ -2072,13 +2072,13 @@ describe("T1 rework7 A1 — the structural admission budget is exactly 103", () 
 
       const invalidInput = await harness.service.register({
         email: "not-an-address", password: REWORK7_PASSWORD,
-        recoveryEmail: "r7-invalid-recovery@example.test", adultAffirmed: true
+        phone: "+40722123456", recoveryEmail: "r7-invalid-recovery@example.test", adultAffirmed: true
       }, { ip: "2001:db8:7ea::ffff", userAgent: "vitest", requestId: "request:invalid" })
         .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
       expect(invalidInput).toBe("AUTH_INPUT_INVALID");
       const invalidSource = await harness.service.register({
         email: "r7-valid@example.test", password: REWORK7_PASSWORD,
-        recoveryEmail: "r7-valid-recovery@example.test", adultAffirmed: true
+        phone: "+40722123456", recoveryEmail: "r7-valid-recovery@example.test", adultAffirmed: true
       }, { ip: "   ", userAgent: "vitest", requestId: "request:invalid-source" })
         .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
       expect(invalidSource).toBe("AUTH_INPUT_INVALID");
@@ -2251,7 +2251,7 @@ describe("T1 rework7 A1 — the admission token is released exactly once, and ne
           harness.service.register({
             email: `rework7-limiter-${attempt}@example.test`,
             password: REWORK7_PASSWORD,
-            recoveryEmail: `rework7-limiter-${attempt}-recovery@example.test`,
+            phone: "+40722123456", recoveryEmail: `rework7-limiter-${attempt}-recovery@example.test`,
             adultAffirmed: true
           }, {
             ip: "2001:db8:7ea::1",

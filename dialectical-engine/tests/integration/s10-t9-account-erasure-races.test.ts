@@ -351,7 +351,7 @@ const writers: readonly Writer[] = Object.freeze([
     invoke: (client,fixture) => runtimeQuery(client,`
       SELECT status AS value FROM identity.create_pending_account_with_audit(
         $1,$2,'{}','{}',$3,$4,clock_timestamp(),clock_timestamp(),$5,
-        clock_timestamp()+interval '1 hour',$6::jsonb
+        clock_timestamp()+interval '1 hour',$6::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp()
       )
     `,[randomUUID(),fixture.emailBlindIndex,fixture.passwordHash,
       `duplicate-${randomUUID()}`,opaqueHash(),sourceContext]),

@@ -436,7 +436,7 @@ async function registerAccount(
   const email = override.email ?? `${label}@example.test`;
   const password = override.password ?? "correct horse battery staple";
   const recoveryEmail = override.recoveryEmail ?? `${label}-recovery@example.test`;
-  const response = await service.register({ email, password, recoveryEmail, adultAffirmed: true }, source);
+  const response = await service.register({ email, password, phone: "+40722123456", recoveryEmail, adultAffirmed: true }, source);
   await (service as RegistrationService & { drainMailDispatches?: () => Promise<void> })
     .drainMailDispatches?.();
   const index = createEmailBlindIndex(blindIndexKey, email);
@@ -1583,7 +1583,7 @@ setTimeout(() => undefined, 500);
       await expect(flow.service.register({
         email,
         password: "correct horse battery staple",
-        recoveryEmail: `s3a-a2-${label}-recovery@example.test`,
+        phone: "+40722123456", recoveryEmail: `s3a-a2-${label}-recovery@example.test`,
         adultAffirmed: true
       }, routeSource)).resolves.toEqual(REGISTRATION_PUBLIC_RESPONSE);
       await flow.service.drainMailDispatches();
@@ -1653,7 +1653,7 @@ setTimeout(() => undefined, 500);
     const registrations = labels.map((label) => flow.service.register({
       email: `s3a-a3-${label}@example.test`,
       password: "correct horse battery staple",
-      recoveryEmail: `s3a-a3-${label}-recovery@example.test`,
+      phone: "+40722123456", recoveryEmail: `s3a-a3-${label}-recovery@example.test`,
       adultAffirmed: true
     }, { ...source, requestId: `request:s3a:a3:${label}` }));
     draining = true;
@@ -1717,7 +1717,7 @@ setTimeout(() => undefined, 500);
     const registration = flow.service.register({
       email,
       password: "correct horse battery staple",
-      recoveryEmail: "s3b-commit-gate-recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "s3b-commit-gate-recovery@example.test",
       adultAffirmed: true
     }, {
       ip: "198.51.100.201",
@@ -1787,7 +1787,7 @@ setTimeout(() => undefined, 500);
       return flow.service.register({
         email,
         password: "correct horse battery staple",
-        recoveryEmail: `s3b-durability-${index}-recovery@example.test`,
+        phone: "+40722123456", recoveryEmail: `s3b-durability-${index}-recovery@example.test`,
         adultAffirmed: true
       }, {
         ip: `198.51.100.${index + 1}`,
@@ -1828,7 +1828,7 @@ setTimeout(() => undefined, 500);
       await flow.service.register({
         email,
         password: "correct horse battery staple",
-        recoveryEmail: "s3b-provision-failure-recovery@example.test",
+        phone: "+40722123456", recoveryEmail: "s3b-provision-failure-recovery@example.test",
         adultAffirmed: true
       }, { ...source, requestId: "request:s3b:provision-failure" });
     } catch (caught) {
@@ -2095,7 +2095,7 @@ setTimeout(() => undefined, 500);
         await flow.service.register({
           email: `s3d-hang-${index}@example.test`,
           password: "correct horse battery staple",
-          recoveryEmail: `s3d-hang-${index}-recovery@example.test`,
+          phone: "+40722123456", recoveryEmail: `s3d-hang-${index}-recovery@example.test`,
           adultAffirmed: true
         }, {
           ip: `2001:db8:3d::${index + 1}`,
@@ -2144,7 +2144,7 @@ setTimeout(() => undefined, 500);
         await flow.service.register({
           email,
           password: "correct horse battery staple",
-          recoveryEmail: `${label}-recovery@example.test`,
+          phone: "+40722123456", recoveryEmail: `${label}-recovery@example.test`,
           adultAffirmed: true
         }, {
           ip: `2001:db8:3d:1::${label === "duplicate" ? "1" : "2"}`,
@@ -2168,7 +2168,7 @@ setTimeout(() => undefined, 500);
         await flow.service.register({
           email: `s3d-overflow-${index}@example.test`,
           password: "correct horse battery staple",
-          recoveryEmail: `s3d-overflow-${index}-recovery@example.test`,
+          phone: "+40722123456", recoveryEmail: `s3d-overflow-${index}-recovery@example.test`,
           adultAffirmed: true
         }, {
           ip: `2001:db8:3d:6::${index + 1}`,
@@ -2356,7 +2356,7 @@ setTimeout(() => undefined, 500);
       flow.service.register({
         email: `s3d-retained-saturation-${index}@example.test`,
         password: "correct horse battery staple",
-        recoveryEmail: `s3d-retained-saturation-${index}-recovery@example.test`,
+        phone: "+40722123456", recoveryEmail: `s3d-retained-saturation-${index}-recovery@example.test`,
         adultAffirmed: true
       }, {
         ip: `2001:db8:3d:4e::${index + 1}`,
@@ -2431,7 +2431,7 @@ setTimeout(() => undefined, 500);
           await flow.service.register({
             email: `s3d-retained-refusal-${index}@example.test`,
             password: "correct horse battery staple",
-            recoveryEmail: `s3d-retained-refusal-${index}-recovery@example.test`,
+            phone: "+40722123456", recoveryEmail: `s3d-retained-refusal-${index}-recovery@example.test`,
             adultAffirmed: true
           }, {
             ip: `2001:db8:3d:4f::${(index % 512) + 1}`,
@@ -2655,7 +2655,7 @@ setTimeout(() => undefined, 500);
     const registerInput = (email: string) => ({
       email,
       password: "correct horse battery staple",
-      recoveryEmail: email.replace("@", "-recovery@"),
+      phone: "+40722123456", recoveryEmail: email.replace("@", "-recovery@"),
       adultAffirmed: true
     });
     const requestSource = (label: string, index: number) => ({
@@ -3069,7 +3069,7 @@ setTimeout(() => undefined, 500);
     const registerInput = (email: string) => ({
       email,
       password: "correct horse battery staple",
-      recoveryEmail: email.replace("@", "-recovery@"),
+      phone: "+40722123456", recoveryEmail: email.replace("@", "-recovery@"),
       adultAffirmed: true
     });
     const requestSource = (route: "register" | "resend", arm: string, index: number) => ({
@@ -3290,7 +3290,7 @@ setTimeout(() => undefined, 500);
     const registration = flow.service.register({
       email,
       password: "correct horse battery staple",
-      recoveryEmail: `s3d-permit-before-store-recovery-${randomUUID()}@example.test`,
+      phone: "+40722123456", recoveryEmail: `s3d-permit-before-store-recovery-${randomUUID()}@example.test`,
       adultAffirmed: true
     }, {
       ip: "2001:db8:4d:10::1",
@@ -3373,7 +3373,7 @@ setTimeout(() => undefined, 500);
     const registration = flow.service.register({
       email: `s3d-slow-hash-${randomUUID()}@example.test`,
       password: "correct horse battery staple",
-      recoveryEmail: `s3d-slow-hash-recovery-${randomUUID()}@example.test`,
+      phone: "+40722123456", recoveryEmail: `s3d-slow-hash-recovery-${randomUUID()}@example.test`,
       adultAffirmed: true
     }, {
       ip: "2001:db8:4d:11::1",
@@ -3414,7 +3414,7 @@ setTimeout(() => undefined, 500);
       await expect(flow.service.register({
         email: `s3d-slow-store-${randomUUID()}@example.test`,
         password: "correct horse battery staple",
-        recoveryEmail: `s3d-slow-store-recovery-${randomUUID()}@example.test`,
+        phone: "+40722123456", recoveryEmail: `s3d-slow-store-recovery-${randomUUID()}@example.test`,
         adultAffirmed: true
       }, {
         ip: "2001:db8:4d:12::1",
@@ -3541,7 +3541,7 @@ setTimeout(() => undefined, 500);
     const registerInput = (email: string) => ({
       email,
       password: "correct horse battery staple",
-      recoveryEmail: email.replace("@", "-recovery@"),
+      phone: "+40722123456", recoveryEmail: email.replace("@", "-recovery@"),
       adultAffirmed: true
     });
     const source = (arm: string, index: number) => ({
@@ -3840,7 +3840,7 @@ setTimeout(() => undefined, 500);
           await flow.service.register({
             email,
             password: "correct horse battery staple",
-            recoveryEmail: `s3d-b4-${size}-${index}-recovery@example.test`,
+            phone: "+40722123456", recoveryEmail: `s3d-b4-${size}-${index}-recovery@example.test`,
             adultAffirmed: true
           }, {
             ip: `2001:db8:3d:b4:${size.toString(16)}::${index + 1}`,
@@ -4033,7 +4033,7 @@ setTimeout(() => undefined, 500);
     await flow.service.register({
       email: existingEmail,
       password: "correct horse battery staple",
-      recoveryEmail: "s3d-deadline-existing-recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "s3d-deadline-existing-recovery@example.test",
       adultAffirmed: true
     }, {
       ip: "2001:db8:3d:dead::eed",
@@ -4046,7 +4046,7 @@ setTimeout(() => undefined, 500);
       (_, index) => flow.service.register({
         email: `s3d-deadline-filler-${index}@example.test`,
         password: "correct horse battery staple",
-        recoveryEmail: `s3d-deadline-filler-${index}-recovery@example.test`,
+        phone: "+40722123456", recoveryEmail: `s3d-deadline-filler-${index}-recovery@example.test`,
         adultAffirmed: true
       }, {
         ip: `2001:db8:3d:dead::${index + 1}`,
@@ -4099,7 +4099,7 @@ setTimeout(() => undefined, 500);
       return flow.service.register({
         email,
         password: "correct horse battery staple",
-        recoveryEmail: `s3d-deadline-${arm}-${sample}-recovery@example.test`,
+        phone: "+40722123456", recoveryEmail: `s3d-deadline-${arm}-${sample}-recovery@example.test`,
         adultAffirmed: true
       }, {
         ip: `2001:db8:3d:deae::${index + 1}`,
@@ -4416,7 +4416,7 @@ setTimeout(() => undefined, 500);
     await flow.service.register({
       email,
       password: "correct horse battery staple",
-      recoveryEmail: "s3d-rolling-ceiling-recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "s3d-rolling-ceiling-recovery@example.test",
       adultAffirmed: true
     }, source);
     await flow.service.drainMailDispatches();
@@ -4468,7 +4468,7 @@ setTimeout(() => undefined, 500);
     await flow.service.register({
       email,
       password: "correct horse battery staple",
-      recoveryEmail: "s3d-first-link-recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "s3d-first-link-recovery@example.test",
       adultAffirmed: true
     }, source);
     await new Promise<void>((resolve) => setImmediate(resolve));
@@ -4501,7 +4501,7 @@ setTimeout(() => undefined, 500);
     const input = {
       email: "enumeration@example.test",
       password: "correct horse battery staple",
-      recoveryEmail: "enumeration-recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "enumeration-recovery@example.test",
       adultAffirmed: true
     };
     const startedNew = performance.now();
@@ -4534,7 +4534,7 @@ setTimeout(() => undefined, 500);
       const input = {
         email: `slow-${latencyMs}@example.test`,
         password: "correct horse battery staple",
-        recoveryEmail: `slow-${latencyMs}-recovery@example.test`,
+        phone: "+40722123456", recoveryEmail: `slow-${latencyMs}-recovery@example.test`,
         adultAffirmed: true
       };
       const startedNew = performance.now();
@@ -4578,7 +4578,7 @@ setTimeout(() => undefined, 500);
             await flow.service.register({
               email: `s3c-real-flood-${route}-${attempt}@example.test`,
               password: "correct horse battery staple",
-              recoveryEmail: `s3c-real-flood-${route}-${attempt}-recovery@example.test`,
+              phone: "+40722123456", recoveryEmail: `s3c-real-flood-${route}-${attempt}-recovery@example.test`,
               adultAffirmed: true
             }, {
               ip: floodIp,
@@ -4639,7 +4639,7 @@ setTimeout(() => undefined, 500);
           await flow.service.register({
             email: `s3c-b2-${label}@example.test`,
             password: "correct horse battery staple",
-            recoveryEmail: `s3c-b2-${label}-recovery@example.test`,
+            phone: "+40722123456", recoveryEmail: `s3c-b2-${label}-recovery@example.test`,
             adultAffirmed: true
           }, realSource);
           await flow.service.drainMailDispatches();
@@ -4809,7 +4809,7 @@ setTimeout(() => undefined, 500);
     await expect(flow.service.register({
       email,
       password: "correct horse battery staple",
-      recoveryEmail: "s3c-d2-register-victim-recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "s3c-d2-register-victim-recovery@example.test",
       adultAffirmed: true
     }, {
       ip: "198.51.100.201",
@@ -4897,7 +4897,7 @@ setTimeout(() => undefined, 500);
         await flow.service.register({
           email,
           password: "correct horse battery staple",
-          recoveryEmail: `${label}-recovery@example.test`,
+          phone: "+40722123456", recoveryEmail: `${label}-recovery@example.test`,
           adultAffirmed: true
         }, {
           ...source,
@@ -5002,7 +5002,7 @@ setTimeout(() => undefined, 500);
       await Promise.all(existingEmails.map((email, index) => flow.service.register({
         email,
         password: "correct horse battery staple",
-        recoveryEmail: `s3b-timing-n${concurrency}-seed-${index}-recovery@example.test`,
+        phone: "+40722123456", recoveryEmail: `s3b-timing-n${concurrency}-seed-${index}-recovery@example.test`,
         adultAffirmed: true
       }, {
         ip: `203.0.${concurrency}.${index + 1}`,
@@ -5032,7 +5032,7 @@ setTimeout(() => undefined, 500);
           await flow.service.register({
             email,
             password: "correct horse battery staple",
-            recoveryEmail: `s3b-timing-n${concurrency}-existing-${index}-recovery@example.test`,
+            phone: "+40722123456", recoveryEmail: `s3b-timing-n${concurrency}-existing-${index}-recovery@example.test`,
             adultAffirmed: true
           }, {
             ip: `203.${concurrency}.${wave}.${index + 1}`,
@@ -5050,7 +5050,7 @@ setTimeout(() => undefined, 500);
           await flow.service.register({
             email,
             password: "correct horse battery staple",
-            recoveryEmail: `s3b-timing-n${concurrency}-missing-${wave}-${index}-recovery@example.test`,
+            phone: "+40722123456", recoveryEmail: `s3b-timing-n${concurrency}-missing-${wave}-${index}-recovery@example.test`,
             adultAffirmed: true
           }, {
             ip: `204.${concurrency}.${wave}.${index + 1}`,
@@ -5299,6 +5299,8 @@ setTimeout(() => undefined, 500);
         recoveryEmailCiphertext: encrypt(dek, Buffer.from(recoveryEmail), [
           "identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"
         ]),
+        phoneCiphertext: encrypt(dek, Buffer.from("+40722123456"), ["identity", "user.phone_ciphertext", userId, "run:none", userId, keyId, "1"]),
+        phoneSource: "manual", phoneVerificationStatus: "unverified", phoneUpdatedAt: new Date(),
         passwordHash: "s3b-f3-password-hash",
         pseudonym: `s3b-f3-${userId}`,
         adultAffirmedAt: new Date("2026-08-20T00:00:00.000Z"),
@@ -5383,7 +5385,7 @@ setTimeout(() => undefined, 500);
       await flow.service.register({
         email,
         password: "correct horse battery staple",
-        recoveryEmail: "rework4-cooldown-recovery@example.test",
+        phone: "+40722123456", recoveryEmail: "rework4-cooldown-recovery@example.test",
         adultAffirmed: true
       }, source);
       await flow.service.resendVerification({ email }, source);
@@ -5407,7 +5409,7 @@ setTimeout(() => undefined, 500);
       await flow.service.register({
         email,
         password: "correct horse battery staple",
-        recoveryEmail: "s3d-delivery-record-failure-recovery@example.test",
+        phone: "+40722123456", recoveryEmail: "s3d-delivery-record-failure-recovery@example.test",
         adultAffirmed: true
       }, source);
       await flow.service.drainMailDispatches();
@@ -5453,7 +5455,7 @@ setTimeout(() => undefined, 500);
     await expect(flow.service.register({
       email: "-option@example.test",
       password: "correct horse battery staple",
-      recoveryEmail: "safe-recovery@example.test",
+      phone: "+40722123456", recoveryEmail: "safe-recovery@example.test",
       adultAffirmed: true
     }, source)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
     const leaked = await database.pool.query(`
@@ -5686,7 +5688,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     api: ReturnType<typeof buildApi>,
     index: number,
     email: string,
-    recoveryEmail: string,
+    _legacyRecoveryEmail: string,
     ip: string
   ): Promise<RegisterObservation> {
     const startedAt = performance.now();
@@ -5697,7 +5699,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         payload: {
           email,
           password: "correct horse battery staple",
-          recovery_email: recoveryEmail,
+          phone: "+40722123456",
           date_of_birth: "1990-01-01"
         },
         remoteAddress: ip,
@@ -8290,7 +8292,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     await expect(flow.service.register({
       email: registered.email,
       password: "another valid password",
-      recoveryEmail: registered.recoveryEmail,
+      phone: "+40722123456", recoveryEmail: registered.recoveryEmail,
       adultAffirmed: true
     }, source)).rejects.toMatchObject({ code: "AUTH_RATE_LIMITED" });
     await flow.service.drainRateLimitAuditFlushes();

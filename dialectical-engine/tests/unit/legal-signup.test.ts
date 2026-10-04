@@ -46,11 +46,11 @@ function serviceCapturing(recordsKey: Buffer | undefined) {
   return { service, captured };
 }
 
-/** The four members the frozen register mount builds (RegisterInput is unchanged by L3b). */
+/** Trusted service compositions can still provision optional recovery addresses. */
 const REGISTRATION = Object.freeze({
   email: "alice@example.test",
   password: "correct horse battery staple",
-  recoveryEmail: "alice.recovery@example.test",
+  phone: "+40722123456", recoveryEmail: "alice.recovery@example.test",
   adultAffirmed: true
 });
 /** The pairs ride on the source, as sourceFor sends them (the age gate's countryCode rides there too). */
@@ -149,7 +149,7 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
     // The age gate's hook needs an adult date before register runs at all (apps/api/src/index.ts:1711-1729).
     const body = {
       email: "alice@example.test", password: "correct horse battery staple",
-      recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01"
+      phone: "+40722123456", date_of_birth: "1990-01-01"
     };
     const stale = await api.inject({ method: "POST", url: "/v1/auth/register", payload: body });
     expect(stale.statusCode).toBe(409);
@@ -167,10 +167,10 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
     });
     expect(malformed.statusCode).toBe(409);
     expect(seen[2]).toBeUndefined();
-    // The frozen region still builds exactly its four members (tests/unit/obs-l2-s04-zone.test.ts pins its text).
+    // The public mount sets recovery absent and keeps adult affirmation a server decision.
     expect(inputs[1]).toEqual({
       email: "alice@example.test", password: "correct horse battery staple",
-      recoveryEmail: "alice.recovery@example.test", adultAffirmed: true
+      phone: "+40722123456", recoveryEmail: null, adultAffirmed: true
     });
     await api.close();
   });

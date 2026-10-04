@@ -76,8 +76,20 @@ beforeAll(async()=>{
   const guardedFunctions=["identity.lock_account_t9_internal", "identity.lock_mfa_enrollment_bearer_internal", "identity.record_verification_delivery_with_audit", "identity.prepare_account_erasure", "identity.finalize_account_erasure", "core.append_run_ownership_event", "identity.audit_publication_preflight_denial", "core.transition_run_publication", "core.prepare_run_key_provision", "core.lock_run_key_provision_for_commit", "serve.prepare_publication_key_provision", "serve.abandon_publication_key_provision", "identity.create_pending_account_with_audit", "identity.consume_verification_with_audit", "identity.prepare_verification_resend_with_audit", "identity.reserve_publication_event_refs", "core.prepare_private_run_erasure", "core.resume_private_run_erasure", "core.finalize_private_run_erasure", "identity.schedule_account_erasure", "identity.cancel_current_account_erasure", "core.claim_legacy_runs"];
   const identityWitness=async()=>(await database.pool.query(`SELECT p.oid::regprocedure::text AS signature,pg_get_userbyid(p.proowner) AS owner,p.proacl::text AS acl,encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') AS definition_sha256 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname||'.'||p.proname=ANY($1::text[]) ORDER BY signature`,[guardedFunctions])).rows;
   const before=await identityWitness();expect(before).toHaveLength(22);await migrate(database.pool);await initializeOwnerRecoveryFixture(database.pool,database.connectionString);const after=await identityWitness();
-  expect(after.map(({signature,owner})=>({signature,owner}))).toEqual(before.map(({signature,owner})=>({signature,owner})));
-  for(let i=0;i<before.length;i++)if(!before[i]!.signature.startsWith('identity.lock_account_t9_internal('))expect(after[i]!.acl).toBe(before[i]!.acl);
+  const phoneSignature='identity.create_pending_account_with_audit(uuid,bytea,jsonb,jsonb,text,text,timestamp with time zone,timestamp with time zone,text,timestamp with time zone,jsonb,jsonb,text,text,timestamp with time zone)';
+  const historicalAfter=after.filter(row=>row.signature!==phoneSignature);
+  expect(after).toHaveLength(23);
+  expect(historicalAfter.map(({signature,owner})=>({signature,owner}))).toEqual(before.map(({signature,owner})=>({signature,owner})));
+  const oldConstructor=before.find(row=>row.signature.startsWith('identity.create_pending_account_with_audit('))!;
+  expect(after.find(row=>row.signature===phoneSignature)!.owner).toBe(oldConstructor.owner);
+  for(const original of before) {
+    const migrated=historicalAfter.find(row=>row.signature===original.signature)!;
+    if(original.signature.startsWith('identity.lock_account_t9_internal('))continue;
+    if(original.signature===oldConstructor.signature) {
+      expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed",[original.signature])).rows[0].allowed).toBe(false);
+      expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed",[phoneSignature])).rows[0].allowed).toBe(true);
+    } else expect(migrated.acl).toBe(original.acl);
+  }
   console.info('[STAFF_IDENTITY_OWNER_ACL]',JSON.stringify({before,after}));
   await database.pool.query(`CREATE ROLE staff_test_runtime LOGIN PASSWORD 'staff-test-only-password' IN ROLE debateai_runtime`);
   const url=new URL(database.connectionString);url.username='staff_test_runtime';url.password='staff-test-only-password';runtime=createPool(url.toString());
@@ -417,7 +429,7 @@ it('reads a security hold through the exported session adapter and fails closed 
 it('locks a known duplicate account before registration INSERT reaches any channel row lock',async()=>{
  const existing=await account(),proposed=randomUUID(),blind=createHash('sha256').update(existing.userId).digest(),first=await database.pool.connect(),second=await database.pool.connect();
  const source={ipArgon2id:'argon2id-audit:v1:'+'0'.repeat(64),userAgentArgon2id:'argon2id-audit:v1:'+'1'.repeat(64)};
- const sql="SELECT * FROM identity.create_pending_account_with_audit($1,$2,'{}','{}','fixture-password',$3,clock_timestamp(),clock_timestamp(),$4,clock_timestamp()+interval '1 hour',$5::jsonb)";
+ const sql="SELECT * FROM identity.create_pending_account_with_audit($1,$2,'{}','{}','fixture-password',$3,clock_timestamp(),clock_timestamp(),$4,clock_timestamp()+interval '1 hour',$5::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp())";
  try {
   await first.query('BEGIN');await first.query('SELECT identity.lock_security_subjects($1::uuid[])',[[existing.userId]]);
   await second.query('BEGIN');await second.query('SELECT identity.begin_runtime_audit_attempt()');
@@ -432,7 +444,7 @@ it('locks a known duplicate account before registration INSERT reaches any chann
 it('serializes concurrent new registration through INSERT uniqueness without retaining a committed duplicate row lock',async()=>{
  const one=randomUUID(),two=randomUUID(),blind=createHash('sha256').update(randomUUID()).digest(),first=await database.pool.connect(),second=await database.pool.connect();
  const source={ipArgon2id:'argon2id-audit:v1:'+'0'.repeat(64),userAgentArgon2id:'argon2id-audit:v1:'+'1'.repeat(64)};
- const sql="SELECT * FROM identity.create_pending_account_with_audit($1,$2,'{}','{}','fixture-password',$3,clock_timestamp(),clock_timestamp(),$4,clock_timestamp()+interval '1 hour',$5::jsonb)";
+ const sql="SELECT * FROM identity.create_pending_account_with_audit($1,$2,'{}','{}','fixture-password',$3,clock_timestamp(),clock_timestamp(),$4,clock_timestamp()+interval '1 hour',$5::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp())";
  try {
   await first.query('BEGIN');await first.query('SELECT identity.begin_runtime_audit_attempt()');await first.query(sql,[one,blind,one,hash(one),source]);
   await second.query('BEGIN');await second.query('SELECT identity.begin_runtime_audit_attempt()');const pid=(await second.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
