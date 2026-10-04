@@ -600,6 +600,9 @@ describe("P3-01 production database-principal manifest", () => {
       "NO_PREDEFINED_PG_ROLE_MEMBERSHIP_EXCEPT_OBSERVATION_AGENT_PG_MONITOR",
       "AUTHORIZATION_EFFECTIVE_MEMBERSHIP_IS_AUTHORIZATION_PLUS_RUNTIME_ONLY",
       "BILLING_CAPABILITY_HELD_BY_API_RUNTIME_ONLY",
+      // Migration 0094: legal.acceptance, the legal retention purge, sign-up with consent and the country-gate
+      // audit sit on debateai_billing_runtime too, not on the shared debateai_runtime.
+      "LEGAL_ACCEPTANCE_SIGN_UP_AND_COUNTRY_GATE_WRITES_HELD_BY_API_RUNTIME_ONLY",
       "PRODUCTION_EVALUATOR_DEV_MENU_FORBIDDEN"
     ]);
     // Go-live row 41: runner-runtime and scheduler-liveness hold debateai_runtime, which since 0093 writes

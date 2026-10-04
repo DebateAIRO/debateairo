@@ -730,7 +730,7 @@ the provisioner clears role settings with `ALTER ROLE ... RESET ALL` and refuses
 principal that carries any (`PRODUCTION_DATABASE_PRINCIPAL_DRIFT`, audit L5-F6). The migrator
 raises its own ceiling per session through `options=-c statement_timeout=0` in the URL above.
 
-`hardening.sql` re-opens CONNECT by name after closing it to PUBLIC. The list is the twelve
+`hardening.sql` re-opens CONNECT by name after closing it to PUBLIC. The list is the thirteen
 capability roles the managed principals inherit through — the support data plane
 (`debateai_support`) and the support-config operator among them (`DL5-F7`: without them the API
 boots and then refuses every support request) — plus the roles the migrations mint themselves. The
@@ -864,6 +864,31 @@ reads it at start-up and refuses a register version without it (`PUBLICATION_CHE
 - **To change the deadline**, add the optional `publicationCheckPolicy` member to the hosted file
   (`deploy/vps/register/README.md`) and publish again: whole milliseconds from 1000 to 60000.
 - **Rolling back** needs no register change: an older API does not read the row.
+
+### Upgrading to the API-only billing and legal privileges release
+
+Migrations `0093_billing_runtime_role.sql` and `0094_legal_runtime_api_only.sql` take every billing privilege, the
+acceptance record (`legal.acceptance`), the legal retention purge, sign-up with consent and the country-gate audit
+away from the shared `debateai_runtime` role. They give them to a new role, `debateai_billing_runtime`, which only
+the API's principal (`debateai_prod_api_runtime`) holds. The runner, the liveness sweep and the authorization pool
+lose nothing they use. No production database was provisioned when this shipped. On a host provisioned before it,
+the API's principal still holds `debateai_runtime` directly: from the migration until the provisioner runs, every
+sign-up, re-acceptance, checkout and billing write fails with permission errors (`42501`). So do all four steps in
+one migrator window, in this order:
+
+1. **Migrate.** Open the migrator window (§4 step 2) and run `pnpm db:migrate`, as §4 step 3 does.
+2. **Harden.** Run `hardening.sql` (§4 step 3). It grants CONNECT to the new role.
+3. **Provision.** Run `pnpm db:provision-principals` (§4 step 4). It moves the API's principal from
+   `debateai_runtime` to `debateai_billing_runtime` and prints `PRODUCTION_DATABASE_PRINCIPALS_READY=18`. It also
+   sets every principal's password to the one in the envelope. To change nothing else, put each service's current
+   password into the envelope (it is in that service's `EnvironmentFile` URL, §3). If you give any principal a new
+   password instead, put it in that service's `EnvironmentFile` and restart that unit too.
+4. **Restart the API** (`systemctl restart debateai-api`), then close the window (§4 step 5). The API's
+   connections then start under the new membership, and its start-up checks run against it.
+
+The release changes no code the production API or runner runs, only privileges, so there is no code to roll back. The migrations are
+forward-only. An API from an earlier release still works after step 3: the new role inherits `debateai_runtime`, so
+the API's principal keeps every privilege that API uses.
 
 ### Upgrading an existing host (paid plans Part 1a)
 

@@ -481,7 +481,11 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0092_billing_query_indexes.sql",
         // Go-live row 41 (Part 2's final review P2-I5, part 3): billing's privileges move from debateai_runtime
         // to debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
-        "0093_billing_runtime_role.sql"
+        "0093_billing_runtime_role.sql",
+        // The 2026-10-04 review of 0080: the legal schema, legal.acceptance and the three SECURITY DEFINER functions
+        // (the retention purge, sign-up with consent, the country-gate audit) move from debateai_runtime to
+        // debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
+        "0094_legal_runtime_api_only.sql"
       ]);
   });
 });

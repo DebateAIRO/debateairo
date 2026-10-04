@@ -55,6 +55,12 @@ describe("P16c scheduling on real PostgreSQL", () => {
       await expect(client.query("SELECT billing.purge_expired_records(clock_timestamp())"))
         .rejects.toMatchObject({ code: "42501" });
       await client.query("ROLLBACK");
+      // 0094: nor the legal one.
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await expect(client.query("SELECT legal.purge_expired_acceptance(clock_timestamp())"))
+        .rejects.toMatchObject({ code: "42501" });
+      await client.query("ROLLBACK");
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

@@ -13,8 +13,9 @@ export type DevelopmentDatabasePrincipal = Readonly<{
 
 export const DEVELOPMENT_DATABASE_PRINCIPALS = Object.freeze([
   // Go-live row 41 (migration 0093): the API's own login holds billing's role, which inherits
-  // debateai_runtime. In development the runner shares this login (DATABASE_URL), so only the
-  // production principals (P3-01) keep billing's writes away from the runner.
+  // debateai_runtime (and, since 0094, the acceptance record, sign-up with consent and the
+  // country-gate audit). In development the runner shares this login (DATABASE_URL), so only the
+  // production principals (P3-01) keep these writes away from the runner.
   Object.freeze({
     roleName: "debateai_dev_runtime",
     capabilityRole: "debateai_billing_runtime",
