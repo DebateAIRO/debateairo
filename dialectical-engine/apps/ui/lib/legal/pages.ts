@@ -276,7 +276,23 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /** The whole Register, in the order `/providers` shows it. */
-export const PROVIDER_REGISTER: readonly ProviderRegisterEntry[] = Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
+/** Serving company for the selected private-preview GLM endpoint; terms reviewed 5 October 2026. */
+export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "deepinfra",
+  provider: "DeepInfra",
+  models: "GLM-5.3-Flash (Z.AI)",
+  entity: "Deep Infra Inc.",
+  purposesConfirmed: true,
+  // Published terms exclude model training. Endpoint-specific retention and transfer facts
+  // remain explicitly unconfirmed until operational/contractual validation is complete.
+  training: "no",
+  basisKey: "legal.providers.unconfirmed",
+  contact: "policy@deepinfra.com",
+  checkedOn: "2026-10-05"
+});
+
+export const PROVIDER_REGISTER: readonly ProviderRegisterEntry[] = Object.freeze([...MODEL_PROVIDERS, DEEPINFRA_PROVIDER, SUPPORT_PROVIDER]);
 
 export type TermsVersion = Readonly<{
   version: string;

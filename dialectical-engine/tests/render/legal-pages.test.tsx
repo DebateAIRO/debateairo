@@ -471,7 +471,7 @@ describe("the model providers page lists the model families the product runs", (
   it("renders one register entry per provider, the support chat's model last", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-    expect(headings).toEqual([...MODEL_PROVIDERS.map(({ provider }) => provider), "Support chat model"]);
+    expect(headings).toEqual([...MODEL_PROVIDERS.map(({ provider }) => provider), "DeepInfra", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
