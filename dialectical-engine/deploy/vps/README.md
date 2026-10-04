@@ -733,7 +733,8 @@ raises its own ceiling per session through `options=-c statement_timeout=0` in t
 `hardening.sql` re-opens CONNECT by name after closing it to PUBLIC. The list is the thirteen
 capability roles the managed principals inherit through — the support data plane
 (`debateai_support`) and the support-config operator among them (`DL5-F7`: without them the API
-boots and then refuses every support request) — plus the roles the migrations mint themselves. The
+boots and then refuses every support request), and billing's role `debateai_billing_runtime`
+(migration 0093) — plus the roles the migrations mint themselves. The
 baseline test checks that list against the P3-01 manifest.
 
 ---
@@ -865,30 +866,54 @@ reads it at start-up and refuses a register version without it (`PUBLICATION_CHE
   (`deploy/vps/register/README.md`) and publish again: whole milliseconds from 1000 to 60000.
 - **Rolling back** needs no register change: an older API does not read the row.
 
-### Upgrading to the API-only billing and legal privileges release
+### Upgrading to the billing-role release (go-live row 41)
 
-Migrations `0093_billing_runtime_role.sql` and `0094_legal_runtime_api_only.sql` take every billing privilege, the
-acceptance record (`legal.acceptance`), the legal retention purge, sign-up with consent and the country-gate audit
-away from the shared `debateai_runtime` role. They give them to a new role, `debateai_billing_runtime`, which only
-the API's principal (`debateai_prod_api_runtime`) holds. The runner, the liveness sweep and the authorization pool
-lose nothing they use. No production database was provisioned when this shipped. On a host provisioned before it,
-the API's principal still holds `debateai_runtime` directly: from the migration until the provisioner runs, every
-sign-up, re-acceptance, checkout and billing write fails with permission errors (`42501`). So do all four steps in
-one migrator window, in this order:
+Migration `migrations/0093_billing_runtime_role.sql` moves every billing privilege from `debateai_runtime`, the
+role the API, the runner and the liveness sweep all hold, to a new role `debateai_billing_runtime` that only the
+API's own login (`debateai_prod_api_runtime`) holds, so the runner and the scheduler can no longer write billing
+rows or queue billing jobs. The migration alone takes the billing privileges away from the API too: the API's
+login gets the new role only when the provisioner runs again. Until it does, the API cannot write billing, **and
+the retention purge fails**: it runs wherever the API runs, whether billing is on or off
+(`apps/api/src/retention-purge.ts`), so `billing.purge_expired_records` is refused (`42501`) and the API logs
+`[RETENTION_PURGE_PENDING]` at every daily check until it succeeds. With billing on, every checkout, renewal and
+billing job would fail the same way. So do these in one sitting, in this order, before the API next starts on
+this code:
 
-1. **Migrate.** Open the migrator window (§4 step 2) and run `pnpm db:migrate`, as §4 step 3 does.
-2. **Harden.** Run `hardening.sql` (§4 step 3). It grants CONNECT to the new role.
-3. **Provision.** Run `pnpm db:provision-principals` (§4 step 4). It moves the API's principal from
-   `debateai_runtime` to `debateai_billing_runtime` and prints `PRODUCTION_DATABASE_PRINCIPALS_READY=18`. It also
-   sets every principal's password to the one in the envelope. To change nothing else, put each service's current
-   password into the envelope (it is in that service's `EnvironmentFile` URL, §3). If you give any principal a new
-   password instead, put it in that service's `EnvironmentFile` and restart that unit too.
-4. **Restart the API** (`systemctl restart debateai-api`), then close the window (§4 step 5). The API's
-   connections then start under the new membership, and its start-up checks run against it.
+1. **Open the migrator window** (§4 step 2).
+2. **Apply the migration, then hardening** (§4 step 3): `pnpm db:migrate`, then `hardening.sql`, which now also
+   opens CONNECT to `debateai_billing_runtime`.
+3. **Re-run the provisioner** (§4 step 4, exactly as written: a fresh envelope, each new password copied into
+   its `EnvironmentFile` before the envelope is destroyed). It moves `debateai_prod_api_runtime` from
+   `debateai_runtime` to `debateai_billing_runtime` and prints `PRODUCTION_DATABASE_PRINCIPALS_READY=18`.
+4. **Close the migrator window** (§4 step 5).
+5. **Restart the API and the runner** (`systemctl restart debateai-api debateai-runner`) so both connect with the
+   passwords step 3 set.
 
-The release changes no code the production API or runner runs, only privileges, so there is no code to roll back. The migrations are
-forward-only. An API from an earlier release still works after step 3: the new role inherits `debateai_runtime`, so
-the API's principal keeps every privilege that API uses.
+Check: one `retention.purged` line at the API's first purge check after the restart, and no
+`[RETENTION_PURGE_PENDING]`. **Rolling back** the code needs nothing: an older API holds the billing role's
+privileges through the new membership, because the role inherits `debateai_runtime`.
+
+### Upgrading to the legal-role release (migration 0094)
+
+Migration `migrations/0094_legal_runtime_api_only.sql` does for the acceptance record what 0093 did for billing. It
+moves the legal schema, `legal.acceptance`, the legal retention purge (`legal.purge_expired_acceptance`), sign-up
+with consent (`identity.create_pending_account_with_consent`) and the country-gate audit
+(`identity.audit_country_gate_refused`) from `debateai_runtime` to `debateai_billing_runtime`. The runner, the
+liveness sweep and the authorization pool then can no longer forge an acceptance, create an account or write a
+country-gate audit row. It adds no role. Until the API's login holds `debateai_billing_runtime`, every sign-up,
+re-acceptance and checkout is refused (`42501`), and so is the legal half of the retention purge. Do it in one
+sitting, before the API next starts on this code:
+
+1. **Open the migrator window** (§4 step 2) and **migrate**: `pnpm db:migrate`.
+2. **Run `hardening.sql`** (§4 step 3).
+3. **Re-run the provisioner** (§4 step 4), exactly as the 0093 section above says.
+4. **Close the window** (§4 step 5), then **restart the API**: `systemctl restart debateai-api`. If step 3 set new
+   passwords, restart the runner too, as that section says.
+
+If the 0093 steps above have already run on this host, the API's login already holds the role. Then
+`pnpm db:migrate` is the only step needed, and the API keeps working throughout: the privileges reach its role the
+moment the migration commits. If both migrations are pending, one pass through the 0093 steps covers both. The check is the same: one `retention.purged` line at the API's first purge
+check, and a test sign-up that succeeds. **Rolling back** the code needs nothing, for the same reason as 0093.
 
 ### Upgrading an existing host (paid plans Part 1a)
 

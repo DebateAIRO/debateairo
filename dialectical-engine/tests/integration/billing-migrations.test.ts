@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BillingJobQueries, BillingRepository, RunRepository, migrate } from "@debateai/db";
@@ -193,6 +194,48 @@ describe("P1a — billing tables are append-only and guarded", () => {
     await expect(asRuntime((client) => client.query("UPDATE billing.outbox SET kind = 'EMAIL'")))
       .rejects.toMatchObject({ code: "42501" });
     await expect(database.pool.query("DELETE FROM billing.outbox")).rejects.toMatchObject({ code: "55000" });
+  });
+
+  // Go-live row 41: 0093's closing contract, replayed against a drifted grant, refuses each drift it names. Each case
+  // runs in its own rolled-back transaction, so the database keeps 0093's state.
+  it("0093's contract refuses a billing role missing one grant, and a runtime role with any write left", async () => {
+    const source = await readFile(new URL("../../migrations/0093_billing_runtime_role.sql", import.meta.url), "utf8");
+    const contract = /DO \$billing_0093_contract\$[\s\S]*?\$billing_0093_contract\$;/u.exec(source)?.[0];
+    expect(contract).toBeDefined();
+    const replay = async (drift: string): Promise<string> => {
+      const client = await database.pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(drift);
+        await client.query(contract!);
+        return "accepted";
+      } catch (error) {
+        return (error as Error).message;
+      } finally {
+        await client.query("ROLLBACK");
+        client.release();
+      }
+    };
+    expect(await replay("SELECT 1")).toBe("accepted");
+    // has_table_privilege(role, t, 'SELECT,INSERT') is true when EITHER is held, so the check asks each on its own.
+    expect(await replay("REVOKE INSERT ON billing.quote FROM debateai_billing_runtime"))
+      .toMatch(/^BILLING_0093_BILLING_ROLE_INCOMPLETE quote$/u);
+    expect(await replay("REVOKE SELECT ON billing.charge_event FROM debateai_billing_runtime"))
+      .toMatch(/^BILLING_0093_BILLING_ROLE_INCOMPLETE charge_event$/u);
+    for (const drift of [
+      "GRANT INSERT ON billing.outbox TO debateai_runtime",
+      "GRANT UPDATE (done_at) ON billing.outbox TO debateai_runtime",
+      "GRANT TRIGGER ON billing.charge TO debateai_runtime",
+      "GRANT REFERENCES ON billing.customer TO debateai_runtime",
+      "GRANT USAGE ON SEQUENCE billing.charge_event_seq_seq TO debateai_runtime",
+      "GRANT CREATE ON SCHEMA billing TO debateai_runtime"
+    ]) {
+      expect(await replay(drift), drift).toMatch(/^BILLING_0093_RUNTIME_WRITES/u);
+    }
+    expect(await replay("GRANT SELECT ON billing.customer TO debateai_runtime"))
+      .toMatch(/^BILLING_0093_RUNTIME_READS /u);
+    expect(await replay("GRANT EXECUTE ON FUNCTION billing.owner_age_frozen(uuid) TO debateai_runtime"))
+      .toMatch(/^BILLING_0093_RUNTIME_FUNCTIONS /u);
   });
 
   it("queues every job kind the billing jobs use, the refund executor and the yearly purge included (R-30)", async () => {

@@ -6,6 +6,7 @@ import { loadNamespace } from "../i18n/server.js";
 import { t, type MessageCatalog } from "../i18n/translate.js";
 import { USER_TOKEN_COOKIE, sessionCookieValue } from "../serverApi.js";
 import { renderReportPdf } from "./renderReport.js";
+import { REPORT_RENDER_LIMITS, ReportRenderGate } from "./reportRenderGate.js";
 import {
   loadReportCatalogs,
   reportSupportedForLocale,
@@ -43,8 +44,16 @@ function textHeaders(): Record<string, string> {
   return { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" };
 }
 
-function textResponse(status: number, body: string): Response {
-  return new Response(body, { status, headers: textHeaders() });
+function textResponse(status: number, body: string, extra: Record<string, string> = {}): Response {
+  return new Response(body, { status, headers: { ...textHeaders(), ...extra } });
+}
+
+/** The one gate every GET in this process passes before making a PDF (lib/report/reportRenderGate.ts). */
+const processRenderGate = new ReportRenderGate(REPORT_RENDER_LIMITS);
+
+/** A render the gate held back: the plain "try again" line, with the gate's Retry-After. */
+function busyResponse(status: 429 | 503, gate: ReportRenderGate, catalogs: ReportCatalogs): Response {
+  return textResponse(status, tryAgainLine(catalogs.publicCatalog), { "retry-after": String(gate.retryAfterSeconds) });
 }
 
 function pdfHeaders(question: string, now: Date): Record<string, string> {
@@ -210,6 +219,8 @@ interface Refusal {
 /** Everything a report needs from the API, read and checked. */
 interface ReadyReport {
   readonly kind: "ready";
+  /** The owner's session the reads were made with; the render gate's key. */
+  readonly session: string;
   readonly answer: Answer;
   readonly story: AnswerStory;
   /** The answer's record, or null: none, not read (HEAD), or a read that failed. */
@@ -260,6 +271,10 @@ export type ReportRequestInput = Readonly<{
   load?: ReportCatalogLoader;
   render?: ReportRenderer;
   supported?: (locale: string) => boolean;
+  /** The render gate; the process's own unless a test brings a fresh one. */
+  gate?: ReportRenderGate;
+  /** The request's own signal: a download abandoned before its PDF is made is never made. */
+  signal?: AbortSignal;
 }>;
 
 /**
@@ -275,7 +290,8 @@ export type ReportRequestInput = Readonly<{
  * interface locale before that.
  */
 async function prepareReport(input: ReportRequestInput, withDisclosure: boolean): Promise<Refusal | ReadyReport> {
-  if (input.sessionCookie === null) return refuse(401, input.interfaceLocale, signInLine);
+  const session = input.sessionCookie;
+  if (session === null) return refuse(401, input.interfaceLocale, signInLine);
 
   let client: ReportReader;
   let answer: Answer;
@@ -304,12 +320,17 @@ async function prepareReport(input: ReportRequestInput, withDisclosure: boolean)
   if (story.story === null || (story.status !== "READY" && story.status !== "READY_WITH_RESERVATION")) {
     return refuse(404, locale, notAvailableLine);
   }
-  return { kind: "ready", answer, story, disclosure, questionTag, locale };
+  return { kind: "ready", session, answer, story, disclosure, questionTag, locale };
 }
 
 /**
  * GET: the report, rendered in memory in the question's locale and streamed as
  * an attachment. Nothing is stored; a refusal is one plain catalogue line.
+ * Making the PDF waits for the render gate, entered only once the owner's
+ * session has read a ready answer: a second download from a session whose first
+ * is still being made is refused (429), and so is one that finds every place
+ * taken (503), both with Retry-After and the plain "try again" line. The place
+ * is freed in `finally`, whatever the render did.
  */
 export async function handleReportRequest(input: ReportRequestInput): Promise<Response> {
   const load = input.load ?? loadNamespace;
@@ -326,8 +347,14 @@ export async function handleReportRequest(input: ReportRequestInput): Promise<Re
     return textResponse(500, tryAgainLine(await refusalCatalog(load, prepared.locale)));
   }
 
+  const gate = input.gate ?? processRenderGate;
+  const admission = await gate.admit(prepared.session, input.signal);
+  if (admission.kind !== "admitted") return busyResponse(admission.kind === "busy" ? 429 : 503, gate, catalogs);
+
   let pdf: Buffer;
   try {
+    // Abandoned while its reads ran or it waited: nobody will read the PDF, so it is not made.
+    if (input.signal?.aborted === true) return busyResponse(503, gate, catalogs);
     pdf = await (input.render ?? renderReportPdf)({
       answer: prepared.answer,
       story: prepared.story,
@@ -338,8 +365,12 @@ export async function handleReportRequest(input: ReportRequestInput): Promise<Re
   } catch {
     console.error("[STORY_REPORT_RENDER_FAILED]");
     return textResponse(500, tryAgainLine(catalogs.publicCatalog));
+  } finally {
+    admission.release();
   }
-  return new Response(new Uint8Array(pdf), { status: 200, headers: pdfHeaders(prepared.answer.question_line, input.now) });
+  // A view of the PDF's own bytes, not a second copy of them. A Node Buffer's
+  // backing store is an ArrayBuffer (never shared memory), which BodyInit needs.
+  return new Response(new Uint8Array(pdf.buffer as ArrayBuffer, pdf.byteOffset, pdf.byteLength), { status: 200, headers: pdfHeaders(prepared.answer.question_line, input.now) });
 }
 
 /**

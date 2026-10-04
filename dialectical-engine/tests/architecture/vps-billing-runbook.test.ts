@@ -659,7 +659,15 @@ describe("P22 the Billing runbook", () => {
     ] as const) {
       const line = row(number);
       for (const needle of ["**Decided by:**", "**Proven by:**", ...needles]) expect(line, `row ${number}: ${needle}`).toContain(needle);
-      expect(line, `row ${number} is open`).toMatch(/\| — \|$/u);
+      // Row 41 is done (pull request #77, migration 0093, 2026-10-04): its proof names the merge, the migration and the
+      // principals test. Every other row here is still open.
+      if (number === 41) {
+        expect(line, "row 41 is done").toMatch(
+          /\| \*\*Done 2026-10-04\*\* by pull request #77 [^|]*0093_billing_runtime_role\.sql[^|]*production-database-principals\.test\.ts[^|]*\|$/u
+        );
+      } else {
+        expect(line, `row ${number} is open`).toMatch(/\| — \|$/u);
+      }
     }
     // W16 fix F1: the "later" Minors gate switching billing on, each fixed or accepted in writing.
     expect(row(54)).not.toContain("None blocks switching billing on alone");
