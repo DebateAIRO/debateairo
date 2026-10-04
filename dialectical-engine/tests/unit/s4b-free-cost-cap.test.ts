@@ -230,14 +230,18 @@ describe("S4b · freeCapsFollowPaidSiteRule: every role's Free cap is set and at
 });
 
 describe("S4b · the hosted API's boot refuses a Free cap that is missing or above Economy's, with billing on only", () => {
+  // Paid plans P4-E: the one candidate is a Free-plan model, declared and scored for both answer jobs,
+  // so with billing on a Free ask can seat them and only the Free caps decide here.
+  const freeModel = PLAN_TIER_ROSTERS.free[0]!;
   const scorecardWith = (settings: Partial<PickerSettings>): Scorecard => testScorecard(
-    [testCandidate("only", "OpenAI")], { JUDGE: [testEntry("only", 90, 1)] },
+    [testCandidate("only", "OpenAI", { modelId: freeModel })],
+    { JUDGE: [testEntry("only", 90, 1)], ANSWER_WRITER: [testEntry("only", 90, 1)], ANSWER_CHECKER: [testEntry("only", 90, 1)] },
     { planStrengthCaps: { free: "ECONOMY" }, economyCap: everyRole(EXAMPLE_ECONOMY_CAP_MICROS), ...settings }
   );
   const boot = (settings: Partial<PickerSettings>, deploymentMode: "hosted" | "local", billingEnabled: boolean) => () => askModelPickerSettings({
     scorecard: Object.freeze({ state: "VALID" as const, scorecard: scorecardWith(settings), sourceRef: "test:s4b" }),
     deploymentMode,
-    targets: [],
+    targets: [{ providerRef: "provider:only", maker: "OpenAI", baseUrl: "https://api.only-vendor-fixture.com/v1", model: freeModel }],
     perRunCeilingMicros: deploymentMode === "hosted" ? 250_000 : null,
     callTokenCeilings: { judge: 2048, synthesizer: 2048, evaluator: 2048 },
     billingEnabled

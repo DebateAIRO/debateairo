@@ -64,15 +64,39 @@ const iso = (value: Date | null): string | null => value === null ? null : value
 
 /**
  * An upgrade is offered only while it can be charged at a prorated price: ACTIVE, below Max, no postponed renewal
- * running, and outside the renewal's lead (P12c refuses it there with UPGRADE_NOT_AVAILABLE_NOW).
+ * running, outside the renewal's lead (P12c refuses it there with UPGRADE_NOT_AVAILABLE_NOW), and the plan paid in
+ * this API's xMoney system (P2-W3 (a): P12c refuses the other one's NOT_SUBSCRIBED).
  */
-function upgradeOffered(state: SubscriptionState, now: Date): boolean {
+function upgradeOffered(input: WindowInput): boolean {
+  const { state, now } = input;
   return state.status === "ACTIVE" && state.planId !== "MAX" && state.renewalPostponedUntil === null
+    && state.xmoneyEnvironment === input.xmoneyEnvironment
     && state.currentPeriodEnd !== null && now.getTime() < state.currentPeriodEnd.getTime() - renewalLeadMs();
 }
 
-export function subscriptionView(input: WindowInput): SubscriptionView {
+/**
+ * A card change is offered while ACTIVE or PAST_DUE, for a plan of this API's xMoney system only (P2-W3 (a): P12e
+ * refuses the other one's NOT_SUBSCRIBED; its order lives in a system this API does not talk to).
+ */
+function cardChangeOffered(input: WindowInput): boolean {
+  const { state } = input;
+  return (state.status === "ACTIVE" || state.status === "PAST_DUE") && state.xmoneyEnvironment === input.xmoneyEnvironment;
+}
+
+/**
+ * C-15: an undo of a pending cancel is offered only where the revoke route (`revokeCancelForOwner`) accepts it: ACTIVE,
+ * the plan paid in this API's xMoney system (D5 5h: the other one's cancel stands, NOT_SUBSCRIBED), a cancel pending,
+ * and before the period end. A SUSPENDED plan's undo is refused while paused (P2-W10); a PAST_DUE plan's cancel ends it
+ * at once, so it never carries one.
+ */
+function revokeCancelOffered(input: WindowInput): boolean {
   const { state, now } = input;
+  return state.status === "ACTIVE" && state.cancelRequested && state.xmoneyEnvironment === input.xmoneyEnvironment
+    && (state.currentPeriodEnd === null || now.getTime() < state.currentPeriodEnd.getTime());
+}
+
+export function subscriptionView(input: WindowInput): SubscriptionView {
+  const { state } = input;
   const renewsOn = state.status === "ACTIVE" && !state.cancelRequested
     ? state.renewalPostponedUntil ?? state.currentPeriodEnd
     : null;
@@ -88,8 +112,9 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
     scheduled_downgrade_plan_id: state.scheduledDowngradePlanId === null ? null : paidPlanOf(state.scheduledDowngradePlanId),
     withdrawal_open_until: iso(withdrawal?.closesAt ?? null),
     withdrawal_last_day: withdrawal?.lastDay ?? null,
-    can_upgrade: upgradeOffered(state, now),
-    can_change_card: state.status === "ACTIVE" || state.status === "PAST_DUE"
+    can_upgrade: upgradeOffered(input),
+    can_change_card: cardChangeOffered(input),
+    can_revoke_cancel: revokeCancelOffered(input)
   });
 }
 

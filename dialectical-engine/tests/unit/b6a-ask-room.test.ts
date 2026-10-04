@@ -459,7 +459,8 @@ describe("B6a what a START writes, and a waiting run's expected start", () => {
     expect(holds).toEqual([{ runId: "run:b", heldMicros: 7 }]);
   });
 
-  it("recomputes a waiting run's expected start on every read, and has none for a run not waiting", async () => {
+  // P4-G keeps it per run for a short window: tests/unit/p4g-waiting-room-reads.test.ts.
+  it("computes a waiting run's expected start, and has none for a run not waiting", async () => {
     const waiting = waitingRun();
     const { room } = arrange({ line: [waiting], ledger: { daySpent: 100_000 } });
     await expect(room.expectedStart(waiting.runId)).resolves.toEqual({ waitsUntil: MIDNIGHT, scope: "SITE_DAY" });

@@ -25,6 +25,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Níorbh fhéidir an díospóireacht seo a thosú mar nach raibh na samhlacha IS a bhí de dhíth uirthi ar fáil. Bain triail eile as ar ball, le do thoil.",
   "runFailure.RUN_LIMIT_REACHED": "Shroich an díospóireacht seo a teorainn sula raibh sí in ann freagra a thabhairt.",
   "runFailure.STOPPED": "Stad an díospóireacht seo i lár báire mar gheall ar fhadhb ar ár dtaobh. Cuir do cheist arís, le do thoil.",
+  "runFailure.PLAN_ENDED": "Tháinig deireadh le do phlean íoctha nó cuireadh ar sos é fad a bhí an cheist seo ag fanacht, mar sin níor thosaigh an díospóireacht. Is féidir leat í a chur arís.",
   "home.status.waiting": "Ag fanacht le tosú. Tosóidh do dhíospóireacht léi féin ag {time}.",
   "home.status.waitingOwnDebates": "Tá do dhíospóireachtaí eile ag úsáid an chuid eile de do theorainn faoi láthair. Tosóidh an díospóireacht seo léi féin chomh luath agus a chríochnaíonn ceann acu.",
   "home.noPublishedDebates": "Níor foilsíodh aon díospóireacht fós.",

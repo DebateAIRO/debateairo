@@ -2,7 +2,7 @@
 import { randomBytes } from "node:crypto";
 import { createServer, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { fakeTaxDecision, fakeTaxIdIsValid, fakeTaxMicros, fakeUsRegionFromPostalCode } from "./tax-rules.js";
+import { fakeTaxDecision, fakeTaxIdIsValid, fakeTaxMicros } from "./tax-rules.js";
 
 type Recorded = Record<string, unknown> & { processor_id?: unknown; custom_metadata?: unknown };
 export type FakeQuaderno = Readonly<{
@@ -55,10 +55,7 @@ export async function startFakeQuaderno(options: Readonly<{ apiKey?: string; por
         const country = url.searchParams.get("to_country") ?? "";
         const net = Math.round(Number(url.searchParams.get("amount") ?? "0") * 100) * 10_000;
         const postal = url.searchParams.get("to_postal_code");
-        const decision = fakeTaxDecision({
-          country, region: country.toUpperCase() === "US" ? fakeUsRegionFromPostalCode(postal) : null,
-          taxId: url.searchParams.get("tax_id")
-        });
+        const decision = fakeTaxDecision({ country, postalCode: postal, taxId: url.searchParams.get("tax_id") });
         const tax = decision.status === "TAXABLE" ? fakeTaxMicros(net, decision.basisPoints) : 0;
         const fields: Record<string, string> = {
           country: JSON.stringify(decision.country),

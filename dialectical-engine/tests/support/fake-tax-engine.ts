@@ -31,7 +31,8 @@ export class FakeTaxEngine implements TaxEngine {
     netMicros: number; currency: "USD"; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
   }>): Promise<TaxQuote> {
     this.#maybeFail();
-    const decision = fakeTaxDecision({ country: i.location.country, region: i.location.region, taxId: i.taxId });
+    // P2-M29: by postal code, as Quaderno and the HTTP fake price it (a state the buyer typed is never sent).
+    const decision = fakeTaxDecision({ country: i.location.country, postalCode: i.location.postalCode, taxId: i.taxId });
     const taxMicros = decision.status === "TAXABLE" ? fakeTaxMicros(i.netMicros, decision.basisPoints) : 0;
     return Object.freeze({
       netMicros: i.netMicros, taxMicros, totalMicros: i.netMicros + taxMicros,

@@ -1,13 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { SaleRecord } from "@debateai/billing-core";
 import { TypedDomainError } from "@debateai/kernel";
-import { createDeadJobAlert } from "../../apps/api/src/billing/dead-jobs.js";
+import { createDeadJobAlert, documentJobAction } from "../../apps/api/src/billing/dead-jobs.js";
 import { openInvoiceCommand, runBillingInvoiceCli } from "../../apps/api/src/billing/invoice-cli.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "../../apps/api/src/billing/invoice-quaderno.js";
 import {
   createSmartBillInvoiceHandler, createSmartBillStornoHandler, type SmartBillPort
 } from "../../apps/api/src/billing/invoice-smartbill.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
+import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from "@debateai/register";
+import { buildTaxSummary, parseTaxQuarter, renderTaxSummary, type TaxQuarter } from "../../apps/api/src/billing/tax-summary.js";
 import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
 import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
 
@@ -80,6 +82,41 @@ const statuses = async (invoiceId: string) => (await h.database.pool.query(
   "SELECT efactura_status FROM billing.invoice_status_event WHERE invoice_id=$1", [invoiceId]
 )).rows.map((row) => row.efactura_status);
 const listed = async (chargeId: string) => (await h.repository.invoiceUnknownItems()).filter((item) => item.chargeId === chargeId);
+/** The quarter that holds a date (UTC), and the one after it. */
+const quarterOf = (date: Date): TaxQuarter =>
+  parseTaxQuarter(`${String(date.getUTCFullYear())}-Q${String(Math.floor(date.getUTCMonth() / 3) + 1)}`);
+const quarterAfter = (quarter: TaxQuarter): TaxQuarter => quarterOf(quarter.to);
+/** When the quarter's rows date a charge's sale (the money moved), read over all time. */
+async function saleDateOf(chargeId: string): Promise<Date> {
+  const rows = await h.repository.quarterSummaryRows(new Date(0), new Date(Date.UTC(9999, 0, 1)), "stage");
+  return rows.find((row) => row.type === "SALE" && row.chargeId === chargeId)!.at;
+}
+/** The quarter's summary as the command builds it, from this harness's xMoney system ("stage"). */
+async function summaryFor(quarter: TaxQuarter) {
+  const summary = buildTaxSummary({
+    quarter, rows: await h.repository.quarterSummaryRows(quarter.from, quarter.to, "stage"),
+    invoiceUnknown: await h.repository.invoiceUnknownItems(), efactura: [], paymentsToCheck: [], deadEmails: [],
+    authorities: taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test")
+  });
+  return { summary, text: renderTaxSummary(summary) };
+}
+/** Part 4 final review C-5 (fix round 1): the before-start charge's only instruction is its own line, in its sale's quarter. */
+async function expectBeforeStartSummary(chargeId: string): Promise<void> {
+  const quarter = quarterOf(await saleDateOf(chargeId));
+  const { summary, text } = await summaryFor(quarter);
+  expect(summary.unknownRefunds.filter((item) => item.chargeId === chargeId)).toEqual([]);
+  expect(summary.invoiceUnknown.filter((item) => item.chargeId === chargeId))
+    .toEqual([expect.objectContaining({ jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED" })]);
+  expect(text).toContain(`charge ${chargeId}: REFUNDED_BEFORE_START (NO_DOCUMENT_OWED), since `);
+  expect(text).toContain("  * REFUNDED_BEFORE_START (NO_DOCUMENT_OWED): Refunded before it started: no invoice or credit"
+    + " note is owed. Take this sale and its refund out of the quarter's figures by hand.");
+  expect(text).not.toContain(`charge ${chargeId}, RO, up to`);
+  // The next quarter holds no sale of it: no line there either.
+  const next = await summaryFor(quarterAfter(quarter));
+  expect(next.summary.invoiceUnknown.filter((item) => item.chargeId === chargeId)).toEqual([]);
+  expect(next.summary.unknownRefunds.filter((item) => item.chargeId === chargeId)).toEqual([]);
+  expect(next.text).not.toContain(`charge ${chargeId}`);
+}
 const jobsOf = async (chargeId: string, kind: string) => (await h.outboxRows(chargeId)).filter((row) => row.kind === kind);
 
 async function romanianSaleThat(fail: "REFUSED" | "UNKNOWN") {
@@ -107,7 +144,7 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     // W12 fix F6: the receipt names the number typed by hand but never fetches a PDF by it (two swapped numbers would
     // mail one customer another's invoice); M2 then says where the invoice is listed and how to ask for a copy.
     const receipt = (await h.outboxRows(paid.chargeId)).find((row) => row.ref === `M2_INVOICE_ATTACHED:${paid.chargeId}`)?.payload;
-    expect(receipt).toMatchObject({ template: "M2_INVOICE_ATTACHED", "param.invoiceNumber": "DBAI 0700" });
+    expect(receipt).toMatchObject({ template: "M2_INVOICE_ATTACHED", "param.invoiceNumber": "DBAI-0700" });
     expect(receipt?.attachments).toBe("");
     expect(await listed(paid.chargeId)).toEqual([]);
     // Once only, and never a document SmartBill already numbered for another charge.
@@ -252,8 +289,9 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     await h.settle(paid.transaction.transactionId);
     expect(await jobsOf(paid.chargeId, "SMARTBILL_STORNO")).toEqual([]);
     expect(await listed(paid.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND" })]);
+    // P4-K: its DASHBOARD_REFUND line is recorded with the owner's amount (--amount, below); without one it is refused.
     expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0960"))
-      .toMatchObject({ code: 1, err: "BILLING_INVOICE_NOTHING_LISTED\n" });
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN\n" });
     const forged = await h.repository.withTransaction((client) => h.repository.enqueue(client, {
       kind: "SMARTBILL_STORNO", ref: `${paid.chargeId}:${paid.transaction.transactionId}`, notBefore: h.clock.now,
       payload: { charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, refund_micros: 24_200_000 }
@@ -265,6 +303,91 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     const unpaid = await h.buy();
     expect(await invoiceCommand("--charge", unpaid.chargeId, "--kind", "INVOICE", "--requeue"))
       .toMatchObject({ code: 1, err: "BILLING_INVOICE_CHARGE_NOT_PAID\n" });
+  });
+
+  it("records a dashboard refund's hand-made credit note at the owner's amount: the line clears and the quarter's figure is known (P4-K)", async () => {
+    const paid = await h.activate();
+    await documents.drain(5);
+    // P9c: a refund made in the dashboard, seen only as the payment's refund-ok: an upper bound, no credit-note job.
+    h.xmoney.setStatus(paid.transaction.transactionId, "refund-ok");
+    await h.settle(paid.transaction.transactionId);
+    expect(await listed(paid.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
+    const quarter = parseTaxQuarter(`${h.clock.now.getUTCFullYear()}-Q${Math.floor(h.clock.now.getUTCMonth() / 3) + 1}`);
+    const quarterRefunds = async () => (await h.repository.quarterSummaryRows(quarter.from, quarter.to, "stage"))
+      .filter((row) => row.type === "REFUND" && row.chargeId === paid.chargeId);
+    expect(await quarterRefunds()).toEqual([expect.objectContaining({ amountMicros: 24_200_000, amountKnown: false })]);
+    const kinds = async () => (await invoices(paid.chargeId)).map((row) => row.kind);
+
+    // At most what the payment held (P9c's REFUNDED row: what was left of it, 24.20 here); nothing is written.
+    expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0970", "--amount", "24.21"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_AMOUNT_ABOVE_PAYMENT\n" });
+    expect(await kinds()).toEqual(["INVOICE"]);
+    expect(await listed(paid.chargeId)).toHaveLength(1);
+
+    const recorded = await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0970", "--amount", "10.00");
+    expect(recorded).toMatchObject({ code: 0, err: "" });
+    expect(recorded.out).toContain(`Recorded: SmartBill credit note DBAI-0970 for charge ${paid.chargeId}.`);
+    expect(recorded.out).toContain("The quarter's tax summary now subtracts this refund at 10.00 USD.");
+    expect(recorded.out).not.toContain("The receipt (M2)");
+    // From the charge's own issuer (its invoice's), at the owner's amount, never the REFUNDED row's upper bound.
+    const credit = (await invoices(paid.chargeId)).find((row) => row.kind === "CREDIT_NOTE")!;
+    expect(credit).toMatchObject({ issuer: "SMARTBILL", series: "DBAI", number: "0970", external_ref: "DBAI-0970", total_micros: "10000000" });
+    expect(await statuses(credit.invoice_id)).toEqual(["SENT_BY_ACCOUNT_SETTING"]);
+    expect(await listed(paid.chargeId)).toEqual([]);
+    expect(await quarterRefunds()).toEqual([expect.objectContaining({ amountMicros: 10_000_000, amountKnown: true })]);
+
+    // One credit note per charge (0086's invoice_one_per_intent): a second is refused and goes to the accountant.
+    expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0971", "--amount", "5.00"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_ALREADY_RECORDED\n" });
+    expect(await kinds()).toEqual(["CREDIT_NOTE", "INVOICE"]);
+    expect(await quarterRefunds()).toEqual([expect.objectContaining({ amountMicros: 10_000_000, amountKnown: true })]);
+  });
+
+  it("records a Quaderno sale's dashboard refund at the whole payment, its credit note from Quaderno (P4-K)", async () => {
+    h.geo.country = "DE";
+    const bought = await h.buy({ country: "DE" });
+    const paying = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "DE" });
+    await h.settle(paying.transactionId);
+    await documents.drain(5);
+    expect((await invoices(bought.chargeId)).map((row) => `${row.issuer} ${row.kind}`)).toEqual(["QUADERNO INVOICE"]);
+    h.xmoney.setStatus(paying.transactionId, "refund-ok");
+    await h.settle(paying.transactionId);
+    expect(await listed(bought.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND" })]);
+    const recorded = await invoiceCommand("--charge", bought.chargeId, "--kind", "CREDIT_NOTE", "--record", "qd_dash01", "--amount", bought.totalDecimal);
+    expect(recorded).toMatchObject({ code: 0, err: "" });
+    expect(recorded.out).toContain(`Recorded: Quaderno credit note qd_dash01 for charge ${bought.chargeId}.`);
+    expect(recorded.out).not.toContain("e-Factura");
+    expect((await invoices(bought.chargeId)).find((row) => row.kind === "CREDIT_NOTE")).toMatchObject({
+      issuer: "QUADERNO", external_ref: "qd_dash01", total_micros: String(Math.round(Number(bought.totalDecimal) * 1_000_000))
+    });
+    expect(await listed(bought.chargeId)).toEqual([]);
+  });
+
+  it("takes --amount only for a dashboard refund's line, after the charge's invoice (P4-K control)", async () => {
+    // A refund our records price (D5 5g, its own transaction): its credit note credits the REFUNDED row, never a typed amount.
+    const priced = await h.activate();
+    await documents.drain(5);
+    await h.xmoney.refund({ transactionId: priced.transaction.transactionId, amountDecimal: "5.00", reason: "customer-demand", message: "dashboard" });
+    const [refundRow] = h.xmoney.refundTransactionsOf(priced.transaction.transactionId);
+    await h.settle(refundRow!.transactionId);
+    await documents.drain(5);
+    expect(await listed(priced.chargeId)).toEqual([expect.objectContaining({ jobKind: "SMARTBILL_STORNO", code: "CREDIT_NOTE_MANUAL" })]);
+    expect(await invoiceCommand("--charge", priced.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0980", "--amount", "4.00"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_NO_DASHBOARD_REFUND\n" });
+    // A charge with no refund at all.
+    const plain = await h.activate();
+    await documents.drain(5);
+    expect(await invoiceCommand("--charge", plain.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0981", "--amount", "4.00"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_NO_DASHBOARD_REFUND\n" });
+    // A dashboard refund of a sale whose invoice is not recorded: the invoice comes first, as for every credit note.
+    const unknown = await romanianSaleThat("UNKNOWN");
+    h.xmoney.setStatus(unknown.transaction.transactionId, "refund-ok");
+    await h.settle(unknown.transaction.transactionId);
+    expect(await invoiceCommand("--charge", unknown.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0982", "--amount", "4.00"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_ORIGINAL_MISSING\n" });
+    for (const chargeId of [priced.chargeId, plain.chargeId, unknown.chargeId]) {
+      expect((await invoices(chargeId)).map((row) => row.kind), chargeId).not.toContain("CREDIT_NOTE");
+    }
   });
 
   it("records a Quaderno invoice by its document id, with the settings-link receipt (fix I-2)", async () => {
@@ -299,5 +422,63 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
       DATABASE_URL: h.database.connectionString, XMONEY_API_BASE_URL: "https://api.xmoney.com", PUBLIC_APP_URL: TEST_PUBLIC_APP_URL
     }), h.clock.read)).toBe(1);
     expect(live.lines.err).toBe("BILLING_INVOICE_OTHER_XMONEY_SYSTEM\n");
+  });
+  it("gives a payment refunded before we ever saw it paid its own line, which asks for no document (C-5)", async () => {
+    // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path records the money coming and going
+    // with no plan and no invoice (A29 (q): no invoice and no credit note owed), so no DASHBOARD_REFUND line asks for a
+    // credit note the command cannot record; the charge has its own line instead.
+    const bought = await h.buy();
+    const refunded = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO", status: "refund-ok" });
+    await h.settle(refunded.transactionId);
+    await documents.drain(5);
+    expect(await h.eventKinds(bought.chargeId)).toEqual(["REFUNDED", "REFUND_REQUESTED", "REQUESTED", "SUCCEEDED"]);
+    expect((await h.outboxRows(bought.chargeId)).map((row) => row.kind)).not.toContain("SMARTBILL_INVOICE");
+    const [line] = await listed(bought.chargeId);
+    expect(await listed(bought.chargeId)).toEqual([expect.objectContaining({ jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED" })]);
+    expect(documentJobAction({ chargeId: "<charge>", jobKind: line!.jobKind, code: line!.code })).toBe("Refunded before it"
+      + " started: no invoice or credit note is owed. Take this sale and its refund out of the quarter's figures by hand.");
+    // Nothing is recorded for it, with or without an amount.
+    await invoiceCommand("--charge", bought.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0990", "--amount", "4.00");
+    expect(await invoices(bought.chargeId)).toEqual([]);
+    // The quarter's summary does not list its refund under 'amount unknown' (which asks for a credit note via --amount).
+    await expectBeforeStartSummary(bought.chargeId);
+    // An INVOICE intent alone (an invoice row needs one, 0086's foreign key) says an invoice is owed: DASHBOARD_REFUND.
+    await h.repository.withTransaction((client) => h.repository.insertInvoiceIntent(client, {
+      chargeId: bought.chargeId, kind: "INVOICE", issuer: "SMARTBILL", requestedAt: h.clock.now
+    }));
+    expect(await listed(bought.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
+
+    // The same for a renewal's payment refunded at xMoney before its check ran: no invoice job was ever queued. (Last in
+    // this file: moving the clock a period on makes every earlier subscription due too.)
+    const paid = await h.activate();
+    await documents.drain(5);
+    h.clock.now = new Date((await h.periodEndOf(paid.subscriptionId)).getTime() + 60_000);
+    await h.renewal.runOnce();
+    const renewal = (await h.repository.chargesForSubscription(paid.subscriptionId)).find((charge) => charge.kind === "RENEWAL")!;
+    const rebill = [...h.xmoney.transactions.values()].find((transaction) =>
+      transaction.orderId === paid.transaction.orderId && transaction.transactionSource === "re-bill")!;
+    h.xmoney.setStatus(rebill.transactionId, "refund-ok");
+    await h.worker.drain(10);
+    expect(await h.eventKinds(renewal.chargeId)).toEqual(expect.arrayContaining(["SUCCEEDED", "REFUNDED"]));
+    expect((await h.outboxRows(renewal.chargeId)).map((row) => row.kind)).not.toContain("SMARTBILL_INVOICE");
+    expect(await listed(renewal.chargeId)).toEqual([expect.objectContaining({ jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED" })]);
+    await expectBeforeStartSummary(renewal.chargeId);
+
+    // Control: a sale whose invoice job was queued (not yet issued) still owes its credit note: DASHBOARD_REFUND.
+    const queued = await h.activate();
+    h.xmoney.setStatus(queued.transaction.transactionId, "refund-ok");
+    await h.settle(queued.transaction.transactionId);
+    expect((await h.outboxRows(queued.chargeId)).filter((row) => row.kind === "SMARTBILL_INVOICE")).toEqual([
+      expect.objectContaining({ done: false, dead: false })
+    ]);
+    expect(await listed(queued.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
+    await documents.drain(5);
+    expect(await listed(queued.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
+    // Its quarter's summary keeps today's 'amount unknown' listing for it, beside its DASHBOARD_REFUND line.
+    const { summary, text } = await summaryFor(quarterOf(await saleDateOf(queued.chargeId)));
+    expect(summary.unknownRefunds.filter((item) => item.chargeId === queued.chargeId))
+      .toEqual([expect.objectContaining({ taxCountry: "RO", upToMicros: 24_200_000 })]);
+    expect(text).toContain(`charge ${queued.chargeId}, RO, up to 24.20 USD, on `);
+    expect(text).toContain(`charge ${queued.chargeId}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since `);
   });
 });

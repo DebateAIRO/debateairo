@@ -49,15 +49,22 @@ export function mailAttachmentFactsOf(
 }
 
 /**
+ * A sentence that depends on a param: `then` when the test holds, `otherwise` when not (`null` shows nothing). P2-W4:
+ * `otherwise` may itself be a condition, so one paragraph chooses among three sentences on two flags (O2's intro).
+ */
+export type MailParamCondition = Readonly<{
+  ifParam: string; test: MailParamTest; then: string; otherwise: string | MailParamCondition | null;
+}>;
+
+/**
  * A catalogue key, the owner summary's block, a sentence that depends on an attachment (`attached` when the message
- * carries it, `missing` otherwise; both use the same params), or a sentence that depends on a param (`then` when the
- * test holds, `otherwise` when not; `null` shows nothing).
+ * carries it, `missing` otherwise; both use the same params), or a sentence that depends on a param.
  */
 export type MailParagraph =
   | string
   | Readonly<{ block: string }>
   | Readonly<{ ifAttached: MailAttachmentFact; attached: string; missing: string }>
-  | Readonly<{ ifParam: string; test: MailParamTest; then: string; otherwise: string | null }>;
+  | MailParamCondition;
 
 export type MailTemplateDefinition = Readonly<{
   catalogue: "mail" | "owner";
@@ -138,17 +145,25 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
       // P12: a cancel that ends the plan at once (accessEndDate = today) has no "until" to promise and no undo to
       // offer; the sender says so with canUndo "false". That is a cancel while a payment is failing, one after the
       // paid month's end (ruling Q-1's quiet retry), or one inside the renewal's 5-minute lead, so "ended on" names
-      // no reason.
-      { ifParam: "canUndo", test: "true", then: "mail.M7.until", otherwise: "mail.M7.endedNow" },
+      // no reason. P2-W10: a plan paused by a card dispute (SUSPENDED) can be cancelled too; its M7 carries the optional
+      // flag `paused` "true" (with canUndo "false"): it won't renew, its features stay paused while the dispute is open,
+      // and a dispute won gives them back until {accessEndDate}, its period end. Left out, M7 reads as before.
+      { ifParam: "paused", test: "true", then: "mail.M7.paused",
+        otherwise: { ifParam: "canUndo", test: "true", then: "mail.M7.until", otherwise: "mail.M7.endedNow" } },
       { ifParam: "canUndo", test: "true", then: "mail.M7.undo", otherwise: "mail.M7.again" }
     ],
-    params: { plan: "plan", accessEndDate: "date", settingsUrl: "url", canUndo: "flag" }
+    params: { plan: "plan", accessEndDate: "date", settingsUrl: "url", canUndo: "flag" },
+    optional: { paused: "flag" }
   }),
   M8: define({
     catalogue: "mail", subject: "mail.M8.subject",
     // P12d: a withdrawal whose used part covers the whole price refunds 0.00, and M8 then says nothing was due back.
-    paragraphs: [{ ifParam: "refundAmount", test: "nonzero", then: "mail.M8.refunded", otherwise: "mail.M8.nothingDue" }],
-    params: { plan: "plan", refundAmount: "amount" }
+    // P2-M7: a withdrawal the owner settles at 0.00 and 0.00 (`settleOwnerWithdrawal`, the optional flag `ownerSettled`
+    // "true") usually had its money back already (a dashboard refund), so its M8 says only that nothing more is due.
+    paragraphs: [{ ifParam: "refundAmount", test: "nonzero", then: "mail.M8.refunded",
+      otherwise: { ifParam: "ownerSettled", test: "true", then: "mail.M8.nothingMoreDue", otherwise: "mail.M8.nothingDue" } }],
+    params: { plan: "plan", refundAmount: "amount" },
+    optional: { ownerSettled: "flag" }
   }),
   // W9 (P2-I11): Directive 2011/83/EU art. 11(3)'s acknowledgement of receipt on a durable medium, queued in the
   // withdrawal's own transaction (Settings and the owner's command alike). It says only what has happened: received
@@ -202,19 +217,24 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // W9 (P2-M8): a real refund's O2 also names what the refund was for (`refundReason`, the intent's reason) and, for a
   // withdrawal's, its legal deadline and how to refund by hand so that M8 still follows (`refundDeadline`). Both are
   // optional, so an O2 queued before them renders as it did; RefundDesk sends neither for REFUND_NOT_REQUESTED.
+  // P2-W4: REFUND_CHARGE_MISSING also takes the not-requested sentences (notRequested "true"). A job of the other
+  // xMoney system (OTHER_XMONEY_SYSTEM, the optional flag `otherSystem` "true") says nothing was sent and nothing is
+  // owed on this server, with no deadline; notRequested wins if both were ever set. Left out, it changes nothing.
   O2: define({
     catalogue: "owner", subject: "owner.O2.subject",
     paragraphs: [
-      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedIntro", otherwise: "owner.O2.intro" },
+      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedIntro",
+        otherwise: { ifParam: "otherSystem", test: "true", then: "owner.O2.otherSystemIntro", otherwise: "owner.O2.intro" } },
       "owner.O2.charge",
       { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedAmount", otherwise: "owner.O2.amount" },
       "owner.O2.reason",
       { ifParam: "refundReason", test: "present", then: "owner.O2.refundReason", otherwise: null },
       { ifParam: "refundDeadline", test: "present", then: "owner.O2.withdrawalDeadline", otherwise: null },
-      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedNext", otherwise: "owner.O2.next" }
+      { ifParam: "notRequested", test: "true", then: "owner.O2.notRequestedNext",
+        otherwise: { ifParam: "otherSystem", test: "true", then: "owner.O2.otherSystemNext", otherwise: "owner.O2.next" } }
     ],
     params: { chargeRef: "text", refundAmount: "amount", reasonCode: "text", notRequested: "flag" },
-    optional: { refundReason: "text", refundDeadline: "date" }
+    optional: { refundReason: "text", refundDeadline: "date", otherSystem: "flag" }
   }),
   // W9 (P2-I11): the O2 variant for a withdrawal handed to the owner (`refund_by_owner`: a dashboard refund or an
   // earlier request touched a payment), sent at once from the withdrawal's own transaction, so the 14-day refund

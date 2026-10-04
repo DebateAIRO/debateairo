@@ -12,17 +12,22 @@
  *  - a hosted boot with no per-run ceiling fails at stage "model-picker", the same way;
  *  - paid plans S4c (final review P3-M4): the money terms and the billing switch main.ts hands
  *    the function reach the picker — the reserve and overrun reach the run maximum, and with
- *    billing on a scorecard that caps Free above ECONOMY fails at stage "model-picker".
+ *    billing on a scorecard that caps Free above ECONOMY fails at stage "model-picker";
+ *  - paid plans P4-E (Part 3b re-review M-4): with billing on, a scorecard under which no declared
+ *    Free-plan model can take the answer writer's or the answer checker's job fails at stage
+ *    "model-picker" (SCORECARD_FREE_ANSWER_UNSCORED); billing off and local mode boot as before.
  */
 import { mkdtemp, open as openFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Pool } from "pg";
+import type { ProviderDiscoveryTarget } from "@debateai/providers";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { generateDek, kekId, loadKek } from "../../packages/crypto/src/index.js";
 import { installBootCustody } from "../../apps/api/src/boot-custody.js";
 import { composeAskModelPicker, type AskMoneyPolicy } from "../../apps/api/src/ask-model-picker.js";
+import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import { SCORECARD_PLAN_CAPS_INVALID } from "@debateai/scorecard";
 import { readExampleScorecardJson, TEST_ENGINE_VERSION } from "../support/scorecardFixtures.js";
 
@@ -98,6 +103,8 @@ describe("final review I5 · composeAskModelPicker, the API's model-scorecard an
     /** Paid plans S4c: the two members main.ts passes; omitted, exactly as before. */
     moneyPolicy?: AskMoneyPolicy | null;
     billingEnabled?: boolean;
+    /** Paid plans P4-E: the declared targets; omitted, none, exactly as before. */
+    targets?: readonly ProviderDiscoveryTarget[];
   }>) {
     const logger = input.logger ?? bootLogger();
     const boot = installBootCustody({ logger });
@@ -108,7 +115,7 @@ describe("final review I5 · composeAskModelPicker, the API's model-scorecard an
       pool: input.pool as unknown as Pool,
       deploymentMode: input.deploymentMode,
       registerVersion: REGISTER_VERSION,
-      targets: [],
+      targets: input.targets ?? [],
       callTokenCeilings: CALL_TOKEN_CEILINGS,
       perRunCeilingMicros: input.perRunCeilingMicros,
       ...(input.moneyPolicy === undefined ? {} : { moneyPolicy: input.moneyPolicy }),
@@ -222,8 +229,113 @@ describe("final review I5 · composeAskModelPicker, the API's model-scorecard an
     expect(() => kekId(key)).toThrowError(expect.objectContaining({ code: "KEK_DESTROYED" }));
   });
 
+  // Paid plans P4-E (Part 3b re-review M-4; the controller's ruling C4 of 3 October 2026): with billing
+  // on, a Free ask's answer writer and answer checker take only a scored Free-plan model, so a scorecard
+  // under which no declared Free-plan model can take one of them would refuse every Free question. The
+  // stage refuses it, as publishing does; the test is the picker's own eligibility.
+  describe("paid plans P4-E · with billing on, a scorecard must seat Free's answer jobs", () => {
+    const sellingPlans = { moneyPolicy: { perRunCeilingMicros: 1_000_000 }, billingEnabled: true } as const;
+
+    it("fails at stage \"model-picker\" when no declared Free-plan model is scored for them, destroying the held key", async () => {
+      const logger = bootLogger();
+      const pool = poolWithRow({ value_json: followingTheCapRules(scorecardJson(5)), source_ref: HOSTED_SOURCE_REF });
+      const { settled, key } = compose({
+        pool, deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans, targets: FREE_ROSTER_TARGETS, logger
+      });
+      await expect(settled).rejects.toThrowError("SCORECARD_FREE_ANSWER_UNSCORED");
+      expect(JSON.parse(String(logger.error.mock.calls[0]?.[0]))).toEqual({
+        event: "api.boot.failed", stage: "model-picker"
+      });
+      expect(() => kekId(key)).toThrowError(expect.objectContaining({ code: "KEK_DESTROYED" }));
+    });
+
+    it("fails the same way when the scored Free-plan models are not among the declared targets", async () => {
+      const pool = poolWithRow({ value_json: followingTheCapRules(freeRosterScored(scorecardJson(5))), source_ref: HOSTED_SOURCE_REF });
+      const { settled } = compose({
+        pool, deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans,
+        targets: FREE_ROSTER_TARGETS.map((target) => ({ ...target, model: `${target.model}-other` }))
+      });
+      await expect(settled).rejects.toThrowError("SCORECARD_FREE_ANSWER_UNSCORED");
+    });
+
+    it("fails the same way when the Free-plan models are scored for the answer writer only", async () => {
+      const json = freeRosterScored(scorecardJson(5));
+      const roles = json.roles as Record<string, Array<Record<string, unknown>>>;
+      roles.ANSWER_CHECKER = roles.ANSWER_CHECKER!.map((entry) =>
+        ((FREE_SCORED as readonly string[]).includes(entry.candidateId as string) ? { ...entry, tier: "AVOID" } : entry));
+      const pool = poolWithRow({ value_json: followingTheCapRules(json), source_ref: HOSTED_SOURCE_REF });
+      const { settled } = compose({
+        pool, deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans, targets: FREE_ROSTER_TARGETS
+      });
+      await expect(settled).rejects.toThrowError("SCORECARD_FREE_ANSWER_UNSCORED");
+    });
+
+    it("boots when a declared Free-plan model can take both answer jobs, and tells the picker the site sells plans", async () => {
+      const pool = poolWithRow({ value_json: followingTheCapRules(freeRosterScored(scorecardJson(5))), source_ref: HOSTED_SOURCE_REF });
+      const { settled } = compose({
+        pool, deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, ...sellingPlans, targets: FREE_ROSTER_TARGETS
+      });
+      expect((await settled).plansSold).toBe(true);
+    });
+
+    it("keeps booting a scorecard that scores no Free-plan model with billing off, and in local mode", async () => {
+      const pool = poolWithRow({ value_json: followingTheCapRules(scorecardJson(5)), source_ref: HOSTED_SOURCE_REF });
+      const off = compose({
+        pool, deploymentMode: "hosted", perRunCeilingMicros: 1_000_000, moneyPolicy: { perRunCeilingMicros: 1_000_000 },
+        billingEnabled: false, targets: FREE_ROSTER_TARGETS
+      });
+      expect((await off.settled).plansSold).toBe(false);
+      const local = compose({
+        pool: refusingPool(), deploymentMode: "local", perRunCeilingMicros: null, billingEnabled: true, targets: FREE_ROSTER_TARGETS
+      });
+      expect((await local.settled).plansSold).toBe(false);
+    });
+  });
+
   it("the temporary files are real files the reader can open (the fixture itself is sound)", async () => {
     const handle = await openFile(bundledScorecard);
     await handle.close();
   });
 });
+
+/** P4-E: two declared vendors (fixture names) serving the Free plan's two models. */
+const FREE_ROSTER_TARGETS: readonly ProviderDiscoveryTarget[] = Object.freeze(["Alpha", "Beta"].map((maker, index) => Object.freeze({
+  providerRef: `vendor:${maker.toLowerCase()}`,
+  maker,
+  baseUrl: `https://api.${maker.toLowerCase()}-vendor-fixture.com/v1`,
+  model: PLAN_TIER_ROSTERS.free[index]!,
+  inputPriceMicrosPerMillionTokens: 1_000_000,
+  outputPriceMicrosPerMillionTokens: 4_000_000
+})));
+
+/** P4-E: the example's two candidates (GOOD_VALUE for both answer jobs) re-pointed at those targets. */
+const FREE_SCORED = ["openai-alpha-low", "anthropic-gamma-low"] as const;
+
+function freeRosterScored(json: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...json,
+    candidates: (json.candidates as Array<Record<string, unknown>>).map((candidate) => {
+      const index = (FREE_SCORED as readonly string[]).indexOf(candidate.candidateId as string);
+      const target = FREE_ROSTER_TARGETS[index];
+      return target === undefined ? candidate
+        : { ...candidate, vendor: target.maker, maker: target.maker, modelId: target.model, thinkingLevel: "DEFAULT_ONLY" };
+    }),
+    roles: structuredClone(json.roles)
+  };
+}
+
+/** The owners' plan-cap rule (Free → ECONOMY) and Free rule (EXAMPLE Free caps: half of each Economy cap). */
+function followingTheCapRules(json: Record<string, unknown>): Record<string, unknown> {
+  const pickerSettings = json.pickerSettings as Record<string, unknown>;
+  const economyCap = pickerSettings.economyCap as Record<string, { moneyMicrosPerCall: number }>;
+  return {
+    ...json,
+    pickerSettings: {
+      ...pickerSettings,
+      planStrengthCaps: { free: "ECONOMY" },
+      freeCap: Object.fromEntries(Object.entries(economyCap).map(([role, cap]) => [
+        role, { moneyMicrosPerCall: Math.floor(cap.moneyMicrosPerCall / 2) }
+      ]))
+    }
+  };
+}

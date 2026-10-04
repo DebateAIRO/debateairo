@@ -25,6 +25,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Ez a vita nem tudott elindulni, mert a szükséges MI-modellek nem voltak elérhetők. Kérjük, próbálja újra egy kis idő múlva.",
   "runFailure.RUN_LIMIT_REACHED": "Ez a vita elérte a korlátját, mielőtt választ adhatott volna.",
   "runFailure.STOPPED": "Ez a vita félúton leállt egy nálunk történt hiba miatt. Kérjük, tegye fel újra a kérdését.",
+  "runFailure.PLAN_ENDED": "Az Ön fizetős csomagja lejárt vagy szüneteltették, amíg ez a kérdés várakozott, ezért a vita nem kezdődött el. Újra felteheti.",
   "home.status.waiting": "Indulásra vár. A vitája magától elindul ekkor: {time}.",
   "home.status.waitingOwnDebates": "A többi vitája egyelőre a korlátja fennmaradó részét használja. Ez a vita magától elindul, amint valamelyik befejeződik.",
   "home.noPublishedDebates": "Még nem tettek közzé vitát.",

@@ -45,7 +45,10 @@ describe("a FAILED run whose reason is the site's day reads as stopped partway (
 
   it("no longer carries the group-4 sentence in the English catalogue", () => {
     expect(Object.keys(homeEnglish).filter((key) => key.startsWith("runFailure.")).sort())
-      .toEqual(["runFailure.MODELS_UNAVAILABLE", "runFailure.NOT_STARTED", "runFailure.RUN_LIMIT_REACHED", "runFailure.STOPPED"]);
+      .toEqual([
+        "runFailure.MODELS_UNAVAILABLE", "runFailure.NOT_STARTED", "runFailure.PLAN_ENDED", "runFailure.RUN_LIMIT_REACHED",
+        "runFailure.STOPPED"
+      ]);
   });
 });
 
@@ -68,4 +71,38 @@ describe("a FAILED run whose pinned role assignment the runner refused at claim 
       expect(html).not.toContain("ASSIGNMENT");
     });
   }
+});
+
+/**
+ * Part 4 (part4-scope.md §4.1), the owner's ruling of 3 October 2026: a
+ * premium question that waited in line while its owner's paid plan ended, was
+ * withdrawn or erased, or was paused by a dispute is recorded
+ * RUN_SETUP_FAILED:PLAN_CHANGED. Its row says the plan changed, not that
+ * something went wrong on the site's side.
+ */
+/** A sentence as React writes it into server-rendered HTML text (as load01-debate-page.test.tsx's escapeText). */
+function escapeText(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#x27;");
+}
+
+describe("a FAILED run whose paid plan ended while it waited reads as the plan's sentence (Part 4)", () => {
+  it("renders RUN_SETUP_FAILED:PLAN_CHANGED as the plan-ended sentence", () => {
+    const html = renderToStaticMarkup(
+      <DebatesBuffer
+        debates={debateSummariesFromIndex(failedWith("RUN_SETUP_FAILED:PLAN_CHANGED"))}
+        catalog={homeEnglish}
+        timeCatalog={timeEnglish}
+        locale="en"
+      />
+    );
+    expect(html).toContain(escapeText(homeEnglish["runFailure.PLAN_ENDED"]));
+    expect(html).not.toContain(homeEnglish["runFailure.NOT_STARTED"]);
+    expect(html).not.toContain("PLAN_CHANGED");
+    expect(html).not.toContain("RUN_SETUP_FAILED");
+  });
 });

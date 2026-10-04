@@ -31,6 +31,19 @@ const RUN_FAILURE_SENTENCES = Object.entries(homeEnglish)
   .filter(([key]) => key.startsWith("runFailure."))
   .map(([, value]) => value);
 
+/**
+ * A sentence as React writes it into server-rendered HTML text: PLAN_ENDED's "didn't" reaches the
+ * page as "didn&#x27;t", so a negative check on the plain string could never fail.
+ */
+function escapeText(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#x27;");
+}
+
 const queuedRun = {
   run_ref: "run:queued",
   question_line: "Messi or Ronaldo?",
@@ -136,9 +149,10 @@ describe("LOAD-01 real debate-page render", () => {
     expect(html).toContain("Provider recovery hold");
     expect(html).toContain("10 minutes remaining");
     expect(html).toContain("one final attempt is scheduled");
-    // Four groups since the day's-limit sentence was retired (budget spec 2026-09-28 §2.11).
-    expect(RUN_FAILURE_SENTENCES).toHaveLength(4);
-    for (const sentence of RUN_FAILURE_SENTENCES) expect(html).not.toContain(sentence);
+    // Four groups since the day's-limit sentence was retired (budget spec 2026-09-28 §2.11), and a
+    // fifth since Part 4: a waiting question whose paid plan ended (part4-scope.md §4.1).
+    expect(RUN_FAILURE_SENTENCES).toHaveLength(5);
+    for (const sentence of RUN_FAILURE_SENTENCES) expect(html).not.toContain(escapeText(sentence));
   });
 
   it("renders a mid-session run.terminal failure as failed with no live progress", () => {

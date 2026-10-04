@@ -549,10 +549,10 @@ describe("P1b — invoices, notices and the tax summary", () => {
     expect(rows).toEqual([
       { type: "SALE", chargeId: charge.chargeId, at: paidAt, taxCountry: "RO", taxRegion: null, taxStatus: "TAXABLE",
         chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000, amountMicros: 24_200_000,
-        amountKnown: true, locationVerdict: "AGREED" },
+        amountKnown: true, saleRecorded: true, locationVerdict: "AGREED" },
       { type: "REFUND", chargeId: charge.chargeId, at: refundedAt, taxCountry: "RO", taxRegion: null, taxStatus: "TAXABLE",
         chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000, amountMicros: 4_200_000,
-        amountKnown: true, locationVerdict: "AGREED" }
+        amountKnown: true, saleRecorded: true, locationVerdict: "AGREED" }
     ]);
     const next = await billing.quarterSummaryRows(new Date("2031-04-01T00:00:00Z"), new Date("2031-07-01T00:00:00Z"), "stage");
     expect(next).toEqual([expect.objectContaining({ type: "SALE", chargeId: renewal.chargeId, locationVerdict: null })]);
@@ -563,6 +563,8 @@ describe("P1b — invoices, notices and the tax summary", () => {
     const subscriptionId = await activeSubscription(ownerRef);
     const open = await quoteAndCharge(ownerRef, subscriptionId, "INITIAL", new Date("2032-01-05T00:00:00.000Z"));
     const won = await quoteAndCharge(ownerRef, subscriptionId, "RENEWAL", new Date("2032-02-05T00:00:00.000Z"));
+    // Part 4 final review C-19: a checkout charged back before we verified it holds only the CHARGEBACK, no SUCCEEDED.
+    const unsold = await quoteAndCharge(ownerRef, subscriptionId, "INITIAL", new Date("2032-01-06T00:00:00.000Z"));
     const paidAt = new Date("2032-02-10T12:00:00.000Z");
     const disputedAt = new Date("2032-02-20T12:00:00.000Z");
     const event = (chargeId: string, kind: "SUCCEEDED" | "DUPLICATE_PAYMENT" | "CHARGEBACK" | "CHARGEBACK_RESOLVED",
@@ -582,6 +584,7 @@ describe("P1b — invoices, notices and the tax summary", () => {
       await billing.appendChargeEvent(c, event(won.chargeId, "CHARGEBACK", disputedAt, "32002", 10_000_000));
       // The owner's `billing:dispute --outcome won` (D6b): that charge-back is over; the sale stays.
       await billing.appendChargeEvent(c, event(won.chargeId, "CHARGEBACK_RESOLVED", new Date("2032-03-01T12:00:00.000Z"), "32002", null));
+      await billing.appendChargeEvent(c, event(unsold.chargeId, "CHARGEBACK", disputedAt, "32004", null));
     });
     const rows = (await billing.quarterSummaryRows(new Date("2032-01-01T00:00:00Z"), new Date("2032-04-01T00:00:00Z"), "stage"))
       .filter((row) => row.chargeId === open.chargeId || row.chargeId === won.chargeId);
@@ -590,8 +593,12 @@ describe("P1b — invoices, notices and the tax summary", () => {
     expect(rows.filter((row) => row.type === "CHARGEBACK")).toEqual([
       { type: "CHARGEBACK", chargeId: open.chargeId, at: disputedAt, taxCountry: "RO", taxRegion: null,
         taxStatus: "TAXABLE", chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000,
-        amountMicros: 24_200_000, amountKnown: true, locationVerdict: null }
+        amountMicros: 24_200_000, amountKnown: true, saleRecorded: true, locationVerdict: null }
     ]);
+    // C-19: the never-verified charge's charge-back says no sale was recorded for it (and it gives no SALE row).
+    const unsoldRows = (await billing.quarterSummaryRows(new Date("2032-01-01T00:00:00Z"), new Date("2032-04-01T00:00:00Z"), "stage"))
+      .filter((row) => row.chargeId === unsold.chargeId);
+    expect(unsoldRows.map((row) => `${row.type} saleRecorded=${String(row.saleRecorded)}`)).toEqual(["CHARGEBACK saleRecorded=false"]);
   });
 
   it("dates each row when xMoney says the money moved, so a payment verified after the quarter's end stays in it", async () => {

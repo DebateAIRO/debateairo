@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Denne debat kunne ikke starte, fordi de AI-modeller, den har brug for, ikke var tilgængelige. Prøv venligst igen om lidt.",
   "runFailure.RUN_LIMIT_REACHED": "Denne debat nåede sin grænse, før den kunne give et svar.",
   "runFailure.STOPPED": "Denne debat stoppede halvvejs på grund af et problem hos os. Stil venligst dit spørgsmål igen.",
+  "runFailure.PLAN_ENDED": "Din betalte plan udløb eller blev sat på pause, mens dette spørgsmål ventede, så debatten gik ikke i gang. Du kan stille det igen.",
   "debateChrome.error.unableToLoadDebate": "Debatten kunne ikke indlæses",
   "debateChrome.error.unableToLoadScoring": "Bedømmelsen kunne ikke indlæses",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Prøvekørslen af adaptiv dybde kunne ikke indlæses",

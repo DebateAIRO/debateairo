@@ -2833,6 +2833,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {
+    // Paid plans P4-G (go-live row 31): the room read is the estimator and the room's reads on every call, so it
+    // charges its own owner-keyed budget when the version in force seals one (required with the band, ruling C7).
+    // The page treats the 429 as "no word", and the ask itself stays authoritative.
+    if (options.admission?.configured("askRoomReads") === true
+      && !admitOrRefuse(reply, "askRoomReads", "GET /v1/asks/room",
+        request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
@@ -4408,7 +4414,8 @@ export class PostgresAskApplication implements AskApplication {
   async readRun(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null> {
     const run = await this.#runs.readLoadingProjection(runId, ownership);
     if (run === null) return null;
-    // Budget spec §2.7: a waiting run's expected start, recomputed on every read.
+    // Budget spec §2.7: a waiting run's expected start. The room keeps it per run for a short window (thirty
+    // seconds, or until the waker's next tick) so a page polling this read does not recompute it every poll (P4-G).
     let waitsUntil: Date | null = null;
     let waitsFor: WaitsFor | null = null;
     if (run.state === "WAITING") {

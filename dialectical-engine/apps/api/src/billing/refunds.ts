@@ -9,7 +9,7 @@ import type { BillingPolicy } from "@debateai/register";
 import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js";
 import type { RequestedRefundReason } from "./codes.js";
 import { enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
-import { DONE, failureRetryAt, otherXMoneySystem, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
+import { claimLost, DONE, failureRetryAt, otherXMoneySystem, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 import { chargeEvent, refundTarget } from "./rows.js";
 import { enqueueCreditNote } from "./settlement.js";
 
@@ -48,6 +48,10 @@ const REQUESTED_REASONS: ReadonlySet<string> = new Set<RequestedRefundReason>([
   "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE", "DUPLICATE_PAYMENT"
 ]);
 const PROVIDER_REASONS: ReadonlySet<string> = new Set(["PROVIDER_REFUND", "PROVIDER_VOID"]);
+/** The releases of a card change's hold (P12e, P20): the only refunds whose amount may be 0 (P2-M4). */
+const CARD_CHECK_REASONS: ReadonlySet<string> = new Set<RequestedRefundReason>([
+  "CARD_CHECK_RELEASE", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE"
+]);
 /** Refused by xMoney as fraud-related: a card from an always-blocked country (a payment, or P12e's new card). */
 const FRAUD_REASONS: ReadonlySet<string> = new Set<RequestedRefundReason>(["CARD_COUNTRY_BLOCKED", "CARD_CHECK_REFUSED"]);
 /**
@@ -202,11 +206,16 @@ function isRequested(charge: ChargeWithEvents, intent: RefundIntent): boolean {
   return refundsWholePayment(intent.reason) && paid !== undefined && paid.amountMicros === intent.amountMicros;
 }
 
+/**
+ * A refund job's payload, or null when it cannot be one. An amount of 0 is a refund only as the whole release of a
+ * card-check hold (P2-M4: 0086 accepts a zero release of a 0.00 CARD_CHECK, and nothing else at 0).
+ */
 function intentOfJob(job: OutboxJob): RefundIntent | null {
   const { charge_id: chargeId, transaction_id: transactionId, amount_micros: amountMicros, whole, owner_ref: ownerRef, reason } = job.payload;
   if (typeof chargeId !== "string" || typeof transactionId !== "string" || typeof ownerRef !== "string"
-    || typeof amountMicros !== "number" || !Number.isSafeInteger(amountMicros) || amountMicros <= 0
+    || typeof amountMicros !== "number" || !Number.isSafeInteger(amountMicros) || amountMicros < 0
     || typeof whole !== "boolean" || typeof reason !== "string" || !REQUESTED_REASONS.has(reason)) return null;
+  if (amountMicros === 0 && !(whole && CARD_CHECK_REASONS.has(reason))) return null;
   return Object.freeze({ chargeId, transactionId, amountMicros, whole, ownerRef, reason: reason as RequestedRefundReason });
 }
 
@@ -221,7 +230,8 @@ export class RefundDesk {
       "withTransaction" | "appendChargeEvent" | "enqueue" | "charge" | "quote" | "customerByOwner"
       | "subscriptionEvents" | "chargesForSubscription" | "withdrawalOwnerSettlement">;
     /** The per-transaction lease around the refund call (defense in depth beside P7's claim re-assert), the job's
-     * call stage, and the owner lock P12d's WITHDRAWAL follow-up takes before it decides on M8. */
+     * call stage (fenced on the job's claim, P2-M6), and the owner lock every refund recording takes before it reads
+     * the charge again (P2-M6) and P12d's WITHDRAWAL follow-up decides on M8. */
     jobs: Pick<BillingJobQueries, "withLease" | "markJobStage" | "jobStage" | "lockOwner">;
     /** `listTransactions`: A4(c)'s look for a refund that is its own transaction (D5 5g). */
     xmoney: Pick<XMoneyClient, "refund" | "getTransaction" | "listTransactions">;
@@ -294,6 +304,15 @@ export class RefundDesk {
     // P2-I5 (1): a job its charge records no request for (a forged or corrupted outbox row) moves no money; it ends
     // here, before any lookup or call, and the owner is told (O2). The 0086 guard would fire only on REFUNDED, after.
     if (!isRequested(charge, intent)) return this.deadLetter(intent, "REFUND_NOT_REQUESTED", now);
+    // P2-M4: a 0.00 card-check hold (A12 allows it, if X0 switches the hold to 0) holds no money, so there is nothing
+    // to release at xMoney. Its release is recorded at once (REFUNDED at 0, which 0086 accepts only for such a hold),
+    // with no call, as `recordDuplicatePayment` skips a zero second hold: no refund is left owed and `deadRefunds`
+    // never counts it. `isRequested` has matched the 0 against the charge's own SUCCEEDED amount. No zero intent ever
+    // reaches xMoney (whole, it would be a call without an amount).
+    if (intent.amountMicros === 0) {
+      await this.recordRefunded(intent, now);
+      return DONE;
+    }
     if (job.attempts > 1) {
       // The stage the last CALL left, read once, inside the lease: XMONEY_UNAVAILABLE / XMONEY_CREDENTIALS_REFUSED
       // prove it sent nothing; REFUND_CALL_STARTED (a process died during it) or any other code proves nothing.
@@ -332,7 +351,9 @@ export class RefundDesk {
       }
     }
     // Recorded before the call: a process that dies during it leaves this stage, which never reads as "not sent".
-    await this.deps.jobs.markJobStage(job.jobId, "REFUND_CALL_STARTED");
+    // P2-M6: only the job's current claim holder records it; a stale holder (another worker claimed the job after this
+    // one's lease ran out) stops here, before the call.
+    if (!await this.deps.jobs.markJobStage(job, "REFUND_CALL_STARTED")) return claimLost(now);
     try {
       await this.deps.xmoney.refund({
         transactionId: intent.transactionId,
@@ -365,17 +386,27 @@ export class RefundDesk {
    * refund's its legal deadline, 14 days after the person withdrew (`withdrawalRefundDeadline` of the WITHDRAWN row's
    * `withdrew_at`), with how to refund it by hand so that M8 still follows. A forged job's O2 carries neither: its
    * reason is only the job's claim.
+   * P2-W4: two more dead ends stop before any xMoney call, so O2 never says "xMoney refused" for them.
+   * REFUND_CHARGE_MISSING (the job names a charge we do not have) is no refund to make either, so it takes the
+   * not-requested sentences and ref. OTHER_XMONEY_SYSTEM (the payment was taken in the other xMoney system) has its own
+   * sentences (`otherSystem`) and ref: nothing was sent and nothing is owed on this server, and this API never sees
+   * that system's refunds, so it carries no deadline ("M8 follows by itself" would be false). Neither carries a reason:
+   * no recorded request was checked, so it is only the job's claim.
    */
   private async deadLetter(intent: RefundIntent, code: string, now: Date): Promise<OutboxOutcome> {
-    const notRequested = code === "REFUND_NOT_REQUESTED";
+    const notRequested = code === "REFUND_NOT_REQUESTED" || code === "REFUND_CHARGE_MISSING";
+    const otherSystem = code === "OTHER_XMONEY_SYSTEM";
+    const real = !notRequested && !otherSystem;
     const ref = `${intent.chargeId}:${intent.transactionId}`;
-    const deadline = notRequested ? null : await this.withdrawalDeadlineOf(intent);
+    const deadline = real ? await this.withdrawalDeadlineOf(intent) : null;
+    const dedupeRef = notRequested ? `${ref}:not-requested` : otherSystem ? `${ref}:other-system` : ref;
     await this.deps.repository.withTransaction((client) => enqueueEmail(this.deps.repository, client, {
-      template: "O2", recipient: { kind: "OWNER" }, dedupeRef: notRequested ? `${ref}:not-requested` : ref,
+      template: "O2", recipient: { kind: "OWNER" }, dedupeRef,
       params: {
         chargeRef: intent.chargeId, refundAmount: microsToDecimal(intent.amountMicros), reasonCode: code,
         notRequested: notRequested ? "true" : "false",
-        ...(notRequested ? {} : { refundReason: intent.reason }),
+        ...(otherSystem ? { otherSystem: "true" } : {}),
+        ...(real ? { refundReason: intent.reason } : {}),
         ...(deadline === null ? {} : { refundDeadline: deadline.toISOString() })
       },
       notBefore: now
@@ -434,8 +465,14 @@ export class RefundDesk {
    * REFUNDED once per paid transaction (P1a's unique keys), with the reason's follow-up in one transaction. For a
    * refund xMoney reported as its own transaction, the row is written on that transaction and names the payment it
    * refunds (`refundsTransactionId`, D5 5g), with that refund transaction's `creationDate` (D5 5m: the quarter rows
-   * date the refund by it). A refund read from the payment's own status carries no such time. A WITHDRAWAL refund
-   * takes the owner lock first, before the REFUNDED row; no other reason takes it.
+   * date the refund by it). A refund read from the payment's own status carries no such time. Every recording takes
+   * the owner lock first, before the REFUNDED row.
+   * P2-M6: one refund can reach here twice at once from two API processes: RefundDesk with the call's answer (a row on
+   * the payment) and VERIFY_PAYMENT with xMoney's own refund transaction naming the payment (a row on that
+   * transaction). The two rows have different keys, and 0086's sum guard lets both in while the refund is at most half
+   * the payment, so the unique keys alone cannot stop the second. Under the owner lock the charge is read again on the
+   * transaction's own connection, and a refund whose payment already holds a REFUNDED (`refundedAlready`) is recorded
+   * already: nothing more is written and no follow-up runs (no second credit note, no second M8).
    */
   async recordRefunded(
     intent: RefundIntent, at: Date, refundTransactionId: string | null = null, refundCreatedAt: Date | null = null
@@ -445,7 +482,9 @@ export class RefundDesk {
       // The owner lock comes first, then the charge's refund lock that 0086's trigger takes on the REFUNDED insert:
       // this is the order the withdrawal and VERIFY_PAYMENT's refund writers use, and the WITHDRAWAL follow-up
       // decides on M8 under the owner lock.
-      if (intent.reason === "WITHDRAWAL") await this.deps.jobs.lockOwner(client, intent.ownerRef);
+      await this.deps.jobs.lockOwner(client, intent.ownerRef);
+      const current = await this.deps.repository.charge(intent.chargeId, client);
+      if (current !== null && refundedAlready(current, intent.transactionId)) return;
       const written = await this.deps.repository.appendChargeEvent(client, chargeEvent(intent.chargeId, "REFUNDED", at, {
         xmoneyTransactionId: refundTransactionId ?? intent.transactionId, amountMicros: intent.amountMicros,
         errorCode: intent.reason, refundsTransactionId: refundTransactionId === null ? null : intent.transactionId,

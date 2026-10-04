@@ -40,6 +40,7 @@
     "finish_up_to_basis_points": 11500,
     "waiting_line_per_person": 1
   },
+  "askRoomReads": { "key": "owner", "limit": 60, "window_ms": 60000, "capacity": 65536 },
   "billingPlans": {
     "kind": "BILLING_PLANS",
     "currency": "USD",

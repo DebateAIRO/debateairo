@@ -20,6 +20,8 @@ const REFUNDED_REASONS: ReadonlySet<string> = new Set(["ALREADY_SUBSCRIBED", "SU
  * W15 F1 (P2-M5): FAILED + PROVIDER_REFUND is a checkout's payment refunded at xMoney before we verified it. Only a
  * checkout can read so (every other kind counts as started), so its sentence speaks of the plan; it promises no email,
  * because none is sent. FAILED + PROVIDER_VOID released a hold, so no money was taken: the caller's text.
+ * Part 4 final review C-19: FAILED + CHARGEBACK is a checkout's payment charged back before we verified it; the bank
+ * gave the money back and the plan never started, so it takes the same sentence (no new key; the owner may reword it).
  */
 export function chargeOutcomeKey(state: "NEEDS_ACTION" | "FAILED", reasonCode: string | null): string | null {
   if (state === "FAILED" && reasonCode === "CARD_COUNTRY_BLOCKED") return "billing.checkout.cardCountryRefused";
@@ -31,7 +33,9 @@ export function chargeOutcomeKey(state: "NEEDS_ACTION" | "FAILED", reasonCode: s
   // released: the start route's NOT_SUBSCRIBED sentence for the same condition, never "saved".
   if (state === "FAILED" && reasonCode === "CARD_CHECK_NOT_LIVE") return "billing.card.notSubscribed";
   if (state === "FAILED" && reasonCode !== null && REFUNDED_REASONS.has(reasonCode)) return "billing.checkout.refunded";
-  if (state === "FAILED" && reasonCode === "PROVIDER_REFUND") return "billing.checkout.refundedBeforeStart";
+  if (state === "FAILED" && (reasonCode === "PROVIDER_REFUND" || reasonCode === "CHARGEBACK")) {
+    return "billing.checkout.refundedBeforeStart";
+  }
   return null;
 }
 

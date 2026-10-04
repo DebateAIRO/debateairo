@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PoolClient } from "pg";
 import type { RefundRecord, SaleRecord } from "@debateai/billing-core";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   createSmartBillInvoiceHandler, createSmartBillStornoHandler, parseSmartBillReference, recordEfacturaStatus,
   smartBillPdfResolver, type SmartBillPort
 } from "../../apps/api/src/billing/invoice-smartbill.js";
+import { sealBillingProfile } from "../../apps/api/src/billing/records.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { enqueueCreditNote } from "../../apps/api/src/billing/settlement.js";
 import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
@@ -64,6 +66,10 @@ class RecordingSmartBill {
 
 let h: BillingHarness;
 let smartbill: RecordingSmartBill;
+let invoiceHandler: () => ReturnType<typeof createSmartBillInvoiceHandler>;
+let invoiceDeps: () => Parameters<typeof createSmartBillInvoiceHandler>[0];
+/** While true, the worker's SMARTBILL_INVOICE attempts change nothing and retry later (C-14's row claims the job itself). */
+let holdInvoices = false;
 beforeAll(async () => {
   h = await startBillingHarness();
   smartbill = new RecordingSmartBill();
@@ -72,7 +78,12 @@ beforeAll(async () => {
     recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy,
     publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const
   });
-  h.worker.register("SMARTBILL_INVOICE", async (job, now) => createSmartBillInvoiceHandler(deps())(job, now));
+  invoiceDeps = deps;
+  invoiceHandler = () => createSmartBillInvoiceHandler(deps());
+  h.worker.register("SMARTBILL_INVOICE", async (job, now) => holdInvoices
+    // C-14: the worker leaves the job untouched (no intent, no SmartBill call), so a test can claim it itself.
+    ? { kind: "RETRY" as const, code: "TEST_INVOICE_HELD", retryAt: new Date(now.getTime() + 3_600_000) }
+    : createSmartBillInvoiceHandler(deps())(job, now));
   h.worker.register("SMARTBILL_STORNO", async (job, now) => createSmartBillStornoHandler(deps())(job, now));
 });
 afterAll(async () => { await h?.stop(); });
@@ -80,6 +91,35 @@ const invoices = async (chargeId: string) => (await h.database.pool.query(
   "SELECT issuer, kind, series, number FROM billing.invoice WHERE charge_id=$1 ORDER BY kind", [chargeId]
 )).rows;
 const invoiceJob = async (chargeId: string) => (await h.outboxRows(chargeId)).find((row) => row.kind === "SMARTBILL_INVOICE");
+/** The invoice intents a charge has (A17b): one per kind, written before SmartBill is ever called. */
+const intents = async (chargeId: string) => (await h.database.pool.query(
+  "SELECT kind, issuer FROM billing.invoice_intent WHERE charge_id=$1 ORDER BY kind", [chargeId]
+)).rows;
+/**
+ * P2-M6 / C-14: one process claims the charge's open SMARTBILL_INVOICE job (the claim's fields as the worker's claim
+ * hands them over), whatever its lease: a second call is another process claiming it again after the first one's
+ * lease ran out.
+ */
+const claimInvoiceJob = async (chargeId: string, workerId: string, at: Date) => {
+  const row = (await h.database.pool.query<{ job_id: string; payload: Record<string, unknown>; created_at: Date; not_before: Date; attempts: number }>(`
+    UPDATE billing.outbox SET claimed_by = $2, claimed_at = $3, attempts = attempts + 1
+    WHERE kind = 'SMARTBILL_INVOICE' AND ref = $1 AND done_at IS NULL AND dead_at IS NULL
+    RETURNING job_id, payload, created_at, not_before, attempts
+  `, [chargeId, workerId, at])).rows[0]!;
+  return {
+    jobId: row.job_id, kind: "SMARTBILL_INVOICE" as const, ref: chargeId, payload: row.payload as never,
+    createdAt: row.created_at, notBefore: row.not_before, attempts: row.attempts, claimedBy: workerId, claimedAt: at
+  };
+};
+/** C-14 (review M-2): a paid charge whose SMARTBILL_INVOICE job the worker left untouched, so the row claims it itself. */
+const heldCharge = async () => {
+  holdInvoices = true;
+  try {
+    return await h.activate();
+  } finally {
+    holdInvoices = false;
+  }
+};
 /** The e-Factura statuses of a charge's SmartBill documents, in the order they were recorded (A21). */
 const statuses = async (chargeId: string) => (await h.database.pool.query(
   `SELECT i.kind, s.efactura_status FROM billing.invoice_status_event s JOIN billing.invoice i USING (invoice_id)
@@ -97,7 +137,9 @@ describe("P10b SmartBill invoices for Romania", () => {
     const mail = (await h.outboxRows(paid.chargeId)).find((row) => row.ref === `M2_INVOICE_ATTACHED:${paid.chargeId}`);
     expect(mail?.payload).toMatchObject({
       attachments: "SMARTBILL_INVOICE_PDF", "attach.SMARTBILL_INVOICE_PDF.series": "DBAI",
-      "attach.SMARTBILL_INVOICE_PDF.number": invoice!.number, "param.invoiceNumber": `DBAI ${invoice!.number}`
+      "attach.SMARTBILL_INVOICE_PDF.number": invoice!.number,
+      // P2-M33: the receipt names the number as Settings, the summary and the owner's commands do, `<series>-<number>`.
+      "param.invoiceNumber": `DBAI-${invoice!.number}`
     });
     const attachment = await smartBillPdfResolver({ issuer: smartbill.port() })({ series: "DBAI", number: invoice!.number }, "ro");
     expect(attachment).toMatchObject({ filename: `DBAI-${invoice!.number}.pdf`, contentType: "application/pdf" });
@@ -182,6 +224,107 @@ describe("P10b SmartBill invoices for Romania", () => {
     smartbill.withLookup = true;
   });
 
+  it("never issues from a stale claim: only the job's current claim holder records the stage and calls SmartBill (P2-M6)", async () => {
+    smartbill.withLookup = false;
+    smartbill.failIssue = "DOWN";
+    const paid = await h.activate();
+    await h.worker.drain(10);
+    // Attempt 1 proved nothing was created, so the next attempt may call `issue` again (A17b).
+    expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: false, dead: false, lastErrorCode: "INVOICE_SERVICE_UNAVAILABLE" });
+    // Process A claims attempt 2; its lease runs out while it is slow, and process B claims attempt 3.
+    const stale = await claimInvoiceJob(paid.chargeId, "process-a", h.clock.now);
+    const current = await claimInvoiceJob(paid.chargeId, "process-b", new Date(h.clock.now.getTime() + 301_000));
+    expect(await invoiceHandler()(stale, h.clock.now)).toMatchObject({ kind: "RETRY", code: "BILLING_OUTBOX_CLAIM_LOST" });
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(0);
+    expect(await invoiceJob(paid.chargeId)).toMatchObject({ lastErrorCode: "INVOICE_SERVICE_UNAVAILABLE" });
+    // B, the holder, issues it once.
+    expect(await invoiceHandler()(current, h.clock.now)).toEqual({ kind: "DONE" });
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
+    expect(await h.repository.complete(current.jobId, h.clock.now, { workerId: "process-b", attempts: current.attempts })).toBe(true);
+    expect(await invoices(paid.chargeId)).toHaveLength(1);
+    smartbill.withLookup = true;
+  });
+
+  it("writes the invoice intent only under the job's current claim: a stale holder's is refused, and the holder issues once (C-14)", async () => {
+    // Production SmartBill has no lookup (X1 row 8), so an intent with no proof of "nothing issued" would be dead-lettered
+    // INVOICE_UNKNOWN: the stale holder's intent must never be written.
+    smartbill.withLookup = false;
+    const paid = await heldCharge();
+    expect(await intents(paid.chargeId)).toEqual([]);
+    // Process A claims the job and stalls past its lease before writing anything; process B claims it again.
+    const stale = await claimInvoiceJob(paid.chargeId, "process-a", h.clock.now);
+    const current = await claimInvoiceJob(paid.chargeId, "process-b", new Date(h.clock.now.getTime() + 301_000));
+    expect(await invoiceHandler()(stale, h.clock.now)).toMatchObject({ kind: "RETRY", code: "BILLING_OUTBOX_CLAIM_LOST" });
+    expect(await intents(paid.chargeId)).toEqual([]);
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(0);
+    // B, the holder, writes the intent and issues the invoice once: no INVOICE_UNKNOWN, no O3, no hand check.
+    expect(await invoiceHandler()(current, h.clock.now)).toEqual({ kind: "DONE" });
+    expect(await intents(paid.chargeId)).toEqual([{ kind: "INVOICE", issuer: "SMARTBILL" }]);
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
+    expect(await h.repository.complete(current.jobId, h.clock.now, { workerId: "process-b", attempts: current.attempts })).toBe(true);
+    expect(await invoices(paid.chargeId)).toHaveLength(1);
+    expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: true, dead: false });
+    smartbill.withLookup = true;
+  });
+
+  it("writes SmartBill's intent and its call-started stage as one write, so a holder that stalls after it still calls SmartBill once and the next holder's unknown is true (C-14, A17b)", async () => {
+    smartbill.withLookup = false;
+    const paid = await heldCharge();
+    const issuedFor = () => smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId);
+    const a = await claimInvoiceJob(paid.chargeId, "process-a", h.clock.now);
+    // A's repository lets its first transaction (the intent's: the reads before it open none) commit for real, says
+    // so, and then holds A there: A has written what it writes and has not called SmartBill yet.
+    let committed!: () => void;
+    const hasCommitted = new Promise<void>((resolve) => { committed = resolve; });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let first = true;
+    const repository = new Proxy(h.repository, {
+      get(target, property) {
+        if (property === "withTransaction") {
+          return async <T>(work: (client: PoolClient) => Promise<T>): Promise<T> => {
+            const isFirst = first;
+            first = false;
+            let value: T;
+            try {
+              value = await target.withTransaction(work);
+            } finally {
+              if (isFirst) committed();
+            }
+            if (isFirst) await gate;
+            return value;
+          };
+        }
+        const value: unknown = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+    });
+    const runA = createSmartBillInvoiceHandler({ ...invoiceDeps(), repository })(a, h.clock.now);
+    try {
+      await Promise.race([hasCommitted, runA]);
+      // While A waits: the intent and its stage are already there, together.
+      expect(await intents(paid.chargeId)).toEqual([{ kind: "INVOICE", issuer: "SMARTBILL" }]);
+      expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: false, dead: false, lastErrorCode: "INVOICE_CALL_STARTED" });
+      // A's lease runs out; B claims the job again. A calls SmartBill next, so B's unknown is a true one: B must never
+      // call `issue` (that would be a second invoice), and with no lookup it hands the job to the owner.
+      const b = await claimInvoiceJob(paid.chargeId, "process-b", new Date(h.clock.now.getTime() + 301_000));
+      expect(await invoiceHandler()(b, h.clock.now)).toEqual({ kind: "DEAD", code: "INVOICE_UNKNOWN" });
+      expect(issuedFor()).toHaveLength(0);
+      expect(await h.repository.fail(b.jobId, "INVOICE_UNKNOWN", null, h.clock.now, { workerId: "process-b", attempts: b.attempts })).toBe(true);
+      // A wakes and issues the invoice once; its own settle is refused, as a stale holder's is.
+      release();
+      expect(await runA).toEqual({ kind: "DONE" });
+      expect(issuedFor()).toHaveLength(1);
+      expect(await invoices(paid.chargeId)).toHaveLength(1);
+      expect(await h.repository.complete(a.jobId, h.clock.now, { workerId: "process-a", attempts: a.attempts })).toBe(false);
+      expect(await invoiceJob(paid.chargeId)).toMatchObject({ dead: true, lastErrorCode: "INVOICE_UNKNOWN" });
+    } finally {
+      release();
+      await runA.catch(() => undefined);
+      smartbill.withLookup = true;
+    }
+  });
+
   it("treats an attempt that died after the call started as an unknown outcome, never a second call", async () => {
     smartbill.withLookup = false;
     smartbill.failIssue = "CRASH";
@@ -217,6 +360,41 @@ describe("P10b SmartBill invoices for Romania", () => {
     const person = await h.activate();
     await h.worker.drain(10);
     expect(smartbill.issued.find((sale) => sale.chargeId === person.chargeId)?.customer.street).toBeNull();
+  });
+
+  it("credits an old charge to that charge's own buyer, not to the details of a later checkout (P2-M30)", async () => {
+    const paid = await h.activate();
+    await h.worker.drain(10);
+    expect(smartbill.issued.find((sale) => sale.chargeId === paid.chargeId)?.customer)
+      .toMatchObject({ name: "Test Buyer", city: "Sector 1", region: "Bucuresti", street: null, taxId: null });
+    // The person later checks out under other details (a company in Cluj): that writes the newest billing profile.
+    const customer = (await h.repository.customerByOwner(paid.ownerRef))!;
+    const later = sealBillingProfile(h.recordsKey, customer.customerId, {
+      email: "later-buyer@example.test", locale: "ro", name: "SC Alta SRL", country: "RO", region: "Cluj",
+      postalCode: "400001", city: "Cluj-Napoca", street: "Str. Noua 2",
+      company: { name: "SC Alta SRL", vatId: "RO999VALID", address: "Str. Noua 2, Cluj-Napoca", vatValidated: true }
+    });
+    h.clock.advance(60_000);
+    await h.repository.withTransaction((client) => h.repository.appendProfile(client, {
+      customerId: customer.customerId, at: h.clock.now, locale: "ro", profileCiphertext: later.ciphertext, keyId: later.keyId
+    }));
+    const charge = (await h.repository.charge(paid.chargeId))!;
+    const quote = (await h.repository.quote(charge.quoteId!, paid.ownerRef))!;
+    await h.repository.withTransaction(async (client) => {
+      const fields = { xmoneyTransactionId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
+      await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUND_REQUESTED", h.clock.now, fields));
+      await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUNDED", h.clock.now, fields));
+      await enqueueCreditNote(h.repository, client, {
+        charge, quote, policy: testBillingPolicy, transactionId: paid.transaction.transactionId, refundMicros: 12_100_000, now: h.clock.now
+      });
+    });
+    await h.worker.drain(10);
+    // The buyer is the one the charge's own quote sealed; only the address it is sent to and its language follow the
+    // newest profile (W8: the account's current address, here the profile's own).
+    expect(smartbill.credits.find((refund) => refund.chargeId === paid.chargeId)?.customer).toEqual({
+      name: "Test Buyer", email: "later-buyer@example.test", country: "RO", region: "Bucuresti", postalCode: null,
+      city: "Sector 1", street: null, taxId: null, locale: "ro"
+    });
   });
 
   it("stornos a full refund, credits a partial one, and hands a partial one to the owner without creditPartial", async () => {

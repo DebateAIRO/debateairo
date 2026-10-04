@@ -34,7 +34,10 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   cancelLinkUrl: `https://dezbatere.ro/cancel#token=${"A".repeat(43)}`,
   withdrawalDays: "14",
   canUndo: "true",
+  paused: "true",
+  ownerSettled: "true",
   notRequested: "true",
+  otherSystem: "true",
   bankDeclined: "true",
   endedPlan: "PRO",
   invoiceNumber: "DBAI 0042",
@@ -78,6 +81,10 @@ function codeOf(run: () => unknown): string {
   }
   throw new Error("expected a MailTemplateError");
 }
+
+/** A catalogue sentence's longest stretch without a placeholder: what a rendered email must (or must not) contain. */
+const longestFixedPart = (sentence: string): string =>
+  sentence.split(/\{[A-Za-z][A-Za-z0-9_]*\}/u).map((part) => part.trim()).sort((a, b) => b.length - a.length)[0]!;
 
 const NOTHING: ReadonlySet<MailAttachmentFact> = new Set();
 const EVERYTHING: ReadonlySet<MailAttachmentFact> = new Set(MAIL_ATTACHMENT_FACTS);
@@ -137,10 +144,12 @@ describe("P17 renderMail", () => {
   });
 
   it("offers the undo only while the plan still runs (a cancel while a payment is failing ends it at once)", () => {
-    const running = renderMail("M7", "en", paramsFor("M7")).text;
+    // A plan that is not paused: M7 as it was before P2-W10's optional flag (an M7 queued before it carries none).
+    const { paused: _paused, ...notPaused } = paramsFor("M7");
+    const running = renderMail("M7", "en", notPaused).text;
     expect(running).toContain("You keep your Plus plan until October 29, 2026. You will not be charged again.");
     expect(running).toContain("Changed your mind? You can undo this in Settings before that date: https://dezbatere.ro/settings");
-    const ended = renderMail("M7", "en", { ...paramsFor("M7"), canUndo: "false" }).text;
+    const ended = renderMail("M7", "en", { ...notPaused, canUndo: "false" }).text;
     expect(ended).toContain("Your Plus plan ended on October 29, 2026. You will not be charged again.");
     expect(ended).toContain("You can choose a plan again at any time in Settings: https://dezbatere.ro/settings");
     expect(ended).not.toContain("undo");
@@ -148,9 +157,37 @@ describe("P17 renderMail", () => {
     // D6b's P12b also ends an ACTIVE plan at once (after the paid month's end, or inside the renewal's lead): the
     // sentence names no reason, so it never claims a payment failed.
     expect(ended).not.toMatch(/fail|renew/iu);
-    expect(codeOf(() => renderMail("M7", "en", { ...paramsFor("M7"), canUndo: "yes" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
-    const { canUndo: _flag, ...withoutFlag } = paramsFor("M7");
+    expect(codeOf(() => renderMail("M7", "en", { ...notPaused, canUndo: "yes" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+    const { canUndo: _flag, ...withoutFlag } = notPaused;
     expect(codeOf(() => renderMail("M7", "en", withoutFlag))).toBe("MAIL_TEMPLATE_PARAM_MISSING");
+    expect(renderMail("M7", "en", { ...notPaused, paused: "false" }).text).toBe(running);
+  });
+
+  it("tells a person who cancels a plan paused by a dispute that it won't renew, with no undo line, in every locale (P2-W10)", () => {
+    const paused = { ...paramsFor("M7"), paused: "true", canUndo: "false" };
+    const english = renderMail("M7", "en", paused).text;
+    expect(english).toContain(
+      "Your Plus plan won't renew, and you won't be charged again. Its paid features stay paused while the payment"
+      + " dispute is open. If the dispute ends in your favour, you can use them until October 29, 2026."
+    );
+    expect(english).not.toContain("undo");
+    expect(english).not.toContain("You keep your");
+    expect(english).not.toContain("ended on");
+    expect(MAIL_TEMPLATES.M7.optional).toEqual({ paused: "flag" });
+    // In every locale: the paused sentence first, then the "choose a plan" line; never the undo, "until" or "ended"
+    // sentence. The text is the greeting, the paragraphs, the sign-off and the footer, one blank line apart.
+    const catalogues = loadMailCatalogues();
+    const { paused: _flag, ...notPaused } = paused;
+    for (const locale of MAIL_LOCALES) {
+      const [, first, second] = renderMail("M7", locale, paused).text.split("\n\n");
+      const [, until, undo] = renderMail("M7", locale, { ...notPaused, canUndo: "true" }).text.split("\n\n");
+      const [, endedNow, again] = renderMail("M7", locale, notPaused).text.split("\n\n");
+      expect(first, `${locale} paused`).toContain(longestFixedPart(catalogues[locale]["mail.M7.paused"]!));
+      expect(first, locale).not.toMatch(/\{[A-Za-z][A-Za-z0-9_]*\}/u);
+      expect([until, endedNow], `${locale} first paragraph`).not.toContain(first);
+      expect(second, `${locale} no undo line`).not.toBe(undo);
+      expect(second, `${locale} second paragraph`).toBe(again);
+    }
   });
 
   it("opens M5A–C with a sentence true in every case, and names the bank only when the bank declined (W10, P2-I21)", () => {
@@ -192,11 +229,34 @@ describe("P17 renderMail", () => {
   });
 
   it("says a withdrawal with nothing due back refunded nothing, and never shows $0.00 as a refund", () => {
-    expect(renderMail("M8", "en", paramsFor("M8")).text).toContain("we refunded $12.10 to your card");
-    const nothing = renderMail("M8", "en", { ...paramsFor("M8"), refundAmount: "0.00" }).text;
+    // RefundDesk's and P12d's M8 carry no `ownerSettled` (P2-M7's flag is the owner's 0.00/0.00 settlement's alone).
+    const { ownerSettled: _settled, ...withdrawal } = paramsFor("M8");
+    expect(renderMail("M8", "en", withdrawal).text).toContain("we refunded $12.10 to your card");
+    const nothing = renderMail("M8", "en", { ...withdrawal, refundAmount: "0.00" }).text;
     expect(nothing).toContain("Your Plus plan has ended. The part you already used covers the whole price, so nothing was due back to you.");
     expect(nothing).not.toContain("refunded");
     expect(nothing).not.toContain("$0.00");
+  });
+
+  it("says only that nothing more is due when the owner settles a withdrawal at 0.00 and 0.00, in every locale (P2-M7)", () => {
+    const settled = renderMail("M8", "en", { plan: "PLUS", refundAmount: "0.00", ownerSettled: "true" }).text;
+    expect(settled).toContain("Your Plus plan has ended, and nothing more is due back to you.");
+    // The money had usually gone back already (a dashboard refund): never "the part you already used covers it".
+    expect(settled).not.toContain("covers the whole price");
+    expect(settled).not.toContain("$0.00");
+    // A settlement with money due keeps today's sentence; so does every M8 the flag is not given to.
+    expect(renderMail("M8", "en", { plan: "PLUS", refundAmount: "12.10", ownerSettled: "true" }).text)
+      .toContain("Your Plus plan has ended, and we refunded $12.10 to your card.");
+    expect(renderMail("M8", "en", { plan: "PLUS", refundAmount: "0.00", ownerSettled: "false" }).text)
+      .toContain("The part you already used covers the whole price");
+    expect(MAIL_TEMPLATES.M8.optional).toEqual({ ownerSettled: "flag" });
+    const catalogues = loadMailCatalogues();
+    for (const locale of MAIL_LOCALES) {
+      const text = renderMail("M8", locale, { plan: "PLUS", refundAmount: "0.00", ownerSettled: "true" }).text;
+      expect(text, locale).not.toMatch(/\{[A-Za-z][A-Za-z0-9_]*\}/u);
+      expect(text, `${locale} nothingMoreDue`).toContain(longestFixedPart(catalogues[locale]["mail.M8.nothingMoreDue"]!));
+      expect(text, `${locale} nothingDue`).not.toContain(longestFixedPart(catalogues[locale]["mail.M8.nothingDue"]!));
+    }
   });
 
   it("says the Romanian invoice is attached only when the PDF is, and otherwise where to find it", () => {
@@ -265,7 +325,7 @@ describe("P17 renderMail", () => {
   });
 
   it("tells the owner at once, in English, which refund could not be completed (ruling Q-5's O2)", () => {
-    const owner = renderMail("O2", "de", { ...paramsFor("O2"), notRequested: "false" });
+    const owner = renderMail("O2", "de", { ...paramsFor("O2"), notRequested: "false", otherSystem: "false" });
     expect(owner.subject).toBe("A refund could not be completed and needs your attention");
     expect(owner.text).toContain("Charge reference: 0123456789abcdef0123456789abcdef");
     expect(owner.text).toContain("Amount to refund: $12.10");
@@ -279,8 +339,8 @@ describe("P17 renderMail", () => {
   });
 
   it("keeps O2 for a refund xMoney refused exactly as it was before P2-I5's flag", () => {
-    // W9's optional reason and deadline left out: the render of every O2 queued before them.
-    const { refundReason: _reason, refundDeadline: _deadline, ...before } = paramsFor("O2");
+    // W9's optional reason and deadline and P2-W4's other-system flag left out: the render of every O2 queued before them.
+    const { refundReason: _reason, refundDeadline: _deadline, otherSystem: _other, ...before } = paramsFor("O2");
     const refused = renderMail("O2", "en", { ...before, notRequested: "false" });
     // The five sentences of ruling Q-5's O2, in order and unchanged (compared with the render before the flag existed).
     expect(refused.text.startsWith([
@@ -296,7 +356,7 @@ describe("P17 renderMail", () => {
   });
 
   it("names a dead withdrawal refund's reason, its legal deadline and how to settle it so M8 follows (W9, P2-M8)", () => {
-    const dead = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false" });
+    const dead = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false", otherSystem: "false" });
     expect(dead.text).toContain("Reason code: XMONEY_REFUSED\n\nRefund reason: WITHDRAWAL\n\n");
     expect(dead.text).toContain(
       "This is a withdrawal refund: the law requires it to be made by October 26, 2026 at the latest (14 days after"
@@ -311,10 +371,12 @@ describe("P17 renderMail", () => {
     expect(dead.html).not.toContain("at least");
     // The reason alone (another refund than a withdrawal's): no deadline sentence.
     const { refundDeadline: _deadline, ...other } = paramsFor("O2");
-    const refusedCard = renderMail("O2", "en", { ...other, refundReason: "CARD_COUNTRY_BLOCKED", notRequested: "false" }).text;
+    const refusedCard = renderMail("O2", "en", {
+      ...other, refundReason: "CARD_COUNTRY_BLOCKED", notRequested: "false", otherSystem: "false"
+    }).text;
     expect(refusedCard).toContain("Refund reason: CARD_COUNTRY_BLOCKED");
     expect(refusedCard).not.toContain("withdrawal");
-    expect(Object.keys(MAIL_TEMPLATES.O2.optional ?? {}).sort()).toEqual(["refundDeadline", "refundReason"]);
+    expect(Object.keys(MAIL_TEMPLATES.O2.optional ?? {}).sort()).toEqual(["otherSystem", "refundDeadline", "refundReason"]);
   });
 
   it("tells the owner at once of a withdrawal they must settle by hand, with its deadline (W9, P2-I11)", () => {
@@ -398,6 +460,40 @@ describe("P17 renderMail", () => {
     expect(forged.text).toContain("Amount the job named: $12.10. This is only the job's own figure, not a refund to make.");
     expect(forged.text).toContain("Something able to write to the billing database queued it, so tell whoever runs the server.");
     expect(forged.text).toContain("They check this charge's own refund requests: a request that was never refunded is still owed.");
+  });
+
+  it("tells the owner a refund job of the other xMoney system sent nothing and is owed nothing here (P2-W4)", () => {
+    // RefundDesk sends the flag and neither the reason nor the deadline (C2: the scope's English, the default).
+    const { refundReason: _reason, refundDeadline: _deadline, ...base } = paramsFor("O2");
+    const other = renderMail("O2", "en", { ...base, reasonCode: "OTHER_XMONEY_SYSTEM", notRequested: "false", otherSystem: "true" });
+    expect(other.subject).toBe("A refund could not be completed and needs your attention");
+    expect(other.text.startsWith([
+      "Hello,",
+      "A refund job was stopped before anything was sent to xMoney: the payment it names was taken in the other xMoney"
+        + " system (sandbox or live), which this server does not use. No money moved.",
+      "Charge reference: 0123456789abcdef0123456789abcdef",
+      "Amount to refund: $12.10",
+      "Reason code: OTHER_XMONEY_SYSTEM",
+      "Nothing is owed on this server. If it was a real customer's payment in the other system, refund it in that"
+        + " system's dashboard; a sandbox test payment needs nothing. The owner summary lists it as REFUND_OTHER_SYSTEM.",
+      "The DebateAI team"
+    ].join("\n\n"))).toBe(true);
+    for (const part of [other.text, other.html]) {
+      expect(part).not.toContain("xMoney refused");
+      expect(part).not.toContain("settle the refund by hand");
+      // No deadline paragraph, and never "M8 follows by itself": this API never sees the other system's refunds.
+      expect(part).not.toContain("the law requires");
+      expect(part).not.toContain("M8");
+      expect(part).not.toContain("A refund job was stopped before anything was sent to xMoney: it does not match");
+    }
+    // The flag off (or left out, as in every O2 queued before it) keeps the refused wording; notRequested still wins.
+    const refused = renderMail("O2", "en", { ...base, notRequested: "false", otherSystem: "false" }).text;
+    expect(refused).toContain("xMoney refused a refund we asked for");
+    expect(refused).not.toContain("other xMoney system");
+    const forged = renderMail("O2", "en", { ...base, notRequested: "true" }).text;
+    expect(forged).toContain("it does not match any refund request our records hold for this payment");
+    expect(forged).not.toContain("other xMoney system");
+    expect(MAIL_TEMPLATES.O2.optional?.otherSystem).toBe("flag");
   });
 
   it("refuses missing, unknown, reserved and malformed params with a code and no value", () => {

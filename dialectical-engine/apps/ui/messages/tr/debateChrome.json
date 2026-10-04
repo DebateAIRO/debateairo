@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Gereken yapay zekâ modelleri kullanılamadığı için bu tartışma başlatılamadı. Lütfen bir süre sonra tekrar deneyin.",
   "runFailure.RUN_LIMIT_REACHED": "Bu tartışma bir yanıt üretemeden sınırına ulaştı.",
   "runFailure.STOPPED": "Bu tartışma, bizden kaynaklanan bir hata nedeniyle yarıda kaldı. Lütfen sorunuzu yeniden sorun.",
+  "runFailure.PLAN_ENDED": "Bu soru beklerken ücretli planınız sona erdi veya duraklatıldı, bu yüzden tartışma başlamadı. Soruyu yeniden sorabilirsiniz.",
   "debateChrome.error.unableToLoadDebate": "Tartışma yüklenemedi",
   "debateChrome.error.unableToLoadScoring": "Puanlama yüklenemedi",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Uyarlanabilir derinlik denemesi yüklenemedi",

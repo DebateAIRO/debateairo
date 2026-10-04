@@ -152,8 +152,9 @@ export function assertStageInvoicersAreSandboxes(input: BillingInvoicerEnvironme
  * charge invoiced by Quaderno's sandbox, or sent to a `.invalid` SmartBill address, gets no legal invoice at all, so
  * when the API talks to anything but xMoney's stage API it refuses a Quaderno host ending in
  * `.sandbox-quadernoapp.com` and a SmartBill host ending in `.invalid`. This is the other half of
- * assertStageInvoicersAreSandboxes: going live on a host that ran the sandbox run (§14.9) must move all three
- * addresses, not only xMoney's.
+ * assertStageInvoicersAreSandboxes: a host that took a look at xMoney's sandbox on the real clock and then goes live
+ * on the same host (README §14.8's path) must move all three addresses, not only xMoney's. A host that ran §14.9's
+ * sandbox run on a moved clock never goes live at all: that server is destroyed (§14.9, step 7).
  */
 export function assertLiveInvoicersAreLive(input: BillingInvoicerEnvironment): void {
   if (hostOf(input.xmoneyApiBaseUrl) === STAGE_API_HOST) return;

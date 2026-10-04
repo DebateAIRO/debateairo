@@ -90,6 +90,12 @@ describe("P19 the waiting screen (B5)", () => {
     expect(container.textContent).not.toContain("email");
     act(() => root.unmount());
     root = createRoot(container);
+    // Part 4 final review C-19: a checkout charged back before it started reads FAILED + CHARGEBACK, and says the
+    // same existing sentence (no new key; the owner may reword it later).
+    await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CHARGEBACK" })));
+    expect(container.textContent).toBe(billingEnglish["billing.checkout.refundedBeforeStart"]);
+    act(() => root.unmount());
+    root = createRoot(container);
     // A void released a hold: no money was taken, so the caller's text stays.
     await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: "PROVIDER_VOID" })));
     expect(container.textContent).toBe("REFUSED");

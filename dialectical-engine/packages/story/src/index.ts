@@ -67,6 +67,7 @@ export {
   type StoryRecordSink,
   type StoryRoleMaker,
   type StoryRoleResolver,
+  type StoryRunRoleMakers,
   type StorySnapshotFailure,
   type StoryStepLease,
   type StoryWriteInput,

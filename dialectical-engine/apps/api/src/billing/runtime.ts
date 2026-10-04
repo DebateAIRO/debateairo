@@ -158,7 +158,9 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     repository, jobs, entitlements, renewal, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
     xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit, clock: deps.clock
   });
-  outbox.register("RENEWAL_NOTICE", createRenewalNoticeHandler({ repository, jobs, renewal, policy: deps.policy }));
+  outbox.register("RENEWAL_NOTICE", createRenewalNoticeHandler({
+    repository, jobs, renewal, policy: deps.policy, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit
+  }));
   let lastMaintenance = Number.NEGATIVE_INFINITY;
   const renewTick = createSingleFlightErasureReconciler(
     async () => {

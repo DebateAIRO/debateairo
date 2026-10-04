@@ -16,7 +16,7 @@ function subscription(overrides: Record<string, unknown> = {}) {
     renews_on: "2026-10-29T10:00:00.000Z", renewal_total: "24.20", scheduled_downgrade_plan_id: null,
     // A Romanian window: it closes at midnight in Bucharest (UTC+3 in October), the end of October 13 there.
     withdrawal_open_until: "2026-10-13T21:00:00.000Z", withdrawal_last_day: "2026-10-13",
-    can_upgrade: true, can_change_card: true, ...overrides
+    can_upgrade: true, can_change_card: true, can_revoke_cancel: false, ...overrides
   };
 }
 const INVOICES = {
@@ -121,7 +121,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Cancel");
     expect(text()).toContain("Cancel your plan? You keep it until October 29, 2026.");
     client.getBillingSubscription.mockResolvedValueOnce({
-      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })
+      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null, can_revoke_cancel: true })
     });
     await click("Yes, cancel");
     expect(client.cancelSubscription).toHaveBeenCalledTimes(1);
@@ -285,6 +285,64 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).not.toContain("September 28, 2026");
   });
 
+  it("offers Undo only when the server says the undo would work: never for a sandbox plan on the live site (C-15)", async () => {
+    // README §14.8's same-host switch: the sandbox plan stays ACTIVE with its cancel pending, and the revoke route
+    // refuses it NOT_SUBSCRIBED, which would read "try again" until the period end. The server says so in the view.
+    const pending = { cancel_requested: true, renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false,
+      withdrawal_open_until: null, withdrawal_last_day: null };
+    client.getBillingSubscription.mockResolvedValue({ subscription: subscription({ ...pending, can_revoke_cancel: false }) });
+    await render();
+    expect(text()).toContain("Your plan ends on October 29, 2026. You won't be charged again.");
+    expect(button("Undo cancellation")).toBeUndefined();
+    expect(button("Cancel")).toBeUndefined();
+    // Control: the same plan on its own system, where the server offers the undo.
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.getBillingSubscription.mockResolvedValue({ subscription: subscription({ ...pending, can_revoke_cancel: true }) });
+    await render();
+    await click("Undo cancellation");
+    expect(client.revokeSubscriptionCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Cancel on a plan paused by a payment dispute, with the paused confirm text (P2-W10)", async () => {
+    // SUSPENDED: the server writes the cancel (no renewal) and ends nothing; the dispute or the sweep decides the end.
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ status: "SUSPENDED", renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false })
+    });
+    await render();
+    expect(text()).toContain("Paid features are paused while a payment dispute is open.");
+    expect(button("Undo cancellation")).toBeUndefined();
+    await click("Cancel");
+    expect(text()).toContain("Cancel your plan? It won't renew. Its paid features stay paused while the payment dispute is open.");
+    // Never a promise of access the paused plan does not give.
+    expect(text()).not.toContain("You keep it until");
+    client.getBillingSubscription.mockResolvedValueOnce({
+      subscription: subscription({
+        status: "SUSPENDED", cancel_requested: true, renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false
+      })
+    });
+    await click("Yes, cancel");
+    expect(client.cancelSubscription).toHaveBeenCalledTimes(1);
+    expect(text()).toContain("Your plan won't renew. You won't be charged again.");
+  });
+
+  it("never offers Undo while a plan is paused by a dispute, and says it won't renew (P2-W10, the W7 review's item 3)", async () => {
+    // A cancel then a charge-back, a person's own cancel while paused, or a deletion scheduled while paused: the server
+    // refuses the undo while SUSPENDED (once a won dispute resumes the plan, the undo comes back until the period end).
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({
+        status: "SUSPENDED", cancel_requested: true, renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false
+      })
+    });
+    await render();
+    expect(button("Undo cancellation")).toBeUndefined();
+    expect(button("Cancel")).toBeUndefined();
+    expect(text()).toContain("Your plan won't renew. You won't be charged again.");
+    // "Your plan ends on {date}" would promise the paid features until then; they are paused.
+    expect(text()).not.toContain("Your plan ends on");
+    expect(client.revokeSubscriptionCancel).not.toHaveBeenCalled();
+  });
+
   it("during an outage at renewal (ruling Q-1) promises no past date, and a downgrade or a cancel names today", async () => {
     // NOW is October 3; the period ended on October 2 and the renewal is being retried quietly (up to 72 h).
     client.getBillingSubscription.mockResolvedValue({
@@ -305,9 +363,13 @@ describe("P20 SubscriptionControls (S1)", () => {
   });
 
   it("once the paid month is over, a pending cancel names today and offers no undo the server would refuse", async () => {
-    // Between the period end and the next period-end sweep (at most 10 minutes) the plan still reads ACTIVE.
+    // Between the period end and the next period-end sweep (at most 10 minutes) the plan still reads ACTIVE. C-15: the
+    // server then says no undo; the page's own clock hides it too, for a view read just before the period end.
     client.getBillingSubscription.mockResolvedValue({
-      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null, current_period_end: "2026-10-02T10:00:00.000Z" })
+      subscription: subscription({
+        cancel_requested: true, renews_on: null, renewal_total: null, current_period_end: "2026-10-02T10:00:00.000Z",
+        can_revoke_cancel: true
+      })
     });
     client.getBillingInvoices.mockResolvedValue({ invoices: [] });
     await render();
@@ -457,7 +519,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     act(() => root.unmount());
     root = createRoot(container);
     client.getBillingSubscription.mockResolvedValue({
-      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })
+      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null, can_revoke_cancel: true })
     });
     client.revokeSubscriptionCancel.mockRejectedValueOnce(refusal());
     await render();
@@ -491,7 +553,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     act(() => root.unmount());
     root = createRoot(container);
     client.getBillingSubscription.mockResolvedValue({
-      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })
+      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null, can_revoke_cancel: true })
     });
     client.revokeSubscriptionCancel.mockRejectedValueOnce(refusal());
     await render();
@@ -502,7 +564,7 @@ describe("P20 SubscriptionControls (S1)", () => {
 
   it("W7: an undo refused while the account deletion is pending says so, never 'try again'", async () => {
     client.getBillingSubscription.mockResolvedValue({
-      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null })
+      subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null, can_revoke_cancel: true })
     });
     client.revokeSubscriptionCancel.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"));
     await render();

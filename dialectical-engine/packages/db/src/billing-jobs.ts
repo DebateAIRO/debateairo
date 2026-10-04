@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { CustomerXMoneyEnvironment, OutboxKind, OutboxPayload } from "./billing.js";
+import type { CustomerXMoneyEnvironment, OutboxJob, OutboxKind, OutboxPayload } from "./billing.js";
 
 const SUBSCRIPTION_LEASE_NAMESPACE = "debateai.billing.subscription:";
 
@@ -70,11 +70,40 @@ export class BillingJobQueries {
    * column). A later attempt tells "the call may have moved money / created the document" (the stage is still there:
    * the process died mid-call) from "the call proved nothing was sent" (the worker overwrote it with that code).
    * RefundDesk (P9b) and the SmartBill jobs (P10b, A17b) use it.
+   * P2-M6: P1b's claim fence holds here too. Only the job's current claim holder (the worker and the attempt its claim
+   * gave it, `claimedBy` and `attempts` as the claim handed the job over) moves the stage. A stale holder, whose lease
+   * ran out and whose job another worker claimed again, changes nothing and gets false, and its caller stops before
+   * any vendor call. With one process the holder is always current, so nothing changes there.
+   * `client` (optional, C-14): the caller's open transaction, so the stage commits or rolls back with the caller's
+   * other writes. SmartBill writes its invoice intent and CALL_STARTED this way, after `holdsClaim` has locked the row
+   * on that same client: the intent never exists without its stage. Without it the write runs on the pool, on its own.
    */
-  async markJobStage(jobId: string, code: string): Promise<void> {
-    await this.pool.query(
-      "UPDATE billing.outbox SET last_error_code=$2 WHERE job_id=$1 AND done_at IS NULL AND dead_at IS NULL", [jobId, code]
-    );
+  async markJobStage(
+    job: Pick<OutboxJob, "jobId" | "claimedBy" | "attempts">, code: string, client?: PoolClient
+  ): Promise<boolean> {
+    if (job.claimedBy === null) return false;
+    const result = await (client ?? this.pool).query(`
+      UPDATE billing.outbox SET last_error_code=$2
+      WHERE job_id=$1 AND done_at IS NULL AND dead_at IS NULL AND claimed_by=$3 AND attempts=$4
+    `, [job.jobId, code, job.claimedBy, job.attempts]);
+    return result.rowCount === 1;
+  }
+
+  /**
+   * C-14: the claim fence for a write that must happen in the caller's transaction (SmartBill's invoice intent). It
+   * locks the open job row FOR UPDATE on `client` and says whether it is still this claim's (`claimedBy` and
+   * `attempts` as the claim handed the job over). While the caller's transaction holds the row, no other worker can
+   * claim it again (the claim skips a locked row; every other write to it waits), so a write made after `true` commits
+   * only while this claim holds the job, and a stale holder (false) writes nothing.
+   */
+  async holdsClaim(client: PoolClient, job: Pick<OutboxJob, "jobId" | "claimedBy" | "attempts">): Promise<boolean> {
+    if (job.claimedBy === null) return false;
+    const result = await client.query(`
+      SELECT 1 FROM billing.outbox
+      WHERE job_id=$1 AND done_at IS NULL AND dead_at IS NULL AND claimed_by=$2 AND attempts=$3
+      FOR UPDATE
+    `, [job.jobId, job.claimedBy, job.attempts]);
+    return result.rowCount === 1;
   }
 
   async jobStage(jobId: string): Promise<string | null> {
@@ -293,11 +322,12 @@ export class BillingJobQueries {
 
   /**
    * D7 #5: whether our own rows say a payment for this INITIAL charge may be on its way: a stored notice naming it
-   * (as `externalOrderId`) that is not `complete-failed` and whose transaction the charge has not recorded as FAILED,
-   * or an open VERIFY_PAYMENT job for it (a notice's job names it as `external_order_id`, a rebill's as `charge_id`).
-   * A not-final attempt (`start`, `in-progress`, `3d-pending`) counts only while it is fresh: a notice with such a
-   * status only when received at or after `notFinalSince`, and a job the check last retried as PAYMENT_NOT_FINAL only
-   * when its notice (else the job itself) is that recent. A job not run yet, and any other status, always count. A
+   * (as `externalOrderId`) that is not `complete-failed` and whose transaction the charge has not recorded as FAILED
+   * or as CHARGEBACK (P2-N1: a first payment charged back before it was verified), or an open VERIFY_PAYMENT job
+   * for it (a notice's job names it as `external_order_id`, a rebill's as `charge_id`). A not-final attempt
+   * (`start`, `in-progress`, `3d-pending`) counts only while it is fresh: a notice with such a status only when
+   * received at or after `notFinalSince`, and a job the check last retried as PAYMENT_NOT_FINAL only when its notice
+   * (else the job itself) is that recent. A job not run yet, and any other status, always count. A
    * notice VERIFY_PAYMENT ended MISMATCH (P2-I1: its order reference is not xMoney's, or its payer is not the
    * checkout's customer) names nothing on its way: a notice is not authenticated, so it never holds a checkout.
    * Read in the checkout's transaction, under the owner lock.
@@ -312,7 +342,8 @@ export class BillingJobQueries {
           AND (notice.status NOT IN ('start', 'in-progress', '3d-pending') OR notice.received_at >= $3)
           AND NOT EXISTS (
             SELECT 1 FROM billing.charge_event AS failed
-            WHERE failed.charge_id = $1 AND failed.kind = 'FAILED' AND failed.xmoney_transaction_id = notice.transaction_id
+            WHERE failed.charge_id = $1 AND failed.kind IN ('FAILED', 'CHARGEBACK')
+              AND failed.xmoney_transaction_id = notice.transaction_id
           )
           AND NOT EXISTS (
             SELECT 1 FROM billing.xmoney_notice_outcome AS outcome

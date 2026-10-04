@@ -20,6 +20,13 @@ describe("W12 pnpm billing:invoice's grammar (P2-I17)", () => {
       .toMatchObject({ mode: "RECORD", reference: "1234567" });
   });
 
+  it("takes --amount <dollars.cents> only with --kind CREDIT_NOTE --record, for a dashboard refund's credit note (P4-K, P2-W12)", () => {
+    expect(parseInvoiceArguments(["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-0042", "--amount", "12.10"]))
+      .toEqual({ chargeId: CHARGE, kind: "CREDIT_NOTE", mode: "RECORD", reference: "DBAI-0042", amountMicros: 12_100_000 });
+    expect(parseInvoiceArguments(["--amount", "0.01", "--record", "qd_7f3a91", "--kind", "CREDIT_NOTE", "--charge", CHARGE]))
+      .toEqual({ chargeId: CHARGE, kind: "CREDIT_NOTE", mode: "RECORD", reference: "qd_7f3a91", amountMicros: 10_000 });
+  });
+
   it("refuses anything else as usage (exit 2) before any connection is opened", async () => {
     for (const args of [
       [],
@@ -31,7 +38,15 @@ describe("W12 pnpm billing:invoice's grammar (P2-I17)", () => {
       ["--charge", CHARGE, "--charge", CHARGE, "--kind", "INVOICE", "--requeue"],
       ["--charge", "not a charge", "--kind", "INVOICE", "--requeue"],
       ["--charge", CHARGE, "--kind", "INVOICE", "--requeue", "--force"],
-      ["--charge", CHARGE, "--kind", "INVOICE", "--record", "two words"]
+      ["--charge", CHARGE, "--kind", "INVOICE", "--record", "two words"],
+      // P4-K: --amount belongs to a credit note's --record only, in whole cents, above zero.
+      ["--charge", CHARGE, "--kind", "INVOICE", "--record", "DBAI-1", "--amount", "12.10"],
+      ["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--requeue", "--amount", "12.10"],
+      ["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--amount", "12.10"],
+      ["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-1", "--amount"],
+      ["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-1", "--amount", "12.10", "--amount", "12.10"],
+      ...["12", "12.1", "12.100", "12,10", "-1.00", "0.00", "012.10", "1e3", " 12.10"].map((amount) =>
+        ["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-1", "--amount", amount])
     ]) {
       const { lines, output } = sink();
       const open = vi.fn();
@@ -54,5 +69,26 @@ describe("W12 pnpm billing:invoice's grammar (P2-I17)", () => {
     }))).toBe(1);
     expect(refused.lines.err).toBe("BILLING_INVOICE_NOTHING_TO_ISSUE\n");
     expect(close).toHaveBeenCalledTimes(2);
+  });
+
+  it("says a dashboard refund's credit note was recorded at the owner's amount, and that the quarter now counts it (P4-K)", async () => {
+    const recorded = sink();
+    expect(await runBillingInvoiceCli(
+      ["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-0042", "--amount", "12.10"], recorded.output,
+      async () => ({
+        run: async () => ({ kind: "RECORDED" as const, document: "CREDIT_NOTE" as const, issuer: "SMARTBILL" as const, creditNoteWaiting: false }),
+        close: async () => undefined
+      })
+    )).toBe(0);
+    expect(recorded.lines.out).toContain(`Recorded: SmartBill credit note DBAI-0042 for charge ${CHARGE}.`);
+    expect(recorded.lines.out).toContain("The quarter's tax summary now subtracts this refund at 12.10 USD.");
+    // Control: a credit note recorded without --amount says nothing of an amount the owner never gave.
+    const plain = sink();
+    expect(await runBillingInvoiceCli(["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-0042"], plain.output,
+      async () => ({
+        run: async () => ({ kind: "RECORDED" as const, document: "CREDIT_NOTE" as const, issuer: "SMARTBILL" as const, creditNoteWaiting: false }),
+        close: async () => undefined
+      }))).toBe(0);
+    expect(plain.lines.out).not.toContain("USD");
   });
 });

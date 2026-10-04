@@ -74,7 +74,10 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
  * ("withdrawal after an upgrade: the paid total is the sum of all successful charges since the first activation");
  * both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is written.
  * W6 (P2-I8): each of those payments gives back its own share, its days measured over the stretch it paid for
- * (`withdrawalPayments`: an UPGRADE's starts at its quote's creation), and the sum is floored once.
+ * (`withdrawalPayments`: an UPGRADE's starts at its quote's creation), and the sum is floored once. C1 (P2-W6): a
+ * payment whose SUCCEEDED is after `withdrewAt` (an upgrade paid after the emailed statement arrived, before the
+ * owner ran the command) takes no share: it goes back whole, what it still holds, on top of that sum. The refund is
+ * still split newest first, so such a payment is the first to go back.
  *
  * D6a F20(c): when a refund made in the xMoney dashboard touched any paid transaction (`providerRefunded`, whose
  * refunded amount is only an upper bound), or when a transaction already holds a refund request
@@ -123,11 +126,17 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
       if (read !== null) charges.push(read);
     }
     const paid = paidTransactions(charges, activatedAt);
+    // C1 (P2-W6): a payment made after the statement arrived (the owner's command records it later) was made after
+    // the person had withdrawn, so it goes back whole (what it still holds); the shares cover only the payments up to
+    // `withdrewAt`. Settings withdraws now, so nothing is ever after it there.
+    const statedOver = paid.filter((row) => row.succeededAt.getTime() <= withdrewAt.getTime());
+    const madeAfter = paid.filter((row) => row.succeededAt.getTime() > withdrewAt.getTime());
     const refundMicros = withdrawalRefundPerPaymentMicros({
-      payments: withdrawalPayments(paid, charges, { start: periodStart, end: periodEnd }),
+      payments: withdrawalPayments(statedOver, charges, { start: periodStart, end: periodEnd }),
       now: withdrewAt, creditSpentMicros: spentMicros,
       monthlyCreditMicros: entitlement.monthCreditOverrideMicros ?? planById(deps.plans, creditPlanId).monthlyCreditMicros
-    });
+    }) + withdrawalPayments(madeAfter, charges, { start: periodStart, end: periodEnd })
+      .reduce((total, payment) => total + payment.paidMicros, 0);
     let byOwner = paid.some((row) => row.providerRefunded);
     let allocations: RefundAllocation[] = [];
     if (!byOwner) {

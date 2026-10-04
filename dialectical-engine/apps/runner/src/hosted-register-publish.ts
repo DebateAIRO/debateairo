@@ -22,9 +22,14 @@
  *    member the seeder's code-owned `countryPolicy` row is dropped, so that version has
  *    no country gate (A14). Likewise optional, the `taxAuthorities` (paid plans P16a,
  *    checked by the register's own parser); without the member the seeder's code-owned
- *    `taxAuthorities` row is sealed as it is. Likewise optional, the `publicationCheckPolicy`
- *    (the pre-publish check's deadline, owner's ruling 2026-10-04, checked by the register's
- *    own parser); without the member the seeder's code-owned row is sealed as it is.
+ *    `taxAuthorities` row is sealed as it is. And optional, the room read's admission budget
+ *    `askRoomReads` (paid plans P4-G, go-live row 31): supplied, the code-owned `admissionPolicy`
+ *    row is sealed with that one member added (`ask_room_reads`, checked by the register's own
+ *    parser); left out, the code-owned row is sealed as it is. A version that seals the budget
+ *    band must carry it (ruling C7, `ASK_ROOM_ADMISSION_UNSEALED`). Likewise optional, the
+ *    `publicationCheckPolicy` (the pre-publish check's deadline, owner's ruling 2026-10-04,
+ *    checked by the register's own parser); without the member the seeder's code-owned row is
+ *    sealed as it is.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -63,8 +68,9 @@ import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import {
-  firstCallPlanModels, freeCapsFollowPaidSiteRule, planCapsFollowPaidSiteRule, SCORECARD_FREE_CAPS_INVALID,
-  SCORECARD_PLAN_CAPS_INVALID, type PickerSettings
+  firstCallPlanModels, freeAnswerJobsFollowPaidSiteRule, freeCapsFollowPaidSiteRule, planCapsFollowPaidSiteRule,
+  SCORECARD_FREE_ANSWER_UNSCORED, SCORECARD_FREE_CAPS_INVALID, SCORECARD_PLAN_CAPS_INVALID, type PickerSettings,
+  type Scorecard
 } from "@debateai/scorecard";
 import {
   assertDeploymentProviderTargets,
@@ -73,6 +79,7 @@ import {
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import {
+  ADMISSION_POLICY_ROW_KEY,
   ALGORITHM_REGISTER_ROW_KEYS,
   BILLING_PLANS_ROW_KEY,
   BILLING_POLICY_ROW_KEY,
@@ -85,12 +92,14 @@ import {
   STORY_ROW_KEYS,
   TAX_AUTHORITIES_ROW_KEY,
   admissionPolicyFromValue,
+  assertAskRoomAdmissionSealed,
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
   billingPlansFromValue,
   billingPolicyFromValue,
   buildConfiguredProviderSetDeploymentRow,
+  callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   costEnvelopeBand,
   costEnvelopeCeilings,
@@ -126,6 +135,7 @@ import {
   registerVersionToSafeLegacyNumber,
   taxAuthoritiesFromValue,
   warnOnIdenticalSynthesisRoleRefs,
+  type AdmissionPolicy,
   type BillingPlans,
   type BillingPolicy,
   type BootstrapRegister,
@@ -176,6 +186,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   "billingPlans", "billingPolicy",
   // Paid plans P16a: OPTIONAL. Left out, the code-owned taxAuthorities row is sealed as it is.
   "taxAuthorities",
+  // Paid plans P4-G (go-live row 31): OPTIONAL, the room read's admission budget. Left out, the
+  // code-owned admissionPolicy row is sealed as it is; required with the budget band (ruling C7).
+  "askRoomReads",
   // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
   "publicationCheckPolicy"
 ] as const);
@@ -358,6 +371,11 @@ export type HostedRegisterFile = Readonly<{
   billingPolicy: Readonly<{ value: unknown }> | null;
   /** Optional (P16a): the operator's own where-and-when text; absent = the code-owned row. */
   taxAuthorities?: unknown;
+  /**
+   * Optional (P4-G): the room read's admission budget, `{ key: "owner", limit, window_ms, capacity }`,
+   * added to the code-owned admissionPolicy row as `ask_room_reads`; absent = the code-owned row as it is.
+   */
+  askRoomReads?: unknown;
   /** Optional (2026-10-04): the pre-publish check's deadline; absent = the code-owned row. */
   publicationCheckPolicy?: unknown;
 }>;
@@ -418,6 +436,7 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     billingPlans: Object.hasOwn(record, BILLING_PLANS_ROW_KEY) ? Object.freeze({ value: record.billingPlans }) : null,
     billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null,
     ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
+    ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
     ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {})
   });
 }
@@ -517,6 +536,8 @@ export type HostedModelScorecard = Readonly<{
   /** Paid plans S4b: Free's own caps and the Economy caps, checked against the owners' Free rule when the version sells plans. */
   freeCap: PickerSettings["freeCap"];
   economyCap: PickerSettings["economyCap"];
+  /** Paid plans P4-E: the validated scorecard, which the Free answer-job rule reads through the picker's own eligibility. */
+  scorecard: Scorecard;
   sha256: string;
   bytes: number;
 }>;
@@ -614,6 +635,7 @@ export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: strin
     planStrengthCaps: read.scorecard.pickerSettings.planStrengthCaps,
     freeCap: read.scorecard.pickerSettings.freeCap,
     economyCap: read.scorecard.pickerSettings.economyCap,
+    scorecard: read.scorecard,
     sha256: createHash("sha256").update(valueJsonText).digest("hex"),
     bytes: Buffer.byteLength(valueJsonText, "utf8")
   });
@@ -660,6 +682,8 @@ export type HostedRegisterPlan = Readonly<{
   billingPolicy: BillingPolicy | null;
   /** Things to know, never refusals: `BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` (spec §2.5.1). */
   warnings: readonly string[];
+  /** P4-G: the room read's admission budget as sealed, or null when this version seals none. */
+  askRoomReads: AdmissionPolicy["askRoomReads"];
   /** A19: what the additive `modelScorecard` row carries, or null when this publication seals none. */
   modelScorecard: Readonly<{
     scorecardVersion: number;
@@ -810,6 +834,26 @@ export async function planHostedRegisterPublication(
       sourceRef: file.sourceRef
     }));
   }
+  // Paid plans P4-G (go-live row 31): the owner's room-read budget joins the code-owned admission row as
+  // its one added member; every other member stays byte for byte. The register's own parser checks the
+  // composed value (ADMISSION_POLICY_INVALID). The file's sourceRef is the version's own; the row names
+  // the member's origin in a fixed suffix, which keeps it inside the register's 1024-character bound.
+  if (file.askRoomReads !== undefined) {
+    const codeOwnedAdmission = codeOwnedRows.find((row) => row.rowKey === ADMISSION_POLICY_ROW_KEY);
+    if (codeOwnedAdmission === undefined) refuse(`HOSTED_REGISTER_ROW_MISSING:${ADMISSION_POLICY_ROW_KEY}`);
+    const composed = {
+      ...(JSON.parse(codeOwnedAdmission.valueJsonText) as Readonly<Record<string, unknown>>),
+      ask_room_reads: file.askRoomReads
+    };
+    const sourceRef = `${codeOwnedAdmission.sourceRef}`
+      + " + paid plans P4-G ask_room_reads, the owner's value from the hosted register file";
+    admissionPolicyFromValue(composed, sourceRef);
+    operatorRows.set(ADMISSION_POLICY_ROW_KEY, Object.freeze({
+      rowKey: ADMISSION_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(composed),
+      sourceRef
+    }));
+  }
   if (file.publicationCheckPolicy !== undefined) {
     operatorRows.set(PUBLICATION_CHECK_POLICY_ROW_KEY, Object.freeze({
       rowKey: PUBLICATION_CHECK_POLICY_ROW_KEY,
@@ -843,11 +887,10 @@ export async function planHostedRegisterPublication(
   }
   // The hosted boot refuses a register whose admission row lacks the support
   // budgets; asked here of the value about to be sealed, so a dry run says so.
-  const admission = rows.find((row) => row.rowKey === "admissionPolicy");
-  if (admission === undefined) refuse("HOSTED_REGISTER_ROW_MISSING:admissionPolicy");
-  assertHostedSupportAdmissionSealed("hosted", admissionPolicyFromValue(
-    JSON.parse(admission.valueJsonText) as unknown, admission.sourceRef
-  ));
+  const admissionRow = rows.find((row) => row.rowKey === ADMISSION_POLICY_ROW_KEY);
+  if (admissionRow === undefined) refuse(`HOSTED_REGISTER_ROW_MISSING:${ADMISSION_POLICY_ROW_KEY}`);
+  const admission = admissionPolicyFromValue(JSON.parse(admissionRow.valueJsonText) as unknown, admissionRow.sourceRef);
+  assertHostedSupportAdmissionSealed("hosted", admission);
   // Engine money rule, Task M7 (spec §14.4.1): the operator's cost row checks
   // its day against one run only; the code-owned story row lands in the same
   // version, so the day is checked against one run AND its story, over both
@@ -914,6 +957,27 @@ export async function planHostedRegisterPublication(
   if (billingPolicy?.enabled === true && scorecard !== null && !freeCapsFollowPaidSiteRule(scorecard)) {
     refuse(SCORECARD_FREE_CAPS_INVALID);
   }
+  // Paid plans P4-E (Part 3b re-review M-4; ruling C4): and only one under which a Free ask
+  // can seat its answer writer and answer checker. With billing on those two take a scored
+  // Free-roster model or none, so a scorecard where no configured Free-roster model can take
+  // one of them would refuse every Free question. Asked by the picker's own eligibility over
+  // the file's targets and the version's sealed answer bounds (the writer's call runs under
+  // the synthesizer bound, the checker's under the evaluator bound, as the API's
+  // `answerTokenCeilingsByRole` maps them); the API's boot asks the same.
+  if (billingPolicy?.enabled === true && scorecard !== null) {
+    const ceilings = callTokenCeilingsFromValues((rowKey) => sealed(rowKey)?.value);
+    if (!freeAnswerJobsFollowPaidSiteRule({
+      scorecard: scorecard.scorecard,
+      targets,
+      freeRosterModelIds: PLAN_TIER_ROSTERS.free,
+      answerTokenCeilingByRole: { ANSWER_WRITER: ceilings.synthesizer, ANSWER_CHECKER: ceilings.evaluator }
+    })) {
+      refuse(SCORECARD_FREE_ANSWER_UNSCORED);
+    }
+  }
+  // Paid plans P4-G, ruling C7 (go-live row 31): a version that seals the band seals the room read's own
+  // admission budget too, as the API's boot asks (ASK_ROOM_ADMISSION_UNSEALED), so a dry run says so.
+  assertAskRoomAdmissionSealed({ envelope: costEnvelope, admission });
   // §2.5.1: WARN, never refuse, when a plan's smallest window (the day cap, or
   // Free's whole month) is below what one debate may spend.
   const warnings = Object.freeze(billingPlans === null ? [] : billingPlans.plans
@@ -949,6 +1013,7 @@ export async function planHostedRegisterPublication(
     billingPlans,
     billingPolicy,
     warnings,
+    askRoomReads: admission.askRoomReads,
     modelScorecard: scorecard === null ? null : Object.freeze({
       scorecardVersion: scorecard.scorecardVersion,
       candidateCount: scorecard.candidateCount,
@@ -1012,6 +1077,11 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
       : `cost_envelope_band admission_close_basis_points=${plan.costEnvelope.closeBasisPoints}`
         + ` finish_up_to_basis_points=${String(plan.costEnvelope.finishBasisPoints)}`
         + ` waiting_line_per_person=${String(plan.costEnvelope.waitingLinePerPerson)}`,
+    // P4-G: the room read's admission budget, which a version with the band must seal (ruling C7).
+    plan.askRoomReads === null
+      ? "ask_room_reads absent"
+      : `ask_room_reads key=${plan.askRoomReads.key} limit=${plan.askRoomReads.limit}`
+        + ` window_ms=${plan.askRoomReads.windowMs} capacity=${plan.askRoomReads.capacity}`,
     `billing_policy ${plan.billingPolicy === null ? "absent" : `enabled=${String(plan.billingPolicy.enabled)}`}`,
     `billing_plans ${plan.billingPlans === null ? "absent" : `plan_ids=${plan.billingPlans.plans.map((entry) => entry.planId).join(",")}`}`,
     ...plan.warnings.map((warning) => `warning=${warning}`),
@@ -1124,6 +1194,8 @@ export async function verifyHostedRegisterBootReadiness(
     plans: await readBillingPlans(pool, version),
     envelope
   });
+  // Paid plans P4-G, ruling C7: the API boot's ask-room stage asks this next, of the same rows.
+  assertAskRoomAdmissionSealed({ envelope, admission });
   // Paid plans P7/P8b/P8c/P9a/P13: main.ts's billing-runtime stage, in its order (country policy first, then the admission scopes).
   if (billingPolicy?.enabled === true && countryPolicy === null) refuse("BILLING_CONFIGURATION_INCOMPLETE");
   if (billingPolicy?.enabled === true && admission.billingQuote === null) refuse("BILLING_ADMISSION_UNSEALED");

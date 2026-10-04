@@ -9,7 +9,7 @@ import {
 import { foldSubscription } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import {
-  holdOwnerLock, recordingAudit, seedActiveSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
+  holdOwnerLock, recordingAudit, seedActiveSubscription, suspendForChargeback, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
 import { DekBillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
@@ -134,6 +134,34 @@ describe("P13 the cancel link on real PostgreSQL", () => {
       { event: "billing.cancel_link.sent", fields: {} },
       { event: "billing.cancel", fields: { source: "EMAIL_LINK" } }
     ]);
+  });
+
+  it("sends a link for a plan paused by a card dispute, and the link cancels it with M7's paused words (P2-W10)", async () => {
+    const clock = { now: new Date() };
+    const { links, mails, audit } = service(clock);
+    const email = `w10-${randomUUID().slice(0, 8)}@example.test`;
+    const ownerRef = await account(email);
+    const seeded = await seedActiveSubscription(database.pool, {
+      ownerRef, planId: "PRO", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE"
+    });
+    await suspendForChargeback(database.pool, seeded, new Date(Date.now() - DAY));
+    expect(await links.request(email)).toBe("SENT");
+    expect(mails).toEqual([expect.objectContaining({ to: email, templateId: "M9" })]);
+    expect(await links.cancelByToken(tokenOf(mails[0]!))).toBe("CANCELLED");
+    const events = await new BillingRepository(database.pool).subscriptionEvents(seeded.subscriptionId);
+    expect(events.at(-1)).toMatchObject({ kind: "CANCEL_REQUESTED", data: { source: "EMAIL_LINK" } });
+    expect(events.map((event) => event.kind)).not.toContain("ENDED");
+    expect(foldSubscription(events)).toMatchObject({ status: "SUSPENDED", cancelRequested: true });
+    const m7 = await database.pool.query<{ payload: Record<string, unknown> }>(
+      "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref LIKE $1", [`M7:${seeded.subscriptionId}%`]
+    );
+    expect(m7.rows.map((row) => row.payload)).toEqual([expect.objectContaining({
+      "param.canUndo": "false", "param.paused": "true", "param.accessEndDate": seeded.periodEnd.toISOString().slice(0, 10)
+    })]);
+    // With the cancel pending, the cancel page sends no further link (nothing is left to cancel).
+    expect(await links.request(email)).toBe("SILENT");
+    expect(mails).toHaveLength(1);
+    expect(audit.events.map(({ event }) => event)).toEqual(["billing.cancel_link.sent", "billing.cancel"]);
   });
 
   it("stays silent for an unknown address, an address without a live plan, a frozen account and a malformed one", async () => {

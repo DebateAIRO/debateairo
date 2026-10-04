@@ -1,7 +1,7 @@
 import { t,type MessageCatalog } from "../i18n/translate.js";
 
 /**
- * What the asker is told when their debate FAILED: one of four fixed
+ * What the asker is told when their debate FAILED: one of five fixed
  * sentences, chosen from the run's terminal reason code and never containing
  * it. Same shape as `requestFailure.ts` (DL3-F7): a closed alphabet, nothing
  * derived from the stored value beyond which group it belongs to.
@@ -15,15 +15,26 @@ import { t,type MessageCatalog } from "../i18n/translate.js";
  * picks (the fifth, the day's limit, was retired by the budget rule, spec
  * 2026-09-28 §2.11), and CALL_BUDGET_EXHAUSTED (a re-claim finding a step's
  * tries used up) is "stopped partway", not a spending limit.
+ *
+ * Owner ruling, 3 October 2026 (Part 4): a waiting question whose paid plan
+ * ended is told so (PLAN_ENDED), not "something went wrong on our side".
  */
 
 export const RUN_FAILURE_KINDS = Object.freeze([
   /**
    * The API created the run, then could not finish setting it up
-   * (`RUN_SETUP_FAILED:<step>`), or the runner, claiming it, refused its pinned
-   * role assignment (RUN_ROLE_ASSIGNMENT_INVALID).
+   * (`RUN_SETUP_FAILED:<step>`, any step but PLAN_CHANGED), or the runner,
+   * claiming it, refused its pinned role assignment (RUN_ROLE_ASSIGNMENT_INVALID).
    */
   "NOT_STARTED",
+  /**
+   * Not a fault (`RUN_SETUP_FAILED:PLAN_CHANGED`, B7b): a premium question
+   * waited in line, and by the time there was room its owner was on Free
+   * because the paid plan ended, was withdrawn or erased, or was paused by a
+   * card dispute (the suspension writes Free). It never started; the owner can
+   * ask again under the plan they have now.
+   */
+  "PLAN_ENDED",
   /** The models pinned when the question was asked were gone when the runner claimed it. */
   "MODELS_UNAVAILABLE",
   /** The run's own ceiling refused its very first call. */
@@ -66,10 +77,21 @@ export const RUN_FAILURE_CODES: Readonly<Record<string, RunFailureKind>> = Objec
   RUN_CEILING_BELOW_FIRST_CALL: "RUN_LIMIT_REACHED"
 });
 
+/**
+ * The whole codes that are read before the head rule, because their head's
+ * group would say something untrue of them. Only an exact match counts: any
+ * other `RUN_SETUP_FAILED:<step>` reads its head's group.
+ */
+export const RUN_FAILURE_FULL_CODES: Readonly<Record<string, RunFailureKind>> = Object.freeze({
+  /** Part 4 (part4-scope.md §4.1): the API's waiting-line waker, B7b. */
+  "RUN_SETUP_FAILED:PLAN_CHANGED": "PLAN_ENDED"
+});
+
 export function runFailureKind(reason: string | null | undefined): RunFailureKind {
   if (typeof reason !== "string") return "STOPPED";
   const code = reason.trim();
   const unwrapped = code.startsWith(RUNNER_WRAPPER) ? code.slice(RUNNER_WRAPPER.length) : code;
+  if (Object.hasOwn(RUN_FAILURE_FULL_CODES, unwrapped)) return RUN_FAILURE_FULL_CODES[unwrapped]!;
   const head = unwrapped.split(":", 1)[0]!;
   return Object.hasOwn(RUN_FAILURE_CODES, head) ? RUN_FAILURE_CODES[head]! : "STOPPED";
 }

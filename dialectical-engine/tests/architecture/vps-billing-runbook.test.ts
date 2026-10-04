@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseHostedRegisterFile } from "../../apps/runner/src/hosted-register-publish.js";
@@ -12,6 +12,8 @@ import {
 const read = (path: string): string => readFileSync(resolve(path), "utf8");
 const readme = read("deploy/vps/README.md");
 const billing = readme.slice(readme.indexOf("## 14. Billing (paid plans)"));
+/** §14.8's billing-on check (Part 4 final review C-10), exactly as its sh block holds it. */
+const WAITING_PREMIUM_QUERY_LINE = String.raw`sudo -u postgres psql -d debateai -c "SELECT count(*) AS waiting_premium, count(*) FILTER (WHERE account.state <> 'active') AS of_accounts_not_active FROM core.run_wait w JOIN core.run r ON r.run_id = w.run_id JOIN identity.\"user\" account ON account.owner_ref = COALESCE((SELECT e.owner_ref FROM core.run_ownership_event e WHERE e.run_id = w.run_id ORDER BY e.at_seq DESC LIMIT 1), CASE WHEN r.asker_id LIKE 'owner:%' THEN substr(r.asker_id, 7)::uuid END) WHERE r.plan_tier IS DISTINCT FROM 'free' AND NOT EXISTS (SELECT 1 FROM core.run_wait_start s WHERE s.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM core.work_item f WHERE f.run_id = w.run_id AND f.state = 'FAILED') AND NOT EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent i WHERE i.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone t WHERE t.run_id = w.run_id)"`;
 
 describe("P22 the Billing runbook", () => {
   it("exists as §14 and names every setting, key file and code an operator needs", () => {
@@ -116,7 +118,9 @@ describe("P22 the Billing runbook", () => {
       "| `\"event\":\"billing.invoice.unknown\"`, with `issuer`, `kind` and `code` |",
       "| `\"event\":\"billing.payment.mismatch\"`, with `code` or `chargeKind` |",
       "this one is asked again on its own every hour", "A list xMoney refuses never causes it",
-      "`REFUND_NOT_REQUESTED` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
+      // P4-H (the P4-B judge's forward, progress.md: P2-W4): REFUND_CHARGE_MISSING is backed by no record either.
+      "`REFUND_NOT_REQUESTED`, `REFUND_CHARGE_MISSING` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
+      "`OTHER_XMONEY_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host",
       "WHERE o.outcome = 'MISMATCH'", "refund it there by hand",
       // W13 fix round 1: the alert promise is exact (O3 never for a dead O3; O2 comes from the refund itself, not for
       // REFUND_PAYLOAD_INVALID or a refund the queue stopped), a refused key keeps a renewal only for its window, any
@@ -146,9 +150,12 @@ describe("P22 the Billing runbook", () => {
       "billing:invoice --charge \"$CHARGE_REF\" --kind \"$KIND\" --requeue --confirm-not-issued",
       "that the document was NOT issued", "CREDIT_NOTE_REFUND_MISSING",
       "The changed amount is never charged until that notice has gone out",
-      // W12 fix F5: a dashboard refund's line is one the command cannot settle, said where the refusal is explained.
-      "A `DASHBOARD_REFUND` line (a refund made in the xMoney dashboard, amount unknown) has no\n  job, so this command"
-        + " cannot settle it",
+      // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): a dashboard refund's line is settled by
+      // recording the hand-made credit note with its amount; the quarter then subtracts it; one credit note per charge.
+      "billing:invoice --charge \"$CHARGE_REF\" --kind CREDIT_NOTE --record \"$DOCUMENT\" --amount \"$AMOUNT\"",
+      "- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only",
+      "tax summary subtracts the refund at that amount",
+      "goes to your accountant",
       // §14.2 (ruling Q-12): the records key is escrowed with the other five secrets.
       "sixth secret", "RESTORE_DRILL_RECORDS_KEY bytes=32",
       // §14.7 (ruling Q-3): the Terms archive M1 attaches from is never pruned.
@@ -168,11 +175,16 @@ describe("P22 the Billing runbook", () => {
     expect(printed.length).toBeGreaterThanOrEqual(15);
     for (const code of printed) expect(billing, code).toContain(`- \`${code}\``);
     expect(billing).not.toContain("(no such line for\nthat charge)");
+    // P4-K: the command now settles a DASHBOARD_REFUND line; the runbook no longer says it cannot.
+    expect(billing.replace(/\s+/gu, " ")).not.toContain("so this command cannot settle it");
+    expect(billing.replace(/\s+/gu, " ")).not.toContain("has no job to record it on");
     // W13 (P2-I18): every bare marker billing can print has its row in the journal table.
     const markers = ["apps/api/src/billing/runtime.ts", "apps/api/src/billing/erasure-hook.ts"]
       .flatMap((path) => [...read(path).matchAll(/reportPending\("(BILLING_[A-Z_]+)"\)/gu)].map((match) => match[1]!));
     expect(new Set(markers).size).toBeGreaterThanOrEqual(5);
     for (const marker of markers) expect(billing, marker).toContain(`| \`[${marker}]\` (a bare marker) |`);
+    // P4-H (P2-I18's open clause): the API's own one-off marker has its row too.
+    expect(billing).toContain("| `[BILLING_ERASURE_STOP_PENDING]` (a bare marker) |");
     // W9 fix round 1 (F1): a dead refund is never settled with "at least" its amount.
     expect(billing).not.toContain("Refund at least");
     // R-7: the public origin is the existing PUBLIC_APP_URL; no second setting names it.
@@ -188,6 +200,317 @@ describe("P22 the Billing runbook", () => {
     // G5 and P16a: the hosted example carries neither the country switches nor a reason to keep taxAuthorities, so
     // the runbook never tells the operator to copy "the four members" from it.
     expect(billing).not.toContain("Copy those four members");
+  });
+
+  it("P4-H (P2-I18's open clause): every billing line the API can write has a journal row, or is named routine", () => {
+    // The source list: the audit event union, the billing lines written straight to the journal, and every bracketed
+    // billing marker (the runtime's reportPending codes and the API's own console markers).
+    const sources = (dir: string): string[] => (readdirSync(resolve(dir), { recursive: true }) as string[])
+      .filter((name) => name.endsWith(".ts")).map((name) => read(`${dir}/${name}`));
+    const api = sources("apps/api/src");
+    const audited = [...read("apps/api/src/billing/audit.ts").matchAll(/^\s*\|\s*"(billing\.[a-z_.]+)"/gmu)].map((m) => m[1]!);
+    const direct = api.flatMap((text) => [...text.matchAll(/event:\s*"(billing\.[a-z_.]+)"/gu)].map((m) => m[1]!));
+    const events = new Set([...audited, ...direct]);
+    expect(audited.length).toBeGreaterThanOrEqual(50);
+    expect(direct).toContain("billing.cancel_link.failed");
+    const markers = new Set(api.flatMap((text) => [
+      ...[...text.matchAll(/reportPending\("(BILLING_[A-Z_]+)"\)/gu)].map((m) => m[1]!),
+      ...[...text.matchAll(/console\.error\("\[(BILLING_[A-Z_]+)\]"\)/gu)].map((m) => m[1]!)
+    ]));
+    expect(markers).toContain("BILLING_ERASURE_STOP_PENDING");
+
+    const start = billing.indexOf("| Signal | What it means | What to do |");
+    expect(start).toBeGreaterThan(0);
+    const tableLines: string[] = [];
+    for (const line of billing.slice(start).split("\n")) {
+      if (!line.startsWith("|")) break;
+      tableLines.push(line);
+    }
+    const firstCell = (line: string): string => line.split(" | ")[0] ?? "";
+    const rowEvents = tableLines.flatMap((line) => [...firstCell(line).matchAll(/`"event":"(billing\.[a-z_.]+)"`/gu)].map((m) => m[1]!));
+    const rowMarkers = tableLines.flatMap((line) => [...firstCell(line).matchAll(/`\[(BILLING_[A-Z_]+)\]`/gu)].map((m) => m[1]!));
+    const routineAt = billing.indexOf("**Every other billing line records a normal event and needs nothing from you:**");
+    expect(routineAt, "the routine sentence").toBeGreaterThan(start);
+    const routineText = billing.slice(routineAt, billing.indexOf("\n\n", routineAt));
+    const routine = [...routineText.matchAll(/`(billing\.[a-z_.]+)`/gu)].map((m) => m[1]!);
+
+    // Every line has exactly one home, and no row or routine name is stale.
+    for (const event of events) {
+      expect(rowEvents.includes(event) || routine.includes(event), `${event} is neither a row nor routine`).toBe(true);
+    }
+    for (const event of routine) expect(rowEvents, `${event} is both a row and routine`).not.toContain(event);
+    for (const event of [...rowEvents, ...routine]) expect(events, `${event} is not written by the API`).toContain(event);
+    expect(new Set(rowEvents).size, "one row per line").toBe(rowEvents.length);
+    for (const marker of markers) expect(rowMarkers, marker).toContain(marker);
+    for (const marker of rowMarkers) expect(markers, `${marker} is not written by the API`).toContain(marker);
+
+    // Each line that asks the owner to act (part4-scope.md §4.3, the open-items row "P2-I18 (X0)" and the W13
+    // re-review's additions) is a row of its own, never only the routine sentence.
+    for (const alarm of [
+      "billing.notice.undecryptable", "billing.mail.attachment_missing", "billing.renewal.stuck",
+      "billing.renewal.price_missing", "billing.renewal.history_invalid", "billing.maintenance.report",
+      "billing.reconcile.errors", "billing.reconcile.expired", "billing.reconcile.rows_rejected", "billing.refund.dead",
+      "billing.refund.unrecorded", "billing.xmoney.row_rejected", "billing.outbox.other_system",
+      "billing.refund.outcome_unknown", "billing.refund.refused", "billing.renewal.owner_stopped",
+      "billing.renewal.dunning_unpriced", "billing.reconcile.no_transaction", "billing.cancel_link.failed",
+      "billing.renewal.tax_refused", "billing.renewal.unknown", "billing.renewal.pending", "billing.chargeback",
+      "billing.withdrawal.owner_review",
+      // W13's rows, kept.
+      "billing.renewal.report", "billing.reconcile.listing_failed", "billing.outbox.dead", "billing.outbox.alert_failed",
+      "billing.outbox.settle_failed", "billing.xmoney.credentials_refused", "billing.quote.refused",
+      "billing.invoice.unknown", "billing.payment.mismatch",
+      // P4-H fix round 1 (finding 4): a renewal REBILL_REFUSED on more than one renewal is reported at once.
+      "billing.payment.failed"
+    ]) {
+      expect(rowEvents, alarm).toContain(alarm);
+    }
+    // Each row says what to do: the third cell is never empty. The row's closing pipe is stripped first, so an empty
+    // last cell ("| sig | meaning |  |") reads as empty, never as "|" (P4-H fix round 1, finding 3).
+    for (const line of tableLines.slice(2)) {
+      expect((line.replace(/\s*\|\s*$/u, "").split(" | ")[2] ?? "").trim(), line).not.toBe("");
+    }
+
+    // P4-H fix round 1: the rows whose wording the code settles, cell by cell.
+    const rowOf = (event: string): string[] => {
+      const line = tableLines.find((candidate) => firstCell(candidate).includes(`\`"event":"${event}"\``)) ?? "";
+      return line.replace(/\s*\|\s*$/u, "").split(" | ").map((cell) => cell.replace(/\s+/gu, " "));
+    };
+    // Finding 1: RenewalService.holdUnverified holds a renewal whose rebill xMoney answered but whose payment check
+    // has not settled it, under its own code, with the same pending line.
+    const [, pendingMeans = "", pendingDo = ""] = rowOf("billing.renewal.pending");
+    for (const needle of ["`PAYMENT_NOT_VERIFIED`", "its payment check has not settled it yet", "still in 3-D Secure"]) {
+      expect(pendingMeans, needle).toContain(needle);
+    }
+    for (const needle of ["Nothing on its own", "`PAYMENT_NOT_VERIFIED`: its payment check settles it",
+      "still without an outcome 30 days after it was made is counted by `billing.reconcile.expired`"]) {
+      expect(pendingDo, needle).toContain(needle);
+    }
+    // Finding 2: the owner summary lists a stuck renewal only when a call may have reached xMoney (a SUBMIT_UNKNOWN,
+    // BillingRepository.stuckRenewals), which is exactly closeStuck's REBILL_OUTCOME_UNKNOWN.
+    const [, stuckMeans = ""] = rowOf("billing.renewal.stuck");
+    for (const needle of ["Only with `REBILL_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`",
+      "A `REBILL_NOT_SENT` one charged nothing and is not listed there"]) {
+      expect(stuckMeans, needle).toContain(needle);
+    }
+    expect(stuckMeans).not.toContain("moves to Free. The owner summary lists it as `RENEWAL_STUCK`.");
+    // Finding 4: a failed payment has its own row; REBILL_REFUSED is xMoney refusing the request, not the card.
+    const [failedSignal = "", failedMeans = "", failedDo = ""] = rowOf("billing.payment.failed");
+    expect(failedSignal).toBe("| `\"event\":\"billing.payment.failed\"`, with `chargeKind` and `code`");
+    for (const needle of ["From a payment check", "`PAYMENT_DECLINED`", "`VOIDED`", "From a renewal or a payment retry",
+      "`REBILL_REFUSED`: xMoney refused the renewal request itself, not the card", "`NO_TRANSACTION`",
+      "follows a `billing.renewal.stuck` line"]) {
+      expect(failedMeans, needle).toContain(needle);
+    }
+    for (const needle of ["A decline: nothing", "`REBILL_REFUSED` on more than one renewal: report it at once, with the code",
+      "every renewal falls into the failed-payment path", "`NO_TRANSACTION`: the `billing.renewal.stuck` row"]) {
+      expect(failedDo, needle).toContain(needle);
+    }
+    expect(read("packages/payments-xmoney/src/client.ts")).toContain("throw new TypedDomainError(\"XMONEY_REFUSED\"");
+
+    // The rows the brief's sources ask for, word for word where the action matters.
+    for (const needle of [
+      // P2-W4 / P2-W3 (b) (the P4-B judge's forward): the other-system row covers a renewal notice too.
+      "or a renewal notice (`RENEWAL_NOTICE`) of a plan of the other system",
+      // The daily dead-refund count holds jobs that owe nothing; the summary's code says which.
+      "Not every one is owed", "the summary's own names",
+      // A notice the key cannot open is answered 200 and never stored, so its payment waits for the daily check.
+      "this host's xMoney private key cannot decrypt",
+      // The erasure stop that failed at scheduling is repeated by the sweep.
+      "the sweep in front of the money check",
+      "The page had already said a link is on its way"
+    ]) {
+      expect(billing.replace(/\s+/gu, " "), needle).toContain(needle);
+    }
+  });
+
+  it("P4-H (the P4-B and P4-C judges' forwards): a refund's three no-refund codes, and C1 in the hand calculation", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const section = (from: string, to: string): string => flat.slice(flat.indexOf(from), flat.indexOf(to, flat.indexOf(from)));
+    // P2-W4: O2 for REFUND_CHARGE_MISSING carries the not-requested sentences; OTHER_XMONEY_SYSTEM has its own.
+    const refund = section("**A refund that could not be completed.**", "**When xMoney or the tax service is down at a renewal.**");
+    for (const needle of [
+      "`REFUND_CHARGE_MISSING`: the job names a charge we do not have",
+      "the owner summary lists both as `REFUND_NOT_REQUESTED`",
+      "The reason code `OTHER_XMONEY_SYSTEM`", "nothing was sent and nothing is owed on this host",
+      "no refund reason and no deadline", "lists it as `REFUND_OTHER_SYSTEM`",
+      "refund it in that system's dashboard; a sandbox test payment needs nothing"
+    ]) {
+      expect(refund, needle).toContain(needle);
+    }
+    expect(refund).not.toContain("The one exception is the reason code `REFUND_NOT_REQUESTED`");
+    // C1 (P2-W6): a payment made after the withdrawal takes no share, and a later upgrade does not set the credit.
+    const withdrawal = section("**A withdrawal sent by email or on the model form.**", "**A refund that could not be completed.**");
+    for (const needle of [
+      "takes no share: it gives back all it still holds",
+      "its `SUCCEEDED` row in `billing.charge_event` is dated after",
+      "an upgrade paid after that moment does not set it"
+    ]) {
+      expect(withdrawal, needle).toContain(needle);
+    }
+  });
+
+  it("P4-H (P2-M41, the owner's ruling of 3 October 2026): switching billing off once plans are live is unsupported", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const off = flat.indexOf("*To switch billing off*");
+    expect(off).toBeGreaterThan(0);
+    const paragraph = flat.slice(off, flat.indexOf("**The tax summary.**", off));
+    for (const needle of [
+      "**Switching billing off once plans are live is not supported.**",
+      "Nothing in the code refuses it",
+      "Do it only with no live plan and no open billing job",
+      // The queries that show it: no live plan, no open billing job, no withdrawal still owed by hand.
+      "AS live_subscriptions FROM billing.subscription_latest_v", "AS open_billing_jobs FROM billing.outbox WHERE done_at IS NULL AND dead_at IS NULL",
+      "AS unsettled_owner_withdrawals",
+      "If any of them is not 0, do not switch billing off"
+    ]) {
+      expect(paragraph, needle).toContain(needle);
+    }
+  });
+
+  it("P4-H fix round 1 (the P4-F judge's route (a)): no paid question waits in line when billing goes on", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    // The check sits in "Switching billing on", before the step that publishes the version switching billing on.
+    const from = flat.indexOf("**Switching billing on.**");
+    const publish = flat.indexOf("Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4.");
+    expect(from).toBeGreaterThan(0);
+    expect(publish).toBeGreaterThan(from);
+    const before = flat.slice(from, publish);
+    for (const needle of [
+      "**No paid question may be waiting when billing goes on.**",
+      // Part 4 final review C-10: the count reads the line's own tables, whatever the account's state (the view
+      // core.run_waiting_v hides every run of an account that is not active); tests/integration/
+      // b3-holds-waiting-line.test.ts runs this exact query against the migrated schema.
+      WAITING_PREMIUM_QUERY_LINE,
+      "The first number it prints must be 0", "A question with no recorded plan counts as a paid one",
+      // Why, in plain words.
+      "the server takes the plan the browser sends", "everyone is on Free, because nobody could pay before",
+      "`RUN_SETUP_FAILED:PLAN_CHANGED`", "Your paid plan ended or was paused while this question waited",
+      "which is false for someone who never paid",
+      "If the count is not 0, wait for the line to empty, check again, then publish",
+      // §11's whole-line count is named only to say it does not do here; the band in the same version stays an option.
+      "`SELECT count(*) FROM core.run_waiting_v`", "in the same version that switches billing on"
+    ]) {
+      expect(before, needle).toContain(needle);
+    }
+    // C-10: the view's count is no longer offered as the stricter check, and the old view-based query is gone.
+    expect(before).not.toContain("is a stricter check that also does");
+    expect(before).not.toContain("FROM core.run_waiting_v WHERE owner_ref IS NOT NULL");
+    // The claims the paragraph makes stay true of the code: a NULL tier is premium to the waker's plan guard, and the
+    // asker reads that sentence.
+    expect(read("apps/api/src/ask-room.ts")).toContain("(run.planTier ?? \"premium\") === \"premium\"");
+    expect(read("apps/ui/messages/en/home.json")).toContain("\"runFailure.PLAN_ENDED\": \"Your paid plan ended or was paused while this question waited");
+  });
+
+  it("Part 4 final review C-10: the billing-on check counts every account, runs again before the restart, names askRoomReads", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const from = flat.indexOf("**No paid question may be waiting when billing goes on.**");
+    const publish = flat.indexOf("Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4.");
+    expect(from).toBeGreaterThan(0);
+    const paragraph = flat.slice(from, publish);
+    for (const needle of [
+      "whatever the state of its asker's account",
+      // The second number: suspended is only an account deletion's prepared state (0040), which ends by deleting the
+      // account row, so its question drops out of the join by itself; nothing makes an age-frozen account active
+      // again (0040's only write of state='active' comes from pending_mfa), so its question stays counted.
+      "The second number counts the questions of accounts that are being deleted or were frozen by the age check.",
+      "A question of an account being deleted leaves the count by itself when the deletion finishes, without ever starting.",
+      "A frozen account's question never starts, but stays counted.",
+      "it leaves out every question of an account that is not active",
+      "If only questions of accounts that are not active keep the count above 0, check again later (for example the next day): a deletion under way finishes by itself.",
+      "If the second number is still above 0, those questions belong to frozen accounts and never leave by waiting: do not switch billing on, and report the case.",
+      // Not atomic with the switch: the same count again after the publish, before the version is pinned. A pinned
+      // file is read by any restart (Restart=on-failure, a reboot), so nothing is pinned while the count is not 0.
+      "Run the same check again after the publish, just before you copy its `REGISTER_VERSION=` line into both files and restart the two services (§14.4)",
+      "If it is not 0 then, pin nothing yet: any restart, including systemd's own after a failure, starts the services on the version the files name.",
+      "Wait for the line to empty, check again, then pin and restart.",
+      // C7: a version with the band needs the room read's budget, so the band option names it.
+      "with `askRoomReads`, the room read's budget, which every version with the band needs"
+    ]) {
+      expect(paragraph, needle).toContain(needle);
+    }
+    // The check reads the line's own tables, never the view that hides an inactive account's run.
+    const query = /```sh\n(sudo -u postgres psql -d debateai -c "SELECT count\(\*\) AS waiting_premium[^\n]*)\n```/u.exec(billing)?.[1] ?? "";
+    expect(query).toBe(WAITING_PREMIUM_QUERY_LINE);
+    expect(query).not.toContain("run_waiting_v");
+    expect(query).not.toContain("account.state = 'active'");
+    // The words this round corrected stay gone: a not-active account's question is not ended later, and the services
+    // are not said to keep their version until an operator restart.
+    expect(paragraph).not.toContain("rests until the account is active again");
+    expect(paragraph).not.toContain("they will not leave by waiting");
+    expect(paragraph).not.toContain("until you restart them, the services keep the version they run");
+    // The facts behind those words: the units read the pinned files and restart on failure by themselves.
+    for (const unit of ["api", "runner"]) {
+      const service = read(`deploy/vps/systemd/debateai-${unit}.service`);
+      expect(service).toContain(`EnvironmentFile=/etc/debateai/${unit}.env`);
+      expect(service).toContain("Restart=on-failure");
+    }
+  });
+
+  it("Part 4 final review C-6, C-9, C-13: the --amount bullet, the dispute states and the retry days", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const between = (from: string, to: string): string => {
+      const start = flat.indexOf(from);
+      expect(start, from).toBeGreaterThan(0);
+      return flat.slice(start, flat.indexOf(to, start));
+    };
+    // C-6: a dashboard refund recorded with --amount is already subtracted; REFUND_UNRECORDED's "by hand" is not again.
+    const C6 = "A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures: do not take it off again.";
+    const amountBullet = between("- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only", "- `--requeue` to let the site");
+    expect(amountBullet).toContain(C6);
+    // The re-review's M-7: a payment refunded before its plan started owes no document, so no command clears its line.
+    expect(amountBullet).toContain("A `REFUNDED_BEFORE_START` line (a payment xMoney refunded before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge");
+    const unrecorded = billing.split("\n").find((line) => line.startsWith("| `\"event\":\"billing.refund.unrecorded\"`")) ?? "";
+    expect(unrecorded).toContain("take it off that country's net sales and tax by hand");
+    expect(unrecorded.replace(/\s+/gu, " ")).toContain(C6);
+    // C-9: a paused plan its person cancelled lists as CANCEL_REQUESTED and still waits; a won dispute's limit.
+    const disputes = between("**Disputes (chargebacks).**", "**A withdrawal sent by email or on the model form.**");
+    for (const needle of [
+      "- `won` gives the plan back; a plan its person cancelled while it was paused comes back only until its period end, then ends; nobody is emailed;",
+      "`CANCEL_REQUESTED` (the person cancelled while the plan was paused) is still waiting for its outcome"
+    ]) {
+      expect(disputes, needle).toContain(needle);
+    }
+    // C-13: beside billingPolicy in §14.4.
+    const publishing = between("### 14.4 Publishing the billing settings", "### 14.5");
+    expect(publishing).toContain(
+      "- `billingPolicy`: `enabled`, the retry days and the withdrawal days. Never shorten `dunning_retry_days` while any plan is"
+      + " PAST_DUE (a spent dunning then ends at once, before the retry date its last email promised);"
+    );
+  });
+
+  it("Part 4 final review C-11: both READMEs say Free's answer models need the scorecard candidate's exact maker", () => {
+    const needle = "be served through a connection whose maker is written exactly as the scorecard candidate's"
+      + " (character for character, so `openai` and `OpenAI` do not match), with the same model id, at the thinking level"
+      + " it was scored at, which that connection declares (a model scored at its default level only needs no declared"
+      + " level), and have a typical call that fits its context window";
+    for (const path of ["deploy/vps/register/README.md", "scorecards/README.md"]) {
+      const text = read(path).replace(/\s+/gu, " ");
+      const at = text.indexOf("is refused `SCORECARD_FREE_ANSWER_UNSCORED`");
+      expect(at, path).toBeGreaterThan(0);
+      expect(text.slice(Math.max(0, at - 700), at), path).toContain(needle);
+    }
+    // The claim stays true of the picker: the maker is compared character for character with the candidate's.
+    expect(read("packages/scorecard/src/picker.ts")).toContain("target.maker === candidate.maker");
+  });
+
+  it("P4-H (§4.3's optional notes): the runner's looser Free check, and what §14.9's journal filter prints", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    // The S4b review's M-1: the runner never reads billingPolicy, so only the API's start and the publish are strict.
+    for (const needle of [
+      "the runner's own start-up check", "prices Free over every configured model",
+      "the API's start-up and the publish price Free on the Free plan's models only"
+    ]) {
+      expect(flat, needle).toContain(needle);
+    }
+    // The W13 judge's minor: the filter prints only three kinds of line, and a second command shows every billing line.
+    const before = flat.slice(flat.indexOf("**Before step 1: read the journal of the first start with billing on.**"),
+      flat.indexOf("**Every purchase in steps 1–5"));
+    for (const needle of [
+      "This filter prints nothing else", "To read every billing line of that start",
+      "grep -E '\"event\":\"billing\\.|\\[BILLING_'", "Every other billing line records a normal event"
+    ]) {
+      expect(before, needle).toContain(needle);
+    }
   });
 
   it("asks for every billing secret at a prompt, never through an editor, and never replaces one", () => {

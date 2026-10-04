@@ -104,14 +104,19 @@ export type OutboxJob = Readonly<{
  * charge, the verdict from its location evidence (null when none). `amountKnown` is false on exactly one shape: a
  * REFUND that D6a's P9c recorded for a refund made in the xMoney dashboard on the payment itself (error code
  * `PROVIDER_REFUND`, no `refunds_transaction_id`), because xMoney's read named no amount and P9c wrote what was left
- * of the charge, an upper bound — P16b lists such a row instead of subtracting it. Every other row is true, a
- * `PROVIDER_REFUND` on xMoney's own refund transaction and a `PROVIDER_VOID` included.
+ * of the charge, an upper bound — P16b lists such a row instead of subtracting it — until the owner records its credit
+ * note (P4-K, P2-W12: `pnpm billing:invoice --record --amount`): the row then carries the credit note's amount and is
+ * known. Every other row is true, a `PROVIDER_REFUND` on xMoney's own refund transaction and a `PROVIDER_VOID` included.
+ * `saleRecorded` (Part 4 final review C-19) says whether the charge holds a SUCCEEDED, in any quarter: always true for a
+ * SALE; false for a charge-back of a payment we never verified (a checkout charged back before its plan started), for
+ * which no sale was ever counted.
  */
 export type TaxSummaryRow = Readonly<{
   type: "SALE" | "REFUND" | "CHARGEBACK"; chargeId: string; at: Date;
   taxCountry: string; taxRegion: string | null; taxStatus: TaxStatus;
   chargeNetMicros: number; chargeTaxMicros: number; chargeTotalMicros: number; amountMicros: number;
   amountKnown: boolean;
+  saleRecorded: boolean;
   locationVerdict: LocationVerdict | null;
 }>;
 /** Where the previous page of due renewals ended: the order is (currentPeriodEnd, subscriptionId). */
@@ -969,7 +974,7 @@ export class BillingRepository {
     const rows = (await this.pool.query<{
       type: "SALE" | "REFUND" | "CHARGEBACK"; charge_id: string; at: Date; tax_country: string; tax_region: string | null;
       tax_status: TaxStatus; net_micros: string; tax_micros: string; total_micros: string; amount_micros: string;
-      amount_known: boolean; verdict: LocationVerdict | null;
+      amount_known: boolean; sale_recorded: boolean; verdict: LocationVerdict | null;
     }>(`
       WITH dated AS (
         -- When xMoney says the money moved; a row recorded without it falls back to when we recorded it.
@@ -979,17 +984,31 @@ export class BillingRepository {
       SELECT CASE dated.kind WHEN 'SUCCEEDED' THEN 'SALE' WHEN 'REFUNDED' THEN 'REFUND' ELSE 'CHARGEBACK' END AS type,
         charge.charge_id, dated.money_at AS at, quote.tax_country, quote.tax_region, quote.tax_status,
         charge.net_micros, charge.tax_micros, charge.total_micros,
-        CASE dated.kind WHEN 'SUCCEEDED' THEN charge.total_micros WHEN 'REFUNDED' THEN dated.amount_micros
+        CASE dated.kind WHEN 'SUCCEEDED' THEN charge.total_micros
+          WHEN 'REFUNDED' THEN COALESCE(dashboard_note.total_micros, dated.amount_micros)
           ELSE COALESCE(dated.amount_micros, charge.total_micros) END AS amount_micros,
-        -- False only for P9c's dashboard refund recorded on the payment itself, whose amount is an upper bound.
-        -- IS NOT DISTINCT FROM keeps a NULL error code a plain false here, so the column is never NULL.
-        NOT (dated.kind = 'REFUNDED' AND dated.error_code IS NOT DISTINCT FROM 'PROVIDER_REFUND'
-          AND dated.refunds_transaction_id IS NULL) AS amount_known,
+        -- False only for P9c's dashboard refund recorded on the payment itself, whose amount is an upper bound, while
+        -- its credit note is not recorded. IS NOT DISTINCT FROM keeps a NULL error code a plain false here, so the
+        -- column is never NULL.
+        dashboard_note.invoice_id IS NOT NULL
+          OR NOT (dated.kind = 'REFUNDED' AND dated.error_code IS NOT DISTINCT FROM 'PROVIDER_REFUND'
+            AND dated.refunds_transaction_id IS NULL) AS amount_known,
+        -- C-19: a charge-back of a payment we never verified has no SUCCEEDED anywhere: no sale was counted for it.
+        EXISTS (
+          SELECT 1 FROM billing.charge_event AS sold WHERE sold.charge_id = dated.charge_id AND sold.kind = 'SUCCEEDED'
+        ) AS sale_recorded,
         evidence.verdict
       FROM dated
       JOIN billing.charge AS charge ON charge.charge_id = dated.charge_id
       JOIN billing.quote AS quote ON quote.quote_id = charge.quote_id
       LEFT JOIN billing.location_evidence AS evidence ON evidence.charge_id = charge.charge_id
+      -- P4-K (P2-W12): that dashboard refund's credit note, recorded by the owner's command at the owner's amount. A
+      -- charge holds one sale refund and one credit note at most (0086's invoice_one_per_intent; P16b's ruling on
+      -- invoiceUnknownItems), so the charge's credit note is this refund's own; every other refund keeps its amount.
+      LEFT JOIN billing.invoice AS dashboard_note
+        ON dated.kind = 'REFUNDED' AND dated.error_code IS NOT DISTINCT FROM 'PROVIDER_REFUND'
+          AND dated.refunds_transaction_id IS NULL
+          AND dashboard_note.charge_id = dated.charge_id AND dashboard_note.kind = 'CREDIT_NOTE'
       WHERE dated.money_at >= $1 AND dated.money_at < $2
         -- Only that xMoney system's charges; the event inherits the charge's system through its foreign key.
         AND charge.xmoney_environment = $3
@@ -1016,7 +1035,7 @@ export class BillingRepository {
       type: row.type, chargeId: row.charge_id, at: row.at, taxCountry: row.tax_country, taxRegion: row.tax_region,
       taxStatus: row.tax_status, chargeNetMicros: micros(row.net_micros), chargeTaxMicros: micros(row.tax_micros),
       chargeTotalMicros: micros(row.total_micros), amountMicros: micros(row.amount_micros),
-      amountKnown: row.amount_known, locationVerdict: row.verdict
+      amountKnown: row.amount_known, saleRecorded: row.sale_recorded, locationVerdict: row.verdict
     }));
   }
 
@@ -1148,11 +1167,17 @@ export class BillingRepository {
   }
 
   /**
-   * P14a/P16b: refunds of ours that xMoney refused — dead `XMONEY_REFUND` jobs (ref `${chargeId}:${transactionId}`,
-   * P9b) whatever their code, while no REFUNDED exists for that charge and paid transaction (read as P8c's
-   * `refundTarget`: a REFUNDED on xMoney's own refund transaction names the payment in `refunds_transaction_id`,
-   * D5 5g). The money is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once; this
-   * list is the daily and quarterly reminder.)
+   * P14a/P16b: refund jobs that ended without a refund — dead `XMONEY_REFUND` jobs (ref
+   * `${chargeId}:${transactionId}`, P9b) whatever their code, while no REFUNDED exists for that charge and paid
+   * transaction (read as P8c's `refundTarget`: a REFUNDED on xMoney's own refund transaction names the payment in
+   * `refunds_transaction_id`, D5 5g). Not every one leaves money owed: the summary reads each code (`deadRefundCheck`).
+   * Three codes owe nothing on this server: REFUND_NOT_REQUESTED and REFUND_CHARGE_MISSING (no request of ours backs
+   * it) and OTHER_XMONEY_SYSTEM (the payment was taken in the other xMoney system). REFUND_PAYLOAD_INVALID (a payload
+   * that failed its check, so nothing was sent; only a row written by something else holds one) is listed with the
+   * first two, its reason withheld (Part 4 final review C-7): the charge's own refund requests say whether money is
+   * still owed. For REFUND_OUTCOME_UNKNOWN the dashboard says whether it landed, and every other code (xMoney refused
+   * it, and the like) is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once, except
+   * for REFUND_PAYLOAD_INVALID, which names no charge it could read; this list is the daily and quarterly reminder.)
    */
   async deadRefunds(): Promise<Array<{
     chargeId: string; transactionId: string; reason: string | null; code: string | null; since: Date;
@@ -1189,6 +1214,14 @@ export class BillingRepository {
    * automatically. A dashboard refund xMoney reports as its own transaction (D5 5g) names its amount and gets its
    * credit-note job automatically (none for a second payment, which was never a sale); it reaches this list only
    * through that job, if the job dies.
+   * Part 4 final review C-5 (the controller's ruling): DASHBOARD_REFUND only for a charge that holds an INVOICE row or
+   * intent (the row needs its intent, 0086's foreign key, so the intent is read) or a sale-invoice job (queued, done or
+   * dead: the invoice is owed, whether or not it is issued yet; the intent is written only when the issuer is called).
+   * P9c's never-verified path (a checkout's, an upgrade's or a renewal's payment xMoney refunded before we ever saw it
+   * paid) queues none of the three, and A29 (q) owes no invoice and no credit note for it: its line is
+   * REFUNDED_BEFORE_START (code NO_DOCUMENT_OWED), whose words (`documentJobAction`) ask for no document. It has
+   * nothing to record, so this query always returns it; the tax summary (`buildTaxSummary`) prints it in its sale's
+   * quarter only, and keeps that charge's refund out of its 'amount unknown' list.
    */
   async invoiceUnknownItems(): Promise<Array<{ chargeId: string; jobKind: string; code: string; since: Date }>> {
     const result = await this.pool.query<{ charge_id: string; kind: string; code: string | null; since: Date }>(`
@@ -1208,8 +1241,20 @@ export class BillingRepository {
               THEN 'INVOICE' ELSE 'CREDIT_NOTE' END
         )
       UNION ALL
-      SELECT refunded.charge_id, 'DASHBOARD_REFUND' AS kind, 'CREDIT_NOTE_MANUAL' AS code, refunded.at AS since
+      SELECT refunded.charge_id,
+        CASE WHEN invoice_owed.owed THEN 'DASHBOARD_REFUND' ELSE 'REFUNDED_BEFORE_START' END AS kind,
+        CASE WHEN invoice_owed.owed THEN 'CREDIT_NOTE_MANUAL' ELSE 'NO_DOCUMENT_OWED' END AS code,
+        refunded.at AS since
       FROM billing.charge_event AS refunded
+      CROSS JOIN LATERAL (
+        -- An INVOICE row needs its intent (0086's foreign key), so the intent stands for both.
+        SELECT EXISTS (
+          SELECT 1 FROM billing.invoice_intent AS intent WHERE intent.charge_id = refunded.charge_id AND intent.kind = 'INVOICE'
+        ) OR EXISTS (
+          SELECT 1 FROM billing.outbox AS sale
+          WHERE sale.kind IN ('SMARTBILL_INVOICE','QUADERNO_RECORD_SALE') AND sale.ref = refunded.charge_id
+        ) AS owed
+      ) AS invoice_owed
       WHERE refunded.kind = 'REFUNDED' AND refunded.error_code = 'PROVIDER_REFUND'
         AND refunded.refunds_transaction_id IS NULL
         AND NOT EXISTS (
@@ -1310,18 +1355,25 @@ export class BillingRepository {
    * which never starts dunning, or any hold that outlived its 72 hours with nothing written. The person is on Free
    * until the renewal is priced again. A hold over a charge that was sent (PAYMENT_NOT_VERIFIED, a not-sent rebill)
    * has its RENEWAL charge, and P14a's lists own it. `since` is when paid access lapsed.
+   *
+   * P4-M (P2-M43, migration 0092): read from the RENEWAL_PENDING rows (0092's partial index), keeping one only when
+   * no event of its owner in force comes after it in B5's order (0084's per-owner index), instead of a DISTINCT ON
+   * over every owner's latest event, which read the whole table. The same rows in the same order: B5's order is the
+   * row comparison below (all three columns NOT NULL, event_id unique, so it is total).
    */
   async blockedRenewals(now: Date): Promise<Array<{ subscriptionId: string; since: Date }>> {
     const held = (await this.pool.query<{ subscription_id: string; paid_through: Date }>(`
-      SELECT latest.subscription_id, latest.paid_through
-      FROM (
-        SELECT DISTINCT ON (event.owner_ref) event.subscription_id, event.cause, event.paid_through
-        FROM billing.entitlement_event AS event
-        WHERE event.effective_at <= $1
-        ORDER BY event.owner_ref, event.effective_at DESC, event.recorded_at DESC, event.event_id DESC
-      ) AS latest
-      WHERE latest.cause = 'RENEWAL_PENDING' AND latest.paid_through < $1 AND latest.subscription_id IS NOT NULL
-      ORDER BY latest.paid_through, latest.subscription_id
+      SELECT pending.subscription_id, pending.paid_through
+      FROM billing.entitlement_event AS pending
+      WHERE pending.cause = 'RENEWAL_PENDING' AND pending.subscription_id IS NOT NULL
+        AND pending.paid_through < $1 AND pending.effective_at <= $1
+        AND NOT EXISTS (
+          SELECT 1 FROM billing.entitlement_event AS later
+          WHERE later.owner_ref = pending.owner_ref AND later.effective_at <= $1
+            AND (later.effective_at, later.recorded_at, later.event_id)
+              > (pending.effective_at, pending.recorded_at, pending.event_id)
+        )
+      ORDER BY pending.paid_through, pending.subscription_id
     `, [now])).rows;
     if (held.length === 0) return [];
     const ids = held.map((row) => row.subscription_id);

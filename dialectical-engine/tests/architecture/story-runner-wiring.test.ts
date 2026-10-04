@@ -55,6 +55,31 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(runner).toContain("stepLease: (use) => this.#memory.withDisclosureContentLease([run.runId], use)");
   });
 
+  /**
+   * Part 4, P4-D (P3-N1; controller C3): the runner-level rows live in
+   * tests/integration/database.test.ts, which CI does not run, so the wiring is
+   * also pinned here by name.
+   */
+  it("hands an assigned run's story its SCORECARD answer seats' members, and only such a run (P4-D)", async () => {
+    const runner = await read("apps/runner/src/index.ts");
+    const snapshot = runner.slice(runner.indexOf("input: buildStoryRunSnapshot({"),
+      runner.indexOf('return { kind: "COMPLETED", answerId: persisted.answerId };'));
+    expect(snapshot).toContain(
+      "roleMakers: seatBook.assigned && (seatBook.answerWriter !== null || seatBook.answerChecker !== null)"
+    );
+    expect(snapshot).toContain("storyteller: storySeatRoleMaker(seatBook.answerWriter,");
+    expect(snapshot).toContain("answeredRound === undefined ? undefined : writerPlannedByRound.get(answeredRound.round)),");
+    expect(snapshot).toContain("checker: storySeatRoleMaker(seatBook.answerChecker,");
+    expect(snapshot).toContain("answeredRound === undefined ? undefined : checkerPlannedByRound.get(answeredRound.round))");
+    // The cost fallback is unchanged: the planned maker first, then the run's own debaters.
+    expect(snapshot).toContain("costFallback: storyCostFallback(synthesisMakers, servePrices)");
+    const passThrough = await read("apps/runner/src/story-snapshot.ts");
+    expect(passThrough).toContain("...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers })");
+    const writer = await read("packages/story/src/writer.ts");
+    expect(writer).toContain("const storyteller = input.roleMakers?.storyteller ?? resolve(policy.storytellerRoleRef);");
+    expect(writer).toContain("const checker = input.roleMakers?.checker ?? resolve(policy.storyCheckerRoleRef);");
+  });
+
   it("keeps the runner's framed-prompt builders at one: the story builds its prompts in packages/story", async () => {
     const runner = await read("apps/runner/src/index.ts");
     // Paid plans S1a: dev's two synthesis framings became the scorecard's ONE

@@ -7,9 +7,11 @@ import type {
 /**
  * In-memory InvoiceIssuer for route tests (P10): numbered invoices, a single reversal, injectable failures.
  * `lookup` exists only with `{ withLookup: true }`, so P10b can test both sides of the R-24 fallback.
+ * `sales` keeps every sale an invoice was issued for (its customer and lines), as SmartBill would print them.
  */
 export class FakeInvoiceIssuer implements InvoiceIssuer {
   readonly issued: Array<Readonly<{ kind: "INVOICE" | "STORNO" | "CREDIT"; chargeId: string; externalRef: string }>> = [];
+  readonly sales: SaleRecord[] = [];
   readonly lookup?: (i: Readonly<{ chargeId: string; kind: "INVOICE" | "CREDIT_NOTE" }>) => Promise<IssuedDocument | null>;
   readonly #reversed = new Set<string>();
   readonly #failures: InvoiceErrorCode[] = [];
@@ -38,7 +40,9 @@ export class FakeInvoiceIssuer implements InvoiceIssuer {
   }
 
   async issue(i: SaleRecord) {
-    return this.#take("INVOICE", i.chargeId);
+    const document = this.#take("INVOICE", i.chargeId);
+    this.sales.push(i);
+    return document;
   }
 
   async storno(i: RefundRecord & Readonly<{ series: string; number: string }>) {
