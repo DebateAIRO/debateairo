@@ -139,8 +139,6 @@ if [ "$KEY_DIGEST" != "$PREVIOUS" ]; then
   VERIFY+=("escrow/debateai-escrow-$STAMP.tar.age")
   age -r "$BACKUP_ESCROW_RECIPIENT" < "$WORK/keys.tar" > "$ESCROW"
   chmod 0600 "$ESCROW"
-  printf '%s\n' "$KEY_DIGEST" > "$STATE"
-  chmod 0600 "$STATE"
   printf 'BACKUP_ESCROW_WRITTEN %s %s\n' "$KEY_DIGEST" "$UTC"
 fi
 
@@ -199,6 +197,13 @@ else
       || offhost_failed "$relative read back from the off-host target differs from the local copy"
   done
   rm -f -- "$WORK/readback"
+fi
+
+# The escrow digest is recorded only now, once its envelope is proved off-host: a night whose copy
+# failed leaves the old digest, so the next night writes and verifies a fresh escrow envelope.
+if [ "$KEY_DIGEST" != "$PREVIOUS" ]; then
+  printf '%s\n' "$KEY_DIGEST" > "$STATE"
+  chmod 0600 "$STATE"
 fi
 
 printf 'BACKUP_OK %s %s %s\n' "$DIGEST" "$BYTES" "$UTC"

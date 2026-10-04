@@ -293,6 +293,17 @@ describe("deploy/vps/backup.sh: BACKUP_OK only after the off-host copy is verifi
     expect(checks[0]).toContain("/escrow/");
     expect(checks[1]).not.toContain("/escrow/");
   });
+
+  it("a night whose copy failed does not mark the escrow envelope done: the next night verifies one", async () => {
+    const staged = await stage({ rclone: "offsite:debateai" });
+    expect((await backup(staged, { dayOfWeek: SUNDAY, mode: "drop" })).code).not.toBe(0);
+    const next = await backup(staged, { dayOfWeek: SUNDAY });
+    expect(next.code, next.stderr).toBe(0);
+    expect(next.stdout).toContain("BACKUP_ESCROW_WRITTEN");
+    const checks = (await remoteLog(staged)).filter((line) => line.startsWith("rclone check"));
+    expect(checks).toHaveLength(2);
+    expect(checks[1]).toContain("/escrow/");
+  });
 });
 
 describe("deploy/vps/backup.sh: retention", () => {
