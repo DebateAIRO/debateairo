@@ -234,6 +234,55 @@ export function emailChangeLink(publicAppUrl: string, action: "confirm" | "cance
   return url.toString();
 }
 
+type SendmailTransportOptions = Readonly<{
+  executable: string;
+  from: string;
+  timeoutMs: number;
+  /** Recovery retains its original fixed exit diagnostic; email change keeps detailed codes. */
+  exitFailureCode?: "SENDMAIL_EXIT_FAILED";
+}>;
+
+/** Process lifecycle only: each sender validates and renders its own mail. */
+async function sendRenderedMail(message: string, options: SendmailTransportOptions): Promise<void> {
+  let child: ReturnType<typeof spawn>;
+  try {
+    child = spawn(options.executable, ["-i", "-t", "-f", options.from], {
+      stdio: ["pipe", "ignore", "ignore"]
+    });
+  } catch {
+    throw new MailDeliveryError("SENDMAIL_EXEC_FAILED");
+  }
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const fail = (code: string): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new MailDeliveryError(code));
+    };
+    const timer = setTimeout(() => {
+      // Claim timeout before kill can synchronously deliver another process event.
+      fail("SENDMAIL_TIMEOUT");
+      try { child.kill("SIGKILL"); } catch { /* Timeout remains the delivery outcome. */ }
+    }, options.timeoutMs);
+    child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
+    child.once("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else reject(new MailDeliveryError(options.exitFailureCode
+        ?? (signal === null ? `SENDMAIL_EXIT_${String(code ?? "UNKNOWN")}` : `SENDMAIL_SIGNAL_${signal}`)));
+    });
+    if (child.stdin === null) {
+      fail("SENDMAIL_STDIN_FAILED");
+      return;
+    }
+    child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
+    try { child.stdin.end(message, "utf8"); } catch { fail("SENDMAIL_STDIN_FAILED"); }
+  });
+}
+
 export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
   constructor(private readonly options: {
     readonly executable: string;
@@ -266,34 +315,7 @@ export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
       ...body,
       ""
     ].join("\r\n");
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
-        stdio: ["pipe", "ignore", "ignore"]
-      });
-      let settled = false;
-      const fail = (code: string): void => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        reject(new MailDeliveryError(code));
-      };
-      const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        fail("SENDMAIL_TIMEOUT");
-      }, this.options.timeoutMs);
-      child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
-      child.once("exit", (code, signal) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (code === 0) resolve();
-        else reject(new MailDeliveryError(
-          signal === null ? `SENDMAIL_EXIT_${String(code ?? "UNKNOWN")}` : `SENDMAIL_SIGNAL_${signal}`
-        ));
-      });
-      child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
-      child.stdin.end(message, "utf8");
-    });
+    await sendRenderedMail(message, this.options);
   }
 
   private render(mail: EmailChangeMail): readonly [string, readonly string[]] {
@@ -363,32 +385,8 @@ export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender 
     if (!isSingleDeliverableRecipient(mail.recipient) || !Number.isFinite(mail.expiresAt.getTime()))
       throw new MailDeliveryError("MAIL_INPUT_INVALID");
     const message = [`From: ${this.options.from}`, `To: ${mail.recipient}`, "Subject: Confirm your Dialectical Engine recovery email", "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "", "Confirm this optional recovery address:", recoveryEmailLink(this.options.publicAppUrl, mail.token), `This link expires at ${mail.expiresAt.toISOString()}.`, "Your existing verified recovery address stays active until confirmation.", ""].join("\r\n");
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
-        stdio: ["pipe", "ignore", "ignore"]
-      });
-      let settled = false;
-      const fail = (code: string) => {
-        if (settled)
-          return;
-        settled = true;
-        clearTimeout(timer);
-        reject(new MailDeliveryError(code));
-      };
-      const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        fail("SENDMAIL_TIMEOUT");
-      }, this.options.timeoutMs);
-      child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
-      child.once("exit", (code) => {
-        if (settled)
-          return;
-        settled = true;
-        clearTimeout(timer);
-        code === 0 ? resolve() : reject(new MailDeliveryError("SENDMAIL_EXIT_FAILED"));
-      });
-      child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
-      child.stdin.end(message, "utf8");
+    await sendRenderedMail(message, {
+      ...this.options, exitFailureCode: "SENDMAIL_EXIT_FAILED"
     });
   }
 }

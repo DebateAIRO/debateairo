@@ -1,3 +1,4 @@
+import type {PoolClient} from "pg";
 import { EmailChangeService } from "../../apps/api/src/email-change.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -34,6 +35,13 @@ async function waitForSecurityWait(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 10));
   }
   throw new Error("TEST_SECURITY_WAIT_NOT_OBSERVED");
+}
+async function rollbackOpenTransactionAndRelease(client: PoolClient, transactionOpen: boolean): Promise<void> {
+  try {
+    if (transactionOpen) await client.query("ROLLBACK");
+  } finally {
+    client.release();
+  }
 }
 const profile = () => new AccountProfileService({
   repository: new PostgresAccountProfileRepository(auth, profileAudit), users: profileUsers
@@ -193,20 +201,22 @@ describe("0097 restricted profile and recovery capabilities", () => {
   });
   it("rechecks the session after a security-lock wait expires it", async () => {
     const a = await profileAccount(db.pool), g = await profileGrant(db.pool, a, "READ_PHONE_PROFILE"), client = await db.pool.connect();
+    let transactionOpen = false;
     try {
       await client.query("BEGIN");
+      transactionOpen = true;
       await client.query("SELECT identity.lock_security_subjects(ARRAY[$1::uuid])", [a.userId]);
       const reveal = profile().revealPhoneProfile(a, g, profileSource);
       await waitForSecurityWait();
       await client.query("UPDATE identity.session SET created_at=clock_timestamp()-interval '2 minutes',last_seen_at=clock_timestamp()-interval '1 minute',idle_expires_at=clock_timestamp()-interval '1 second' WHERE session_id=$1", [a.sessionId]);
       await client.query("COMMIT");
+      transactionOpen = false;
       await expect(reveal).rejects.toMatchObject({
         code: "STEP_UP_REQUIRED"
       });
     }
     finally {
-      await client.query("ROLLBACK");
-      client.release();
+      await rollbackOpenTransactionAndRelease(client, transactionOpen);
     }
   });
   it("denies profile reads and recovery confirmation after PREPARE and cascades ciphertext on erasure", async () => {
@@ -228,15 +238,17 @@ describe("0097 restricted profile and recovery capabilities", () => {
     });
     await db.pool.query("UPDATE identity.account_erasure_notification_outbox SET claim_token=gen_random_uuid(),claim_expires_at=NULL,acknowledged_at=clock_timestamp(),last_error_code=NULL WHERE user_id=$1", [a.userId]);
     const client = await db.pool.connect();
+    let transactionOpen = false;
     try {
       await client.query("BEGIN");
+      transactionOpen = true;
       await client.query("SET LOCAL ROLE debateai_erasure_runtime");
       expect((await client.query("SELECT identity.finalize_account_erasure($1,clock_timestamp(),clock_timestamp(),0,0,1,0) AS outcome", [id])).rows[0].outcome).toBe("COMMITTED");
       await client.query("COMMIT");
+      transactionOpen = false;
     }
     finally {
-      await client.query("ROLLBACK");
-      client.release();
+      await rollbackOpenTransactionAndRelease(client, transactionOpen);
     }
     await profileUsers.destroy(a.userId);
     await expect(profileUsers.load(a.userId)).rejects.toThrow("USER_DEK_UNRESOLVED");
@@ -271,8 +283,10 @@ describe("0097 restricted profile and recovery capabilities", () => {
     if (link?.kind !== "confirmation")
       throw new Error("TEST_PRIMARY_CONFIRMATION_MISSING");
     const client = await db.pool.connect();
+    let transactionOpen = false;
     try {
       await client.query("BEGIN");
+      transactionOpen = true;
       await client.query("SELECT identity.lock_security_subjects(ARRAY[$1::uuid])", [a.userId]);
       const confirm = service.confirmRecoveryEmail({
         token: mail.messages[0]!.token
@@ -283,13 +297,13 @@ describe("0097 restricted profile and recovery capabilities", () => {
           ipArgon2id: `argon2id-audit:v1:${"33".repeat(32)}`, userAgentArgon2id: `argon2id-audit:v1:${"44".repeat(32)}`
         })])).rows[0].outcome).toBe("CONFIRMED");
       await client.query("COMMIT");
+      transactionOpen = false;
       await expect(confirm).rejects.toMatchObject({
         code: "LINK_INVALID"
       });
     }
     finally {
-      await client.query("ROLLBACK");
-      client.release();
+      await rollbackOpenTransactionAndRelease(client, transactionOpen);
     }
     expect(await service.recoveryEmail(a)).toEqual({
       state: "verified", email: "old-recovery@example.test", pending: null
@@ -301,8 +315,10 @@ describe("0097 restricted profile and recovery capabilities", () => {
       email: "held@example.test", grantToken: await profileGrant(db.pool, a, "CHANGE_RECOVERY_EMAIL")
     }, profileSource);
     const client = await db.pool.connect();
+    let transactionOpen = false;
     try {
       await client.query("BEGIN");
+      transactionOpen = true;
       await client.query("SELECT identity.lock_security_subjects(ARRAY[$1::uuid])", [a.userId]);
       const confirm = service.confirmRecoveryEmail({
         token: mail.messages[0]!.token
@@ -310,6 +326,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
       await waitForSecurityWait();
       await client.query("INSERT INTO identity.account_security_hold(user_id,held) VALUES($1,true) ON CONFLICT(user_id) DO UPDATE SET held=true", [a.userId]);
       await client.query("COMMIT");
+      transactionOpen = false;
       await expect(confirm).rejects.toMatchObject({
         code: "LINK_INVALID"
       });
@@ -317,8 +334,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
       expect((await db.pool.query("SELECT 1 FROM identity.channel_binding WHERE user_id=$1 AND channel_type='recovery_email'", [a.userId])).rows).toHaveLength(0);
     }
     finally {
-      await client.query("ROLLBACK");
-      client.release();
+      await rollbackOpenTransactionAndRelease(client, transactionOpen);
     }
   });
   it("rejects an old candidate whose confirmation waited while a replacement became current", async () => {
@@ -327,8 +343,10 @@ describe("0097 restricted profile and recovery capabilities", () => {
       email: "first-race@example.test", grantToken: await profileGrant(db.pool, a, "CHANGE_RECOVERY_EMAIL")
     }, profileSource);
     const client = await db.pool.connect();
+    let transactionOpen = false;
     try {
       await client.query("BEGIN");
+      transactionOpen = true;
       await client.query("SELECT identity.lock_security_subjects(ARRAY[$1::uuid])", [a.userId]);
       const confirm = service.confirmRecoveryEmail({
         token: mail.messages[0]!.token
@@ -344,14 +362,14 @@ describe("0097 restricted profile and recovery capabilities", () => {
           ipArgon2id: `argon2id-audit:v1:${"33".repeat(32)}`, userAgentArgon2id: `argon2id-audit:v1:${"44".repeat(32)}`
         })])).rows[0].result).toBe("PENDING");
       await client.query("COMMIT");
+      transactionOpen = false;
       await expect(confirm).rejects.toMatchObject({
         code: "LINK_INVALID"
       });
       expect((await db.pool.query("SELECT 1 FROM identity.channel_binding WHERE user_id=$1 AND channel_type='recovery_email'", [a.userId])).rows).toHaveLength(0);
     }
     finally {
-      await client.query("ROLLBACK");
-      client.release();
+      await rollbackOpenTransactionAndRelease(client, transactionOpen);
     }
   });
   it("mints all three account-bound five-minute actions through production TOTP grant rotation", async () => {
@@ -402,9 +420,11 @@ describe("0097 restricted profile and recovery capabilities", () => {
       email: "erase-race@example.test", grantToken: await profileGrant(db.pool, a, "CHANGE_RECOVERY_EMAIL")
     }, profileSource);
     const read = await profileGrant(db.pool, a, "READ_PHONE_PROFILE"), change = await profileGrant(db.pool, a, "CHANGE_PHONE_PROFILE"), id = randomUUID(), client = await db.pool.connect();
+    let transactionOpen = false;
     await db.pool.query("INSERT INTO identity.account_erasure_request(erasure_id,user_id,requested_at,execute_at) VALUES($1,$2,clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second')", [id, a.userId]);
     try {
       await client.query("BEGIN");
+      transactionOpen = true;
       await client.query("SELECT identity.lock_security_subjects(ARRAY[$1::uuid])", [a.userId]);
       const outcomes = Promise.allSettled([s.revealPhoneProfile(a, read, profileSource), s.updatePhoneProfile(a, {
           phone: "+40733123456", grantToken: change
@@ -414,6 +434,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
       await waitForSecurityWait();
       expect((await client.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [id])).rows[0].outcome).toBe("PREPARED");
       await client.query("COMMIT");
+      transactionOpen = false;
       const results = await outcomes;
       expect(results.map(result => result.status)).toEqual(["rejected", "rejected", "rejected"]);
       expect(results.map(result => result.status === "rejected" ? result.reason.code : null)).toEqual(["STEP_UP_REQUIRED", "STEP_UP_REQUIRED", "LINK_INVALID"]);
@@ -421,8 +442,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
       expect(decrypt(profileKeys.get(a.userId)!, cipher, profileAad(a.userId, "user.phone_ciphertext")).toString()).toBe("+40722123456");
     }
     finally {
-      await client.query("ROLLBACK");
-      client.release();
+      await rollbackOpenTransactionAndRelease(client, transactionOpen);
     }
   });
   it("grants only narrow capabilities and never exposes the new candidate table directly", async () => {
