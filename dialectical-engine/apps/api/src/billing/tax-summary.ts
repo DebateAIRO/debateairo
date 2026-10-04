@@ -507,7 +507,8 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     "Invoices and credit notes to check by hand in SmartBill or Quaderno (a legal document that was never issued, or"
       + " whose issuing was never confirmed; what to do is said once for each job kind and code below the list, where"
       + " <charge> stands for the line's charge; pnpm billing:invoice records a document you issued or found by hand, or"
-      + " re-queues the job; the line stays until the document is recorded):",
+      + " re-queues the job; a document's line stays until the document is recorded, and a payment refunded before its"
+      + " plan started, which owes no document, is listed only in its sale's quarter):",
     (item) => `charge ${item.chargeId}: ${documentKey(item)}, since ${isoDay(item.since)}`),
   documentKey, (item) => documentJobAction({ chargeId: "<charge>", jobKind: item.jobKind, code: item.code }));
   // F4: the job itself is never tried again; only M3 is sent again, by the renewal (deadEmailAction says so for M3).

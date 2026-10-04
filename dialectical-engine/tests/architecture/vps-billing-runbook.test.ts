@@ -455,7 +455,10 @@ describe("P22 the Billing runbook", () => {
     };
     // C-6: a dashboard refund recorded with --amount is already subtracted; REFUND_UNRECORDED's "by hand" is not again.
     const C6 = "A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures: do not take it off again.";
-    expect(between("- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only", "- `--requeue` to let the site")).toContain(C6);
+    const amountBullet = between("- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only", "- `--requeue` to let the site");
+    expect(amountBullet).toContain(C6);
+    // The re-review's M-7: a payment refunded before its plan started owes no document, so no command clears its line.
+    expect(amountBullet).toContain("A `REFUNDED_BEFORE_START` line (a payment xMoney refunded before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge");
     const unrecorded = billing.split("\n").find((line) => line.startsWith("| `\"event\":\"billing.refund.unrecorded\"`")) ?? "";
     expect(unrecorded).toContain("take it off that country's net sales and tax by hand");
     expect(unrecorded.replace(/\s+/gu, " ")).toContain(C6);

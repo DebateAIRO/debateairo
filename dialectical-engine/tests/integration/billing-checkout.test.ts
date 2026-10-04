@@ -342,7 +342,11 @@ describe("P8c the checkout", () => {
       await fake.completeSignedOrder({
         orderPayload: first.orderPayload, orderChecksum: first.orderChecksum, cardCountry: "RO", succeed: true, status: "3d-pending"
       });
-      await expect(checkout(new Date(Math.max(Date.now(), now.getTime() + 1_000))))
+      // xMoney's listing window is whole seconds (the client sends both ends without milliseconds), so the second look
+      // asks at a whole second no earlier than the transaction: a look later in the transaction's own second would end
+      // the window before it, as happened under a loaded run.
+      const later = Math.ceil(Math.max(Date.now(), now.getTime() + 1_000) / 1_000) * 1_000;
+      await expect(checkout(new Date(later)))
         .rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: first.chargeId });
     } finally {
       await fake.stop();

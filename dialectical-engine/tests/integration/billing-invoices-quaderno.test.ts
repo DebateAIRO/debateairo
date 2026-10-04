@@ -80,6 +80,11 @@ describe("P10a Quaderno invoices", () => {
     // Outside the US and Canada the typed region stays (a Romanian county SmartBill needs, R-15; the EU's VAT has none).
     const germany = await activateInGermany();
     expect(h.tax.sales.find((recorded) => recorded.chargeId === germany.chargeId)?.customer).toMatchObject({ region: "Bucuresti" });
+    // Canada follows the same rule (Part 4's re-review M-7): the region Quaderno priced, never the typed one. The
+    // fakes price no Canadian region, so the Texas charge stands in with a Canadian buyer and quote.
+    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY }, texas.chargeId))!;
+    const canadian = { ...loaded, location: { ...loaded.location, country: "CA", region: "Quebec" }, quote: { ...loaded.quote, taxRegion: "ON" } };
+    expect(saleRecordOf(canadian, {}, "saas").customer).toMatchObject({ country: "CA", region: "ON" });
   });
 
   it("dead-letters a sale Quaderno refuses", async () => {
