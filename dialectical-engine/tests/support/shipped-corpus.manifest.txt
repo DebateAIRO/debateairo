@@ -583,6 +583,7 @@ apps/ui/lib/report/reportLanguage.ts
 apps/ui/lib/report/reportLayout.ts
 apps/ui/lib/report/reportLineBreaks.ts
 apps/ui/lib/report/reportModel.ts
+apps/ui/lib/report/reportRenderGate.ts
 apps/ui/lib/report/reportRoute.ts
 apps/ui/lib/returnPath.ts
 apps/ui/lib/scoring/scoringResponseSpecification.ts
