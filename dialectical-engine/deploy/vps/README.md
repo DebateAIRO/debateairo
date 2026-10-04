@@ -2600,7 +2600,7 @@ For an invoice or a credit note, settle the line with `pnpm billing:invoice`, gi
   quarter's tax summary subtracts the refund at that amount instead of listing it as "amount unknown". A charge has
   one credit note at most: if it already has one, the command refuses (`BILLING_INVOICE_ALREADY_RECORDED`), and that
   refund goes to your accountant. A refund transaction of a payment whose dashboard-refund credit note is recorded is
-  already in the figures: do not take it off again.
+  already in the figures: do not take it off again. A `REFUNDED_BEFORE_START` line (a payment xMoney refunded before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge (`BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`, or `BILLING_INVOICE_ORIGINAL_MISSING` with `--amount`); take that sale and its refund out of its quarter's figures by hand.
 - `--requeue` to let the site try the job again once the cause is fixed (the Quaderno key replaced, Quaderno or
   SmartBill answering again). A SmartBill job also needs `--confirm-not-issued`: add it only after you have checked
   in SmartBill that the document was NOT issued, because SmartBill would issue a second one. A Quaderno job needs no
