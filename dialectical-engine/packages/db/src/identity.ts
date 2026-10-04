@@ -29,7 +29,10 @@ export interface PendingAccountInput {
   /** The passed age check this account is created under (the date itself is never stored). */
   readonly ageCheck: RegistrationAgeCheck;
   readonly verificationTokenHash: string;
+  /** Legacy intended lifetime is derived from this minus occurredAt, never trusted as the stored expiry. */
   readonly verificationExpiresAt: Date;
+  /** Server-selected lifetime; legacy internal callers derive it from their two request instants. */
+  readonly verificationTokenTtlMs?: number;
   readonly occurredAt: Date;
   readonly source: AuthSourceContext;
   /**
@@ -47,12 +50,12 @@ export interface RegistrationAgeCheck {
 }
 
 export type PendingAccountResult =
-  | Readonly<{ status: "created"; userId: string; channelBindingId: string }>
+  | Readonly<{ status: "created"; userId: string; channelBindingId: string; verificationExpiresAt: Date; reservationId: string }>
   | Readonly<{ status: "email_duplicate"; userId: string }>
   | Readonly<{ status: "pseudonym_collision" }>;
 
 export type ResendPreparation =
-  | Readonly<{ status: "send"; userId: string; auditToken: string; channelBindingId: string }>
+  | Readonly<{ status: "send"; userId: string; auditToken: string; channelBindingId: string; verificationExpiresAt: Date; reservationId: string }>
   | Readonly<{ status: "ignored" }>;
 
 export interface TotpEnrollmentRecord {
@@ -206,7 +209,7 @@ export class PostgresIdentityRepository {
         input.adultAffirmedAt,
         input.occurredAt,
         input.verificationTokenHash,
-        input.verificationExpiresAt,
+        input.verificationTokenTtlMs ?? (input.verificationExpiresAt.getTime() - input.occurredAt.getTime()),
         JSON.stringify({
           ipArgon2id: prepared.ipArgon2id,
           userAgentArgon2id: prepared.userAgentArgon2id
@@ -221,14 +224,18 @@ export class PostgresIdentityRepository {
           status: "CREATED" | "EMAIL_DUPLICATE" | "PSEUDONYM_COLLISION";
           user_id: string | null;
           channel_binding_id: string | null;
-        }>(`SELECT * FROM identity.create_pending_account_with_audit(
+          verification_expires_at: Date | null;
+          reservation_id: string | null;
+        }>(`SELECT * FROM identity.create_pending_account_reserved_with_audit(
           $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,$15
         )`, parameters)
         : await client.query<{
           status: "CREATED" | "EMAIL_DUPLICATE" | "PSEUDONYM_COLLISION";
           user_id: string | null;
           channel_binding_id: string | null;
-        }>(`SELECT * FROM identity.create_pending_account_with_consent(
+          verification_expires_at: Date | null;
+          reservation_id: string | null;
+        }>(`SELECT * FROM identity.create_pending_account_reserved_with_consent(
           $1,$2,$3::jsonb,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,$15,$16::smallint,$17,$18,$19::jsonb
         )`, [
           ...parameters,
@@ -254,7 +261,8 @@ export class PostgresIdentityRepository {
         if (row.user_id === null) throw new Error("ACCOUNT_DUPLICATE_ID_MISSING");
         return Object.freeze({ status: "email_duplicate" as const, userId: row.user_id });
       }
-      if (row.user_id === null || row.channel_binding_id === null) {
+      if (row.user_id === null || row.channel_binding_id === null
+        || row.verification_expires_at === null || row.reservation_id === null) {
         throw new Error("ACCOUNT_CREATE_RECEIPT_INVALID");
       }
       // The consent wrapper (0080) writes the age record inside its own call; only the old path writes it here.
@@ -271,7 +279,9 @@ export class PostgresIdentityRepository {
       return Object.freeze({
         status: "created" as const,
         userId: row.user_id,
-        channelBindingId: row.channel_binding_id
+        channelBindingId: row.channel_binding_id,
+        verificationExpiresAt: row.verification_expires_at,
+        reservationId: row.reservation_id
       });
     });
   }
@@ -384,6 +394,10 @@ export class PostgresIdentityRepository {
     readonly expiresAt: Date;
     readonly occurredAt: Date;
     readonly cooldownMs: number;
+    readonly windowMs?: number;
+    readonly maximumSends?: number;
+    readonly tokenTtlMs?: number;
+    readonly mechanism?: "per_row_last_sent_timestamp_minimum_spacing" | "atomic_rolling_reservation_ledger";
     readonly source: AuthSourceContext;
   }): Promise<ResendPreparation> {
     const prepared = await this.prepareAuditContext(input.source);
@@ -393,22 +407,28 @@ export class PostgresIdentityRepository {
         user_id: string | null;
         audit_token: string | null;
         channel_binding_id: string | null;
-      }>(`SELECT * FROM identity.prepare_verification_resend_with_audit(
-        $1,$2,$3,$4,$5,$6::jsonb
+        verification_expires_at: Date | null;
+        reservation_id: string | null;
+      }>(`SELECT * FROM identity.prepare_verification_resend_reserved_with_audit(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb
       )`, [
-        input.emailBlindIndex,input.tokenHash,input.expiresAt,input.occurredAt,
-        input.cooldownMs,JSON.stringify({
+        input.emailBlindIndex,input.tokenHash,
+        input.tokenTtlMs ?? (input.expiresAt.getTime() - input.occurredAt.getTime()),input.occurredAt,
+        input.cooldownMs,input.windowMs ?? 3_600_000,input.maximumSends ?? 3,
+        input.mechanism ?? "per_row_last_sent_timestamp_minimum_spacing",JSON.stringify({
           ipArgon2id: prepared.ipArgon2id,
           userAgentArgon2id: prepared.userAgentArgon2id
         })
       ]);
       const row = result.rows[0];
       if (row?.status !== "SEND") return Object.freeze({ status: "ignored" as const });
-      if (row.user_id === null || row.audit_token === null || row.channel_binding_id === null) {
+      if (row.user_id === null || row.audit_token === null || row.channel_binding_id === null
+        || row.verification_expires_at === null || row.reservation_id === null) {
         throw new Error("RESEND_RECEIPT_INVALID");
       }
       return Object.freeze({ status: "send" as const, userId: row.user_id,
-        auditToken: row.audit_token, channelBindingId: row.channel_binding_id });
+        auditToken: row.audit_token, channelBindingId: row.channel_binding_id,
+        verificationExpiresAt: row.verification_expires_at, reservationId: row.reservation_id });
     });
   }
 

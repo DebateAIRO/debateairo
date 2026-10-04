@@ -49,7 +49,7 @@ test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
 
 test("sign-up exposes only fields backed by the registration contract", () => {
   assert.match(signUp, /client\.register/);
-  assert.doesNotMatch(signUp, /client\.resendVerification/);
+  // Resend now belongs to EmailPendingScreen after ACK; behavioral/proof coverage lives in the render suite.
   assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
   assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
   // Age gate (Turn 8): the date of birth replaced the 18+ tick box, and the separate age

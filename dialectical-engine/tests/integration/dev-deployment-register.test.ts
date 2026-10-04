@@ -449,6 +449,12 @@ describe("DEV-05 complete development deployment register", () => {
       readDeploymentRiskTier(database.pool, registerVersion)
     ]);
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);
+    expect(auth.verification).toMatchObject({ resendCooldownMs: 60_000, outboundSendWindowMs: 3_600_000,
+      outboundSendMax: 3, outboundSendMechanism: "atomic_rolling_reservation_ledger" });
+    const historicalAuth = await readAuthPolicy(database.pool, bootstrap.registerVersion);
+    expect(historicalAuth.verification).toMatchObject({ resendCooldownMs: 1_200_000,
+      outboundSendMechanism: "per_row_last_sent_timestamp_minimum_spacing" });
+    await expect(readAuthPolicy(database.pool, 999_999)).rejects.toThrow();
     expect(mfa.totp.algorithm).toBe("SHA1");
     expect(session.absoluteTtlMs).toBeGreaterThan(session.idleTtlMs);
     expect(recovery).toMatchObject({

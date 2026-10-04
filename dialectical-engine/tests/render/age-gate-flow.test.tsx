@@ -20,7 +20,7 @@ let host: HTMLDivElement;
 let requests: { path: string; body: unknown }[];
 
 /** A real contract client over a recording fetch: the assertions are about the network. */
-function networkClient(ageOutcome: "allowed" | "refused", registerStatus = 202, registerBody: unknown = { message: REGISTRATION_MESSAGE }) {
+function networkClient(ageOutcome: "allowed" | "refused", registerStatus = 202, registerBody: unknown = { message: REGISTRATION_MESSAGE, retry_after_seconds: 60 }) {
   return createContractClient("https://app.debateai.test", (async (url: URL | string, init: RequestInit = {}) => {
     const path = new URL(String(url)).pathname;
     requests.push({ path, body: init.body === undefined ? undefined : JSON.parse(String(init.body)) });

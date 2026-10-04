@@ -60,7 +60,7 @@ describe("sign-up sends the pairs of the documents it displayed (paid plans L3b)
   });
 
   it("passes the Terms and Privacy version and hash, and the locale, after the age gate's date", async () => {
-    const register = vi.fn().mockResolvedValue({ message: "ok" });
+    const register = vi.fn().mockResolvedValue({ message: "ok", retry_after_seconds: 60 });
     await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} />));
     await fillAndSubmit();
     expect(checkAge).toHaveBeenCalledWith("1990-01-01");

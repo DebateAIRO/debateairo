@@ -76,7 +76,7 @@ async function mount(client?: {
 
 /** Drive the card into its `sent` state the way a real registration does. */
 async function registerSuccessfully(): Promise<void> {
-  const register = vi.fn().mockResolvedValue({ message: "sent" });
+  const register = vi.fn().mockResolvedValue({ message: "sent", retry_after_seconds: 60 });
   const checkAge = vi.fn().mockResolvedValue({ outcome: "allowed" });
   await mount({ register, checkAge });
   // First: its re-renders would reset the controlled fields assigned directly below.
@@ -161,7 +161,7 @@ describe("sign-up consent checkbox group", () => {
   });
 
   /* S02-S19 — form semantics. Two boxes now: the age gate replaced the 18+ box (Turn 8). */
-  it("keeps both boxes real, required, single-form controls that disable with the card", async () => {
+  it("keeps required consent controls in the form and removes them after acknowledgement", async () => {
     await mount();
 
     for (const name of ["privacy-accepted", "terms-accepted"]) {
@@ -174,9 +174,9 @@ describe("sign-up consent checkbox group", () => {
 
     await registerSuccessfully();
 
-    expect(field("privacy-accepted").disabled, "privacy-accepted disabled when sent").toBe(true);
-    expect(field("terms-accepted").disabled, "terms-accepted disabled when sent").toBe(true);
-    expect(document.querySelectorAll("form")).toHaveLength(1);
+    expect(document.querySelector('input[name="privacy-accepted"]')).toBeNull();
+    expect(document.querySelector('input[name="terms-accepted"]')).toBeNull();
+    expect(document.querySelectorAll("form")).toHaveLength(0);
   });
 
   /* S02-S20 — both accessible names resolve through aria-labelledby. The 18+ box's <label>

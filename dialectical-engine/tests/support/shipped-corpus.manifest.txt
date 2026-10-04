@@ -314,6 +314,7 @@ apps/ui/components/SynthesisPanel.tsx
 apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
+apps/ui/components/auth/EmailPendingScreen.tsx
 apps/ui/components/auth/TurnstileChallenge.tsx
 apps/ui/components/authRoutes.source-test.mjs
 apps/ui/components/billing/LegalAcceptGate.tsx

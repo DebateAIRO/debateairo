@@ -1698,67 +1698,73 @@ setTimeout(() => undefined, 500);
   }, 30_000);
 
   it("S3b keeps a success pending until its real PostgreSQL transaction commits", async () => {
-    const durableStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
-    let releaseStore!: () => void;
-    let markStoreEntered!: () => void;
-    const storeGate = new Promise<void>((resolve) => { releaseStore = resolve; });
-    const storeEntered = new Promise<void>((resolve) => { markStoreEntered = resolve; });
-    const gatedStore: UserDekStore = {
-      async store(userId, dek) {
-        markStoreEntered();
-        await storeGate;
-        await durableStore.store(userId, dek);
-      },
-      async destroy(userId) { return durableStore.destroy(userId); }
-    };
-    const flow = buildService({ dekStore: gatedStore });
-    const email = "s3b-commit-gate@example.test";
-    const index = createEmailBlindIndex(blindIndexKey, email);
-    let settledBeforeRelease = 0;
-    const registration = flow.service.register({
-      email,
-      password: "correct horse battery staple",
-      phone: "+40722123456", recoveryEmail: "s3b-commit-gate-recovery@example.test",
-      adultAffirmed: true
-    }, {
-      ip: "198.51.100.201",
-      userAgent: "vitest-s3b-commit-gate",
-      requestId: "request:s3b:commit-gate"
-    }).then((response) => {
-      settledBeforeRelease += 1;
-      return response;
-    });
+    const operator = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const durableStore = new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d)));
+      let releaseStore!: () => void;
+      let markStoreEntered!: () => void;
+      const storeGate = new Promise<void>((resolve) => { releaseStore = resolve; });
+      const storeEntered = new Promise<void>((resolve) => { markStoreEntered = resolve; });
+      const gatedStore: UserDekStore = {
+        async store(userId, dek) {
+          markStoreEntered();
+          await storeGate;
+          await durableStore.store(userId, dek);
+        },
+        async destroy(userId) { return durableStore.destroy(userId); }
+      };
+      const flow = buildService({ dekStore: gatedStore });
+      const email = "s3b-commit-gate@example.test";
+      const index = createEmailBlindIndex(blindIndexKey, email);
+      let settledBeforeRelease = 0;
+      const registration = flow.service.register({
+        email,
+        password: "correct horse battery staple",
+        phone: "+40722123456", recoveryEmail: "s3b-commit-gate-recovery@example.test",
+        adultAffirmed: true
+      }, {
+        ip: "198.51.100.201",
+        userAgent: "vitest-s3b-commit-gate",
+        requestId: "request:s3b:commit-gate"
+      }).then((response) => {
+        settledBeforeRelease += 1;
+        return response;
+      });
 
-    await storeEntered;
-    await new Promise<void>((resolve) => setTimeout(
-      resolve,
-      basePolicy.verification.enumerationResponseFloorMs
-        + basePolicy.verification.enumerationToleranceMs
-        + 50
-    ));
-    const responsesSettledWhileCommitBlocked = settledBeforeRelease;
-    const beforeRelease = await database.pool.query<{ count: string }>(`
-      SELECT count(*)::text AS count FROM identity."user"
-      WHERE email_blind_index=$1
-    `, [index]);
-    releaseStore();
-    const response = await registration;
-    const committedAtResponse = await database.pool.query<{ count: string }>(`
-      SELECT count(*)::text AS count FROM identity."user"
-      WHERE email_blind_index=$1
-    `, [index]);
-    await flow.service.drainMailDispatches();
+      await storeEntered;
+      await new Promise<void>((resolve) => setTimeout(
+        resolve,
+        basePolicy.verification.enumerationResponseFloorMs
+          + basePolicy.verification.enumerationToleranceMs
+          + 50
+      ));
+      const responsesSettledWhileCommitBlocked = settledBeforeRelease;
+      const beforeRelease = await database.pool.query<{ count: string }>(`
+        SELECT count(*)::text AS count FROM identity."user"
+        WHERE email_blind_index=$1
+      `, [index]);
+      releaseStore();
+      const response = await registration;
+      const committedAtResponse = await database.pool.query<{ count: string }>(`
+        SELECT count(*)::text AS count FROM identity."user"
+        WHERE email_blind_index=$1
+      `, [index]);
+      await flow.service.drainMailDispatches();
 
-    console.info(
-      `[S3b COMMIT GATE] backend=postgres settled_while_commit_blocked=${responsesSettledWhileCommitBlocked} `
-      + `committed_before_release=${beforeRelease.rows[0]!.count} `
-      + `committed_at_response=${committedAtResponse.rows[0]!.count}`
-    );
-    expect(Object.prototype.hasOwnProperty.call(flow.service, "pendingRegistrationDispatches")).toBe(false);
-    expect(responsesSettledWhileCommitBlocked).toBe(0);
-    expect(Number(beforeRelease.rows[0]!.count)).toBe(0);
-    expect(response).toEqual(REGISTRATION_PUBLIC_RESPONSE);
-    expect(Number(committedAtResponse.rows[0]!.count)).toBe(1);
+      console.info(
+        `[S3b COMMIT GATE] backend=postgres settled_while_commit_blocked=${responsesSettledWhileCommitBlocked} `
+        + `committed_before_release=${beforeRelease.rows[0]!.count} `
+        + `committed_at_response=${committedAtResponse.rows[0]!.count}`
+      );
+      expect(Object.prototype.hasOwnProperty.call(flow.service, "pendingRegistrationDispatches")).toBe(false);
+      expect(responsesSettledWhileCommitBlocked).toBe(0);
+      expect(Number(beforeRelease.rows[0]!.count)).toBe(0);
+      expect(response).toEqual(REGISTRATION_PUBLIC_RESPONSE);
+      expect(Number(committedAtResponse.rows[0]!.count)).toBe(1);
+      const signals = operator.mock.calls.flat().map(String).filter(line => line.startsWith("[AUTH_REGISTRATION_PRETRANSPORT_BUDGET_EXCEEDED]"));
+      expect(signals).toHaveLength(1);
+      expect(signals[0]).toMatch(/^\[AUTH_REGISTRATION_PRETRANSPORT_BUDGET_EXCEEDED\] correlation=[0-9a-f-]{36} code=REGISTRATION_PRETRANSPORT_SLOW elapsed_ms=\d+ budget_ms=600$/);
+    } finally { operator.mockRestore(); }
   }, 30_000);
 
   it("S3b returns 100 burst successes only after all 100 accounts are committed", async () => {
@@ -1924,7 +1930,9 @@ setTimeout(() => undefined, 500);
     const flow = buildService();
     const registered = await registerAccount(flow.service, "expired");
     const token = (flow.mail as MemoryMailSender).messages[0]!.token;
-    flow.advance(basePolicy.verification.tokenTtlMs + 1);
+    await database.pool.query(`UPDATE identity.verification_token_credential SET
+      issued_at=clock_timestamp()-interval '25 hours',expires_at=clock_timestamp()-interval '1 hour'
+      WHERE channel_binding_id IN (SELECT channel_binding_id FROM identity.channel_binding WHERE user_id=$1)`, [registered.user.user_id]);
 
     await expect(flow.service.verifyEmail({ token }, source)).rejects.toMatchObject({
       code: "VERIFICATION_TOKEN_INVALID"
@@ -1936,7 +1944,7 @@ setTimeout(() => undefined, 500);
   });
 
   it("keeps resend cooldown and missing-account outcomes indistinguishable while preserving older mailed tokens", async () => {
-    const flow = buildService();
+    const flow = buildService({ initialNow: new Date() });
     const registered = await registerAccount(flow.service, "resend");
     const firstToken = (flow.mail as MemoryMailSender).messages[0]!.token;
 
@@ -1946,7 +1954,8 @@ setTimeout(() => undefined, 500);
     expect(missing).toEqual(RESEND_PUBLIC_RESPONSE);
     expect((flow.mail as MemoryMailSender).messages).toHaveLength(1);
 
-    flow.advance(basePolicy.verification.resendCooldownMs + 1);
+    await database.pool.query(`UPDATE identity.channel_binding SET verification_last_sent_at=clock_timestamp()-interval '20 minutes'-interval '1 second' WHERE user_id=$1`, [registered.user.user_id]);
+    await database.pool.query(`UPDATE identity.verification_delivery_reservation SET reserved_at=reserved_at-interval '20 minutes'-interval '1 second' WHERE channel_binding_id IN (SELECT channel_binding_id FROM identity.channel_binding WHERE user_id=$1)`, [registered.user.user_id]);
     await expect(flow.service.resendVerification({ email: registered.email }, source))
       .resolves.toEqual(RESEND_PUBLIC_RESPONSE);
     await (flow.service as RegistrationService & { drainMailDispatches?: () => Promise<void> })

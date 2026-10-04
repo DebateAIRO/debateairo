@@ -486,6 +486,7 @@ interface PendingRegistration {
 }
 
 interface VerificationDelivery {
+  readonly reservationId: string;
   readonly userId: string;
   readonly channelBindingId: string;
   readonly email: string;
@@ -1348,7 +1349,7 @@ export class RegistrationService implements RegistrationApplication {
     let delivery: VerificationDelivery | undefined = duplicate === undefined
       ? input as VerificationDelivery
       : undefined;
-    const deliveryAttemptId = delivery?.channelBindingId;
+    const deliveryAttemptId = delivery?.reservationId;
     let pending!: Promise<void>;
     pending = new Promise<void>((resolve) => setImmediate(resolve))
       .then(async () => {
@@ -1456,6 +1457,7 @@ export class RegistrationService implements RegistrationApplication {
           },
           verificationTokenHash: tokenHash,
           verificationExpiresAt: expiresAt,
+          verificationTokenTtlMs: this.dependencies.policy.verification.tokenTtlMs,
           occurredAt: input.requestedAt,
           source: input.source,
           ...(acceptances === undefined ? {} : { acceptances })
@@ -1473,9 +1475,10 @@ export class RegistrationService implements RegistrationApplication {
           kind: "delivery" as const,
           userId: created.userId,
           channelBindingId: created.channelBindingId,
+          reservationId: created.reservationId,
           email: input.email,
           token,
-          expiresAt,
+          expiresAt: created.verificationExpiresAt,
           source: input.source
         });
       } finally {
@@ -1494,14 +1497,14 @@ export class RegistrationService implements RegistrationApplication {
     let errorCode: string | null = null;
     try {
       await this.dependencies.mail.sendVerification({
-        attemptId: input.channelBindingId,
+        attemptId: input.reservationId,
         recipient: input.email,
         token: input.token,
         expiresAt: input.expiresAt
       });
     } catch (error) {
       errorCode = error instanceof MailDeliveryError ? error.operatorCode : "MAIL_DELIVERY_FAILED";
-      console.error(`[AUTH_MAIL_DELIVERY_FAILED] attempt=${input.channelBindingId} code=${errorCode}`);
+      console.error(`[AUTH_MAIL_DELIVERY_FAILED] attempt=${input.reservationId} code=${errorCode}`);
     }
     return Object.freeze({
       userId: input.userId,
@@ -1798,15 +1801,20 @@ export class RegistrationService implements RegistrationApplication {
         expiresAt,
         occurredAt: now,
         cooldownMs: this.dependencies.policy.verification.resendCooldownMs,
+        windowMs: this.dependencies.policy.verification.outboundSendWindowMs,
+        maximumSends: this.dependencies.policy.verification.outboundSendMax,
+        tokenTtlMs: this.dependencies.policy.verification.tokenTtlMs,
+        mechanism: this.dependencies.policy.verification.outboundSendMechanism,
         source
       });
       if (prepared.status === "send") {
         pendingDelivery = {
           userId: prepared.userId,
           channelBindingId: prepared.channelBindingId,
+          reservationId: prepared.reservationId,
           email,
           token,
-          expiresAt,
+          expiresAt: prepared.verificationExpiresAt,
           source
         };
       }

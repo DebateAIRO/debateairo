@@ -12,6 +12,7 @@ import {
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { checkDob, dobToIso, meetsMinimumAge, type DobErrorCode, type DobParts } from "@debateai/kernel";
 import { AgeRefusal } from "@/components/AgeRefusal";
+import { EmailPendingScreen } from "@/components/auth/EmailPendingScreen";
 import { AuthShell } from "@/components/AuthShell";
 import { DateOfBirthField, EMPTY_DOB } from "@/components/DateOfBirthField";
 import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
@@ -24,7 +25,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { TurnstilePublicConfig } from "@/lib/turnstile";
 import authEnglish from "@/messages/en/auth.json";
 
-type RegistrationClient = Pick<ContractClient, "checkAge" | "register">;
+type RegistrationClient = Pick<ContractClient, "checkAge" | "register"> & Partial<Pick<ContractClient, "resendVerification">>;
 type SuccessMessageKey = "auth.signUp.registrationSent";
 
 type Validity = Readonly<{ state: "idle" | "ok" | "bad"; text: string }>;
@@ -138,6 +139,7 @@ function gatedRowClick(
 }
 
 export function SignUpFlow({
+  turnstile,
   catalog = authEnglish,
   client = contractClient,
   dobLocale = resolveDobLocale("en"),
@@ -161,6 +163,7 @@ export function SignUpFlow({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [retryAfterSeconds, setRetryAfterSeconds] = useState(60);
   const [messageKey, setMessageKey] = useState<SuccessMessageKey | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -241,7 +244,7 @@ export function SignUpFlow({
         setRefused(true);
         return;
       }
-      await client.register(
+      const acknowledgement = await client.register(
         submitted,
         String(data.get("password") ?? ""),
         String(data.get("recovery-email") ?? "").trim(),
@@ -252,6 +255,11 @@ export function SignUpFlow({
           locale
         }
       );
+      setEmail(""); setConfirmEmail(""); setRecoveryEmail("");
+      setPassword(""); setConfirmPassword(""); setDateOfBirth(EMPTY_DOB);
+      setDateOfBirthError(null); setPrivacyAccepted(false); setTermsAccepted(false);
+      setPolicyOpen(false); setTermsOpen(false);
+      setRetryAfterSeconds(acknowledgement.retry_after_seconds);
       setSubmittedEmail(submitted);
       setMessageKey("auth.signUp.registrationSent");
     } catch (failure) {
@@ -333,6 +341,9 @@ export function SignUpFlow({
   const rules = passwordRules(catalog);
 
   if (refused) return <AgeRefusal catalog={catalog} />;
+  if (submittedEmail !== null) return <EmailPendingScreen email={submittedEmail} retryAfterSeconds={retryAfterSeconds}
+    client={{ resendVerification: client.resendVerification ?? contractClient.resendVerification }} catalog={catalog} locale={locale}
+    turnstile={turnstile} onDifferentEmail={() => { setSubmittedEmail(null); setMessageKey(null); }} />;
 
   return (
     <AuthShell

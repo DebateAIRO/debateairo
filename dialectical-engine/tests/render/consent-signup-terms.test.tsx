@@ -351,7 +351,7 @@ describe("sign-up — the Terms of Service row", () => {
 
   // Rewritten to both boxes plus an adult date of birth: the age gate replaced the 18+ box (Turn 8).
   it("refuses a scripted submit with the Terms box empty, and registers with both ticked", async () => {
-    const register = vi.fn().mockResolvedValue({ message: "sent" });
+    const register = vi.fn().mockResolvedValue({ message: "sent", retry_after_seconds: 60 });
     const checkAge = vi.fn().mockResolvedValue({ outcome: "allowed" });
     await mount({ register, checkAge });
 
@@ -376,6 +376,6 @@ describe("sign-up — the Terms of Service row", () => {
       "1990-01-01",
       DISPLAYED_LEGAL_EN
     );
-    expect(field("terms-accepted").disabled, "terms-accepted disabled when sent").toBe(true);
+    expect(document.querySelector('input[name="terms-accepted"]')).toBeNull();
   });
 });

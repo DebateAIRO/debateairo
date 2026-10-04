@@ -23,7 +23,7 @@ function harness(provisionFails = false) {
         records.push(input);
         if (provisionFails) throw new Error("PHONE_PROFILE_TEST_PROVISION_FAILED");
         await beforeCommit();
-        return { status: "created" as const, userId: input.userId, channelBindingId: randomUUID() };
+        return { status: "created" as const, userId: input.userId, channelBindingId: randomUUID(), verificationExpiresAt: input.verificationExpiresAt, reservationId: randomUUID() };
       },
       recordVerificationDelivery: async () => undefined,
       recordRegistrationFailure: async () => undefined,

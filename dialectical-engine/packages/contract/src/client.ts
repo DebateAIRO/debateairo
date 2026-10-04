@@ -282,8 +282,6 @@ function exactPublicMessageSchema<const Message extends string>(message: Message
   });
 }
 
-const RegistrationPublicResponseSchema = exactPublicMessageSchema(REGISTRATION_PUBLIC_MESSAGE);
-const ResendVerificationPublicResponseSchema = exactPublicMessageSchema(RESEND_VERIFICATION_PUBLIC_MESSAGE);
 const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
 
 export interface ContractClient {
@@ -297,12 +295,10 @@ export interface ContractClient {
     recoveryEmail: string,
     dateOfBirth: string,
     legal: RegisterLegalDocuments
-  ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
+  ): Promise<VerificationAck>;
   resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
   /** @deprecated Branch migration adapter; remove when the resend UI sends its full request. */
-  resendVerification(email: string): Promise<Readonly<{
-    message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
-  }>>;
+  resendVerification(email: string): Promise<VerificationAck>;
   startRecovery(email: string): Promise<Readonly<{
     message: typeof RECOVERY_START_PUBLIC_MESSAGE;
   }>>;
@@ -436,27 +432,27 @@ export function createContractClient(
   // They never invent phone/proof values; the revised server boundary must reject old payloads.
   function register(input: RegisterRequest): Promise<VerificationAck>;
   function register(email: string, password: string, recoveryEmail: string, dateOfBirth: string,
-    legal: RegisterLegalDocuments): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
+    legal: RegisterLegalDocuments): Promise<VerificationAck>;
   async function register(input: RegisterRequest | string, password?: string, recoveryEmail?: string,
-    dateOfBirth?: string, legal?: RegisterLegalDocuments): Promise<VerificationAck | Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>> {
+    dateOfBirth?: string, legal?: RegisterLegalDocuments): Promise<VerificationAck> {
     if (typeof input !== "string") {
       return request("/v1/auth/register", RegistrationVerificationAckSchema,
         { method: "POST", body: JSON.stringify(RegisterRequestSchema.parse(input)) }, 202);
     }
     if (legal === undefined) throw new TypeError("Missing legacy registration documents");
-    return request("/v1/auth/register", RegistrationPublicResponseSchema, { method: "POST", body: JSON.stringify({
+    return request("/v1/auth/register", RegistrationVerificationAckSchema, { method: "POST", body: JSON.stringify({
       email: input, password, recovery_email: recoveryEmail, date_of_birth: dateOfBirth,
       terms: legal.terms, privacy: legal.privacy, locale: legal.locale
     }) }, 202);
   }
   function resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
-  function resendVerification(email: string): Promise<Readonly<{ message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE }>>;
-  async function resendVerification(input: ResendVerificationRequest | string): Promise<VerificationAck | Readonly<{ message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE }>> {
+  function resendVerification(email: string): Promise<VerificationAck>;
+  async function resendVerification(input: ResendVerificationRequest | string): Promise<VerificationAck> {
     if (typeof input !== "string") {
       return request("/v1/auth/resend-verification", ResendVerificationAckSchema,
         { method: "POST", body: JSON.stringify(ResendVerificationRequestSchema.parse(input)) }, 202);
     }
-    return request("/v1/auth/resend-verification", ResendVerificationPublicResponseSchema,
+    return request("/v1/auth/resend-verification", ResendVerificationAckSchema,
       { method: "POST", body: JSON.stringify({ email: input }) }, 202);
   }
   const eventResponse = async (runId: string, signal?: AbortSignal): Promise<Response> => {

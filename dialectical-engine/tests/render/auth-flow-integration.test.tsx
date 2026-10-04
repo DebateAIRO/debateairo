@@ -333,7 +333,7 @@ describe("rendered auth flow integration", () => {
   });
 
   it("renders the non-enumerating registration state", async () => {
-    const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE });
+    const register = vi.fn().mockResolvedValue({ message: REGISTRATION_MESSAGE, retry_after_seconds: 60 });
     await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} />));
 
     await fillAdultDateOfBirth();
@@ -355,7 +355,12 @@ describe("rendered auth flow integration", () => {
       DISPLAYED_LEGAL_EN
     );
     expect(document.body.textContent).toContain(REGISTRATION_MESSAGE);
-    expect(document.body.textContent).toContain("No account status is revealed here.");
+    expect(document.querySelector("h1")?.textContent).toBe("Check your email");
+    expect(document.querySelector('input[name="password"]')).toBeNull();
+    expect(document.querySelector('input[name="email"]')).toBeNull();
+    await click("Use a different email");
+    for (const name of ["email", "confirm-email", "password", "confirm-password", "recovery-email", "dob-d", "dob-m", "dob-y"]) expect(field(name).value).toBe("");
+    expect(field("privacy-accepted").checked).toBe(false); expect(field("terms-accepted").checked).toBe(false);
 
     expect(document.body.textContent).not.toMatch(/Google|forgot|keep me signed|model API key/i);
   });

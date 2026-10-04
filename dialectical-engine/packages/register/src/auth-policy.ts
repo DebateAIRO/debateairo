@@ -63,10 +63,13 @@ const verificationPolicySchema = z.object({
   resend_cooldown_ms: z.number().int().positive(),
   outbound_send_window_ms: z.literal(60 * 60_000),
   outbound_send_max: z.literal(3),
-  outbound_send_enforcement: z.object({
-    mechanism: z.literal("per_row_last_sent_timestamp_minimum_spacing"),
-    minimum_spacing_ms: z.literal(20 * 60_000)
-  }).strict(),
+  outbound_send_enforcement: z.discriminatedUnion("mechanism", [
+    // Historical sealed rows retain their original shape and per-row authority.
+    z.object({ mechanism: z.literal("per_row_last_sent_timestamp_minimum_spacing"),
+      minimum_spacing_ms: z.literal(20 * 60_000) }).strict(),
+    z.object({ mechanism: z.literal("atomic_rolling_reservation_ledger"),
+      decision_version: z.literal(2), minimum_spacing_ms: z.literal(60_000) }).strict()
+  ]),
   verification_credentials: z.object({
     storage: z.literal("HASH_ONLY_APPEND_ONLY_LEDGER"),
     validity: z.literal("EACH_MAILED_TOKEN_UNTIL_OWN_EXPIRY_OR_ACCOUNT_ACTIVATION"),
@@ -1088,6 +1091,20 @@ const AUTH_POLICY_DEPLOYMENT_PUBLICATION_ROWS = Object.freeze(
         sourceRef: `${row.sourceRef}${PASSWORD_POLICY_MAXIMUM_LENGTH_SOURCE_REF}`
       });
     }
+    if (row.rowKey === "verificationPolicy") {
+      return Object.freeze({
+        rowKey: row.rowKey,
+        value: Object.freeze({ ...row.value,
+          "resend_cooldown_ms": canonicalDecimal("60000"),
+          "outbound_send_enforcement": Object.freeze({
+            "mechanism": "atomic_rolling_reservation_ledger",
+            "decision_version": canonicalDecimal("2"),
+            "minimum_spacing_ms": canonicalDecimal("60000")
+          })
+        }),
+        sourceRef: `${row.sourceRef}; Task5 decision v2: independent committed rolling reservations; 60000ms spacing; (t-3600000ms,t] maximum3 including initial and failed transports`
+      });
+    }
     if (row.rowKey === "rateLimitPolicy") {
       const value = row.value as unknown as Readonly<Record<string, CanonicalJsonAst>> & {
         readonly sketch_design: Readonly<Record<string, CanonicalJsonAst>>;
@@ -1180,6 +1197,7 @@ export interface AuthPolicy {
     readonly resendCooldownMs: number;
     readonly outboundSendWindowMs: number;
     readonly outboundSendMax: 3;
+    readonly outboundSendMechanism: "per_row_last_sent_timestamp_minimum_spacing" | "atomic_rolling_reservation_ledger";
     readonly enumerationResponseFloorMs: number;
     readonly enumerationToleranceMs: number;
   };
@@ -1269,12 +1287,17 @@ export function authPolicyFromRegisterRows(rows: readonly AuthPolicyRegisterRow[
     admissionPerSource: rateLimits.data.routes[route].admission_per_source
   });
   if (verification.success
+    && verification.data.outbound_send_enforcement.mechanism === "per_row_last_sent_timestamp_minimum_spacing"
     && verification.data.resend_cooldown_ms * verification.data.outbound_send_max
       < verification.data.outbound_send_window_ms) {
     throw new TypedDomainError(
       "AUTH_POLICY_INVALID",
       "Verification cooldown does not enforce the outbound send ceiling"
     );
+  }
+  if (verification.data.outbound_send_enforcement.mechanism === "atomic_rolling_reservation_ledger"
+    && verification.data.resend_cooldown_ms !== verification.data.outbound_send_enforcement.minimum_spacing_ms) {
+    throw new TypedDomainError("AUTH_POLICY_INVALID", "Verification cooldown contradicts reservation spacing");
   }
   if (rateLimits.success
     && rateLimits.data.bucket_capacity !== rateLimits.data.sketch_design.slots_per_route) {
@@ -1484,6 +1507,7 @@ export function authPolicyFromRegisterRows(rows: readonly AuthPolicyRegisterRow[
       resendCooldownMs: verification.data.resend_cooldown_ms,
       outboundSendWindowMs: verification.data.outbound_send_window_ms,
       outboundSendMax: verification.data.outbound_send_max,
+      outboundSendMechanism: verification.data.outbound_send_enforcement.mechanism,
       enumerationResponseFloorMs: verification.data.enumeration_response_floor_ms,
       enumerationToleranceMs: verification.data.enumeration_tolerance_ms
     }),

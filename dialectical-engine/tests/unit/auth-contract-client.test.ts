@@ -31,10 +31,10 @@ describe("auth registration contract client", () => {
       });
       return Response.json(
         url.pathname.endsWith("/register")
-          ? { message: REGISTRATION_MESSAGE }
+          ? { message: REGISTRATION_MESSAGE, retry_after_seconds: 60 }
           : url.pathname.endsWith("/start")
             ? { message: RECOVERY_START_MESSAGE }
-            : { message: RESEND_MESSAGE },
+            : { message: RESEND_MESSAGE, retry_after_seconds: 60 },
         { status: 202 }
       );
     }) as typeof fetch;
@@ -46,9 +46,9 @@ describe("auth registration contract client", () => {
       "recovery@example.test",
       "1990-01-01",
       { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en" }
-    )).resolves.toEqual({ message: REGISTRATION_MESSAGE });
+    )).resolves.toEqual({ message: REGISTRATION_MESSAGE, retry_after_seconds: 60 });
     await expect(client.resendVerification("person@example.test"))
-      .resolves.toEqual({ message: RESEND_MESSAGE });
+      .resolves.toEqual({ message: RESEND_MESSAGE, retry_after_seconds: 60 });
     await expect(client.startRecovery("person@example.test"))
       .resolves.toEqual({ message: RECOVERY_START_MESSAGE });
 
@@ -101,7 +101,7 @@ describe("auth registration contract client", () => {
   it("requires the ruled 202 status even when the generic response body is exact", async () => {
     const client = createContractClient(
       "https://api.debateai.test",
-      (async () => Response.json({ message: RESEND_MESSAGE }, { status: 200 })) as typeof fetch
+      (async () => Response.json({ message: RESEND_MESSAGE, retry_after_seconds: 60 }, { status: 200 })) as typeof fetch
     );
 
     await expect(client.resendVerification("person@example.test"))

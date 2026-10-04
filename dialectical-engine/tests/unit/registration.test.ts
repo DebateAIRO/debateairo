@@ -1805,7 +1805,9 @@ function rework7Harness(options: {
         : Object.freeze({
             status: "created",
             userId: "22222222-2222-4222-8222-222222222222",
-            channelBindingId: "33333333-3333-4333-8333-333333333333"
+            channelBindingId: "33333333-3333-4333-8333-333333333333",
+            verificationExpiresAt: (_input as { verificationExpiresAt: Date }).verificationExpiresAt,
+            reservationId: "44444444-4444-4444-8444-444444444444"
           });
     },
     recordVerificationDelivery: async () => {
@@ -2835,5 +2837,28 @@ describe("T1 rework7 A3 — admission close-and-drain", () => {
     } finally {
       harness.restore();
     }
+  });
+});
+
+describe("Task5 versioned verification delivery policy", () => {
+  it("selects the independently bounded60-second deployment mechanism while preserving sealed history", () => {
+    const historical = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+    const deployed = authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS);
+    expect(historical.verification.resendCooldownMs).toBe(1_200_000);
+    expect(deployed.verification).toMatchObject({ resendCooldownMs: 60_000, outboundSendWindowMs: 3_600_000, outboundSendMax: 3, outboundSendMechanism: "atomic_rolling_reservation_ledger" });
+    const old = AUTH_POLICY_REGISTER_ROWS.find(row => row.rowKey === "verificationPolicy")!;
+    const fresh = AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.find(row => row.rowKey === "verificationPolicy")!;
+    expect(old.value.outbound_send_enforcement).toEqual({ mechanism: "per_row_last_sent_timestamp_minimum_spacing", minimum_spacing_ms: 1_200_000 });
+    expect(fresh.sourceRef.startsWith(old.sourceRef)).toBe(true);
+    expect(fresh.value.outbound_send_enforcement).toMatchObject({ mechanism: "atomic_rolling_reservation_ledger", decision_version: 2, minimum_spacing_ms: 60_000 });
+    expect(fresh.value.verification_credentials).toEqual(old.value.verification_credentials);
+  });
+  it.each([
+    { mechanism: "atomic_rolling_reservation_ledger", decision_version: 1, minimum_spacing_ms: 60_000 },
+    { mechanism: "atomic_rolling_reservation_ledger", decision_version: 2, minimum_spacing_ms: 59_999 },
+    { mechanism: "per_row_last_sent_timestamp_minimum_spacing", minimum_spacing_ms: 60_000 }
+  ])("rejects malformed or reinterpreted enforcement%j", (enforcement) => {
+    const rows = AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.map(row => row.rowKey === "verificationPolicy" ? { ...row, value: { ...row.value, outbound_send_enforcement: enforcement } } : row);
+    expect(() => authPolicyFromRegisterRows(rows)).toThrow();
   });
 });

@@ -8,6 +8,7 @@ const root = process.cwd();
 const ownedFiles = [
   "components/LoginFlow.tsx",
   "components/SignUpFlow.tsx",
+  "components/auth/EmailPendingScreen.tsx",
   "components/AuthShell.tsx",
   "components/DateOfBirthField.tsx",
   "components/AgeRefusal.tsx",

@@ -59,7 +59,7 @@ async function submit(scripted = true): Promise<void> {
 
 beforeEach(async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  register.mockReset().mockResolvedValue({ message: "Check your inbox for verification instructions." });
+  register.mockReset().mockResolvedValue({ message: "Check your inbox for verification instructions.", retry_after_seconds: 60 });
   checkAge.mockReset().mockResolvedValue({ outcome: "allowed" });
   host = document.createElement("div");
   document.body.append(host);
@@ -180,8 +180,8 @@ describe("register form F2 confirm email", () => {
 
   // Property: confirmation shares primary email disabling at idle, during the request and after success.
   // Breaks: always disabling it, omitting busy, or omitting sent.
-  it("disables confirmation with its sibling while busy and after success", async () => {
-    let resolve!: (value: { message: string }) => void;
+  it("disables confirmation while busy and removes both fields after acknowledgement", async () => {
+    let resolve!: (value: { message: string; retry_after_seconds: 60 }) => void;
     register.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
     expect(field("confirm-email").disabled).toBe(false);
     await fillOtherFields();
@@ -189,9 +189,9 @@ describe("register form F2 confirm email", () => {
     await submit();
     expect(field("email").disabled).toBe(true);
     expect(field("confirm-email").disabled).toBe(true);
-    await act(async () => resolve({ message: "Check your inbox." }));
-    expect(field("email").disabled).toBe(true);
-    expect(field("confirm-email").disabled).toBe(true);
+    await act(async () => resolve({ message: "Check your inbox.", retry_after_seconds: 60 }));
+    expect(host.querySelector('input[name="email"]')).toBeNull();
+    expect(host.querySelector('input[name="confirm-email"]')).toBeNull();
   });
 
   // Property: a rejected registration returns confirmation to an editable state.

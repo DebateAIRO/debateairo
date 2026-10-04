@@ -23,7 +23,7 @@ function serviceCapturing(recordsKey: Buffer | undefined) {
       createPendingAccount: async (input: PendingAccountInput, beforeCommit: () => Promise<void>) => {
         captured.push(input);
         await beforeCommit();
-        return { status: "created" as const, userId: input.userId, channelBindingId: randomUUID() };
+        return { status: "created" as const, userId: input.userId, channelBindingId: randomUUID(), verificationExpiresAt: input.verificationExpiresAt, reservationId: randomUUID() };
       },
       recordVerificationDelivery: async () => undefined,
       recordRegistrationFailure: async () => undefined,
