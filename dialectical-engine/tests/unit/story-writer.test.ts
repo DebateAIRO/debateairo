@@ -849,8 +849,14 @@ describe("StoryWriter — per-run role makers (P4-D, P3-N1)", () => {
   });
 
   it("a story call refused for money on a role maker goes to the run's cost fallback with that maker planned", async () => {
-    const seat = scripted(byContract);
+    // C-17: the seat's makers really refuse for money (the story seam's STORY_COST_ENVELOPE_REACHED, raised before
+    // sending), so the story is READY only if each refusal reaches the run's fallback, named as money, and the
+    // fallback's cheaper maker serves it and is named on the record.
+    const seat = scripted(() => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story has spent its envelope"));
+    const cheaper = scripted(byContract);
+    const CHEAPER = "provider:cheaper";
     const planned: string[] = [];
+    const refusedForMoneyOn: string[] = [];
     const { writer, inserted } = harness();
     await writer.writeAfterSettle({
       ...SNAPSHOT,
@@ -859,12 +865,26 @@ describe("StoryWriter — per-run role makers (P4-D, P3-N1)", () => {
         storyteller: { provider: seat.provider, providerRef: SEAT_WRITER },
         checker: { provider: seat.provider, providerRef: SEAT_CHECKER }
       },
-      costFallback: async ({ planned: maker, request, call }) => {
+      // As the runner's fallback does: the planned maker first; only a refusal the writer names as money moves the
+      // same request to another maker.
+      costFallback: async ({ planned: maker, request, refusedForMoney, call }) => {
         planned.push(maker.providerRef);
-        return { result: await call(maker, request), servedBy: maker };
+        try {
+          return { result: await call(maker, request), servedBy: maker };
+        } catch (error) {
+          if (!refusedForMoney(error)) throw error;
+          refusedForMoneyOn.push(maker.providerRef);
+          const fallback = { provider: cheaper.provider, providerRef: CHEAPER };
+          return { result: await call(fallback, request), servedBy: fallback };
+        }
       }
     });
-    expect(inserted[0]).toMatchObject({ outcome: "READY" });
     expect(planned).toEqual([SEAT_WRITER, SEAT_CHECKER]);
+    expect(refusedForMoneyOn).toEqual([SEAT_WRITER, SEAT_CHECKER]);
+    expect(seat.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
+    expect(cheaper.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:CHECKER:1"]);
+    expect(inserted[0]).toMatchObject({
+      outcome: "READY", storytellerLineage: { provider_ref: CHEAPER }, checkerLineage: { provider_ref: CHEAPER }
+    });
   });
 });

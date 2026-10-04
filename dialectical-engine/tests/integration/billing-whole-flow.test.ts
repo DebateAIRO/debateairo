@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { microsToDecimal, upgradeMonthCreditOverrideMicros, upgradeProrationMicros } from "@debateai/billing-core";
 import { BillingRepository, EntitlementRepository } from "@debateai/db";
 import { taxSummaryJobFor } from "../../apps/api/src/billing/owner-jobs.js";
@@ -119,9 +119,22 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(percent).toEqual({ PERSON_DAY: 50, PERSON_WEEK: 20, PERSON_MONTH: 10 });
     expect(usage.text).not.toMatch(/micros|\$|"0\.5/u);
 
-    // Renewal: the period ends, the saved card is charged again, the plan stays.
+    // Renewal: the period ends, the saved card is charged again, the plan stays. C-18: the tax service is watched
+    // from here, so a renewal that copied the checkout's tax (whose numbers the fake's fixed rate would reproduce)
+    // fails below: the renewal must ask for ONE fresh quote, for its recurring net, at its own (moved) time.
+    const taxQuotes = vi.spyOn(stack.tax, "quote");
     stack.advanceDays(31);
+    const renewalFrom = stack.now();
     await stack.runRenewals();
+    const renewalUntil = stack.now();
+    // Read before the restore, which clears the spy's record.
+    const quoteCalls = taxQuotes.mock.calls.map(([input]) => input);
+    taxQuotes.mockRestore();
+    expect(quoteCalls).toHaveLength(1);
+    const asked = quoteCalls[0]!;
+    expect(asked).toMatchObject({ netMicros: 20_000_000, currency: "USD", location: expect.objectContaining({ country: "RO" }) });
+    expect(asked.date.getTime()).toBeGreaterThanOrEqual(renewalFrom.getTime());
+    expect(asked.date.getTime()).toBeLessThanOrEqual(renewalUntil.getTime());
     expect(await stack.subscriptionStatus(person.ownerRef)).toBe("ACTIVE");
     expect(ids(stack.mailsTo(person.email)).filter((id) => id === "M2_INVOICE_ATTACHED")).toHaveLength(2);
     // P2-M39, the renewal's amount: the recurring net (Plus's 20.00) plus tax priced afresh by the tax service at the

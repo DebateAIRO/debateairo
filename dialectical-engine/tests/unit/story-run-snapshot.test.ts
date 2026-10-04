@@ -221,24 +221,38 @@ describe("buildStoryRunSnapshot", () => {
  * register's ref decides.
  */
 describe("the story's per-run role makers (P4-D)", () => {
-  const member = (providerRef: string) => ({ provider, providerRef });
-  const seat = { main: member("provider:main"), runnerUp: member("provider:runner-up") };
+  // C-17: each member has its OWN gateway double, so a role that paired one member's ref with the other's gateway (the
+  // story run on the main's route under the runner-up's name) fails here, not only in an integration suite.
+  const gateway = (): ProviderGateway => ({ call: async () => { throw new Error("unused"); } });
+  const mainGateway = gateway();
+  const runnerUpGateway = gateway();
+  const seat = {
+    main: { provider: mainGateway, providerRef: "provider:main" },
+    runnerUp: { provider: runnerUpGateway, providerRef: "provider:runner-up" }
+  };
+  /** The role is exactly that member: its own ref AND its own gateway object. */
+  const expectMember = (
+    made: ReturnType<typeof storySeatRoleMaker>, member: Readonly<{ provider: ProviderGateway; providerRef: string }>
+  ) => {
+    expect(made?.providerRef).toBe(member.providerRef);
+    expect(made?.provider).toBe(member.provider);
+  };
 
   it("passes the role makers through untouched, and leaves them out when the runner set none", () => {
-    const roleMakers = { storyteller: member("provider:w"), checker: null };
+    const roleMakers = { storyteller: { provider: gateway(), providerRef: "provider:w" }, checker: null };
     expect(buildStoryRunSnapshot({ ...source(), roleMakers }).roleMakers).toBe(roleMakers);
     expect(buildStoryRunSnapshot(source()).roleMakers).toBeUndefined();
   });
 
-  it("takes the member the served round recorded, main or runner-up", () => {
-    expect(storySeatRoleMaker(seat, "provider:runner-up")).toEqual({ provider, providerRef: "provider:runner-up" });
-    expect(storySeatRoleMaker(seat, "provider:main")).toEqual({ provider, providerRef: "provider:main" });
+  it("takes the member the served round recorded, main or runner-up, each on its own gateway", () => {
+    expectMember(storySeatRoleMaker(seat, "provider:runner-up"), seat.runnerUp);
+    expectMember(storySeatRoleMaker(seat, "provider:main"), seat.main);
   });
 
   it("takes the seat's main when no round answered, or the recorded ref is neither member", () => {
-    expect(storySeatRoleMaker(seat, undefined)).toEqual({ provider, providerRef: "provider:main" });
-    expect(storySeatRoleMaker({ main: member("provider:main"), runnerUp: null }, "provider:elsewhere"))
-      .toEqual({ provider, providerRef: "provider:main" });
+    expectMember(storySeatRoleMaker(seat, undefined), seat.main);
+    expectMember(storySeatRoleMaker(seat, "provider:elsewhere"), seat.main);
+    expectMember(storySeatRoleMaker({ main: seat.main, runnerUp: null }, "provider:elsewhere"), seat.main);
   });
 
   it("keeps the register's ref (null) for a role with no scorecard seat", () => {
