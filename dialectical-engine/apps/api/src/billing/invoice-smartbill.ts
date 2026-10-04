@@ -29,7 +29,7 @@ export type EfacturaStatus = "SENT_BY_ACCOUNT_SETTING" | "ACCEPTED" | "REJECTED"
 type SmartBillDeps = InvoiceJobDeps & Readonly<{
   repository: Pick<BillingRepository, "appendInvoiceStatus">;
   issuer: SmartBillPort;
-  jobs: Pick<BillingJobQueries, "markJobStage" | "jobStage">;
+  jobs: Pick<BillingJobQueries, "markJobStage" | "jobStage" | "holdsClaim">;
   audit: BillingAudit;
 }>;
 
@@ -108,9 +108,16 @@ async function issueOnce(
   deps: SmartBillDeps, job: Parameters<OutboxHandler>[0], now: Date, paid: PaidCharge, kind: "INVOICE" | "CREDIT_NOTE",
   totalMicros: number, issue: () => Promise<SmartBillDocument>
 ): Promise<OutboxOutcome> {
-  const intent = await deps.repository.withTransaction((client) => deps.repository.insertInvoiceIntent(client, {
-    chargeId: paid.charge.chargeId, kind, issuer: "SMARTBILL", requestedAt: now
-  }));
+  // C-14: the intent is written only while the job row is still this claim's, in one transaction. A stale holder's
+  // intent would read as "an earlier attempt may have issued it" to the current holder, which (with no lookup) would
+  // dead-letter INVOICE_UNKNOWN for an invoice nobody issued.
+  const intent = await deps.repository.withTransaction(async (client) => {
+    if (!await deps.jobs.holdsClaim(client, job)) return "CLAIM_LOST" as const;
+    return deps.repository.insertInvoiceIntent(client, {
+      chargeId: paid.charge.chargeId, kind, issuer: "SMARTBILL", requestedAt: now
+    });
+  });
+  if (intent === "CLAIM_LOST") return claimLost(now);
   if (intent === "DUPLICATE" && !provenNothingIssued(await deps.jobs.jobStage(job.jobId))) {
     if (deps.issuer.lookup === undefined) return unknownOutcome(deps, kind);
     let found: SmartBillDocument | null;

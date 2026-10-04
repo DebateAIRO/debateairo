@@ -433,7 +433,9 @@ export const BillingSubscriptionResponseSchema = z.object({
     /** The window's last day in the consumer's own calendar (the UI's "withdraw until {date}"); null with no window. */
     withdrawal_last_day: z.iso.date().nullable(),
     can_upgrade: z.boolean(),
-    can_change_card: z.boolean()
+    can_change_card: z.boolean(),
+    /** C-15: Settings offers "Undo cancellation" only when the revoke route would accept it. */
+    can_revoke_cancel: z.boolean()
   }).strict().nullable()
 }).strict();
 export type BillingSubscriptionResponse = z.infer<typeof BillingSubscriptionResponseSchema>;

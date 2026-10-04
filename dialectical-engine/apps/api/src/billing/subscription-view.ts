@@ -83,6 +83,18 @@ function cardChangeOffered(input: WindowInput): boolean {
   return (state.status === "ACTIVE" || state.status === "PAST_DUE") && state.xmoneyEnvironment === input.xmoneyEnvironment;
 }
 
+/**
+ * C-15: an undo of a pending cancel is offered only where the revoke route (`revokeCancelForOwner`) accepts it: ACTIVE,
+ * the plan paid in this API's xMoney system (D5 5h: the other one's cancel stands, NOT_SUBSCRIBED), a cancel pending,
+ * and before the period end. A SUSPENDED plan's undo is refused while paused (P2-W10); a PAST_DUE plan's cancel ends it
+ * at once, so it never carries one.
+ */
+function revokeCancelOffered(input: WindowInput): boolean {
+  const { state, now } = input;
+  return state.status === "ACTIVE" && state.cancelRequested && state.xmoneyEnvironment === input.xmoneyEnvironment
+    && (state.currentPeriodEnd === null || now.getTime() < state.currentPeriodEnd.getTime());
+}
+
 export function subscriptionView(input: WindowInput): SubscriptionView {
   const { state } = input;
   const renewsOn = state.status === "ACTIVE" && !state.cancelRequested
@@ -101,7 +113,8 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
     withdrawal_open_until: iso(withdrawal?.closesAt ?? null),
     withdrawal_last_day: withdrawal?.lastDay ?? null,
     can_upgrade: upgradeOffered(input),
-    can_change_card: cardChangeOffered(input)
+    can_change_card: cardChangeOffered(input),
+    can_revoke_cancel: revokeCancelOffered(input)
   });
 }
 

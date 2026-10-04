@@ -341,11 +341,13 @@ export function SubscriptionControls({
             {live.can_change_card
               ? <a className="setBtn" href="/settings/card">{t(catalog, "billing.subscription.updateCard")}</a>
               : null}
-            {/* After the period end the server refuses the undo (NOT_SUBSCRIBED) and the sweep ends the plan: offer neither.
-                While SUSPENDED it refuses the undo too, whatever wrote the cancel (P2-W10, the W7 review's item 3); a won
-                dispute resumes the plan, and the undo comes back until the period end (C5). P2-W10: a plan paused by a
-                dispute can be cancelled; nothing ends at once. */}
-            {live.cancel_requested ? (periodOver || paused ? null : (
+            {/* C-15: Undo only where the server says the revoke route would accept it (`can_revoke_cancel`): never for
+                a plan of the other xMoney system, whose cancel stands. After the period end the server refuses the undo
+                (NOT_SUBSCRIBED) and the sweep ends the plan: offer neither (the page's own clock hides it too, for a
+                view read just before the end). While SUSPENDED it refuses the undo too, whatever wrote the cancel
+                (P2-W10, the W7 review's item 3); a won dispute resumes the plan, and the undo comes back until the
+                period end (C5). P2-W10: a plan paused by a dispute can be cancelled; nothing ends at once. */}
+            {live.cancel_requested ? (!live.can_revoke_cancel || periodOver ? null : (
               <button type="button" className="setBtn" disabled={busy}
                 onClick={() => { void run(async () => { await client.revokeSubscriptionCancel(); await reload(); }, revokeFailureWords); }}>
                 {t(catalog, "billing.subscription.revoke")}

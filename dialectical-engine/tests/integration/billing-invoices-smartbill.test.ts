@@ -66,6 +66,8 @@ class RecordingSmartBill {
 let h: BillingHarness;
 let smartbill: RecordingSmartBill;
 let invoiceHandler: () => ReturnType<typeof createSmartBillInvoiceHandler>;
+/** While true, the worker's SMARTBILL_INVOICE attempts change nothing and retry later (C-14's row claims the job itself). */
+let holdInvoices = false;
 beforeAll(async () => {
   h = await startBillingHarness();
   smartbill = new RecordingSmartBill();
@@ -75,7 +77,10 @@ beforeAll(async () => {
     publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const
   });
   invoiceHandler = () => createSmartBillInvoiceHandler(deps());
-  h.worker.register("SMARTBILL_INVOICE", async (job, now) => createSmartBillInvoiceHandler(deps())(job, now));
+  h.worker.register("SMARTBILL_INVOICE", async (job, now) => holdInvoices
+    // C-14: the worker leaves the job untouched (no intent, no SmartBill call), so a test can claim it itself.
+    ? { kind: "RETRY" as const, code: "TEST_INVOICE_HELD", retryAt: new Date(now.getTime() + 3_600_000) }
+    : createSmartBillInvoiceHandler(deps())(job, now));
   h.worker.register("SMARTBILL_STORNO", async (job, now) => createSmartBillStornoHandler(deps())(job, now));
 });
 afterAll(async () => { await h?.stop(); });
@@ -83,6 +88,26 @@ const invoices = async (chargeId: string) => (await h.database.pool.query(
   "SELECT issuer, kind, series, number FROM billing.invoice WHERE charge_id=$1 ORDER BY kind", [chargeId]
 )).rows;
 const invoiceJob = async (chargeId: string) => (await h.outboxRows(chargeId)).find((row) => row.kind === "SMARTBILL_INVOICE");
+/** The invoice intents a charge has (A17b): one per kind, written before SmartBill is ever called. */
+const intents = async (chargeId: string) => (await h.database.pool.query(
+  "SELECT kind, issuer FROM billing.invoice_intent WHERE charge_id=$1 ORDER BY kind", [chargeId]
+)).rows;
+/**
+ * P2-M6 / C-14: one process claims the charge's open SMARTBILL_INVOICE job (the claim's fields as the worker's claim
+ * hands them over), whatever its lease: a second call is another process claiming it again after the first one's
+ * lease ran out.
+ */
+const claimInvoiceJob = async (chargeId: string, workerId: string, at: Date) => {
+  const row = (await h.database.pool.query<{ job_id: string; payload: Record<string, unknown>; created_at: Date; not_before: Date; attempts: number }>(`
+    UPDATE billing.outbox SET claimed_by = $2, claimed_at = $3, attempts = attempts + 1
+    WHERE kind = 'SMARTBILL_INVOICE' AND ref = $1 AND done_at IS NULL AND dead_at IS NULL
+    RETURNING job_id, payload, created_at, not_before, attempts
+  `, [chargeId, workerId, at])).rows[0]!;
+  return {
+    jobId: row.job_id, kind: "SMARTBILL_INVOICE" as const, ref: chargeId, payload: row.payload as never,
+    createdAt: row.created_at, notBefore: row.not_before, attempts: row.attempts, claimedBy: workerId, claimedAt: at
+  };
+};
 /** The e-Factura statuses of a charge's SmartBill documents, in the order they were recorded (A21). */
 const statuses = async (chargeId: string) => (await h.database.pool.query(
   `SELECT i.kind, s.efactura_status FROM billing.invoice_status_event s JOIN billing.invoice i USING (invoice_id)
@@ -195,19 +220,8 @@ describe("P10b SmartBill invoices for Romania", () => {
     // Attempt 1 proved nothing was created, so the next attempt may call `issue` again (A17b).
     expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: false, dead: false, lastErrorCode: "INVOICE_SERVICE_UNAVAILABLE" });
     // Process A claims attempt 2; its lease runs out while it is slow, and process B claims attempt 3.
-    const claim = async (workerId: string, at: Date) => {
-      const row = (await h.database.pool.query<{ job_id: string; payload: Record<string, unknown>; created_at: Date; not_before: Date; attempts: number }>(`
-        UPDATE billing.outbox SET claimed_by = $2, claimed_at = $3, attempts = attempts + 1
-        WHERE kind = 'SMARTBILL_INVOICE' AND ref = $1 AND done_at IS NULL AND dead_at IS NULL
-        RETURNING job_id, payload, created_at, not_before, attempts
-      `, [paid.chargeId, workerId, at])).rows[0]!;
-      return {
-        jobId: row.job_id, kind: "SMARTBILL_INVOICE" as const, ref: paid.chargeId, payload: row.payload as never,
-        createdAt: row.created_at, notBefore: row.not_before, attempts: row.attempts, claimedBy: workerId, claimedAt: at
-      };
-    };
-    const stale = await claim("process-a", h.clock.now);
-    const current = await claim("process-b", new Date(h.clock.now.getTime() + 301_000));
+    const stale = await claimInvoiceJob(paid.chargeId, "process-a", h.clock.now);
+    const current = await claimInvoiceJob(paid.chargeId, "process-b", new Date(h.clock.now.getTime() + 301_000));
     expect(await invoiceHandler()(stale, h.clock.now)).toMatchObject({ kind: "RETRY", code: "BILLING_OUTBOX_CLAIM_LOST" });
     expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(0);
     expect(await invoiceJob(paid.chargeId)).toMatchObject({ lastErrorCode: "INVOICE_SERVICE_UNAVAILABLE" });
@@ -216,6 +230,30 @@ describe("P10b SmartBill invoices for Romania", () => {
     expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
     expect(await h.repository.complete(current.jobId, h.clock.now, { workerId: "process-b", attempts: current.attempts })).toBe(true);
     expect(await invoices(paid.chargeId)).toHaveLength(1);
+    smartbill.withLookup = true;
+  });
+
+  it("writes the invoice intent only under the job's current claim: a stale holder's is refused, and the holder issues once (C-14)", async () => {
+    // Production SmartBill has no lookup (X1 row 8), so an intent with no proof of "nothing issued" would be dead-lettered
+    // INVOICE_UNKNOWN: the stale holder's intent must never be written.
+    smartbill.withLookup = false;
+    holdInvoices = true;
+    const paid = await h.activate();
+    holdInvoices = false;
+    expect(await intents(paid.chargeId)).toEqual([]);
+    // Process A claims the job and stalls past its lease before writing anything; process B claims it again.
+    const stale = await claimInvoiceJob(paid.chargeId, "process-a", h.clock.now);
+    const current = await claimInvoiceJob(paid.chargeId, "process-b", new Date(h.clock.now.getTime() + 301_000));
+    expect(await invoiceHandler()(stale, h.clock.now)).toMatchObject({ kind: "RETRY", code: "BILLING_OUTBOX_CLAIM_LOST" });
+    expect(await intents(paid.chargeId)).toEqual([]);
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(0);
+    // B, the holder, writes the intent and issues the invoice once: no INVOICE_UNKNOWN, no O3, no hand check.
+    expect(await invoiceHandler()(current, h.clock.now)).toEqual({ kind: "DONE" });
+    expect(await intents(paid.chargeId)).toEqual([{ kind: "INVOICE", issuer: "SMARTBILL" }]);
+    expect(smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId)).toHaveLength(1);
+    expect(await h.repository.complete(current.jobId, h.clock.now, { workerId: "process-b", attempts: current.attempts })).toBe(true);
+    expect(await invoices(paid.chargeId)).toHaveLength(1);
+    expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: true, dead: false });
     smartbill.withLookup = true;
   });
 

@@ -84,6 +84,23 @@ export class BillingJobQueries {
     return result.rowCount === 1;
   }
 
+  /**
+   * C-14: the claim fence for a write that must happen in the caller's transaction (SmartBill's invoice intent). It
+   * locks the open job row FOR UPDATE on `client` and says whether it is still this claim's (`claimedBy` and
+   * `attempts` as the claim handed the job over). While the caller's transaction holds the row, no other worker can
+   * claim it again (the claim skips a locked row; every other write to it waits), so a write made after `true` commits
+   * only while this claim holds the job, and a stale holder (false) writes nothing.
+   */
+  async holdsClaim(client: PoolClient, job: Pick<OutboxJob, "jobId" | "claimedBy" | "attempts">): Promise<boolean> {
+    if (job.claimedBy === null) return false;
+    const result = await client.query(`
+      SELECT 1 FROM billing.outbox
+      WHERE job_id=$1 AND done_at IS NULL AND dead_at IS NULL AND claimed_by=$2 AND attempts=$3
+      FOR UPDATE
+    `, [job.jobId, job.claimedBy, job.attempts]);
+    return result.rowCount === 1;
+  }
+
   async jobStage(jobId: string): Promise<string | null> {
     const result = await this.pool.query<{ last_error_code: string | null }>(
       "SELECT last_error_code FROM billing.outbox WHERE job_id=$1", [jobId]
