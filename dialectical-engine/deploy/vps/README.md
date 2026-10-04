@@ -1994,7 +1994,8 @@ on every billing page, with the exact text "IP Geolocation by DB-IP", linking to
 The hosted register file (§11) has four billing members:
 
 - `billingPlans`: the prices and monthly credits;
-- `billingPolicy`: `enabled`, the retry days and the withdrawal days;
+- `billingPolicy`: `enabled`, the retry days and the withdrawal days. Never shorten `dunning_retry_days` while any plan
+  is PAST_DUE (a spent dunning then ends at once, before the retry date its last email promised);
 - `countryPolicy`: each country's two switches (left out, that version has no country gate at all, and billing
   cannot be switched on);
 - `taxAuthorities`: where each tax is paid, for the summary.
@@ -2223,21 +2224,37 @@ stat -c '%y %n' /etc/debateai/api/billing/xmoney-private-key /etc/debateai/api/b
 ```
 
 **No paid question may be waiting when billing goes on.** Before you publish the version that switches billing on,
-check that no question of a paid plan is waiting in line (the waiting line of the budget rule, §11). It must print 0:
+check that no question of a paid plan is waiting in line (the waiting line of the budget rule, §11), whatever the
+state of its asker's account. The first number it prints must be 0:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT count(*) AS waiting_premium FROM core.run_waiting_v WHERE owner_ref IS NOT NULL AND plan_tier IS DISTINCT FROM 'free'"
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS waiting_premium, count(*) FILTER (WHERE account.state <> 'active') AS of_accounts_not_active FROM core.run_wait w JOIN core.run r ON r.run_id = w.run_id JOIN identity.\"user\" account ON account.owner_ref = COALESCE((SELECT e.owner_ref FROM core.run_ownership_event e WHERE e.run_id = w.run_id ORDER BY e.at_seq DESC LIMIT 1), CASE WHEN r.asker_id LIKE 'owner:%' THEN substr(r.asker_id, 7)::uuid END) WHERE r.plan_tier IS DISTINCT FROM 'free' AND NOT EXISTS (SELECT 1 FROM core.run_wait_start s WHERE s.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM core.work_item f WHERE f.run_id = w.run_id AND f.state = 'FAILED') AND NOT EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent i WHERE i.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone t WHERE t.run_id = w.run_id)"
 ```
 
-A question with no recorded plan counts as a paid one, as it does for the site. Why: while billing is off, the server
-takes the plan the browser sends, so a question can wait in line as a paid one. At the first start with billing on,
-everyone is on Free, because nobody could pay before. Each such question would then be ended at once
-(`RUN_SETUP_FAILED:PLAN_CHANGED`), and its asker would read "Your paid plan ended or was paused while this question
-waited…", which is false for someone who never paid. If the count is not 0, wait for the line to empty, check again,
-then publish. The plain count of every waiting question that §11 uses before removing the band,
-`SELECT count(*) FROM core.run_waiting_v`, is a stricter check that also does. Or publish the band (the three members of
-go-live line 13) in the same version that switches billing on: a host without the band has no waiting line, so nobody
-can be waiting.
+It counts every signed-in person's question that waits in line, has neither started nor failed, and is not recorded
+as Free. A question with no recorded plan counts as a paid one, as it does for the site. The second number says how
+many of them belong to an account that is not active (suspended, or frozen by the age check): such a question rests
+until the account is active again, and is then ended as described below. A question whose account or private debate
+was deleted is not counted, because it never starts. §11's count of the line,
+`SELECT count(*) FROM core.run_waiting_v`, does not do here: it leaves out every question of an account that is not
+active.
+
+Why: while billing is off, the server takes the plan the browser sends, so a question can wait in line as a paid one.
+At the first start with billing on, everyone is on Free, because nobody could pay before. Each such question would
+then be ended at once (`RUN_SETUP_FAILED:PLAN_CHANGED`), and its asker would read "Your paid plan ended or was paused
+while this question waited…", which is false for someone who never paid. If the count is not 0, wait for the line to
+empty, check again, then publish. If only questions of accounts that are not active keep it above 0, they will not
+leave by waiting: do not switch billing on, and report the case.
+
+Run the same check again just before you restart the two services on the version that switches billing on (after
+the publish, once its `REGISTER_VERSION=` line is in both files, §14.4): a question can join the line in the minutes
+between. If it is not 0 then, do not restart yet: until you restart them, the services keep the version they run,
+with billing off. Wait for the line to empty, check again, then restart.
+
+On a host without the band, you can instead publish the band (the three members of go-live line 13, with
+`askRoomReads`, the room read's budget, which every version with the band needs) in the same version that switches
+billing on: a host without the band takes no question into the line, so the count cannot grow between the check
+and the restart. The count must still print 0.
 
 Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4. The version that switches billing
 on must also carry the `countryPolicy` member, from `deploy/vps/register/country-policy.example.json` with the
@@ -2327,14 +2344,17 @@ xMoney reports as its own transaction is recorded under the payment it names, so
 dispute's own id) with `--charge` and the outcome with
 `--outcome won` or `--outcome lost`:
 
-- `won` gives the plan back;
+- `won` gives the plan back; a plan its person cancelled while it was paused comes back only until its period end,
+  then ends; nobody is emailed;
 - `lost` ends it.
 
 The command below lists the chargebacks not recorded as won, each with its charge reference, the kind of charge,
 xMoney's transaction id, its `error_code`, when it arrived, and the subscription's state now. A charge-back counts as
 won only by a `CHARGEBACK_RESOLVED` on its own transaction. It is not a list of open disputes: a lost dispute writes
 no charge event, so it stays on the list. The state tells you which are still waiting (`SUSPENDED`) and which have
-ended (`ENDED`: either recorded as lost, or ended by the period-end sweep, when a won outcome can still be recorded):
+ended (`ENDED`: either recorded as lost, or ended by the period-end sweep, when a won outcome can still be recorded).
+`CANCEL_REQUESTED` (the person cancelled while the plan was paused) is still waiting for its outcome: record it as
+you would a `SUSPENDED` one. The command:
 
 ```sh
 sudo -u postgres psql -d debateai -c "SELECT e.charge_id, c.kind AS charge_kind, e.xmoney_transaction_id, e.error_code, e.at, s.kind AS subscription_now FROM billing.charge_event e JOIN billing.charge c ON c.charge_id = e.charge_id JOIN billing.subscription_latest_v s ON s.subscription_id = c.subscription_id WHERE e.kind = 'CHARGEBACK' AND NOT EXISTS (SELECT 1 FROM billing.charge_event r WHERE r.charge_id = e.charge_id AND r.kind = 'CHARGEBACK_RESOLVED' AND r.xmoney_transaction_id = e.xmoney_transaction_id) ORDER BY e.at"
@@ -2505,7 +2525,7 @@ signals that matter:
 | `"event":"billing.outbox.other_system"`, with `kind` and `code` `OTHER_XMONEY_SYSTEM` | A queued job belongs to the other xMoney system (sandbox or live) than the one this host uses, so it was stopped before any call or price quote: a refund, an invoice, a credit note or a payment check whose payment was taken in the other system, or a renewal notice (`RENEWAL_NOTICE`) of a plan of the other system. Normally this happens only on a host that went from the sandbox to live (above). A `billing.outbox.dead` line with the same code follows. For a refund you also get O2, saying nothing was sent and nothing is owed on this host, and the owner summary lists it as `REFUND_OTHER_SYSTEM`. | Nothing to do on this host, whatever the kind. For a refund: if it was a real customer's payment in the other system, refund it in that system's dashboard; a sandbox test payment needs nothing. |
 | `"event":"billing.refund.refused"`, with `reason` | xMoney refused a refund the site asked for (`reason` says what it was for, for example `WITHDRAWAL`). The refund job stops (a `billing.outbox.dead` line with `XMONEY_REFUSED` follows), and you get O2 at once. The money is still owed. | **A refund that could not be completed**, above: settle it in the xMoney dashboard, by its deadline for a withdrawal. |
 | `"event":"billing.refund.outcome_unknown"`, with `reason` | A partial refund whose earlier attempt may already have moved the money (its call was cut off, or got no clear answer), while xMoney does not show it as made. The site never sends it twice: the job stops (`REFUND_OUTCOME_UNKNOWN`), and you get O2 at once. | **A refund that could not be completed**, above: look at that payment in the xMoney dashboard first, and refund only if no such refund is there. |
-| `"event":"billing.refund.unrecorded"`, with `reason` `PROVIDER_REFUND` | xMoney reported another refund on a payment that already has a refund recorded or asked for (for example one made in the xMoney dashboard). Our records cannot hold it, so it is in no figure of the tax summary, and no credit note and no email follow for it. The owner summary lists it as `REFUND_UNRECORDED`, by the refund's xMoney transaction id. | Read its amount on that transaction in the xMoney dashboard, take it off that country's net sales and tax by hand, confirm the refund to the person yourself, and give its amount to the accountant for the credit note. |
+| `"event":"billing.refund.unrecorded"`, with `reason` `PROVIDER_REFUND` | xMoney reported another refund on a payment that already has a refund recorded or asked for (for example one made in the xMoney dashboard). Our records cannot hold it, so it is in no figure of the tax summary, and no credit note and no email follow for it. The owner summary lists it as `REFUND_UNRECORDED`, by the refund's xMoney transaction id. | Read its amount on that transaction in the xMoney dashboard, take it off that country's net sales and tax by hand, confirm the refund to the person yourself, and give its amount to the accountant for the credit note. A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures: do not take it off again. |
 | `"event":"billing.refund.dead"`, with `count` | Once a day, the money check counts the refund jobs that stopped for good with no refund recorded since, whatever their code. Not every one is owed: `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (no request of ours backs the job, or it names a charge we do not have) and `OTHER_XMONEY_SYSTEM` (a payment of the other xMoney system) owe nothing on this host; `REFUND_PAYLOAD_INVALID` (a job whose payload cannot be read, so nothing was sent) is listed with the first two, without the reason the job claims, and whoever runs the server checks that charge's own refund requests (one never refunded is still owed); `REFUND_OUTCOME_UNKNOWN` is checked in the dashboard first; every other code is still owed. The owner summary lists each one under "Payments to check by hand in xMoney", by the summary's own names: `REFUND_REFUSED` (still owed), `REFUND_OUTCOME_UNKNOWN`, `REFUND_NOT_REQUESTED` (which covers `REFUND_CHARGE_MISSING` and `REFUND_PAYLOAD_INVALID` too) and `REFUND_OTHER_SYSTEM`. | Print the summary (**The tax summary**, above) and settle each line as its name says, and as **A refund that could not be completed**, above, describes. |
 | `"event":"billing.xmoney.credentials_refused"`, with `operation` | xMoney refused our key (`operation` says on what: `checkout`, `verify`, `rebill`, `refund` or `list`). xMoney processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose rebill is refused this way is kept, as in an xMoney outage, for up to 3 days past its due time (a payment retry: 24 hours). After that it is closed as failed (`NO_TRANSACTION`, with a `"event":"billing.renewal.stuck"` line), and the failed-payment path starts, with its emails. A refund keeps being tried; a payment check stops after its last try (`billing.outbox.dead`, above). New checkouts fail while it lasts. | At once: check the key file `XMONEY_PRIVATE_KEY_PATH` names and the xMoney account (a revoked or replaced key, or a sandbox key beside the live address, or the reverse, §14.2). Fix it and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
 | `"event":"billing.quote.refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price a purchase. That is not an outage: most often the Quaderno key is wrong or revoked (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or Quaderno rejects the request (`QUADERNO_HTTP_422`). The person is told to try again in a minute, and nothing is charged. The same event with `code` `TAX_SERVICE_UNAVAILABLE` is an outage of the tax service; with any other code it is one person's own refusal (for example `ALREADY_SUBSCRIBED` or `TAX_ID_INVALID`). | `TAX_SERVICE_REFUSED`: every purchase fails until it is fixed. Check the Quaderno key file and the Quaderno account at once; fix the key and restart `debateai-api`. `TAX_SERVICE_UNAVAILABLE`: nothing, unless it lasts; then check Quaderno's status page. |
@@ -2577,7 +2597,8 @@ For an invoice or a credit note, settle the line with `pnpm billing:invoice`, gi
   payment held (the "up to" figure the tax summary gives for that charge). The line then leaves the list, and the
   quarter's tax summary subtracts the refund at that amount instead of listing it as "amount unknown". A charge has
   one credit note at most: if it already has one, the command refuses (`BILLING_INVOICE_ALREADY_RECORDED`), and that
-  refund goes to your accountant.
+  refund goes to your accountant. A refund transaction of a payment whose dashboard-refund credit note is recorded is
+  already in the figures: do not take it off again.
 - `--requeue` to let the site try the job again once the cause is fixed (the Quaderno key replaced, Quaderno or
   SmartBill answering again). A SmartBill job also needs `--confirm-not-issued`: add it only after you have checked
   in SmartBill that the document was NOT issued, because SmartBill would issue a second one. A Quaderno job needs no

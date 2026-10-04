@@ -12,6 +12,8 @@ import {
 const read = (path: string): string => readFileSync(resolve(path), "utf8");
 const readme = read("deploy/vps/README.md");
 const billing = readme.slice(readme.indexOf("## 14. Billing (paid plans)"));
+/** §14.8's billing-on check (Part 4 final review C-10), exactly as its sh block holds it. */
+const WAITING_PREMIUM_QUERY_LINE = String.raw`sudo -u postgres psql -d debateai -c "SELECT count(*) AS waiting_premium, count(*) FILTER (WHERE account.state <> 'active') AS of_accounts_not_active FROM core.run_wait w JOIN core.run r ON r.run_id = w.run_id JOIN identity.\"user\" account ON account.owner_ref = COALESCE((SELECT e.owner_ref FROM core.run_ownership_event e WHERE e.run_id = w.run_id ORDER BY e.at_seq DESC LIMIT 1), CASE WHEN r.asker_id LIKE 'owner:%' THEN substr(r.asker_id, 7)::uuid END) WHERE r.plan_tier IS DISTINCT FROM 'free' AND NOT EXISTS (SELECT 1 FROM core.run_wait_start s WHERE s.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM core.work_item f WHERE f.run_id = w.run_id AND f.state = 'FAILED') AND NOT EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent i WHERE i.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone t WHERE t.run_id = w.run_id)"`;
 
 describe("P22 the Billing runbook", () => {
   it("exists as §14 and names every setting, key file and code an operator needs", () => {
@@ -375,22 +377,99 @@ describe("P22 the Billing runbook", () => {
     const before = flat.slice(from, publish);
     for (const needle of [
       "**No paid question may be waiting when billing goes on.**",
-      "sudo -u postgres psql -d debateai -c \"SELECT count(*) AS waiting_premium FROM core.run_waiting_v WHERE owner_ref IS NOT NULL AND plan_tier IS DISTINCT FROM 'free'\"",
-      "It must print 0", "A question with no recorded plan counts as a paid one",
+      // Part 4 final review C-10: the count reads the line's own tables, whatever the account's state (the view
+      // core.run_waiting_v hides every run of an account that is not active); tests/integration/
+      // b3-holds-waiting-line.test.ts runs this exact query against the migrated schema.
+      WAITING_PREMIUM_QUERY_LINE,
+      "The first number it prints must be 0", "A question with no recorded plan counts as a paid one",
       // Why, in plain words.
       "the server takes the plan the browser sends", "everyone is on Free, because nobody could pay before",
       "`RUN_SETUP_FAILED:PLAN_CHANGED`", "Your paid plan ended or was paused while this question waited",
       "which is false for someone who never paid",
       "If the count is not 0, wait for the line to empty, check again, then publish",
-      // The two alternatives the judge allowed: §11's stricter whole-line count, or the band in the same version.
+      // §11's whole-line count is named only to say it does not do here; the band in the same version stays an option.
       "`SELECT count(*) FROM core.run_waiting_v`", "in the same version that switches billing on"
     ]) {
       expect(before, needle).toContain(needle);
     }
+    // C-10: the view's count is no longer offered as the stricter check, and the old view-based query is gone.
+    expect(before).not.toContain("is a stricter check that also does");
+    expect(before).not.toContain("FROM core.run_waiting_v WHERE owner_ref IS NOT NULL");
     // The claims the paragraph makes stay true of the code: a NULL tier is premium to the waker's plan guard, and the
     // asker reads that sentence.
     expect(read("apps/api/src/ask-room.ts")).toContain("(run.planTier ?? \"premium\") === \"premium\"");
     expect(read("apps/ui/messages/en/home.json")).toContain("\"runFailure.PLAN_ENDED\": \"Your paid plan ended or was paused while this question waited");
+  });
+
+  it("Part 4 final review C-10: the billing-on check counts every account, runs again before the restart, names askRoomReads", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const from = flat.indexOf("**No paid question may be waiting when billing goes on.**");
+    const publish = flat.indexOf("Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4.");
+    expect(from).toBeGreaterThan(0);
+    const paragraph = flat.slice(from, publish);
+    for (const needle of [
+      "whatever the state of its asker's account",
+      "The second number says how many of them belong to an account that is not active (suspended, or frozen by the age check)",
+      "it leaves out every question of an account that is not active",
+      "If only questions of accounts that are not active keep it above 0, they will not leave by waiting: do not switch billing on, and report the case.",
+      // Not atomic with the switch: the same count again, just before the restart on the new version.
+      "Run the same check again just before you restart the two services on the version that switches billing on",
+      "If it is not 0 then, do not restart yet",
+      "Wait for the line to empty, check again, then restart.",
+      // C7: a version with the band needs the room read's budget, so the band option names it.
+      "with `askRoomReads`, the room read's budget, which every version with the band needs"
+    ]) {
+      expect(paragraph, needle).toContain(needle);
+    }
+    // The check reads the line's own tables, never the view that hides an inactive account's run.
+    const query = /```sh\n(sudo -u postgres psql -d debateai -c "SELECT count\(\*\) AS waiting_premium[^\n]*)\n```/u.exec(billing)?.[1] ?? "";
+    expect(query).toBe(WAITING_PREMIUM_QUERY_LINE);
+    expect(query).not.toContain("run_waiting_v");
+    expect(query).not.toContain("account.state = 'active'");
+  });
+
+  it("Part 4 final review C-6, C-9, C-13: the --amount bullet, the dispute states and the retry days", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const between = (from: string, to: string): string => {
+      const start = flat.indexOf(from);
+      expect(start, from).toBeGreaterThan(0);
+      return flat.slice(start, flat.indexOf(to, start));
+    };
+    // C-6: a dashboard refund recorded with --amount is already subtracted; REFUND_UNRECORDED's "by hand" is not again.
+    const C6 = "A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures: do not take it off again.";
+    expect(between("- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only", "- `--requeue` to let the site")).toContain(C6);
+    const unrecorded = billing.split("\n").find((line) => line.startsWith("| `\"event\":\"billing.refund.unrecorded\"`")) ?? "";
+    expect(unrecorded).toContain("take it off that country's net sales and tax by hand");
+    expect(unrecorded.replace(/\s+/gu, " ")).toContain(C6);
+    // C-9: a paused plan its person cancelled lists as CANCEL_REQUESTED and still waits; a won dispute's limit.
+    const disputes = between("**Disputes (chargebacks).**", "**A withdrawal sent by email or on the model form.**");
+    for (const needle of [
+      "- `won` gives the plan back; a plan its person cancelled while it was paused comes back only until its period end, then ends; nobody is emailed;",
+      "`CANCEL_REQUESTED` (the person cancelled while the plan was paused) is still waiting for its outcome"
+    ]) {
+      expect(disputes, needle).toContain(needle);
+    }
+    // C-13: beside billingPolicy in §14.4.
+    const publishing = between("### 14.4 Publishing the billing settings", "### 14.5");
+    expect(publishing).toContain(
+      "- `billingPolicy`: `enabled`, the retry days and the withdrawal days. Never shorten `dunning_retry_days` while any plan is"
+      + " PAST_DUE (a spent dunning then ends at once, before the retry date its last email promised);"
+    );
+  });
+
+  it("Part 4 final review C-11: both READMEs say Free's answer models need the scorecard candidate's exact maker", () => {
+    const needle = "be served through a connection whose maker is written exactly as the scorecard candidate's"
+      + " (character for character, so `openai` and `OpenAI` do not match), with the same model id, at the thinking level"
+      + " it was scored at, which that connection declares (a model scored at its default level only needs no declared"
+      + " level), and have a typical call that fits its context window";
+    for (const path of ["deploy/vps/register/README.md", "scorecards/README.md"]) {
+      const text = read(path).replace(/\s+/gu, " ");
+      const at = text.indexOf("is refused `SCORECARD_FREE_ANSWER_UNSCORED`");
+      expect(at, path).toBeGreaterThan(0);
+      expect(text.slice(Math.max(0, at - 700), at), path).toContain(needle);
+    }
+    // The claim stays true of the picker: the maker is compared character for character with the candidate's.
+    expect(read("packages/scorecard/src/picker.ts")).toContain("target.maker === candidate.maker");
   });
 
   it("P4-H (§4.3's optional notes): the runner's looser Free check, and what §14.9's journal filter prints", () => {
