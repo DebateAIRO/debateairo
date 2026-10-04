@@ -30,14 +30,11 @@ import {
 const ROOT = process.cwd();
 const INDEX_PATH = resolve(ROOT, "apps/api/src/index.ts");
 const INDEX_SOURCE = readFileSync(INDEX_PATH, "utf8");
-// Re-baselined at DEV-SYNC 2026-09-18, as the live-loop mission ruled in advance
-// (.hermes/reports/2026-09-01-algorithm-live-loop/DECISIONS.md:870-871, :1340): the
-// security hardening changed the registration mount region on purpose — B5's route-level
-// request bounds, then B25b's constant MALFORMED_REQUEST envelope — so the region no longer
-// equals its 9d0c8e30 text. 1eb623e7 (B25b) is the FIRST commit carrying the region's
-// present bytes (measured: every later commit on the branch hashes the same, every earlier
-// one differs); from here on the gate again refuses any edit to the zone, by anyone.
-const BASE_REF = "1eb623e7426987c1bc43cfb55bf10d7e293413c1";
+// Task 2 intentionally supersedes the prior 1eb623e7 byte pin: public signup now
+// forwards required manual phone and SQL-null recovery. The controller approved
+// only this auth forwarding change. Pin its exact implementation commit while
+// retaining every semantic boundary rule and all 15 falsification mutants.
+const BASE_REF = "c49179b6b6aed5d590c3756b991ea5fc7c7d3f55";
 
 function syntheticError(
   repoRelativeFrames: readonly string[],
@@ -93,7 +90,7 @@ describe("S04 semantic zone boundary", () => {
     const beforeClosingBrace = base.startOffset + base.region.lastIndexOf("\n") + 1;
     const fourthMount = '    api.get("/v1/auth/extra", async () => ({}));\n';
     const disagreementNeedle =
-      '        recoveryEmail: typeof body.recovery_email === "string" ? body.recovery_email : "",';
+      '        phone: typeof body.phone === "string" ? body.phone : "",';
     const disagreementNeedleOffset = base.region.indexOf(disagreementNeedle);
     expect(disagreementNeedleOffset).toBeGreaterThan(-1);
     expect(base.region.indexOf(disagreementNeedle, disagreementNeedleOffset + 1)).toBe(-1);
