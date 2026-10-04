@@ -165,13 +165,13 @@ answer or the real browser acceptance journey.
 The local databases have ten wrapper LOGINs. Eight least-privilege application wrappers are provisioned by DEV-03 after migrations create their NOLOGIN capability roles; the migrator and Hatchet database owner remain separate bootstrap concerns.
 
 - `debateai_dev_migrator` is the only elevated principal. It owns the `debateai` database and the migration-created schemas `audit_crypto_internal`, `core`, `evidence`, `identity`, `ledger`, `memory`, `obs`, `register`, `scorecard`, and `serve`, and is used only by principal bootstrap, migrations, and register seeding. Migration 0023 deliberately leaves `evaluator` owned by the NOLOGIN `debateai_evaluator_ddl` role; the migrator applies and replays that migration but must not take evaluator ownership. Its credential is never passed to a long-lived service.
-- `debateai_dev_runtime` is `LOGIN INHERIT` and a member only of `debateai_runtime`.
+- `debateai_dev_runtime` is `LOGIN INHERIT` and a direct member only of `debateai_billing_runtime` (migration 0093, go-live row 41); that migration-owned capability deliberately inherits `debateai_runtime`, so the API's login holds billing's privileges and the runtime ones. The development runner shares this login, so in development only the liveness login is kept away from billing.
 - `debateai_dev_content_provision` is `LOGIN INHERIT` and a member only of `debateai_content_provision`.
 - `debateai_dev_erasure` is `LOGIN INHERIT` and a member only of `debateai_erasure_runtime`.
 - `debateai_dev_authorization` is `LOGIN INHERIT` and a direct member only of `debateai_authorization_runtime`; that migration-owned capability deliberately inherits `debateai_runtime`.
 - `debateai_dev_publication_cleanup` is `LOGIN INHERIT` and a member only of `debateai_publication_cleanup`.
 - `debateai_dev_replay` is `LOGIN INHERIT` and a member only of `debateai_replay`.
-- `debateai_dev_liveness` is a credential-distinct `LOGIN INHERIT` member only of `debateai_runtime`, matching the liveness repository's existing runtime-governed tables without sharing the API credential.
+- `debateai_dev_liveness` is a credential-distinct `LOGIN INHERIT` member only of `debateai_runtime`, matching the liveness repository's existing runtime-governed tables without sharing the API credential; it is never a member of `debateai_billing_runtime`.
 - `debateai_dev_settlement` is `LOGIN INHERIT` and a member only of `debateai_settlement_watch`.
 - `debateai_dev_evaluator_api` is `LOGIN INHERIT` and a member only of `debateai_evaluator_api`; it is the only development principal accepted for the development-only evaluator menu.
 - `debateai_dev_hatchet` owns only the separate `hatchet` database and has no application capability membership.

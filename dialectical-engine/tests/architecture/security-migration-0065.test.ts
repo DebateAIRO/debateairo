@@ -478,7 +478,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0091_billing_erasure_commit.sql",
         // Paid plans Part 4 P4-M (P2-M43, the owner's ruling of 3 October 2026): indexes for the recurring billing
         // queries. The next free prefix, no pair.
-        "0092_billing_query_indexes.sql"
+        "0092_billing_query_indexes.sql",
+        // Go-live row 41 (Part 2's final review P2-I5, part 3): billing's privileges move from debateai_runtime
+        // to debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
+        "0093_billing_runtime_role.sql"
       ]);
   });
 });

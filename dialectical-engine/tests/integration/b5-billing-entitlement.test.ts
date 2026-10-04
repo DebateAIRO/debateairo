@@ -254,6 +254,13 @@ describe("the runner's read-only path (A20)", () => {
       expect(row.rows).toEqual([{ plan_id: "MAX" }]);
       await expect(client.query("UPDATE billing.entitlement_event SET plan_id='FREE' WHERE owner_ref=$1", [ownerRef]))
         .rejects.toThrowError();
+      // Go-live row 41 (0093): nor append, to either relation; the appends are the API's billing role's.
+      await expect(client.query(
+        "INSERT INTO billing.entitlement_event (owner_ref) SELECT owner_ref FROM billing.entitlement_event WHERE false"
+      )).rejects.toMatchObject({ code: "42501" });
+      await expect(client.query(
+        "INSERT INTO billing.run_charge_scope (run_id) SELECT run_id FROM billing.run_charge_scope WHERE false"
+      )).rejects.toMatchObject({ code: "42501" });
     } finally {
       await client.query("RESET ROLE");
       client.release();

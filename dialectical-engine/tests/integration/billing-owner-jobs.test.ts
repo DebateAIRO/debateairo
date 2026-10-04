@@ -38,16 +38,23 @@ describe("P16c scheduling on real PostgreSQL", () => {
   });
 
   it("purges as the API's own role, with no billing composed at all", async () => {
-    // The main pool's principal (debateai_runtime) runs both functions; nothing of the billing runtime is needed.
+    // The main pool's principal (api-runtime: debateai_billing_runtime since 0093, which inherits debateai_runtime)
+    // runs both functions; nothing of the billing runtime is needed.
     const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query("SET LOCAL ROLE debateai_billing_runtime");
       const counts = await createRetentionPurge({
         pool: client, clock: () => new Date(), log: () => undefined
       }).run();
       await client.query("COMMIT");
       expect(counts).toEqual({ legal: 0, records: 0 });
+      // Go-live row 41: the role the runner and the liveness sweep hold cannot run billing's purge.
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_runtime");
+      await expect(client.query("SELECT billing.purge_expired_records(clock_timestamp())"))
+        .rejects.toMatchObject({ code: "42501" });
+      await client.query("ROLLBACK");
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

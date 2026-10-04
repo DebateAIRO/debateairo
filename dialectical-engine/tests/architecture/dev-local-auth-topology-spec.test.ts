@@ -105,7 +105,8 @@ describe("DEV-01 local-auth topology specification", () => {
       {
         id: "debateai_dev_runtime", login: true,
         attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
-        memberships: ["debateai_runtime"],
+        // Go-live row 41 (migration 0093): billing's role, which inherits debateai_runtime.
+        memberships: ["debateai_billing_runtime"],
         forbiddenMemberships: ["debateai_content_provision", "debateai_erasure_runtime", "pg_*"], owns: [],
         purpose: ["DATABASE_URL", "LEGACY_ASK_ADMISSION_POOL"], serviceCredential: true
       },
@@ -148,7 +149,7 @@ describe("DEV-01 local-auth topology specification", () => {
         id: "debateai_dev_liveness", login: true,
         attributes: ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
         memberships: ["debateai_runtime"],
-        forbiddenMemberships: ["debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"], owns: [],
+        forbiddenMemberships: ["debateai_billing_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"], owns: [],
         purpose: ["LIVENESS_DATABASE_URL"], serviceCredential: true
       },
       {

@@ -10,7 +10,7 @@
 \set ON_ERROR_STOP on
 
 -- Who may connect at all. PUBLIC keeps CONNECT by default; close it, then open it for exactly the
--- twelve capability roles the managed principals inherit from (INHERIT TRUE memberships, P3-01),
+-- thirteen capability roles the managed principals inherit from (INHERIT TRUE memberships, P3-01),
 -- the NOINHERIT LOGIN roles the migrations mint themselves (the four obs roles of 0034, the
 -- observation agent of 0057 and its threshold operator of 0071), the migrator and the Hatchet owner.
 -- tests/architecture/vps-deployment-baseline.test.ts checks this list against the manifest.
@@ -20,7 +20,7 @@ GRANT CONNECT ON DATABASE hatchet TO debateai_prod_hatchet;
 GRANT CONNECT ON DATABASE debateai TO debateai_prod_migrator;
 GRANT CONNECT ON DATABASE debateai TO
   debateai_runtime, debateai_content_provision, debateai_erasure_runtime,
-  debateai_authorization_runtime, debateai_publication_cleanup, debateai_replay,
+  debateai_authorization_runtime, debateai_billing_runtime, debateai_publication_cleanup, debateai_replay,
   debateai_settlement_watch, debateai_evaluator_worker, debateai_evaluator_api,
   debateai_evaluator_reader;
 -- DL5-F7: the support data plane (inherited by debateai_prod_api_support) and the JIT
