@@ -45,12 +45,15 @@ export const REPORT_RENDER_LIMITS: ReportRenderLimits = Object.freeze({
 /**
  * The gate's answer: `admitted` with the one `release` the caller must call in
  * a `finally`; `busy` when this session already has a report in progress (429);
- * `full` when the queue is full or the wait ran out (503). A refusal carries
- * the seconds its Retry-After names.
+ * `full` when the queue is full, the wait ran out, or the download was
+ * abandoned while it waited (503, which no one then reads).
  */
 export type ReportRenderAdmission =
   | Readonly<{ kind: "admitted"; release: () => void }>
-  | Readonly<{ kind: "busy" | "full"; retryAfterSeconds: number }>;
+  | Readonly<{ kind: "busy" | "full" }>;
+
+const BUSY: ReportRenderAdmission = Object.freeze({ kind: "busy" as const });
+const FULL: ReportRenderAdmission = Object.freeze({ kind: "full" as const });
 
 export class ReportRenderGate {
   private active = 0;
@@ -58,35 +61,47 @@ export class ReportRenderGate {
   /** The sessions holding a place, making or waiting; held only while their request is in flight. */
   private readonly holders = new Set<string>();
 
-  private readonly busy: ReportRenderAdmission;
-  private readonly full: ReportRenderAdmission;
+  /** The seconds a refusal's Retry-After names. */
+  readonly retryAfterSeconds: number;
 
   constructor(private readonly limits: ReportRenderLimits) {
-    this.busy = Object.freeze({ kind: "busy" as const, retryAfterSeconds: limits.retryAfterSeconds });
-    this.full = Object.freeze({ kind: "full" as const, retryAfterSeconds: limits.retryAfterSeconds });
+    this.retryAfterSeconds = limits.retryAfterSeconds;
   }
 
-  async admit(session: string): Promise<ReportRenderAdmission> {
-    if (this.holders.has(session)) return this.busy;
+  /**
+   * A place for `session`, at once or after a wait. `signal` is the request's
+   * own: a download abandoned while it waits leaves the queue at once, freeing
+   * its waiting place and its session's. One abandoned after it was admitted is
+   * the caller's to skip (it still releases in `finally`).
+   */
+  async admit(session: string, signal?: AbortSignal): Promise<ReportRenderAdmission> {
+    if (this.holders.has(session)) return BUSY;
     if (this.active < this.limits.concurrent) {
       this.holders.add(session);
       this.active += 1;
       return this.admitted(session);
     }
-    if (this.queue.length >= this.limits.waiting) return this.full;
+    if (this.queue.length >= this.limits.waiting || signal?.aborted === true) return FULL;
     this.holders.add(session);
     return new Promise<ReportRenderAdmission>((resolve) => {
-      const turn = (): void => {
+      const settle = (): void => {
         clearTimeout(timer);
+        signal?.removeEventListener("abort", leave);
+      };
+      const turn = (): void => {
+        settle();
         resolve(this.admitted(session));
       };
-      const timer = setTimeout(() => {
+      const leave = (): void => {
+        settle();
         const index = this.queue.indexOf(turn);
         if (index >= 0) this.queue.splice(index, 1);
         this.holders.delete(session);
-        resolve(this.full);
-      }, this.limits.waitMs);
+        resolve(FULL);
+      };
+      const timer = setTimeout(leave, this.limits.waitMs);
       timer.unref();
+      signal?.addEventListener("abort", leave, { once: true });
       this.queue.push(turn);
     });
   }

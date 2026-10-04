@@ -51,6 +51,11 @@ function textResponse(status: number, body: string, extra: Record<string, string
 /** The one gate every GET in this process passes before making a PDF (lib/report/reportRenderGate.ts). */
 const processRenderGate = new ReportRenderGate(REPORT_RENDER_LIMITS);
 
+/** A render the gate held back: the plain "try again" line, with the gate's Retry-After. */
+function busyResponse(status: 429 | 503, gate: ReportRenderGate, catalogs: ReportCatalogs): Response {
+  return textResponse(status, tryAgainLine(catalogs.publicCatalog), { "retry-after": String(gate.retryAfterSeconds) });
+}
+
 function pdfHeaders(question: string, now: Date): Record<string, string> {
   return {
     "content-type": "application/pdf",
@@ -268,6 +273,8 @@ export type ReportRequestInput = Readonly<{
   supported?: (locale: string) => boolean;
   /** The render gate; the process's own unless a test brings a fresh one. */
   gate?: ReportRenderGate;
+  /** The request's own signal: a download abandoned before its PDF is made is never made. */
+  signal?: AbortSignal;
 }>;
 
 /**
@@ -340,15 +347,14 @@ export async function handleReportRequest(input: ReportRequestInput): Promise<Re
     return textResponse(500, tryAgainLine(await refusalCatalog(load, prepared.locale)));
   }
 
-  const admission = await (input.gate ?? processRenderGate).admit(prepared.session);
-  if (admission.kind !== "admitted") {
-    return textResponse(admission.kind === "busy" ? 429 : 503, tryAgainLine(catalogs.publicCatalog), {
-      "retry-after": String(admission.retryAfterSeconds)
-    });
-  }
+  const gate = input.gate ?? processRenderGate;
+  const admission = await gate.admit(prepared.session, input.signal);
+  if (admission.kind !== "admitted") return busyResponse(admission.kind === "busy" ? 429 : 503, gate, catalogs);
 
   let pdf: Buffer;
   try {
+    // Abandoned while its reads ran or it waited: nobody will read the PDF, so it is not made.
+    if (input.signal?.aborted === true) return busyResponse(503, gate, catalogs);
     pdf = await (input.render ?? renderReportPdf)({
       answer: prepared.answer,
       story: prepared.story,
@@ -362,7 +368,9 @@ export async function handleReportRequest(input: ReportRequestInput): Promise<Re
   } finally {
     admission.release();
   }
-  return new Response(new Uint8Array(pdf), { status: 200, headers: pdfHeaders(prepared.answer.question_line, input.now) });
+  // A view of the PDF's own bytes, not a second copy of them. A Node Buffer's
+  // backing store is an ArrayBuffer (never shared memory), which BodyInit needs.
+  return new Response(new Uint8Array(pdf.buffer as ArrayBuffer, pdf.byteOffset, pdf.byteLength), { status: 200, headers: pdfHeaders(prepared.answer.question_line, input.now) });
 }
 
 /**

@@ -68,15 +68,21 @@ function heldRenders() {
   };
 }
 
-function request(sessionCookie: string, render: ReportRenderer, gate?: ReportRenderGate): Promise<Response> {
+function request(
+  sessionCookie: string,
+  render: ReportRenderer,
+  gate?: ReportRenderGate,
+  extra: Readonly<{ signal?: AbortSignal; client?: ReportReader }> = {}
+): Promise<Response> {
   return handleReportRequest({
     id: STORY_FIXTURE_DEBATE_ID,
     sessionCookie,
     interfaceLocale: "en",
-    client: () => reader,
+    client: () => extra.client ?? reader,
     now: NOW,
     render,
-    ...(gate === undefined ? {} : { gate })
+    ...(gate === undefined ? {} : { gate }),
+    ...(extra.signal === undefined ? {} : { signal: extra.signal })
   });
 }
 
@@ -214,11 +220,94 @@ describe("the report render gate", () => {
     expect(renders.state.active).toBe(0);
   });
 
-  it("serves a single download exactly as before", async () => {
-    const response = await quickly(request(session("a"), async () => FAKE_PDF));
+  it("drops a download abandoned while it waits: its waiting place and its session are free at once, and it is never made", async () => {
+    const renders = heldRenders();
+    const fresh = gate({ concurrent: 1, waiting: 1 });
+    const making = request(session("a"), renders.render, fresh);
+    await renders.started(1);
+    const browser = new AbortController();
+    const abandoned = request(session("b"), renders.render, fresh, { signal: browser.signal });
+    await settle();
+    await expectRefused(request(session("c"), renders.render, fresh), 503, 5);
+
+    browser.abort();
+    await expectRefused(abandoned, 503, 5);
+
+    // The same session asks again at once: it waits (not 429, not 503) and is served.
+    const retried = request(session("b"), renders.render, fresh);
+    await settle();
+    renders.finishNext();
+    await renders.started(2);
+    renders.finishNext();
+    expect((await making).status).toBe(200);
+    expect((await retried).status).toBe(200);
+    expect(renders.state.started).toBe(2);
+  });
+
+  it("never makes a download abandoned before its render starts, and frees its place", async () => {
+    const fresh = gate({ concurrent: 1, waiting: 0 });
+    const browser = new AbortController();
+    // The browser goes away while the story is being read.
+    const client: ReportReader = {
+      ...reader,
+      readAnswerStory: async () => { browser.abort(); return storyFixture("READY"); }
+    };
+    const render = vi.fn<ReportRenderer>(async () => FAKE_PDF);
+    await expectRefused(request(session("a"), render, fresh, { signal: browser.signal, client }), 503, 5);
+    expect(render).not.toHaveBeenCalled();
+
+    const next = await quickly(request(session("b"), render, fresh));
+    expect(next.status).toBe(200);
+    expect(render).toHaveBeenCalledTimes(1);
+  });
+
+  it("serves a single download exactly as before, byte for byte, from a PDF that is a view into a larger buffer", async () => {
+    const backing = Buffer.concat([Buffer.from("head"), FAKE_PDF, Buffer.from("tail")]);
+    const view = backing.subarray(4, 4 + FAKE_PDF.length);
+    expect(view.byteOffset).toBeGreaterThan(0);
+    const response = await quickly(request(session("a"), async () => view));
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("retry-after")).toBeNull();
     expect(Buffer.from(await response.arrayBuffer())).toEqual(FAKE_PDF);
+  });
+});
+
+describe("ReportRenderGate", () => {
+  it("frees a place once, however many times it is released", async () => {
+    const fresh = gate({ concurrent: 1, waiting: 0 });
+    const first = await fresh.admit(session("a"));
+    expect(first.kind).toBe("admitted");
+    if (first.kind !== "admitted") return;
+    first.release();
+    first.release();
+    const second = await fresh.admit(session("b"));
+    expect(second.kind).toBe("admitted");
+    // A second release that counted would have opened a second place here.
+    expect((await fresh.admit(session("c"))).kind).toBe("full");
+    if (second.kind === "admitted") second.release();
+  });
+
+  it("clears an abandoned wait's own timer, so it can never free the place a later request of its session holds", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const fresh = gate({ concurrent: 1, waiting: 1, waitMs: 1_000 });
+      const first = await fresh.admit(session("a"));
+      const browser = new AbortController();
+      const abandoned = fresh.admit(session("b"), browser.signal);
+      expect(vi.getTimerCount()).toBe(1);
+      browser.abort();
+      expect((await abandoned).kind).toBe("full");
+      expect(vi.getTimerCount()).toBe(0);
+
+      const retried = fresh.admit(session("b"));
+      // Past the abandoned wait's deadline: the retried wait still holds b's place.
+      vi.advanceTimersByTime(999);
+      expect((await fresh.admit(session("b"))).kind).toBe("busy");
+      if (first.kind === "admitted") first.release();
+      expect((await retried).kind).toBe("admitted");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
