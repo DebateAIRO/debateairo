@@ -73,7 +73,11 @@ export type TaxSummaryLine = Readonly<{
   sales: number;
   /** Refunds subtracted above (their amount is known). */
   refunds: number;
-  /** Dashboard refunds of unknown amount on this line's charges: NOT subtracted, listed in `TaxSummary.unknownRefunds`. */
+  /**
+   * Dashboard refunds of unknown amount on this line's charges: NOT subtracted, listed in `TaxSummary.unknownRefunds`.
+   * Not a payment refunded before its plan started (a REFUNDED_BEFORE_START line, Part 4 final review C-5): no credit
+   * note is owed for it, and its own line is its only instruction.
+   */
   unknownRefunds: number;
   statusCounts: Readonly<Record<TaxStatus, number>>;
 }>;
@@ -92,8 +96,15 @@ export type TaxSummary = Readonly<{
    * verified it), so no sale was ever counted for it.
    */
   chargebacks: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; amountMicros: number; at: Date; saleRecorded: boolean }>>;
-  /** Not subtracted from any line: the owner reads each amount in the dashboard and adjusts that country by hand. */
+  /**
+   * Not subtracted from any line: the owner reads each amount in the dashboard, records its credit note with
+   * `--amount`, and until then adjusts that country by hand. Never a charge with a REFUNDED_BEFORE_START line (C-5).
+   */
   unknownRefunds: ReadonlyArray<UnknownRefundItem>;
+  /**
+   * `invoiceUnknownItems`' lines, every kind in every quarter, except a REFUNDED_BEFORE_START line, which only the
+   * quarter holding its charge's SALE prints (C-5): the quarter whose figures its words ask to correct.
+   */
   invoiceUnknown: ReadonlyArray<InvoiceUnknownItem>;
   efactura: ReadonlyArray<EFacturaCheckItem>;
   paymentsToCheck: ReadonlyArray<PaymentToCheckItem>;
@@ -292,6 +303,11 @@ export function buildTaxSummary(input: Readonly<{
   const notRegistered: Array<TaxSummary["notRegistered"][number]> = [];
   const chargebacks: Array<TaxSummary["chargebacks"][number]> = [];
   const unknownRefunds: UnknownRefundItem[] = [];
+  // Part 4 final review C-5: the charges `invoiceUnknownItems` names REFUNDED_BEFORE_START (P9c's never-verified path:
+  // no invoice was owed, so no credit note is). That one test decides it; this list is read, never re-derived.
+  const refundedBeforeStart = new Set(input.invoiceUnknown
+    .filter((item) => item.jobKind === "REFUNDED_BEFORE_START").map((item) => item.chargeId));
+  const soldThisQuarter = new Set(input.rows.filter((row) => row.type === "SALE").map((row) => row.chargeId));
   let sales = 0;
   let refunds = 0;
   for (const row of input.rows) {
@@ -302,6 +318,12 @@ export function buildTaxSummary(input: Readonly<{
         chargeId: row.chargeId, taxCountry: row.taxCountry, amountMicros: row.amountMicros, at: row.at,
         saleRecorded: row.saleRecorded
       }));
+      continue;
+    }
+    if (row.type === "REFUND" && !row.amountKnown && refundedBeforeStart.has(row.chargeId)) {
+      // C-5: a payment xMoney refunded before its plan started owes no credit note (A29 (q)); the 'amount unknown'
+      // list asks for one via --amount, which the command refuses for it. Its REFUNDED_BEFORE_START line alone tells
+      // the owner to take the sale and the refund out by hand; this row changes no figure and is listed nowhere else.
       continue;
     }
     const authority = taxAuthorityFor(input.authorities, row.taxCountry, row.taxStatus);
@@ -320,7 +342,8 @@ export function buildTaxSummary(input: Readonly<{
       }
     } else if (!row.amountKnown) {
       // P9c's dashboard refund on the payment itself: `amountMicros` is only an upper bound. Subtracting it would
-      // understate this country's sales and tax; it is listed for the owner instead, and changes no figure.
+      // understate this country's sales and tax; it is listed for the owner instead, and changes no figure. (A charge
+      // refunded before its plan started never reaches here: see the C-5 skip above.)
       unknownRefunds.push(Object.freeze({
         chargeId: row.chargeId, taxCountry: row.taxCountry, taxRegion: row.taxRegion, upToMicros: row.amountMicros, at: row.at
       }));
@@ -349,7 +372,10 @@ export function buildTaxSummary(input: Readonly<{
     quarter: input.quarter, authorities: input.authorities, lines: Object.freeze(lines),
     conflicting: Object.freeze(conflicting), notRegistered: Object.freeze(notRegistered),
     chargebacks: Object.freeze(chargebacks), unknownRefunds: Object.freeze(unknownRefunds),
-    invoiceUnknown: Object.freeze([...input.invoiceUnknown]),
+    // C-5: a REFUNDED_BEFORE_START line belongs to its sale's quarter (quarterSummaryRows dates the SALE when the money
+    // moved, and keeps only one xMoney system's charges); every other line prints in every quarter.
+    invoiceUnknown: Object.freeze(input.invoiceUnknown.filter((item) =>
+      item.jobKind !== "REFUNDED_BEFORE_START" || soldThisQuarter.has(item.chargeId))),
     efactura: Object.freeze([...input.efactura]), paymentsToCheck: Object.freeze([...input.paymentsToCheck]),
     deadEmails: Object.freeze([...input.deadEmails]), sales, refunds
   });

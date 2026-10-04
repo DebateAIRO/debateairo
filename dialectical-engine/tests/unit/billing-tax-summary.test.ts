@@ -230,6 +230,77 @@ describe("P16b the summary", () => {
     });
   });
 
+  it("keeps a payment refunded before its plan started out of the amount-unknown list: its own line is its only instruction (C-5)", () => {
+    // Part 4 final review C-5 (fix round 1): P9c's never-verified path records the sale and an amount-unknown refund,
+    // and A29 (q) owes no credit note for it. The 'amount unknown' heading asks for a credit note via --amount, which
+    // the command refuses for such a charge, so only its REFUNDED_BEFORE_START line speaks of it.
+    const charge = "a".repeat(32);
+    const sale = row({ chargeId: charge });
+    const unknown = row({ chargeId: charge, type: "REFUND", amountMicros: 24_200_000, amountKnown: false,
+      at: new Date("2026-11-20T09:00:00.000Z") });
+    const since = new Date("2026-11-20T09:00:00.000Z");
+    const built = buildTaxSummary({
+      quarter: Q4, rows: [sale, unknown], authorities, efactura: [], paymentsToCheck: [], deadEmails: [],
+      invoiceUnknown: [{ chargeId: charge, jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED", since }]
+    });
+    expect(built.unknownRefunds).toEqual([]);
+    expect(built.lines.find((line) => line.taxCountry === "RO")).toMatchObject({
+      netMicros: 20_000_000, taxMicros: 4_200_000, sales: 1, refunds: 0, unknownRefunds: 0
+    });
+    const text = renderTaxSummary(built);
+    expect(text).toContain(`charge ${charge}: REFUNDED_BEFORE_START (NO_DOCUMENT_OWED), since 2026-11-20`);
+    expect(text).toContain("  * REFUNDED_BEFORE_START (NO_DOCUMENT_OWED): Refunded before it started: no invoice or credit"
+      + " note is owed. Take this sale and its refund out of the quarter's figures by hand.");
+    expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown: none.");
+    expect(text).not.toContain("Not subtracted:");
+    expect(text).not.toContain(`charge ${charge}, RO, up to`);
+
+    // The same rows for a charge that owes its invoice (DASHBOARD_REFUND) keep today's 'amount unknown' listing.
+    const dashboard = buildTaxSummary({
+      quarter: Q4, rows: [sale, unknown], authorities, efactura: [], paymentsToCheck: [], deadEmails: [],
+      invoiceUnknown: [{ chargeId: charge, jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL", since }]
+    });
+    expect(dashboard.unknownRefunds).toEqual([{
+      chargeId: charge, taxCountry: "RO", taxRegion: null, upToMicros: 24_200_000, at: new Date("2026-11-20T09:00:00.000Z")
+    }]);
+    expect(dashboard.lines.find((line) => line.taxCountry === "RO")).toMatchObject({ unknownRefunds: 1 });
+    const dashboardText = renderTaxSummary(dashboard);
+    expect(dashboardText).toContain("Not subtracted: 1 refund made in the xMoney dashboard, amount unknown (listed below).");
+    expect(dashboardText).toContain(`charge ${charge}, RO, up to 24.20 USD, on 2026-11-20`);
+    expect(dashboardText).toContain(`charge ${charge}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since 2026-11-20`);
+  });
+
+  it("prints a refunded-before-start line only in the quarter that holds its sale; every other line in every quarter (C-5)", () => {
+    // Part 4 final review C-5 (fix round 1): 'Take this sale and its refund out of the quarter's figures by hand'
+    // speaks of the quarter whose figures carry the sale; quarterSummaryRows dates the SALE when the money moved.
+    const charge = "a".repeat(32);
+    const items = [
+      { chargeId: charge, jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED", since: new Date("2026-12-30T09:00:00.000Z") },
+      { chargeId: "b".repeat(32), jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL", since: new Date("2026-11-08T00:00:00.000Z") },
+      { chargeId: "c".repeat(32), jobKind: "SMARTBILL_INVOICE", code: "INVOICE_UNKNOWN", since: new Date("2026-11-04T00:00:00.000Z") }
+    ];
+    const inQ4 = buildTaxSummary({
+      quarter: Q4, rows: [row({ chargeId: charge })], authorities, invoiceUnknown: items, efactura: [], paymentsToCheck: [],
+      deadEmails: []
+    });
+    expect(inQ4.invoiceUnknown.map((item) => item.jobKind)).toEqual(["REFUNDED_BEFORE_START", "DASHBOARD_REFUND", "SMARTBILL_INVOICE"]);
+    expect(renderTaxSummary(inQ4)).toContain(`charge ${charge}: REFUNDED_BEFORE_START (NO_DOCUMENT_OWED), since 2026-12-30`);
+
+    // The next quarter holds no SALE of it (its refund only, dated in January, does not count): no line there.
+    const Q1 = parseTaxQuarter("2027-Q1");
+    const refundOnly = row({ chargeId: charge, type: "REFUND", amountKnown: false, at: new Date("2027-01-02T09:00:00.000Z") });
+    for (const rows of [[], [refundOnly], [row({ chargeId: "d".repeat(32), at: new Date("2027-01-05T09:00:00.000Z") })]]) {
+      const inQ1 = buildTaxSummary({
+        quarter: Q1, rows, authorities, invoiceUnknown: items, efactura: [], paymentsToCheck: [], deadEmails: []
+      });
+      expect(inQ1.invoiceUnknown.map((item) => item.jobKind)).toEqual(["DASHBOARD_REFUND", "SMARTBILL_INVOICE"]);
+      expect(inQ1.unknownRefunds).toEqual([]);
+      const text = renderTaxSummary(inQ1);
+      expect(text).not.toContain("REFUNDED_BEFORE_START");
+      expect(text).not.toContain(`charge ${charge}`);
+    }
+  });
+
   it("labels a charge-back of a payment no sale was recorded for, and keeps the sale's words for the others (C-19)", () => {
     // Part 4 final review C-19: a checkout charged back before we verified it holds no SUCCEEDED, so no sale above.
     const unsold = row({ chargeId: "8".repeat(32), type: "CHARGEBACK", saleRecorded: false, at: new Date("2026-12-02T08:00:00.000Z") });

@@ -56,7 +56,9 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
   if (item.jobKind === "REFUNDED_BEFORE_START") {
     // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path (a payment xMoney refunded before we
     // ever saw it paid, for a checkout, an upgrade or a renewal) queues no invoice; A29 (q) owes no invoice and no
-    // credit note for it. The quarter still counts its SALE and lists its refund, so the owner takes both out by hand.
+    // credit note for it. The quarter still counts its SALE (its refund is listed nowhere else: buildTaxSummary keeps
+    // it out of the 'amount unknown' list), so the owner takes both out by hand; the summary prints this line in the
+    // sale's quarter only.
     return "Refunded before it started: no invoice or credit note is owed. Take this sale and its refund out of the"
       + " quarter's figures by hand.";
   }

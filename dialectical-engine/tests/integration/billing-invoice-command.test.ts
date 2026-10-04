@@ -8,7 +8,8 @@ import {
   createSmartBillInvoiceHandler, createSmartBillStornoHandler, type SmartBillPort
 } from "../../apps/api/src/billing/invoice-smartbill.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
-import { parseTaxQuarter } from "../../apps/api/src/billing/tax-summary.js";
+import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from "@debateai/register";
+import { buildTaxSummary, parseTaxQuarter, renderTaxSummary, type TaxQuarter } from "../../apps/api/src/billing/tax-summary.js";
 import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
 import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
 
@@ -81,6 +82,41 @@ const statuses = async (invoiceId: string) => (await h.database.pool.query(
   "SELECT efactura_status FROM billing.invoice_status_event WHERE invoice_id=$1", [invoiceId]
 )).rows.map((row) => row.efactura_status);
 const listed = async (chargeId: string) => (await h.repository.invoiceUnknownItems()).filter((item) => item.chargeId === chargeId);
+/** The quarter that holds a date (UTC), and the one after it. */
+const quarterOf = (date: Date): TaxQuarter =>
+  parseTaxQuarter(`${String(date.getUTCFullYear())}-Q${String(Math.floor(date.getUTCMonth() / 3) + 1)}`);
+const quarterAfter = (quarter: TaxQuarter): TaxQuarter => quarterOf(quarter.to);
+/** When the quarter's rows date a charge's sale (the money moved), read over all time. */
+async function saleDateOf(chargeId: string): Promise<Date> {
+  const rows = await h.repository.quarterSummaryRows(new Date(0), new Date(Date.UTC(9999, 0, 1)), "stage");
+  return rows.find((row) => row.type === "SALE" && row.chargeId === chargeId)!.at;
+}
+/** The quarter's summary as the command builds it, from this harness's xMoney system ("stage"). */
+async function summaryFor(quarter: TaxQuarter) {
+  const summary = buildTaxSummary({
+    quarter, rows: await h.repository.quarterSummaryRows(quarter.from, quarter.to, "stage"),
+    invoiceUnknown: await h.repository.invoiceUnknownItems(), efactura: [], paymentsToCheck: [], deadEmails: [],
+    authorities: taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test")
+  });
+  return { summary, text: renderTaxSummary(summary) };
+}
+/** Part 4 final review C-5 (fix round 1): the before-start charge's only instruction is its own line, in its sale's quarter. */
+async function expectBeforeStartSummary(chargeId: string): Promise<void> {
+  const quarter = quarterOf(await saleDateOf(chargeId));
+  const { summary, text } = await summaryFor(quarter);
+  expect(summary.unknownRefunds.filter((item) => item.chargeId === chargeId)).toEqual([]);
+  expect(summary.invoiceUnknown.filter((item) => item.chargeId === chargeId))
+    .toEqual([expect.objectContaining({ jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED" })]);
+  expect(text).toContain(`charge ${chargeId}: REFUNDED_BEFORE_START (NO_DOCUMENT_OWED), since `);
+  expect(text).toContain("  * REFUNDED_BEFORE_START (NO_DOCUMENT_OWED): Refunded before it started: no invoice or credit"
+    + " note is owed. Take this sale and its refund out of the quarter's figures by hand.");
+  expect(text).not.toContain(`charge ${chargeId}, RO, up to`);
+  // The next quarter holds no sale of it: no line there either.
+  const next = await summaryFor(quarterAfter(quarter));
+  expect(next.summary.invoiceUnknown.filter((item) => item.chargeId === chargeId)).toEqual([]);
+  expect(next.summary.unknownRefunds.filter((item) => item.chargeId === chargeId)).toEqual([]);
+  expect(next.text).not.toContain(`charge ${chargeId}`);
+}
 const jobsOf = async (chargeId: string, kind: string) => (await h.outboxRows(chargeId)).filter((row) => row.kind === kind);
 
 async function romanianSaleThat(fail: "REFUSED" | "UNKNOWN") {
@@ -404,6 +440,8 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     // Nothing is recorded for it, with or without an amount.
     await invoiceCommand("--charge", bought.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0990", "--amount", "4.00");
     expect(await invoices(bought.chargeId)).toEqual([]);
+    // The quarter's summary does not list its refund under 'amount unknown' (which asks for a credit note via --amount).
+    await expectBeforeStartSummary(bought.chargeId);
     // An INVOICE intent alone (an invoice row needs one, 0086's foreign key) says an invoice is owed: DASHBOARD_REFUND.
     await h.repository.withTransaction((client) => h.repository.insertInvoiceIntent(client, {
       chargeId: bought.chargeId, kind: "INVOICE", issuer: "SMARTBILL", requestedAt: h.clock.now
@@ -424,6 +462,7 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     expect(await h.eventKinds(renewal.chargeId)).toEqual(expect.arrayContaining(["SUCCEEDED", "REFUNDED"]));
     expect((await h.outboxRows(renewal.chargeId)).map((row) => row.kind)).not.toContain("SMARTBILL_INVOICE");
     expect(await listed(renewal.chargeId)).toEqual([expect.objectContaining({ jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED" })]);
+    await expectBeforeStartSummary(renewal.chargeId);
 
     // Control: a sale whose invoice job was queued (not yet issued) still owes its credit note: DASHBOARD_REFUND.
     const queued = await h.activate();
@@ -435,5 +474,11 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     expect(await listed(queued.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
     await documents.drain(5);
     expect(await listed(queued.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
+    // Its quarter's summary keeps today's 'amount unknown' listing for it, beside its DASHBOARD_REFUND line.
+    const { summary, text } = await summaryFor(quarterOf(await saleDateOf(queued.chargeId)));
+    expect(summary.unknownRefunds.filter((item) => item.chargeId === queued.chargeId))
+      .toEqual([expect.objectContaining({ taxCountry: "RO", upToMicros: 24_200_000 })]);
+    expect(text).toContain(`charge ${queued.chargeId}, RO, up to 24.20 USD, on `);
+    expect(text).toContain(`charge ${queued.chargeId}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since `);
   });
 });

@@ -1220,7 +1220,8 @@ export class BillingRepository {
    * P9c's never-verified path (a checkout's, an upgrade's or a renewal's payment xMoney refunded before we ever saw it
    * paid) queues none of the three, and A29 (q) owes no invoice and no credit note for it: its line is
    * REFUNDED_BEFORE_START (code NO_DOCUMENT_OWED), whose words (`documentJobAction`) ask for no document. It has
-   * nothing to record, so it stays listed.
+   * nothing to record, so this query always returns it; the tax summary (`buildTaxSummary`) prints it in its sale's
+   * quarter only, and keeps that charge's refund out of its 'amount unknown' list.
    */
   async invoiceUnknownItems(): Promise<Array<{ chargeId: string; jobKind: string; code: string; since: Date }>> {
     const result = await this.pool.query<{ charge_id: string; kind: string; code: string | null; since: Date }>(`
