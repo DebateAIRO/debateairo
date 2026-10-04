@@ -127,7 +127,7 @@ async function seedTheDeployedExposure(target: TestDatabase): Promise<void> {
 }
 
 /**
- * The one capability role whose CREATE lands ABOVE the `THROUGH` cutoff.
+ * The capability roles whose CREATE lands ABOVE the `THROUGH` cutoff (0055 below; 0093 in the body).
  *
  * `assertCapabilityRoles` (`apps/runner/src/dev-database-principals.ts:405-413`)
  * requires every capability role in `DEVELOPMENT_DATABASE_PRINCIPALS` to exist
@@ -156,6 +156,12 @@ async function seedTheDeployedExposure(target: TestDatabase): Promise<void> {
  */
 async function createPostCutoffCapabilityRole(target: TestDatabase): Promise<void> {
   await target.pool.query("CREATE ROLE debateai_support_config_operator NOLOGIN NOINHERIT");
+  // Go-live row 41: `migrations/0093_billing_runtime_role.sql` creates `debateai_billing_runtime`
+  // (NOLOGIN, a member of `debateai_runtime`), the development runtime login's capability role since
+  // then; 0093 sorts above the cutoff too. Created with exactly 0093's shape and no privilege of its
+  // own, so it reaches nothing the runtime role does not, and nothing on `GUARD`.
+  await target.pool.query("CREATE ROLE debateai_billing_runtime NOLOGIN");
+  await target.pool.query("GRANT debateai_runtime TO debateai_billing_runtime");
 }
 
 /** The eleven SCRAM LOGIN principals, provisioned the way DEV-03 provisions them. */
