@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { contractInventory, staffContractInventory, fundedStaffContractInventory,
-  consumerAuthContractSchemas,
+  consumerAuthContractSchemas, accountProfileContractSchemas,
   BillingUsageResponseSchema, AskRoomResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
@@ -12,6 +12,7 @@ import { contractInventory, staffContractInventory, fundedStaffContractInventory
 
 const endpointSchemas = {
   ...consumerAuthContractSchemas,
+  ...accountProfileContractSchemas,
   BillingUsageResponseSchema, AskRoomResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
@@ -27,6 +28,13 @@ const response = (schema: unknown, status = "200") => ({ responses: { [status]: 
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   "POST /v1/auth/register": { ...request(reference("RegisterRequestSchema")), ...response(reference("RegistrationVerificationAckSchema"), "202") },
   "POST /v1/auth/resend-verification": { ...request(reference("ResendVerificationRequestSchema")), ...response(reference("ResendVerificationAckSchema"), "202") },
+  "GET /v1/account/profile": response(reference("AccountPhoneProfileSchema")),
+  "POST /v1/account/profile/reveal": { ...request(reference("PhoneProfileRevealRequestSchema")), ...response(reference("PhoneProfileRevealSchema")) },
+  "POST /v1/account/profile": { ...request(reference("PhoneProfileUpdateRequestSchema")), ...response(reference("AccountPhoneProfileSchema")) },
+  "GET /v1/account/recovery-email": response(reference("RecoveryEmailSettingsSchema")),
+  "POST /v1/account/recovery-email": { ...request(reference("RecoveryEmailRequestSchema")), ...response(reference("RecoveryEmailSettingsSchema"), "202") },
+  "DELETE /v1/account/recovery-email": { ...request(reference("RecoveryEmailRemoveRequestSchema")), responses: { "204": {description:"Optional recovery address removed"} } },
+  "POST /v1/account/recovery-email/confirm": { ...request(reference("EmailChangeLinkRequestSchema")), ...response(reference("EmailChangeConfirmedSchema")) },
   "GET /v1/billing/usage": response(reference("BillingUsageResponseSchema")),
   "GET /v1/asks/room": response(reference("AskRoomResponseSchema")),
   "GET /v1/admin/enrollment": response(variants("StaffEnrollmentResponseSchema","FundedStaffEnrollmentResponseSchema")),

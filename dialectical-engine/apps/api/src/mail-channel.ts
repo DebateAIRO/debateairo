@@ -323,3 +323,72 @@ export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
     ]];
   }
 }
+
+export type RecoveryEmailMail = Readonly<{
+  kind: "confirmation";
+  recipient: string;
+  token: string;
+  expiresAt: Date;
+}>;
+export interface RecoveryEmailMailSender {
+  sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void>;
+}
+export class MemoryRecoveryEmailMailSender implements RecoveryEmailMailSender {
+  readonly messages: RecoveryEmailMail[] = [];
+  async sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void> {
+    this.messages.push(Object.freeze({
+      ...mail
+    }));
+  }
+}
+export function recoveryEmailLink(publicAppUrl: string, token: string): string {
+  if (!EMAIL_CHANGE_BEARER.test(token))
+    throw new MailDeliveryError("MAIL_INPUT_INVALID");
+  const url = new URL("/settings", publicAppUrl);
+  url.hash = `recovery-email=confirm&token=${token}`;
+  return url.toString();
+}
+/** Narrow adapter; delivery remains governed by the configured mail transport. */
+export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender {
+  constructor(private readonly options: {
+    readonly executable: string;
+    readonly from: string;
+    readonly publicAppUrl: string;
+    readonly timeoutMs: number;
+  }) {
+    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from) || !options.executable.trim() || !/^https:\/\//.test(options.publicAppUrl) || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
+      throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
+  }
+  async sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void> {
+    if (!isSingleDeliverableRecipient(mail.recipient) || !Number.isFinite(mail.expiresAt.getTime()))
+      throw new MailDeliveryError("MAIL_INPUT_INVALID");
+    const message = [`From: ${this.options.from}`, `To: ${mail.recipient}`, "Subject: Confirm your Dialectical Engine recovery email", "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "", "Confirm this optional recovery address:", recoveryEmailLink(this.options.publicAppUrl, mail.token), `This link expires at ${mail.expiresAt.toISOString()}.`, "Your existing verified recovery address stays active until confirmation.", ""].join("\r\n");
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
+        stdio: ["pipe", "ignore", "ignore"]
+      });
+      let settled = false;
+      const fail = (code: string) => {
+        if (settled)
+          return;
+        settled = true;
+        clearTimeout(timer);
+        reject(new MailDeliveryError(code));
+      };
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        fail("SENDMAIL_TIMEOUT");
+      }, this.options.timeoutMs);
+      child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
+      child.once("exit", (code) => {
+        if (settled)
+          return;
+        settled = true;
+        clearTimeout(timer);
+        code === 0 ? resolve() : reject(new MailDeliveryError("SENDMAIL_EXIT_FAILED"));
+      });
+      child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
+      child.stdin.end(message, "utf8");
+    });
+  }
+}

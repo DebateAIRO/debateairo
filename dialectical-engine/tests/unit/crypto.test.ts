@@ -108,7 +108,7 @@ describe("S1 crypto foundation", () => {
     // L2-F12: one unkeyed SHA-256 served session, CSRF, login-challenge,
     // step-up-grant and verification tokens with no per-purpose domain.
     const token = generateVerificationToken();
-    const kinds = ["session", "csrf", "login-challenge", "step-up-grant", "verification"] as const;
+    const kinds = ["session", "csrf", "login-challenge", "step-up-grant", "verification", "email-change-confirm", "recovery-email-confirm"] as const;
     const hashes = kinds.map((kind) => hashToken(kind, token));
     for (const hash of hashes) expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(new Set(hashes).size).toBe(kinds.length);

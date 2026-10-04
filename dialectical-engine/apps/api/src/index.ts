@@ -1,3 +1,6 @@
+import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
+import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
+import type { ProfileSession } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
 import type { FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
@@ -42,6 +45,8 @@ import {
   RunEventSchema,
   RunProjectionSchema,
   SessionSchema,
+  AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
+  RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
   StepUpAuthorizationRequestSchema,
   UnpublishDebateRequestSchema,
   type Answer,
@@ -1187,6 +1192,13 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   // Turn 14 — change email. The owner routes ride the cookie session and CSRF;
   // the two link routes need only the first-party Origin and the mailed bearer.
+  { route: "GET /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/profile/reveal", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "GET /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/recovery-email/confirm", auth: "public", origin:"trusted", resource: "identity", action: "confirm-recovery-email" },
+  { route: "DELETE /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
   { route: "GET /v1/account/email", auth: "user", resource: "identity", action: "read-email" },
   { route: "POST /v1/account/email/change", auth: "user", resource: "identity", action: "request-email-change" },
   { route: "POST /v1/account/email/change/resend", auth: "user", resource: "identity", action: "resend-email-change" },
@@ -1469,6 +1481,8 @@ export interface ApiOptions {
   readonly legal?: LegalAcceptanceApplication;
   /** Turn 14 — change email; the routes answer a closed 503 when it is absent. */
   readonly emailChange?: EmailChangeApplication;
+  readonly accountProfile?: Pick<AccountProfileService,"phoneProfile"|"revealPhoneProfile"|"updatePhoneProfile">;
+  readonly recoveryEmail?: Pick<RecoveryEmailService,"recoveryEmail"|"requestRecoveryEmail"|"confirmRecoveryEmail"|"removeRecoveryEmail">;
   readonly allowedOrigin?: string;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
@@ -2409,7 +2423,112 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }));
     }
   );
-  // Turn 14 — change email (design doc 14A/14B/14C).
+  // Purpose-bound account phone profile and optional recovery email.
+  const profileSession = (authenticated: AuthenticatedSession): ProfileSession => ({
+    userId: authenticated.userId, sessionId: authenticated.session.session_id, tokenHash: authenticated.tokenHash
+  });
+  const profileRefusal = (reply: FastifyReply, error: unknown) => {
+    if (error instanceof AccountProfileError || error instanceof RecoveryEmailError)
+      return reply.status(error.code === "STEP_UP_REQUIRED" ? 403 : error.code === "LINK_EXPIRED" ? 410 : 400).send({
+        error: error.code
+      });
+    throw error;
+  };
+  api.get("/v1/account/profile", routePolicy("GET /v1/account/profile"), async (request, reply) => {
+    if (options.accountProfile === undefined)
+      return reply.status(503).send({
+        error: "ACCOUNT_PROFILE_UNAVAILABLE"
+      });
+    const result = await options.accountProfile.phoneProfile(profileSession(request.authenticatedSession!));
+    return result === null ? reply.status(401).send({
+      error: "SESSION_REQUIRED"
+    }) : reply.send(AccountPhoneProfileSchema.parse(result));
+  });
+  api.post("/v1/account/profile/reveal", credentialRoutePolicy("POST /v1/account/profile/reveal"), async (request, reply) => {
+    if (options.accountProfile === undefined)
+      return reply.status(503).send({
+        error: "ACCOUNT_PROFILE_UNAVAILABLE"
+      });
+    const input = parseRequest(PhoneProfileRevealRequestSchema, request.body);
+    try {
+      return reply.send(PhoneProfileRevealSchema.parse(await options.accountProfile.revealPhoneProfile(profileSession(request.authenticatedSession!), input.step_up_grant, sourceFor(request))));
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
+  api.post("/v1/account/profile", credentialRoutePolicy("POST /v1/account/profile"), async (request, reply) => {
+    if (options.accountProfile === undefined)
+      return reply.status(503).send({
+        error: "ACCOUNT_PROFILE_UNAVAILABLE"
+      });
+    const input = parseRequest(PhoneProfileUpdateRequestSchema, request.body);
+    try {
+      return reply.send(AccountPhoneProfileSchema.parse(await options.accountProfile.updatePhoneProfile(profileSession(request.authenticatedSession!), {
+        phone: input.phone, grantToken: input.step_up_grant
+      }, sourceFor(request))));
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
+  api.get("/v1/account/recovery-email", routePolicy("GET /v1/account/recovery-email"), async (request, reply) => {
+    if (options.recoveryEmail === undefined)
+      return reply.status(503).send({
+        error: "RECOVERY_EMAIL_UNAVAILABLE"
+      });
+    const result = await options.recoveryEmail.recoveryEmail(profileSession(request.authenticatedSession!));
+    return result === null ? reply.status(401).send({
+      error: "SESSION_REQUIRED"
+    }) : reply.send(RecoveryEmailSettingsSchema.parse(result));
+  });
+  api.post("/v1/account/recovery-email", credentialRoutePolicy("POST /v1/account/recovery-email"), async (request, reply) => {
+    if (options.recoveryEmail === undefined)
+      return reply.status(503).send({
+        error: "RECOVERY_EMAIL_UNAVAILABLE"
+      });
+    const input = parseRequest(RecoveryEmailRequestSchema, request.body);
+    try {
+      return reply.status(202).send(RecoveryEmailSettingsSchema.parse(await options.recoveryEmail.requestRecoveryEmail(profileSession(request.authenticatedSession!), {
+        email: input.email, grantToken: input.step_up_grant
+      }, sourceFor(request))));
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
+  api.delete("/v1/account/recovery-email", credentialRoutePolicy("DELETE /v1/account/recovery-email"), async (request, reply) => {
+    if (options.recoveryEmail === undefined)
+      return reply.status(503).send({
+        error: "RECOVERY_EMAIL_UNAVAILABLE"
+      });
+    const input = parseRequest(RecoveryEmailRemoveRequestSchema, request.body);
+    try {
+      await options.recoveryEmail.removeRecoveryEmail(profileSession(request.authenticatedSession!), {
+        grantToken: input.step_up_grant
+      }, sourceFor(request));
+      return reply.status(204).send();
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
+  api.post("/v1/account/recovery-email/confirm", credentialRoutePolicy("POST /v1/account/recovery-email/confirm"), async (request, reply) => {
+    if (options.recoveryEmail === undefined)
+      return reply.status(503).send({
+        error: "RECOVERY_EMAIL_UNAVAILABLE"
+      });
+    const input = parseRequest(EmailChangeLinkRequestSchema, request.body);
+    try {
+      await options.recoveryEmail.confirmRecoveryEmail(input, sourceFor(request));
+      return reply.send(EmailChangeConfirmedSchema.parse({
+        status: "CONFIRMED"
+      }));
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
   const emailChangeSession = (authenticated: AuthenticatedSession): EmailChangeSession =>
     Object.freeze({ userId: authenticated.userId, sessionId: authenticated.session.session_id });
   const pendingBody = (pending: EmailChangePending) => EmailChangePendingSchema.parse({
@@ -3281,6 +3400,7 @@ export interface RunCreationSettings {
    * signed-in owner (ASK_SIGN_IN_REQUIRED). Absent means today's ask exactly.
    */
   readonly billing?: AskBilling;
+  readonly accountProfile?: Pick<AccountProfileService,"hasPhone">;
   /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
   readonly waitingLine?: AskWaitingLinePort;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
@@ -3551,6 +3671,12 @@ export class PostgresAskApplication implements AskApplication {
       }
       const now = billing.clock();
       const resolved = await resolveBillingAsk(requestedAsk, principal.ownerRef, billing, now);
+      // The resolved plan governs completion. Paid/internal questions remain
+      // usable even when coarse fit later chooses the Free provider roster.
+      if (resolved.planId === "FREE" && this.settings.accountProfile !== undefined
+        && !await this.settings.accountProfile.hasPhone(principal.ownerRef)) {
+        markAskRefusal(new TypedDomainError("ACCOUNT_PHONE_REQUIRED", "Complete your phone profile before asking a free question"));
+      }
       fundingBasis = resolved.fundingBasis;
       ask = resolved.ask;
       plannedAsk = resolved.ask;

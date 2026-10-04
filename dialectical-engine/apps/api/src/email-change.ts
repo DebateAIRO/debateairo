@@ -64,7 +64,7 @@ function addressAad(userId: string, field: "user.email_ciphertext" | "user.recov
   return ["identity", field, userId, "run:none", userId, `user-dek:${userId}`, "1"] as const;
 }
 
-function normalizedAddress(value: unknown): string {
+export function normalizedAddress(value: unknown): string {
   if (typeof value !== "string" || value.length > MAX_ADDRESS_LENGTH) throw new EmailChangeError("EMAIL_INVALID");
   let normalized: string;
   try {

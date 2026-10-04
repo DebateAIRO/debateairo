@@ -1,3 +1,6 @@
+import { AccountProfileService } from "./account-profile.js";
+import { RecoveryEmailService } from "./recovery-email.js";
+import { PostgresAccountProfileRepository,PostgresRecoveryEmailRepository } from "@debateai/db";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -92,7 +95,7 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
-import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
+import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender } from "./mail-channel.js";
 import { EMAIL_CHANGE_LINK_TTL_MS, EMAIL_CHANGE_RESEND_COOLDOWN_MS, EmailChangeService } from "./email-change.js";
 import {
   AccountErasureNotificationReconciler,
@@ -638,8 +641,23 @@ const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undef
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
-// Turn 14 — change email: the capabilities of migration 0079 are granted to the
-// authorization role, beside the step-up that mints their CHANGE_EMAIL grant.
+// Self-service profile/recovery capabilities use the existing authorization
+// role and account DEK custody, beside purpose-bound TOTP grant rotation.
+const accountProfile = new AccountProfileService({
+  repository: new PostgresAccountProfileRepository(authorizationPool, auditContextHasher),
+  users: dekStore
+});
+const recoveryEmail = new RecoveryEmailService({
+  repository: new PostgresRecoveryEmailRepository(authorizationPool, auditContextHasher),
+  users: dekStore,
+  blindIndexKey,
+  mail: new SendmailRecoveryEmailMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    publicAppUrl: environment.PUBLIC_APP_URL,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  })
+});
 const emailChange = new EmailChangeService({
   repository: new PostgresEmailChangeRepository(authorizationPool, auditContextHasher),
   users: dekStore,
@@ -671,6 +689,7 @@ const application = new PostgresAskApplication(pool, dispatcher, {
         assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
       }),
   ...(askBilling === undefined ? {} : { billing: askBilling }),
+  accountProfile,
   resolveDiscoveredPanel: resolveProviderPanel,
   resolveEnvelopeBasis: async (input) => computeStructuralCeilingBasis({
     ...structuralInputs,
@@ -1014,6 +1033,8 @@ const api = buildApi({
   legacyRunClaim,
   legal,
   emailChange,
+  accountProfile,
+  recoveryEmail,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
   // B7a: the room read and, while billing is on, the usage read. Absent, the

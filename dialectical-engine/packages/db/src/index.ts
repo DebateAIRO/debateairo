@@ -1927,3 +1927,6 @@ export { PostgresOwnerCommandRepository, OwnerCommandAlertKeyMappings, type Owne
 export { PostgresStaffPrerequisiteProducer, type StaffPrerequisiteProducer, type StaffPrerequisiteInput, type StaffManagementRepository, type StaffProjectionRead, type StaffEnrollmentRecord, type StaffTeamPageRecord, type StaffAuditPageRecord, type StaffTargetInvitationChannels, type StaffTargetInvitationChannelInput } from "./staff-access.js";
 
 export { PostgresInternalAllowanceRepository, type InternalAllowancePort, type InternalAllowanceCommandState, type InternalAllowanceConfigureCommand, type InternalAllowanceRevokeCommand, type SelectedInternalAllowancePolicy } from "./internal-allowance.js";
+
+export {PostgresAccountProfileRepository, type ProfileSession, type PhoneProfileRecord} from "./account-profile.js";
+export {PostgresRecoveryEmailRepository, type RecoveryEmailRecord} from "./recovery-email.js";

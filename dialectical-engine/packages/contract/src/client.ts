@@ -11,6 +11,9 @@ import {
   type VerificationAck,
   type AuthenticationResponse,
   AccountEmailSchema,
+  AccountPhoneProfileSchema,PhoneProfileRevealSchema,PhoneProfileRevealRequestSchema,PhoneProfileUpdateRequestSchema,
+  RecoveryEmailSettingsSchema,RecoveryEmailRequestSchema,RecoveryEmailRemoveRequestSchema,
+  type AccountPhoneProfile,type PhoneProfileReveal,type RecoveryEmailSettings,
   AccountErasureCancelRequestSchema,
   AgeCheckResultSchema,
   AgeConfirmationStatusSchema,
@@ -322,7 +325,7 @@ export interface ContractClient {
       action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
       target_run_id: string;
     }>
-    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" }>): Promise<{
+    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" }>): Promise<{
     status: "step_up_complete";
     csrf_token: string;
     step_up_grant?: ({
@@ -332,7 +335,7 @@ export interface ContractClient {
       expires_at: string;
     } | {
       token: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL";
       expires_at: string;
     }) | undefined;
   }>;
@@ -371,6 +374,13 @@ export interface ContractClient {
   /** Paid plans G3a: whether this address may sign up and pay — two booleans, never the country. */
   getGeoAvailability(): Promise<GeoAvailabilityResponse>;
   readAccountEmail(): Promise<AccountEmail>;
+  phoneProfile():Promise<AccountPhoneProfile>;
+  revealPhoneProfile(grantToken:string):Promise<PhoneProfileReveal>;
+  updatePhoneProfile(input:Readonly<{phone:string;grantToken:string}>):Promise<AccountPhoneProfile>;
+  recoveryEmail():Promise<RecoveryEmailSettings>;
+  requestRecoveryEmail(input:Readonly<{email:string;grantToken:string}>):Promise<RecoveryEmailSettings>;
+  confirmRecoveryEmail(input:Readonly<{token:string}>):Promise<{status:"CONFIRMED"}>;
+  removeRecoveryEmail(input:Readonly<{grantToken:string}>):Promise<void>;
   requestEmailChange(newEmail: string, stepUpGrant: string): Promise<EmailChangePending>;
   resendEmailChange(): Promise<EmailChangePending>;
   cancelEmailChange(): Promise<void>;
@@ -553,7 +563,7 @@ export function createContractClient(
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         target_run_id: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" }>) => request(
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" }>) => request(
       "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,
@@ -603,6 +613,13 @@ export function createContractClient(
     readAccountErasure:()=>request(
       "/v1/account/erasure",AccountErasureStatusSchema
     ),
+    phoneProfile:()=>request("/v1/account/profile",AccountPhoneProfileSchema),
+    revealPhoneProfile:(grantToken:string)=>request("/v1/account/profile/reveal",PhoneProfileRevealSchema,{method:"POST",body:JSON.stringify(PhoneProfileRevealRequestSchema.parse({step_up_grant:grantToken}))}),
+    updatePhoneProfile:(input:Readonly<{phone:string;grantToken:string}>)=>request("/v1/account/profile",AccountPhoneProfileSchema,{method:"POST",body:JSON.stringify(PhoneProfileUpdateRequestSchema.parse({phone:input.phone,step_up_grant:input.grantToken}))}),
+    recoveryEmail:()=>request("/v1/account/recovery-email",RecoveryEmailSettingsSchema),
+    requestRecoveryEmail:(input:Readonly<{email:string;grantToken:string}>)=>request("/v1/account/recovery-email",RecoveryEmailSettingsSchema,{method:"POST",body:JSON.stringify(RecoveryEmailRequestSchema.parse({email:input.email,step_up_grant:input.grantToken}))},202),
+    confirmRecoveryEmail:(input:Readonly<{token:string}>)=>request("/v1/account/recovery-email/confirm",EmailChangeConfirmedSchema,{method:"POST",body:JSON.stringify(EmailChangeLinkRequestSchema.parse(input))}),
+    removeRecoveryEmail:(input:Readonly<{grantToken:string}>)=>requestNoContent(root.href,fetchImplementation,"/v1/account/recovery-email",{method:"DELETE",body:JSON.stringify(RecoveryEmailRemoveRequestSchema.parse({step_up_grant:input.grantToken}))},auth),
     readAccountEmail: () => request("/v1/account/email", AccountEmailSchema),
     requestEmailChange: (newEmail: string, stepUpGrant: string) => request(
       "/v1/account/email/change", EmailChangePendingSchema,

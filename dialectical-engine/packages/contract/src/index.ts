@@ -448,7 +448,8 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
     target_run_id: z.uuid()
   }).strict(),
   z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
-  z.object({ action: z.literal("CHANGE_EMAIL") }).strict()
+  z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
+  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL"]) }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
@@ -464,7 +465,7 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    action: z.literal("CHANGE_EMAIL"),
+    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL"]),
     expires_at: z.iso.datetime()
   }).strict()
 ]);
@@ -558,6 +559,23 @@ export const EmailChangeLinkRequestSchema = z.object({
 }).strict();
 export const EmailChangeConfirmedSchema = z.object({ status: z.literal("CONFIRMED") }).strict();
 export const EmailChangeCancelledSchema = z.object({ status: z.literal("CANCELLED") }).strict();
+
+export const AccountPhoneProfileSchema=z.object({phone_present:z.boolean(),phone_masked:z.string().nullable(),phone_verified:z.literal(false),updated_at:z.iso.datetime().nullable()}).strict();
+export type AccountPhoneProfile=z.infer<typeof AccountPhoneProfileSchema>;
+export const PhoneProfileRevealRequestSchema=z.object({step_up_grant:StepUpGrantTokenSchema}).strict();
+export const PhoneProfileRevealSchema=z.object({phone:z.string().nullable(),phone_verified:z.literal(false)}).strict();
+export type PhoneProfileReveal=z.infer<typeof PhoneProfileRevealSchema>;
+export const PhoneProfileUpdateRequestSchema=z.object({phone:z.string().min(1).max(128),step_up_grant:StepUpGrantTokenSchema}).strict();
+export const RecoveryEmailSettingsSchema=z.object({state:z.enum(["absent","pending","verified"]),email:EmailAddressSchema.nullable(),pending:z.object({email:EmailAddressSchema,expires_at:z.iso.datetime()}).strict().nullable()}).strict();
+export type RecoveryEmailSettings=z.infer<typeof RecoveryEmailSettingsSchema>;
+export const RecoveryEmailRequestSchema=z.object({email:EmailAddressSchema,step_up_grant:StepUpGrantTokenSchema}).strict();
+export const RecoveryEmailRemoveRequestSchema=z.object({step_up_grant:StepUpGrantTokenSchema}).strict();
+
+export const accountProfileContractSchemas = {
+  AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
+  RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
+  EmailChangeLinkRequestSchema, EmailChangeConfirmedSchema
+} as const;
 
 export const PrivateDebateErasureRequestSchema = z.object({
   step_up_grant:StepUpGrantTokenSchema
@@ -1049,6 +1067,13 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
+    "GET /v1/account/profile",
+    "POST /v1/account/profile/reveal",
+    "POST /v1/account/profile",
+    "GET /v1/account/recovery-email",
+    "POST /v1/account/recovery-email",
+    "POST /v1/account/recovery-email/confirm",
+    "DELETE /v1/account/recovery-email",
     "GET /v1/account/email",
     "POST /v1/account/email/change",
     "POST /v1/account/email/change/resend",
@@ -1109,6 +1134,8 @@ export const contractInventory = Object.freeze({
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
+    AccountPhoneProfileSchema,PhoneProfileRevealRequestSchema,PhoneProfileRevealSchema,PhoneProfileUpdateRequestSchema,
+    RecoveryEmailSettingsSchema,RecoveryEmailRequestSchema,RecoveryEmailRemoveRequestSchema,
     AccountEmailSchema,EmailChangeRequestSchema,EmailChangePendingSchema,EmailChangeLinkRequestSchema,
     EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,

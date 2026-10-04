@@ -604,7 +604,7 @@ export class PostgresSessionRepository {
     }> | Readonly<{
       grantId: string;
       grantTokenHash: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL";
       expiresAt: Date;
     }>;
   }>): Promise<boolean> {

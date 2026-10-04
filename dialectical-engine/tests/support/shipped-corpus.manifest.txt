@@ -11,6 +11,7 @@
 # tests/unit/s1-1-depth-contract.test.ts and are NOT duplicated here.
 
 apps/api/src/account-erasure.ts
+apps/api/src/account-profile.ts
 apps/api/src/admission.ts
 apps/api/src/ask-billing.ts
 apps/api/src/ask-room.ts
@@ -36,6 +37,7 @@ apps/api/src/publication-check/material.ts
 apps/api/src/publication-check/policy.ts
 apps/api/src/publication-check/verdict.ts
 apps/api/src/publications.ts
+apps/api/src/recovery-email.ts
 apps/api/src/recovery.ts
 apps/api/src/registration.ts
 apps/api/src/risk-signal-identity.ts
@@ -613,6 +615,7 @@ packages/crypto/src/index.ts
 packages/crypto/src/pseudonym.ts
 packages/crypto/src/records.ts
 packages/db/src/account-erasure.ts
+packages/db/src/account-profile.ts
 packages/db/src/auth-risk.ts
 packages/db/src/billing-entitlement.ts
 packages/db/src/email-change.ts
@@ -624,6 +627,7 @@ packages/db/src/obs-schema.ts
 packages/db/src/publication-check.ts
 packages/db/src/publication-lease.ts
 packages/db/src/publication.ts
+packages/db/src/recovery-email.ts
 packages/db/src/recovery.ts
 packages/db/src/run-cost-substitution.ts
 packages/db/src/run-wait.ts
