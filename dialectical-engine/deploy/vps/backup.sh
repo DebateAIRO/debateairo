@@ -71,9 +71,20 @@ mkdir -p "$DAILY_DIR" "$WEEKLY_DIR" "$ESCROW_DIR"
 chmod 0700 "$BACKUP_DIR" "$DAILY_DIR" "$WEEKLY_DIR" "$ESCROW_DIR"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/debateai-backup.XXXXXXXX")"
+# Every failed run leaves exactly one line in the journal. The explicit exits below say why
+# (BACKUP_REFUSED / BACKUP_FAILED) and set REPORTED; anything else that stops the run through
+# errexit — pg_dump, tar, age, prune — is reported here, with the line of the last top-level
+# command that failed when bash knows it.
+REPORTED=""
+FAILED_AT=""
+trap 'FAILED_AT="$LINENO"' ERR
 cleanup() {
+  local status=$?
   # The staging tree holds plaintext dumps and copies of key files; it never outlives the run.
   rm -rf -- "$WORK"
+  if [ "$status" -ne 0 ] && [ -z "$REPORTED" ]; then
+    echo "BACKUP_FAILED exit=$status${FAILED_AT:+ line=$FAILED_AT}" >&2
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -94,6 +105,7 @@ audit_name="$(basename "$AUDIT_KEY_STORE_PATH")"
 if [ "$dek_name" = "$publication_name" ] || [ "$dek_name" = "$audit_name" ] \
   || [ "$publication_name" = "$audit_name" ]; then
   echo "BACKUP_REFUSED custody store basenames must be distinct" >&2
+  REPORTED=1
   exit 1
 fi
 tar -cf "$WORK/custody.tar" -C "$(dirname "$USER_DEK_STORE_PATH")" "$dek_name"
@@ -119,6 +131,7 @@ secret_names="$(printf '%s\n' "$KEK_PATH" "$CORPUS_KEK_PATH" "$BLIND_INDEX_KEY_P
   "$AUDIT_SOURCE_IP_SALT_PATH" "$SUPPORT_KEK_PATH" "$RECORDS_KEY_PATH" | xargs -n 1 basename | sort)"
 if [ "$(printf '%s\n' "$secret_names" | uniq | wc -l | tr -d ' ')" != "6" ]; then
   echo "BACKUP_REFUSED escrowed secret basenames must be distinct" >&2
+  REPORTED=1
   exit 1
 fi
 tar -cf "$WORK/keys.tar" \
@@ -165,6 +178,7 @@ prune "$WEEKLY_DIR" "$KEEP_WEEKLY"
 # written) is looked up on the remote, and BACKUP_OK is printed only once it is there.
 offhost_failed() {
   echo "BACKUP_FAILED $1" >&2
+  REPORTED=1
   exit 1
 }
 if [ -n "${BACKUP_RCLONE_REMOTE:-}" ]; then

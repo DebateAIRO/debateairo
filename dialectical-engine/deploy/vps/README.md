@@ -592,18 +592,15 @@ its file, so it never appears in this document or your shell history. The file i
 if it does not exist yet, because `bootstrap.sql` creates the role once and a second paste must
 not leave a password on disk that the role does not have. The password reaches `psql` on its
 standard input, as a `\set` line the shell's builtin `printf` writes ahead of the SQL file — never
-as an argument, so it is not in a process listing, the sudo log or your shell history:
+as an argument, so it is not in a process listing or your shell history, nor in the sudo log while
+sudoers' `log_input` stays off (the Debian and Ubuntu default). The line starts with `test -r`
+because standard input cannot fail loudly the way `-f` did: run from the wrong directory, psql
+would get only the `\set` line and exit 0 having created nothing.
 
 ```sh
 test -e /etc/debateai/hatchet.pgpass || (umask 0177 && openssl rand -hex 32 > /etc/debateai/hatchet.pgpass)
-{ printf '\\set hatchet_password %s\n' "$(cat /etc/debateai/hatchet.pgpass)"; cat deploy/postgres/bootstrap.sql; } | sudo -u postgres psql -v ON_ERROR_STOP=1
+test -r deploy/postgres/bootstrap.sql && { printf '\\set hatchet_password %s\n' "$(cat /etc/debateai/hatchet.pgpass)"; cat deploy/postgres/bootstrap.sql; } | sudo -u postgres psql -v ON_ERROR_STOP=1
 ```
-
-If this host was brought up with an earlier version of this step, which passed the password as
-`-v hatchet_password=...` on psql's command line, treat that password as exposed and rotate it: a
-new `hatchet.pgpass`, `ALTER ROLE debateai_prod_hatchet PASSWORD :'hatchet_password'` sent through
-the same standard-input channel, the same new password in `hatchet.env`'s `DATABASE_URL`, then a
-restart of `debateai-hatchet.service`.
 
 Then write the Hatchet container's `DATABASE_URL` with that same password, so the role and the
 container agree. The password goes from the file to the new file through the shell's builtin
@@ -617,6 +614,22 @@ test ! -e /etc/debateai/hatchet.env && (umask 0177 && printf 'DATABASE_URL=postg
 The container reaches the socket through its bind mount (`compose.prod.yaml`). The file's other
 keys (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) are Hatchet's own: add them with an
 editor, `0600 root:root` stays, and no seeded or example value is ever used (audit L7-F3).
+
+**Rotating the Hatchet password — required once if this host ran the older step 1.** An earlier
+version of step 1 passed the password as `-v hatchet_password=...` on psql's command line, where
+`ps` and the sudo log could read it: treat it as exposed. The generator and the `hatchet.env` line
+above both do nothing while their file exists, so move both files aside first, generate a new
+password, and give it to the role through the same standard-input channel:
+
+```sh
+mv /etc/debateai/hatchet.pgpass /etc/debateai/hatchet.pgpass.old && mv /etc/debateai/hatchet.env /etc/debateai/hatchet.env.old
+test -e /etc/debateai/hatchet.pgpass || (umask 0177 && openssl rand -hex 32 > /etc/debateai/hatchet.pgpass)
+{ printf '\\set hatchet_password %s\n' "$(cat /etc/debateai/hatchet.pgpass)"; printf '%s\n' "ALTER ROLE debateai_prod_hatchet PASSWORD :'hatchet_password';"; } | sudo -u postgres psql -v ON_ERROR_STOP=1
+```
+
+Then run the `hatchet.env` line above again, copy Hatchet's own keys (`ADMIN_EMAIL`,
+`ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) from `hatchet.env.old` into the new file with an editor,
+delete both `.old` files, and `systemctl restart debateai-hatchet.service`.
 
 **2. Open the migrator for fifteen minutes.** Its password is NULL between ceremonies, and the
 provisioner refuses an admin whose credential is not bounded (manifest invariant
@@ -1127,9 +1140,12 @@ one in `backup.conf`). Encrypted before it leaves the box, so the remote is untr
 construction. Receipt: `BACKUP_OK <sha256> <bytes> <utc>`, printed only after the night's artefact
 (and its escrow envelope, on a night one is written) has been found on the remote: `rclone check`
 for rclone (by hash where the backend keeps one, by size where it does not), a read-back compared
-byte for byte for scp — so the scp account must be able to read what it wrote. A run with no
+byte for byte for scp — so the scp account must be able to read what it wrote. **Upgrading:** an
+scp account set up write-only, as the earlier `backup.conf.example` allowed, now fails every night
+at the read-back (`BACKUP_FAILED could not read ...`) until it is given read access. A run with no
 destination, or with both, stops before it dumps anything (`BACKUP_REFUSED ...`); a copy that
-cannot be proved stops with `BACKUP_FAILED ...`. Either way the service exits nonzero and shows as
+cannot be proved stops with `BACKUP_FAILED ...`; any other failure (`pg_dump`, `tar`, `age`,
+pruning) ends with `BACKUP_FAILED exit=<status> line=<line>`. Either way the service exits nonzero and shows as
 failed in `systemctl --failed`. Nothing pages anyone: the unit has no `OnFailure=` hook, so a
 missing receipt in the journal is the signal to look for.
 

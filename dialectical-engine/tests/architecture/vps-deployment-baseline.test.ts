@@ -2,7 +2,7 @@
 // Pins the VPS deployment baseline (PLAN §8 C3, §9.1 C3 amendments, audit corrections
 // L2-F3, L5-F6/F7/F8/F11, L7-F2/F3/F7). Every assertion is a floor on a file under
 // deploy/; the files are configuration, so the pins are textual and deliberately exact.
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -13,7 +13,10 @@ const read = (relative: string): string => readFileSync(resolve(engineRoot, rela
 const exists = (relative: string): boolean => existsSync(resolve(engineRoot, relative));
 /** README §4 bring-up step 1, verbatim: the Hatchet password reaches psql on stdin, never in argv. */
 const BOOTSTRAP_STEP =
-  "{ printf '\\\\set hatchet_password %s\\n' \"$(cat /etc/debateai/hatchet.pgpass)\"; cat deploy/postgres/bootstrap.sql; } | sudo -u postgres psql -v ON_ERROR_STOP=1";
+  "test -r deploy/postgres/bootstrap.sql && { printf '\\\\set hatchet_password %s\\n' \"$(cat /etc/debateai/hatchet.pgpass)\"; cat deploy/postgres/bootstrap.sql; } | sudo -u postgres psql -v ON_ERROR_STOP=1";
+/** README §4, rotating the Hatchet password: the same stdin channel, one ALTER ROLE. */
+const ROTATE_STEP =
+  "{ printf '\\\\set hatchet_password %s\\n' \"$(cat /etc/debateai/hatchet.pgpass)\"; printf '%s\\n' \"ALTER ROLE debateai_prod_hatchet PASSWORD :'hatchet_password';\"; } | sudo -u postgres psql -v ON_ERROR_STOP=1";
 
 const manifest = JSON.parse(
   read("docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json")
@@ -880,6 +883,18 @@ describe("VPS baseline: runbook and environment templates", () => {
       const stream = execFileSync("bash", ["-c", runnable], { cwd: engineRoot, encoding: "utf8" });
       expect(stream).toBe(`\\set hatchet_password ${generated}\n${read("deploy/postgres/bootstrap.sql")}`);
       expect(read("deploy/postgres/bootstrap.sql")).toContain(":'hatchet_password'");
+      // Run from the wrong directory, psql must get nothing at all (not a lone \set line) and the
+      // step must fail: `test -r` stands in for the "file not found" that -f used to give.
+      const wrongDirectory = spawnSync("bash", ["-c", runnable], { cwd: scratch, encoding: "utf8" });
+      expect(wrongDirectory.status).not.toBe(0);
+      expect(wrongDirectory.stdout).toBe("");
+      // The rotation step sends exactly the \set line and one ALTER ROLE that reads the variable.
+      expect(readme).toContain(ROTATE_STEP);
+      const rotation = ROTATE_STEP
+        .replace("/etc/debateai/hatchet.pgpass", join(scratch, "hatchet.pgpass"))
+        .replace("sudo -u postgres psql -v ON_ERROR_STOP=1", "cat");
+      expect(execFileSync("bash", ["-c", rotation], { cwd: scratch, encoding: "utf8" }))
+        .toBe(`\\set hatchet_password ${generated}\nALTER ROLE debateai_prod_hatchet PASSWORD :'hatchet_password';\n`);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }

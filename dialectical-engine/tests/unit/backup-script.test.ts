@@ -210,6 +210,7 @@ describe("deploy/vps/backup.sh: exactly one off-host destination, checked before
     const result = await backup(staged, { dayOfWeek: SUNDAY });
     expect(result.code).not.toBe(0);
     expect(result.stderr).toMatch(/^BACKUP_REFUSED no off-host destination/mu);
+    expect(result.stderr).not.toContain("BACKUP_FAILED");
     expect(result.stdout).not.toContain("BACKUP_OK");
     await expect(readdir(staged.backup)).rejects.toThrow();
   });
@@ -244,6 +245,7 @@ describe("deploy/vps/backup.sh: BACKUP_OK only after the off-host copy is verifi
     const result = await backup(staged, { dayOfWeek: SUNDAY, mode: "drop" });
     expect(result.code).not.toBe(0);
     expect(result.stderr).toMatch(/^BACKUP_FAILED rclone check/mu);
+    expect(result.stderr.match(/BACKUP_FAILED/gu)).toHaveLength(1);
     expect(result.stdout).not.toContain("BACKUP_OK");
   });
 
@@ -303,6 +305,26 @@ describe("deploy/vps/backup.sh: BACKUP_OK only after the off-host copy is verifi
     const checks = (await remoteLog(staged)).filter((line) => line.startsWith("rclone check"));
     expect(checks).toHaveLength(2);
     expect(checks[1]).toContain("/escrow/");
+  });
+});
+
+describe("deploy/vps/backup.sh: every other failure is reported once", () => {
+  it("a pg_dump that fails ends the run with one BACKUP_FAILED line, no receipt, no copy", async () => {
+    const staged = await stage({ rclone: "offsite:debateai" }, { pg_dump: "#!/bin/sh\nexit 1\n" });
+    const result = await backup(staged, { dayOfWeek: SUNDAY });
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/^BACKUP_FAILED exit=1 line=\d+$/mu);
+    expect(result.stderr.match(/BACKUP_FAILED/gu)).toHaveLength(1);
+    expect(result.stdout).not.toContain("BACKUP_OK");
+    expect(await remoteLog(staged)).toEqual([]);
+  });
+
+  it("a failure inside prune is reported too", async () => {
+    const staged = await stage({ rclone: "offsite:debateai" }, { grep: "#!/bin/sh\nexit 2\n" });
+    const result = await backup(staged, { dayOfWeek: TUESDAY });
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toMatch(/^BACKUP_FAILED exit=\d+/mu);
+    expect(result.stderr.match(/BACKUP_FAILED/gu)).toHaveLength(1);
   });
 });
 
