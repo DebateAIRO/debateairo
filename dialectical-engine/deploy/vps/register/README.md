@@ -47,6 +47,7 @@ read that vendor's data-use and retention terms and named the vendor in the priv
 | `billingPlans` | optional: the paid plans (prices, monthly credit, day and week shares, the finish edge, Free's fixed gauges) as the register row stores them. Left out, the engine's own row is sealed | the register's own parser — `BILLING_PLANS_INVALID` |
 | `billingPolicy` | optional: the billing switch (`enabled`) and its rules. Left out, the engine's own row is sealed: billing OFF | the register's own parser — `BILLING_POLICY_INVALID`; switched on without the budget members, `BILLING_REQUIRES_ENVELOPE_MEMBERS`; switched on in a version without `countryPolicy`, `BILLING_CONFIGURATION_INCOMPLETE` (the publish's boot check) |
 | `taxAuthorities` | optional: where and when each tax is paid, in plain words, for the quarterly tax summary. Left out, the code-owned `taxAuthorities` row is published unchanged; include the member to correct the text. The example carries the member, equal to the code-owned text, so a file copied from it seals that copy under your own `sourceRef`: the code-owned "research of 29 September 2026, for the accountant to confirm" provenance is dropped, and a later correction of the code-owned row never reaches your versions while your file keeps the member. Delete the member from your copy unless you are correcting the text | the register's own parser — `TAX_AUTHORITIES_INVALID` (a `null` member is refused too) |
+| `publicationCheckPolicy` | optional, and NOT in the example: the deadline of the safety check that runs before a debate is published, as `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": 60000}`, in whole milliseconds from 1000 to 60000 (60 seconds is the spec's cap, and the website waits 85 seconds for a publish). Left out, the code-owned `publicationCheckPolicy` row is published unchanged (60000); include the member only to change the deadline. A check that runs out of time refuses the publish, so a shorter deadline can only refuse more publishes, never skip the check | the register's own parser — `PUBLICATION_CHECK_POLICY_INVALID` (a `null` member is refused too) |
 
 Any other member is refused (`HOSTED_REGISTER_FILE_KEY_UNKNOWN`). `providerTargets` is checked and
 **never published**: prices, addresses and credential paths stay in the two `EnvironmentFile`s,
@@ -78,6 +79,8 @@ Your `sourceRef` is sealed in these places, and only there:
 - the `countryPolicy` row's source reference, verbatim, when the file carries the member;
 - the `taxAuthorities` row's source reference, verbatim, when the file carries the member (left
   out, that row keeps the code-owned source reference);
+- the `publicationCheckPolicy` row's source reference, verbatim, when the file carries the member
+  (left out, that row keeps the code-owned source reference);
 - the `configuredProviderSet` row's source reference: your `sourceRef` followed by the fixed V-9
   sentence `+ V-9 ruled 2026-09-22 (V, chat): versioned configuredProviderSet row carrying each
   vendor's V-9(4) vetting record, superseding the sealed row without altering it`. That sentence

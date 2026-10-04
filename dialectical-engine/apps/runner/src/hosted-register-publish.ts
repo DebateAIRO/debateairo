@@ -22,7 +22,9 @@
  *    member the seeder's code-owned `countryPolicy` row is dropped, so that version has
  *    no country gate (A14). Likewise optional, the `taxAuthorities` (paid plans P16a,
  *    checked by the register's own parser); without the member the seeder's code-owned
- *    `taxAuthorities` row is sealed as it is.
+ *    `taxAuthorities` row is sealed as it is. Likewise optional, the `publicationCheckPolicy`
+ *    (the pre-publish check's deadline, owner's ruling 2026-10-04, checked by the register's
+ *    own parser); without the member the seeder's code-owned row is sealed as it is.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -79,6 +81,7 @@ import {
   COUNTRY_POLICY_ROW_KEY,
   MODEL_SCORECARD_MAX_BYTES,
   MODEL_SCORECARD_ROW_KEY,
+  PUBLICATION_CHECK_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   TAX_AUTHORITIES_ROW_KEY,
   admissionPolicyFromValue,
@@ -101,6 +104,7 @@ import {
   parseRegisterVersionText,
   persistBootstrapRegister,
   planCapMicros,
+  publicationCheckPolicyFromValue,
   readAdmissionPolicy,
   readAuthPolicy,
   readBillingPlans,
@@ -114,6 +118,7 @@ import {
   readModelScorecard,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
+  readPublicationCheckPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStoryPolicy,
@@ -170,7 +175,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // rows are sealed (billing OFF); supplied, they supersede them.
   "billingPlans", "billingPolicy",
   // Paid plans P16a: OPTIONAL. Left out, the code-owned taxAuthorities row is sealed as it is.
-  "taxAuthorities"
+  "taxAuthorities",
+  // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
+  "publicationCheckPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -351,6 +358,8 @@ export type HostedRegisterFile = Readonly<{
   billingPolicy: Readonly<{ value: unknown }> | null;
   /** Optional (P16a): the operator's own where-and-when text; absent = the code-owned row. */
   taxAuthorities?: unknown;
+  /** Optional (2026-10-04): the pre-publish check's deadline; absent = the code-owned row. */
+  publicationCheckPolicy?: unknown;
 }>;
 
 /**
@@ -408,7 +417,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     synthesisRoles,
     billingPlans: Object.hasOwn(record, BILLING_PLANS_ROW_KEY) ? Object.freeze({ value: record.billingPlans }) : null,
     billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null,
-    ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {})
+    ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
+    ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {})
   });
 }
 
@@ -722,6 +732,9 @@ export async function planHostedRegisterPublication(
   // Paid plans P16a: the operator's where-and-when text, by the register's own parser
   // (TAX_AUTHORITIES_INVALID). Absent member = the code-owned row, sealed as it is.
   if (file.taxAuthorities !== undefined) taxAuthoritiesFromValue(file.taxAuthorities, file.sourceRef);
+  // hate-speech S02: the operator's deadline, by the register's own parser (PUBLICATION_CHECK_POLICY_INVALID).
+  // Absent member = the code-owned row, sealed as it is.
+  if (file.publicationCheckPolicy !== undefined) publicationCheckPolicyFromValue(file.publicationCheckPolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -794,6 +807,13 @@ export async function planHostedRegisterPublication(
     operatorRows.set(TAX_AUTHORITIES_ROW_KEY, Object.freeze({
       rowKey: TAX_AUTHORITIES_ROW_KEY,
       valueJsonText: canonicalRowValue(file.taxAuthorities),
+      sourceRef: file.sourceRef
+    }));
+  }
+  if (file.publicationCheckPolicy !== undefined) {
+    operatorRows.set(PUBLICATION_CHECK_POLICY_ROW_KEY, Object.freeze({
+      rowKey: PUBLICATION_CHECK_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.publicationCheckPolicy),
       sourceRef: file.sourceRef
     }));
   }
@@ -1117,6 +1137,8 @@ export async function verifyHostedRegisterBootReadiness(
   await readStructuralCeilingPolicyInputs(pool, version);
   await readEnvelopeFormulaInputs(pool, version);
   await readDeploymentRiskTier(pool, version);
+  // hate-speech S02: main.ts's publication-check-policy stage (the pre-publish check's deadline).
+  await readPublicationCheckPolicy(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());
