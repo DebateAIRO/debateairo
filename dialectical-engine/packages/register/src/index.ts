@@ -1096,6 +1096,15 @@ export {
   type TaxAuthorityStatus,
   type TaxDueRule
 } from "./tax-authorities.js";
+// hate-speech S02: the pre-publish check's deadline, a code-owned row a hosted file may supersede (owner, 2026-10-04).
+export {
+  PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+  PUBLICATION_CHECK_POLICY_ROW_KEY,
+  publicationCheckPolicyFromValue,
+  readPublicationCheckPolicy,
+  type PublicationCheckPolicy,
+  type PublicationCheckPolicyValue
+} from "./publication-check-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,
