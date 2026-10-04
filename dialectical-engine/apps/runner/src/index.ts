@@ -191,7 +191,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot } from "./story-snapshot.js";
+import { buildStoryRunSnapshot, storySeatRoleMaker } from "./story-snapshot.js";
 
 // Model scorecard A15/A16: the seat book and the seat caller live in their own module.
 export * from "./run-seats.js";
@@ -8116,6 +8116,23 @@ export class WalkingSkeletonRunner {
               // to the SAME claim-eligible makers, cheapest first by this runner's
               // price map — the answer-writer's own fallback (Task M3).
               costFallback: storyCostFallback(synthesisMakers, servePrices),
+              // Part 4, P4-D (P3-N1; controller C3, 3 October 2026): on a pinned
+              // assignment whose answer job has a SCORECARD seat, the story is
+              // written and checked by this debate's OWN answer writer and checker
+              // — the seat member that answered the served round, main or
+              // runner-up (the seat's main when no round answered) — so a Free
+              // story stays on the Free roster. A FALLBACK seat (null) keeps the
+              // register's ref, already in `synthesisMakers`; legacy runs set none.
+              // The cost fallback above is unchanged: the planned maker first,
+              // then the run's own debaters.
+              roleMakers: seatBook.assigned && (seatBook.answerWriter !== null || seatBook.answerChecker !== null)
+                ? {
+                    storyteller: storySeatRoleMaker(seatBook.answerWriter,
+                      answeredRound === undefined ? undefined : writerPlannedByRound.get(answeredRound.round)),
+                    checker: storySeatRoleMaker(seatBook.answerChecker,
+                      answeredRound === undefined ? undefined : checkerPlannedByRound.get(answeredRound.round))
+                  }
+                : undefined,
               // Each story step re-takes the SAME disclosure lease the debate held
               // (this run and its memory-linked prior run), briefly, on this
               // runner's pool: every store and gateway inside it borrows it, and

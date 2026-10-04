@@ -30,15 +30,19 @@ export type EFacturaCheckItem = Readonly<{
 }>;
 /**
  * What the owner checks in xMoney or at the tax service: a refund xMoney refused (still owed) or one whose outcome is
- * unknown; a refund job the charge records no request for (P2-I5's REFUND_NOT_REQUESTED: nothing was sent, it is no
- * refund to make, and whoever runs the server checks who queued it); a second refund made elsewhere on one payment,
+ * unknown; a refund job the charge records no request for, naming a charge we do not have, or whose payload cannot be
+ * read (P2-I5's REFUND_NOT_REQUESTED, with C-7's REFUND_PAYLOAD_INVALID: nothing was sent, it is no refund to make, and
+ * whoever runs the server checks who queued it); a
+ * refund job of a payment of the other xMoney system (P2-W4's REFUND_OTHER_SYSTEM: nothing was sent, nothing is owed on
+ * this server); a second refund made elsewhere on one payment,
  * which our records cannot hold (P9c's REFUND_UNRECORDED: its amount is in no line of the summary); a withdrawal
  * handed to the owner; a renewal closed with its outcome unknown; a charge with no outcome after 30 days; R2 Q-1's
  * renewals with no charge (a dunning the tax service could not price, a plan such a dunning ended, a renewal a tax
  * refusal blocks); a subscription whose history does not fold (renewals skip it: what was its subscriber charged?).
  */
 export type PaymentCheck =
-  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_UNRECORDED" | "WITHDRAWAL_BY_OWNER"
+  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_OTHER_SYSTEM" | "REFUND_UNRECORDED"
+  | "WITHDRAWAL_BY_OWNER"
   | "RENEWAL_STUCK" | "PAYMENT_UNSETTLED" | "DUNNING_UNPRICED" | "ENDED_UNPRICED" | "RENEWAL_BLOCKED"
   | "SUBSCRIPTION_HISTORY_INVALID";
 export type PaymentToCheckItem = Readonly<{
@@ -53,7 +57,8 @@ export type PaymentToCheckItem = Readonly<{
    * A dead refund's reason (a WITHDRAWAL refund is due within 14 days of the withdrawal), or the code a charge-less
    * attempt names (TAX_SERVICE_UNAVAILABLE: the tax service could not price it; RETRY_TOTAL_CHANGED: P2-M10's retry
    * priced afresh at a total other than the announced one, so nothing was charged); else null. Null for
-   * REFUND_NOT_REQUESTED: its payload's reason is only what the job claimed.
+   * REFUND_NOT_REQUESTED and REFUND_OTHER_SYSTEM: no recorded request was checked, so its payload's reason is only what
+   * the job claimed.
    */
   reason: string | null;
   since: Date;
@@ -68,7 +73,11 @@ export type TaxSummaryLine = Readonly<{
   sales: number;
   /** Refunds subtracted above (their amount is known). */
   refunds: number;
-  /** Dashboard refunds of unknown amount on this line's charges: NOT subtracted, listed in `TaxSummary.unknownRefunds`. */
+  /**
+   * Dashboard refunds of unknown amount on this line's charges: NOT subtracted, listed in `TaxSummary.unknownRefunds`.
+   * Not a payment refunded before its plan started (a REFUNDED_BEFORE_START line, Part 4 final review C-5): no credit
+   * note is owed for it, and its own line is its only instruction.
+   */
   unknownRefunds: number;
   statusCounts: Readonly<Record<TaxStatus, number>>;
 }>;
@@ -82,9 +91,20 @@ export type TaxSummary = Readonly<{
   lines: ReadonlyArray<TaxSummaryLine>;
   conflicting: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; at: Date }>>;
   notRegistered: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; taxRegion: string | null; at: Date }>>;
-  chargebacks: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; amountMicros: number; at: Date }>>;
-  /** Not subtracted from any line: the owner reads each amount in the dashboard and adjusts that country by hand. */
+  /**
+   * `saleRecorded` false (Part 4 final review C-19): the charge holds no SUCCEEDED (a checkout charged back before we
+   * verified it), so no sale was ever counted for it.
+   */
+  chargebacks: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; amountMicros: number; at: Date; saleRecorded: boolean }>>;
+  /**
+   * Not subtracted from any line: the owner reads each amount in the dashboard, records its credit note with
+   * `--amount`, and until then adjusts that country by hand. Never a charge with a REFUNDED_BEFORE_START line (C-5).
+   */
   unknownRefunds: ReadonlyArray<UnknownRefundItem>;
+  /**
+   * `invoiceUnknownItems`' lines, every kind in every quarter, except a REFUNDED_BEFORE_START line, which only the
+   * quarter holding its charge's SALE prints (C-5): the quarter whose figures its words ask to correct.
+   */
   invoiceUnknown: ReadonlyArray<InvoiceUnknownItem>;
   efactura: ReadonlyArray<EFacturaCheckItem>;
   paymentsToCheck: ReadonlyArray<PaymentToCheckItem>;
@@ -176,7 +196,8 @@ export async function paymentsToCheckFrom(
   const lookBack = new Date(now.getTime() - 120 * dayMs);
   const refunds = (await billing.deadRefunds()).map((item): PaymentToCheckItem => {
     const what = deadRefundCheck(item.code);
-    return Object.freeze({ what, ref: item.chargeId, reason: what === "REFUND_NOT_REQUESTED" ? null : item.reason, since: item.since });
+    const claimedOnly = what === "REFUND_NOT_REQUESTED" || what === "REFUND_OTHER_SYSTEM";
+    return Object.freeze({ what, ref: item.chargeId, reason: claimedOnly ? null : item.reason, since: item.since });
   });
   const unrecorded = (await billing.unrecordedRefunds(lookBack)).map((item): PaymentToCheckItem => Object.freeze({
     what: "REFUND_UNRECORDED", ref: item.transactionId, reason: null, since: item.since
@@ -212,14 +233,25 @@ export async function deadEmailsFrom(
 
 /**
  * Which list a dead XMONEY_REFUND job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
- * (P2-I5) moved no money and is no refund to make; every other dead end leaves the money owed.
+ * (P2-I5) and REFUND_CHARGE_MISSING (P2-W4: the job names a charge we do not have) moved no money and are no refund to
+ * make; REFUND_PAYLOAD_INVALID (Part 4 final review C-7) ended before any xMoney call, and only a row written by
+ * something other than `RefundDesk.request` holds an unreadable payload, so it goes with them: its reason is only the
+ * job's claim, and REFUND_NOT_REQUESTED's legend sends the owner to the charge's own refund requests (one never
+ * refunded is still owed, progress.md's P4-B ruling); OTHER_XMONEY_SYSTEM (P2-W4) moved none and is owed nothing on
+ * this server; every other dead end leaves the money owed.
  */
-function deadRefundCheck(code: string | null): "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" {
+function deadRefundCheck(
+  code: string | null
+): "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_OTHER_SYSTEM" {
   switch (code) {
     case "REFUND_OUTCOME_UNKNOWN":
       return "REFUND_OUTCOME_UNKNOWN";
     case "REFUND_NOT_REQUESTED":
+    case "REFUND_CHARGE_MISSING":
+    case "REFUND_PAYLOAD_INVALID":
       return "REFUND_NOT_REQUESTED";
+    case "OTHER_XMONEY_SYSTEM":
+      return "REFUND_OTHER_SYSTEM";
     default:
       return "REFUND_REFUSED";
   }
@@ -240,6 +272,7 @@ function subjectOf(item: PaymentToCheckItem): string {
     case "REFUND_REFUSED":
     case "REFUND_OUTCOME_UNKNOWN":
     case "REFUND_NOT_REQUESTED":
+    case "REFUND_OTHER_SYSTEM":
     case "RENEWAL_STUCK":
     case "PAYMENT_UNSETTLED":
       return `charge ${item.ref}`;
@@ -270,12 +303,27 @@ export function buildTaxSummary(input: Readonly<{
   const notRegistered: Array<TaxSummary["notRegistered"][number]> = [];
   const chargebacks: Array<TaxSummary["chargebacks"][number]> = [];
   const unknownRefunds: UnknownRefundItem[] = [];
+  // Part 4 final review C-5: the charges `invoiceUnknownItems` names REFUNDED_BEFORE_START (P9c's never-verified path:
+  // no invoice was owed, so no credit note is). That one test decides it; this list is read, never re-derived.
+  const refundedBeforeStart = new Set(input.invoiceUnknown
+    .filter((item) => item.jobKind === "REFUNDED_BEFORE_START").map((item) => item.chargeId));
+  const soldThisQuarter = new Set(input.rows.filter((row) => row.type === "SALE").map((row) => row.chargeId));
   let sales = 0;
   let refunds = 0;
   for (const row of input.rows) {
     if (row.type === "CHARGEBACK") {
-      // For the accountant: the sale stays counted where it was made; the bank took the money back.
-      chargebacks.push(Object.freeze({ chargeId: row.chargeId, taxCountry: row.taxCountry, amountMicros: row.amountMicros, at: row.at }));
+      // For the accountant: the sale stays counted where it was made; the bank took the money back. C-19: a charge-back
+      // of a payment we never verified has no sale anywhere, and its line says so.
+      chargebacks.push(Object.freeze({
+        chargeId: row.chargeId, taxCountry: row.taxCountry, amountMicros: row.amountMicros, at: row.at,
+        saleRecorded: row.saleRecorded
+      }));
+      continue;
+    }
+    if (row.type === "REFUND" && !row.amountKnown && refundedBeforeStart.has(row.chargeId)) {
+      // C-5: a payment xMoney refunded before its plan started owes no credit note (A29 (q)); the 'amount unknown'
+      // list asks for one via --amount, which the command refuses for it. Its REFUNDED_BEFORE_START line alone tells
+      // the owner to take the sale and the refund out by hand; this row changes no figure and is listed nowhere else.
       continue;
     }
     const authority = taxAuthorityFor(input.authorities, row.taxCountry, row.taxStatus);
@@ -294,7 +342,8 @@ export function buildTaxSummary(input: Readonly<{
       }
     } else if (!row.amountKnown) {
       // P9c's dashboard refund on the payment itself: `amountMicros` is only an upper bound. Subtracting it would
-      // understate this country's sales and tax; it is listed for the owner instead, and changes no figure.
+      // understate this country's sales and tax; it is listed for the owner instead, and changes no figure. (A charge
+      // refunded before its plan started never reaches here: see the C-5 skip above.)
       unknownRefunds.push(Object.freeze({
         chargeId: row.chargeId, taxCountry: row.taxCountry, taxRegion: row.taxRegion, upToMicros: row.amountMicros, at: row.at
       }));
@@ -323,7 +372,10 @@ export function buildTaxSummary(input: Readonly<{
     quarter: input.quarter, authorities: input.authorities, lines: Object.freeze(lines),
     conflicting: Object.freeze(conflicting), notRegistered: Object.freeze(notRegistered),
     chargebacks: Object.freeze(chargebacks), unknownRefunds: Object.freeze(unknownRefunds),
-    invoiceUnknown: Object.freeze([...input.invoiceUnknown]),
+    // C-5: a REFUNDED_BEFORE_START line belongs to its sale's quarter (quarterSummaryRows dates the SALE when the money
+    // moved, and keeps only one xMoney system's charges); every other line prints in every quarter.
+    invoiceUnknown: Object.freeze(input.invoiceUnknown.filter((item) =>
+      item.jobKind !== "REFUNDED_BEFORE_START" || soldThisQuarter.has(item.chargeId))),
     efactura: Object.freeze([...input.efactura]), paymentsToCheck: Object.freeze([...input.paymentsToCheck]),
     deadEmails: Object.freeze([...input.deadEmails]), sales, refunds
   });
@@ -436,11 +488,15 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     (item) => `charge ${item.chargeId}, ${item.taxCountry}${item.taxRegion === null ? "" : `, ${item.taxRegion}`}, on ${isoDay(item.at)}`);
   section(summary.chargebacks, "Charge-backs this quarter: none.",
     "Charge-backs this quarter (the card holder's bank took the money back; the sale above still counts until the"
-      + " accountant decides):",
-    (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} USD, on ${isoDay(item.at)}`);
+      + " accountant decides, except for a line that says no sale was recorded for it):",
+    (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} USD, on ${isoDay(item.at)}`
+      + (item.saleRecorded ? "" : ": no sale was recorded for it"));
   section(summary.unknownRefunds, "Refunds made in the xMoney dashboard, amount unknown: none.",
-    "Refunds made in the xMoney dashboard, amount unknown (not subtracted above; read the amount in the dashboard and"
-      + " adjust that country's net sales and tax by hand, at most the amount shown):",
+    // P4-K (P2-W12): once the owner records the credit note with its amount, `quarterSummaryRows` subtracts it.
+    "Refunds made in the xMoney dashboard, amount unknown (not subtracted above; read the amount in the dashboard,"
+      + " issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as its line under"
+      + " the invoices and credit notes to check by hand says), and the summary then subtracts it at that amount; until"
+      + " then, adjust that country's net sales and tax by hand, at most the amount shown):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}${item.taxRegion === null ? "" : `, ${item.taxRegion}`},`
       + ` up to ${microsToDecimal(item.upToMicros)} USD, on ${isoDay(item.at)}`);
   // W12 (P2-I16, P2-I17): every dead document job, whatever its code; what to do once per job kind and code (fix I-1).
@@ -451,7 +507,8 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     "Invoices and credit notes to check by hand in SmartBill or Quaderno (a legal document that was never issued, or"
       + " whose issuing was never confirmed; what to do is said once for each job kind and code below the list, where"
       + " <charge> stands for the line's charge; pnpm billing:invoice records a document you issued or found by hand, or"
-      + " re-queues the job; the line stays until the document is recorded):",
+      + " re-queues the job; a document's line stays until the document is recorded, and a payment refunded before its"
+      + " plan started, which owes no document, is listed only in its sale's quarter):",
     (item) => `charge ${item.chargeId}: ${documentKey(item)}, since ${isoDay(item.since)}`),
   documentKey, (item) => documentJobAction({ chargeId: "<charge>", jobKind: item.jobKind, code: item.code }));
   // F4: the job itself is never tried again; only M3 is sent again, by the renewal (deadEmailAction says so for M3).
@@ -477,9 +534,14 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to the"
       + " billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
       + " (one never refunded is still owed);"
+      + " REFUND_OTHER_SYSTEM: a refund job for a payment of the other xMoney system (sandbox or live): nothing was"
+      + " sent, and nothing is owed on this server;"
       + " REFUND_UNRECORDED: a second refund made in the xMoney dashboard on a payment that already had one, which our"
       + " records cannot hold, so it is in no figure above: read its amount on that transaction in the dashboard and"
-      + " take it off that country's net sales and tax by hand;"
+      + " take it off that country's net sales and tax by hand."
+      // Part 4 final review C-6: P4-K's --amount credit note is already subtracted above (quarterSummaryRows).
+      + " A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures"
+      + " above: do not take it off again;"
       + " WITHDRAWAL_BY_OWNER: a withdrawal over a payment a dashboard refund touched, refund in the dashboard what the"
       + " command cannot take back, then settle it with pnpm billing:withdraw --owner <ref> --refund <amount>"
       + " --dashboard <amount refunded in the dashboard>; RENEWAL_STUCK: a renewal closed with its outcome"

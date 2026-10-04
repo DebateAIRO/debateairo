@@ -173,6 +173,17 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     ["the xMoney environment A22 removed", (row: Record<string, unknown>) => { row.xmoney_environment = "stage"; }],
     ["no catch-all invoice rule", (row: Record<string, unknown>) => { row.invoice_issuer_rules = { RO: "SMARTBILL" }; }],
     ["a lower-case rule country", (row: Record<string, unknown>) => { row.invoice_issuer_rules = { ro: "SMARTBILL", "*": "QUADERNO" }; }],
+    // P2-M23 (spec §1.4): exactly RO→SmartBill and everything else→Quaderno. A catch-all SmartBill would issue
+    // e-Facturas placing foreign buyers in Romania; RO→Quaderno would issue Romanian invoices with no e-Factura.
+    ["a catch-all SmartBill rule", (row: Record<string, unknown>) => { row.invoice_issuer_rules = { RO: "SMARTBILL", "*": "SMARTBILL" }; }],
+    ["Romania sent to Quaderno", (row: Record<string, unknown>) => { row.invoice_issuer_rules = { RO: "QUADERNO", "*": "QUADERNO" }; }],
+    ["no Romanian rule", (row: Record<string, unknown>) => { row.invoice_issuer_rules = { "*": "QUADERNO" }; }],
+    ["a second SmartBill country", (row: Record<string, unknown>) => {
+      row.invoice_issuer_rules = { RO: "SMARTBILL", MD: "SMARTBILL", "*": "QUADERNO" };
+    }],
+    ["an extra country spelled out", (row: Record<string, unknown>) => {
+      row.invoice_issuer_rules = { RO: "SMARTBILL", DE: "QUADERNO", "*": "QUADERNO" };
+    }],
     ["retry days that do not rise", (row: Record<string, unknown>) => { row.dunning_retry_days = [1, 7, 3]; }],
     ["four retry days, one more than A2's 1..4 attempts allow", (row: Record<string, unknown>) => { row.dunning_retry_days = [1, 3, 7, 14]; }],
     ["a look-ahead shorter than the renewal notice", (row: Record<string, unknown>) => { row.look_ahead_business_days = 5; }],

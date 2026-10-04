@@ -8,7 +8,7 @@ import {
   creditNoteContext, invoicesOfCharge, loadPaidCharge, otherSystemOutcome, recordedChargeOf, saleRecordOf,
   type InvoiceJobDeps, type PaidCharge, type RecordedCharge
 } from "./invoice-common.js";
-import { DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
+import { claimLost, DONE, failureRetryAt, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
 
 type SmartBillDocument = IssuedDocument;
 
@@ -29,7 +29,7 @@ export type EfacturaStatus = "SENT_BY_ACCOUNT_SETTING" | "ACCEPTED" | "REJECTED"
 type SmartBillDeps = InvoiceJobDeps & Readonly<{
   repository: Pick<BillingRepository, "appendInvoiceStatus">;
   issuer: SmartBillPort;
-  jobs: Pick<BillingJobQueries, "markJobStage" | "jobStage">;
+  jobs: Pick<BillingJobQueries, "markJobStage" | "jobStage" | "holdsClaim">;
   audit: BillingAudit;
 }>;
 
@@ -80,7 +80,8 @@ export async function recordSmartBillDocument(
       template: "M2_INVOICE_ATTACHED", recipient: { kind: "CUSTOMER", customerId: charge.customerId }, dedupeRef: charge.chargeId,
       params: {
         plan: charge.planId, totalAmount: microsToDecimal(charge.chargeTotalMicros), chargeDate: charge.paidAt.toISOString(),
-        invoiceNumber: `${document.series} ${document.number}`
+        // P2-M33: one number in one form, `<series>-<number>`, as Settings, the owner's summary and commands show it.
+        invoiceNumber: `${document.series}-${document.number}`
       },
       ...(input.attachPdf ? {
         attachments: [{ kind: "SMARTBILL_INVOICE_PDF" as const, fields: { series: document.series, number: document.number } }]
@@ -102,31 +103,55 @@ async function record(
  * A17(b): calls `issue` only when no earlier attempt can have created the document: the intent is new, or the
  * previous attempt proved nothing was created (INVOICE_SERVICE_UNAVAILABLE), or the owner confirmed it when
  * re-queueing the job (W12's INVOICE_CONFIRMED_NOT_ISSUED), or SmartBill's own lookup says so.
+ * C-14: a new intent and its CALL_STARTED stage are one write, made under the job's claim, and the holder that made it
+ * calls `issue` next with no further check. A holder that goes stale after that write (its lease ran out while it was
+ * slow) still calls SmartBill, so the next holder, which finds the intent with CALL_STARTED and (with no lookup)
+ * dead-letters INVOICE_UNKNOWN, reports a true unknown: the document may well exist (A17b), and the owner checks.
  */
 async function issueOnce(
   deps: SmartBillDeps, job: Parameters<OutboxHandler>[0], now: Date, paid: PaidCharge, kind: "INVOICE" | "CREDIT_NOTE",
   totalMicros: number, issue: () => Promise<SmartBillDocument>
 ): Promise<OutboxOutcome> {
-  const intent = await deps.repository.withTransaction((client) => deps.repository.insertInvoiceIntent(client, {
-    chargeId: paid.charge.chargeId, kind, issuer: "SMARTBILL", requestedAt: now
-  }));
-  if (intent === "DUPLICATE" && !provenNothingIssued(await deps.jobs.jobStage(job.jobId))) {
-    if (deps.issuer.lookup === undefined) return unknownOutcome(deps, kind);
-    let found: SmartBillDocument | null;
-    try {
-      found = await deps.issuer.lookup({ chargeId: paid.charge.chargeId, kind });
-    } catch {
-      // A failed lookup proves nothing either way: it must never leave INVOICE_SERVICE_UNAVAILABLE as the stage
-      // (which would let the next attempt call `issue` blindly). The next attempt looks up again; a spent schedule
-      // ends DEAD INVOICE_UNKNOWN for the owner.
-      return retry("INVOICE_UNKNOWN", job.attempts, now);
+  // C-14: the intent is written only while the job row is still this claim's, in one transaction, and a new intent's
+  // CALL_STARTED stage is written in that same transaction, under the row lock `holdsClaim` took. A stale holder's
+  // intent would read as "an earlier attempt may have issued it" to the current holder, which (with no lookup) would
+  // dead-letter INVOICE_UNKNOWN for an invoice nobody issued; and an intent committed without its stage would let a
+  // holder that stalls before the stage write lose the claim there, after the next holder had already read the intent
+  // as an unknown. Now a holder that goes stale after this commit still calls SmartBill next, so the next holder's
+  // INVOICE_UNKNOWN is a true unknown (A17b); a holder that goes stale before it writes nothing.
+  const intent = await deps.repository.withTransaction(async (client) => {
+    if (!await deps.jobs.holdsClaim(client, job)) return "CLAIM_LOST" as const;
+    const inserted = await deps.repository.insertInvoiceIntent(client, {
+      chargeId: paid.charge.chargeId, kind, issuer: "SMARTBILL", requestedAt: now
+    });
+    if (inserted === "INSERTED" && !await deps.jobs.markJobStage(job, CALL_STARTED, client)) {
+      // `holdsClaim` locked this very row a moment ago, so the fenced write cannot miss it; if it ever does, the
+      // transaction rolls back: there is never an intent without its stage.
+      throw new TypedDomainError("INVOICE_STAGE_NOT_WRITTEN", "The invoice intent's call stage matched no job row");
     }
-    if (found !== null) {
-      await record(deps, paid, kind, found, totalMicros, now);
-      return DONE;
+    return inserted;
+  });
+  if (intent === "CLAIM_LOST") return claimLost(now);
+  if (intent === "DUPLICATE") {
+    if (!provenNothingIssued(await deps.jobs.jobStage(job.jobId))) {
+      if (deps.issuer.lookup === undefined) return unknownOutcome(deps, kind);
+      let found: SmartBillDocument | null;
+      try {
+        found = await deps.issuer.lookup({ chargeId: paid.charge.chargeId, kind });
+      } catch {
+        // A failed lookup proves nothing either way: it must never leave INVOICE_SERVICE_UNAVAILABLE as the stage
+        // (which would let the next attempt call `issue` blindly). The next attempt looks up again; a spent schedule
+        // ends DEAD INVOICE_UNKNOWN for the owner.
+        return retry("INVOICE_UNKNOWN", job.attempts, now);
+      }
+      if (found !== null) {
+        await record(deps, paid, kind, found, totalMicros, now);
+        return DONE;
+      }
     }
+    // P2-M6: only the job's current claim holder records the stage; a stale holder stops before SmartBill is called.
+    if (!await deps.jobs.markJobStage(job, CALL_STARTED)) return claimLost(now);
   }
-  await deps.jobs.markJobStage(job.jobId, CALL_STARTED);
   let document: SmartBillDocument;
   try {
     document = await issue();

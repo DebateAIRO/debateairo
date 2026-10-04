@@ -730,4 +730,29 @@ describe("P11a monthly renewal", () => {
     expect((await subscriptionKinds(paid.subscriptionId)).slice(-2)).toEqual(["DOWNGRADED", "RENEWED"]);
     expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "PLUS", cause: "DOWNGRADED" });
   });
+
+  it("renews a revived checkout with its own buyer's VAT id, never a later checkout's company (A8c, P2-M30)", async () => {
+    h.geo.country = "DE";
+    try {
+      const ownerRef = randomUUID();
+      // The older checkout bought as a person in Germany; the newer one, under other details, as a company with a
+      // validated VAT id, and it wrote the latest billing profile. The older one is then paid late and revived.
+      const older = await h.buy({ ownerRef, planId: "PLUS", country: "DE" });
+      await h.buy({ ownerRef, planId: "PRO", country: "DE", company: { name: "Later GmbH", vatId: "DE123VALID", address: "Teststr. 1, 10115 Berlin" } });
+      const olderPaid = h.xmoney.pay({ externalOrderId: older.chargeId, amountDecimal: older.totalDecimal, cardCountry: "DE" });
+      await h.settle(olderPaid.transactionId);
+      expect((await h.repository.subscriptionEvents(older.subscriptionId)).at(-1))
+        .toMatchObject({ kind: "ACTIVATED", data: { reactivated: true } });
+      h.clock.now = new Date((await h.periodEndOf(older.subscriptionId)).getTime() + MINUTE);
+      await h.renewal.runOnce();
+      // Priced as the person it was bought by: German VAT, the same total, so no notice and one rebill.
+      expect(rebills({ transaction: olderPaid })).toBe(1);
+      const [charge] = await renewalCharges(older.subscriptionId);
+      expect(charge).toMatchObject({ totalMicros: 23_800_000 });
+      expect(await h.repository.quote(charge!.quoteId!, ownerRef))
+        .toMatchObject({ taxStatus: "TAXABLE", taxCountry: "DE", taxRateBasisPoints: 1_900 });
+    } finally {
+      h.geo.country = "RO";
+    }
+  });
 });

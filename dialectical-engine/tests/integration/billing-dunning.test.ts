@@ -397,4 +397,39 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     expect((await renewals(pastDue.subscriptionId)).map((charge) => charge.attempt)).toEqual([1, 2]);
     expect(h.xmoney.rebillsFor(orderId)).toBe(rebillsAfterFailure + 1);
   });
+
+  it("ends a dunning the owner's shorter retry days left with no retry day: ENDED(DUNNING), Free and M6 (P2-M13)", async () => {
+    // The owner publishes a billing policy whose dunning has one retry day where the plan was dunned under three.
+    const shorter = new BillingMaintenance({
+      repository: h.repository, jobs: h.jobs, entitlements: h.entitlements, renewal: h.renewal,
+      policy: { ...testBillingPolicy, dunningRetryDays: [1] },
+      publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "stage", audit: h.audit, clock: h.clock.read
+    });
+    // Two attempts failed under +1/+3/+7: the plan waits for its +3 retry, which the new policy no longer has.
+    const { paid, failedAt } = await firstFailure();
+    const orderId = paid.transaction.orderId;
+    h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
+    h.xmoney.failNextRebill(orderId, "XMONEY_PAYMENT_FAILED");
+    await h.maintenance.runOnce();
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 2 } });
+    const rebills = h.xmoney.rebillsFor(orderId);
+    await shorter.runOnce();
+    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "ENDED", data: { cause: "DUNNING" } });
+    expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).status).toBe("ENDED");
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "FREE", cause: "ENDED_DUNNING", paidThrough: null });
+    expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`M6:${paid.subscriptionId}`);
+    // Nothing is charged for it, and the next pass writes nothing more.
+    expect(await renewals(paid.subscriptionId)).toHaveLength(2);
+    expect(h.xmoney.rebillsFor(orderId)).toBe(rebills);
+    const written = (await h.repository.subscriptionEvents(paid.subscriptionId)).length;
+    await shorter.runOnce();
+    expect(await h.repository.subscriptionEvents(paid.subscriptionId)).toHaveLength(written);
+
+    // The control: a plan with its one failed attempt still has the +1 retry day under that policy, and is retried.
+    const retried = await firstFailure();
+    h.clock.now = new Date(retried.failedAt.getTime() + DAY + MINUTE);
+    await shorter.runOnce();
+    expect((await renewals(retried.paid.subscriptionId)).map((charge) => charge.attempt)).toEqual([1, 2]);
+    expect((await h.repository.subscriptionEvents(retried.paid.subscriptionId)).some((event) => event.kind === "ENDED")).toBe(false);
+  });
 });

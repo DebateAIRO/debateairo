@@ -24,7 +24,8 @@ describe("the setup step B8 adds, beside B6b's and B7b's (budget spec §2.9)", (
     expect(row).toBeDefined();
     // The pages show a plain sentence, never the code (apps/ui/lib/v3/runFailure.ts), so the row says
     // what the asker sees instead of the old "shown the same way" ("Debate generation failed: …").
-    expect(row).toContain("`RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees \"Something went wrong on our side before this debate began…\"");
+    // Part 4 (part4-scope.md §4.1): PLAN_CHANGED has its own sentence, so the row says so.
+    expect(row).toContain("`RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees \"Something went wrong on our side before this debate began…\", or for `PLAN_CHANGED` \"Your paid plan ended or was paused while this question waited…\"");
     expect(row).toContain("`COST_RECORD` means a paid question that did not fit its owner's remaining allowance");
   });
 });

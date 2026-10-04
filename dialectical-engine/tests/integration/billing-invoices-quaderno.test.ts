@@ -61,6 +61,32 @@ describe("P10a Quaderno invoices", () => {
     expect(await invoices(paid.chargeId)).toHaveLength(1);
   });
 
+  it("records a US sale under the state Quaderno priced from the ZIP code, never the state the buyer typed (C-8)", async () => {
+    // Part 4 final review C-8: ZIP 75001 is Texas, where the fakes charge sales tax; the buyer typed "NY". The quote
+    // took Texas's rate (its taxRegion TX), so Quaderno's sale record carries TX as the customer's region (and each tax
+    // line's, which recordSale reads from it), as O1 groups it.
+    h.geo.country = "US";
+    const texas = await h.activate({ country: "US", cardCountry: "US", postalCode: "75001", region: "NY" });
+    await h.worker.drain(5);
+    expect((await h.repository.quote(texas.quoteId, texas.ownerRef))).toMatchObject({ taxCountry: "US", taxRegion: "TX", taxStatus: "TAXABLE" });
+    const [sale] = h.tax.sales.filter((recorded) => recorded.chargeId === texas.chargeId);
+    expect(sale?.customer).toMatchObject({ country: "US", region: "TX", postalCode: "75001" });
+    expect(sale?.lines).toEqual([expect.objectContaining({ taxRateBasisPoints: 625 })]);
+    // Where Quaderno named no region (New York's ZIP, where the fakes are not registered), none is sent: never the
+    // typed text.
+    const newYork = await h.activate({ country: "US", cardCountry: "US", postalCode: "10001", region: "Texas" });
+    await h.worker.drain(5);
+    expect(h.tax.sales.find((recorded) => recorded.chargeId === newYork.chargeId)?.customer).toMatchObject({ country: "US", region: null });
+    // Outside the US and Canada the typed region stays (a Romanian county SmartBill needs, R-15; the EU's VAT has none).
+    const germany = await activateInGermany();
+    expect(h.tax.sales.find((recorded) => recorded.chargeId === germany.chargeId)?.customer).toMatchObject({ region: "Bucuresti" });
+    // Canada follows the same rule (Part 4's re-review M-7): the region Quaderno priced, never the typed one. The
+    // fakes price no Canadian region, so the Texas charge stands in with a Canadian buyer and quote.
+    const loaded = (await loadPaidCharge({ repository: h.repository, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY }, texas.chargeId))!;
+    const canadian = { ...loaded, location: { ...loaded.location, country: "CA", region: "Quebec" }, quote: { ...loaded.quote, taxRegion: "ON" } };
+    expect(saleRecordOf(canadian, {}, "saas").customer).toMatchObject({ country: "CA", region: "ON" });
+  });
+
   it("dead-letters a sale Quaderno refuses", async () => {
     h.geo.country = "DE";
     const bought = await h.buy({ country: "DE" });

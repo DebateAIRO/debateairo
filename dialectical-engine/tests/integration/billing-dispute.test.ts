@@ -5,12 +5,14 @@ import { foldSubscription } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testBillingPolicy } from "../support/billingFixtures.js";
 import {
-  recordingAudit, seedActiveSubscription, seedPaidUpgrade, TEST_PUBLIC_APP_URL
+  recordingAudit, seedActiveSubscription, seedPaidUpgrade, subscriptionDeps, TEST_PUBLIC_APP_URL
 } from "../support/billingSubscriptionFixtures.js";
+import { startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
 import { recordDisputeOutcome, type DisputeStores } from "../../apps/api/src/billing/dispute-cli.js";
 import { BillingMaintenance, type MaintenanceDeps } from "../../apps/api/src/billing/maintenance.js";
 import { openBillingOperatorPool } from "../../apps/api/src/billing/operator-connection.js";
 import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
+import { cancelForOwner, revokeCancelForOwner } from "../../apps/api/src/billing/subscription-actions.js";
 
 let database: TestDatabase;
 /** The command's own pool, opened the way `pnpm billing:dispute` opens it (two connections, bounded waits). */
@@ -276,4 +278,85 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     await expect(recordDisputeOutcome(stores(), { chargeRef: "f".repeat(32), outcome: "won" }))
       .rejects.toThrow("BILLING_DISPUTE_CHARGE_NOT_FOUND");
   });
+});
+
+/**
+ * P2-W10, the owner's ruling of 3 October 2026: a plan paused by a card dispute can be cancelled by its person, with no
+ * further renewal; if the dispute is won, the plan ends at its period end instead of renewing. Through the whole fake
+ * stack: the payment's charge-back reaches VERIFY_PAYMENT (SUSPENDED + Free), the person cancels in Settings, the owner
+ * records the outcome, and P11a's renewal tick and P11b's maintenance pass run at the period end.
+ */
+describe("P2-W10 a plan cancelled while a card dispute pauses it, on the fake stack", () => {
+  let h: BillingHarness;
+  beforeAll(async () => { h = await startBillingHarness(); }, 120_000);
+  afterAll(async () => { await h?.stop(); });
+
+  const MINUTE = 60_000;
+  const harnessStores = (): DisputeStores => Object.freeze({
+    billing: h.repository, jobs: h.jobs, entitlements: h.entitlements, clock: () => h.clock.now
+  });
+  const settingsDeps = () => subscriptionDeps(h.database.pool, { recordsKey: h.recordsKey, tax: h.tax, clock: h.clock.read });
+  const folded = async (subscriptionId: string) => foldSubscription(await h.repository.subscriptionEvents(subscriptionId));
+  const renewalCharges = async (subscriptionId: string) => (await h.repository.chargesForSubscription(subscriptionId))
+    .filter((charge) => charge.kind === "RENEWAL");
+
+  /** A paid plan whose payment the bank took back: SUSPENDED, paid features paused. */
+  async function pausedByDispute() {
+    const paid = await h.activate();
+    h.xmoney.setStatus(paid.transaction.transactionId, "charge-back");
+    await h.settle(paid.transaction.transactionId);
+    expect(await folded(paid.subscriptionId)).toMatchObject({ status: "SUSPENDED", cancelRequested: false });
+    return paid;
+  }
+
+  /** One minute past the paid period's end: the renewal tick, then the period-end sweep. */
+  async function pastPeriodEnd(subscriptionId: string): Promise<void> {
+    h.clock.now = new Date((await h.periodEndOf(subscriptionId)).getTime() + MINUTE);
+    await h.renewal.runOnce();
+    await h.maintenance.runOnce();
+  }
+
+  it("won: the plan resumes with the cancel still pending, then ends at its period end and is never renewed", async () => {
+    const paid = await pausedByDispute();
+    await cancelForOwner(settingsDeps(), paid.ownerRef);
+    expect(await folded(paid.subscriptionId)).toMatchObject({ status: "SUSPENDED", cancelRequested: true });
+    expect(await recordDisputeOutcome(harnessStores(), { chargeRef: paid.chargeId, outcome: "won" })).toBe("RESUMED");
+    // RESUMED keeps the cancel: the paid features come back until the period end, and no renewal follows.
+    expect(await folded(paid.subscriptionId)).toMatchObject({ status: "ACTIVE", cancelRequested: true });
+    expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "PLUS", cause: "RESUMED" });
+    await pastPeriodEnd(paid.subscriptionId);
+    expect(await folded(paid.subscriptionId)).toMatchObject({ status: "ENDED", endedCause: "CANCEL" });
+    expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "FREE", cause: "ENDED_CANCEL" });
+    h.clock.advance(10 * MINUTE);
+    await h.renewal.runOnce();
+    expect(await renewalCharges(paid.subscriptionId)).toEqual([]);
+    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(0);
+  }, 30_000);
+
+  it("lost: a plan cancelled while paused ends as a dispute", async () => {
+    const paid = await pausedByDispute();
+    await cancelForOwner(settingsDeps(), paid.ownerRef);
+    expect(await recordDisputeOutcome(harnessStores(), { chargeRef: paid.chargeId, outcome: "lost" })).toBe("ENDED_DISPUTE");
+    expect(await folded(paid.subscriptionId)).toMatchObject({ status: "ENDED", endedCause: "DISPUTE" });
+    expect(await renewalCharges(paid.subscriptionId)).toEqual([]);
+  }, 30_000);
+
+  it("the undo stays refused while paused, and works again once a won dispute resumes the plan (C5)", async () => {
+    const paid = await pausedByDispute();
+    await cancelForOwner(settingsDeps(), paid.ownerRef);
+    await expect(revokeCancelForOwner(settingsDeps(), paid.ownerRef)).rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+    expect(await folded(paid.subscriptionId)).toMatchObject({ status: "SUSPENDED", cancelRequested: true });
+    expect(await recordDisputeOutcome(harnessStores(), { chargeRef: paid.chargeId, outcome: "won" })).toBe("RESUMED");
+    await revokeCancelForOwner(settingsDeps(), paid.ownerRef);
+    expect(await folded(paid.subscriptionId)).toMatchObject({ status: "ACTIVE", cancelRequested: false });
+  }, 30_000);
+
+  it("control: a won dispute without a cancel still renews at the period end", async () => {
+    const paid = await pausedByDispute();
+    expect(await recordDisputeOutcome(harnessStores(), { chargeRef: paid.chargeId, outcome: "won" })).toBe("RESUMED");
+    await pastPeriodEnd(paid.subscriptionId);
+    expect(await renewalCharges(paid.subscriptionId)).toHaveLength(1);
+    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(1);
+    expect((await folded(paid.subscriptionId)).status).not.toBe("ENDED");
+  }, 30_000);
 });

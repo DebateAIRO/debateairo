@@ -34,9 +34,17 @@ export type CancelOutcome = "REQUESTED" | "ALREADY_REQUESTED" | "NOT_CANCELLABLE
  *   takes the settlement's not-live branch instead (a full SUBSCRIPTION_ENDED refund, no RENEWED); every one of those
  *   writers takes this same owner lock, so none interleaves. The cost: a cancel inside the lead ends the paid access
  *   up to `renewalLeadMs()` before the period end.
+ * - SUSPENDED (P2-W10, the owner's ruling of 3 October 2026: a plan paused by a card dispute can be cancelled by its
+ *   person): only the cancel is written, nothing ends now. The suspension already wrote Free, and the dispute decides
+ *   the end: lost is ENDED(DISPUTE); won is RESUMED, which keeps the flag, so P11b's sweep ends the plan ENDED(CANCEL)
+ *   at its period end and no renewal starts (P11a's `renewable`); a period already over is P11b's ENDED(DISPUTE).
  * M7's `canUndo` (D7's flag) is "true" only while the access runs on into the future, which is exactly when the revoke
- * route accepts an undo. Its dedupe ref is the subscription and the access end, so cancel, revoke, cancel again in one
- * period queues one M7. A25 and R2 Q-4: M7 links to a page (Settings, the one place that undoes it), never to a token.
+ * route accepts an undo. A SUSPENDED plan's M7 takes the paused variant instead (`paused` "true", `canUndo` "false"):
+ * its features are paused, so there is no "you keep it until", and the revoke route refuses it while paused (C5: once
+ * a won dispute resumes the plan, the undo works as for every cancel); its access end is the period end, the latest
+ * the features can come back. Its dedupe ref is the subscription and the access end, so cancel, revoke, cancel again
+ * in one period queues one M7. A25 and R2 Q-4: M7 links to a page (Settings, the one place that undoes it), never to a
+ * token.
  */
 export async function requestCancelLocked(
   deps: Readonly<{
@@ -50,7 +58,8 @@ export async function requestCancelLocked(
   if (written.outcome !== "REQUESTED") return written.outcome;
   const { state } = locked;
   const { accessEndsAt } = written;
-  const canUndo = accessEndsAt.getTime() > now.getTime();
+  const paused = state.status === "SUSPENDED";
+  const canUndo = !paused && accessEndsAt.getTime() > now.getTime();
   const customer = await deps.billing.customerByOwner(state.ownerRef, undefined, client);
   if (customer !== null) {
     await enqueueEmail(deps.billing, client, {
@@ -61,7 +70,9 @@ export async function requestCancelLocked(
         plan: state.planId,
         accessEndDate: accessEndsAt.toISOString().slice(0, 10),
         settingsUrl: new URL("/settings", deps.publicAppUrl).toString(),
-        canUndo: canUndo ? "true" : "false"
+        canUndo: canUndo ? "true" : "false",
+        // Only a paused plan carries the flag: every other M7 keeps its params exactly as before P2-W10.
+        ...(paused ? { paused: "true" } : {})
       },
       notBefore: now
     });
@@ -73,9 +84,10 @@ export async function requestCancelLocked(
  * `requestCancelLocked`'s records without its email: CANCEL_REQUESTED, and the immediate end (ENDED(CANCEL) with a
  * FREE entitlement effective now) when the plan is PAST_DUE or its renewal has been reached. W7 (P2-I10): P15's hook
  * writes an account deletion's renewal stop through it (`ACCOUNT_ERASURE`), with no M7, since the deletion screen
- * already said what happens to the plan; for that source alone a SUSPENDED plan is stopped too (no end: the dispute
- * decides it), so a plan resumed after the deletion was cancelled is not renewed either. `accessEndsAt`: the end of
- * the paid access the cancel leaves.
+ * already said what happens to the plan. A SUSPENDED plan is stopped from every source (W7 for an erasure, P2-W10 for
+ * the person's own cancel in Settings or through the emailed link), with no end: the dispute decides it, so a plan
+ * resumed after it was cancelled is not renewed. `accessEndsAt`: the end of the paid access the cancel leaves (for a
+ * SUSPENDED plan, the period end: the latest its paused features can come back).
  */
 export async function writeCancelLocked(
   deps: Readonly<{
@@ -85,8 +97,9 @@ export async function writeCancelLocked(
   client: PoolClient, locked: LockedSubscription, now: Date, source: CancelSource
 ): Promise<Readonly<{ outcome: "REQUESTED"; accessEndsAt: Date }> | Readonly<{ outcome: Exclude<CancelOutcome, "REQUESTED"> }>> {
   const { state } = locked;
-  const suspendedStop = source === "ACCOUNT_ERASURE" && state.status === "SUSPENDED";
-  if (state.status !== "ACTIVE" && state.status !== "PAST_DUE" && !suspendedStop) return { outcome: "NOT_CANCELLABLE" };
+  if (state.status !== "ACTIVE" && state.status !== "PAST_DUE" && state.status !== "SUSPENDED") {
+    return { outcome: "NOT_CANCELLABLE" };
+  }
   if (state.cancelRequested) return { outcome: "ALREADY_REQUESTED" };
   const periodEnd = state.currentPeriodEnd;
   // Read on the lock's own connection (P12b's one-connection rule): a RENEWAL charge whose period starts at this

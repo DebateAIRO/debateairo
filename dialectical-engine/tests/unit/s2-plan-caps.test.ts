@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { DEBATE_ROLES, type ModelStrength } from "@debateai/kernel";
 import { SCORECARD_PLAN_CAPS_INVALID, planCapsFollowPaidSiteRule, type PickerSettings } from "@debateai/scorecard";
 import { askModelPickerSettings } from "@debateai/api";
+import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import { testCandidate, testEntry, testScorecard } from "../support/scorecardFixtures.js";
 
 type Caps = Readonly<{ free?: ModelStrength; premium?: ModelStrength }>;
@@ -17,14 +18,19 @@ type Caps = Readonly<{ free?: ModelStrength; premium?: ModelStrength }>;
 const FREE_CAPS_FOLLOWING_THE_RULE = Object.fromEntries(DEBATE_ROLES.map((role) => [role, { moneyMicrosPerCall: 50 }])) as
   NonNullable<PickerSettings["freeCap"]>;
 
+// Paid plans P4-E: the one candidate is a Free-plan model, declared and scored for both answer jobs,
+// so with billing on a Free ask can seat them and only the plan caps decide here.
+const FREE_MODEL = PLAN_TIER_ROSTERS.free[0]!;
 const scorecardWith = (planStrengthCaps: Caps) => testScorecard(
-  [testCandidate("only", "OpenAI")], { JUDGE: [testEntry("only", 90, 1)] }, { planStrengthCaps, freeCap: FREE_CAPS_FOLLOWING_THE_RULE }
+  [testCandidate("only", "OpenAI", { modelId: FREE_MODEL })],
+  { JUDGE: [testEntry("only", 90, 1)], ANSWER_WRITER: [testEntry("only", 90, 1)], ANSWER_CHECKER: [testEntry("only", 90, 1)] },
+  { planStrengthCaps, freeCap: FREE_CAPS_FOLLOWING_THE_RULE }
 );
 
 const settingsFor = (caps: Caps, deploymentMode: "hosted" | "local", billingEnabled: boolean) => () => askModelPickerSettings({
   scorecard: Object.freeze({ state: "VALID" as const, scorecard: scorecardWith(caps), sourceRef: "test:s2-caps" }),
   deploymentMode,
-  targets: [],
+  targets: [{ providerRef: "provider:only", maker: "OpenAI", baseUrl: "https://api.only-vendor-fixture.com/v1", model: FREE_MODEL }],
   perRunCeilingMicros: deploymentMode === "hosted" ? 250_000 : null,
   callTokenCeilings: { judge: 2048, synthesizer: 2048, evaluator: 2048 },
   billingEnabled

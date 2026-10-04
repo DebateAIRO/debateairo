@@ -4,6 +4,7 @@
  *
  *   pnpm billing:invoice --charge <ref> --kind INVOICE|CREDIT_NOTE --record <series>-<number> | <Quaderno id>
  *   pnpm billing:invoice --charge <ref> --kind INVOICE|CREDIT_NOTE --requeue [--confirm-not-issued]
+ *   pnpm billing:invoice --charge <ref> --kind CREDIT_NOTE --record <series>-<number> | <Quaderno id> --amount <12.10>
  *
  * `--record` stores a document the owner issued or found by hand, through the handlers' own record path (P10b's
  * `record()` for SmartBill: the row, its SENT_BY_ACCOUNT_SETTING status and, for an invoice, M2 naming the invoice
@@ -16,6 +17,14 @@
  * not back (CREDIT_NOTE_REFUND_MISSING and the other `unbackedDocumentCode`s, the W4 judge's forward) is refused,
  * so nothing is issued for a refund that never happened.
  *
+ * `--amount` (P4-K, P2-W12; the owner's ruling of 3 October 2026, option (b)) records the credit note the owner
+ * issued by hand for a refund made in the xMoney dashboard that xMoney reported on the payment itself (P9c's
+ * PROVIDER_REFUND REFUNDED with no refund transaction, the owner summary's DASHBOARD_REFUND line, which has no job):
+ * at the owner's amount, at most what the payment held (that REFUNDED row's amount, P9c's upper bound), from the
+ * issuer of the charge's own invoice. The line then clears by `invoiceUnknownItems`' own NOT EXISTS, and
+ * `quarterSummaryRows` subtracts the refund at the credit note's amount. One credit note per charge stays (0086's
+ * `invoice_one_per_intent`): a charge that has one already is refused, and that refund goes to the accountant.
+ *
  * On the host it runs under `systemd-run` with the API's EnvironmentFile and writes as the API's own principal
  * (P14b's operator pool, read-write, one connection); it never calls Quaderno or SmartBill. It prints one plain
  * line; a refusal is ONE code on stderr (`BILLING_INVOICE_USAGE` exits 2 before any connection is opened, the others
@@ -23,8 +32,10 @@
  */
 import { pathToFileURL } from "node:url";
 import {
-  BillingJobQueries, BillingRepository, type ChargeEventRow, type ChargeRow, type CustomerXMoneyEnvironment, type OutboxJob
+  BillingJobQueries, BillingRepository, type ChargeEventRow, type ChargeRow, type CustomerXMoneyEnvironment, type InvoiceRow,
+  type OutboxJob
 } from "@debateai/db";
+import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { xmoneyEnvironmentOf } from "@debateai/payments-xmoney";
 import { loadBillingInvoiceEnvironment } from "@debateai/register";
@@ -35,7 +46,8 @@ import { INVOICE_CONFIRMED_NOT_ISSUED, parseSmartBillReference, recordSmartBillD
 import { openBillingOperatorPool } from "./operator-connection.js";
 
 export type InvoiceArguments =
-  | Readonly<{ chargeId: string; kind: "INVOICE" | "CREDIT_NOTE"; mode: "RECORD"; reference: string }>
+  /** `amountMicros` (P4-K): only with `--kind CREDIT_NOTE`, for a DASHBOARD_REFUND line; absent otherwise. */
+  | Readonly<{ chargeId: string; kind: "INVOICE" | "CREDIT_NOTE"; mode: "RECORD"; reference: string; amountMicros?: number }>
   | Readonly<{ chargeId: string; kind: "INVOICE" | "CREDIT_NOTE"; mode: "REQUEUE"; confirmNotIssued: boolean }>;
 export type InvoiceResult =
   | Readonly<{
@@ -63,6 +75,8 @@ export type InvoiceCommandDeps = Readonly<{
 const CHARGE_REF = /^[A-Za-z0-9]{1,64}$/u;
 const QUADERNO_ID = /^[A-Za-z0-9_-]{1,64}$/u;
 const PRINTABLE_CODE = /^[A-Z][A-Z0-9_]{2,95}$/u;
+/** Dollars and cents, as `pnpm billing:withdraw` takes an amount (the charges are in USD). */
+const AMOUNT = /^(0|[1-9][0-9]*)\.[0-9]{2}$/u;
 const refuse = (code: string, message: string): never => { throw new TypedDomainError(code, message); };
 
 /** Exactly the grammar above, the flags in any order, each once. */
@@ -73,7 +87,7 @@ export function parseInvoiceArguments(args: readonly string[]): InvoiceArguments
     if (values.has(name)) throw new TypeError("BILLING_INVOICE_USAGE");
     if (name === "--requeue" || name === "--confirm-not-issued") {
       values.set(name, true);
-    } else if (name === "--charge" || name === "--kind" || name === "--record") {
+    } else if (name === "--charge" || name === "--kind" || name === "--record" || name === "--amount") {
       const value = args[index + 1];
       if (value === undefined || value.startsWith("--")) throw new TypeError("BILLING_INVOICE_USAGE");
       values.set(name, value);
@@ -87,14 +101,21 @@ export function parseInvoiceArguments(args: readonly string[]): InvoiceArguments
   const record = values.get("--record");
   const requeue = values.get("--requeue") === true;
   const confirmNotIssued = values.get("--confirm-not-issued") === true;
+  const amount = values.get("--amount");
   if (typeof chargeId !== "string" || !CHARGE_REF.test(chargeId) || (kind !== "INVOICE" && kind !== "CREDIT_NOTE")) {
     throw new TypeError("BILLING_INVOICE_USAGE");
   }
   if (typeof record === "string" && !requeue && !confirmNotIssued) {
     if (parseSmartBillReference(record) === null && !QUADERNO_ID.test(record)) throw new TypeError("BILLING_INVOICE_USAGE");
-    return Object.freeze({ chargeId, kind, mode: "RECORD" as const, reference: record });
+    if (amount === undefined) return Object.freeze({ chargeId, kind, mode: "RECORD" as const, reference: record });
+    // P4-K: an amount names a dashboard refund's credit note, in whole cents above zero.
+    const amountMicros = typeof amount === "string" && AMOUNT.test(amount) ? decimalToMicros(amount) : 0;
+    if (kind !== "CREDIT_NOTE" || amountMicros <= 0) throw new TypeError("BILLING_INVOICE_USAGE");
+    return Object.freeze({ chargeId, kind, mode: "RECORD" as const, reference: record, amountMicros });
   }
-  if (record === undefined && requeue) return Object.freeze({ chargeId, kind, mode: "REQUEUE" as const, confirmNotIssued });
+  if (record === undefined && amount === undefined && requeue) {
+    return Object.freeze({ chargeId, kind, mode: "REQUEUE" as const, confirmNotIssued });
+  }
   throw new TypeError("BILLING_INVOICE_USAGE");
 }
 
@@ -115,13 +136,20 @@ export async function runInvoiceCommand(deps: InvoiceCommandDeps, input: Invoice
   }
   const jobs = await deps.jobs.documentJobsOfCharge(charge.chargeId, input.kind);
   if (jobs.open) return refuse("BILLING_INVOICE_JOB_OPEN", "a job for this document is still queued");
+  const original = issued.find((invoice) => invoice.kind === "INVOICE");
+  if (input.mode === "RECORD" && input.amountMicros !== undefined) {
+    return recordDashboardCreditNote(deps, { charge, paid, original, reference: input.reference, amountMicros: input.amountMicros, now });
+  }
   const dead = jobs.dead;
   if (dead === null || !isDocumentJobKind(dead.kind)) {
+    // P4-K: a DASHBOARD_REFUND line has no job; its credit note is recorded with the owner's amount (`--amount`).
+    if (input.mode === "RECORD" && input.kind === "CREDIT_NOTE" && dashboardRefundOf(charge, paid) !== null) {
+      return refuse("BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN", "a dashboard refund: give the credit note's amount with --amount");
+    }
     return refuse("BILLING_INVOICE_NOTHING_LISTED", "no dead job of this kind is listed for the charge");
   }
   if (unbackedDocumentCode(dead.code)) return refuse("BILLING_INVOICE_NOTHING_TO_ISSUE", "our records do not back this job");
   const issuer = issuerOfJob(dead.kind);
-  const original = issued.find((invoice) => invoice.kind === "INVOICE");
   if (input.kind === "CREDIT_NOTE" && original === undefined) {
     return refuse("BILLING_INVOICE_ORIGINAL_MISSING", "settle the charge's invoice first");
   }
@@ -129,11 +157,48 @@ export async function runInvoiceCommand(deps: InvoiceCommandDeps, input: Invoice
   switch (input.mode) {
     case "REQUEUE":
       return requeue(deps, listed, issuer, input.confirmNotIssued, now);
-    case "RECORD":
-      return record(deps, { charge, paid, dead: listed, issuer, reference: input.reference, now });
+    case "RECORD": {
+      const document = documentOfJob(listed.kind);
+      return record(deps, {
+        charge, paid, document, issuer, reference: input.reference, now,
+        totalMicros: () => document === "INVOICE" ? charge.totalMicros : creditedMicros(charge, paid, listed)
+      });
+    }
     default:
       return exhaustive(input);
   }
+}
+
+/**
+ * P4-K: P9c's dashboard refund recorded on the sale's payment itself (PROVIDER_REFUND, no refund transaction), the
+ * row the owner summary lists as DASHBOARD_REFUND; null when the charge holds none. `saleRefundOf` decides the shape,
+ * the one definition the credit-note jobs read.
+ */
+function dashboardRefundOf(charge: PaidChargeRow, paid: ChargeEventRow): Readonly<{ upToMicros: number }> | null {
+  const sale = paid.xmoneyTransactionId === null ? null : saleRefundOf(charge, paid, paid.xmoneyTransactionId);
+  return sale?.kind === "AMOUNT_UNKNOWN" ? sale : null;
+}
+
+/**
+ * P4-K (P2-W12, option (b)): the credit note the owner issued by hand for a DASHBOARD_REFUND line, at the owner's
+ * amount, at most what the payment held, from the issuer of the charge's own invoice (spec §1.4: the credit note
+ * comes from the charge's issuer). The checks before it (no credit note yet, no job queued) are `runInvoiceCommand`'s.
+ */
+async function recordDashboardCreditNote(deps: InvoiceCommandDeps, input: Readonly<{
+  charge: PaidChargeRow; paid: ChargeEventRow; original: InvoiceRow | undefined; reference: string; amountMicros: number; now: Date;
+}>): Promise<InvoiceResult> {
+  const dashboard = dashboardRefundOf(input.charge, input.paid);
+  if (dashboard === null) {
+    return refuse("BILLING_INVOICE_NO_DASHBOARD_REFUND", "--amount is only for a refund made in the xMoney dashboard");
+  }
+  if (input.original === undefined) return refuse("BILLING_INVOICE_ORIGINAL_MISSING", "settle the charge's invoice first");
+  if (input.amountMicros > dashboard.upToMicros) {
+    return refuse("BILLING_INVOICE_AMOUNT_ABOVE_PAYMENT", "the credit note would credit more than the payment held");
+  }
+  return record(deps, {
+    charge: input.charge, paid: input.paid, document: "CREDIT_NOTE", issuer: input.original.issuer,
+    totalMicros: () => input.amountMicros, reference: input.reference, now: input.now
+  });
 }
 
 type PaidChargeRow = ChargeRow & Readonly<{ events: ChargeEventRow[] }>;
@@ -155,10 +220,11 @@ async function requeue(
 }
 
 async function record(deps: InvoiceCommandDeps, input: Readonly<{
-  charge: PaidChargeRow; paid: ChargeEventRow; dead: ListedJob; issuer: "QUADERNO" | "SMARTBILL"; reference: string; now: Date;
+  charge: PaidChargeRow; paid: ChargeEventRow; document: "INVOICE" | "CREDIT_NOTE"; issuer: "QUADERNO" | "SMARTBILL";
+  /** Read after the reference checks, so a refusal names the reference first, as before P4-K. */
+  totalMicros: () => number; reference: string; now: Date;
 }>): Promise<InvoiceResult> {
-  const { charge, dead, issuer, now } = input;
-  const document = documentOfJob(dead.kind);
+  const { charge, document, issuer, now } = input;
   const smartbill = issuer === "SMARTBILL" ? parseSmartBillReference(input.reference) : null;
   if (issuer === "SMARTBILL" ? smartbill === null : !QUADERNO_ID.test(input.reference)) {
     return refuse("BILLING_INVOICE_REFERENCE_INVALID", "SmartBill takes <series>-<number>, Quaderno its document id");
@@ -167,7 +233,7 @@ async function record(deps: InvoiceCommandDeps, input: Readonly<{
   if (await deps.jobs.documentByExternalRef(issuer, externalRef)) {
     return refuse("BILLING_INVOICE_DOCUMENT_TAKEN", "this document is already recorded for a charge");
   }
-  const totalMicros = document === "INVOICE" ? charge.totalMicros : creditedMicros(charge, input.paid, dead);
+  const totalMicros = input.totalMicros();
   const quote = charge.quoteId === null ? null : await deps.repository.quote(charge.quoteId, charge.ownerRef);
   const customer = await deps.repository.customerByOwner(charge.ownerRef);
   if (quote === null || customer === null) return refuse("BILLING_INVOICE_DATA_MISSING", "a paid charge without its quote or customer");
@@ -230,6 +296,8 @@ export function renderInvoiceResult(input: InvoiceArguments, result: InvoiceResu
         + (result.issuer === "SMARTBILL"
           ? " It joins the e-Factura list until you record ANAF's answer with pnpm billing:efactura-status." : "")
         + " It leaves the owner summary's list."
+        + (input.mode === "RECORD" && input.amountMicros !== undefined
+          ? ` The quarter's tax summary now subtracts this refund at ${microsToDecimal(input.amountMicros)} USD.` : "")
         + (result.creditNoteWaiting
           ? ` A credit note of this charge was waiting for this invoice: re-queue it with pnpm billing:invoice --charge`
             + ` ${input.chargeId} --kind CREDIT_NOTE --requeue${result.issuer === "SMARTBILL" ? " --confirm-not-issued (once you have checked SmartBill)" : ""}.`

@@ -2,7 +2,10 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
-import { foldSubscription, microsToDecimal, withdrawalRefundMicros } from "@debateai/billing-core";
+import {
+  foldSubscription, microsToDecimal, withdrawalRefundMicros, withdrawalRefundPerPaymentMicros
+} from "@debateai/billing-core";
+import { renderMail } from "@debateai/mail-templates";
 import { planById } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
@@ -51,6 +54,12 @@ const rows = () => new BillingRepository(database.pool);
 const m8Of = async (subscriptionId: string) => (await database.pool.query<{ payload: Record<string, unknown> }>(
   "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref=$1", [`M8:${subscriptionId}`]
 )).rows;
+
+/** The English text of a queued EMAIL job, rendered from its own params (`param.<name>` in the payload). */
+const renderedText = (payload: Record<string, unknown>): string => renderMail(
+  payload.template as "M8", "en", Object.fromEntries(Object.entries(payload)
+    .filter(([key]) => key.startsWith("param.")).map(([key, value]) => [key.slice("param.".length), String(value)]))
+).text;
 
 /** The EMAIL job a template queued under this ref (W9: `M8_RECEIVED:<subscription>`, `O2_WITHDRAWAL:<subscription>`). */
 const emailOf = async (template: string, ref: string) => (await database.pool.query<{ payload: Record<string, unknown> }>(
@@ -258,13 +267,17 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     expect(await runWithdrawCommand(stores(), settle)).toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 17_590_000 });
     // Nothing moves through RefundDesk, so M8 goes now, worded as refunded (D7's `mail.M8.refunded`).
     expect((await m8Of(seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "17.59", "param.plan": "PLUS" });
+    // P2-M7's control: a settlement with money due keeps today's M8, its params unchanged.
+    expect((await m8Of(seeded.subscriptionId))[0]?.payload).not.toHaveProperty("param.ownerSettled");
+    expect(renderedText((await m8Of(seeded.subscriptionId))[0]!.payload))
+      .toContain("Your Plus plan has ended, and we refunded $17.59 to your card.");
     expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([]);
     expect(await rows().withdrawalsAwaitingOwner(seeded.ownerRef)).toEqual([]);
     await expect(runWithdrawCommand(stores(), settle)).rejects.toThrow("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
     expect(await m8Of(seeded.subscriptionId)).toHaveLength(1);
   }, 10_000);
 
-  it("settles with nothing refunded by either part: M8 at once for 0.00 (the nothing-due wording), and the withdrawal leaves the owner's list", async () => {
+  it("settles with nothing refunded by either part: M8 at once for 0.00, saying only that nothing more is due (P2-M7), and the withdrawal leaves the owner's list", async () => {
     const now = new Date();
     const seeded = await seedActiveSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 2 * DAY), taxCountry: "RO"
@@ -275,7 +288,13 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     // `--refund 0.00` with no dashboard part.
     expect(await runWithdrawCommand(stores(), parseWithdrawArguments(["--owner", seeded.ownerRef, "--refund", "0.00"])))
       .toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 0 });
-    expect((await m8Of(seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "0.00" });
+    const [m8] = await m8Of(seeded.subscriptionId);
+    expect(m8?.payload).toMatchObject({ "param.refundAmount": "0.00", "param.ownerSettled": "true" });
+    // P2-M7: the money had usually gone back already (here, a dashboard refund), so M8 never says that the part already
+    // used covers the whole price; it says only what is true in both cases.
+    const text = renderedText(m8!.payload);
+    expect(text).toContain("Your Plus plan has ended, and nothing more is due back to you.");
+    expect(text).not.toContain("covers the whole price");
     expect(await rows().withdrawalsAwaitingOwner(seeded.ownerRef)).toEqual([]);
   }, 10_000);
 });
@@ -334,6 +353,64 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
       // A4(b) unchanged: the newest payment (the upgrade) gives back first, the rest comes from Plus.
       expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([[seeded.initialTransactionId, expected - 123_420_000]]);
     }
+  }, 20_000);
+
+  it("refunds in full a payment made after the statement arrived; one made before it keeps its share (P2-W6, C1)", async () => {
+    // The W6 judge's example: Romania, Plus from 1 April 2026 09:00 UTC (24.20), the emailed statement arrives on
+    // day 13 with 2.50 of Plus's 5.00 credit spent, and a Max upgrade is paid on day 14 ((200 − 20) × 16/30 = 96.00
+    // net, 116.16 with VAT) before the owner runs the command.
+    const activatedAt = new Date("2026-04-01T09:00:00.000Z");
+    const day13 = new Date(activatedAt.getTime() + 13 * DAY);
+    let transaction = 7_740_000;
+    const upgradedToMax = async (upgrade: Readonly<{ at: Date; netMicros: number; taxMicros: number; monthCreditOverrideMicros: number }>) => {
+      const seeded = await seedActiveSubscription(database.pool, {
+        ownerRef: randomUUID(), planId: "PLUS", activatedAt, taxCountry: "RO"
+      });
+      expect(seeded.totalMicros).toBe(24_200_000);
+      const paid = await seedPaidUpgrade(database.pool, seeded, { ...upgrade, planId: "MAX", transactionId: String(transaction += 1) });
+      return { seeded, upgradeChargeId: paid.chargeId, upgradeTransactionId: String(transaction) };
+    };
+    const command = (seeded: SeededSubscription, receivedAt: Date) =>
+      recordOwnerWithdrawal({ ...stores(), ownerSpend: spending(2_500_000) }, { ownerRef: seeded.ownerRef, receivedAt });
+
+    // Plus gives back its credit share, 24.20 × (1 − 2.50/5.00) = 12.10 (smaller than its 17 of 30 days), and the
+    // upgrade, paid after the person had withdrawn, goes back whole: 128.26. Before C1 it kept the same credit share
+    // of the upgrade (58.08), and the refund was 70.18 of 140.36.
+    const after = await upgradedToMax({
+      at: new Date(activatedAt.getTime() + 14 * DAY), netMicros: 96_000_000, taxMicros: 20_160_000,
+      monthCreditOverrideMicros: 82_333_333
+    });
+    expect(await command(after.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: 128_260_000 });
+    expect((await rows().subscriptionEvents(after.seeded.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: 128_260_000, withdrew_at: day13.toISOString() } });
+    // A4(b) unchanged, newest first: the upgrade's payment goes back whole, then Plus's 12.10.
+    expect(await withdrawalRequests(after.upgradeChargeId)).toEqual([[after.upgradeTransactionId, 116_160_000]]);
+    expect(await withdrawalRequests(after.seeded.initialChargeId)).toEqual([[after.seeded.initialTransactionId, 12_100_000]]);
+    expect((await emailOf("M8_RECEIVED", after.seeded.subscriptionId)).map((row) => row.payload)).toEqual([expect.objectContaining({
+      template: "M8_RECEIVED", "param.withdrawalDate": day13.toISOString(), "param.refundAmount": "128.26"
+    })]);
+
+    // Control: a statement received after the upgrade is measured as before. Max paid half a day earlier, on day 12.5
+    // ((200 − 20) × 17.5/30 = 105.00 net, 127.05 with VAT), so at day 13 each payment gives back its own share, with
+    // Max's credit (A6's override, 89.58) in force.
+    const upgradeAt = new Date(activatedAt.getTime() + 12.5 * DAY);
+    const before = await upgradedToMax({
+      at: upgradeAt, netMicros: 105_000_000, taxMicros: 22_050_000, monthCreditOverrideMicros: 89_583_333
+    });
+    const expected = withdrawalRefundPerPaymentMicros({
+      payments: [
+        { paidMicros: 24_200_000, coverageStart: before.seeded.periodStart, coverageEnd: before.seeded.periodEnd },
+        // seedPaidUpgrade quotes one minute before the payment: the upgrade's coverage starts there.
+        { paidMicros: 127_050_000, coverageStart: new Date(upgradeAt.getTime() - 60_000), coverageEnd: before.seeded.periodEnd }
+      ],
+      now: day13, creditSpentMicros: 2_500_000, monthlyCreditMicros: 89_583_333
+    });
+    // Plus 24.20 × 17/30 = 13.71 (its days), Max 127.05 × 17 days of its 17.5 days and a minute = 123.41: 137.12.
+    expect(expected).toBe(137_120_000);
+    expect(await command(before.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: expected });
+    expect(await withdrawalRequests(before.upgradeChargeId)).toEqual([[before.upgradeTransactionId, 127_050_000]]);
+    expect(await withdrawalRequests(before.seeded.initialChargeId))
+      .toEqual([[before.seeded.initialTransactionId, expected - 127_050_000]]);
   }, 20_000);
 
   it("keeps a window whose 14th day is a Saturday open through Monday, in Settings and by the command", async () => {

@@ -20,7 +20,7 @@ function row(overrides: Partial<TaxSummaryRow>): TaxSummaryRow {
   return Object.freeze({
     type: "SALE", chargeId: "c".repeat(32), at, taxCountry: "RO", taxRegion: null, taxStatus: "TAXABLE",
     chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000, amountMicros: 24_200_000,
-    amountKnown: true, locationVerdict: "AGREED", ...overrides
+    amountKnown: true, saleRecorded: true, locationVerdict: "AGREED", ...overrides
   }) as TaxSummaryRow;
 }
 
@@ -82,6 +82,7 @@ describe("P16b the summary", () => {
       { what: "REFUND_REFUSED", ref: "7".repeat(32), reason: null, since: new Date("2026-11-06T00:00:00.000Z") },
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: new Date("2026-11-09T00:00:00.000Z") },
       { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: new Date("2026-11-17T00:00:00.000Z") },
+      { what: "REFUND_OTHER_SYSTEM", ref: "2".repeat(32), reason: null, since: new Date("2026-11-20T00:00:00.000Z") },
       { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: new Date("2026-11-11T00:00:00.000Z") },
       { what: "WITHDRAWAL_BY_OWNER", ref: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", reason: null, since: new Date("2026-11-10T00:00:00.000Z") },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: new Date("2026-11-12T00:00:00.000Z") },
@@ -104,7 +105,8 @@ describe("P16b the summary", () => {
     expect(summary.conflicting).toEqual([{ chargeId: "d".repeat(32), taxCountry: "DE", at }]);
     expect(summary.notRegistered).toEqual([{ chargeId: "f".repeat(32), taxCountry: "US", taxRegion: "CA", at }]);
     expect(summary.chargebacks).toEqual([{
-      chargeId: "9".repeat(32), taxCountry: "DE", amountMicros: 59_500_000, at: new Date("2026-12-01T08:00:00.000Z")
+      chargeId: "9".repeat(32), taxCountry: "DE", amountMicros: 59_500_000, at: new Date("2026-12-01T08:00:00.000Z"),
+      saleRecorded: true
     }]);
   });
 
@@ -158,6 +160,10 @@ describe("P16b the summary", () => {
       + " payment, so nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to"
       + " the billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
       + " (one never refunded is still owed);");
+    // P2-W4: a refund job of the other xMoney system sent nothing and is owed nothing on this server (C2's legend).
+    expect(text).toContain(`charge ${"2".repeat(32)}: REFUND_OTHER_SYSTEM, since 2026-11-20`);
+    expect(text).toContain("REFUND_OTHER_SYSTEM: a refund job for a payment of the other xMoney system (sandbox or live):"
+      + " nothing was sent, and nothing is owed on this server;");
     // The two real dead ends keep their own words.
     expect(text).toContain("(REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund it from the dashboard;"
       + " REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the dashboard before refunding again;"
@@ -165,6 +171,10 @@ describe("P16b the summary", () => {
     // P9c's second refund made elsewhere: named by the xMoney transaction the owner opens in the dashboard.
     expect(text).toContain("xMoney transaction 9912345: REFUND_UNRECORDED, since 2026-11-11");
     expect(text).toContain("REFUND_UNRECORDED: a second refund made in the xMoney dashboard");
+    // Part 4 final review C-6: a refund transaction of a payment whose dashboard-refund credit note is recorded
+    // (P4-K's --amount, which the figures already subtract) is never taken off a second time by hand.
+    expect(text).toContain("take it off that country's net sales and tax by hand. A refund transaction of a payment whose"
+      + " dashboard-refund credit note is recorded is already in the figures above: do not take it off again;");
     expect(text).toContain("owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93: WITHDRAWAL_BY_OWNER, since 2026-11-10");
     expect(text).toContain(`charge ${"5".repeat(32)}: RENEWAL_STUCK, since 2026-11-12`);
     expect(text).toContain(`charge ${"8".repeat(32)}: PAYMENT_UNSETTLED, since 2026-10-02`);
@@ -205,6 +215,10 @@ describe("P16b the summary", () => {
     expect(text).toContain("Net sales 20.00 USD, tax collected 4.20 USD, from 1 sale and 0 refunds.");
     expect(text).toContain("Not subtracted: 1 refund made in the xMoney dashboard, amount unknown (listed below).");
     expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown (not subtracted above;");
+    // P4-K (P2-W12): the owner records the hand-made credit note with its amount, and the summary then subtracts it.
+    expect(text).toContain("issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as"
+      + " its line under the invoices and credit notes to check by hand says), and the summary then subtracts it at that"
+      + " amount; until then, adjust that country's net sales and tax by hand, at most the amount shown):");
     expect(text).toContain(`charge ${"a".repeat(32)}, RO, up to 24.20 USD, on 2026-11-20`);
     // A refund whose amount is known (ours, or one xMoney reported as its own transaction) is still subtracted.
     const known = row({ chargeId: "a".repeat(32), type: "REFUND", amountMicros: 12_100_000, amountKnown: true });
@@ -214,6 +228,93 @@ describe("P16b the summary", () => {
     expect(both.lines.find((line) => line.taxCountry === "RO")).toMatchObject({
       netMicros: 10_000_000, taxMicros: 2_100_000, refunds: 1, unknownRefunds: 1
     });
+  });
+
+  it("keeps a payment refunded before its plan started out of the amount-unknown list: its own line is its only instruction (C-5)", () => {
+    // Part 4 final review C-5 (fix round 1): P9c's never-verified path records the sale and an amount-unknown refund,
+    // and A29 (q) owes no credit note for it. The 'amount unknown' heading asks for a credit note via --amount, which
+    // the command refuses for such a charge, so only its REFUNDED_BEFORE_START line speaks of it.
+    const charge = "a".repeat(32);
+    const sale = row({ chargeId: charge });
+    const unknown = row({ chargeId: charge, type: "REFUND", amountMicros: 24_200_000, amountKnown: false,
+      at: new Date("2026-11-20T09:00:00.000Z") });
+    const since = new Date("2026-11-20T09:00:00.000Z");
+    const built = buildTaxSummary({
+      quarter: Q4, rows: [sale, unknown], authorities, efactura: [], paymentsToCheck: [], deadEmails: [],
+      invoiceUnknown: [{ chargeId: charge, jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED", since }]
+    });
+    expect(built.unknownRefunds).toEqual([]);
+    expect(built.lines.find((line) => line.taxCountry === "RO")).toMatchObject({
+      netMicros: 20_000_000, taxMicros: 4_200_000, sales: 1, refunds: 0, unknownRefunds: 0
+    });
+    const text = renderTaxSummary(built);
+    expect(text).toContain(`charge ${charge}: REFUNDED_BEFORE_START (NO_DOCUMENT_OWED), since 2026-11-20`);
+    expect(text).toContain("  * REFUNDED_BEFORE_START (NO_DOCUMENT_OWED): Refunded before it started: no invoice or credit"
+      + " note is owed. Take this sale and its refund out of the quarter's figures by hand.");
+    expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown: none.");
+    expect(text).not.toContain("Not subtracted:");
+    expect(text).not.toContain(`charge ${charge}, RO, up to`);
+
+    // The same rows for a charge that owes its invoice (DASHBOARD_REFUND) keep today's 'amount unknown' listing.
+    const dashboard = buildTaxSummary({
+      quarter: Q4, rows: [sale, unknown], authorities, efactura: [], paymentsToCheck: [], deadEmails: [],
+      invoiceUnknown: [{ chargeId: charge, jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL", since }]
+    });
+    expect(dashboard.unknownRefunds).toEqual([{
+      chargeId: charge, taxCountry: "RO", taxRegion: null, upToMicros: 24_200_000, at: new Date("2026-11-20T09:00:00.000Z")
+    }]);
+    expect(dashboard.lines.find((line) => line.taxCountry === "RO")).toMatchObject({ unknownRefunds: 1 });
+    const dashboardText = renderTaxSummary(dashboard);
+    expect(dashboardText).toContain("Not subtracted: 1 refund made in the xMoney dashboard, amount unknown (listed below).");
+    expect(dashboardText).toContain(`charge ${charge}, RO, up to 24.20 USD, on 2026-11-20`);
+    expect(dashboardText).toContain(`charge ${charge}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since 2026-11-20`);
+  });
+
+  it("prints a refunded-before-start line only in the quarter that holds its sale; every other line in every quarter (C-5)", () => {
+    // Part 4 final review C-5 (fix round 1): 'Take this sale and its refund out of the quarter's figures by hand'
+    // speaks of the quarter whose figures carry the sale; quarterSummaryRows dates the SALE when the money moved.
+    const charge = "a".repeat(32);
+    const items = [
+      { chargeId: charge, jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED", since: new Date("2026-12-30T09:00:00.000Z") },
+      { chargeId: "b".repeat(32), jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL", since: new Date("2026-11-08T00:00:00.000Z") },
+      { chargeId: "c".repeat(32), jobKind: "SMARTBILL_INVOICE", code: "INVOICE_UNKNOWN", since: new Date("2026-11-04T00:00:00.000Z") }
+    ];
+    const inQ4 = buildTaxSummary({
+      quarter: Q4, rows: [row({ chargeId: charge })], authorities, invoiceUnknown: items, efactura: [], paymentsToCheck: [],
+      deadEmails: []
+    });
+    expect(inQ4.invoiceUnknown.map((item) => item.jobKind)).toEqual(["REFUNDED_BEFORE_START", "DASHBOARD_REFUND", "SMARTBILL_INVOICE"]);
+    expect(renderTaxSummary(inQ4)).toContain(`charge ${charge}: REFUNDED_BEFORE_START (NO_DOCUMENT_OWED), since 2026-12-30`);
+
+    // The next quarter holds no SALE of it (its refund only, dated in January, does not count): no line there.
+    const Q1 = parseTaxQuarter("2027-Q1");
+    const refundOnly = row({ chargeId: charge, type: "REFUND", amountKnown: false, at: new Date("2027-01-02T09:00:00.000Z") });
+    for (const rows of [[], [refundOnly], [row({ chargeId: "d".repeat(32), at: new Date("2027-01-05T09:00:00.000Z") })]]) {
+      const inQ1 = buildTaxSummary({
+        quarter: Q1, rows, authorities, invoiceUnknown: items, efactura: [], paymentsToCheck: [], deadEmails: []
+      });
+      expect(inQ1.invoiceUnknown.map((item) => item.jobKind)).toEqual(["DASHBOARD_REFUND", "SMARTBILL_INVOICE"]);
+      expect(inQ1.unknownRefunds).toEqual([]);
+      const text = renderTaxSummary(inQ1);
+      expect(text).not.toContain("REFUNDED_BEFORE_START");
+      expect(text).not.toContain(`charge ${charge}`);
+    }
+  });
+
+  it("labels a charge-back of a payment no sale was recorded for, and keeps the sale's words for the others (C-19)", () => {
+    // Part 4 final review C-19: a checkout charged back before we verified it holds no SUCCEEDED, so no sale above.
+    const unsold = row({ chargeId: "8".repeat(32), type: "CHARGEBACK", saleRecorded: false, at: new Date("2026-12-02T08:00:00.000Z") });
+    const sold = row({ chargeId: "9".repeat(32), type: "CHARGEBACK", at: new Date("2026-12-01T08:00:00.000Z") });
+    const built = buildTaxSummary({
+      quarter: Q4, rows: [sold, unsold], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
+    });
+    expect(built.chargebacks.map((item) => [item.chargeId, item.saleRecorded])).toEqual([["9".repeat(32), true], ["8".repeat(32), false]]);
+    expect(built.sales).toBe(0);
+    const text = renderTaxSummary(built);
+    expect(text).toContain("Charge-backs this quarter (the card holder's bank took the money back; the sale above still counts"
+      + " until the accountant decides, except for a line that says no sale was recorded for it):");
+    expect(text).toContain(`charge ${"8".repeat(32)}, RO, 24.20 USD, on 2026-12-02: no sale was recorded for it\n`);
+    expect(text).toContain(`charge ${"9".repeat(32)}, RO, 24.20 USD, on 2026-12-01\n`);
   });
 
   it("caps each list and cuts the whole text at a line boundary only when a limit is given (O1; W12 fix I-1)", () => {
@@ -256,7 +357,15 @@ describe("P16b the summary", () => {
         { chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED", since: now },
         { chargeId: "6".repeat(32), transactionId: "2", reason: "WITHDRAWAL", code: "REFUND_OUTCOME_UNKNOWN", since: now },
         // P2-I5: a forged job's payload reason is only its claim, so the line carries none.
-        { chargeId: "4".repeat(32), transactionId: "3", reason: "CARD_CHECK_RELEASE", code: "REFUND_NOT_REQUESTED", since: now }
+        { chargeId: "4".repeat(32), transactionId: "3", reason: "CARD_CHECK_RELEASE", code: "REFUND_NOT_REQUESTED", since: now },
+        // P2-W4: neither reached xMoney, so neither is a refund xMoney refused. A job naming a charge we do not have is
+        // no refund to make; a job of the other xMoney system is owed nothing here. Neither payload reason is verified.
+        { chargeId: "3".repeat(32), transactionId: "4", reason: "WITHDRAWAL", code: "REFUND_CHARGE_MISSING", since: now },
+        { chargeId: "2".repeat(32), transactionId: "5", reason: "WITHDRAWAL", code: "OTHER_XMONEY_SYSTEM", since: now },
+        // Part 4 final review C-7: an unreadable payload ended before any xMoney call, and only a row written by
+        // something else holds one, so it is listed like the claimed-only codes: no refund xMoney refused, and its
+        // reason is never printed (REFUND_NOT_REQUESTED's legend sends the owner to the charge's own requests).
+        { chargeId: "1".repeat(32), transactionId: "6", reason: "WITHDRAWAL", code: "REFUND_PAYLOAD_INVALID", since: now }
       ],
       unrecordedRefunds: async (since) => {
         // P9c's second refunds made elsewhere, as far back as A10's refund listing reaches.
@@ -292,6 +401,9 @@ describe("P16b the summary", () => {
       { what: "REFUND_REFUSED", ref: "7".repeat(32), reason: "WITHDRAWAL", since: now },
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: now },
       { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: now },
+      { what: "REFUND_NOT_REQUESTED", ref: "3".repeat(32), reason: null, since: now },
+      { what: "REFUND_OTHER_SYSTEM", ref: "2".repeat(32), reason: null, since: now },
+      { what: "REFUND_NOT_REQUESTED", ref: "1".repeat(32), reason: null, since: now },
       { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: now },
       { what: "WITHDRAWAL_BY_OWNER", ref: owner, reason: null, since: now },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: now },

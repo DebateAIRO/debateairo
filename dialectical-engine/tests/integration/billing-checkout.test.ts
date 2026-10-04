@@ -6,6 +6,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import { signOrderPayload, XMoneyClient } from "@debateai/payments-xmoney";
 import { inFlightAttemptLifeMs, type CheckoutInput } from "../../apps/api/src/billing/checkout.js";
 import { englishOrderText, planName, type BillingOrderText } from "../../apps/api/src/billing/order-text.js";
+import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { openBillingProfile } from "../../apps/api/src/billing/records.js";
 import { activeSubscriptionEvents } from "../support/billingFixtures.js";
 import {
@@ -211,15 +212,17 @@ describe("P8c the checkout", () => {
     expect(SELLER_COMPANY.tradingNames[0]).toBe("DebateAI");
   });
 
-  it("refuses a US checkout that names neither a state nor a postal code (spec §1.3)", async () => {
+  it("refuses a US checkout that names no postal code, with or without a state (spec §1.3, P2-M29)", async () => {
     h.geo.country = "US";
-    const ownerRef = randomUUID();
-    const quoted = await h.quotes.create({
-      ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "US", name: null, region: null, postalCode: null,
-      city: null, company: null, now: h.clock.now
-    });
-    await expect(startWith(ownerRef, quoted.quote.quoteId)).rejects.toMatchObject({ status: 422, code: "BILLING_ADDRESS_REQUIRED" });
-    expect(await h.repository.subscriptionForOwner(ownerRef)).toBeNull();
+    for (const region of [null, "NY"]) {
+      const ownerRef = randomUUID();
+      const quoted = await h.quotes.create({
+        ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "US", name: null, region, postalCode: null,
+        city: null, company: null, now: h.clock.now
+      });
+      await expect(startWith(ownerRef, quoted.quote.quoteId)).rejects.toMatchObject({ status: 422, code: "BILLING_ADDRESS_REQUIRED" });
+      expect(await h.repository.subscriptionForOwner(ownerRef)).toBeNull();
+    }
   });
 
   it("names its xMoney system on CREATED and on the charge (D5 5h)", async () => {
@@ -339,7 +342,11 @@ describe("P8c the checkout", () => {
       await fake.completeSignedOrder({
         orderPayload: first.orderPayload, orderChecksum: first.orderChecksum, cardCountry: "RO", succeed: true, status: "3d-pending"
       });
-      await expect(checkout(new Date(Math.max(Date.now(), now.getTime() + 1_000))))
+      // xMoney's listing window is whole seconds (the client sends both ends without milliseconds), so the second look
+      // asks at a whole second no earlier than the transaction: a look later in the transaction's own second would end
+      // the window before it, as happened under a loaded run.
+      const later = Math.ceil(Math.max(Date.now(), now.getTime() + 1_000) / 1_000) * 1_000;
+      await expect(checkout(new Date(later)))
         .rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: first.chargeId });
     } finally {
       await fake.stop();
@@ -405,6 +412,54 @@ describe("P8c the checkout", () => {
     // duplicate payment on this reused order, refunded).
     h.clock.advance(inFlightAttemptLifeMs() + 60_000);
     expect(await h.buy({ ownerRef })).toMatchObject({ chargeId: first.chargeId, reused: true });
+  });
+
+  it("lets a new checkout proceed once the first payment was charged back before it was verified (P2-N1)", async () => {
+    /** What P9b's check writes for a first payment charged back before it was ever verified (A9 `chargedBack`). */
+    const recordChargeback = async (chargeId: string, transactionId: string, noticeId: string | null = null) => {
+      const charge = await h.repository.charge(chargeId);
+      await h.repository.withTransaction(async (client) => {
+        await h.repository.appendChargeEvent(client, chargeEvent(chargeId, "CHARGEBACK", h.clock.now, {
+          xmoneyTransactionId: transactionId, amountMicros: charge?.totalMicros ?? null, errorCode: null
+        }));
+        if (noticeId !== null) await h.repository.recordNoticeOutcome(client, { noticeId, at: h.clock.now, outcome: "CHARGEBACK" });
+      });
+    };
+    const endedForNewCheckout = async (subscriptionId: string) => expect((await h.repository.subscriptionEvents(subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED", reason: "NEW_CHECKOUT" } });
+
+    // (a) xMoney lists the payment as `charge-back`, and the charge recorded its CHARGEBACK: it is not on its way. The
+    // open checkout cannot be reused (its charge holds more than REQUESTED), so it ends and a new charge is made.
+    const listedOwner = randomUUID();
+    const listed = await h.buy({ ownerRef: listedOwner });
+    const chargedBack = h.xmoney.pay({
+      externalOrderId: listed.chargeId, amountDecimal: listed.totalDecimal, cardCountry: "RO", status: "charge-back"
+    });
+    await recordChargeback(listed.chargeId, chargedBack.transactionId);
+    const afterListed = await h.buy({ ownerRef: listedOwner });
+    expect([afterListed.chargeId === listed.chargeId, afterListed.reused]).toEqual([false, false]);
+    await endedForNewCheckout(listed.subscriptionId);
+
+    // (b) A stored `complete-ok` notice whose check then recorded CHARGEBACK (xMoney's listing has not caught up).
+    const storedOwner = randomUUID();
+    const stored = await h.buy({ ownerRef: storedOwner });
+    const noticeId = randomUUID();
+    const transactionId = String(7_790_000 + Math.floor(Math.random() * 9_999));
+    await h.repository.withTransaction((client) => h.repository.insertNotice(client, {
+      noticeId, receivedAt: h.clock.now, payloadSha256: createHash("sha256").update(noticeId).digest("hex"),
+      transactionId, orderId: "7790001", externalOrderId: stored.chargeId, status: "complete-ok", xmoneyEnvironment: "stage"
+    }));
+    await recordChargeback(stored.chargeId, transactionId, noticeId);
+    const afterStored = await h.buy({ ownerRef: storedOwner });
+    expect([afterStored.chargeId === stored.chargeId, afterStored.reused]).toEqual([false, false]);
+    await endedForNewCheckout(stored.subscriptionId);
+
+    // Control: an unverified `complete-ok` payment xMoney lists, with nothing recorded on the charge, still holds it.
+    const waitingOwner = randomUUID();
+    const waiting = await h.buy({ ownerRef: waitingOwner });
+    h.xmoney.pay({ externalOrderId: waiting.chargeId, amountDecimal: waiting.totalDecimal, cardCountry: "RO", status: "complete-ok" });
+    await expect(h.buy({ ownerRef: waitingOwner }))
+      .rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: waiting.chargeId });
   });
 
   it("never starves its pool: eleven concurrent checkouts on a two-connection pool all finish", async () => {

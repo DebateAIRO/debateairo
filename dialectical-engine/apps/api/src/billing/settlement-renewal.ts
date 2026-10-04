@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import type { SubscriptionState } from "@debateai/billing-core";
+import type { SubscriptionEventData, SubscriptionState } from "@debateai/billing-core";
 import type { BillingRepository, EntitlementRepository } from "@debateai/db";
 import type { BillingPolicy } from "@debateai/register";
 import { enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
@@ -82,16 +82,30 @@ export async function writeDunningAttempt(
     });
     return "PAST_DUE";
   }
-  await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "ENDED", now, { cause: "DUNNING", ...which }));
+  await endDunning(deps, client, { subscription, customerId: input.customerId, data: which, now });
+  return "ENDED";
+}
+
+/**
+ * The end of a dunning (spec §2.5.5), in the caller's transaction under the owner lock, on the subscription folded
+ * there: ENDED(DUNNING) with `data`, Free from `now` (ENDED_DUNNING) and M6. `writeDunningAttempt` ends a failed attempt
+ * past the last retry day through here; P2-M13's maintenance pass ends a dunning the current policy has no retry day
+ * left for.
+ */
+export async function endDunning(
+  deps: Pick<RenewalSettlementDeps, "repository" | "entitlements" | "publicAppUrl">, client: PoolClient,
+  input: Readonly<{ subscription: SubscriptionState; customerId: string; data: SubscriptionEventData; now: Date }>
+): Promise<void> {
+  const { subscription, now } = input;
+  await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "ENDED", now, { cause: "DUNNING", ...input.data }));
   await deps.entitlements.append(client, {
     ownerRef: subscription.ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ENDED_DUNNING", effectiveAt: now,
     subscriptionId: subscription.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
   });
   await enqueueEmail(deps.repository, client, {
-    template: "M6", recipient, dedupeRef: subscription.subscriptionId,
-    params: { plan: subscription.planId, pricingUrl: page("/pricing") }, notBefore: now
+    template: "M6", recipient: { kind: "CUSTOMER", customerId: input.customerId }, dedupeRef: subscription.subscriptionId,
+    params: { plan: subscription.planId, pricingUrl: new URL("/pricing", deps.publicAppUrl).toString() }, notBefore: now
   });
-  return "ENDED";
 }
 
 export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSettlement {

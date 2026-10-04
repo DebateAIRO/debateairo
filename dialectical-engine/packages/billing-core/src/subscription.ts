@@ -178,8 +178,9 @@ function apply(state: Working, event: SubscriptionEvent): void {
       state.scheduledDowngradePlanId = event.planId;
       return;
     case "CANCEL_REQUESTED":
-      // W7 (P2-I10): SUSPENDED too, for an account deletion's renewal stop (a person's own cancel never reaches it:
-      // `requestCancelLocked` refuses a suspended plan). RESUMED keeps the flag, so the plan then ends at its period end.
+      // SUSPENDED too: an account deletion's renewal stop (W7, P2-I10) and the person's own cancel in Settings or through
+      // the emailed link (P2-W10, the owner's ruling of 3 October 2026: a plan paused by a card dispute can be
+      // cancelled). RESUMED keeps the flag, so a plan whose dispute is won ends at its period end instead of renewing.
       requireStatus(state, event, ["ACTIVE", "PAST_DUE", "SUSPENDED"]);
       if (state.cancelRequested) illegal("CANCEL_REQUESTED twice");
       state.cancelRequested = true;

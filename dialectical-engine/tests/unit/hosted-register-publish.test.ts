@@ -32,6 +32,7 @@ import {
 import { runHostedRegisterPublishCli } from "../../apps/runner/src/hosted-register-publish-cli.js";
 import { PLAN_TIER_ROSTERS } from "../../packages/contract/src/index.js";
 import {
+  ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
@@ -57,6 +58,9 @@ const temporaryRoots: string[] = [];
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
+
+/** P4-G: a room-read admission budget, which every file that seals the budget band must carry (ruling C7). */
+const ROOM_READS_FIXTURE = Object.freeze({ key: "owner", limit: 60, window_ms: 60_000, capacity: 65_536 });
 
 /** A file the operator would publish: two vendors on real-looking public names. */
 function validFile(): Record<string, unknown> {
@@ -712,6 +716,8 @@ describe("Paid plans · the billing rows and the budget band in the hosted regis
     Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
       admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
     const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)));
     expect(plan.billingPolicy?.enabled).toBe(true);
@@ -750,6 +756,8 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
       serve_reserve_basis_points: 3_000,
       ...(band ? { admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1 } : {})
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    if (band) file.askRoomReads = ROOM_READS_FIXTURE;
     return file;
   }
 
@@ -768,6 +776,8 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
       serve_reserve_basis_points: 3_000, admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500,
       waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     for (const target of file.providerTargets as Array<Record<string, unknown>>) {
       target.input_price_micros_per_million = 5_000_000;
       target.output_price_micros_per_million = 25_000_000;
@@ -792,6 +802,8 @@ describe("Budget rule · the plan asks the boot's one-call check (RUN_CEILING_BE
       serve_reserve_basis_points: 3_000, admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500,
       waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     for (const target of file.providerTargets as Array<Record<string, unknown>>) {
       target.input_price_micros_per_million = 5_000_000;
       target.output_price_micros_per_million = 25_000_000;
@@ -1208,11 +1220,15 @@ describe("A19 fix round 2 · the refusal line admits `*` only as the unknown-fie
  * rule, checked BEFORE anything is sealed — a sealed register row can never be edited.
  */
 describe("Paid plans S2 · the plan caps of a scorecard published with billing on", () => {
+  // Paid plans P4-E (M-4): the two vendors serve the Free plan's models, which the scorecard below
+  // scores for the answer jobs, so only the rule each row names decides it.
   const billingOn = (): Record<string, unknown> => {
-    const file = validFile();
+    const file = serveFreeRoster(validFile());
     Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
       admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
     });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
     file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
     return file;
   };
@@ -1223,7 +1239,7 @@ describe("Paid plans S2 · the plan caps of a scorecard published with billing o
     planStrengthCaps: Readonly<Record<string, string>>,
     freeCap: unknown = "FOLLOWS_THE_RULE"
   ) => {
-    const example = await compatibleExampleScorecard(8);
+    const example = freeRosterScored(await compatibleExampleScorecard(8));
     const pickerSettings = example.pickerSettings as Record<string, unknown>;
     const caps = freeCap === "FOLLOWS_THE_RULE" ? exampleFreeCaps(pickerSettings, 0.5) : freeCap;
     const scorecard = parseHostedScorecardFile(bytesOf({
@@ -1272,6 +1288,151 @@ describe("Paid plans S2 · the plan caps of a scorecard published with billing o
   });
 });
 
+/**
+ * Paid plans P4-E (Part 3b re-review M-4; the controller's ruling C4 of 3 October 2026). With billing
+ * on, a Free ask's answer writer and answer checker take only a scored Free-plan model (S4b fix round
+ * 1), so a scorecard under which no configured Free-plan model can take one of those two jobs would
+ * refuse every Free question at ask time. A version that sells plans seals no such scorecard. The
+ * test is the picker's own eligibility (`eligiblePool`): scored for the job and not AVOID or UNTESTED,
+ * reachable through an API, a configured target serving a Free-plan model at the candidate's level,
+ * and a typical call that fits the window. Billing off changes nothing.
+ */
+describe("Paid plans P4-E · a scorecard published with billing on can seat Free's answer jobs", () => {
+  const sellingPlans = (file: Record<string, unknown>): Record<string, unknown> => {
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, {
+      admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
+    });
+    // P4-G (ruling C7): a version with the band seals the room read's admission budget too.
+    file.askRoomReads = ROOM_READS_FIXTURE;
+    file.billingPolicy = { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true };
+    return file;
+  };
+  /** The example with caps that follow the owners' two rules, after `change`. */
+  const planCodeOf = async (file: Record<string, unknown>, change: (example: Record<string, unknown>) => Record<string, unknown>) => {
+    const example = change(await compatibleExampleScorecard(8));
+    const pickerSettings = example.pickerSettings as Record<string, unknown>;
+    const scorecard = parseHostedScorecardFile(bytesOf({
+      ...example,
+      pickerSettings: { ...pickerSettings, planStrengthCaps: { free: "ECONOMY" }, freeCap: exampleFreeCaps(pickerSettings, 0.5) }
+    }), await readEngineVersion());
+    return codeOfAsync(async () => planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(file)), scorecard));
+  };
+  const asIs = (example: Record<string, unknown>) => example;
+
+  it("refuses a scorecard that scores no Free-plan model, by a content-free code", async () => {
+    expect(await planCodeOf(sellingPlans(serveFreeRoster(validFile())), asIs)).toBe("SCORECARD_FREE_ANSWER_UNSCORED");
+  });
+
+  it("refuses scored Free-plan models the register file does not configure", async () => {
+    expect(await planCodeOf(sellingPlans(validFile()), freeRosterScored)).toBe("SCORECARD_FREE_ANSWER_UNSCORED");
+  });
+
+  it.each([
+    ["AVOID for the answer checker", (example: Record<string, unknown>) => withFreeEntries(example, "ANSWER_CHECKER", { tier: "AVOID" })],
+    ["UNTESTED for the answer writer", (example: Record<string, unknown>) => withFreeEntries(example, "ANSWER_WRITER", { tier: "UNTESTED" })],
+    ["listed for the answer writer only", (example: Record<string, unknown>) => withoutFreeEntries(example, "ANSWER_CHECKER")],
+    ["reachable only through a subscription", (example: Record<string, unknown>) =>
+      withFreeCandidates(example, { accessRoutes: [{ kind: "SUBSCRIPTION", tool: "codex" }] })],
+    ["whose typical answer does not fit its window", (example: Record<string, unknown>) =>
+      withFreeCandidates(example, { contextWindowTokens: 20_000 })],
+    ["at a thinking level its connection does not declare", (example: Record<string, unknown>) =>
+      withFreeCandidates(example, { thinkingLevel: "high" })]
+  ])("refuses Free-plan models scored but %s", async (_name, change) => {
+    expect(await planCodeOf(sellingPlans(serveFreeRoster(validFile())), (example) => change(freeRosterScored(example))))
+      .toBe("SCORECARD_FREE_ANSWER_UNSCORED");
+  });
+
+  it("reads the version's own sealed answer bound against the window", async () => {
+    const rows = (await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(serveFreeRoster(validFile()))))).rows;
+    const bound = (JSON.parse(rows.find((row) => row.rowKey === "synthesizerCallBound")!.valueJsonText) as { tokenCeiling: number })
+      .tokenCeiling;
+    // The example's typical answer-writer call has 9000 input tokens; the gateway's wall counts each as 4, plus the bound.
+    const writerWindow = 9_000 * 4 + bound;
+    const windowOf = (tokens: number) => (example: Record<string, unknown>) =>
+      withFreeCandidates(freeRosterScored(example), { contextWindowTokens: tokens });
+    expect(await planCodeOf(sellingPlans(serveFreeRoster(validFile())), windowOf(writerWindow - 1))).toBe("SCORECARD_FREE_ANSWER_UNSCORED");
+    expect(await planCodeOf(sellingPlans(serveFreeRoster(validFile())), windowOf(writerWindow))).toBe("NO_REFUSAL");
+  });
+
+  it("seals a scorecard under which a configured Free-plan model can take both answer jobs", async () => {
+    expect(await planCodeOf(sellingPlans(serveFreeRoster(validFile())), freeRosterScored)).toBe("NO_REFUSAL");
+  });
+
+  it("seals one when a single Free-plan model can take both jobs, the other unscored", async () => {
+    const one = (example: Record<string, unknown>) => {
+      const scored = freeRosterScored(example);
+      const roles = scored.roles as Record<string, Array<Record<string, unknown>>>;
+      for (const role of ["ANSWER_WRITER", "ANSWER_CHECKER"]) {
+        roles[role] = roles[role]!.filter((entry) => entry.candidateId !== FREE_SCORED_CANDIDATES[1]);
+      }
+      return scored;
+    };
+    expect(await planCodeOf(sellingPlans(serveFreeRoster(validFile())), one)).toBe("NO_REFUSAL");
+  });
+
+  it("keeps sealing a scorecard that scores no Free-plan model with billing off", async () => {
+    expect(await planCodeOf(serveFreeRoster(validFile()), asIs)).toBe("NO_REFUSAL");
+    expect(await planCodeOf(validFile(), asIs)).toBe("NO_REFUSAL");
+  });
+
+  it("asks the two cap rules first", async () => {
+    const example = await compatibleExampleScorecard(8);
+    const scorecard = parseHostedScorecardFile(bytesOf({
+      ...example, pickerSettings: { ...(example.pickerSettings as Record<string, unknown>), planStrengthCaps: { free: "ECONOMY" } }
+    }), await readEngineVersion());
+    expect(await codeOfAsync(async () => planHostedRegisterPublication(
+      parseHostedRegisterFile(bytesOf(sellingPlans(serveFreeRoster(validFile())))), scorecard
+    ))).toBe("SCORECARD_FREE_CAPS_INVALID");
+  });
+});
+
+/** P4-E: validFile's two vendors (makers Alpha and Beta) serve the Free plan's two models instead. */
+function serveFreeRoster(file: Record<string, unknown>): Record<string, unknown> {
+  (file.providerTargets as Array<Record<string, unknown>>).forEach((target, index) => {
+    target.model = PLAN_TIER_ROSTERS.free[index];
+  });
+  return file;
+}
+
+/** P4-E: the example's two candidates re-pointed at the Free plan's models, in serveFreeRoster's order. */
+const FREE_SCORED_CANDIDATES = ["openai-alpha-low", "anthropic-gamma-low"] as const;
+
+/**
+ * P4-E: the example scorecard with two of its candidates (GOOD_VALUE for both answer jobs) re-pointed
+ * at the Free plan's models on validFile's makers, at the default level. EXAMPLE scoring only.
+ */
+function freeRosterScored(example: Record<string, unknown>): Record<string, unknown> {
+  const makers = ["Alpha", "Beta"];
+  const candidates = (example.candidates as Array<Record<string, unknown>>).map((candidate) => {
+    const index = (FREE_SCORED_CANDIDATES as readonly string[]).indexOf(candidate.candidateId as string);
+    return index < 0 ? candidate : {
+      ...candidate, vendor: makers[index], maker: makers[index], modelId: PLAN_TIER_ROSTERS.free[index], thinkingLevel: "DEFAULT_ONLY"
+    };
+  });
+  return { ...example, candidates, roles: structuredClone(example.roles) };
+}
+
+function withFreeCandidates(example: Record<string, unknown>, fields: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...example,
+    candidates: (example.candidates as Array<Record<string, unknown>>).map((candidate) =>
+      ((FREE_SCORED_CANDIDATES as readonly string[]).includes(candidate.candidateId as string) ? { ...candidate, ...fields } : candidate))
+  };
+}
+
+function withFreeEntries(example: Record<string, unknown>, role: string, fields: Record<string, unknown>): Record<string, unknown> {
+  const roles = structuredClone(example.roles) as Record<string, Array<Record<string, unknown>>>;
+  roles[role] = roles[role]!.map((entry) =>
+    ((FREE_SCORED_CANDIDATES as readonly string[]).includes(entry.candidateId as string) ? { ...entry, ...fields } : entry));
+  return { ...example, roles };
+}
+
+function withoutFreeEntries(example: Record<string, unknown>, role: string): Record<string, unknown> {
+  const roles = structuredClone(example.roles) as Record<string, Array<Record<string, unknown>>>;
+  roles[role] = roles[role]!.filter((entry) => !(FREE_SCORED_CANDIDATES as readonly string[]).includes(entry.candidateId as string));
+  return { ...example, roles };
+}
+
 /** S4b: EXAMPLE Free caps — each role's Economy money cap × `share`, floored. Not production numbers. */
 function exampleFreeCaps(pickerSettings: Record<string, unknown>, share: number): Record<string, { moneyMicrosPerCall: number }> {
   const economyCap = pickerSettings.economyCap as Record<string, { moneyMicrosPerCall: number }>;
@@ -1279,3 +1440,74 @@ function exampleFreeCaps(pickerSettings: Record<string, unknown>, share: number)
     role, { moneyMicrosPerCall: Math.floor(cap.moneyMicrosPerCall * share) }
   ]));
 }
+
+/**
+ * Paid plans P4-G, ruling C7 (go-live row 31). The room read GET /v1/asks/room charges its own owner-keyed
+ * admission budget, `ask_room_reads`. No code-owned row carries it: the operator's file supplies it as the
+ * optional `askRoomReads` member, which the plan adds to the code-owned admission row, and a version that
+ * seals the budget band without it is refused before anything is sealed (ASK_ROOM_ADMISSION_UNSEALED), as
+ * the API's boot refuses it. The example carries an example budget; the owner sets the real value.
+ */
+describe("Paid plans P4-G · the room read's admission budget (ruling C7)", () => {
+  const ROOM_READS = Object.freeze({ key: "owner", limit: 30, window_ms: 60_000, capacity: 65_536 });
+  const BAND = Object.freeze({
+    admission_close_basis_points: 9_500, finish_up_to_basis_points: 11_500, waiting_line_per_person: 1
+  });
+  function bandedFile(): Record<string, unknown> {
+    const file = validFile();
+    Object.assign(file.costEnvelopePolicy as Record<string, unknown>, BAND);
+    return file;
+  }
+  const admissionOf = (plan: Awaited<ReturnType<typeof planHostedRegisterPublication>>) =>
+    plan.rows.find((row) => row.rowKey === "admissionPolicy")!;
+
+  it("refuses a version that seals the band without askRoomReads, and accepts it with the member", async () => {
+    expect(await planCode(bandedFile())).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+    expect(await planCode({ ...bandedFile(), askRoomReads: ROOM_READS })).toBe("NO_REFUSAL");
+    // Billing on needs the band, so it needs the member too.
+    const billingOn = { ...bandedFile(), billingPolicy: { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, enabled: true } };
+    expect(await planCode(billingOn)).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+    expect(await planCode({ ...billingOn, askRoomReads: ROOM_READS })).toBe("NO_REFUSAL");
+  });
+
+  it("changes nothing without the band: the code-owned admission row is sealed as it is", async () => {
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    const admission = admissionOf(plan);
+    expect(admission.sourceRef).toBe(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef);
+    expect(JSON.parse(admission.valueJsonText)).toEqual(JSON.parse(JSON.stringify(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value)));
+    expect(plan.askRoomReads).toBeNull();
+    expect(renderHostedRegisterPlan(plan)).toContain("ask_room_reads absent\n");
+  });
+
+  it("adds the owner's budget to the code-owned admission row, every other member as it was, and says so in the plan", async () => {
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...bandedFile(), askRoomReads: ROOM_READS })));
+    const admission = admissionOf(plan);
+    expect(JSON.parse(admission.valueJsonText)).toEqual({
+      ...JSON.parse(JSON.stringify(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.value)), ask_room_reads: ROOM_READS
+    });
+    expect(admission.sourceRef.startsWith(ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef)).toBe(true);
+    expect(admission.sourceRef).toContain("P4-G ask_room_reads");
+    expect(admission.sourceRef.length).toBeLessThanOrEqual(1_024);
+    expect(plan.askRoomReads).toEqual({ key: "owner", limit: 30, windowMs: 60_000, capacity: 65_536 });
+    expect(renderHostedRegisterPlan(plan)).toContain("ask_room_reads key=owner limit=30 window_ms=60000 capacity=65536\n");
+  });
+
+  it.each([
+    ["a source-keyed budget", { ...ROOM_READS, key: "source" }],
+    ["a zero limit", { ...ROOM_READS, limit: 0 }],
+    ["an unknown field", { ...ROOM_READS, extra: true }],
+    ["the JSON value null", null]
+  ])("refuses %s by the register's own code", async (_name, value) => {
+    expect(await planCode({ ...bandedFile(), askRoomReads: value })).toBe("ADMISSION_POLICY_INVALID");
+  });
+
+  it("ships an example that seals the band with an example room-read budget", async () => {
+    const example = JSON.parse(await readFile(EXAMPLE_PATH, "utf8")) as Record<string, unknown>;
+    expect(example.askRoomReads).toEqual({ key: "owner", limit: 60, window_ms: 60_000, capacity: 65_536 });
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(example)));
+    expect(renderHostedRegisterPlan(plan)).toContain("ask_room_reads key=owner limit=60 window_ms=60000 capacity=65536\n");
+    // Without the member the example itself is refused: the band is sealed.
+    delete example.askRoomReads;
+    expect(await planCode(example)).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+  });
+});

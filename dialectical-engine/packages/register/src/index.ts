@@ -620,9 +620,22 @@ export async function readCallTokenCeilings(pool: Pool, registerVersion: number)
     [registerVersion, ["acceptanceOrganCostBounds", "synthesizerCallBound", "evaluatorCallBound"]]
   );
   const byKey = new Map(result.rows.map((row) => [row.row_key, row.value_json]));
-  const organs = organTokenCeilingsSchema.safeParse(byKey.get("acceptanceOrganCostBounds"));
-  const synthesizer = callTokenCeilingSchema.safeParse(byKey.get("synthesizerCallBound"));
-  const evaluator = callTokenCeilingSchema.safeParse(byKey.get("evaluatorCallBound"));
+  return callTokenCeilingsFromValues((rowKey) => byKey.get(rowKey));
+}
+
+/**
+ * The same three bounds read from row values already in hand (`valueOf(rowKey)`, undefined for no
+ * row): the hosted publish command's plan asks them of the rows it is about to seal (paid plans
+ * P4-E), as it asks the judge bound (`judgeTokenCeilingFromValue`). Refuses by the same code.
+ */
+export function callTokenCeilingsFromValues(valueOf: (rowKey: string) => unknown): {
+  readonly judge: number;
+  readonly synthesizer: number;
+  readonly evaluator: number;
+} {
+  const organs = organTokenCeilingsSchema.safeParse(valueOf("acceptanceOrganCostBounds"));
+  const synthesizer = callTokenCeilingSchema.safeParse(valueOf("synthesizerCallBound"));
+  const evaluator = callTokenCeilingSchema.safeParse(valueOf("evaluatorCallBound"));
   if (!organs.success || !synthesizer.success || !evaluator.success) {
     throw new TypeError("CALL_TOKEN_CEILINGS_UNRESOLVED");
   }
@@ -1136,6 +1149,7 @@ export {
   SESSION_POLICY_REGISTER_ROW,
   SESSION_POLICY_ROW_KEY,
   admissionPolicyFromValue,
+  assertAskRoomAdmissionSealed,
   readAdmissionPolicy,
   readSessionPolicy,
   sessionPolicyFromValue,

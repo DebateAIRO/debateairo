@@ -475,7 +475,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0090_model_scorecard.sql",
         // Paid plans Part 2b W7 (P2-I10): billing tells a committed erasure from a pending one (the plan now ends
         // at the commit). 0090 is Part 3's scorecard; the next free prefix, no pair.
-        "0091_billing_erasure_commit.sql"
+        "0091_billing_erasure_commit.sql",
+        // Paid plans Part 4 P4-M (P2-M43, the owner's ruling of 3 October 2026): indexes for the recurring billing
+        // queries. The next free prefix, no pair.
+        "0092_billing_query_indexes.sql"
       ]);
   });
 });

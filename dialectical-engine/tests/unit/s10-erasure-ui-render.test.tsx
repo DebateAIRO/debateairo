@@ -148,7 +148,7 @@ describe("S10 rendered erasure boundaries",()=>{
       plan_id:"MAX",status,cancel_requested:false,current_period_end:"2026-10-29T10:00:00.000Z",
       renews_on:"2026-10-29T10:00:00.000Z",renewal_total:"242.00",scheduled_downgrade_plan_id:null,
       withdrawal_open_until:"2026-10-13T21:00:00.000Z",withdrawal_last_day:"2026-10-13",
-      can_upgrade:false,can_change_card:true
+      can_upgrade:false,can_change_card:true,can_revoke_cancel:false
     } });
     const erasureClient=(getBillingSubscription:()=>Promise<unknown>,scheduled=false)=>({
       readAccountErasure:vi.fn(async ()=>scheduled

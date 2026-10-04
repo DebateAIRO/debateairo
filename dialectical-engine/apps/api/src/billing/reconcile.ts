@@ -35,7 +35,13 @@ export type ReconcileReport = Readonly<{
   listed: number; enqueued: number; adopted: number; failed: number;
   /** An order lookup failed, so no checkout charge was failed this pass. */
   uncertain: boolean;
-  /** Refunds xMoney refused, still owed (P16b lists them). */
+  /**
+   * Dead XMONEY_REFUND jobs with no REFUNDED since, whatever their code (`deadRefunds()`; P16b lists them). The owner
+   * summary reads each code: REFUND_NOT_REQUESTED, REFUND_CHARGE_MISSING and OTHER_XMONEY_SYSTEM owe nothing on this
+   * server; REFUND_PAYLOAD_INVALID is listed as REFUND_NOT_REQUESTED (Part 4 final review C-7: nothing was sent, and
+   * the charge's own refund requests say whether money is owed); REFUND_OUTCOME_UNKNOWN is checked in the dashboard;
+   * every other code is still owed.
+   */
   deadRefunds: number;
   /** UPGRADE/RENEWAL charges past the 30-day horizon with no outcome, no longer looked up (P16b lists them). */
   expired: number;

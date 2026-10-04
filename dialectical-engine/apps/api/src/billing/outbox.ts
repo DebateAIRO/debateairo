@@ -22,15 +22,28 @@ const DECLARED_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 /**
  * P2-I4 (D5 5h): the two xMoney systems number their transactions separately, and the database keeps the sandbox's
  * records across README §14.8's same-host switch. A refund, invoice or credit-note job, or a payment check
- * (VERIFY_PAYMENT) that names its own charge, whose charge was paid in the other system ends here, DEAD before any
- * vendor call, with this one content-free code and one audit line (the kind and the code). The caller compares
- * `charge.xmoneyEnvironment` with the connectors' system.
+ * (VERIFY_PAYMENT) that names its own charge, whose charge was paid in the other system, and (P2-W3 (b)) a
+ * still-due RENEWAL_NOTICE whose plan belongs to the other system end here, DEAD before any vendor call or quote,
+ * with this one content-free code and one audit line (the kind and the code). The charge jobs' callers compare
+ * `charge.xmoneyEnvironment` with the connectors' system; the RENEWAL_NOTICE handler compares the subscription's
+ * `xmoneyEnvironment` (its folded state) instead, since a notice names no charge.
  */
 export function otherXMoneySystem(
   audit: BillingAudit, kind: OutboxKind
 ): Readonly<{ kind: "DEAD"; code: "OTHER_XMONEY_SYSTEM" }> {
   audit("billing.outbox.other_system", { kind, code: "OTHER_XMONEY_SYSTEM" });
   return Object.freeze({ kind: "DEAD" as const, code: "OTHER_XMONEY_SYSTEM" as const });
+}
+
+/**
+ * P2-M6: a handler whose job was claimed again by another worker (its claim's lease ran out while it ran) learns it
+ * from `markJobStage`, which only the current claim holder can move, or (C-14, SmartBill) from `holdsClaim` in the
+ * transaction that would write the invoice intent, before the intent is written. It stops there, before any vendor
+ * call, with this outcome; P1b's fence then refuses its settle too (the worker reports `BILLING_OUTBOX_CLAIM_LOST`),
+ * and the new holder runs the job.
+ */
+export function claimLost(now: Date): OutboxOutcome {
+  return Object.freeze({ kind: "RETRY" as const, code: "BILLING_OUTBOX_CLAIM_LOST", retryAt: new Date(now.getTime() + 60_000) });
 }
 
 /** `attempts` counts the attempt that just failed (the claim increments it). 1m, 5m, 30m, 2h, 12h, then dead. */

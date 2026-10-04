@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Te razprave ni bilo mogoče začeti, ker modeli UI, ki jih potrebuje, niso bili na voljo. Prosimo, poskusite znova čez nekaj časa.",
   "runFailure.RUN_LIMIT_REACHED": "Ta razprava je dosegla svojo omejitev, preden je lahko podala odgovor.",
   "runFailure.STOPPED": "Ta razprava se je sredi poteka ustavila zaradi težave na naši strani. Prosimo, znova zastavite svoje vprašanje.",
+  "runFailure.PLAN_ENDED": "Vaš plačljivi paket se je iztekel ali je bil začasno ustavljen, medtem ko je to vprašanje čakalo, zato se razprava ni začela. Lahko ga zastavite znova.",
   "debateChrome.error.unableToLoadDebate": "Razprave ni mogoče naložiti",
   "debateChrome.error.unableToLoadScoring": "Ocenjevanja ni mogoče naložiti",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Poskusnega zagona prilagodljive globine ni mogoče naložiti",

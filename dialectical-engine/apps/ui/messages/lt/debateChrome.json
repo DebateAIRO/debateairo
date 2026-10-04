@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Šie debatai negalėjo prasidėti, nes jiems reikalingi DI modeliai buvo nepasiekiami. Prašome pabandyti dar kartą šiek tiek vėliau.",
   "runFailure.RUN_LIMIT_REACHED": "Šie debatai pasiekė savo ribą anksčiau, nei spėjo pateikti atsakymą.",
   "runFailure.STOPPED": "Šie debatai sustojo pusiaukelėje dėl problemos mūsų pusėje. Prašome užduoti savo klausimą dar kartą.",
+  "runFailure.PLAN_ENDED": "Jūsų mokamas planas baigėsi arba buvo pristabdytas, kol šis klausimas laukė, todėl debatai neprasidėjo. Galite jį užduoti dar kartą.",
   "debateChrome.error.unableToLoadDebate": "Nepavyko įkelti debatų",
   "debateChrome.error.unableToLoadScoring": "Nepavyko įkelti vertinimo",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Nepavyko įkelti adaptyviojo gylio bandomojo vykdymo",

@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Não foi possível iniciar este debate porque os modelos de IA necessários não estavam disponíveis. Por favor, tente novamente daqui a algum tempo.",
   "runFailure.RUN_LIMIT_REACHED": "Este debate atingiu o seu limite antes de conseguir chegar a uma resposta.",
   "runFailure.STOPPED": "Este debate parou a meio devido a um problema do nosso lado. Por favor, volte a fazer a sua pergunta.",
+  "runFailure.PLAN_ENDED": "O seu plano pago terminou ou foi suspenso enquanto esta pergunta aguardava, por isso o debate não começou. Pode fazê-la novamente.",
   "debateChrome.error.unableToLoadDebate": "Não foi possível carregar o debate",
   "debateChrome.error.unableToLoadScoring": "Não foi possível carregar a pontuação",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Não foi possível carregar a simulação de profundidade adaptativa",

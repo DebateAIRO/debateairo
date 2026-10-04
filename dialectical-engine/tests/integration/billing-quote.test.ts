@@ -82,12 +82,16 @@ describe("P8b the quote", () => {
       .toBe(true);
   });
 
-  it("asks a US or Canadian buyer for a state or a postal code before the checkout (spec §1.3)", async () => {
+  it("asks a US or Canadian buyer for the postal code before the checkout: a state alone is not enough (spec §1.3, P2-M29)", async () => {
     geo.country = "US";
     const bare = { country: "US", name: null, region: null, postalCode: null, city: null } as const;
     expect(await service().create(input(randomUUID(), bare))).toMatchObject({ addressRequired: true, quote: { taxCountry: "US" } });
     expect((await service().create(input(randomUUID(), { ...bare, postalCode: "10001" }))).addressRequired).toBe(false);
-    expect((await service().create(input(randomUUID(), { ...bare, region: "NY" }))).addressRequired).toBe(false);
+    // Quaderno is never sent a region (P4), so a state alone would price the sale with no state at all.
+    expect((await service().create(input(randomUUID(), { ...bare, region: "NY" }))).addressRequired).toBe(true);
+    expect((await service().create(input(randomUUID(), { ...bare, region: "TX" }))).quote).toMatchObject({ taxMicros: 0, taxStatus: "NOT_REGISTERED" });
+    expect((await service().create(input(randomUUID(), { ...bare, postalCode: "75001" }))).quote)
+      .toMatchObject({ taxMicros: 1_250_000, taxRegion: "TX", taxStatus: "TAXABLE" });
   });
 
   it("asks the person to confirm their country when the connection looks like another one", async () => {

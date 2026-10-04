@@ -1,5 +1,6 @@
-import { DEBATE_ROLES } from "@debateai/kernel";
-import type { PickerSettings } from "./schema.js";
+import { DEBATE_ROLES, type DebateRole } from "@debateai/kernel";
+import { roleHasEligibleCandidate, type ReachableTarget } from "./picker.js";
+import type { PickerSettings, Scorecard } from "./schema.js";
 
 /** The typed refusal of a scorecard that breaks the owners' plan-cap rule on a site that sells plans. */
 export const SCORECARD_PLAN_CAPS_INVALID = "SCORECARD_PLAN_CAPS_INVALID" as const;
@@ -40,4 +41,59 @@ export function freeCapsFollowPaidSiteRule(settings: Pick<PickerSettings, "freeC
     const economy = settings.economyCap[role]?.moneyMicrosPerCall ?? null;
     return free !== null && economy !== null && free <= economy;
   });
+}
+
+/** The typed refusal of a scorecard that cannot seat a Free ask's answer jobs on a site that sells plans. */
+export const SCORECARD_FREE_ANSWER_UNSCORED = "SCORECARD_FREE_ANSWER_UNSCORED" as const;
+
+/**
+ * A declared connection as the publish command and the API boot hold it (`ProviderDiscoveryTarget`
+ * in @debateai/providers, structurally): its route, maker and model, and the levels and window it
+ * declares.
+ */
+export type DeclaredModelTarget = Readonly<{
+  providerRef: string;
+  maker: string;
+  model: string;
+  thinkingLevels?: readonly string[];
+  contextWindowTokens?: number;
+}>;
+
+/**
+ * PAID PLANS P4-E (Part 3b re-review M-4; the controller's ruling C4 of 3 October 2026) — A FREE ASK
+ * CAN SEAT ITS ANSWER JOBS. On a site that sells plans a Free ask's ANSWER_WRITER and ANSWER_CHECKER
+ * take a scored Free-roster model or none (S4b fix round 1, `roleMayFallBack` in ./picker.ts), so a
+ * scorecard under which no declared Free-roster model can take one of them refuses every Free
+ * question at ask time. This asks, for each of the two jobs, whether the picker's own eligibility
+ * (`roleHasEligibleCandidate`, which is `eligiblePool`: listed for the job, not AVOID or UNTESTED, an
+ * API route, a declared target serving a Free-roster model at the candidate's level, and a typical
+ * call that fits the window under the job's sealed answer bound) admits at least one candidate. The
+ * two jobs may share one model, as the picker allows. The reachable targets are the declared ones
+ * serving a Free-roster model, the filter admission applies to a Free ask then
+ * (`reachableInTodaysOrder` with `rosterOnly`); health is the ask's question, not this one. Checked
+ * where plans are sold (hosted, billing on), after the two cap rules; the callers refuse, never
+ * override.
+ */
+export function freeAnswerJobsFollowPaidSiteRule(input: Readonly<{
+  scorecard: Scorecard;
+  targets: readonly DeclaredModelTarget[];
+  freeRosterModelIds: readonly string[];
+  answerTokenCeilingByRole: Readonly<Record<"ANSWER_WRITER" | "ANSWER_CHECKER", number>>;
+}>): boolean {
+  const reachable: readonly ReachableTarget[] = input.targets
+    .filter((target) => input.freeRosterModelIds.includes(target.model))
+    .map((target) => Object.freeze({
+      providerRef: target.providerRef,
+      maker: target.maker,
+      modelId: target.model,
+      thinkingLevels: target.thinkingLevels ?? [],
+      contextWindowTokens: target.contextWindowTokens ?? null
+    }));
+  const answerJobs: readonly DebateRole[] = ["ANSWER_WRITER", "ANSWER_CHECKER"];
+  return answerJobs.every((role) => roleHasEligibleCandidate({
+    scorecard: input.scorecard,
+    mode: "HOSTED",
+    reachable,
+    answerTokenCeilingByRole: input.answerTokenCeilingByRole
+  }, role));
 }

@@ -15,15 +15,17 @@ import {
   type ReadableUserDekStore
 } from "@debateai/crypto";
 import {
-  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, PostgresEmailChangeRepository,
-  RunRepository, migrate
+  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, PostgresAccountErasureRepository,
+  PostgresEmailChangeRepository, RunRepository, migrate, type PrivateRunErasureCoordinator
 } from "@debateai/db";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { currentDocument } from "@debateai/legal-manifest";
 import { XMoneyClient } from "@debateai/payments-xmoney";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue, type PlanId } from "@debateai/register";
+import { PostgresAccountErasureApplication } from "../../apps/api/src/account-erasure.js";
 import { buildApi } from "../../apps/api/src/index.js";
 import type { BillingConnectors } from "../../apps/api/src/billing/connectors.js";
+import { OwnerJobs } from "../../apps/api/src/billing/owner-jobs.js";
 import { BillingReconciler, type ReconcileReport } from "../../apps/api/src/billing/reconcile.js";
 import { createBillingRuntime, type BillingRuntime, type BillingRuntimeDeps } from "../../apps/api/src/billing/runtime.js";
 import { StageShiftedXMoneyClient } from "../../apps/api/src/billing/stage-clock.js";
@@ -32,6 +34,7 @@ import { billingMailAttachmentResolvers } from "../../apps/api/src/mail-attachme
 import { EmailChangeService } from "../../apps/api/src/email-change.js";
 import { MemoryEmailChangeMailSender, MemoryTemplatedMailSender, type TemplatedMail } from "../../apps/api/src/mail-channel.js";
 import type { SessionApplication } from "../../apps/api/src/sessions.js";
+import { eraseBillingTestAccount } from "./billingAccountFixture.js";
 import { testBillingPlans, testBillingPolicy, testCountryPolicy, unusedAskApplication } from "./billingFixtures.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "./discoveredPanel.js";
 import { startFakeXMoney } from "./fake-xmoney.js";
@@ -46,7 +49,8 @@ import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
  * directly (the sign-up, verification and 2-step flows are L3's, the age gate's and the existing suites'), each with
  * the age record (0077, unless a test asks for an account that still owes it) and the sign-up TERMS acceptance
  * registration writes; the session application reads that age record as SessionService does. Everything from the
- * quote on goes through the real routes and the real jobs. The
+ * quote on goes through the real routes and the real jobs, and the account deletion routes (DELETE /v1/account) are
+ * composed with billing's hook as main.ts composes them (P2-M39). The
  * runtime's timers are never started: the test drives time. The stack's clock is real time plus whatever the test has
  * advanced, and xMoney is reached through StageShiftedXMoneyClient with that same offset, exactly as a stage host
  * with BILLING_STAGE_CLOCK_OFFSET_DAYS runs: the fake stamps transactions with real time, as xMoney does.
@@ -93,6 +97,19 @@ export interface BillingStack {
   xmoneyOrderOf(ownerRef: string): Promise<string | null>;
   get(person: BillingPerson | null, url: string, ip?: string): Promise<HttpAnswer>;
   post(person: BillingPerson | null, url: string, payload: unknown, ip?: string): Promise<HttpAnswer>;
+  delete(person: BillingPerson, url: string, payload: unknown): Promise<HttpAnswer>;
+  /**
+   * P2-M39: the verified email address registration's email check leaves on the account (the stack makes accounts
+   * active directly, without one). Scheduling an account deletion (DELETE /v1/account, 0040) refuses an account with no
+   * address to tell; nothing else in the stack reads it.
+   */
+  addEmailChannel(person: BillingPerson): Promise<void>;
+  /**
+   * P2-M39: the scheduled account deletion runs, as the erasure worker runs it once its week has passed (the request's
+   * time moved to now, on the database's clock, which the stack does not move): prepare, the completion notice
+   * acknowledged, finalize as the erasure principal. Returns finalize's outcome ("COMMITTED").
+   */
+  commitErasure(person: BillingPerson): Promise<string>;
   /** The notice as xMoney posts it: form-encoded, no session. */
   notify(opensslResult: string): Promise<HttpAnswer>;
   consents(locale: string): Readonly<Record<"renewal_terms" | "immediate_start", Readonly<{ version: string; sha256: string }>>>;
@@ -111,6 +128,12 @@ export interface BillingStack {
    * runtime.ts builds its own (which the runtime does not expose), then every job it queued.
    */
   reconcileDaily(): Promise<ReconcileReport>;
+  /**
+   * P2-M39: P16c's daily owner-jobs tick (the quarter's tax summary queued once), built from the same members as
+   * runtime.ts builds its own (which the runtime does not expose), then every job due; the runtime's own
+   * OWNER_TAX_SUMMARY handler renders O1. Returns how many summary jobs the tick queued.
+   */
+  runOwnerJobs(): Promise<number>;
   subscriptionStatus(ownerRef: string): Promise<string | null>;
   cancelRequested(ownerRef: string): Promise<boolean>;
   entitlementPlan(ownerRef: string): Promise<PlanId>;
@@ -230,6 +253,16 @@ export async function startBillingStack(): Promise<BillingStack> {
     users: deks, blindIndexKey, mail: emailChangeMail, tokenTtlMs: 24 * 3_600_000, resendCooldownMs: 60_000
   });
   const emailChangeSource = Object.freeze({ ip: TEST_IPS.RO, userAgent: "billing-stack", requestId: "request:w8" });
+  // P2-M39: the account deletion routes exactly as main.ts composes them (PostgresAccountErasureApplication over its
+  // repository), with billing's hook beside them (`billingErasure` below). Deleting a private debate is not a billing
+  // journey: the stack never calls it, so its coordinator is left out.
+  const accountErasure = new PostgresAccountErasureApplication(
+    new PostgresAccountErasureRepository(database.pool, Object.freeze({
+      hashSourceIp: async () => "55".repeat(32),
+      hashUserAgent: async () => "66".repeat(32)
+    }) as unknown as AuditContextHasher),
+    Object.freeze({}) as unknown as PrivateRunErasureCoordinator
+  );
 
   const identities: TestHttpIdentity[] = [];
   const byToken = (presented: string) => identities.find((identity) => identity.rawSessionToken === presented);
@@ -259,13 +292,18 @@ export async function startBillingStack(): Promise<BillingStack> {
       const identity = identities.find((candidate) => candidate.authenticated === input.session);
       if (identity === undefined) throw new Error("BILLING_STACK_SESSION_UNKNOWN");
       const grantToken = randomBytes(32).toString("base64url");
-      if (input.authorization?.action === "WITHDRAW_SUBSCRIPTION") {
+      const action = input.authorization?.action;
+      // The account-scoped grants: P12d's withdrawal, and (P2-M39) the account deletion 0040's schedule consumes.
+      if (action === "WITHDRAW_SUBSCRIPTION" || action === "DELETE_ACCOUNT") {
         await database.pool.query(`
           INSERT INTO identity.step_up_grant(
             step_up_grant_id,token_hash,session_id,user_id,action,target_run_id,target_account_id,issued_at,expires_at
-          ) VALUES ($1,$2,$3,$4,'WITHDRAW_SUBSCRIPTION',NULL,$4,clock_timestamp()-interval '1 second',
+          ) VALUES ($1,$2,$3,$4,$5,NULL,$4,clock_timestamp()-interval '1 second',
             clock_timestamp()+interval '2 minutes')
-        `, [randomUUID(), hashToken("step-up-grant", grantToken), identity.authenticated.session.session_id, identity.authenticated.userId]);
+        `, [
+          randomUUID(), hashToken("step-up-grant", grantToken), identity.authenticated.session.session_id,
+          identity.authenticated.userId, action
+        ]);
       }
       return {
         sessionToken: identity.rawSessionToken, csrfToken: identity.rawCsrfToken, grantToken,
@@ -301,6 +339,12 @@ export async function startBillingStack(): Promise<BillingStack> {
     billing: billingRepository, jobs: new BillingJobQueries(database.pool), xmoney: connectors.xmoney,
     environment: connectors.xmoneyEnvironment, audit: () => undefined, clock: now, kick: () => undefined
   });
+  const taxAuthorities = taxAuthoritiesFromValue(
+    TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef
+  );
+  const ownerJobs = new OwnerJobs({
+    billing: billingRepository, jobs: new BillingJobQueries(database.pool), taxAuthorities, audit: () => undefined, clock: now
+  });
   const runtime = createBillingRuntime({
     pool: database.pool,
     connectors,
@@ -332,9 +376,7 @@ export async function startBillingStack(): Promise<BillingStack> {
         return found.rows[0]?.owner_ref ?? null;
       }
     },
-    taxAuthorities: taxAuthoritiesFromValue(
-      TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef
-    )
+    taxAuthorities
   });
   // B7a's usage read, composed as main.ts composes it beside the runtime's routes (R-3).
   const usage = new PersonUsageReader({
@@ -344,7 +386,9 @@ export async function startBillingStack(): Promise<BillingStack> {
   });
   const api: FastifyInstance = buildApi({
     application: unusedAskApplication(), sessions, allowedOrigin: TEST_APP_ORIGIN,
-    billing: { ...runtime.routes, usage }
+    billing: { ...runtime.routes, usage },
+    // As main.ts passes them: the deletion routes, and billing's renewal stop on a scheduled deletion (P15, W7).
+    accountErasure, billingErasure: runtime.erasure
   });
   await api.ready();
 
@@ -405,6 +449,32 @@ export async function startBillingStack(): Promise<BillingStack> {
     },
     async post(person, url, payload, ip) {
       return answer(await api.inject({ method: "POST", url, remoteAddress: ip ?? person?.ip ?? TEST_IPS.RO, headers: headersFor(person, true), payload: payload as Record<string, unknown> }));
+    },
+    async delete(person, url, payload) {
+      return answer(await api.inject({ method: "DELETE", url, remoteAddress: person.ip, headers: headersFor(person, true), payload: payload as Record<string, unknown> }));
+    },
+    async addEmailChannel(person) {
+      // The columns P1b's erasure fixture writes for a verified address (tests/support/billingAccountFixture.ts).
+      await database.pool.query(`
+        INSERT INTO identity.channel_binding(
+          channel_binding_id,user_id,channel_type,address_ciphertext,state,created_at,
+          verified_at,verification_token_hash,verification_expires_at,
+          verification_last_sent_at,verification_consumed_at,delivery_status,delivery_error
+        ) VALUES ($1,$2,'email','{}','verified',clock_timestamp(),clock_timestamp(),$3,
+          clock_timestamp()+interval '1 hour',clock_timestamp()-interval '1 hour',clock_timestamp(),'sent',NULL)
+      `, [randomUUID(), person.userId, opaqueHash()]);
+    },
+    async commitErasure(person) {
+      const request = await database.pool.query<{ erasure_id: string }>(`
+        UPDATE identity.account_erasure_request SET execute_at = clock_timestamp()
+        WHERE user_id = $1 AND cancelled_at IS NULL AND committed_at IS NULL
+        RETURNING erasure_id::text AS erasure_id
+      `, [person.userId]);
+      if (request.rows.length !== 1) throw new Error("BILLING_STACK_ERASURE_NOT_SCHEDULED");
+      return eraseBillingTestAccount(database.pool, {
+        userId: person.userId, ownerRef: person.ownerRef, sessionId: person.identity.authenticated.session.session_id,
+        erasureId: request.rows[0]!.erasure_id
+      });
     },
     async notify(opensslResult) {
       return answer(await api.inject({
@@ -479,6 +549,11 @@ export async function startBillingStack(): Promise<BillingStack> {
       if (report.refusedListings.length > 0) throw new Error(`BILLING_STACK_LISTING_REFUSED:${report.refusedListings.join(",")}`);
       await stack.runJobs();
       return report;
+    },
+    async runOwnerJobs() {
+      const queued = await ownerJobs.schedule();
+      await stack.runJobs();
+      return queued;
     },
 
     async subscriptionStatus(ownerRef) {

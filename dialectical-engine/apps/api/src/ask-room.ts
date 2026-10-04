@@ -302,9 +302,23 @@ function alreadyWaiting(evaluation: RoomEvaluation): AskAlreadyWaitingError {
   return new AskAlreadyWaitingError(oldest.runId, evaluation.expected.waitsUntil, evaluation.expected.waitsFor ?? null);
 }
 
+/**
+ * Paid plans P4-G (go-live row 31): how long one WAITING run's expected start is kept, at most. It is
+ * never kept past the waker's next tick either (`nextWholeMinute`), when the run may start or its room
+ * change. A debate page polls GET /v1/runs/{id}; without this every poll ran the estimator and the
+ * room's reads again. A server-side window protects against any client, which a slower poll would not.
+ */
+const EXPECTED_START_KEEP_MS = 30_000;
+/** The most runs whose expected start one process keeps; beyond it the oldest is dropped first. */
+const EXPECTED_START_KEEP_RUNS = 4_096;
+
+type KeptExpectedStart = Readonly<{ until: number; value: Promise<ExpectedStart | null> }>;
+
 export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   readonly #options: AskRoomOptions;
   readonly #clock: () => Date;
+  /** P4-G: each WAITING run's expected start, per run, until its short window ends. */
+  readonly #expectedStarts = new Map<string, KeptExpectedStart>();
   /** Why the decision on each open transaction would make its question wait; set and cleared by `decide`. */
   readonly #waitReasons = new WeakMap<PoolClient, WaitReason>();
 
@@ -379,11 +393,42 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     await this.#openStartWith(tx, input, entitlement);
   }
 
-  /** A waiting run's expected start, recomputed on every read (budget spec §2.7), and why when no reset is what it waits for. */
-  async expectedStart(runId: string): Promise<ExpectedStart | null> {
+  /**
+   * A waiting run's expected start (budget spec §2.7), and why when no reset is what it waits for.
+   * P4-G: computed at most once per run per short window (`EXPECTED_START_KEEP_MS`, and never past the
+   * waker's next tick); reads inside the window, concurrent ones included, share that one computation.
+   * A computation that fails is not kept.
+   */
+  expectedStart(runId: string): Promise<ExpectedStart | null> {
+    const now = this.#clock();
+    const instant = now.getTime();
+    const kept = this.#expectedStarts.get(runId);
+    if (kept !== undefined && instant < kept.until) return kept.value;
+    this.#expectedStarts.delete(runId);
+    if (this.#expectedStarts.size >= EXPECTED_START_KEEP_RUNS) {
+      for (const [key, entry] of this.#expectedStarts) {
+        if (entry.until <= instant) this.#expectedStarts.delete(key);
+      }
+      // Map iteration is insertion order: the oldest is dropped first.
+      for (const key of this.#expectedStarts.keys()) {
+        if (this.#expectedStarts.size < EXPECTED_START_KEEP_RUNS) break;
+        this.#expectedStarts.delete(key);
+      }
+    }
+    const entry: KeptExpectedStart = Object.freeze({
+      until: Math.min(instant + EXPECTED_START_KEEP_MS, nextWholeMinute(now).getTime()),
+      value: this.#computeExpectedStart(runId, now)
+    });
+    this.#expectedStarts.set(runId, entry);
+    entry.value.catch(() => {
+      if (this.#expectedStarts.get(runId) === entry) this.#expectedStarts.delete(runId);
+    });
+    return entry.value;
+  }
+
+  async #computeExpectedStart(runId: string, now: Date): Promise<ExpectedStart | null> {
     const run = await this.#options.line.readWaiting(runId);
     if (run === null) return null;
-    const now = this.#clock();
     const estimateMicros = await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run));
     const { rooms } = await this.#measure(accessOfWaitingRun(run), estimateMicros, now);
     const until = waitingUntil({ rooms, nextTickAt: nextWholeMinute(now) });

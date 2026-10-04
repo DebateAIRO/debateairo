@@ -27,7 +27,7 @@ export type CheckoutConsents = Readonly<{ renewal: ConsentPair; immediateStart: 
 
 /**
  * Quaderno prices the US and Canada by postal code (spec §1.3 "Paying" step 1). For them P8b's `address_required`
- * means the state or postal code, which the postal block already asks for (outside Romania the name is optional,
+ * means the postal code (P2-M29), which the postal block already requires (outside Romania the name is optional,
  * R-15), so it never opens the invoice-address block there.
  */
 const POSTAL_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);

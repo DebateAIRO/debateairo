@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 import { mostOneRunMaySpendMicros } from "@debateai/budget";
+import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import type { DiscoveredPanelMember } from "@debateai/db";
 import { TypedDomainError, type DebateRole, type ModelStrength } from "@debateai/kernel";
 import { providerTargetPrice, type ProviderDiscoveryTarget } from "@debateai/providers";
@@ -12,8 +13,10 @@ import {
   type ModelScorecardReadResult
 } from "@debateai/register";
 import {
+  freeAnswerJobsFollowPaidSiteRule,
   freeCapsFollowPaidSiteRule,
   planCapsFollowPaidSiteRule,
+  SCORECARD_FREE_ANSWER_UNSCORED,
   SCORECARD_FREE_CAPS_INVALID,
   SCORECARD_PLAN_CAPS_INVALID,
   type ReachableTarget,
@@ -229,6 +232,20 @@ export function askModelPickerSettings(input: Readonly<{
     throw new TypeError("ASK_MODEL_PICKER_MONEY_POLICY_MISMATCH");
   }
   const answerTokenCeilings = answerTokenCeilingsByRole(input.callTokenCeilings);
+  // Paid plans P4-E (Part 3b re-review M-4; ruling C4): the backstop of the publish-time
+  // check. With billing on a Free ask's answer writer and checker take a scored Free-roster
+  // model or none, so a scorecard under which no declared Free-roster model can take one of
+  // them would refuse every Free question; boot refuses it instead, by the picker's own
+  // eligibility over the declared targets and the sealed answer bounds.
+  if (hosted && input.billingEnabled === true && input.scorecard.state === "VALID"
+    && !freeAnswerJobsFollowPaidSiteRule({
+      scorecard: input.scorecard.scorecard,
+      targets: input.targets,
+      freeRosterModelIds: PLAN_TIER_ROSTERS.free,
+      answerTokenCeilingByRole: answerTokenCeilings
+    })) {
+    throw new TypeError(SCORECARD_FREE_ANSWER_UNSCORED);
+  }
   return Object.freeze({
     scorecard: input.scorecard,
     mode: hosted ? "HOSTED" : "LOCAL",

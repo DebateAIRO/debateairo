@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Dit debat kon niet starten omdat de benodigde AI-modellen niet beschikbaar waren. Probeer het over een tijdje alstublieft opnieuw.",
   "runFailure.RUN_LIMIT_REACHED": "Dit debat heeft zijn limiet bereikt voordat het een antwoord kon geven.",
   "runFailure.STOPPED": "Dit debat is halverwege gestopt door een probleem aan onze kant. Stel uw vraag alstublieft opnieuw.",
+  "runFailure.PLAN_ENDED": "Uw betaalde abonnement is afgelopen of gepauzeerd terwijl deze vraag wachtte, dus het debat is niet begonnen. U kunt de vraag opnieuw stellen.",
   "debateChrome.error.unableToLoadDebate": "Debat kon niet worden geladen",
   "debateChrome.error.unableToLoadScoring": "Scores konden niet worden geladen",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Proefuitvoering voor adaptieve diepte kon niet worden geladen",

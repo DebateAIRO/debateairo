@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "לא ניתן היה להתחיל את הדיון הזה, כי מודלי הבינה המלאכותית הדרושים לו לא היו זמינים. נא לנסות שוב בעוד זמן מה.",
   "runFailure.RUN_LIMIT_REACHED": "הדיון הזה הגיע למגבלה שלו לפני שהספיק לתת תשובה.",
   "runFailure.STOPPED": "הדיון הזה נעצר באמצע בגלל תקלה אצלנו. נא לשאול את השאלה שוב.",
+  "runFailure.PLAN_ENDED": "התוכנית בתשלום שלכם הסתיימה או הושהתה בזמן שהשאלה הזו המתינה, ולכן הדיון לא התחיל. אפשר לשאול אותה שוב.",
   "debateChrome.error.unableToLoadDebate": "לא ניתן לטעון את הדיון",
   "debateChrome.error.unableToLoadScoring": "לא ניתן לטעון את הציונים",
   "debateChrome.error.unableToLoadAdaptiveDepth": "לא ניתן לטעון את הרצת הניסיון של העומק המסתגל",

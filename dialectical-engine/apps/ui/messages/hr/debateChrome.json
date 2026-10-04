@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Ova rasprava nije mogla započeti jer modeli umjetne inteligencije koji su joj potrebni nisu bili dostupni. Molimo, pokušajte ponovno malo kasnije.",
   "runFailure.RUN_LIMIT_REACHED": "Ova je rasprava dosegnula svoje ograničenje prije nego što je mogla dati odgovor.",
   "runFailure.STOPPED": "Ova je rasprava prekinuta na pola puta zbog problema na našoj strani. Molimo, ponovno postavite svoje pitanje.",
+  "runFailure.PLAN_ENDED": "Vaš plaćeni plan je istekao ili je pauziran dok je ovo pitanje čekalo, pa rasprava nije počela. Možete ga ponovno postaviti.",
   "debateChrome.error.unableToLoadDebate": "Nije moguće učitati raspravu",
   "debateChrome.error.unableToLoadScoring": "Nije moguće učitati bodovanje",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Nije moguće učitati probni rad prilagodljive dubine",

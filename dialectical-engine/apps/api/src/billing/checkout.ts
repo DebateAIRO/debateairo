@@ -365,9 +365,10 @@ export class CheckoutService implements CheckoutServicePort {
    * for. A1: a transaction carries no id of ours, so the listed deposits (created since the charge, by creation date)
    * are first matched on the CREATED event's xMoney customer, then each one's order is confirmed with GET /order
    * (asked once per order) to hold the charge id. A transaction that is `complete-failed`, or that the charge already
-   * recorded as FAILED (a decline, a void), is not on its way; a not-final one (`start` / `in-progress` /
-   * `3d-pending`) counts only while `inFlightAttemptFresh`, so a person who closed the bank's window is not locked
-   * out until xMoney finalises it. Null: no open checkout, or nothing on its way. An xMoney failure is the 503.
+   * recorded as FAILED (a decline, a void) or as CHARGEBACK (P2-N1: charged back before it was verified), is not on
+   * its way; a not-final one (`start` / `in-progress` / `3d-pending`) counts only while `inFlightAttemptFresh`, so a
+   * person who closed the bank's window is not locked out until xMoney finalises it. Null: no open checkout, or
+   * nothing on its way. An xMoney failure is the 503.
    */
   private async listedPaymentUnderway(ownerRef: string, now: Date): Promise<ListedUnderway> {
     const existing = await this.deps.repository.subscriptionForOwner(ownerRef);
@@ -379,8 +380,9 @@ export class CheckoutService implements CheckoutServicePort {
     const created = (await this.deps.repository.subscriptionEvents(existing.subscriptionId)).find((event) => event.kind === "CREATED");
     const customer = created?.xmoneyCustomerId ?? null;
     if (customer === null) return null;
+    // P2-N1: a payment charged back before it was ever verified is recorded CHARGEBACK, not FAILED; neither is on its way.
     const failed = new Set(((await this.deps.repository.charge(initial.chargeId))?.events ?? [])
-      .filter((event) => event.kind === "FAILED" && event.xmoneyTransactionId !== null)
+      .filter((event) => (event.kind === "FAILED" || event.kind === "CHARGEBACK") && event.xmoneyTransactionId !== null)
       .map((event) => event.xmoneyTransactionId));
     const rejected = rejectedRows(this.deps.audit, "checkout");
     const listed = await this.deps.xmoney.listTransactions({

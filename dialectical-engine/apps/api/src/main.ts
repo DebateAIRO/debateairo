@@ -21,6 +21,7 @@ import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debate
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
+  assertAskRoomAdmissionSealed,
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
@@ -474,6 +475,10 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
         }
         return undefined;
       }
+      // Paid plans P4-G, ruling C7 (go-live row 31): with the band the room read is a real computation on
+      // every call, so the version in force must seal its askRoomReads budget (ASK_ROOM_ADMISSION_UNSEALED).
+      // The hosted publish asks the same question in its plan and in verifyHostedRegisterBootReadiness.
+      assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
       const spend = new PostgresModelSpendStore(pool);
       const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
       const personAllowance = entitlements === null || billingPlans === null
@@ -520,7 +525,9 @@ const askRoom = askRoomComposition?.room;
  * from the guard's policy, and with billing on a scorecard that breaks the
  * owners' plan-cap rule refuses this stage (SCORECARD_PLAN_CAPS_INVALID), and
  * so does one whose Free caps are unset or above Economy's
- * (SCORECARD_FREE_CAPS_INVALID, paid plans S4b).
+ * (SCORECARD_FREE_CAPS_INVALID, paid plans S4b), and one under which no declared
+ * Free-plan model can take the answer writer's or the answer checker's job
+ * (SCORECARD_FREE_ANSWER_UNSCORED, paid plans P4-E).
  */
 const billingEnabled = (askRoomComposition?.billingPlans ?? null) !== null;
 const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));

@@ -39,6 +39,8 @@ export type CancelLinkDeps = Readonly<{
   clock: () => Date;
 }>;
 
+/** The statuses `requestCancelLocked` cancels (P2-W10: SUSPENDED too); any other plan gets no link. */
+const CANCELLABLE: ReadonlySet<string> = new Set(["ACTIVE", "PAST_DUE", "SUSPENDED"]);
 /** A25: at most three links per account in any 24 hours; each token lives 24 hours. */
 const LINKS_PER_DAY = 3;
 const DAY_MS = 86_400_000;
@@ -100,14 +102,17 @@ export class CancelLinkService {
     }
   }
 
-  /** One link for this owner's live plan, at most three a day (A25), mailed to `recipient`'s answer. */
+  /**
+   * One link for this owner's live plan with no cancel pending, at most three a day (A25), mailed to `recipient`'s
+   * answer. P2-W10: a plan paused by a card dispute (SUSPENDED) is live and cancellable too.
+   */
   private async issue(
     ownerRef: string, recipient: (customerId: string, profile: BillingProfile) => Promise<string>
   ): Promise<"SENT" | "SILENT"> {
     const mail = this.deps.mail;
     if (mail === undefined) return "SILENT";
     const state = await this.deps.billing.subscriptionForOwner(ownerRef);
-    if (state === null || (state.status !== "ACTIVE" && state.status !== "PAST_DUE") || state.cancelRequested) {
+    if (state === null || !CANCELLABLE.has(state.status) || state.cancelRequested) {
       return "SILENT";
     }
     const customer = await this.deps.billing.customerByOwner(ownerRef);

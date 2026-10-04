@@ -3,9 +3,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { RUN_FAILURE_CODES, RUN_FAILURE_KINDS, runFailureKind, runFailureMessage } from "./runFailure.ts";
+import {
+  RUN_FAILURE_CODES, RUN_FAILURE_FULL_CODES, RUN_FAILURE_KINDS, runFailureKind, runFailureMessage
+} from "./runFailure.ts";
 
-// A failed debate is told to its asker in one of four sentences, never by the
+// A failed debate is told to its asker in one of five sentences, never by the
 // engine's own terminal reason code (owner ruling 2026-09-28: codes stay for
 // operators — the database, GET /v1/runs/:id, the logs, deploy/vps/README.md).
 
@@ -21,9 +23,14 @@ const LOCALES = readdirSync(messagesRoot, { withFileTypes: true })
 /** The two catalogues whose pages show a failed debate: the home list, and the debate page's banner. */
 const NAMESPACES = ["home", "debateChrome"];
 
-/** The owner's picks, 2026-09-28 (1b 2b 3b 5b); 4b was retired by the budget rule (spec 2026-09-28 §2.11). */
+/**
+ * The owner's picks, 2026-09-28 (1b 2b 3b 5b); 4b was retired by the budget rule (spec 2026-09-28 §2.11).
+ * PLAN_ENDED is the owner's ruling of 3 October 2026 (Part 4, phrasing 2 of part4-scope.md §4.1).
+ */
 const ENGLISH = Object.freeze({
   NOT_STARTED: "Something went wrong on our side before this debate began. Please ask again.",
+  PLAN_ENDED:
+    "Your paid plan ended or was paused while this question waited, so the debate didn't start. You can ask it again.",
   MODELS_UNAVAILABLE:
     "This debate could not start because the AI models it needs were unavailable. Please try again in a while.",
   RUN_LIMIT_REACHED: "This debate reached its limit before it could produce an answer.",
@@ -40,13 +47,18 @@ test("every code family lands in its group, whether or not the runner wrapped it
     ["RUN_SETUP_FAILED:WORK_QUEUE", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:DISPATCH", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:MODEL_ASSIGNMENT", "NOT_STARTED"],
-    // Part 1b's setup steps (B6b, B7b, B8): a question that could not take its
-    // place in line, hold its estimate, start under its current plan, or record
-    // its roster swap never began.
+    // Part 1b's setup steps (B6b, B8): a question that could not take its
+    // place in line, hold its estimate, or record its roster swap never began.
     ["RUN_SETUP_FAILED:WAITING_LINE", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:ROOM_HOLD", "NOT_STARTED"],
-    ["RUN_SETUP_FAILED:PLAN_CHANGED", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:COST_RECORD", "NOT_STARTED"],
+    // B7b's step is not a fault (Part 4, part4-scope.md §4.1): a premium
+    // question waited in line, and by the time there was room its owner's paid
+    // plan had ended, been withdrawn or erased, or been paused by a dispute.
+    // The owner's ruling of 3 October 2026 tells the asker so, not "something
+    // went wrong on our side".
+    ["RUN_SETUP_FAILED:PLAN_CHANGED", "PLAN_ENDED"],
+    ["  RUN_SETUP_FAILED:PLAN_CHANGED  ", "PLAN_ENDED"],
     // The runner's claim-time refusals, first as written, then as the Hatchet
     // catch overwrites them (the role suffix is lost there).
     ["RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", "MODELS_UNAVAILABLE"],
@@ -98,6 +110,11 @@ test("every code family lands in its group, whether or not the runner wrapped it
     [undefined, "STOPPED"],
     // Near misses are not their neighbours.
     ["RUN_SETUP_FAILED_ELSEWHERE", "STOPPED"],
+    // Only the whole code is the plan's sentence; a longer step is any other step.
+    ["RUN_SETUP_FAILED:PLAN_CHANGED_ELSEWHERE", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:PLAN_CHANGED:EXTRA", "NOT_STARTED"],
+    ["RUN_SETUP_FAILED:plan_changed", "NOT_STARTED"],
+    ["PLAN_CHANGED", "STOPPED"],
     ["RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL_TOO", "STOPPED"],
     ["XRUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM", "STOPPED"]
   ];
@@ -111,6 +128,7 @@ test("every code family lands in its group, whether or not the runner wrapped it
 test("says the owner's chosen English sentence in both catalogues, and on the English backstop", () => {
   const samples = {
     NOT_STARTED: "RUN_SETUP_FAILED:DISPATCH",
+    PLAN_ENDED: "RUN_SETUP_FAILED:PLAN_CHANGED",
     MODELS_UNAVAILABLE: "RUNNER_EXECUTION_FAILED:RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
     RUN_LIMIT_REACHED: "RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL",
     STOPPED: "CALL_BUDGET_EXHAUSTED"
@@ -220,6 +238,28 @@ test("maps only codes their writers still produce", () => {
     assert.ok(RUN_FAILURE_KINDS.includes(kind), `${code} → ${kind}`);
     assert.ok(writers[code](code), `${code} is still written where this table expects`);
   }
+
+  // The whole codes read before the head rule (Part 4, part4-scope.md §4.1).
+  // PLAN_CHANGED is written by the API's waiting-line waker
+  // (PostgresAskApplication.wakeWaitingRuns, B7b) through the same
+  // #recordRunSetupFailure that writes every RUN_SETUP_FAILED:<step>; the step
+  // is a member of its RunSetupStep union.
+  const fullWriters = {
+    "RUN_SETUP_FAILED:PLAN_CHANGED": () =>
+      api.includes("const reason = `RUN_SETUP_FAILED:${step}`;")
+      && api.includes('await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");')
+      && /\| "ROOM_HOLD" \| "PLAN_CHANGED"\n/u.test(api)
+  };
+  assert.deepEqual(
+    Object.keys(RUN_FAILURE_FULL_CODES).sort(), Object.keys(fullWriters).sort(), "a writer check per whole code"
+  );
+  for (const [code, kind] of Object.entries(RUN_FAILURE_FULL_CODES)) {
+    assert.ok(RUN_FAILURE_KINDS.includes(kind), `${code} → ${kind}`);
+    assert.ok(fullWriters[code](), `${code} is still written where this table expects`);
+    // A whole code always has a head the head rule also knows, so a stored
+    // code that differs from it by one letter still reads that head's group.
+    assert.ok(Object.hasOwn(RUN_FAILURE_CODES, code.split(":", 1)[0]), `${code}'s head is mapped`);
+  }
 });
 
 test("a debate the site's day stopped is told the group-5 sentence (budget spec 2026-09-28 §2.11)", () => {
@@ -247,4 +287,38 @@ test("a debate whose pinned role assignment the runner refused at claim is told 
       );
     }
   }
+});
+
+test("a waiting question whose paid plan ended is told so, not that something went wrong (Part 4, §4.1)", () => {
+  // Owner ruling, 3 October 2026: with billing on, a premium question waiting
+  // in line whose owner is now on Free (the plan ended, was withdrawn or
+  // erased, or was paused by a dispute) is recorded RUN_SETUP_FAILED:PLAN_CHANGED.
+  for (const namespace of NAMESPACES) {
+    const message = runFailureMessage("RUN_SETUP_FAILED:PLAN_CHANGED", catalogue("en", namespace));
+    assert.equal(message, ENGLISH.PLAN_ENDED, `en/${namespace}`);
+    assert.notEqual(message, ENGLISH.NOT_STARTED, `en/${namespace} still blames the site`);
+  }
+  // Every other setup step keeps the not-started sentence.
+  for (const step of ["ADMISSION_RELEASE", "DISPATCH", "WAITING_LINE", "ROOM_HOLD", "COST_RECORD", "MODEL_ASSIGNMENT"]) {
+    assert.equal(runFailureKind(`RUN_SETUP_FAILED:${step}`), "NOT_STARTED", step);
+  }
+});
+
+test("the operator runbook's table lists every sentence the pages can show", () => {
+  // deploy/vps/README.md, "What the asker sees when a debate fails": when an
+  // asker quotes a sentence, the operator looks it up there.
+  const runbook = readFileSync(join(appRoot, "..", "..", "deploy", "vps", "README.md"), "utf8");
+  const start = runbook.indexOf("#### What the asker sees when a debate fails");
+  assert.notEqual(start, -1, "the table's heading");
+  const section = runbook.slice(start, runbook.indexOf("\n### ", start));
+  const rows = section.split("\n").filter((line) => line.startsWith("| \""));
+  assert.equal(rows.length, RUN_FAILURE_KINDS.length, "one row per group");
+  for (const kind of RUN_FAILURE_KINDS) {
+    const row = rows.find((line) => line.startsWith(`| "${ENGLISH[kind]}" | \`${kind}\` |`));
+    assert.ok(row, `the ${kind} row quotes its English sentence`);
+  }
+  const planRow = rows.find((line) => line.includes("| `PLAN_ENDED` |"));
+  assert.ok(planRow.includes("`RUN_SETUP_FAILED:PLAN_CHANGED`"), "the PLAN_ENDED row names its code");
+  const notStartedRow = rows.find((line) => line.includes("| `NOT_STARTED` |"));
+  assert.ok(!notStartedRow.includes("any step (see"), "the NOT_STARTED row no longer claims every step");
 });

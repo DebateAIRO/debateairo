@@ -157,8 +157,9 @@ export async function recordOwnerWithdrawal(
  * `--dashboard` amount — what the owner refunded in the xMoney dashboard for this withdrawal — is recorded once, in
  * P12a's `billing.withdrawal_owner_settlement`, in the same transaction; both together may not exceed what the
  * withdrawal's payments took (a typo, BILLING_WITHDRAW_EXCEEDS_PAID). M8 names the sum: RefundDesk's WITHDRAWAL
- * follow-up sends it after the last refund, or it goes now when nothing moves through RefundDesk ("0.00", the
- * nothing-due wording, only when both parts are zero).
+ * follow-up sends it after the last refund, or it goes now when nothing moves through RefundDesk. P2-M7: when both
+ * parts are zero it carries `ownerSettled` "true", so it says only that nothing more is due back (the money had
+ * usually gone back already); never P12d's "the part you already used covers the whole price".
  */
 export async function settleOwnerWithdrawal(
   stores: WithdrawStores, input: Readonly<{ ownerRef: string; refundMicros: number; dashboardMicros: number }>
@@ -197,7 +198,11 @@ export async function settleOwnerWithdrawal(
         await enqueueEmail(stores.billing, client, {
           template: "M8", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
           dedupeRef: waiting.subscriptionId,
-          params: { plan: waiting.planId, refundAmount: microsToDecimal(input.dashboardMicros) }, notBefore: now
+          params: {
+            plan: waiting.planId, refundAmount: microsToDecimal(input.dashboardMicros),
+            ...(input.dashboardMicros === 0 && input.refundMicros === 0 ? { ownerSettled: "true" } : {})
+          },
+          notBefore: now
         });
       }
     }

@@ -32,7 +32,10 @@ afterEach(async () => {
   );
 });
 
-async function legacyRun(askerId = `hold:${randomUUID()}`): Promise<string> {
+async function legacyRun(
+  askerId = `hold:${randomUUID()}`,
+  planTier: "free" | "premium" | "none" = "free"
+): Promise<string> {
   return new RunRepository(database.pool).startRun({
     questionLine: "Does a hold stop counting when its run ends?",
     principal: { kind: "legacy", legacyAskerId: askerId },
@@ -44,7 +47,7 @@ async function legacyRun(askerId = `hold:${randomUUID()}`): Promise<string> {
     tierSource: "ASKER",
     tierProvenanceRef: "asker:test",
     compositionBudgetTier: "low",
-    planTier: "free",
+    ...(planTier === "none" ? {} : { planTier }),
     depthParams: { depth: 1 },
     discoveredPanel: fixtureDiscoveredPanel(2),
     strangerSampleRate: 0,
@@ -426,5 +429,80 @@ describe("B3 withSpendDecisionLock serialises decisions on one day", () => {
   it("refuses a day that is not YYYY-MM-DD", async () => {
     await expect(withSpendDecisionLock(database.pool, { day: "tomorrow", ownerRef: null }, async () => 1))
       .rejects.toThrow("SPEND_DECISION_DAY_INVALID");
+  });
+});
+
+describe("Part 4 final review C-10: the runbook's billing-on count, run exactly as README §14.8 writes it", () => {
+  it("counts every waiting paid question of an existing account, whatever the account's state, and nothing else", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const line = readme.split("\n")
+      .find((text) => text.startsWith("sudo -u postgres psql -d debateai -c \"SELECT count(*) AS waiting_premium")) ?? "";
+    expect(line.endsWith("\"")).toBe(true);
+    // The shell hands psql the text between -c " and the closing quote, with each \" read as ".
+    const sql = line.slice(line.indexOf("-c \"") + 4, -1).replaceAll("\\\"", "\"");
+    expect(sql).toMatch(/^SELECT count\(\*\) AS waiting_premium, count\(\*\) FILTER/u);
+    const count = async (): Promise<readonly [number, number]> => {
+      const row = (await database.pool.query<{ waiting_premium: string; of_accounts_not_active: string }>(sql)).rows[0]!;
+      return [Number(row.waiting_premium), Number(row.of_accounts_not_active)] as const;
+    };
+    const viewCount = async (): Promise<number> => Number((await database.pool.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM core.run_waiting_v WHERE owner_ref IS NOT NULL AND plan_tier IS DISTINCT FROM 'free'"
+    )).rows[0]?.count);
+    const [before, beforeInactive] = await count();
+    const viewBefore = await viewCount();
+
+    const waits = new RunWaitRepository(database.pool);
+    const waiting = async (ownerRef: string | null, planTier: "free" | "premium" | "none"): Promise<string> => {
+      const runId = await legacyRun(`billing-on:${randomUUID()}`, planTier);
+      if (ownerRef !== null) await database.pool.query("SELECT core.append_run_ownership_event($1,$2)", [runId, ownerRef]);
+      await inTransaction((client) => waits.enterWait(client, runId, new Date("2031-03-01T10:00:00.000Z")));
+      return runId;
+    };
+    const active = await activeOwner();
+    const suspended = await activeOwner();
+    const frozen = await activeOwner();
+    const erased = await activeOwner();
+
+    // Counted: a paid question, a question with no recorded plan (a paid one to the site), and the paid questions of a
+    // suspended and an age-frozen account. Neither starts: the waker reads only core.run_waiting_v, which needs an
+    // active account. Suspended is only an account deletion's prepared state, which ends by deleting the account row,
+    // so that question leaves the count by itself; nothing makes an age-frozen account active again, so its question
+    // stays counted.
+    await waiting(active, "premium");
+    await waiting(active, "none");
+    await waiting(suspended, "premium");
+    await waiting(frozen, "premium");
+    // Not counted: a Free question, a legacy asker's, an erased account's, a started one, a failed one, and an
+    // encrypted debate its person deleted (both erasure marks); none of them can ever meet PLAN_CHANGED.
+    await waiting(active, "free");
+    await waiting(null, "premium");
+    await waiting(erased, "premium");
+    const started = await waiting(active, "premium");
+    await inTransaction((client) => waits.markStarted(client, started, new Date()));
+    const failed = await waiting(active, "premium");
+    await new WorkItemRepository(database.pool).recordSetupFailure({
+      runId: failed, batteryRowId: "Q1", commandKey: `S00:${failed}:Q1`, reason: "RUN_SETUP_FAILED:WAITING_LINE"
+    });
+    const tombstoned = await waiting(active, "premium");
+    await database.pool.query(
+      `INSERT INTO serve.private_run_erasure_tombstone (run_id, completed_at, destroyed_key_count, already_absent_key_count)
+       VALUES ($1, now(), 1, 0)`,
+      [tombstoned]
+    );
+    const cleaning = await waiting(active, "premium");
+    await database.pool.query(
+      `INSERT INTO serve.private_run_key_cleanup_intent (request_ref, user_id, run_id, requested_at, cleanup_publication_refs)
+       SELECT $1, account.user_id, $2, now(), '{}'::uuid[] FROM identity."user" AS account WHERE account.owner_ref = $3`,
+      [randomUUID(), cleaning, active]
+    );
+    await database.pool.query(`UPDATE identity."user" SET state='suspended' WHERE owner_ref=$1`, [suspended]);
+    await database.pool.query(`UPDATE identity."user" SET state='age_frozen' WHERE owner_ref=$1`, [frozen]);
+    await database.pool.query(`DELETE FROM identity."user" WHERE owner_ref=$1`, [erased]);
+
+    expect(await count()).toEqual([before + 4, beforeInactive + 2]);
+    // The view the earlier check read hides the suspended and the frozen account's questions: the gap C-10 closes.
+    // (It does count the two runs with erasure marks, but only because this fixture's runs are not encrypted: the
+    // view reads those marks for an encrypted run only, and only a private debate ever carries them.)
+    expect(await viewCount()).toBe(viewBefore + 4);
   });
 });

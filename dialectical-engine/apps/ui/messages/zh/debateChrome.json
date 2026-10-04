@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "所需的 AI 模型暂时不可用，本场辩论未能开始。请稍后再试。",
   "runFailure.RUN_LIMIT_REACHED": "本场辩论在得出答案之前已达到上限。",
   "runFailure.STOPPED": "由于我们这边出现问题，本场辩论中途停止了。请重新提出您的问题。",
+  "runFailure.PLAN_ENDED": "此问题等待期间，您的付费方案已结束或被暂停，因此辩论没有开始。您可以重新提问。",
   "debateChrome.error.unableToLoadDebate": "无法加载辩论",
   "debateChrome.error.unableToLoadScoring": "无法加载评分",
   "debateChrome.error.unableToLoadAdaptiveDepth": "无法加载自适应深度试运行",

@@ -25,6 +25,7 @@
   "runFailure.MODELS_UNAVAILABLE": "필요한 AI 모델을 사용할 수 없어 이 토론을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "runFailure.RUN_LIMIT_REACHED": "이 토론은 답변을 내기 전에 한도에 도달했습니다.",
   "runFailure.STOPPED": "저희 쪽 문제로 이 토론이 중간에 멈췄습니다. 질문을 다시 해 주세요.",
+  "runFailure.PLAN_ENDED": "이 질문이 대기하는 동안 유료 요금제가 종료되었거나 일시 중지되어 토론이 시작되지 않았습니다. 다시 질문하실 수 있습니다.",
   "home.status.waiting": "시작 대기 중입니다. 토론은 {time}에 자동으로 시작됩니다.",
   "home.status.waitingOwnDebates": "다른 토론들이 지금 한도의 나머지를 사용하고 있습니다. 이 토론은 그중 하나가 끝나는 대로 자동으로 시작됩니다.",
   "home.noPublishedDebates": "아직 게시된 토론이 없습니다.",

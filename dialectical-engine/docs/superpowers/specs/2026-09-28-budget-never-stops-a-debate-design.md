@@ -304,7 +304,7 @@ confirms this against `migrations/0040_account_erasure.sql`.
 - **The waiting run's settings and pinned panel are the ones from asking.** The runner already drops absent
   or changed models at claim (`apps/runner/src/index.ts:3840-3880`).
 
-**Expected start** (`waits_until`), recomputed on every read:
+**Expected start** (`waits_until`), recomputed on every read (since paid-plans amendment A31 (m), a waiting run's read keeps it for at most 30 seconds, never past the waker's next tick; the room read, the 202 WAITING answer and 422 `ASK_ALREADY_WAITING` compute it fresh):
 
 - the next UTC midnight when `SITE_DAY` is full;
 - the person's `resetsAt` when their allowance is full;

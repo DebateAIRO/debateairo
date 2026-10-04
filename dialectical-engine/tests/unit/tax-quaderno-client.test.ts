@@ -249,7 +249,12 @@ describe("P4 — FakeTaxEngine (what the route tests rely on)", () => {
     const base = { netMicros: 20_000_000, currency: "USD" as const, taxCode: "saas" as const, date: new Date() };
     expect(await fakeEngine.quote({ ...base, location: location("RO"), taxId: null })).toMatchObject({ taxMicros: 4_200_000, status: "TAXABLE" });
     expect(await fakeEngine.quote({ ...base, location: location("RO"), taxId: "RO-VALID-1" })).toMatchObject({ taxMicros: 4_200_000, status: "TAXABLE" });
-    expect(await fakeEngine.quote({ ...base, location: location("US", { region: "TX" }), taxId: null })).toMatchObject({ taxMicros: 1_250_000, taxRegion: "TX" });
+    // P2-M29: like the HTTP fake (and Quaderno, which P4 never sends a region), it prices the US by postal code only.
+    expect(await fakeEngine.quote({ ...base, location: location("US", { postalCode: "75001" }), taxId: null })).toMatchObject({ taxMicros: 1_250_000, taxRegion: "TX" });
+    expect(await fakeEngine.quote({ ...base, location: location("US", { region: "TX" }), taxId: null }))
+      .toMatchObject({ taxMicros: 0, status: "NOT_REGISTERED", taxRegion: null });
+    expect(await fakeEngine.quote({ ...base, location: location("US", { region: "NY", postalCode: "75001" }), taxId: null }))
+      .toMatchObject({ taxMicros: 1_250_000, taxRegion: "TX" });
     expect(await fakeEngine.quote({ ...base, location: location("FR"), taxId: "FR-VALID-9" })).toMatchObject({ taxMicros: 0, status: "REVERSE_CHARGE" });
     // Any EU/EEA country outside Romania, also one without a rate row (spec §2.5.7's VALID rule).
     expect(await fakeEngine.quote({ ...base, location: location("IT"), taxId: "IT-VALID-3" })).toMatchObject({ taxMicros: 0, status: "REVERSE_CHARGE" });

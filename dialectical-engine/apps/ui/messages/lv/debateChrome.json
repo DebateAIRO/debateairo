@@ -9,6 +9,7 @@
   "runFailure.MODELS_UNAVAILABLE": "Šīs debates nevarēja sākties, jo tām nepieciešamie MI modeļi nebija pieejami. Lūdzu, pēc brīža mēģiniet vēlreiz.",
   "runFailure.RUN_LIMIT_REACHED": "Šīs debates sasniedza savu ierobežojumu, pirms spēja sniegt atbildi.",
   "runFailure.STOPPED": "Šīs debates apstājās pusceļā mūsu pusē radušās problēmas dēļ. Lūdzu, uzdodiet savu jautājumu vēlreiz.",
+  "runFailure.PLAN_ENDED": "Jūsu maksas plāns beidzās vai tika apturēts, kamēr šis jautājums gaidīja, tāpēc debates nesākās. Varat to uzdot vēlreiz.",
   "debateChrome.error.unableToLoadDebate": "Neizdevās ielādēt debates",
   "debateChrome.error.unableToLoadScoring": "Neizdevās ielādēt vērtēšanu",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Neizdevās ielādēt adaptīvā dziļuma izmēģinājumu",

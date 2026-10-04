@@ -32,14 +32,18 @@ export function fakeUsRegionFromPostalCode(postalCode: string | null): string | 
   return postalCode !== null && /^7[5-9][0-9]{3}/u.test(postalCode) ? "TX" : null;
 }
 
-export function fakeTaxDecision(i: Readonly<{ country: string; region: string | null; taxId: string | null }>): FakeTaxDecision {
+/**
+ * P2-M29: the decision reads the postal code, never a state the buyer typed. Quaderno is sent no region (P4), so both
+ * fakes (the HTTP fake Quaderno and the in-memory FakeTaxEngine) price the US by postal code exactly as it does.
+ */
+export function fakeTaxDecision(i: Readonly<{ country: string; postalCode: string | null; taxId: string | null }>): FakeTaxDecision {
   const country = i.country.toUpperCase();
   const rate = COUNTRY_RATES.get(country);
   if (i.taxId !== null && fakeTaxIdIsValid(i.taxId) && country !== HOME_COUNTRY && FAKE_REVERSE_CHARGE_COUNTRIES.has(country)) {
     return { status: "REVERSE_CHARGE", basisPoints: 0, name: "Reverse charge", country, region: null };
   }
   if (country === "US") {
-    const region = i.region === null ? null : i.region.toUpperCase();
+    const region = fakeUsRegionFromPostalCode(i.postalCode);
     const state = region === null ? undefined : US_REGION_RATES.get(region);
     return state === undefined
       ? { status: "NOT_REGISTERED", basisPoints: 0, name: "Sales tax", country, region }

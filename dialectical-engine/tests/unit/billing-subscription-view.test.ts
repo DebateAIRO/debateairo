@@ -32,7 +32,7 @@ describe("P12b the subscription as the person sees it", () => {
       renewal_total: "24.20", scheduled_downgrade_plan_id: null,
       // Romania: the 14 days run 2–15 October, Bucharest time; the window closes at the next local midnight.
       withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15",
-      can_upgrade: true, can_change_card: true
+      can_upgrade: true, can_change_card: true, can_revoke_cancel: false
     });
   });
 
@@ -110,6 +110,36 @@ describe("P12b the subscription as the person sees it", () => {
     const insideLead = new Date(PERIOD_END.getTime() - renewalLeadMs());
     expect(view({}, "RO", insideLead).can_upgrade).toBe(false);
     expect(view({}, "RO", new Date(insideLead.getTime() - 1)).can_upgrade).toBe(true);
+  });
+
+  it("offers no upgrade and no card change for a plan of the other xMoney system (P2-W3 (a), D5 5h)", () => {
+    // README §14.8's same-host switch: a sandbox plan still open, read by the live API. Both routes would refuse it
+    // NOT_SUBSCRIBED (upgrade.ts, card-change.ts), so Settings never offers them.
+    const read = (api: "stage" | "live", overrides: Partial<SubscriptionState> = {}) =>
+      subscriptionView({ state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now: NOW, xmoneyEnvironment: api });
+    expect(read("live")).toMatchObject({ can_upgrade: false, can_change_card: false });
+    expect(read("live", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: false });
+    // Control: the plan's own system offers both, and a live plan on the live API too.
+    expect(read("stage")).toMatchObject({ can_upgrade: true, can_change_card: true });
+    expect(read("stage", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: true });
+    expect(read("live", { xmoneyEnvironment: "live" })).toMatchObject({ can_upgrade: true, can_change_card: true });
+  });
+
+  it("offers Undo only where the revoke route accepts it: ACTIVE, this API's xMoney system, a cancel pending, before the period end (C-15)", () => {
+    const read = (api: "stage" | "live", overrides: Partial<SubscriptionState> = {}, now = NOW) =>
+      subscriptionView({ state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now, xmoneyEnvironment: api });
+    // README §14.8's same-host switch: a live start allows a sandbox plan only ACTIVE with a cancel pending, and the
+    // revoke route refuses it NOT_SUBSCRIBED (subscription-actions.ts), which Settings would word as "try again".
+    expect(read("live", { cancelRequested: true }).can_revoke_cancel).toBe(false);
+    // Control: the plan's own system offers it, and a live plan on the live API too.
+    expect(read("stage", { cancelRequested: true }).can_revoke_cancel).toBe(true);
+    expect(read("live", { cancelRequested: true, xmoneyEnvironment: "live" }).can_revoke_cancel).toBe(true);
+    // Nothing to undo; the period is over (the route refuses it there); a plan paused by a dispute (refused while paused).
+    expect(read("stage").can_revoke_cancel).toBe(false);
+    expect(read("stage", { cancelRequested: true }, new Date(PERIOD_END.getTime() - 1)).can_revoke_cancel).toBe(true);
+    expect(read("stage", { cancelRequested: true }, PERIOD_END).can_revoke_cancel).toBe(false);
+    expect(read("stage", { cancelRequested: true, status: "SUSPENDED" }).can_revoke_cancel).toBe(false);
+    expect(read("stage", { cancelRequested: true, status: "ENDED" }).can_revoke_cancel).toBe(false);
   });
 
   it("names only paid plans, every one of them a PlanIdSchema member, and never shows Free as a subscription", () => {

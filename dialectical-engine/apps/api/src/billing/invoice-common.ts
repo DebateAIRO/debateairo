@@ -53,7 +53,10 @@ export type PaidCharge = Readonly<{
   customerId: string;
   quote: QuoteRow;
   location: QuoteLocation;
-  /** The latest billing profile, its `email` replaced by the account's current address (W8) while the account exists. */
+  /**
+   * The latest billing profile, its `email` replaced by the account's current address (W8) while the account exists.
+   * P2-M30: a document takes only the email and the locale from it; the buyer is `location`, the charge's own.
+   */
   profile: BillingProfile;
   /** The service period the payment bought: the invoice prints it (see "What the invoice says"). */
   period: Readonly<{ start: Date; end: Date }>;
@@ -132,20 +135,34 @@ export function invoiceLine(
   });
 }
 
-/** Spec §2.5.4 invoice jobs: the customer, one line with the tax rate, and the three pieces of location evidence. */
+/** C-8: where Quaderno prices a sale by a region it reads from the postal code (P2-M29). */
+const PRICED_REGION_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);
+
+/**
+ * Spec §2.5.4 invoice jobs: the customer, one line with the tax rate, and the three pieces of location evidence.
+ * P2-M30: the buyer is the charge's own, from the location its quote sealed (the checkout's; a renewal's and an
+ * upgrade's quote seal the subscription's checkout location again, `storedTaxContext`, and later quotes price with
+ * that same company's VAT id), so a late invoice or a partial credit note of an old charge never names the details of
+ * a later checkout. Only the address the document is sent to and its language come from the profile.
+ * Part 4 final review C-8: for a US or Canadian sale the region is the one Quaderno priced from the postal code (the
+ * quote's `taxRegion`, which O1 groups by), never the free-text state the buyer typed; Quaderno's sale record carries it
+ * as the customer's region and each tax line's. Elsewhere the typed region stays (a Romanian county SmartBill needs).
+ */
 export function saleRecordOf(
   paid: PaidCharge, payload: OutboxJob["payload"], taxCode: BillingPolicy["taxCode"], text: BillingOrderText = englishOrderText
 ): SaleRecord {
-  const company = paid.profile.company;
+  const buyer = paid.location;
+  const company = buyer.company;
+  const region = PRICED_REGION_COUNTRIES.has(buyer.country) ? paid.quote.taxRegion : buyer.region;
   return Object.freeze({
     chargeId: paid.charge.chargeId,
     transactionId: paid.paid.xmoneyTransactionId!,
     issuedOn: paid.paid.at,
     customer: Object.freeze({
-      name: company?.name ?? paid.profile.name, email: paid.profile.email, country: paid.profile.country,
-      region: paid.profile.region, postalCode: paid.profile.postalCode, city: paid.profile.city,
+      name: company?.name ?? buyer.name, email: paid.profile.email, country: buyer.country,
+      region, postalCode: buyer.postalCode, city: buyer.city,
       // Spec §2.5.4: "the client is the person or company" — a company is invoiced at its own address.
-      street: company?.address ?? paid.profile.street,
+      street: company?.address ?? buyer.street,
       taxId: company !== null && company.vatValidated ? company.vatId : null, locale: paid.profile.locale
     }),
     lines: Object.freeze([Object.freeze({
@@ -177,13 +194,15 @@ export function refundJobOf(job: Pick<OutboxJob, "payload">): Readonly<{ chargeI
  * or on a refund transaction naming it (D5 5g), gives the amount and the date. A job naming any other transaction (a
  * duplicate payment's refund was never a sale), or one with no such REFUNDED row, is MISSING. P9c's dashboard refund
  * recorded on the payment itself (PROVIDER_REFUND, no refund transaction) holds only an upper bound: xMoney's read
- * named no amount (`quarterSummaryRows` marks it amountKnown=false), so it is AMOUNT_UNKNOWN. A D5 5g PROVIDER_REFUND
- * on its own refund transaction, and a PROVIDER_VOID, carry their true amount.
+ * named no amount (`quarterSummaryRows` marks it amountKnown=false until its credit note is recorded), so it is
+ * AMOUNT_UNKNOWN, with that row (`upToMicros`, what was left of the payment, bounds the credit note P4-K's
+ * `pnpm billing:invoice --record --amount` records). A D5 5g PROVIDER_REFUND on its own refund transaction, and a
+ * PROVIDER_VOID, carry their true amount.
  */
 export type SaleRefund =
   | Readonly<{ kind: "BACKED"; refunded: ChargeEventRow; amountMicros: number }>
   | Readonly<{ kind: "MISSING" }>
-  | Readonly<{ kind: "AMOUNT_UNKNOWN" }>;
+  | Readonly<{ kind: "AMOUNT_UNKNOWN"; refunded: ChargeEventRow; upToMicros: number }>;
 
 export function saleRefundOf(
   charge: Readonly<{ events: readonly ChargeEventRow[] }>, paid: ChargeEventRow, transactionId: string
@@ -195,7 +214,7 @@ export function saleRefundOf(
     return Object.freeze({ kind: "MISSING" as const });
   }
   if (refunded.errorCode === "PROVIDER_REFUND" && refunded.refundsTransactionId === null) {
-    return Object.freeze({ kind: "AMOUNT_UNKNOWN" as const });
+    return Object.freeze({ kind: "AMOUNT_UNKNOWN" as const, refunded, upToMicros: refunded.amountMicros });
   }
   return Object.freeze({ kind: "BACKED" as const, refunded, amountMicros: refunded.amountMicros });
 }
