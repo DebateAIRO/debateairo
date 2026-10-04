@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { SaleRecord } from "@debateai/billing-core";
 import { TypedDomainError } from "@debateai/kernel";
-import { createDeadJobAlert } from "../../apps/api/src/billing/dead-jobs.js";
+import { createDeadJobAlert, documentJobAction } from "../../apps/api/src/billing/dead-jobs.js";
 import { openInvoiceCommand, runBillingInvoiceCli } from "../../apps/api/src/billing/invoice-cli.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "../../apps/api/src/billing/invoice-quaderno.js";
 import {
@@ -386,5 +386,54 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
       DATABASE_URL: h.database.connectionString, XMONEY_API_BASE_URL: "https://api.xmoney.com", PUBLIC_APP_URL: TEST_PUBLIC_APP_URL
     }), h.clock.read)).toBe(1);
     expect(live.lines.err).toBe("BILLING_INVOICE_OTHER_XMONEY_SYSTEM\n");
+  });
+  it("gives a payment refunded before we ever saw it paid its own line, which asks for no document (C-5)", async () => {
+    // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path records the money coming and going
+    // with no plan and no invoice (A29 (q): no invoice and no credit note owed), so no DASHBOARD_REFUND line asks for a
+    // credit note the command cannot record; the charge has its own line instead.
+    const bought = await h.buy();
+    const refunded = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO", status: "refund-ok" });
+    await h.settle(refunded.transactionId);
+    await documents.drain(5);
+    expect(await h.eventKinds(bought.chargeId)).toEqual(["REFUNDED", "REFUND_REQUESTED", "REQUESTED", "SUCCEEDED"]);
+    expect((await h.outboxRows(bought.chargeId)).map((row) => row.kind)).not.toContain("SMARTBILL_INVOICE");
+    const [line] = await listed(bought.chargeId);
+    expect(await listed(bought.chargeId)).toEqual([expect.objectContaining({ jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED" })]);
+    expect(documentJobAction({ chargeId: "<charge>", jobKind: line!.jobKind, code: line!.code })).toBe("Refunded before it"
+      + " started: no invoice or credit note is owed. Take this sale and its refund out of the quarter's figures by hand.");
+    // Nothing is recorded for it, with or without an amount.
+    await invoiceCommand("--charge", bought.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0990", "--amount", "4.00");
+    expect(await invoices(bought.chargeId)).toEqual([]);
+    // An INVOICE intent alone (an invoice row needs one, 0086's foreign key) says an invoice is owed: DASHBOARD_REFUND.
+    await h.repository.withTransaction((client) => h.repository.insertInvoiceIntent(client, {
+      chargeId: bought.chargeId, kind: "INVOICE", issuer: "SMARTBILL", requestedAt: h.clock.now
+    }));
+    expect(await listed(bought.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
+
+    // The same for a renewal's payment refunded at xMoney before its check ran: no invoice job was ever queued. (Last in
+    // this file: moving the clock a period on makes every earlier subscription due too.)
+    const paid = await h.activate();
+    await documents.drain(5);
+    h.clock.now = new Date((await h.periodEndOf(paid.subscriptionId)).getTime() + 60_000);
+    await h.renewal.runOnce();
+    const renewal = (await h.repository.chargesForSubscription(paid.subscriptionId)).find((charge) => charge.kind === "RENEWAL")!;
+    const rebill = [...h.xmoney.transactions.values()].find((transaction) =>
+      transaction.orderId === paid.transaction.orderId && transaction.transactionSource === "re-bill")!;
+    h.xmoney.setStatus(rebill.transactionId, "refund-ok");
+    await h.worker.drain(10);
+    expect(await h.eventKinds(renewal.chargeId)).toEqual(expect.arrayContaining(["SUCCEEDED", "REFUNDED"]));
+    expect((await h.outboxRows(renewal.chargeId)).map((row) => row.kind)).not.toContain("SMARTBILL_INVOICE");
+    expect(await listed(renewal.chargeId)).toEqual([expect.objectContaining({ jobKind: "REFUNDED_BEFORE_START", code: "NO_DOCUMENT_OWED" })]);
+
+    // Control: a sale whose invoice job was queued (not yet issued) still owes its credit note: DASHBOARD_REFUND.
+    const queued = await h.activate();
+    h.xmoney.setStatus(queued.transaction.transactionId, "refund-ok");
+    await h.settle(queued.transaction.transactionId);
+    expect((await h.outboxRows(queued.chargeId)).filter((row) => row.kind === "SMARTBILL_INVOICE")).toEqual([
+      expect.objectContaining({ done: false, dead: false })
+    ]);
+    expect(await listed(queued.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
+    await documents.drain(5);
+    expect(await listed(queued.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
   });
 });

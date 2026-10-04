@@ -93,6 +93,11 @@ describe("P16b the summary reads our own rows", () => {
       await billing.enqueue(client, {
         kind: "SMARTBILL_INVOICE", ref: refused.initialChargeId, notBefore: new Date(0), payload: { charge_id: refused.initialChargeId }
       });
+      // A verified sale: its invoice was asked of SmartBill (Part 4 final review C-5 lists a dashboard refund only for a
+      // charge that owes an invoice).
+      await billing.insertInvoiceIntent(client, {
+        chargeId: dashboard.initialChargeId, kind: "INVOICE", issuer: "SMARTBILL", requestedAt: new Date()
+      });
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(dashboard.initialChargeId, kind, new Date(), {
           xmoneyTransactionId: dashboard.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
@@ -127,6 +132,10 @@ describe("P16b the summary reads our own rows", () => {
     const ownTransaction = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
     const refundTransactionId = String(8_800_000_000 + Math.floor(Math.random() * 99_999_999));
     await billing.withTransaction(async (client) => {
+      // A verified sale, whose invoice was asked of SmartBill (C-5: so its dashboard refund owes a credit note).
+      await billing.insertInvoiceIntent(client, {
+        chargeId: onPayment.initialChargeId, kind: "INVOICE", issuer: "SMARTBILL", requestedAt: new Date()
+      });
       // P9c, xMoney's read naming no refunded amount: recorded on the payment at what was left of the charge.
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(onPayment.initialChargeId, kind, new Date(), {

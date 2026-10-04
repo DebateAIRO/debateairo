@@ -135,25 +135,32 @@ export function invoiceLine(
   });
 }
 
+/** C-8: where Quaderno prices a sale by a region it reads from the postal code (P2-M29). */
+const PRICED_REGION_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA"]);
+
 /**
  * Spec §2.5.4 invoice jobs: the customer, one line with the tax rate, and the three pieces of location evidence.
  * P2-M30: the buyer is the charge's own, from the location its quote sealed (the checkout's; a renewal's and an
  * upgrade's quote seal the subscription's checkout location again, `storedTaxContext`, and later quotes price with
  * that same company's VAT id), so a late invoice or a partial credit note of an old charge never names the details of
  * a later checkout. Only the address the document is sent to and its language come from the profile.
+ * Part 4 final review C-8: for a US or Canadian sale the region is the one Quaderno priced from the postal code (the
+ * quote's `taxRegion`, which O1 groups by), never the free-text state the buyer typed; Quaderno's sale record carries it
+ * as the customer's region and each tax line's. Elsewhere the typed region stays (a Romanian county SmartBill needs).
  */
 export function saleRecordOf(
   paid: PaidCharge, payload: OutboxJob["payload"], taxCode: BillingPolicy["taxCode"], text: BillingOrderText = englishOrderText
 ): SaleRecord {
   const buyer = paid.location;
   const company = buyer.company;
+  const region = PRICED_REGION_COUNTRIES.has(buyer.country) ? paid.quote.taxRegion : buyer.region;
   return Object.freeze({
     chargeId: paid.charge.chargeId,
     transactionId: paid.paid.xmoneyTransactionId!,
     issuedOn: paid.paid.at,
     customer: Object.freeze({
       name: company?.name ?? buyer.name, email: paid.profile.email, country: buyer.country,
-      region: buyer.region, postalCode: buyer.postalCode, city: buyer.city,
+      region, postalCode: buyer.postalCode, city: buyer.city,
       // Spec §2.5.4: "the client is the person or company" — a company is invoiced at its own address.
       street: company?.address ?? buyer.street,
       taxId: company !== null && company.vatValidated ? company.vatId : null, locale: paid.profile.locale

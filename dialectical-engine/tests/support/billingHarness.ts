@@ -336,6 +336,8 @@ export type BillingHarness = Readonly<{
   buy(input?: Readonly<{
     ownerRef?: string; userId?: string; planId?: "PLUS" | "PRO" | "MAX"; country?: string; chargeId?: string;
     countryConfirmed?: boolean; company?: Readonly<{ name: string; vatId: string; address: string }>;
+    /** The postal code and the free-text state or county the buyer typed (defaults below). */
+    postalCode?: string; region?: string;
   }>): Promise<Purchase>;
   refunds: RefundDesk;
   verify: VerifyPaymentHandler;
@@ -474,10 +476,11 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       // A Romanian buyer carries the name, city and county SmartBill needs (R-15); a US or Canadian buyer the postal
       // code Quaderno prices by (P2-M29; New York's and Ottawa's, where the fakes are not registered).
       const country = input.country ?? "RO";
-      const postalCode = country === "US" ? "10001" : country === "CA" ? "K1A 0B1" : null;
+      const postalCode = input.postalCode ?? (country === "US" ? "10001" : country === "CA" ? "K1A 0B1" : null);
       const quoted = await quotes.create({
         ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country,
-        name: "Test Buyer", region: "Bucuresti", postalCode, city: "Sector 1", company: input.company ?? null, now: clock.now
+        name: "Test Buyer", region: input.region ?? "Bucuresti", postalCode, city: "Sector 1", company: input.company ?? null,
+        now: clock.now
       });
       const chargeId = input.chargeId;
       const service = chargeId === undefined ? checkout : checkoutWith({ chargeIds: () => chargeId });

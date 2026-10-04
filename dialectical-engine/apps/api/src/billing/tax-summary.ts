@@ -30,8 +30,9 @@ export type EFacturaCheckItem = Readonly<{
 }>;
 /**
  * What the owner checks in xMoney or at the tax service: a refund xMoney refused (still owed) or one whose outcome is
- * unknown; a refund job the charge records no request for, or naming a charge we do not have (P2-I5's
- * REFUND_NOT_REQUESTED: nothing was sent, it is no refund to make, and whoever runs the server checks who queued it); a
+ * unknown; a refund job the charge records no request for, naming a charge we do not have, or whose payload cannot be
+ * read (P2-I5's REFUND_NOT_REQUESTED, with C-7's REFUND_PAYLOAD_INVALID: nothing was sent, it is no refund to make, and
+ * whoever runs the server checks who queued it); a
  * refund job of a payment of the other xMoney system (P2-W4's REFUND_OTHER_SYSTEM: nothing was sent, nothing is owed on
  * this server); a second refund made elsewhere on one payment,
  * which our records cannot hold (P9c's REFUND_UNRECORDED: its amount is in no line of the summary); a withdrawal
@@ -86,7 +87,11 @@ export type TaxSummary = Readonly<{
   lines: ReadonlyArray<TaxSummaryLine>;
   conflicting: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; at: Date }>>;
   notRegistered: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; taxRegion: string | null; at: Date }>>;
-  chargebacks: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; amountMicros: number; at: Date }>>;
+  /**
+   * `saleRecorded` false (Part 4 final review C-19): the charge holds no SUCCEEDED (a checkout charged back before we
+   * verified it), so no sale was ever counted for it.
+   */
+  chargebacks: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; amountMicros: number; at: Date; saleRecorded: boolean }>>;
   /** Not subtracted from any line: the owner reads each amount in the dashboard and adjusts that country by hand. */
   unknownRefunds: ReadonlyArray<UnknownRefundItem>;
   invoiceUnknown: ReadonlyArray<InvoiceUnknownItem>;
@@ -218,8 +223,11 @@ export async function deadEmailsFrom(
 /**
  * Which list a dead XMONEY_REFUND job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
  * (P2-I5) and REFUND_CHARGE_MISSING (P2-W4: the job names a charge we do not have) moved no money and are no refund to
- * make; OTHER_XMONEY_SYSTEM (P2-W4) moved none and is owed nothing on this server; every other dead end leaves the
- * money owed.
+ * make; REFUND_PAYLOAD_INVALID (Part 4 final review C-7) ended before any xMoney call, and only a row written by
+ * something other than `RefundDesk.request` holds an unreadable payload, so it goes with them: its reason is only the
+ * job's claim, and REFUND_NOT_REQUESTED's legend sends the owner to the charge's own refund requests (one never
+ * refunded is still owed, progress.md's P4-B ruling); OTHER_XMONEY_SYSTEM (P2-W4) moved none and is owed nothing on
+ * this server; every other dead end leaves the money owed.
  */
 function deadRefundCheck(
   code: string | null
@@ -229,6 +237,7 @@ function deadRefundCheck(
       return "REFUND_OUTCOME_UNKNOWN";
     case "REFUND_NOT_REQUESTED":
     case "REFUND_CHARGE_MISSING":
+    case "REFUND_PAYLOAD_INVALID":
       return "REFUND_NOT_REQUESTED";
     case "OTHER_XMONEY_SYSTEM":
       return "REFUND_OTHER_SYSTEM";
@@ -287,8 +296,12 @@ export function buildTaxSummary(input: Readonly<{
   let refunds = 0;
   for (const row of input.rows) {
     if (row.type === "CHARGEBACK") {
-      // For the accountant: the sale stays counted where it was made; the bank took the money back.
-      chargebacks.push(Object.freeze({ chargeId: row.chargeId, taxCountry: row.taxCountry, amountMicros: row.amountMicros, at: row.at }));
+      // For the accountant: the sale stays counted where it was made; the bank took the money back. C-19: a charge-back
+      // of a payment we never verified has no sale anywhere, and its line says so.
+      chargebacks.push(Object.freeze({
+        chargeId: row.chargeId, taxCountry: row.taxCountry, amountMicros: row.amountMicros, at: row.at,
+        saleRecorded: row.saleRecorded
+      }));
       continue;
     }
     const authority = taxAuthorityFor(input.authorities, row.taxCountry, row.taxStatus);
@@ -449,8 +462,9 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     (item) => `charge ${item.chargeId}, ${item.taxCountry}${item.taxRegion === null ? "" : `, ${item.taxRegion}`}, on ${isoDay(item.at)}`);
   section(summary.chargebacks, "Charge-backs this quarter: none.",
     "Charge-backs this quarter (the card holder's bank took the money back; the sale above still counts until the"
-      + " accountant decides):",
-    (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} USD, on ${isoDay(item.at)}`);
+      + " accountant decides, except for a line that says no sale was recorded for it):",
+    (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} USD, on ${isoDay(item.at)}`
+      + (item.saleRecorded ? "" : ": no sale was recorded for it"));
   section(summary.unknownRefunds, "Refunds made in the xMoney dashboard, amount unknown: none.",
     // P4-K (P2-W12): once the owner records the credit note with its amount, `quarterSummaryRows` subtracts it.
     "Refunds made in the xMoney dashboard, amount unknown (not subtracted above; read the amount in the dashboard,"
@@ -497,7 +511,10 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " sent, and nothing is owed on this server;"
       + " REFUND_UNRECORDED: a second refund made in the xMoney dashboard on a payment that already had one, which our"
       + " records cannot hold, so it is in no figure above: read its amount on that transaction in the dashboard and"
-      + " take it off that country's net sales and tax by hand;"
+      + " take it off that country's net sales and tax by hand."
+      // Part 4 final review C-6: P4-K's --amount credit note is already subtracted above (quarterSummaryRows).
+      + " A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures"
+      + " above: do not take it off again;"
       + " WITHDRAWAL_BY_OWNER: a withdrawal over a payment a dashboard refund touched, refund in the dashboard what the"
       + " command cannot take back, then settle it with pnpm billing:withdraw --owner <ref> --refund <amount>"
       + " --dashboard <amount refunded in the dashboard>; RENEWAL_STUCK: a renewal closed with its outcome"

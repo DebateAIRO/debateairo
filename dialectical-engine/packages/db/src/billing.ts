@@ -107,12 +107,16 @@ export type OutboxJob = Readonly<{
  * of the charge, an upper bound — P16b lists such a row instead of subtracting it — until the owner records its credit
  * note (P4-K, P2-W12: `pnpm billing:invoice --record --amount`): the row then carries the credit note's amount and is
  * known. Every other row is true, a `PROVIDER_REFUND` on xMoney's own refund transaction and a `PROVIDER_VOID` included.
+ * `saleRecorded` (Part 4 final review C-19) says whether the charge holds a SUCCEEDED, in any quarter: always true for a
+ * SALE; false for a charge-back of a payment we never verified (a checkout charged back before its plan started), for
+ * which no sale was ever counted.
  */
 export type TaxSummaryRow = Readonly<{
   type: "SALE" | "REFUND" | "CHARGEBACK"; chargeId: string; at: Date;
   taxCountry: string; taxRegion: string | null; taxStatus: TaxStatus;
   chargeNetMicros: number; chargeTaxMicros: number; chargeTotalMicros: number; amountMicros: number;
   amountKnown: boolean;
+  saleRecorded: boolean;
   locationVerdict: LocationVerdict | null;
 }>;
 /** Where the previous page of due renewals ended: the order is (currentPeriodEnd, subscriptionId). */
@@ -970,7 +974,7 @@ export class BillingRepository {
     const rows = (await this.pool.query<{
       type: "SALE" | "REFUND" | "CHARGEBACK"; charge_id: string; at: Date; tax_country: string; tax_region: string | null;
       tax_status: TaxStatus; net_micros: string; tax_micros: string; total_micros: string; amount_micros: string;
-      amount_known: boolean; verdict: LocationVerdict | null;
+      amount_known: boolean; sale_recorded: boolean; verdict: LocationVerdict | null;
     }>(`
       WITH dated AS (
         -- When xMoney says the money moved; a row recorded without it falls back to when we recorded it.
@@ -989,6 +993,10 @@ export class BillingRepository {
         dashboard_note.invoice_id IS NOT NULL
           OR NOT (dated.kind = 'REFUNDED' AND dated.error_code IS NOT DISTINCT FROM 'PROVIDER_REFUND'
             AND dated.refunds_transaction_id IS NULL) AS amount_known,
+        -- C-19: a charge-back of a payment we never verified has no SUCCEEDED anywhere: no sale was counted for it.
+        EXISTS (
+          SELECT 1 FROM billing.charge_event AS sold WHERE sold.charge_id = dated.charge_id AND sold.kind = 'SUCCEEDED'
+        ) AS sale_recorded,
         evidence.verdict
       FROM dated
       JOIN billing.charge AS charge ON charge.charge_id = dated.charge_id
@@ -1027,7 +1035,7 @@ export class BillingRepository {
       type: row.type, chargeId: row.charge_id, at: row.at, taxCountry: row.tax_country, taxRegion: row.tax_region,
       taxStatus: row.tax_status, chargeNetMicros: micros(row.net_micros), chargeTaxMicros: micros(row.tax_micros),
       chargeTotalMicros: micros(row.total_micros), amountMicros: micros(row.amount_micros),
-      amountKnown: row.amount_known, locationVerdict: row.verdict
+      amountKnown: row.amount_known, saleRecorded: row.sale_recorded, locationVerdict: row.verdict
     }));
   }
 
@@ -1164,10 +1172,12 @@ export class BillingRepository {
    * transaction (read as P8c's `refundTarget`: a REFUNDED on xMoney's own refund transaction names the payment in
    * `refunds_transaction_id`, D5 5g). Not every one leaves money owed: the summary reads each code (`deadRefundCheck`).
    * Three codes owe nothing on this server: REFUND_NOT_REQUESTED and REFUND_CHARGE_MISSING (no request of ours backs
-   * it) and OTHER_XMONEY_SYSTEM (the payment was taken in the other xMoney system). For REFUND_OUTCOME_UNKNOWN the
-   * dashboard says whether it landed, and every other code (xMoney refused it, a payload that failed its check, and the
-   * like) is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once; this list is the
-   * daily and quarterly reminder.)
+   * it) and OTHER_XMONEY_SYSTEM (the payment was taken in the other xMoney system). REFUND_PAYLOAD_INVALID (a payload
+   * that failed its check, so nothing was sent; only a row written by something else holds one) is listed with the
+   * first two, its reason withheld (Part 4 final review C-7): the charge's own refund requests say whether money is
+   * still owed. For REFUND_OUTCOME_UNKNOWN the dashboard says whether it landed, and every other code (xMoney refused
+   * it, and the like) is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once, except
+   * for REFUND_PAYLOAD_INVALID, which names no charge it could read; this list is the daily and quarterly reminder.)
    */
   async deadRefunds(): Promise<Array<{
     chargeId: string; transactionId: string; reason: string | null; code: string | null; since: Date;
@@ -1204,6 +1214,13 @@ export class BillingRepository {
    * automatically. A dashboard refund xMoney reports as its own transaction (D5 5g) names its amount and gets its
    * credit-note job automatically (none for a second payment, which was never a sale); it reaches this list only
    * through that job, if the job dies.
+   * Part 4 final review C-5 (the controller's ruling): DASHBOARD_REFUND only for a charge that holds an INVOICE row or
+   * intent (the row needs its intent, 0086's foreign key, so the intent is read) or a sale-invoice job (queued, done or
+   * dead: the invoice is owed, whether or not it is issued yet; the intent is written only when the issuer is called).
+   * P9c's never-verified path (a checkout's, an upgrade's or a renewal's payment xMoney refunded before we ever saw it
+   * paid) queues none of the three, and A29 (q) owes no invoice and no credit note for it: its line is
+   * REFUNDED_BEFORE_START (code NO_DOCUMENT_OWED), whose words (`documentJobAction`) ask for no document. It has
+   * nothing to record, so it stays listed.
    */
   async invoiceUnknownItems(): Promise<Array<{ chargeId: string; jobKind: string; code: string; since: Date }>> {
     const result = await this.pool.query<{ charge_id: string; kind: string; code: string | null; since: Date }>(`
@@ -1223,8 +1240,20 @@ export class BillingRepository {
               THEN 'INVOICE' ELSE 'CREDIT_NOTE' END
         )
       UNION ALL
-      SELECT refunded.charge_id, 'DASHBOARD_REFUND' AS kind, 'CREDIT_NOTE_MANUAL' AS code, refunded.at AS since
+      SELECT refunded.charge_id,
+        CASE WHEN invoice_owed.owed THEN 'DASHBOARD_REFUND' ELSE 'REFUNDED_BEFORE_START' END AS kind,
+        CASE WHEN invoice_owed.owed THEN 'CREDIT_NOTE_MANUAL' ELSE 'NO_DOCUMENT_OWED' END AS code,
+        refunded.at AS since
       FROM billing.charge_event AS refunded
+      CROSS JOIN LATERAL (
+        -- An INVOICE row needs its intent (0086's foreign key), so the intent stands for both.
+        SELECT EXISTS (
+          SELECT 1 FROM billing.invoice_intent AS intent WHERE intent.charge_id = refunded.charge_id AND intent.kind = 'INVOICE'
+        ) OR EXISTS (
+          SELECT 1 FROM billing.outbox AS sale
+          WHERE sale.kind IN ('SMARTBILL_INVOICE','QUADERNO_RECORD_SALE') AND sale.ref = refunded.charge_id
+        ) AS owed
+      ) AS invoice_owed
       WHERE refunded.kind = 'REFUNDED' AND refunded.error_code = 'PROVIDER_REFUND'
         AND refunded.refunds_transaction_id IS NULL
         AND NOT EXISTS (

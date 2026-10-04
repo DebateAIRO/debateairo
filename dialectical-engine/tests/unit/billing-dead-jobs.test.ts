@@ -147,6 +147,10 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("the line then leaves this list and the quarter's tax"
       + " summary subtracts that amount");
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).not.toContain("cannot record");
+    // Part 4 final review C-5 (the controller's ruling): a payment xMoney refunded before we ever saw it paid owes no
+    // invoice and no credit note (A29 (q)), so its line asks for no document and names no command.
+    expect(say("REFUNDED_BEFORE_START", "NO_DOCUMENT_OWED")).toBe("Refunded before it started: no invoice or credit note"
+      + " is owed. Take this sale and its refund out of the quarter's figures by hand.");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("--amount");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).toContain("(a partial refund, or a second refund of one charge)");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("dashboard");

@@ -48,10 +48,18 @@ export function unbackedDocumentCode(code: string): boolean {
 }
 
 /**
- * What the owner does about one dead document job (or P9c's DASHBOARD_REFUND, which has no job). The command lines
- * name the charge and the document kind, ready to copy. An if chain, not a switch: the codes are an open set.
+ * What the owner does about one dead document job (or P9c's DASHBOARD_REFUND and REFUNDED_BEFORE_START lines, which
+ * have no job). The command lines name the charge and the document kind, ready to copy. An if chain, not a switch: the
+ * codes are an open set.
  */
 export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: string; code: string }>): string {
+  if (item.jobKind === "REFUNDED_BEFORE_START") {
+    // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path (a payment xMoney refunded before we
+    // ever saw it paid, for a checkout, an upgrade or a renewal) queues no invoice; A29 (q) owes no invoice and no
+    // credit note for it. The quarter still counts its SALE and lists its refund, so the owner takes both out by hand.
+    return "Refunded before it started: no invoice or credit note is owed. Take this sale and its refund out of the"
+      + " quarter's figures by hand.";
+  }
   if (item.jobKind === "DASHBOARD_REFUND") {
     // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): P9c queued no job for this refund, so the
     // owner issues the credit note by hand and records it with its amount (`--amount`, at most what the payment held).

@@ -257,6 +257,21 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(again.chargeId).not.toBe(bought.chargeId);
   });
 
+  it("reads FAILED when a checkout's payment was charged back before we verified it, and no sale is recorded (C-19)", async () => {
+    // Part 4 final review C-19 (the controller's ruling): the check finds the payment already `charge-back`, so the
+    // charge records only its CHARGEBACK (no SUCCEEDED, no plan, no M10): the waiting screen must not wait for ever.
+    const bought = await h.buy();
+    const disputed = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO", status: "charge-back" });
+    await h.settle(disputed.transactionId);
+    expect(await h.eventKinds(bought.chargeId)).toEqual(kindsOf("REQUESTED", "CHARGEBACK"));
+    expect(await subscriptionKinds(bought.subscriptionId)).not.toContain("ACTIVATED");
+    expect(await status(bought.chargeId, bought.ownerRef)).toEqual({ state: "FAILED", reasonCode: "CHARGEBACK" });
+    const quarter = { from: new Date(h.clock.now.getTime() - 86_400_000), to: new Date(h.clock.now.getTime() + 86_400_000) };
+    expect((await h.repository.quarterSummaryRows(quarter.from, quarter.to, "stage"))
+      .filter((row) => row.chargeId === bought.chargeId).map((row) => `${row.type} ${String(row.saleRecorded)}`))
+      .toEqual(["CHARGEBACK false"]);
+  });
+
   it("answers no one but the charge's owner about its status (P2-M16)", async () => {
     const paid = await h.activate();
     expect(await status(paid.chargeId, paid.ownerRef)).toEqual({ state: "SUCCEEDED", reasonCode: null });

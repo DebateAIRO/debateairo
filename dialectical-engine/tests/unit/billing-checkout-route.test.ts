@@ -200,6 +200,10 @@ describe("P8c GET /v1/billing/charges/{chargeRef}", () => {
         .toEqual({ state: "FAILED", reasonCode: reason });
     }
     expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED")], false)).toEqual({ state: "SUCCEEDED", reasonCode: null });
+    // Part 4 final review C-19 (the controller's ruling): a checkout charged back before we verified it never starts
+    // (no SUCCEEDED, no plan): it reads FAILED, never "payment on its way" for ever. On a started plan it changes nothing.
+    expect(chargeStatusOf([event("REQUESTED"), event("CHARGEBACK")], false)).toEqual({ state: "FAILED", reasonCode: "CHARGEBACK" });
+    expect(chargeStatusOf([event("REQUESTED"), event("CHARGEBACK")])).toEqual({ state: "PENDING", reasonCode: null });
   });
 
   it("reads a charge's status through the real reader for its owner only: another person's is not found (P2-M16)", async () => {
