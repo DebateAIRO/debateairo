@@ -47,6 +47,7 @@ const ADMIN_ROLE = "debateai_prod_migrator";
 const ADMIN_PASSWORD = "p3-admin-test-only-abcdefghijklmnopqrstuvwxyz-123456";
 const CAPABILITY_ROLES = [
   "debateai_authorization_runtime",
+  "debateai_billing_runtime",
   "debateai_content_provision",
   "debateai_erasure_runtime",
   "debateai_evaluator_api",
@@ -628,9 +629,11 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       CREATE ROLE p3_forbidden_member NOLOGIN;
       GRANT p3_forbidden_bridge TO debateai_prod_api_runtime;
       GRANT debateai_prod_api_runtime TO p3_forbidden_member;
-      REVOKE debateai_runtime FROM debateai_prod_api_runtime;
-      GRANT debateai_runtime TO debateai_prod_api_runtime
+      REVOKE debateai_billing_runtime FROM debateai_prod_api_runtime;
+      GRANT debateai_billing_runtime TO debateai_prod_api_runtime
         WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
+      -- The shape before 0093 (go-live row 41): api-runtime held debateai_runtime directly.
+      GRANT debateai_runtime TO debateai_prod_api_runtime;
       ALTER ROLE debateai_prod_api_runtime CREATEDB CREATEROLE REPLICATION BYPASSRLS NOINHERIT;
       ALTER ROLE debateai_prod_api_runtime SET statement_timeout='1s';
       ALTER ROLE debateai_prod_api_runtime IN DATABASE debateai SET search_path='pg_catalog'
@@ -688,7 +691,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       rolconfig: null,
       hasRoleSettings: false,
       directRoles: [{
-        roleName: "debateai_runtime",
+        roleName: "debateai_billing_runtime",
         adminOption: false,
         inheritOption: true,
         setOption: true
@@ -3264,5 +3267,81 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       expect(output).not.toContain(decodeURIComponent(new URL(databaseUrl).password));
     }
     expect(outcome.stdout).toBe("PRODUCTION_DATABASE_PRINCIPALS_READY=18\n");
+  }, 120_000);
+
+  // Go-live row 41 (Part 2's final review P2-I5, part 3): the billing tables are written by the API
+  // alone. runner-runtime and scheduler-liveness hold debateai_runtime, and api-authorization inherits
+  // it, so none of the billing writes may sit on that role; they sit on debateai_billing_runtime (0093),
+  // which only api-runtime holds. The runner keeps the two billing reads it makes (A20, R-12).
+  it("lets only the API runtime principal write billing rows (go-live row 41)", async () => {
+    const envelope = credentialEnvelope();
+    await provisionProductionDatabasePrincipals({
+      adminPool,
+      adminDatabaseUrl,
+      manifest,
+      credentialEnvelope: envelope,
+      supportConfigCredentialFilePath
+    });
+    const urls = databaseUrls(envelope);
+    const outcome = async (principalId: string, statement: string): Promise<string> => {
+      const loginPool = createPool(urls.get(principalId)!);
+      const client = await loginPool.connect();
+      try {
+        await client.query("BEGIN");
+        try {
+          await client.query(statement);
+          return "ok";
+        } catch (error) {
+          return String((error as { code?: unknown }).code);
+        } finally {
+          await client.query("ROLLBACK");
+        }
+      } finally {
+        client.release();
+        await loginPool.end();
+      }
+    };
+    const enqueue = `INSERT INTO billing.outbox (job_id,kind,ref,payload,created_at,not_before)
+      VALUES (gen_random_uuid(),'EMAIL','row41-probe','{}'::jsonb,clock_timestamp(),clock_timestamp())`;
+    const claim = "UPDATE billing.outbox SET claimed_by='row41',claimed_at=clock_timestamp() WHERE false";
+    const chargeEvent = "INSERT INTO billing.charge_event (charge_id) SELECT 'row41' WHERE false";
+    const entitlement = "INSERT INTO billing.entitlement_event (owner_ref) SELECT owner_ref FROM billing.entitlement_event WHERE false";
+    const purge = "SELECT billing.purge_expired_records(clock_timestamp())";
+
+    expect(await outcome("api-runtime", enqueue)).toBe("ok");
+    expect(await outcome("api-runtime", claim)).toBe("ok");
+    expect(await outcome("api-runtime", chargeEvent)).toBe("ok");
+    expect(await outcome("api-runtime", entitlement)).toBe("ok");
+    expect(await outcome("api-runtime", purge)).toBe("ok");
+    for (const principalId of ["runner-runtime", "scheduler-liveness", "api-authorization"]) {
+      for (const statement of [enqueue, claim, chargeEvent, entitlement, purge]) {
+        expect(`${principalId}: ${await outcome(principalId, statement)}`)
+          .toBe(`${principalId}: 42501`);
+      }
+      expect(`${principalId}: ${await outcome(principalId, "SELECT count(*) FROM billing.customer")}`)
+        .toBe(`${principalId}: 42501`);
+    }
+    // What the runner reads of billing, and nothing more (apps/runner/src/main.ts, A20).
+    expect(await outcome("runner-runtime", "SELECT count(*) FROM billing.person_windows_v")).toBe("ok");
+    expect(await outcome("runner-runtime", "SELECT count(*) FROM billing.run_charge_scope")).toBe("ok");
+
+    // The whole billing schema: every write privilege, on every table and column, is the API's alone among the
+    // service and human principals the provisioner manages (the migrator is the schema's superuser owner).
+    const writers = (await adminPool.query<{ principal: string; relation: string }>(`
+      SELECT DISTINCT principal.rolname AS principal,relation.relname AS relation
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=relation.relnamespace
+      CROSS JOIN pg_catalog.pg_roles AS principal
+      WHERE namespace.nspname='billing' AND relation.relkind IN ('r','p','v')
+        AND principal.rolname=ANY($1::text[])
+        AND (has_table_privilege(principal.oid,relation.oid,'INSERT,UPDATE,DELETE,TRUNCATE')
+          OR has_any_column_privilege(principal.oid,relation.oid,'INSERT,UPDATE'))
+      ORDER BY 1,2
+    `,[manifest.principals
+      .filter(({ id }) => manifest.provisioner.managedPrincipalIds.includes(id))
+      .map(({ roleName }) => roleName)])).rows;
+    expect(new Set(writers.map(({ principal }) => principal))).toEqual(new Set(["debateai_prod_api_runtime"]));
+    expect(writers.map(({ relation }) => relation)).toContain("outbox");
+    expect(writers.map(({ relation }) => relation)).toContain("charge_event");
   }, 120_000);
 });

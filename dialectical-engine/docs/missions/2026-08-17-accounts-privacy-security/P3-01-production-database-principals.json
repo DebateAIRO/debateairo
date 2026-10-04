@@ -150,6 +150,14 @@
       ]
     },
     {
+      "roleName": "debateai_billing_runtime",
+      "login": false,
+      "inherit": true,
+      "directMemberships": [
+        "debateai_runtime"
+      ]
+    },
+    {
       "roleName": "debateai_content_provision",
       "login": false,
       "inherit": false,
@@ -369,9 +377,10 @@
       "replication": false,
       "bypassRls": false,
       "directMemberships": [
-        "debateai_runtime"
+        "debateai_billing_runtime"
       ],
       "effectiveMemberships": [
+        "debateai_billing_runtime",
         "debateai_runtime"
       ],
       "forbiddenMemberships": [
@@ -472,6 +481,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -528,6 +538,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -577,6 +588,7 @@
         "debateai_runtime"
       ],
       "forbiddenMemberships": [
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -626,6 +638,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -676,6 +689,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -739,6 +753,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -796,6 +811,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -845,6 +861,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -894,6 +911,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -943,6 +961,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -991,6 +1010,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_ddl",
@@ -1039,6 +1059,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1083,6 +1104,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1128,6 +1150,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1173,6 +1196,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1218,6 +1242,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1263,6 +1288,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1309,6 +1335,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1359,6 +1386,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1404,6 +1432,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1459,8 +1488,15 @@
       "setOption": true
     },
     {
-      "memberRole": "debateai_prod_api_runtime",
+      "memberRole": "debateai_billing_runtime",
       "grantedRole": "debateai_runtime",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_runtime",
+      "grantedRole": "debateai_billing_runtime",
       "adminOption": false,
       "inheritOption": true,
       "setOption": true
@@ -1740,6 +1776,7 @@
     "NO_SERVICE_TO_SERVICE_MEMBERSHIP",
     "NO_PREDEFINED_PG_ROLE_MEMBERSHIP_EXCEPT_OBSERVATION_AGENT_PG_MONITOR",
     "AUTHORIZATION_EFFECTIVE_MEMBERSHIP_IS_AUTHORIZATION_PLUS_RUNTIME_ONLY",
+    "BILLING_CAPABILITY_HELD_BY_API_RUNTIME_ONLY",
     "PRODUCTION_EVALUATOR_DEV_MENU_FORBIDDEN"
   ]
 }

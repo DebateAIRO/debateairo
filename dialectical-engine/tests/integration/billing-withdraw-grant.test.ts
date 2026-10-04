@@ -73,7 +73,8 @@ async function consumeAsRuntime(values: readonly unknown[]): Promise<boolean> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_runtime");
+    // The API's login holds debateai_billing_runtime (0093, go-live row 41).
+    await client.query("SET LOCAL ROLE debateai_billing_runtime");
     const result = await client.query<{ ok: boolean }>(
       "SELECT billing.consume_withdrawal_grant($1,$2,$3,$4) AS ok", [...values]
     );
@@ -218,12 +219,18 @@ describe("P12a the WITHDRAW_SUBSCRIPTION grant on real PostgreSQL", () => {
     // One settlement per withdrawal.
     await expect(settle(1_000_000)).rejects.toMatchObject({ code: "23505" });
     const privileges = (await database.pool.query<{ can_select: boolean; can_insert: boolean; can_update: boolean; can_delete: boolean }>(`
-      SELECT has_table_privilege('debateai_runtime', 'billing.withdrawal_owner_settlement', 'SELECT') AS can_select,
-        has_table_privilege('debateai_runtime', 'billing.withdrawal_owner_settlement', 'INSERT') AS can_insert,
-        has_table_privilege('debateai_runtime', 'billing.withdrawal_owner_settlement', 'UPDATE') AS can_update,
-        has_table_privilege('debateai_runtime', 'billing.withdrawal_owner_settlement', 'DELETE') AS can_delete
-    `)).rows[0];
-    expect(privileges).toEqual({ can_select: true, can_insert: true, can_update: false, can_delete: false });
+      SELECT has_table_privilege(role, 'billing.withdrawal_owner_settlement', 'SELECT') AS can_select,
+        has_table_privilege(role, 'billing.withdrawal_owner_settlement', 'INSERT') AS can_insert,
+        has_table_privilege(role, 'billing.withdrawal_owner_settlement', 'UPDATE') AS can_update,
+        has_table_privilege(role, 'billing.withdrawal_owner_settlement', 'DELETE') AS can_delete
+      FROM unnest(ARRAY['debateai_billing_runtime', 'debateai_runtime']) WITH ORDINALITY AS roles(role, position)
+      ORDER BY position
+    `)).rows;
+    // Go-live row 41 (0093): the API's billing role, and not the role the runner and the liveness sweep hold.
+    expect(privileges).toEqual([
+      { can_select: true, can_insert: true, can_update: false, can_delete: false },
+      { can_select: false, can_insert: false, can_update: false, can_delete: false }
+    ]);
     // Append-only even for the owner of the database.
     await expect(database.pool.query(
       "UPDATE billing.withdrawal_owner_settlement SET dashboard_refund_micros = 0 WHERE subscription_id = $1", [subscriptionId]

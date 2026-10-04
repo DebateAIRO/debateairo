@@ -29,11 +29,15 @@ const thisYear = new Date().getUTCFullYear();
 // Every row outside the retention cases is dated this year, so no purge below ever reaches it.
 const RECENT = `${thisYear}-01-15T10:00:00Z`;
 
+/**
+ * As the API: since 0093 (go-live row 41) its login holds debateai_billing_runtime, which inherits
+ * debateai_runtime, so this role writes both the billing rows and the core rows the API writes.
+ */
 async function asRuntime<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_runtime");
+    await client.query("SET LOCAL ROLE debateai_billing_runtime");
     const result = await run(client);
     await client.query("COMMIT");
     return result;
@@ -147,23 +151,39 @@ describe("P1a — billing tables are append-only and guarded", () => {
     await expect(database.pool.query("TRUNCATE billing.quote CASCADE")).rejects.toMatchObject({ code: "55000" });
   });
 
-  it("gives the runtime SELECT and INSERT only, and on the outbox only the claim columns", async () => {
-    const privileges = (await database.pool.query<{ relation: string; can_insert: boolean; can_update: boolean; can_delete: boolean }>(`
-      SELECT relation, has_table_privilege('debateai_runtime', relation, 'INSERT') AS can_insert,
-        has_table_privilege('debateai_runtime', relation, 'UPDATE') AS can_update,
-        has_table_privilege('debateai_runtime', relation, 'DELETE') AS can_delete
+  it("gives the API's billing role SELECT and INSERT only, and on the outbox only the claim columns", async () => {
+    const privileges = (await database.pool.query<{
+      relation: string; can_insert: boolean; can_update: boolean; can_delete: boolean;
+      shared_insert: boolean; shared_update: boolean; shared_select: boolean;
+    }>(`
+      SELECT relation, has_table_privilege('debateai_billing_runtime', relation, 'INSERT') AS can_insert,
+        has_table_privilege('debateai_billing_runtime', relation, 'UPDATE') AS can_update,
+        has_table_privilege('debateai_billing_runtime', relation, 'DELETE') AS can_delete,
+        has_table_privilege('debateai_runtime', relation, 'INSERT') AS shared_insert,
+        has_any_column_privilege('debateai_runtime', relation, 'UPDATE') AS shared_update,
+        has_table_privilege('debateai_runtime', relation, 'SELECT') AS shared_select
       FROM unnest($1::text[]) AS relation
-    `, [[...APPEND_ONLY, "billing.outbox"]])).rows;
+    `, [[...APPEND_ONLY, ...ENTITLEMENT_TABLES, "billing.outbox", "billing.withdrawal_owner_settlement"]])).rows;
     for (const row of privileges) {
       expect(row, row.relation).toMatchObject({ can_insert: true, can_update: false, can_delete: false });
+      // Go-live row 41 (0093): the role the runner and the liveness sweep also hold writes nothing in billing,
+      // and reads only the runner's two relations (A20).
+      expect(row, row.relation).toMatchObject({
+        shared_insert: false,
+        shared_update: false,
+        shared_select: (ENTITLEMENT_TABLES as readonly string[]).includes(row.relation)
+      });
     }
-    const columns = (await database.pool.query<{ column_name: string; allowed: boolean }>(`
-      SELECT column_name, has_column_privilege('debateai_runtime', 'billing.outbox', column_name, 'UPDATE') AS allowed
+    const columns = (await database.pool.query<{ column_name: string; allowed: boolean; shared: boolean }>(`
+      SELECT column_name,
+        has_column_privilege('debateai_billing_runtime', 'billing.outbox', column_name, 'UPDATE') AS allowed,
+        has_column_privilege('debateai_runtime', 'billing.outbox', column_name, 'UPDATE') AS shared
       FROM information_schema.columns WHERE table_schema = 'billing' AND table_name = 'outbox' ORDER BY column_name
     `)).rows;
     expect(columns.filter((column) => column.allowed).map((column) => column.column_name)).toEqual([
       "attempts", "claimed_at", "claimed_by", "dead_at", "done_at", "last_error_code", "not_before"
     ]);
+    expect(columns.filter((column) => column.shared)).toEqual([]);
     await asRuntime(async (client) => {
       const jobId = randomUUID();
       await client.query(`INSERT INTO billing.outbox (job_id, kind, ref, payload, created_at, not_before)
@@ -590,7 +610,8 @@ describe("P1a — the waiting line refuses a row its reader could not read (B11d
       const bad = await runLike(good, changed);
       await expect(enterLine(bad), JSON.stringify(changed)).rejects.toMatchObject(unreadable);
     }
-    // The API and the waker write the line as debateai_runtime: the guard's read of the run works under that role.
+    // The API and the waker write the line as the API's login (debateai_runtime's grants, inherited through the billing
+    // role since 0093): the guard's read of the run works under that role.
     const asWriter = await legacyRun();
     await asRuntime((client) => client.query(
       "INSERT INTO core.run_wait (run_id, waiting_since) VALUES ($1, clock_timestamp())", [asWriter]

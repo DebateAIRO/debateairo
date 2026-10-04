@@ -12,9 +12,12 @@ export type DevelopmentDatabasePrincipal = Readonly<{
 }>;
 
 export const DEVELOPMENT_DATABASE_PRINCIPALS = Object.freeze([
+  // Go-live row 41 (migration 0093): the API's own login holds billing's role, which inherits
+  // debateai_runtime. In development the runner shares this login (DATABASE_URL), so only the
+  // production principals (P3-01) keep billing's writes away from the runner.
   Object.freeze({
     roleName: "debateai_dev_runtime",
-    capabilityRole: "debateai_runtime",
+    capabilityRole: "debateai_billing_runtime",
     environmentKey: "DATABASE_URL"
   }),
   Object.freeze({
@@ -410,6 +413,7 @@ async function assertCapabilityRoles(client: PoolClient): Promise<void> {
   if (roles.rows.length !== expected.length
     || roles.rows.some((role, index) => {
       const expectedDirect = role.rolname === "debateai_authorization_runtime"
+        || role.rolname === "debateai_billing_runtime"
         ? ["debateai_runtime"] : [];
       return role.rolname !== expected[index] || role.rolcanlogin || role.rolsuper
         || role.dangerous_builtin_member
@@ -505,6 +509,34 @@ async function assertExistingPrincipalState(client: PoolClient): Promise<void> {
   }
 }
 
+/**
+ * Go-live row 41 (migration 0093): a development database provisioned before 0093 gave
+ * debateai_dev_runtime debateai_runtime itself. That exact earlier shape, and nothing else, moves
+ * to billing's role (which inherits debateai_runtime); any other membership is still drift.
+ */
+async function upgradePreBillingRuntimeMembership(client: PoolClient): Promise<void> {
+  const legacy = (await client.query<{ legacy: boolean }>(`
+    SELECT COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'roleName',capability.rolname,
+        'adminOption',membership.admin_option,
+        'inheritOption',membership.inherit_option,
+        'setOption',membership.set_option
+      ))
+      FROM pg_catalog.pg_auth_members AS membership
+      JOIN pg_catalog.pg_roles AS target ON target.oid=membership.member
+      JOIN pg_catalog.pg_roles AS capability ON capability.oid=membership.roleid
+      WHERE target.rolname='debateai_dev_runtime'
+    ),'[]'::jsonb)='[{"roleName":"debateai_runtime","adminOption":false,"inheritOption":true,"setOption":true}]'::jsonb
+      AS legacy
+  `)).rows[0]?.legacy;
+  if (legacy !== true) return;
+  await client.query(
+    "GRANT \"debateai_billing_runtime\" TO \"debateai_dev_runtime\" WITH INHERIT TRUE, SET TRUE"
+  );
+  await client.query("REVOKE \"debateai_runtime\" FROM \"debateai_dev_runtime\"");
+}
+
 async function assertNoPrincipalMembers(client: PoolClient): Promise<void> {
   const roleNames = DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName }) => roleName);
   const hasMembers = (await client.query<{ has_members: boolean }>(`
@@ -555,6 +587,7 @@ export async function provisionDevelopmentDatabasePrincipals(
       );
       await assertCapabilityRoles(client);
       await assertNoPrincipalMembers(client);
+      await upgradePreBillingRuntimeMembership(client);
       await assertExistingPrincipalState(client);
       await assertNoOwnership(client);
       const credentials = await ensureCredentialFile(
