@@ -25,6 +25,7 @@ import {
   readLivenessPolicy,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
+  readPublicationCheckPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -438,7 +439,7 @@ describe("DEV-05 complete development deployment register", () => {
 
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
     const registerVersion = registerVersionToSafeLegacyNumber(first.registerVersion);
-    const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk, callTokenCeilings] = await Promise.all([
+    const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk, callTokenCeilings, publicationCheck] = await Promise.all([
       readAuthPolicy(database.pool, registerVersion),
       readMfaPolicy(database.pool, registerVersion),
       readSessionPolicy(database.pool, registerVersion),
@@ -449,9 +450,12 @@ describe("DEV-05 complete development deployment register", () => {
       readStructuralCeilingPolicyInputs(database.pool, registerVersion),
       readDeploymentRiskTier(database.pool, registerVersion),
       // Final review I3: the API's "call-token-ceilings" boot stage resolves on the sealed rows.
-      readCallTokenCeilings(database.pool, registerVersion)
+      readCallTokenCeilings(database.pool, registerVersion),
+      // Owner's ruling 2026-10-04: the API's "publication-check-policy" boot stage reads the sealed deadline back.
+      readPublicationCheckPolicy(database.pool, registerVersion)
     ]);
     expect(callTokenCeilings).toEqual({ judge: 2048, synthesizer: 2048, evaluator: 2048 });
+    expect(publicationCheck).toEqual({ deadlineMs: 60_000 });
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);
     expect(mfa.totp.algorithm).toBe("SHA1");
     expect(session.absoluteTtlMs).toBeGreaterThan(session.idleTtlMs);
