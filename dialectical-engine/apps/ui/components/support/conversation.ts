@@ -5,7 +5,7 @@ import {
 } from "@debateai/support-kb/catalog";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
 import type { SupportAssistantLanguage, SupportAssistantOutcome } from "./Assistant.js";
-import { isLocale } from "../../lib/i18n/locales.js";
+import { catalogLocale, isLocale } from "../../lib/i18n/locales.js";
 
 /**
  * DL3-F3. What the support widget is allowed to leave behind in the browser.
@@ -170,7 +170,9 @@ export function supportActionsFrom(
     if (!hasExactKeys(action, ["id", "label", "href"])
       || typeof action.id !== "string" || typeof action.label !== "string"
       || typeof action.href !== "string" || seen.has(action.id)) return null;
-    const canonical = resolveSupportActions([action.id as SupportActionId], context!);
+    const canonical = resolveSupportActions([action.id as SupportActionId], {
+      ...context!, language: catalogLocale(context!.language)
+    });
     if (canonical.length !== 1 || canonical[0]!.id !== action.id
       || canonical[0]!.label !== action.label || canonical[0]!.href !== action.href) return null;
     seen.add(action.id);

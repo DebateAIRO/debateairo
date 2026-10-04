@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { contractInventory, staffContractInventory, fundedStaffContractInventory,
+  consumerAuthContractSchemas,
   BillingUsageResponseSchema, AskRoomResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
@@ -9,7 +10,8 @@ import { contractInventory, staffContractInventory, fundedStaffContractInventory
   StaffAuthenticationOptionsResponseSchema, StaffActionProofResponseSchema,
   InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema } from "./index.js";
 
-const staffEndpointSchemas = {
+const endpointSchemas = {
+  ...consumerAuthContractSchemas,
   BillingUsageResponseSchema, AskRoomResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
@@ -17,12 +19,14 @@ const staffEndpointSchemas = {
   StaffAuthenticationOptionsResponseSchema, StaffActionProofResponseSchema,
   InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema
 };
-type StaffEndpointSchemaName = keyof typeof staffEndpointSchemas;
-const reference = (name: StaffEndpointSchemaName) => ({ $ref: `#/components/schemas/${name}` });
-const variants = (...names: StaffEndpointSchemaName[]) => ({ anyOf: names.map(reference) });
+type EndpointSchemaName = keyof typeof endpointSchemas;
+const reference = (name: EndpointSchemaName) => ({ $ref: `#/components/schemas/${name}` });
+const variants = (...names: EndpointSchemaName[]) => ({ anyOf: names.map(reference) });
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
-const response = (schema: unknown) => ({ responses: { "200": { description: "Current selected policy response", content: { "application/json": { schema } } } } });
+const response = (schema: unknown, status = "200") => ({ responses: { [status]: { description: status === "202" ? "Generic verification acknowledgement" : "Current selected policy response", content: { "application/json": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
+  "POST /v1/auth/register": { ...request(reference("RegisterRequestSchema")), ...response(reference("RegistrationVerificationAckSchema"), "202") },
+  "POST /v1/auth/resend-verification": { ...request(reference("ResendVerificationRequestSchema")), ...response(reference("ResendVerificationAckSchema"), "202") },
   "GET /v1/billing/usage": response(reference("BillingUsageResponseSchema")),
   "GET /v1/asks/room": response(reference("AskRoomResponseSchema")),
   "GET /v1/admin/enrollment": response(variants("StaffEnrollmentResponseSchema","FundedStaffEnrollmentResponseSchema")),
@@ -56,7 +60,7 @@ await writeFile(
   `${JSON.stringify({
     openapi: "3.1.0",
     info: { title: "DebateAI V3", version: "v1" },
-    components: { schemas: Object.fromEntries(Object.entries(staffEndpointSchemas).map(([name, schema]) => [name, z.toJSONSchema(schema)])) },
+    components: { schemas: Object.fromEntries(Object.entries(endpointSchemas).map(([name, schema]) => [name, z.toJSONSchema(schema)])) },
     paths: contractInventory.routes.reduce<Record<string, Record<string, unknown>>>((paths, route) => {
       const separator = route.indexOf(" ");
       const method = route.slice(0, separator).toLowerCase();
@@ -79,6 +83,7 @@ await writeFile(
   new URL("../generated/client.ts", import.meta.url),
   `// Generated from packages/contract/src/index.ts; do not edit.\n` +
   `export * from "../src/index.js";\n` +
-  `export * from "../src/client.js";\n`,
+  `export * from "../src/client.js";\n` +
+  `export * from "../src/consumer-auth.js";\n`,
   "utf8"
 );

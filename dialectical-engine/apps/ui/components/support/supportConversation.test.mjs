@@ -338,3 +338,15 @@ test("DL3-F3: ending a session erases the support conversation in the same tab",
     "logout, revoke-all and revoking this session all run through finishSession"
   );
 });
+
+
+test("regional English preferences validate actions against the English support catalog", async () => {
+  const { supportActionsFrom } = await loadConversation();
+  for (const language of ["en-US", "en-GB"]) {
+    assert.deepEqual(supportActionsFrom([
+      { id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" }
+    ], { signedIn: false, language }), [
+      { id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" }
+    ]);
+  }
+});

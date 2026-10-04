@@ -1,6 +1,10 @@
 import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
 export * from "./staff-access.js";
 import { z } from "zod";
+import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
+export * from "./auth-shared.js";
+import { consumerAuthContractSchemas } from "./consumer-auth.js";
+export * from "./consumer-auth.js";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
@@ -364,17 +368,6 @@ export const RunProjectionSchema = z.object({
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
 
-const ServerSessionSchema = z.object({
-  asker_id: z.string().regex(/^owner:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
-  session_id: z.uuid(),
-  caller_scope: z.literal("ASKER"),
-  ownership_provenance: z.literal("server_session"),
-  provisional_identity_model: z.literal(false)
-}).strict();
-
-export const SessionSchema = ServerSessionSchema;
-export type Session = z.infer<typeof SessionSchema>;
-
 export const SessionSummarySchema = z.object({
   session_id: z.uuid(),
   created_at: z.iso.datetime(),
@@ -406,13 +399,6 @@ export const AgeCheckResultSchema = z.object({ outcome: z.enum(["allowed", "refu
 export type AgeCheckResult = z.infer<typeof AgeCheckResultSchema>;
 export const AgeConfirmationStatusSchema = z.object({ status: z.enum(["required", "confirmed"]) }).strict();
 export type AgeConfirmationStatus = z.infer<typeof AgeConfirmationStatusSchema>;
-/** Paid plans L2/L3b: a legal document as the manifest names it — `Version N.M` and the draft's sha256. */
-export const LegalDocumentPairSchema = z.object({
-  version: z.string().regex(/^[0-9]{1,4}\.[0-9]{1,4}$/u),
-  sha256: z.string().regex(/^[0-9a-f]{64}$/u)
-}).strict();
-export type LegalDocumentPairWire = z.infer<typeof LegalDocumentPairSchema>;
-
 /** What sign-up sends for the two documents it displayed, and the locale it displayed them in. */
 export const RegisterLegalDocumentsSchema = z.object({
   terms: LegalDocumentPairSchema,
@@ -1107,6 +1093,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/billing/usage"
   ]),
   resources: Object.freeze({
+    ...consumerAuthContractSchemas,
     ...staffContractInventory.resources,
     ...fundedStaffContractInventory.resources,
     FundingBasisSchema,

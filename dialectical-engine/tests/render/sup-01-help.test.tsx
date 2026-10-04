@@ -363,6 +363,29 @@ describe("SUP-01 /help assistant", () => {
     );
   });
 
+  it.each(["en-US", "en-GB"] as const)("sends %s support through the English catalog language", async (locale) => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
+      calls.push({ url, body: typeof init.body === "string" ? JSON.parse(init.body) : null });
+      if (url === "/api/v1/support/sessions") return Response.json({
+        session: { session_id: "english-session", identity_bound: false }, session_token: "support-token",
+        first_message: { role: "assistant", text: "English server greeting." }
+      }, { status: 201 });
+      if (url === "/api/v1/support/sessions/english-session/messages") return Response.json({
+        message_id: "english-answer", outcome: "NO_SOURCE", text: "English answer.",
+        actions: [{ id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" }]
+      });
+      throw new Error(`UNEXPECTED_FETCH:${url}`);
+    });
+    await render(<I18nProvider locale={locale} catalog={{ ...chromeEnglish, ...supportEnglish }}>
+      <Assistant fullPage client={supportAssistantClient} signedIn={false} />
+    </I18nProvider>);
+    await submit("How do I start?");
+    expect(calls.find(({ url }) => url === "/api/v1/support/sessions")?.body).toEqual({ language: "en" });
+    expect(document.body.textContent).toContain("English answer.");
+    expect(document.querySelector('a[href="/login?next=%2Fnew"]')?.textContent).toBe("Start a debate");
+  });
+
   it("drops a stored conversation from another locale and sends text only", async () => {
     sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
       language: "en",

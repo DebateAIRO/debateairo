@@ -1,14 +1,13 @@
 import { dobOrderForLocale, type DobErrorCode, type DobOrder } from "@debateai/kernel";
-import { getLocale } from "@/lib/i18n/locales";
-import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { getLocale } from "../i18n/locales.js";
+import { t, type MessageCatalog } from "../i18n/translate.js";
 
 /** How the date-of-birth widget reads the UI locale: field order, script direction and Intl tag. */
 export type DobLocale = Readonly<{ tag: string; order: DobOrder; dir: "ltr" | "rtl" }>;
 
 /**
- * The widget's locale for a UI locale. The interface has one English, so the
- * English reader's region comes from the request's Accept-Language: an "en-US"
- * browser gets month-first fields, every other English reader day-first.
+ * Explicit US/UK preferences determine formatting. Legacy `en` cookies retain
+ * their Accept-Language behavior: US browsers get MDY, other English readers DMY.
  */
 export function resolveDobLocale(uiLocale: string, acceptLanguage: string | null = null): DobLocale {
   const definition = getLocale(uiLocale);

@@ -1,13 +1,13 @@
 import "server-only";
 
-import { DEFAULT_LOCALE, isLocale, type LocaleCode } from "./locales";
+import { DEFAULT_LOCALE, catalogLocale, isLocale, type CatalogLocaleCode } from "./locales";
 import type { I18nNamespace } from "./I18nProvider";
 import type { MessageCatalog } from "./translate";
 
 type CatalogModule = Readonly<{ default: MessageCatalog }>;
 type CatalogLoader = () => Promise<CatalogModule>;
 
-const LOADERS: Readonly<Record<LocaleCode, Readonly<Record<I18nNamespace, CatalogLoader>>>> = Object.freeze({
+const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace, CatalogLoader>>>> = Object.freeze({
     ar: {
       chrome: () => import("../../messages/ar/chrome.json"),
       home: () => import("../../messages/ar/home.json"),
@@ -644,7 +644,7 @@ export async function loadNamespace(
   locale: string,
   namespace: I18nNamespace
 ): Promise<MessageCatalog> {
-  const selectedLocale = isLocale(locale) ? locale : DEFAULT_LOCALE;
+  const selectedLocale = catalogLocale(isLocale(locale) ? locale : DEFAULT_LOCALE);
   try {
     return (await LOADERS[selectedLocale][namespace]()).default;
   } catch {

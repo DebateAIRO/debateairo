@@ -56,9 +56,25 @@ export const LOCALES = Object.freeze([
   locale("tr", "Türkçe", "MIDDLE EAST")
 ] as const);
 
-export type LocaleCode = (typeof LOCALES)[number]["code"];
+export type CatalogLocaleCode = (typeof LOCALES)[number]["code"];
+export type LocaleCode = CatalogLocaleCode | "en-US" | "en-GB";
 
-const localeCodes = new Set<string>(LOCALES.map(({ code }) => code));
+/** Formatting choices share the 35 translation catalogs; old `en` cookies remain valid. */
+export const LOCALE_PREFERENCES: readonly LocaleDefinition[] = Object.freeze(LOCALES.flatMap<LocaleDefinition>((definition) =>
+  definition.code === "en"
+    ? [locale("en-US", "English (United States)", "EUROPE"), locale("en-GB", "English (United Kingdom)", "EUROPE")]
+    : [definition]
+));
+
+export function catalogLocale(locale: LocaleCode): CatalogLocaleCode {
+  return locale === "en-US" || locale === "en-GB" ? "en" : locale;
+}
+
+export function legalLocale(locale: LocaleCode): CatalogLocaleCode {
+  return catalogLocale(locale);
+}
+
+const localeCodes = new Set<string>([...LOCALES.map(({ code }) => code), "en-US", "en-GB"]);
 
 export function isLocale(value: unknown): value is LocaleCode {
   return typeof value === "string" && localeCodes.has(value);
@@ -66,13 +82,14 @@ export function isLocale(value: unknown): value is LocaleCode {
 
 export function getLocale(value: unknown): LocaleDefinition {
   const code = isLocale(value) ? value : DEFAULT_LOCALE;
-  return LOCALES.find((candidate) => candidate.code === code) ?? LOCALES[5];
+  return LOCALE_PREFERENCES.find((candidate) => candidate.code === code)
+    ?? LOCALES.find((candidate) => candidate.code === code) ?? LOCALES[5];
 }
 
 export function filterLocales(query: string): readonly LocaleDefinition[] {
   const normalized = query.trim().toLowerCase();
-  if (normalized.length === 0) return LOCALES;
-  return LOCALES.filter(({ code, nativeName }) =>
+  if (normalized.length === 0) return LOCALE_PREFERENCES;
+  return LOCALE_PREFERENCES.filter(({ code, nativeName }) =>
     code.toLowerCase().includes(normalized) ||
     nativeName.toLowerCase().includes(normalized)
   );

@@ -1,4 +1,15 @@
 import {
+  AuthenticationResponseSchema,
+  REGISTRATION_PUBLIC_MESSAGE,
+  RESEND_VERIFICATION_PUBLIC_MESSAGE,
+  RegisterRequestSchema,
+  ResendVerificationRequestSchema,
+  RegistrationVerificationAckSchema,
+  ResendVerificationAckSchema,
+  type RegisterRequest,
+  type ResendVerificationRequest,
+  type VerificationAck,
+  type AuthenticationResponse,
   AccountEmailSchema,
   AccountErasureCancelRequestSchema,
   AgeCheckResultSchema,
@@ -248,10 +259,6 @@ function browserCsrfToken(): string | null {
   return values.length === 1 ? values[0]! : null;
 }
 
-const REGISTRATION_PUBLIC_MESSAGE =
-  "If this address can be registered, verification instructions will arrive. Check your spam folder." as const;
-const RESEND_VERIFICATION_PUBLIC_MESSAGE =
-  "If this address is awaiting verification, new instructions will arrive. Check your spam folder." as const;
 const RECOVERY_START_PUBLIC_MESSAGE =
   "If this account can be recovered, instructions will arrive through an eligible channel." as const;
 
@@ -279,6 +286,8 @@ const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_STAR
 export interface ContractClient {
   /** Age gate: answers `refused` (and sets the lockout cookie) for anyone under the minimum age. */
   checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
+  register(input: RegisterRequest): Promise<VerificationAck>;
+  /** @deprecated Branch migration adapter; remove when the signup UI sends RegisterRequest. */
   register(
     email: string,
     password: string,
@@ -286,6 +295,8 @@ export interface ContractClient {
     dateOfBirth: string,
     legal: RegisterLegalDocuments
   ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
+  resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
+  /** @deprecated Branch migration adapter; remove when the resend UI sends its full request. */
   resendVerification(email: string): Promise<Readonly<{
     message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
   }>>;
@@ -293,12 +304,7 @@ export interface ContractClient {
     message: typeof RECOVERY_START_PUBLIC_MESSAGE;
   }>>;
   beginLogin(email: string, password: string): Promise<{ status: "mfa_required"; challenge_token: string }>;
-  completeLogin(challengeToken: string, code: string): Promise<{
-    status: "authenticated";
-    csrf_token: string;
-    session: Session;
-    replacement_recovery_code?: string;
-  }>;
+  completeLogin(challengeToken: string, code: string): Promise<AuthenticationResponse>;
   logout(): Promise<void>;
   listSessions(): Promise<SessionList>;
   revokeSession(sessionId: string): Promise<void>;
@@ -416,6 +422,33 @@ export function createContractClient(
     init: RequestInit = {},
     expectedStatus?: number
   ) => requestJson(root.href, fetchImplementation, path, schema, init, auth, expectedStatus);
+  // TEMPORARY TASK11 ADAPTERS: preserve existing positional callers during branch migration.
+  // They never invent phone/proof values; the revised server boundary must reject old payloads.
+  function register(input: RegisterRequest): Promise<VerificationAck>;
+  function register(email: string, password: string, recoveryEmail: string, dateOfBirth: string,
+    legal: RegisterLegalDocuments): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
+  async function register(input: RegisterRequest | string, password?: string, recoveryEmail?: string,
+    dateOfBirth?: string, legal?: RegisterLegalDocuments): Promise<VerificationAck | Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>> {
+    if (typeof input !== "string") {
+      return request("/v1/auth/register", RegistrationVerificationAckSchema,
+        { method: "POST", body: JSON.stringify(RegisterRequestSchema.parse(input)) }, 202);
+    }
+    if (legal === undefined) throw new TypeError("Missing legacy registration documents");
+    return request("/v1/auth/register", RegistrationPublicResponseSchema, { method: "POST", body: JSON.stringify({
+      email: input, password, recovery_email: recoveryEmail, date_of_birth: dateOfBirth,
+      terms: legal.terms, privacy: legal.privacy, locale: legal.locale
+    }) }, 202);
+  }
+  function resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
+  function resendVerification(email: string): Promise<Readonly<{ message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE }>>;
+  async function resendVerification(input: ResendVerificationRequest | string): Promise<VerificationAck | Readonly<{ message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE }>> {
+    if (typeof input !== "string") {
+      return request("/v1/auth/resend-verification", ResendVerificationAckSchema,
+        { method: "POST", body: JSON.stringify(ResendVerificationRequestSchema.parse(input)) }, 202);
+    }
+    return request("/v1/auth/resend-verification", ResendVerificationPublicResponseSchema,
+      { method: "POST", body: JSON.stringify({ email: input }) }, 202);
+  }
   const eventResponse = async (runId: string, signal?: AbortSignal): Promise<Response> => {
     let response: Response;
     try {
@@ -454,27 +487,7 @@ export function createContractClient(
       AgeCheckResultSchema,
       { method: "POST", body: JSON.stringify({ date_of_birth: dateOfBirth }) }
     ),
-    register: (
-      email: string,
-      password: string,
-      recoveryEmail: string,
-      dateOfBirth: string,
-      legal: RegisterLegalDocuments
-    ) => request(
-      "/v1/auth/register",
-      RegistrationPublicResponseSchema,
-      { method: "POST", body: JSON.stringify({
-          email,
-          password,
-          recovery_email: recoveryEmail,
-          date_of_birth: dateOfBirth,
-          // Paid plans L3b (R3-2): the displayed documents, beside the age gate's date.
-          terms: legal.terms,
-          privacy: legal.privacy,
-          locale: legal.locale
-        }) },
-      202
-    ),
+    register,
     readAgeConfirmation: () => request("/v1/auth/age-confirmation", AgeConfirmationStatusSchema),
     confirmAge: (dateOfBirth: string) => request(
       "/v1/auth/age-confirmation",
@@ -487,12 +500,7 @@ export function createContractClient(
       SensitiveDataConsentStatusSchema,
       { method: "POST", body: JSON.stringify({ notice_version: SENSITIVE_DATA_NOTICE_VERSION, locale }) }
     ),
-    resendVerification: (email: string) => request(
-      "/v1/auth/resend-verification",
-      ResendVerificationPublicResponseSchema,
-      { method: "POST", body: JSON.stringify({ email }) },
-      202
-    ),
+    resendVerification,
     startRecovery: (email: string) => request(
       "/v1/auth/recovery/start",
       RecoveryStartPublicResponseSchema,
@@ -507,21 +515,10 @@ export function createContractClient(
         return { status: "mfa_required" as const, challenge_token: row.challenge_token };
       }
     }, { method: "POST", body: JSON.stringify({ email, password }) }),
-    completeLogin: (challengeToken: string, code: string) => request("/v1/auth/login", {
-      parse(value: unknown) {
-        if (typeof value !== "object" || value === null) throw new TypeError("Invalid login response");
-        const row = value as Record<string, unknown>;
-        if (row.status !== "authenticated" || typeof row.csrf_token !== "string") throw new TypeError("Invalid login response");
-        const session = SessionSchema.parse(row.session);
-        return {
-          status: "authenticated" as const,
-          csrf_token: row.csrf_token,
-          session,
-          ...(typeof row.replacement_recovery_code === "string"
-            ? { replacement_recovery_code: row.replacement_recovery_code } : {})
-        };
-      }
-    }, { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }),
+    completeLogin: (challengeToken: string, code: string) => request(
+      "/v1/auth/login", AuthenticationResponseSchema,
+      { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }
+    ),
     async logout() {
       let response: Response;
       const headers = new Headers();

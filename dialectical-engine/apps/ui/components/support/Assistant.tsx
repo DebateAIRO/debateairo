@@ -9,7 +9,7 @@ import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { useChromeI18n } from "../../lib/i18n/I18nProvider";
-import type { LocaleCode } from "../../lib/i18n/locales";
+import { catalogLocale, type LocaleCode } from "../../lib/i18n/locales";
 import { t } from "../../lib/i18n/translate";
 import { AiBanner } from "../AiNotice";
 import { supportCaseLink } from "./caseLink.js";
@@ -351,7 +351,8 @@ export function Assistant({
   auxiliaryContent?: ReactNode;
   onClose?: () => void;
 }>) {
-  const { catalog: chromeCatalog,locale: language } = useChromeI18n();
+  const { catalog: chromeCatalog,locale: uiLocale } = useChromeI18n();
+  const language = catalogLocale(uiLocale);
   const persistent = client === supportAssistantClient;
   // DL3-F3: the capability lives here and nowhere else. It is never written to
   // sessionStorage, so it cannot outlive the page that minted it.
