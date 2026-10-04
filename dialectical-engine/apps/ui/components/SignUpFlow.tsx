@@ -21,6 +21,7 @@ import { contractClient } from "@/lib/api";
 import { resolveDobLocale, type DobLocale } from "@/lib/dob/dobLocale";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import type { TurnstilePublicConfig } from "@/lib/turnstile";
 import authEnglish from "@/messages/en/auth.json";
 
 type RegistrationClient = Pick<ContractClient, "checkAge" | "register">;
@@ -143,6 +144,8 @@ export function SignUpFlow({
   refused: refusedOnArrival = false,
   reloadPage = () => window.location.reload()
 }: Readonly<{
+  /** Server-provided public key and request nonce. Task11 mounts the managed challenge. */
+  turnstile?: TurnstilePublicConfig;
   catalog?: MessageCatalog;
   client?: RegistrationClient;
   /** The date-of-birth widget's field order and direction, from the UI locale (8g). */

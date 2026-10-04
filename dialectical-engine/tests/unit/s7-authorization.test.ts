@@ -43,6 +43,13 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
+  { route: "GET /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/profile/reveal", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "GET /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/recovery-email/confirm", auth: "public", origin: "trusted", resource: "identity", action: "confirm-recovery-email" },
+  { route: "DELETE /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
   { route: "GET /v1/account/email", auth: "user", resource: "identity", action: "read-email" },
   { route: "POST /v1/account/email/change", auth: "user", resource: "identity", action: "request-email-change" },
   { route: "POST /v1/account/email/change/resend", auth: "user", resource: "identity", action: "resend-email-change" },
@@ -217,7 +224,7 @@ describe("S7 deny-by-default authorization", () => {
     await api.close();
     expect(authorizationPolicyInventory.filter(policy => !policy.route.startsWith("GET /v1/admin/") && !policy.route.startsWith("POST /v1/admin/") && !policy.route.startsWith("PATCH /v1/admin/") && policy.route !== "DELETE /v1/admin/internal-allowances/{grantId}")).toEqual(EXPECTED_AUTHORIZATION_MATRIX);
     expect(staffContractInventory.routes).toHaveLength(18);
-    expect(contractInventory.routes).toHaveLength(86);
+    expect(contractInventory.routes).toHaveLength(93);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

@@ -1,3 +1,4 @@
+import { canonicalSignup, canonicalResend, passedTurnstile } from "../support/turnstileFixtures.js";
 import { createHmac, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import {
@@ -1437,6 +1438,7 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
     name: "register" as const,
     url: "/v1/auth/register",
     payload: {
+      ...canonicalSignup,
       email: "alice@example.test", password: "correct horse battery staple",
       phone: "+40722123456", date_of_birth: "1990-01-01"
     }
@@ -1449,7 +1451,7 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
   Object.freeze({
     name: "resend" as const,
     url: "/v1/auth/resend-verification",
-    payload: { email: "alice@example.test" }
+    payload: canonicalResend
   })
 ]);
 
@@ -1461,7 +1463,7 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
         verifyEmail: async () => { throw new Argon2InfrastructureError(code); },
         resendVerification: async () => { throw new Argon2InfrastructureError(code); }
       };
-      const api = buildApi({ application: fixtureAskApplication(), registration: failing });
+      const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: failing });
       try {
         for (const route of AUTH_ROUTE_REQUESTS) {
           const response = await api.inject({
@@ -1497,7 +1499,7 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
         verifyEmail: async () => { throw expected.error; },
         resendVerification: async () => { throw expected.error; }
       };
-      const api = buildApi({ application: fixtureAskApplication(), registration: failing });
+      const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: failing });
       try {
         const response = await api.inject({
           method: "POST", url: "/v1/auth/register", payload: AUTH_ROUTE_REQUESTS[0]!.payload

@@ -374,6 +374,8 @@ const apiEnvironmentShape = {
     MAIL_SENDMAIL_PATH: z.string().min(1),
     MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://")),
+    // Public Unix relay address only; the API has no Turnstile credential.
+    TURNSTILE_SOCKET_PATH: z.string().max(103).regex(/^\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\0]*\.sock$/u).optional(),
     DATABASE_URL: z.string().url(),
     SUPPORT_DATABASE_URL: z.string().url(),
     API_HOST: z.string().min(1), API_PORT: positiveInteger,

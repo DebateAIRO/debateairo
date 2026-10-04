@@ -115,7 +115,7 @@ test("auth server routes load the auth namespace and pass it to client flows", (
   assert.match(source("app/login/page.tsx"), /loadNamespace\(locale, "auth"\)/);
   assert.match(source("app/login/page.tsx"), /<LoginFlow catalog=\{catalog\} \/>/);
   assert.match(source("app/sign-up/page.tsx"), /loadNamespace\(locale, "auth"\)/);
-  assert.match(source("app/sign-up/page.tsx"), /<SignUpFlow catalog=\{catalog\} dobLocale=\{dobLocale\} refused=\{refused\} \/>/);
+  assert.match(source("app/sign-up/page.tsx"), /<SignUpFlow catalog=\{catalog\} dobLocale=\{dobLocale\} refused=\{refused\} turnstile=\{turnstile\} \/>/);
   // Age gate (8k): the home page stands in for itself with the one-time check while it is owed.
   assert.match(source("app/page.tsx"), /const authCatalog = await loadNamespace\(locale, "auth"\)/);
   assert.match(source("app/page.tsx"), /<AgeConfirmationFlow catalog=\{authCatalog\} dobLocale=\{dobLocale\} \/>/);

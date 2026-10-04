@@ -17,7 +17,7 @@ import {
   type UserDekStore
 } from "@debateai/crypto";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
-import type { RegisterLegalDocuments } from "@debateai/contract";
+import { LocaleCodeSchema, type RegisterLegalDocuments } from "@debateai/contract";
 import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
@@ -48,14 +48,23 @@ export interface RegisterInput {
  * edge country already rides here (AuthSourceContext.countryCode); the Terms and Privacy pairs the page
  * displayed ride here too, parsed by the register preHandler hook and added by sourceFor.
  */
-export type RegistrationSource = AuthSourceContext & Readonly<{ legal?: RegisterLegalDocuments }>;
+export type VerificationMailSource = AuthSourceContext & Readonly<{
+  /** Validated UI language/time zone for delivery only; carries no identity authority. */
+  mailDisplay?: Readonly<{ locale: string; timeZone: string | null }>;
+}>;
+export type RegistrationSource = VerificationMailSource & Readonly<{ legal?: RegisterLegalDocuments }>;
 
+declare const sourceAdmissionBrand: unique symbol;
+export type AuthSourceAdmission = Readonly<{ [sourceAdmissionBrand]: true; release(): void }>;
 export interface RegistrationApplication {
-  register(input: RegisterInput, source: RegistrationSource): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
+  /** Trusted composition port; the capability never enters public JSON or source metadata. */
+  admitSource?(route: "register" | "resend", source: VerificationMailSource): Promise<AuthSourceAdmission>;
+  register(input: RegisterInput, source: RegistrationSource, admission?: AuthSourceAdmission): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
   verifyEmail(input: { readonly token: string }, source: AuthSourceContext): Promise<{ readonly status: "mfa_required" }>;
   resendVerification(
     input: { readonly email: string },
-    source: AuthSourceContext
+    source: VerificationMailSource,
+    admission?: AuthSourceAdmission
   ): Promise<typeof RESEND_PUBLIC_RESPONSE>;
 }
 
@@ -444,7 +453,7 @@ interface PendingRegistration {
   readonly requestedAt: Date;
   readonly countryCode: string | null;
   readonly documents: SignUpDocuments | null;
-  readonly source: AuthSourceContext;
+  readonly source: VerificationMailSource;
 }
 
 interface VerificationDelivery {
@@ -453,7 +462,7 @@ interface VerificationDelivery {
   readonly email: string;
   readonly token: string;
   readonly expiresAt: Date;
-  readonly source: AuthSourceContext;
+  readonly source: VerificationMailSource;
 }
 
 interface VerificationDeliveryRecord {
@@ -543,7 +552,11 @@ interface RefusalAuditCoordinator {
   writer: Promise<void> | undefined;
 }
 
-function sourceContext(source: AuthSourceContext): AuthSourceContext {
+function normalizeMailDisplay(display: NonNullable<VerificationMailSource["mailDisplay"]>): NonNullable<VerificationMailSource["mailDisplay"]> {
+  if (!LocaleCodeSchema.safeParse(display.locale).success || (display.timeZone !== null && (typeof display.timeZone !== "string" || display.timeZone.length < 1 || display.timeZone.length > 128))) throw new AuthFlowError("AUTH_INPUT_INVALID");
+  return Object.freeze({ locale: display.locale, timeZone: display.timeZone });
+}
+export function sourceContext(source: VerificationMailSource): VerificationMailSource {
   if (source.ip.trim() === "" || source.requestId.trim() === "") {
     throw new AuthFlowError("AUTH_INPUT_INVALID");
   }
@@ -551,7 +564,8 @@ function sourceContext(source: AuthSourceContext): AuthSourceContext {
   return Object.freeze({
     ip: source.ip.slice(0, 64),
     userAgent: (userAgent === "" ? "unknown" : userAgent).slice(0, 256),
-    requestId: source.requestId.slice(0, 128)
+    requestId: source.requestId.slice(0, 128),
+    ...(source.mailDisplay === undefined ? {} : { mailDisplay: normalizeMailDisplay(source.mailDisplay) })
   });
 }
 
@@ -612,6 +626,26 @@ export class RegistrationService implements RegistrationApplication {
    * advances. Nothing here is ever replaced or copied on rollover.
    */
   private readonly refusalAuditRoutes = new Map<AuthRoute, RefusalAuditCoordinator>();
+  private readonly sourceAdmissions = new WeakMap<AuthSourceAdmission, Readonly<{ route: "register" | "resend"; ip: string; requestId: string }>>();
+
+  async admitSource(route: "register" | "resend", rawSource: VerificationMailSource): Promise<AuthSourceAdmission> {
+    const startedAt = performance.now(); const source = sourceContext(rawSource); const now = this.clock();
+    const limit = this.dependencies.limiter.consume({ route, ip: source.ip, addressKey: "", now });
+    if (!limit.allowed) {
+      // A terminal source refusal spends no Siteverify, account lookup, password KDF, token or mail.
+      // The established route-window audit starts only after that decision's opaque response clamp.
+      await this.refuseRateLimit({ route, scope: limit.scope, now, source: { ip: source.ip, userAgent: source.userAgent, requestId: source.requestId },
+        persistAfter: route === "register" ? this.holdRegistrationEnumerationClamp(startedAt) : this.holdEnumerationFloor(startedAt) });
+    }
+    const capability = Object.freeze({ release: () => { this.sourceAdmissions.delete(capability); } }) as AuthSourceAdmission;
+    this.sourceAdmissions.set(capability, Object.freeze({ route, ip: source.ip, requestId: source.requestId }));
+    return capability;
+  }
+  private consumeSourceAdmission(route: "register" | "resend", source: AuthSourceContext, admission: AuthSourceAdmission): void {
+    const granted = this.sourceAdmissions.get(admission);
+    this.sourceAdmissions.delete(admission);
+    if (!granted || granted.route !== route || granted.ip !== source.ip || granted.requestId !== source.requestId) throw new AuthFlowError("AUTH_INPUT_INVALID");
+  }
 
   constructor(private readonly dependencies: {
     readonly repository: IdentityRepository;
@@ -942,7 +976,7 @@ export class RegistrationService implements RegistrationApplication {
    */
   private scheduleRefusalAuditFlush(route: AuthRoute, windowStartedAt: number, now: Date): void {
     const coordinator = this.refusalAuditRoute(route);
-    if (coordinator.active?.windowStartedAt === windowStartedAt) return;
+    if (coordinator.active !== undefined && coordinator.active.windowStartedAt >= windowStartedAt) return;
     if (coordinator.active !== undefined) clearTimeout(coordinator.active.timer);
 
     const delay = Math.max(0,
@@ -1185,6 +1219,7 @@ export class RegistrationService implements RegistrationApplication {
     readonly scope: "ip" | "address";
     readonly now: Date;
     readonly source: AuthSourceContext;
+    readonly persistAfter?: Promise<void>;
   }): Promise<never> {
     const aggregate = this.dependencies.limiter.aggregateRefusal(input);
     if (aggregate.finalized !== null) {
@@ -1194,8 +1229,9 @@ export class RegistrationService implements RegistrationApplication {
       // because it is no longer the active one.
       this.enqueueRefusalAggregate(input.route, aggregate.finalized);
     }
+    if (input.persistAfter !== undefined) await input.persistAfter;
     if (aggregate.startedWindow) {
-      this.scheduleRefusalAuditFlush(input.route, aggregate.windowStartedAt, input.now);
+      this.scheduleRefusalAuditFlush(input.route, aggregate.windowStartedAt, input.persistAfter === undefined ? input.now : this.clock());
     }
     if (aggregate.finalized !== null) {
       // FIRE-AND-FORGET, never awaited. A rate-limit refusal is a public path:
@@ -1410,7 +1446,7 @@ export class RegistrationService implements RegistrationApplication {
     }
   }
 
-  async register(input: RegisterInput, rawSource: RegistrationSource): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
+  async register(input: RegisterInput, rawSource: RegistrationSource, admission?: AuthSourceAdmission): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
     const requestedAt = new Date(this.clock().getTime());
     const startedAt = performance.now();
     const correlationId = randomUUID();
@@ -1446,6 +1482,7 @@ export class RegistrationService implements RegistrationApplication {
           throw new AuthFlowError("LEGAL_DOCUMENT_STALE");
         }
         const source = sourceContext(rawSource);
+        if (admission !== undefined) this.consumeSourceAdmission("register", source, admission);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
         // await, the limiter lookup, either KDF, the mail reservation, the token
@@ -1460,7 +1497,7 @@ export class RegistrationService implements RegistrationApplication {
         // Its account audit token never enters a refusal row: that event is a
         // route-window incident with DB-minted event-local actor/target refs.
         const existing = await this.dependencies.repository.findAuditIdentityByBlindIndex(emailBlindIndex);
-        const limit = this.dependencies.limiter.consume({
+        const limit = admission !== undefined ? { allowed: true as const } : this.dependencies.limiter.consume({
           route: "register",
           ip: source.ip,
           addressKey: existing?.addressKey ?? emailBlindIndex.toString("hex"),
@@ -1583,6 +1620,7 @@ export class RegistrationService implements RegistrationApplication {
       // either given successful postwork to `dispatchVerification` or given the
       // reservation to a visible hold. Never at commit, clamp entry, or before
       // the secret/hash and mail-capacity owners have settled.
+      if (admission !== undefined) this.sourceAdmissions.delete(admission);
       releaseAdmission?.();
     }
   }
@@ -1646,7 +1684,8 @@ export class RegistrationService implements RegistrationApplication {
 
   async resendVerification(
     input: { readonly email: string },
-    rawSource: AuthSourceContext
+    rawSource: VerificationMailSource,
+    admission?: AuthSourceAdmission
   ): Promise<typeof RESEND_PUBLIC_RESPONSE> {
     const startedAt = performance.now();
     const correlationId = randomUUID();
@@ -1655,11 +1694,12 @@ export class RegistrationService implements RegistrationApplication {
     try {
       if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
       const source = sourceContext(rawSource);
+      if (admission !== undefined) this.consumeSourceAdmission("resend", source, admission);
       const email = normalizeEmailForBlindIndex(input.email);
       const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
       const identity = await this.dependencies.repository.findAuditIdentityByBlindIndex(emailBlindIndex);
       const now = this.clock();
-      const limit = this.dependencies.limiter.consume({
+      const limit = admission !== undefined ? { allowed: true as const } : this.dependencies.limiter.consume({
         route: "resend",
         ip: source.ip,
         addressKey: identity?.addressKey ?? emailBlindIndex.toString("hex"),
@@ -1699,6 +1739,7 @@ export class RegistrationService implements RegistrationApplication {
       // The resend route reaches the pool through its audit derivations.
       throw asAuthFlowFailure(error);
     } finally {
+      if (admission !== undefined) this.sourceAdmissions.delete(admission);
       try {
         await this.holdEnumerationFloor(startedAt);
       } finally {

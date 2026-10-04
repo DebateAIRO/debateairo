@@ -1,11 +1,12 @@
+import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
 import { REGISTRATION_PUBLIC_RESPONSE, RESEND_PUBLIC_RESPONSE } from "../../apps/api/src/registration.js";
 
-const body = { email: "phone@example.test", password: "password-123", phone: "+40 722 123 456", date_of_birth: "1990-01-01" };
+const body = { ...canonicalSignup, email: "phone@example.test", password: "password-123", phone: "+40 722 123 456", date_of_birth: "1990-01-01" };
 function harness() {
   const inputs: unknown[] = [];
-  const api = buildApi({ application: {} as AskApplication, registration: {
+  const api = buildApi({ application: {} as AskApplication, turnstile: passedTurnstile, registration: {
     register: async input => { inputs.push(input); return REGISTRATION_PUBLIC_RESPONSE; },
     verifyEmail: async () => ({ status: "mfa_required" }), resendVerification: async () => RESEND_PUBLIC_RESPONSE
   } });

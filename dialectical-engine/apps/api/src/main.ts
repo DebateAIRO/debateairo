@@ -1,3 +1,4 @@
+import { UnixTurnstileVerifier } from "./turnstile.js";
 import { AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailService } from "./recovery-email.js";
 import { PostgresAccountProfileRepository,PostgresRecoveryEmailRepository } from "@debateai/db";
@@ -1024,6 +1025,7 @@ const api = buildApi({
   disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pool)),
   accountErasure:erasureApplication,
   registration,
+  turnstile: new UnixTurnstileVerifier({ publicAppUrl: environment.PUBLIC_APP_URL, ...(environment.TURNSTILE_SOCKET_PATH === undefined ? {} : { socketPath: environment.TURNSTILE_SOCKET_PATH }) }),
   recovery,
   mfa,
   sessions,

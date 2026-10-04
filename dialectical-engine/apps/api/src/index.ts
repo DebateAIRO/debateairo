@@ -1,3 +1,5 @@
+import type { AuthSourceAdmission } from "./registration.js";
+import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } from "./turnstile.js";
 import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
@@ -78,6 +80,7 @@ import {
   PUBLICATION_CONTENT_REFUSED_MESSAGE,
   RegisterLegalDocumentsSchema,
   RegisterRequestSchema,
+  ResendVerificationRequestSchema,
   type RegisterLegalDocuments,
   LegalAcceptRequestSchema,
   LegalStatusResponseSchema,
@@ -1447,6 +1450,8 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
 export interface ApiOptions {
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
+  /** Mandatory for signup and resend; absent configuration fails closed. */
+  readonly turnstile?: TurnstileVerifier;
   readonly recovery?: RecoveryApplication;
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
@@ -1813,8 +1818,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * request and no request decoration is added.
    */
   const registerLegalDocuments = new WeakMap<object, RegisterLegalDocuments>();
-  const registerPublicKeys = new WeakMap<object, readonly string[]>();
-  const registerAllowedKeys = new Set(Object.keys(RegisterRequestSchema.shape));
+  const registerPublicBodies = new WeakMap<object, Record<string, unknown>>();
+  const sourceAdmissions = new WeakMap<object, AuthSourceAdmission>();
+  api.addHook("onResponse", async request => { sourceAdmissions.get(request)?.release(); sourceAdmissions.delete(request); });
+  const mailDisplays = new WeakMap<object, Readonly<{ locale: string; timeZone: string | null }>>();
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
@@ -1840,7 +1847,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // Age gate (R3-3): the country computed above (the edge's, else the country gate's lookup),
       // left out when neither gives one.
       ...(countryCode === null ? {} : { countryCode }),
-      ...(legal === undefined ? {} : { legal })
+      ...(legal === undefined ? {} : { legal }),
+      ...(mailDisplays.get(request) === undefined ? {} : { mailDisplay: mailDisplays.get(request)! })
     });
   };
   const admissionRefusalAuditedUntil = new Map<string, number>();
@@ -2041,15 +2049,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const dateOfBirth = body === null ? null : dateOfBirthValue(body.date_of_birth);
     if (body === null || dateOfBirth === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (!meetsMinimumAge(dateOfBirth)) return ageRefused(reply);
-    registerPublicKeys.set(request, Object.keys(body));
+    // Keep the original submitted facts separate from the server age decision.
+    registerPublicBodies.set(request, { ...body });
     body.adult_affirmed = true;
   });
   /**
    * Paid plans L3b (spec §2.3.2): the pairs of the documents the sign-up page displayed. The registration
    * mount region is frozen (S04), so — as the age gate does for the date — they are read here and travel to
-   * the service on the source (sourceFor), separately from account profile input. A missing or malformed
-   * triple travels as absent, which the service refuses as LEGAL_DOCUMENT_STALE when the records key is
-   * composed. Runs after the age gate's hook, so a refused date never gets this far.
+   * the service on the source (sourceFor), separately from account profile input. The canonical hook
+   * below rejects a missing or malformed triple before proof or identity work; a well-formed stale
+   * triple still reaches the service's legal-manifest decision after valid proof. Runs after age refusal.
    */
   api.addHook("preHandler", async (request) => {
     if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
@@ -2062,24 +2071,27 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
     if (legal.success) registerLegalDocuments.set(request, legal.data);
   });
-  // Task 2 stages the canonical key boundary after the existing country/age/legal hooks.
-  // Task 4 must require the full request shape and verified Turnstile proof before account work.
+  // Parse submitted facts, never the body carrying the server's injected age decision.
   api.addHook("preHandler", async (request, reply) => {
-    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
-    const keys = registerPublicKeys.get(request);
-    const body = request.body as Record<string, unknown>;
-    if (keys === undefined || keys.some(key => !registerAllowedKeys.has(key))) {
+    const path = request.routeOptions.url;
+    if (request.method !== "POST" || (path !== "/v1/auth/register" && path !== "/v1/auth/resend-verification")) return;
+    const submitted = path === "/v1/auth/register" ? registerPublicBodies.get(request) : request.body;
+    if (submitted && typeof submitted === "object" && !passwordWithinRequestBound(submitted as Record<string, unknown>)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
-    for (const [key, maximum] of [["locale", 16], ["ui_locale", 16], ["time_zone", 128], ["turnstile_token", 2048]] as const) {
-      const value = body[key];
-      if (value === undefined || (key === "time_zone" && value === null)) continue;
-      if (typeof value !== "string" || value.length > maximum) {
-        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
-      }
+    const parsed = path === "/v1/auth/register"
+      ? RegisterRequestSchema.safeParse(registerPublicBodies.get(request))
+      : ResendVerificationRequestSchema.safeParse(request.body);
+    if (!parsed.success || !passwordWithinRequestBound(parsed.data)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    if (path === "/v1/auth/register") {
+      const body = request.body as Record<string, unknown>;
+      try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
     }
-    try { body.phone = normalizeManualPhone(body.phone); }
-    catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+    mailDisplays.set(request, Object.freeze({ locale: parsed.data.ui_locale, timeZone: parsed.data.time_zone }));
+    const admission = await options.registration?.admitSource?.(path === "/v1/auth/register" ? "register" : "resend", sourceFor(request));
+    if (admission !== undefined) sourceAdmissions.set(request, admission);
+    try { await requireTurnstileProof(options.turnstile, { token: parsed.data.turnstile_token, action: path === "/v1/auth/register" ? "signup" : "resend-verification" }); }
+    catch (error) { admission?.release(); sourceAdmissions.delete(request); throw error; }
   });
   /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
@@ -2090,6 +2102,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.setNotFoundHandler((_request, reply) =>
     reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" }));
   api.setErrorHandler((error, request, reply) => {
+    if (error instanceof TurnstileGateError) {
+      return reply.status(error.statusCode).send({ error: error.code, message: error.code });
+    }
     if (reply.sent || reply.raw.headersSent) {
       // A streaming response has no lawful error envelope left to send. Abort
       // the one connection instead of fabricating a terminal SSE event (DR-115)
@@ -2694,8 +2709,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         recoveryEmail: null,
         phone: typeof body.phone === "string" ? body.phone : "",
         adultAffirmed: body.adult_affirmed === true
-      }, sourceFor(request));
-      return reply.status(202).send(response);
+      }, sourceFor(request), sourceAdmissions.get(request));
+      return reply.status(202).send({ message: response.message, retry_after_seconds: 60 });
     });
     api.post("/v1/auth/verify-email", credentialRoutePolicy("POST /v1/auth/verify-email"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
@@ -2712,8 +2727,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : {};
       const response = await options.registration!.resendVerification({
         email: typeof body.email === "string" ? body.email : ""
-      }, sourceFor(request));
-      return reply.status(202).send(response);
+      }, sourceFor(request), sourceAdmissions.get(request));
+      return reply.status(202).send({ message: response.message, retry_after_seconds: 60 });
     });
   }
   // Age gate (8d → 8j). Stateless: the date is checked and dropped. The UI calls this before

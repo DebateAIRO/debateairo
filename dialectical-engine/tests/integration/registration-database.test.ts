@@ -1,3 +1,4 @@
+import { canonicalSignup, canonicalResend, passedTurnstile } from "../support/turnstileFixtures.js";
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -5516,7 +5517,7 @@ setTimeout(() => undefined, 500);
 });
 
 describe("T9 resend lock-order race through the real HTTP boundary", () => {
-  const RESEND_BODY = JSON.stringify(RESEND_PUBLIC_RESPONSE);
+  const RESEND_BODY = JSON.stringify({ ...RESEND_PUBLIC_RESPONSE, retry_after_seconds: 60 });
 
   /**
    * Real transport that suspends exactly one armed send. Suspending the first
@@ -5578,7 +5579,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const response = await api.inject({
         method: "POST",
         url: "/v1/auth/resend-verification",
-        payload: { email },
+        payload: { ...canonicalResend, email },
         remoteAddress: ip,
         headers: { "user-agent": "vitest-t9" }
       });
@@ -5697,6 +5698,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         method: "POST",
         url: "/v1/auth/register",
         payload: {
+          ...canonicalSignup,
           email,
           password: "correct horse battery staple",
           phone: "+40722123456",
@@ -5906,6 +5908,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     });
     const api = buildApi({
       application: fixtureAskApplication(),
+      turnstile: passedTurnstile,
       registration: flow.service,
       mfa
     });
@@ -6022,7 +6025,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T09:00:00.000Z");
     const mail = new GatedVerificationMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const observedDeliveryErrors: string[] = [];
     const shippedRecordDelivery = flow.repository.recordVerificationDelivery
       .bind(flow.repository);
@@ -6289,7 +6292,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T11:00:00.000Z");
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-verify-vs-resend");
       const ownerToken = mail.messages[0]!.token;
@@ -6383,7 +6386,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T15:00:00.000Z");
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-single-send-race");
       expect(mail.messages).toHaveLength(1);
@@ -7070,7 +7073,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const namespace = `t9-rework9-r${replicate + 1}-${order.toLowerCase()}`;
       const mail = new MemoryMailSender();
       const flow = buildService({ mail, initialNow });
-      const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+      const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
       try {
         const registered = await registerAccount(flow.service, `${namespace}-existing`);
         await flow.service.drainMailDispatches();
@@ -7323,7 +7326,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T17:00:00.000Z");
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const gate = await database.pool.connect();
     const monitor = await database.pool.connect();
     const prober = await database.pool.connect();
@@ -7441,7 +7444,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T18:00:00.000Z");
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const monitor = await database.pool.connect();
     let barrier: QueryBarrier | undefined;
     try {
@@ -7516,7 +7519,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 
       expect(waiters).toBeGreaterThanOrEqual(1);
       expect(register.status).toBe(202);
-      expect(register.body).toBe(JSON.stringify(REGISTRATION_PUBLIC_RESPONSE));
+      expect(register.body).toBe(JSON.stringify({ ...REGISTRATION_PUBLIC_RESPONSE, retry_after_seconds: 60 }));
       expect(resend.status).toBe(202);
       expect(resend.body).toBe(RESEND_BODY);
       for (const observation of [register, resend]) {
@@ -7548,7 +7551,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T19:00:00.000Z");
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const monitor = await database.pool.connect();
     let barrier: QueryBarrier | undefined;
     try {
@@ -7603,7 +7606,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 
       expect(waiters).toBeGreaterThanOrEqual(1);
       expect(register.status).toBe(202);
-      expect(register.body).toBe(JSON.stringify(REGISTRATION_PUBLIC_RESPONSE));
+      expect(register.body).toBe(JSON.stringify({ ...REGISTRATION_PUBLIC_RESPONSE, retry_after_seconds: 60 }));
       expect(resend.status).toBe(202);
       expect(resend.body).toBe(RESEND_BODY);
       for (const observation of [register, resend]) {
@@ -7638,7 +7641,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T22:00:00.000Z");
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const monitor = await database.pool.connect();
     let barrier: QueryBarrier | undefined;
     try {
@@ -7719,7 +7722,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T20:00:00.000Z");
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const gate = await database.pool.connect();
     const monitor = await database.pool.connect();
     const prober = await database.pool.connect();
@@ -7804,7 +7807,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date("2026-08-21T21:00:00.000Z");
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), registration: flow.service });
+    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-d-siblings");
       const channelBindingId = await emailChannelOf(registered.user.user_id);

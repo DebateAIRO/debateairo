@@ -83,6 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <script
           nonce={nonce}
+          id="dialectical-document-bootstrap"
           // Browsers blank a nonce attribute once parsed (CSP hiding), so hydration would see
           // nonce="" against the server value; the attribute is still enforced.
           suppressHydrationWarning
