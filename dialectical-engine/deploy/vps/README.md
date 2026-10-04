@@ -893,6 +893,28 @@ Check: one `retention.purged` line at the API's first purge check after the rest
 `[RETENTION_PURGE_PENDING]`. **Rolling back** the code needs nothing: an older API holds the billing role's
 privileges through the new membership, because the role inherits `debateai_runtime`.
 
+### Upgrading to the legal-role release (migration 0094)
+
+Migration `migrations/0094_legal_runtime_api_only.sql` does for the acceptance record what 0093 did for billing. It
+moves the legal schema, `legal.acceptance`, the legal retention purge (`legal.purge_expired_acceptance`), sign-up
+with consent (`identity.create_pending_account_with_consent`) and the country-gate audit
+(`identity.audit_country_gate_refused`) from `debateai_runtime` to `debateai_billing_runtime`. The runner, the
+liveness sweep and the authorization pool then can no longer forge an acceptance, create an account or write a
+country-gate audit row. It adds no role. Until the API's login holds `debateai_billing_runtime`, every sign-up,
+re-acceptance and checkout is refused (`42501`), and so is the legal half of the retention purge. Do it in one
+sitting, before the API next starts on this code:
+
+1. **Open the migrator window** (§4 step 2) and **migrate**: `pnpm db:migrate`.
+2. **Run `hardening.sql`** (§4 step 3).
+3. **Re-run the provisioner** (§4 step 4), exactly as the 0093 section above says.
+4. **Close the window** (§4 step 5), then **restart the API**: `systemctl restart debateai-api`. If step 3 set new
+   passwords, restart the runner too, as that section says.
+
+If the 0093 steps above have already run on this host, the API's login already holds the role. Then
+`pnpm db:migrate` is the only step needed, and the API keeps working throughout: the privileges reach its role the
+moment the migration commits. If both migrations are pending, one pass through the 0093 steps covers both. The check is the same: one `retention.purged` line at the API's first purge
+check, and a test sign-up that succeeds. **Rolling back** the code needs nothing, for the same reason as 0093.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
