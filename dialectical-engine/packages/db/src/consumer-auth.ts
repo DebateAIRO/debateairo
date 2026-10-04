@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import type { AuditContextHasher } from '@debateai/crypto';
 import type { AuthSourceContext } from './identity.js';
 export type ConsumerLegalPair = Readonly<{
@@ -43,6 +43,9 @@ export type ConsumerSessionPersistence = Readonly<{
     absoluteExpiresAt: Date;
 }>;
 export type ConsumerCeremonySeed = Readonly<{
+    retentionKey: string;
+    challengeCapacity: number;
+    challengesPerScope: number;
     handleHash: string;
     challengeHash: string;
     bindingHash: string;
@@ -59,6 +62,7 @@ export type ConsumerEnrollmentAuthority = Readonly<{
 }>;
 export type ConsumerEnrollmentSeed = ConsumerCeremonySeed & ConsumerEnrollmentAuthority & Readonly<{
     userHandle: string;
+    optionsBaseBytes: number;
 }>;
 export type ConsumerEnrollmentOptions = Readonly<{
     userHandle: string;
@@ -92,10 +96,10 @@ export type ConsumerLoginCompletion = ConsumerCredential & Readonly<{
     bindingHash: string;
     material: ConsumerSessionPersistence;
 }>;
-/** Execute-only consumer authority. Memory-hard source reduction always precedes BEGIN and locks. */
+/** Execute-only authority. Cleanup commits first; audit reduction holds no connection and precedes its owning transaction/locks. */
 export class PostgresConsumerAuthRepository {
     constructor(private readonly pool: Pool, private readonly auditContext: AuditContextHasher) { }
-    private async audited<T>(source: AuthSourceContext, sql: string, values: readonly unknown[]): Promise<T> {
+    private async audited<T>(source: AuthSourceContext, operation: (client: PoolClient, prepared: Readonly<Record<string, string>>) => Promise<T>): Promise<T> {
         const normalize = (value: unknown, max: number) => (typeof value === 'string' && value.trim() !== '' ? value.trim() : 'unknown').slice(0, max);
         const ip = await this.auditContext.hashSourceIp(normalize(source.ip, 64));
         const ua = await this.auditContext.hashUserAgent(normalize(source.userAgent, 256));
@@ -106,11 +110,9 @@ export class PostgresConsumerAuthRepository {
         try {
             await client.query('BEGIN');
             await client.query('SELECT identity.begin_runtime_audit_attempt()');
-            const result = await client.query<{
-                value: T;
-            }>(sql, [...values, prepared]);
+            const result = await operation(client, prepared);
             await client.query('COMMIT');
-            return result.rows[0]!.value;
+            return result;
         }
         catch (error) {
             await client.query('ROLLBACK');
@@ -120,14 +122,26 @@ export class PostgresConsumerAuthRepository {
             client.release();
         }
     }
-    async beginEnrollment(input: ConsumerEnrollmentSeed, currentLegal: readonly ConsumerLegalPair[], source: AuthSourceContext): Promise<ConsumerEnrollmentOptions> {
-        return this.audited(source, 'SELECT identity.begin_consumer_passkey_enrollment($1,$2,$3) AS value', [input, JSON.stringify(currentLegal)]);
+    async beginEnrollment<T>(input: ConsumerEnrollmentSeed, currentLegal: readonly ConsumerLegalPair[], source: AuthSourceContext, validateOptions: (candidate: ConsumerEnrollmentOptions) => Promise<T>): Promise<T> {
+        // A separate transaction prevents cleanup challenge-row locks from being
+        // retained while preflight waits for an account held by a completion.
+        await this.pool.query('SELECT identity.prune_consumer_passkey_challenges($1)', [input.challengeCapacity]);
+        return this.audited(source, async (client, prepared) => {
+            const preflight = await client.query<{
+                value: ConsumerEnrollmentOptions;
+            }>('SELECT identity.prepare_consumer_passkey_enrollment($1,$2) AS value', [input, JSON.stringify(currentLegal)]);
+            const candidate = preflight.rows[0]!.value;
+            const response = await validateOptions(candidate);
+            await client.query('SELECT identity.begin_consumer_passkey_enrollment($1,$2,$3)', [{ ...input, optionsExpiresAt: candidate.expiresAt }, JSON.stringify(currentLegal), prepared]);
+            return response;
+        });
     }
     async beginLogin(input: ConsumerCeremonySeed & Readonly<{
         continuationHash?: string;
     }>): Promise<Readonly<{
         expiresAt: string;
     }>> {
+        await this.pool.query('SELECT identity.prune_consumer_passkey_challenges($1)', [input.challengeCapacity]);
         const result = await this.pool.query('SELECT identity.begin_consumer_passkey_login($1) AS value', [input]);
         return result.rows[0].value;
     }
@@ -139,10 +153,21 @@ export class PostgresConsumerAuthRepository {
         const result = await this.pool.query('SELECT identity.read_consumer_passkey_credential($1,$2,$3) AS value', [handleHash, credentialId, bindingHash]);
         return result.rows[0].value;
     }
-    async completeEnrollment(input: ConsumerEnrollmentCompletion, currentLegal: readonly ConsumerLegalPair[], source: AuthSourceContext): Promise<ConsumerSessionCommit> {
-        return this.audited(source, 'SELECT identity.complete_consumer_passkey_enrollment($1,$2,$3) AS value', [input, JSON.stringify(currentLegal)]);
+    async completeEnrollment(input: ConsumerEnrollmentCompletion, currentLegal: readonly ConsumerLegalPair[], source: AuthSourceContext, validateFutureOptions: (candidate: ConsumerEnrollmentOptions) => Promise<unknown>): Promise<ConsumerSessionCommit> {
+        return this.audited(source, async (client, prepared) => {
+            const result = await client.query<{
+                value: ConsumerSessionCommit & {
+                    optionsContext: ConsumerEnrollmentOptions;
+                };
+            }>('SELECT identity.complete_consumer_passkey_enrollment($1,$2,$3) AS value', [input, JSON.stringify(currentLegal), prepared]);
+            const { optionsContext, ...committed } = result.rows[0]!.value;
+            await validateFutureOptions(optionsContext);
+            return committed;
+        });
     }
     async completeLogin(input: ConsumerLoginCompletion, source: AuthSourceContext): Promise<ConsumerSessionCommit> {
-        return this.audited(source, 'SELECT identity.complete_consumer_passkey_login($1,$2) AS value', [input]);
+        return this.audited(source, async (client, prepared) => { const result = await client.query<{
+            value: ConsumerSessionCommit;
+        }>('SELECT identity.complete_consumer_passkey_login($1,$2) AS value', [input, prepared]); return result.rows[0]!.value; });
     }
 }

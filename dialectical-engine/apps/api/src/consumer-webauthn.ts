@@ -3,7 +3,7 @@ import { generateRegistrationOptions, generateAuthenticationOptions } from '@sim
 import { BeginPasskeyEnrollmentRequestSchema, CompletePasskeyEnrollmentRequestSchema, BeginPasskeyLoginRequestSchema, CompletePasskeyLoginRequestSchema, PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsResponseSchema, type PasskeyRegistrationOptionsResponse, type PasskeyAuthenticationOptionsResponse } from '@debateai/contract';
 import { hashToken } from '@debateai/crypto';
 import { currentDocument, legalManifestLocales } from '@debateai/legal-manifest';
-import type { AuthSourceContext, PostgresConsumerAuthRepository, ConsumerLegalPair, ConsumerSessionPersistence } from '@debateai/db';
+import type { AuthSourceContext, PostgresConsumerAuthRepository, ConsumerLegalPair, ConsumerSessionPersistence, ConsumerEnrollmentOptions } from '@debateai/db';
 import { AuthFlowError } from './registration.js';
 import type { AuthenticatedSession, ConsumerSessionMaterial, ConsumerSessionProducer, LoginResult } from './sessions.js';
 import { verifyConsumerRegistration, verifyConsumerAuthentication } from './consumer-webauthn-verifier.js';
@@ -51,18 +51,17 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
     }
     async beginPasskeyEnrollment(input: unknown, source: AuthSourceContext, session?: AuthenticatedSession): Promise<PasskeyRegistrationOptionsResponse> {
         bounded(input);
-        const parsed = BeginPasskeyEnrollmentRequestSchema.parse(input), { handle, challenge, seed } = this.seed('ENROLLMENT', source);
+        const parsed = BeginPasskeyEnrollmentRequestSchema.parse(input);
+        const admission = await this.sessions.admit('ENROLLMENT_BEGIN', 'enrollment_token' in parsed ? parsed.enrollment_token : session?.userId ?? 'missing-session', source);
+        const { handle, challenge, seed } = this.seed('ENROLLMENT', source);
         if ('step_up_grant' in parsed && session === undefined)
             throw new AuthFlowError('AUTH_CREDENTIALS_INVALID');
         try {
             const authority = 'enrollment_token' in parsed ? { enrollmentTokenHash: hashToken('verification', parsed.enrollment_token) }
                 : { userId: session!.userId, sessionId: session!.session.session_id, tokenHash: session!.tokenHash, grantHash: hashToken('step-up-grant', parsed.step_up_grant) };
-            const result = await this.repository.beginEnrollment({ ...seed, ...authority, userHandle: random() }, this.legal, source);
-            const options = await generateRegistrationOptions({ rpName: 'Dialectical Engine', rpID: this.rpId, challenge: new Uint8Array(Buffer.from(challenge, 'base64url')), userID: new Uint8Array(Buffer.from(result.userHandle, 'base64url')),
-                userName: result.userHandle, userDisplayName: 'Dialectical Engine account', timeout: 300000, attestationType: 'none', supportedAlgorithmIDs: [-7, -257],
-                authenticatorSelection: { residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
-                excludeCredentials: result.excludeCredentials.map(c => ({ id: c.id })), extensions: { credProps: true } });
-            return PasskeyRegistrationOptionsResponseSchema.parse({ challenge_handle: handle, expires_at: new Date(result.expiresAt).toISOString(), options });
+            const userHandle = random();
+            const empty = await this.enrollmentOptions(handle, challenge, { userHandle, expiresAt: new Date(0).toISOString(), excludeCredentials: [] });
+            return await this.repository.beginEnrollment({ ...seed, ...authority, ...admission, userHandle, optionsBaseBytes: Buffer.byteLength(JSON.stringify(empty)) }, this.legal, source, candidate => this.enrollmentOptions(handle, challenge, candidate));
         }
         catch (error) {
             throw this.failure(error);
@@ -72,7 +71,9 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
         status: 'enrolled';
     }>> {
         bounded(input);
-        const parsed = CompletePasskeyEnrollmentRequestSchema.parse(input), hash = handleHash('ENROLLMENT', parsed.challenge_handle), bindingHash = this.sessions.bindingHash(source);
+        const parsed = CompletePasskeyEnrollmentRequestSchema.parse(input);
+        await this.sessions.admit('ENROLLMENT_COMPLETE', parsed.challenge_handle, source);
+        const hash = handleHash('ENROLLMENT', parsed.challenge_handle), bindingHash = this.sessions.bindingHash(source);
         try {
             const c = await this.repository.readChallenge(hash, 'ENROLLMENT', bindingHash);
             if (c === null || c.origin !== this.origin || c.rpId !== this.rpId || (c.purpose === 'ADD_PASSKEY' && (session === undefined || session.userId !== c.userId)))
@@ -80,7 +81,7 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
             const verified = await verifyConsumerRegistration(parsed.credential, c);
             const material = c.purpose === 'INITIAL_ENROLLMENT' ? this.sessions.prepare(source) : undefined;
             const committed = await this.repository.completeEnrollment({ ...verified, handleHash: hash, challengeHash: c.challengeHash, bindingHash,
-                ...(parsed.label === undefined ? {} : { label: parsed.label }), ...(material === undefined ? { sessionId: session!.session.session_id, tokenHash: session!.tokenHash } : { material: persistence(material) }) }, this.legal, source);
+                ...(parsed.label === undefined ? {} : { label: parsed.label }), ...(material === undefined ? { sessionId: session!.session.session_id, tokenHash: session!.tokenHash } : { material: persistence(material) }) }, this.legal, source, candidate => this.enrollmentOptions(parsed.challenge_handle, parsed.challenge_handle, candidate));
             if (material === undefined)
                 return Object.freeze({ status: 'enrolled' });
             if (committed.sessionId !== material.sessionId)
@@ -93,9 +94,11 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
     }
     async beginPasskeyLogin(input: unknown = {}, source: AuthSourceContext): Promise<PasskeyAuthenticationOptionsResponse> {
         bounded(input);
-        const parsed = BeginPasskeyLoginRequestSchema.parse(input), { handle, challenge, seed } = this.seed('LOGIN', source);
+        const parsed = BeginPasskeyLoginRequestSchema.parse(input);
+        const admission = await this.sessions.admit('LOGIN_BEGIN', parsed.continuation_token ?? 'discoverable', source);
+        const { handle, challenge, seed } = this.seed('LOGIN', source);
         try {
-            const result = await this.repository.beginLogin({ ...seed, ...(parsed.continuation_token === undefined ? {} : { continuationHash: hashToken('login-challenge', parsed.continuation_token) }) });
+            const result = await this.repository.beginLogin({ ...seed, ...admission, ...(parsed.continuation_token === undefined ? {} : { continuationHash: hashToken('login-challenge', parsed.continuation_token) }) });
             const { extensions: _extensions, ...options } = await generateAuthenticationOptions({ rpID: this.rpId, challenge: new Uint8Array(Buffer.from(challenge, 'base64url')), timeout: 300000, userVerification: 'required' });
             return PasskeyAuthenticationOptionsResponseSchema.parse({ challenge_handle: handle, expires_at: new Date(result.expiresAt).toISOString(), options });
         }
@@ -105,7 +108,9 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
     }
     async completePasskeyLogin(input: unknown, source: AuthSourceContext): Promise<LoginResult> {
         bounded(input);
-        const parsed = CompletePasskeyLoginRequestSchema.parse(input), hash = handleHash('LOGIN', parsed.challenge_handle), bindingHash = this.sessions.bindingHash(source);
+        const parsed = CompletePasskeyLoginRequestSchema.parse(input);
+        await this.sessions.admit('LOGIN_COMPLETE', parsed.challenge_handle, source);
+        const hash = handleHash('LOGIN', parsed.challenge_handle), bindingHash = this.sessions.bindingHash(source);
         try {
             const c = await this.repository.readChallenge(hash, 'LOGIN', bindingHash);
             if (c === null || c.origin !== this.origin || c.rpId !== this.rpId)
@@ -123,7 +128,22 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
             throw this.failure(error);
         }
     }
+    /** Runs inside the authoritative repository transaction, before any result becomes durable. */
+    private async enrollmentOptions(handle: string, challenge: string, candidate: ConsumerEnrollmentOptions): Promise<PasskeyRegistrationOptionsResponse> {
+        const options = await generateRegistrationOptions({ rpName: 'Dialectical Engine', rpID: this.rpId, challenge: new Uint8Array(Buffer.from(challenge, 'base64url')),
+            userID: new Uint8Array(Buffer.from(candidate.userHandle, 'base64url')), userName: candidate.userHandle, userDisplayName: 'Dialectical Engine account',
+            timeout: 300000, attestationType: 'none', supportedAlgorithmIDs: [-7, -257], authenticatorSelection: { residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
+            excludeCredentials: candidate.excludeCredentials.map(c => ({ id: c.id })), extensions: { credProps: true } });
+        const result = PasskeyRegistrationOptionsResponseSchema.safeParse({ challenge_handle: handle, expires_at: new Date(candidate.expiresAt).toISOString(), options });
+        if (!result.success)
+            throw new AuthFlowError('MFA_ENROLLMENT_STATE_INVALID');
+        return result.data;
+    }
     private failure(error: unknown): Error {
+        if (error instanceof Error && error.message === 'CONSUMER_OPTIONS_CAPACITY')
+            return new AuthFlowError('MFA_ENROLLMENT_STATE_INVALID');
+        if (error instanceof Error && error.message === 'CONSUMER_CHALLENGE_CAPACITY')
+            return new AuthFlowError('MFA_RATE_LIMITED');
         // Expected proof/state refusals are generic. Operational/audit failures remain visible to server diagnostics.
         if (error instanceof Error && (/^CONSUMER_(AUTH|WEBAUTHN)_INVALID$/.test(error.message) || ('code' in error && error.code === '23505')))
             return new AuthFlowError('AUTH_CREDENTIALS_INVALID');

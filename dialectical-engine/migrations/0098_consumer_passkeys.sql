@@ -126,6 +126,8 @@ CREATE TABLE identity.consumer_passkey_credential (
 CREATE TABLE identity.consumer_passkey_challenge (
  challenge_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  handle_hash text NOT NULL UNIQUE CHECK(handle_hash ~ '^sha256:[0-9a-f]{64}$'),
+ retention_hash text NOT NULL CHECK(retention_hash ~ '^sha256:[0-9a-f]{64}$'),
+ options_base_bytes integer CHECK(options_base_bytes BETWEEN 1 AND 32768),
  challenge_hash text NOT NULL CHECK(challenge_hash ~ '^sha256:[0-9a-f]{64}$'),
  purpose text NOT NULL CHECK(purpose IN ('INITIAL_ENROLLMENT','ADD_PASSKEY','LOGIN')),
  user_id uuid REFERENCES identity."user"(user_id) ON DELETE CASCADE,
@@ -136,11 +138,14 @@ CREATE TABLE identity.consumer_passkey_challenge (
  created_at timestamptz NOT NULL DEFAULT clock_timestamp(), expires_at timestamptz NOT NULL,
  consumed_at timestamptz,
  CHECK(expires_at<=created_at+interval '5 minutes'),
+ CHECK((purpose='LOGIN')=(options_base_bytes IS NULL)),
  CHECK((purpose='INITIAL_ENROLLMENT' AND user_id IS NOT NULL AND enrollment_token_hash IS NOT NULL AND ordinary_session_id IS NULL AND ordinary_token_hash IS NULL AND continuation_hash IS NULL)
  OR (purpose='ADD_PASSKEY' AND user_id IS NOT NULL AND enrollment_token_hash IS NULL AND ordinary_session_id IS NOT NULL AND ordinary_token_hash IS NOT NULL AND continuation_hash IS NULL)
  OR (purpose='LOGIN' AND enrollment_token_hash IS NULL AND ordinary_session_id IS NULL AND ordinary_token_hash IS NULL))
 );
 CREATE INDEX consumer_passkey_user ON identity.consumer_passkey_credential(user_id);
+CREATE INDEX consumer_passkey_challenge_expiry ON identity.consumer_passkey_challenge(expires_at);
+CREATE INDEX consumer_passkey_challenge_source ON identity.consumer_passkey_challenge(retention_hash,purpose,created_at);
 CREATE INDEX consumer_passkey_challenge_user ON identity.consumer_passkey_challenge(user_id);
 
 -- This is a controlled capability, not an extension of arbitrary runtime audit writes.
@@ -174,6 +179,77 @@ BEGIN
    AND EXISTS(SELECT 1 FROM jsonb_array_elements(p_current_legal) x WHERE x->>'kind'='PRIVACY' AND x->>'locale'=p.locale AND x->>'version'=p.document_version AND x->>'sha256'=p.document_sha256));
 END $$;
 
+-- Reuse the selected MFA limiter capacity; no independent ceremony quota. All begins
+-- acquire the count lock after account locks. Completion never needs this global lock.
+CREATE FUNCTION identity.lock_consumer_challenges_internal(p_capacity integer) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+ IF p_capacity IS NULL OR p_capacity NOT BETWEEN 1 AND 8192 THEN RAISE EXCEPTION 'CONSUMER_CHALLENGE_CAPACITY';END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('identity.consumer_passkey_challenges',0));
+END $$;
+-- The repository executes cleanup as a standalone autocommitted operation before
+-- opening its account transaction. Cleanup never waits for an account lock.
+CREATE FUNCTION identity.prune_consumer_passkey_challenges(p_capacity integer) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+ PERFORM identity.lock_consumer_challenges_internal(p_capacity);
+ DELETE FROM identity.consumer_passkey_challenge WHERE consumed_at IS NOT NULL OR expires_at<=clock_timestamp();
+END $$;
+CREATE FUNCTION identity.reserve_consumer_challenge_internal(p_user uuid,p_purpose text,p_source text,p_capacity integer,p_scope_limit integer) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+ PERFORM identity.lock_consumer_challenges_internal(p_capacity);
+ IF p_scope_limit IS NULL OR p_scope_limit NOT BETWEEN 1 AND 5 OR p_source IS NULL OR p_source !~ '^sha256:[0-9a-f]{64}$' THEN RAISE EXCEPTION 'CONSUMER_CHALLENGE_CAPACITY';END IF;
+ -- The oldest pending ceremony is replaced only when the existing per-enrollment
+ -- budget is full. Independent in-flight ceremonies remain possible within it.
+ DELETE FROM identity.consumer_passkey_challenge WHERE challenge_id IN (
+   SELECT challenge_id FROM identity.consumer_passkey_challenge
+   WHERE purpose=p_purpose AND (CASE WHEN p_user IS NULL THEN user_id IS NULL AND retention_hash=p_source ELSE user_id=p_user END)
+   ORDER BY created_at DESC,challenge_id DESC OFFSET (p_scope_limit-1));
+ IF (SELECT count(*) FROM identity.consumer_passkey_challenge)>=p_capacity THEN RAISE EXCEPTION 'CONSUMER_CHALLENGE_CAPACITY';END IF;
+END $$;
+-- base bytes are measured from the actual server-generated empty public envelope.
+-- IDs contain base64url ASCII only and generation projects exactly {id,type}.
+CREATE FUNCTION identity.assert_consumer_options_capacity_internal(p_user uuid,p_base integer) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_count bigint;v_ids bigint;
+BEGIN
+ SELECT count(*),COALESCE(sum(octet_length(credential_id)+octet_length('{"id":"","type":"public-key"}')),0) INTO v_count,v_ids
+ FROM identity.consumer_passkey_credential WHERE user_id=p_user AND revoked_at IS NULL;
+ IF p_base IS NULL OR p_base NOT BETWEEN 1 AND 32768 OR v_count>100 OR p_base+v_ids+GREATEST(v_count-1,0)>32768 THEN RAISE EXCEPTION 'CONSUMER_OPTIONS_CAPACITY';END IF;
+END $$;
+CREATE FUNCTION identity.consumer_options_context_internal(p_user uuid,p_handle text,p_expires timestamptz) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+ SELECT jsonb_build_object('userHandle',COALESCE((SELECT user_handle FROM identity.consumer_passkey_subject WHERE user_id=p_user),p_handle),'expiresAt',p_expires,
+ 'excludeCredentials',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',credential_id,'type','public-key','transports',transports) ORDER BY credential_id) FROM identity.consumer_passkey_credential WHERE user_id=p_user AND revoked_at IS NULL),'[]'::jsonb));
+$$;
+CREATE FUNCTION identity.prepare_consumer_passkey_enrollment(p_input jsonb,p_current_legal jsonb) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_user uuid;v_bearer record;v_expires timestamptz;v_now timestamptz;v_grant identity.step_up_grant%ROWTYPE;v_actor uuid;
+BEGIN
+ IF p_input->>'enrollmentTokenHash' IS NOT NULL THEN
+   IF p_input->>'grantHash' IS NOT NULL OR p_input->>'userId' IS NOT NULL THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
+   SELECT * INTO v_bearer FROM identity.lock_mfa_enrollment_bearer_internal(p_input->>'enrollmentTokenHash');
+   IF v_bearer.user_id IS NULL OR v_bearer.is_binding_bearer IS DISTINCT FROM true OR v_bearer.user_state<>'pending_mfa'
+     OR v_bearer.consumed_at IS NULL OR v_bearer.expires_at<=clock_timestamp()
+     OR NOT EXISTS(SELECT 1 FROM identity.channel_binding WHERE channel_binding_id=v_bearer.channel_binding_id AND state='verified' AND verification_consumed_at IS NOT NULL)
+     OR identity.consumer_initial_evidence_internal(v_bearer.user_id,p_current_legal) IS DISTINCT FROM true THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
+   v_user:=v_bearer.user_id;v_expires:=v_bearer.expires_at;
+ ELSE
+   v_user:=(p_input->>'userId')::uuid;
+   SELECT audit_token INTO v_actor FROM identity.lock_account_t9_internal(v_user,true);
+   SELECT * INTO v_grant FROM identity.step_up_grant WHERE token_hash=p_input->>'grantHash' AND user_id=v_user FOR UPDATE;
+   v_now:=clock_timestamp();
+   IF v_actor IS NULL OR v_grant.step_up_grant_id IS NULL OR v_grant.action<>'ADD_PASSKEY' OR v_grant.target_account_id IS DISTINCT FROM v_user OR v_grant.target_run_id IS NOT NULL
+     OR v_grant.session_id IS DISTINCT FROM (p_input->>'sessionId')::uuid OR v_grant.consumed_at IS NOT NULL OR v_grant.issued_at>v_now OR v_grant.issued_at<v_now-interval '5 minutes'
+     OR v_grant.expires_at<=v_now OR v_grant.expires_at>v_grant.issued_at+interval '5 minutes'
+     OR identity.assert_session_current(v_user,(p_input->>'sessionId')::uuid,p_input->>'tokenHash') IS DISTINCT FROM true THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
+   v_expires:=v_grant.expires_at;
+ END IF;
+ PERFORM identity.assert_consumer_options_capacity_internal(v_user,(p_input->>'optionsBaseBytes')::integer);
+ RETURN identity.consumer_options_context_internal(v_user,p_input->>'userHandle',LEAST(v_expires,clock_timestamp()+interval '5 minutes'));
+END $$;
+
 CREATE FUNCTION identity.begin_consumer_passkey_enrollment(p_input jsonb,p_current_legal jsonb,p_source jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_user uuid;v_actor uuid;v_bearer record;v_expires timestamptz;v_now timestamptz;v_grant identity.step_up_grant%ROWTYPE;v_purpose text;
@@ -194,11 +270,15 @@ BEGIN
    IF v_actor IS NULL OR v_grant.step_up_grant_id IS NULL OR identity.consume_profile_grant_internal(v_user,(p_input->>'sessionId')::uuid,p_input->>'tokenHash',p_input->>'grantHash','ADD_PASSKEY') IS NULL THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
    v_expires:=v_grant.expires_at;v_purpose:='ADD_PASSKEY';
  END IF;
+ PERFORM identity.assert_consumer_options_capacity_internal(v_user,(p_input->>'optionsBaseBytes')::integer);
+ PERFORM identity.reserve_consumer_challenge_internal(v_user,v_purpose,p_input->>'retentionKey',(p_input->>'challengeCapacity')::integer,(p_input->>'challengesPerScope')::integer);
+ v_expires:=LEAST(v_expires,(p_input->>'optionsExpiresAt')::timestamptz);
+ IF p_input->>'optionsExpiresAt' IS NULL THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
  INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES(v_user,p_input->>'userHandle') ON CONFLICT(user_id) DO NOTHING;
  v_now:=clock_timestamp();
  IF v_expires<=v_now THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
- INSERT INTO identity.consumer_passkey_challenge(handle_hash,challenge_hash,purpose,user_id,binding_hash,rp_id,origin,enrollment_token_hash,ordinary_session_id,ordinary_token_hash,account_security_epoch,created_at,expires_at)
- VALUES(p_input->>'handleHash',p_input->>'challengeHash',v_purpose,v_user,p_input->>'bindingHash',p_input->>'rpId',p_input->>'origin',p_input->>'enrollmentTokenHash',
+ INSERT INTO identity.consumer_passkey_challenge(retention_hash,options_base_bytes,handle_hash,challenge_hash,purpose,user_id,binding_hash,rp_id,origin,enrollment_token_hash,ordinary_session_id,ordinary_token_hash,account_security_epoch,created_at,expires_at)
+ VALUES(p_input->>'retentionKey',(p_input->>'optionsBaseBytes')::integer,p_input->>'handleHash',p_input->>'challengeHash',v_purpose,v_user,p_input->>'bindingHash',p_input->>'rpId',p_input->>'origin',p_input->>'enrollmentTokenHash',
  (p_input->>'sessionId')::uuid,p_input->>'tokenHash',COALESCE((SELECT security_epoch FROM identity.account_security_hold WHERE user_id=v_user),0),v_now,LEAST(v_expires,v_now+interval '5 minutes'));
  PERFORM identity.append_consumer_passkey_audit_internal(v_actor,'enrollment_started',p_source);
  RETURN jsonb_build_object('userHandle',(SELECT user_handle FROM identity.consumer_passkey_subject WHERE user_id=v_user),'expiresAt',LEAST(v_expires,v_now+interval '5 minutes'),
@@ -217,10 +297,11 @@ BEGIN
      OR v_login.binding_hash IS DISTINCT FROM p_input->>'bindingHash' OR v_login.password_hash_snapshot IS DISTINCT FROM v_account.password_hash
      OR NOT EXISTS(SELECT 1 FROM identity.mfa_factor WHERE mfa_factor_id=v_login.mfa_factor_id AND user_id=v_user AND factor_type='totp' AND state='active') THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
  END IF;
+ PERFORM identity.reserve_consumer_challenge_internal(v_user,'LOGIN',p_input->>'retentionKey',(p_input->>'challengeCapacity')::integer,(p_input->>'challengesPerScope')::integer);
  v_now:=clock_timestamp();v_expires:=LEAST(v_now+interval '5 minutes',v_login.expires_at);
  IF v_expires<=v_now THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
- INSERT INTO identity.consumer_passkey_challenge(handle_hash,challenge_hash,purpose,user_id,binding_hash,rp_id,origin,continuation_hash,account_security_epoch,created_at,expires_at)
- VALUES(p_input->>'handleHash',p_input->>'challengeHash','LOGIN',v_user,p_input->>'bindingHash',p_input->>'rpId',p_input->>'origin',p_input->>'continuationHash',
+ INSERT INTO identity.consumer_passkey_challenge(retention_hash,handle_hash,challenge_hash,purpose,user_id,binding_hash,rp_id,origin,continuation_hash,account_security_epoch,created_at,expires_at)
+ VALUES(p_input->>'retentionKey',p_input->>'handleHash',p_input->>'challengeHash','LOGIN',v_user,p_input->>'bindingHash',p_input->>'rpId',p_input->>'origin',p_input->>'continuationHash',
  CASE WHEN v_user IS NULL THEN NULL ELSE COALESCE((SELECT security_epoch FROM identity.account_security_hold WHERE user_id=v_user),0) END,v_now,v_expires);
  RETURN jsonb_build_object('expiresAt',v_expires);
 END $$;
@@ -282,6 +363,7 @@ BEGIN
  INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,transports,rp_id,origin,label)
  VALUES(v_user,p_input->>'credentialId',p_input->>'publicKey',(p_input->>'counter')::bigint,p_input->>'deviceType',(p_input->>'backedUp')::boolean,
  ARRAY(SELECT jsonb_array_elements_text(p_input->'transports')),c.rp_id,c.origin,p_input->>'label') ON CONFLICT(credential_id) DO NOTHING RETURNING consumer_credential_id INTO v_credential;
+ PERFORM identity.assert_consumer_options_capacity_internal(v_user,c.options_base_bytes);
  v_now:=clock_timestamp();
  IF v_credential IS NULL OR c.expires_at<=v_now OR (c.purpose='INITIAL_ENROLLMENT' AND v_email_expiry<=v_now)
  OR (c.purpose='ADD_PASSKEY' AND identity.assert_session_current(v_user,c.ordinary_session_id,c.ordinary_token_hash) IS DISTINCT FROM true) THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
@@ -295,7 +377,7 @@ BEGIN
  IF v_session IS NOT NULL THEN PERFORM identity.append_consumer_passkey_audit_internal(v_account.audit_token,'session_created',p_source);END IF;
  IF c.expires_at<=clock_timestamp() OR (c.purpose='INITIAL_ENROLLMENT' AND v_email_expiry<=clock_timestamp())
  OR (c.purpose='ADD_PASSKEY' AND identity.assert_session_current(v_user,c.ordinary_session_id,c.ordinary_token_hash) IS DISTINCT FROM true) THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
- RETURN jsonb_build_object('userId',v_user,'ownerRef',v_account.owner_ref,'sessionId',v_session);
+ RETURN jsonb_build_object('userId',v_user,'ownerRef',v_account.owner_ref,'sessionId',v_session,'optionsContext',identity.consumer_options_context_internal(v_user,NULL,clock_timestamp()+interval '5 minutes'));
 END $$;
 
 CREATE FUNCTION identity.complete_consumer_passkey_login(p_input jsonb,p_source jsonb) RETURNS jsonb
@@ -344,6 +426,10 @@ DO $$DECLARE v_owner name;v_function text;v_table text;BEGIN
    PERFORM core.install_truncate_guard('identity.'||v_table);
  END LOOP;
  FOREACH v_function IN ARRAY ARRAY[
+ 'identity.prune_consumer_passkey_challenges(integer)',
+ 'identity.lock_consumer_challenges_internal(integer)','identity.reserve_consumer_challenge_internal(uuid,text,text,integer,integer)',
+ 'identity.assert_consumer_options_capacity_internal(uuid,integer)','identity.consumer_options_context_internal(uuid,text,timestamptz)',
+ 'identity.prepare_consumer_passkey_enrollment(jsonb,jsonb)',
  'identity.append_consumer_passkey_audit_internal(uuid,text,jsonb)','identity.consumer_initial_evidence_internal(uuid,jsonb)',
  'identity.begin_consumer_passkey_enrollment(jsonb,jsonb,jsonb)','identity.begin_consumer_passkey_login(jsonb)',
  'identity.read_consumer_passkey_challenge(text,text,text)','identity.read_consumer_passkey_credential(text,text,text)',
@@ -353,6 +439,6 @@ DO $$DECLARE v_owner name;v_function text;v_table text;BEGIN
    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,debateai_erasure_runtime,debateai_staff_security_owner',v_function);
  END LOOP;
 END $$;
-GRANT EXECUTE ON FUNCTION identity.begin_consumer_passkey_enrollment(jsonb,jsonb,jsonb),identity.begin_consumer_passkey_login(jsonb),
+GRANT EXECUTE ON FUNCTION identity.prune_consumer_passkey_challenges(integer),identity.prepare_consumer_passkey_enrollment(jsonb,jsonb),identity.begin_consumer_passkey_enrollment(jsonb,jsonb,jsonb),identity.begin_consumer_passkey_login(jsonb),
  identity.read_consumer_passkey_challenge(text,text,text),identity.read_consumer_passkey_credential(text,text,text),
  identity.complete_consumer_passkey_enrollment(jsonb,jsonb,jsonb),identity.complete_consumer_passkey_login(jsonb,jsonb) TO debateai_authorization_runtime;

@@ -69,7 +69,14 @@ export interface ConsumerSessionMaterial {
   readonly sessionBindingContext:Readonly<{user_agent_hash:string}>; readonly occurredAt:Date;
   readonly idleExpiresAt:Date; readonly absoluteExpiresAt:Date;
 }
+export type ConsumerCeremonyOperation = 'ENROLLMENT_BEGIN' | 'ENROLLMENT_COMPLETE' | 'LOGIN_BEGIN' | 'LOGIN_COMPLETE';
+export interface ConsumerCeremonyAdmission {
+  readonly retentionKey:string;
+  readonly challengeCapacity:number;
+  readonly challengesPerScope:number;
+}
 export interface ConsumerSessionProducer {
+  admit(operation:ConsumerCeremonyOperation,scope:string,source:AuthSourceContext):Promise<ConsumerCeremonyAdmission>;
   bindingHash(source:AuthSourceContext):string;
   prepare(source:AuthSourceContext):ConsumerSessionMaterial;
   committed(material:ConsumerSessionMaterial, identity:Readonly<{userId:string;ownerRef:string}>, source:AuthSourceContext):Promise<LoginResult>;
@@ -437,6 +444,12 @@ export class SessionService implements SessionApplication {
   /** Construct only from the fully initialized service so every method shares token/KDF policy. */
   consumerProducer():ConsumerSessionProducer {
     return Object.freeze({
+      admit:async(operation:ConsumerCeremonyOperation,scope:string,source:AuthSourceContext)=>{
+        await this.requireRateBudget(this.challengeRateKey(`consumer:${operation}:${scope==='discoverable'?`${scope}:${this.sourceIp(source)}`:scope}`),source,this.now());
+        return Object.freeze({retentionKey:`sha256:${this.challengeRateKey(`consumer:retention:${this.sourceIp(source)}`)}`,
+          challengeCapacity:this.dependencies.mfaPolicy.verificationLimits.capacity,
+          challengesPerScope:this.dependencies.mfaPolicy.verificationLimits.perEnrollment});
+      },
       bindingHash:(source:AuthSourceContext)=>this.bindingHash(source),
       prepare:(source:AuthSourceContext)=>{
         const now=this.now(), bindingHash=this.bindingHash(source);

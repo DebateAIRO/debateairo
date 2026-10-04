@@ -14,7 +14,7 @@ const token = () => b64(randomBytes(32));
 const hash = (value: string) => 'sha256:' + createHash('sha256').update(value).digest('hex');
 const handleHash = (kind: string, value: string) => hash('consumer-passkey:' + kind + '\0' + value);
 const env = { v: 1 as const, keyId: 'fixture', nonce: 'AAAAAAAAAAAAAAAA', tag: 'AAAAAAAAAAAAAAAAAAAAAA==', ct: 'YQ==' };
-let risks = 0;
+let risks = 0, sourceSequence = 0;
 function deferred() { let release!: () => void; const promise = new Promise<void>(resolve => { release = resolve; }); return { promise, resolve: () => release() }; }
 beforeAll(async () => {
     database = await startTestDatabase();
@@ -25,13 +25,18 @@ beforeAll(async () => {
     url.password = 'consumer-test-only';
     runtime = createPool(url.toString());
     repo = new PostgresConsumerAuthRepository(runtime, audit);
-    sessions = await SessionService.create({ repository: new PostgresSessionRepository(runtime, audit), riskSignals: { recordForSession: async () => { risks++; return 'recorded'; } } as never, onRiskSignalFailure: () => undefined,
-        dekStore: {} as never, argon2: {} as never, authPolicy: authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), mfaPolicy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
-        sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: Buffer.alloc(32, 5), dummyPasswordHash: 'fixture-password' });
+    sessions = await freshSessions();
     service = new ConsumerWebAuthnService(repo, sessions.consumerProducer(), { publicAppUrl: origin });
 }, 120000);
+async function freshSessions() {
+    return SessionService.create({ repository: new PostgresSessionRepository(runtime, audit), riskSignals: { recordForSession: async () => { risks++; return 'recorded'; } } as never, onRiskSignalFailure: () => undefined,
+        dekStore: {} as never, argon2: {} as never, authPolicy: authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), mfaPolicy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
+        sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: Buffer.alloc(32, 5), dummyPasswordHash: 'fixture-password' });
+}
 afterAll(async () => { await runtime?.end(); await database?.stop(); });
 async function account(badLegal = false) {
+    // Independent synthetic clients keep correctness cases independent of the real shared source gate.
+    source.ip = `198.51.${Math.floor(++sourceSequence / 256)}.${sourceSequence % 256}`;
     const userId = randomUUID(), bearer = token(), channelId = randomUUID();
     const u = (await database.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at,phone_ciphertext,phone_source,phone_verification_status,phone_updated_at) VALUES($1::uuid,$2,'{}',NULL,'fixture-password',$1::text,'pending_mfa',clock_timestamp(),$3,'manual','unverified',clock_timestamp()) RETURNING owner_ref,audit_token`, [userId, randomBytes(32), env])).rows[0];
     await database.pool.query(`INSERT INTO identity.channel_binding(channel_binding_id,user_id,channel_type,address_ciphertext,state,created_at,verified_at,verification_token_hash,verification_expires_at,verification_consumed_at) VALUES($1,$2,'email','{}','verified',now(),now(),$3,now()+interval '24 hours',now())`, [channelId, userId, hashToken('verification', bearer)]);
@@ -82,7 +87,7 @@ async function addGrant(a: Awaited<ReturnType<typeof enrolled>>, action = 'ADD_P
     const session = await sessions.authenticate(replacement, source);
     if (!session)
         throw new Error('ROTATED_SESSION_MISSING');
-    return { grant, session, old: authenticated, factorId };
+    return { grant, session, old: authenticated, factorId, replacement };
 }
 describe('restricted consumer passkey authority', () => {
     it('uses a real nonsuperuser with execute-only capabilities, fixed owners/search paths, and no consumer table access', async () => {
@@ -92,11 +97,11 @@ describe('restricted consumer passkey authority', () => {
             await expect(runtime.query('SELECT * FROM identity.' + table)).rejects.toMatchObject({ code: '42501' });
             await expect(runtime.query('TRUNCATE identity.' + table)).rejects.toMatchObject({ code: '42501' });
         }
-        for (const fn of ['append_consumer_passkey_audit_internal(uuid,text,jsonb)', 'consumer_initial_evidence_internal(uuid,jsonb)', 'insert_consumer_session_internal(uuid,jsonb,text)']) {
+        for (const fn of ['append_consumer_passkey_audit_internal(uuid,text,jsonb)', 'consumer_initial_evidence_internal(uuid,jsonb)', 'insert_consumer_session_internal(uuid,jsonb,text)', 'lock_consumer_challenges_internal(integer)', 'reserve_consumer_challenge_internal(uuid,text,text,integer,integer)', 'assert_consumer_options_capacity_internal(uuid,integer)', 'consumer_options_context_internal(uuid,text,timestamptz)']) {
             expect((await database.pool.query("SELECT has_function_privilege('consumer_test_runtime',$1,'EXECUTE') AS allowed", ['identity.' + fn])).rows[0].allowed).toBe(false);
         }
         const functions = (await database.pool.query("SELECT p.proname,p.prosecdef,p.proconfig,p.proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure) AS owner FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='identity' AND p.proname LIKE '%consumer%'")).rows;
-        expect(functions.length).toBe(9);
+        expect(functions.length).toBe(15);
         expect(functions.every(x => x.owner && x.prosecdef && x.proconfig.includes('search_path=pg_catalog'))).toBe(true);
     });
     it('requires discoverability and UV without attachment restrictions and safely resumes the bound email enrollment', async () => {
@@ -320,8 +325,10 @@ describe('restricted consumer passkey authority', () => {
         await service.beginPasskeyEnrollment({ enrollment_token: other.bearer }, source);
         await database.pool.query("UPDATE identity.consumer_passkey_challenge SET expires_at=clock_timestamp()+interval '250 milliseconds' WHERE handle_hash=$1", [handleHash('ENROLLMENT', o.challenge_handle)]);
         const blocker = await database.pool.connect(), client = await runtime.connect();
+        let blockerOpen = false;
         try {
             await blocker.query('BEGIN');
+            blockerOpen = true;
             await blocker.query("INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin) VALUES($1,$2,$3,0,'multiDevice',true,$4,$5)", [other.userId, f.credentialId, b64(f.k.wire), rpId, origin]);
             const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid, facade = { query: client.query.bind(client), connect: async () => ({ query: client.query.bind(client), release: () => undefined }) } as unknown as Pool;
             const isolated = new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(facade, audit), sessions.consumerProducer(), { publicAppUrl: origin });
@@ -329,12 +336,14 @@ describe('restricted consumer passkey authority', () => {
             await pending(pid);
             await new Promise(r => setTimeout(r, 300));
             await blocker.query('ROLLBACK');
+            blockerOpen = false;
             await denied;
             expect(await state(a)).toEqual({ state: 'pending_mfa', credentials: 0, sessions: 0 });
             expect((await database.pool.query('SELECT consumed_at FROM identity.consumer_passkey_challenge WHERE handle_hash=$1', [handleHash('ENROLLMENT', o.challenge_handle)])).rows[0].consumed_at).toBeNull();
         }
         finally {
-            await blocker.query('ROLLBACK');
+            if (blockerOpen)
+                await blocker.query('ROLLBACK');
             blocker.release();
             client.release();
         }
@@ -376,8 +385,10 @@ describe('restricted consumer passkey authority', () => {
         const a = await account(), o = await service.beginPasskeyEnrollment({ enrollment_token: a.bearer }, source), f = consumerFixture();
         await database.pool.query("UPDATE identity.verification_token_credential SET expires_at=clock_timestamp()+interval '250 milliseconds' WHERE token_hash=$1", [hashToken('verification', a.bearer)]);
         const blocker = await database.pool.connect(), client = await runtime.connect();
+        let blockerOpen = false;
         try {
             await blocker.query('BEGIN');
+            blockerOpen = true;
             await blocker.query('SELECT identity.lock_security_subjects(ARRAY[$1::uuid])', [a.userId]);
             const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
             const facade = { query: client.query.bind(client), connect: async () => ({ query: client.query.bind(client), release: () => undefined }) } as unknown as Pool;
@@ -386,11 +397,13 @@ describe('restricted consumer passkey authority', () => {
             await pending(pid);
             await new Promise(r => setTimeout(r, 300));
             await blocker.query('COMMIT');
+            blockerOpen = false;
             await denied;
             expect(await state(a)).toEqual({ state: 'pending_mfa', credentials: 0, sessions: 0 });
         }
         finally {
-            await blocker.query('ROLLBACK');
+            if (blockerOpen)
+                await blocker.query('ROLLBACK');
             blocker.release();
             client.release();
         }
@@ -398,8 +411,10 @@ describe('restricted consumer passkey authority', () => {
     it('rechecks login expiry after waiting on its credential lock', async () => {
         const a = await enrolled(), l = await login(a), blocker = await database.pool.connect(), client = await runtime.connect();
         await database.pool.query("UPDATE identity.consumer_passkey_challenge SET expires_at=clock_timestamp()+interval '250 milliseconds' WHERE handle_hash=$1", [handleHash('LOGIN', l.options.challenge_handle)]);
+        let blockerOpen = false;
         try {
             await blocker.query('BEGIN');
+            blockerOpen = true;
             await blocker.query('SELECT 1 FROM identity.consumer_passkey_credential WHERE user_id=$1 FOR UPDATE', [a.userId]);
             const pid = (await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid, facade = { query: client.query.bind(client), connect: async () => ({ query: client.query.bind(client), release: () => undefined }) } as unknown as Pool;
             const isolated = new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(facade, audit), sessions.consumerProducer(), { publicAppUrl: origin });
@@ -407,11 +422,13 @@ describe('restricted consumer passkey authority', () => {
             await pending(pid);
             await new Promise(r => setTimeout(r, 300));
             await blocker.query('COMMIT');
+            blockerOpen = false;
             await denied;
             expect((await state(a)).sessions).toBe(1);
         }
         finally {
-            await blocker.query('ROLLBACK');
+            if (blockerOpen)
+                await blocker.query('ROLLBACK');
             blocker.release();
             client.release();
         }
@@ -423,5 +440,174 @@ describe('restricted consumer passkey authority', () => {
         for (const table of ['consumer_passkey_subject', 'consumer_passkey_credential', 'consumer_passkey_challenge'])
             expect((await database.pool.query(`SELECT count(*)::int AS n FROM identity.${table} WHERE user_id=$1`, [a.userId])).rows[0].n).toBe(0);
         await expect(database.pool.query('TRUNCATE identity.consumer_passkey_challenge')).rejects.toThrow();
+    });
+});
+async function seedInventory(userId: string, count: number, idBytes: number) {
+    await database.pool.query('DELETE FROM identity.consumer_passkey_credential WHERE user_id=$1', [userId]);
+    const ids = Array.from({ length: count }, () => b64(randomBytes(idBytes)));
+    await database.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin)
+      SELECT $1,id,$3,0,'multiDevice',true,$4,$5 FROM unnest($2::text[]) AS id`, [userId, ids, b64(consumerFixture().k.wire), rpId, origin]);
+}
+async function beginMutationState(a: {
+    userId: string;
+    auditToken: string;
+}, grant: string) {
+    return (await database.pool.query(`SELECT (SELECT consumed_at FROM identity.step_up_grant WHERE token_hash=$1) AS consumed,
+      (SELECT count(*)::int FROM identity.consumer_passkey_challenge WHERE user_id=$2 AND consumed_at IS NULL AND expires_at>clock_timestamp()) AS challenges,
+      (SELECT count(*)::int FROM identity.audit_event WHERE actor_key_ref=$3) AS audits`, [hashToken('step-up-grant', grant), a.userId, a.auditToken])).rows[0];
+}
+describe('bounded enrollment options transaction', () => {
+    it('does not spend proof, create challenge or audit for an unbounded current exclusion response', async () => {
+        for (const [count, bytes] of [[101, 32], [31, 768]]) {
+            const a = await enrolled(), g = await addGrant(a);
+            await seedInventory(a.userId, count!, bytes!);
+            const before = await beginMutationState(a, g.grant);
+            await expect(service.beginPasskeyEnrollment({ step_up_grant: g.grant }, source, g.session)).rejects.toThrow();
+            expect(await beginMutationState(a, g.grant)).toEqual(before);
+        }
+    });
+    it('allows the hundredth short ID but rolls back completion that would create 101 exclusions', async () => {
+        const a = await enrolled(), g = await addGrant(a);
+        await seedInventory(a.userId, 100, 32);
+        const o = await service.beginPasskeyEnrollment({ step_up_grant: g.grant }, source, g.session), f = consumerFixture();
+        expect(o.options.excludeCredentials).toHaveLength(100);
+        const before = await beginMutationState(a, g.grant);
+        await expect(service.completePasskeyEnrollment({ challenge_handle: o.challenge_handle, credential: f.registration(o.options.challenge) }, source, g.session)).rejects.toThrow();
+        expect(await beginMutationState(a, g.grant)).toEqual(before);
+        expect((await state(a)).credentials).toBe(100);
+        await database.pool.query('DELETE FROM identity.consumer_passkey_credential WHERE consumer_credential_id=(SELECT consumer_credential_id FROM identity.consumer_passkey_credential WHERE user_id=$1 LIMIT 1)', [a.userId]);
+        expect(await service.completePasskeyEnrollment({ challenge_handle: o.challenge_handle, credential: f.registration(o.options.challenge) }, source, g.session)).toEqual({ status: 'enrolled' });
+        expect((await state(a)).credentials).toBe(100);
+    });
+    it('accepts thirty maximum-length IDs, rejects the thirty-first long ID, and permits a short ID in the same live ceremony', async () => {
+        const a = await enrolled(), g = await addGrant(a);
+        await seedInventory(a.userId, 30, 768);
+        const o = await service.beginPasskeyEnrollment({ step_up_grant: g.grant }, source, g.session), long = consumerFixture(undefined, randomBytes(768));
+        expect(Buffer.byteLength(JSON.stringify(o))).toBeLessThanOrEqual(32768);
+        const base = (await database.pool.query('SELECT options_base_bytes FROM identity.consumer_passkey_challenge WHERE handle_hash=$1', [handleHash('ENROLLMENT', o.challenge_handle)])).rows[0].options_base_bytes;
+        const descriptors = o.options.excludeCredentials!;
+        expect(base + descriptors.reduce((sum, d) => sum + Buffer.byteLength(JSON.stringify(d)), 0) + descriptors.length - 1).toBe(Buffer.byteLength(JSON.stringify(o)));
+        const before = await beginMutationState(a, g.grant);
+        await expect(service.completePasskeyEnrollment({ challenge_handle: o.challenge_handle, credential: long.registration(o.options.challenge) }, source, g.session)).rejects.toThrow();
+        expect(await beginMutationState(a, g.grant)).toEqual(before);
+        expect((await state(a)).credentials).toBe(30);
+        const short = consumerFixture();
+        expect(await service.completePasskeyEnrollment({ challenge_handle: o.challenge_handle, credential: short.registration(o.options.challenge) }, source, g.session)).toEqual({ status: 'enrolled' });
+        expect((await state(a)).credentials).toBe(31);
+    });
+});
+describe('retained ceremony bounds and transaction order', () => {
+    it('bounds anonymous and email-resume pending state across fresh API instances while retaining independent ceremonies', async () => {
+        const a = await account(), limits = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value).verificationLimits;
+        const registrations: Awaited<ReturnType<typeof service.beginPasskeyEnrollment>>[] = [];
+        const logins: Awaited<ReturnType<typeof service.beginPasskeyLogin>>[] = [];
+        for (let i = 0; i < limits.perEnrollment + 2; i++) {
+            const fresh = new ConsumerWebAuthnService(repo, (await freshSessions()).consumerProducer(), { publicAppUrl: origin });
+            registrations.push(await fresh.beginPasskeyEnrollment({ enrollment_token: a.bearer }, source));
+            logins.push(await fresh.beginPasskeyLogin({}, source));
+        }
+        expect(new Set(registrations.map(o => o.options.user.id)).size).toBe(1);
+        const admission = await (await freshSessions()).consumerProducer().admit('LOGIN_BEGIN', 'discoverable', source);
+        const rows = (await database.pool.query('SELECT purpose,count(*)::int AS n FROM identity.consumer_passkey_challenge WHERE user_id=$1 OR (user_id IS NULL AND retention_hash=$2) GROUP BY purpose', [a.userId, admission.retentionKey])).rows;
+        expect(rows).toEqual(expect.arrayContaining([{ purpose: 'INITIAL_ENROLLMENT', n: limits.perEnrollment }, { purpose: 'LOGIN', n: limits.perEnrollment }]));
+        expect(await repo.readChallenge(handleHash('ENROLLMENT', registrations[0]!.challenge_handle), 'ENROLLMENT', sessions.consumerProducer().bindingHash(source))).toBeNull();
+        expect(await repo.readChallenge(handleHash('LOGIN', logins[0]!.challenge_handle), 'LOGIN', sessions.consumerProducer().bindingHash(source))).toBeNull();
+        const last = registrations.at(-1)!, f = consumerFixture();
+        expect((await service.completePasskeyEnrollment({ challenge_handle: last.challenge_handle, credential: f.registration(last.options.challenge) }, source)).status).toBe('authenticated');
+    });
+    it('bounds one password continuation fan-out by the same account/purpose policy', async () => {
+        const a = await enrolled(), g = await addGrant(a), continuation = token();
+        const identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: 'fixture-password', factorId: g.factorId, secretCiphertext: env, lastAcceptedStep: 2 };
+        expect(await new PostgresSessionRepository(runtime, audit).createLoginChallenge({ identity, challengeId: randomUUID(), challengeTokenHash: hashToken('login-challenge', continuation), bindingHash: sessions.consumerProducer().bindingHash(source), occurredAt: new Date(), expiresAt: new Date(Date.now() + 300000), source })).toBe(true);
+        for (let i = 0; i < 7; i++)
+            await new ConsumerWebAuthnService(repo, (await freshSessions()).consumerProducer(), { publicAppUrl: origin }).beginPasskeyLogin({ continuation_token: continuation }, source);
+        expect((await database.pool.query("SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge WHERE user_id=$1 AND purpose='LOGIN'", [a.userId])).rows[0].n).toBe(5);
+    });
+    it('removes expired anonymous/account-bound and consumed rows on the next admitted begin, and bounds the global retained set', async () => {
+        await database.pool.query('DELETE FROM identity.consumer_passkey_challenge');
+        const capacity = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value).verificationLimits.capacity;
+        await database.pool.query(`INSERT INTO identity.consumer_passkey_challenge(handle_hash,challenge_hash,retention_hash,purpose,binding_hash,rp_id,origin,expires_at)
+          SELECT 'sha256:'||md5('handle'||n)||md5('handle2'||n),'sha256:'||repeat('a',64),'sha256:'||md5('source'||n)||md5('source2'||n),'LOGIN','sha256:'||repeat('b',64),$2,$3,now()+interval '5 minutes' FROM generate_series(1,$1::integer) n`, [capacity, rpId, origin]);
+        const local = { ...source, ip: '203.0.113.210' }, fresh = new ConsumerWebAuthnService(repo, (await freshSessions()).consumerProducer(), { publicAppUrl: origin });
+        await expect(fresh.beginPasskeyLogin({}, local)).rejects.toMatchObject({ code: 'MFA_RATE_LIMITED' });
+        expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge')).rows[0].n).toBe(capacity);
+        await database.pool.query("UPDATE identity.consumer_passkey_challenge SET created_at=now()-interval '10 minutes',expires_at=now()-interval '5 minutes'");
+        await fresh.beginPasskeyLogin({}, local);
+        expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge')).rows[0].n).toBe(1);
+        const a = await account();
+        await service.beginPasskeyEnrollment({ enrollment_token: a.bearer }, source);
+        const b = await enrolled(); // Completed challenge is retained only until the next admitted begin.
+        await database.pool.query("UPDATE identity.consumer_passkey_challenge SET created_at=now()-interval '10 minutes',expires_at=now()-interval '5 minutes' WHERE user_id=$1", [a.userId]);
+        await fresh.beginPasskeyLogin({}, local);
+        expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge WHERE user_id IN ($1,$2)', [a.userId, b.userId])).rows[0].n).toBe(0);
+    });
+    it('serializes concurrent additions so only one can cross from 29 to 30 long IDs', async () => {
+        const a = await enrolled(), one = await addGrant(a), two = await addGrant({ ...a, result: { ...a.result, sessionToken: one.replacement } });
+        await seedInventory(a.userId, 29, 768);
+        const first = await service.beginPasskeyEnrollment({ step_up_grant: one.grant }, source, two.session), second = await service.beginPasskeyEnrollment({ step_up_grant: two.grant }, source, two.session);
+        const firstKey = consumerFixture(undefined, randomBytes(768)), secondKey = consumerFixture(undefined, randomBytes(768));
+        const results = await Promise.allSettled([service.completePasskeyEnrollment({ challenge_handle: first.challenge_handle, credential: firstKey.registration(first.options.challenge) }, source, two.session), service.completePasskeyEnrollment({ challenge_handle: second.challenge_handle, credential: secondKey.registration(second.options.challenge) }, source, two.session)]);
+        expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
+        expect((await state(a)).credentials).toBe(30);
+        const rows = (await database.pool.query('SELECT consumed_at FROM identity.consumer_passkey_challenge WHERE handle_hash=ANY($1::text[])', [[handleHash('ENROLLMENT', first.challenge_handle), handleHash('ENROLLMENT', second.challenge_handle)]])).rows;
+        expect(rows.filter(r => r.consumed_at === null)).toHaveLength(1);
+    });
+    it('rolls back even a post-preflight or post-insert exact-options callback failure', async () => {
+        const a = await enrolled(), g = await addGrant(a);
+        const failingBegin = new Proxy(repo, { get(target, property) {
+                if (property === 'beginEnrollment')
+                    return (...args: Parameters<typeof repo.beginEnrollment>) => target.beginEnrollment(args[0], args[1], args[2], async (candidate) => { await args[3](candidate); throw new Error('FIXTURE_OPTIONS_FAILURE'); });
+                const value = Reflect.get(target, property, target);
+                return typeof value === 'function' ? value.bind(target) : value;
+            } });
+        const before = await beginMutationState(a, g.grant);
+        await expect(new ConsumerWebAuthnService(failingBegin, sessions.consumerProducer(), { publicAppUrl: origin }).beginPasskeyEnrollment({ step_up_grant: g.grant }, source, g.session)).rejects.toThrow('FIXTURE_OPTIONS_FAILURE');
+        expect(await beginMutationState(a, g.grant)).toEqual(before);
+        const o = await service.beginPasskeyEnrollment({ step_up_grant: g.grant }, source, g.session), f = consumerFixture(), afterBegin = await beginMutationState(a, g.grant);
+        const failingComplete = new Proxy(repo, { get(target, property) {
+                if (property === 'completeEnrollment')
+                    return (...args: Parameters<typeof repo.completeEnrollment>) => target.completeEnrollment(args[0], args[1], args[2], async (candidate) => { await args[3](candidate); throw new Error('FIXTURE_OPTIONS_FAILURE'); });
+                const value = Reflect.get(target, property, target);
+                return typeof value === 'function' ? value.bind(target) : value;
+            } });
+        await expect(new ConsumerWebAuthnService(failingComplete, sessions.consumerProducer(), { publicAppUrl: origin }).completePasskeyEnrollment({ challenge_handle: o.challenge_handle, credential: f.registration(o.options.challenge) }, source, g.session)).rejects.toThrow('FIXTURE_OPTIONS_FAILURE');
+        expect(await beginMutationState(a, g.grant)).toEqual(afterBegin);
+        expect((await state(a)).credentials).toBe(1);
+    });
+    it('finishes cleanup before waiting for the account held by an already-verified completion', async () => {
+        const a = await account(), o = await service.beginPasskeyEnrollment({ enrollment_token: a.bearer }, source), f = consumerFixture();
+        const completeClient = await runtime.connect(), beginClient = await runtime.connect(), locked = deferred(), resume = deferred();
+        const completingPool = { query: completeClient.query.bind(completeClient), connect: async () => ({ query: async (sql: string, values?: unknown[]) => {
+                    if (sql.includes('identity.complete_consumer_passkey_enrollment')) {
+                        await completeClient.query('SELECT identity.assert_session_current($1,$2,$3)', [a.userId, randomUUID(), hash(token())]);
+                        locked.resolve();
+                        await resume.promise;
+                    }
+                    return completeClient.query(sql, values);
+                }, release: () => undefined }) } as unknown as Pool;
+        const beginningPool = { query: beginClient.query.bind(beginClient), connect: async () => ({ query: beginClient.query.bind(beginClient), release: () => undefined }) } as unknown as Pool;
+        const completing = new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(completingPool, audit), sessions.consumerProducer(), { publicAppUrl: origin });
+        const beginning = new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(beginningPool, audit), sessions.consumerProducer(), { publicAppUrl: origin });
+        const result = completing.completePasskeyEnrollment({ challenge_handle: o.challenge_handle, credential: f.registration(o.options.challenge) }, source);
+        const completionError = result.then(() => null, (error: unknown) => error);
+        let next: Promise<Awaited<ReturnType<typeof service.beginPasskeyEnrollment>>> | undefined;
+        try {
+            await Promise.race([locked.promise, completionError.then(error => { throw error ?? new Error('COMPLETION_DID_NOT_PAUSE'); })]);
+            await database.pool.query("UPDATE identity.consumer_passkey_challenge SET expires_at=clock_timestamp() WHERE handle_hash=$1", [handleHash('ENROLLMENT', o.challenge_handle)]);
+            const pid = (await beginClient.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+            next = beginning.beginPasskeyEnrollment({ enrollment_token: a.bearer }, source);
+            await pending(pid);
+            // The expired challenge is already durably removed, although preflight is still waiting for the account.
+            expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge WHERE handle_hash=$1', [handleHash('ENROLLMENT', o.challenge_handle)])).rows[0].n).toBe(0);
+            resume.resolve();
+            expect(await completionError).toMatchObject({ code: 'AUTH_CREDENTIALS_INVALID' });
+            expect((await next).options.user.id).toBe(o.options.user.id);
+        }
+        finally {
+            resume.resolve();
+            await Promise.allSettled([result, ...(next ? [next] : [])]);
+            completeClient.release();
+            beginClient.release();
+        }
     });
 });
