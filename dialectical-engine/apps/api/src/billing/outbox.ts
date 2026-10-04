@@ -37,9 +37,10 @@ export function otherXMoneySystem(
 
 /**
  * P2-M6: a handler whose job was claimed again by another worker (its claim's lease ran out while it ran) learns it
- * from `markJobStage`, which only the current claim holder can move. It stops there, before any vendor call, with this
- * outcome; P1b's fence then refuses its settle too (the worker reports `BILLING_OUTBOX_CLAIM_LOST`), and the new holder
- * runs the job.
+ * from `markJobStage`, which only the current claim holder can move, or (C-14, SmartBill) from `holdsClaim` in the
+ * transaction that would write the invoice intent, before the intent is written. It stops there, before any vendor
+ * call, with this outcome; P1b's fence then refuses its settle too (the worker reports `BILLING_OUTBOX_CLAIM_LOST`),
+ * and the new holder runs the job.
  */
 export function claimLost(now: Date): OutboxOutcome {
   return Object.freeze({ kind: "RETRY" as const, code: "BILLING_OUTBOX_CLAIM_LOST", retryAt: new Date(now.getTime() + 60_000) });

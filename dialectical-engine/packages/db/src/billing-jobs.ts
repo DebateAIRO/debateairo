@@ -74,10 +74,15 @@ export class BillingJobQueries {
    * gave it, `claimedBy` and `attempts` as the claim handed the job over) moves the stage. A stale holder, whose lease
    * ran out and whose job another worker claimed again, changes nothing and gets false, and its caller stops before
    * any vendor call. With one process the holder is always current, so nothing changes there.
+   * `client` (optional, C-14): the caller's open transaction, so the stage commits or rolls back with the caller's
+   * other writes. SmartBill writes its invoice intent and CALL_STARTED this way, after `holdsClaim` has locked the row
+   * on that same client: the intent never exists without its stage. Without it the write runs on the pool, on its own.
    */
-  async markJobStage(job: Pick<OutboxJob, "jobId" | "claimedBy" | "attempts">, code: string): Promise<boolean> {
+  async markJobStage(
+    job: Pick<OutboxJob, "jobId" | "claimedBy" | "attempts">, code: string, client?: PoolClient
+  ): Promise<boolean> {
     if (job.claimedBy === null) return false;
-    const result = await this.pool.query(`
+    const result = await (client ?? this.pool).query(`
       UPDATE billing.outbox SET last_error_code=$2
       WHERE job_id=$1 AND done_at IS NULL AND dead_at IS NULL AND claimed_by=$3 AND attempts=$4
     `, [job.jobId, code, job.claimedBy, job.attempts]);

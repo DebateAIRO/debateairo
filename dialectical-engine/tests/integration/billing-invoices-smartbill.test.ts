@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PoolClient } from "pg";
 import type { RefundRecord, SaleRecord } from "@debateai/billing-core";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -66,6 +67,7 @@ class RecordingSmartBill {
 let h: BillingHarness;
 let smartbill: RecordingSmartBill;
 let invoiceHandler: () => ReturnType<typeof createSmartBillInvoiceHandler>;
+let invoiceDeps: () => Parameters<typeof createSmartBillInvoiceHandler>[0];
 /** While true, the worker's SMARTBILL_INVOICE attempts change nothing and retry later (C-14's row claims the job itself). */
 let holdInvoices = false;
 beforeAll(async () => {
@@ -76,6 +78,7 @@ beforeAll(async () => {
     recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy,
     publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const
   });
+  invoiceDeps = deps;
   invoiceHandler = () => createSmartBillInvoiceHandler(deps());
   h.worker.register("SMARTBILL_INVOICE", async (job, now) => holdInvoices
     // C-14: the worker leaves the job untouched (no intent, no SmartBill call), so a test can claim it itself.
@@ -107,6 +110,15 @@ const claimInvoiceJob = async (chargeId: string, workerId: string, at: Date) => 
     jobId: row.job_id, kind: "SMARTBILL_INVOICE" as const, ref: chargeId, payload: row.payload as never,
     createdAt: row.created_at, notBefore: row.not_before, attempts: row.attempts, claimedBy: workerId, claimedAt: at
   };
+};
+/** C-14 (review M-2): a paid charge whose SMARTBILL_INVOICE job the worker left untouched, so the row claims it itself. */
+const heldCharge = async () => {
+  holdInvoices = true;
+  try {
+    return await h.activate();
+  } finally {
+    holdInvoices = false;
+  }
 };
 /** The e-Factura statuses of a charge's SmartBill documents, in the order they were recorded (A21). */
 const statuses = async (chargeId: string) => (await h.database.pool.query(
@@ -237,9 +249,7 @@ describe("P10b SmartBill invoices for Romania", () => {
     // Production SmartBill has no lookup (X1 row 8), so an intent with no proof of "nothing issued" would be dead-lettered
     // INVOICE_UNKNOWN: the stale holder's intent must never be written.
     smartbill.withLookup = false;
-    holdInvoices = true;
-    const paid = await h.activate();
-    holdInvoices = false;
+    const paid = await heldCharge();
     expect(await intents(paid.chargeId)).toEqual([]);
     // Process A claims the job and stalls past its lease before writing anything; process B claims it again.
     const stale = await claimInvoiceJob(paid.chargeId, "process-a", h.clock.now);
@@ -255,6 +265,64 @@ describe("P10b SmartBill invoices for Romania", () => {
     expect(await invoices(paid.chargeId)).toHaveLength(1);
     expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: true, dead: false });
     smartbill.withLookup = true;
+  });
+
+  it("writes SmartBill's intent and its call-started stage as one write, so a holder that stalls after it still calls SmartBill once and the next holder's unknown is true (C-14, A17b)", async () => {
+    smartbill.withLookup = false;
+    const paid = await heldCharge();
+    const issuedFor = () => smartbill.issued.filter((sale) => sale.chargeId === paid.chargeId);
+    const a = await claimInvoiceJob(paid.chargeId, "process-a", h.clock.now);
+    // A's repository lets its first transaction (the intent's: the reads before it open none) commit for real, says
+    // so, and then holds A there: A has written what it writes and has not called SmartBill yet.
+    let committed!: () => void;
+    const hasCommitted = new Promise<void>((resolve) => { committed = resolve; });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let first = true;
+    const repository = new Proxy(h.repository, {
+      get(target, property) {
+        if (property === "withTransaction") {
+          return async <T>(work: (client: PoolClient) => Promise<T>): Promise<T> => {
+            const isFirst = first;
+            first = false;
+            let value: T;
+            try {
+              value = await target.withTransaction(work);
+            } finally {
+              if (isFirst) committed();
+            }
+            if (isFirst) await gate;
+            return value;
+          };
+        }
+        const value: unknown = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+    });
+    const runA = createSmartBillInvoiceHandler({ ...invoiceDeps(), repository })(a, h.clock.now);
+    try {
+      await Promise.race([hasCommitted, runA]);
+      // While A waits: the intent and its stage are already there, together.
+      expect(await intents(paid.chargeId)).toEqual([{ kind: "INVOICE", issuer: "SMARTBILL" }]);
+      expect(await invoiceJob(paid.chargeId)).toMatchObject({ done: false, dead: false, lastErrorCode: "INVOICE_CALL_STARTED" });
+      // A's lease runs out; B claims the job again. A calls SmartBill next, so B's unknown is a true one: B must never
+      // call `issue` (that would be a second invoice), and with no lookup it hands the job to the owner.
+      const b = await claimInvoiceJob(paid.chargeId, "process-b", new Date(h.clock.now.getTime() + 301_000));
+      expect(await invoiceHandler()(b, h.clock.now)).toEqual({ kind: "DEAD", code: "INVOICE_UNKNOWN" });
+      expect(issuedFor()).toHaveLength(0);
+      expect(await h.repository.fail(b.jobId, "INVOICE_UNKNOWN", null, h.clock.now, { workerId: "process-b", attempts: b.attempts })).toBe(true);
+      // A wakes and issues the invoice once; its own settle is refused, as a stale holder's is.
+      release();
+      expect(await runA).toEqual({ kind: "DONE" });
+      expect(issuedFor()).toHaveLength(1);
+      expect(await invoices(paid.chargeId)).toHaveLength(1);
+      expect(await h.repository.complete(a.jobId, h.clock.now, { workerId: "process-a", attempts: a.attempts })).toBe(false);
+      expect(await invoiceJob(paid.chargeId)).toMatchObject({ dead: true, lastErrorCode: "INVOICE_UNKNOWN" });
+    } finally {
+      release();
+      await runA.catch(() => undefined);
+      smartbill.withLookup = true;
+    }
   });
 
   it("treats an attempt that died after the call started as an unknown outcome, never a second call", async () => {
