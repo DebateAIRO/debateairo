@@ -47,6 +47,18 @@ CONFIG="${DEBATEAI_BACKUP_CONFIG:-/etc/debateai/backup.conf}"
 : "${SUPPORT_KEK_PATH:?}"
 : "${RECORDS_KEY_PATH:?}"
 
+# Exactly one off-host destination, checked before any work. A copy that stays on this host is
+# not a backup: the VPS is the thing a backup must survive. Neither set, or both set, is refused
+# with a nonzero exit, so the unit fails instead of printing a receipt for a local-only copy.
+if [ -n "${BACKUP_RCLONE_REMOTE:-}" ] && [ -n "${BACKUP_SCP_TARGET:-}" ]; then
+  echo "BACKUP_REFUSED both BACKUP_RCLONE_REMOTE and BACKUP_SCP_TARGET are set; configure exactly one" >&2
+  exit 1
+fi
+if [ -z "${BACKUP_RCLONE_REMOTE:-}" ] && [ -z "${BACKUP_SCP_TARGET:-}" ]; then
+  echo "BACKUP_REFUSED no off-host destination: set BACKUP_RCLONE_REMOTE or BACKUP_SCP_TARGET" >&2
+  exit 1
+fi
+
 KEEP_DAILY=14
 KEEP_WEEKLY=8
 
@@ -59,9 +71,20 @@ mkdir -p "$DAILY_DIR" "$WEEKLY_DIR" "$ESCROW_DIR"
 chmod 0700 "$BACKUP_DIR" "$DAILY_DIR" "$WEEKLY_DIR" "$ESCROW_DIR"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/debateai-backup.XXXXXXXX")"
+# Every failed run leaves exactly one line in the journal. The explicit exits below say why
+# (BACKUP_REFUSED / BACKUP_FAILED) and set REPORTED; anything else that stops the run through
+# errexit — pg_dump, tar, age, prune — is reported here, with the line of the last top-level
+# command that failed when bash knows it.
+REPORTED=""
+FAILED_AT=""
+trap 'FAILED_AT="$LINENO"' ERR
 cleanup() {
+  local status=$?
   # The staging tree holds plaintext dumps and copies of key files; it never outlives the run.
   rm -rf -- "$WORK"
+  if [ "$status" -ne 0 ] && [ -z "$REPORTED" ]; then
+    echo "BACKUP_FAILED exit=$status${FAILED_AT:+ line=$FAILED_AT}" >&2
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -82,6 +105,7 @@ audit_name="$(basename "$AUDIT_KEY_STORE_PATH")"
 if [ "$dek_name" = "$publication_name" ] || [ "$dek_name" = "$audit_name" ] \
   || [ "$publication_name" = "$audit_name" ]; then
   echo "BACKUP_REFUSED custody store basenames must be distinct" >&2
+  REPORTED=1
   exit 1
 fi
 tar -cf "$WORK/custody.tar" -C "$(dirname "$USER_DEK_STORE_PATH")" "$dek_name"
@@ -107,6 +131,7 @@ secret_names="$(printf '%s\n' "$KEK_PATH" "$CORPUS_KEK_PATH" "$BLIND_INDEX_KEY_P
   "$AUDIT_SOURCE_IP_SALT_PATH" "$SUPPORT_KEK_PATH" "$RECORDS_KEY_PATH" | xargs -n 1 basename | sort)"
 if [ "$(printf '%s\n' "$secret_names" | uniq | wc -l | tr -d ' ')" != "6" ]; then
   echo "BACKUP_REFUSED escrowed secret basenames must be distinct" >&2
+  REPORTED=1
   exit 1
 fi
 tar -cf "$WORK/keys.tar" \
@@ -120,12 +145,13 @@ KEY_DIGEST="$(sha256sum "$WORK/keys.tar" | cut -d' ' -f1)"
 STATE="$ESCROW_DIR/.last-sha256"
 PREVIOUS=""
 if [ -f "$STATE" ]; then PREVIOUS="$(cat "$STATE")"; fi
+# Paths relative to BACKUP_DIR that this run must find off-host before it prints its receipt.
+VERIFY=("daily/debateai-$STAMP.tar.age")
 if [ "$KEY_DIGEST" != "$PREVIOUS" ]; then
   ESCROW="$ESCROW_DIR/debateai-escrow-$STAMP.tar.age"
+  VERIFY+=("escrow/debateai-escrow-$STAMP.tar.age")
   age -r "$BACKUP_ESCROW_RECIPIENT" < "$WORK/keys.tar" > "$ESCROW"
   chmod 0600 "$ESCROW"
-  printf '%s\n' "$KEY_DIGEST" > "$STATE"
-  chmod 0600 "$STATE"
   printf 'BACKUP_ESCROW_WRITTEN %s %s\n' "$KEY_DIGEST" "$UTC"
 fi
 
@@ -135,22 +161,63 @@ if [ "$DAY_OF_WEEK" = "7" ]; then
 fi
 prune() {
   local directory="$1" keep="$2" victim
+  # grep exits 1 when nothing matches — an empty directory, e.g. weekly/ before its first Sunday —
+  # and under pipefail that would end the run before the off-host copy. Exit 1 is therefore
+  # success here; any other failure (ls, grep exit 2, rm) still fails the run.
   # shellcheck disable=SC2012
-  ls -1t "$directory" 2>/dev/null | grep -E '\.tar\.age$' | tail -n "+$((keep + 1))" \
-    | while IFS= read -r victim; do rm -f -- "$directory/$victim"; done
+  ls -1t "$directory" | { grep -E '\.tar\.age$' || [ "$?" -eq 1 ]; } | tail -n "+$((keep + 1))" \
+    | while IFS= read -r victim; do rm -f -- "$directory/$victim" || exit 1; done
 }
 prune "$DAILY_DIR" "$KEEP_DAILY"
 prune "$WEEKLY_DIR" "$KEEP_WEEKLY"
 
-# --- 7. off-host copy ---------------------------------------------------------------------
+# --- 7. off-host copy, then proof that it arrived ------------------------------------------
 # Encrypted at rest before it leaves the box, so the remote is untrusted by construction.
-# Configure exactly one of BACKUP_RCLONE_REMOTE or BACKUP_SCP_TARGET in backup.conf.
+# Exactly one of BACKUP_RCLONE_REMOTE or BACKUP_SCP_TARGET is set (checked at the top). A copy
+# command that exits 0 is not proof: the artefact (and tonight's escrow envelope, if one was
+# written) is looked up on the remote, and BACKUP_OK is printed only once it is there.
+offhost_failed() {
+  echo "BACKUP_FAILED $1" >&2
+  REPORTED=1
+  exit 1
+}
 if [ -n "${BACKUP_RCLONE_REMOTE:-}" ]; then
-  rclone copy "$BACKUP_DIR" "$BACKUP_RCLONE_REMOTE" --checksum --transfers 2
-elif [ -n "${BACKUP_SCP_TARGET:-}" ]; then
-  scp -q -p -o BatchMode=yes -r "$BACKUP_DIR"/. "$BACKUP_SCP_TARGET"
+  rclone copy "$BACKUP_DIR" "$BACKUP_RCLONE_REMOTE" --checksum --transfers 2 \
+    || offhost_failed "rclone copy to the off-host remote exited nonzero"
+  # One-way check of exactly this run's files: present on the remote, and equal by hash where
+  # the backend keeps one (by size where it does not — rclone says so in the journal).
+  includes=()
+  for relative in "${VERIFY[@]}"; do
+    # A filter that matches nothing locally would make the check vacuous: the file must be here.
+    [ -f "$BACKUP_DIR/$relative" ] || offhost_failed "$relative is missing from the local staging directory"
+    includes+=(--include "/$relative")
+  done
+  rclone check "$BACKUP_DIR" "$BACKUP_RCLONE_REMOTE" --one-way "${includes[@]}" \
+    || offhost_failed "rclone check did not find this run's files intact on the off-host remote"
 else
-  echo "BACKUP_WARNING no off-host destination configured" >&2
+  scp -q -p -o BatchMode=yes -r "$BACKUP_DIR"/. "$BACKUP_SCP_TARGET" \
+    || offhost_failed "scp to the off-host target exited nonzero"
+  # scp has no remote listing, so each file is read back and compared byte for byte. That costs
+  # one download of the artefact per night, and needs read access on the target.
+  case "$BACKUP_SCP_TARGET" in
+    *:) remote_base="$BACKUP_SCP_TARGET" ;;
+    *) remote_base="${BACKUP_SCP_TARGET%/}/" ;;
+  esac
+  for relative in "${VERIFY[@]}"; do
+    rm -f -- "$WORK/readback"
+    scp -q -o BatchMode=yes "$remote_base$relative" "$WORK/readback" \
+      || offhost_failed "could not read $relative back from the off-host target"
+    cmp -s "$BACKUP_DIR/$relative" "$WORK/readback" \
+      || offhost_failed "$relative read back from the off-host target differs from the local copy"
+  done
+  rm -f -- "$WORK/readback"
+fi
+
+# The escrow digest is recorded only now, once its envelope is proved off-host: a night whose copy
+# failed leaves the old digest, so the next night writes and verifies a fresh escrow envelope.
+if [ "$KEY_DIGEST" != "$PREVIOUS" ]; then
+  printf '%s\n' "$KEY_DIGEST" > "$STATE"
+  chmod 0600 "$STATE"
 fi
 
 printf 'BACKUP_OK %s %s %s\n' "$DIGEST" "$BYTES" "$UTC"

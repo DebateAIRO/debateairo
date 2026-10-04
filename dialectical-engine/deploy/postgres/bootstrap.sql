@@ -1,7 +1,10 @@
 -- deploy/postgres/bootstrap.sql
 -- Phase 1 of the cluster bring-up, run ONCE as the `postgres` OS user over the socket, BEFORE the
 -- first `pnpm db:migrate` (README §4):
---   sudo -u postgres psql -v ON_ERROR_STOP=1 -v hatchet_password="$(cat /etc/debateai/hatchet.pgpass)" -f bootstrap.sql
+--   test -r deploy/postgres/bootstrap.sql && { printf '\\set hatchet_password %s\n' "$(cat /etc/debateai/hatchet.pgpass)"; cat deploy/postgres/bootstrap.sql; } | sudo -u postgres psql -v ON_ERROR_STOP=1
+-- The password arrives on psql's standard input, never as an argument: `-v hatchet_password=...`
+-- would put it in sudo's and psql's argv, where `ps` and the sudo log can read it. `test -r` stands
+-- in for -f's "file not found": without it, a wrong directory feeds psql only the \set line.
 -- It creates the two roles no migration or provisioner creates, and the two databases. It never
 -- contains a literal password: the Hatchet password is a psql variable, the migrator has NONE
 -- until a ceremony mints a just-in-time one (README §4). Idempotent by guard blocks.
