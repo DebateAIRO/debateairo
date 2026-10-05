@@ -68,6 +68,7 @@ describe('consumer token plus saved-code recovery', () => {
         await audited('SELECT identity.start_consumer_recovery($1,$2,$3) AS value', [a.index, tokenHash]);
         const blocker = await database.pool.connect();
         let pending: Promise<unknown> | undefined;
+        let blockerCommitted=false;
         try {
             await blocker.query('BEGIN');
             await blocker.query('SELECT identity.lock_security_subjects(ARRAY[$1::uuid])', [a.userId]);
@@ -83,11 +84,11 @@ describe('consumer token plus saved-code recovery', () => {
             }
             expect(blocked).toBe(true);
             await blocker.query('INSERT INTO identity.account_security_hold(user_id,held,security_epoch) VALUES($1,true,1)', [a.userId]);
-            await blocker.query('COMMIT');
+            await blocker.query('COMMIT');blockerCommitted=true;
             await refusal;
         }
         finally {
-            await blocker.query('ROLLBACK');
+            if(!blockerCommitted)await blocker.query('ROLLBACK');
             blocker.release();
             await pending?.catch(() => { });
         }

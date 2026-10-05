@@ -126,11 +126,17 @@ async function startFromHome(locale: "en" | "ro"): Promise<HTMLElement> {
   return container;
 }
 
+async function startFromNew(locale:"en"|"ro"):Promise<HTMLElement> {
+  const container=await mount(<NewDebatePage catalog={catalogue(locale,"newDebate")} homeCatalog={catalogue(locale,"home")} chromeCatalog={catalogue(locale,"chrome")}/>);
+  await type(container.querySelector<HTMLTextAreaElement>("#topic")!,"Cities should ban cars downtown");
+  await act(async()=>container.querySelector<HTMLFormElement>("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));await settle();return container;
+}
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   mocks.createDebate.mockReset();
   mocks.validateSession.mockReset().mockResolvedValue(undefined);
-  mocks.readSession.mockReset().mockRejectedValue(new Error("session unavailable in render test"));
+  mocks.readSession.mockReset().mockResolvedValue({asker_id:"owner:33333333-3333-4333-8333-333333333333",session_id:"22222222-2222-4222-8222-222222222222",caller_scope:"ASKER",ownership_provenance:"server_session",provisional_identity_model:false});
   mocks.push.mockReset();
   mocks.composerProps = [];
   mocks.locale = "en";
@@ -144,34 +150,19 @@ afterEach(async () => {
 });
 
 describe("the home composer says today's limit where the person typed (§14.4.7)", () => {
-  it("shows the friendly words and does not send the person to /new", async () => {
-    mocks.createDebate.mockRejectedValue(dayRefusal());
-    const container = await startFromHome("en");
-    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
-    expect(container.querySelector(".libComposer .error")?.textContent).toBe(DAY_EN);
-    expect(mocks.push).not.toHaveBeenCalled();
-    // What was typed stays, and the button is ready again.
+  it("forwards the typed home question to the complete first-party flow without submitting an incomplete ask",async()=>{
+    const container=await startFromHome("en");expect(mocks.createDebate).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith(`/new?topic=${encodeURIComponent("Cities should ban cars downtown")}`);
     expect(container.querySelector<HTMLTextAreaElement>("#library-claim")?.value).toBe("Cities should ban cars downtown");
-    const start = container.querySelector<HTMLButtonElement>(".libStart")!;
-    expect(start.disabled).toBe(false);
-    expect(start.textContent).toContain("Start debate");
   });
-
-  it("says it in the interface's language", async () => {
-    mocks.createDebate.mockRejectedValue(dayRefusal());
-    const container = await startFromHome("ro");
-    expect(container.querySelector(".libComposer .error")?.textContent).toBe(DAY_RO);
-    expect(mocks.push).not.toHaveBeenCalled();
+  it.each([['en',DAY_EN],['ro',DAY_RO]] as const)("reports the daily refusal in %s at the owning /new submission",async(locale,message)=>{
+    mocks.createDebate.mockRejectedValue(dayRefusal());const container=await startFromNew(locale);
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);expect(container.querySelector('.error')?.textContent).toBe(message);expect(mocks.push).not.toHaveBeenCalled();
   });
-
-  it("clears the words when the person starts again", async () => {
-    mocks.createDebate.mockRejectedValueOnce(dayRefusal()).mockResolvedValueOnce({ id: "run-next-day" });
-    const container = await startFromHome("en");
-    expect(container.querySelector(".libComposer .error")).not.toBeNull();
-    await act(async () => container.querySelector<HTMLButtonElement>(".libStart")!.click());
-    await settle();
-    expect(container.querySelector(".libComposer .error")).toBeNull();
-    expect(mocks.push).toHaveBeenCalledWith("/debate/run-next-day");
+  it("clears the /new refusal on a successful retry",async()=>{
+    mocks.createDebate.mockRejectedValueOnce(dayRefusal()).mockResolvedValueOnce({id:"run-next-day"});const container=await startFromNew("en");expect(container.querySelector('.error')).not.toBeNull();
+    await act(async()=>container.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));await settle();
+    expect(container.querySelector('.error')).toBeNull();expect(mocks.push).toHaveBeenCalledWith('/debate/run-next-day?starting=1');
   });
 
   it("still hands every other failure to /new, as before", async () => {
@@ -181,7 +172,7 @@ describe("the home composer says today's limit where the person typed (§14.4.7)
       new ContractHttpError("SERVER_FAILURE", 503, "down")
     ]) {
       mocks.push.mockReset();
-      mocks.createDebate.mockReset().mockRejectedValue(failure);
+      mocks.validateSession.mockReset().mockRejectedValue(failure);
       const container = await startFromHome("en");
       expect(mocks.push, String(failure)).toHaveBeenCalledWith(`/new?topic=${encodeURIComponent("Cities should ban cars downtown")}`);
       expect(container.querySelector(".libComposer .error")).toBeNull();

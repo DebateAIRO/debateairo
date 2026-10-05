@@ -468,13 +468,13 @@ describe("the report in the question's own script (R-fonts)", () => {
     expect(pages[0]!.filter((line) => line.endsWith(printed(fate))).length).toBe(2);
     // The footer: page numbers on the left, the footer's words on the right.
     const footer = pages[0]!.at(-1)!;
-    expect(footer.indexOf("1")).toBeLessThan(footer.indexOf("DebateAI"));
+    expect(footer.indexOf("1")).toBeLessThan(footer.indexOf("Dialectical Engine"));
     // A left-to-right report keeps its footer the other way round (control).
     const romanian = drawnLines(await renderReportPdf({
       answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY"), generatedAt: new Date("2026-09-26T12:00:00.000Z"), catalogs: ROMANIAN
     }));
     const romanianFooter = romanian[0]!.at(-1)!;
-    expect(romanianFooter.indexOf("DebateAI")).toBeLessThan(romanianFooter.indexOf("1"));
+    expect(romanianFooter.indexOf("Dialectical Engine")).toBeLessThan(romanianFooter.indexOf("1"));
   }, 120_000);
 
   it.each(["hi", "he"] as const)("hands react-pdf every face of the %s report through the glyph fix (reportGlyphs.ts), never the bare font", async (locale) => {

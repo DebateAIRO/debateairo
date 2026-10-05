@@ -145,7 +145,10 @@ describe("reviewed Support recovery components", () => {
         ),"utf8");
         const component = document.components.find(({ id: candidate,lang: candidateLang }) =>
           candidate === id && candidateLang === lang)!;
-        for (const phrase of expectations[lang]) {
+        const current=id==='settings-help-menus' ? (lang==='en'
+          ? ['Report a bug prepares ordinary public-guide text','Escalate to a human creates a separate human handoff','email support is a separate mail workflow']
+          : ['Raportează o eroare pregătește text obișnuit pentru ghidul public','Escaladează către o persoană creează un transfer separat','emailul de asistență este un flux separat de mail']) : expectations[lang];
+        for (const phrase of current) {
           expect(article).toContain(phrase);
           expect(`${component.modelProjection} ${component.fallback}`).toContain(phrase);
         }

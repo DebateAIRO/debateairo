@@ -81,5 +81,6 @@
   "support.answerRating": "Αξιολόγηση απάντησης",
   "support.privacyPreferences": "Προτιμήσεις απορρήτου",
   "support.aiBanner": "Οι απαντήσεις δημιουργούνται από ΤΝ, επισημαίνονται με μηχανικώς αναγνώσιμο τρόπο και μπορεί να είναι λανθασμένες. Ζητήστε άνθρωπο οποιαδήποτε στιγμή.",
-  "support.cookiePreferences": "Προτιμήσεις cookie"
+  "support.cookiePreferences": "Προτιμήσεις cookie",
+  "support.recoverAccount": "Ανάκτηση λογαριασμού"
 }

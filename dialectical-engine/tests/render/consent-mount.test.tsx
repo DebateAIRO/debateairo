@@ -225,7 +225,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     const source = layoutSource();
 
     expect(source, "the mount sits immediately after {children}").toMatch(
-      /\{children\}\s*<CookieConsent \/>/
+      /\{children\}<\/AuthCatalogProvider>\s*<CookieConsent \/>/
     );
     expect(source.split("<CookieConsent").length - 1, "exactly one mount").toBe(1);
     expect(source.split("import { CookieConsent }").length - 1, "exactly one import").toBe(1);

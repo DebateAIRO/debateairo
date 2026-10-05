@@ -81,5 +81,6 @@
   "support.answerRating": "Đánh giá câu trả lời",
   "support.privacyPreferences": "Tùy chọn quyền riêng tư",
   "support.aiBanner": "Phản hồi do AI tạo, có dấu hiệu máy có thể đọc và có thể sai. Bạn có thể yêu cầu gặp người hỗ trợ bất cứ lúc nào.",
-  "support.cookiePreferences": "Tùy chọn cookie"
+  "support.cookiePreferences": "Tùy chọn cookie",
+  "support.recoverAccount": "Khôi phục tài khoản"
 }

@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Answer, RunEvent } from "@debateai/contract";
 import { debateDetailFromAnswer, debateDetailFromRunProjection } from "../../apps/ui/lib/v3/adapter.js";
+import { testHttpIdentity } from "../support/httpSession.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { DebateCanvas } from "../../apps/ui/components/DebateCanvas.js";
 import { DebateMap } from "../../apps/ui/components/DebateMap.js";
@@ -29,6 +30,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     COOKIE_SESSION_MARKER: "cookie-session",
     validateSession: vi.fn().mockResolvedValue(undefined),
     contractClient: {
+      readSession: vi.fn(async()=>testHttpIdentity("t1-canvas").authenticated.session),
       streamEvents: mocks.streamEvents,
       readEvents: mocks.readEvents,
       readLedgerDigest: mocks.readLedgerDigest,

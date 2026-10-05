@@ -942,6 +942,7 @@ export {
 } from "./story-policy.js";
 export {
   MFA_POLICY_REGISTER_ROW,
+  MFA_POLICY_DEPLOYMENT_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,
   mfaPolicyFromValue,
   readMfaPolicy,

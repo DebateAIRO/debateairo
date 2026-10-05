@@ -39,7 +39,14 @@ it("preserves original charge bytes and mutation/truncate guards across additive
   expect((await database.pool.query("SELECT funding_kind,internal_grant_id,internal_grant_event_id FROM billing.run_charge_scope WHERE run_id=$1", [runId])).rows[0])
     .toEqual({ funding_kind: "SUBSCRIPTION", internal_grant_id: null, internal_grant_event_id: null });
   const ledger = (await database.pool.query("SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
-  expect(ledger).toHaveLength(102);
+  expect(ledger.map(row=>row.name)).toEqual([
+    ...historical,
+    "0092_internal_funded_allowance.sql", "0093_internal_provider_admission.sql", "0094_owner_one_verified_key.sql",
+    "0095_phone_profile_optional_recovery.sql", "0096_verification_delivery_budget.sql",
+    "0097_recovery_email_verification.sql", "0098_consumer_passkeys.sql", "0099_direct_secure_sessions.sql",
+    "0100_consumer_security_recovery.sql", "0101_social_identities.sql", "0102_consumer_auth_method_availability.sql",
+    "0103_password_recovery_t2.sql", "0104_account_flow_recovery_bridge.sql"
+  ]);
   await migrate(database.pool);
   expect((await database.pool.query("SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(ledger);
   expect(await bytes()).toEqual(beforeBytes);

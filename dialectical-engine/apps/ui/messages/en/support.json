@@ -81,5 +81,6 @@
   "support.answerRating": "Answer rating",
   "support.privacyPreferences": "Privacy preferences",
   "support.aiBanner": "Replies are AI-generated, machine-readably marked, and can be wrong. Ask for a human at any point.",
-  "support.cookiePreferences": "Cookie preferences"
+  "support.cookiePreferences": "Cookie preferences",
+  "support.recoverAccount": "Recover your account"
 }

@@ -17,7 +17,7 @@ import {
   totpCodeAtStep,
   totpProvisioningUri
 } from "../../packages/crypto/src/index.js";
-import { MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue } from "../../packages/register/src/mfa-policy.js";
+import { MFA_POLICY_REGISTER_ROW, MFA_POLICY_DEPLOYMENT_REGISTER_ROW, mfaPolicyFromValue } from "../../packages/register/src/mfa-policy.js";
 import { MfaEnrollmentService, MfaVerificationLimiter } from "../../apps/api/src/mfa.js";
 import { totpQrMatrix } from "../../apps/ui/lib/totpQr.js";
 
@@ -357,4 +357,14 @@ describe("S4 MFA enrolment service", () => {
     expect(stored).toHaveLength(10);
     expect(registrationHash).toMatch(/^\$argon2id\$/);
   });
+});
+
+it("keeps sealed historical issuer bytes and publishes only the current display issuer separately",()=>{
+  expect(MFA_POLICY_REGISTER_ROW.value.issuer).toBe("DebateAIRO");
+  expect(MFA_POLICY_DEPLOYMENT_REGISTER_ROW.value).toEqual({...MFA_POLICY_REGISTER_ROW.value,issuer:"Dialectical Engine"});
+  expect(MFA_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef).toContain(MFA_POLICY_REGISTER_ROW.sourceRef);
+  for(const row of [MFA_POLICY_REGISTER_ROW,MFA_POLICY_DEPLOYMENT_REGISTER_ROW]) {
+    const policy=mfaPolicyFromValue(row.value),uri=new URL(totpProvisioningUri(Buffer.alloc(20,7),{issuer:policy.issuer,accountLabel:"synthetic account"}));
+    expect(uri.searchParams.get('issuer')).toBe(row.value.issuer);expect(uri.searchParams.get('digits')).toBe('6');expect(uri.searchParams.get('period')).toBe('30');
+  }
 });

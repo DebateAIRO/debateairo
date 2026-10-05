@@ -81,5 +81,6 @@
   "support.answerRating": "Оценка ответа",
   "support.privacyPreferences": "Настройки конфиденциальности",
   "support.aiBanner": "Ответы создаются ИИ, имеют машиночитаемую маркировку и могут быть ошибочными. В любой момент можно попросить подключить человека.",
-  "support.cookiePreferences": "Настройки файлов cookie"
+  "support.cookiePreferences": "Настройки файлов cookie",
+  "support.recoverAccount": "Восстановить аккаунт"
 }

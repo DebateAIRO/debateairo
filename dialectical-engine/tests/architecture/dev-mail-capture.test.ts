@@ -50,12 +50,12 @@ describe("DEV-06 mail capture executable contract", () => {
     }
     // Every sender routes the recipient through the one guard that refuses a
     // separator, which would fan the message out to a second mailbox once the
-    // MTA parses `To:`. One definition, five call sites: the change-email
+    // MTA parses `To:`. One definition, six call sites: the change-email
     // sender also guards the new address it quotes in the notice body.
     const templates = readFileSync("apps/api/src/account-mail-template.mjs", "utf8");
     expect(templates).toContain("[,;");
     expect(mailer).toContain("return singleRecipient(recipient)");
-    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(6);
+    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(7);
 
     const capture = readFileSync("deploy/dev-auth/sendmail-capture.mjs", "utf8");
     expect(capture).toContain('argv[1] !== "-t"');

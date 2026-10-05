@@ -423,7 +423,10 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
 ]);
 
 export const SUPPORT_PAGE_ROUTES: readonly string[] = Object.freeze(
-  [...new Set(SUPPORT_CAPABILITIES.map(({ route }) => route))].sort(),
+  // Knowing these stateful routes grants no model-selectable action or private account authority.
+  [...new Set([...SUPPORT_CAPABILITIES.map(({ route }) => route),
+    "/social/complete", "/recover", "/settings/security", "/verify-recovery-email"
+  ])].sort(),
 );
 
 export const SUPPORT_PROXY_ROUTES: readonly string[] = Object.freeze(["/api/[...path]"]);

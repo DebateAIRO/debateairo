@@ -454,7 +454,19 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // prefix after dev's 0077 (age gate), the colleague's 0078
         // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
         // (publication check record) and B3's 0083. No pair.
-        "0084_billing_entitlement.sql"
+        "0084_billing_entitlement.sql",
+        // Account-flow plan: exact new source and checksum-preserved external103.
+        // Historical85–94 inventory debt remains visible, not absorbed by a count.
+        "0095_phone_profile_optional_recovery.sql",
+        "0096_verification_delivery_budget.sql",
+        "0097_recovery_email_verification.sql",
+        "0098_consumer_passkeys.sql",
+        "0099_direct_secure_sessions.sql",
+        "0100_consumer_security_recovery.sql",
+        "0101_social_identities.sql",
+        "0102_consumer_auth_method_availability.sql",
+        "0103_password_recovery_t2.sql",
+        "0104_account_flow_recovery_bridge.sql"
       ]);
   });
 });

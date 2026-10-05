@@ -1,14 +1,8 @@
 import { z } from "zod";
 import { LegalDocumentPairSchema, SessionSchema } from "./auth-shared.js";
 
-export const CatalogLocaleCodeSchema = z.enum([
-  "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "ga", "it",
-  "lv", "lt", "mt", "pl", "pt", "ro", "ru", "sk", "sl", "es", "sv", "uk", "zh", "hi",
-  "id", "ja", "ko", "vi", "ar", "he", "tr"
-]);
-export type CatalogLocaleCode = z.infer<typeof CatalogLocaleCodeSchema>;
-export const LocaleCodeSchema = z.union([CatalogLocaleCodeSchema, z.enum(["en-US", "en-GB"])]);
-export type LocaleCode = z.infer<typeof LocaleCodeSchema>;
+import { CatalogLocaleCodeSchema, LocaleCodeSchema } from "./locale.js";
+export { CatalogLocaleCodeSchema, LocaleCodeSchema, type CatalogLocaleCode, type LocaleCode } from "./locale.js";
 
 const EmailSchema = z.email().max(254);
 const TurnstileTokenSchema = z.string().min(1).max(2048).regex(/\S/u);

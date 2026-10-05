@@ -1057,7 +1057,10 @@ describe('exact elapsed consumer lifetimes across DST',()=>{
     try {
       await client.query('SELECT set_config($1,$2,false)',['TimeZone',zone]);
       const facade={query:client.query.bind(client)} as unknown as Pool,repo=new PostgresSessionRepository(facade,fakeAuditHasher);
-      for(const [i,start] of ['2027-03-15T10:00:00.000Z','2027-10-15T10:00:00.000Z','2027-01-15T10:00:00.000Z'].entries()) {
+      const year = Number((await client.query("SELECT extract(year FROM clock_timestamp())::int + 1 AS year")).rows[0].year);
+      for(const [i,start] of [`${year}-03-15T10:00:00.000Z`,`${year}-10-15T10:00:00.000Z`,`${year}-01-15T10:00:00.000Z`].entries()) {
+        const offset = (await client.query("SELECT extract(timezone FROM $1::timestamptz)::int AS start_offset,extract(timezone FROM ($1::timestamptz + interval '720 hours'))::int AS end_offset", [start])).rows[0];
+        expect(offset.end_offset - offset.start_offset).toBe(zone === 'UTC' || i === 2 ? 0 : i === 0 ? 3600 : -3600);
         for(const duration of [2592000000,3600000]) {
           const identity=await fixtureUser(`dst-${zone==='UTC'?'utc':'ro'}-${i}-${duration}`),created=new Date(start),stored=new Date(created.getTime()+(duration===3600000?duration:7776000000));
           const id=randomUUID();

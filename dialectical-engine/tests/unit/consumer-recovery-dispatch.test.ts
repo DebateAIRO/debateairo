@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, onTestFinished } from 'vitest';
 import { RegistrationService, InProcessAuthRateLimiter, RESEND_PUBLIC_RESPONSE } from '../../apps/api/src/registration.js';
 import { AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS, authPolicyFromRegisterRows, type AuthPolicy } from '@debateai/register';
 const base = authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS);
@@ -10,6 +10,15 @@ function fixture(waitMs = 150) {
     return { service, counters };
 }
 const tick = () => new Promise<void>(r => setTimeout(r, 2));
+function expectedCapacityDiagnostic() {
+    const messages:string[]=[];const original=console.error.bind(console);
+    const spy=vi.spyOn(console,'error').mockImplementation((...args:unknown[])=>{
+        if(args.length===1 && typeof args[0]==='string' && /^\[AUTH_MAIL_CAPACITY_EXHAUSTED\] correlation=[0-9a-f-]{36} code=MAIL_DISPATCH_CAPACITY window=\d{4}-\d{2}-\d{2}T.*Z count=1$/.test(args[0]))messages.push(args[0]);
+        else original(...args);
+    });
+    onTestFinished(()=>spy.mockRestore());
+    return ()=>expect(messages).toHaveLength(1);
+}
 describe('shared bounded consumer recovery mail handoff', () => {
     it('uses the selected existing dispatcher values rather than a new pool or numeric quota', () => { expect(base.channel).toMatchObject({ maxConcurrentVerificationDispatches: 32, maxQueuedVerificationDispatches: 96, mailDispatchActivationSpacingMs: 60, mailDispatchQueueWaitTimeoutMs: 18000, mailDispatchMinimumReservationMs: 5700, mailDispatchPreTransportWorkBudgetMs: 600, mailDispatchNoSendEqualWorkMs: 5000 }); });
     it('returns before slow transport and retains the same minimum lease for an eligible and no-send branch', async () => {
@@ -26,6 +35,7 @@ describe('shared bounded consumer recovery mail handoff', () => {
         }
     });
     it('shares capacity with actual resend work and refuses before recovery preparation when the common queue is full', async () => {
+        const assertDiagnostic=expectedCapacityDiagnostic();
         const { service, counters } = fixture(), transport = deferred();
         await service.dispatchRecoveryMail(async () => async () => { await transport.promise; });
         const resend = service.resendVerification({ email: 'person@example.test' }, { ip: '192.0.2.1', userAgent: 'mixed', requestId: 'mixed' });
@@ -40,11 +50,13 @@ describe('shared bounded consumer recovery mail handoff', () => {
         expect(await resend).toEqual(RESEND_PUBLIC_RESPONSE);
         await service.drainMailDispatches();
         service.drainMailCapacitySignals();
+        assertDiagnostic();
         expect(counters.lookup).toBe(1);
         expect(counters.token).toBe(1);
         expect(service.mailDispatchOccupancy()).toMatchObject({ inFlight: 0, queued: 0 });
     });
     it('times out an exact waiting ticket before token/lookup work and releases it once', async () => {
+        const assertDiagnostic=expectedCapacityDiagnostic();
         const { service } = fixture(20), transport = deferred();
         await service.dispatchRecoveryMail(async () => async () => { await transport.promise; });
         let prepared = 0;
@@ -54,6 +66,7 @@ describe('shared bounded consumer recovery mail handoff', () => {
         transport.resolve();
         await service.drainMailDispatches();
         service.drainMailCapacitySignals();
+        assertDiagnostic();
         expect(service.mailDispatchOccupancy().inFlight).toBe(0);
     });
     it('shutdown joins an admitted late preparation and its eventual transport and refuses new work', async () => {
@@ -77,7 +90,7 @@ describe('shared bounded consumer recovery mail handoff', () => {
         expect(service.mailDispatchOccupancy().inFlight).toBe(0);
     });
     it('releases failed preparation and transport ownership without retry or secret-bearing diagnostics', async () => {
-        const { service } = fixture(), errors = vi.spyOn(console, 'error').mockImplementation(() => { });
+        const { service } = fixture(), original=console.error.bind(console), errors = vi.spyOn(console, 'error').mockImplementation((...args:unknown[]) => { if(args.length!==1 || args[0]!=="[AUTH_CONSUMER_RECOVERY_DISPATCH_FAILED]")original(...args); });
         try {
             await expect(service.dispatchRecoveryMail(async () => { throw new Error('PREPARATION_FAILED'); })).rejects.toThrow('PREPARATION_FAILED');
             await service.drainMailDispatches();
@@ -86,6 +99,7 @@ describe('shared bounded consumer recovery mail handoff', () => {
             await service.drainMailDispatches();
             expect(sends).toBe(1);
             expect(JSON.stringify(errors.mock.calls)).not.toContain('private-token-value');
+            expect(errors.mock.calls).toEqual([["[AUTH_CONSUMER_RECOVERY_DISPATCH_FAILED]"]]);
             expect(service.mailDispatchOccupancy().inFlight).toBe(0);
         }
         finally {

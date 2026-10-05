@@ -1,6 +1,6 @@
 -- Consumer credentials never enter identity.mfa_factor or staff selectors.
 -- Purpose-bound self-service profile capabilities. No phone delivery authority.
-ALTER TABLE identity.step_up_grant DROP CONSTRAINT step_up_grant_action_check;
+ALTER TABLE identity.step_up_grant DROP CONSTRAINT IF EXISTS step_up_grant_action_check;
 ALTER TABLE identity.step_up_grant ADD CONSTRAINT step_up_grant_action_check CHECK (
  (action IN ('PUBLISH','UNPUBLISH','DELETE_PRIVATE_DEBATE') AND target_run_id IS NOT NULL AND target_account_id IS NULL)
  OR (action IN ('DELETE_ACCOUNT','CHANGE_EMAIL','READ_PHONE_PROFILE','CHANGE_PHONE_PROFILE','CHANGE_RECOVERY_EMAIL','ADD_PASSKEY') AND target_run_id IS NULL AND target_account_id=user_id));
@@ -105,11 +105,11 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE identity.consumer_passkey_subject (
+CREATE TABLE IF NOT EXISTS identity.consumer_passkey_subject (
  user_id uuid PRIMARY KEY REFERENCES identity."user"(user_id) ON DELETE CASCADE,
  user_handle text NOT NULL UNIQUE CHECK(user_handle ~ '^[A-Za-z0-9_-]{43}$')
 );
-CREATE TABLE identity.consumer_passkey_credential (
+CREATE TABLE IF NOT EXISTS identity.consumer_passkey_credential (
  consumer_credential_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  user_id uuid NOT NULL REFERENCES identity.consumer_passkey_subject(user_id) ON DELETE CASCADE,
  credential_id text NOT NULL UNIQUE CHECK(credential_id ~ '^[A-Za-z0-9_-]+$' AND length(credential_id) BETWEEN 1 AND 1024),
@@ -123,7 +123,7 @@ CREATE TABLE identity.consumer_passkey_credential (
  CHECK(NOT backed_up OR device_type='multiDevice'),
  CHECK(cardinality(transports)<=7 AND transports<@ARRAY['ble','cable','hybrid','internal','nfc','smart-card','usb']::text[])
 );
-CREATE TABLE identity.consumer_passkey_challenge (
+CREATE TABLE IF NOT EXISTS identity.consumer_passkey_challenge (
  challenge_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  handle_hash text NOT NULL UNIQUE CHECK(handle_hash ~ '^sha256:[0-9a-f]{64}$'),
  retention_hash text NOT NULL CHECK(retention_hash ~ '^sha256:[0-9a-f]{64}$'),
@@ -143,13 +143,13 @@ CREATE TABLE identity.consumer_passkey_challenge (
  OR (purpose='ADD_PASSKEY' AND user_id IS NOT NULL AND enrollment_token_hash IS NULL AND ordinary_session_id IS NOT NULL AND ordinary_token_hash IS NOT NULL AND continuation_hash IS NULL)
  OR (purpose='LOGIN' AND enrollment_token_hash IS NULL AND ordinary_session_id IS NULL AND ordinary_token_hash IS NULL))
 );
-CREATE INDEX consumer_passkey_user ON identity.consumer_passkey_credential(user_id);
-CREATE INDEX consumer_passkey_challenge_expiry ON identity.consumer_passkey_challenge(expires_at);
-CREATE INDEX consumer_passkey_challenge_source ON identity.consumer_passkey_challenge(retention_hash,purpose,created_at);
-CREATE INDEX consumer_passkey_challenge_user ON identity.consumer_passkey_challenge(user_id);
+CREATE INDEX IF NOT EXISTS consumer_passkey_user ON identity.consumer_passkey_credential(user_id);
+CREATE INDEX IF NOT EXISTS consumer_passkey_challenge_expiry ON identity.consumer_passkey_challenge(expires_at);
+CREATE INDEX IF NOT EXISTS consumer_passkey_challenge_source ON identity.consumer_passkey_challenge(retention_hash,purpose,created_at);
+CREATE INDEX IF NOT EXISTS consumer_passkey_challenge_user ON identity.consumer_passkey_challenge(user_id);
 
 -- This is a controlled capability, not an extension of arbitrary runtime audit writes.
-CREATE FUNCTION identity.append_consumer_passkey_audit_internal(p_actor uuid,p_event text,p_source jsonb) RETURNS void
+CREATE OR REPLACE FUNCTION identity.append_consumer_passkey_audit_internal(p_actor uuid,p_event text,p_source jsonb) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  IF p_actor IS NULL OR p_event IS NULL OR p_event NOT IN ('enrollment_started','enrolled','session_created','counter_anomaly')
@@ -162,7 +162,7 @@ BEGIN
 END $$;
 
 -- p_current_legal comes exclusively from the shipped server manifest, never an uploaded assertion.
-CREATE FUNCTION identity.consumer_initial_evidence_internal(p_user uuid,p_current_legal jsonb) RETURNS boolean
+CREATE OR REPLACE FUNCTION identity.consumer_initial_evidence_internal(p_user uuid,p_current_legal jsonb) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_owner uuid;
 BEGIN
@@ -181,7 +181,7 @@ END $$;
 
 -- Reuse the selected MFA limiter capacity; no independent ceremony quota. All begins
 -- acquire the count lock after account locks. Completion never needs this global lock.
-CREATE FUNCTION identity.lock_consumer_challenges_internal(p_capacity integer) RETURNS void
+CREATE OR REPLACE FUNCTION identity.lock_consumer_challenges_internal(p_capacity integer) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  IF p_capacity IS NULL OR p_capacity NOT BETWEEN 1 AND 8192 THEN RAISE EXCEPTION 'CONSUMER_CHALLENGE_CAPACITY';END IF;
@@ -189,13 +189,13 @@ BEGIN
 END $$;
 -- The repository executes cleanup as a standalone autocommitted operation before
 -- opening its account transaction. Cleanup never waits for an account lock.
-CREATE FUNCTION identity.prune_consumer_passkey_challenges(p_capacity integer) RETURNS void
+CREATE OR REPLACE FUNCTION identity.prune_consumer_passkey_challenges(p_capacity integer) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  PERFORM identity.lock_consumer_challenges_internal(p_capacity);
  DELETE FROM identity.consumer_passkey_challenge WHERE consumed_at IS NOT NULL OR expires_at<=clock_timestamp();
 END $$;
-CREATE FUNCTION identity.reserve_consumer_challenge_internal(p_user uuid,p_purpose text,p_source text,p_capacity integer,p_scope_limit integer) RETURNS void
+CREATE OR REPLACE FUNCTION identity.reserve_consumer_challenge_internal(p_user uuid,p_purpose text,p_source text,p_capacity integer,p_scope_limit integer) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  PERFORM identity.lock_consumer_challenges_internal(p_capacity);
@@ -210,7 +210,7 @@ BEGIN
 END $$;
 -- base bytes are measured from the actual server-generated empty public envelope.
 -- IDs contain base64url ASCII only and generation projects exactly {id,type}.
-CREATE FUNCTION identity.assert_consumer_options_capacity_internal(p_user uuid,p_base integer) RETURNS void
+CREATE OR REPLACE FUNCTION identity.assert_consumer_options_capacity_internal(p_user uuid,p_base integer) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_count bigint;v_ids bigint;
 BEGIN
@@ -218,12 +218,12 @@ BEGIN
  FROM identity.consumer_passkey_credential WHERE user_id=p_user AND revoked_at IS NULL;
  IF p_base IS NULL OR p_base NOT BETWEEN 1 AND 32768 OR v_count>100 OR p_base+v_ids+GREATEST(v_count-1,0)>32768 THEN RAISE EXCEPTION 'CONSUMER_OPTIONS_CAPACITY';END IF;
 END $$;
-CREATE FUNCTION identity.consumer_options_context_internal(p_user uuid,p_handle text,p_expires timestamptz) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.consumer_options_context_internal(p_user uuid,p_handle text,p_expires timestamptz) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT jsonb_build_object('userHandle',COALESCE((SELECT user_handle FROM identity.consumer_passkey_subject WHERE user_id=p_user),p_handle),'expiresAt',p_expires,
  'excludeCredentials',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',credential_id,'type','public-key','transports',transports) ORDER BY credential_id) FROM identity.consumer_passkey_credential WHERE user_id=p_user AND revoked_at IS NULL),'[]'::jsonb));
 $$;
-CREATE FUNCTION identity.prepare_consumer_passkey_enrollment(p_input jsonb,p_current_legal jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.prepare_consumer_passkey_enrollment(p_input jsonb,p_current_legal jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_user uuid;v_bearer record;v_expires timestamptz;v_now timestamptz;v_grant identity.step_up_grant%ROWTYPE;v_actor uuid;
 BEGIN
@@ -250,7 +250,7 @@ BEGIN
  RETURN identity.consumer_options_context_internal(v_user,p_input->>'userHandle',LEAST(v_expires,clock_timestamp()+interval '5 minutes'));
 END $$;
 
-CREATE FUNCTION identity.begin_consumer_passkey_enrollment(p_input jsonb,p_current_legal jsonb,p_source jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.begin_consumer_passkey_enrollment(p_input jsonb,p_current_legal jsonb,p_source jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_user uuid;v_actor uuid;v_bearer record;v_expires timestamptz;v_now timestamptz;v_grant identity.step_up_grant%ROWTYPE;v_purpose text;
 BEGIN
@@ -285,7 +285,7 @@ BEGIN
  'excludeCredentials',COALESCE((SELECT jsonb_agg(jsonb_build_object('id',credential_id,'type','public-key','transports',transports)) FROM identity.consumer_passkey_credential WHERE user_id=v_user AND revoked_at IS NULL),'[]'::jsonb));
 END $$;
 
-CREATE FUNCTION identity.begin_consumer_passkey_login(p_input jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.begin_consumer_passkey_login(p_input jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_login identity.login_challenge%ROWTYPE;v_user uuid;v_account record;v_now timestamptz;v_expires timestamptz;
 BEGIN
@@ -306,13 +306,13 @@ BEGIN
  RETURN jsonb_build_object('expiresAt',v_expires);
 END $$;
 
-CREATE FUNCTION identity.read_consumer_passkey_challenge(p_handle text,p_purpose text,p_binding text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.read_consumer_passkey_challenge(p_handle text,p_purpose text,p_binding text) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT jsonb_build_object('challengeHash',c.challenge_hash,'purpose',c.purpose,'rpId',c.rp_id,'origin',c.origin,'userId',c.user_id,'expiresAt',c.expires_at)
  FROM identity.consumer_passkey_challenge c WHERE c.handle_hash=p_handle AND c.binding_hash=p_binding AND c.consumed_at IS NULL AND c.expires_at>clock_timestamp()
  AND ((p_purpose='ENROLLMENT' AND c.purpose IN ('INITIAL_ENROLLMENT','ADD_PASSKEY')) OR (p_purpose='LOGIN' AND c.purpose='LOGIN'));
 $$;
-CREATE FUNCTION identity.read_consumer_passkey_credential(p_handle text,p_id text,p_binding text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.read_consumer_passkey_credential(p_handle text,p_id text,p_binding text) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT jsonb_build_object('credentialId',f.credential_id,'publicKey',f.public_key,'counter',f.signature_counter,'deviceType',f.device_type,'backedUp',f.backed_up,
  'userHandle',s.user_handle,'userId',u.user_id,'ownerRef',u.owner_ref,'passwordHash',u.password_hash,'securityEpoch',COALESCE(h.security_epoch,0))
@@ -322,7 +322,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  AND (c.user_id IS NULL OR c.user_id=f.user_id) AND u.state='active' AND NOT COALESCE(h.held,false) AND f.revoked_at IS NULL;
 $$;
 
-CREATE FUNCTION identity.insert_consumer_session_internal(p_user uuid,p_material jsonb,p_binding text) RETURNS uuid
+CREATE OR REPLACE FUNCTION identity.insert_consumer_session_internal(p_user uuid,p_material jsonb,p_binding text) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_now timestamptz:=clock_timestamp();v_id uuid:=(p_material->>'sessionId')::uuid;v_idle timestamptz:=(p_material->>'idleExpiresAt')::timestamptz;v_absolute timestamptz:=(p_material->>'absoluteExpiresAt')::timestamptz;
 BEGIN
@@ -337,7 +337,7 @@ BEGIN
  RETURN v_id;
 END $$;
 
-CREATE FUNCTION identity.complete_consumer_passkey_enrollment(p_input jsonb,p_current_legal jsonb,p_source jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.complete_consumer_passkey_enrollment(p_input jsonb,p_current_legal jsonb,p_source jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c identity.consumer_passkey_challenge%ROWTYPE;v_user uuid;v_account record;v_bearer record;v_now timestamptz;v_session uuid;v_credential uuid;v_email_expiry timestamptz;
 BEGIN
@@ -380,7 +380,7 @@ BEGIN
  RETURN jsonb_build_object('userId',v_user,'ownerRef',v_account.owner_ref,'sessionId',v_session,'optionsContext',identity.consumer_options_context_internal(v_user,NULL,clock_timestamp()+interval '5 minutes'));
 END $$;
 
-CREATE FUNCTION identity.complete_consumer_passkey_login(p_input jsonb,p_source jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.complete_consumer_passkey_login(p_input jsonb,p_source jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c identity.consumer_passkey_challenge%ROWTYPE;f identity.consumer_passkey_credential%ROWTYPE;v_account record;v_user uuid:=(p_input->>'userId')::uuid;
  v_counter bigint:=(p_input->>'counter')::bigint;v_now timestamptz;v_login identity.login_challenge%ROWTYPE;v_session uuid;

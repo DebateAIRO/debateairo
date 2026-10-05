@@ -113,8 +113,13 @@ describe("atomic rolling verification reservations on real PostgreSQL", () => {
     const b = await account(); await shift(b, 60); expect((await resend(b)).status).toBe("send");
     expect(await repository.consumeVerification({ tokenHash: b.input.verificationTokenHash, occurredAt: new Date("2020-01-01"), source })).toBe(true);
     const rows = (await db.pool.query("SELECT consumed_at FROM identity.verification_token_credential WHERE channel_binding_id=$1", [b.channel])).rows;
-    expect(rows).toHaveLength(2); expect(rows.every(r => r.consumed_at !== null)).toBe(true); expect(await count(b)).toBe(2);
+    expect(rows).toHaveLength(2); expect(rows.filter(r=>r.consumed_at!==null)).toHaveLength(1); expect(await count(b)).toBe(2);
     expect(await repository.consumeVerification({ tokenHash: b.input.verificationTokenHash, occurredAt: new Date(), source })).toBe(false);
+    const sibling=(await db.pool.query("SELECT token_hash FROM identity.verification_token_credential WHERE channel_binding_id=$1 AND consumed_at IS NULL",[b.channel])).rows[0].token_hash;
+    expect(await repository.consumeVerification({tokenHash:sibling,occurredAt:new Date(),source})).toBe(true);
+    expect(await repository.consumeVerification({tokenHash:sibling,occurredAt:new Date(),source})).toBe(false);
+    expect((await db.pool.query("SELECT verification_token_hash FROM identity.channel_binding WHERE channel_binding_id=$1",[b.channel])).rows[0].verification_token_hash).toBe(sibling);
+    expect((await db.pool.query("SELECT count(*)::int n FROM identity.session WHERE user_id=$1",[b.userId])).rows[0].n).toBe(0);
     expect(await resend(b)).toEqual({ status: "ignored" });
   });
   it("rolls back the initial reservation with a failed DEK write and reserves none on duplicate creation", async () => {
@@ -191,7 +196,7 @@ describe("atomic rolling verification reservations on real PostgreSQL", () => {
     const a = await account(); await db.pool.query("DELETE FROM identity.verification_delivery_reservation WHERE channel_binding_id=$1", [a.channel]);
     await db.pool.query("DELETE FROM identity.verification_token_credential WHERE channel_binding_id=$1", [a.channel]);
     const migration = await readFile(new URL("../../migrations/0096_verification_delivery_budget.sql", import.meta.url), "utf8");
-    const seed = migration.slice(migration.indexOf("INSERT INTO identity.verification_delivery_reservation"), migration.indexOf("CREATE FUNCTION identity.enforce_verification_reservation_parent"));
+    const seed = migration.slice(migration.indexOf("INSERT INTO identity.verification_delivery_reservation"), migration.indexOf("CREATE OR REPLACE FUNCTION identity.enforce_verification_reservation_parent"));
     await db.pool.query(seed); expect(await count(a)).toBe(3); await shift(a,60); expect(await resend(a)).toEqual({ status:"ignored" });
   });
 
@@ -238,4 +243,42 @@ describe("atomic rolling verification reservations on real PostgreSQL", () => {
     } finally { await blocker.query("ROLLBACK"); blocker.release(); }
   });
 
+});
+
+it('instrumented DB-clock fixture witnesses the inclusive73 endpoint and next-microsecond pruning without changing the issuer predicate',async()=>{
+  const a=await account();
+  const context={ipArgon2id:'argon2id-audit:v1:'+'a'.repeat(64),userAgentArgon2id:'argon2id-audit:v1:'+'b'.repeat(64)};
+  const signature='identity.prepare_verification_resend_reserved_with_audit(bytea,text,bigint,timestamptz,bigint,bigint,integer,text,jsonb)';
+  const metadata=async()=> (await db.pool.query('SELECT oid::text,proowner::text,proacl::text,prosecdef,proconfig,pg_get_functiondef(oid) definition FROM pg_proc WHERE oid=$1::regprocedure',[signature])).rows[0];
+  const original=await metadata();
+  const issue=async()=>{
+    const hash=token(),c=await db.pool.connect();
+    try {await c.query('BEGIN');await c.query('SET LOCAL ROLE debateai_runtime');await c.query('SELECT identity.begin_runtime_audit_attempt()');
+      const result=(await c.query("SELECT * FROM identity.prepare_verification_resend_reserved_with_audit($1,$2,86400000,clock_timestamp(),60000,3600000,3,'atomic_rolling_reservation_ledger',$3::jsonb)",[a.emailBlindIndex,hash,context])).rows[0];await c.query('COMMIT');return {hash,result};
+    }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+  };
+  const advance=async(seconds:number)=>{await shift(a,seconds);await db.pool.query("UPDATE identity.verification_token_credential SET issued_at=issued_at-$2*interval '1 second',expires_at=expires_at-$2*interval '1 second' WHERE channel_binding_id=$1",[a.channel,seconds]);};
+  for(let hour=0;hour<24;hour++){
+    if(hour>0){await advance(3420);expect((await issue()).result.status).toBe('SEND');}
+    await advance(60);expect((await issue()).result.status).toBe('SEND');await advance(60);expect((await issue()).result.status).toBe('SEND');await advance(60);expect((await issue()).result.status).toBe('IGNORED');
+  }
+  expect((await db.pool.query('SELECT count(*)::int n FROM identity.verification_token_credential WHERE channel_binding_id=$1',[a.channel])).rows[0].n).toBe(72);
+  const marker='v_now := clock_timestamp();';expect(original.definition.split(marker)).toHaveLength(2);
+  const install=async(offset:0|-1)=>{
+    // Fixture-only DML sees the real captured DB instant under the issuer's existing account locks.
+    // It supplies no clock, function, role grant, alternative predicate or production-source edit.
+    const hook=`\n  IF v_channel.channel_binding_id='${a.channel}'::uuid THEN\n    UPDATE identity.verification_token_credential SET expires_at=v_now+(${offset}*interval '1 microsecond'),issued_at=v_now+(${offset}*interval '1 microsecond')-interval '24 hours' WHERE token_hash='${a.input.verificationTokenHash}';\n  END IF;`;
+    const definition=original.definition.replace(marker,marker+hook);expect(definition.replace(hook,'')).toBe(original.definition);
+    await db.pool.query(definition);const changed=await metadata();expect({...changed,definition:undefined}).toEqual({...original,definition:undefined});expect(changed.definition).toBe(definition);
+  };
+  try {
+    await advance(3420);await install(0);const boundary=await issue();expect(boundary.result.status).toBe('SEND');
+    const witness=(await db.pool.query(`SELECT count(*)::int total,count(*) FILTER(WHERE c.expires_at>=fresh.issued_at)::int live_at_captured_t,bool_and(CASE WHEN c.token_hash=$2 THEN c.expires_at=fresh.issued_at AND c.expires_at-c.issued_at=interval '24 hours' ELSE true END) exact_equality FROM identity.verification_token_credential c CROSS JOIN identity.verification_token_credential fresh WHERE c.channel_binding_id=$1 AND fresh.token_hash=$3`,[a.channel,a.input.verificationTokenHash,boundary.hash])).rows[0];
+    expect(witness).toEqual({total:73,live_at_captured_t:73,exact_equality:true});
+    await shift(a,60);await install(-1);const next=await issue();expect(next.result.status).toBe('SEND');
+    expect((await db.pool.query('SELECT token_hash FROM identity.verification_token_credential WHERE token_hash=$1',[a.input.verificationTokenHash])).rows).toEqual([]);
+    expect(await repository.consumeVerification({tokenHash:next.hash,occurredAt:new Date(),source})).toBe(true);
+    expect(await repository.consumeVerification({tokenHash:next.hash,occurredAt:new Date(),source})).toBe(false);
+    expect((await db.pool.query("SELECT state,(SELECT count(*)::int FROM identity.session WHERE user_id=u.user_id) sessions FROM identity.\"user\" u WHERE user_id=$1",[a.userId])).rows[0]).toEqual({state:'pending_mfa',sessions:0});
+  } finally {await db.pool.query(original.definition);expect(await metadata()).toEqual(original);}
 });

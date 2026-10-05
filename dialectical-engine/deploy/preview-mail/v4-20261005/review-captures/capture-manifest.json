@@ -1,0 +1,385 @@
+{
+  "schema": "account-mail-v4-source-captures",
+  "reviewDerivative": "Decoded plain/HTML alternatives and flat headers replace every installed recipient with a symbolic fixture address; valid re-encoded MIME, not original body bytes.",
+  "reviewRedactorSha256": "71653c369ecf747bbf90fb284afec7ff4347e5bb4e831d63ce0aeb71d9d4401b",
+  "runtime": "node=26.8.2;icu=78.3;tz=2026a;cldr=48.0;unicode=17.0",
+  "sourceMailChannelSha256": "41fd0cb732bc8421aecbb036b658fc08c3fad9178415bdc9f69b34e69d5b42f6",
+  "sourceTemplateSha256": "8c9436739e82efbe13e6f35cee0071262055d846fd55d4cb3493ef6fd5f2a412",
+  "observedBindings": {
+    "schema": "preview-mail-v4-purpose-binding",
+    "observedWrapperSha256": "bc201edd5875f1aae9984acebc6fa52b484772b06058b00f2cdef1aefcb70edf",
+    "observedRecoveryPolicySha256": "b6ce9c849b3baceead6938db5b97c53bbff46f4bbd3e1fe8856d8c75f129772b",
+    "recipientSha256": {
+      "verification-forward-primary": "2bdfb49c50be86c26e2cc71a2eed037ec88852f7e227ad211cbebbd4e90e3b66",
+      "verification-forward-secondary": "2896ffbc0c81a347fb66548d4915e538f6de76143fad4b6bc374ac44f0c1b5c8",
+      "verification-direct-and-recovery-proof": "5978582c55e5d05e87c2b6aee334c0a50a5f8734dc962606be9ea2732c433015",
+      "recovery-notice-secondary": "397572f7fd895e7f681e35680724bf8664d471b019b1e830300a56da18805794"
+    }
+  },
+  "receipts": [
+    {
+      "template": "verification-v1",
+      "alias": "verification-forward-primary",
+      "allowed": true,
+      "originalSha256": "7b322424d49316cfdeb18564d45377dc78d3f975a50a70283589caaa114d052a",
+      "redactedSha256": "988884e51ff16bea9f9d2d94330ed25a31948c8efd6c17a173df725e117e993a"
+    },
+    {
+      "template": "recovery-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "6492bee58b7719a1f2834e294bc8fb60d658b5ae257bf8e1156694db57d7c76f",
+      "redactedSha256": "49c140b7f8be902c7d35c321924de35f6a0f4e589b106c1580e817f66c16ae89"
+    },
+    {
+      "template": "security-scheduled-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "473088942f0bdc207eaccb13a25ddf0dadff10b657cafe761f6ba585936095a6",
+      "redactedSha256": "3df8d5e56e6dd02f4099200c10b82355c67db4444c2ceefd41a1ffa970cfa92d"
+    },
+    {
+      "template": "security-cancelled-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "90180b152ba13e454280d6b21814188f5c76f50d8cffe178e2b124238e094c66",
+      "redactedSha256": "77c3297179b48d3d3c0bea4c20ddb43bdbef5d293b4e4d17604dcb2a8fd1891b"
+    },
+    {
+      "template": "security-completion-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "7b6cd50093f6756e684de714fa14d0409a79399c4666aad8650afa14b6f0a1b6",
+      "redactedSha256": "515aa5d6f1e6d875579cbaaf3475b2b11136ba57e746ce1c6c538e17a160b876"
+    },
+    {
+      "template": "email-change-confirm-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "a00bf85e742f1163c39878678042f4af203c31ee43ca4ddab3fe3c2ba7dca2ca",
+      "redactedSha256": "5eb0950651961d6bb3f9763f4e034f841fbc67556166a0ea2417554794243ec5"
+    },
+    {
+      "template": "email-change-notice-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "2499201c459a6624b9bbc1909314e50e68d5f3e6dcefa64d2bd746d92fd282d0",
+      "redactedSha256": "361f7b4cae5e760d3b7cb263fe6693829c08b815e24e31191324be2caa78bb8e"
+    },
+    {
+      "template": "email-change-unavailable-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "891f41a97ed3cf7a99152b6c01a513a789a306e222f231cd563d877fb3a73013",
+      "redactedSha256": "146b0e526dc358237cf5db195d6f5a54bccc9c0e088ac4c59fd3d110f56c5393"
+    },
+    {
+      "template": "consumer-recovery-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "050730cdae35285e5877f15e0c8adf9a38ced72eb5a2ed0fccba9a168cf32705",
+      "redactedSha256": "bae28d69977f35d0178101535861e05256cd5bfb368e8309da841624adea824a"
+    },
+    {
+      "template": "security-method-changed-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "3899378a1047cfc1fd141d35181f1d2f349456dff857181a2e0e337787044325",
+      "redactedSha256": "d557332e6acab72f1839ac3e1350737b1040edfc58bbe1c4fc3678e3a93bf7f8"
+    },
+    {
+      "template": "security-codes-regenerated-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "934b631f810c2019f7f7761801028c43a41f75a9c16928138a1a1469acae1dc9",
+      "redactedSha256": "db4042824d685b1a240754e058773e46f8d3cbb574a237f7171657c2d005bc59"
+    },
+    {
+      "template": "security-recovery-proved-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "683863e92478fb61fda2f151d25e66cb7032c518357747684c3711a256313cf2",
+      "redactedSha256": "578525f012de289fefab0b525219c3afd708e3ba85a6ef5c0d8cb50e77986f3d"
+    },
+    {
+      "template": "security-recovery-completed-v1",
+      "alias": "verification-forward-primary",
+      "allowed": false,
+      "originalSha256": "ae699d47f6c222548b0222f44fbbfeb3cef2090fec44965f93f22a862bcf5770",
+      "redactedSha256": "73087b48ea02302f3f1b266c07826237204fbe8ae49876a53fbb43be3e1ca2ea"
+    },
+    {
+      "template": "verification-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": true,
+      "originalSha256": "65c443746221385089cfd678ef3cf1235871973429c8dd55fd517cc2a71e98d5",
+      "redactedSha256": "2e33d83a1d74b1c283ddc8fdd292f6074831abf3de05e20e913034b325450b70"
+    },
+    {
+      "template": "recovery-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "5859902eeec1b512e753b5a84e1dcefb0c1ea90a1095e5f75f9525acfd36ddce",
+      "redactedSha256": "a99194647a38f2360d914bec65db3c62f2774203e0759003b803919e9ca790f1"
+    },
+    {
+      "template": "security-scheduled-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "23dffc7519477c9d7a65172c2bd0e88a74042160c94bb0cfff38324bad895b7e",
+      "redactedSha256": "2a330fa01c70e76ef2f87c0e89c69672cf3597864d9b7dfe0bceab7effb463a6"
+    },
+    {
+      "template": "security-cancelled-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "e205d3dfb203a81bcb1049cba0e6663d60ac13bc5886e04c1ef35a2891155dfc",
+      "redactedSha256": "c8806ab84d2151b137cff781b4052e11b89f40cf852ed8548ee497da104070b8"
+    },
+    {
+      "template": "security-completion-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "9129380b04dd024b369fc66c635728e8a0e1548536bc3d02eecd5b8ef41c3d3e",
+      "redactedSha256": "394181be9d90009d7a9292a7b5127424106ce42236caf541cad899ac75188cf7"
+    },
+    {
+      "template": "email-change-confirm-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "7ee3edbf15359c097da7c68ea3f9cf8267b39082122fa19e16314bba25092b4e",
+      "redactedSha256": "36a5ee72ee3d136f7933075b5c9636535181e3c2e17c4b0ce1e94aa5a222591a"
+    },
+    {
+      "template": "email-change-notice-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "205ff23b436dc793724476169a190de0f41aa899baba838f5610efdfa45515d6",
+      "redactedSha256": "1de925101b4aa1d1829d1eb8e2b1d78ca445edc39a1e7918c87f297b0b282675"
+    },
+    {
+      "template": "email-change-unavailable-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "3fa1b502b66a480e57f2897976be6a271f68402eb799243be45ee398f4d8d607",
+      "redactedSha256": "cf7d82ec4355759cf4aa9f7360369f5fde4ed784852e280e3d744fa79303db82"
+    },
+    {
+      "template": "consumer-recovery-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "13e33cea09c68a04a910206e2f5f6c10e9d2bd06c93c771a2f572963ef62b7ba",
+      "redactedSha256": "6fe2e5c7e99594566e9310058a01ba14f424b4c1aab741cb9dc49ddeaa7ea736"
+    },
+    {
+      "template": "security-method-changed-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "cc8b3d6b11aea14b3833aa510693397661a2a5a5ed44090e3273c90aae6cdade",
+      "redactedSha256": "f2f004a32fa1e63c05ed035519f4acc738ffd37f1d09631d123418638c7d6daf"
+    },
+    {
+      "template": "security-codes-regenerated-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "646ec7a597f76dcb47d02810e3b4de949faaad5573c2153f425262d875803c00",
+      "redactedSha256": "c4247068693a43aec0b6ddc4426e12da3f95354a23d349b99256815cd21abdb1"
+    },
+    {
+      "template": "security-recovery-proved-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "f4694b59983a92ccf23da165f11bd33dad8ee28a47d75854c4c914be60e1809a",
+      "redactedSha256": "cfe4e1ba8b402e0a8cbc7091629d52682beaaf19062af682547c43d9c6fb668d"
+    },
+    {
+      "template": "security-recovery-completed-v1",
+      "alias": "verification-forward-secondary",
+      "allowed": false,
+      "originalSha256": "ee715cf2561519ab166f2bb30b7f856defa1d93f5b79d7a42ec1db1bcc5dd96a",
+      "redactedSha256": "c1c3989bb7fb855af96102364a29b7268baa6a075a953f08bd12d9c94f0f2681"
+    },
+    {
+      "template": "verification-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "6cf8974c72c141f1cfdf9a212da4e7b9e03e3acc3ae712a73bd3e13b23972f85",
+      "redactedSha256": "31670046b0a675d3fecfe69e7081fa122ba08d0d91a674a337198e42944d2c35"
+    },
+    {
+      "template": "recovery-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "1921eb5d9068d29c2defc4de7f5740ec456e10a82f3ce67994d3bf535de41ee5",
+      "redactedSha256": "5cce9110543e10dee161c2909b104eedc6037148c86d452226ea2214eb163c99"
+    },
+    {
+      "template": "security-scheduled-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "e05e04eae17b9819a301344ca532254f78492a7dea411af3cf75db025f0f6ea1",
+      "redactedSha256": "9050df4b8d4d2d1ad80e753bd16a8a897557905a2f5cdf393291293aee0c9d17"
+    },
+    {
+      "template": "security-cancelled-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "49ebedafcdb98cdc1158343d04e62de6b686b9a711d0692207b539ab951c8330",
+      "redactedSha256": "63299a179218ca8ec0abe7e2ac9e5fe75dceb8eda1c841df7a8f49b4cb3e8503"
+    },
+    {
+      "template": "security-completion-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "e1e7ca9ee2f092eb1d6a8d2cac362a8ee3a75494d316fda87ee6f4f9ce2dbba7",
+      "redactedSha256": "7698c44e0214a2e06fde3a13a55bda13813024aacab386b7b5130511cf3d29cb"
+    },
+    {
+      "template": "email-change-confirm-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "7f89aa78903e7169bc034b3aa3f25afea002cb9b352c7037bc48f1f8ad71f505",
+      "redactedSha256": "eb96b82ff5b2b53a58a5114195d401d1acfa93697f997fd3382cfb6ea45bf5d4"
+    },
+    {
+      "template": "email-change-notice-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "f05588f924b09443db4184035c71749555325a0916bb9e375de5138cdbc9ea4d",
+      "redactedSha256": "50d88d331913e734e61ce24f949aeca790c1c6ed635d84a690cba4d71df5412f"
+    },
+    {
+      "template": "email-change-unavailable-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "7d34ab634ca4de4b667d3a6a3683c6d7aa9a19a02d9acee74dc4c62af9f9bbe6",
+      "redactedSha256": "135b2b91365735fba3a58f5e3f8426e97bfd2727ba75eb49fc70bf8240005902"
+    },
+    {
+      "template": "consumer-recovery-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "bbbbe2855ec3130dcd453fec84552c613b65a088bceafa07787d51a72006caf4",
+      "redactedSha256": "55f62872a590c7ec4f93d3abe78554e54313111ce1e9b17b27776e6d21e56800"
+    },
+    {
+      "template": "security-method-changed-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "5f13a90086b27d57a5d5286c36c842b52882dc060ea8851782fbbec8b8a2d37b",
+      "redactedSha256": "14ef3cd9dbea06cb8361a1115d2b34b1ab89e496a14254ac45ee5db0cd3838a8"
+    },
+    {
+      "template": "security-codes-regenerated-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "ed4b09b290e31b62e8ee2cb6d034577cd1e1ede178d4ac0c33f5309b0502de9d",
+      "redactedSha256": "47b7337ce4af51f78a17116656cee331df6aaf380abafa221f18667eca3ed72a"
+    },
+    {
+      "template": "security-recovery-proved-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "9d66f9f2ff08eb8c5267e605af0b40ba49fa213ef88ecde688b67e8663216bc8",
+      "redactedSha256": "0eb8cf2b543431b3d09a41ee636abea2e0363b2eda2edbf1fe1a20be77fe3f99"
+    },
+    {
+      "template": "security-recovery-completed-v1",
+      "alias": "verification-direct-and-recovery-proof",
+      "allowed": true,
+      "originalSha256": "858aab600d4ee8b84c477cd7fb1cca4e103f19ff06131d20f676c000b8b03e88",
+      "redactedSha256": "75b3b9860327eccd8dc317133ebd0ee037769ad5feff2003ef4d1b34afbef4b8"
+    },
+    {
+      "template": "verification-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": false,
+      "originalSha256": "f2ff46271d93a1ef91d18ac4d2c8aaa706ce97199706cf281b1b4de49dff48ff",
+      "redactedSha256": "38727f3f424929a6582e3a36033b3051e336918264227180edf40d09098f937d"
+    },
+    {
+      "template": "recovery-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": false,
+      "originalSha256": "a2299dab46bbf09eb55ce3dc15a1f8c305e853a3b7e9f838ef8bdcdde5c8b61f",
+      "redactedSha256": "ec971db02b3b31fa1afe3c10446c7df17b4bb8d77530cff04c2667b671928308"
+    },
+    {
+      "template": "security-scheduled-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": true,
+      "originalSha256": "d558afb890688d8ffb38ef42d3c58060beeb498b2e6f36460d388464dbcf1620",
+      "redactedSha256": "94df02db3f9e074db7362b7aa63591362bded8cb6879ea65b2bdf4c0f25f95f3"
+    },
+    {
+      "template": "security-cancelled-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": true,
+      "originalSha256": "970f3133d9662ae3abe2bf297d7faf3ffeb1288640ba9bda669bb448b3226b3d",
+      "redactedSha256": "56a9e083bb1c62166ea1aa0c553814edf1b396a4b1c7195d66cf3b5d87e2e148"
+    },
+    {
+      "template": "security-completion-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": true,
+      "originalSha256": "6b7281a3363fa17f49773288f43ec6e426713e0839c6b4163752e7906cd09d58",
+      "redactedSha256": "0e296440a289076d46e2b3be3e56e4041344d71f8ce8f8acf679c814ccccafda"
+    },
+    {
+      "template": "email-change-confirm-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": false,
+      "originalSha256": "e8849b7d8fb1183a8db327fe94d5189f09e41d40a8452ef31b2ff1eef0404dd4",
+      "redactedSha256": "66f28494c8f00dbc3c2f8d077f768ff685500efed25eab0de78921c2b4aa0adf"
+    },
+    {
+      "template": "email-change-notice-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": false,
+      "originalSha256": "e9147912760cce44baa00816bc39e9e5896e6ecf55bd8f79a0ea5de9e6184b40",
+      "redactedSha256": "0e46696ad6ccb687676b14480b4edbda0b75c09d569c0a591543737372cde9c3"
+    },
+    {
+      "template": "email-change-unavailable-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": true,
+      "originalSha256": "97e5a9458bed00f2a05e91aa412ce17de804ac3617acf3f5db3a1392e7bd2f22",
+      "redactedSha256": "9fb3c7cb7646fe2be36301b00f9f49c0296eacd06449e07a3133e2e6e0e206f7"
+    },
+    {
+      "template": "consumer-recovery-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": false,
+      "originalSha256": "e53a60464fe10129765bb25e37204c75d5911f3417daaef38baa6ab1746036f7",
+      "redactedSha256": "bffd9eaccc4498a05a1d109159bad44f1e5c3a8d00a112622c11417078770af2"
+    },
+    {
+      "template": "security-method-changed-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": true,
+      "originalSha256": "c435cb37a4d97889fa8722098c386593b57ab55cb8f69ebe0667837b034abe60",
+      "redactedSha256": "3d84089481b45ca4ad6e5bd0cb6bd750797fe6b7ae6ed878629084241acfa7f1"
+    },
+    {
+      "template": "security-codes-regenerated-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": true,
+      "originalSha256": "85fd35d76b5df443cc64e2cad68f15ba40bd0ef0df652b46985ffeca27803d6f",
+      "redactedSha256": "efde215a8f8af58e3b62931ab15b8bf870d74d422e62599061324525f057b158"
+    },
+    {
+      "template": "security-recovery-proved-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": true,
+      "originalSha256": "a8a480eed2acbbf342b86001094282bd1f48fd54bb8a43bc15fedf373b1a5858",
+      "redactedSha256": "f07b1d973437f7243a7cab4ccb7597616f12bc1ab556c9f793631ae725e5eae9"
+    },
+    {
+      "template": "security-recovery-completed-v1",
+      "alias": "recovery-notice-secondary",
+      "allowed": true,
+      "originalSha256": "f7f5af6b318ccb67a84dba18389cdfe29d1b8073d7df90742205559cee2e2707",
+      "redactedSha256": "2f0587d8602be95769b1cb4f2d57de901698c2f2813b39269c90b0653fae7c95"
+    }
+  ]
+}

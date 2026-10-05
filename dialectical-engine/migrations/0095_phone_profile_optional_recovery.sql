@@ -2,10 +2,11 @@
 ALTER TABLE identity."user" DROP CONSTRAINT IF EXISTS identity_user_phone_channel_unsupported;
 DROP TRIGGER IF EXISTS reject_unsupported_phone_channel ON identity."user";
 ALTER TABLE identity."user" ALTER COLUMN recovery_email_ciphertext DROP NOT NULL;
+ALTER TABLE identity."user" DROP CONSTRAINT IF EXISTS identity_user_phone_profile_consistent;
 ALTER TABLE identity."user"
-  ADD COLUMN phone_source text,
-  ADD COLUMN phone_verification_status text,
-  ADD COLUMN phone_updated_at timestamptz,
+  ADD COLUMN IF NOT EXISTS phone_source text,
+  ADD COLUMN IF NOT EXISTS phone_verification_status text,
+  ADD COLUMN IF NOT EXISTS phone_updated_at timestamptz,
   ADD CONSTRAINT identity_user_phone_profile_consistent CHECK (
     (phone_ciphertext IS NULL AND phone_source IS NULL AND phone_verification_status IS NULL AND phone_updated_at IS NULL)
     OR

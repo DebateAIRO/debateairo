@@ -81,5 +81,6 @@
   "support.answerRating": "Vastuse hinnang",
   "support.privacyPreferences": "Privaatsuseelistused",
   "support.aiBanner": "Vastused on tehisintellekti loodud, masinloetavalt märgistatud ja võivad olla valed. Võite igal ajal paluda inimesega rääkida.",
-  "support.cookiePreferences": "Küpsiste eelistused"
+  "support.cookiePreferences": "Küpsiste eelistused",
+  "support.recoverAccount": "Taasta konto"
 }

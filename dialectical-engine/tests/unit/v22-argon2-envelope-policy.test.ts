@@ -86,9 +86,10 @@ async function sourceFilesUnder(directory: string): Promise<readonly string[]> {
 async function verificationCallSites(): Promise<readonly Readonly<{
   path: string;
   line: number;
+  callee: string;
   statementAndPredecessor: string;
 }>[]> {
-  const sites: { path: string; line: number; statementAndPredecessor: string }[] = [];
+  const sites: { path: string; line: number; callee: string; statementAndPredecessor: string }[] = [];
   for (const path of await sourceFilesUnder(API_SOURCE_ROOT)) {
     const source = await readFile(path, "utf8");
     for (const call of source.matchAll(VERIFY_CALL)) {
@@ -99,6 +100,7 @@ async function verificationCallSites(): Promise<readonly Readonly<{
       const statements = before.split(";");
       sites.push({
         path,
+        callee: call[0].replace(/\s*\($/u, ""),
         line: before.split("\n").length,
         statementAndPredecessor: statements.slice(-2).join(";") + source.slice(call.index, call.index + 200)
       });
@@ -312,14 +314,16 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
 
   it("guards every stored-hash verification in the whole API tree, and knows how many there are", async () => {
     const sites = await verificationCallSites();
-    // An EXACT count, so a sixth call site fails loudly here instead of being
-    // quietly skipped by a pattern that no longer matches it.
-    expect(sites.map((site) => `${site.path}:${site.line}`)).toEqual([
-      "apps/api/src/mfa.ts:375",
-      "apps/api/src/mfa.ts:418",
-      "apps/api/src/sessions.ts:350",
-      "apps/api/src/sessions.ts:475",
-      "apps/api/src/sessions.ts:638"
+    // Exact path/callee multiplicity detects added or omitted callers without
+    // treating unrelated line movement as a policy change. Every current caller
+    // still has to carry its own structural guard below.
+    expect(sites.map((site) => `${site.path}:${site.callee}`)).toEqual([
+      "apps/api/src/consumer-recovery.ts:verifyRecoveryCode",
+      "apps/api/src/mfa.ts:verifyRecoveryCode",
+      "apps/api/src/sessions.ts:verifyPassword",
+      "apps/api/src/sessions.ts:verifyRecoveryCode",
+      "apps/api/src/sessions.ts:verifyPassword",
+      "apps/api/src/social-step-up.ts:verifyRecoveryCode"
     ]);
     for (const site of sites) {
       // Structural, not "somewhere in the preceding 400 characters": the guard

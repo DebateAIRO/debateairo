@@ -81,5 +81,6 @@
   "support.answerRating": "回答の評価",
   "support.privacyPreferences": "プライバシー設定",
   "support.aiBanner": "回答はAIが生成し、機械可読の印が付きますが、誤っている場合があります。いつでも人による対応を依頼できます。",
-  "support.cookiePreferences": "Cookieの設定"
+  "support.cookiePreferences": "Cookieの設定",
+  "support.recoverAccount": "アカウントを復旧"
 }

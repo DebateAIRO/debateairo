@@ -81,5 +81,6 @@
   "support.answerRating": "Hodnotenie odpovede",
   "support.privacyPreferences": "Nastavenia súkromia",
   "support.aiBanner": "Odpovede sú vytvorené AI, strojovo čitateľne označené a môžu byť nesprávne. Kedykoľvek môžete požiadať o pomoc človeka.",
-  "support.cookiePreferences": "Nastavenia súborov cookie"
+  "support.cookiePreferences": "Nastavenia súborov cookie",
+  "support.recoverAccount": "Obnoviť účet"
 }

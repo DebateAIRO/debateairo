@@ -359,6 +359,50 @@
         "billing.settle_internal_provider_call",
         "billing.read_internal_run_state"
       ]
+    },
+    {
+      "roleName": "debateai_password_recovery_owner",
+      "login": false,
+      "inherit": false,
+      "directMemberships": [],
+      "ownsSchemas": [],
+      "ownsRelations": [
+        "identity.password_recovery_control",
+        "identity.password_recovery_staged_code",
+        "identity.password_recovery_retry_lock",
+        "identity.password_recovery_source_window",
+        "identity.password_recovery_notice",
+        "identity.password_recovery_feed"
+      ],
+      "ownsFunctions": [
+        "identity.password_recovery_rules",
+        "identity.password_recovery_eligible",
+        "identity.password_recovery_audit",
+        "identity.password_recovery_notice_event",
+        "identity.password_recovery_close",
+        "identity.password_recovery_current",
+        "identity.password_recovery_prepare",
+        "identity.password_recovery_start",
+        "identity.password_recovery_exchange",
+        "identity.password_recovery_read",
+        "identity.password_recovery_read_code",
+        "identity.password_recovery_accept_code",
+        "identity.password_recovery_stage_factor",
+        "identity.password_recovery_verify_factor",
+        "identity.password_recovery_stage_codes",
+        "identity.password_recovery_ack_code",
+        "identity.password_recovery_complete",
+        "identity.password_recovery_cancel",
+        "identity.expire_password_recovery",
+        "identity.password_recovery_started_scope",
+        "identity.password_recovery_admit",
+        "identity.password_recovery_failure",
+        "identity.password_recovery_cancel_session",
+        "identity.password_recovery_read_feed",
+        "identity.password_recovery_cancel_own",
+        "identity.password_recovery_claim_notice",
+        "identity.password_recovery_finish_notice"
+      ]
     }
   ],
   "principals": [
@@ -1997,5 +2041,15 @@
       "staff.publish_independent_alert_readiness",
       "staff.revoke_independent_alert_readiness"
     ]
-  }
+  },
+  "retiredCapabilityRoles": [
+    {
+      "roleName": "debateai_password_recovery_runtime",
+      "login": false,
+      "inherit": false,
+      "directMemberships": [],
+      "status": "RETIRED_BY_0104",
+      "reason": "External0103 retained for history; every ordinary EXECUTE and runtime membership removed by forward bridge."
+    }
+  ]
 }

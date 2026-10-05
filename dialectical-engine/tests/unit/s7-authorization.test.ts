@@ -18,13 +18,27 @@ const ANSWER_ID = "22222222-2222-4222-8222-222222222222";
 const NODE_ID = "33333333-3333-4333-8333-333333333333";
 
 const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
+  // Approved account-flow capabilities: exact authority and Origin classes, independent of declaration order.
+  ...['begin','status','passkey-options','complete'].map((step,index)=>({route:index===0?'POST /v1/account/social/{provider}/step-up/begin':`POST /v1/account/social/step-up/${step}`,auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'})),
+  {route:'GET /v1/auth/providers',auth:'public',resource:'identity',action:'social-providers'},
+  {route:'POST /v1/auth/social/{provider}/begin',auth:'public',origin:'trusted',resource:'identity',action:'social-begin'},
+  {route:'GET /v1/auth/social/{provider}/callback',auth:'public',resource:'identity',action:'social-callback'},
+  {route:'POST /v1/auth/social/apple/callback',auth:'public',resource:'identity',action:'social-callback'},
+  ...['status','complete'].map(step=>({route:`POST /v1/auth/social/signup/${step}`,auth:'public',origin:'trusted',resource:'identity',action:'social-signup'})),
+  {route:'GET /v1/account/social-providers',auth:'user',resource:'identity',action:'social-links'},
+  {route:'POST /v1/account/social/{provider}/link',auth:'user',origin:'trusted',resource:'identity',action:'social-link'},
+  {route:'POST /v1/account/social/unlink',auth:'user',origin:'trusted',resource:'identity',action:'social-unlink'},
+  ...['recovery/prove','recovery/enrollment/options','recovery/enrollment/complete','recovery/enrollment/status','recovery/enrollment/complete-evidence','onboarding/status','onboarding/complete'].map(path=>({route:`POST /v1/auth/${path}`,auth:'public',origin:'trusted',resource:'identity',action:'restricted-onboarding'})),
+  ...['options','complete'].map(step=>({route:`POST /v1/auth/passkeys/enrollment/${step}`,auth:'public',origin:'trusted',session:'optional',resource:'identity',action:`passkey-enrollment-${step}`})),
+  ...['options','complete'].map(step=>({route:`POST /v1/auth/passkeys/login/${step}`,auth:'public',origin:'trusted',resource:'identity',action:`passkey-login-${step}`})),
+  ...['GET /v1/account/auth-methods','POST /v1/account/auth-methods/remove','POST /v1/account/recovery-codes/regenerate','POST /v1/auth/passkeys/step-up/options','POST /v1/auth/passkeys/step-up/complete'].map(route=>({route,auth:'user',resource:'session-self',action:'consumer-security'})),
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
   { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
-  { route: "POST /v1/auth/mfa/totp/begin", auth: "public", resource: "identity", action: "begin-totp" },
-  { route: "POST /v1/auth/mfa/totp/verify", auth: "public", resource: "identity", action: "verify-totp" },
+  { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin:"trusted", session:"optional", resource: "identity", action: "begin-totp" },
+  { route: "POST /v1/auth/mfa/totp/verify", auth: "public", origin:"trusted", session:"optional", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
   { route: "POST /v1/auth/mfa/recovery-codes/confirm", auth: "public", resource: "identity", action: "confirm-recovery-code" },
   { route: "POST /v1/auth/login", auth: "public", origin: "trusted", resource: "identity", action: "login" },
@@ -215,22 +229,25 @@ describe("S7 deny-by-default authorization", () => {
     expect(new Set(contractInventory.routes).size).toBe(contractInventory.routes.length);
     expect(new Set(governed).size).toBe(governed.length);
     expect(new Set(governed)).toEqual(new Set(contractInventory.routes));
-    const api = buildApi({application: fixtureApplication(), sessions: testSessionApplication([USER_IDENTITY]), allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, registration: {} as never, recovery: {} as never, mfa: {} as never, support: {} as never, evaluatorDevMenu: {} as never, evaluatorDevMenuRegisterVersion: 1});
+    const api = buildApi({application: fixtureApplication(), sessions: testSessionApplication([USER_IDENTITY]), allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, consumerRecovery:{} as never,onboardingEvidence:{} as never,consumerSecurity:{} as never,consumerWebAuthn:{} as never, registration: {} as never, recovery: {} as never, mfa: {} as never, support: {} as never, evaluatorDevMenu: {} as never, evaluatorDevMenuRegisterVersion: 1});
     await api.ready();
     for (const route of contractInventory.routes) {
       const [method, path] = route.split(" ");
       expect(api.hasRoute({method: method as "GET" | "POST" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
     }
     await api.close();
-    expect(authorizationPolicyInventory.filter(policy => !policy.route.startsWith("GET /v1/admin/") && !policy.route.startsWith("POST /v1/admin/") && !policy.route.startsWith("PATCH /v1/admin/") && policy.route !== "DELETE /v1/admin/internal-allowances/{grantId}")).toEqual(EXPECTED_AUTHORIZATION_MATRIX);
+    const ordinary=authorizationPolicyInventory.filter(policy => !policy.route.startsWith("GET /v1/admin/") && !policy.route.startsWith("POST /v1/admin/") && !policy.route.startsWith("PATCH /v1/admin/") && policy.route !== "DELETE /v1/admin/internal-allowances/{grantId}");
+    const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
+    expect([...ordinary].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
     expect(staffContractInventory.routes).toHaveLength(18);
-    expect(contractInventory.routes).toHaveLength(93);
+    expect(contractInventory.routes).toHaveLength(122);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
   it("registers the full optional composition and rejects anonymous access to every governed private route", async () => {
     const api = buildApi({
       application: fixtureApplication(),
+      consumerRecovery:{} as never,onboardingEvidence:{} as never,consumerSecurity:{} as never,consumerWebAuthn:{} as never,
       registration: {} as never,
       recovery: {} as never,
       mfa: {} as never,

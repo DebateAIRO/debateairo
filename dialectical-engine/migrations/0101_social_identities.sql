@@ -1,12 +1,12 @@
 -- Configured social identities. All destinations and assertion validation live in
 -- the confined API/finite worker; this schema consumes only private verified ports.
-CREATE TABLE identity.social_identity (
+CREATE TABLE IF NOT EXISTS identity.social_identity (
  social_identity_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,
  provider text NOT NULL CHECK(provider IN ('google','apple','facebook','x')),issuer text NOT NULL,app_scope text NOT NULL,subject text NOT NULL CHECK(length(subject) BETWEEN 1 AND 255),
  configuration text NOT NULL CHECK(configuration ~ '^sha256:[0-9a-f]{64}$'),created_at timestamptz NOT NULL DEFAULT clock_timestamp(),revoked_at timestamptz,
  UNIQUE(provider,issuer,app_scope,subject)
 );
-CREATE TABLE identity.social_flow (
+CREATE TABLE IF NOT EXISTS identity.social_flow (
  state_hash text PRIMARY KEY CHECK(state_hash ~ '^sha256:[0-9a-f]{64}$'),cookie_hash text NOT NULL CHECK(cookie_hash ~ '^sha256:[0-9a-f]{64}$'),
  binding_hash text NOT NULL CHECK(binding_hash ~ '^sha256:[0-9a-f]{64}$'),nonce_hash text NOT NULL CHECK(nonce_hash ~ '^sha256:[0-9a-f]{64}$'),retention_hash text NOT NULL CHECK(retention_hash ~ '^sha256:[0-9a-f]{64}$'),
  provider text NOT NULL CHECK(provider IN ('google','apple','facebook','x')),configuration text NOT NULL CHECK(configuration ~ '^sha256:[0-9a-f]{64}$'),purpose text NOT NULL CHECK(purpose IN ('LOGIN','LINK','PROVIDER_STEP_UP')),
@@ -17,8 +17,8 @@ CREATE TABLE identity.social_flow (
  CHECK(expires_at>created_at AND expires_at<=created_at+interval '5 minutes'),
  CHECK((purpose='LOGIN' AND user_id IS NULL AND session_id IS NULL AND session_token_hash IS NULL) OR (purpose IN ('LINK','PROVIDER_STEP_UP') AND user_id IS NOT NULL AND session_id IS NOT NULL AND session_token_hash IS NOT NULL))
 );
-CREATE INDEX social_flow_expiry ON identity.social_flow(expires_at);
-CREATE TABLE identity.social_enrollment (
+CREATE INDEX IF NOT EXISTS social_flow_expiry ON identity.social_flow(expires_at);
+CREATE TABLE IF NOT EXISTS identity.social_enrollment (
  token_hash text PRIMARY KEY CHECK(token_hash ~ '^sha256:[0-9a-f]{64}$'),user_id uuid NOT NULL REFERENCES identity."user" ON DELETE CASCADE,
  channel_binding_id uuid NOT NULL REFERENCES identity.channel_binding ON DELETE CASCADE,social_identity_id uuid NOT NULL REFERENCES identity.social_identity ON DELETE CASCADE,
  cookie_hash text NOT NULL CHECK(cookie_hash ~ '^sha256:[0-9a-f]{64}$'),binding_hash text NOT NULL CHECK(binding_hash ~ '^sha256:[0-9a-f]{64}$'),security_epoch bigint NOT NULL,
@@ -27,12 +27,12 @@ CREATE TABLE identity.social_enrollment (
 );
 CREATE TRIGGER social_identity_parent BEFORE INSERT OR UPDATE ON identity.social_identity FOR EACH ROW EXECUTE FUNCTION identity.guard_consumer_security_parent();
 CREATE TRIGGER social_enrollment_parent BEFORE INSERT OR UPDATE ON identity.social_enrollment FOR EACH ROW EXECUTE FUNCTION identity.guard_consumer_security_parent();
-CREATE FUNCTION identity.prune_social_flows() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.prune_social_flows() RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  PERFORM pg_advisory_xact_lock(hashtextextended('identity.social_flow_capacity',0));
  DELETE FROM identity.social_flow WHERE expires_at<=clock_timestamp() OR consumed_at IS NOT NULL;
 END $$;
-CREATE FUNCTION identity.begin_social_flow(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.begin_social_flow(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE u uuid:=(p->>'userId')::uuid;t timestamptz;e timestamptz;g identity.step_up_grant%ROWTYPE;capacity integer:=(p->>'challengeCapacity')::integer;scope_limit integer:=(p->>'challengesPerScope')::integer;
 BEGIN
  IF capacity IS NULL OR capacity NOT BETWEEN 1 AND 8192 OR scope_limit IS NULL OR scope_limit NOT BETWEEN 1 AND 5 OR p->>'purpose' NOT IN ('LOGIN','LINK','PROVIDER_STEP_UP') THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;
@@ -53,7 +53,7 @@ BEGIN
  VALUES(p->>'stateHash',p->>'cookieHash',p->>'bindingHash',p->>'nonceHash',p->>'retentionKey',p->>'provider',p->>'configuration',p->>'purpose',p->>'next',u,(p->>'sessionId')::uuid,p->>'tokenHash',CASE WHEN u IS NULL THEN NULL ELSE COALESCE((SELECT security_epoch FROM identity.account_security_hold WHERE user_id=u),0) END,t,e,p->'authorization');
  RETURN jsonb_build_object('expiresAt',e);
 END $$;
-CREATE FUNCTION identity.claim_social_flow(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.claim_social_flow(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE f identity.social_flow%ROWTYPE;BEGIN
  SELECT * INTO f FROM identity.social_flow WHERE state_hash=p->>'stateHash';
  IF f.user_id IS NOT NULL THEN PERFORM identity.lock_security_subjects(ARRAY[f.user_id]);END IF;
@@ -65,7 +65,7 @@ DECLARE f identity.social_flow%ROWTYPE;BEGIN
  UPDATE identity.social_flow SET claimed_at=clock_timestamp(),claim_id=gen_random_uuid() WHERE state_hash=f.state_hash RETURNING claim_id INTO f.claim_id;
  RETURN jsonb_build_object('claimId',f.claim_id,'nonceHash',f.nonce_hash,'purpose',f.purpose,'next',f.next_path,'expiresAt',f.expires_at);
 END $$;
-CREATE FUNCTION identity.append_social_audit_internal(p_actor uuid,p_purpose text,p_source jsonb) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.append_social_audit_internal(p_actor uuid,p_purpose text,p_source jsonb) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  IF p_purpose NOT IN ('LINK','UNLINK','SIGNUP_PROOF','INITIAL_ENROLLMENT','LOGIN_FIRST_STEP','LOGIN_COMPLETED') OR p_actor IS NULL
  OR jsonb_typeof(p_source) IS DISTINCT FROM 'object' OR p_source<>jsonb_build_object('ipArgon2id',p_source->>'ipArgon2id','userAgentArgon2id',p_source->>'userAgentArgon2id')
@@ -74,17 +74,18 @@ BEGIN
 END $$;
 ALTER TABLE identity."user" ALTER COLUMN password_hash DROP NOT NULL;
 ALTER TABLE identity.login_challenge ALTER COLUMN password_hash_snapshot DROP NOT NULL;
-ALTER TABLE identity.login_challenge ADD COLUMN first_step text NOT NULL DEFAULT 'PASSWORD',ADD COLUMN social_identity_id uuid REFERENCES identity.social_identity ON DELETE CASCADE,ADD COLUMN social_configuration text,ADD COLUMN social_cookie_hash text,ADD COLUMN social_security_epoch bigint;
+ALTER TABLE identity.login_challenge ADD COLUMN IF NOT EXISTS first_step text NOT NULL DEFAULT 'PASSWORD',ADD COLUMN IF NOT EXISTS social_identity_id uuid REFERENCES identity.social_identity ON DELETE CASCADE,ADD COLUMN IF NOT EXISTS social_configuration text,ADD COLUMN IF NOT EXISTS social_cookie_hash text,ADD COLUMN IF NOT EXISTS social_security_epoch bigint;
+ALTER TABLE identity.login_challenge DROP CONSTRAINT IF EXISTS login_first_step;
 ALTER TABLE identity.login_challenge ADD CONSTRAINT login_first_step CHECK((first_step='PASSWORD' AND password_hash_snapshot IS NOT NULL AND social_identity_id IS NULL AND social_configuration IS NULL AND social_cookie_hash IS NULL AND social_security_epoch IS NULL)
  OR (first_step='PROVIDER' AND social_identity_id IS NOT NULL AND social_configuration IS NOT NULL AND social_cookie_hash IS NOT NULL AND social_configuration ~ '^sha256:[0-9a-f]{64}$' AND social_cookie_hash ~ '^sha256:[0-9a-f]{64}$' AND social_security_epoch IS NOT NULL));
-CREATE FUNCTION identity.social_first_step_current_internal(p_id uuid,p_bindings jsonb,p_cookie text) RETURNS boolean LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.social_first_step_current_internal(p_id uuid,p_bindings jsonb,p_cookie text) RETURNS boolean LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT EXISTS(SELECT 1 FROM identity.login_challenge c JOIN identity.social_identity s USING(social_identity_id) JOIN identity."user" u ON u.user_id=c.user_id
  WHERE c.login_challenge_id=p_id AND c.first_step='PROVIDER' AND c.consumed_at IS NULL AND c.expires_at>clock_timestamp()
  AND c.social_cookie_hash=p_cookie AND s.user_id=c.user_id AND s.revoked_at IS NULL AND s.configuration=c.social_configuration AND p_bindings ? s.configuration
  AND c.password_hash_snapshot IS NOT DISTINCT FROM u.password_hash AND c.social_security_epoch=COALESCE((SELECT security_epoch FROM identity.account_security_hold WHERE user_id=c.user_id),0)
  AND NOT staff.consumer_security_affiliated(c.user_id));
 $$;
-CREATE FUNCTION identity.finish_social_callback(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.finish_social_callback(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE f identity.social_flow%ROWTYPE;s identity.social_identity%ROWTYPE;a record;u uuid;factor uuid;t timestamptz;original_subject_user uuid;BEGIN
  PERFORM identity.consume_runtime_audit_attempt();
  SELECT * INTO f FROM identity.social_flow WHERE state_hash=p->>'stateHash';
@@ -134,7 +135,7 @@ DECLARE f identity.social_flow%ROWTYPE;s identity.social_identity%ROWTYPE;a reco
  PERFORM identity.append_social_audit_internal(gen_random_uuid(),'SIGNUP_PROOF',p_source);
  RETURN jsonb_build_object('status','signup_required','next',f.next_path,'expiresAt',f.expires_at);
 END $$;
-CREATE FUNCTION identity.read_social_signup(p jsonb) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.read_social_signup(p jsonb) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT jsonb_build_object('provider',provider,'configuration',configuration,'expiresAt',expires_at) FROM identity.social_flow
  WHERE purpose='LOGIN' AND proof_hash=p->>'proofHash' AND continuation_cookie_hash=p->>'browserHash' AND binding_hash=p->>'bindingHash' AND consumed_at IS NULL AND expires_at>clock_timestamp() AND p->'admittedProviders' ? configuration;
 $$;
@@ -168,7 +169,7 @@ BEGIN
  IF p_password_hash IS NULL OR btrim(p_password_hash)='' THEN RAISE EXCEPTION 'PASSWORD_REQUIRED';END IF;
  RETURN QUERY SELECT * FROM identity.create_pending_account_base_internal(p_user_id,p_email_blind_index,p_email_ciphertext,p_recovery_email_ciphertext,p_password_hash,p_pseudonym,p_adult_affirmed_at,p_occurred_at,p_verification_token_hash,p_token_ttl_ms,p_source_context,p_phone_ciphertext,p_phone_source,p_phone_verification_status,p_phone_updated_at);
 END $$;
-CREATE FUNCTION identity.guard_social_parent() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.guard_social_parent() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  IF TG_OP='UPDATE' AND (NEW.user_id IS DISTINCT FROM OLD.user_id OR (TG_TABLE_NAME='social_identity' AND (to_jsonb(NEW)->'provider' IS DISTINCT FROM to_jsonb(OLD)->'provider' OR to_jsonb(NEW)->'issuer' IS DISTINCT FROM to_jsonb(OLD)->'issuer' OR to_jsonb(NEW)->'app_scope' IS DISTINCT FROM to_jsonb(OLD)->'app_scope' OR to_jsonb(NEW)->'subject' IS DISTINCT FROM to_jsonb(OLD)->'subject'))) THEN RAISE EXCEPTION 'SOCIAL_PARENT_IMMUTABLE';END IF;
  PERFORM identity.lock_security_subjects(ARRAY[NEW.user_id]);
@@ -177,7 +178,7 @@ BEGIN
 END $$;
 DROP TRIGGER social_identity_parent ON identity.social_identity;
 CREATE TRIGGER social_identity_parent BEFORE INSERT OR UPDATE ON identity.social_identity FOR EACH ROW EXECUTE FUNCTION identity.guard_social_parent();
-CREATE FUNCTION identity.create_social_account(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.create_social_account(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE f identity.social_flow%ROWTYPE;r record;u uuid:=(p->>'userId')::uuid;existing_user uuid;sid uuid;t timestamptz;trusted boolean;BEGIN
  SELECT * INTO f FROM identity.social_flow WHERE proof_hash=p->>'proofHash';
  SELECT user_id INTO existing_user FROM identity."user" WHERE email_blind_index=decode(p->>'emailBlindIndex','hex');
@@ -208,7 +209,7 @@ DECLARE f identity.social_flow%ROWTYPE;r record;u uuid:=(p->>'userId')::uuid;exi
  IF f.expires_at<=clock_timestamp() THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;
  RETURN jsonb_build_object('status',CASE WHEN trusted THEN 'enrollment' ELSE 'created' END,'userId',u,'channelBindingId',r.channel_binding_id,'reservationId',r.reservation_id,'verificationExpiresAt',CASE WHEN trusted THEN f.expires_at ELSE r.verification_expires_at END);
 END $$;
-CREATE FUNCTION identity.lock_consumer_enrollment_internal(p_hash text,p_social_hash text,p_cookie text,p_binding text,p_providers jsonb)
+CREATE OR REPLACE FUNCTION identity.lock_consumer_enrollment_internal(p_hash text,p_social_hash text,p_cookie text,p_binding text,p_providers jsonb)
 RETURNS TABLE(channel_binding_id uuid,user_id uuid,audit_token uuid,pseudonym text,user_state text,expires_at timestamptz,consumed_at timestamptz,is_binding_bearer boolean)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE e identity.social_enrollment%ROWTYPE;a record;BEGIN
@@ -223,7 +224,7 @@ DECLARE e identity.social_enrollment%ROWTYPE;a record;BEGIN
  OR NOT EXISTS(SELECT 1 FROM identity.channel_binding c WHERE c.channel_binding_id=e.channel_binding_id AND c.user_id=e.user_id AND c.state='verified') THEN RETURN;END IF;
  RETURN QUERY SELECT e.channel_binding_id,e.user_id,a.audit_token,a.pseudonym,a.user_state,e.expires_at,e.created_at,true;
 END $$;
-CREATE FUNCTION identity.consumer_enrollment_channel_internal(p_channel uuid,p_hash text) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.consumer_enrollment_channel_internal(p_channel uuid,p_hash text) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT EXISTS(SELECT 1 FROM identity.channel_binding c WHERE c.channel_binding_id=p_channel AND c.state='verified' AND (c.verification_consumed_at IS NOT NULL OR EXISTS(SELECT 1 FROM identity.social_enrollment e WHERE e.channel_binding_id=c.channel_binding_id AND e.token_hash=p_hash AND e.consumed_at IS NULL)));
 $$;
 DO $$DECLARE o name;f text;BEGIN
@@ -232,7 +233,7 @@ DO $$DECLARE o name;f text;BEGIN
  EXECUTE format('ALTER FUNCTION identity.%s OWNER TO %I',f,o);EXECUTE format('REVOKE ALL ON FUNCTION identity.%s FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_staff_security_owner',f);END LOOP;
 END $$;
 GRANT EXECUTE ON FUNCTION identity.create_social_account(jsonb,jsonb) TO debateai_authorization_runtime;
-CREATE FUNCTION identity.require_social_password_origin() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.require_social_password_origin() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE u uuid:=CASE WHEN TG_OP='DELETE' THEN OLD.user_id ELSE NEW.user_id END;BEGIN
  IF EXISTS(SELECT 1 FROM identity."user" WHERE user_id=u AND password_hash IS NULL) AND NOT EXISTS(SELECT 1 FROM identity.social_identity WHERE user_id=u) THEN RAISE EXCEPTION 'PASSWORD_REQUIRED';END IF;
  RETURN NULL;
@@ -242,7 +243,7 @@ CREATE CONSTRAINT TRIGGER social_password_origin_link AFTER DELETE ON identity.s
 DO $$DECLARE o name;BEGIN SELECT pg_get_userbyid(proowner) INTO o FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure;EXECUTE format('ALTER FUNCTION identity.require_social_password_origin() OWNER TO %I',o);END $$;
 REVOKE ALL ON FUNCTION identity.require_social_password_origin() FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_staff_security_owner;
 
-ALTER TABLE identity.consumer_passkey_challenge ADD COLUMN social_enrollment_hash text;
+ALTER TABLE identity.consumer_passkey_challenge ADD COLUMN IF NOT EXISTS social_enrollment_hash text;
 
 -- Explicit current-consumer inventory; historical email-only authority stays
 -- closed. Each edit asserts the exact old expression once and preserves OID/ACL.
@@ -263,12 +264,12 @@ DO $$DECLARE f text;d text;old text;replacement text;n integer;BEGIN
 END $$;
 -- Activation consumes every initial-provider capability on that account. The
 -- existing email refresh remains the fail-safe resumable pending-account path.
-CREATE FUNCTION identity.consume_social_enrollment_on_activation() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.consume_social_enrollment_on_activation() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN IF NEW.state='active' AND OLD.state<>'active' THEN UPDATE identity.social_enrollment SET consumed_at=clock_timestamp() WHERE user_id=NEW.user_id AND consumed_at IS NULL;END IF;RETURN NEW;END $$;
 CREATE TRIGGER social_enrollment_activation AFTER UPDATE OF state ON identity."user" FOR EACH ROW EXECUTE FUNCTION identity.consume_social_enrollment_on_activation();
 DO $$DECLARE o name;BEGIN SELECT pg_get_userbyid(proowner) INTO o FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure;EXECUTE format('ALTER FUNCTION identity.consume_social_enrollment_on_activation() OWNER TO %I',o);END $$;
 REVOKE ALL ON FUNCTION identity.consume_social_enrollment_on_activation() FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_staff_security_owner;
-CREATE FUNCTION identity.login_first_step_current_internal(p_id uuid,p_bindings jsonb,p_cookie text) RETURNS boolean LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.login_first_step_current_internal(p_id uuid,p_bindings jsonb,p_cookie text) RETURNS boolean LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT EXISTS(SELECT 1 FROM identity.login_challenge c JOIN identity."user" u USING(user_id) WHERE c.login_challenge_id=p_id AND c.first_step='PASSWORD' AND c.password_hash_snapshot IS NOT NULL AND c.password_hash_snapshot=u.password_hash)
  OR identity.social_first_step_current_internal(p_id,p_bindings,p_cookie);
 $$;
@@ -283,7 +284,7 @@ CREATE OR REPLACE FUNCTION identity.read_secure_login_challenge(p_hash text) RET
  AND NOT COALESCE((SELECT held FROM identity.account_security_hold WHERE user_id=u.user_id),false) AND NOT EXISTS(SELECT 1 FROM identity.consumer_recovery_gate WHERE user_id=u.user_id AND active)
  AND identity.login_method_current_internal(u.user_id,c.mfa_factor_id);
 $$;
-CREATE FUNCTION identity.complete_social_login(p jsonb,p_source jsonb) RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.complete_social_login(p jsonb,p_source jsonb) RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c identity.login_challenge%ROWTYPE;a record;f identity.mfa_factor%ROWTYPE;r identity.recovery_code%ROWTYPE;u uuid:=(p->>'userId')::uuid;step bigint:=(p->>'acceptedStep')::bigint;t timestamptz;BEGIN
  PERFORM identity.consume_runtime_audit_attempt();SELECT * INTO a FROM identity.lock_account_t9_internal(u,true);
  SELECT * INTO f FROM identity.mfa_factor WHERE mfa_factor_id=(p->>'factorId')::uuid AND user_id=u FOR UPDATE;
@@ -320,12 +321,12 @@ DO $$DECLARE f text;d text;old text;n integer;BEGIN
  old:='UPDATE identity.consumer_recovery_gate SET active=false';IF position(old IN d)=0 THEN RAISE EXCEPTION 'SOCIAL_RECOVERY_SOURCE_DRIFT';END IF;
  d:=replace(d,old,'UPDATE identity.social_identity SET revoked_at=clock_timestamp() WHERE user_id=g.user_id AND revoked_at IS NULL; UPDATE identity.login_challenge SET consumed_at=clock_timestamp() WHERE user_id=g.user_id AND first_step=''PROVIDER'' AND consumed_at IS NULL; DELETE FROM identity.social_enrollment WHERE user_id=g.user_id; UPDATE identity.social_flow SET consumed_at=clock_timestamp() WHERE user_id=g.user_id AND consumed_at IS NULL; '||old);EXECUTE d;
 END $$;
-CREATE FUNCTION identity.consumer_social_path_internal(p_user uuid,p_exclude_factor uuid,p_exclude_provider text,p_password text,p_usable boolean,p_bindings jsonb) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.consumer_social_path_internal(p_user uuid,p_exclude_factor uuid,p_exclude_provider text,p_password text,p_usable boolean,p_bindings jsonb) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT identity.consumer_viable_path_internal(p_user,p_exclude_factor,p_password,p_usable)
  OR (EXISTS(SELECT 1 FROM identity.social_identity WHERE user_id=p_user AND revoked_at IS NULL AND provider IS DISTINCT FROM p_exclude_provider AND p_bindings ? configuration)
  AND EXISTS(SELECT 1 FROM identity.mfa_factor WHERE user_id=p_user AND mfa_factor_id IS DISTINCT FROM p_exclude_factor AND factor_type='totp' AND state='active' AND verified_at IS NOT NULL));
 $$;
-CREATE FUNCTION identity.consumer_social_method_removable_internal(p_user uuid,p_factor uuid,p_password text,p_usable boolean,p_bindings jsonb) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.consumer_social_method_removable_internal(p_user uuid,p_factor uuid,p_password text,p_usable boolean,p_bindings jsonb) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT CASE WHEN staff.consumer_security_affiliated(p_user) THEN identity.consumer_method_removable_internal(p_user,p_factor,p_password,p_usable)
  ELSE identity.consumer_social_path_internal(p_user,p_factor,NULL,p_password,p_usable,p_bindings) END;
 $$;
@@ -340,12 +341,12 @@ DO $$DECLARE f text;d text;old text;n integer;BEGIN
  d:=replace(d,old,replace(left(old,length(old)-1),'identity.consumer_method_removable_internal','identity.consumer_social_method_removable_internal')||',p_input->''admittedProviders'')');END IF;EXECUTE d;
  END LOOP;
 END $$;
-CREATE FUNCTION identity.read_social_links(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.read_social_links(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE u uuid:=(p->>'userId')::uuid;BEGIN
  IF identity.assert_session_current(u,(p->>'sessionId')::uuid,p->>'tokenHash') IS DISTINCT FROM true THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;
  RETURN jsonb_build_object('providers',COALESCE((SELECT jsonb_agg(jsonb_build_object('provider',s.provider,'linked_at',s.created_at,'removable',identity.consumer_social_path_internal(u,NULL,s.provider,p->>'passwordHashSnapshot',(p->>'passwordUsable')::boolean,p->'admittedProviders')) ORDER BY s.provider) FROM identity.social_identity s WHERE s.user_id=u AND s.revoked_at IS NULL),'[]'::jsonb));
 END $$;
-CREATE FUNCTION identity.unlink_social_identity(p jsonb,p_source jsonb) RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.unlink_social_identity(p jsonb,p_source jsonb) RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE u uuid:=(p->>'userId')::uuid;a uuid;BEGIN
  PERFORM identity.consume_runtime_audit_attempt();a:=identity.consume_consumer_security_grant_internal(p,'UNLINK_PROVIDER',NULL,p->>'provider');
  PERFORM 1 FROM identity.consumer_passkey_credential WHERE user_id=u ORDER BY consumer_credential_id FOR UPDATE;
@@ -364,8 +365,8 @@ DO $$DECLARE o name;f text;BEGIN
  EXECUTE format('ALTER FUNCTION identity.%s OWNER TO %I',f,o);EXECUTE format('REVOKE ALL ON FUNCTION identity.%s FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_staff_security_owner',f);END LOOP;
 END $$;
 GRANT EXECUTE ON FUNCTION identity.complete_social_login(jsonb,jsonb),identity.read_social_links(jsonb),identity.unlink_social_identity(jsonb,jsonb) TO debateai_authorization_runtime;
-CREATE UNIQUE INDEX social_one_active_provider_per_account ON identity.social_identity(user_id,provider) WHERE revoked_at IS NULL;
-CREATE UNIQUE INDEX social_one_initial_enrollment_per_account ON identity.social_enrollment(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS social_one_active_provider_per_account ON identity.social_identity(user_id,provider) WHERE revoked_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS social_one_initial_enrollment_per_account ON identity.social_enrollment(user_id);
 CREATE OR REPLACE FUNCTION identity.onboarding_subject_internal(p jsonb) RETURNS uuid LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE b record;g identity.consumer_recovery_gate%ROWTYPE;BEGIN
  IF p->>'kind'='RECOVERY' THEN g:=identity.recovery_cap_internal(p->>'proofHash');RETURN g.user_id;END IF;
@@ -376,7 +377,7 @@ DECLARE b record;g identity.consumer_recovery_gate%ROWTYPE;BEGIN
  OR EXISTS(SELECT 1 FROM identity.account_erasure_request WHERE user_id=b.user_id AND cancelled_at IS NULL)
  OR identity.consumer_enrollment_channel_internal(b.channel_binding_id,p->>'socialEnrollmentHash') IS DISTINCT FROM true THEN RAISE EXCEPTION 'ONBOARDING_AUTHORITY_INVALID';END IF;RETURN b.user_id;
 END $$;
-CREATE FUNCTION identity.cancel_social_before_erasure() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.cancel_social_before_erasure() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN IF NEW.prepared_at IS NOT NULL AND OLD.prepared_at IS NULL THEN
  PERFORM identity.lock_security_subjects(ARRAY[NEW.user_id]);DELETE FROM identity.social_flow WHERE user_id=NEW.user_id;DELETE FROM identity.social_enrollment WHERE user_id=NEW.user_id;
  END IF;RETURN NEW;END $$;
@@ -384,7 +385,7 @@ CREATE TRIGGER social_erasure_cancel BEFORE UPDATE OF prepared_at ON identity.ac
 DO $$DECLARE o name;BEGIN SELECT pg_get_userbyid(proowner) INTO o FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure;EXECUTE format('ALTER FUNCTION identity.cancel_social_before_erasure() OWNER TO %I',o);END $$;
 REVOKE ALL ON FUNCTION identity.cancel_social_before_erasure() FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_staff_security_owner;
 
-CREATE FUNCTION identity.read_social_step_up(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.read_social_step_up(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE f identity.social_flow%ROWTYPE;t identity.mfa_factor%ROWTYPE;k identity.consumer_passkey_credential%ROWTYPE;r identity.recovery_code%ROWTYPE;u uuid:=(p->>'userId')::uuid;BEGIN
  IF identity.assert_session_current(u,(p->>'sessionId')::uuid,p->>'tokenHash') IS DISTINCT FROM true OR staff.consumer_security_affiliated(u) THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;
  SELECT * INTO f FROM identity.social_flow WHERE proof_hash=p->>'proofHash' AND user_id=u FOR UPDATE;
@@ -399,13 +400,13 @@ DECLARE f identity.social_flow%ROWTYPE;t identity.mfa_factor%ROWTYPE;k identity.
  'challengeHash',f.passkey_challenge_hash,'handleHash',f.passkey_handle_hash,'rpId',f.rp_id,'origin',f.origin,'credentialId',k.credential_id,'publicKey',k.public_key,'counter',k.signature_counter,'deviceType',k.device_type,'backedUp',k.backed_up,'userHandle',(SELECT user_handle FROM identity.consumer_passkey_subject WHERE user_id=u),
  'recoveryCodeId',r.recovery_code_id,'codeHash',r.code_hash,'codeSlot',r.code_slot,'availableMethods',array_remove(ARRAY[CASE WHEN t.mfa_factor_id IS NOT NULL THEN 'totp' END,CASE WHEN EXISTS(SELECT 1 FROM identity.consumer_passkey_credential WHERE user_id=u AND revoked_at IS NULL) THEN 'passkey' END,CASE WHEN EXISTS(SELECT 1 FROM identity.recovery_code WHERE user_id=u AND consumed_at IS NULL AND revoked_at IS NULL) THEN 'recovery_code' END],NULL));
 END $$;
-CREATE FUNCTION identity.begin_social_step_up_passkey(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.begin_social_step_up_passkey(p jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE r jsonb;BEGIN
  r:=identity.read_social_step_up(p);
  UPDATE identity.social_flow SET passkey_handle_hash=p->>'handleHash',passkey_challenge_hash=p->>'challengeHash',rp_id=p->>'rpId',origin=p->>'origin' WHERE proof_hash=p->>'proofHash';
  RETURN jsonb_build_object('expiresAt',r->>'expiresAt');
 END $$;
-CREATE FUNCTION identity.complete_social_step_up(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.complete_social_step_up(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE r jsonb;t timestamptz;u uuid:=(p->>'userId')::uuid;counter bigint:=(p->>'counter')::bigint;step bigint:=(p->>'acceptedStep')::bigint;BEGIN
  PERFORM identity.consume_runtime_audit_attempt();r:=identity.read_social_step_up(p);t:=clock_timestamp();
  IF p->>'method'='totp' THEN

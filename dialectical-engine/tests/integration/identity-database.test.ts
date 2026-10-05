@@ -53,10 +53,17 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "account_erasure_notification_outbox", "account_erasure_request",
       "account_recovery_binding", "account_recovery_request",
       "account_recovery_state_event", "account_security_hold", "age_check", "audit_event", "authentication_risk_signal",
-      "channel_binding", "email_change_request", "login_challenge", "mfa_factor", "private_erasure_audit_binding",
+      "channel_binding",
+      "consumer_passkey_challenge", "consumer_passkey_credential", "consumer_passkey_subject",
+      "consumer_recovery_enrollment", "consumer_recovery_gate", "consumer_recovery_reservation", "consumer_recovery_token",
+      "consumer_security_challenge", "consumer_security_notice", "consumer_totp_enrollment",
+      "email_change_request", "login_challenge", "mfa_factor",
+      "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
+      "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
+      "private_erasure_audit_binding",
       "publication_event_binding", "recovery_code", "recovery_email_request", "run_execution_binding", "runtime_audit_attempt",
-      "sensitive_data_consent", "session", "staff_webauthn_metadata", "step_up_grant", "user",
-      "verification_token_credential"
+      "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "user",
+      "verification_delivery_reservation", "verification_token_credential"
     ]);
 
     const columns = await database.pool.query<{ table_name: string; column_name: string; data_type: string }>(`

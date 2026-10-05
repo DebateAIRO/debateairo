@@ -98,13 +98,14 @@ describe("V-14 the password maximum length is register policy", () => {
     expect(deploymentRow("passwordPolicy").sourceRef)
       .toContain(sealedRow("passwordPolicy").sourceRef);
     expect(deploymentRow("passwordPolicy").sourceRef).toMatch(/V-14/);
+    expect(deploymentRow("verificationPolicy").value).toMatchObject({resend_cooldown_ms:60000,outbound_send_enforcement:{mechanism:"atomic_rolling_reservation_ledger",decision_version:2,minimum_spacing_ms:60000}});
     // Every row the deployment set does not supersede is republished
     // byte-for-byte. Two rows are superseded: this one, and `rateLimitPolicy`
     // under V-25, whose own addition is checked just below.
     expect(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.map((row) => row.rowKey))
       .toEqual(AUTH_POLICY_REGISTER_ROWS.map((row) => row.rowKey));
     for (const row of AUTH_POLICY_REGISTER_ROWS) {
-      if (row.rowKey === "passwordPolicy" || row.rowKey === "rateLimitPolicy") continue;
+      if (row.rowKey === "passwordPolicy" || row.rowKey === "rateLimitPolicy" || row.rowKey === "verificationPolicy") continue;
       expect(deploymentRow(row.rowKey).value).toEqual(row.value);
       expect(deploymentRow(row.rowKey).sourceRef).toBe(row.sourceRef);
     }

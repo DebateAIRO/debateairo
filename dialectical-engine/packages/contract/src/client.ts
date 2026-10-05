@@ -263,13 +263,15 @@ export type ContractClientAuth = Readonly<{
 
 function browserCsrfToken(): string | null {
   if (typeof document === "undefined") return null;
-  const values = document.cookie.split(";").flatMap((member) => {
+  const raw = document.cookie;
+  if (/[\r\n\0]/.test(raw)) return null;
+  const values = raw.split(";").flatMap((member) => {
     const index = member.indexOf("=");
     if (index < 1 || member.slice(0, index).trim() !== "__Host-debateai-csrf") return [];
     const value = member.slice(index + 1).trim();
-    return /^[A-Za-z0-9_-]{43}$/.test(value) ? [value] : [];
+    return [value];
   });
-  return values.length === 1 ? values[0]! : null;
+  return values.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(values[0]!) ? values[0]! : null;
 }
 
 const RECOVERY_START_PUBLIC_MESSAGE =

@@ -158,7 +158,7 @@ function relayStateLabel(
   return key === undefined ? relayState : t(catalog,key);
 }
 
-const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help"]);
+const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help","/recover"]);
 const PUBLIC_DEBATE = /^\/public\/debate\/[A-Za-z0-9_-]+$/u;
 /** The API's case-capability grammar (`apps/api/src/support/session.ts`). */
 const CASE_BEARER = /^[A-Za-z0-9_-]{43}$/u;
@@ -673,8 +673,8 @@ export function Assistant({
                 {actions.map((action) => <a href={action.href} key={action.id}>{action.label}</a>)}
               </nav>}
               {link === null ? null : <>
-                <span>{generated ? "AI · " : ""}{t(chromeCatalog,"support.docsProductGuide")}</span>
-                <a href={link}>{t(chromeCatalog,"support.viewSource")} →</a>
+                {link === "/recover" ? null : <span>{generated ? "AI · " : ""}{t(chromeCatalog,"support.docsProductGuide")}</span>}
+                <a href={link}>{t(chromeCatalog,link === "/recover" ? "support.recoverAccount" : "support.viewSource")} →</a>
               </>}
             </footer>}
           </div>

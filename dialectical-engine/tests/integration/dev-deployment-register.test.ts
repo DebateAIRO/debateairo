@@ -158,6 +158,7 @@ describe("DEV-05 complete development deployment register", () => {
       adminPool: database.pool, providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot, roleRefs
     });
+    expect((await readMfaPolicy(database.pool,registerVersionToSafeLegacyNumber(parseRegisterVersionText(first.registerVersion)))).issuer).toBe("Dialectical Engine");
     const before = await database.pool.query(
       "SELECT row_key, value_json, source_ref FROM register.register_row WHERE register_version=$1 AND row_key IN ('synthesizerRoleRef','evaluatorRoleRef') ORDER BY row_key",
       [first.registerVersion]

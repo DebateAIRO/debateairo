@@ -20,7 +20,8 @@ import {
   type UserDekStore
 } from "@debateai/crypto";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
-import { LocaleCodeSchema, type RegisterLegalDocuments } from "@debateai/contract";
+import type { RegisterLegalDocuments } from "@debateai/contract";
+import { LocaleCodeSchema } from "@debateai/contract/locale";
 import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";

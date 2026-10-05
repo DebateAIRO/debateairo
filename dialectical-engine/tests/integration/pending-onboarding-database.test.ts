@@ -51,6 +51,7 @@ describe('pending onboarding independent email-proof authority', () => {
     it('rechecks email proof expiry after a real account-lock wait', async () => {
         const a = await account(), blocker = await db.pool.connect();
         let pending: Promise<unknown> | undefined;
+        let blockerCommitted=false;
         try {
             await blocker.query('BEGIN');
             await blocker.query('SELECT identity.lock_security_subjects(ARRAY[$1::uuid])', [a.user]);
@@ -66,11 +67,11 @@ describe('pending onboarding independent email-proof authority', () => {
             }
             expect(blocked).toBe(true);
             await blocker.query("UPDATE identity.verification_token_credential SET expires_at=clock_timestamp()-interval '1 millisecond' WHERE token_hash=$1", [a.tokenHash]);
-            await blocker.query('COMMIT');
+            await blocker.query('COMMIT');blockerCommitted=true;
             await refused;
         }
         finally {
-            await blocker.query('ROLLBACK');
+            if(!blockerCommitted)await blocker.query('ROLLBACK');
             blocker.release();
             await pending?.catch(() => { });
         }

@@ -81,5 +81,6 @@
   "support.answerRating": "Vastauksen arviointi",
   "support.privacyPreferences": "Tietosuoja-asetukset",
   "support.aiBanner": "Vastaukset ovat tekoälyn tuottamia ja koneellisesti luettavasti merkittyjä, ja ne voivat olla vääriä. Voit pyytää ihmistä mukaan milloin tahansa.",
-  "support.cookiePreferences": "Evästeasetukset"
+  "support.cookiePreferences": "Evästeasetukset",
+  "support.recoverAccount": "Palauta tilisi"
 }

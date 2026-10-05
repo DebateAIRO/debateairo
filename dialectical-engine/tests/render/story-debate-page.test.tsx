@@ -42,6 +42,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     COOKIE_SESSION_MARKER: "cookie-session",
     validateSession: vi.fn().mockResolvedValue(undefined),
     contractClient: {
+      readSession: vi.fn(async()=>({asker_id:"owner:33333333-3333-4333-8333-333333333333",session_id:"22222222-2222-4222-8222-222222222222",caller_scope:"ASKER",ownership_provenance:"server_session",provisional_identity_model:false})),
       readAnswerStory: mocks.readAnswerStory,
       streamEvents: mocks.streamEvents,
       readEvents: mocks.readEvents,

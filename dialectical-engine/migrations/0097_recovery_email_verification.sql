@@ -1,5 +1,5 @@
 -- Purpose-bound self-service profile capabilities. No phone delivery authority.
-ALTER TABLE identity.step_up_grant DROP CONSTRAINT step_up_grant_action_check;
+ALTER TABLE identity.step_up_grant DROP CONSTRAINT IF EXISTS step_up_grant_action_check;
 ALTER TABLE identity.step_up_grant ADD CONSTRAINT step_up_grant_action_check CHECK (
  (action IN ('PUBLISH','UNPUBLISH','DELETE_PRIVATE_DEBATE') AND target_run_id IS NOT NULL AND target_account_id IS NULL)
  OR (action IN ('DELETE_ACCOUNT','CHANGE_EMAIL','READ_PHONE_PROFILE','CHANGE_PHONE_PROFILE','CHANGE_RECOVERY_EMAIL') AND target_run_id IS NULL AND target_account_id=user_id));
@@ -104,7 +104,7 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE identity.recovery_email_request (
+CREATE TABLE IF NOT EXISTS identity.recovery_email_request (
  recovery_email_request_id uuid PRIMARY KEY,
  user_id uuid NOT NULL REFERENCES identity."user"(user_id) ON DELETE CASCADE,
  candidate_blind_index bytea NOT NULL CHECK(octet_length(candidate_blind_index)=32),
@@ -116,11 +116,11 @@ CREATE TABLE identity.recovery_email_request (
  outcome text CHECK(outcome IN ('CONFIRMED','SUPERSEDED','REMOVED','EXPIRED','INVALID')),
  CHECK((closed_at IS NULL)=(outcome IS NULL))
 );
-CREATE UNIQUE INDEX recovery_email_one_open ON identity.recovery_email_request(user_id) WHERE closed_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS recovery_email_one_open ON identity.recovery_email_request(user_id) WHERE closed_at IS NULL;
 REVOKE ALL ON identity.recovery_email_request FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,debateai_erasure_runtime,debateai_staff_security_owner;
 SELECT core.install_truncate_guard('identity.recovery_email_request');
 
-CREATE FUNCTION identity.append_profile_audit_internal(p_actor uuid,p_purpose text,p_source jsonb,p_success boolean) RETURNS void
+CREATE OR REPLACE FUNCTION identity.append_profile_audit_internal(p_actor uuid,p_purpose text,p_source jsonb,p_success boolean) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  IF p_purpose NOT IN ('READ_PHONE_PROFILE','CHANGE_PHONE_PROFILE','REQUEST_RECOVERY_EMAIL','CONFIRM_RECOVERY_EMAIL','REMOVE_RECOVERY_EMAIL')
@@ -135,7 +135,7 @@ BEGIN
   CASE WHEN p_success THEN NULL ELSE 'PROFILE_AUTHORITY_INVALID' END);
 END $$;
 
-CREATE FUNCTION identity.consume_profile_grant_internal(p_user uuid,p_session uuid,p_token text,p_grant text,p_action text) RETURNS uuid
+CREATE OR REPLACE FUNCTION identity.consume_profile_grant_internal(p_user uuid,p_session uuid,p_token text,p_grant text,p_action text) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_id uuid;v_now timestamptz;
 BEGIN
@@ -151,7 +151,7 @@ BEGIN
  RETURN (SELECT audit_token FROM identity."user" WHERE user_id=p_user);
 END $$;
 
-CREATE FUNCTION identity.read_phone_profile(p_user uuid,p_session uuid,p_token text)
+CREATE OR REPLACE FUNCTION identity.read_phone_profile(p_user uuid,p_session uuid,p_token text)
 RETURNS TABLE(phone_ciphertext jsonb,phone_updated_at timestamptz)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
@@ -159,12 +159,12 @@ BEGIN
  IF identity.assert_session_current(p_user,p_session,p_token) IS DISTINCT FROM true THEN RETURN;END IF;
  RETURN QUERY SELECT u.phone_ciphertext,u.phone_updated_at FROM identity."user" u WHERE u.user_id=p_user;
 END $$;
-CREATE FUNCTION identity.has_phone_profile(p_owner uuid) RETURNS boolean
+CREATE OR REPLACE FUNCTION identity.has_phone_profile(p_owner uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT EXISTS(SELECT 1 FROM identity."user" u WHERE u.owner_ref=p_owner AND u.state='active' AND u.phone_ciphertext IS NOT NULL
  AND NOT EXISTS(SELECT 1 FROM identity.account_security_hold h WHERE h.user_id=u.user_id AND h.held));
 $$;
-CREATE FUNCTION identity.use_phone_profile_with_audit(p_user uuid,p_session uuid,p_token text,p_action text,p_grant text,p_cipher jsonb,p_source jsonb)
+CREATE OR REPLACE FUNCTION identity.use_phone_profile_with_audit(p_user uuid,p_session uuid,p_token text,p_action text,p_grant text,p_cipher jsonb,p_source jsonb)
 RETURNS TABLE(phone_ciphertext jsonb,phone_updated_at timestamptz)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_actor uuid;
@@ -180,7 +180,7 @@ BEGIN
  RETURN QUERY SELECT u.phone_ciphertext,u.phone_updated_at FROM identity."user" u WHERE u.user_id=p_user;
 END $$;
 
-CREATE FUNCTION identity.read_recovery_email(p_user uuid,p_session uuid,p_token text)
+CREATE OR REPLACE FUNCTION identity.read_recovery_email(p_user uuid,p_session uuid,p_token text)
 RETURNS TABLE(ciphertext jsonb,pending_ciphertext jsonb,expires_at timestamptz)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
@@ -189,7 +189,7 @@ BEGIN
  RETURN QUERY SELECT (SELECT c.address_ciphertext FROM identity.channel_binding c WHERE c.user_id=p_user AND c.channel_type='recovery_email' AND c.state='verified'),
  q.candidate_ciphertext,q.expires_at FROM identity."user" u LEFT JOIN identity.recovery_email_request q ON q.user_id=u.user_id AND q.closed_at IS NULL AND q.expires_at>clock_timestamp() WHERE u.user_id=p_user;
 END $$;
-CREATE FUNCTION identity.request_recovery_email_with_audit(p_user uuid,p_session uuid,p_token text,p_grant text,p_id uuid,p_index bytea,p_cipher jsonb,p_hash text,p_expires timestamptz,p_source jsonb) RETURNS text
+CREATE OR REPLACE FUNCTION identity.request_recovery_email_with_audit(p_user uuid,p_session uuid,p_token text,p_grant text,p_id uuid,p_index bytea,p_cipher jsonb,p_hash text,p_expires timestamptz,p_source jsonb) RETURNS text
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_actor uuid;v_now timestamptz;
 BEGIN
@@ -204,7 +204,7 @@ BEGIN
  INSERT INTO identity.recovery_email_request VALUES(p_id,p_user,p_index,p_cipher,p_hash,v_now,p_expires,NULL,NULL);
  PERFORM identity.append_profile_audit_internal(v_actor,'REQUEST_RECOVERY_EMAIL',p_source,true);RETURN 'PENDING';
 END $$;
-CREATE FUNCTION identity.confirm_recovery_email_with_audit(p_hash text,p_source jsonb) RETURNS text
+CREATE OR REPLACE FUNCTION identity.confirm_recovery_email_with_audit(p_hash text,p_source jsonb) RETURNS text
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_user uuid;v_actor uuid;q identity.recovery_email_request%ROWTYPE;v_now timestamptz;
 BEGIN
@@ -233,7 +233,7 @@ BEGIN
  UPDATE identity.recovery_email_request SET closed_at=v_now,outcome='CONFIRMED' WHERE recovery_email_request_id=q.recovery_email_request_id;
  PERFORM identity.append_profile_audit_internal(v_actor,'CONFIRM_RECOVERY_EMAIL',p_source,true);RETURN 'CONFIRMED';
 END $$;
-CREATE FUNCTION identity.remove_recovery_email_with_audit(p_user uuid,p_session uuid,p_token text,p_grant text,p_source jsonb) RETURNS boolean
+CREATE OR REPLACE FUNCTION identity.remove_recovery_email_with_audit(p_user uuid,p_session uuid,p_token text,p_grant text,p_source jsonb) RETURNS boolean
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_actor uuid;v_now timestamptz;
 BEGIN

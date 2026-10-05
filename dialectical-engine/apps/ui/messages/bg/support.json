@@ -81,5 +81,6 @@
   "support.answerRating": "Оценка на отговора",
   "support.privacyPreferences": "Предпочитания за поверителност",
   "support.aiBanner": "Отговорите са генерирани от ИИ, обозначени са в машинночетим вид и може да са погрешни. По всяко време можете да поискате разговор с човек.",
-  "support.cookiePreferences": "Предпочитания за бисквитките"
+  "support.cookiePreferences": "Предпочитания за бисквитките",
+  "support.recoverAccount": "Възстановете акаунта си"
 }

@@ -81,5 +81,6 @@
   "support.answerRating": "回答评分",
   "support.privacyPreferences": "隐私偏好设置",
   "support.aiBanner": "回复由 AI 生成，带有机器可读标记，并且可能有误。您可以随时要求人工协助。",
-  "support.cookiePreferences": "Cookie 偏好设置"
+  "support.cookiePreferences": "Cookie 偏好设置",
+  "support.recoverAccount": "恢复账户"
 }

@@ -178,7 +178,7 @@ describe("T9-C2 chrome labels & CTAs", () => {
     }
 
     const wordmark = [...chrome!.querySelectorAll<HTMLAnchorElement>("a")]
-      .find((candidate) => candidate.textContent?.trim() === "DebateAI");
+      .find((candidate) => candidate.textContent?.trim() === "Dialectical Engine");
     expect(wordmark).toBeDefined();
     expect(wordmark?.style.fontFamily).toBe("var(--font-display)");
   });
@@ -209,7 +209,7 @@ describe("T9-C2 chrome labels & CTAs", () => {
       const link = chrome!.querySelector<HTMLAnchorElement>(`a[href="${href}"]`);
       expect(link, `missing stub ${href}`).not.toBeNull();
       expect(() => link!.click()).not.toThrow();
-      expect(chrome!.textContent).toContain("DebateAI");
+      expect(chrome!.textContent).toContain("Dialectical Engine");
       expect(document.querySelector("[data-nextjs-error-boundary]")).toBeNull();
     }
 

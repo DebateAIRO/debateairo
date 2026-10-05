@@ -1,3 +1,7 @@
+import { currentDocument, legalManifestLocales } from "@debateai/legal-manifest";
+import { SessionService } from "../../apps/api/src/sessions.js";
+import { ConsumerSecurityService } from "../../apps/api/src/consumer-security.js";
+import { SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue } from "@debateai/register";
 import { canonicalSignup, canonicalResend, passedTurnstile } from "../support/turnstileFixtures.js";
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -13,7 +17,7 @@ import { setFlagsFromString, writeHeapSnapshot } from "node:v8";
 import { Worker } from "node:worker_threads";
 import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { PoolClient } from "pg";
-import { createPool, migrate, PostgresIdentityRepository } from "@debateai/db";
+import { createPool, migrate, PostgresConsumerAuthRepository, PostgresConsumerSecurityRepository, PostgresSessionRepository, PostgresIdentityRepository } from "@debateai/db";
 import {
   createEmailBlindIndex,
   decodeBase32,
@@ -359,6 +363,7 @@ function limiterMemoryOccupancy(limiter: InProcessAuthRateLimiter): Readonly<{
 }
 
 function buildService(input: {
+  readonly legalAcceptance?: boolean;
   readonly mail?: MailSender;
   readonly policy?: AuthPolicy;
   readonly initialNow?: Date;
@@ -376,6 +381,13 @@ function buildService(input: {
     database.pool,
     new AuditContextHasher(sharedArgon2Pool(), sourceIpSalt, policy.auditSourceIpKdf)
   );
+  const channels = new Set<string>();
+  const createPending = repository.createPendingAccount.bind(repository);
+  repository.createPendingAccount = async (...args) => {
+    const result = await createPending(...args);
+    if (result.status === "created") channels.add(result.channelBindingId);
+    return result;
+  };
   const limiter = new InProcessAuthRateLimiter(
     policy.rateLimits,
     policy.rateLimitBucketCapacity,
@@ -384,6 +396,7 @@ function buildService(input: {
   );
   const service = new RegistrationService({
     repository,
+    ...(input.legalAcceptance ? { legalAcceptance: { recordsKey: Buffer.alloc(32, 23) } } : {}),
     mail,
     dekStore: input.dekStore ?? new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
     blindIndexKey,
@@ -398,7 +411,16 @@ function buildService(input: {
   });
   return {
     service, repository, limiter, mail,
-    advance(milliseconds: number) { now = new Date(now.getTime() + milliseconds); }
+    async advance(milliseconds: number) {
+      now = new Date(now.getTime() + milliseconds);
+      // Age only this fixture's stored authority. App clocks remain independent audit/limiter inputs.
+      // PostgreSQL still samples its real post-lock clock for every issuance/consume decision.
+      for (const channel of channels) {
+        await database.pool.query("UPDATE identity.verification_delivery_reservation SET reserved_at=reserved_at-$2*interval '1 millisecond' WHERE channel_binding_id=$1", [channel,milliseconds]);
+        await database.pool.query("UPDATE identity.verification_token_credential SET issued_at=issued_at-$2*interval '1 millisecond',expires_at=expires_at-$2*interval '1 millisecond' WHERE channel_binding_id=$1", [channel,milliseconds]);
+        await database.pool.query("UPDATE identity.channel_binding SET verification_expires_at=verification_expires_at-$2*interval '1 millisecond',verification_last_sent_at=(SELECT max(reserved_at) FROM identity.verification_delivery_reservation r WHERE r.channel_binding_id=identity.channel_binding.channel_binding_id) WHERE channel_binding_id=$1", [channel,milliseconds]);
+      }
+    }
   };
 }
 
@@ -426,7 +448,8 @@ function completedPasswordHashArgon2(): Argon2Executor {
 }
 
 const source = Object.freeze({
-  ip: "192.0.2.40", userAgent: "vitest-registration", requestId: "request:s3"
+  ip: "192.0.2.40", userAgent: "vitest-registration", requestId: "request:s3", countryCode: "RO",
+  legal: {locale:"en",terms:currentDocument("TERMS","en")!,privacy:currentDocument("PRIVACY","en")!}
 });
 
 async function registerAccount(
@@ -452,6 +475,22 @@ async function registerAccount(
     FROM identity."user" WHERE email_blind_index=$1
   `, [index]);
   return { email, password, recoveryEmail, response, index, user: row.rows[0]! };
+}
+
+const enrollmentOrigin = "https://app.example.test";
+const enrollmentHeaders = { origin: enrollmentOrigin, "user-agent": source.userAgent };
+async function currentMfa(flow: ReturnType<typeof buildService>, passwordHash: string, clock: () => Date) {
+  const audit = new AuditContextHasher(sharedArgon2Pool(),sourceIpSalt,basePolicy.auditSourceIpKdf);
+  const dekStore = new FileUserDekStore(secretRoot,loadKek(Buffer.alloc(32,0x7d)));
+  const mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value);
+  const sessions = await SessionService.create({repository:new PostgresSessionRepository(database.pool,audit),
+    riskSignals:{recordForSession:async()=>null} as never,onRiskSignalFailure:()=>{},dekStore,argon2:sharedArgon2Pool(),
+    authPolicy:basePolicy,mfaPolicy,sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value,SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),
+    blindIndexKey,dummyPasswordHash:passwordHash,clock});
+  const consumerRepository = new PostgresConsumerAuthRepository(database.pool,audit);
+  const mfa = new MfaEnrollmentService({repository:flow.repository,consumerRepository,sessions:sessions.consumerProducer(),dekStore,argon2:sharedArgon2Pool(),policy:mfaPolicy,clock});
+  const security = new ConsumerSecurityService(new PostgresConsumerSecurityRepository(database.pool,audit),sessions.consumerProducer(),{publicAppUrl:enrollmentOrigin,argon2:sharedArgon2Pool(),mfaPolicy,authPolicy:basePolicy});
+  return {mfa,sessions,security,consumerRepository};
 }
 
 function fixtureAskApplication(): AskApplication {
@@ -849,6 +888,7 @@ const refuseWave = async (offset, count) => {
       await service.register({
         email: address("refusal", offset + index),
         password: "correct horse battery staple",
+        phone: "+40722123456",
         recoveryEmail: address("refusal-recovery", offset + index),
         adultAffirmed: true
       }, {
@@ -1258,150 +1298,49 @@ setTimeout(() => undefined, 500);
   });
 
   it("S4 enrols TOTP, persists no plaintext seed/codes, confirms one code, and atomically replaces a used code", async () => {
-    const initialNow = new Date(Date.now() + 60_000);
-    const flow = buildService({ initialNow });
-    const registered = await registerAccount(flow.service, `s4-${randomUUID()}`);
+    const now = new Date();
+    const flow = buildService({initialNow:now,legalAcceptance:true});
+    const registered = await registerAccount(flow.service,`s4-${randomUUID()}`);
     const enrollmentToken = (flow.mail as MemoryMailSender).messages[0]!.token;
-    await expect(flow.service.verifyEmail({ token: enrollmentToken }, source))
-      .resolves.toEqual({ status: "mfa_required" });
-
-    const mfa = new MfaEnrollmentService({
-      repository: flow.repository,
-      dekStore: new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
-      argon2: sharedArgon2Pool(),
-      policy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
-      clock: () => initialNow
-    });
-    const api = buildApi({ application: fixtureAskApplication(), mfa });
-    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const logs = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(flow.service.verifyEmail({token:enrollmentToken},source)).resolves.toEqual({status:"mfa_required"});
+    const {mfa,sessions,security} = await currentMfa(flow,registered.user.password_hash,()=>new Date());
+    const api = buildApi({application:fixtureAskApplication(),mfa,sessions,allowedOrigin:enrollmentOrigin});
+    const errors = vi.spyOn(console,"error"), logs = vi.spyOn(console,"log");
     try {
-      const begin = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/totp/begin",
-        payload: { enrollment_token: enrollmentToken }
-      });
-      expect(begin.statusCode).toBe(200);
-      const begun = begin.json<{
-        status: string;
-        secret: string;
-        otpauthUri: string;
-      }>();
-      expect(begun).toMatchObject({ status: "verification_required" });
-      expect(begun.secret).toMatch(/^[A-Z2-7]{32}$/);
-      expect(begun.otpauthUri).toContain(`secret=${begun.secret}`);
-
-      const atRest = await database.pool.query<{ persisted: string }>(`
-        SELECT row_to_json(factor)::text AS persisted
-        FROM identity.mfa_factor factor WHERE user_id=$1
-      `, [registered.user.user_id]);
-      expect(atRest.rows).toHaveLength(1);
-      expect(atRest.rows[0]!.persisted).not.toContain(begun.secret);
-      expect(atRest.rows[0]!.persisted).toContain("secret_ciphertext");
-
-      const step = Math.floor(initialNow.getTime() / 30_000);
-      const code = totpCodeAtStep(decodeBase32(begun.secret), step);
-      const verified = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/totp/verify",
-        payload: { enrollment_token: enrollmentToken, code }
-      });
-      expect(verified.statusCode).toBe(200);
-      expect(verified.json()).toEqual({ status: "recovery_codes_required" });
-
-      const generated = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/recovery-codes/generate",
-        payload: { enrollment_token: enrollmentToken }
-      });
-      expect(generated.statusCode).toBe(200);
-      const unseen = generated.json<{ status: string; recoveryCodes: string[] }>();
-      expect(unseen.status).toBe("confirmation_required");
-      expect(unseen.recoveryCodes).toHaveLength(10);
-
-      const forbiddenRestart = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/totp/begin",
-        payload: { enrollment_token: enrollmentToken }
-      });
-      expect(forbiddenRestart.statusCode).toBe(409);
-      expect(forbiddenRestart.json()).toMatchObject({ error: "MFA_ENROLLMENT_STATE_INVALID" });
-
-      const regenerated = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/recovery-codes/generate",
-        payload: { enrollment_token: enrollmentToken }
-      });
-      expect(regenerated.statusCode).toBe(200);
-      const recovery = regenerated.json<{ status: string; recoveryCodes: string[] }>();
-      expect(recovery.recoveryCodes).toHaveLength(10);
-      expect(recovery.recoveryCodes).not.toEqual(unseen.recoveryCodes);
-
-      const obsolete = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/recovery-codes/confirm",
-        payload: { enrollment_token: enrollmentToken, recovery_code: unseen.recoveryCodes[0] }
-      });
-      expect(obsolete.statusCode).toBe(400);
-      expect(obsolete.json()).toMatchObject({ error: "MFA_RECOVERY_CONFIRMATION_INVALID" });
-
-      const stored = await database.pool.query<{ code_hash: string; code_slot: number }>(`
-        SELECT code_hash,code_slot FROM identity.recovery_code
-        WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL ORDER BY code_slot
-      `, [registered.user.user_id]);
-      expect(stored.rows).toHaveLength(10);
-      expect(stored.rows.map((row) => Number(row.code_slot))).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-      expect(stored.rows.every((row) => /^\$argon2id\$v=19\$m=19456,t=2,p=1\$/.test(row.code_hash)))
-        .toBe(true);
-      for (const plaintext of recovery.recoveryCodes) {
-        expect(stored.rows.every((row) => !row.code_hash.includes(plaintext))).toBe(true);
-      }
-
-      const confirmed = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/recovery-codes/confirm",
-        payload: { enrollment_token: enrollmentToken, recovery_code: recovery.recoveryCodes[0] }
-      });
-      expect(confirmed.statusCode).toBe(200);
-      expect(confirmed.json()).toEqual({ status: "active" });
-      const activated = await database.pool.query<{ user_state: string; factor_state: string }>(`
-        SELECT u.state AS user_state,factor.state AS factor_state
-        FROM identity."user" u
-        JOIN identity.mfa_factor factor ON factor.user_id=u.user_id
-        WHERE u.user_id=$1
-      `, [registered.user.user_id]);
-      expect(activated.rows[0]).toEqual({ user_state: "active", factor_state: "active" });
-
-      const firstUse = await mfa.consumeRecoveryCode({
-        userId: registered.user.user_id,
-        recoveryCode: recovery.recoveryCodes[1]!
-      }, source);
-      expect(firstUse).toMatchObject({ consumed: true });
-      await expect(mfa.consumeRecoveryCode({
-        userId: registered.user.user_id,
-        recoveryCode: recovery.recoveryCodes[1]!
-      }, source)).resolves.toEqual({ consumed: false });
-      const lifecycle = await database.pool.query<{
-        total: string; active: string; consumed: string; revoked: string;
-      }>(`
-        SELECT count(*)::text AS total,
-          count(*) FILTER (WHERE consumed_at IS NULL AND revoked_at IS NULL)::text AS active,
-          count(*) FILTER (WHERE consumed_at IS NOT NULL)::text AS consumed,
-          count(*) FILTER (WHERE revoked_at IS NOT NULL)::text AS revoked
-        FROM identity.recovery_code WHERE user_id=$1
-      `, [registered.user.user_id]);
-      expect(lifecycle.rows[0]).toEqual({ total: "21", active: "10", consumed: "1", revoked: "10" });
-
-      const observable = [...errors.mock.calls, ...logs.mock.calls].flat().join(" ");
-      expect(observable).not.toContain(begun.secret);
-      for (const plaintext of unseen.recoveryCodes) expect(observable).not.toContain(plaintext);
-      for (const plaintext of recovery.recoveryCodes) expect(observable).not.toContain(plaintext);
-    } finally {
-      errors.mockRestore();
-      logs.mockRestore();
-      await api.close();
-    }
-  }, 120_000);
+      const begin = await api.inject({method:"POST",url:"/v1/auth/mfa/totp/begin",headers:enrollmentHeaders,payload:{enrollment_token:enrollmentToken}});
+      expect(begin.statusCode).toBe(200);const begun=begin.json<{secret:string;otpauthUri:string}>();
+      expect(begun.secret).toMatch(/^[A-Z2-7]{32}$/);expect(begun.otpauthUri).toContain(`secret=${begun.secret}`);
+      const atRest=(await database.pool.query("SELECT row_to_json(f)::text AS persisted FROM identity.mfa_factor f WHERE user_id=$1",[registered.user.user_id])).rows;
+      expect(atRest).toHaveLength(1);expect(atRest[0].persisted).not.toContain(begun.secret);expect(atRest[0].persisted).toContain("secret_ciphertext");
+      const verified=await api.inject({method:"POST",url:"/v1/auth/mfa/totp/verify",headers:enrollmentHeaders,payload:{enrollment_token:enrollmentToken,code:totpCodeAtStep(decodeBase32(begun.secret),Math.floor(Date.now()/30000))}});
+      expect(verified.statusCode).toBe(200);expect(verified.json().status).toBe("authenticated");
+      let bearer=(verified.headers['set-cookie'] as string[]).find(c=>c.startsWith('__Host-debateai-session='))!.split(';')[0]!.split('=')[1]!;
+      expect(verified.body).not.toContain(bearer);
+      expect((await database.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1',[registered.user.user_id])).rows[0].n).toBe(0);
+      const backups=async()=>{
+        const used=Number((await database.pool.query('SELECT last_accepted_step FROM identity.mfa_factor WHERE user_id=$1',[registered.user.user_id])).rows[0].last_accepted_step);
+        while(Math.floor(Date.now()/30000)<=used) await new Promise(resolve=>setTimeout(resolve,Math.max(1,(used+1)*30000-Date.now()+10)));
+        const backupStep=Math.floor(Date.now()/30000);
+        const session=(await sessions.authenticate(bearer,source))!;expect(session).not.toBeNull();
+        const proof=await sessions.stepUp({session,password:registered.password,code:totpCodeAtStep(decodeBase32(begun.secret),backupStep),authorization:{action:"REGENERATE_RECOVERY_CODES"}},source);
+        bearer=proof.sessionToken;
+        return (await security.regenerateRecoveryCodes({step_up_grant:proof.grantToken},(await sessions.authenticate(bearer,source))!,source)).codes;
+      };
+      const unseen=await backups(),recovery=await backups();expect(unseen).toHaveLength(10);expect(recovery).toHaveLength(10);expect(recovery).not.toEqual(unseen);
+      await expect(mfa.consumeRecoveryCode({userId:registered.user.user_id,recoveryCode:unseen[0]!},source)).resolves.toEqual({consumed:false});
+      const stored=(await database.pool.query("SELECT code_hash,code_slot FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL ORDER BY code_slot",[registered.user.user_id])).rows;
+      expect(stored).toHaveLength(10);expect(stored.map(r=>r.code_slot)).toEqual([1,2,3,4,5,6,7,8,9,10]);
+      expect(stored.every(r=>/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/.test(r.code_hash))).toBe(true);
+      for(const code of recovery)expect(stored.every(r=>!r.code_hash.includes(code))).toBe(true);
+      const firstUse=await mfa.consumeRecoveryCode({userId:registered.user.user_id,recoveryCode:recovery[1]!},source);expect(firstUse).toMatchObject({consumed:true});
+      await expect(mfa.consumeRecoveryCode({userId:registered.user.user_id,recoveryCode:recovery[1]!},source)).resolves.toEqual({consumed:false});
+      const state=(await database.pool.query(`SELECT u.state AS user_state,f.state AS factor_state FROM identity."user" u JOIN identity.mfa_factor f USING(user_id) WHERE user_id=$1`,[registered.user.user_id])).rows[0];
+      expect(state).toEqual({user_state:"active",factor_state:"active"});
+      const lifecycle=(await database.pool.query("SELECT count(*)::int total,count(*) FILTER(WHERE consumed_at IS NULL AND revoked_at IS NULL)::int active,count(consumed_at)::int consumed,count(revoked_at)::int revoked FROM identity.recovery_code WHERE user_id=$1",[registered.user.user_id])).rows[0];
+      expect(lifecycle).toEqual({total:21,active:10,consumed:1,revoked:10});
+      const observable=[...errors.mock.calls,...logs.mock.calls].flat().join(' ');expect(observable).not.toContain(begun.secret);for(const code of [...unseen,...recovery])expect(observable).not.toContain(code);
+    } finally {errors.mockRestore();logs.mockRestore();await api.close();}
+  },120000);
 
   it("reads every MFA enrollment stage through the actual runtime role without credential-table SELECT", async () => {
     const flow = buildService({ initialNow: new Date() });
@@ -1465,32 +1404,26 @@ setTimeout(() => undefined, 500);
   });
 
   it("S4 grants MFA enrolment only to the sibling token actually presented for email proof", async () => {
-    const initialNow = new Date(Date.now() + 60_000);
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
-    const flow = buildService({ initialNow, mail });
+    const flow = buildService({ initialNow, mail, legalAcceptance: true });
     const registered = await registerAccount(flow.service, `s4-sibling-${randomUUID()}`);
     const presentedToken = mail.messages[0]!.token;
-    flow.advance(basePolicy.verification.resendCooldownMs + 1);
+    await flow.advance(basePolicy.verification.resendCooldownMs + 1);
     await expect(flow.service.resendVerification({ email: registered.email }, source))
       .resolves.toEqual(RESEND_PUBLIC_RESPONSE);
     await flow.service.drainMailDispatches();
     expect(mail.messages).toHaveLength(2);
     const nonPresentedToken = mail.messages[1]!.token;
-    const mfaNow = new Date(initialNow.getTime() + basePolicy.verification.resendCooldownMs + 1);
+    const mfaNow = new Date();
     await expect(flow.service.verifyEmail({ token: presentedToken }, source))
       .resolves.toEqual({ status: "mfa_required" });
 
-    const mfa = new MfaEnrollmentService({
-      repository: flow.repository,
-      dekStore: new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
-      argon2: sharedArgon2Pool(),
-      policy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
-      clock: () => mfaNow
-    });
-    const api = buildApi({ application: fixtureAskApplication(), mfa });
+    const {mfa,sessions} = await currentMfa(flow,registered.user.password_hash,()=>mfaNow);
+    const api=buildApi({application:fixtureAskApplication(),mfa,sessions,allowedOrigin:enrollmentOrigin});
     try {
       const refusedBegin = await api.inject({
-        method: "POST",
+        method: "POST", headers: enrollmentHeaders,
         url: "/v1/auth/mfa/totp/begin",
         payload: { enrollment_token: nonPresentedToken }
       });
@@ -1498,7 +1431,7 @@ setTimeout(() => undefined, 500);
       expect(refusedBegin.json()).toMatchObject({ error: "MFA_ENROLLMENT_INVALID" });
 
       const begin = await api.inject({
-        method: "POST",
+        method: "POST", headers: enrollmentHeaders,
         url: "/v1/auth/mfa/totp/begin",
         payload: { enrollment_token: presentedToken }
       });
@@ -1507,7 +1440,7 @@ setTimeout(() => undefined, 500);
       const code = totpCodeAtStep(decodeBase32(begun.secret), Math.floor(mfaNow.getTime() / 30_000));
 
       const refusedVerify = await api.inject({
-        method: "POST",
+        method: "POST", headers: enrollmentHeaders,
         url: "/v1/auth/mfa/totp/verify",
         payload: { enrollment_token: nonPresentedToken, code }
       });
@@ -1515,42 +1448,16 @@ setTimeout(() => undefined, 500);
       expect(refusedVerify.json()).toMatchObject({ error: "MFA_ENROLLMENT_STATE_INVALID" });
 
       const verified = await api.inject({
-        method: "POST",
+        method: "POST", headers: enrollmentHeaders,
         url: "/v1/auth/mfa/totp/verify",
         payload: { enrollment_token: presentedToken, code }
       });
       expect(verified.statusCode).toBe(200);
 
-      const refusedGenerate = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/recovery-codes/generate",
-        payload: { enrollment_token: nonPresentedToken }
-      });
-      expect(refusedGenerate.statusCode).toBe(409);
-      expect(refusedGenerate.json()).toMatchObject({ error: "MFA_ENROLLMENT_STATE_INVALID" });
-
-      const generated = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/recovery-codes/generate",
-        payload: { enrollment_token: presentedToken }
-      });
-      expect(generated.statusCode).toBe(200);
-      const recoveryCode = generated.json<{ recoveryCodes: string[] }>().recoveryCodes[0]!;
-
-      const refusedActivate = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/recovery-codes/confirm",
-        payload: { enrollment_token: nonPresentedToken, recovery_code: recoveryCode }
-      });
-      expect(refusedActivate.statusCode).toBe(400);
-      expect(refusedActivate.json()).toMatchObject({ error: "MFA_RECOVERY_CONFIRMATION_INVALID" });
-
-      const activated = await api.inject({
-        method: "POST",
-        url: "/v1/auth/mfa/recovery-codes/confirm",
-        payload: { enrollment_token: presentedToken, recovery_code: recoveryCode }
-      });
-      expect(activated.statusCode).toBe(200);
+      expect(verified.json().status).toBe("authenticated");
+      const replay = await api.inject({method:"POST",url:"/v1/auth/mfa/totp/verify",headers:enrollmentHeaders,payload:{enrollment_token:nonPresentedToken,code}});
+      expect(replay.statusCode).toBe(409);
+      expect((await database.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1',[registered.user.user_id])).rows[0].n).toBe(1);
       const binding = await database.pool.query<{
         verification_token_hash: string | null;
         verification_expires_at: Date | null;
@@ -1669,11 +1576,13 @@ setTimeout(() => undefined, 500);
       const persisted = await database.pool.query<{
         adult_affirmed_at: Date;
         verification_expires_at: Date;
+        issued_at: Date;
         audit_occurred_at: Date;
       }>(`
-        SELECT u.adult_affirmed_at,c.verification_expires_at,a.occurred_at AS audit_occurred_at
+        SELECT u.adult_affirmed_at,c.verification_expires_at,v.issued_at,a.occurred_at AS audit_occurred_at
         FROM identity."user" u
         JOIN identity.channel_binding c ON c.user_id=u.user_id AND c.channel_type='email'
+        JOIN identity.verification_token_credential v ON v.token_hash=c.verification_token_hash
         JOIN identity.audit_event a
           ON a.actor_key_ref=u.audit_token::text
           AND a.event_type='identity.registration'
@@ -1687,8 +1596,12 @@ setTimeout(() => undefined, 500);
       expect(row.audit_occurred_at.getTime()).toBeGreaterThanOrEqual(auditWindowStartedAt.getTime());
       expect(row.audit_occurred_at.getTime()).toBeLessThanOrEqual(auditWindowFinishedAt.getTime());
       expect(row.verification_expires_at).toEqual(
-        new Date(expectedRequestedAt.getTime() + basePolicy.verification.tokenTtlMs)
+        new Date(row.issued_at.getTime() + basePolicy.verification.tokenTtlMs)
       );
+      expect(row.issued_at.getTime()).toBeGreaterThanOrEqual(auditWindowStartedAt.getTime());
+      expect(row.issued_at.getTime()).toBeLessThanOrEqual(auditWindowFinishedAt.getTime());
+      const delivered = (flow.mail as MemoryMailSender).messages.find(message => message.recipient === `s3a-a3-${label}@example.test`)!;
+      expect(delivered.expiresAt).toEqual(row.verification_expires_at);
       drifts.push(Math.abs(row.adult_affirmed_at.getTime() - expectedRequestedAt.getTime()));
     }
     console.info(
@@ -1987,7 +1900,7 @@ setTimeout(() => undefined, 500);
 
     const attackerOutcomes: string[] = [];
     for (let minute = 1; minute < 60; minute += 1) {
-      flow.advance(60_000);
+      await flow.advance(60_000);
       try {
         await flow.service.resendVerification({ email: victimEmail }, {
           ip: `203.0.120.${((minute - 1) % 20) + 1}`,
@@ -2718,7 +2631,7 @@ setTimeout(() => undefined, 500);
         `s3d-r3-b1-${route}-marker-${index}@example.test`
       );
       await seedAccounts(flow, [existingRegister, ...resendTargets, ...resendMarkers], route);
-      flow.advance(basePolicy.verification.resendCooldownMs);
+      await flow.advance(basePolicy.verification.resendCooldownMs);
       mail.sentRecipients.length = 0;
       mail.delayTargets = true;
 
@@ -2888,7 +2801,7 @@ setTimeout(() => undefined, 500);
         targets.filter((_, index) => targetArms[index] === "existing"),
         `b3-mixed-${wave}`
       );
-      flow.advance(basePolicy.verification.resendCooldownMs);
+      await flow.advance(basePolicy.verification.resendCooldownMs);
       mail.sentRecipients.length = 0;
       mail.delayTargets = true;
 
@@ -3114,8 +3027,8 @@ setTimeout(() => undefined, 500);
       }));
       await flow.service.drainMailDispatches();
     }
-    flow.advance(basePolicy.verification.resendCooldownMs);
-    balancingFlow.advance(basePolicy.verification.resendCooldownMs);
+    await flow.advance(basePolicy.verification.resendCooldownMs);
+    await balancingFlow.advance(basePolicy.verification.resendCooldownMs);
 
     type ArmMeasurement = {
       grantIntervals: number[];
@@ -4307,11 +4220,11 @@ setTimeout(() => undefined, 500);
 
   it("S3d D2 preserves the owner's first verification credential across the full resend allowance", async () => {
     const initialNow = new Date("2026-08-20T09:00:00.000Z");
-    const flow = buildService({ initialNow, sleep: async () => undefined });
+    const flow = buildService({ initialNow, sleep: async () => undefined, legalAcceptance: true });
     const registered = await registerAccount(flow.service, "s3d-owner-link");
     const firstToken = (flow.mail as MemoryMailSender).messages[0]!.token;
     for (let resend = 1; resend <= basePolicy.verification.outboundSendMax; resend += 1) {
-      flow.advance(basePolicy.verification.resendCooldownMs);
+      await flow.advance(basePolicy.verification.resendCooldownMs);
       await expect(flow.service.resendVerification({ email: registered.email }, {
         ip: `2001:db8:3d:2::${resend}`,
         userAgent: "vitest-s3d-attacker",
@@ -4345,27 +4258,24 @@ setTimeout(() => undefined, 500);
       requestId: "request:s3d:d2:owner-verify"
     });
     expect(verification).toEqual({ status: "mfa_required" });
-    const consumedFamily = await database.pool.query<{ total: string; consumed: string }>(`
-      SELECT count(*)::text AS total,count(consumed_at)::text AS consumed
-      FROM identity.verification_token_credential credential
-      JOIN identity.channel_binding binding USING (channel_binding_id)
-      WHERE binding.user_id=$1
-    `, [registered.user.user_id]);
-    for (const [index, sibling] of messages.slice(1).entries()) {
-      await expect(flow.service.verifyEmail({ token: sibling.token }, {
-        ip: `2001:db8:3d:2:5::${index + 1}`,
-        userAgent: "vitest-s3d-sibling-invalidation",
-        requestId: `request:s3d:d2:sibling:${index}`
-      })).rejects.toMatchObject({ code: "VERIFICATION_TOKEN_INVALID" });
+    const {mfa}=await currentMfa(flow,registered.user.password_hash,()=>new Date());
+    let previousToken=firstToken, previous=await mfa.beginTotp({enrollmentToken:firstToken},source);
+    for (const [index,sibling] of messages.slice(1).entries()) {
+      const proofSource={...source,ip:`2001:db8:3d:2:5::${index+1}`,requestId:`request:s3d:d2:sibling:${index}`};
+      await expect(flow.service.verifyEmail({token:sibling.token},proofSource)).resolves.toEqual({status:"mfa_required"});
+      await expect(flow.service.verifyEmail({token:sibling.token},proofSource)).rejects.toMatchObject({code:"VERIFICATION_TOKEN_INVALID"});
+      const current=(await database.pool.query("SELECT verification_token_hash FROM identity.channel_binding WHERE user_id=$1 AND channel_type='email'",[registered.user.user_id])).rows[0];
+      expect(current.verification_token_hash).toBe(hashToken("verification",sibling.token));
+      await expect(mfa.verifyTotp({enrollmentToken:previousToken,code:totpCodeAtStep(decodeBase32(previous.secret),Math.floor(Date.now()/30000))},source)).rejects.toMatchObject({code:"MFA_ENROLLMENT_STATE_INVALID"});
+      previousToken=sibling.token;previous=await mfa.beginTotp({enrollmentToken:previousToken},source);
     }
-    expect(consumedFamily.rows).toEqual([{
-      total: String(messages.length),
-      consumed: String(messages.length)
-    }]);
+    const consumedFamily=await database.pool.query<{total:string;consumed:string}>(`SELECT count(*)::text AS total,count(consumed_at)::text AS consumed FROM identity.verification_token_credential JOIN identity.channel_binding USING(channel_binding_id) WHERE user_id=$1`,[registered.user.user_id]);
+    expect(consumedFamily.rows).toEqual([{total:String(messages.length),consumed:String(messages.length)}]);
+    expect((await database.pool.query(`SELECT state,(SELECT count(*)::int FROM identity.session WHERE user_id=u.user_id) sessions,(SELECT count(*)::int FROM identity.mfa_factor WHERE user_id=u.user_id AND state='active') active_factors FROM identity."user" u WHERE user_id=$1`,[registered.user.user_id])).rows[0]).toEqual({state:"pending_mfa",sessions:0,active_factors:0});
     console.info(
       `[S3d D2 RED/GREEN] backend=postgres attacker_resends=${basePolicy.verification.outboundSendMax} `
       + `messages=${messages.length} live_hashes=${credentials.rowCount} first_token_still_valid=true `
-      + `siblings_invalid=${messages.length - 1} consumed_at=${consumedFamily.rows[0]!.consumed}/${consumedFamily.rows[0]!.total}`
+      + `siblings_proved_once=${messages.length - 1} consumed_at=${consumedFamily.rows[0]!.consumed}/${consumedFamily.rows[0]!.total}`
     );
   }, 60_000);
 
@@ -4377,7 +4287,7 @@ setTimeout(() => undefined, 500);
     const registered = await registerAccount(flow.service, "s3d-credential-lifetime");
     const firstToken = (flow.mail as MemoryMailSender).messages[0]!.token;
     for (let resend = 1; resend <= 80; resend += 1) {
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await flow.advance(basePolicy.verification.resendCooldownMs + 1);
       await flow.service.resendVerification({ email: registered.email }, {
         ip: `2001:db8:3d:4::${resend}`,
         userAgent: "vitest-s3d-credential-lifetime",
@@ -4433,6 +4343,7 @@ setTimeout(() => undefined, 500);
     const outcomes: string[] = [];
     for (let minute = 1; minute <= 60; minute += 1) {
       now = new Date(now.getTime() + 60_000);
+      await flow.advance(60_000);
       try {
         await flow.service.resendVerification({ email }, {
           ip: `2001:db8:3d:5::${((minute - 1) % 20) + 1}`,
@@ -4861,7 +4772,7 @@ setTimeout(() => undefined, 500);
     const resendFlow = buildService({ initialNow });
     const resendRegistered = await registerAccount(resendFlow.service, "s3c-d2-resend-owner");
     const resendAddressKey = resendRegistered.index.toString("hex");
-    resendFlow.advance(basePolicy.verification.resendCooldownMs + 1);
+    await resendFlow.advance(basePolicy.verification.resendCooldownMs + 1);
     const legacyResendAddressBudget = 3;
     for (let attempt = 0; attempt < legacyResendAddressBudget; attempt += 1) {
       expect(resendFlow.limiter.consume({
@@ -5826,17 +5737,20 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   function installQueryBarrier(matches: (sql: string) => boolean): QueryBarrier {
     patchPoolForQueryBarriers();
     let signalReached!: () => void;
+    let cancelReached!: (error: Error) => void;
     let signalReleased!: () => void;
-    const reached = new Promise<void>((resolve) => { signalReached = resolve; });
+    const reached = new Promise<void>((resolve,reject) => { signalReached = resolve;cancelReached=reject; });
+    void reached.catch(()=>undefined);
     const released = new Promise<void>((resolve) => { signalReleased = resolve; });
     const barrier = { matches, signalReached, released, count: 0 };
     activeQueryBarrier = barrier;
+    const release=()=>{if(activeQueryBarrier===barrier)activeQueryBarrier=undefined;signalReleased();};
+    onTestFinished(()=>{
+      if(activeQueryBarrier===barrier){cancelReached(new Error("OWNED_QUERY_BARRIER_TEST_FINISHED"));release();}
+    });
     return Object.freeze({
       reached,
-      release(): void {
-        activeQueryBarrier = undefined;
-        signalReleased();
-      },
+      release,
       hits: () => barrier.count
     });
   }
@@ -5902,24 +5816,18 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     // not turn into an expired-token test as wall time advances.
     const initialNow = new Date();
     const mail = new MemoryMailSender();
-    const flow = buildService({ initialNow, mail });
+    const flow = buildService({ initialNow, mail, legalAcceptance: true });
     const registered = await registerAccount(flow.service, `s4-lock-order-${randomUUID()}`);
     const token = mail.messages[0]!.token;
     await expect(flow.service.verifyEmail({ token }, source))
       .resolves.toEqual({ status: "mfa_required" });
 
-    const mfa = new MfaEnrollmentService({
-      repository: flow.repository,
-      dekStore: new FileUserDekStore(secretRoot, loadKek(Buffer.alloc(32, 0x7d))),
-      argon2: sharedArgon2Pool(),
-      policy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
-      clock: () => initialNow
-    });
+    const {mfa,sessions} = await currentMfa(flow,registered.user.password_hash,()=>initialNow);
     const api = buildApi({
       application: fixtureAskApplication(),
       turnstile: passedTurnstile,
       registration: flow.service,
-      mfa
+      mfa, sessions, allowedOrigin: enrollmentOrigin
     });
     const monitor = await database.pool.connect();
     let barrier: QueryBarrier | undefined;
@@ -5931,7 +5839,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       );
 
       const retryVerification = api.inject({
-        method: "POST",
+        method: "POST", headers: enrollmentHeaders,
         url: "/v1/auth/verify-email",
         payload: { token }
       });
@@ -5940,7 +5848,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       expect(barrier.hits()).toBe(1);
 
       const beginningEnrollment = api.inject({
-        method: "POST",
+        method: "POST", headers: enrollmentHeaders,
         url: "/v1/auth/mfa/totp/begin",
         payload: { enrollment_token: token }
       });
@@ -6031,7 +5939,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   }, 60_000);
 
   it("T9 keeps 32 existing and 32 missing concurrent resends byte-identical with zero deadlocks", async () => {
-    const initialNow = new Date("2026-08-21T09:00:00.000Z");
+    const initialNow = new Date();
     const mail = new GatedVerificationMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
@@ -6070,7 +5978,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       expect(mail.messages).toHaveLength(1);
 
       mail.arm();
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
       const resendAuditBefore = await database.pool.query<{ audit_id: string }>(`
         SELECT audit_id FROM identity.audit_event
@@ -6121,7 +6029,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const existingAuditIds = new Set(existingAudit.map((row) => row.audit_id));
 
       // Step 6: the paired missing-address arm across the same public boundary.
-      flow.advance(1);
+      await flow.advance(1);
       const missingObservations = await Promise.all(Array.from({ length: 32 }, (_, index) =>
         injectResend(
           api, "missing", index, "t9-resend-race-missing@example.test", `203.0.113.${index + 1}`
@@ -6277,9 +6185,12 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       expect(audit.chain).toHaveLength(audit.totalRows);
       expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
 
-      // S3d credential semantics: the seeded credential is untouched and every
-      // live credential keeps its own ruled lifetime.
-      expect(credentials.rows[0]).toEqual(seededCredentials.rows[0]);
+      // S3d credential semantics: only the fixture's explicit elapsed-time shifts
+      // age the seeded row; resends leave its hash, consumption and lifetime intact.
+      const agedBy=basePolicy.verification.resendCooldownMs+2;
+      expect(credentials.rows[0]).toEqual({...seededCredentials.rows[0],
+        issued_at:new Date(seededCredentials.rows[0]!.issued_at.getTime()-agedBy),
+        expires_at:new Date(seededCredentials.rows[0]!.expires_at.getTime()-agedBy)});
       expect(credentials.rows.every((credential) =>
         credential.consumed_at === null
         && credential.expires_at.getTime() - credential.issued_at.getTime()
@@ -6298,14 +6209,14 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   }, 300_000);
 
   it("T9 keeps concurrent verification and resend on one account deadlock-free and singly activating", async () => {
-    const initialNow = new Date("2026-08-21T11:00:00.000Z");
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-verify-vs-resend");
       const ownerToken = mail.messages[0]!.token;
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
 
       // Interleave both routes so `consumeVerification`'s token,c,u locking and
@@ -6392,14 +6303,14 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     // already committed the cooldown write before the other 31 arrive. This
     // check contends the read-decide-write window itself, which is the property
     // prepareVerificationResend's `FOR UPDATE OF c,u` exists to guarantee.
-    const initialNow = new Date("2026-08-21T15:00:00.000Z");
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-single-send-race");
       expect(mail.messages).toHaveLength(1);
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
       const resendAuditBefore = await database.pool.query<{ audit_id: string }>(`
         SELECT audit_id FROM identity.audit_event
@@ -7078,7 +6989,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 
     const runWindow = async (replicate: number, order: T9Order): Promise<T9Window> => {
       const windowIndex = replicate * 2 + (order === "AB" ? 0 : 1);
-      const initialNow = new Date(Date.UTC(2026, 7, 24 + windowIndex, 13, 0, 0));
+      const initialNow = new Date();
       const namespace = `t9-rework9-r${replicate + 1}-${order.toLowerCase()}`;
       const mail = new MemoryMailSender();
       const flow = buildService({ mail, initialNow });
@@ -7100,7 +7011,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         expect(mail.messages, `T9 ${namespace} bootstrap mail`).toHaveLength(1);
         expect(seededCredentials.rows, `T9 ${namespace} bootstrap credential`).toHaveLength(1);
 
-        flow.advance(basePolicy.verification.resendCooldownMs + 1);
+        await flow.advance(basePolicy.verification.resendCooldownMs + 1);
         const deadlocksBefore = await databaseDeadlockCount();
         const resendAuditBefore = await database.pool.query<{ audit_id: string }>(`
           SELECT audit_id FROM identity.audit_event
@@ -7250,7 +7161,10 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         expect(mail.messages).toHaveLength(2);
         expect(new Set(mail.messages.map((message) => message.token)).size).toBe(2);
         expect(credentials.rows).toHaveLength(2);
-        expect(credentials.rows).toContainEqual(seededCredentials.rows[0]);
+        const agedBy=basePolicy.verification.resendCooldownMs+1;
+        expect(credentials.rows).toContainEqual({...seededCredentials.rows[0],
+          issued_at:new Date(seededCredentials.rows[0]!.issued_at.getTime()-agedBy),
+          expires_at:new Date(seededCredentials.rows[0]!.expires_at.getTime()-agedBy)});
         expect(credentials.rows.every((credential) => credential.consumed_at === null
           && credential.expires_at.getTime() - credential.issued_at.getTime()
             === basePolicy.verification.tokenTtlMs)).toBe(true);
@@ -7332,7 +7246,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   }, 420_000);
 
   it("T9-A serializes expired-token verification against an eligible resend without deadlock", async () => {
-    const initialNow = new Date("2026-08-21T17:00:00.000Z");
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
@@ -7347,7 +7261,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const channelBindingId = await emailChannelOf(registered.user.user_id);
       // Production TTL and cooldown: past the token's own 24 h life the
       // credential is expired AND resend is eligible.
-      flow.advance(basePolicy.verification.tokenTtlMs + 1);
+      await flow.advance(basePolicy.verification.tokenTtlMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
 
       // External gate holds the account's email channel row.
@@ -7450,11 +7364,13 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   }, 300_000);
 
   it("T9-B1 serializes a duplicate registration against an eligible resend without deadlock", async () => {
-    const initialNow = new Date("2026-08-21T18:00:00.000Z");
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const monitor = await database.pool.connect();
+    let monitorReleased=false;const releaseMonitor=()=>{if(!monitorReleased){monitorReleased=true;monitor.release();}};
+    onTestFinished(releaseMonitor);
     let barrier: QueryBarrier | undefined;
     try {
       const registered = await registerAccount(flow.service, "t9-b1-duplicate");
@@ -7464,7 +7380,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         SELECT user_id,pseudonym,password_hash,audit_token,state
         FROM identity."user" WHERE user_id=$1
       `, [registered.user.user_id]);
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
       const auditIdsBefore = (await database.pool.query<{ audit_ids: string[] }>(`
         SELECT COALESCE(array_agg(audit_id),'{}'::uuid[]) AS audit_ids
@@ -7475,7 +7391,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       // capability returns, with that transaction still open and holding the
       // canonical channel -> user -> credential locks.
       barrier = installQueryBarrier((sql) =>
-        sql.includes("identity.create_pending_account_with_audit"));
+        sql.includes("identity.create_pending_account_reserved_with_audit"));
       const registering = injectRegister(
         api, 0, registered.email, "t9-b1-duplicate-second-recovery@example.test", "198.51.71.1"
       );
@@ -7550,14 +7466,14 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
     } finally {
       barrier?.release();
-      monitor.release();
+      releaseMonitor();
       await flow.service.drainMailDispatches();
       await api.close();
     }
   }, 300_000);
 
   it("T9-B2 serializes duplicate postwork against an eligible resend without deadlock", async () => {
-    const initialNow = new Date("2026-08-21T19:00:00.000Z");
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
@@ -7565,7 +7481,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     let barrier: QueryBarrier | undefined;
     try {
       const registered = await registerAccount(flow.service, "t9-b2-postwork");
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
       const auditIdsBefore = (await database.pool.query<{ audit_ids: string[] }>(`
         SELECT COALESCE(array_agg(audit_id),'{}'::uuid[]) AS audit_ids
@@ -7647,7 +7563,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     // This gate forces the interleaving: the delivery transaction is paused the
     // instant its first locking statement returns, and a real resend is launched
     // into it.
-    const initialNow = new Date("2026-08-21T22:00:00.000Z");
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
@@ -7655,7 +7571,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     let barrier: QueryBarrier | undefined;
     try {
       const registered = await registerAccount(flow.service, "t9-e-delivery-order");
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await flow.advance(basePolicy.verification.resendCooldownMs + 1);
       const deadlocksBefore = await databaseDeadlockCount();
 
       // Pause after the narrow delivery capability returns and before its
@@ -7728,7 +7644,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   }, 300_000);
 
   it("T9-C proves verification takes the channel before the user and credentials last", async () => {
-    const initialNow = new Date("2026-08-21T20:00:00.000Z");
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
@@ -7812,15 +7728,15 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     }
   }, 300_000);
 
-  it("T9-D activates exactly once when two live sibling tokens verify simultaneously", async () => {
-    const initialNow = new Date("2026-08-21T21:00:00.000Z");
+  it("T9-D serializes two live sibling email proofs without creating a session", async () => {
+    const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
     const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-d-siblings");
       const channelBindingId = await emailChannelOf(registered.user.user_id);
-      flow.advance(basePolicy.verification.resendCooldownMs + 1);
+      await flow.advance(basePolicy.verification.resendCooldownMs + 1);
       await expect(injectResend(api, "existing", 0, registered.email, "198.51.73.1"))
         .resolves.toMatchObject({ status: 202 });
       await flow.service.drainMailDispatches();
@@ -7873,19 +7789,19 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         expect(observation.rejection).toBeNull();
         expect(databaseErrorLeak(observation.body)).toBe(false);
       }
-      expect([first, second].filter((one) => one.status === 200)).toHaveLength(1);
+      expect([first, second].filter((one) => one.status === 200)).toHaveLength(2);
       expect([first, second].filter((one) =>
-        one.status === 200 && one.body === JSON.stringify({ status: "mfa_required" }))).toHaveLength(1);
-      expect([first, second].filter((one) =>
-        one.status === 400 && one.body === JSON.stringify({
-          error: "VERIFICATION_TOKEN_INVALID", message: "VERIFICATION_TOKEN_INVALID"
-        }))).toHaveLength(1);
+        one.status === 200 && one.body === JSON.stringify({ status: "mfa_required" }))).toHaveLength(2);
+      const binding=(await database.pool.query("SELECT verification_token_hash FROM identity.channel_binding WHERE channel_binding_id=$1",[channelBindingId])).rows[0].verification_token_hash;
+      expect(mail.messages.map(message=>hashToken("verification",message.token))).toContain(binding);
+      expect((await database.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1',[registered.user.user_id])).rows[0].n).toBe(0);
+      for(const [index,message] of mail.messages.entries())expect((await injectVerify(api,index,message.token,`203.0.117.${index+1}`)).status).toBe(400);
       expect(account.rows[0]).toEqual({ state: "pending_mfa", binding_state: "verified" });
-      // Whole family consumed: no live sibling remains.
+      // Each concurrently presented credential was consumed once; neither proof created a session.
       expect(credentials.rows[0]!.total).toBe("2");
       expect(credentials.rows[0]!.consumed).toBe("2");
       expect(consumedAudit.rows.filter((row) => row.decision === "ALLOW" && row.success))
-        .toHaveLength(1);
+        .toHaveLength(2);
       expect(audit.rootCount).toBe(1);
       expect(audit.chain).toHaveLength(audit.totalRows);
       expect(verifyChain(audit.chain as ChainedAuditEvent[])).toBe(true);
@@ -8042,7 +7958,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
         perAddress: 100
       })
     });
-    const initialNow = new Date("2026-08-20T07:00:00.000Z");
+    const initialNow = new Date();
     const refusalAuditIntervalMs = 25;
     const policy = withPolicy({ rateLimits, rateLimitRefusalAuditIntervalMs: refusalAuditIntervalMs });
     const flow = buildService({ policy, initialNow });
@@ -8200,7 +8116,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     vi.spyOn(flow.repository, "recordRateLimitRefusal")
       .mockRejectedValueOnce(new Error("password authentication failed for postgres://secret"));
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    flow.advance(60_000);
+    await flow.advance(60_000);
     try {
       await expect(flow.service.verifyEmail({ token }, source))
         .rejects.toMatchObject({ code: "AUTH_RATE_LIMITED", statusCode: 429 });
@@ -8217,7 +8133,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     const verifyFlow = buildService({ initialNow: initial });
     vi.spyOn(verifyFlow.repository, "findAuditIdentityByVerificationHash")
       .mockImplementationOnce(async () => {
-        verifyFlow.advance(1_000);
+        await verifyFlow.advance(1_000);
         return null;
       });
     const consume = vi.spyOn(verifyFlow.repository, "consumeVerification").mockResolvedValueOnce(false);
@@ -8228,7 +8144,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     const resendFlow = buildService({ initialNow: initial });
     vi.spyOn(resendFlow.repository, "findAuditIdentityByBlindIndex")
       .mockImplementationOnce(async () => {
-        resendFlow.advance(1_000);
+        await resendFlow.advance(1_000);
         return null;
       });
     const prepare = vi.spyOn(resendFlow.repository, "prepareVerificationResend")
@@ -8632,106 +8548,24 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
   });
 
   it("S10 invalid verification and missing MFA rows deny once without domain mutation", async () => {
-    const flow = buildService();
-    const registered = await registerAccount(flow.service, `missing-mfa-${randomUUID()}`);
-    const enrollmentToken = (flow.mail as MemoryMailSender).messages[0]!.token;
-    await expect(flow.service.verifyEmail({ token: enrollmentToken }, source))
-      .resolves.toEqual({ status: "mfa_required" });
-    const enrollmentTokenHash = hashToken("verification", enrollmentToken);
-    const missingFactorId = randomUUID();
-    const missingRecoveryCodeId = randomUUID();
-    const before = await database.pool.query<{
-      verification_denials: string;
-      factor_denials: string;
-      activation_denials: string;
-      factor_count: string;
-      recovery_count: string;
-    }>(`
-      SELECT
-        (SELECT count(*)::text FROM identity.audit_event
-         WHERE event_type='identity.verification.consumed'
-           AND decision='DENY' AND NOT success) AS verification_denials,
-        (SELECT count(*)::text FROM identity.audit_event
-         WHERE event_type='identity.mfa.totp.verified'
-           AND decision='DENY' AND NOT success) AS factor_denials,
-        (SELECT count(*)::text FROM identity.audit_event
-         WHERE event_type='identity.mfa.enrollment.activated'
-           AND decision='DENY' AND NOT success) AS activation_denials,
-        (SELECT count(*)::text FROM identity.mfa_factor WHERE user_id=$1) AS factor_count,
-        (SELECT count(*)::text FROM identity.recovery_code WHERE user_id=$1) AS recovery_count
-    `,[registered.user.user_id]);
-
-    await expect(flow.service.verifyEmail({ token: generateVerificationToken() },source))
-      .rejects.toMatchObject({ code: "VERIFICATION_TOKEN_INVALID" });
-    await expect(flow.repository.confirmTotpEnrollment({
-      enrollmentTokenHash,
-      factorId: missingFactorId,
-      acceptedStep: 1,
-      occurredAt: new Date(),
-      source
-    })).resolves.toBe("invalid");
-    await expect(flow.repository.activateMfaEnrollment({
-      enrollmentTokenHash,
-      recoveryCodeId: missingRecoveryCodeId,
-      occurredAt: new Date(),
-      source
-    })).resolves.toBe(false);
-
-    const after = await database.pool.query<{
-      user_state: string;
-      verification_denials: string;
-      factor_denials: string;
-      activation_denials: string;
-      factor_count: string;
-      recovery_count: string;
-      attempts: string;
-      opaque_denials: string;
-      roots: string;
-      reachable: string;
-      total: string;
-    }>(`
-      WITH RECURSIVE chain AS (
-        SELECT audit_id,this_hash FROM identity.audit_event WHERE prev_hash IS NULL
-        UNION ALL
-        SELECT child.audit_id,child.this_hash FROM identity.audit_event AS child
-        JOIN chain ON child.prev_hash=chain.this_hash
-      )
-      SELECT
-        (SELECT state FROM identity."user" WHERE user_id=$1) AS user_state,
-        (SELECT count(*)::text FROM identity.audit_event
-         WHERE event_type='identity.verification.consumed'
-           AND decision='DENY' AND NOT success) AS verification_denials,
-        (SELECT count(*)::text FROM identity.audit_event
-         WHERE event_type='identity.mfa.totp.verified'
-           AND decision='DENY' AND NOT success) AS factor_denials,
-        (SELECT count(*)::text FROM identity.audit_event
-         WHERE event_type='identity.mfa.enrollment.activated'
-           AND decision='DENY' AND NOT success) AS activation_denials,
-        (SELECT count(*)::text FROM identity.mfa_factor WHERE user_id=$1) AS factor_count,
-        (SELECT count(*)::text FROM identity.recovery_code WHERE user_id=$1) AS recovery_count,
-        (SELECT count(*)::text FROM identity.runtime_audit_attempt) AS attempts,
-        (SELECT count(*)::text FROM identity.audit_event
-         WHERE decision='DENY' AND NOT success
-           AND event_type IN ('identity.verification.consumed',
-             'identity.mfa.totp.verified','identity.mfa.enrollment.activated')
-           AND actor_key_ref<>$2 AND target_id NOT IN ($3,$4)) AS opaque_denials,
-        (SELECT count(*)::text FROM identity.audit_event WHERE prev_hash IS NULL) AS roots,
-        (SELECT count(*)::text FROM chain) AS reachable,
-        (SELECT count(*)::text FROM identity.audit_event) AS total
-    `,[registered.user.user_id,registered.user.audit_token,missingFactorId,missingRecoveryCodeId]);
-    expect(Number(after.rows[0]!.verification_denials)
-      -Number(before.rows[0]!.verification_denials)).toBe(1);
-    expect(Number(after.rows[0]!.factor_denials)-Number(before.rows[0]!.factor_denials)).toBe(1);
-    expect(Number(after.rows[0]!.activation_denials)
-      -Number(before.rows[0]!.activation_denials)).toBe(1);
-    expect(after.rows[0]).toMatchObject({
-      user_state: "pending_mfa",
-      factor_count: before.rows[0]!.factor_count,
-      recovery_count: before.rows[0]!.recovery_count,
-      attempts: "0",
-      roots: "1"
-    });
-    expect(Number(after.rows[0]!.opaque_denials)).toBeGreaterThanOrEqual(3);
-    expect(after.rows[0]!.reachable).toBe(after.rows[0]!.total);
+    const flow=buildService({legalAcceptance:true,initialNow:new Date()});
+    const registered=await registerAccount(flow.service,`missing-mfa-${randomUUID()}`);
+    const enrollmentToken=(flow.mail as MemoryMailSender).messages[0]!.token;
+    await expect(flow.service.verifyEmail({token:enrollmentToken},source)).resolves.toEqual({status:"mfa_required"});
+    const {consumerRepository,sessions}=await currentMfa(flow,registered.user.password_hash,()=>new Date());
+    const snapshot=async()=> (await database.pool.query(`SELECT state,
+      (SELECT count(*)::int FROM identity.mfa_factor WHERE user_id=u.user_id) factors,
+      (SELECT count(*)::int FROM identity.recovery_code WHERE user_id=u.user_id) codes,
+      (SELECT count(*)::int FROM identity.session WHERE user_id=u.user_id) sessions,
+      (SELECT count(*)::int FROM identity.runtime_audit_attempt) attempts,
+      (SELECT count(*)::int FROM identity.audit_event WHERE event_type='identity.verification.consumed' AND decision='DENY' AND NOT success) denials
+      FROM identity."user" u WHERE user_id=$1`,[registered.user.user_id])).rows[0];
+    const before=await snapshot();
+    await expect(flow.service.verifyEmail({token:generateVerificationToken()},source)).rejects.toMatchObject({code:"VERIFICATION_TOKEN_INVALID"});
+    const material=sessions.consumerProducer().prepare(source);
+    await expect(consumerRepository.completeTotpEnrollment({enrollmentTokenHash:hashToken("verification",enrollmentToken),additionHandleHash:hashToken("verification",generateVerificationToken()),bindingHash:sessions.consumerProducer().bindingHash(source),userId:registered.user.user_id,factorId:randomUUID(),secretCiphertext:{v:1,keyId:"fixture",nonce:"AAAAAAAAAAAAAAAA",tag:"AAAAAAAAAAAAAAAAAAAAAA==",ct:"YQ=="},acceptedStep:Math.floor(Date.now()/30000),material:{sessionId:material.sessionId,sessionTokenHash:material.sessionTokenHash,csrfTokenHash:material.csrfTokenHash,sessionBindingContext:material.sessionBindingContext,idleExpiresAt:material.idleExpiresAt,absoluteExpiresAt:material.absoluteExpiresAt}},(["TERMS","PRIVACY"] as const).flatMap(kind=>legalManifestLocales(kind).map(locale=>({kind,locale,...currentDocument(kind,locale)!}))),source)).rejects.toThrow("CONSUMER_AUTH_INVALID");
+    await expect(flow.repository.activateMfaEnrollment({enrollmentTokenHash:hashToken("verification",enrollmentToken),recoveryCodeId:randomUUID(),occurredAt:new Date(),source})).rejects.toThrow("MFA_ENROLLMENT_STATE_INVALID");
+    expect(await snapshot()).toEqual({...before,denials:before.denials+1});
+    const chain=await readAuditChain();expect(chain.rootCount).toBe(1);expect(chain.chain).toHaveLength(chain.totalRows);
   });
 });

@@ -448,7 +448,7 @@ BEGIN
  END LOOP;
 END $migration$;
 
-ALTER TABLE identity.step_up_grant DROP CONSTRAINT step_up_grant_action_check;
+ALTER TABLE identity.step_up_grant DROP CONSTRAINT IF EXISTS step_up_grant_action_check;
 ALTER TABLE identity.step_up_grant ADD CONSTRAINT step_up_grant_action_check CHECK (
  (action IN ('PUBLISH','UNPUBLISH','DELETE_PRIVATE_DEBATE') AND target_run_id IS NOT NULL AND target_account_id IS NULL)
  OR (action IN ('DELETE_ACCOUNT','CHANGE_EMAIL','READ_PHONE_PROFILE','CHANGE_PHONE_PROFILE','CHANGE_RECOVERY_EMAIL','ADD_PASSKEY','ADD_TOTP') AND target_run_id IS NULL AND target_account_id=user_id));
@@ -556,7 +556,7 @@ $$;
 -- A password continuation records the current password and a real available secure method.
 ALTER TABLE identity.login_challenge ALTER COLUMN mfa_factor_id DROP NOT NULL;
 
-CREATE FUNCTION identity.read_secure_login_identity(p_email bytea) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.read_secure_login_identity(p_email bytea) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT jsonb_build_object('userId',u.user_id,'ownerRef',u.owner_ref,'auditToken',u.audit_token,'passwordHash',u.password_hash,
  'factorId',f.mfa_factor_id,'secretCiphertext',f.secret_ciphertext,'lastAcceptedStep',f.last_accepted_step,
@@ -572,14 +572,14 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
 $$;
 
 -- Internal account-lock caller only. A null TOTP snapshot is supported only when another current secure method exists.
-CREATE FUNCTION identity.login_method_current_internal(p_user uuid,p_factor uuid) RETURNS boolean
+CREATE OR REPLACE FUNCTION identity.login_method_current_internal(p_user uuid,p_factor uuid) RETURNS boolean
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT CASE WHEN p_factor IS NOT NULL THEN EXISTS(SELECT 1 FROM identity.mfa_factor WHERE mfa_factor_id=p_factor AND user_id=p_user AND factor_type='totp' AND state='active')
  ELSE EXISTS(SELECT 1 FROM identity.consumer_passkey_credential WHERE user_id=p_user AND revoked_at IS NULL)
  OR EXISTS(SELECT 1 FROM identity.recovery_code WHERE user_id=p_user AND consumed_at IS NULL AND revoked_at IS NULL) END;
 $$;
 
-CREATE TABLE identity.consumer_totp_enrollment (
+CREATE TABLE IF NOT EXISTS identity.consumer_totp_enrollment (
  user_id uuid PRIMARY KEY REFERENCES identity."user"(user_id) ON DELETE CASCADE,
  factor_id uuid NOT NULL UNIQUE REFERENCES identity.mfa_factor(mfa_factor_id) ON DELETE CASCADE,
  handle_hash text NOT NULL UNIQUE CHECK(handle_hash ~ '^sha256:[0-9a-f]{64}$'),
@@ -590,16 +590,16 @@ CREATE TABLE identity.consumer_totp_enrollment (
  created_at timestamptz NOT NULL,expires_at timestamptz NOT NULL,consumed_at timestamptz,
  CHECK(expires_at>created_at AND expires_at<=created_at+interval '5 minutes')
 );
-CREATE INDEX consumer_totp_enrollment_expiry ON identity.consumer_totp_enrollment(expires_at);
-CREATE INDEX consumer_totp_enrollment_source ON identity.consumer_totp_enrollment(retention_hash);
+CREATE INDEX IF NOT EXISTS consumer_totp_enrollment_expiry ON identity.consumer_totp_enrollment(expires_at);
+CREATE INDEX IF NOT EXISTS consumer_totp_enrollment_source ON identity.consumer_totp_enrollment(retention_hash);
 
-CREATE FUNCTION identity.expired_totp_addition_candidates(p_limit integer) RETURNS TABLE(user_id uuid)
+CREATE OR REPLACE FUNCTION identity.expired_totp_addition_candidates(p_limit integer) RETURNS TABLE(user_id uuid)
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 5 THEN RAISE EXCEPTION 'CONSUMER_CHALLENGE_CAPACITY';END IF;
  RETURN QUERY SELECT c.user_id FROM identity.consumer_totp_enrollment c WHERE c.expires_at<=clock_timestamp() OR c.consumed_at IS NOT NULL ORDER BY c.expires_at,c.user_id LIMIT p_limit;
 END $$;
-CREATE FUNCTION identity.prune_totp_addition(p_user uuid) RETURNS void
+CREATE OR REPLACE FUNCTION identity.prune_totp_addition(p_user uuid) RETURNS void
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c identity.consumer_totp_enrollment%ROWTYPE;
 BEGIN
@@ -612,7 +612,7 @@ BEGIN
  DELETE FROM identity.consumer_totp_enrollment WHERE user_id=p_user;
 END $$;
 
-CREATE FUNCTION identity.prepare_secure_totp_enrollment(p_input jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.prepare_secure_totp_enrollment(p_input jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE b record;a record;g identity.step_up_grant%ROWTYPE;v_user uuid;
 BEGIN
@@ -632,7 +632,7 @@ BEGIN
  RETURN jsonb_build_object('userId',v_user,'pseudonym',a.pseudonym,'expiresAt',g.expires_at);
 END $$;
 
-CREATE FUNCTION identity.begin_secure_totp_enrollment(p_input jsonb,p_source jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.begin_secure_totp_enrollment(p_input jsonb,p_source jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE a jsonb;v_user uuid;v_now timestamptz;v_expiry timestamptz;v_actor uuid;v_initial boolean:=p_input->>'enrollmentTokenHash' IS NOT NULL;v_capacity integer:=(p_input->>'challengeCapacity')::integer;v_limit integer:=(p_input->>'challengesPerScope')::integer;
 BEGIN
@@ -667,7 +667,7 @@ BEGIN
  RETURN jsonb_build_object('expiresAt',v_expiry);
 END $$;
 
-CREATE FUNCTION identity.read_secure_totp_enrollment(p_input jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.read_secure_totp_enrollment(p_input jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c identity.consumer_totp_enrollment%ROWTYPE;b record;a record;f identity.mfa_factor%ROWTYPE;v_user uuid;v_expiry timestamptz;v_purpose text;
 BEGIN
@@ -693,7 +693,7 @@ BEGIN
  RETURN jsonb_build_object('userId',v_user,'pseudonym',(SELECT pseudonym FROM identity."user" WHERE user_id=v_user),'factorId',f.mfa_factor_id,'secretCiphertext',f.secret_ciphertext,'lastAcceptedStep',f.last_accepted_step,'purpose',v_purpose,'expiresAt',v_expiry);
 END $$;
 
-CREATE FUNCTION identity.complete_secure_totp_enrollment(p_input jsonb,p_current_legal jsonb,p_source jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.complete_secure_totp_enrollment(p_input jsonb,p_current_legal jsonb,p_source jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE e jsonb;v_user uuid;v_actor uuid;v_owner uuid;v_step bigint:=(p_input->>'acceptedStep')::bigint;v_now timestamptz;v_session uuid;
 BEGIN
@@ -1053,7 +1053,7 @@ BEGIN
  OR (c.purpose='ADD_PASSKEY' AND identity.assert_session_current(v_user,c.ordinary_session_id,c.ordinary_token_hash) IS DISTINCT FROM true) THEN RAISE EXCEPTION 'CONSUMER_AUTH_INVALID';END IF;
  RETURN jsonb_build_object('userId',v_user,'ownerRef',v_account.owner_ref,'sessionId',v_session,'optionsContext',identity.consumer_options_context_internal(v_user,NULL,clock_timestamp()+interval '5 minutes'));
 END $$;
-CREATE FUNCTION identity.read_secure_login_challenge(p_hash text) RETURNS jsonb
+CREATE OR REPLACE FUNCTION identity.read_secure_login_challenge(p_hash text) RETURNS jsonb
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
  SELECT jsonb_build_object('challengeId',c.login_challenge_id,'challengeTokenHash',c.token_hash,'userId',u.user_id,'ownerRef',u.owner_ref,'auditToken',u.audit_token,'passwordHash',c.password_hash_snapshot,
  'factorId',f.mfa_factor_id,'secretCiphertext',f.secret_ciphertext,'lastAcceptedStep',f.last_accepted_step,'bindingHash',c.binding_hash,'expiresAt',c.expires_at,'consumedAt',c.consumed_at)

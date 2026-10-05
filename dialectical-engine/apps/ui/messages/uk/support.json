@@ -81,5 +81,6 @@
   "support.answerRating": "Оцінка відповіді",
   "support.privacyPreferences": "Налаштування конфіденційності",
   "support.aiBanner": "Відповіді створює ШІ; вони мають машинозчитуване маркування й можуть бути помилковими. Будь-коли попросіть залучити людину.",
-  "support.cookiePreferences": "Налаштування файлів cookie"
+  "support.cookiePreferences": "Налаштування файлів cookie",
+  "support.recoverAccount": "Відновити обліковий запис"
 }

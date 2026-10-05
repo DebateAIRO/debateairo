@@ -81,5 +81,6 @@
   "support.answerRating": "تقييم الإجابة",
   "support.privacyPreferences": "تفضيلات الخصوصية",
   "support.aiBanner": "الردود مولّدة بالذكاء الاصطناعي وموسومة بما يمكن للآلة قراءته، وقد تكون خاطئة. اطلب التحدث إلى إنسان في أي وقت.",
-  "support.cookiePreferences": "تفضيلات ملفات تعريف الارتباط"
+  "support.cookiePreferences": "تفضيلات ملفات تعريف الارتباط",
+  "support.recoverAccount": "استرداد حسابك"
 }

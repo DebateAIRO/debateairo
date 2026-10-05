@@ -1,11 +1,11 @@
 -- Committed send attempts survive credential expiry/consumption and transport callbacks.
 -- No raw bearer, address, phone or source context is stored in this ledger.
-CREATE TABLE identity.verification_delivery_reservation (
+CREATE TABLE IF NOT EXISTS identity.verification_delivery_reservation (
   reservation_id uuid PRIMARY KEY,
   channel_binding_id uuid NOT NULL REFERENCES identity.channel_binding(channel_binding_id) ON DELETE CASCADE,
   reserved_at timestamptz NOT NULL
 );
-CREATE INDEX verification_delivery_reservation_channel_time
+CREATE INDEX IF NOT EXISTS verification_delivery_reservation_channel_time
   ON identity.verification_delivery_reservation(channel_binding_id,reserved_at);
 
 -- Conservative migration: seed every surviving recent credential plus a later
@@ -27,7 +27,7 @@ FROM (
     AND channel.verification_last_sent_at-offsets.minutes*interval '1 minute'>clock_timestamp()-interval '1 hour'
 ) history;
 
-CREATE FUNCTION identity.enforce_verification_reservation_parent()
+CREATE OR REPLACE FUNCTION identity.enforce_verification_reservation_parent()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_user_id uuid; BEGIN
   IF TG_OP='UPDATE' AND NEW.channel_binding_id IS DISTINCT FROM OLD.channel_binding_id THEN
@@ -296,7 +296,7 @@ BEGIN
 END;
 $$;
 
-CREATE FUNCTION identity.prepare_verification_resend_reserved_with_audit(
+CREATE OR REPLACE FUNCTION identity.prepare_verification_resend_reserved_with_audit(
   p_email_blind_index bytea,p_token_hash text,p_token_ttl_ms bigint,
   p_occurred_at timestamptz,p_cooldown_ms bigint,p_window_ms bigint,p_maximum_sends integer,
   p_mechanism text,p_source_context jsonb

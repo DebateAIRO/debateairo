@@ -330,6 +330,29 @@ describe("S5 HTTP session boundary", () => {
     await api.close();
   });
 
+  it.each(["malformed", "", CSRF_TOKEN])("client and server reject a valid CSRF cookie plus duplicate %s", async duplicate => {
+    const raw = `${CSRF_COOKIE_NAME}=${CSRF_TOKEN}; ${CSRF_COOKIE_NAME}=${duplicate}`;
+    const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN });
+    const sent: Headers[] = [];
+    vi.stubGlobal("document", { cookie: raw });
+    try {
+      const client = createContractClient(ORIGIN, (async (_url, init) => {
+        const headers = new Headers(init?.headers); sent.push(headers);
+        const response = await api.inject({ method: "POST", url: "/v1/auth/logout", headers: {
+          cookie: `${SESSION_COOKIE_NAME}=${SESSION_TOKEN}; ${raw}`, origin: ORIGIN,
+          ...(headers.has("x-csrf-token") ? { "x-csrf-token": headers.get("x-csrf-token")! } : {})
+        } });
+        return new Response(response.body, { status: response.statusCode, headers: { "content-type": "application/json" } });
+      }) as typeof fetch);
+      await expect(client.logout()).rejects.toMatchObject({ status: 403 });
+      expect(sent[0]!.get("x-csrf-token")).toBeNull();
+      const response = await api.inject({ method: "POST", url: "/v1/auth/logout", headers: {
+        cookie: `${SESSION_COOKIE_NAME}=${SESSION_TOKEN}; ${raw}`, origin: ORIGIN, "x-csrf-token": CSRF_TOKEN
+      } });
+      expect(response.statusCode).toBe(403);
+    } finally { vi.unstubAllGlobals(); await api.close(); }
+  });
+
   it("maps malformed revoke ids to foreign-safe 404 without reaching the repository", async () => {
     const revokeSession = vi.fn().mockResolvedValue(true);
     const api = buildApi({

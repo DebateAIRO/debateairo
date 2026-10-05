@@ -81,5 +81,6 @@
   "support.answerRating": "Ocena odpowiedzi",
   "support.privacyPreferences": "Ustawienia prywatności",
   "support.aiBanner": "Odpowiedzi są generowane przez AI, oznaczone w sposób możliwy do odczytu maszynowego i mogą być błędne. W każdej chwili możesz poprosić o kontakt z człowiekiem.",
-  "support.cookiePreferences": "Ustawienia plików cookie"
+  "support.cookiePreferences": "Ustawienia plików cookie",
+  "support.recoverAccount": "Odzyskaj konto"
 }

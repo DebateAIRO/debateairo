@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, access } from "node:fs/promises";
 import { extname, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -53,27 +53,17 @@ describe("S9 dev-token retirement architecture contract", () => {
     expect(migration).not.toMatch(/UPDATE\s+core\.run\b/i);
   });
 
-  it("exposes a one-shot cookie claim UI and boots acceptance with a real service session", async () => {
-    const [uiControl, uiSettings, acceptance, packageJson,
+  it("keeps the retired claim UI absent and boots acceptance with a real service session", async () => {
+    const [uiSettings, acceptance, packageJson,
       vitestConfig] = await Promise.all([
-      read("apps/ui/components/LegacyRunClaimControls.tsx"),
       read("apps/ui/components/SettingsPageClient.tsx"),
       read("acceptance/main.ts"),
       read("package.json"),
       read("vitest.config.ts")
     ]);
-    for (const control of [uiControl]) {
-      expect(control).toContain("client.claimLegacyRuns(submittedToken)");
-      // VACUOUS-ORDERING GUARD: only the right-hand needle was pinned present.
-      // Without this, dropping the token clear entirely gave indexOf -1 and the
-      // "clears before claiming" ordering passed with no clear at all.
-      expect(control).toContain('setLegacyToken("")');
-      expect(control.indexOf('setLegacyToken("")')).toBeLessThan(
-        control.indexOf("client.claimLegacyRuns(submittedToken)")
-      );
-      expect(control).not.toMatch(/localStorage|sessionStorage|console\./);
-    }
-    expect(uiSettings).toContain("<LegacyRunClaimControls");
+    await expect(access(new URL("apps/ui/components/LegacyRunClaimControls.tsx",root))).rejects.toMatchObject({code:"ENOENT"});
+    expect(uiSettings).not.toContain("LegacyRunClaimControls");
+
     expect(acceptance).toContain("new PostgresSessionRepository(");
     expect(acceptance).toContain("acceptanceServiceRequestHeaders");
     expect(acceptance).toContain("serviceCredential");

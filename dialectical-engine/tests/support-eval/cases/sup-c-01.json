@@ -2,7 +2,7 @@
   "id": "SUP-C-01",
   "class": "C",
   "messages": [
-    { "role": "user", "content": "Where can I sign in to my account?" }
+    { "role": "user", "content": "I forgot my password. Where can I reset it?" }
   ],
   "expected_outcome": "REFUSE_ZONE",
   "expected_source_ids": [],

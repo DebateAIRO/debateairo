@@ -1,7 +1,7 @@
 -- Own-account advisory method availability. No new privileges or proof authority.
 -- Password usability is privately derived by the selected-policy API worker;
 -- the database checks its hash snapshot under the current account/session locks.
-ALTER TABLE identity.social_flow DROP CONSTRAINT social_flow_next_path_check;
+ALTER TABLE identity.social_flow DROP CONSTRAINT IF EXISTS social_flow_next_path_check;
 ALTER TABLE identity.social_flow ADD CONSTRAINT social_flow_next_path_check
  CHECK(next_path IN ('/','/new','/settings','/settings/security','/account'));
 DO $$DECLARE d text;old text;replacement text;BEGIN

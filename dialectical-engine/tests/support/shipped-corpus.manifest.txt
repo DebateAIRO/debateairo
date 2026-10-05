@@ -649,6 +649,7 @@ packages/contract/src/crisis.ts
 packages/contract/src/disclosure.ts
 packages/contract/src/generate.ts
 packages/contract/src/index.ts
+packages/contract/src/locale.ts
 packages/contract/src/lineage.ts
 packages/contract/src/plan-tiers.ts
 packages/contract/src/social-auth.ts

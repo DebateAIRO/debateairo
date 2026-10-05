@@ -81,5 +81,6 @@
   "support.answerRating": "Atbildes vērtējums",
   "support.privacyPreferences": "Privātuma preferences",
   "support.aiBanner": "Atbildes ģenerē MI, tās ir mašīnlasāmi marķētas un var būt kļūdainas. Jebkurā brīdī varat lūgt cilvēka palīdzību.",
-  "support.cookiePreferences": "Sīkdatņu preferences"
+  "support.cookiePreferences": "Sīkdatņu preferences",
+  "support.recoverAccount": "Atgūt kontu"
 }

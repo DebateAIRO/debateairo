@@ -78,6 +78,10 @@ beforeAll(async()=>{
   const before=await identityWitness();expect(before).toHaveLength(22);await migrate(database.pool);await initializeOwnerRecoveryFixture(database.pool,database.connectionString);const after=await identityWitness();
   const phoneSignature='identity.create_pending_account_with_audit(uuid,bytea,jsonb,jsonb,text,text,timestamp with time zone,timestamp with time zone,text,timestamp with time zone,jsonb,jsonb,text,text,timestamp with time zone)';
   const historicalAfter=after.filter(row=>row.signature!==phoneSignature);
+  const reservedSignature='identity.create_pending_account_reserved_with_audit(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,bigint,jsonb,jsonb,text,text,timestamptz)';
+  const retiredResendSignature='identity.prepare_verification_resend_with_audit(bytea,text,timestamp with time zone,timestamp with time zone,bigint,jsonb)';
+  const can=async(role:string,signature:string)=>(await database.pool.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS allowed",[role,signature])).rows[0].allowed as boolean;
+
   expect(after).toHaveLength(23);
   expect(historicalAfter.map(({signature,owner})=>({signature,owner}))).toEqual(before.map(({signature,owner})=>({signature,owner})));
   const oldConstructor=before.find(row=>row.signature.startsWith('identity.create_pending_account_with_audit('))!;
@@ -85,11 +89,17 @@ beforeAll(async()=>{
   for(const original of before) {
     const migrated=historicalAfter.find(row=>row.signature===original.signature)!;
     if(original.signature.startsWith('identity.lock_account_t9_internal('))continue;
-    if(original.signature===oldConstructor.signature) {
-      expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed",[original.signature])).rows[0].allowed).toBe(false);
-      expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed",[phoneSignature])).rows[0].allowed).toBe(true);
+    if(original.signature===oldConstructor.signature || original.signature===retiredResendSignature) {
+      for(const role of ['debateai_runtime','debateai_authorization_runtime','debateai_replay','public'])expect(await can(role,original.signature),`${role}:${original.signature}`).toBe(false);
+      expect(await can(original.owner,original.signature)).toBe(true);
     } else expect(migrated.acl).toBe(original.acl);
   }
+  for(const role of ['debateai_runtime','debateai_authorization_runtime','debateai_replay','public'])expect(await can(role,phoneSignature),`${role}:${phoneSignature}`).toBe(false);
+  expect(await can(oldConstructor.owner,phoneSignature)).toBe(true);
+  const reserved=(await database.pool.query("SELECT pg_get_userbyid(proowner) AS owner,proconfig FROM pg_proc WHERE oid=$1::regprocedure",[reservedSignature])).rows[0];
+  expect(reserved).toEqual({owner:oldConstructor.owner,proconfig:['search_path=pg_catalog']});
+  expect(await can('debateai_runtime',reservedSignature)).toBe(true);
+  expect(await can('public',reservedSignature)).toBe(false);expect(await can('debateai_replay',reservedSignature)).toBe(false);
   console.info('[STAFF_IDENTITY_OWNER_ACL]',JSON.stringify({before,after}));
   await database.pool.query(`CREATE ROLE staff_test_runtime LOGIN PASSWORD 'staff-test-only-password' IN ROLE debateai_runtime`);
   const url=new URL(database.connectionString);url.username='staff_test_runtime';url.password='staff-test-only-password';runtime=createPool(url.toString());
@@ -427,33 +437,37 @@ it('reads a security hold through the exported session adapter and fails closed 
  expect(await reader.readAccountSecurityHold(randomUUID())).toBe(true);
 });
 it('locks a known duplicate account before registration INSERT reaches any channel row lock',async()=>{
- const existing=await account(),proposed=randomUUID(),blind=createHash('sha256').update(existing.userId).digest(),first=await database.pool.connect(),second=await database.pool.connect();
+ const existing=await account(),proposed=randomUUID(),blind=createHash('sha256').update(existing.userId).digest(),first=await database.pool.connect(),second=await runtime.connect();
  const source={ipArgon2id:'argon2id-audit:v1:'+'0'.repeat(64),userAgentArgon2id:'argon2id-audit:v1:'+'1'.repeat(64)};
- const sql="SELECT * FROM identity.create_pending_account_with_audit($1,$2,'{}','{}','fixture-password',$3,clock_timestamp(),clock_timestamp(),$4,clock_timestamp()+interval '1 hour',$5::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp())";
+ const sql="SELECT * FROM identity.create_pending_account_reserved_with_audit($1,$2,'{}','{}','fixture-password',$3,clock_timestamp(),clock_timestamp(),$4,3600000::bigint,$5::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp())";
+ // Preserve the original one-hour verification-token validity; this TTL is not a dispatch reservation.
+ let firstOpen=false,secondOpen=false;
  try {
-  await first.query('BEGIN');await first.query('SELECT identity.lock_security_subjects($1::uuid[])',[[existing.userId]]);
-  await second.query('BEGIN');await second.query('SELECT identity.begin_runtime_audit_attempt()');
+  await first.query('BEGIN');firstOpen=true;await first.query('SELECT identity.lock_security_subjects($1::uuid[])',[[existing.userId]]);
+  await second.query('BEGIN');secondOpen=true;await second.query('SELECT identity.begin_runtime_audit_attempt()');
   const pid=(await second.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
   const duplicate=second.query(sql,[proposed,blind,proposed,hash(proposed),source]);await pending(duplicate);
   expect((await database.pool.query("SELECT wait_event FROM pg_stat_activity WHERE pid=$1",[pid])).rows[0].wait_event).toBe('advisory');
-  await first.query('SELECT * FROM identity.lock_account_t9_internal($1,false)',[existing.userId]);await first.query('COMMIT');
-  expect((await duplicate).rows[0].status).toBe('EMAIL_DUPLICATE');await second.query('COMMIT');
+  await first.query('SELECT * FROM identity.lock_account_t9_internal($1,false)',[existing.userId]);await first.query('COMMIT');firstOpen=false;
+  expect((await duplicate).rows[0].status).toBe('EMAIL_DUPLICATE');await second.query('COMMIT');secondOpen=false;
   expect((await database.pool.query('SELECT count(*)::int AS n FROM identity."user" WHERE user_id=$1',[proposed])).rows[0].n).toBe(0);
- } finally {await first.query('ROLLBACK');await second.query('ROLLBACK');first.release();second.release();}
+ } finally {try{if(firstOpen)await first.query('ROLLBACK');}finally{first.release();try{if(secondOpen)await second.query('ROLLBACK');}finally{second.release();}}}
 });
 it('serializes concurrent new registration through INSERT uniqueness without retaining a committed duplicate row lock',async()=>{
- const one=randomUUID(),two=randomUUID(),blind=createHash('sha256').update(randomUUID()).digest(),first=await database.pool.connect(),second=await database.pool.connect();
+ const one=randomUUID(),two=randomUUID(),blind=createHash('sha256').update(randomUUID()).digest(),first=await database.pool.connect(),second=await runtime.connect();
  const source={ipArgon2id:'argon2id-audit:v1:'+'0'.repeat(64),userAgentArgon2id:'argon2id-audit:v1:'+'1'.repeat(64)};
- const sql="SELECT * FROM identity.create_pending_account_with_audit($1,$2,'{}','{}','fixture-password',$3,clock_timestamp(),clock_timestamp(),$4,clock_timestamp()+interval '1 hour',$5::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp())";
+ const sql="SELECT * FROM identity.create_pending_account_reserved_with_audit($1,$2,'{}','{}','fixture-password',$3,clock_timestamp(),clock_timestamp(),$4,3600000::bigint,$5::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp())";
+ // Preserve the original one-hour verification-token validity; this TTL is not a dispatch reservation.
+ let firstOpen=false,secondOpen=false;
  try {
-  await first.query('BEGIN');await first.query('SELECT identity.begin_runtime_audit_attempt()');await first.query(sql,[one,blind,one,hash(one),source]);
-  await second.query('BEGIN');await second.query('SELECT identity.begin_runtime_audit_attempt()');const pid=(await second.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+  await first.query('BEGIN');firstOpen=true;await first.query('SELECT identity.begin_runtime_audit_attempt()');await first.query(sql,[one,blind,one,hash(one),source]);
+  await second.query('BEGIN');secondOpen=true;await second.query('SELECT identity.begin_runtime_audit_attempt()');const pid=(await second.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
   const duplicate=second.query(sql,[two,blind,two,hash(two),source]);await pending(duplicate);
   expect((await database.pool.query('SELECT wait_event FROM pg_stat_activity WHERE pid=$1',[pid])).rows[0].wait_event).toBe('transactionid');
-  await first.query('SELECT * FROM identity.lock_account_t9_internal($1,false)',[one]);await first.query('COMMIT');
-  expect((await duplicate).rows[0].status).toBe('EMAIL_DUPLICATE');await second.query('COMMIT');
+  await first.query('SELECT * FROM identity.lock_account_t9_internal($1,false)',[one]);await first.query('COMMIT');firstOpen=false;
+  expect((await duplicate).rows[0].status).toBe('EMAIL_DUPLICATE');await second.query('COMMIT');secondOpen=false;
   expect((await database.pool.query('SELECT count(*)::int AS n FROM identity."user" WHERE email_blind_index=$1',[blind])).rows[0].n).toBe(1);
- } finally {await first.query('ROLLBACK');await second.query('ROLLBACK');first.release();second.release();}
+ } finally {try{if(firstOpen)await first.query('ROLLBACK');}finally{first.release();try{if(secondOpen)await second.query('ROLLBACK');}finally{second.release();}}}
 });
 it('requires live OWNER designation even for malformed delegated rows carrying Owner capabilities',async()=>{
  const actor=await staff(),capabilities=['TEAM_READ','TEAM_INVITE','TEAM_GRANT','TEAM_DISABLE','AUDIT_READ','EMERGENCY_DISABLE'];

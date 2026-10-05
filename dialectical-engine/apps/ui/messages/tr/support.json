@@ -81,5 +81,6 @@
   "support.answerRating": "Yanıt değerlendirmesi",
   "support.privacyPreferences": "Gizlilik tercihleri",
   "support.aiBanner": "Yanıtlar yapay zekâ tarafından üretilir, makinece okunabilir biçimde işaretlenir ve yanlış olabilir. İstediğiniz zaman bir insanla görüşmeyi talep edin.",
-  "support.cookiePreferences": "Çerez tercihleri"
+  "support.cookiePreferences": "Çerez tercihleri",
+  "support.recoverAccount": "Hesabınızı kurtarın"
 }

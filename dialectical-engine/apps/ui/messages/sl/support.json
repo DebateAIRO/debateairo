@@ -81,5 +81,6 @@
   "support.answerRating": "Ocena odgovora",
   "support.privacyPreferences": "Nastavitve zasebnosti",
   "support.aiBanner": "Odgovori so ustvarjeni z UI, strojno berljivo označeni in so lahko napačni. Kadar koli lahko zahtevate pomoč človeka.",
-  "support.cookiePreferences": "Nastavitve piškotkov"
+  "support.cookiePreferences": "Nastavitve piškotkov",
+  "support.recoverAccount": "Obnovi račun"
 }

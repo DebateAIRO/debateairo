@@ -34,6 +34,7 @@ describe("Support catalog route coverage", () => {
       "/",
       "/admin/workers",
       "/ai-transparency",
+      "/social/complete",
       "/cookies",
       "/debate/[id]",
       "/enroll-mfa",
@@ -45,12 +46,15 @@ describe("Support catalog route coverage", () => {
       "/privacy/us-health-data",
       "/providers",
       "/public/debate/[id]",
+      "/recover",
       "/settings",
+      "/settings/security",
       "/sign-up",
       "/terms",
       "/terms/versions",
       "/verify-email",
-    ]);
+      "/verify-recovery-email",
+    ].sort());
   });
 
   it("marks sensitive stateful pages as excluded from ordinary actions", () => {
@@ -107,7 +111,7 @@ describe("Support catalog route coverage", () => {
     expect(capabilities.get("owner-debate")?.articleIds).toContain("debate-workspace-menus");
     expect(capabilities.get("settings")).toMatchObject({
       articleIds: expect.arrayContaining(["settings-help-menus"]),
-      actionIds: expect.arrayContaining(["active-sessions","claim-legacy","delete-account"])
+      actionIds: expect.arrayContaining(["active-sessions","security","delete-account"])
     });
     expect(capabilities.get("help-desk")?.articleIds).toEqual(expect.arrayContaining([
       "app-navigation","settings-help-menus","support-status-limits"
@@ -119,9 +123,8 @@ describe("Support catalog route coverage", () => {
     expect(actions.get("active-sessions")).toMatchObject({
       availability:"signed-in",href:"/settings#active-sessions-heading"
     });
-    expect(actions.get("claim-legacy")).toMatchObject({
-      availability:"signed-in",href:"/settings#legacy-run-claim-heading"
-    });
+    expect(actions.get("security")).toMatchObject({availability:"signed-in",href:"/settings/security"});
+    expect(actions.has("claim-legacy")).toBe(false);
     expect(actions.get("delete-account")).toMatchObject({
       availability:"signed-in",href:"/settings#account-deletion-heading"
     });

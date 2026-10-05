@@ -494,6 +494,7 @@ export function createPool() {}
 export function configureContentEncryption() {}
 export class RunRepository {}
 export class EntitlementRepository {}
+export class PostgresInternalAllowanceRepository {}
 const uncaught = process.listenerCount("uncaughtExceptionMonitor");
 const exitSink = process.listenerCount("exit");
 if (uncaught < 1 || exitSink < 1) throw new Error("RUNNER_INSTALLER_NOT_FIRST");

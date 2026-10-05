@@ -1,0 +1,53 @@
+{
+  "schema": "task13-reviewable-release-evidence-v1",
+  "status": "RELEASE_BLOCKED",
+  "base": "b20373576c5cb9140fe47d555056220f5c708dce",
+  "fullReviewStart": "aeeb06260",
+  "files": {
+    "final-report.md": "095a6c22d2e3f220316c44956b0818a0caef4b3a3a2d136d02e7c2edf3b5ae07",
+    "completed-command-receipts.json": "5902fda637c0304059c6a416286cbb1c7ca719aa93c02afe8e410c86806ba631",
+    "rulings.md": "dcb4032c4eeeddb8a9dd4d252304f2db5c3a3302fbcd7f697fd1520e282d04c8",
+    "rulings-provenance.json": "45aa8918345c06ab0dad7b32fed36fd6f2e94ad062b8809cfa09b82e85cdeb90",
+    "approved-local-evidence.tar.xz": "b84a776eae20d4d5fce210dd05df322e80d2f052a40234c8c362a830804cfaf0",
+    "approved-local-evidence-copy-receipt.json": "8f971e6facdbafd3d253c36192113dfc845dafa8fcc70956f9f668fdb293d4bf",
+    "approved-local-evidence-preview-manifest.json": "eeb306101dbf6d7a06d592277e829c44bf7b5eedfbf6c2b6fe4cffc38515fc3e",
+    "approved-local-evidence-redaction-map.json": "af6a2f1f78516574eb434a9afadaa0bf09160bbcfbc490ec8a4fe5e7b2a35088",
+    "approved-supplemental-evidence.tar.xz": "d3bc5bc01ffdfe5405f6561a666a92733767eac4086c6348de50b552c3dbfa0c",
+    "approved-supplemental-evidence-copy-receipt.json": "917f537e913f2ea62506760d191f9ad9915ad01eec80f5f00fa5288aeec8b123",
+    "approved-supplemental-evidence-preview-manifest.json": "9d6da37479a327e94acf854bba280b2782eead68828e1b0f4144032c77e9bc60",
+    "approved-supplemental-evidence-redaction-map.json": "928c394a4144d49bad99f2b7b59a481b0d455d9e9099041bbe2b55b054309e89",
+    "source-integration.md": "8ebac45d173a7e0cf2bd7727e2fbf9767df7f77a68a781bdbc0da3941f0f1757",
+    "deployment-handoff.md": "d4c487037a0913b16042fc4a8a384b192760f9a301bc8c6c64e9dc8188d201be",
+    "release-checklist.md": "6538ef74f361b7f5280edde525337547544fc871dda7cf49c59cc26705c4a2f2",
+    "legal-pending-delta.md": "332629c3e3f78ce87db10c5d7f1d15e3ef300fb189b7328df95e6fb9bf1821cc",
+    "migration-preservation.json": "b29c11102123f24c80c1be576fe4504c8de4bf7da00817e85a1a59f5a6c4bf61",
+    "source-audit-disposition.json": "97838a52c2b1da9e75175bd4a500e97f5df9e3a79239b4cd46c76ed19bfbfc66",
+    "three-tree-baseline-comparison.json": "bce634ebbc9bc7ddda15e7a292a90dbc92135effec152038364bf76f3e6fe872",
+    "root-build-source-comparison.json": "b7c16b680c8e8332ac2f4caca96b16d4b7744207527e7869faa8f157b718a432",
+    "approved-fix1-evidence.tar.xz": "600c4737b67b7687dd7644917378711efa71ef658cb7d744760f75080f1e0fbc",
+    "approved-fix1-evidence-copy-receipt.json": "a857c59894e7dde1cef2ad27d7f89bcebfa5b9ec6445a50ef64d18efb99592b6",
+    "approved-fix1-evidence-preview-manifest.json": "889369fbd6dc0baf199f69146c4cf680c29d5a3b6bd1a1cb403049cac1b0cea9",
+    "approved-fix1-evidence-redaction-map.json": "61ce42450bc3514a5b69c4d17eb9c57a1d267f5e0855e1f206f59cfa4458633b",
+    "fix1-report.md": "b7e78932e8a04e6657b4c1ae7b025b146fb78e060526008ddf9a88e96a47b779",
+    "probe-public-profile.py": "bda330ef2a6cbe911ae52210a9e80b53918823d461d86a80f5d0002deb41b811",
+    "test-release-artifacts.py": "04c110086182c9da0b5c6ed8fd592908d33e81821184d23cc7c9c241d53f9b76",
+    "prepare-legal-brand-candidate.py": "a1e374c08473966a140b8a927f4ebc7f56508483e33397848fce6c72d0476b2c",
+    "legal-brand-candidate.patch": "8e07102399a088bb93ebc2d2621d0237bf8c9fb3c8db0b646a0d62a79e119416",
+    "legal-brand-candidate-hashes.json": "3aabf4b498e61cd67b01994b9bde3461fb6fb9b642c9bdc127f21de458756fe7"
+  },
+  "reviewBoundary": "This index pins current reviewed preparation, not target acceptance. Subsequent review/fix artifacts require their own preservation and affected checks.",
+  "fix1": {
+    "findings": [
+      "I1",
+      "I2",
+      "M1"
+    ],
+    "status": "CORRECTED_PENDING_INDEPENDENT_FIX_REVIEW",
+    "unsafeOriginalHead": "e2a2c9e6d159372e4dc2003a85e99fc56de1d063",
+    "replacementParent": "b20373576c5cb9140fe47d555056220f5c708dce",
+    "mailArtifactSha256Sums": "9a92f2d5fabcb5640a918c17db24e0b7922b9df9a14ae6f8cae5eff73b69c038",
+    "mailArtifactFiles": 66,
+    "historicalRulingsAtFixFreeze": 139,
+    "noReleaseAcceptanceWaiver": true
+  }
+}

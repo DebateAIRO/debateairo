@@ -1069,5 +1069,13 @@ describe("SUP-01 /help assistant", () => {
     expect(document.querySelector('[aria-label="Acțiuni"]')).toBeNull();
   });
 
-  it.todo("opens the verified first-party Forgot password flow after V-1 supplies its exact destination");
+  it.each(["en","ro"] as const)("opens the verified first-party Forgot password destination in %s",async language=>{
+    vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url==="/api/v1/support/sessions"
+      ? {session:{session_id:"recovery-session",identity_bound:false},session_token:"recovery-token"}
+      : {message_id:"recovery-link",outcome:"REFUSE_ZONE",text:"Support cannot reset credentials.",sources:[],actions:[],refusal_link:"/recover"}),{status:url==="/api/v1/support/sessions"?201:200,headers:{"content-type":"application/json"}})));
+    await renderLocalized(language,<Assistant client={supportAssistantClient} signedIn={false}/>);await submit(language==="ro"?"Am uitat parola":"Forgot password");
+    const link=document.querySelector<HTMLAnchorElement>('a[href="/recover"]');expect(link).not.toBeNull();
+    expect(link!.textContent).toContain(language==="ro"?"Recuperează":"Recover");
+    expect(link!.search).toBe("");expect(link!.hash).toBe("");
+  });
 });

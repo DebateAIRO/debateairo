@@ -13,5 +13,7 @@ test('named CTA button and text hover geometry has no transforms',()=>{
  const css=read('app/globals.css');for(const name of ['lpCtaNav','lpCtaHero','lpCtaClosing','lpCtaGhost','ndStart','libStart']) {const rules=[...css.matchAll(new RegExp('\\.'+name+':hover[^}]*\\}', 'g'))];assert.ok(rules.length>0,name);for(const [rule] of rules) assert.doesNotMatch(rule,/transform:\s*(?:scale|translate)/,name);}
 });
 test('report and provisioned MFA issuer use the product brand, preserving company identity',()=>{
- assert.doesNotMatch(read('lib/report/ReportDocument.tsx'),/(?:author|creator|producer)="DebateAI"/);assert.match(read('../../packages/register/src/mfa-policy.ts'),/"issuer": "Dialectical Engine"/);
+ assert.doesNotMatch(read('lib/report/ReportDocument.tsx'),/(?:author|creator|producer)="DebateAI"/);const issuer=read('../../packages/register/src/mfa-policy.ts');
+ assert.match(issuer,/export const MFA_POLICY_DEPLOYMENT_REGISTER_ROW = Object\.freeze\([\s\S]*?issuer:\s*"Dialectical Engine"/);
+ assert.match(issuer,/"issuer": "DebateAIRO"/);
 });

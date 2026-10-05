@@ -1,0 +1,42 @@
+From: dezbatere.ro <noreply@dezbatere.ro>
+To: verification-direct-and-recovery-proof@fixture.invalid
+Message-ID: <11111111-1111-4111-8111-111111111111@debateai.local>
+Subject: Your Dialectical Engine account recovery completed
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="dialectical-account-v1"
+X-Account-Template: security-recovery-completed-v1
+X-Account-Expires: 1791186060000
+X-Account-Locale: en
+X-Account-Time-Zone: UTC
+X-Account-Runtime: node=26.8.2;icu=78.3;tz=2026a;cldr=48.0;unicode=17.0
+
+--dialectical-account-v1
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+RGlhbGVjdGljYWwgRW5naW5lDQoNCkEgcmVwbGFjZW1lbnQgc2VjdXJpdHkgbWV0aG9kIHdhcyB2
+ZXJpZmllZCBhdCA1IE9jdG9iZXIgMjAyNiBhdCAwNzo0MSBHTVQrMCAoVVRDKS4NCg0KUHJldmlv
+dXMgc2VjdXJpdHkgbWV0aG9kcyBhbmQgdW51c2VkIHNhdmVkIHJlY292ZXJ5IGNvZGVzIG5vIGxv
+bmdlciB3b3JrLg0KDQpJZiB5b3UgZGlkIG5vdCBjb21wbGV0ZSByZWNvdmVyeSwgY29udGFjdCB0
+aGUgc2l0ZSBvcGVyYXRvciBpbW1lZGlhdGVseS4NCg==
+--dialectical-account-v1
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+PCFkb2N0eXBlIGh0bWw+PGh0bWwgbGFuZz0iZW4iPjxoZWFkPjxtZXRhIGNoYXJzZXQ9IlVURi04
+Ij48dGl0bGU+WW91ciBEaWFsZWN0aWNhbCBFbmdpbmUgYWNjb3VudCByZWNvdmVyeSBjb21wbGV0
+ZWQ8L3RpdGxlPjwvaGVhZD48Ym9keSBzdHlsZT0ibWFyZ2luOjA7YmFja2dyb3VuZDojZjdmM2U4
+O2NvbG9yOiMyNDI0MjQ7Zm9udC1mYW1pbHk6QXJpYWwsc2Fucy1zZXJpZiI+PG1haW4gc3R5bGU9
+Im1heC13aWR0aDo2MDBweDttYXJnaW46MzJweCBhdXRvO3BhZGRpbmc6MzJweDtib3JkZXItdG9w
+OjRweCBzb2xpZCAjYjg5YjVlIj48cCBzdHlsZT0iZm9udC1zaXplOjIycHg7Zm9udC13ZWlnaHQ6
+Ym9sZCI+RGlhbGVjdGljYWwgRW5naW5lPC9wPjxoMSBzdHlsZT0iZm9udC1zaXplOjI0cHgiPllv
+dXIgRGlhbGVjdGljYWwgRW5naW5lIGFjY291bnQgcmVjb3ZlcnkgY29tcGxldGVkPC9oMT48cCBz
+dHlsZT0ibGluZS1oZWlnaHQ6MS42Ij5BIHJlcGxhY2VtZW50IHNlY3VyaXR5IG1ldGhvZCB3YXMg
+dmVyaWZpZWQgYXQgPHNwYW4gbGFuZz0iZW4iPjUgT2N0b2JlciAyMDI2IGF0IDA3OjQxIEdNVCsw
+IChVVEMpPC9zcGFuPi48L3A+PHAgc3R5bGU9ImxpbmUtaGVpZ2h0OjEuNiI+UHJldmlvdXMgc2Vj
+dXJpdHkgbWV0aG9kcyBhbmQgdW51c2VkIHNhdmVkIHJlY292ZXJ5IGNvZGVzIG5vIGxvbmdlciB3
+b3JrLjwvcD48cCBzdHlsZT0ibGluZS1oZWlnaHQ6MS42Ij5JZiB5b3UgZGlkIG5vdCBjb21wbGV0
+ZSByZWNvdmVyeSwgY29udGFjdCB0aGUgc2l0ZSBvcGVyYXRvciBpbW1lZGlhdGVseS48L3A+PHAg
+c3R5bGU9ImZvbnQtc2l6ZToxMnB4Ij5kZXpiYXRlcmUucm88L3A+PC9tYWluPjwvYm9keT48L2h0
+bWw+DQo=
+--dialectical-account-v1--

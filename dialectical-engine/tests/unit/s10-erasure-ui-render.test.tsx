@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { JSDOM } from "jsdom";
 import { act,useState } from "react";
 import { createRoot,type Root } from "react-dom/client";
@@ -13,21 +14,17 @@ let dom:JSDOM;
 let root:Root|null=null;
 
 beforeEach(()=>{
-  dom=new JSDOM("<!doctype html><html><body><div id='root'></div></body></html>",{
-    url:"https://app.debateai.test/debate/"+RUN_ID
-  });
-  Object.assign(globalThis,{
-    window:dom.window,document:dom.window.document,HTMLElement:dom.window.HTMLElement,
-    Event:dom.window.Event,MouseEvent:dom.window.MouseEvent,
-    IS_REACT_ACT_ENVIRONMENT:true
-  });
+  dom={window} as unknown as JSDOM;
+  document.body.innerHTML="<div id='root'></div>";
+  window.history.replaceState({},"","/debate/"+RUN_ID);
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
 });
 
 afterEach(async ()=>{
   if (root!==null) await act(async ()=>{ root?.unmount(); });
   root=null;
   vi.useRealTimers();
-  dom.window.close();
+  vi.unstubAllGlobals();
 });
 
 function button(label:string):HTMLButtonElement {
@@ -42,6 +39,13 @@ async function flush():Promise<void> {
   await act(async ()=>{ await Promise.resolve(); });
 }
 
+async function confirmCurrentSecurityAction():Promise<void> {
+  await flush();await act(async()=>button("Password").click());await flush();
+  const password=document.querySelector<HTMLInputElement>('[name="security-password"]')!,code=document.querySelector<HTMLInputElement>('[name="security-code"]')!;
+  await act(async()=>{password.value="correct horse battery staple";code.value="123456";password.form!.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true}));});
+  await flush();
+}
+
 describe("S10 rendered erasure boundaries",()=>{
   for (const [name,Control] of [
     ["apps/ui",AppPublicationControl]
@@ -49,11 +53,12 @@ describe("S10 rendered erasure boundaries",()=>{
     for (const outcome of ["PENDING","CLEANED"] as const) {
       it(`${name} purges every mounted private plaintext view on ${outcome}`,async ()=>{
         const client={
+          authMethods:vi.fn(async()=>({methods:[],recovery_codes_remaining:0,available_step_up_methods:['password_totp' as const],step_up_providers:[]})),
           readRunVisibility:vi.fn(async ()=>({ state:"PRIVATE" as const,public_ref:null })),
           stepUp:vi.fn(async ()=>({
             status:"step_up_complete" as const,csrf_token:"c".repeat(43),
             step_up_grant:{ token:"g".repeat(43),action:"DELETE_PRIVATE_DEBATE" as const,
-              target_run_id:RUN_ID,expires_at:"2026-08-24T22:00:00.000Z" }
+              target_run_id:RUN_ID,expires_at:new Date(Date.now()+300000).toISOString() }
           })),
           publishRun:vi.fn(),unpublishRun:vi.fn(),
           deletePrivateDebate:vi.fn(async ()=>({ status:outcome }))
@@ -74,7 +79,9 @@ describe("S10 rendered erasure boundaries",()=>{
         await act(async ()=>{ form.dispatchEvent(new dom.window.Event(
           "submit",{ bubbles:true,cancelable:true }
         )); });
-        await flush();
+        await confirmCurrentSecurityAction();
+        expect(client.stepUp).toHaveBeenCalledWith("correct horse battery staple","123456",{action:"DELETE_PRIVATE_DEBATE",target_run_id:RUN_ID});
+        expect(client.deletePrivateDebate).toHaveBeenCalledWith(RUN_ID,"g".repeat(43));
         expect(document.body.textContent).not.toContain(PRIVATE_SENTINEL);
         expect(document.querySelector('[role="status"]')?.textContent).toBe(outcome);
       });
@@ -82,11 +89,12 @@ describe("S10 rendered erasure boundaries",()=>{
 
     it(`${name} retains the mounted plaintext when deletion fails`,async ()=>{
       const client={
+        authMethods:vi.fn(async()=>({methods:[],recovery_codes_remaining:0,available_step_up_methods:['password_totp' as const],step_up_providers:[]})),
         readRunVisibility:vi.fn(async ()=>({ state:"PRIVATE" as const,public_ref:null })),
         stepUp:vi.fn(async ()=>({
           status:"step_up_complete" as const,csrf_token:"c".repeat(43),
           step_up_grant:{ token:"g".repeat(43),action:"DELETE_PRIVATE_DEBATE" as const,
-            target_run_id:RUN_ID,expires_at:"2026-08-24T22:00:00.000Z" }
+            target_run_id:RUN_ID,expires_at:new Date(Date.now()+300000).toISOString() }
         })),
         publishRun:vi.fn(),unpublishRun:vi.fn(),
         deletePrivateDebate:vi.fn(async ()=>{ throw new Error("DENIED"); })
@@ -106,7 +114,8 @@ describe("S10 rendered erasure boundaries",()=>{
       await act(async ()=>{ form.dispatchEvent(new dom.window.Event(
         "submit",{ bubbles:true,cancelable:true }
       )); });
-      await flush();
+      await confirmCurrentSecurityAction();
+      expect(client.deletePrivateDebate).toHaveBeenCalledTimes(1);
       expect(document.body.textContent).toContain(PRIVATE_SENTINEL);
       expect(document.body.textContent).toContain("not authorized");
     });

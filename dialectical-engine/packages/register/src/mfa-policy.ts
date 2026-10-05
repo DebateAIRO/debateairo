@@ -71,7 +71,7 @@ const MFA_POLICY_PUBLICATION_ROW = Object.freeze({
   "rowKey": "mfaPolicy",
   "value": Object.freeze({
     "kind": "MFA_POLICY",
-    "issuer": "Dialectical Engine",
+    "issuer": "DebateAIRO",
     "enrollment_credential_ttl_ms": canonicalDecimal("86400000"),
     "totp": Object.freeze({
       "algorithm": "SHA1",
@@ -107,6 +107,14 @@ export const MFA_POLICY_REGISTER_ROW = Object.freeze({
   valueAst: MFA_POLICY_PUBLICATION_ROW.value,
   value: JSON.parse(canonicalRegisterJson(MFA_POLICY_PUBLICATION_ROW.value)) as MfaPolicyValue,
   sourceRef: MFA_POLICY_PUBLICATION_ROW.sourceRef
+});
+
+/** A new deployment publication changes the display issuer; sealed historical MFA bytes stay exact. */
+export const MFA_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
+  rowKey: MFA_POLICY_ROW_KEY,
+  valueAst: Object.freeze({...MFA_POLICY_REGISTER_ROW.valueAst,issuer:"Dialectical Engine"}),
+  value: Object.freeze({...MFA_POLICY_REGISTER_ROW.value,issuer:"Dialectical Engine"}),
+  sourceRef: `${MFA_POLICY_REGISTER_ROW.sourceRef}; 2026-10-04-account-onboarding-passkeys:Task13 current product issuer; historical row unchanged`
 });
 
 export function mfaPolicyFromValue(candidate: unknown): MfaPolicy {

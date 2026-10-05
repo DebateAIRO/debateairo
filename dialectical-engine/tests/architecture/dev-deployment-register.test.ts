@@ -40,7 +40,8 @@ describe("DEV-05 development deployment register source contract", () => {
     // V-14: the deployment register publishes the superseding authentication
     // rows; the sealed historical set is never republished from here.
     expect(source).toContain("AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS");
-    expect(source).toContain("MFA_POLICY_REGISTER_ROW");
+    expect(source).toContain("MFA_POLICY_DEPLOYMENT_REGISTER_ROW");
+    expect(source).not.toMatch(/\bMFA_POLICY_REGISTER_ROW\b/u);
     expect(source).toContain("SESSION_POLICY_DEPLOYMENT_REGISTER_ROW");
     expect(source).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(source).toContain("CONSUMER_RECOVERY_POLICY_REGISTER_ROW");

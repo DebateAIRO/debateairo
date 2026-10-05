@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { mailAlternatives } from "../support/accountMail.js";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -42,7 +43,9 @@ describe("S10 own-sendmail security notification adapter", () => {
         expect(message).toContain("To: person@example.test\r\n");
         expect(message).toContain(`Message-ID: <${messageId}@debateai.local>\r\n`);
         expect(mailAlternatives(message).text).toContain(expected);
-        expect(mailAlternatives(message).html).toContain(expected);
+        const html=new DOMParser().parseFromString(mailAlternatives(message).html,"text/html");
+        expect(html.body.textContent).toContain(expected);
+        expect(html.documentElement.lang).toBe("en");
         expect(message).not.toContain("DELETE MY ACCOUNT");
       }
       await expect(sender.sendSecurityNotification({
