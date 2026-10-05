@@ -1,6 +1,7 @@
 "use client";
 
 import { ContractHttpError } from '@debateai/contract';
+import { clearPhoneCompletionDraft, phoneCompletionDraftForOwner, consumePhoneDraftUpdate, savePhoneCompletionDraft, type PhoneDraftForm, type SubmittedPhoneDraft } from '@/lib/phoneCompletionDraft';
 import { PhoneProfileCard } from '@/components/PhoneProfileCard';
 import settingsEnglish from '@/messages/en/settings.json';
 import authEnglish from '@/messages/en/auth.json';
@@ -157,10 +158,13 @@ function NewDebateForm({
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  type SubmittedDraft = { topic: string; config: ReturnType<typeof buildNewDebateAskConfig>; query: { plan_tier: PlanTier; composition_budget_tier: CompositionBudgetTier; depth: number } };
+  type SubmittedDraft = SubmittedPhoneDraft;
   const [phoneCompletion, setPhoneCompletion] = useState<SubmittedDraft | null>(null);
   const submittedDraft = useRef<SubmittedDraft | null>(null);
   const submitFlight = useRef(false);
+  const [providerRetry, setProviderRetry] = useState<SubmittedDraft | null>(null);
+  const formSnapshot = useRef<PhoneDraftForm>(null!);
+  formSnapshot.current = { topic, planTier, optionsOpen, depthMode, scrutiny, depth, branching, concurrency, maxTokens, riskTier, riskTierWasEdited, budgetTier, decisionScope, asOf };
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
   const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
   // Budget spec §2.11: the room for the ask this form would send. It is a
@@ -203,12 +207,26 @@ function NewDebateForm({
     let active = true;
     void contractClient.readSession().then((session) => {
       if (!active) return;
+      const preserved = phoneCompletionDraftForOwner(session.asker_id);
+      if (preserved) {
+        const v = preserved.form;
+        setTopic(v.topic); setPlanTier(v.planTier); followedTier.current = v.planTier;
+        setOptionsOpen(v.optionsOpen); setDepthMode(v.depthMode); setScrutiny(v.scrutiny);
+        setDepth(v.depth); setBranching(v.branching); setConcurrency(v.concurrency); setMaxTokens(v.maxTokens);
+        setRiskTier(v.riskTier); setRiskTierWasEdited(v.riskTierWasEdited); setBudgetTier(v.budgetTier); setDecisionScope(v.decisionScope); setAsOf(v.asOf);
+        submittedDraft.current = preserved.submitted;
+        if (preserved.phase === 'phone-required') setPhoneCompletion(preserved.submitted);
+        else if (preserved.phase === 'updated') setProviderRetry(consumePhoneDraftUpdate(preserved.id, session.asker_id));
+        setSessionDefaultsError(null);
+        return;
+      }
       const defaults = deriveSessionAskDefaults(session, new Date(), catalog);
       setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);
       setAsOf(defaults.asOf);
       setSessionDefaultsError(null);
     }).catch((failure: unknown) => {
       if (!active) return;
+      if (failure instanceof ContractHttpError && (failure.status === 401 || failure.status === 403)) clearPhoneCompletionDraft();
       // DL3-F7: classified copy, never the contract client's server-authored text.
       setSessionDefaultsError(requestFailureMessage("SESSION_DEFAULTS",failure,catalog));
     });
@@ -243,7 +261,7 @@ function NewDebateForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (submitFlight.current) return;
+    if (submitFlight.current || phoneCompletion !== null) return;
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
     // debate — and before anything else, the form's own rules and the consent screen included.
     if (crisis.offerIfCrisis(topic)) return;
@@ -278,6 +296,7 @@ function NewDebateForm({
         if (!await consent.ensureConsent({ known: "required" })) return;
         debate = await createDebate(topic.trim(), config, token);
       }
+      clearPhoneCompletionDraft();
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (exc) {
       if (exc instanceof ContractHttpError && exc.serverCode === 'ACCOUNT_PHONE_REQUIRED' && submittedDraft.current) {
@@ -316,9 +335,9 @@ function NewDebateForm({
     void submit(event as unknown as FormEvent);
   }
 
-  async function retryCompletedPhone() {
-    if (!phoneCompletion || submitFlight.current) return;
-    const draft = phoneCompletion;
+  async function retryCompletedPhone(restored?: SubmittedDraft) {
+    const draft = restored ?? phoneCompletion;
+    if (!draft || submitFlight.current) return;
     submitFlight.current = true; setSubmitting(true); setError(null); setPhoneCompletion(null);
     try {
       if (crisis.offerIfCrisis(draft.topic)) return;
@@ -330,6 +349,7 @@ function NewDebateForm({
         if (!await consent.ensureConsent({ known: "required" })) return;
         debate = await createDebate(draft.topic, draft.config, token);
       }
+      clearPhoneCompletionDraft();
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (failure) {
       if (failure instanceof ContractHttpError && failure.serverCode === 'ACCOUNT_PHONE_REQUIRED') setPhoneCompletion(draft);
@@ -342,6 +362,12 @@ function NewDebateForm({
     } finally { submitFlight.current = false; setSubmitting(false); }
   }
 
+  useEffect(() => {
+    if (!providerRetry) return;
+    setProviderRetry(null);
+    void retryCompletedPhone(providerRetry);
+  }, [providerRetry]);
+
   return (
     <div className="screen scroll ndScreen">
       <div className="ndInner">
@@ -349,7 +375,7 @@ function NewDebateForm({
         <h1 className="ndTitle">{t(catalog, "newDebate.title")}</h1>
         <div className="ndAiDisclosure"><AiNotice catalog={noticeCatalog} body={t(catalog, "newDebate.aiNotice")} /></div>
         <UsageBars catalog={billingCatalog} locale={locale} onPlan={rememberPlan} onFunding={rememberFunding} />
-        {phoneCompletion ? <PhoneProfileCard completion catalog={settingsCatalog} authCatalog={authCatalog} onUpdated={retryCompletedPhone} onCancel={() => setPhoneCompletion(null)}/> : null}
+        {phoneCompletion ? <PhoneProfileCard completion catalog={settingsCatalog} authCatalog={authCatalog} onUpdated={retryCompletedPhone} onBeforeProviderRedirect={async ({isCurrent}) => { return phoneCompletion ? await savePhoneCompletionDraft(contractClient, () => formSnapshot.current, phoneCompletion, isCurrent) : false; }} onCancel={() => { clearPhoneCompletionDraft(); setPhoneCompletion(null); }}/> : null}
       <form onSubmit={submit} onKeyDown={onKeyDown}>
           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
           {consent.declined ? (

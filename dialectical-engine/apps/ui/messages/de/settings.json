@@ -170,5 +170,6 @@
   "settings.phone.required": "Füge deine Telefonnummer hinzu, um fortzufahren. Deine Frage und Optionen bleiben erhalten.",
   "settings.security.lastPath": "Füge eine andere Anmeldemethode hinzu, bevor du diese entfernst.",
   "settings.security.codesRemaining": "Wiederherstellungscodes: {count}",
-  "settings.security.regenerate": "Neue Wiederherstellungscodes erstellen"
+  "settings.security.regenerate": "Neue Wiederherstellungscodes erstellen",
+  "settings.security.refreshFailed": "Die Sicherheitsdetails konnten nicht aktualisiert werden. Lade die Seite neu."
 }

@@ -171,5 +171,6 @@
   "settings.phone.required": "Dodajte telefon za nastavak. Pitanje i opcije ostaju spremljeni.",
   "settings.security.lastPath": "Dodajte drugi način prijave prije uklanjanja ovoga.",
   "settings.security.codesRemaining": "Kodovi za oporavak: {count}",
-  "settings.security.regenerate": "Generiraj nove kodove za oporavak"
+  "settings.security.regenerate": "Generiraj nove kodove za oporavak",
+  "settings.security.refreshFailed": "Sigurnosni podaci nisu osvježeni. Ponovno učitajte stranicu."
 }

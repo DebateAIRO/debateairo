@@ -10,7 +10,7 @@ import { SecurityConfirmation, type SecurityConfirmationClient } from './auth/Se
 import { PhoneField } from './auth/PhoneField';
 export type SecurityResume = { authorization: StepUpAuthorizationRequest; initialProof: ConfirmedSecurityAction };
 export type PhoneProfileClient = Pick<ContractClient, 'phoneProfile' | 'revealPhoneProfile' | 'updatePhoneProfile'> & SecurityConfirmationClient;
-export function PhoneProfileCard({ client = contractClient, catalog, authCatalog, resume, completion = false, onUpdated, onCancel }: {
+export function PhoneProfileCard({ client = contractClient, catalog, authCatalog, resume, completion = false, onUpdated, onCancel, onBeforeProviderRedirect }: {
     client?: PhoneProfileClient;
     catalog: MessageCatalog;
     authCatalog: MessageCatalog;
@@ -18,6 +18,7 @@ export function PhoneProfileCard({ client = contractClient, catalog, authCatalog
     completion?: boolean;
     onUpdated?: () => void | Promise<void>;
     onCancel?: () => void;
+    onBeforeProviderRedirect?: (context: {authorization: StepUpAuthorizationRequest; isCurrent: () => boolean}) => void | boolean | Promise<void | boolean>;
 }) {
     const [profile, setProfile] = useState<AccountPhoneProfile | null>(null);
     const [full, setFull] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export function PhoneProfileCard({ client = contractClient, catalog, authCatalog
     const [held, setHeld] = useState<ConfirmedSecurityAction | null>(null);
     const [busy, setBusy] = useState(false);
     const sequence = useRef(0);
+    const revealSequence = useRef(0);
     const metadataSequence = useRef(0);
     const flight = useRef(false);
     const active = useRef(true);
@@ -50,6 +52,7 @@ export function PhoneProfileCard({ client = contractClient, catalog, authCatalog
     useEffect(() => {
         setFull(null);
         const ended = (event: Event) => {
+            revealSequence.current++;
             setFull(null);
             if (event instanceof CustomEvent && event.detail?.ended === true) { metadataSequence.current++; sequence.current++; setPhone(''); setHeld(null); setAction(null); }
         };
@@ -78,8 +81,9 @@ export function PhoneProfileCard({ client = contractClient, catalog, authCatalog
         flight.current = true; setBusy(true); setError(null); setHeld(null);
         try {
             if (authorization.action === 'READ_PHONE_PROFILE') {
+                const revealOwner = ++revealSequence.current;
                 const value = await client.revealPhoneProfile(result.step_up_grant.token);
-                if (active.current && generation === sequence.current && matchingSecurityGrant(result, authorization)) { setRevealUntil(Date.parse(result.step_up_grant.expires_at)); setFull(value.phone); }
+                if (active.current && generation === sequence.current && revealOwner === revealSequence.current && matchingSecurityGrant(result, authorization)) { setRevealUntil(Date.parse(result.step_up_grant.expires_at)); setFull(value.phone); }
             } else if (authorization.action === 'CHANGE_PHONE_PROFILE') {
                 const value = await client.updatePhoneProfile({ phone: normalized!, grantToken: result.step_up_grant.token });
                 if (active.current && generation === sequence.current) { metadataSequence.current++; setProfile(value); setPhone(''); setAction(null); await onUpdated?.(); }
@@ -100,7 +104,7 @@ export function PhoneProfileCard({ client = contractClient, catalog, authCatalog
             <button type="button" disabled={busy} onClick={() => choose('CHANGE_PHONE_PROFILE')}>{t(catalog, 'settings.phone.change')}</button>
         </div> : <>
             {action.action === 'CHANGE_PHONE_PROFILE' ? <PhoneField id={`${id}-phone`} value={phone} onChange={value => { setPhone(value); setPhoneError(undefined); }} catalog={authCatalog} error={phoneError} disabled={busy}/> : null}
-            {held ? <><button type="button" data-resumed-confirm disabled={busy} onClick={() => void execute(held)}>{t(authCatalog, 'auth.security.confirm')}</button><button type="button" onClick={cancel}>{t(authCatalog, 'auth.security.cancel')}</button></> : <SecurityConfirmation catalog={authCatalog} client={client} authorization={action} disabled={busy || (action.action === 'CHANGE_PHONE_PROFILE' && !normalized)} onConfirmed={execute} onCancel={cancel}/>}
+            {held ? <><button type="button" data-resumed-confirm disabled={busy} onClick={() => void execute(held)}>{t(authCatalog, 'auth.security.confirm')}</button><button type="button" onClick={cancel}>{t(authCatalog, 'auth.security.cancel')}</button></> : <SecurityConfirmation catalog={authCatalog} client={client} authorization={action} onBeforeProviderRedirect={onBeforeProviderRedirect} disabled={busy || (action.action === 'CHANGE_PHONE_PROFILE' && !normalized)} onConfirmed={execute} onCancel={cancel}/>}
         </>}
     </section>;
 }

@@ -18,9 +18,10 @@ export interface SecurityConfirmationProps {
     onConfirmed: (result: ConfirmedSecurityAction) => void | Promise<void>;
     onCancel?: () => void;
     onError?: (failure: unknown) => void;
+    onBeforeProviderRedirect?: (context: {authorization: StepUpAuthorizationRequest; isCurrent: () => boolean}) => void | boolean | Promise<void | boolean>;
 }
 /** Exact action/target proof. Callback executes with the current rotated cookie/CSRF pair. */
-export function SecurityConfirmation({ authorization, catalog, client = contractClient, browser: provided, initialProof, disabled = false, onConfirmed, onCancel, onError }: SecurityConfirmationProps) {
+export function SecurityConfirmation({ authorization, catalog, client = contractClient, browser: provided, initialProof, disabled = false, onConfirmed, onCancel, onError, onBeforeProviderRedirect }: SecurityConfirmationProps) {
     const enabled = useRef(!disabled);
     enabled.current = !disabled;
     const usedInitial = useRef<string | null>(null);
@@ -146,6 +147,13 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
         setBusy(true);
         setError(null);
         try {
+            const isCurrent = () => owner === sequence.current && requestedAuthorization === authorizationKey.current && enabled.current;
+            const prepared = onBeforeProviderRedirect ? await onBeforeProviderRedirect({authorization, isCurrent}) : undefined;
+            if (prepared === false) {
+                if (isCurrent()) { flight.current = false; setBusy(false); setError(t(catalog, 'auth.social.unavailable')); }
+                return;
+            }
+            if (!isCurrent()) return;
             const result = await (client.beginSocialStepUp ?? contractClient.beginSocialStepUp)(provider, authorization);
             if (owner !== sequence.current || requestedAuthorization !== authorizationKey.current || !enabled.current)
                 return;

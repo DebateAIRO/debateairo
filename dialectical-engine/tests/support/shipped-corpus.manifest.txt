@@ -521,6 +521,7 @@ apps/ui/lib/models.ts
 apps/ui/lib/observability/index.ts
 apps/ui/lib/observability/logger.ts
 apps/ui/lib/observability/suspiciousScoring.ts
+apps/ui/lib/phoneCompletionDraft.ts
 apps/ui/lib/privacyPolicy.ts
 apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts

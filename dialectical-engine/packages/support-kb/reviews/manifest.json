@@ -320,7 +320,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "a5aa3386877d3af0bba7d432d150451c67ab735393f5fc49302aa36626349543",
+    "componentFileSha256": "53ba9f42e9984a5c152f55934f6c47bb517e16d5adffdb23e85f07f5759e20dc",
     "components": [
       {
         "id": "account-access",
@@ -365,8 +365,8 @@
         "id": "account-settings",
         "lang": "ro",
         "articleSha256": "60cef78be7c3eb7dafaf5686d2648beaea9a058d597b49ec2fef9d99ac5fc298",
-        "modelProjectionSha256": "853de67fee75354bb2f4b8e2d22f595d58f3ab19d5a98245bdcf38bad4602ec0",
-        "fallbackSha256": "853de67fee75354bb2f4b8e2d22f595d58f3ab19d5a98245bdcf38bad4602ec0",
+        "modelProjectionSha256": "87365bf4a4e5448ce92a556b2d8d9dc810e1da8257e1b29770415a9a5c2ad89f",
+        "fallbackSha256": "87365bf4a4e5448ce92a556b2d8d9dc810e1da8257e1b29770415a9a5c2ad89f",
         "reviewedBy": "SOL",
         "reviewerSession": "/root/implement_task12",
         "reviewedOn": "2026-10-05",

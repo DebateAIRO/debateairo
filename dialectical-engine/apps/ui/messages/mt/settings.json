@@ -173,5 +173,6 @@
   "settings.phone.required": "Żid it-telefon biex tkompli. Il-mistoqsija u l-għażliet tiegħek jinżammu.",
   "settings.security.lastPath": "Żid metodu ieħor ta’ dħul qabel tneħħi dan.",
   "settings.security.codesRemaining": "Kodiċijiet ta’ rkupru: {count}",
-  "settings.security.regenerate": "Iġġenera kodiċijiet ġodda ta’ rkupru"
+  "settings.security.regenerate": "Iġġenera kodiċijiet ġodda ta’ rkupru",
+  "settings.security.refreshFailed": "Id-dettalji tas-sigurtà ma setgħux jiġu aġġornati. Erġa’ tella’ l-paġna."
 }

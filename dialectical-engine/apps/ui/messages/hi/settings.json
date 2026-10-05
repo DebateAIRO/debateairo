@@ -170,5 +170,6 @@
   "settings.phone.required": "जारी रखने के लिए फ़ोन नंबर जोड़ें। आपका प्रश्न और विकल्प सुरक्षित रहेंगे।",
   "settings.security.lastPath": "इसे हटाने से पहले साइन इन का दूसरा तरीका जोड़ें।",
   "settings.security.codesRemaining": "रिकवरी कोड: {count}",
-  "settings.security.regenerate": "नए रिकवरी कोड बनाएँ"
+  "settings.security.regenerate": "नए रिकवरी कोड बनाएँ",
+  "settings.security.refreshFailed": "सुरक्षा जानकारी रीफ़्रेश नहीं हो सकी। पेज फिर से लोड करें।"
 }

@@ -171,5 +171,6 @@
   "settings.phone.required": "Adicione o telefone para continuar. A pergunta e as opções são mantidas.",
   "settings.security.lastPath": "Adicione outro método de início de sessão antes de remover este.",
   "settings.security.codesRemaining": "Códigos de recuperação: {count}",
-  "settings.security.regenerate": "Gerar novos códigos de recuperação"
+  "settings.security.regenerate": "Gerar novos códigos de recuperação",
+  "settings.security.refreshFailed": "Não foi possível atualizar os detalhes de segurança. Recarregue a página."
 }

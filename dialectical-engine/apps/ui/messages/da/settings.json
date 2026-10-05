@@ -170,5 +170,6 @@
   "settings.phone.required": "Tilføj dit telefonnummer for at fortsætte. Dit spørgsmål og dine valg bevares.",
   "settings.security.lastPath": "Tilføj en anden loginmetode, før du fjerner denne.",
   "settings.security.codesRemaining": "Gendannelseskoder: {count}",
-  "settings.security.regenerate": "Generér nye gendannelseskoder"
+  "settings.security.regenerate": "Generér nye gendannelseskoder",
+  "settings.security.refreshFailed": "Sikkerhedsoplysningerne kunne ikke opdateres. Genindlæs siden."
 }

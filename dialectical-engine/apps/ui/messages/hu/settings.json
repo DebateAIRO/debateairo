@@ -170,5 +170,6 @@
   "settings.phone.required": "A folytatáshoz adja meg a telefonszámát. A kérdés és a beállítások megmaradnak.",
   "settings.security.lastPath": "Az eltávolítás előtt adjon hozzá másik bejelentkezési módot.",
   "settings.security.codesRemaining": "Helyreállítási kódok: {count}",
-  "settings.security.regenerate": "Új helyreállítási kódok létrehozása"
+  "settings.security.regenerate": "Új helyreállítási kódok létrehozása",
+  "settings.security.refreshFailed": "A biztonsági adatokat nem sikerült frissíteni. Töltse be újra az oldalt."
 }

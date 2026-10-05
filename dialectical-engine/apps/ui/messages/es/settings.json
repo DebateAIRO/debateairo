@@ -171,5 +171,6 @@
   "settings.phone.required": "Añade tu teléfono para continuar. Se conservan tu pregunta y tus opciones.",
   "settings.security.lastPath": "Añade otro método de acceso antes de eliminar este.",
   "settings.security.codesRemaining": "Códigos de recuperación: {count}",
-  "settings.security.regenerate": "Generar nuevos códigos de recuperación"
+  "settings.security.regenerate": "Generar nuevos códigos de recuperación",
+  "settings.security.refreshFailed": "No se pudieron actualizar los datos de seguridad. Vuelve a cargar la página."
 }

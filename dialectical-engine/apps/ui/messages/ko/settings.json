@@ -169,5 +169,6 @@
   "settings.phone.required": "계속하려면 전화번호를 추가하세요. 질문과 옵션은 유지됩니다.",
   "settings.security.lastPath": "이 방법을 삭제하기 전에 다른 로그인 방법을 추가하세요.",
   "settings.security.codesRemaining": "복구 코드: {count}",
-  "settings.security.regenerate": "새 복구 코드 생성"
+  "settings.security.regenerate": "새 복구 코드 생성",
+  "settings.security.refreshFailed": "보안 정보를 새로 고칠 수 없습니다. 페이지를 다시 불러오세요."
 }

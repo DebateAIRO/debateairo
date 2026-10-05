@@ -172,5 +172,6 @@
   "settings.phone.required": "Добавьте телефон, чтобы продолжить. Вопрос и параметры сохраняются.",
   "settings.security.lastPath": "Добавьте другой способ входа, прежде чем удалить этот.",
   "settings.security.codesRemaining": "Коды восстановления: {count}",
-  "settings.security.regenerate": "Создать новые коды восстановления"
+  "settings.security.regenerate": "Создать новые коды восстановления",
+  "settings.security.refreshFailed": "Не удалось обновить сведения о безопасности. Перезагрузите страницу."
 }

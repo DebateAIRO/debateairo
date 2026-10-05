@@ -172,5 +172,6 @@
   "settings.phone.required": "Norėdami tęsti pridėkite telefoną. Klausimas ir parinktys išsaugomi.",
   "settings.security.lastPath": "Prieš pašalindami šį būdą pridėkite kitą prisijungimo būdą.",
   "settings.security.codesRemaining": "Atkūrimo kodai: {count}",
-  "settings.security.regenerate": "Generuoti naujus atkūrimo kodus"
+  "settings.security.regenerate": "Generuoti naujus atkūrimo kodus",
+  "settings.security.refreshFailed": "Nepavyko atnaujinti saugumo duomenų. Įkelkite puslapį iš naujo."
 }

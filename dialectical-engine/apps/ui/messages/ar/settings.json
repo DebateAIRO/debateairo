@@ -174,5 +174,6 @@
   "settings.phone.required": "أضف رقم هاتفك للمتابعة. سيتم الاحتفاظ بسؤالك وخياراتك.",
   "settings.security.lastPath": "أضف طريقة أخرى لتسجيل الدخول قبل إزالة هذه الطريقة.",
   "settings.security.codesRemaining": "رموز الاسترداد: {count}",
-  "settings.security.regenerate": "إنشاء رموز استرداد جديدة"
+  "settings.security.regenerate": "إنشاء رموز استرداد جديدة",
+  "settings.security.refreshFailed": "تعذر تحديث تفاصيل الأمان. أعد تحميل الصفحة."
 }

@@ -170,5 +170,6 @@
   "settings.phone.required": "Add your phone to continue. Your question and options are kept.",
   "settings.security.lastPath": "Add another sign-in method before removing this one.",
   "settings.security.codesRemaining": "Recovery codes: {count}",
-  "settings.security.regenerate": "Generate new recovery codes"
+  "settings.security.regenerate": "Generate new recovery codes",
+  "settings.security.refreshFailed": "Security details could not be refreshed. Reload the page."
 }

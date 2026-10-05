@@ -5,6 +5,7 @@ import type { ContractClient, LocaleCode, CatalogLocaleCode, StepUpResponse, Soc
 import { dobToIso, type DobParts } from '@debateai/kernel';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
+import { ownedPhoneCompletionDraft } from '@/lib/phoneCompletionDraft';
 import { retainSocialStepUp } from '@/lib/socialStepUpHandoff';
 import { safeSocialReturnPath } from '@/lib/returnPath';
 import { takeFragmentToken } from '@/lib/mfaEnrollment';
@@ -37,6 +38,12 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     onAuthenticated?: () => void;
     onStepUp?: (result: StepUpResponse) => void;
 }) {
+    const [returnToQuestion, setReturnToQuestion] = useState(false);
+    useEffect(() => {
+        let current = true;
+        void ownedPhoneCompletionDraft(client, () => current).then(value => { if (current) setReturnToQuestion(!!value); });
+        return () => { current = false; };
+    }, [client]);
     const router = useRouter();
     const started = useRef(false);
     const flight = useRef(false);
@@ -318,6 +325,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const methods = kind === 'stepup' ? stepUpStatus?.available_methods ?? [] : ['passkey', 'totp', 'recovery_code'];
     return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
  {error ? <p role="alert">{error}</p> : null}
+ {returnToQuestion && !stepUpResult && !backup ? <a href="/new">{t(catalog, 'auth.continue')}</a> : null}
  {backup ? <div><EphemeralCodes codes={[backup]} catalog={catalog}/><button type="button" onClick={() => {
                 setBackup(null);
                 if (authenticated)

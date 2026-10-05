@@ -169,5 +169,6 @@
   "settings.phone.required": "添加电话号码后继续。你的问题和选项会保留。",
   "settings.security.lastPath": "删除此方式前，请添加其他登录方式。",
   "settings.security.codesRemaining": "恢复代码：{count}",
-  "settings.security.regenerate": "生成新的恢复代码"
+  "settings.security.regenerate": "生成新的恢复代码",
+  "settings.security.refreshFailed": "无法刷新安全信息。请重新加载页面。"
 }

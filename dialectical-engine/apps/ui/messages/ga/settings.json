@@ -173,5 +173,6 @@
   "settings.phone.required": "Cuir d’uimhir fóin leis chun leanúint ar aghaidh. Coinneofar do cheist agus do roghanna.",
   "settings.security.lastPath": "Cuir modh eile sínithe isteach leis sula mbainfidh tú an ceann seo.",
   "settings.security.codesRemaining": "Cóid aisghabhála: {count}",
-  "settings.security.regenerate": "Gin cóid aisghabhála nua"
+  "settings.security.regenerate": "Gin cóid aisghabhála nua",
+  "settings.security.refreshFailed": "Níorbh fhéidir na sonraí slándála a athnuachan. Athlódáil an leathanach."
 }

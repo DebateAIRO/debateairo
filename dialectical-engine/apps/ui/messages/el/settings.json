@@ -170,5 +170,6 @@
   "settings.phone.required": "Προσθέστε το τηλέφωνό σας για να συνεχίσετε. Η ερώτηση και οι επιλογές σας διατηρούνται.",
   "settings.security.lastPath": "Προσθέστε άλλη μέθοδο σύνδεσης πριν αφαιρέσετε αυτήν.",
   "settings.security.codesRemaining": "Κωδικοί ανάκτησης: {count}",
-  "settings.security.regenerate": "Δημιουργία νέων κωδικών ανάκτησης"
+  "settings.security.regenerate": "Δημιουργία νέων κωδικών ανάκτησης",
+  "settings.security.refreshFailed": "Δεν ήταν δυνατή η ανανέωση των στοιχείων ασφάλειας. Φορτώστε ξανά τη σελίδα."
 }
