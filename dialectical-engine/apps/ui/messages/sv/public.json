@@ -84,8 +84,6 @@
   "public.publication.openPublicVersion": "Öppna den offentliga versionen",
   "public.publication.unpublishEllipsis": "Återkalla publicering…",
   "public.publication.publishEllipsis": "Publicera…",
-  "public.publication.accountPassword": "Kontots lösenord",
-  "public.publication.authenticatorCode": "Autentiseringskod",
   "public.publication.acknowledgePublish": "Jag förstår och vill publicera den här debatten.",
   "public.publication.acknowledgeUnpublish": "Jag förstår och vill återkalla publiceringen av den här debatten.",
   "public.publication.authorizing": "Kontrollerar behörighet…",

@@ -1,22 +1,49 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthProvidersResponseSchema, type AuthProvidersResponse, type ContractClient } from '@debateai/contract';
-export function SocialProviderButtons({ client, navigate = (url: string) => window.location.assign(url) }: {
+import { t, type MessageCatalog } from '@/lib/i18n/translate';
+import { safeSocialReturnPath } from '@/lib/returnPath';
+export function SocialProviderButtons({ client, catalog, navigate = (url: string) => window.location.assign(url), onBegin }: {
     client: Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin'>>;
+    catalog: MessageCatalog;
     navigate?: (url: string) => void;
+    onBegin?: () => void;
 }) {
-    const [providers, setProviders] = useState<AuthProvidersResponse['providers']>([]), [busy, setBusy] = useState(false), [error, setError] = useState(false);
-    useEffect(() => { let active = true; if (client.authProviders)
-        void client.authProviders().then(value => { const parsed = AuthProvidersResponseSchema.safeParse(value); if (active && parsed.success)
-            setProviders(parsed.data.providers); }).catch(() => { }); return () => { active = false; }; }, [client]);
+    const [providers, setProviders] = useState<AuthProvidersResponse['providers']>([]);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState(false);
+    const flight = useRef(false);
+    useEffect(() => {
+        let active = true;
+        if (client.authProviders)
+            void client.authProviders().then(value => {
+                const parsed = AuthProvidersResponseSchema.safeParse(value);
+                if (active && parsed.success)
+                    setProviders(parsed.data.providers);
+            }).catch(() => {
+            });
+        return () => {
+            active = false;
+        };
+    }, [client]);
     if (!providers.length || !client.beginSocialLogin)
         return null;
-    return <div aria-label="Other ways to sign in">{providers.map(provider => <button key={provider.id} type="button" className="authSecondaryButton" disabled={busy} onClick={async () => { setBusy(true); setError(false); try {
-        const requested=new URLSearchParams(window.location.search).get('next');const next=requested==='/settings'||requested==='/account'?requested:'/';const result = await client.beginSocialLogin!(provider.id, {next});
-        navigate(result.authorization_url);
-    }
-    catch {
-        setError(true);
-        setBusy(false);
-    } }}>Continue with {provider.name}</button>)}{error ? <p role="alert">Sign-in is unavailable. Please try again.</p> : null}</div>;
+    return <div aria-label={t(catalog, "auth.social.methods")}>{providers.map(provider => <button key={provider.id} type="button" className="authSecondaryButton" disabled={busy} onClick={async () => {
+                if (flight.current)
+                    return;
+                flight.current = true;
+                onBegin?.();
+                setBusy(true);
+                setError(false);
+                try {
+                    const next = safeSocialReturnPath(new URLSearchParams(window.location.search).get('next'));
+                    const result = await client.beginSocialLogin!(provider.id, { next });
+                    navigate(result.authorization_url);
+                }
+                catch {
+                    setError(true);
+                    flight.current = false;
+                    setBusy(false);
+                }
+            }}>{t(catalog, "auth.social.continue", { provider: provider.name })}</button>)}{error ? <p role="alert">{t(catalog, "auth.social.unavailable")}</p> : null}</div>;
 }

@@ -84,8 +84,6 @@
   "public.publication.openPublicVersion": "公開版を開く",
   "public.publication.unpublishEllipsis": "公開を取り消す…",
   "public.publication.publishEllipsis": "公開する…",
-  "public.publication.accountPassword": "アカウントのパスワード",
-  "public.publication.authenticatorCode": "認証アプリのコード",
   "public.publication.acknowledgePublish": "理解したうえで、この討論を公開します。",
   "public.publication.acknowledgeUnpublish": "理解したうえで、この討論の公開を取り消します。",
   "public.publication.authorizing": "承認中…",

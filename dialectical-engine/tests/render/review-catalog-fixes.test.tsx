@@ -177,7 +177,7 @@ describe("review F5: /enroll-mfa and /verify-email are served with their auth ca
   it("paints the Hebrew enrolment copy on the first render, with no English in between", async () => {
     for (const layout of [EnrollMfaLayout, VerifyEmailLayout]) {
       const html = await firstPaint("he", layout);
-      for (const key of ["auth.enroll.mandatoryMfa", "auth.enroll.protectAccount"]) {
+      for (const key of ["auth.signUp.eyebrow", "auth.enroll.securityTitle"]) {
         expect(html).toContain(escapeHtml(catalogValue("he", "auth", key)));
         // MUT: restore the lazy client loader (English until the chunk arrives) -> RED.
         expect(html).not.toContain(escapeHtml(catalogValue("en", "auth", key)));
@@ -187,7 +187,7 @@ describe("review F5: /enroll-mfa and /verify-email are served with their auth ca
 
   it("keeps English on the English path and refuses a silent English fallback elsewhere", async () => {
     const html = await firstPaint("en", EnrollMfaLayout);
-    expect(html).toContain(escapeHtml(catalogValue("en", "auth", "auth.enroll.protectAccount")));
+    expect(html).toContain(escapeHtml(catalogValue("en", "auth", "auth.enroll.securityTitle")));
     function Unserved() {
       useSelectedAuthCatalog("he");
       return null;

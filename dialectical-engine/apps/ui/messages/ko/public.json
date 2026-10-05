@@ -84,8 +84,6 @@
   "public.publication.openPublicVersion": "공개 버전 열기",
   "public.publication.unpublishEllipsis": "게시 취소…",
   "public.publication.publishEllipsis": "게시…",
-  "public.publication.accountPassword": "계정 비밀번호",
-  "public.publication.authenticatorCode": "인증 앱 코드",
   "public.publication.acknowledgePublish": "내용을 이해했으며 이 토론을 게시하겠습니다.",
   "public.publication.acknowledgeUnpublish": "내용을 이해했으며 이 토론의 게시를 취소하겠습니다.",
   "public.publication.authorizing": "승인 중…",

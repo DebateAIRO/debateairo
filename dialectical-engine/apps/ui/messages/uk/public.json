@@ -84,8 +84,6 @@
   "public.publication.openPublicVersion": "Відкрити загальнодоступну версію",
   "public.publication.unpublishEllipsis": "Скасувати оприлюднення…",
   "public.publication.publishEllipsis": "Оприлюднити…",
-  "public.publication.accountPassword": "Пароль облікового запису",
-  "public.publication.authenticatorCode": "Код застосунку-автентифікатора",
   "public.publication.acknowledgePublish": "Я розумію наслідки й хочу оприлюднити ці дебати.",
   "public.publication.acknowledgeUnpublish": "Я розумію наслідки й хочу скасувати оприлюднення цих дебатів.",
   "public.publication.authorizing": "Авторизація…",

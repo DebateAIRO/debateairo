@@ -443,7 +443,7 @@ describe("the footers (15a full, 15b one line)", () => {
 
   it("the layout renders the one-line footer on every page and CSS hides it under a full footer", () => {
     const layout = source("apps/ui/app/layout.tsx");
-    expect(layout).toMatch(/\{children\}\s*<CookieConsent \/>\s*<SiteFooter variant="line" \/>/);
+    expect(layout).toMatch(/\{children\}<\/AuthCatalogProvider>\s*<CookieConsent \/>\s*<SiteFooter variant="line" \/>/);
     const css = source("apps/ui/app/legal.css");
     expect(css).toMatch(/\.appShell:has\(\.siteFooterFull\) > \.siteFooterLine\s*\{\s*display: none;/);
   });

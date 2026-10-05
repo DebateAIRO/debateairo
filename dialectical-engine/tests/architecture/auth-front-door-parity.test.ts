@@ -39,12 +39,16 @@ describe("auth front-door parity", () => {
   // in favour of apps/ui (.hermes/reports/2026-09-01-algorithm-live-loop/
   // PROGRESS.md:32, DECISIONS.md:810), so the manifest gate is asserted over the
   // one surviving build. Nothing else about the gate changes.
-  it("uses one exact four-route production-manifest gate from the surviving Next build", async () => {
+  it("uses one exact auth-route production-manifest gate from the surviving Next build", async () => {
     expect(REQUIRED_AUTH_ROUTES).toEqual([
       "/login",
       "/sign-up",
       "/verify-email",
-      "/enroll-mfa"
+      "/enroll-mfa",
+      "/recover",
+      "/verify-recovery-email",
+      "/social/complete",
+      "/settings/security"
     ]);
     const packageJson = JSON.parse(await read("apps/ui/package.json")) as { scripts: { build: string } };
     expect(packageJson.scripts.build).toContain("assert-auth-front-door-routes.mjs");
@@ -77,9 +81,9 @@ describe("auth front-door parity", () => {
     expect(login).toMatch(/client\.completeLogin/);
     expect(login).toMatch(/replacement_recovery_code/);
     for (const [key, english] of [
-      ["auth.login.authenticatorTitle", "Enter your authentication code."],
+      ["auth.passkey.signIn", "Sign in with a passkey"],
       ["auth.login.useRecoveryCode", "Use a recovery code"],
-      ["auth.login.recoveryTitle", "Enter a recovery code."],
+      ["auth.login.authenticationCodeLabel", "6-digit authentication code"],
       ["auth.login.backToSignIn", "Back to sign in"]
     ] as const) {
       expect(login).toContain(`t(catalog, "${key}")`);
@@ -88,16 +92,19 @@ describe("auth front-door parity", () => {
     expect(login).not.toMatch(/localStorage|sessionStorage|Bearer|OAuth|forgot|remember/i);
 
     expect(signUp).toMatch(/client\.register/);
-    expect(signUp).not.toMatch(/client\.resendVerification/);
-    expect(signUp).toMatch(/section-primary-email email/);
-    expect(signUp).toMatch(/section-recovery-email email/);
+    expect(signUp).toMatch(/<EmailPendingScreen/);
+    expect(signUp).toMatch(/autoComplete="username"/);
+    expect(signUp).toMatch(/<PhoneField/);
+    expect(signUp).not.toMatch(/name="(?:confirm-email|confirm-password|recovery-email)"/);
     expect(signUp).not.toMatch(/localStorage|sessionStorage|Bearer|Google|Model API/i);
 
     expect(verify).toMatch(/export \{ default \} from "\.\.\/enroll-mfa\/page"/);
     expect(verify).not.toMatch(/<form\b/);
 
-    expect(enroll).toContain('id="totp-code"');
-    expect(enroll).toContain('id="recovery-typeback"');
+    expect(enroll).toContain('<SecurityEnrollment');
+    const shared=await read('apps/ui/components/auth/SecurityEnrollment.tsx');
+    expect(shared).toContain('id="enrollment-code"');
+    expect(shared).not.toContain('recovery-typeback');
     expect(enroll).not.toMatch(/<form\b/);
   });
 });

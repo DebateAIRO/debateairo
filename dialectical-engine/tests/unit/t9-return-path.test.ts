@@ -59,3 +59,6 @@ describe("T9 return-path validation", () => {
     expect(safeReturnPath(raw)).toBe(DEFAULT_RETURN_PATH);
   });
 });
+import {safeSocialReturnPath} from '../../apps/ui/lib/returnPath.js';
+import {BeginSocialLoginRequestSchema,BeginSocialStepUpRequestSchema} from '@debateai/contract';
+it('ordinary success defaults to /new and OAuth admits only exact closed routes including Security',()=>{expect(DEFAULT_RETURN_PATH).toBe('/new');for(const path of ['/new','/settings/security'] as const){expect(safeSocialReturnPath(path)).toBe(path);expect(BeginSocialLoginRequestSchema.safeParse({next:path}).success).toBe(true);expect(BeginSocialStepUpRequestSchema.safeParse({authorization:{action:'CHANGE_EMAIL'},next:path}).success).toBe(true);}for(const path of ['//evil.invalid','https://evil.invalid','/settings/security/../x','/new?next=//evil.invalid','/settings/security#token=secret']){expect(safeSocialReturnPath(path)).toBe('/new');expect(BeginSocialLoginRequestSchema.safeParse({next:path}).success).toBe(false);}});

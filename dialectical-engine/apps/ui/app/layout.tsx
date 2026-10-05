@@ -1,3 +1,4 @@
+import { AuthCatalogProvider } from '@/components/AuthShell';
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
@@ -57,7 +58,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await requestLocale();
   const localeDefinition = getLocale(locale);
-  const [chrome, debateViews, support, consent, privacy, terms] = await Promise.all([
+  const [chrome, debateViews, support, consent, privacy, terms, auth] = await Promise.all([
     loadNamespace(locale, "chrome"),
     loadNamespace(locale, "debateViews"),
     loadNamespace(locale, "support"),
@@ -65,7 +66,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // on its first render, with no client chunk load and no English in between.
     loadNamespace(locale, "consent"),
     loadLegalDocument(locale, "privacy"),
-    loadLegalDocument(locale, "terms")
+    loadLegalDocument(locale, "terms"),
+    loadNamespace(locale, "auth")
   ]);
   const sharedCatalog = Object.freeze({ ...chrome, ...debateViews, ...support });
 
@@ -106,7 +108,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <LegalDocumentsProvider locale={locale} privacy={privacy} terms={terms}>
               <div className="appShell">
                 <TopBar />
-                {children}
+                <AuthCatalogProvider catalog={auth}>{children}</AuthCatalogProvider>
                 <CookieConsent />
                 <SiteFooter variant="line" />
               </div>

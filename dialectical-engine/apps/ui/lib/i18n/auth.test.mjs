@@ -9,6 +9,21 @@ const ownedFiles = [
   "components/LoginFlow.tsx",
   "components/SignUpFlow.tsx",
   "components/auth/EmailPendingScreen.tsx",
+  "components/auth/PhoneField.tsx",
+  "components/auth/InlineFieldMessage.tsx",
+  "components/auth/SecurityEnrollment.tsx",
+  "components/auth/OnboardingEvidence.tsx",
+  "components/auth/EphemeralCodes.tsx",
+  "components/auth/SecurityConfirmation.tsx",
+  "components/auth/SecurityActionResume.tsx",
+  "components/auth/SocialCompleteFlow.tsx",
+  "components/auth/SocialProviderButtons.tsx",
+  "components/auth/RecoveryFlow.tsx",
+  "lib/authFormValidation.ts",
+  "app/recover/page.tsx",
+  "app/verify-recovery-email/page.tsx",
+  "app/settings/security/page.tsx",
+  "app/social/complete/page.tsx",
   "components/AuthShell.tsx",
   "components/DateOfBirthField.tsx",
   "components/AgeRefusal.tsx",
@@ -78,7 +93,7 @@ test("every auth translation key used by the owned source exists in English", ()
   const english = JSON.parse(readFileSync(englishPath, "utf8"));
   const used = new Set();
   for (const path of ownedFiles) {
-    for (const match of source(path).matchAll(/t\(\s*catalog\s*,\s*"(auth\.[A-Za-z0-9.]+)"/g)) {
+    for (const match of source(path).matchAll(/["'](auth\.[A-Za-z0-9.]+)["']/g)) {
       used.add(match[1]);
     }
   }
@@ -135,10 +150,12 @@ test("client-only auth surfaces resolve the selected auth catalogue", () => {
 test("sign-up localizes the successful registration response and has no resend response", () => {
   const signUp = source("components/SignUpFlow.tsx");
   assert.doesNotMatch(signUp, /result\.message/);
-  assert.match(signUp, /auth\.signUp\.registrationSent/);
+  assert.match(source("components/auth/EmailPendingScreen.tsx"), /auth\.signUp\.registrationSent/);
   assert.doesNotMatch(signUp, /auth\.signUp\.resendSent/);
 });
 
 test("the canonical verification route still delegates to MFA enrollment", () => {
   assert.match(source("app/verify-email/page.tsx"), /export \{ default \} from "\.\.\/enroll-mfa\/page"/);
 });
+
+test("all 35 signup headlines match the approved Appendix A exactly",()=>{const spec=readFileSync(join(root,"../../docs/superpowers/specs/2026-10-04-account-onboarding-passkeys-design.md"),"utf8");const rows=[...spec.matchAll(/^\| ([a-z]{2}) \| (.*?) \|$/gm)];assert.equal(rows.length,35);for(const [,locale,headline] of rows)assert.equal(JSON.parse(source(`messages/${locale}/auth.json`))["auth.signUp.title"],headline);});

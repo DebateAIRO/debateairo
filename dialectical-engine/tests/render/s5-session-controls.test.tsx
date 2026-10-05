@@ -95,21 +95,8 @@ describe.each(surfaces)("S5 rendered session controls — %s", (_name, Controls)
     await click(`Revoke session ${remoteId}`);
     expect(client.revokeSession).toHaveBeenCalledWith(remoteId);
 
-    const password = document.querySelector<HTMLInputElement>('input[name="step-up-password"]');
-    const code = document.querySelector<HTMLInputElement>('input[name="step-up-code"]');
-    const form = document.querySelector<HTMLFormElement>('form[data-session-step-up="true"]');
-    expect(password).not.toBeNull();
-    expect(code).not.toBeNull();
-    expect(form).not.toBeNull();
-    password!.value = "correct horse battery staple";
-    code!.value = "123456";
-    await act(async () => {
-      form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    });
-    await settle();
-    expect(client.stepUp).toHaveBeenCalledWith("correct horse battery staple", "123456");
-    expect(document.body.textContent).toContain("Fresh authentication complete");
-
+    expect(document.querySelector('form[data-session-step-up]')).toBeNull();
+    expect(client.stepUp).not.toHaveBeenCalled();
     await click("Revoke all sessions");
     expect(client.revokeAllSessions).toHaveBeenCalledTimes(1);
     expect(ended).toHaveBeenCalledTimes(1);

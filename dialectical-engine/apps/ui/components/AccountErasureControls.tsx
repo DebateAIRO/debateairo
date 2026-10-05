@@ -8,6 +8,9 @@ import {
 import { contractClient } from "@/lib/api";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import {SecurityConfirmation,type SecurityConfirmationClient} from '@/components/auth/SecurityConfirmation';
+import {useSelectedAuthCatalog} from '@/components/AuthShell';
+import type {ConfirmedSecurityAction} from '@/lib/securityConfirmation';
 import settingsEnglish from "@/messages/en/settings.json";
 
 /**
@@ -46,8 +49,8 @@ export function confirmationPhraseMatches(typed: string, phrase: string, locale:
 
 type ErasureStatus = Awaited<ReturnType<ContractClient["readAccountErasure"]>>;
 type AccountErasureClient = Pick<ContractClient,
-  "stepUp" | "scheduleAccountErasure" | "readAccountErasure" | "cancelAccountErasure"
->;
+  "scheduleAccountErasure" | "readAccountErasure" | "cancelAccountErasure"
+> & SecurityConfirmationClient;
 
 function failureMessage(failure: unknown, catalog: MessageCatalog): string {
   if (failure instanceof ContractHttpError
@@ -70,8 +73,7 @@ export function AccountErasureControls({
   locale?: LocaleCode;
 }>) {
   const [status, setStatus] = useState<ErasureStatus | null>(null);
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  const authCatalog=useSelectedAuthCatalog(locale),[confirming,setConfirming]=useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -92,18 +94,16 @@ export function AccountErasureControls({
   async function schedule(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!confirmed || busy) return;
-    setBusy(true);
-    setMessage(null);
+    setConfirming(true);
+  }
+  async function scheduleConfirmed(result:ConfirmedSecurityAction):Promise<void> {
+    if(!confirmed)return;
+    setBusy(true);setMessage(null);
     try {
-      const steppedUp = await client.stepUp(password, code, { action: "DELETE_ACCOUNT" });
-      const grant = steppedUp.step_up_grant;
-      if (grant === undefined || grant.action !== "DELETE_ACCOUNT") {
-        throw new Error("DELETE_ACCOUNT_GRANT_MISSING");
-      }
+      const grant=result.step_up_grant;
       const scheduled = await client.scheduleAccountErasure(grant.token);
       setStatus(scheduled);
-      setPassword("");
-      setCode("");
+      setConfirming(false);
       setConfirmation("");
       setMessage(t(catalog, "settings.erasure.scheduled"));
     } catch (failure) {
@@ -169,37 +169,8 @@ export function AccountErasureControls({
           )}
         </div>
       ) : status !== null ? (
-        <form onSubmit={(event) => void schedule(event)}>
+        <div><form noValidate onSubmit={(event) => void schedule(event)}>
           <div className="setCardRow">
-            <div className="setField">
-              <label htmlFor="account-deletion-password">
-                {t(catalog, "settings.erasure.passwordLabel")}
-              </label>
-              <input
-                id="account-deletion-password"
-                type="password"
-                autoComplete="current-password"
-                placeholder={t(catalog, "settings.password")}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
-            <div className="setField">
-              <label htmlFor="account-deletion-code">
-                {t(catalog, "settings.authenticatorCode")}
-              </label>
-              <input
-                id="account-deletion-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                placeholder={t(catalog, "settings.authenticatorCode")}
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                required
-              />
-            </div>
             <div className="setField setFieldDanger">
               <label htmlFor="account-deletion-confirmation">
                 {t(catalog, "settings.erasure.typeConfirmation", { confirmation: confirmationPhrase })}
@@ -225,6 +196,7 @@ export function AccountErasureControls({
             </button>
           </div>
         </form>
+        {confirming?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'DELETE_ACCOUNT'}} disabled={!confirmed} onError={failure=>setMessage(failureMessage(failure,catalog))} onConfirmed={scheduleConfirmed} onCancel={()=>setConfirming(false)}/>:null}</div>
       ) : null}
       {message ? <p className="setStatus" role="status">{message}</p> : null}
     </section>

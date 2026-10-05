@@ -9,6 +9,10 @@ import {
 } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import {SecurityConfirmation,type SecurityConfirmationClient} from '@/components/auth/SecurityConfirmation';
+import {useSelectedAuthCatalog} from '@/components/AuthShell';
+import {useChromeI18n} from '@/lib/i18n/I18nProvider';
+import type {ConfirmedSecurityAction} from '@/lib/securityConfirmation';
 import settingsEnglish from "@/messages/en/settings.json";
 
 /**
@@ -20,7 +24,7 @@ import settingsEnglish from "@/messages/en/settings.json";
  */
 
 type EmailCardClient = Pick<ContractClient, "readAccountEmail" | "resendEmailChange" | "cancelEmailChange">;
-type ChangeFormClient = Pick<ContractClient, "stepUp" | "requestEmailChange">;
+type ChangeFormClient = Pick<ContractClient, "requestEmailChange"> & SecurityConfirmationClient;
 type LinkClient = Pick<ContractClient, "confirmEmailChange" | "cancelEmailChangeByLink">;
 
 export type EmailChangeLink = Readonly<{ action: "confirm" | "cancel"; token: string }>;
@@ -186,8 +190,8 @@ export function ChangeEmailScreen({
 }>) {
   const [newEmail, setNewEmail] = useState("");
   const [confirmEmail, setConfirmEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  const {locale}=useChromeI18n(),authCatalog=useSelectedAuthCatalog(locale);
+  const [confirming,setConfirming]=useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -200,31 +204,19 @@ export function ChangeEmailScreen({
   const confirmCheck: FieldCheck = confirmEmail.trim() === ""
     ? "empty"
     : normalizedAddress(confirmEmail) === normalized ? "valid" : "mismatch";
-  const ready = newCheck === "valid" && confirmCheck === "valid" && password !== "" && /^[0-9]{6}$/.test(code);
+  const ready = newCheck === "valid" && confirmCheck === "valid";
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!ready || busy) return;
-    setBusy(true);
-    setMessage(null);
-    let grant: string;
-    try {
-      const steppedUp = await client.stepUp(password, code, { action: "CHANGE_EMAIL" });
-      if (steppedUp.step_up_grant === undefined || steppedUp.step_up_grant.action !== "CHANGE_EMAIL") {
-        throw new Error("CHANGE_EMAIL_GRANT_MISSING");
-      }
-      grant = steppedUp.step_up_grant.token;
-    } catch (failure) {
-      setMessage(failure instanceof ContractHttpError && failure.code === "RATE_LIMITED"
-        ? t(catalog, "settings.emailChange.rateLimited")
-        : t(catalog, "settings.emailChange.credentialsInvalid"));
-      setBusy(false);
-      return;
-    }
+    setConfirming(true);
+  }
+  async function changeConfirmed(result:ConfirmedSecurityAction):Promise<void> {
+    setBusy(true);setMessage(null);
+    const grant=result.step_up_grant.token;
     try {
       const pending = await client.requestEmailChange(normalized, grant);
-      setPassword("");
-      setCode("");
+      setConfirming(false);
       onRequested(pending);
     } catch (failure) {
       const reason = serverCode(failure);
@@ -270,6 +262,7 @@ export function ChangeEmailScreen({
                 <label className="emlLabel" htmlFor="email-change-new">{t(catalog, "settings.emailChange.newLabel")}</label>
                 <input
                   id="email-change-new"
+                  disabled={busy||confirming}
                   className="emlInput"
                   type="email"
                   autoComplete="email"
@@ -290,6 +283,7 @@ export function ChangeEmailScreen({
                 </label>
                 <input
                   id="email-change-confirm"
+                  disabled={busy||confirming}
                   className="emlInput"
                   type="email"
                   autoComplete="off"
@@ -305,31 +299,6 @@ export function ChangeEmailScreen({
                 )}
               </div>
               <div className="emlRule" aria-hidden="true" />
-              <fieldset className="emlVerify">
-                <legend className="emlLabel">{t(catalog, "settings.emailChange.verifyTitle")}</legend>
-                <p className="emlVerifyHint">{t(catalog, "settings.emailChange.verifyHint")}</p>
-                <div className="emlVerifyRow">
-                  <input
-                    className="emlInput emlPassword"
-                    type="password"
-                    autoComplete="current-password"
-                    aria-label={t(catalog, "settings.password")}
-                    placeholder={t(catalog, "settings.password")}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                  />
-                  <input
-                    className="emlInput emlCode"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    aria-label={t(catalog, "settings.emailChange.codePlaceholder")}
-                    placeholder={t(catalog, "settings.emailChange.codePlaceholder")}
-                    value={code}
-                    onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, ""))}
-                  />
-                </div>
-              </fieldset>
               <button type="submit" className="emlSubmit" disabled={!ready || busy}>
                 {busy ? t(catalog, "settings.emailChange.submitting") : t(catalog, "settings.emailChange.submit")}
               </button>
@@ -337,6 +306,7 @@ export function ChangeEmailScreen({
               {message ? <p className="setError" role="alert">{message}</p> : null}
             </div>
           </form>
+          {confirming?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'CHANGE_EMAIL'}} onError={failure=>setMessage(failure instanceof ContractHttpError&&failure.code==="RATE_LIMITED"?t(catalog,"settings.emailChange.rateLimited"):t(catalog,"settings.emailChange.credentialsInvalid"))} onConfirmed={changeConfirmed} onCancel={()=>setConfirming(false)}/>:null}
         </div>
       </div>
     </div>

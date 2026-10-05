@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+vi.mock("@/components/auth/TurnstileChallenge", async()=>{const {useEffect}=await import("react");return {TurnstileChallenge:({onToken}:{onToken:(token:string)=>void})=>{useEffect(()=>onToken("test-proof"),[onToken]);return null;}};});
 
 /**
  * The Terms of Service row of the sign-up consent group (design artboard 8a, third row).
@@ -16,7 +17,7 @@
  * inside `act` for every box, the scroll metrics shadowed on `HTMLElement.prototype`.
  */
 
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
@@ -177,7 +178,7 @@ async function mount(client?: {
     register: vi.fn(),
     checkAge: vi.fn().mockResolvedValue({ outcome: "allowed" })
   };
-  await act(async () => root!.render(<SignUpFlow client={stub} />));
+  await act(async () => root!.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={stub} />));
   await settle();
 }
 
@@ -358,10 +359,8 @@ describe("sign-up — the Terms of Service row", () => {
     // First: its re-renders would reset the controlled fields assigned directly below.
     await fillAdultDateOfBirth();
     field("email").value = "person@example.test";
-    field("confirm-email").value = "person@example.test";
-    field("recovery-email").value = "recovery@example.test";
-    field("password").value = "correct horse battery staple";
-    field("confirm-password").value = "correct horse battery staple";
+    field("phone").value = "+40712345678";
+    field("password").value = "Correct horse 7!";
     field("privacy-accepted").checked = true;
     await submit();
     expect(register, "an empty Terms box must refuse the registration").not.toHaveBeenCalled();
@@ -369,13 +368,7 @@ describe("sign-up — the Terms of Service row", () => {
     field("terms-accepted").checked = true;
     await submit();
     expect(register).toHaveBeenCalledTimes(1);
-    expect(register).toHaveBeenCalledWith(
-      "person@example.test",
-      "correct horse battery staple",
-      "recovery@example.test",
-      "1990-01-01",
-      DISPLAYED_LEGAL_EN
-    );
+    expect(register).toHaveBeenCalledWith(expect.objectContaining({email:"person@example.test",password:"Correct horse 7!",phone:"+40712345678",date_of_birth:"1990-01-01",...DISPLAYED_LEGAL_EN,turnstile_token:"test-proof"}));
     expect(document.querySelector('input[name="terms-accepted"]')).toBeNull();
   });
 });

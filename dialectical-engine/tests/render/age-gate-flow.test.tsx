@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+vi.mock("@/components/auth/TurnstileChallenge", async()=>{const {useEffect}=await import("react");return {TurnstileChallenge:({onToken}:{onToken:(token:string)=>void})=>{useEffect(()=>onToken("test-proof"),[onToken]);return null;}};});
 
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError, createContractClient } from "@debateai/contract";
@@ -23,6 +24,7 @@ let requests: { path: string; body: unknown }[];
 function networkClient(ageOutcome: "allowed" | "refused", registerStatus = 202, registerBody: unknown = { message: REGISTRATION_MESSAGE, retry_after_seconds: 60 }) {
   return createContractClient("https://app.debateai.test", (async (url: URL | string, init: RequestInit = {}) => {
     const path = new URL(String(url)).pathname;
+    if(path==="/v1/auth/providers")return Response.json({providers:[]});
     requests.push({ path, body: init.body === undefined ? undefined : JSON.parse(String(init.body)) });
     if (path === "/v1/auth/age-check") return Response.json({ outcome: ageOutcome });
     if (path === "/v1/auth/register") return Response.json(registerBody, { status: registerStatus });
@@ -41,10 +43,8 @@ async function setValue(name: string, value: string): Promise<void> {
 
 async function fillForm(dateOfBirth: readonly [string, string, string] | null): Promise<void> {
   await setValue("email", "adult@example.test");
-  await setValue("confirm-email", "adult@example.test");
-  await setValue("recovery-email", "recovery@example.test");
+  await setValue("phone", "+40712345678");
   await setValue("password", "Correct horse 7!");
-  await setValue("confirm-password", "Correct horse 7!");
   if (dateOfBirth !== null) {
     await setValue("dob-d", dateOfBirth[0]);
     await setValue("dob-m", dateOfBirth[1]);
@@ -77,10 +77,10 @@ afterEach(async () => {
 
 describe("sign-up with the date of birth (8a)", () => {
   it("places the date of birth after Password and before the privacy consent, with no 18+ box", async () => {
-    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed")} />));
     const form = host.querySelector("form")!;
+    const password=field("password");
     const fieldset = form.querySelector("fieldset.dobFieldset")!;
-    const password = field("confirm-password");
     const consent = form.querySelector(".consentGroup")!;
     expect(password.compareDocumentPosition(fieldset) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(fieldset.compareDocumentPosition(consent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -91,7 +91,7 @@ describe("sign-up with the date of birth (8a)", () => {
   });
 
   it("checks the date on submit before any request", async () => {
-    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed")} />));
     await fillForm(null);
     await submit();
     expect(host.querySelector("#dob-msg")!.textContent).toBe("✗ Enter the day, month and year.");
@@ -99,7 +99,7 @@ describe("sign-up with the date of birth (8a)", () => {
   });
 
   it("asks the age check first, then registers with the ISO date", async () => {
-    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed")} />));
     await fillForm(["14", "03", "1998"]);
     await submit();
     expect(requests.map((request) => request.path)).toEqual(["/v1/auth/age-check", "/v1/auth/register"]);
@@ -111,7 +111,7 @@ describe("sign-up with the date of birth (8a)", () => {
 
   it("refuses a date under 18 on the form: the reason under the field, Create account disabled, no request", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.UTC(2026, 8, 29, 12)) });
-    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed")} />));
     await fillForm(["14", "03", "2012"]);
     const message = host.querySelector("#dob-msg")!;
     expect(message.textContent).toBe("✗ You must be 18 or over in order for you to create an account.");
@@ -130,7 +130,7 @@ describe("sign-up with the date of birth (8a)", () => {
 
   it("holds the boundary: 18 tomorrow is refused on the form, exactly 18 today goes through", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.UTC(2026, 8, 29, 12)) });
-    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed")} />));
     await fillForm(["30", "09", "2008"]);
     expect(host.querySelector("#dob-msg")!.textContent).toBe("✗ You must be 18 or over in order for you to create an account.");
     await submit();
@@ -149,7 +149,7 @@ describe("sign-up with the date of birth (8a)", () => {
     ["an impossible date", ["31", "02", "2001"], "✗ That date doesn't exist. Check the day and month."]
   ] as const)("refuses %s on the form as soon as the date is complete, and sends nothing", async (_label, date, text) => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.UTC(2026, 8, 29, 12)) });
-    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed")} />));
     await fillForm(date);
     expect(host.querySelector("#dob-msg")!.textContent).toBe(text);
     expect(host.querySelector("#dob-msg")!.getAttribute("data-state")).toBe("bad");
@@ -160,7 +160,7 @@ describe("sign-up with the date of birth (8a)", () => {
   });
 
   it("stays quiet while the date is still being typed", async () => {
-    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed")} />));
     await setValue("dob-d", "14");
     await setValue("dob-m", "03");
     await setValue("dob-y", "150");
@@ -168,7 +168,7 @@ describe("sign-up with the date of birth (8a)", () => {
   });
 
   it("names the minimum age in the reader's language (de)", async () => {
-    await act(async () => root.render(<SignUpFlow catalog={german} dobLocale={resolveDobLocale("de")} client={networkClient("allowed")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} catalog={german} dobLocale={resolveDobLocale("de")} client={networkClient("allowed")} />));
     await setValue("dob-d", "01");
     await setValue("dob-m", "01");
     await setValue("dob-y", "2015");
@@ -177,7 +177,7 @@ describe("sign-up with the date of birth (8a)", () => {
   });
 
   it("on a server refusal (the lockout) shows only the refusal screen and never calls register", async () => {
-    await act(async () => root.render(<SignUpFlow client={networkClient("refused")} />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("refused")} />));
     await fillForm(["14", "03", "1998"]);
     await submit();
     expect(requests.map((request) => request.path)).toEqual(["/v1/auth/age-check"]);
@@ -194,7 +194,7 @@ describe("sign-up with the date of birth (8a)", () => {
 
   it("shows the same refusal when register itself refuses the age", async () => {
     await act(async () => root.render(
-      <SignUpFlow client={networkClient("allowed", 403, { error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" })} />
+      <SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed", 403, { error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" })} />
     ));
     await fillForm(["01", "01", "1990"]);
     await submit();
@@ -202,14 +202,14 @@ describe("sign-up with the date of birth (8a)", () => {
   });
 
   it("renders the refusal straight away while the lockout cookie is set (reload, back, second attempt)", async () => {
-    await act(async () => root.render(<SignUpFlow client={networkClient("allowed")} refused />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={networkClient("allowed")} refused />));
     expect(host.querySelector("form")).toBeNull();
     expect(host.querySelector("h2")!.textContent).toBe("We can't create an account for you.");
     expect(requests).toEqual([]);
   });
 
   it("speaks the reader's language on the refusal (de)", async () => {
-    await act(async () => root.render(<SignUpFlow catalog={german} dobLocale={resolveDobLocale("de")} refused />));
+    await act(async () => root.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} catalog={german} dobLocale={resolveDobLocale("de")} refused />));
     expect(host.querySelector("h2")!.textContent).toBe("Wir können kein Konto für Sie erstellen.");
     expect(host.querySelector("a")!.textContent).toBe("Zur Startseite");
   });
@@ -230,7 +230,7 @@ describe("the existing-account interstitial (8k)", () => {
     const client = fakeClient();
     await act(async () => root.render(<AgeConfirmationFlow client={client} onConfirmed={vi.fn()} onSignedOut={vi.fn()} />));
     expect(host.querySelector(".authEyebrow")!.textContent).toBe("One-time check");
-    expect(host.querySelector("h1")!.textContent).toBe("Confirm your date of birth to keep using DebateAI");
+    expect(host.querySelector("h1")!.textContent).toBe("Confirm your date of birth to keep using Dialectical Engine");
     expect(host.querySelector(".authLede")!.textContent).toBe("We ask once. Only the result is kept, never the date.");
     expect(host.querySelector("fieldset.dobFieldset legend")!.textContent).toBe("Date of birth");
     const buttons = host.querySelectorAll("button.authPrimary");

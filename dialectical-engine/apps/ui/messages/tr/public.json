@@ -84,8 +84,6 @@
   "public.publication.openPublicVersion": "Herkese açık sürümü aç",
   "public.publication.unpublishEllipsis": "Yayından kaldır…",
   "public.publication.publishEllipsis": "Yayımla…",
-  "public.publication.accountPassword": "Hesap parolası",
-  "public.publication.authenticatorCode": "Kimlik doğrulayıcı kodu",
   "public.publication.acknowledgePublish": "Bu tartışmayı yayımlamanın sonuçlarını anlıyor ve yayımlamak istiyorum.",
   "public.publication.acknowledgeUnpublish": "Bu tartışmayı yayından kaldırmanın sonuçlarını anlıyor ve yayından kaldırmak istiyorum.",
   "public.publication.authorizing": "Yetkilendiriliyor…",

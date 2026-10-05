@@ -40,13 +40,7 @@ describe("auth registration contract client", () => {
     }) as typeof fetch;
     const client = createContractClient("https://api.debateai.test", fetchImplementation);
 
-    await expect(client.register(
-      "person@example.test",
-      "correct horse battery staple",
-      "recovery@example.test",
-      "1990-01-01",
-      { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en" }
-    )).resolves.toEqual({ message: REGISTRATION_MESSAGE, retry_after_seconds: 60 });
+    await expect(client.register({email:"person@example.test",password:"correct horse battery staple",phone:"+40712345678",date_of_birth:"1990-01-01",terms:{version:"2.0",sha256:"a".repeat(64)},privacy:{version:"3.0",sha256:"b".repeat(64)},locale:"en",ui_locale:"en",time_zone:"Europe/Bucharest",turnstile_token:"test-proof"})).resolves.toEqual({ message: REGISTRATION_MESSAGE, retry_after_seconds: 60 });
     await expect(client.resendVerification("person@example.test"))
       .resolves.toEqual({ message: RESEND_MESSAGE, retry_after_seconds: 60 });
     await expect(client.startRecovery("person@example.test"))
@@ -59,7 +53,8 @@ describe("auth registration contract client", () => {
       body: {
         email: "person@example.test",
         password: "correct horse battery staple",
-        recovery_email: "recovery@example.test",
+        phone: "+40712345678",
+        ui_locale: "en", time_zone: "Europe/Bucharest",turnstile_token:"test-proof",
         date_of_birth: "1990-01-01",
         terms: { version: "2.0", sha256: "a".repeat(64) },
         privacy: { version: "3.0", sha256: "b".repeat(64) },
@@ -91,10 +86,7 @@ describe("auth registration contract client", () => {
       (async () => Response.json({ message: "That account already exists." }, { status: 202 })) as typeof fetch
     );
 
-    await expect(client.register(
-      "person@example.test", "password", "recovery@example.test", "1990-01-01",
-      { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en" }
-    ))
+    await expect(client.register({email:"person@example.test",password:"password",phone:"+40712345678",date_of_birth:"1990-01-01",terms:{version:"2.0",sha256:"a".repeat(64)},privacy:{version:"3.0",sha256:"b".repeat(64)},locale:"en",ui_locale:"en",time_zone:null,turnstile_token:"test-proof"}))
       .rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 202 });
   });
 

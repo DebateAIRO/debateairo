@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act } from "react";
+vi.mock("@/components/auth/TurnstileChallenge", async()=>{const {useEffect}=await import("react");return {TurnstileChallenge:({onToken}:{onToken:(token:string)=>void})=>{useEffect(()=>onToken("test-proof"),[onToken]);return null;}};});
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
@@ -32,14 +33,12 @@ async function fillAndSubmit(): Promise<void> {
   await type("dob-m", "01");
   await type("dob-y", "1990");
   field("email").value = "person@example.test";
-  field("confirm-email").value = "person@example.test";
-  field("recovery-email").value = "recovery@example.test";
-  field("password").value = "correct horse battery staple";
-  field("confirm-password").value = "correct horse battery staple";
+  field("phone").value = "+40712345678";
+  field("password").value = "Correct horse 7!";
   field("privacy-accepted").checked = true;
   field("terms-accepted").checked = true;
   const form = document.querySelector<HTMLFormElement>('form[data-form="signup"]')!;
-  await act(async () => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+  await act(async () => { form.requestSubmit(); });
   await act(async () => { await Promise.resolve(); });
 }
 
@@ -61,19 +60,12 @@ describe("sign-up sends the pairs of the documents it displayed (paid plans L3b)
 
   it("passes the Terms and Privacy version and hash, and the locale, after the age gate's date", async () => {
     const register = vi.fn().mockResolvedValue({ message: "ok", retry_after_seconds: 60 });
-    await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} />));
+    await act(async () => root!.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={{ register, checkAge }} />));
     await fillAndSubmit();
     expect(checkAge).toHaveBeenCalledWith("1990-01-01");
-    expect(register).toHaveBeenCalledWith(
-      "person@example.test", "correct horse battery staple", "recovery@example.test", "1990-01-01",
-      {
-        terms: { version: TERMS_OF_SERVICE.version, sha256: TERMS_OF_SERVICE.sha256 },
-        privacy: { version: PRIVACY_POLICY.version, sha256: PRIVACY_POLICY.sha256 },
-        locale: "en"
-      }
-    );
+    expect(register).toHaveBeenCalledWith(expect.objectContaining({email:"person@example.test",password:"Correct horse 7!",phone:"+40712345678",date_of_birth:"1990-01-01",terms:{version:TERMS_OF_SERVICE.version,sha256:TERMS_OF_SERVICE.sha256},privacy:{version:PRIVACY_POLICY.version,sha256:PRIVACY_POLICY.sha256},locale:"en",ui_locale:"en",turnstile_token:"test-proof"}));
     // The shared fixture the four pinned render tests use is exactly this argument.
-    expect(register.mock.calls[0]![4]).toEqual(DISPLAYED_LEGAL_EN);
+    expect(register.mock.calls[0]![0]).toMatchObject(DISPLAYED_LEGAL_EN);
   });
 
   it("says the documents changed, withdraws both acknowledgements and offers the reload, on LEGAL_DOCUMENT_STALE", async () => {
@@ -81,7 +73,7 @@ describe("sign-up sends the pairs of the documents it displayed (paid plans L3b)
       new ContractHttpError("SERVER_FAILURE", 409, "LEGAL_DOCUMENT_STALE", "LEGAL_DOCUMENT_STALE")
     );
     const reloadPage = vi.fn();
-    await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} reloadPage={reloadPage} />));
+    await act(async () => root!.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={{ register, checkAge }} reloadPage={reloadPage} />));
     await fillAndSubmit();
     expect(document.querySelector('[role="alert"]')?.textContent).toBe(
       "The Terms of Service or the Privacy Policy were updated while you were reading. Reload the page to read the current version, then try again."
@@ -102,7 +94,7 @@ describe("sign-up sends the pairs of the documents it displayed (paid plans L3b)
 
   it("offers no reload for any other failure", async () => {
     const register = vi.fn().mockRejectedValue(new Error("offline"));
-    await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} reloadPage={vi.fn()} />));
+    await act(async () => root!.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={{ register, checkAge }} reloadPage={vi.fn()} />));
     await fillAndSubmit();
     expect(document.querySelector('[role="alert"]')?.textContent).toBe("Account creation could not be completed.");
     expect([...document.querySelectorAll("button")].some((node) => node.textContent === "Reload the page")).toBe(false);
@@ -111,7 +103,7 @@ describe("sign-up sends the pairs of the documents it displayed (paid plans L3b)
   it("never calls register when the age gate refuses, so no document pair is sent", async () => {
     checkAge.mockResolvedValue({ outcome: "refused" });
     const register = vi.fn();
-    await act(async () => root!.render(<SignUpFlow client={{ register, checkAge }} />));
+    await act(async () => root!.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={{ register, checkAge }} />));
     await fillAndSubmit();
     expect(register).not.toHaveBeenCalled();
   });

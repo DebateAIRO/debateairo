@@ -1,6 +1,6 @@
-export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/settings"] as const;
+export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/settings", "/settings/security", "/account"] as const;
 
-export const DEFAULT_RETURN_PATH = "/#start-a-debate";
+export const DEFAULT_RETURN_PATH = "/new";
 
 const PUBLIC_DEBATE_PREFIX = "/public/debate/";
 const PUBLIC_DEBATE_PATH = /^\/public\/debate\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
@@ -24,3 +24,6 @@ export function safeReturnPath(raw: string | null | undefined): string {
   const publicDebate = PUBLIC_DEBATE_PATH.exec(path);
   return publicDebate === null ? DEFAULT_RETURN_PATH : `${PUBLIC_DEBATE_PREFIX}${publicDebate[1]}${suffix}`;
 }
+
+/** OAuth callbacks accept only exact route constants; query and fragment suffixes are excluded. */
+export function safeSocialReturnPath(raw:string|null|undefined): "/new"|"/"|"/settings"|"/settings/security"|"/account" {return RETURN_PATH_ALLOW_LIST.find(path=>path===raw)??"/new";}

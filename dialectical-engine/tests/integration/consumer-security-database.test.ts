@@ -156,4 +156,24 @@ describe('consumer security execute-only authority', () => {
         await database.pool.query('UPDATE identity.\"user\" SET password_hash=$1 WHERE user_id=$2',[fixturePasswordHash.replace('m=65536','m=65537'),a.userId]);
         await expect(mutation('remove_consumer_auth_method',{...a,factorId:a.factors[0],grantHash:stale})).rejects.toThrow('CONSUMER_LAST_METHOD');
     });
+    it('projects only usable step-up paths with NULL passwords, exact admitted providers and current snapshots', async()=>{
+      const a=await account(),configuration='sha256:'+ 'aa'.repeat(32);
+      await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())`,[randomUUID(),a.userId]);
+      const read=async(input:unknown)=>(await runtime.query('SELECT identity.read_consumer_auth_methods($1) value',[input])).rows[0].value;
+      expect((await read(a)).available_step_up_methods).toEqual(['passkey','password_totp']);
+      await database.pool.query(`INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration) VALUES($1,'google','https://accounts.google.com','test-app',$2,$3)`,[a.userId,randomUUID(),configuration]);
+      await database.pool.query('UPDATE identity."user" SET password_hash=NULL WHERE user_id=$1',[a.userId]);
+      const nullable={...a,passwordHashSnapshot:null,passwordUsable:false,admittedProviders:[configuration]};
+      expect(await read(nullable)).toMatchObject({available_step_up_methods:['passkey','provider'],step_up_providers:['google']});
+      expect(await read({...nullable,admittedProviders:[]})).toMatchObject({available_step_up_methods:['passkey'],step_up_providers:[]});
+      await database.pool.query('UPDATE identity."user" SET password_hash=$1 WHERE user_id=$2',['malformed',a.userId]);
+      expect((await read({...a,passwordHashSnapshot:'malformed',passwordUsable:false})).available_step_up_methods).toEqual(['passkey']);
+      expect((await read(a)).available_step_up_methods).toEqual(['passkey']);
+      await database.pool.query('INSERT INTO staff.subject(user_id) VALUES($1)',[a.userId]);
+      expect((await read({...nullable,admittedProviders:[configuration]})).step_up_providers).toEqual([]);
+      await expect(runtime.query('SELECT identity.consumer_social_path_internal($1,NULL,NULL,NULL,false,$2)',[a.userId,JSON.stringify([configuration])])).rejects.toMatchObject({code:'42501'});
+      await database.pool.query('INSERT INTO identity.account_security_hold(user_id,held) VALUES($1,true)',[a.userId]);
+      await expect(read(nullable)).rejects.toThrow('CONSUMER_SECURITY_INVALID');
+    });
+
 });

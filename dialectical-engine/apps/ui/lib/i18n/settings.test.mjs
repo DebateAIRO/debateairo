@@ -16,7 +16,8 @@ const ownedFiles = [
   "app/admin/workers/page.tsx",
   "components/SettingsPageClient.tsx",
   "components/EmailSettings.tsx",
-  "components/EvaluatorDevMenu.tsx"
+  "components/EvaluatorDevMenu.tsx",
+  "components/auth/SecurityActionResume.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const sources = new Map(ownedFiles.map((path) => [path, source(path)]));
@@ -87,7 +88,7 @@ test("every settings translation key used by owned source exists in English", ()
   const english = JSON.parse(readFileSync(englishPath, "utf8"));
   const used = new Set();
   for (const fileSource of sources.values()) {
-    for (const match of fileSource.matchAll(/\bt\(\s*catalog\s*,\s*"(settings\.[A-Za-z0-9.]+)"/g)) {
+    for (const match of fileSource.matchAll(/\bt\(\s*(?:catalog|settingsCatalog)\s*,\s*["'](settings\.[A-Za-z0-9.]+)["']/g)) {
       used.add(match[1]);
     }
     for (const match of fileSource.matchAll(/\btPlural\(\s*catalog\s*,\s*"(settings\.[A-Za-z0-9.]+)"/g)) {
@@ -166,7 +167,7 @@ test("security and transparency behavior survives the copy migration", () => {
   assert.doesNotMatch(erasure, /const CONFIRMATION = "DELETE MY ACCOUNT"/);
   assert.match(erasure, /if \(locale === "en"\) return typed === phrase;/);
   assert.equal(JSON.parse(readFileSync(englishPath, "utf8"))["settings.erasure.confirmationPhrase"], "DELETE MY ACCOUNT");
-  assert.match(erasure, /action: "DELETE_ACCOUNT"/);
+  assert.match(erasure, /action:\s*["']DELETE_ACCOUNT["']/);
   assert.doesNotMatch(erasure, /target_run_id/);
   assert.match(erasure, /scheduleAccountErasure\(grant\.token\)/);
   assert.match(erasure, /readAccountErasure\(\)/);
@@ -176,8 +177,9 @@ test("security and transparency behavior survives the copy migration", () => {
   assert.match(erasure, /window\.setInterval\(\(\)=>\{ void refresh\(\); \},5_000\)/);
 
   const sessions = sources.get("components/SessionControls.tsx");
-  assert.match(sessions, /autoComplete="current-password"/);
-  assert.match(sessions, /autoComplete="one-time-code"/);
+  assert.doesNotMatch(sessions,/current-password|one-time-code|data-session-step-up/);
+  const confirmation=source("components/auth/SecurityConfirmation.tsx");
+  assert.match(confirmation,/beginPasskeyStepUp/);assert.match(confirmation,/matchingSecurityGrant/);assert.match(confirmation,/authorization/);
   assert.match(sessions, /revokeAllSessions\(\)/);
 
   const transparency = sources.get("app/ai-transparency/page.tsx");

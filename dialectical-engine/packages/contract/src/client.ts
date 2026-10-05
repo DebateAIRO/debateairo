@@ -33,7 +33,6 @@ import {
   type SensitiveDataConsentStatus,
   type AgeCheckResult,
   type AgeConfirmationStatus,
-  type RegisterLegalDocuments,
   LegalStatusResponseSchema,
   type LegalAcceptRequest,
   type LegalStatusResponse,
@@ -299,14 +298,6 @@ export interface ContractClient {
   /** Age gate: answers `refused` (and sets the lockout cookie) for anyone under the minimum age. */
   checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
   register(input: RegisterRequest): Promise<VerificationAck>;
-  /** @deprecated Branch migration adapter; remove when the signup UI sends RegisterRequest. */
-  register(
-    email: string,
-    password: string,
-    recoveryEmail: string,
-    dateOfBirth: string,
-    legal: RegisterLegalDocuments
-  ): Promise<VerificationAck>;
   resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
   /** @deprecated Branch migration adapter; remove when the resend UI sends its full request. */
   resendVerification(email: string): Promise<VerificationAck>;
@@ -318,7 +309,7 @@ export interface ContractClient {
   beginSocialStepUpPasskey(continuationToken:string):Promise<PasskeyAuthenticationOptionsResponse>;
   completeSocialStepUp(input:CompleteSocialStepUpRequest):Promise<StepUpResponse>;
   authProviders():Promise<AuthProvidersResponse>;
-  beginSocialLogin(provider:'google'|'apple'|'facebook'|'x',input?:{next?:'/'|'/settings'|'/account'}):Promise<{authorization_url:string}>;
+  beginSocialLogin(provider:'google'|'apple'|'facebook'|'x',input?:{next?:'/'|'/new'|'/settings'|'/settings/security'|'/account'}):Promise<{authorization_url:string}>;
   socialSignupStatus(input:{continuation_token:string}):Promise<SocialSignupStatusResponse>;
   completeSocialSignup(input:CompleteSocialSignupRequest):Promise<CompleteSocialSignupResponse>;
   linkedSocialProviders():Promise<SocialLinksResponse>;
@@ -450,22 +441,9 @@ export function createContractClient(
     init: RequestInit = {},
     expectedStatus?: number
   ) => requestJson(root.href, fetchImplementation, path, schema, init, auth, expectedStatus);
-  // TEMPORARY TASK11 ADAPTERS: preserve existing positional callers during branch migration.
-  // They never invent phone/proof values; the revised server boundary must reject old payloads.
-  function register(input: RegisterRequest): Promise<VerificationAck>;
-  function register(email: string, password: string, recoveryEmail: string, dateOfBirth: string,
-    legal: RegisterLegalDocuments): Promise<VerificationAck>;
-  async function register(input: RegisterRequest | string, password?: string, recoveryEmail?: string,
-    dateOfBirth?: string, legal?: RegisterLegalDocuments): Promise<VerificationAck> {
-    if (typeof input !== "string") {
-      return request("/v1/auth/register", RegistrationVerificationAckSchema,
-        { method: "POST", body: JSON.stringify(RegisterRequestSchema.parse(input)) }, 202);
-    }
-    if (legal === undefined) throw new TypeError("Missing legacy registration documents");
-    return request("/v1/auth/register", RegistrationVerificationAckSchema, { method: "POST", body: JSON.stringify({
-      email: input, password, recovery_email: recoveryEmail, date_of_birth: dateOfBirth,
-      terms: legal.terms, privacy: legal.privacy, locale: legal.locale
-    }) }, 202);
+  async function register(input: RegisterRequest): Promise<VerificationAck> {
+    return request("/v1/auth/register", RegistrationVerificationAckSchema,
+      {method:"POST",body:JSON.stringify(RegisterRequestSchema.parse(input))},202);
   }
   function resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
   function resendVerification(email: string): Promise<VerificationAck>;
@@ -560,16 +538,16 @@ export function createContractClient(
       }
       if (!response.ok) throw await contractErrorForResponse(response);
     },
-    beginSocialStepUp:(provider:'google'|'apple'|'facebook'|'x',authorization:StepUpAuthorizationRequest)=>request(`/v1/account/social/${provider}/step-up/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify({authorization,next:'/settings'})}),
+    beginSocialStepUp:(provider:'google'|'apple'|'facebook'|'x',authorization:StepUpAuthorizationRequest)=>request(`/v1/account/social/${provider}/step-up/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify({authorization,next:'/settings/security'})}),
     socialStepUpStatus:(continuationToken:string)=>request('/v1/account/social/step-up/status',SocialStepUpStatusResponseSchema,{method:'POST',body:JSON.stringify({continuation_token:continuationToken})}),
     beginSocialStepUpPasskey:(continuationToken:string)=>request('/v1/account/social/step-up/passkey-options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify({continuation_token:continuationToken})}),
     completeSocialStepUp:(input:CompleteSocialStepUpRequest)=>request('/v1/account/social/step-up/complete',StepUpResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     authProviders:()=>request('/v1/auth/providers',AuthProvidersResponseSchema),
-    beginSocialLogin:(provider:"google"|"apple"|"facebook"|"x",input:{next?:"/"|"/settings"|"/account"}={})=>request(`/v1/auth/social/${provider}/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    beginSocialLogin:(provider:"google"|"apple"|"facebook"|"x",input:{next?:"/"|"/new"|"/settings"|"/settings/security"|"/account"}={})=>request(`/v1/auth/social/${provider}/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     socialSignupStatus:(input:{continuation_token:string})=>request('/v1/auth/social/signup/status',SocialSignupStatusResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     completeSocialSignup:(input:CompleteSocialSignupRequest)=>request('/v1/auth/social/signup/complete',CompleteSocialSignupResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     linkedSocialProviders:()=>request('/v1/account/social-providers',SocialLinksResponseSchema),
-    beginSocialLink:(provider:"google"|"apple"|"facebook"|"x",grant:string)=>request(`/v1/account/social/${provider}/link`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify({step_up_grant:grant,next:'/settings'})}),
+    beginSocialLink:(provider:"google"|"apple"|"facebook"|"x",grant:string)=>request(`/v1/account/social/${provider}/link`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify({step_up_grant:grant,next:'/settings/security'})}),
     unlinkSocialProvider:(provider:"google"|"apple"|"facebook"|"x",grant:string)=>requestNoContent(root.href,fetchImplementation,'/v1/account/social/unlink',{method:'POST',body:JSON.stringify({provider,step_up_grant:grant})},auth),
     beginPasskeyEnrollment:(input:BeginPasskeyEnrollmentRequest)=>request('/v1/auth/passkeys/enrollment/options',PasskeyRegistrationOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     completePasskeyEnrollment:(input:CompletePasskeyEnrollmentRequest)=>request('/v1/auth/passkeys/enrollment/complete',PasskeyEnrollmentResponseSchema,{method:'POST',body:JSON.stringify(input)}),

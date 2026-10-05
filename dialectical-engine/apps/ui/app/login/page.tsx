@@ -22,6 +22,6 @@ export default async function LoginPage() {
       // A stale or invalid cookie must not prevent a fresh login attempt.
     }
   }
-  if (sessionConfirmed) redirect("/#start-a-debate");
+  if (sessionConfirmed) redirect("/new");
   return <LoginFlow catalog={catalog} />;
 }

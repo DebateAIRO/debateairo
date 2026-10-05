@@ -464,3 +464,5 @@ export function redactSupportText(text: string): Readonly<{ text: string;redacte
   const redactedText = labelled.replace(SUPPORT_SECRET_LIKE_PATTERN,"[REDACTED_SECRET_LIKE]");
   return Object.freeze({ text: redactedText,redacted: redactedText !== text });
 }
+
+export { normalizeManualPhone } from "./manualPhone.js";

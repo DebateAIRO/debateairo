@@ -163,6 +163,11 @@ const LEGAL_DOCUMENT_LOADERS = Object.freeze({
   Record<CatalogLocaleCode, Readonly<Record<LegalDocumentKey, () => Promise<LegalDocument>>>>
 >);
 
+/** Loads the exact edition selected by server onboarding metadata. No fallback hash is accepted. */
+export async function loadClientLegalDocument(locale: CatalogLocaleCode,key: LegalDocumentKey): Promise<LegalDocument> {
+  return LEGAL_DOCUMENT_LOADERS[locale][key]();
+}
+
 const documentCache: Partial<Record<CatalogLocaleCode, Partial<Record<LegalDocumentKey, LegalDocument>>>> = {
   en: ENGLISH_DOCUMENTS
 };

@@ -3,7 +3,7 @@ import { RegisterRequestSchema, RegistrationVerificationAckSchema } from './cons
 export const SocialProviderSchema = z.enum(['google', 'apple', 'facebook', 'x']);
 const Handle = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const AuthProvidersResponseSchema = z.object({ providers: z.array(z.object({ id: SocialProviderSchema, name: z.enum(['Google', 'Apple', 'Facebook', 'X']) }).strict()).max(4) }).strict();
-export const BeginSocialLoginRequestSchema = z.object({ next: z.enum(['/', '/settings', '/account']).optional() }).strict();
+export const BeginSocialLoginRequestSchema = z.object({ next: z.enum(['/', '/new', '/settings', '/settings/security', '/account']).optional() }).strict();
 export const BeginSocialLinkRequestSchema = BeginSocialLoginRequestSchema.extend({ step_up_grant: Handle }).strict();
 export const BeginSocialLoginResponseSchema = z.object({ authorization_url: z.url().max(4096) }).strict();
 export const SocialSignupStatusRequestSchema = z.object({ continuation_token: Handle }).strict();

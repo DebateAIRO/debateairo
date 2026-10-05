@@ -16,9 +16,9 @@ export type LegalPageCatalogs = Readonly<{
 }>;
 
 /** The reader's locale (the layout's rule: the locale cookie, else English) and both catalogues. */
-export async function loadLegalPageCatalogs(): Promise<LegalPageCatalogs> {
+export async function loadLegalPageCatalogs(explicitLocale?: string): Promise<LegalPageCatalogs> {
   const requested = (await cookies()).get(LOCALE_COOKIE)?.value;
-  const locale: LocaleCode = isLocale(requested) ? requested : "en";
+  const locale: LocaleCode = isLocale(explicitLocale) ? explicitLocale : isLocale(requested) ? requested : "en";
   const [chromeCatalog, legalCatalog] = await Promise.all([
     loadNamespace(locale, "chrome"),
     loadNamespace(locale, "legal")

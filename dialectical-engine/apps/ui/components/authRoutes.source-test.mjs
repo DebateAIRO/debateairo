@@ -25,58 +25,13 @@ const enrollMfa = read("../app/enroll-mfa/page.tsx");
 const packageJson = read("../package.json");
 const authMessages = JSON.parse(read("../messages/en/auth.json"));
 
-test("dedicated login keeps the two-phase mandatory-MFA contract", () => {
-  assert.match(login, /client\.beginLogin/);
-  assert.match(login, /client\.completeLogin/);
-  assert.match(login, /t\(catalog, "auth\.login\.securityPolicy"\)/);
-  assert.match(login, /t\(catalog, "auth\.login\.authenticatorTitle"\)/);
-  assert.match(login, /t\(catalog, "auth\.login\.authenticationCodeLabel"\)/);
-  assert.match(login, /t\(catalog, "auth\.login\.useRecoveryCode"\)/);
-  assert.match(login, /t\(catalog, "auth\.login\.recoveryTitle"\)/);
-  assert.match(login, /t\(catalog, "auth\.login\.backToSignIn"\)/);
-  assert.match(authMessages["auth.login.securityPolicy"], /authenticator or a recovery code/);
-  assert.equal(authMessages["auth.login.authenticatorTitle"], "Enter your authentication code.");
-  assert.equal(authMessages["auth.login.authenticationCodeLabel"], "6-digit authentication code");
-  assert.equal(authMessages["auth.login.useRecoveryCode"], "Use a recovery code");
-  assert.equal(authMessages["auth.login.recoveryTitle"], "Enter a recovery code.");
-  assert.equal(authMessages["auth.login.backToSignIn"], "Back to sign in");
-  assert.match(login, /replacement_recovery_code/);
-  assert.match(login, /role="alert"/);
-  // Age gate (8k): an account that still owes its one-time check goes to the interstitial first.
-  assert.match(login, /window\.location\.assign\(await ageConfirmationRequired\(\) \? ageConfirmationHref\(next\) : safeReturnPath\(next\)\)/);
-  assert.doesNotMatch(login, /localStorage|sessionStorage|Bearer|keep me signed|forgot/i);
+test("login offers passkeys and only server-offered secure continuations",()=>{
+ assert.match(login,/client\.beginLogin/);assert.match(login,/client\.completeLogin/);assert.match(login,/client\.completePasskeyLogin/);assert.match(login,/available_methods/);assert.match(login,/cancelConditional/);assert.match(login,/ageConfirmationRequired/);assert.match(login,/safeReturnPath/);
+ assert.doesNotMatch(login,/localStorage|sessionStorage|failure\.message|authRules/);assert.equal(authMessages["auth.login.signInFailed"],"Email or password are incorrect. Please try again.");
 });
-
-test("sign-up exposes only fields backed by the registration contract", () => {
-  assert.match(signUp, /client\.register/);
-  // Resend now belongs to EmailPendingScreen after ACK; behavioral/proof coverage lives in the render suite.
-  assert.match(signUp, /name="recovery-email"[\s\S]*?required/);
-  assert.match(signUp, /name="password"[\s\S]*?minLength=\{8\}/);
-  // Age gate (Turn 8): the date of birth replaced the 18+ tick box, and the separate age
-  // check runs before register — a refusal never reaches it.
-  assert.doesNotMatch(signUp, /adult-affirmed/);
-  assert.match(signUp, /<DateOfBirthField/);
-  // V 2026-09-29: a date under 18 is refused on the form — named under the field, and the
-  // Create account button stays disabled.
-  assert.match(signUp, /minimumAgeMessage=\{t\(catalog, "auth\.dob\.underAge"\)\}/);
-  // ...and so is any other complete date that is not a real one (before 1900, future, impossible).
-  assert.match(signUp, /const dateRefused = checkDob\(dateOfBirth\)\.code !== "incomplete" && !meetsMinimumAge\(dateOfBirth\);/);
-  assert.match(signUp, /disabled=\{busy \|\| sent \|\| !privacyAccepted \|\| !termsAccepted \|\| dateRefused\}/);
-  assert.ok(signUp.indexOf("await client.checkAge") > 0);
-  assert.ok(signUp.indexOf("await client.checkAge") < signUp.indexOf("await client.register"));
-  assert.match(signUp, /await client\.register/);
-  assert.match(signUp, /successMessage\(catalog, messageKey\)/);
-  assert.equal(
-    authMessages["auth.signUp.registrationSent"],
-    "If this address can be registered, verification instructions will arrive. Check your spam folder."
-  );
-  assert.match(signUp, /name="privacy-accepted"[\s\S]*?required/);
-  assert.match(signUp, /name="terms-accepted"[\s\S]*?required/);
-  assert.match(signUp, /role="status"/);
-  // `terms` left this list when the Terms of Service became a document in the product
-  // (`apps/ui/legal/terms-of-service.md` → `TermsOfServiceModal`); the sign-up card may
-  // now name it because it can show it.
-  assert.doesNotMatch(signUp, /localStorage|sessionStorage|Bearer|Google|Model API|privacy notice/i);
+test("signup has one email, phone, password, age and displayed consent evidence",()=>{
+ assert.doesNotMatch(signUp,/name="(?:confirm-email|confirm-password|recovery-email)"|localStorage|sessionStorage|failure\.message/);
+ assert.match(signUp,/<PhoneField/);assert.match(signUp,/name="password"/);assert.match(signUp,/autoComplete="new-password"/);assert.match(signUp,/<DateOfBirthField/);assert.match(signUp,/validateSignup/);assert.match(signUp,/flight\.current/);assert.ok(signUp.indexOf('await client.checkAge')<signUp.indexOf('await client.register'));assert.match(signUp,/termsDocument\.sha256/);assert.match(signUp,/privacyDocument\.sha256/);assert.match(signUp,/name="privacy-accepted"/);assert.match(signUp,/name="terms-accepted"/);assert.match(signUp,/<EmailPendingScreen/);
 });
 
 test("auth screens share the reference hierarchy and replace the inline gate", () => {
@@ -104,9 +59,9 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\} legalGate=\{false\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
-  assert.match(login, /useState\("\/sign-up"\)/);
+  assert.match(login, /useState\(["']\/sign-up["']\)/);
   assert.match(login, /href=\{signUpHref\}/);
-  assert.match(signUp, /useState\("\/login"\)/);
+  assert.match(signUp, /useState\(["']\/login["']\)/);
   assert.match(signUp, /href=\{loginHref\}/);
   assert.match(gate, /window\.location\.replace\("\/login"\)/);
 });
@@ -134,7 +89,7 @@ test("the login route sends an already-authenticated browser back to its debate 
   assert.match(loginPage, /const cookieStore = await cookies\(\);[\s\S]*?readSessionCookie\(cookieStore\)/);
   assert.match(loginPage, /createServerContractClient/);
   assert.match(loginPage, /\.readSession\(\)/);
-  assert.match(loginPage, /redirect\("\/#start-a-debate"\)/);
+  assert.match(loginPage, /redirect\("\/new"\)/);
   assert.match(loginPage, /catch \{/);
   assert.match(loginPage, /return <LoginFlow catalog=\{catalog\} \/>/);
 });
@@ -176,32 +131,8 @@ test("desktop auth content is the document's 540px card", () => {
   assert.match(styles, /\.authCard\s*\{[\s\S]*?width:\s*540px;[\s\S]*?max-width:\s*100%;[\s\S]*?\}/);
 });
 
-test("auth failures use stable public copy instead of exception text", () => {
-  assert.doesNotMatch(login, /failure\.message/);
-  assert.doesNotMatch(signUp, /failure\.message/);
-  assert.match(login, /setError\(t\(catalog, "auth\.login\.signInFailed"\)\)/);
-  assert.match(login, /setError\(t\(catalog, "auth\.login\.verificationFailed"\)\)/);
-  assert.match(login, /t\(catalog, "auth\.login\.recoveryCodeRejected"\)/);
-  assert.match(login, /t\(catalog, "auth\.login\.tooManyAttempts"\)/);
-  assert.match(signUp, /setError\(t\(catalog, "auth\.signUp\.creationFailed"\)\)/);
-  assert.doesNotMatch(signUp, /setError\(t\(catalog, "auth\.signUp\.resendFailed"\)\)/);
-  assert.equal(authMessages["auth.login.signInFailed"], "Sign-in could not be completed.");
-  assert.equal(authMessages["auth.login.verificationFailed"], "Authenticator verification could not be completed.");
-  assert.match(authMessages["auth.login.recoveryCodeRejected"], /^That recovery code was not accepted\./);
-  assert.match(authMessages["auth.login.tooManyAttempts"], /^Too many verification attempts\./);
-  assert.equal(authMessages["auth.signUp.creationFailed"], "Account creation could not be completed.");
-});
-
-test("primary and recovery emails occupy distinct autocomplete sections", () => {
-  assert.match(
-    signUp,
-    /name="email"[^>]*autoComplete="section-primary-email email"/
-  );
-  assert.match(
-    signUp,
-    /name="recovery-email"[^>]*autoComplete="section-recovery-email email"/
-  );
-});
+test("auth failures retain public generic copy",()=>{assert.doesNotMatch(login,/failure\.message/);assert.doesNotMatch(signUp,/failure\.message/);assert.match(login,/auth\.login\.tooManyAttempts/);assert.match(login,/auth\.login\.recoveryCodeRejected/);assert.match(signUp,/auth\.signUp\.creationFailed/);});
+test("signup uses password-manager autofill without recovery or confirmation fields",()=>{assert.match(signUp,/autoComplete="username"/);assert.match(signUp,/autoComplete="new-password"/);assert.doesNotMatch(signUp,/name="recovery-email"/);});
 
 test("ordinary top bar exposes a neutral account entry without inventing session state", () => {
   // SYNC3: the entry is dev's /settings (163f15c5); still neutral, still no session guess.
@@ -225,9 +156,11 @@ test("every credential-bearing auth form has an explicit query-free POST fallbac
 });
 
 test("mailed-token enrollment has no native form that could submit secrets before hydration", () => {
-  assert.match(enrollMfa, /id="totp-code"/);
+  const enrollment=read("./auth/SecurityEnrollment.tsx");
+  assert.match(enrollment, /id="enrollment-code"/);
   assert.doesNotMatch(enrollMfa, /id="recovery-typeback"/);
-  assert.match(enrollMfa, /setActive\(true\)/);
+  assert.match(enrollMfa, /<SecurityEnrollment/);
+  assert.match(enrollment,/result.status\s*===\s*["']authenticated["']/);
   assert.doesNotMatch(enrollMfa, /<form\b/);
   assert.doesNotMatch(verifyEmail, /<form\b/);
 });

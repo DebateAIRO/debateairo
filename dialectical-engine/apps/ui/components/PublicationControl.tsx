@@ -5,6 +5,10 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { contractClient } from "@/lib/api";
 import { ContractHttpError } from "@debateai/contract";
 import type { ContractClient, PublicationPartKind, PublicationRefusalStatement } from "@debateai/contract";
+import {SecurityConfirmation,type SecurityConfirmationClient} from '@/components/auth/SecurityConfirmation';
+import {useSelectedAuthCatalog} from '@/components/AuthShell';
+import {useChromeI18n} from '@/lib/i18n/I18nProvider';
+import type {ConfirmedSecurityAction} from '@/lib/securityConfirmation';
 import publicEnglish from "@/messages/en/public.json";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
@@ -15,8 +19,8 @@ type Visibility = Readonly<{
 
 export type PrivateDeletionStatus="PENDING"|"CLEANED";
 type PublicationControlClient=Pick<ContractClient,
-  "readRunVisibility"|"stepUp"|"publishRun"|"unpublishRun"|"deletePrivateDebate"
->;
+  "readRunVisibility"|"publishRun"|"unpublishRun"|"deletePrivateDebate"
+> & SecurityConfirmationClient;
 
 export function PublicationControl({ runId,onPrivateDeletion,client=contractClient,catalog=publicEnglish }: {
   readonly runId:string;
@@ -26,15 +30,13 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
 }) {
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [action, setAction] = useState<"PUBLISH" | "UNPUBLISH" | null>(null);
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  const {locale}=useChromeI18n(),authCatalog=useSelectedAuthCatalog(locale),[confirming,setConfirming]=useState<"publication"|"delete"|null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [statement, setStatement] = useState<PublicationRefusalStatement | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deleteCode, setDeleteCode] = useState("");
+
   const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -65,23 +67,19 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (action === null || !acknowledged || busy) return;
-    setBusy(true);
-    setMessage(null);
-    setStatement(null);
+    setConfirming('publication');
+  }
+  async function publishConfirmed(result:ConfirmedSecurityAction):Promise<void> {
+    if(action===null||!acknowledged)return;
+    setBusy(true);setMessage(null);setStatement(null);
     try {
-      const steppedUp = await client.stepUp(password, code, {
-        action,
-        target_run_id: runId
-      });
-      const grant = steppedUp.step_up_grant;
-      if (grant === undefined) throw new Error("STEP_UP_GRANT_MISSING");
+      const grant=result.step_up_grant;
       const changed = action === "PUBLISH"
         ? await client.publishRun(runId, grant.token)
         : await client.unpublishRun(runId, grant.token);
       setVisibility(changed);
       setAction(null);
-      setPassword("");
-      setCode("");
+      setConfirming(null);
       setAcknowledged(false);
       setMessage(action === "PUBLISH"
         ? t(catalog, "public.publication.publishedSuccess")
@@ -107,21 +105,15 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   async function deletePrivate(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!deleteAcknowledged || busy || visibility?.state !== "PRIVATE") return;
-    setBusy(true);
-    setMessage(null);
-    setStatement(null);
+    setConfirming('delete');
+  }
+  async function deleteConfirmed(result:ConfirmedSecurityAction):Promise<void> {
+    if(!deleteAcknowledged||visibility?.state!=='PRIVATE')return;
+    setBusy(true);setMessage(null);setStatement(null);
     try {
-      const steppedUp = await client.stepUp(deletePassword, deleteCode, {
-        action: "DELETE_PRIVATE_DEBATE",
-        target_run_id: runId
-      });
-      const grant = steppedUp.step_up_grant;
-      if (grant === undefined || grant.action !== "DELETE_PRIVATE_DEBATE") {
-        throw new Error("DELETE_PRIVATE_DEBATE_GRANT_MISSING");
-      }
+      const grant=result.step_up_grant;
       const { status } = await client.deletePrivateDebate(runId, grant.token);
-      setDeletePassword("");
-      setDeleteCode("");
+      setConfirming(null);
       setDeleteAcknowledged(false);
       setDeleteOpen(false);
       setDeleted(status === "CLEANED");
@@ -144,18 +136,17 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
     }
   }
 
+  function proofFailure(failure:unknown) {
+    if(confirming==='delete')setMessage(t(catalog,"public.publication.deletionUnauthorized"));
+    else if(failure instanceof ContractHttpError&&failure.status>=400&&failure.status<500)setMessage(t(catalog,"public.publication.changeUnauthorized"));
+    else setMessage(t(catalog,"public.publication.statusUnavailable"));
+    setAnswered(count=>count+1);
+  }
   const selected = action ?? (visibility?.state === "PUBLISHED" ? "UNPUBLISH" : "PUBLISH");
   const warning = selected === "PUBLISH"
     ? t(catalog, "public.publication.publishWarning")
     : t(catalog, "public.publication.unpublishWarning");
 
-  const partLabels: Record<PublicationPartKind, string> = {
-    QUESTION: t(catalog, "public.publication.contentCheck.part.question"),
-    SUMMARY: t(catalog, "public.publication.contentCheck.part.summary"),
-    ARGUMENTS: t(catalog, "public.publication.contentCheck.part.arguments"),
-    REVIEWS: t(catalog, "public.publication.contentCheck.part.reviews"),
-    STORY: t(catalog, "public.publication.contentCheck.part.story")
-  };
 
   if (deleted) {
     return (
@@ -182,20 +173,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       {/* The card's answer to the last action sits above its controls: the card is height-capped and scrolls
           (globals.css, D-S02-24), so anything below the form and the delete section starts out of view (pt-B2). */}
       {statement !== null ? (
-        <div role="status">
-          <h3>{t(catalog, "public.publication.contentCheck.refusedHeading")}</h3>
-          <p>{statement.outcome === "BLOCK"
-            ? t(catalog, "public.publication.contentCheck.refusedWhatBlock")
-            : t(catalog, "public.publication.contentCheck.refusedWhatUnsure")}</p>
-          <p>{t(catalog, "public.publication.contentCheck.partsIntro")}</p>
-          <ul>{statement.parts.map((part) => <li key={part}>{partLabels[part]}</li>)}</ul>
-          <p>{t(catalog, "public.publication.contentCheck.groundTerms")}</p>
-          {statement.ground === "TERMS_AND_POSSIBLY_ILLEGAL"
-            ? <p>{t(catalog, "public.publication.contentCheck.groundIllegal")}</p> : null}
-          <p>{t(catalog, "public.publication.contentCheck.automated")}</p>
-          <p>{t(catalog, "public.publication.contentCheck.stillPrivate")}</p>
-          <p>{t(catalog, "public.publication.contentCheck.appeal")}</p>
-        </div>
+        <PublicationStatement statement={statement} catalog={catalog}/>
       ) : message ? <p role="status">{message}</p> : null}
       {action === null ? (
         <button
@@ -205,6 +183,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           onClick={() => {
             setStatement(null);
             setDeleteOpen(false);
+            setConfirming(null);
             setAction(visibility?.state === "PUBLISHED" ? "UNPUBLISH" : "PUBLISH");
           }}
         >
@@ -213,29 +192,8 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
             : t(catalog, "public.publication.publishEllipsis")}
         </button>
       ) : (
-        <form onSubmit={(event) => void submit(event)}>
+        <form noValidate onSubmit={(event) => void submit(event)}>
           <p><strong>{warning}</strong></p>
-          <label>
-            {t(catalog, "public.publication.accountPassword")}
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </label>
-          <label>
-            {t(catalog, "public.publication.authenticatorCode")}
-            <input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              required
-            />
-          </label>
           <label>
             <input
               type="checkbox"
@@ -255,7 +213,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
                   ? t(catalog, "public.publication.publishPublicly")
                   : t(catalog, "public.publication.unpublish")}
             </button>
-            <button type="button" className="button" disabled={busy} onClick={() => { setStatement(null); setAction(null); }}>{t(catalog, "public.publication.cancel")}</button>
+            <button type="button" className="button" disabled={busy} onClick={() => { setStatement(null); setAction(null); setConfirming(null); }}>{t(catalog, "public.publication.cancel")}</button>
           </div>
         </form>
       )}
@@ -270,35 +228,14 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
               type="button"
               className="button"
               disabled={busy || deletePending}
-              onClick={() => { setStatement(null); setAction(null); setDeleteOpen(true); }}
+              onClick={() => { setStatement(null); setAction(null); setConfirming(null); setDeleteOpen(true); }}
             >
               {deletePending
                 ? t(catalog, "public.publication.deletionPendingShort")
                 : t(catalog, "public.publication.deletePrivateEllipsis")}
             </button>
           ) : (
-            <form onSubmit={(event) => void deletePrivate(event)}>
-              <label>
-                {t(catalog, "public.publication.accountPassword")}
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={deletePassword}
-                  onChange={(event) => setDeletePassword(event.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                {t(catalog, "public.publication.authenticatorCode")}
-                <input
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  value={deleteCode}
-                  onChange={(event) => setDeleteCode(event.target.value)}
-                  required
-                />
-              </label>
+            <form noValidate onSubmit={(event) => void deletePrivate(event)}>
               <label>
                 <input
                   type="checkbox"
@@ -314,7 +251,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
                     ? t(catalog, "public.publication.authorizing")
                     : t(catalog, "public.publication.permanentlyDelete")}
                 </button>
-                <button type="button" className="button" disabled={busy} onClick={() => setDeleteOpen(false)}>
+                <button type="button" className="button" disabled={busy} onClick={() => {setDeleteOpen(false);setConfirming(null);}}>
                   {t(catalog, "public.publication.cancel")}
                 </button>
               </div>
@@ -322,6 +259,36 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           )}
         </div>
       ) : null}
+      {confirming==='publication'&&action?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action,target_run_id:runId}} disabled={!acknowledged} onError={proofFailure} onConfirmed={publishConfirmed} onCancel={()=>setConfirming(null)}/>:null}
+      {confirming==='delete'?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'DELETE_PRIVATE_DEBATE',target_run_id:runId}} disabled={!deleteAcknowledged} onError={proofFailure} onConfirmed={deleteConfirmed} onCancel={()=>setConfirming(null)}/>:null}
     </section>
+  );
+}
+
+/** Shared server refusal statement for ordinary and provider-resumed publication. */
+export function PublicationStatement({statement,catalog}:{statement:PublicationRefusalStatement;catalog:MessageCatalog}) {
+  const partLabels: Record<PublicationPartKind, string> = {
+    QUESTION: t(catalog, "public.publication.contentCheck.part.question"),
+    SUMMARY: t(catalog, "public.publication.contentCheck.part.summary"),
+    ARGUMENTS: t(catalog, "public.publication.contentCheck.part.arguments"),
+    REVIEWS: t(catalog, "public.publication.contentCheck.part.reviews"),
+    STORY: t(catalog, "public.publication.contentCheck.part.story")
+  };
+
+  return (
+        <div role="status">
+          <h3>{t(catalog, "public.publication.contentCheck.refusedHeading")}</h3>
+          <p>{statement.outcome === "BLOCK"
+            ? t(catalog, "public.publication.contentCheck.refusedWhatBlock")
+            : t(catalog, "public.publication.contentCheck.refusedWhatUnsure")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.partsIntro")}</p>
+          <ul>{statement.parts.map((part) => <li key={part}>{partLabels[part]}</li>)}</ul>
+          <p>{t(catalog, "public.publication.contentCheck.groundTerms")}</p>
+          {statement.ground === "TERMS_AND_POSSIBLY_ILLEGAL"
+            ? <p>{t(catalog, "public.publication.contentCheck.groundIllegal")}</p> : null}
+          <p>{t(catalog, "public.publication.contentCheck.automated")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.stillPrivate")}</p>
+          <p>{t(catalog, "public.publication.contentCheck.appeal")}</p>
+        </div>
   );
 }

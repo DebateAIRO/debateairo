@@ -484,7 +484,7 @@ export const StepUpResponseSchema = z.object({
 
 export type StepUpAuthorizationRequest = z.infer<typeof StepUpAuthorizationRequestSchema>;
 export type StepUpResponse = z.infer<typeof StepUpResponseSchema>;
-export const BeginSocialStepUpRequestSchema = z.object({authorization:StepUpAuthorizationRequestSchema,next:z.enum(['/','/settings','/account']).optional()}).strict();
+export const BeginSocialStepUpRequestSchema = z.object({authorization:StepUpAuthorizationRequestSchema,next:z.enum(['/','/new','/settings','/settings/security','/account']).optional()}).strict();
 export const SocialStepUpStatusRequestSchema = z.object({continuation_token:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
 export const SocialStepUpStatusResponseSchema = z.object({authorization:StepUpAuthorizationRequestSchema,expires_at:z.iso.datetime(),available_methods:z.array(z.enum(['passkey','totp','recovery_code']))}).strict();
 export const CompleteSocialStepUpRequestSchema = z.union([SocialStepUpStatusRequestSchema.extend({code:z.string().min(1).max(1024)}).strict(),SocialStepUpStatusRequestSchema.extend({challenge_handle:z.string().regex(/^[A-Za-z0-9_-]{43}$/),credential:ConsumerAuthenticationCredentialSchema}).strict()]);
@@ -492,7 +492,7 @@ export type SocialStepUpStatusResponse = z.infer<typeof SocialStepUpStatusRespon
 export type CompleteSocialStepUpRequest = z.infer<typeof CompleteSocialStepUpRequestSchema>;
 export const BeginPasskeyStepUpRequestSchema = z.object({ authorization:StepUpAuthorizationRequestSchema }).strict();
 export const CompletePasskeyStepUpRequestSchema = z.object({ challenge_handle:z.string().regex(/^[A-Za-z0-9_-]{43}$/),credential:ConsumerAuthenticationCredentialSchema }).strict();
-export const AuthMethodsResponseSchema = z.object({ methods:z.array(z.object({ factor_id:z.uuid(),type:z.enum(["passkey","totp"]),label:z.string().nullable(),created_at:z.iso.datetime(),last_used_at:z.iso.datetime().nullable(),removable:z.boolean() }).strict()),recovery_codes_remaining:z.number().int().min(0).max(10) }).strict();
+export const AuthMethodsResponseSchema = z.object({ methods:z.array(z.object({ factor_id:z.uuid(),type:z.enum(["passkey","totp"]),label:z.string().nullable(),created_at:z.iso.datetime(),last_used_at:z.iso.datetime().nullable(),removable:z.boolean() }).strict()),recovery_codes_remaining:z.number().int().min(0).max(10),available_step_up_methods:z.array(z.enum(["passkey","password_totp","provider"])).max(3),step_up_providers:z.array(z.enum(["google","apple","facebook","x"])).max(4) }).strict();
 export type AuthMethodsResponse = z.infer<typeof AuthMethodsResponseSchema>;
 export const RemoveAuthMethodRequestSchema = z.object({factor_id:z.uuid(),step_up_grant:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
 export const RegenerateRecoveryCodesRequestSchema = z.object({step_up_grant:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();

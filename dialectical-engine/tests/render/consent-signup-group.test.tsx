@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+vi.mock("@/components/auth/TurnstileChallenge", async()=>{const {useEffect}=await import("react");return {TurnstileChallenge:({onToken}:{onToken:(token:string)=>void})=>{useEffect(()=>onToken("test-proof"),[onToken]);return null;}};});
 
 /**
  * S02-C3 — the sign-up consent checkbox group (design artboard 8a).
@@ -13,7 +14,7 @@
  * (cluster S02-C4) — an assertion about either would be one a later cluster rewrites.
  */
 
-import { act } from "react";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
@@ -71,7 +72,7 @@ async function mount(client?: {
     register: vi.fn(),
     checkAge: vi.fn().mockResolvedValue({ outcome: "allowed" })
   };
-  await act(async () => root!.render(<SignUpFlow client={stub} />));
+  await act(async () => root!.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={stub} />));
 }
 
 /** Drive the card into its `sent` state the way a real registration does. */
@@ -82,10 +83,8 @@ async function registerSuccessfully(): Promise<void> {
   // First: its re-renders would reset the controlled fields assigned directly below.
   await fillAdultDateOfBirth();
   field("email").value = "person@example.test";
-  field("confirm-email").value = "person@example.test";
-  field("recovery-email").value = "recovery@example.test";
-  field("password").value = "correct horse battery staple";
-  field("confirm-password").value = "correct horse battery staple";
+  field("phone").value = "+40712345678";
+  field("password").value = "Correct horse 7!";
   field("privacy-accepted").checked = true;
   field("terms-accepted").checked = true;
   const form = document.querySelector<HTMLFormElement>("form");
@@ -95,7 +94,7 @@ async function registerSuccessfully(): Promise<void> {
   });
   await settle();
   expect(register).toHaveBeenCalledTimes(1);
-  expect(register.mock.calls[0]![3], "the date of birth, not an 18+ flag").toBe("1990-01-01");
+  expect(register.mock.calls[0]![0].date_of_birth, "the date of birth, not an 18+ flag").toBe("1990-01-01");
 }
 
 describe("sign-up consent checkbox group", () => {

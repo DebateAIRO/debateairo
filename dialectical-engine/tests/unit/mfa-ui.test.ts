@@ -52,9 +52,8 @@ describe("S4 mailed-token enrolment UI", () => {
       }
     );
     expect(consumed).toBe(token);
-    expect(order).toEqual(["replace", "replace", "verify"]);
+    expect(order).toEqual(["replace", "verify"]);
     expect(replacedWith).toEqual([
-      `/verify-email?campaign=welcome#setup&token=${token}`,
       "/verify-email?campaign=welcome#setup"
     ]);
     expect(replacedWith.at(-1)).not.toContain(token);
@@ -152,3 +151,13 @@ describe("S4 mailed-token enrolment UI", () => {
     });
   });
 });
+import {takeFragmentToken} from '../../apps/ui/lib/mfaEnrollment.js';
+it.each([
+ '/verify-email#token='+ 'a'.repeat(43)+'&token='+ 'b'.repeat(43),
+ '/verify-email?token='+ 'a'.repeat(43)+'#token='+ 'b'.repeat(43),
+ '/verify-email?token='+ 'a'.repeat(43)+'&%74oken='+ 'b'.repeat(43),
+ '/verify-email?token%GG='+ 'a'.repeat(43),
+ '/verify-email#token=',
+ '/verify-email#%74oken=malformed',
+ '/verify-email#token%GG='+ 'a'.repeat(43)
+])('rejects ambiguous/malformed %s while scrubbing every bearer before any request',async path=>{let cleaned=path;const verify=vi.fn();const location={href:'https://test.invalid'+path},history={state:null,replaceState(_state:unknown,_unused:string,url?:string|URL|null){cleaned=String(url);}};expect(takeFragmentToken(location,history,true)).toBeNull();await consumeMailedEnrollmentTokenFromUrl(location,history,verify);expect(verify).not.toHaveBeenCalled();expect(cleaned).not.toContain('token');expect(cleaned).not.toContain('a'.repeat(43));expect(cleaned).not.toContain('b'.repeat(43));});

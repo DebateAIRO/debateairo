@@ -617,7 +617,11 @@ importers:
         specifier: workspace:*
         version: link:../register
 
-  packages/kernel: {}
+  packages/kernel:
+    dependencies:
+      libphonenumber-js:
+        specifier: 1.13.7
+        version: 1.13.7
 
   packages/ledger:
     dependencies:
