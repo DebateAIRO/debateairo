@@ -27,6 +27,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -90,6 +91,7 @@ async function mount(client?: {
     root!.render((<SignUpFlow client={stub} />) as ReactNode);
   });
   await settle();
+  await pickRegion("RO");
 }
 
 function field(name: string): HTMLInputElement {
@@ -459,6 +461,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
      Its 18+ click is gone: the age gate replaced that box (Turn 8). */
   it("ticks the box, closes, returns focus to the input, and enables Create account", async () => {
     await mount();
+    await pickRegion("RO");
 
     await acknowledgePolicy();
 
@@ -644,6 +647,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
      replaced that box (Turn 8). */
   it("enables Create account with both boxes checked, the privacy one via the policy", async () => {
     await mount();
+    await pickRegion("RO");
 
     await acknowledgePolicy();
     await acknowledgeTerms();
@@ -661,6 +665,7 @@ describe("sign-up card ↔ privacy policy modal", () => {
      guarantee is S02-S30's. */
   it("announces nothing on assignment, and enables only after real activations", async () => {
     await mount();
+    await pickRegion("RO");
 
     field("privacy-accepted").checked = true;
     field("terms-accepted").checked = true;

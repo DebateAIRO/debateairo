@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import authEnglish from "../../apps/ui/messages/en/auth.json";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 let host: HTMLDivElement;
 let root: Root;
@@ -53,6 +54,7 @@ async function fillAdultDateOfBirth(): Promise<void> {
 async function submitValidForm() {
   // First: its re-renders would reset the controlled fields assigned directly below.
   await fillAdultDateOfBirth();
+  await pickRegion("RO");
   // Email inputs strip ASCII padding before FormData; NBSP survives and exercises trim().
   field("email").value = "\u00a0Person@Example.test\u00a0";
   field("confirm-email").value = "\u00a0Person@Example.test\u00a0";
@@ -98,7 +100,8 @@ describe("register form F1", () => {
       " Correct horse 7! ",
       "Recovery@Example.test",
       "1990-01-01",
-      DISPLAYED_LEGAL_EN
+      DISPLAYED_LEGAL_EN,
+      { country: "RO", usState: null }
     );
   });
 

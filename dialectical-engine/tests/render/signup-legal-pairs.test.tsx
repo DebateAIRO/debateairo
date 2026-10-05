@@ -7,6 +7,7 @@ import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 let root: Root | null = null;
 const checkAge = vi.fn();
@@ -31,6 +32,7 @@ async function fillAndSubmit(): Promise<void> {
   await type("dob-d", "01");
   await type("dob-m", "01");
   await type("dob-y", "1990");
+  await pickRegion("RO");
   field("email").value = "person@example.test";
   field("confirm-email").value = "person@example.test";
   field("recovery-email").value = "recovery@example.test";
@@ -70,7 +72,8 @@ describe("sign-up sends the pairs of the documents it displayed (paid plans L3b)
         terms: { version: TERMS_OF_SERVICE.version, sha256: TERMS_OF_SERVICE.sha256 },
         privacy: { version: PRIVACY_POLICY.version, sha256: PRIVACY_POLICY.sha256 },
         locale: "en"
-      }
+      },
+      { country: "RO", usState: null }
     );
     // The shared fixture the four pinned render tests use is exactly this argument.
     expect(register.mock.calls[0]![4]).toEqual(DISPLAYED_LEGAL_EN);

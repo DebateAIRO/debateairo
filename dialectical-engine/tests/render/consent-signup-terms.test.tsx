@@ -21,6 +21,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 const PRIVACY_ROW_TEXT = "I have read the Privacy Policy.";
 const TERMS_ROW_TEXT = "I have read and agree to the Terms of Service.";
@@ -179,6 +180,7 @@ async function mount(client?: {
   };
   await act(async () => root!.render(<SignUpFlow client={stub} />));
   await settle();
+  await pickRegion("RO");
 }
 
 describe("sign-up — the Terms of Service row", () => {
@@ -336,6 +338,7 @@ describe("sign-up — the Terms of Service row", () => {
   // birth does not gate the button.
   it("keeps Create account disabled until both boxes are ticked", async () => {
     await mount();
+    await pickRegion("RO");
 
     await acknowledgePolicy();
     expect(field("privacy-accepted").checked).toBe(true);
@@ -357,6 +360,7 @@ describe("sign-up — the Terms of Service row", () => {
 
     // First: its re-renders would reset the controlled fields assigned directly below.
     await fillAdultDateOfBirth();
+    await pickRegion("RO");
     field("email").value = "person@example.test";
     field("confirm-email").value = "person@example.test";
     field("recovery-email").value = "recovery@example.test";
@@ -374,7 +378,8 @@ describe("sign-up — the Terms of Service row", () => {
       "correct horse battery staple",
       "recovery@example.test",
       "1990-01-01",
-      DISPLAYED_LEGAL_EN
+      DISPLAYED_LEGAL_EN,
+      { country: "RO", usState: null }
     );
     expect(field("terms-accepted").disabled, "terms-accepted disabled when sent").toBe(true);
   });

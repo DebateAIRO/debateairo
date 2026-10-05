@@ -151,7 +151,7 @@ describe("the gate on the routes", () => {
   // The age gate's register hook (apps/api/src/index.ts:1711-1729) needs a real adult date before register runs.
   const REGISTER_BODY = {
     email: "alice@example.test", password: "correct horse battery staple",
-    recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01"
+    recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01", country: "RO"
   };
   const setCookies = (response: { headers: Record<string, unknown> }): string[] => {
     const raw = response.headers["set-cookie"];

@@ -98,6 +98,7 @@ import {
   type Session,
   type SessionList
 } from "./index.js";
+import type { DeclaredRegion } from "@debateai/kernel";
 
 export type ContractErrorCode =
   | "SESSION_REQUIRED"
@@ -321,7 +322,8 @@ export interface ContractClient {
     password: string,
     recoveryEmail: string,
     dateOfBirth: string,
-    legal: RegisterLegalDocuments
+    legal: RegisterLegalDocuments,
+    region: DeclaredRegion
   ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
   resendVerification(email: string): Promise<Readonly<{
     message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
@@ -521,7 +523,8 @@ export function createContractClient(
       password: string,
       recoveryEmail: string,
       dateOfBirth: string,
-      legal: RegisterLegalDocuments
+      legal: RegisterLegalDocuments,
+      region: DeclaredRegion
     ) => request(
       "/v1/auth/register",
       RegistrationPublicResponseSchema,
@@ -533,7 +536,10 @@ export function createContractClient(
           // Paid plans L3b (R3-2): the displayed documents, beside the age gate's date.
           terms: legal.terms,
           privacy: legal.privacy,
-          locale: legal.locale
+          locale: legal.locale,
+          // Region picker S01 (SPEC R16): the declared country, and the US state only for "US".
+          country: region.country,
+          ...(region.country === "US" ? { us_state: region.usState } : {})
         }) },
       202
     ),

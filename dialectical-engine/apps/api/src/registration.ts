@@ -16,7 +16,7 @@ import {
   type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
-import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
+import { AGE_RULE_VERSION, MIN_AGE, isDeclaredRegion, type DeclaredRegion } from "@debateai/kernel";
 import type { RegisterLegalDocuments } from "@debateai/contract";
 import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
@@ -44,9 +44,9 @@ export interface RegisterInput {
  * Paid plans L3b: the request-scoped facts the frozen register mount cannot pass in its four input members
  * (apps/api/src/index.ts, S04 — tests/unit/obs-l2-s04-zone.test.ts hashes that region). The age gate's
  * edge country already rides here (AuthSourceContext.countryCode); the Terms and Privacy pairs the page
- * displayed ride here too, parsed by the register preHandler hook and added by sourceFor.
+ * displayed and the declared region ride here too, parsed by register preHandler hooks and added by sourceFor.
  */
-export type RegistrationSource = AuthSourceContext & Readonly<{ legal?: RegisterLegalDocuments }>;
+export type RegistrationSource = AuthSourceContext & Readonly<{ legal?: RegisterLegalDocuments; region?: DeclaredRegion }>;
 
 export interface RegistrationApplication {
   register(input: RegisterInput, source: RegistrationSource): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
@@ -441,6 +441,7 @@ interface PendingRegistration {
   readonly requestedAt: Date;
   readonly countryCode: string | null;
   readonly documents: SignUpDocuments | null;
+  readonly region: DeclaredRegion | null;
   readonly source: AuthSourceContext;
 }
 
@@ -1317,7 +1318,8 @@ export class RegistrationService implements RegistrationApplication {
           verificationExpiresAt: expiresAt,
           occurredAt: input.requestedAt,
           source: input.source,
-          ...(acceptances === undefined ? {} : { acceptances })
+          ...(acceptances === undefined ? {} : { acceptances }),
+          ...(input.region === null ? {} : { declaredRegion: input.region })
         }, () => this.dependencies.dekStore.store(userId, dek));
         if (created.status === "pseudonym_collision") continue;
         if (created.status === "email_duplicate") {
@@ -1426,6 +1428,11 @@ export class RegistrationService implements RegistrationApplication {
         if (this.dependencies.legalAcceptance !== undefined && documents === null) {
           throw new AuthFlowError("LEGAL_DOCUMENT_STALE");
         }
+        // Region picker S01: the register hook parsed the region; other compositions may omit it.
+        if (rawSource.region !== undefined && !isDeclaredRegion(rawSource.region)) {
+          throw new AuthFlowError("AUTH_INPUT_INVALID");
+        }
+        const region = rawSource.region ?? null;
         const source = sourceContext(rawSource);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
@@ -1490,7 +1497,7 @@ export class RegistrationService implements RegistrationApplication {
         mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents
+            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents, region
           }));
           const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
           if (preTransportWorkMs
