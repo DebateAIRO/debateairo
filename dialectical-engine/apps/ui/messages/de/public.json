@@ -128,6 +128,7 @@
   "public.report.models": "Beteiligte Modelle: {models}",
   "public.report.modelsNotRecorded": "Beteiligte Modelle: nicht erfasst",
   "public.report.disclosure": "Dieser Bericht wurde von KI-Modellen auf Grundlage der Argumente der Debatte verfasst.",
+  "public.report.notAdvice": "KI-generierter Bericht. Er ist keine medizinische, rechtliche, finanzielle oder sonstige Fachberatung.",
   "public.report.title.inShort": "Kurz gesagt",
   "public.report.title.story": "Die vollständige Geschichte",
   "public.report.title.why": "Warum diese Antwort",

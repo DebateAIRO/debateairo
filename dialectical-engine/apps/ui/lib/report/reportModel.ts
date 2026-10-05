@@ -72,6 +72,8 @@ export interface ReportModel {
   /** Every page's footer; `pageWords` holds {page} and {total}, filled in by reportPageWords as each page is laid out. */
   readonly footer: Readonly<{ text: string; pageWords: string }>;
   readonly cover: Readonly<{
+    /** The fixed "not professional advice" line, printed first on page 1, above the eyebrow. */
+    notAdvice: string;
     eyebrow: string;
     question: string;
     /** The arithmetic label in human words; null for an answer without a verdict (no pill then). */
@@ -581,6 +583,7 @@ export function buildReportModel(
     // No values: the placeholders stay for reportPageWords to fill on each page.
     footer: { text: t(publicCatalog, "public.report.footer"), pageWords: t(publicCatalog, "public.report.pageOf") },
     cover: {
+      notAdvice: t(publicCatalog, "public.report.notAdvice"),
       eyebrow: t(publicCatalog, "public.report.eyebrow"),
       question: answer.question_line,
       labelWords: label === null ? null : storyLabelWords(label, publicCatalog),

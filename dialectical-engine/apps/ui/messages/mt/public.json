@@ -128,6 +128,7 @@
   "public.report.models": "Mudelli li ħadu sehem: {models}",
   "public.report.modelsNotRecorded": "Mudelli li ħadu sehem: mhux irreġistrati",
   "public.report.disclosure": "Dan ir-rapport inkiteb minn mudelli tal-IA abbażi tal-argumenti tad-dibattitu.",
+  "public.report.notAdvice": "Rapport iġġenerat mill-IA. Mhuwiex parir mediku, legali, finanzjarju jew parir professjonali ieħor.",
   "public.report.title.inShort": "Fil-qosor",
   "public.report.title.story": "L-istorja sħiħa",
   "public.report.title.why": "Għaliex din ir-risposta",
