@@ -27,6 +27,7 @@ import { TermsOfServiceModal } from '../consent/TermsOfServiceModal';
 import { useLegalDocument } from '../consent/useLegalDocument';
 import { useChromeI18n } from '@/lib/i18n/I18nProvider';
 import { catalogLocale } from '@/lib/i18n/locales';
+type SocialFlowKind = 'signup' | 'login' | 'stepup' | 'enroll';
 export function SocialCompleteFlow({ client = contractClient, catalog = authEnglish, turnstile, locale = 'en', uiLocale = 'en', onAuthenticated, onStepUp }: {
     client?: ContractClient;
     catalog?: MessageCatalog;
@@ -44,7 +45,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const attempt = useRef(createCodeAttempt());
     const [returnPath, setReturnPath] = useState('/new');
     const [token, setToken] = useState('');
-    const [kind, setKind] = useState<'signup' | 'login' | 'stepup' | 'enroll' | null>(null);
+    const [kind, setKind] = useState<SocialFlowKind | null>(null);
+    const authority = useRef<{ token: string; kind: SocialFlowKind | null }>({ token: '', kind: null });
     const [email, setEmail] = useState('');
     const [name, setName] = useState<string | null>(null);
     const [phone, setPhone] = useState('');
@@ -69,6 +71,14 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const privacyDocument = useLegalDocument('privacy');
     const termsDocument = useLegalDocument('terms');
     const chrome = useChromeI18n();
+    function replaceAuthority(nextToken: string, nextKind: SocialFlowKind | null) {
+        authority.current = { token: nextToken, kind: nextKind };
+        setToken(nextToken);
+        setKind(nextKind);
+    }
+    function owns(owner: number, ownedToken: string, ownedKind: SocialFlowKind | null) {
+        return owner === sequence.current && authority.current.token === ownedToken && authority.current.kind === ownedKind;
+    }
     const navigateAuthenticated = () => {
         if (onAuthenticated)
             onAuthenticated();
@@ -91,33 +101,43 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             setBusy(false);
             return;
         }
-        setToken(value);
-        setKind(mode as 'signup' | 'login' | 'stepup');
+        const initialKind = mode as 'signup' | 'login' | 'stepup';
+        const owner = sequence.current;
+        replaceAuthority(value, initialKind);
         void (async () => {
             try {
                 if (mode === 'signup') {
                     const status = await client.socialSignupStatus({ continuation_token: value });
+                    if (!owns(owner, value, initialKind))
+                        return;
                     setEmail(status.email ?? '');
                     setName(status.name);
                     setFlowExpiry(status.expires_at);
                 }
                 else if (mode === 'stepup') {
                     const status = await client.socialStepUpStatus(value);
+                    if (!owns(owner, value, initialKind))
+                        return;
                     setStepUpStatus(status);
                     setFlowExpiry(status.expires_at);
                 }
             }
             catch {
+                if (!owns(owner, value, initialKind))
+                    return;
                 setError(t(catalog, "auth.enroll.invalidLink"));
-                setToken('');
+                replaceAuthority('', null);
             }
             finally {
-                setBusy(false);
+                if (owner === sequence.current)
+                    setBusy(false);
             }
         })();
     }, [client, catalog]);
     useEffect(() => () => {
         sequence.current++;
+        authority.current = { token: '', kind: null };
+        flight.current = false;
         browser.cancel();
     }, [browser]);
     useEffect(() => {
@@ -126,7 +146,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         const timer = setTimeout(() => {
             sequence.current++;
             browser.cancel();
-            setToken('');
+            replaceAuthority('', null);
             setCode('');
             setBusy(false);
             flight.current = false;
@@ -137,7 +157,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     function finish(result: AuthenticationResponse) {
         if (result.status !== 'authenticated')
             return;
-        setToken('');
+        replaceAuthority('', null);
         setCode('');
         setAuthenticated(true);
         if (result.replacement_recovery_code)
@@ -147,7 +167,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     }
     function finishStepUp(result: StepUpResponse) {
         window.dispatchEvent(new Event('debateai:staff-session-ended'));
-        setToken('');
+        replaceAuthority('', null);
         setCode('');
         setStepUpResult(result);
         if (result.replacement_recovery_code)
@@ -177,31 +197,38 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         flight.current = true;
         setBusy(true);
         setError(null);
+        const owner = sequence.current;
+        const ownedToken = token;
+        const ownedKind = kind;
         try {
-            const response = await client.completeSocialSignup({ continuation_token: token, email: address, phone: rawPhone, date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(chrome.locale), ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            const response = await client.completeSocialSignup({ continuation_token: ownedToken, email: address, phone: rawPhone, date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(chrome.locale), ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            if (!owns(owner, ownedToken, ownedKind))
+                return;
             setBirth(EMPTY_DOB);
             setPhone('');
             setPrivacyAccepted(false);
             setTermsAccepted(false);
             if ('status' in response) {
-                setKind('enroll');
-                setToken(response.enrollment_token);
+                replaceAuthority(response.enrollment_token, 'enroll');
                 setFlowExpiry(response.expires_at);
             }
             else {
                 setPending(address);
                 setEmail('');
-                setToken('');
+                replaceAuthority('', null);
             }
         }
         catch {
-            setError(t(catalog, "auth.signUp.creationFailed"));
+            if (owns(owner, ownedToken, ownedKind))
+                setError(t(catalog, "auth.signUp.creationFailed"));
         }
         finally {
-            setProof(null);
-            setReset(x => x + 1);
-            flight.current = false;
-            setBusy(false);
+            if (owner === sequence.current) {
+                setProof(null);
+                setReset(x => x + 1);
+                flight.current = false;
+                setBusy(false);
+            }
         }
     }
     async function passkey() {
@@ -211,20 +238,27 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         setBusy(true);
         setError(null);
         const owner = sequence.current;
+        const ownedToken = token;
+        const ownedKind = kind;
         try {
-            const options = kind === 'stepup' ? await client.beginSocialStepUpPasskey(token) : await client.beginPasskeyLogin({ continuation_token: token });
-            if (owner !== sequence.current)
+            const options = ownedKind === 'stepup' ? await client.beginSocialStepUpPasskey(ownedToken) : await client.beginPasskeyLogin({ continuation_token: ownedToken });
+            if (!owns(owner, ownedToken, ownedKind))
                 return;
             const credential = await browser.authenticate(options.options);
-            if (owner !== sequence.current)
+            if (!owns(owner, ownedToken, ownedKind))
                 return;
-            if (kind === 'stepup')
-                finishStepUp(await client.completeSocialStepUp({ continuation_token: token, challenge_handle: options.challenge_handle, credential }));
+            const result = ownedKind === 'stepup'
+                ? await client.completeSocialStepUp({ continuation_token: ownedToken, challenge_handle: options.challenge_handle, credential })
+                : await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
+            if (!owns(owner, ownedToken, ownedKind))
+                return;
+            if (ownedKind === 'stepup')
+                finishStepUp(result as StepUpResponse);
             else
-                finish(await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential }));
+                finish(result as AuthenticationResponse);
         }
         catch {
-            if (owner === sequence.current)
+            if (owns(owner, ownedToken, ownedKind))
                 setError(t(catalog, "auth.passkey.cancelled"));
         }
         finally {
@@ -242,18 +276,29 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         flight.current = true;
         setBusy(true);
         setError(null);
+        const owner = sequence.current;
+        const ownedToken = token;
+        const ownedKind = kind;
         try {
-            if (kind === 'stepup')
-                finishStepUp(await client.completeSocialStepUp({ continuation_token: token, code: value.trim() }));
+            const result = ownedKind === 'stepup'
+                ? await client.completeSocialStepUp({ continuation_token: ownedToken, code: value.trim() })
+                : await client.completeLogin(ownedToken, value.trim());
+            if (!owns(owner, ownedToken, ownedKind))
+                return;
+            if (ownedKind === 'stepup')
+                finishStepUp(result as StepUpResponse);
             else
-                finish(await client.completeLogin(token, value.trim()));
+                finish(result as AuthenticationResponse);
         }
         catch {
-            setError(t(catalog, "auth.login.authenticationCodeRejected"));
+            if (owns(owner, ownedToken, ownedKind))
+                setError(t(catalog, "auth.login.authenticationCodeRejected"));
         }
         finally {
-            flight.current = false;
-            setBusy(false);
+            if (owner === sequence.current) {
+                flight.current = false;
+                setBusy(false);
+            }
         }
     }
     if (pending)
@@ -305,6 +350,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                 }}/><button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form>{methods.includes('recovery_code') ? <button type="button" onClick={() => {
                         sequence.current++;
                         browser.cancel();
+                        flight.current = false;
+                        setBusy(false);
+                        setError(null);
                         setRecoveryMode(!recoveryMode);
                         setCode('');
                         attempt.current.edited();

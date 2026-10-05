@@ -15,3 +15,47 @@ it('provider resume takes once under StrictMode, never auto-executes and cannot 
 it('exposes the exact typed Task12 onResume handoff and discards expired original deadlines',async()=>{const result={...grant(),step_up_grant:{...grant().step_up_grant,action:'ADD_PASSKEY',target_run_id:undefined}},handler=vi.fn();delete result.step_up_grant.target_run_id;const {host,root}=await mount(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={pub} locale="en" takeProof={()=>result as any} client={{authMethods:vi.fn().mockResolvedValue({methods:[],available_step_up_methods:[],step_up_providers:[],recovery_codes_remaining:0})} as any} onResume={handler}/>);try{expect(handler).not.toHaveBeenCalled();await click(host,'Confirm action');expect(handler).toHaveBeenCalledWith({action:'ADD_PASSKEY'},expect.objectContaining({step_up_grant:expect.objectContaining({token:'g'.repeat(43),action:'ADD_PASSKEY'})}));}finally{await unmount(root,host);}});
 it('original provider grant expiry removes confirmation without executing and retains optional replacement code',async()=>{vi.useFakeTimers();const value={...grant(),replacement_recovery_code:'OPTIONAL-RESTART',step_up_grant:{...grant().step_up_grant,expires_at:new Date(Date.now()+1000).toISOString()}},publish=vi.fn(),client={authMethods:vi.fn().mockResolvedValue({methods:[],available_step_up_methods:[],step_up_providers:[],recovery_codes_remaining:0}),publishRun:publish};const {host,root}=await mount(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={pub} locale="en" takeProof={()=>value as any} client={client as any}/>);try{await act(async()=>vi.advanceTimersByTime(1001));expect([...host.querySelectorAll('button')].find(b=>b.textContent==='Confirm action')).toBeUndefined();expect(host.textContent).toContain('OPTIONAL-RESTART');expect(publish).not.toHaveBeenCalled();}finally{await unmount(root,host);vi.useRealTimers();}});
 it('cancels an explicit browser proof on unmount and ignores its late resolve',async()=>{let resolve:(value:any)=>void=()=>{};const browser={authenticate:vi.fn().mockReturnValue(new Promise(r=>resolve=r)),cancel:vi.fn()},client={authMethods:vi.fn().mockResolvedValue({methods:[],recovery_codes_remaining:0,available_step_up_methods:['passkey'],step_up_providers:[]}),beginPasskeyStepUp:vi.fn().mockResolvedValue({options:{},challenge_handle:'a'.repeat(43)}),completePasskeyStepUp:vi.fn()},done=vi.fn();const {host,root}=await mount(<SecurityConfirmation catalog={auth} authorization={{action:'PUBLISH',target_run_id:run}} client={client as any} browser={browser as any} onConfirmed={done}/>);await click(host,'Use a passkey');await act(async()=>root.unmount());await act(async()=>resolve({}));expect(browser.cancel).toHaveBeenCalled();expect(client.completePasskeyStepUp).not.toHaveBeenCalled();expect(done).not.toHaveBeenCalled();host.remove();vi.unstubAllGlobals();});
+
+const providerMethods={methods:[],recovery_codes_remaining:0,available_step_up_methods:['provider'],step_up_providers:['google']};
+
+it('cancelled provider confirmation ignores its late preparation result',async()=>{
+ let release!:(value:any)=>void;
+ const waiting=new Promise(r=>{release=r;}),assign=vi.fn(),onCancel=vi.fn();
+ const client={authMethods:vi.fn().mockResolvedValue(providerMethods),beginSocialStepUp:vi.fn().mockReturnValue(waiting)};
+ const {host,root}=await mount(<SecurityConfirmation catalog={auth} client={client as any} authorization={{action:'CHANGE_EMAIL'}} onConfirmed={vi.fn()} onCancel={onCancel}/>);
+ try{
+  await click(host,'Continue with Google');
+  await click(host,'Cancel');
+  const replacement=Object.create(window);Object.defineProperty(replacement,'location',{value:{assign}});vi.stubGlobal('window',replacement);
+  await act(async()=>release({authorization_url:'https://accounts.google.com/authorized-fixture'}));
+  expect(client.beginSocialStepUp).toHaveBeenCalledWith('google',{action:'CHANGE_EMAIL'});
+  expect(onCancel).toHaveBeenCalledOnce();
+  expect(assign).not.toHaveBeenCalled();
+ }finally{await unmount(root,host);}
+});
+
+it('authorization replacement invalidates a late provider preparation result',async()=>{
+ let release!:(value:any)=>void;
+ const waiting=new Promise(r=>{release=r;}),assign=vi.fn(),client={authMethods:vi.fn().mockResolvedValue(providerMethods),beginSocialStepUp:vi.fn().mockReturnValue(waiting)};
+ const done=vi.fn(),{host,root}=await mount(<SecurityConfirmation catalog={auth} client={client as any} authorization={{action:'CHANGE_EMAIL'}} onConfirmed={done}/>);
+ try{
+  await click(host,'Continue with Google');
+  await act(async()=>root.render(<SecurityConfirmation catalog={auth} client={client as any} authorization={{action:'DELETE_ACCOUNT'}} onConfirmed={done}/>));
+  const replacement=Object.create(window);Object.defineProperty(replacement,'location',{value:{assign}});vi.stubGlobal('window',replacement);
+  await act(async()=>release({authorization_url:'https://accounts.google.com/authorized-fixture'}));
+  expect(assign).not.toHaveBeenCalled();
+  expect(done).not.toHaveBeenCalled();
+ }finally{await unmount(root,host);}
+});
+
+it('unmounted provider confirmation ignores its late preparation result',async()=>{
+ let release!:(value:any)=>void;
+ const waiting=new Promise(r=>{release=r;}),assign=vi.fn(),client={authMethods:vi.fn().mockResolvedValue(providerMethods),beginSocialStepUp:vi.fn().mockReturnValue(waiting)};
+ const {host,root}=await mount(<SecurityConfirmation catalog={auth} client={client as any} authorization={{action:'CHANGE_EMAIL'}} onConfirmed={vi.fn()}/>);
+ await click(host,'Continue with Google');
+ const replacement=Object.create(window);Object.defineProperty(replacement,'location',{value:{assign}});vi.stubGlobal('window',replacement);
+ await act(async()=>root.unmount());
+ await act(async()=>release({authorization_url:'https://accounts.google.com/authorized-fixture'}));
+ expect(assign).not.toHaveBeenCalled();
+ host.remove();vi.unstubAllGlobals();
+});

@@ -30,6 +30,8 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const sequence = useRef(0);
     const attempt = useRef(createCodeAttempt());
     const key = JSON.stringify(authorization);
+    const authorizationKey = useRef(key);
+    authorizationKey.current = key;
     const [methods, setMethods] = useState<AuthMethodsResponse | null>(null);
     const [password, setPassword] = useState('');
     const [code, setCode] = useState('');
@@ -39,6 +41,10 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const [held, setHeld] = useState<ConfirmedSecurityAction | null>(null);
     const [passwordMode, setPasswordMode] = useState(false);
     useEffect(() => {
+        sequence.current++;
+        browser.cancel();
+        flight.current = false;
+        setBusy(false);
         let active = true;
         void (client.authMethods ?? contractClient.authMethods)().then(value => {
             if (active)
@@ -53,7 +59,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
             browser.cancel();
             flight.current = false;
         };
-    }, [key, client, browser, catalog]);
+    }, [key, client, browser, catalog, disabled]);
     async function finish(result: StepUpResponse) {
         if (!enabled.current || !matchingSecurityGrant(result, authorization))
             throw new Error('STEP_UP_TARGET_MISMATCH');
@@ -133,15 +139,21 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     async function provider(provider: 'google' | 'apple' | 'facebook' | 'x') {
         if (flight.current || disabled)
             return;
+        const owner = sequence.current;
+        const requestedAuthorization = key;
         flight.current = true;
         browser.cancel();
         setBusy(true);
         setError(null);
         try {
             const result = await (client.beginSocialStepUp ?? contractClient.beginSocialStepUp)(provider, authorization);
+            if (owner !== sequence.current || requestedAuthorization !== authorizationKey.current || !enabled.current)
+                return;
             window.location.assign(result.authorization_url);
         }
         catch {
+            if (owner !== sequence.current || requestedAuthorization !== authorizationKey.current || !enabled.current)
+                return;
             flight.current = false;
             setBusy(false);
             setError(t(catalog, "auth.social.unavailable"));
@@ -205,6 +217,9 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
  {onCancel ? <button type="button" onClick={() => {
                 sequence.current++;
                 browser.cancel();
+                flight.current = false;
+                setBusy(false);
+                setError(null);
                 setPassword('');
                 setCode('');
                 setBackup(null);

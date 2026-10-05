@@ -49,6 +49,18 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         conditional.current = null;
         browser.cancel();
     }
+    async function waitForConditionalPreparation(owner: number) {
+        const pending = conditionalOptions.current;
+        if (pending) {
+            try {
+                await pending;
+            }
+            catch {
+                // Conditional discovery is only an ordering barrier. Its failure cannot poison an explicit method.
+            }
+        }
+        return owner === sequence.current;
+    }
     function finish(result: AuthenticationResponse) {
         if (result.status !== 'authenticated')
             return;
@@ -78,8 +90,14 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                     return;
                 const pending = client.beginPasskeyLogin();
                 conditionalOptions.current = pending;
-                const options = await pending;
-                conditionalOptions.current = null;
+                let options;
+                try {
+                    options = await pending;
+                }
+                finally {
+                    if (conditionalOptions.current === pending)
+                        conditionalOptions.current = null;
+                }
                 if (abort.signal.aborted || owner !== sequence.current)
                     return;
                 const credential = await browser.authenticate(options.options, { mediation: 'conditional', signal: abort.signal });
@@ -114,8 +132,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         setBusy(true);
         setError(null);
         try {
-            await conditionalOptions.current;
-            if (owner !== sequence.current)
+            if (!await waitForConditionalPreparation(owner))
                 return;
             const options = await client.beginPasskeyLogin(continuation ? { continuation_token: continuation.challenge_token } : undefined);
             if (owner !== sequence.current)
@@ -132,8 +149,10 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 setError(t(catalog, "auth.passkey.cancelled"));
         }
         finally {
-            flight.current = false;
-            setBusy(false);
+            if (owner === sequence.current) {
+                flight.current = false;
+                setBusy(false);
+            }
         }
     }
     async function submitCredentials(event: FormEvent<HTMLFormElement>) {
@@ -156,9 +175,13 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         flight.current = true;
         setBusy(true);
         setError(null);
+        const owner = sequence.current;
         try {
-            await conditionalOptions.current;
+            if (!await waitForConditionalPreparation(owner))
+                return;
             const result = await client.beginLogin(address, secret);
+            if (owner !== sequence.current)
+                return;
             setPassword('');
             setContinuation(result);
             setMethod(result.available_methods.includes('totp') ? 'totp' : 'recovery_code');
@@ -166,11 +189,14 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             attempt.current.edited();
         }
         catch {
-            setError(t(catalog, "auth.login.signInFailed"));
+            if (owner === sequence.current)
+                setError(t(catalog, "auth.login.signInFailed"));
         }
         finally {
-            flight.current = false;
-            setBusy(false);
+            if (owner === sequence.current) {
+                flight.current = false;
+                setBusy(false);
+            }
         }
     }
     async function submitCode(value: string) {
