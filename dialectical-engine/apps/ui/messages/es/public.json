@@ -128,6 +128,7 @@
   "public.report.models": "Modelos que participaron: {models}",
   "public.report.modelsNotRecorded": "Modelos que participaron: no registrados",
   "public.report.disclosure": "Este informe lo redactaron modelos de IA a partir de los argumentos del debate.",
+  "public.report.notAdvice": "Informe generado por IA. No constituye asesoramiento médico, jurídico, financiero ni ningún otro asesoramiento profesional.",
   "public.report.title.inShort": "En resumen",
   "public.report.title.story": "La historia completa",
   "public.report.title.why": "Por qué esta respuesta",

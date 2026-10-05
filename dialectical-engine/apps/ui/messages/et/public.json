@@ -128,6 +128,7 @@
   "public.report.models": "Osalenud mudelid: {models}",
   "public.report.modelsNotRecorded": "Osalenud mudelid: pole salvestatud",
   "public.report.disclosure": "Selle aruande kirjutasid tehisintellektimudelid väitluse argumentide põhjal.",
+  "public.report.notAdvice": "Tehisintellekti loodud aruanne. See ei ole meditsiini-, õigus-, finants- ega muu kutsealane nõuanne.",
   "public.report.title.inShort": "Lühidalt",
   "public.report.title.story": "Täielik lugu",
   "public.report.title.why": "Miks just see vastus",

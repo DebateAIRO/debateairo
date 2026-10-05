@@ -128,6 +128,7 @@
   "public.report.models": "Model yang ikut serta: {models}",
   "public.report.modelsNotRecorded": "Model yang ikut serta: tidak tercatat",
   "public.report.disclosure": "Laporan ini ditulis oleh model AI berdasarkan argumen-argumen dalam debat.",
+  "public.report.notAdvice": "Laporan buatan AI. Laporan ini bukan nasihat medis, hukum, keuangan, atau nasihat profesional lainnya.",
   "public.report.title.inShort": "Singkatnya",
   "public.report.title.story": "Kisah lengkap",
   "public.report.title.why": "Mengapa jawaban ini",

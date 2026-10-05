@@ -128,6 +128,7 @@
   "public.report.models": "Iesaistītie modeļi: {models}",
   "public.report.modelsNotRecorded": "Iesaistītie modeļi: nav reģistrēti",
   "public.report.disclosure": "Šo pārskatu uzrakstīja MI modeļi, pamatojoties uz debašu argumentiem.",
+  "public.report.notAdvice": "MI ģenerēts pārskats. Tas nav medicīniska, juridiska, finanšu vai cita profesionāla konsultācija.",
   "public.report.title.inShort": "Īsumā",
   "public.report.title.story": "Pilns stāsts",
   "public.report.title.why": "Kāpēc šāda atbilde",
