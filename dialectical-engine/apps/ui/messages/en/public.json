@@ -128,6 +128,7 @@
   "public.report.models": "Models that took part: {models}",
   "public.report.modelsNotRecorded": "Models that took part: not recorded",
   "public.report.disclosure": "This report was written by AI models from the debate's arguments.",
+  "public.report.notAdvice": "AI-generated report. It is not medical, legal, financial or other professional advice.",
   "public.report.title.inShort": "In short",
   "public.report.title.story": "The full story",
   "public.report.title.why": "Why this answer",

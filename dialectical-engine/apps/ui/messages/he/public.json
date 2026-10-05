@@ -128,6 +128,7 @@
   "public.report.models": "מודלים שהשתתפו: {models}",
   "public.report.modelsNotRecorded": "מודלים שהשתתפו: לא תועדו",
   "public.report.disclosure": "הדוח הזה נכתב על ידי מודלים של בינה מלאכותית על סמך הטיעונים שעלו בדיון.",
+  "public.report.notAdvice": "דוח שנוצר על ידי בינה מלאכותית. אין מדובר בייעוץ רפואי, משפטי, פיננסי או מקצועי אחר.",
   "public.report.title.inShort": "בקצרה",
   "public.report.title.story": "הסיפור המלא",
   "public.report.title.why": "למה התשובה הזאת",

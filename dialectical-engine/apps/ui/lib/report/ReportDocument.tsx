@@ -64,6 +64,8 @@ const styles = StyleSheet.create({
   meta: { fontSize: 9, lineHeight: 1.45, color: MUTED, marginBottom: 2 },
   disclosure: { marginTop: 14, paddingVertical: 9, paddingHorizontal: 11, borderWidth: 1, borderColor: LINE, borderRadius: 6 },
   disclosureLine: { fontSize: 8.5, lineHeight: 1.5, color: MUTED },
+  // The "not professional advice" notice: the disclosure's box, first on the page, above the eyebrow.
+  notAdvice: { marginBottom: 16, paddingVertical: 7, paddingHorizontal: 11, borderWidth: 1, borderColor: LINE, borderRadius: 6 },
 
   // Headings: the serif prints only the fixed part titles. Every heading-like line sits in an
   // unbreakable View with minPresenceAhead (KeepWithNext): measured with 4.9.0's paginator, a Text alone
@@ -288,6 +290,9 @@ function CoverAndShort({ look }: { look: Look }): JSX.Element {
   const { cover, inShort } = model;
   return (
     <>
+      <View style={styles.notAdvice}>
+        <Words look={look} style={styles.disclosureLine} text={cover.notAdvice} />
+      </View>
       <Words look={look} style={[styles.eyebrow, look.tracked]} text={capitals(model, cover.eyebrow)} />
       <Words look={look} style={styles.question} text={cover.question} />
       {cover.labelWords === null ? null : (
