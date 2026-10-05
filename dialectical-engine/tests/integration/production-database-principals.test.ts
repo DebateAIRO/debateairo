@@ -3424,6 +3424,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     const signUpWithConsent = `SELECT * FROM identity.create_pending_account_with_consent(
       NULL::uuid,NULL::bytea,NULL::jsonb,NULL::jsonb,NULL::text,NULL::text,NULL::timestamptz,NULL::timestamptz,
       NULL::text,NULL::timestamptz,NULL::jsonb,NULL::smallint,NULL::text,NULL::text,'[]'::jsonb)`;
+    const regionWriter = "SELECT identity.record_registration_region(NULL::uuid,'RO',NULL::text)";
     const countryGate = "SELECT identity.audit_country_gate_refused('{}'::jsonb,'')";
 
     // The control: the forged row's shape is valid, so api-runtime may write it (and rolls it back).
@@ -3431,9 +3432,10 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     expect(await outcome("api-runtime", readAcceptances)).toBe("ok");
     // api-runtime reaches both functions' bodies, which refuse these empty arguments for their own reasons.
     expect(await outcome("api-runtime", signUpWithConsent)).toBe("22023");
+    expect(await outcome("api-runtime", regionWriter)).toBe("22023");
     expect(await outcome("api-runtime", countryGate)).toBe("22023");
     for (const principalId of ["runner-runtime", "scheduler-liveness", "api-authorization"]) {
-      for (const statement of [forgeCheckout, readAcceptances, purge, signUpWithConsent, countryGate]) {
+      for (const statement of [forgeCheckout, readAcceptances, purge, signUpWithConsent, regionWriter, countryGate]) {
         expect(`${principalId}: ${statement.slice(0, 60)}: ${await outcome(principalId, statement)}`)
           .toBe(`${principalId}: ${statement.slice(0, 60)}: 42501`);
       }
@@ -3457,6 +3459,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         FROM unnest(ARRAY[
           'legal.purge_expired_acceptance(timestamptz)',
           'identity.create_pending_account_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb,smallint,text,text,jsonb)',
+          'identity.record_registration_region(uuid,text,text)',
           'identity.audit_country_gate_refused(jsonb,text)'
         ]) AS fn
         WHERE has_function_privilege(principal.oid,fn::regprocedure,'EXECUTE')
@@ -3469,6 +3472,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     expect(holders).toEqual([
       "EXECUTE identity.audit_country_gate_refused(jsonb,text)",
       "EXECUTE identity.create_pending_account_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb,smallint,text,text,jsonb)",
+      "EXECUTE identity.record_registration_region(uuid,text,text)",
       "EXECUTE legal.purge_expired_acceptance(timestamptz)",
       "INSERT legal.acceptance",
       "SELECT legal.acceptance",
@@ -3512,6 +3516,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         verificationExpiresAt: new Date(Date.now() + 86_400_000),
         occurredAt: new Date(),
         source: { ip: "81.196.1.2", userAgent: "test/1", requestId: randomUUID() },
+        declaredRegion: { country: "RO", usState: null },
         acceptances
       }, async () => undefined);
       expect(created.status).toBe("created");
@@ -3520,6 +3525,9 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       expect((await adminPool.query<{ kind: string }>(
         "SELECT kind FROM legal.acceptance WHERE owner_ref=$1 ORDER BY kind", [ownerRef])).rows
         .map(({ kind }) => kind)).toEqual(["ADULT", "PRIVACY_SHOWN", "TERMS"]);
+      expect((await adminPool.query<{ country_code: string; us_state: string | null }>(
+        "SELECT country_code,us_state FROM identity.registration_region WHERE user_id=$1", [userId])).rows)
+        .toEqual([{ country_code: "RO", us_state: null }]);
 
       await expect(identity.recordCountryGateRefusal({
         route: "register", code: "COUNTRY_SIGNUP_UNAVAILABLE", country: "KP", windowStartedAt: new Date(),

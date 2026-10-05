@@ -65,6 +65,7 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.account_recovery_binding": "recovery binding is rotated in place",
   "identity.age_check": "0077 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.sensitive_data_consent": "0078 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
+  "identity.registration_region": "0090 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.account_erasure_request": "erasure request state machine",
   "identity.account_erasure_notification_outbox": "outbox rows are sent then cleared",
   "identity.private_erasure_audit_binding": "erasure binding is cleared by the sweep",
@@ -485,7 +486,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // The 2026-10-04 review of 0080: the legal schema, legal.acceptance and the three SECURITY DEFINER functions
         // (the retention purge, sign-up with consent, the country-gate audit) move from debateai_runtime to
         // debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
-        "0094_legal_runtime_api_only.sql"
+        "0094_legal_runtime_api_only.sql",
+        // Region picker S01: identity.registration_region and its definer writer. Next free prefix after dev's 0094; no pair.
+        "0095_registration_region.sql"
       ]);
   });
 });
