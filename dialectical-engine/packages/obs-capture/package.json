@@ -12,6 +12,6 @@
     "./runtime": "./src/runtime/index.ts"
   },
   "dependencies": {
-    "pg": "8.22.0"
+    "pg": "8.23.0"
   }
 }
