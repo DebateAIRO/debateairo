@@ -1933,3 +1933,10 @@ export {PostgresRecoveryEmailRepository, type RecoveryEmailRecord} from "./recov
 export * from './consumer-auth.js';
 
 export type { TotpEnrollmentAuthority, SecureTotpEnrollment, TotpEnrollmentLookup } from "./consumer-auth.js";
+
+export * from "./consumer-security.js";
+
+export * from "./consumer-recovery.js";
+export * from "./onboarding-evidence.js";
+
+export {PostgresConsumerSecurityNoticeRepository,type ConsumerSecurityNotice,type ConsumerSecurityNoticeClaim} from "./consumer-security-mail.js";

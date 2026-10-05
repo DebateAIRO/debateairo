@@ -102,7 +102,7 @@ describe('restricted consumer passkey authority', () => {
         for (const fn of ['append_consumer_passkey_audit_internal(uuid,text,jsonb)', 'consumer_initial_evidence_internal(uuid,jsonb)', 'insert_consumer_session_internal(uuid,jsonb,text)', 'lock_consumer_challenges_internal(integer)', 'reserve_consumer_challenge_internal(uuid,text,text,integer,integer)', 'assert_consumer_options_capacity_internal(uuid,integer)', 'consumer_options_context_internal(uuid,text,timestamptz)']) {
             expect((await database.pool.query("SELECT has_function_privilege('consumer_test_runtime',$1,'EXECUTE') AS allowed", ['identity.' + fn])).rows[0].allowed).toBe(false);
         }
-        const functions = (await database.pool.query("SELECT p.proname,p.prosecdef,p.proconfig,p.proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure) AS owner FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='identity' AND p.proname LIKE '%consumer%'")).rows;
+        const functions = (await database.pool.query("SELECT p.proname,p.prosecdef,p.proconfig,p.proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure) AS owner FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='identity' AND p.proname=ANY($1::text[])", [["prune_consumer_passkey_challenges", "lock_consumer_challenges_internal", "reserve_consumer_challenge_internal", "assert_consumer_options_capacity_internal", "consumer_options_context_internal", "prepare_consumer_passkey_enrollment", "append_consumer_passkey_audit_internal", "consumer_initial_evidence_internal", "begin_consumer_passkey_enrollment", "begin_consumer_passkey_login", "read_consumer_passkey_challenge", "read_consumer_passkey_credential", "insert_consumer_session_internal", "complete_consumer_passkey_enrollment", "complete_consumer_passkey_login"]])).rows;
         expect(functions.length).toBe(15);
         expect(functions.every(x => x.owner && x.prosecdef && x.proconfig.includes('search_path=pg_catalog'))).toBe(true);
     });
@@ -544,11 +544,12 @@ describe('retained ceremony bounds and transaction order', () => {
         expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_passkey_challenge WHERE user_id IN ($1,$2)', [a.userId, b.userId])).rows[0].n).toBe(0);
     });
     it('serializes concurrent additions so only one can cross from 29 to 30 long IDs', async () => {
-        const a = await enrolled(), one = await addGrant(a), two = await addGrant({ ...a, result: { ...a.result, sessionToken: one.replacement } });
+        const a = await enrolled(), independent = await login(a), secondLogin = await service.completePasskeyLogin(independent.input, source);
+        const one = await addGrant(a), two = await addGrant({ ...a, result: secondLogin });
         await seedInventory(a.userId, 29, 768);
-        const first = await service.beginPasskeyEnrollment({ step_up_grant: one.grant }, source, two.session), second = await service.beginPasskeyEnrollment({ step_up_grant: two.grant }, source, two.session);
+        const first = await service.beginPasskeyEnrollment({ step_up_grant: one.grant }, source, one.session), second = await service.beginPasskeyEnrollment({ step_up_grant: two.grant }, source, two.session);
         const firstKey = consumerFixture(undefined, randomBytes(768)), secondKey = consumerFixture(undefined, randomBytes(768));
-        const results = await Promise.allSettled([service.completePasskeyEnrollment({ challenge_handle: first.challenge_handle, credential: firstKey.registration(first.options.challenge) }, source, two.session), service.completePasskeyEnrollment({ challenge_handle: second.challenge_handle, credential: secondKey.registration(second.options.challenge) }, source, two.session)]);
+        const results = await Promise.allSettled([service.completePasskeyEnrollment({ challenge_handle: first.challenge_handle, credential: firstKey.registration(first.options.challenge) }, source, one.session), service.completePasskeyEnrollment({ challenge_handle: second.challenge_handle, credential: secondKey.registration(second.options.challenge) }, source, two.session)]);
         expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1);
         expect((await state(a)).credentials).toBe(30);
         const rows = (await database.pool.query('SELECT consumed_at FROM identity.consumer_passkey_challenge WHERE handle_hash=ANY($1::text[])', [[handleHash('ENROLLMENT', first.challenge_handle), handleHash('ENROLLMENT', second.challenge_handle)]])).rows;

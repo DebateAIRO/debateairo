@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { contractInventory, staffContractInventory, fundedStaffContractInventory,
-  consumerAuthContractSchemas, accountProfileContractSchemas,
+  consumerAuthContractSchemas, consumerSecurityContractSchemas, accountProfileContractSchemas,
   BillingUsageResponseSchema, AskRoomResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
@@ -12,6 +12,7 @@ import { contractInventory, staffContractInventory, fundedStaffContractInventory
 
 const endpointSchemas = {
   ...consumerAuthContractSchemas,
+  ...consumerSecurityContractSchemas,
   ...accountProfileContractSchemas,
   BillingUsageResponseSchema, AskRoomResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
@@ -26,6 +27,19 @@ const variants = (...names: EndpointSchemaName[]) => ({ anyOf: names.map(referen
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
 const response = (schema: unknown, status = "200") => ({ responses: { [status]: { description: status === "202" ? "Generic verification acknowledgement" : "Current selected policy response", content: { "application/json": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
+  "POST /v1/auth/recovery/prove": {...request(reference("ConsumerRecoveryProveRequestSchema")),...response(reference("ConsumerRecoveryProofResponseSchema"))},
+  "POST /v1/auth/recovery/enrollment/options": {...request(reference("RecoveryEnrollmentBeginRequestSchema")),...response(reference("RecoveryEnrollmentOptionsResponseSchema"))},
+  "POST /v1/auth/recovery/enrollment/complete": {...request(reference("RecoveryEnrollmentCompleteRequestSchema")),...response(reference("AuthenticationResponseSchema"))},
+  "POST /v1/auth/recovery/enrollment/status": {...request(reference("RecoveryEvidenceStatusRequestSchema")),...response(reference("OnboardingRequirementsResponseSchema"))},
+  "POST /v1/auth/recovery/enrollment/complete-evidence": {...request(reference("RecoveryEvidenceCompleteRequestSchema")),responses:{"204":{description:"Current evidence recorded; no session or capability renewal"}}},
+  "POST /v1/auth/onboarding/status": {...request(reference("PendingOnboardingStatusRequestSchema")),...response(reference("OnboardingRequirementsResponseSchema"))},
+  "POST /v1/auth/onboarding/complete": {...request(reference("PendingOnboardingCompleteRequestSchema")),responses:{"204":{description:"Current pending evidence recorded; no session or factor reset"}}},
+  "POST /v1/auth/passkeys/step-up/options": {...request(reference("BeginPasskeyStepUpRequestSchema")),...response(reference("PasskeyAuthenticationOptionsResponseSchema"))},
+  "POST /v1/auth/passkeys/step-up/complete": {...request(reference("CompletePasskeyStepUpRequestSchema")),...response(reference("StepUpResponseSchema"))},
+  "GET /v1/account/auth-methods": response(reference("AuthMethodsResponseSchema")),
+  "POST /v1/account/auth-methods/remove": {...request(reference("RemoveAuthMethodRequestSchema")),responses:{"204":{description:"Authentication method removed with a viable sign-in path retained"}}},
+  "POST /v1/account/recovery-codes/regenerate": {...request(reference("RegenerateRecoveryCodesRequestSchema")),...response(reference("RecoveryCodesResponseSchema"))},
+
   "POST /v1/auth/mfa/totp/begin": {...request(reference("BeginTotpEnrollmentRequestSchema")),...response(reference("TotpEnrollmentOptionsResponseSchema"))},
   "POST /v1/auth/mfa/totp/verify": {...request(reference("CompleteTotpEnrollmentRequestSchema")),...response(reference("TotpEnrollmentResponseSchema"))},
   "POST /v1/auth/passkeys/enrollment/options": {...request(reference("BeginPasskeyEnrollmentRequestSchema")),...response(reference("PasskeyRegistrationOptionsResponseSchema"))},

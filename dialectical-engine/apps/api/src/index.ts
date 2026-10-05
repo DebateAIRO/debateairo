@@ -1,3 +1,6 @@
+import type {ConsumerRecoveryApplication} from "./consumer-recovery.js";
+import type {OnboardingEvidenceApplication} from "./onboarding-evidence.js";
+import type { ConsumerSecurityApplication } from "./consumer-security.js";
 import type { ConsumerWebAuthnApplication } from "./consumer-webauthn.js";
 import type { AuthSourceAdmission } from "./registration.js";
 import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } from "./turnstile.js";
@@ -1173,6 +1176,13 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+  { route:"POST /v1/auth/recovery/prove",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/recovery/enrollment/options",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/recovery/enrollment/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/recovery/enrollment/status",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/recovery/enrollment/complete-evidence",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/onboarding/status",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/onboarding/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
   { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "begin-totp" },
   { route: "POST /v1/auth/mfa/totp/verify", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "verify-totp" },
@@ -1187,6 +1197,11 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/auth/sessions", auth: "user", resource: "session-owner", action: "list" },
   { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
   { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
+  { route: "GET /v1/account/auth-methods", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/account/auth-methods/remove", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/account/recovery-codes/regenerate", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/auth/passkeys/step-up/options", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/auth/passkeys/step-up/complete", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
   { route: "GET /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "read-age-confirmation" },
   { route: "POST /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "confirm-age" },
@@ -1462,6 +1477,9 @@ export interface ApiOptions {
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly consumerWebAuthn?: ConsumerWebAuthnApplication;
+  readonly consumerSecurity?:ConsumerSecurityApplication;
+  readonly consumerRecovery?:ConsumerRecoveryApplication;
+  readonly onboardingEvidence?:OnboardingEvidenceApplication;
   readonly staffAccess?: StaffAccessApplication;
   readonly staffPolicyVersion?: 1 | 2;
   readonly staff?: StaffHttpApplication;
@@ -2144,7 +2162,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }
       return;
     }
-    const knownError = error instanceof Error ? error : new Error(String(error));
+    const rawError = error instanceof Error ? error : new Error(String(error));
+    const consumerRefusal = new Set(['CONSUMER_PASSWORD_PATH_UNAVAILABLE','STEP_UP_GRANT_GENERATION_INVALID','CONSUMER_SECURITY_INVALID','CONSUMER_RECOVERY_INVALID','CONSUMER_LAST_METHOD','CONSUMER_WEBAUTHN_INVALID','ONBOARDING_AUTHORITY_INVALID','ONBOARDING_EVIDENCE_CHANGED','ONBOARDING_EVIDENCE_REQUIRED','ONBOARDING_AGE_REQUIRED','ONBOARDING_AGE_NOT_REQUIRED']);
+    const knownError = rawError.message==='CONSUMER_PASSWORD_PATH_UNAVAILABLE'||rawError.message==='CONSUMER_LAST_METHOD' ? new AuthFlowError('MFA_ENROLLMENT_STATE_INVALID') : consumerRefusal.has(rawError.message) ? new AuthFlowError('AUTH_CREDENTIALS_INVALID') : rawError;
     const frameworkCode = (knownError as Error & Readonly<{ code?: unknown }>).code;
     const transportFault = typeof frameworkCode === "string"
       ? TRANSPORT_FAULT_ENVELOPES.get(frameworkCode) : undefined;
@@ -2219,6 +2239,31 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   });
 
+  if(options.consumerRecovery!==undefined){
+    const recovery=options.consumerRecovery;
+    api.post('/v1/auth/recovery/prove',credentialRoutePolicy('POST /v1/auth/recovery/prove'),async(request,reply)=>reply.send(await recovery.prove(request.body,sourceFor(request))));
+    api.post('/v1/auth/recovery/enrollment/options',credentialRoutePolicy('POST /v1/auth/recovery/enrollment/options'),async(request,reply)=>reply.send(await recovery.beginEnrollment(request.body,sourceFor(request))));
+    api.post('/v1/auth/recovery/enrollment/complete',{...credentialRoutePolicy('POST /v1/auth/recovery/enrollment/complete'),bodyLimit:32768},async(request,reply)=>completeAuthenticatedResponse(reply,await recovery.completeEnrollment(request.body,sourceFor(request))));
+  }
+  if(options.onboardingEvidence!==undefined){
+    const evidence=options.onboardingEvidence;
+    api.post('/v1/auth/onboarding/status',credentialRoutePolicy('POST /v1/auth/onboarding/status'),async(request,reply)=>reply.send(await evidence.status('PENDING',request.body,sourceFor(request))));
+    api.post('/v1/auth/onboarding/complete',credentialRoutePolicy('POST /v1/auth/onboarding/complete'),async(request,reply)=>{await evidence.complete('PENDING',request.body,sourceFor(request));return reply.status(204).send();});
+    api.post('/v1/auth/recovery/enrollment/status',credentialRoutePolicy('POST /v1/auth/recovery/enrollment/status'),async(request,reply)=>reply.send(await evidence.status('RECOVERY',request.body,sourceFor(request))));
+    api.post('/v1/auth/recovery/enrollment/complete-evidence',credentialRoutePolicy('POST /v1/auth/recovery/enrollment/complete-evidence'),async(request,reply)=>{await evidence.complete('RECOVERY',request.body,sourceFor(request));return reply.status(204).send();});
+  }
+  if(options.consumerSecurity!==undefined){
+    const security=options.consumerSecurity;
+    api.get('/v1/account/auth-methods',routePolicy('GET /v1/account/auth-methods'),async(request,reply)=>reply.send(await security.authMethods(request.authenticatedSession!)));
+    api.post('/v1/account/auth-methods/remove',credentialRoutePolicy('POST /v1/account/auth-methods/remove'),async(request,reply)=>{await security.removeAuthMethod(request.body,request.authenticatedSession!,sourceFor(request));return reply.status(204).send();});
+    api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
+    api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
+    api.post('/v1/auth/passkeys/step-up/complete',{...credentialRoutePolicy('POST /v1/auth/passkeys/step-up/complete'),bodyLimit:32768},async(request,reply)=>{
+      const result=await security.completePasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request));
+      reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.response.csrf_token,SESSION_IDLE_MAX_AGE_SECONDS)]);
+      return reply.send(result.response);
+    });
+  }
   if(options.consumerWebAuthn!==undefined){
     const consumer=options.consumerWebAuthn;
     api.post("/v1/auth/passkeys/enrollment/options",{...routePolicy("POST /v1/auth/passkeys/enrollment/options"),bodyLimit:32768},async(request,reply)=>
@@ -2354,9 +2399,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         password: typeof body.password === "string" ? body.password : "",
         code: typeof body.code === "string" ? body.code : "",
         ...(authorization === undefined ? {} : { authorization:
-          !("target_run_id" in authorization)
-            ? { action: authorization.action }
-            : { action: authorization.action, targetRunId: authorization.target_run_id }
+          "target_run_id" in authorization ? {action:authorization.action,targetRunId:authorization.target_run_id}
+            : "target_factor_id" in authorization ? {action:authorization.action,targetFactorId:authorization.target_factor_id}
+            : "target_provider" in authorization ? {action:authorization.action,targetProvider:authorization.target_provider}
+            : {action:authorization.action}
         })
       }, sourceFor(request));
       reply.header("set-cookie", [
@@ -2370,18 +2416,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           || rotated.grantToken === undefined
           || rotated.grantExpiresAt === undefined
           ? {}
-          : { step_up_grant: !("target_run_id" in authorization)
-              ? {
-                  token: rotated.grantToken,
-                  action: authorization.action,
-                  expires_at: rotated.grantExpiresAt.toISOString()
-                }
-              : {
-                  token: rotated.grantToken,
-                  action: authorization.action,
-                  target_run_id: authorization.target_run_id,
-                  expires_at: rotated.grantExpiresAt.toISOString()
-                } })
+          : {step_up_grant:{...authorization,token:rotated.grantToken,expires_at:rotated.grantExpiresAt.toISOString()}})
+
       });
     });
   }

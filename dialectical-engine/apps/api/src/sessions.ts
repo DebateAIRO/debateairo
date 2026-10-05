@@ -69,7 +69,7 @@ export interface ConsumerSessionMaterial {
   readonly sessionBindingContext:Readonly<{user_agent_hash:string}>; readonly occurredAt:Date;
   readonly idleExpiresAt:Date; readonly absoluteExpiresAt:Date;
 }
-export type ConsumerCeremonyOperation = 'ENROLLMENT_BEGIN' | 'ENROLLMENT_COMPLETE' | 'LOGIN_BEGIN' | 'LOGIN_COMPLETE';
+export type ConsumerCeremonyOperation = 'ENROLLMENT_BEGIN' | 'ENROLLMENT_COMPLETE' | 'LOGIN_BEGIN' | 'LOGIN_COMPLETE' | 'STEP_UP_BEGIN' | 'STEP_UP_COMPLETE' | 'SECURITY_CODES' | 'RECOVERY_PROVE' | 'RECOVERY_BEGIN' | 'RECOVERY_COMPLETE' | 'ONBOARDING_STATUS' | 'ONBOARDING_COMPLETE';
 export interface ConsumerCeremonyAdmission {
   readonly retentionKey:string;
   readonly challengeCapacity:number;
@@ -135,7 +135,9 @@ export interface SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" }>
+      | Readonly<{action:"REMOVE_AUTH_METHOD";targetFactorId:string}>
+      | Readonly<{action:"LINK_PROVIDER"|"UNLINK_PROVIDER";targetProvider:"google"|"apple"|"facebook"|"x"}>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -663,7 +665,9 @@ export class SessionService implements SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" }>
+      | Readonly<{action:"REMOVE_AUTH_METHOD";targetFactorId:string}>
+      | Readonly<{action:"LINK_PROVIDER"|"UNLINK_PROVIDER";targetProvider:"google"|"apple"|"facebook"|"x"}>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -765,6 +769,8 @@ export class SessionService implements SessionApplication {
                   grantId: randomUUID(),
                   grantTokenHash: hashToken("step-up-grant", grantToken),
                   action: input.authorization.action,
+                  ...("targetFactorId" in input.authorization ? {targetFactorId:input.authorization.targetFactorId} : {}),
+                  ...("targetProvider" in input.authorization ? {targetProvider:input.authorization.targetProvider} : {}),
                   expiresAt: grantExpiresAt
                 }
               : {

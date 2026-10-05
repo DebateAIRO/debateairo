@@ -322,8 +322,8 @@ const writers: readonly Writer[] = Object.freeze([
   {
     name: "verification-resend",role: "debateai_runtime",
     invoke: (client,fixture) => runtimeQuery(client,`
-      SELECT status AS value FROM identity.prepare_verification_resend_with_audit(
-        $1,$2,clock_timestamp()+interval '1 hour',clock_timestamp(),0,$3::jsonb
+      SELECT status AS value FROM identity.prepare_verification_resend_reserved_with_audit(
+        $1,$2,3600000,clock_timestamp(),60000,3600000,3,'atomic_rolling_reservation_ledger',$3::jsonb
       )
     `,[fixture.emailBlindIndex,opaqueHash(),sourceContext]),
     assertDeletionWin: (value) => expect(value).toBe("IGNORED")
@@ -349,9 +349,9 @@ const writers: readonly Writer[] = Object.freeze([
   {
     name: "duplicate-registration",role: "debateai_runtime",
     invoke: (client,fixture) => runtimeQuery(client,`
-      SELECT status AS value FROM identity.create_pending_account_with_audit(
+      SELECT status AS value FROM identity.create_pending_account_reserved_with_audit(
         $1,$2,'{}','{}',$3,$4,clock_timestamp(),clock_timestamp(),$5,
-        clock_timestamp()+interval '1 hour',$6::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp()
+        3600000,$6::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp()
       )
     `,[randomUUID(),fixture.emailBlindIndex,fixture.passwordHash,
       `duplicate-${randomUUID()}`,opaqueHash(),sourceContext]),

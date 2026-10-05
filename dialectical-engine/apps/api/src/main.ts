@@ -1,3 +1,11 @@
+import {ConsumerRecoveryService} from "./consumer-recovery.js";
+import {OnboardingEvidenceService} from "./onboarding-evidence.js";
+import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
+import {PostgresConsumerRecoveryRepository,PostgresOnboardingEvidenceRepository,PostgresConsumerSecurityNoticeRepository} from "@debateai/db";
+import {readConsumerRecoveryPolicy} from "@debateai/register";
+import {SendmailConsumerAccountSender} from "./mail-channel.js";
+import { ConsumerSecurityService } from "./consumer-security.js";
+import { PostgresConsumerSecurityRepository } from "@debateai/db";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -553,7 +561,10 @@ const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository
   pool,auditContextHasher,dekStore,recoveryPolicy.riskSignals.rawSignalRetentionMs,
   recoveryPolicy.riskSignals.maximumEvaluatorSignals
 );
+const consumerRecoveryPolicy=await boot.run("consumer-recovery-policy",()=>readConsumerRecoveryPolicy(pool,environment.REGISTER_VERSION));
 const recovery = new RecoveryStartService({
+  consumerPrepare:(input,source)=>consumerRecovery.prepareStart(input,source),
+  mailDispatch:{dispatchRecoveryMail:prepare=>registration.dispatchRecoveryMail(prepare)},
   repository: new PostgresRecoveryStartRepository(pool,auditContextHasher,dekStore),
   riskSignals:authenticationRiskSignals,
   onRiskSignalFailure:(error)=>console.error(
@@ -624,6 +635,10 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   sessionPolicy,
   blindIndexKey
 }));
+const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL});
+const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy,authPolicy,policy:consumerRecoveryPolicy,blindIndexKey,mail:consumerAccountMail,onMailFailure:()=>console.error('[CONSUMER_RECOVERY_MAIL_FAILED]')});
+const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
+const consumerSecurityNotices=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authorizationPool),dekStore,consumerAccountMail);
 const mfa = new MfaEnrollmentService({
   repository: identityRepository,
   consumerRepository: new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),
@@ -791,6 +806,7 @@ const reconcileErasure = async ():Promise<void> => {
   // Completion notifications must be acknowledged while the user DEK still
   // exists. Account cleanup runs last, so a same-cycle ACK can open the
   // authoritative SQL gate before any key destruction begins.
+  try { await consumerSecurityNotices.reconcile(100); } catch { console.error('[CONSUMER_SECURITY_NOTICE_PENDING]'); }
   await erasureNotifications.reconcile(100);
   await accountErasure.reconcileRunKeyProvisionIntents(100);
   await privateErasure.reconcile(reconciliationSource(),100);
@@ -1031,8 +1047,11 @@ const api = buildApi({
   registration,
   turnstile: new UnixTurnstileVerifier({ publicAppUrl: environment.PUBLIC_APP_URL, ...(environment.TURNSTILE_SOCKET_PATH === undefined ? {} : { socketPath: environment.TURNSTILE_SOCKET_PATH }) }),
   recovery,
+  consumerRecovery,
+  onboardingEvidence,
   mfa,
   sessions,
+  consumerSecurity:new ConsumerSecurityService(new PostgresConsumerSecurityRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,argon2:argon2Pool,mfaPolicy,authPolicy}),
   consumerWebAuthn: new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL}),
   ...(staffAccess === undefined ? {} : { staffAccess }),
   staffPolicyVersion: environment.STAFF_ACCESS.policyVersion,

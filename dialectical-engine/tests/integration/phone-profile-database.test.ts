@@ -24,7 +24,7 @@ function fixture(email = `${randomUUID()}@example.test`) {
     passwordHash: "$argon2id$phone-profile-fixture", pseudonym: `phone-${userId}`,
     adultAffirmedAt: occurredAt, occurredAt,
     ageCheck: { minAgeApplied: MIN_AGE, countryCode: "RO", ruleVersion: AGE_RULE_VERSION },
-    verificationTokenHash: hashToken("verification", randomUUID()), verificationExpiresAt: new Date(Date.now() + 86_400_000),
+    verificationTokenHash: hashToken("verification", randomUUID()), verificationExpiresAt: new Date(occurredAt.getTime() + 86_400_000), verificationTokenTtlMs: 86_400_000,
     source: { ip: "192.0.2.51", userAgent: "phone-profile-test", requestId: randomUUID() },
     acceptances: (["ADULT", "TERMS", "PRIVACY_SHOWN"] as const).map(kind => {
       const acceptanceId = randomUUID();
@@ -102,9 +102,11 @@ describe("0095 encrypted manual phone and optional recovery", () => {
   it("keeps superseded constructors inaccessible to runtime and grants only the phone-required overloads", async () => {
     const oldSignature = "uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb";
     const phoneSignature = `${oldSignature},jsonb,text,text,timestamptz`;
-    for (const [name, suffix] of [["create_pending_account_with_audit", ""], ["create_pending_account_with_consent", ",smallint,text,text,jsonb"]]) {
+    for (const [name, suffix] of [["create_pending_account_with_audit", ""], ["create_pending_account_with_consent", ",smallint,text,text,jsonb"]] as const) {
       const old = `identity.${name}(${oldSignature}${suffix})`;
-      const current = `identity.${name}(${phoneSignature}${suffix})`;
+      const reservedSignature="uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,bigint,jsonb,jsonb,text,text,timestamptz";
+      const current = `identity.${name.replace('create_pending_account_','create_pending_account_reserved_')}(${reservedSignature}${suffix})`;
+      expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [`identity.${name}(${phoneSignature}${suffix})`])).rows[0].allowed).toBe(false);
       expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [old])).rows[0].allowed).toBe(false);
       expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [current])).rows[0].allowed).toBe(true);
       for (const role of ["public", "debateai_replay", "debateai_erasure_runtime", "debateai_publication_cleanup", "debateai_content_provision"]) {
@@ -127,10 +129,10 @@ describe("0095 encrypted manual phone and optional recovery", () => {
           await client.query("BEGIN");
           await client.query("SELECT identity.begin_runtime_audit_attempt()");
           const input = account.input;
-          await expect(client.query(`SELECT * FROM identity.create_pending_account_with_audit(
+          await expect(client.query(`SELECT * FROM identity.create_pending_account_reserved_with_audit(
             $1,$2,$3::jsonb,'null'::jsonb,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,'manual','unverified',$7
           )`, [input.userId, input.emailBlindIndex, JSON.stringify(input.emailCiphertext), input.passwordHash,
-            input.pseudonym, input.adultAffirmedAt, input.occurredAt, input.verificationTokenHash, input.verificationExpiresAt,
+            input.pseudonym, input.adultAffirmedAt, input.occurredAt, input.verificationTokenHash, 86400000,
             JSON.stringify({ ipArgon2id: `argon2id-audit:v1:${"ab".repeat(32)}`, userAgentArgon2id: `argon2id-audit:v1:${"cd".repeat(32)}` }), JSON.stringify(input.phoneCiphertext)]))
             .rejects.toMatchObject({ code: "23514" });
         } finally { await client.query("ROLLBACK"); client.release(); }

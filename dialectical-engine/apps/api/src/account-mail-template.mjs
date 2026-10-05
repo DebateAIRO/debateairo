@@ -1,8 +1,8 @@
-// Version 1 canonical account-mail contract. Dependency-free: an immutable copy
+// Task9 revision: canonical account-mail contract with consumer recovery purposes. Dependency-free: an immutable copy
 // is reviewed beside the preview wrapper; it never imports mutable app/config code.
 export const ACCOUNT_MAIL_BOUNDARY = 'dialectical-account-v1';
 export const ACCOUNT_MAIL_LOCALES = Object.freeze(['bg','hr','cs','da','nl','en','et','fi','fr','de','el','hu','ga','it','lv','lt','mt','pl','pt','ro','ru','sk','sl','es','sv','uk','zh','hi','id','ja','ko','vi','ar','he','tr','en-US','en-GB']);
-export const ACCOUNT_MAIL_TEMPLATES = Object.freeze(['verification-v1','recovery-v1','security-scheduled-v1','security-cancelled-v1','security-completion-v1','email-change-confirm-v1','email-change-notice-v1','email-change-unavailable-v1']);
+export const ACCOUNT_MAIL_TEMPLATES = Object.freeze(['verification-v1','recovery-v1','security-scheduled-v1','security-cancelled-v1','security-completion-v1','email-change-confirm-v1','email-change-notice-v1','email-change-unavailable-v1','consumer-recovery-v1','security-method-changed-v1','security-codes-regenerated-v1','security-recovery-proved-v1','security-recovery-completed-v1']);
 const invalid = () => { throw new TypeError('MAIL_INPUT_INVALID'); };
 export function singleRecipient(value) {
   return typeof value === 'string' && value.length <= 254 && /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(value) && !/[,;\u0000-\u001f\u007f]/.test(value);
@@ -47,6 +47,28 @@ export function renderAccountEmail(input) {
       action = 'Verify your email';
       paragraphs = [`Verify ${input.recipient} for your Dialectical Engine account.`, `This verification link is valid for 24 hours and expires at ${expiry}.`, 'If you cannot find this message, check your spam folder.', 'If you did not create this account, ignore this message.'];
       break;
+    case 'consumer-recovery-v1':
+      subject = 'Recover your Dialectical Engine account';
+      link = credentialUrl(input.url, '/recover', /^#token=[A-Za-z0-9_-]{43}$/);
+      action = 'Continue account recovery';
+      paragraphs = [`This recovery link is valid for 15 minutes and expires at ${expiry}.`, 'You also need an unused saved recovery code. This email alone cannot recover your account.', 'After proving both, verify a replacement passkey or authenticator within five minutes.', 'If you did not request this, ignore this message.'];
+      break;
+    case 'security-method-changed-v1':
+      subject = 'Your Dialectical Engine sign-in methods changed';
+      paragraphs = [`A sign-in method change was recorded at ${expiry}.`, 'If you did not make this change, contact the site operator immediately.'];
+      break;
+    case 'security-codes-regenerated-v1':
+      subject = 'Your Dialectical Engine recovery codes changed';
+      paragraphs = [`New saved recovery codes were created at ${expiry}.`, 'Previous unused codes no longer work. No recovery code is included in this email.', 'If you did not make this change, contact the site operator immediately.'];
+      break;
+    case 'security-recovery-proved-v1':
+      subject = 'Your Dialectical Engine account recovery started';
+      paragraphs = [`Both recovery proofs were accepted at ${expiry}.`, 'Existing sessions have ended. Normal sign-in remains blocked until a replacement security method is verified.', 'If you did not begin recovery, contact the site operator immediately.'];
+      break;
+    case 'security-recovery-completed-v1':
+      subject = 'Your Dialectical Engine account recovery completed';
+      paragraphs = [`A replacement security method was verified at ${expiry}.`, 'Previous security methods and unused saved recovery codes no longer work.', 'If you did not complete recovery, contact the site operator immediately.'];
+      break;
     case 'recovery-v1':
       subject = 'Confirm your Dialectical Engine recovery email';
       link = credentialUrl(input.url, '/verify-recovery-email', /^#token=[A-Za-z0-9_-]{43}$/);
@@ -86,7 +108,7 @@ export function renderAccountEmail(input) {
   }
   const text = [ 'Dialectical Engine', ...paragraphs, ...(link ? [action + ':', link] : []) ].join('\r\n\r\n') + '\r\n';
   const button = link ? `<p><a href="${escapeHtml(link)}" style="display:inline-block;padding:14px 22px;background:#b89b5e;color:#242424;text-decoration:none;font-weight:bold;border-radius:4px">${escapeHtml(action)}</a></p><p>If the button does not work, open this complete link:<br><a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>` : '';
-  const html = `<!doctype html><html lang="${escapeHtml(display.locale)}"><head><meta charset="UTF-8"><title>${escapeHtml(subject)}</title></head><body style="margin:0;background:#f7f3e8;color:#242424;font-family:Arial,sans-serif"><main style="max-width:600px;margin:32px auto;padding:32px;border-top:4px solid #b89b5e"><p style="font-size:22px;font-weight:bold">Dialectical Engine</p><h1 style="font-size:24px">${escapeHtml(subject)}</h1>${paragraphs.map(copy => `<p style="line-height:1.6">${escapeHtml(copy)}</p>`).join('')}${button}<p style="font-size:12px">dezbatere.ro</p></main></body></html>\r\n`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="UTF-8"><title>${escapeHtml(subject)}</title></head><body style="margin:0;background:#f7f3e8;color:#242424;font-family:Arial,sans-serif"><main style="max-width:600px;margin:32px auto;padding:32px;border-top:4px solid #b89b5e"><p style="font-size:22px;font-weight:bold">Dialectical Engine</p><h1 style="font-size:24px">${escapeHtml(subject)}</h1>${paragraphs.map(copy => `<p style="line-height:1.6">${expiry === null ? escapeHtml(copy) : escapeHtml(copy).replace(escapeHtml(expiry), `<span lang="${escapeHtml(display.locale)}">${escapeHtml(expiry)}</span>`)}</p>`).join('')}${button}<p style="font-size:12px">dezbatere.ro</p></main></body></html>\r\n`;
   return Object.freeze({ subject, text, html });
 }
 function base64Lines(value) {

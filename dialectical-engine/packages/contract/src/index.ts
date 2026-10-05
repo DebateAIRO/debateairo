@@ -3,7 +3,7 @@ export * from "./staff-access.js";
 import { z } from "zod";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
-import { consumerAuthContractSchemas } from "./consumer-auth.js";
+import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
 export * from "./consumer-auth.js";
 import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
@@ -448,10 +448,14 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
     target_run_id: z.uuid()
   }).strict(),
   z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
+  z.object({ action: z.literal("REMOVE_AUTH_METHOD"), target_factor_id: z.uuid() }).strict(),
+  z.object({ action: z.enum(["LINK_PROVIDER", "UNLINK_PROVIDER"]), target_provider: z.enum(["google", "apple", "facebook", "x"]) }).strict(),
   z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
-  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP"]) }).strict()
+  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]) }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
+  z.object({ token:z.string().regex(/^[A-Za-z0-9_-]{43}$/), action:z.literal("REMOVE_AUTH_METHOD"), target_factor_id:z.uuid(), expires_at:z.iso.datetime() }).strict(),
+  z.object({ token:z.string().regex(/^[A-Za-z0-9_-]{43}$/), action:z.enum(["LINK_PROVIDER","UNLINK_PROVIDER"]), target_provider:z.enum(["google","apple","facebook","x"]), expires_at:z.iso.datetime() }).strict(),
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     action: RunTargetedGrantActionSchema,
@@ -465,7 +469,7 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP"]),
+    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]),
     expires_at: z.iso.datetime()
   }).strict()
 ]);
@@ -474,6 +478,17 @@ export const StepUpResponseSchema = z.object({
   csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   step_up_grant: StepUpGrantResponseSchema.optional()
 }).strict();
+
+export type StepUpAuthorizationRequest = z.infer<typeof StepUpAuthorizationRequestSchema>;
+export type StepUpResponse = z.infer<typeof StepUpResponseSchema>;
+export const BeginPasskeyStepUpRequestSchema = z.object({ authorization:StepUpAuthorizationRequestSchema }).strict();
+export const CompletePasskeyStepUpRequestSchema = z.object({ challenge_handle:z.string().regex(/^[A-Za-z0-9_-]{43}$/),credential:ConsumerAuthenticationCredentialSchema }).strict();
+export const AuthMethodsResponseSchema = z.object({ methods:z.array(z.object({ factor_id:z.uuid(),type:z.enum(["passkey","totp"]),label:z.string().nullable(),created_at:z.iso.datetime(),last_used_at:z.iso.datetime().nullable(),removable:z.boolean() }).strict()),recovery_codes_remaining:z.number().int().min(0).max(10) }).strict();
+export type AuthMethodsResponse = z.infer<typeof AuthMethodsResponseSchema>;
+export const RemoveAuthMethodRequestSchema = z.object({factor_id:z.uuid(),step_up_grant:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
+export const RegenerateRecoveryCodesRequestSchema = z.object({step_up_grant:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
+export const RecoveryCodesResponseSchema = z.object({codes:z.array(z.string()).length(10)}).strict();
+export const consumerSecurityContractSchemas=Object.freeze({StepUpAuthorizationRequestSchema,StepUpResponseSchema,BeginPasskeyStepUpRequestSchema,CompletePasskeyStepUpRequestSchema,AuthMethodsResponseSchema,RemoveAuthMethodRequestSchema,RegenerateRecoveryCodesRequestSchema,RecoveryCodesResponseSchema});
 
 export const PUBLICATION_PART_KINDS = ["QUESTION", "SUMMARY", "ARGUMENTS", "REVIEWS", "STORY"] as const;
 export const PublicationPartKindSchema = z.enum(PUBLICATION_PART_KINDS);
@@ -1047,6 +1062,19 @@ export const contractInventory = Object.freeze({
     "POST /v1/auth/verify-email",
     "POST /v1/auth/resend-verification",
     "POST /v1/auth/recovery/start",
+    "POST /v1/auth/recovery/prove",
+    "POST /v1/auth/recovery/enrollment/options",
+    "POST /v1/auth/recovery/enrollment/complete",
+    "POST /v1/auth/recovery/enrollment/status",
+    "POST /v1/auth/recovery/enrollment/complete-evidence",
+    "POST /v1/auth/onboarding/status",
+    "POST /v1/auth/onboarding/complete",
+    "POST /v1/auth/passkeys/step-up/options",
+    "POST /v1/auth/passkeys/step-up/complete",
+    "GET /v1/account/auth-methods",
+    "POST /v1/account/auth-methods/remove",
+    "POST /v1/account/recovery-codes/regenerate",
+
     "POST /v1/auth/mfa/totp/begin",
     "POST /v1/auth/mfa/totp/verify",
     "POST /v1/auth/mfa/recovery-codes/generate",
@@ -1133,7 +1161,7 @@ export const contractInventory = Object.freeze({
     LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
-    StepUpAuthorizationRequestSchema, StepUpResponseSchema,
+    StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,

@@ -548,13 +548,23 @@ export class PostgresSessionRepository {
     }> | Readonly<{
       grantId: string;
       grantTokenHash: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" | "REMOVE_AUTH_METHOD" | "LINK_PROVIDER" | "UNLINK_PROVIDER";
+      targetFactorId?:string; targetProvider?:"google"|"apple"|"facebook"|"x";
       expiresAt: Date;
     }>;
   }>): Promise<boolean> {
     if (input.grant !== undefined) assertCredentialHash(input.grant.grantTokenHash);
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      if(input.grant!==undefined && ["REMOVE_AUTH_METHOD","REGENERATE_RECOVERY_CODES","LINK_PROVIDER","UNLINK_PROVIDER"].includes(input.grant.action)) {
+        const g=input.grant;
+        const result=await client.query<{valid:boolean}>('SELECT identity.rotate_consumer_totp_step_up($1,$2) AS valid', [{
+          userId:input.identity.userId,ownerRef:input.identity.ownerRef,passwordHash:input.identity.passwordHash,factorId:input.identity.factorId,acceptedStep:input.acceptedStep,
+          sessionId:input.currentSessionId,tokenHash:input.currentTokenHash,replacementTokenHash:input.replacementTokenHash,replacementCsrfHash:input.replacementCsrfHash,bindingContext:input.bindingContext,idleExpiresAt:input.idleExpiresAt,
+          grantHash:g.grantTokenHash,expiresAt:g.expiresAt,authorization:{action:g.action,...('targetFactorId' in g?{target_factor_id:g.targetFactorId}:{}),...('targetProvider' in g?{target_provider:g.targetProvider}:{})}
+        },JSON.stringify({ipArgon2id:prepared.ipArgon2id,userAgentArgon2id:prepared.userAgentArgon2id})]);
+        return result.rows[0]?.valid===true;
+      }
       const rotated = await client.query<{ valid: boolean }>(`
         SELECT identity.rotate_session_after_step_up_with_audit(
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17::jsonb

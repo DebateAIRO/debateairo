@@ -1,3 +1,4 @@
+import { CONSUMER_RECOVERY_POLICY_REGISTER_ROW } from "@debateai/register";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, readFile, rename, unlink } from "node:fs/promises";
@@ -693,6 +694,7 @@ function developmentRows(
     MFA_POLICY_REGISTER_ROW,
     SESSION_POLICY_DEPLOYMENT_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
+    CONSUMER_RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
     // DL1-F2/DL1-F7: the SUPERSEDING admission row, on the same precedent as
     // V-14's authentication rows above. The sealed three-scope row stays the

@@ -169,7 +169,36 @@ export type BeginPasskeyLoginRequest=z.infer<typeof BeginPasskeyLoginRequestSche
 export type CompletePasskeyLoginRequest=z.infer<typeof CompletePasskeyLoginRequestSchema>;
 export type PasskeyEnrollmentResponse=z.infer<typeof PasskeyEnrollmentResponseSchema>;
 
+
+export const ConsumerRecoveryProveRequestSchema=z.object({token:HandleSchema,recovery_code:z.string().min(1).max(128),method:z.enum(['passkey','totp'])}).strict();
+export const ConsumerRecoveryProofResponseSchema=z.object({status:z.literal('RECOVERY_ENROLL_ONLY'),available_methods:z.array(z.enum(['passkey','totp'])).min(1).max(2),totp_unavailable_reason:z.literal('PASSWORD_UNAVAILABLE').nullable(),recovery_capability:HandleSchema,replacement_recovery_code:z.string().min(1).max(128),expires_at:z.iso.datetime()}).strict();
+export const RecoveryEnrollmentBeginRequestSchema=z.object({recovery_capability:HandleSchema,method:z.enum(['passkey','totp'])}).strict();
+export const RecoveryEnrollmentCompleteRequestSchema=z.union([
+ z.object({recovery_capability:HandleSchema,challenge_handle:HandleSchema,credential:ConsumerRegistrationCredentialSchema,label:z.string().trim().min(1).max(128).optional()}).strict(),
+ z.object({recovery_capability:HandleSchema,challenge_handle:HandleSchema,code:z.string().regex(/^\d{6}$/)}).strict()
+]);
+export const RecoveryEnrollmentOptionsResponseSchema=z.union([
+ PasskeyRegistrationOptionsResponseSchema.extend({method:z.literal('passkey')}),
+ z.object({method:z.literal('totp'),challenge_handle:HandleSchema,secret:z.string().regex(/^[A-Z2-7]{32}$/),otpauthUri:z.string().startsWith('otpauth://totp/'),expires_at:z.iso.datetime()}).strict()
+]);
+const evidenceFields={locale:CatalogLocaleCodeSchema,terms:LegalDocumentPairSchema,privacy:LegalDocumentPairSchema,terms_accepted:z.literal(true),privacy_acknowledged:z.literal(true),adult_affirmed:z.literal(true),date_of_birth:z.iso.date().optional()};
+export const PendingOnboardingStatusRequestSchema=z.object({enrollment_token:HandleSchema,locale:CatalogLocaleCodeSchema}).strict();
+export const PendingOnboardingCompleteRequestSchema=z.object({enrollment_token:HandleSchema,...evidenceFields}).strict();
+export const RecoveryEvidenceStatusRequestSchema=z.object({recovery_capability:HandleSchema,locale:CatalogLocaleCodeSchema}).strict();
+export const RecoveryEvidenceCompleteRequestSchema=z.object({recovery_capability:HandleSchema,...evidenceFields}).strict();
+export const OnboardingRequirementsResponseSchema=z.object({status:z.enum(['pending_mfa','RECOVERY_ENROLL_ONLY']),country:z.string().nullable(),age_confirmation_required:z.boolean(),legal_acceptance_required:z.boolean(),terms:LegalDocumentPairSchema.extend({locale:CatalogLocaleCodeSchema,url:z.string()}),privacy:LegalDocumentPairSchema.extend({locale:CatalogLocaleCodeSchema,url:z.string()})}).strict();
+export type ConsumerRecoveryProveRequest=z.infer<typeof ConsumerRecoveryProveRequestSchema>;
+export type RecoveryEnrollmentBeginRequest=z.infer<typeof RecoveryEnrollmentBeginRequestSchema>;
+export type RecoveryEnrollmentCompleteRequest=z.infer<typeof RecoveryEnrollmentCompleteRequestSchema>;
+export type PendingOnboardingStatusRequest=z.infer<typeof PendingOnboardingStatusRequestSchema>;
+export type PendingOnboardingCompleteRequest=z.infer<typeof PendingOnboardingCompleteRequestSchema>;
+export type RecoveryEvidenceStatusRequest=z.infer<typeof RecoveryEvidenceStatusRequestSchema>;
+export type RecoveryEvidenceCompleteRequest=z.infer<typeof RecoveryEvidenceCompleteRequestSchema>;
+export type ConsumerRecoveryProofResponse=z.infer<typeof ConsumerRecoveryProofResponseSchema>;
+export type RecoveryEnrollmentOptionsResponse=z.infer<typeof RecoveryEnrollmentOptionsResponseSchema>;
+export type OnboardingRequirementsResponse=z.infer<typeof OnboardingRequirementsResponseSchema>;
 export const consumerAuthContractSchemas = Object.freeze({
+ ConsumerRecoveryProveRequestSchema,ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentBeginRequestSchema,RecoveryEnrollmentCompleteRequestSchema,RecoveryEnrollmentOptionsResponseSchema,PendingOnboardingStatusRequestSchema,PendingOnboardingCompleteRequestSchema,RecoveryEvidenceStatusRequestSchema,RecoveryEvidenceCompleteRequestSchema,OnboardingRequirementsResponseSchema,
   BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
   BeginPasskeyEnrollmentRequestSchema, CompletePasskeyEnrollmentRequestSchema, BeginPasskeyLoginRequestSchema, CompletePasskeyLoginRequestSchema, PasskeyEnrollmentResponseSchema,
   CatalogLocaleCodeSchema, LocaleCodeSchema, RegisterRequestSchema, ResendVerificationRequestSchema,

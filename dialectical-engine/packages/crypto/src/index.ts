@@ -1702,11 +1702,11 @@ export function generateVerificationToken(): string {
  */
 export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant"
   | "verification" | "support-session" | "support-case"
-  | "email-change-confirm" | "email-change-cancel" | "recovery-email-confirm";
+  | "email-change-confirm" | "email-change-cancel" | "recovery-email-confirm" | "consumer-recovery-channel" | "consumer-recovery-enroll";
 
 const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
   "session", "csrf", "login-challenge", "step-up-grant", "verification",
-  "support-session", "support-case", "email-change-confirm", "email-change-cancel", "recovery-email-confirm"
+  "support-session", "support-case", "email-change-confirm", "email-change-cancel", "recovery-email-confirm", "consumer-recovery-channel", "consumer-recovery-enroll"
 ]);
 
 /**

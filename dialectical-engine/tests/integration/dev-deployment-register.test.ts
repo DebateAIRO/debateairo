@@ -1,3 +1,4 @@
+import {readConsumerRecoveryPolicy} from "@debateai/register";
 import { spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { chmod, link, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -375,6 +376,7 @@ describe("DEV-05 complete development deployment register", () => {
   it("persists recovery and product-role policies inside an exact sealed bootstrap version", async () => {
     const bootstrap = await loadBootstrapRegister();
     await persistBootstrapRegister(database.pool, bootstrap);
+    await expect(readConsumerRecoveryPolicy(database.pool, bootstrap.registerVersion)).rejects.toMatchObject({code:'CONSUMER_RECOVERY_POLICY_INVALID'});
     await expect(readRecoveryPolicy(database.pool, bootstrap.registerVersion)).resolves.toMatchObject({
       policyVersion: 1,
       publicResponse: "ENUMERATION_RESISTANT_GENERIC"
@@ -437,6 +439,7 @@ describe("DEV-05 complete development deployment register", () => {
 
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
     const registerVersion = registerVersionToSafeLegacyNumber(first.registerVersion);
+    await expect(readConsumerRecoveryPolicy(database.pool,registerVersion)).resolves.toMatchObject({kind:'CONSUMER_RECOVERY_POLICY',token_ttl_ms:900000,capability_ttl_ms:300000,maximum_send_attempts:3,dispatch:'SHARED_SELECTED_AUTH_MAIL_PERMIT_BEFORE_BOTH_MECHANISMS_WITH_PRETRANSPORT_RESPONSE_FLOOR'});
     const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk] = await Promise.all([
       readAuthPolicy(database.pool, registerVersion),
       readMfaPolicy(database.pool, registerVersion),

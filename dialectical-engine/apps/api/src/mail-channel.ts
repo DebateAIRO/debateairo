@@ -282,3 +282,24 @@ export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender 
     });
   }
 }
+
+export type ConsumerSecurityNoticeKind='METHOD_CHANGED'|'CODES_REGENERATED'|'RECOVERY_PROVED'|'RECOVERY_COMPLETED';
+export interface ConsumerSecurityNoticeSender {
+  sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>;
+}
+/** Task9 purposes require their reviewed wrapper/template revision at deployment. */
+export class SendmailConsumerAccountSender implements ConsumerSecurityNoticeSender {
+  constructor(private readonly options:Readonly<{executable:string;from:string;timeoutMs:number;publicAppUrl:string}>){
+    if(!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)||!options.executable.trim()||!Number.isInteger(options.timeoutMs)||options.timeoutMs<1||!isPublicAppUrl(options.publicAppUrl))throw new TypeError('OWN_MAIL_CONFIGURATION_INVALID');
+  }
+  async sendRecovery(mail:Readonly<{recipient:string;token:string;expiresAt:Date}>):Promise<void>{
+    if(!isSingleDeliverableRecipient(mail.recipient)||!/^[A-Za-z0-9_-]{43}$/.test(mail.token))throw new MailDeliveryError('MAIL_INPUT_INVALID');
+    const url=new URL('/recover',this.options.publicAppUrl);url.hash='token='+mail.token;
+    await sendRenderedMail(renderMail({template:'consumer-recovery-v1',recipient:mail.recipient,url,expiresAt:mail.expiresAt},this.options.from),this.options);
+  }
+  async sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>{
+    const templates={METHOD_CHANGED:'security-method-changed-v1',CODES_REGENERATED:'security-codes-regenerated-v1',RECOVERY_PROVED:'security-recovery-proved-v1',RECOVERY_COMPLETED:'security-recovery-completed-v1'} as const;
+    const template=templates[mail.eventKind];if(!template)throw new MailDeliveryError('MAIL_INPUT_INVALID');
+    await sendRenderedMail(renderMail({template,recipient:mail.recipient,messageId:mail.messageId,expiresAt:mail.happenedAt},this.options.from),this.options);
+  }
+}

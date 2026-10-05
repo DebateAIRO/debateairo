@@ -513,6 +513,10 @@ interface DuplicateRegistrationPostwork {
 }
 
 type RegistrationPostwork = VerificationDeliveryPostwork | DuplicateRegistrationPostwork;
+export type RecoveryMailWork = () => Promise<void>;
+export interface RecoveryMailDispatchPort {
+  dispatchRecoveryMail(prepare:()=>Promise<RecoveryMailWork|null>):Promise<void>;
+}
 type MailDispatchRelease = () => Promise<void>;
 interface MailDispatchActivationReceipt {
   readonly activatedAt: number;
@@ -604,6 +608,9 @@ export class RegistrationService implements RegistrationApplication {
   private readonly clock: () => Date;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly pendingMailDispatches = new Set<Promise<void>>();
+  // Ownership tracking only: these preparations already hold a slot or waiter
+  // in the SAME mail dispatcher. This is not another admission pool.
+  private readonly pendingMailPreparations = new Set<Promise<void>>();
   private readonly waitingMailDispatches: WaitingMailDispatch[] = [];
   private mailDispatchReservations = 0;
   private nextMailDispatchActivationAt = Number.NEGATIVE_INFINITY;
@@ -1251,6 +1258,7 @@ export class RegistrationService implements RegistrationApplication {
     readonly minimumReservationMs?: number;
     readonly activationSpacingMs?: number;
     readonly waitDeadlineMs?: number;
+    readonly enforceMinimum?: boolean;
   }): Promise<MailDispatchActivation> {
     const channel = this.dependencies.policy.channel;
     const minimumReservationMs = request.minimumReservationMs
@@ -1261,7 +1269,7 @@ export class RegistrationService implements RegistrationApplication {
     if (this.mailDispatchReservations < channel.maxConcurrentVerificationDispatches) {
       this.mailDispatchReservations += 1;
       return Promise.resolve(() => this.scheduleMailDispatchActivation(
-        false, minimumReservationMs, activationSpacingMs
+        request.enforceMinimum ?? false, minimumReservationMs, activationSpacingMs
       ));
     }
     if (this.waitingMailDispatches.length >= channel.maxQueuedVerificationDispatches) {
@@ -1402,9 +1410,54 @@ export class RegistrationService implements RegistrationApplication {
     this.pendingMailDispatches.add(pending);
   }
 
+  /** Composition-only: one source-admitted recovery request owns one common ticket.
+   * Both P2 and token preparation run only after activation. No raw token is
+   * retained by a waiter, and public completion never awaits real transport. */
+  dispatchRecoveryMail(prepare:()=>Promise<RecoveryMailWork|null>):Promise<void> {
+    if(this.registrationAdmissionClosing)return Promise.reject(new AuthFlowError("AUTH_MAIL_BUSY"));
+    const startedAt=performance.now();
+    let permit:Promise<MailDispatchActivation>;
+    try { permit=this.reserveMailDispatchPermit({correlationId:randomUUID(),enforceMinimum:true}); }
+    catch(error){return Promise.reject(error);}
+    let preparing!:Promise<void>;
+    preparing=(async()=>{
+      let receipt:MailDispatchActivationReceipt|undefined;
+      let work:RecoveryMailWork|null= null;
+      try {
+        receipt=await(await permit)();
+        work=await prepare();
+        if(performance.now()-receipt.activatedAt>this.dependencies.policy.channel.mailDispatchPreTransportWorkBudgetMs)
+          console.error("[AUTH_CONSUMER_RECOVERY_PREPARATION_SLOW]");
+      } finally {
+        try {
+          await this.holdEnumerationFloor(startedAt);
+          if(receipt!==undefined)await this.holdRegistrationPostActivationFloor(receipt.activatedAt);
+        } finally {
+          if(receipt!==undefined)this.dispatchRecoveryWork(work,receipt.release);
+          work=null;
+          this.pendingMailPreparations.delete(preparing);
+        }
+      }
+    })();
+    this.pendingMailPreparations.add(preparing);
+    return preparing;
+  }
+
+  private dispatchRecoveryWork(work:RecoveryMailWork|null,release:MailDispatchRelease):void {
+    let pending!:Promise<void>;
+    pending=new Promise<void>(resolve=>setImmediate(resolve)).then(async()=>{
+      if(work===null)await this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs);
+      else await work();
+    }).catch(()=>{console.error("[AUTH_CONSUMER_RECOVERY_DISPATCH_FAILED]");}).finally(async()=>{
+      work=null;
+      try {await release();} finally {this.pendingMailDispatches.delete(pending);}
+    });
+    this.pendingMailDispatches.add(pending);
+  }
+
   async drainMailDispatches(): Promise<void> {
-    while (this.pendingMailDispatches.size > 0) {
-      await Promise.allSettled([...this.pendingMailDispatches]);
+    while (this.pendingMailDispatches.size > 0 || this.pendingMailPreparations.size > 0) {
+      await Promise.allSettled([...this.pendingMailPreparations,...this.pendingMailDispatches]);
     }
   }
 

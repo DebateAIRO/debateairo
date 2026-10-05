@@ -1,3 +1,8 @@
+import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
+ type ConsumerRecoveryProveRequest,type ConsumerRecoveryProofResponse,type RecoveryEnrollmentBeginRequest,type RecoveryEnrollmentCompleteRequest,type RecoveryEnrollmentOptionsResponse,type PendingOnboardingStatusRequest,type PendingOnboardingCompleteRequest,type RecoveryEvidenceStatusRequest,type RecoveryEvidenceCompleteRequest,type OnboardingRequirementsResponse} from './consumer-auth.js';
+import {AuthMethodsResponseSchema,RecoveryCodesResponseSchema,type AuthMethodsResponse} from "./index.js";
+import type {ConsumerAuthenticationCredential} from "./consumer-auth.js";
+import type { StepUpAuthorizationRequest, StepUpResponse } from "./index.js";
 import {PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsResponseSchema, PasskeyEnrollmentResponseSchema,
  type BeginPasskeyEnrollmentRequest,type CompletePasskeyEnrollmentRequest,type BeginPasskeyLoginRequest,type CompletePasskeyLoginRequest,
  type PasskeyRegistrationOptionsResponse,type PasskeyAuthenticationOptionsResponse,type PasskeyEnrollmentResponse} from './consumer-auth.js';
@@ -326,25 +331,19 @@ export interface ContractClient {
   readSensitiveDataConsent(): Promise<SensitiveDataConsentStatus>;
   /** Agrees to the current sensitive-data notice, shown in `locale`. */
   giveSensitiveDataConsent(locale: string): Promise<SensitiveDataConsentStatus>;
-  stepUp(password: string, code: string, authorization?:
-    | Readonly<{
-      action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
-      target_run_id: string;
-    }>
-    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" }>): Promise<{
-    status: "step_up_complete";
-    csrf_token: string;
-    step_up_grant?: ({
-      token: string;
-      action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
-      target_run_id: string;
-      expires_at: string;
-    } | {
-      token: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP";
-      expires_at: string;
-    }) | undefined;
-  }>;
+  recoveryProve(input:ConsumerRecoveryProveRequest):Promise<ConsumerRecoveryProofResponse>;
+  beginRecoveryEnrollment(input:RecoveryEnrollmentBeginRequest):Promise<RecoveryEnrollmentOptionsResponse>;
+  completeRecoveryEnrollment(input:RecoveryEnrollmentCompleteRequest):Promise<AuthenticationResponse>;
+  pendingOnboardingStatus(input:PendingOnboardingStatusRequest):Promise<OnboardingRequirementsResponse>;
+  completePendingOnboarding(input:PendingOnboardingCompleteRequest):Promise<void>;
+  recoveryEnrollmentStatus(input:RecoveryEvidenceStatusRequest):Promise<OnboardingRequirementsResponse>;
+  completeRecoveryEvidence(input:RecoveryEvidenceCompleteRequest):Promise<void>;
+  authMethods():Promise<AuthMethodsResponse>;
+  removeAuthMethod(factorId:string,grant:string):Promise<void>;
+  regenerateRecoveryCodes(grant:string):Promise<{codes:string[]}>;
+  beginPasskeyStepUp(authorization:StepUpAuthorizationRequest):Promise<PasskeyAuthenticationOptionsResponse>;
+  completePasskeyStepUp(input:{challenge_handle:string;credential:ConsumerAuthenticationCredential}):Promise<StepUpResponse>;
+  stepUp(password:string,code:string,authorization?:StepUpAuthorizationRequest):Promise<StepUpResponse>;
   readPublicDebates(limit: number, offset: number): Promise<Readonly<{
     items: readonly Readonly<{
       public_ref: string;
@@ -563,12 +562,19 @@ export function createContractClient(
     revokeAllSessions: () => request(
       "/v1/auth/sessions", RevokeAllSessionsSchema, { method: "DELETE" }
     ),
-    stepUp: (password: string, code: string, authorization?:
-      | Readonly<{
-        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
-        target_run_id: string;
-      }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" }>) => request(
+    recoveryProve:(input:ConsumerRecoveryProveRequest)=>request('/v1/auth/recovery/prove',ConsumerRecoveryProofResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    beginRecoveryEnrollment:(input:RecoveryEnrollmentBeginRequest)=>request('/v1/auth/recovery/enrollment/options',RecoveryEnrollmentOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completeRecoveryEnrollment:(input:RecoveryEnrollmentCompleteRequest)=>request('/v1/auth/recovery/enrollment/complete',AuthenticationResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    pendingOnboardingStatus:(input:PendingOnboardingStatusRequest)=>request('/v1/auth/onboarding/status',OnboardingRequirementsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completePendingOnboarding:(input:PendingOnboardingCompleteRequest)=>requestNoContent(root.href,fetchImplementation,'/v1/auth/onboarding/complete',{method:'POST',body:JSON.stringify(input)},auth),
+    recoveryEnrollmentStatus:(input:RecoveryEvidenceStatusRequest)=>request('/v1/auth/recovery/enrollment/status',OnboardingRequirementsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completeRecoveryEvidence:(input:RecoveryEvidenceCompleteRequest)=>requestNoContent(root.href,fetchImplementation,'/v1/auth/recovery/enrollment/complete-evidence',{method:'POST',body:JSON.stringify(input)},auth),
+    authMethods:()=>request('/v1/account/auth-methods',AuthMethodsResponseSchema),
+    removeAuthMethod:(factorId:string,grant:string)=>requestNoContent(root.href,fetchImplementation,'/v1/account/auth-methods/remove',{method:'POST',body:JSON.stringify({factor_id:factorId,step_up_grant:grant})},auth),
+    regenerateRecoveryCodes:(grant:string)=>request('/v1/account/recovery-codes/regenerate',RecoveryCodesResponseSchema,{method:'POST',body:JSON.stringify({step_up_grant:grant})}),
+    beginPasskeyStepUp:(authorization:StepUpAuthorizationRequest)=>request('/v1/auth/passkeys/step-up/options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify({authorization})}),
+    completePasskeyStepUp:(input:{challenge_handle:string;credential:ConsumerAuthenticationCredential})=>request('/v1/auth/passkeys/step-up/complete',StepUpResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    stepUp: (password: string, code: string, authorization?:StepUpAuthorizationRequest) => request(
       "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,

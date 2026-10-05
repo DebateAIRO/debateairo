@@ -1044,3 +1044,5 @@ export {
 } from "./staff-access-policy.js";
 
 export { internalAllowancePolicyValue } from "./internal-allowance-policy.js";
+
+export * from "./consumer-recovery-policy.js";
