@@ -1,16 +1,13 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
 import { AuthMethodsResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, PasskeyAuthenticationOptionsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, StepUpAuthorizationRequestSchema, type AuthMethodsResponse, type PasskeyAuthenticationOptionsResponse, type StepUpResponse } from '@debateai/contract';
-import { generateRecoveryCodes, hashRecoveryCode, hashToken, parseEncodedArgon2id, type Argon2Executor } from '@debateai/crypto';
+import { generateRecoveryCodes, hashRecoveryCode, hashToken, type Argon2Executor } from '@debateai/crypto';
 import type { AuthSourceContext, PostgresConsumerSecurityRepository, ProfileSession } from '@debateai/db';
 import type { MfaPolicy, AuthPolicy } from '@debateai/register';
 import type { AuthenticatedSession, ConsumerSessionProducer } from './sessions.js';
 import { verifyConsumerAuthentication } from './consumer-webauthn-verifier.js';
-import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from './registration.js';
-/** Match the existing worker encoding admission AND its selected per-use cost ceiling. */
-export function consumerPasswordUsable(value: string | null, policy: AuthPolicy): boolean {
-    return value !== null && parseEncodedArgon2id(value) !== undefined && storedArgon2EnvelopeNotOverPolicy(value, policy.password.argon2id, 'password');
-}
+import { AuthFlowError, consumerPasswordUsable } from './registration.js';
+export { consumerPasswordUsable } from './registration.js';
 export function parseConsumerSecurityInput<T>(schema: {
     safeParse(input: unknown): {
         success: true;
@@ -57,7 +54,7 @@ export class ConsumerSecurityService implements ConsumerSecurityApplication {
         this.origin = u.origin;
         this.rpId = u.hostname;
     }
-    private async passwordPath(session: AuthenticatedSession) { const passwordHashSnapshot = await this.repository.readPasswordState(consumerSecuritySession(session)); return { passwordHashSnapshot, passwordUsable: consumerPasswordUsable(passwordHashSnapshot, this.dependencies.authPolicy) }; }
+    private async passwordPath(session: AuthenticatedSession) { const passwordHashSnapshot = await this.repository.readPasswordState(consumerSecuritySession(session)); return { admittedProviders:await this.sessions.socialBindings?.()??[],passwordHashSnapshot, passwordUsable: consumerPasswordUsable(passwordHashSnapshot, this.dependencies.authPolicy) }; }
     async authMethods(session: AuthenticatedSession): Promise<AuthMethodsResponse> { const record = await this.repository.authMethods(consumerSecuritySession(session), await this.passwordPath(session)) as AuthMethodsResponse; return AuthMethodsResponseSchema.parse({ ...record, methods: record.methods.map(method => ({ ...method, created_at: new Date(method.created_at).toISOString(), last_used_at: method.last_used_at === null ? null : new Date(method.last_used_at).toISOString() })) }); }
     async beginPasskeyStepUp(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<PasskeyAuthenticationOptionsResponse> {
         const parsed = parseConsumerSecurityInput(BeginPasskeyStepUpRequestSchema, input), admission = await this.sessions.admit('STEP_UP_BEGIN', session.userId, source), handle = random(), challenge = random();

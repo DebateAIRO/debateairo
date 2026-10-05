@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SocialProviderButtons } from "@/components/auth/SocialProviderButtons";
 import {
   FormEvent,
   MouseEvent as ReactMouseEvent,
@@ -25,7 +26,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { TurnstilePublicConfig } from "@/lib/turnstile";
 import authEnglish from "@/messages/en/auth.json";
 
-type RegistrationClient = Pick<ContractClient, "checkAge" | "register"> & Partial<Pick<ContractClient, "resendVerification">>;
+type RegistrationClient = Pick<ContractClient, "checkAge" | "register"> & Partial<Pick<ContractClient, "resendVerification"|"authProviders"|"beginSocialLogin">>;
 type SuccessMessageKey = "auth.signUp.registrationSent";
 
 type Validity = Readonly<{ state: "idle" | "ok" | "bad"; text: string }>;
@@ -359,6 +360,7 @@ export function SignUpFlow({
         </button>
       ) : null}
 
+      <SocialProviderButtons client={client} />
       <form className="authForm" data-form="signup" method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
         <div className="authField">
           <label htmlFor="signup-email">{t(catalog, "auth.email")}</label>

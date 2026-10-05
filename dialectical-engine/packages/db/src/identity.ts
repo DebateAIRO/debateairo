@@ -12,6 +12,8 @@ export interface AuthSourceContext {
   readonly requestId: string;
   /** ISO 3166-1 alpha-2 the edge reported for this source, when it reported one. */
   readonly countryCode?: string;
+  /** Server-derived HttpOnly social continuation cookie hash; never public JSON. */
+  readonly socialBrowserHash?: string;
 }
 
 export interface PendingAccountInput {

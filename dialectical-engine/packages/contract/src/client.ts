@@ -1,3 +1,5 @@
+import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type CompleteSocialStepUpRequest } from './index.js';
+import { AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
 import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
  type ConsumerRecoveryProveRequest,type ConsumerRecoveryProofResponse,type RecoveryEnrollmentBeginRequest,type RecoveryEnrollmentCompleteRequest,type RecoveryEnrollmentOptionsResponse,type PendingOnboardingStatusRequest,type PendingOnboardingCompleteRequest,type RecoveryEvidenceStatusRequest,type RecoveryEvidenceCompleteRequest,type OnboardingRequirementsResponse} from './consumer-auth.js';
 import {AuthMethodsResponseSchema,RecoveryCodesResponseSchema,type AuthMethodsResponse} from "./index.js";
@@ -311,6 +313,17 @@ export interface ContractClient {
   startRecovery(email: string): Promise<Readonly<{
     message: typeof RECOVERY_START_PUBLIC_MESSAGE;
   }>>;
+  beginSocialStepUp(provider:'google'|'apple'|'facebook'|'x',authorization:StepUpAuthorizationRequest):Promise<{authorization_url:string}>;
+  socialStepUpStatus(continuationToken:string):Promise<SocialStepUpStatusResponse>;
+  beginSocialStepUpPasskey(continuationToken:string):Promise<PasskeyAuthenticationOptionsResponse>;
+  completeSocialStepUp(input:CompleteSocialStepUpRequest):Promise<StepUpResponse>;
+  authProviders():Promise<AuthProvidersResponse>;
+  beginSocialLogin(provider:'google'|'apple'|'facebook'|'x',input?:{next?:'/'|'/settings'|'/account'}):Promise<{authorization_url:string}>;
+  socialSignupStatus(input:{continuation_token:string}):Promise<SocialSignupStatusResponse>;
+  completeSocialSignup(input:CompleteSocialSignupRequest):Promise<CompleteSocialSignupResponse>;
+  linkedSocialProviders():Promise<SocialLinksResponse>;
+  beginSocialLink(provider:'google'|'apple'|'facebook'|'x',grant:string):Promise<{authorization_url:string}>;
+  unlinkSocialProvider(provider:'google'|'apple'|'facebook'|'x',grant:string):Promise<void>;
   beginPasskeyEnrollment(input:BeginPasskeyEnrollmentRequest):Promise<PasskeyRegistrationOptionsResponse>;
   completePasskeyEnrollment(input:CompletePasskeyEnrollmentRequest):Promise<PasskeyEnrollmentResponse>;
   beginPasskeyLogin(input?:BeginPasskeyLoginRequest):Promise<PasskeyAuthenticationOptionsResponse>;
@@ -547,6 +560,17 @@ export function createContractClient(
       }
       if (!response.ok) throw await contractErrorForResponse(response);
     },
+    beginSocialStepUp:(provider:'google'|'apple'|'facebook'|'x',authorization:StepUpAuthorizationRequest)=>request(`/v1/account/social/${provider}/step-up/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify({authorization,next:'/settings'})}),
+    socialStepUpStatus:(continuationToken:string)=>request('/v1/account/social/step-up/status',SocialStepUpStatusResponseSchema,{method:'POST',body:JSON.stringify({continuation_token:continuationToken})}),
+    beginSocialStepUpPasskey:(continuationToken:string)=>request('/v1/account/social/step-up/passkey-options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify({continuation_token:continuationToken})}),
+    completeSocialStepUp:(input:CompleteSocialStepUpRequest)=>request('/v1/account/social/step-up/complete',StepUpResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    authProviders:()=>request('/v1/auth/providers',AuthProvidersResponseSchema),
+    beginSocialLogin:(provider:"google"|"apple"|"facebook"|"x",input:{next?:"/"|"/settings"|"/account"}={})=>request(`/v1/auth/social/${provider}/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    socialSignupStatus:(input:{continuation_token:string})=>request('/v1/auth/social/signup/status',SocialSignupStatusResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completeSocialSignup:(input:CompleteSocialSignupRequest)=>request('/v1/auth/social/signup/complete',CompleteSocialSignupResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    linkedSocialProviders:()=>request('/v1/account/social-providers',SocialLinksResponseSchema),
+    beginSocialLink:(provider:"google"|"apple"|"facebook"|"x",grant:string)=>request(`/v1/account/social/${provider}/link`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify({step_up_grant:grant,next:'/settings'})}),
+    unlinkSocialProvider:(provider:"google"|"apple"|"facebook"|"x",grant:string)=>requestNoContent(root.href,fetchImplementation,'/v1/account/social/unlink',{method:'POST',body:JSON.stringify({provider,step_up_grant:grant})},auth),
     beginPasskeyEnrollment:(input:BeginPasskeyEnrollmentRequest)=>request('/v1/auth/passkeys/enrollment/options',PasskeyRegistrationOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     completePasskeyEnrollment:(input:CompletePasskeyEnrollmentRequest)=>request('/v1/auth/passkeys/enrollment/complete',PasskeyEnrollmentResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     beginPasskeyLogin:(input:BeginPasskeyLoginRequest={})=>request('/v1/auth/passkeys/login/options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),

@@ -1,3 +1,7 @@
+import type { SocialStepUpApplication } from './social-step-up.js';
+import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
+import { socialBrowserHash } from './social-providers/hashes.js';
+import { SocialProviderSchema, CompleteSocialSignupRequestSchema } from '@debateai/contract';
 import type {ConsumerRecoveryApplication} from "./consumer-recovery.js";
 import type {OnboardingEvidenceApplication} from "./onboarding-evidence.js";
 import type { ConsumerSecurityApplication } from "./consumer-security.js";
@@ -1171,6 +1175,19 @@ export function apiOperationalErrorDiagnostic(error: unknown): string {
 }
 
 export const authorizationPolicyInventory = Object.freeze([
+  {route:'POST /v1/account/social/{provider}/step-up/begin',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
+  {route:'POST /v1/account/social/step-up/status',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
+  {route:'POST /v1/account/social/step-up/passkey-options',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
+  {route:'POST /v1/account/social/step-up/complete',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
+  {route:'GET /v1/auth/providers',auth:'public',resource:'identity',action:'social-providers'},
+  {route:'POST /v1/auth/social/{provider}/begin',auth:'public',origin:'trusted',resource:'identity',action:'social-begin'},
+  {route:'GET /v1/auth/social/{provider}/callback',auth:'public',resource:'identity',action:'social-callback'},
+  {route:'POST /v1/auth/social/apple/callback',auth:'public',resource:'identity',action:'social-callback'},
+  {route:'POST /v1/auth/social/signup/status',auth:'public',origin:'trusted',resource:'identity',action:'social-signup'},
+  {route:'POST /v1/auth/social/signup/complete',auth:'public',origin:'trusted',resource:'identity',action:'social-signup'},
+  {route:'GET /v1/account/social-providers',auth:'user',resource:'identity',action:'social-links'},
+  {route:'POST /v1/account/social/{provider}/link',auth:'user',origin:'trusted',resource:'identity',action:'social-link'},
+  {route:'POST /v1/account/social/unlink',auth:'user',origin:'trusted',resource:'identity',action:'social-unlink'},
   // Age gate (Turn 8): the browser-only pre-register check, like login held to the exact Origin.
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
@@ -1478,6 +1495,8 @@ export interface ApiOptions {
   readonly sessions?: SessionApplication;
   readonly consumerWebAuthn?: ConsumerWebAuthnApplication;
   readonly consumerSecurity?:ConsumerSecurityApplication;
+  readonly socialAuth?:SocialAuthApplication;
+  readonly socialStepUp?:SocialStepUpApplication;
   readonly consumerRecovery?:ConsumerRecoveryApplication;
   readonly onboardingEvidence?:OnboardingEvidenceApplication;
   readonly staffAccess?: StaffAccessApplication;
@@ -1729,7 +1748,7 @@ function csrfCookie(value: string, maxAgeSeconds: number): string {
 function completeAuthenticatedResponse(reply:FastifyReply,result:LoginResult):FastifyReply {
   const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session,
     ...(result.replacementRecoveryCode===undefined?{}:{replacement_recovery_code:result.replacementRecoveryCode})});
-  reply.header("set-cookie",[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS)]);
+  reply.header("set-cookie",[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS),...(exactCookie(reply.request.headers.cookie,SOCIAL_BROWSER_COOKIE)===null?[]:[`${SOCIAL_BROWSER_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`])]);
   return reply.send(response);
 }
 
@@ -1877,6 +1896,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? request.headers["user-agent"] as string
         : "unknown",
       requestId: request.id,
+      ...(socialBrowserHash(exactCookie(request.headers.cookie as string | undefined,SOCIAL_BROWSER_COOKIE)) === undefined ? {} : { socialBrowserHash: socialBrowserHash(exactCookie(request.headers.cookie as string | undefined,SOCIAL_BROWSER_COOKIE))! }),
       // Age gate (R3-3): the country computed above (the edge's, else the country gate's lookup),
       // left out when neither gives one.
       ...(countryCode === null ? {} : { countryCode }),
@@ -2062,7 +2082,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * birth is judged and before any account work. The answer is the code only.
    */
   api.addHook("preHandler", async (request, reply) => {
-    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (request.method !== "POST" || !["/v1/auth/register","/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
     if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
   });
@@ -2074,7 +2094,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * and it overwrites anything the client claimed. The date itself goes no further.
    */
   api.addHook("preHandler", async (request, reply) => {
-    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (request.method !== "POST" || !["/v1/auth/register","/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     if (ageRefusalCookiePresent(request.headers.cookie)) return ageRefused(reply);
     const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
       ? request.body as Record<string, unknown>
@@ -2094,7 +2114,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * well-formed pairs against the current manifest before any budget or proof. Runs after age refusal.
    */
   api.addHook("preHandler", async (request) => {
-    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (request.method !== "POST" || !["/v1/auth/register","/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
       ? request.body as Record<string, unknown>
       : null;
@@ -2107,29 +2127,33 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // Parse submitted facts, never the body carrying the server's injected age decision.
   api.addHook("preHandler", async (request, reply) => {
     const path = request.routeOptions.url;
-    if (request.method !== "POST" || (path !== "/v1/auth/register" && path !== "/v1/auth/resend-verification")) return;
-    const submitted = path === "/v1/auth/register" ? registerPublicBodies.get(request) : request.body;
+    if (request.method !== "POST" || (path !== "/v1/auth/register" && path !== "/v1/auth/resend-verification" && path !== "/v1/auth/social/signup/complete")) return;
+    const socialSignup = path === "/v1/auth/social/signup/complete";
+    const signup = path === "/v1/auth/register" || socialSignup;
+    const submitted = signup ? registerPublicBodies.get(request) : request.body;
     if (submitted && typeof submitted === "object" && !passwordWithinRequestBound(submitted as Record<string, unknown>)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
-    const parsed = path === "/v1/auth/register"
+    const parsed = socialSignup ? CompleteSocialSignupRequestSchema.safeParse(registerPublicBodies.get(request)) : path === "/v1/auth/register"
       ? RegisterRequestSchema.safeParse(registerPublicBodies.get(request))
       : ResendVerificationRequestSchema.safeParse(request.body);
     if (!parsed.success || !passwordWithinRequestBound(parsed.data)) throw new AuthFlowError("AUTH_INPUT_INVALID");
-    if (path === "/v1/auth/register") {
+    if (signup) {
       const body = request.body as Record<string, unknown>;
       try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
     }
     mailDisplays.set(request, Object.freeze({ locale: parsed.data.ui_locale, timeZone: parsed.data.time_zone }));
     const body = request.body as Record<string, unknown>;
-    const admission = await options.registration?.admitSource?.(path === "/v1/auth/register"
+    const admission = await options.registration?.admitSource?.(socialSignup
+      ? {route:"social",source:sourceFor(request),input:{email:parsed.data.email,phone:typeof body.phone === "string" ? body.phone : "",adultAffirmed:body.adult_affirmed===true}}
+      : path === "/v1/auth/register"
       ? { route: "register", source: sourceFor(request), input: {
           email: typeof body.email === "string" ? body.email : "", password: typeof body.password === "string" ? body.password : "",
           phone: typeof body.phone === "string" ? body.phone : "", recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
         } }
       : { route: "resend", source: sourceFor(request), input: { email: parsed.data.email } });
     if (admission !== undefined) sourceAdmissions.set(request, admission);
-    try { await requireTurnstileProof(options.turnstile, { token: parsed.data.turnstile_token, action: path === "/v1/auth/register" ? "signup" : "resend-verification" }); }
+    try { await requireTurnstileProof(options.turnstile, { token: parsed.data.turnstile_token, action: signup ? "signup" : "resend-verification" }); }
     catch (error) { admission?.release(); sourceAdmissions.delete(request); throw error; }
   });
   /**
@@ -2141,6 +2165,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.setNotFoundHandler((_request, reply) =>
     reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" }));
   api.setErrorHandler((error, request, reply) => {
+    if (error instanceof SocialAuthError) return reply.status(error.statusCode).send({error:error.code,message:error.code});
     if (error instanceof TurnstileGateError) {
       return reply.status(error.statusCode).send({ error: error.code, message: error.code });
     }
@@ -2163,7 +2188,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return;
     }
     const rawError = error instanceof Error ? error : new Error(String(error));
-    const consumerRefusal = new Set(['CONSUMER_PASSWORD_PATH_UNAVAILABLE','STEP_UP_GRANT_GENERATION_INVALID','CONSUMER_SECURITY_INVALID','CONSUMER_RECOVERY_INVALID','CONSUMER_LAST_METHOD','CONSUMER_WEBAUTHN_INVALID','ONBOARDING_AUTHORITY_INVALID','ONBOARDING_EVIDENCE_CHANGED','ONBOARDING_EVIDENCE_REQUIRED','ONBOARDING_AGE_REQUIRED','ONBOARDING_AGE_NOT_REQUIRED']);
+    const consumerRefusal = new Set(['SOCIAL_FLOW_INVALID','SOCIAL_PARENT_INVALID','SOCIAL_LAST_PATH','CONSUMER_PASSWORD_PATH_UNAVAILABLE','STEP_UP_GRANT_GENERATION_INVALID','CONSUMER_SECURITY_INVALID','CONSUMER_RECOVERY_INVALID','CONSUMER_LAST_METHOD','CONSUMER_WEBAUTHN_INVALID','ONBOARDING_AUTHORITY_INVALID','ONBOARDING_EVIDENCE_CHANGED','ONBOARDING_EVIDENCE_REQUIRED','ONBOARDING_AGE_REQUIRED','ONBOARDING_AGE_NOT_REQUIRED']);
     const knownError = rawError.message==='CONSUMER_PASSWORD_PATH_UNAVAILABLE'||rawError.message==='CONSUMER_LAST_METHOD' ? new AuthFlowError('MFA_ENROLLMENT_STATE_INVALID') : consumerRefusal.has(rawError.message) ? new AuthFlowError('AUTH_CREDENTIALS_INVALID') : rawError;
     const frameworkCode = (knownError as Error & Readonly<{ code?: unknown }>).code;
     const transportFault = typeof frameworkCode === "string"
@@ -2238,6 +2263,58 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : askRefusal ? askRefusalPublicMessage(knownError.code, knownError.message) : knownError.message
     });
   });
+
+  const socialCookie = (name:string,value:string,expiresAt:string,sameSite:'Lax'|'None'='Lax') => `${name}=${value}; Path=/; Max-Age=${Math.max(0,Math.min(300,Math.floor((new Date(expiresAt).getTime()-Date.now())/1000)))}; HttpOnly; Secure; SameSite=${sameSite}`;
+  const clearedSocialCookie = (name:string,sameSite:'Lax'|'None'='Lax') => `${name}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=${sameSite}`;
+  api.get('/v1/auth/providers',routePolicy('GET /v1/auth/providers'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/auth/providers',sourceFor(request).ip))return reply;return reply.send(await options.socialAuth?.authProviders() ?? {providers:[]});});
+  api.post<{Params:{provider:string}}>('/v1/auth/social/:provider/begin',credentialRoutePolicy('POST /v1/auth/social/{provider}/begin'),async(request,reply)=>{
+    const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.begin(provider.data,request.body??{},sourceFor(request));
+    reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));
+    return reply.send({authorization_url:result.authorization_url});
+  });
+  const socialCallback = async(provider:'google'|'apple'|'facebook'|'x',input:unknown,request:FastifyRequest,reply:FastifyReply)=>{
+    const cookieName=provider==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE;
+    reply.header('set-cookie',clearedSocialCookie(cookieName,provider==='apple'?'None':'Lax'));
+    if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.callback(provider,input,exactCookie(request.headers.cookie,cookieName),sourceFor(request));
+    if(result.status==='linked')return reply.redirect(result.next,303);
+    reply.header('set-cookie',[clearedSocialCookie(cookieName,provider==='apple'?'None':'Lax'),socialCookie(SOCIAL_BROWSER_COOKIE,result.browserCookie,result.expiresAt)]);
+    return reply.redirect('/social/complete#'+new URLSearchParams({kind:result.status==='mfa_required'?'login':result.status==='provider_step_up_required'?'stepup':'signup',token:result.token,next:result.next}),303);
+  };
+  api.get<{Params:{provider:string}}>('/v1/auth/social/:provider/callback',routePolicy('GET /v1/auth/social/{provider}/callback'),async(request,reply)=>{
+    const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success||provider.data==='apple')throw new SocialAuthError('SOCIAL_PROOF_INVALID');return socialCallback(provider.data,request.query,request,reply);
+  });
+  void api.register(async apple=>{
+    apple.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string',bodyLimit:8192},(_request,body,done)=>{
+      try {const form=new URLSearchParams(body as string);const value:Record<string,string>={};for(const [key,member] of form){if(Object.hasOwn(value,key)||!['state','code','error','error_description','user'].includes(key))throw new SocialAuthError('SOCIAL_PROOF_INVALID');value[key]=member;}done(null,value);}catch{done(new SocialAuthError('SOCIAL_PROOF_INVALID'));}
+    });
+    apple.post('/v1/auth/social/apple/callback',{...routePolicy('POST /v1/auth/social/apple/callback'),bodyLimit:8192},async(request,reply)=>{
+      if(request.headers['content-type']?.split(';')[0]?.trim()!=='application/x-www-form-urlencoded')throw new SocialAuthError('SOCIAL_PROOF_INVALID');return socialCallback('apple',request.body,request,reply);
+    });
+  });
+  api.post('/v1/auth/social/signup/status',credentialRoutePolicy('POST /v1/auth/social/signup/status'),async(request,reply)=>{if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialAuth.signupStatus(request.body,sourceFor(request)));});
+  api.post('/v1/auth/social/signup/complete',credentialRoutePolicy('POST /v1/auth/social/signup/complete'),async(request,reply)=>{
+    if(!options.socialAuth||!sourceAdmissions.get(request))throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.completeSignup(registerPublicBodies.get(request),sourceFor(request),sourceAdmissions.get(request)!);
+    if('status' in result)return reply.send(result);
+    reply.header('set-cookie',clearedSocialCookie(SOCIAL_BROWSER_COOKIE));return reply.status(202).send({...result,retry_after_seconds:60});
+  });
+  api.get('/v1/account/social-providers',routePolicy('GET /v1/account/social-providers'),async(request,reply)=>{if(!options.socialAuth)return reply.send({providers:[]});return reply.send(await options.socialAuth.linked(request.authenticatedSession!));});
+  api.post<{Params:{provider:string}}>('/v1/account/social/:provider/link',credentialRoutePolicy('POST /v1/account/social/{provider}/link'),async(request,reply)=>{
+    const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.begin(provider.data,request.body,sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
+  });
+  api.post<{Params:{provider:string}}>('/v1/account/social/:provider/step-up/begin',credentialRoutePolicy('POST /v1/account/social/{provider}/step-up/begin'),async(request,reply)=>{
+    const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.beginStepUp(provider.data,request.body,sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
+  });
+  api.post('/v1/account/social/step-up/status',credentialRoutePolicy('POST /v1/account/social/step-up/status'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.status(request.body,request.authenticatedSession!,sourceFor(request)));});
+  api.post('/v1/account/social/step-up/passkey-options',credentialRoutePolicy('POST /v1/account/social/step-up/passkey-options'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.beginPasskey(request.body,request.authenticatedSession!,sourceFor(request)));});
+  api.post('/v1/account/social/step-up/complete',{...credentialRoutePolicy('POST /v1/account/social/step-up/complete'),bodyLimit:32768},async(request,reply)=>{
+    if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');const r=await options.socialStepUp.complete(request.body,request.authenticatedSession!,sourceFor(request));reply.header('set-cookie',[sessionCookie(r.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(r.response.csrf_token,SESSION_IDLE_MAX_AGE_SECONDS),clearedSocialCookie(SOCIAL_BROWSER_COOKIE)]);return reply.send(r.response);
+  });
+  api.post('/v1/account/social/unlink',credentialRoutePolicy('POST /v1/account/social/unlink'),async(request,reply)=>{if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');await options.socialAuth.unlink(request.body,request.authenticatedSession!,sourceFor(request));return reply.status(204).send();});
 
   if(options.consumerRecovery!==undefined){
     const recovery=options.consumerRecovery;

@@ -1,0 +1,49 @@
+# Source template only. Provisioning/install/egress acceptance belongs to Task13.
+[Unit]
+Description=Dialectical Engine finite social identity relay
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=debateai-social
+Group=debateai-social-clients
+WorkingDirectory=/opt/debateai/dialectical-engine
+Environment=NODE_ENV=production
+Environment=SOCIAL_SOCKET_PATH=/run/debateai-social/identity.sock
+LoadCredential=social-providers:/etc/debateai/social/providers.json
+ExecStart=/usr/bin/node /opt/debateai/dialectical-engine/deploy/social/social-relay.mjs
+RuntimeDirectory=debateai-social
+RuntimeDirectoryMode=0750
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/run/debateai-social
+InaccessiblePaths=-/etc/debateai -/var/lib/debateai -/run/postgresql -/var/run/postgresql
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitNOFILE=256
+TasksMax=32
+[Install]
+WantedBy=multi-user.target

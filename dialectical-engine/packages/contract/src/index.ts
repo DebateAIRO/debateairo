@@ -1,3 +1,5 @@
+import { socialAuthContractSchemas } from './social-auth.js';
+export * from './social-auth.js';
 import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
 export * from "./staff-access.js";
 import { z } from "zod";
@@ -474,6 +476,7 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   }).strict()
 ]);
 export const StepUpResponseSchema = z.object({
+  replacement_recovery_code:z.string().min(1).max(1024).optional(),
   status: z.literal("step_up_complete"),
   csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   step_up_grant: StepUpGrantResponseSchema.optional()
@@ -481,6 +484,12 @@ export const StepUpResponseSchema = z.object({
 
 export type StepUpAuthorizationRequest = z.infer<typeof StepUpAuthorizationRequestSchema>;
 export type StepUpResponse = z.infer<typeof StepUpResponseSchema>;
+export const BeginSocialStepUpRequestSchema = z.object({authorization:StepUpAuthorizationRequestSchema,next:z.enum(['/','/settings','/account']).optional()}).strict();
+export const SocialStepUpStatusRequestSchema = z.object({continuation_token:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
+export const SocialStepUpStatusResponseSchema = z.object({authorization:StepUpAuthorizationRequestSchema,expires_at:z.iso.datetime(),available_methods:z.array(z.enum(['passkey','totp','recovery_code']))}).strict();
+export const CompleteSocialStepUpRequestSchema = z.union([SocialStepUpStatusRequestSchema.extend({code:z.string().min(1).max(1024)}).strict(),SocialStepUpStatusRequestSchema.extend({challenge_handle:z.string().regex(/^[A-Za-z0-9_-]{43}$/),credential:ConsumerAuthenticationCredentialSchema}).strict()]);
+export type SocialStepUpStatusResponse = z.infer<typeof SocialStepUpStatusResponseSchema>;
+export type CompleteSocialStepUpRequest = z.infer<typeof CompleteSocialStepUpRequestSchema>;
 export const BeginPasskeyStepUpRequestSchema = z.object({ authorization:StepUpAuthorizationRequestSchema }).strict();
 export const CompletePasskeyStepUpRequestSchema = z.object({ challenge_handle:z.string().regex(/^[A-Za-z0-9_-]{43}$/),credential:ConsumerAuthenticationCredentialSchema }).strict();
 export const AuthMethodsResponseSchema = z.object({ methods:z.array(z.object({ factor_id:z.uuid(),type:z.enum(["passkey","totp"]),label:z.string().nullable(),created_at:z.iso.datetime(),last_used_at:z.iso.datetime().nullable(),removable:z.boolean() }).strict()),recovery_codes_remaining:z.number().int().min(0).max(10) }).strict();
@@ -1151,6 +1160,7 @@ export const contractInventory = Object.freeze({
   ]),
   resources: Object.freeze({
     ...consumerAuthContractSchemas,
+    ...socialAuthContractSchemas,
     ...staffContractInventory.resources,
     ...fundedStaffContractInventory.resources,
     FundingBasisSchema,
@@ -1161,7 +1171,7 @@ export const contractInventory = Object.freeze({
     LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
-    StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema,
+    BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,

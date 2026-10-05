@@ -979,29 +979,26 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       verifyEmail: async () => { calls.push("verify"); return { status: "mfa_required" }; },
       resendVerification: async () => { calls.push("resend"); return RESEND_PUBLIC_RESPONSE; }
     };
-    const api = buildApi({ application: fixtureAskApplication(), registration });
+    const api = buildApi({ application: fixtureAskApplication(), registration, turnstile:passedTurnstile });
     try {
       const register = await api.inject({
         method: "POST", url: "/v1/auth/register",
-        payload: {
-          email: "alice@example.test", password: "password-123",
-          phone: "+40722123456", date_of_birth: "1990-01-01"
-        }
+        payload:canonicalSignup
       });
       const verify = await api.inject({
         method: "POST", url: "/v1/auth/verify-email", payload: { token: "opaque-token" }
       });
       const resend = await api.inject({
-        method: "POST", url: "/v1/auth/resend-verification", payload: { email: "alice@example.test" }
+        method: "POST", url: "/v1/auth/resend-verification", payload:canonicalResend
       });
 
       expect(register.statusCode).toBe(202);
-      expect(register.json()).toEqual(REGISTRATION_PUBLIC_RESPONSE);
+      expect(register.json()).toEqual({...REGISTRATION_PUBLIC_RESPONSE,retry_after_seconds:60});
       expect(register.body).toMatch(/spam/i);
       expect(verify.statusCode).toBe(200);
       expect(verify.json()).toEqual({ status: "mfa_required" });
       expect(resend.statusCode).toBe(202);
-      expect(resend.json()).toEqual(RESEND_PUBLIC_RESPONSE);
+      expect(resend.json()).toEqual({...RESEND_PUBLIC_RESPONSE,retry_after_seconds:60});
       expect(resend.body).toMatch(/spam/i);
       expect(calls).toEqual(["register", "verify", "resend"]);
     } finally {

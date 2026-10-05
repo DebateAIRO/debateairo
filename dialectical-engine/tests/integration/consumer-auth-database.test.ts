@@ -15,6 +15,8 @@ const token = () => b64(randomBytes(32));
 const hash = (value: string) => 'sha256:' + createHash('sha256').update(value).digest('hex');
 const handleHash = (kind: string, value: string) => hash('consumer-passkey:' + kind + '\0' + value);
 const env = { v: 1 as const, keyId: 'fixture', nonce: 'AAAAAAAAAAAAAAAA', tag: 'AAAAAAAAAAAAAAAAAAAAAA==', ct: 'YQ==' };
+const fixturePasswordCost=authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS).password.argon2id;
+const fixturePassword=`$argon2id$v=19$m=${fixturePasswordCost.memoryCostKiB},t=${fixturePasswordCost.timeCost},p=${fixturePasswordCost.parallelism}$${Buffer.alloc(16,1).toString('base64').replace(/=/g,'')}$${Buffer.alloc(fixturePasswordCost.hashLength,1).toString('base64').replace(/=/g,'')}`;
 let risks = 0, sourceSequence = 0;
 function deferred() { let release!: () => void; const promise = new Promise<void>(resolve => { release = resolve; }); return { promise, resolve: () => release() }; }
 beforeAll(async () => {
@@ -32,14 +34,14 @@ beforeAll(async () => {
 async function freshSessions() {
     return SessionService.create({ repository: new PostgresSessionRepository(runtime, audit), riskSignals: { recordForSession: async () => { risks++; return 'recorded'; } } as never, onRiskSignalFailure: () => undefined,
         dekStore: {} as never, argon2: {} as never, authPolicy: authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), mfaPolicy: mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),
-        sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: Buffer.alloc(32, 5), dummyPasswordHash: 'fixture-password' });
+        sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: Buffer.alloc(32, 5), dummyPasswordHash: fixturePassword });
 }
 afterAll(async () => { await runtime?.end(); await database?.stop(); });
 async function account(badLegal = false, missingAdult = false) {
     // Independent synthetic clients keep correctness cases independent of the real shared source gate.
     source.ip = `198.51.${Math.floor(++sourceSequence / 256)}.${sourceSequence % 256}`;
     const userId = randomUUID(), bearer = token(), channelId = randomUUID();
-    const u = (await database.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at,phone_ciphertext,phone_source,phone_verification_status,phone_updated_at) VALUES($1::uuid,$2,'{}',NULL,'fixture-password',$1::text,'pending_mfa',clock_timestamp(),$3,'manual','unverified',clock_timestamp()) RETURNING owner_ref,audit_token`, [userId, randomBytes(32), env])).rows[0];
+    const u = (await database.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at,phone_ciphertext,phone_source,phone_verification_status,phone_updated_at) VALUES($1::uuid,$2,'{}',NULL,$4,$1::text,'pending_mfa',clock_timestamp(),$3,'manual','unverified',clock_timestamp()) RETURNING owner_ref,audit_token`, [userId, randomBytes(32), env,fixturePassword])).rows[0];
     await database.pool.query(`INSERT INTO identity.channel_binding(channel_binding_id,user_id,channel_type,address_ciphertext,state,created_at,verified_at,verification_token_hash,verification_expires_at,verification_consumed_at) VALUES($1,$2,'email','{}','verified',now(),now(),$3,now()+interval '24 hours',now())`, [channelId, userId, hashToken('verification', bearer)]);
     await database.pool.query(`INSERT INTO identity.verification_token_credential VALUES($1,$2,now()-interval '1 second',now()+interval '24 hours',now())`, [hashToken('verification', bearer), channelId]);
     await database.pool.query(`INSERT INTO identity.age_check VALUES($1,'passed',18,'RO','fixture-v1','registration',now())`, [userId]);
@@ -83,7 +85,7 @@ async function addGrant(a: Awaited<ReturnType<typeof enrolled>>, action = 'ADD_P
     const factorId = randomUUID();
     await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at,last_accepted_step) VALUES($1,$2,'totp','{}','active',now(),now(),1)`, [factorId, a.userId]);
     const grant = token(), replacement = token(), csrf = token(), sessionRepo = new PostgresSessionRepository(runtime, audit);
-    const identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: 'fixture-password', factorId, secretCiphertext: env, lastAcceptedStep: 1 };
+    const identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: fixturePassword, factorId, secretCiphertext: env, lastAcceptedStep: 1 };
     expect(await sessionRepo.rotateAfterStepUp({ identity, currentSessionId: authenticated.session.session_id, currentTokenHash: authenticated.tokenHash, acceptedStep: 2, replacementTokenHash: hashToken('session', replacement), replacementCsrfHash: hashToken('csrf', csrf), bindingContext: { user_agent_hash: sessions.consumerProducer().bindingHash(source) }, occurredAt: new Date(), idleExpiresAt: new Date(Date.now() + 1209600000), source,
         grant: { grantId: randomUUID(), grantTokenHash: hashToken('step-up-grant', grant), action: action as 'ADD_PASSKEY', expiresAt: new Date(Date.now() + 300000) } })).toBe(true);
     const session = await sessions.authenticate(replacement, source);
@@ -295,7 +297,7 @@ describe('restricted consumer passkey authority', () => {
     it('binds password continuation to account, source, current password/method, expiry and one-time completion', async () => {
         for (const mutation of ['valid', 'owner', 'binding', 'password', 'method', 'expiry', 'used']) {
             const a = await enrolled(), g = await addGrant(a), continuation = token();
-            const sessionRepo = new PostgresSessionRepository(runtime, audit), identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: 'fixture-password', factorId: g.factorId, secretCiphertext: env, lastAcceptedStep: 2 };
+            const sessionRepo = new PostgresSessionRepository(runtime, audit), identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: fixturePassword, factorId: g.factorId, secretCiphertext: env, lastAcceptedStep: 2 };
             expect(await sessionRepo.createLoginChallenge({ identity, challengeId: randomUUID(), challengeTokenHash: hashToken('login-challenge', continuation), bindingHash: sessions.consumerProducer().bindingHash(source), occurredAt: new Date(), expiresAt: new Date(Date.now() + 300000), source })).toBe(true);
             if (mutation === 'binding') {
                 await expect(service.beginPasskeyLogin({ continuation_token: continuation }, { ...source, userAgent: 'other' })).rejects.toThrow();
@@ -519,7 +521,7 @@ describe('retained ceremony bounds and transaction order', () => {
     });
     it('bounds one password continuation fan-out by the same account/purpose policy', async () => {
         const a = await enrolled(), g = await addGrant(a), continuation = token();
-        const identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: 'fixture-password', factorId: g.factorId, secretCiphertext: env, lastAcceptedStep: 2 };
+        const identity = { userId: a.userId, ownerRef: a.ownerRef, auditToken: a.auditToken, passwordHash: fixturePassword, factorId: g.factorId, secretCiphertext: env, lastAcceptedStep: 2 };
         expect(await new PostgresSessionRepository(runtime, audit).createLoginChallenge({ identity, challengeId: randomUUID(), challengeTokenHash: hashToken('login-challenge', continuation), bindingHash: sessions.consumerProducer().bindingHash(source), occurredAt: new Date(), expiresAt: new Date(Date.now() + 300000), source })).toBe(true);
         for (let i = 0; i < 7; i++)
             await new ConsumerWebAuthnService(repo, (await freshSessions()).consumerProducer(), { publicAppUrl: origin }).beginPasskeyLogin({ continuation_token: continuation }, source);
@@ -742,7 +744,7 @@ it('checks the verified TOTP bearer deadline after waiting for a factor lock',as
     await blocker.query('BEGIN');blockerOpen=true;await blocker.query('SELECT 1 FROM identity.mfa_factor WHERE mfa_factor_id=$1 FOR UPDATE',[e.factorId]);
     const facade={connect:async()=>({query:client.query.bind(client),release:()=>{}})} as unknown as Pool;
     const pid=(await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
-    const operation=new PostgresConsumerAuthRepository(facade,audit).completeTotpEnrollment({...lookup,userId:e.userId,factorId:e.factorId,secretCiphertext:e.secretCiphertext,acceptedStep:Math.floor(Date.now()/30000),material:{sessionId:material.sessionId,sessionTokenHash:material.sessionTokenHash,csrfTokenHash:material.csrfTokenHash,sessionBindingContext:material.sessionBindingContext,idleExpiresAt:material.idleExpiresAt,absoluteExpiresAt:material.absoluteExpiresAt}},legal,source);
+    const operation=new PostgresConsumerAuthRepository(facade,audit).completeTotpEnrollment({...lookup,passwordHashSnapshot:e.passwordHash,passwordUsable:sessions.consumerProducer().passwordUsable?.(e.passwordHash)??false,userId:e.userId,factorId:e.factorId,secretCiphertext:e.secretCiphertext,acceptedStep:Math.floor(Date.now()/30000),material:{sessionId:material.sessionId,sessionTokenHash:material.sessionTokenHash,csrfTokenHash:material.csrfTokenHash,sessionBindingContext:material.sessionBindingContext,idleExpiresAt:material.idleExpiresAt,absoluteExpiresAt:material.absoluteExpiresAt}},legal,source);
     const denial=expect(operation).rejects.toThrow('CONSUMER_AUTH_INVALID');await pending(pid);await new Promise(r=>setTimeout(r,300));await blocker.query('ROLLBACK');blockerOpen=false;await denial;
     expect(await state(a)).toEqual({state:'pending_mfa',credentials:0,sessions:0});
   } finally {if(blockerOpen)await blocker.query('ROLLBACK');blocker.release();client.release();}

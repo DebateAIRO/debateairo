@@ -17,13 +17,17 @@ export interface LoginIdentityRecord {
   readonly lastAcceptedStep: number | null;
 }
 
-export interface LoginContinuationIdentity extends Omit<LoginIdentityRecord,"factorId"|"secretCiphertext"> {
+export interface LoginContinuationIdentity extends Omit<LoginIdentityRecord,"factorId"|"secretCiphertext"|"passwordHash"> {
   readonly factorId: string|null;
   readonly secretCiphertext: CryptoEnvelope|null;
+  readonly passwordHash:string|null;
   readonly availableMethods?: readonly ("passkey"|"totp"|"recovery_code")[];
 }
 
 export interface LoginChallengeRecord extends LoginContinuationIdentity {
+  readonly firstStep?:"PASSWORD"|"PROVIDER";
+  readonly socialConfiguration?:string;
+  readonly socialCookieHash?:string;
   readonly challengeId: string;
   readonly challengeTokenHash: string;
   readonly bindingHash: string;
@@ -245,12 +249,23 @@ export class PostgresSessionRepository {
     idleExpiresAt: Date;
     absoluteExpiresAt: Date;
     source: AuthSourceContext;
+    admittedProviders?:readonly string[];
+    browserHash?:string;
+    recoveryCodeHash?:string;
   }>): Promise<boolean> {
     assertCredentialHash(input.bindingHash);
     assertCredentialHash(input.sessionTokenHash);
     assertCredentialHash(input.csrfTokenHash);
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      if(input.challenge.firstStep==='PROVIDER') {
+        const p={userId:input.challenge.userId,ownerRef:input.challenge.ownerRef,passwordHash:input.challenge.passwordHash,
+          challengeId:input.challenge.challengeId,challengeHash:input.challenge.challengeTokenHash,factorId:input.challenge.factorId,secretCiphertext:input.challenge.secretCiphertext,
+          bindingHash:input.bindingHash,browserHash:input.browserHash,admittedProviders:input.admittedProviders,
+          material:{sessionId:input.sessionId,sessionTokenHash:input.sessionTokenHash,csrfTokenHash:input.csrfTokenHash,sessionBindingContext:input.sessionBindingContext,idleExpiresAt:input.idleExpiresAt,absoluteExpiresAt:input.absoluteExpiresAt},
+          acceptedStep:input.acceptedStep};
+        return (await client.query('SELECT identity.complete_social_login($1,$2) valid',[p,{ipArgon2id:prepared.ipArgon2id,userAgentArgon2id:prepared.userAgentArgon2id}])).rows[0]?.valid===true;
+      }
       const result = await client.query<{ valid: boolean }>(`
         SELECT identity.complete_totp_login_with_audit(
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15,$16::jsonb
@@ -305,9 +320,20 @@ export class PostgresSessionRepository {
     idleExpiresAt: Date;
     absoluteExpiresAt: Date;
     source: AuthSourceContext;
+    admittedProviders?:readonly string[];
+    browserHash?:string;
+    recoveryCodeHash?:string;
   }>): Promise<boolean> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      if(input.challenge.firstStep==='PROVIDER') {
+        const p={userId:input.challenge.userId,ownerRef:input.challenge.ownerRef,passwordHash:input.challenge.passwordHash,
+          challengeId:input.challenge.challengeId,challengeHash:input.challenge.challengeTokenHash,factorId:input.challenge.factorId,secretCiphertext:input.challenge.secretCiphertext,
+          bindingHash:input.bindingHash,browserHash:input.browserHash,admittedProviders:input.admittedProviders,
+          material:{sessionId:input.sessionId,sessionTokenHash:input.sessionTokenHash,csrfTokenHash:input.csrfTokenHash,sessionBindingContext:input.sessionBindingContext,idleExpiresAt:input.idleExpiresAt,absoluteExpiresAt:input.absoluteExpiresAt},
+          recoveryCodeId:input.recoveryCodeId,recoveryCodeHash:input.recoveryCodeHash,replacementHash:input.replacementHash};
+        return (await client.query('SELECT identity.complete_social_login($1,$2) valid',[p,{ipArgon2id:prepared.ipArgon2id,userAgentArgon2id:prepared.userAgentArgon2id}])).rows[0]?.valid===true;
+      }
       const result = await client.query<{ valid: boolean }>(`
         SELECT identity.complete_recovery_login_with_audit(
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17::jsonb

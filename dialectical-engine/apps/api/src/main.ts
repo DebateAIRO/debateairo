@@ -1,3 +1,7 @@
+import { SocialStepUpService } from './social-step-up.js';
+import { SocialAuthService } from './social-auth.js';
+import { SocialProviders, UnixSocialTransport, socialConfigurations } from './social-providers/provider.js';
+import { PostgresSocialIdentityRepository } from '@debateai/db';
 import {ConsumerRecoveryService} from "./consumer-recovery.js";
 import {OnboardingEvidenceService} from "./onboarding-evidence.js";
 import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
@@ -592,8 +596,11 @@ const runKeyStore = boot.runSync("run-content-key-store", () =>
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   configureContentEncryption(pool, new ContentCipher(runKeyStore));
 }
+const socialProviders = (()=>{try{return new SocialProviders(socialConfigurations(environment.SOCIAL_PROVIDERS_JSON,environment.PUBLIC_APP_URL),environment.SOCIAL_SOCKET_PATH===undefined?undefined:new UnixSocialTransport(environment.SOCIAL_SOCKET_PATH));}catch{console.error('[SOCIAL_CONFIGURATION_INVALID]');return new SocialProviders([]);}})();
+const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,auditContextHasher);
 const registration = new RegistrationService({
   repository: identityRepository,
+  socialRepository,
   mail: new SendmailMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
@@ -633,8 +640,10 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   authPolicy,
   mfaPolicy,
   sessionPolicy,
+  socialProviderBindings:async()=>(await socialProviders.available()).map(p=>p.configuration),
   blindIndexKey
 }));
+const socialAuth = new SocialAuthService(socialRepository,socialProviders,sessions.consumerProducer(),{registration,security:new PostgresConsumerSecurityRepository(authorizationPool,auditContextHasher),authPolicy,blindIndexKey});
 const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL});
 const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy,authPolicy,policy:consumerRecoveryPolicy,blindIndexKey,mail:consumerAccountMail,onMailFailure:()=>console.error('[CONSUMER_RECOVERY_MAIL_FAILED]')});
 const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
@@ -1045,6 +1054,8 @@ const api = buildApi({
   disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pool)),
   accountErasure:erasureApplication,
   registration,
+  socialAuth,
+  socialStepUp:new SocialStepUpService(socialRepository,socialProviders,sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy}),
   turnstile: new UnixTurnstileVerifier({ publicAppUrl: environment.PUBLIC_APP_URL, ...(environment.TURNSTILE_SOCKET_PATH === undefined ? {} : { socketPath: environment.TURNSTILE_SOCKET_PATH }) }),
   recovery,
   consumerRecovery,

@@ -1,3 +1,5 @@
+import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows } from '@debateai/register';
+import { consumerPasswordUsable } from '../../apps/api/src/consumer-security.js';
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -229,16 +231,17 @@ describe("S4 MFA enrolment service", () => {
       }
     };
     const argon2=fakeArgon2();
+    const fixtureAuthPolicy=authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS),fixturePassword=await hashPassword(argon2,"Fixture password 123!",fixtureAuthPolicy.password.argon2id);
     let committed=0;
     const service = new MfaEnrollmentService({
       repository: repository as never,
       consumerRepository: {
         prepareTotpEnrollment: async()=>({userId,pseudonym,expiresAt:new Date(now.getTime()+300000).toISOString()}),
         beginTotpEnrollment: async(input)=>{await repository.beginTotpEnrollment(input);return {expiresAt:new Date(now.getTime()+300000).toISOString()};},
-        readTotpEnrollment: async()=>factor?.state!=="pending"?null:{userId,pseudonym,factorId:factor.factorId,secretCiphertext:factor.secretCiphertext,lastAcceptedStep:factor.lastAcceptedStep,purpose:"INITIAL_ENROLLMENT",expiresAt:new Date(now.getTime()+300000).toISOString()},
+        readTotpEnrollment: async()=>factor?.state!=="pending"?null:{passwordHash:fixturePassword,userId,pseudonym,factorId:factor.factorId,secretCiphertext:factor.secretCiphertext,lastAcceptedStep:factor.lastAcceptedStep,purpose:"INITIAL_ENROLLMENT",expiresAt:new Date(now.getTime()+300000).toISOString()},
         completeTotpEnrollment: async(input)=>{factor!.state="active";factor!.lastAcceptedStep=input.acceptedStep;accountState="active";return {userId,ownerRef:userId,sessionId:input.material!.sessionId};}
       },
-      sessions:{ admit:async()=>({retentionKey:"sha256:"+"a".repeat(64),challengeCapacity:8192,challengesPerScope:5}),bindingHash:()=>"sha256:"+"b".repeat(64),
+      sessions:{ passwordUsable:(value)=>consumerPasswordUsable(value,fixtureAuthPolicy),admit:async()=>({retentionKey:"sha256:"+"a".repeat(64),challengeCapacity:8192,challengesPerScope:5}),bindingHash:()=>"sha256:"+"b".repeat(64),
         prepare:()=>({sessionId:userId,sessionToken:"s".repeat(43),csrfToken:"c".repeat(43),sessionTokenHash:"sha256:"+"a".repeat(64),csrfTokenHash:"sha256:"+"c".repeat(64),bindingHash:"sha256:"+"b".repeat(64),sessionBindingContext:{user_agent_hash:"sha256:"+"b".repeat(64)},occurredAt:now,idleExpiresAt:new Date(now.getTime()+1209600000),absoluteExpiresAt:new Date(now.getTime()+2592000000)}),
         committed:async(material)=>{expect(accountState).toBe("active");committed++;return {status:"authenticated",sessionToken:material.sessionToken,csrfToken:material.csrfToken,session:{asker_id:`owner:${userId}`,session_id:userId,caller_scope:"ASKER",ownership_provenance:"server_session",provisional_identity_model:false}};}
       },

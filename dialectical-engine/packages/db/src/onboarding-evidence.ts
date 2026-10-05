@@ -6,6 +6,7 @@ import type { SignUpAcceptanceRow } from './legal-acceptance.js';
 import { ProfileTransactions } from './account-profile.js';
 export type OnboardingAuthority = Readonly<{
     kind: 'PENDING' | 'RECOVERY';
+    socialEnrollmentHash?:string;browserHash?:string;bindingHash?:string;admittedProviders?:readonly string[];
     proofHash: string;
     minAge: 18;
     ruleVersion: string;

@@ -1,7 +1,8 @@
 import { normalizeMailDisplay as normalizeAccountMailDisplay } from "./account-mail-template.mjs";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
-import type { PostgresIdentityRepository, AuthSourceContext } from "@debateai/db";
+import { socialHash } from "./social-providers/hashes.js";
+import type { PostgresSocialIdentityRepository, SocialSignupAuthority, PostgresIdentityRepository, AuthSourceContext } from "@debateai/db";
 import type { AuthPolicy, AuthRouteLimit } from "@debateai/register";
 import {
   Argon2InfrastructureError,
@@ -14,6 +15,7 @@ import {
   hashPassword,
   hashToken,
   normalizeEmailForBlindIndex,
+  parseEncodedArgon2id,
   type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
@@ -55,10 +57,14 @@ export type VerificationMailSource = AuthSourceContext & Readonly<{
 }>;
 export type RegistrationSource = VerificationMailSource & Readonly<{ legal?: RegisterLegalDocuments }>;
 
+export type SocialRegisterInput = Omit<RegisterInput, "password" | "recoveryEmail">;
+export type SocialRegistrationResult = typeof REGISTRATION_PUBLIC_RESPONSE | Readonly<{status:"mfa_required";enrollment_token:string;expires_at:string}>;
+
 declare const sourceAdmissionBrand: unique symbol;
 export type AuthSourceAdmission = Readonly<{ [sourceAdmissionBrand]: true; release(): void }>;
 export type AuthSourceAdmissionRequest =
   | Readonly<{ route: "register"; input: RegisterInput; source: RegistrationSource }>
+  | Readonly<{ route: "social"; input: SocialRegisterInput; source: RegistrationSource }>
   | Readonly<{ route: "resend"; input: Readonly<{ email: string }>; source: VerificationMailSource }>;
 interface SourceAdmissionGrant {
   readonly route: "register" | "resend";
@@ -115,6 +121,10 @@ export function storedArgon2EnvelopeNotOverPolicy(
   return false;
 }
 
+/** Match the existing worker encoding admission AND its selected per-use cost ceiling. */
+export function consumerPasswordUsable(value: string | null, policy: AuthPolicy): boolean {
+    return value !== null && parseEncodedArgon2id(value) !== undefined && storedArgon2EnvelopeNotOverPolicy(value, policy.password.argon2id, 'password');
+}
 export class AuthFlowError extends Error {
   constructor(readonly code:
     | "AUTH_INPUT_INVALID"
@@ -125,6 +135,7 @@ export class AuthFlowError extends Error {
     | "AUTH_CREDENTIALS_INVALID"
     | "VERIFICATION_TOKEN_INVALID"
     | "MFA_ENROLLMENT_INVALID"
+    | "MFA_FIRST_STEP_UNAVAILABLE"
     | "MFA_ENROLLMENT_STATE_INVALID"
     | "MFA_TOTP_INVALID"
     | "MFA_TOTP_REPLAYED"
@@ -140,7 +151,7 @@ export class AuthFlowError extends Error {
   get statusCode(): 400 | 401 | 409 | 429 | 503 {
     return this.code === "AUTH_CREDENTIALS_INVALID" ? 401
       : this.code === "AUTH_RATE_LIMITED" || this.code === "MFA_RATE_LIMITED" ? 429
-      : this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
+      : this.code === "MFA_FIRST_STEP_UNAVAILABLE" || this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
         || this.code === "LEGAL_DOCUMENT_STALE" ? 409
       : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY"
         || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" ? 503 : 400;
@@ -479,7 +490,8 @@ interface PendingRegistration {
   readonly recoveryEmail: string | null;
   readonly phone: string;
   readonly emailBlindIndex: Buffer;
-  readonly passwordHash: string;
+  readonly passwordHash: string | null;
+  readonly social?: SocialSignupAuthority;
   readonly requestedAt: Date;
   readonly countryCode: string | null;
   readonly documents: SignUpDocuments | null;
@@ -512,7 +524,7 @@ interface DuplicateRegistrationPostwork {
   readonly source: AuthSourceContext;
 }
 
-type RegistrationPostwork = VerificationDeliveryPostwork | DuplicateRegistrationPostwork;
+type RegistrationPostwork = VerificationDeliveryPostwork | DuplicateRegistrationPostwork | Readonly<{kind:"social_collision"}> | Readonly<{kind:"social_enrollment";token:string;expiresAt:Date}>;
 export type RecoveryMailWork = () => Promise<void>;
 export interface RecoveryMailDispatchPort {
   dispatchRecoveryMail(prepare:()=>Promise<RecoveryMailWork|null>):Promise<void>;
@@ -666,15 +678,15 @@ export class RegistrationService implements RegistrationApplication {
   private readonly refusalAuditRoutes = new Map<AuthRoute, RefusalAuditCoordinator>();
   private readonly sourceAdmissions = new WeakMap<AuthSourceAdmission, SourceAdmissionGrant>();
 
-  private validateRegistration(input: RegisterInput, rawSource: RegistrationSource) {
+  private validateRegistration(input: RegisterInput | SocialRegisterInput, rawSource: RegistrationSource, social = false) {
     const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
-    if (!validEmail(input.email) || (input.recoveryEmail != null && !validEmail(input.recoveryEmail))
-      || typeof input.password !== "string"
+    if (!validEmail(input.email) || ("recoveryEmail" in input && input.recoveryEmail != null && !validEmail(input.recoveryEmail))
+      || (!social && (!("password" in input) || typeof input.password !== "string"
       || input.password.length < this.dependencies.policy.password.minimumLength
       // V-14: the ruled maximum, in the same unit as the minimum. The route
       // keeps its own 1024-byte request-shape bound ahead of this; a
       // register version that publishes no maximum leaves that bound alone.
-      || (maximumPasswordLength !== null && input.password.length > maximumPasswordLength)
+      || (maximumPasswordLength !== null && input.password.length > maximumPasswordLength)))
       || input.adultAffirmed !== true) {
       throw new AuthFlowError("AUTH_INPUT_INVALID");
     }
@@ -701,10 +713,11 @@ export class RegistrationService implements RegistrationApplication {
     let releaseStructural: (() => void) | undefined;
     let refusalClamped = false;
     try {
-      const { route, input, source: rawSource } = request;
+      const { input, source: rawSource } = request;
+      const route = request.route === "social" ? "register" : request.route;
       let source: VerificationMailSource;
-      if (request.route === "register") {
-        source = this.validateRegistration(request.input, request.source).source;
+      if (request.route !== "resend") {
+        source = this.validateRegistration(request.input, request.source, request.route === "social").source;
         // The existing 103-registration slot spans proof, provisioning, clamp and handoff: no async stage before it.
         releaseStructural = this.acquireRegistrationAdmission(randomUUID());
       } else {
@@ -726,7 +739,7 @@ export class RegistrationService implements RegistrationApplication {
     } catch (error) {
       try {
         if (!refusalClamped) {
-          if (request.route === "register") await this.holdRegistrationEnumerationClamp(startedAt);
+          if (request.route !== "resend") await this.holdRegistrationEnumerationClamp(startedAt);
           else await this.holdEnumerationFloor(startedAt);
         }
       } finally { releaseStructural?.(); }
@@ -749,6 +762,7 @@ export class RegistrationService implements RegistrationApplication {
 
   constructor(private readonly dependencies: {
     readonly repository: IdentityRepository;
+    readonly socialRepository?: Pick<PostgresSocialIdentityRepository,"createAccount">;
     readonly mail: MailSender;
     readonly dekStore: UserDekStore;
     readonly blindIndexKey: Uint8Array;
@@ -1354,6 +1368,7 @@ export class RegistrationService implements RegistrationApplication {
     input: RegistrationPostwork | VerificationDelivery,
     releaseReservation: MailDispatchRelease
   ): void {
+    if ("kind" in input && (input.kind === "social_enrollment" || input.kind === "social_collision")) { this.dispatchMailReservationHold(releaseReservation, true); return; }
     const duplicate = "kind" in input && input.kind === "duplicate" ? input : undefined;
     let delivery: VerificationDelivery | undefined = duplicate === undefined
       ? input as VerificationDelivery
@@ -1492,14 +1507,14 @@ export class RegistrationService implements RegistrationApplication {
             documents: input.documents,
             source: input.source
           });
-        const created = await this.dependencies.repository.createPendingAccount({
+        const accountInput = {
           userId,
           emailBlindIndex: input.emailBlindIndex,
           emailCiphertext,
           recoveryEmailCiphertext,
           phoneCiphertext,
-          phoneSource: "manual",
-          phoneVerificationStatus: "unverified",
+          phoneSource: "manual" as const,
+          phoneVerificationStatus: "unverified" as const,
           phoneUpdatedAt: input.requestedAt,
           passwordHash: input.passwordHash,
           pseudonym,
@@ -1515,7 +1530,12 @@ export class RegistrationService implements RegistrationApplication {
           occurredAt: input.requestedAt,
           source: input.source,
           ...(acceptances === undefined ? {} : { acceptances })
-        }, () => this.dependencies.dekStore.store(userId, dek));
+        };
+        const created = input.social === undefined
+          ? await this.dependencies.repository.createPendingAccount({...accountInput,passwordHash:input.passwordHash!}, () => this.dependencies.dekStore.store(userId,dek))
+          : await this.dependencies.socialRepository!.createAccount({...accountInput,...input.social,socialEnrollmentHash:socialHash('enrollment',token)}, () => this.dependencies.dekStore.store(userId,dek));
+        if(created.status==='collision') return {kind:'social_collision'};
+        if(created.status==='enrollment') return {kind:'social_enrollment',token,expiresAt:created.verificationExpiresAt};
         if (created.status === "pseudonym_collision") continue;
         if (created.status === "email_duplicate") {
           return Object.freeze({
@@ -1597,6 +1617,15 @@ export class RegistrationService implements RegistrationApplication {
   }
 
   async register(input: RegisterInput, rawSource: RegistrationSource, admission?: AuthSourceAdmission): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
+    const result = await this.registerFlow(input,rawSource,admission);
+    if(!('message' in result)) throw new AuthFlowError('AUTH_REGISTRATION_FAILED');
+    return result;
+  }
+  async registerSocial(input:SocialRegisterInput,source:RegistrationSource,authority:SocialSignupAuthority,admission:AuthSourceAdmission):Promise<SocialRegistrationResult> {
+    if(!this.dependencies.socialRepository || !this.dependencies.legalAcceptance) throw new AuthFlowError('AUTH_TEMPORARILY_UNAVAILABLE');
+    return this.registerFlow(input,source,admission,authority);
+  }
+  private async registerFlow(input: RegisterInput | SocialRegisterInput, rawSource: RegistrationSource, admission?: AuthSourceAdmission,social?:SocialSignupAuthority): Promise<SocialRegistrationResult> {
     const requestedAt = new Date(this.clock().getTime());
     const startedAt = performance.now();
     const correlationId = randomUUID();
@@ -1610,7 +1639,7 @@ export class RegistrationService implements RegistrationApplication {
       const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
       releaseAdmission = granted?.releaseStructural;
       try {
-        const { phone, countryCode, documents, source } = this.validateRegistration(input, rawSource);
+        const { phone, countryCode, documents, source } = this.validateRegistration(input, rawSource, social !== undefined);
         if (admission !== undefined) this.assertSourceAdmission("register", source, granted);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
@@ -1620,7 +1649,7 @@ export class RegistrationService implements RegistrationApplication {
         // at all — it only pays the response clamp, like every other arm.
         if (admission === undefined) releaseAdmission = this.acquireRegistrationAdmission(correlationId);
         const email = normalizeEmailForBlindIndex(input.email);
-        const recoveryEmail = input.recoveryEmail == null ? null : normalizeEmailForBlindIndex(input.recoveryEmail);
+        const recoveryEmail = !("recoveryEmail" in input) || input.recoveryEmail == null ? null : normalizeEmailForBlindIndex(input.recoveryEmail);
         const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
         // This lookup exists only to preserve the stable address limiter key.
         // Its account audit token never enters a refusal row: that event is a
@@ -1642,8 +1671,9 @@ export class RegistrationService implements RegistrationApplication {
           });
         }
 
-        const passwordHashWork = this.scheduleRegistrationHash(input.password);
-        let passwordHash: string;
+        let passwordHash: string | null = null;
+        if(social === undefined) {
+        const passwordHashWork = this.scheduleRegistrationHash((input as RegisterInput).password);
         try {
           passwordHash = await passwordHashWork.promise;
         } catch (error) {
@@ -1657,6 +1687,7 @@ export class RegistrationService implements RegistrationApplication {
           // any mail capacity for a registration that has no completed hash.
           await passwordHashWork.settlement;
           throw error;
+        }
         }
         // Hash first: there is no live positive Argon2+provisioning bound that
         // fits the 600 ms pre-transport budget. Once hashing is complete, bind
@@ -1676,7 +1707,7 @@ export class RegistrationService implements RegistrationApplication {
         mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-            email, recoveryEmail, phone, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents
+            email, recoveryEmail, phone, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents, ...(social===undefined?{}:{social})
           }));
           const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
           if (preTransportWorkMs
@@ -1707,7 +1738,7 @@ export class RegistrationService implements RegistrationApplication {
             ? new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE", { cause: provisionError })
             : new AuthFlowError("AUTH_REGISTRATION_FAILED");
         }
-        return REGISTRATION_PUBLIC_RESPONSE;
+        return pendingPostwork?.kind === "social_enrollment" ? {status:"mfa_required",enrollment_token:pendingPostwork.token,expires_at:pendingPostwork.expiresAt.toISOString()} : REGISTRATION_PUBLIC_RESPONSE;
       } catch (error) {
         // Password-hash and mail-reservation failures reach here; every Argon2
         // pool failure among them leaves as the one constant 503 envelope.

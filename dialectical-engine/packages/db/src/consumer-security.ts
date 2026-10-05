@@ -6,6 +6,7 @@ import type { ConsumerCeremonySeed, ConsumerCredential } from './consumer-auth.j
 export type ConsumerPasswordPath = Readonly<{
     passwordHashSnapshot: string | null;
     passwordUsable: boolean;
+    admittedProviders?:readonly string[];
 }>;
 export type ConsumerSecurityAssertion = Omit<ConsumerCredential, 'ownerRef' | 'passwordHash'> & Readonly<{
     authorization: Readonly<Record<string, string>>;

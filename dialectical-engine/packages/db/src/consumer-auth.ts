@@ -24,7 +24,7 @@ export type ConsumerCredential = Readonly<{
     userHandle: string;
     userId: string;
     ownerRef: string;
-    passwordHash: string;
+    passwordHash: string|null;
     securityEpoch: number;
 }>;
 export type ConsumerSessionCommit = Readonly<{
@@ -44,6 +44,7 @@ export type ConsumerSessionPersistence = Readonly<{
 }>;
 export type ConsumerCeremonySeed = Readonly<{
     retentionKey: string;
+    socialEnrollmentHash?:string;browserHash?:string;admittedProviders?:readonly string[];
     challengeCapacity: number;
     challengesPerScope: number;
     handleHash: string;
@@ -54,6 +55,7 @@ export type ConsumerCeremonySeed = Readonly<{
 }>;
 export type ConsumerEnrollmentAuthority = Readonly<{
     enrollmentTokenHash: string;
+    socialEnrollmentHash?:string;browserHash?:string;admittedProviders?:readonly string[];
 }> | Readonly<{
     userId: string;
     sessionId: string;
@@ -85,20 +87,22 @@ export type ConsumerEnrollmentCompletion = ConsumerVerifiedRegistration & Readon
     handleHash: string;
     challengeHash: string;
     bindingHash: string;
+    browserHash?:string;admittedProviders?:readonly string[];
     label?: string;
     sessionId?: string;
     tokenHash?: string;
     material?: ConsumerSessionPersistence;
 }>;
 export type ConsumerLoginCompletion = ConsumerCredential & Readonly<{
+    browserHash?:string;admittedProviders?:readonly string[];
     handleHash: string;
     challengeHash: string;
     bindingHash: string;
     material: ConsumerSessionPersistence;
 }>;
-export type TotpEnrollmentAuthority = Readonly<{ enrollmentTokenHash: string }> | Readonly<{ userId: string; sessionId: string; tokenHash: string; grantHash: string }>;
-export type SecureTotpEnrollment = Readonly<{ userId:string; pseudonym:string; factorId:string; secretCiphertext:CryptoEnvelope; lastAcceptedStep:number|null; purpose:'INITIAL_ENROLLMENT'|'ADD_TOTP'; expiresAt:string }>;
-export type TotpEnrollmentLookup = Readonly<{ enrollmentTokenHash:string; additionHandleHash:string; bindingHash:string; sessionId?:string; tokenHash?:string }>;
+export type TotpEnrollmentAuthority = Readonly<{ enrollmentTokenHash: string;socialEnrollmentHash?:string;browserHash?:string;bindingHash?:string;admittedProviders?:readonly string[] }> | Readonly<{ userId: string; sessionId: string; tokenHash: string; grantHash: string }>;
+export type SecureTotpEnrollment = Readonly<{ passwordHash:string|null;userId:string; pseudonym:string; factorId:string; secretCiphertext:CryptoEnvelope; lastAcceptedStep:number|null; purpose:'INITIAL_ENROLLMENT'|'ADD_TOTP'; expiresAt:string }>;
+export type TotpEnrollmentLookup = Readonly<{ enrollmentTokenHash:string;socialEnrollmentHash?:string;browserHash?:string;admittedProviders?:readonly string[]; additionHandleHash:string; bindingHash:string; sessionId?:string; tokenHash?:string }>;
 /** Execute-only authority. Cleanup commits first; audit reduction holds no connection and precedes its owning transaction/locks. */
 export class PostgresConsumerAuthRepository {
     constructor(private readonly pool: Pool, private readonly auditContext: AuditContextHasher) { }
@@ -141,7 +145,7 @@ export class PostgresConsumerAuthRepository {
         const result=await this.pool.query('SELECT identity.read_secure_totp_enrollment($1) AS value',[input]);
         return result.rows[0]!.value;
     }
-    async completeTotpEnrollment(input:TotpEnrollmentLookup & Readonly<{userId:string;factorId:string;secretCiphertext:CryptoEnvelope;acceptedStep:number;material?:ConsumerSessionPersistence}>,currentLegal:readonly ConsumerLegalPair[],source:AuthSourceContext):Promise<ConsumerSessionCommit> {
+    async completeTotpEnrollment(input:TotpEnrollmentLookup & Readonly<{userId:string;factorId:string;secretCiphertext:CryptoEnvelope;acceptedStep:number;passwordHashSnapshot?:string|null;passwordUsable?:boolean;material?:ConsumerSessionPersistence}>,currentLegal:readonly ConsumerLegalPair[],source:AuthSourceContext):Promise<ConsumerSessionCommit> {
         return this.audited(source,async(client,prepared)=>{
             const result=await client.query('SELECT identity.complete_secure_totp_enrollment($1,$2,$3) AS value',[input,JSON.stringify(currentLegal),prepared]);
             return result.rows[0]!.value;

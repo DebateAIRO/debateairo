@@ -28,7 +28,7 @@ import {
   type ReadableUserDekStore,
   type TokenKind
 } from "@debateai/crypto";
-import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
+import { AuthFlowError, consumerPasswordUsable, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
 import { MfaVerificationLimiter } from "./mfa.js";
 
 import { staffTokenHash } from "./staff/access.js";
@@ -69,7 +69,7 @@ export interface ConsumerSessionMaterial {
   readonly sessionBindingContext:Readonly<{user_agent_hash:string}>; readonly occurredAt:Date;
   readonly idleExpiresAt:Date; readonly absoluteExpiresAt:Date;
 }
-export type ConsumerCeremonyOperation = 'ENROLLMENT_BEGIN' | 'ENROLLMENT_COMPLETE' | 'LOGIN_BEGIN' | 'LOGIN_COMPLETE' | 'STEP_UP_BEGIN' | 'STEP_UP_COMPLETE' | 'SECURITY_CODES' | 'RECOVERY_PROVE' | 'RECOVERY_BEGIN' | 'RECOVERY_COMPLETE' | 'ONBOARDING_STATUS' | 'ONBOARDING_COMPLETE';
+export type ConsumerCeremonyOperation = 'ENROLLMENT_BEGIN' | 'ENROLLMENT_COMPLETE' | 'LOGIN_BEGIN' | 'LOGIN_COMPLETE' | 'STEP_UP_BEGIN' | 'STEP_UP_COMPLETE' | 'SECURITY_CODES' | 'RECOVERY_PROVE' | 'RECOVERY_BEGIN' | 'RECOVERY_COMPLETE' | 'ONBOARDING_STATUS' | 'ONBOARDING_COMPLETE' | 'SOCIAL_BEGIN' | 'SOCIAL_CALLBACK' | 'SOCIAL_SIGNUP';
 export interface ConsumerCeremonyAdmission {
   readonly retentionKey:string;
   readonly challengeCapacity:number;
@@ -78,6 +78,8 @@ export interface ConsumerCeremonyAdmission {
 export interface ConsumerSessionProducer {
   admit(operation:ConsumerCeremonyOperation,scope:string,source:AuthSourceContext):Promise<ConsumerCeremonyAdmission>;
   bindingHash(source:AuthSourceContext):string;
+  socialBindings?():Promise<readonly string[]>;
+  passwordUsable?(hash:string|null):boolean;
   prepare(source:AuthSourceContext):ConsumerSessionMaterial;
   committed(material:ConsumerSessionMaterial, identity:Readonly<{userId:string;ownerRef:string}>, source:AuthSourceContext):Promise<LoginResult>;
 }
@@ -233,6 +235,7 @@ export class SessionService implements SessionApplication {
     mfaPolicy: MfaPolicy;
     sessionPolicy: SessionPolicy;
     blindIndexKey: Uint8Array;
+    socialProviderBindings?: () => Promise<readonly string[]>;
     sessionBindingKey: Buffer;
     loginRateKey: Buffer;
     dummyPasswordHash: string;
@@ -252,6 +255,7 @@ export class SessionService implements SessionApplication {
     mfaPolicy: MfaPolicy;
     sessionPolicy: SessionPolicy;
     blindIndexKey: Uint8Array;
+    socialProviderBindings?: () => Promise<readonly string[]>;
     bindingKey?: Uint8Array;
     dummyPasswordHash?: string;
     clock?: () => Date;
@@ -397,7 +401,7 @@ export class SessionService implements SessionApplication {
         envelopeAdmitted ? passwordHash : this.dependencies.dummyPasswordHash,
         input.password
       ) && envelopeAdmitted;
-      if (!verified || identity === null) {
+      if (!verified || identity === null || identity.passwordHash === null) {
         await this.dependencies.repository.recordLoginFailure({
           ...(identity === null ? {} : { actorToken: identity.auditToken }),
           occurredAt: now, source, reason: "AUTH_CREDENTIALS_INVALID"
@@ -454,6 +458,8 @@ export class SessionService implements SessionApplication {
           challengesPerScope:this.dependencies.mfaPolicy.verificationLimits.perEnrollment});
       },
       bindingHash:(source:AuthSourceContext)=>this.bindingHash(source),
+      passwordUsable:(hash:string|null)=>consumerPasswordUsable(hash,this.dependencies.authPolicy),
+      socialBindings:()=>this.dependencies.socialProviderBindings?.() ?? Promise.resolve([]),
       prepare:(source:AuthSourceContext)=>{
         const now=this.now(), bindingHash=this.bindingHash(source);
         const material=this.sessionMaterial(now);
@@ -516,6 +522,9 @@ export class SessionService implements SessionApplication {
         });
         throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       }
+      const admittedProviders=challenge.firstStep==='PROVIDER'?await this.dependencies.socialProviderBindings?.()??[]:[];
+      if(challenge.firstStep==='PROVIDER' && (!challenge.socialConfiguration || !admittedProviders.includes(challenge.socialConfiguration) || !source.socialBrowserHash || challenge.socialCookieHash!==source.socialBrowserHash)) throw new AuthFlowError('AUTH_CREDENTIALS_INVALID');
+      const socialAuthority={admittedProviders,...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash})};
       const material = this.sessionMaterial(now);
       const context = Object.freeze({ user_agent_hash: bindingHash });
       let replacementRecoveryCode: string | undefined;
@@ -523,7 +532,7 @@ export class SessionService implements SessionApplication {
       if (/^\d{6}$/.test(input.code)) {
         const acceptedStep = await this.totpStep(challenge, input.code, now);
         completed = acceptedStep !== null && await this.dependencies.repository.completeTotpLogin({
-          challenge,
+          ...socialAuthority,challenge,
           acceptedStep,
           bindingHash,
           sessionId: material.sessionId,
@@ -555,7 +564,7 @@ export class SessionService implements SessionApplication {
             this.dependencies.mfaPolicy.recoveryCodes.argon2id
           );
           completed = await this.dependencies.repository.completeRecoveryLogin({
-            challenge,
+            ...socialAuthority,recoveryCodeHash:record.codeHash,challenge,
             recoveryCodeId: record.recoveryCodeId,
             replacementHash,
             bindingHash,

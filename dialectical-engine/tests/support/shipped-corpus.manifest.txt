@@ -50,6 +50,11 @@ apps/api/src/recovery.ts
 apps/api/src/registration.ts
 apps/api/src/risk-signal-identity.ts
 apps/api/src/sessions.ts
+apps/api/src/social-auth.ts
+apps/api/src/social-providers/hashes.ts
+apps/api/src/social-providers/oidc.ts
+apps/api/src/social-providers/provider.ts
+apps/api/src/social-step-up.ts
 apps/api/src/startup-resource-owner.ts
 apps/api/src/stories.ts
 apps/api/src/support/answer.ts
@@ -268,6 +273,7 @@ apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx
 apps/ui/app/public/debate/[id]/page.tsx
 apps/ui/app/settings/page.tsx
 apps/ui/app/sign-up/page.tsx
+apps/ui/app/social/complete/page.tsx
 apps/ui/app/terms/page.tsx
 apps/ui/app/terms/versions/page.tsx
 apps/ui/app/verify-email/layout.tsx
@@ -324,6 +330,8 @@ apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
 apps/ui/components/auth/EmailPendingScreen.tsx
+apps/ui/components/auth/SocialCompleteFlow.tsx
+apps/ui/components/auth/SocialProviderButtons.tsx
 apps/ui/components/auth/TurnstileChallenge.tsx
 apps/ui/components/authRoutes.source-test.mjs
 apps/ui/components/billing/LegalAcceptGate.tsx
@@ -382,6 +390,7 @@ apps/ui/lib/billing/roomCatalog.ts
 apps/ui/lib/billing/usage.ts
 apps/ui/lib/canvasViewport.ts
 apps/ui/lib/consent.ts
+apps/ui/lib/consumerWebAuthn.ts
 apps/ui/lib/contentSecurityPolicy.test.mjs
 apps/ui/lib/crisisLineDirectory.ts
 apps/ui/lib/crisisLines.ts
@@ -520,6 +529,7 @@ apps/ui/lib/scrutinyDepth.ts
 apps/ui/lib/serverApi.test.mjs
 apps/ui/lib/serverApi.ts
 apps/ui/lib/sessionProxy.test.mjs
+apps/ui/lib/socialStepUpHandoff.ts
 apps/ui/lib/termsOfService.ts
 apps/ui/lib/totpQr.ts
 apps/ui/lib/trustedClientIp.test.mjs
@@ -620,6 +630,7 @@ packages/contract/src/generate.ts
 packages/contract/src/index.ts
 packages/contract/src/lineage.ts
 packages/contract/src/plan-tiers.ts
+packages/contract/src/social-auth.ts
 packages/contract/src/story.ts
 packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
@@ -652,6 +663,7 @@ packages/db/src/run-wait.ts
 packages/db/src/schema.ts
 packages/db/src/serve-disclosure.ts
 packages/db/src/sessions.ts
+packages/db/src/social-identity.ts
 packages/db/src/support.ts
 packages/evaluator/src/blind-sample.ts
 packages/evaluator/src/consumer-postgres.ts

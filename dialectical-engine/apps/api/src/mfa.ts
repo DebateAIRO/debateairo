@@ -1,3 +1,4 @@
+import { socialHash } from './social-providers/hashes.js';
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { AuthSourceContext, PostgresIdentityRepository, PostgresConsumerAuthRepository, TotpEnrollmentAuthority } from "@debateai/db";
 import { currentDocument, legalManifestLocales } from "@debateai/legal-manifest";
@@ -141,6 +142,7 @@ function normalizedSourceIp(source: AuthSourceContext): string {
 }
 
 function mfaFailure(error: unknown): unknown {
+  if(error instanceof Error && error.message==="CONSUMER_PASSWORD_PATH_UNAVAILABLE") return new AuthFlowError("MFA_FIRST_STEP_UNAVAILABLE");
   if(error instanceof Error && error.message==="MFA_ENROLLMENT_STATE_INVALID") return new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
   if(error instanceof Error && error.message==="CONSUMER_AUTH_INVALID") return new AuthFlowError("MFA_ENROLLMENT_INVALID");
   if(error instanceof Error && error.message==="CONSUMER_CHALLENGE_CAPACITY") return new AuthFlowError("MFA_RATE_LIMITED");
@@ -201,10 +203,11 @@ export class MfaEnrollmentService implements MfaApplication {
     const initial="enrollmentToken" in input;
     if(!initial) enrollmentHash(input.stepUpGrant);
     if(!initial && session===undefined) throw new AuthFlowError("MFA_ENROLLMENT_INVALID");
-    const authority:TotpEnrollmentAuthority=initial ? {enrollmentTokenHash:enrollmentHash(input.enrollmentToken)} : {
+    if(initial) enrollmentHash(input.enrollmentToken);
+    const admission=await this.secureDependencies().sessions.admit("ENROLLMENT_BEGIN",initial?input.enrollmentToken:session!.userId,source);
+    const authority:TotpEnrollmentAuthority=initial ? {enrollmentTokenHash:enrollmentHash(input.enrollmentToken),socialEnrollmentHash:socialHash('enrollment',input.enrollmentToken),bindingHash:this.secureDependencies().sessions.bindingHash(source),...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash}),admittedProviders:await this.secureDependencies().sessions.socialBindings?.()??[]} : {
       userId:session!.userId,sessionId:session!.session.session_id,tokenHash:session!.tokenHash,grantHash:hashToken("step-up-grant",input.stepUpGrant)
     };
-    const admission=await this.secureDependencies().sessions.admit("ENROLLMENT_BEGIN",initial?input.enrollmentToken:session!.userId,source);
     const identity=await this.secureDependencies().consumerRepository.prepareTotpEnrollment(authority);
     if(identity===null) throw new AuthFlowError("MFA_ENROLLMENT_INVALID");
     const factorId=randomUUID(),secret=generateTotpSecret();
@@ -222,9 +225,10 @@ export class MfaEnrollmentService implements MfaApplication {
 
   async verifyTotp(input:Readonly<{enrollmentToken:string;code:string}>,source:AuthSourceContext,session?:AuthenticatedSession):Promise<LoginResult|Readonly<{status:"enrolled"}>> {
     try {
-      const lookup={enrollmentTokenHash:enrollmentHash(input.enrollmentToken),additionHandleHash:this.additionHash(input.enrollmentToken),bindingHash:this.secureDependencies().sessions.bindingHash(source),
-        ...(session===undefined?{}:{sessionId:session.session.session_id,tokenHash:session.tokenHash})};
+      enrollmentHash(input.enrollmentToken);
       await this.secureDependencies().sessions.admit("ENROLLMENT_COMPLETE",input.enrollmentToken,source);
+      const lookup={enrollmentTokenHash:enrollmentHash(input.enrollmentToken),socialEnrollmentHash:socialHash('enrollment',input.enrollmentToken),...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash}),admittedProviders:await this.secureDependencies().sessions.socialBindings?.()??[],additionHandleHash:this.additionHash(input.enrollmentToken),bindingHash:this.secureDependencies().sessions.bindingHash(source),
+        ...(session===undefined?{}:{sessionId:session.session.session_id,tokenHash:session.tokenHash})};
       const enrollment=await this.secureDependencies().consumerRepository.readTotpEnrollment(lookup);
       if(enrollment===null) throw new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
       let dek:Buffer|undefined,secret:Buffer|undefined;
@@ -238,7 +242,7 @@ export class MfaEnrollmentService implements MfaApplication {
         }
         const material=enrollment.purpose==="INITIAL_ENROLLMENT"?this.secureDependencies().sessions.prepare(source):undefined;
         const currentLegal=(["TERMS","PRIVACY"] as const).flatMap(kind=>legalManifestLocales(kind).map(locale=>({kind,locale,...currentDocument(kind,locale)!})));
-        const committed=await this.secureDependencies().consumerRepository.completeTotpEnrollment({...lookup,userId:enrollment.userId,factorId:enrollment.factorId,secretCiphertext:enrollment.secretCiphertext,acceptedStep:matched.step,
+        const committed=await this.secureDependencies().consumerRepository.completeTotpEnrollment({...lookup,passwordHashSnapshot:enrollment.passwordHash,passwordUsable:this.secureDependencies().sessions.passwordUsable?.(enrollment.passwordHash)??false,userId:enrollment.userId,factorId:enrollment.factorId,secretCiphertext:enrollment.secretCiphertext,acceptedStep:matched.step,
           ...(material===undefined?{}:{material:{sessionId:material.sessionId,sessionTokenHash:material.sessionTokenHash,csrfTokenHash:material.csrfTokenHash,sessionBindingContext:material.sessionBindingContext,idleExpiresAt:material.idleExpiresAt,absoluteExpiresAt:material.absoluteExpiresAt}})},currentLegal,source);
         return material===undefined?Object.freeze({status:"enrolled" as const}):this.secureDependencies().sessions.committed(material,committed,source);
       } finally {secret?.fill(0);dek?.fill(0);}

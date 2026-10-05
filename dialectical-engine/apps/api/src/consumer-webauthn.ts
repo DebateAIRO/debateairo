@@ -1,3 +1,4 @@
+import { socialHash } from './social-providers/hashes.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { generateRegistrationOptions, generateAuthenticationOptions } from '@simplewebauthn/server';
 import { BeginPasskeyEnrollmentRequestSchema, CompletePasskeyEnrollmentRequestSchema, BeginPasskeyLoginRequestSchema, CompletePasskeyLoginRequestSchema, PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsResponseSchema, type PasskeyRegistrationOptionsResponse, type PasskeyAuthenticationOptionsResponse } from '@debateai/contract';
@@ -57,7 +58,7 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
         if ('step_up_grant' in parsed && session === undefined)
             throw new AuthFlowError('AUTH_CREDENTIALS_INVALID');
         try {
-            const authority = 'enrollment_token' in parsed ? { enrollmentTokenHash: hashToken('verification', parsed.enrollment_token) }
+            const authority = 'enrollment_token' in parsed ? { enrollmentTokenHash: hashToken('verification', parsed.enrollment_token),socialEnrollmentHash:socialHash('enrollment',parsed.enrollment_token),...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash}),admittedProviders:await this.sessions.socialBindings?.()??[] }
                 : { userId: session!.userId, sessionId: session!.session.session_id, tokenHash: session!.tokenHash, grantHash: hashToken('step-up-grant', parsed.step_up_grant) };
             const userHandle = random();
             const empty = await this.enrollmentOptions(handle, challenge, { userHandle, expiresAt: new Date(0).toISOString(), excludeCredentials: [] });
@@ -80,7 +81,7 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
                 throw new Error('CONSUMER_AUTH_INVALID');
             const verified = await verifyConsumerRegistration(parsed.credential, c);
             const material = c.purpose === 'INITIAL_ENROLLMENT' ? this.sessions.prepare(source) : undefined;
-            const committed = await this.repository.completeEnrollment({ ...verified, handleHash: hash, challengeHash: c.challengeHash, bindingHash,
+            const committed = await this.repository.completeEnrollment({ ...verified, handleHash: hash, challengeHash: c.challengeHash, bindingHash, ...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash}),admittedProviders:await this.sessions.socialBindings?.()??[],
                 ...(parsed.label === undefined ? {} : { label: parsed.label }), ...(material === undefined ? { sessionId: session!.session.session_id, tokenHash: session!.tokenHash } : { material: persistence(material) }) }, this.legal, source, candidate => this.enrollmentOptions(parsed.challenge_handle, parsed.challenge_handle, candidate));
             if (material === undefined)
                 return Object.freeze({ status: 'enrolled' });
@@ -98,7 +99,7 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
         const admission = await this.sessions.admit('LOGIN_BEGIN', parsed.continuation_token ?? 'discoverable', source);
         const { handle, challenge, seed } = this.seed('LOGIN', source);
         try {
-            const result = await this.repository.beginLogin({ ...seed, ...admission, ...(parsed.continuation_token === undefined ? {} : { continuationHash: hashToken('login-challenge', parsed.continuation_token) }) });
+            const result = await this.repository.beginLogin({...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash}),admittedProviders:await this.sessions.socialBindings?.()??[], ...seed, ...admission, ...(parsed.continuation_token === undefined ? {} : { continuationHash: hashToken('login-challenge', parsed.continuation_token) }) });
             const { extensions: _extensions, ...options } = await generateAuthenticationOptions({ rpID: this.rpId, challenge: new Uint8Array(Buffer.from(challenge, 'base64url')), timeout: 300000, userVerification: 'required' });
             return PasskeyAuthenticationOptionsResponseSchema.parse({ challenge_handle: handle, expires_at: new Date(result.expiresAt).toISOString(), options });
         }
@@ -119,7 +120,7 @@ export class ConsumerWebAuthnService implements ConsumerWebAuthnApplication {
             if (credential === null || (c.userId !== null && c.userId !== credential.userId))
                 throw new Error('CONSUMER_AUTH_INVALID');
             const verified = await verifyConsumerAuthentication(parsed.credential, credential, c), material = this.sessions.prepare(source);
-            const committed = await this.repository.completeLogin({ ...credential, ...verified, handleHash: hash, challengeHash: c.challengeHash, bindingHash, material: persistence(material) }, source);
+            const committed = await this.repository.completeLogin({ ...credential, ...verified, handleHash: hash, challengeHash: c.challengeHash, bindingHash, ...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash}),admittedProviders:await this.sessions.socialBindings?.()??[], material: persistence(material) }, source);
             if (committed.sessionId !== material.sessionId)
                 throw new Error('CONSUMER_SESSION_INVALID');
             return this.sessions.committed(material, committed, source);

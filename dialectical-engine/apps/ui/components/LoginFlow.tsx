@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SocialProviderButtons } from "@/components/auth/SocialProviderButtons";
 import { FormEvent, useEffect, useState } from "react";
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
@@ -11,7 +12,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { safeReturnPath } from "@/lib/returnPath";
 import authEnglish from "@/messages/en/auth.json";
 
-type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
+type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin"> & Partial<Pick<ContractClient,"authProviders"|"beginSocialLogin">>;
 type VerificationMethod = "authenticator" | "recovery";
 
 /* The document shows live validity marks under both auth fields (7a, and 8a
@@ -174,7 +175,7 @@ export function LoginFlow({
           </button>
         </section>
       ) : challengeToken === null ? (
-        <form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitCredentials}>
+        <><SocialProviderButtons client={client}/><form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitCredentials}>
           <div className="authField">
             <label htmlFor="login-email">{t(catalog, "auth.email")}</label>
             <input
@@ -225,7 +226,7 @@ export function LoginFlow({
           <button className="authPrimary" type="submit" disabled={busy}>
             {busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}
           </button>
-        </form>
+        </form></>
       ) : (
         <form className="authForm authMfaForm" method="post" action="/login" aria-busy={busy} onSubmit={submitMfa}>
           <p className="srOnly" role="status">{t(catalog, "auth.login.passwordAcceptedStatus")}</p>
