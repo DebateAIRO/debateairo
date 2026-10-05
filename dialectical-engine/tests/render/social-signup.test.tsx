@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { StrictMode, act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { SignUpFlow } from '../../apps/ui/components/SignUpFlow.js';
@@ -97,5 +97,39 @@ it('step-up code method switch invalidates a late final server response',async()
   await act(async()=>{release({status:'step_up_complete',csrf_token:'c'.repeat(43),step_up_grant:{action:'CHANGE_EMAIL',token:'g'.repeat(43),expires_at:new Date(Date.now()+300000).toISOString()}});await Promise.resolve();await Promise.resolve();});
   expect(done).not.toHaveBeenCalled();
   expect(host.textContent).not.toContain('Fresh authentication complete');
+ }finally{await unmount(root,host);window.history.replaceState(null,'','/');}
+});
+
+it('social login remains usable after Strict Mode effect replay',async()=>{
+ window.history.replaceState(null,'','/social/complete#kind=login&token='+'a'.repeat(43));
+ webauthn.browser.authenticate.mockReset().mockResolvedValue({});webauthn.browser.cancel.mockClear();
+ const done=vi.fn(),client={beginPasskeyLogin:vi.fn().mockResolvedValue({challenge_handle:'b'.repeat(43),options:{}}),completePasskeyLogin:vi.fn().mockResolvedValue({status:'authenticated',csrf_token:'c'.repeat(43)})};
+ const {host,root}=await mount(<StrictMode><SocialCompleteFlow client={client as any} onAuthenticated={done}/></StrictMode>);
+ try{
+  await click(host,'Use a passkey');
+  expect(client.beginPasskeyLogin).toHaveBeenCalledOnce();
+  expect(done).toHaveBeenCalledOnce();
+ }finally{await unmount(root,host);window.history.replaceState(null,'','/');}
+});
+
+it('Strict Mode replays signup status from the scrubbed in-memory authority',async()=>{
+ window.history.replaceState(null,'','/social/complete#kind=signup&token='+'a'.repeat(43));
+ const client={socialSignupStatus:vi.fn().mockResolvedValue({provider:'apple',email:'relay@privaterelay.appleid.com',name:'Person',expires_at:new Date(Date.now()+300000).toISOString()})};
+ const {host,root}=await mount(<StrictMode><SocialCompleteFlow client={client as any}/></StrictMode>);
+ try{
+  expect(window.location.hash).toBe('');
+  expect(host.querySelector<HTMLInputElement>('[name=email]')?.value).toBe('relay@privaterelay.appleid.com');
+  expect(host.querySelector<HTMLInputElement>('[name=phone]')?.disabled).toBe(false);
+ }finally{await unmount(root,host);window.history.replaceState(null,'','/');}
+});
+
+it('Strict Mode replays provider step-up status from the scrubbed in-memory authority',async()=>{
+ window.history.replaceState(null,'','/social/complete#kind=stepup&token='+'a'.repeat(43));
+ const client={socialStepUpStatus:vi.fn().mockResolvedValue({authorization:{action:'CHANGE_EMAIL'},expires_at:new Date(Date.now()+300000).toISOString(),available_methods:['totp']})};
+ const {host,root}=await mount(<StrictMode><SocialCompleteFlow client={client as any}/></StrictMode>);
+ try{
+  expect(window.location.hash).toBe('');
+  expect(host.querySelector<HTMLInputElement>('[name=code]')).not.toBeNull();
+  expect(host.querySelector<HTMLInputElement>('[name=code]')?.disabled).toBe(false);
  }finally{await unmount(root,host);window.history.replaceState(null,'','/');}
 });

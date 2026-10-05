@@ -47,6 +47,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [token, setToken] = useState('');
     const [kind, setKind] = useState<SocialFlowKind | null>(null);
     const authority = useRef<{ token: string; kind: SocialFlowKind | null }>({ token: '', kind: null });
+    const startup = useRef<{ token: string; kind: 'signup' | 'login' | 'stepup' } | null>(null);
     const [email, setEmail] = useState('');
     const [name, setName] = useState<string | null>(null);
     const [phone, setPhone] = useState('');
@@ -86,27 +87,33 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             window.location.assign(returnPath);
     };
     useEffect(() => {
-        if (started.current)
-            return;
-        started.current = true;
-        const fragment = new URLSearchParams(window.location.hash.slice(1));
-        const mode = fragment.get('kind');
-        const next = fragment.get('next');
-        const validShape = fragment.getAll('kind').length === 1 && fragment.getAll('next').length <= 1;
-        const value = takeFragmentToken(window.location, window.history);
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-        setReturnPath(safeSocialReturnPath(next));
-        if (!value || !validShape || !['signup', 'login', 'stepup'].includes(mode ?? '')) {
-            setError(t(catalog, "auth.enroll.invalidLink"));
-            setBusy(false);
-            return;
+        let initial = startup.current;
+        if (!started.current) {
+            started.current = true;
+            const fragment = new URLSearchParams(window.location.hash.slice(1));
+            const mode = fragment.get('kind');
+            const next = fragment.get('next');
+            const validShape = fragment.getAll('kind').length === 1 && fragment.getAll('next').length <= 1;
+            const value = takeFragmentToken(window.location, window.history);
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            setReturnPath(safeSocialReturnPath(next));
+            if (!value || !validShape || !['signup', 'login', 'stepup'].includes(mode ?? '')) {
+                setError(t(catalog, "auth.enroll.invalidLink"));
+                setBusy(false);
+                return;
+            }
+            initial = { token: value, kind: mode as 'signup' | 'login' | 'stepup' };
+            startup.current = initial;
         }
-        const initialKind = mode as 'signup' | 'login' | 'stepup';
+        else if (!initial || authority.current.token || authority.current.kind)
+            return;
+        const { token: value, kind: initialKind } = initial;
         const owner = sequence.current;
         replaceAuthority(value, initialKind);
+        setBusy(true);
         void (async () => {
             try {
-                if (mode === 'signup') {
+                if (initialKind === 'signup') {
                     const status = await client.socialSignupStatus({ continuation_token: value });
                     if (!owns(owner, value, initialKind))
                         return;
@@ -114,7 +121,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     setName(status.name);
                     setFlowExpiry(status.expires_at);
                 }
-                else if (mode === 'stepup') {
+                else if (initialKind === 'stepup') {
                     const status = await client.socialStepUpStatus(value);
                     if (!owns(owner, value, initialKind))
                         return;
@@ -125,6 +132,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             catch {
                 if (!owns(owner, value, initialKind))
                     return;
+                startup.current = null;
                 setError(t(catalog, "auth.enroll.invalidLink"));
                 replaceAuthority('', null);
             }
@@ -146,6 +154,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         const timer = setTimeout(() => {
             sequence.current++;
             browser.cancel();
+            startup.current = null;
             replaceAuthority('', null);
             setCode('');
             setBusy(false);
@@ -157,6 +166,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     function finish(result: AuthenticationResponse) {
         if (result.status !== 'authenticated')
             return;
+        startup.current = null;
         replaceAuthority('', null);
         setCode('');
         setAuthenticated(true);
@@ -167,6 +177,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     }
     function finishStepUp(result: StepUpResponse) {
         window.dispatchEvent(new Event('debateai:staff-session-ended'));
+        startup.current = null;
         replaceAuthority('', null);
         setCode('');
         setStepUpResult(result);
@@ -204,6 +215,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             const response = await client.completeSocialSignup({ continuation_token: ownedToken, email: address, phone: rawPhone, date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(chrome.locale), ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
             if (!owns(owner, ownedToken, ownedKind))
                 return;
+            startup.current = null;
             setBirth(EMPTY_DOB);
             setPhone('');
             setPrivacyAccepted(false);
@@ -350,6 +362,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                 }}/><button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form>{methods.includes('recovery_code') ? <button type="button" onClick={() => {
                         sequence.current++;
                         browser.cancel();
+                        startup.current = null;
                         flight.current = false;
                         setBusy(false);
                         setError(null);
