@@ -99,7 +99,10 @@ DECLARE f identity.social_flow%ROWTYPE;s identity.social_identity%ROWTYPE;a reco
  OR f.cookie_hash IS DISTINCT FROM p->>'cookieHash' OR f.binding_hash IS DISTINCT FROM p->>'bindingHash' OR f.provider IS DISTINCT FROM p->>'provider' OR f.configuration IS DISTINCT FROM p->>'configuration'
  OR NOT COALESCE(p->'admittedProviders' ? f.configuration,false) OR f.expires_at<=clock_timestamp() OR p->>'subject' IS NULL OR length(p->>'subject') NOT BETWEEN 1 AND 255 THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;
  IF f.purpose='PROVIDER_STEP_UP' THEN
-  IF s.user_id IS DISTINCT FROM f.user_id OR s.revoked_at IS NOT NULL OR s.configuration IS DISTINCT FROM f.configuration OR a.audit_token IS NULL OR staff.consumer_security_affiliated(f.user_id)
+  -- An unlinked subject never initialized a. Refuse ownership first, in its
+  -- own statement, before planning any expression that dereferences a.
+  IF s.user_id IS NULL OR s.user_id IS DISTINCT FROM f.user_id THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;
+  IF s.revoked_at IS NOT NULL OR s.configuration IS DISTINCT FROM f.configuration OR a.audit_token IS NULL OR staff.consumer_security_affiliated(f.user_id)
   OR identity.assert_session_current(f.user_id,f.session_id,f.session_token_hash) IS DISTINCT FROM true OR f.security_epoch IS DISTINCT FROM COALESCE((SELECT security_epoch FROM identity.account_security_hold WHERE user_id=f.user_id),0) THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;
   UPDATE identity.social_flow SET proof_hash=p->>'proofHash',continuation_cookie_hash=p->>'continuationCookieHash',issuer=p->>'issuer',app_scope=p->>'appScope',subject=p->>'subject' WHERE state_hash=f.state_hash;
   RETURN jsonb_build_object('status','provider_step_up_required','next',f.next_path,'expiresAt',f.expires_at);

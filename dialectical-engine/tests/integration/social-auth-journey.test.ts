@@ -1,3 +1,5 @@
+import { buildApi, type AskApplication } from '../../apps/api/src/index.js';
+import { SOCIAL_FLOW_COOKIE } from '../../apps/api/src/social-auth.js';
 import { ConsumerSecurityService } from '../../apps/api/src/consumer-security.js';
 import { ConsumerRecoveryService } from '../../apps/api/src/consumer-recovery.js';
 import { SocialStepUpService } from '../../apps/api/src/social-step-up.js';
@@ -78,11 +80,14 @@ async function harness() {
     const stepUp = new SocialStepUpService(repository, providers, sessions.consumerProducer(), { publicAppUrl: origin, users: users as never, argon2, mfaPolicy });
     const security = new ConsumerSecurityService(new PostgresConsumerSecurityRepository(runtime, audit), sessions.consumerProducer(), { publicAppUrl: origin, argon2, mfaPolicy, authPolicy });
     const recovery = new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(runtime, audit), sessions.consumerProducer(), { publicAppUrl: origin, users: users as never, argon2, mfaPolicy, authPolicy, policy: consumerRecoveryPolicyFromValue(CONSUMER_RECOVERY_POLICY_REGISTER_ROW.value, CONSUMER_RECOVERY_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: blindKey, mail: { sendRecovery: async (m) => { sent.push(m); } }, onMailFailure: () => { throw new Error('UNEXPECTED_MAIL_FAILURE'); } });
-    const callback = async (extra: Record<string, unknown> = {}, session?: AuthenticatedSession, authorization?: StepUpAuthorizationRequest, beforeCallback?: () => Promise<void>) => {
+    const prepareCallback = async (extra: Record<string, unknown> = {}, session?: AuthenticatedSession, authorization?: StepUpAuthorizationRequest) => {
         const begin = session && authorization ? await social.beginStepUp('google', { authorization }, source, session) : await social.begin('google', {}, source), authorizationUrl = new URL(begin.authorization_url);
         assertion = { ...assertion, nonce: authorizationUrl.searchParams.get('nonce')!, ...extra };
-        await beforeCallback?.();
-        return social.callback('google', { state: authorizationUrl.searchParams.get('state'), code: 'one-use-code' }, begin.flowCookie, source);
+        return { begin, input: { state: authorizationUrl.searchParams.get('state')!, code: 'one-use-code' } };
+    };
+    const callback = async (extra: Record<string, unknown> = {}, session?: AuthenticatedSession, authorization?: StepUpAuthorizationRequest) => {
+        const prepared = await prepareCallback(extra, session, authorization);
+        return social.callback('google', prepared.input, prepared.begin.flowCookie, source);
     };
     const finishFlow=async(begin:{authorization_url:string;flowCookie:string},extra:Record<string,unknown>={},metadata:Record<string,string>={})=>{const url=new URL(begin.authorization_url);assertion={...assertion,nonce:url.searchParams.get('nonce')!,...extra};return social.callback('google',{state:url.searchParams.get('state'),code:'link-code',...metadata},begin.flowCookie,source);};
     const signup = async (email?: string) => {
@@ -91,7 +96,7 @@ async function harness() {
         const admission = await registration.admitSource({ route: 'social', input: { email: input.email, phone: input.phone, adultAffirmed: true }, source: bound });
         return { cb, bound, input, result: await social.completeSignup(input, bound, admission) };
     };
-    return { social, repository, security, recovery, finishFlow, stepUp, mfa, sessions, registration, passkeys, callback, signup, source, sent, users, disable: () => { enabled = false; } };
+    return { social, repository, security, recovery, finishFlow, stepUp, mfa, sessions, registration, passkeys, prepareCallback, callback, signup, source, sent, users, disable: () => { enabled = false; } };
 }
 describe('actual signed-provider and restricted-database journeys', () => {
     it('creates a NULL-password encrypted-phone account from a signed authoritative subject, then requires one genuine UV method', async () => {
@@ -246,16 +251,50 @@ describe('actual signed-provider and restricted-database journeys', () => {
             if (login.status !== 'authenticated')
                 throw new Error('EXPECTED_SESSION');
             const session = (await h.sessions.authenticate(login.sessionToken, h.source))!;
-            await expect(h.callback(refusal === 'substitution' ? { sub: randomUUID() } : {}, session, { action: 'READ_PHONE_PROFILE' }, async () => {
-                if (refusal === 'rotation')
-                    await db.pool.query('UPDATE identity.session SET token_hash=$1 WHERE session_id=$2', [hashToken('session', 'r'.repeat(43)), session.session.session_id]);
-                if (refusal === 'hold')
-                    await db.pool.query('INSERT INTO identity.account_security_hold(user_id,held) VALUES($1,true)', [session.userId]);
-                if (refusal === 'staff')
-                    await db.pool.query('INSERT INTO staff.subject(user_id) VALUES($1)', [session.userId]);
-                if (refusal === 'expiry')
-                    await db.pool.query("UPDATE identity.social_flow SET created_at=clock_timestamp()-interval '6 minutes',expires_at=clock_timestamp()-interval '1 minute' WHERE user_id=$1", [session.userId]);
-            })).rejects.toThrow();
+            const prepared = await h.prepareCallback(refusal === 'substitution' ? { sub: randomUUID() } : {}, session, { action: 'READ_PHONE_PROFILE' });
+            // Setup is outside the callback rejection assertion. A failed UPDATE
+            // must fail the test, never masquerade as an expired-flow refusal.
+            if (refusal === 'rotation')
+                await db.pool.query('UPDATE identity.session SET token_hash=$1 WHERE session_id=$2', [hashToken('session', 'r'.repeat(43)), session.session.session_id]);
+            if (refusal === 'hold')
+                await db.pool.query('INSERT INTO identity.account_security_hold(user_id,held) VALUES($1,true)', [session.userId]);
+            if (refusal === 'staff')
+                await db.pool.query('INSERT INTO staff.subject(user_id) VALUES($1)', [session.userId]);
+            if (refusal === 'expiry') {
+                const changed = await db.pool.query(`
+                    WITH instant AS MATERIALIZED (SELECT clock_timestamp() AS value)
+                    UPDATE identity.social_flow
+                    SET created_at=instant.value-interval '6 minutes',
+                        expires_at=instant.value-interval '1 minute'
+                    FROM instant WHERE state_hash=$1
+                    RETURNING expires_at<statement_timestamp() AS expired,
+                        expires_at-created_at=interval '5 minutes' AS exact_window
+                `, [socialHash('state', prepared.input.state)]);
+                expect(changed.rowCount).toBe(1);
+                expect(changed.rows[0]).toEqual({ expired: true, exact_window: true });
+            }
+            const expected = refusal === 'substitution' || refusal === 'staff'
+                ? { message: 'SOCIAL_FLOW_INVALID', code: 'P0001' }
+                : { message: 'SOCIAL_PROOF_INVALID', code: 'SOCIAL_PROOF_INVALID', statusCode: 400 };
+            await expect(h.social.callback('google', prepared.input, prepared.begin.flowCookie, h.source)).rejects.toMatchObject(expected);
+            if (refusal === 'substitution' || refusal === 'expiry') {
+                // A substituted state was claimed already. Use a new real
+                // signed callback to check the same SQL denial through HTTP.
+                const publicAttempt = refusal === 'substitution'
+                    ? await h.prepareCallback({ sub: randomUUID() }, session, { action: 'READ_PHONE_PROFILE' }) : prepared;
+                const api = buildApi({ application: {} as AskApplication, allowedOrigin: origin, socialAuth: h.social });
+                try {
+                    const response = await api.inject({ method: 'GET', url: '/v1/auth/social/google/callback?' + new URLSearchParams(publicAttempt.input), headers: { 'user-agent': h.source.userAgent, cookie: `${SOCIAL_FLOW_COOKIE}=${publicAttempt.begin.flowCookie}` } });
+                    const error = refusal === 'substitution' ? 'AUTH_CREDENTIALS_INVALID' : 'SOCIAL_PROOF_INVALID';
+                    expect(response.statusCode).toBe(refusal === 'substitution' ? 401 : 400);
+                    expect(response.json()).toEqual({ error, message: error });
+                    expect(response.headers.location).toBeUndefined();
+                    expect(response.headers['set-cookie']).toBe(`${SOCIAL_FLOW_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`);
+                } finally { await api.close(); }
+                expect((await db.pool.query('SELECT count(*)::int n FROM identity.session WHERE user_id=$1', [session.userId])).rows[0].n).toBe(1);
+                expect((await db.pool.query('SELECT token_hash FROM identity.session WHERE session_id=$1', [session.session.session_id])).rows[0].token_hash).toBe(session.tokenHash);
+                expect((await db.pool.query('SELECT count(*)::int n FROM identity.social_flow WHERE user_id=$1 AND proof_hash IS NOT NULL', [session.userId])).rows[0].n).toBe(0);
+            }
             expect((await db.pool.query('SELECT count(*)::int n FROM identity.step_up_grant WHERE user_id=$1', [session.userId])).rows[0].n).toBe(0);
         }
         finally {
