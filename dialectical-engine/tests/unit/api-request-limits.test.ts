@@ -96,9 +96,9 @@ function harness() {
   } satisfies RecoveryApplication;
   const mfa = {
     beginTotp: vi.fn(async () => ({
-      status: "verification_required" as const, secret: "secret", otpauthUri: "otpauth://totp/test"
+      status: "verification_required" as const, enrollment_token:"e".repeat(43), expires_at:"2026-10-05T00:00:00.000Z", secret: "secret", otpauthUri: "otpauth://totp/test"
     })),
-    verifyTotp: vi.fn(async () => ({ status: "recovery_codes_required" as const })),
+    verifyTotp: vi.fn(async () => ({ status: "enrolled" as const })),
     generateRecoveryCodes: vi.fn(async () => ({ status: "confirmation_required" as const, recoveryCodes: [] })),
     confirmRecoveryCode: vi.fn(async () => ({ status: "active" as const }))
   } satisfies MfaApplication;

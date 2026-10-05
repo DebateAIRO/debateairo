@@ -17,7 +17,13 @@ export interface LoginIdentityRecord {
   readonly lastAcceptedStep: number | null;
 }
 
-export interface LoginChallengeRecord extends LoginIdentityRecord {
+export interface LoginContinuationIdentity extends Omit<LoginIdentityRecord,"factorId"|"secretCiphertext"> {
+  readonly factorId: string|null;
+  readonly secretCiphertext: CryptoEnvelope|null;
+  readonly availableMethods?: readonly ("passkey"|"totp"|"recovery_code")[];
+}
+
+export interface LoginChallengeRecord extends LoginContinuationIdentity {
   readonly challengeId: string;
   readonly challengeTokenHash: string;
   readonly bindingHash: string;
@@ -150,41 +156,13 @@ export class PostgresSessionRepository {
     throw new TypeError("AUDIT_OPERATION_CAPABILITY_REQUIRED");
   }
 
-  async findLoginIdentity(emailBlindIndex: Buffer): Promise<LoginIdentityRecord | null> {
-    const result = await this.pool.query<{
-      user_id: string;
-      owner_ref: string;
-      audit_token: string;
-      password_hash: string;
-      mfa_factor_id: string;
-      secret_ciphertext: CryptoEnvelope;
-      last_accepted_step: string | number | null;
-    }>(`
-      SELECT u.user_id,u.owner_ref,u.audit_token,u.password_hash,f.mfa_factor_id,
-        f.secret_ciphertext,f.last_accepted_step
-      FROM identity."user" u
-      JOIN LATERAL (
-        SELECT mfa_factor_id,secret_ciphertext,last_accepted_step
-        FROM identity.mfa_factor
-        WHERE user_id=u.user_id AND factor_type='totp' AND state='active'
-        ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
-      ) f ON true
-      WHERE u.email_blind_index=$1 AND u.state='active' AND NOT identity.read_account_security_hold(u.user_id)
-    `, [emailBlindIndex]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      userId: row.user_id,
-      ownerRef: row.owner_ref,
-      auditToken: row.audit_token,
-      passwordHash: row.password_hash,
-      factorId: row.mfa_factor_id,
-      secretCiphertext: row.secret_ciphertext,
-      lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step)
-    });
+  async findLoginIdentity(emailBlindIndex: Buffer): Promise<LoginContinuationIdentity | null> {
+    const result=await this.pool.query<{value:LoginContinuationIdentity|null}>("SELECT identity.read_secure_login_identity($1) AS value",[emailBlindIndex]);
+    return result.rows[0]?.value??null;
   }
 
   async createLoginChallenge(input: Readonly<{
-    identity: LoginIdentityRecord;
+    identity: LoginContinuationIdentity;
     challengeId: string;
     challengeTokenHash: string;
     bindingHash: string;
@@ -248,45 +226,11 @@ export class PostgresSessionRepository {
     }));
   }
 
-  async readLoginChallenge(challengeTokenHash: string): Promise<LoginChallengeRecord | null> {
+  async readLoginChallenge(challengeTokenHash:string):Promise<LoginChallengeRecord|null> {
     assertCredentialHash(challengeTokenHash);
-    const result = await this.pool.query<{
-      login_challenge_id: string;
-      user_id: string;
-      owner_ref: string;
-      audit_token: string;
-      password_hash_snapshot: string;
-      mfa_factor_id: string;
-      secret_ciphertext: CryptoEnvelope;
-      last_accepted_step: string | number | null;
-      binding_hash: string;
-      expires_at: Date;
-      consumed_at: Date | null;
-    }>(`
-      SELECT c.login_challenge_id,c.user_id,u.owner_ref,u.audit_token,c.password_hash_snapshot,
-        f.mfa_factor_id,f.secret_ciphertext,f.last_accepted_step,
-        c.binding_hash,c.expires_at,c.consumed_at
-      FROM identity.login_challenge c
-      JOIN identity."user" u ON u.user_id=c.user_id AND u.state='active'
-      JOIN identity.mfa_factor f ON f.mfa_factor_id=c.mfa_factor_id
-        AND f.user_id=u.user_id AND f.factor_type='totp' AND f.state='active'
-      WHERE c.token_hash=$1 AND u.password_hash=c.password_hash_snapshot AND NOT identity.read_account_security_hold(u.user_id)
-    `, [challengeTokenHash]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      challengeId: row.login_challenge_id,
-      challengeTokenHash,
-      userId: row.user_id,
-      ownerRef: row.owner_ref,
-      auditToken: row.audit_token,
-      passwordHash: row.password_hash_snapshot,
-      factorId: row.mfa_factor_id,
-      secretCiphertext: row.secret_ciphertext,
-      lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step),
-      bindingHash: row.binding_hash,
-      expiresAt: row.expires_at,
-      consumedAt: row.consumed_at
-    });
+    const result=await this.pool.query<{value:(Omit<LoginChallengeRecord,"expiresAt"|"consumedAt">&{expiresAt:string;consumedAt:string|null})|null}>("SELECT identity.read_secure_login_challenge($1) AS value",[challengeTokenHash]);
+    const row=result.rows[0]?.value;
+    return row==null?null:Object.freeze({...row,expiresAt:new Date(row.expiresAt),consumedAt:row.consumedAt===null?null:new Date(row.consumedAt)});
   }
 
   async completeTotpLogin(input: Readonly<{
@@ -437,11 +381,11 @@ export class PostgresSessionRepository {
       session_id: string; created_at: Date; last_seen_at: Date;
       idle_expires_at: Date; absolute_expires_at: Date; last_mfa_at: Date;
     }>(`
-      SELECT session_id,created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
+      SELECT session_id,created_at,last_seen_at,LEAST(idle_expires_at,absolute_expires_at,created_at+interval '720 hours') AS idle_expires_at,LEAST(absolute_expires_at,created_at+interval '720 hours') AS absolute_expires_at,last_mfa_at
       FROM identity.session
-      WHERE user_id=$1 AND revoked_at IS NULL AND idle_expires_at>$2 AND absolute_expires_at>$2
+      WHERE user_id=$1 AND revoked_at IS NULL AND idle_expires_at>clock_timestamp() AND LEAST(absolute_expires_at,created_at+interval '720 hours')>clock_timestamp()
       ORDER BY last_seen_at DESC,session_id
-    `, [userId, occurredAt]);
+    `, [userId]);
     return Object.freeze(result.rows.map((row) => Object.freeze({
       sessionId: row.session_id,
       createdAt: row.created_at,
@@ -604,7 +548,7 @@ export class PostgresSessionRepository {
     }> | Readonly<{
       grantId: string;
       grantTokenHash: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP";
       expiresAt: Date;
     }>;
   }>): Promise<boolean> {

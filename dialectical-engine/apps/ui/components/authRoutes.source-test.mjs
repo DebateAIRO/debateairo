@@ -226,7 +226,8 @@ test("every credential-bearing auth form has an explicit query-free POST fallbac
 
 test("mailed-token enrollment has no native form that could submit secrets before hydration", () => {
   assert.match(enrollMfa, /id="totp-code"/);
-  assert.match(enrollMfa, /id="recovery-typeback"/);
+  assert.doesNotMatch(enrollMfa, /id="recovery-typeback"/);
+  assert.match(enrollMfa, /setActive\(true\)/);
   assert.doesNotMatch(enrollMfa, /<form\b/);
   assert.doesNotMatch(verifyEmail, /<form\b/);
 });

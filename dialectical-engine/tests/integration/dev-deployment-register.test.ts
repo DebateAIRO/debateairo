@@ -456,7 +456,9 @@ describe("DEV-05 complete development deployment register", () => {
       outboundSendMechanism: "per_row_last_sent_timestamp_minimum_spacing" });
     await expect(readAuthPolicy(database.pool, 999_999)).rejects.toThrow();
     expect(mfa.totp.algorithm).toBe("SHA1");
-    expect(session.absoluteTtlMs).toBeGreaterThan(session.idleTtlMs);
+    expect(session).toMatchObject({idleTtlMs:1209600000,absoluteTtlMs:2592000000,stepUpFreshnessMs:300000});
+    expect(await readSessionPolicy(database.pool,bootstrap.registerVersion)).toMatchObject({idleTtlMs:1209600000,absoluteTtlMs:7776000000,stepUpFreshnessMs:300000});
+    await expect(readSessionPolicy(database.pool,999999)).rejects.toMatchObject({code:"SESSION_POLICY_UNRESOLVED"});
     expect(recovery).toMatchObject({
       policyVersion: 1,
       publicResponse: "ENUMERATION_RESISTANT_GENERIC",

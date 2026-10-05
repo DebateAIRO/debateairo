@@ -57,6 +57,25 @@ export type AuthenticationResponse = z.infer<typeof AuthenticationResponseSchema
 const EncodedValueSchema = z.string().min(1).max(32768).regex(/^[A-Za-z0-9_-]+$/u);
 const CredentialIdSchema = z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/u);
 const HandleSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/u);
+export const BeginTotpEnrollmentRequestSchema = z.union([
+  z.object({ enrollment_token: HandleSchema }).strict(),
+  z.object({ step_up_grant: HandleSchema }).strict()
+]);
+export type BeginTotpEnrollmentRequest = z.infer<typeof BeginTotpEnrollmentRequestSchema>;
+export const CompleteTotpEnrollmentRequestSchema = z.object({ enrollment_token: HandleSchema, code: z.string().regex(/^\d{6}$/u) }).strict();
+export type CompleteTotpEnrollmentRequest = z.infer<typeof CompleteTotpEnrollmentRequestSchema>;
+export const TotpEnrollmentOptionsResponseSchema = z.object({
+  status: z.literal("verification_required"), secret: z.string().regex(/^[A-Z2-7]{32}$/u),
+  otpauthUri: z.string().startsWith("otpauth://totp/"), enrollment_token: HandleSchema, expires_at: z.iso.datetime()
+}).strict();
+export type TotpEnrollmentOptionsResponse = z.infer<typeof TotpEnrollmentOptionsResponseSchema>;
+export const TotpEnrollmentResponseSchema = z.union([AuthenticationResponseSchema, z.object({ status: z.literal("enrolled") }).strict()]);
+export type TotpEnrollmentResponse = z.infer<typeof TotpEnrollmentResponseSchema>;
+export const LoginContinuationResponseSchema = z.object({ status: z.literal("mfa_required"), challenge_token: HandleSchema,
+  available_methods: z.array(z.enum(["passkey", "totp", "recovery_code"])).min(1).max(3)
+}).strict();
+export type LoginContinuationResponse = z.infer<typeof LoginContinuationResponseSchema>;
+
 const TransportSchema = z.enum(["ble", "cable", "hybrid", "internal", "nfc", "smart-card", "usb"]);
 const TransportsSchema = z.array(TransportSchema).max(7).refine((values) => new Set(values).size === values.length);
 const AttachmentSchema = z.enum(["platform", "cross-platform"]);
@@ -151,6 +170,7 @@ export type CompletePasskeyLoginRequest=z.infer<typeof CompletePasskeyLoginReque
 export type PasskeyEnrollmentResponse=z.infer<typeof PasskeyEnrollmentResponseSchema>;
 
 export const consumerAuthContractSchemas = Object.freeze({
+  BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
   BeginPasskeyEnrollmentRequestSchema, CompletePasskeyEnrollmentRequestSchema, BeginPasskeyLoginRequestSchema, CompletePasskeyLoginRequestSchema, PasskeyEnrollmentResponseSchema,
   CatalogLocaleCodeSchema, LocaleCodeSchema, RegisterRequestSchema, ResendVerificationRequestSchema,
   RegistrationVerificationAckSchema, ResendVerificationAckSchema, VerificationAckSchema, AuthenticationResponseSchema,

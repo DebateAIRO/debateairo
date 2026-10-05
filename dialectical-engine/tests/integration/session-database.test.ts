@@ -1,9 +1,11 @@
+import { readFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   migrate,
   PostgresAuthenticationRiskSignalRepository,
   PostgresSessionRepository,
+  type Pool,
   type LoginChallengeRecord
 } from "@debateai/db";
 import {
@@ -112,14 +114,110 @@ async function fixtureSession(userId: string, tokenHash: string, csrfHash: strin
   return sessionId;
 }
 
+let clampInventory: Array<{signature:string;patterns:Array<{old:string;new:string;count:number}>}>;
+let sessionAclBefore:Array<Record<string,unknown>>=[],sessionAclAfter:Array<Record<string,unknown>>=[];
+let metadataBefore: Array<Record<string,unknown>>=[],metadataAfter:Array<Record<string,unknown>>=[];
 beforeAll(async () => {
   database = await startTestDatabase();
-  await migrate(database.pool);
+  const migration=await readFile(new URL("../../migrations/0099_direct_secure_sessions.sql",import.meta.url),"utf8");
+  clampInventory=JSON.parse(migration.split("$inventory$")[1]!);
+  const metadataSql=`SELECT oid::text,oid::regprocedure::text AS signature,proowner::text,proacl::text,prosecdef,proconfig,pg_get_functiondef(oid) AS definition FROM pg_proc WHERE oid=ANY($1::regprocedure[]) ORDER BY oid`;
+  const aclSql=`SELECT a.attname,a.attacl::text,has_column_privilege('debateai_staff_security_owner','identity.session',a.attname,'SELECT') AS staff_read FROM pg_attribute a WHERE a.attrelid='identity.session'::regclass AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum`;
+  const facade={connect:async()=>{
+    const client=await database.pool.connect();
+    return {release:()=>client.release(),query:async(sql:string,values?:unknown[])=>{
+      const tracked=sql.startsWith("-- Task8:");
+      if(tracked) sessionAclBefore=(await client.query(aclSql)).rows;
+      if(tracked) metadataBefore=(await client.query(metadataSql,[clampInventory.map(x=>x.signature)])).rows;
+      const result=await client.query(sql,values);
+      if(tracked) sessionAclAfter=(await client.query(aclSql)).rows;
+      if(tracked) metadataAfter=(await client.query(metadataSql,[clampInventory.map(x=>x.signature)])).rows;
+      return result;
+    }};
+  }} as unknown as Pool;
+  await migrate(facade);
 }, 120_000);
 
 afterAll(async () => database?.stop());
 
 describe("S5 sessions on real PostgreSQL", () => {
+  it("preserves the exact 29 function identities/owners/ACLs/security while clamping only ordinary sessions",async()=>{
+    expect(metadataBefore).toHaveLength(29);expect(metadataAfter).toHaveLength(29);
+    for(const [i,before] of sessionAclBefore.entries()) {
+      if(before.attname==='created_at') {expect(before.staff_read).toBe(false);expect(sessionAclAfter[i]!.staff_read).toBe(true);}
+      else expect(sessionAclAfter[i]).toEqual(before);
+    }
+    const extraAcl=(await database.pool.query(`SELECT grantor=(SELECT relowner FROM pg_class WHERE oid=a.attrelid) AS owner_grant,grantee::regrole::text,privilege_type,is_grantable FROM pg_attribute a CROSS JOIN LATERAL aclexplode(a.attacl) WHERE a.attrelid='identity.session'::regclass AND a.attname='created_at'`)).rows;
+    expect(extraAcl).toEqual([{owner_grant:true,grantee:'debateai_staff_security_owner',privilege_type:'SELECT',is_grantable:false}]);
+    for(const [i,before] of metadataBefore.entries()) {
+      const {definition:oldDefinition,...oldAuthority}=before;
+      const {definition:newDefinition,...newAuthority}=metadataAfter[i]!;
+      expect(newAuthority).toEqual(oldAuthority);
+      const entry=clampInventory.find(x=>x.signature.replaceAll("timestamptz","timestamp with time zone")===before.signature)!;
+      expect(entry).toBeDefined();
+      let expected=String(oldDefinition);
+      for(const pattern of entry.patterns) expected=expected.split(pattern.old).join(pattern.new);
+      if(entry.signature.startsWith("identity.rotate_session_after_step_up(")) expected=expected.replaceAll("'ADD_PASSKEY'","'ADD_PASSKEY','ADD_TOTP'");
+      expect(String(newDefinition)).toBe(expected);
+    }
+    const staff=metadataAfter.find(x=>String(x.signature).startsWith("staff.complete_owned_webauthn_assertion("))!;
+    expect(String(staff.definition)).toContain("v_time+interval '8 hours'");
+    expect(String(staff.definition)).toContain("v_time+interval '15 minutes'");
+  });
+
+  it("ages historical sessions out at 30 days without rewriting or revoking them", async () => {
+    const identity = await fixtureUser("historical-cutoff");
+    const repository = new PostgresSessionRepository(database.pool, fakeAuditHasher);
+    const tokenHash = fixtureHash("historical-cutoff");
+    const sessionId = await fixtureSession(identity.userId, tokenHash, fixtureHash("historical-csrf"), {
+      absoluteExpiresAt: new Date(Date.now() + 60 * 86400000)
+    });
+    await database.pool.query(`UPDATE identity.session SET created_at=clock_timestamp()-interval '31 days' WHERE session_id=$1`, [sessionId]);
+    await expect(repository.authenticateSession({ tokenHash, bindingHash: hash("b"), occurredAt: new Date(), idleExpiresAt: new Date(Date.now()+1209600000) })).resolves.toBeNull();
+    await expect(repository.assertSessionCurrent({ userId: identity.userId, sessionId, tokenHash })).resolves.toBe(false);
+    expect(await repository.listActiveSessions(identity.userId, new Date())).toEqual([]);
+    const stored = (await database.pool.query(`SELECT revoked_at,absolute_expires_at>clock_timestamp()+interval '59 days' AS original_expiry FROM identity.session WHERE session_id=$1`, [sessionId])).rows[0];
+    expect(stored).toEqual({ revoked_at: null, original_expiry: true });
+    const client=await database.pool.connect();
+    try {
+      await client.query("SET ROLE debateai_authorization_runtime");
+      expect((await client.query('SELECT * FROM identity.read_email_settings($1,$2)',[identity.userId,sessionId])).rows).toEqual([]);
+      expect((await client.query('SELECT identity.record_sensitive_data_consent($1,$2,$3,$4,$5) AS value',[identity.userId,sessionId,'fixture','en',new Date()])).rows[0].value).toBe('SESSION_NOT_FOUND');
+      await client.query('RESET ROLE');
+    } finally {await client.query('RESET ROLE');client.release();}
+
+  });
+
+  it("refresh and rotation preserve created_at and earlier stored expiry while using the 30-day effective ceiling",async()=>{
+    for(const earlier of [false,true]) {
+      const identity=await fixtureUser(`rotation-clamp-${earlier}`),repository=new PostgresSessionRepository(database.pool,fakeAuditHasher),token=fixtureHash(randomUUID());
+      const sessionId=await fixtureSession(identity.userId,token,fixtureHash(randomUUID()),{absoluteExpiresAt:new Date(Date.now()+(earlier?86400000:60*86400000))});
+      await database.pool.query("UPDATE identity.session SET created_at=clock_timestamp()-interval '29 days' WHERE session_id=$1",[sessionId]);
+      const before=(await database.pool.query("SELECT created_at,absolute_expires_at,LEAST(absolute_expires_at,created_at+interval '720 hours') AS effective FROM identity.session WHERE session_id=$1",[sessionId])).rows[0];
+      const auth=await repository.authenticateSession({tokenHash:token,bindingHash:hash("b"),occurredAt:new Date(),idleExpiresAt:new Date(Date.now()+1209600000)});
+      expect(auth!.absoluteExpiresAt).toEqual(before.effective);expect(auth!.idleExpiresAt.getTime()).toBeLessThanOrEqual(before.effective.getTime());
+      expect(await repository.rotateAfterStepUp({identity:{...identity,secretCiphertext:{} as never,lastAcceptedStep:10},currentSessionId:sessionId,currentTokenHash:token,acceptedStep:11,replacementTokenHash:fixtureHash(randomUUID()),replacementCsrfHash:fixtureHash(randomUUID()),bindingContext:{user_agent_hash:hash("b")},occurredAt:new Date(),idleExpiresAt:new Date(Date.now()+1209600000),source})).toBe(true);
+      const after=(await database.pool.query('SELECT created_at,absolute_expires_at,idle_expires_at FROM identity.session WHERE session_id=$1',[sessionId])).rows[0];
+      expect(after.created_at).toEqual(before.created_at);expect(after.absolute_expires_at).toEqual(before.absolute_expires_at);expect(after.idle_expires_at.getTime()).toBeLessThanOrEqual(before.effective.getTime());
+    }
+  });
+
+  it("refuses backdated, null and lock-wait expiry at a direct ordinary-session authority",async()=>{
+    const identity=await fixtureUser("clock-clamp"),sessionId=await fixtureSession(identity.userId,fixtureHash(randomUUID()),fixtureHash(randomUUID()),{absoluteExpiresAt:new Date(Date.now()+60*86400000)});
+    expect((await database.pool.query('SELECT identity.record_sensitive_data_consent($1,$2,$3,$4,NULL) AS value',[identity.userId,sessionId,'fixture','en'])).rows[0].value).toBe('SESSION_NOT_FOUND');
+    const blocker=await database.pool.connect(),reader=await database.pool.connect();let blockerOpen=false,readerOpen=false;
+    try {
+      await database.pool.query("UPDATE identity.session SET created_at=clock_timestamp()-interval '720 hours'+interval '250 milliseconds' WHERE session_id=$1",[sessionId]);
+      await blocker.query('BEGIN');blockerOpen=true;await blocker.query('SELECT identity.lock_account_t9_internal($1,true)',[identity.userId]);
+      await reader.query('SET ROLE debateai_authorization_runtime');
+      await reader.query('BEGIN');readerOpen=true;await reader.query('SELECT identity.begin_runtime_audit_attempt()');
+      const pending=reader.query("SELECT identity.confirm_account_age_with_audit($1,$2,true,18::smallint,'RO','fixture',$3,$4) AS value",[identity.userId,sessionId,new Date(Date.now()-86400000),{ipArgon2id:'argon2id-audit:v1:'+"1".repeat(64),userAgentArgon2id:'argon2id-audit:v1:'+"2".repeat(64)}]);
+      await expectStillPending(pending);await new Promise(resolve=>setTimeout(resolve,300));await blocker.query('ROLLBACK');blockerOpen=false;
+      expect((await pending).rows[0].value).toBe('SESSION_NOT_FOUND');await reader.query('COMMIT');readerOpen=false;
+      expect((await reader.query('SELECT identity.record_sensitive_data_consent($1,$2,$3,$4,$5) AS value',[identity.userId,sessionId,'fixture','en',new Date(Date.now()-86400000)])).rows[0].value).toBe('SESSION_NOT_FOUND');
+    } finally {if(blockerOpen)await blocker.query('ROLLBACK');if(readerOpen)await reader.query('ROLLBACK');await reader.query('RESET ROLE');blocker.release();reader.release();}
+  });
+
   it("refreshes conditionally, caps idle at absolute, and rejects the exact expiry boundary", async () => {
     const identity = await fixtureUser("refresh");
     const repository = new PostgresSessionRepository(database.pool, fakeAuditHasher);
@@ -950,5 +1048,35 @@ describe("S5 sessions on real PostgreSQL", () => {
     };
     await runSchedule(false);
     await runSchedule(true);
+  });
+});
+
+describe('exact elapsed consumer lifetimes across DST',()=>{
+  it.each(['Europe/Bucharest','UTC'])('clamps old projected sessions to exactly720 hours and preserves earlier expiry under %s',async zone=>{
+    const client=await database.pool.connect();
+    try {
+      await client.query('SELECT set_config($1,$2,false)',['TimeZone',zone]);
+      const facade={query:client.query.bind(client)} as unknown as Pool,repo=new PostgresSessionRepository(facade,fakeAuditHasher);
+      for(const [i,start] of ['2027-03-15T10:00:00.000Z','2027-10-15T10:00:00.000Z','2027-01-15T10:00:00.000Z'].entries()) {
+        for(const duration of [2592000000,3600000]) {
+          const identity=await fixtureUser(`dst-${zone==='UTC'?'utc':'ro'}-${i}-${duration}`),created=new Date(start),stored=new Date(created.getTime()+(duration===3600000?duration:7776000000));
+          const id=randomUUID();
+          await client.query(`INSERT INTO identity.session(session_id,user_id,token_hash,csrf_token_hash,binding_context,created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at) VALUES($1,$2,$3,$4,$5,$6,$6,$7,$7,$6)`,[id,identity.userId,fixtureHash(randomUUID()),fixtureHash(randomUUID()),{user_agent_hash:hash('b')},created,stored]);
+          const projected=(await repo.listActiveSessions(identity.userId,new Date()))[0]!;
+          expect(projected.absoluteExpiresAt.getTime()-projected.createdAt.getTime()).toBe(duration);
+          expect((await client.query('SELECT absolute_expires_at FROM identity.session WHERE session_id=$1',[id])).rows[0].absolute_expires_at).toEqual(stored);
+        }
+      }
+    } finally {await client.query('RESET TimeZone');client.release();}
+  });
+  it.each(['Europe/Bucharest','UTC'])('clips new SQL session material to exact14/30 day millisecond limits under %s',async zone=>{
+    const user=await fixtureUser(`new-dst-${zone==='UTC'?'utc':'ro'}`),client=await database.pool.connect();
+    try {
+      await client.query('SELECT set_config($1,$2,false)',['TimeZone',zone]);
+      const sessionId=randomUUID(),binding=hash('b');
+      await client.query('SELECT identity.insert_consumer_session_internal($1,$2,$3)',[user.userId,{sessionId,sessionTokenHash:fixtureHash(randomUUID()),csrfTokenHash:fixtureHash(randomUUID()),sessionBindingContext:{user_agent_hash:binding},idleExpiresAt:new Date(Date.now()+7776000000),absoluteExpiresAt:new Date(Date.now()+7776000000)},binding]);
+      const row=(await client.query('SELECT extract(epoch FROM (idle_expires_at-created_at))*1000 AS idle,extract(epoch FROM (absolute_expires_at-created_at))*1000 AS absolute FROM identity.session WHERE session_id=$1',[sessionId])).rows[0];
+      expect(Number(row.idle)).toBe(1209600000);expect(Number(row.absolute)).toBe(2592000000);
+    } finally {await client.query('RESET TimeZone');client.release();}
   });
 });

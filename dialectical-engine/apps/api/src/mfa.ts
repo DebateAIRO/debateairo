@@ -1,5 +1,7 @@
-import { randomUUID } from "node:crypto";
-import type { AuthSourceContext, PostgresIdentityRepository } from "@debateai/db";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { AuthSourceContext, PostgresIdentityRepository, PostgresConsumerAuthRepository, TotpEnrollmentAuthority } from "@debateai/db";
+import { currentDocument, legalManifestLocales } from "@debateai/legal-manifest";
+import type { AuthenticatedSession, ConsumerSessionProducer, LoginResult } from "./sessions.js";
 import type { MfaPolicy } from "@debateai/register";
 import {
   Argon2InfrastructureError,
@@ -22,12 +24,7 @@ import {
 import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
 
 type MfaRepository = Pick<PostgresIdentityRepository,
-  | "activateMfaEnrollment"
-  | "beginTotpEnrollment"
-  | "confirmTotpEnrollment"
   | "consumeAndReplaceRecoveryCode"
-  | "readMfaEnrollmentIdentity"
-  | "readRecoveryCodeForConfirmation"
   | "readRecoveryCodeForUse"
   | "readTotpEnrollment"
   | "recordMfaVerificationFailure"
@@ -115,15 +112,8 @@ export class MfaVerificationLimiter {
 }
 
 export interface MfaApplication {
-  beginTotp(input: { readonly enrollmentToken: string }, source: AuthSourceContext): Promise<Readonly<{
-    status: "verification_required";
-    secret: string;
-    otpauthUri: string;
-  }>>;
-  verifyTotp(input: {
-    readonly enrollmentToken: string;
-    readonly code: string;
-  }, source: AuthSourceContext): Promise<Readonly<{ status: "recovery_codes_required" }>>;
+  beginTotp(input: Readonly<{enrollmentToken:string}>|Readonly<{stepUpGrant:string}>, source:AuthSourceContext, session?:AuthenticatedSession):Promise<Readonly<{status:"verification_required";secret:string;otpauthUri:string;enrollment_token:string;expires_at:string}>>;
+  verifyTotp(input:Readonly<{enrollmentToken:string;code:string}>,source:AuthSourceContext,session?:AuthenticatedSession):Promise<LoginResult|Readonly<{status:"enrolled"}>>;
   generateRecoveryCodes(input: {
     readonly enrollmentToken: string;
   }, source: AuthSourceContext): Promise<Readonly<{
@@ -151,6 +141,9 @@ function normalizedSourceIp(source: AuthSourceContext): string {
 }
 
 function mfaFailure(error: unknown): unknown {
+  if(error instanceof Error && error.message==="MFA_ENROLLMENT_STATE_INVALID") return new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
+  if(error instanceof Error && error.message==="CONSUMER_AUTH_INVALID") return new AuthFlowError("MFA_ENROLLMENT_INVALID");
+  if(error instanceof Error && error.message==="CONSUMER_CHALLENGE_CAPACITY") return new AuthFlowError("MFA_RATE_LIMITED");
   return error instanceof Argon2InfrastructureError
     ? new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE", { cause: error })
     : error;
@@ -161,6 +154,8 @@ export class MfaEnrollmentService implements MfaApplication {
 
   constructor(private readonly dependencies: Readonly<{
     repository: MfaRepository;
+    consumerRepository?: Pick<PostgresConsumerAuthRepository,"prepareTotpEnrollment"|"beginTotpEnrollment"|"readTotpEnrollment"|"completeTotpEnrollment">;
+    sessions?: ConsumerSessionProducer;
     dekStore: ReadableUserDekStore;
     argon2: Argon2Executor;
     policy: MfaPolicy;
@@ -191,117 +186,63 @@ export class MfaEnrollmentService implements MfaApplication {
     throw new AuthFlowError("MFA_RATE_LIMITED");
   }
 
-  async beginTotp(
-    input: { readonly enrollmentToken: string },
-    source: AuthSourceContext
-  ): Promise<Readonly<{ status: "verification_required"; secret: string; otpauthUri: string }>> {
-    const tokenHash = enrollmentHash(input.enrollmentToken);
-    const now = this.now();
-    await this.rateLimit(tokenHash, source, now);
-    const identity = await this.dependencies.repository.readMfaEnrollmentIdentity(tokenHash);
-    if (identity === null) {
-      await this.dependencies.repository.recordMfaVerificationFailure({
-        enrollmentTokenHash: tokenHash,
-        reason: "MFA_ENROLLMENT_INVALID",
-        occurredAt: now,
-        source
-      });
-      throw new AuthFlowError("MFA_ENROLLMENT_INVALID");
-    }
-    const existing = await this.dependencies.repository.readTotpEnrollment(tokenHash);
-    if (existing !== null && existing.factorState !== "pending") {
-      throw new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
-    }
-    const factorId = randomUUID();
-    const secret = generateTotpSecret();
-    let dek: Buffer | undefined;
-    try {
-      dek = await this.dependencies.dekStore.load(identity.userId);
-      const secretCiphertext = encrypt(dek, secret, [
-        "identity", "mfa_factor.secret_ciphertext", factorId, "run:none", identity.userId,
-        `user-dek:${identity.userId}`, "1"
-      ]);
-      const begun = await this.dependencies.repository.beginTotpEnrollment({
-        enrollmentTokenHash: tokenHash,
-        factorId,
-        secretCiphertext,
-        occurredAt: now,
-        source
-      });
-      if (begun === null || begun.userId !== identity.userId || begun.factorId !== factorId) {
-        throw new AuthFlowError("MFA_ENROLLMENT_INVALID");
-      }
-      const encoded = encodeBase32(secret);
-      return Object.freeze({
-        status: "verification_required" as const,
-        // The authorized begin response is the only lawful plaintext exposure;
-        // the value is never retrievable from a later route, log or datastore.
-        secret: encoded,
-        otpauthUri: totpProvisioningUri(secret, {
-          issuer: this.dependencies.policy.issuer,
-          accountLabel: begun.pseudonym
-        })
-      });
-    } finally {
-      secret.fill(0);
-      dek?.fill(0);
-    }
+  private secureDependencies() {
+    const {consumerRepository,sessions}=this.dependencies;
+    if(consumerRepository===undefined || sessions===undefined) throw new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE");
+    return {consumerRepository,sessions};
   }
 
-  async verifyTotp(input: {
-    readonly enrollmentToken: string;
-    readonly code: string;
-  }, source: AuthSourceContext): Promise<Readonly<{ status: "recovery_codes_required" }>> {
+  private additionHash(token:string):string {
+    enrollmentHash(token);
+    return "sha256:"+createHash("sha256").update("consumer-totp:ADD_TOTP\0").update(token).digest("hex");
+  }
+
+  async beginTotp(input:Readonly<{enrollmentToken:string}>|Readonly<{stepUpGrant:string}>,source:AuthSourceContext,session?:AuthenticatedSession) {
+    const initial="enrollmentToken" in input;
+    if(!initial) enrollmentHash(input.stepUpGrant);
+    if(!initial && session===undefined) throw new AuthFlowError("MFA_ENROLLMENT_INVALID");
+    const authority:TotpEnrollmentAuthority=initial ? {enrollmentTokenHash:enrollmentHash(input.enrollmentToken)} : {
+      userId:session!.userId,sessionId:session!.session.session_id,tokenHash:session!.tokenHash,grantHash:hashToken("step-up-grant",input.stepUpGrant)
+    };
+    const admission=await this.secureDependencies().sessions.admit("ENROLLMENT_BEGIN",initial?input.enrollmentToken:session!.userId,source);
+    const identity=await this.secureDependencies().consumerRepository.prepareTotpEnrollment(authority);
+    if(identity===null) throw new AuthFlowError("MFA_ENROLLMENT_INVALID");
+    const factorId=randomUUID(),secret=generateTotpSecret();
+    const enrollmentToken=initial?input.enrollmentToken:randomBytes(32).toString("base64url");
+    let dek:Buffer|undefined;
     try {
-      const tokenHash = enrollmentHash(input.enrollmentToken);
-      const now = this.now();
-      await this.rateLimit(tokenHash, source, now);
-      const enrollment = await this.dependencies.repository.readTotpEnrollment(tokenHash);
-      if (enrollment === null || enrollment.factorState !== "pending") {
-        throw new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
-      }
-      let dek: Buffer | undefined;
-      let secret: Buffer | undefined;
+      dek=await this.dependencies.dekStore.load(identity.userId);
+      const secretCiphertext=encrypt(dek,secret,["identity","mfa_factor.secret_ciphertext",factorId,"run:none",identity.userId,`user-dek:${identity.userId}`,"1"]);
+      const begun=await this.secureDependencies().consumerRepository.beginTotpEnrollment({...authority,...admission,factorId,secretCiphertext,bindingHash:this.secureDependencies().sessions.bindingHash(source),
+        ...(initial?{}:{handleHash:this.additionHash(enrollmentToken)})},source).catch(error=>{throw mfaFailure(error);});
+      return Object.freeze({status:"verification_required" as const,secret:encodeBase32(secret),otpauthUri:totpProvisioningUri(secret,{issuer:this.dependencies.policy.issuer,accountLabel:identity.pseudonym}),
+        enrollment_token:enrollmentToken,expires_at:new Date(begun.expiresAt).toISOString()});
+    } finally {secret.fill(0);dek?.fill(0);}
+  }
+
+  async verifyTotp(input:Readonly<{enrollmentToken:string;code:string}>,source:AuthSourceContext,session?:AuthenticatedSession):Promise<LoginResult|Readonly<{status:"enrolled"}>> {
+    try {
+      const lookup={enrollmentTokenHash:enrollmentHash(input.enrollmentToken),additionHandleHash:this.additionHash(input.enrollmentToken),bindingHash:this.secureDependencies().sessions.bindingHash(source),
+        ...(session===undefined?{}:{sessionId:session.session.session_id,tokenHash:session.tokenHash})};
+      await this.secureDependencies().sessions.admit("ENROLLMENT_COMPLETE",input.enrollmentToken,source);
+      const enrollment=await this.secureDependencies().consumerRepository.readTotpEnrollment(lookup);
+      if(enrollment===null) throw new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
+      let dek:Buffer|undefined,secret:Buffer|undefined;
       try {
-        dek = await this.dependencies.dekStore.load(enrollment.userId);
-        secret = decrypt(dek, enrollment.secretCiphertext, [
-          "identity", "mfa_factor.secret_ciphertext", enrollment.factorId,
-          "run:none", enrollment.userId, `user-dek:${enrollment.userId}`, "1"
-        ]);
-        const matched = matchTotpStep(
-          secret,
-          input.code,
-          Math.floor(now.getTime() / (this.dependencies.policy.totp.periodSeconds * 1_000)),
-          enrollment.lastAcceptedStep
-        );
-        if (matched.status !== "accepted") {
-          await this.dependencies.repository.recordMfaVerificationFailure({
-            enrollmentTokenHash: tokenHash,
-            reason: "MFA_TOTP_INVALID",
-            occurredAt: now,
-            source
-          });
-          throw new AuthFlowError(matched.status === "replayed" ? "MFA_TOTP_REPLAYED" : "MFA_TOTP_INVALID");
+        dek=await this.dependencies.dekStore.load(enrollment.userId);
+        secret=decrypt(dek,enrollment.secretCiphertext,["identity","mfa_factor.secret_ciphertext",enrollment.factorId,"run:none",enrollment.userId,`user-dek:${enrollment.userId}`,"1"]);
+        const matched=matchTotpStep(secret,input.code,Math.floor(this.now().getTime()/(this.dependencies.policy.totp.periodSeconds*1000)),enrollment.lastAcceptedStep);
+        if(matched.status!=="accepted") {
+          await this.dependencies.repository.recordMfaVerificationFailure({enrollmentTokenHash:lookup.enrollmentTokenHash,reason:"MFA_TOTP_INVALID",occurredAt:this.now(),source});
+          throw new AuthFlowError(matched.status==="replayed"?"MFA_TOTP_REPLAYED":"MFA_TOTP_INVALID");
         }
-        const result = await this.dependencies.repository.confirmTotpEnrollment({
-          enrollmentTokenHash: tokenHash,
-          factorId: enrollment.factorId,
-          acceptedStep: matched.step,
-          occurredAt: now,
-          source
-        });
-        if (result !== "confirmed") {
-          throw new AuthFlowError(result === "replayed" ? "MFA_TOTP_REPLAYED" : "MFA_ENROLLMENT_INVALID");
-        }
-        this.limiter.clearEnrollment(tokenHash);
-        return Object.freeze({ status: "recovery_codes_required" as const });
-      } finally {
-        secret?.fill(0);
-        dek?.fill(0);
-      }
-    } catch (error) {
-      throw mfaFailure(error);
-    }
+        const material=enrollment.purpose==="INITIAL_ENROLLMENT"?this.secureDependencies().sessions.prepare(source):undefined;
+        const currentLegal=(["TERMS","PRIVACY"] as const).flatMap(kind=>legalManifestLocales(kind).map(locale=>({kind,locale,...currentDocument(kind,locale)!})));
+        const committed=await this.secureDependencies().consumerRepository.completeTotpEnrollment({...lookup,userId:enrollment.userId,factorId:enrollment.factorId,secretCiphertext:enrollment.secretCiphertext,acceptedStep:matched.step,
+          ...(material===undefined?{}:{material:{sessionId:material.sessionId,sessionTokenHash:material.sessionTokenHash,csrfTokenHash:material.csrfTokenHash,sessionBindingContext:material.sessionBindingContext,idleExpiresAt:material.idleExpiresAt,absoluteExpiresAt:material.absoluteExpiresAt}})},currentLegal,source);
+        return material===undefined?Object.freeze({status:"enrolled" as const}):this.secureDependencies().sessions.committed(material,committed,source);
+      } finally {secret?.fill(0);dek?.fill(0);}
+    } catch(error) {throw mfaFailure(error);}
   }
 
   async generateRecoveryCodes(input: {
@@ -351,50 +292,8 @@ export class MfaEnrollmentService implements MfaApplication {
     }
   }
 
-  async confirmRecoveryCode(input: {
-    readonly enrollmentToken: string;
-    readonly recoveryCode: string;
-  }, source: AuthSourceContext): Promise<Readonly<{ status: "active" }>> {
-    try {
-      const tokenHash = enrollmentHash(input.enrollmentToken);
-      const now = this.now();
-      await this.rateLimit(tokenHash, source, now);
-      let code: string;
-      try {
-        code = normalizeRecoveryCode(input.recoveryCode);
-      } catch {
-        code = "";
-      }
-      const record = code === "" ? null : await this.dependencies.repository
-        .readRecoveryCodeForConfirmation(tokenHash, recoveryCodeSlot(code));
-      const valid = record !== null
-        // V-22: twice the sealed recovery-code cost, and no further.
-        && storedArgon2EnvelopeNotOverPolicy(
-          record.codeHash, this.dependencies.policy.recoveryCodes.argon2id, "recovery-code"
-        )
-        && await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, code);
-      if (!valid || record === null) {
-        await this.dependencies.repository.recordMfaVerificationFailure({
-          enrollmentTokenHash: tokenHash,
-          reason: "MFA_RECOVERY_CONFIRMATION_INVALID",
-          occurredAt: now,
-          source
-        });
-        throw new AuthFlowError("MFA_RECOVERY_CONFIRMATION_INVALID");
-      }
-      if (!await this.dependencies.repository.activateMfaEnrollment({
-        enrollmentTokenHash: tokenHash,
-        recoveryCodeId: record.recoveryCodeId,
-        occurredAt: now,
-        source
-      })) {
-        throw new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
-      }
-      this.limiter.clearEnrollment(tokenHash);
-      return Object.freeze({ status: "active" as const });
-    } catch (error) {
-      throw mfaFailure(error);
-    }
+  async confirmRecoveryCode(_input:{readonly enrollmentToken:string;readonly recoveryCode:string},_source:AuthSourceContext):Promise<Readonly<{status:"active"}>> {
+    throw new AuthFlowError("MFA_ENROLLMENT_STATE_INVALID");
   }
 
   /** Future S5/S10 session code calls this with a server-derived user id. */

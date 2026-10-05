@@ -569,3 +569,35 @@ it('rechecks a prepared staff string response at final onSend after its handler 
     expect(response.body).not.toContain('SECRET_STRING_MUST_NOT_ESCAPE');
     await f.api.close();
 });
+
+
+describe("direct TOTP session completion", () => {
+  it("sets the shared host-only session cookies and projects no bearer into JSON", async () => {
+    const auth = authenticated();
+    const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN,
+      mfa: { verifyTotp: async () => ({ status: "authenticated", sessionToken: SESSION_TOKEN, csrfToken: CSRF_TOKEN, session: auth.session }) } as never });
+    try {
+      const response = await api.inject({ method: "POST", url: "/v1/auth/mfa/totp/verify", headers: { origin: ORIGIN }, payload: { enrollment_token: "e".repeat(43), code: "123456" } });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ status: "authenticated", csrf_token: CSRF_TOKEN, session: auth.session });
+      const cookies = response.headers["set-cookie"] as string[];
+      expect(cookies).toHaveLength(2);
+      expect(cookies[0]).toContain("HttpOnly");
+      for (const cookie of cookies) { expect(cookie).toContain("Secure"); expect(cookie).toContain("SameSite=Lax"); expect(cookie).toContain("Max-Age=1209600"); expect(cookie).not.toContain("Domain="); }
+    } finally { await api.close(); }
+  });
+});
+
+it('requires ordinary cookie CSRF when adding TOTP and exposes only enrolled on completion',async()=>{
+  const begin=vi.fn(async()=>({status:'verification_required',secret:'A'.repeat(32),otpauthUri:'otpauth://totp/fixture',enrollment_token:'e'.repeat(43),expires_at:'2026-10-05T12:00:00.000Z'}));
+  const complete=vi.fn(async(..._args:unknown[])=>({status:'enrolled'}));
+  const api=buildApi({application:application(),sessions:sessions(),allowedOrigin:ORIGIN,mfa:{beginTotp:begin,verifyTotp:complete} as never});
+  try {
+    const cookie=`${SESSION_COOKIE_NAME}=${SESSION_TOKEN}; ${CSRF_COOKIE_NAME}=${CSRF_TOKEN}`;
+    const missing=await api.inject({method:'POST',url:'/v1/auth/mfa/totp/begin',headers:{cookie,origin:ORIGIN},payload:{step_up_grant:'g'.repeat(43)}});
+    expect(missing.statusCode).toBe(403);expect(begin).not.toHaveBeenCalled();
+    const success=await api.inject({method:'POST',url:'/v1/auth/mfa/totp/verify',headers:{cookie,origin:ORIGIN,'x-csrf-token':CSRF_TOKEN},payload:{enrollment_token:'e'.repeat(43),code:'123456'}});
+    expect(success.statusCode).toBe(200);expect(success.json()).toEqual({status:'enrolled'});
+    expect(complete.mock.calls[0]?.[2]).toMatchObject({userId:authenticated().userId});
+  } finally {await api.close();}
+});

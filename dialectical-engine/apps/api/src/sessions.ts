@@ -98,6 +98,7 @@ export interface SessionApplication {
   beginLogin(input: Readonly<{ email: string; password: string }>, source: AuthSourceContext): Promise<Readonly<{
     status: "mfa_required";
     challengeToken: string;
+    availableMethods?: readonly ("passkey"|"totp"|"recovery_code")[];
   }>>;
   completeLogin(input: Readonly<{ challengeToken: string; code: string }>, source: AuthSourceContext): Promise<LoginResult>;
   logout(session: AuthenticatedSession, source: AuthSourceContext): Promise<boolean>;
@@ -134,7 +135,7 @@ export interface SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -331,7 +332,7 @@ export class SessionService implements SessionApplication {
       tokenHash,
       bindingHash: this.bindingHash(source),
       occurredAt: now,
-      idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs)
+      idleExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.idleTtlMs,1209600000))
     });
     return record === null ? null : Object.freeze({
       session: sessionFor(record.ownerRef, record.sessionId),
@@ -366,7 +367,7 @@ export class SessionService implements SessionApplication {
   async beginLogin(
     input: Readonly<{ email: string; password: string }>,
     source: AuthSourceContext
-  ): Promise<Readonly<{ status: "mfa_required"; challengeToken: string }>> {
+  ): Promise<Readonly<{ status: "mfa_required"; challengeToken: string; availableMethods:readonly ("passkey"|"totp"|"recovery_code")[] }>> {
     const now = this.now();
     let normalizedEmail = "";
     try {
@@ -413,7 +414,7 @@ export class SessionService implements SessionApplication {
         source
       });
       if (!created) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
-      return Object.freeze({ status: "mfa_required" as const, challengeToken });
+      return Object.freeze({ status: "mfa_required" as const, challengeToken, availableMethods:identity.availableMethods??["totp" as const] });
     } catch (error) {
       throw asAuthFailure(error);
     }
@@ -436,8 +437,8 @@ export class SessionService implements SessionApplication {
       sessionTokenHash: hashToken("session", sessionToken),
       csrfToken,
       csrfTokenHash: hashToken("csrf", csrfToken),
-      idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs),
-      absoluteExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.absoluteTtlMs)
+      idleExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.idleTtlMs,1209600000)),
+      absoluteExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.absoluteTtlMs,2592000000))
     });
   }
 
@@ -454,7 +455,7 @@ export class SessionService implements SessionApplication {
       prepare:(source:AuthSourceContext)=>{
         const now=this.now(), bindingHash=this.bindingHash(source);
         const material=this.sessionMaterial(now);
-        // New consumer producer ceiling only. Historical sealed selection and old sessions are unchanged.
+        // Preserve shorter selected lifetimes within the consumer maximums.
         const absoluteExpiresAt=new Date(Math.min(material.absoluteExpiresAt.getTime(),now.getTime()+2592000000));
         const idleExpiresAt=new Date(Math.min(material.idleExpiresAt.getTime(),now.getTime()+1209600000,absoluteExpiresAt.getTime()));
         return Object.freeze({...material,absoluteExpiresAt,idleExpiresAt,bindingHash,sessionBindingContext:Object.freeze({user_agent_hash:bindingHash}),occurredAt:now});
@@ -470,6 +471,7 @@ export class SessionService implements SessionApplication {
   }
 
   private async totpStep(challenge: LoginChallengeRecord, code: string, now: Date): Promise<number | null> {
+    if(challenge.factorId===null || challenge.secretCiphertext===null) return null;
     let dek: Buffer | undefined;
     let secret: Buffer | undefined;
     try {
@@ -572,20 +574,9 @@ export class SessionService implements SessionApplication {
         });
         throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       }
-      try{
-        const recorded=await this.dependencies.riskSignals.recordForSession({
-          tokenHash:material.sessionTokenHash,bindingHash,kind:"LOGIN_SUCCESS",source
-        });
-        if(recorded!=="recorded") throw new TypeError("LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED");
-      }catch(error){this.dependencies.onRiskSignalFailure(error);}
       this.limiter.clearEnrollment(rateKey);
-      return Object.freeze({
-        status: "authenticated" as const,
-        sessionToken: material.sessionToken,
-        csrfToken: material.csrfToken,
-        session: sessionFor(challenge.ownerRef, material.sessionId),
-        ...(replacementRecoveryCode === undefined ? {} : { replacementRecoveryCode })
-      });
+      const result=await this.consumerProducer().committed({...material,bindingHash,sessionBindingContext:context,occurredAt:now},challenge,source);
+      return Object.freeze({...result,...(replacementRecoveryCode===undefined?{}:{replacementRecoveryCode})});
     } catch (error) {
       throw asAuthFailure(error);
     }
@@ -672,7 +663,7 @@ export class SessionService implements SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" }>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -765,7 +756,7 @@ export class SessionService implements SessionApplication {
         replacementCsrfHash: hashToken("csrf", replacementCsrf),
         bindingContext: Object.freeze({ user_agent_hash: this.bindingHash(source) }),
         occurredAt: now,
-        idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs),
+        idleExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.idleTtlMs,1209600000)),
         source,
         ...(input.authorization === undefined || grantToken === undefined || grantExpiresAt === undefined
           ? {}

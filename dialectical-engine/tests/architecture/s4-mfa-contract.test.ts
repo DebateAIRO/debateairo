@@ -38,13 +38,14 @@ describe("S4 MFA architecture contract", () => {
     });
   });
 
-  it("contains no Phase-1 passkey or WebAuthn behavior", async () => {
+  it("uses separate consumer passkeys and direct TOTP completion", async () => {
     const [api, mfa] = await Promise.all([
       read("apps/api/src/index.ts"),
       read("apps/api/src/mfa.ts")
     ]);
     const behavior = `${api}\n${mfa}`;
-    expect(behavior).not.toMatch(/auth\/mfa\/passkey|webauthn/i);
+    expect(behavior).toMatch(/auth\/passkeys\/enrollment/);
+    expect(behavior).toContain("completeAuthenticatedResponse");
     expect(behavior).toMatch(/auth\/mfa\/totp\/begin/);
     expect(behavior).toMatch(/auth\/mfa\/recovery-codes\/confirm/);
   });

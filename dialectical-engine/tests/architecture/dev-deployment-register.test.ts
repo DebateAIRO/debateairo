@@ -41,7 +41,7 @@ describe("DEV-05 development deployment register source contract", () => {
     // rows; the sealed historical set is never republished from here.
     expect(source).toContain("AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS");
     expect(source).toContain("MFA_POLICY_REGISTER_ROW");
-    expect(source).toContain("SESSION_POLICY_REGISTER_ROW");
+    expect(source).toContain("SESSION_POLICY_DEPLOYMENT_REGISTER_ROW");
     expect(source).toContain("RECOVERY_POLICY_REGISTER_ROW");
     expect(source).toContain("PRODUCT_ROLE_POLICY_REGISTER_ROW");
     expect(source).toContain("createPostgresRegisterPublicationPort(input.adminPool).publishGeneral");

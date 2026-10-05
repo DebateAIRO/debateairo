@@ -449,7 +449,7 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
   z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
-  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY"]) }).strict()
+  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP"]) }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
@@ -465,7 +465,7 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY"]),
+    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP"]),
     expires_at: z.iso.datetime()
   }).strict()
 ]);

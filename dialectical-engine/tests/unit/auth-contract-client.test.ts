@@ -296,3 +296,19 @@ describe("streamlined consumer auth boundary", () => {
     expect(inventory.resources).toHaveProperty("ResendVerificationRequestSchema");
   });
 });
+
+it('exposes strict direct TOTP enrollment and secure available-method continuation contracts',async()=>{
+  const requests:Array<{path:string;body:unknown}>=[];
+  const response={status:'verification_required',secret:'A'.repeat(32),otpauthUri:'otpauth://totp/fixture',enrollment_token:'e'.repeat(43),expires_at:'2026-10-05T12:00:00.000Z'};
+  const client=createContractClient('https://debate.test',async(input,init)=>{
+    const path=new URL(String(input)).pathname;requests.push({path,body:JSON.parse(String(init?.body))});
+    return Response.json(path.endsWith('/begin')?response:path.endsWith('/verify')?AUTHENTICATED:{status:'mfa_required',challenge_token:'l'.repeat(43),available_methods:['passkey']});
+  });
+  await expect(client.beginTotpEnrollment({step_up_grant:'g'.repeat(43)})).resolves.toEqual(response);
+  await expect(client.completeTotpEnrollment({enrollment_token:'e'.repeat(43),code:'123456'})).resolves.toEqual(AUTHENTICATED);
+  await expect(client.beginLogin('person@example.test','password')).resolves.toMatchObject({status:'mfa_required',available_methods:['passkey']});
+  expect(requests[0]).toEqual({path:'/v1/auth/mfa/totp/begin',body:{step_up_grant:'g'.repeat(43)}});
+  expect(contract.BeginTotpEnrollmentRequestSchema.safeParse({enrollment_token:'e'.repeat(43),step_up_grant:'g'.repeat(43)}).success).toBe(false);
+  expect(contract.TotpEnrollmentResponseSchema.safeParse({status:'recovery_codes_required'}).success).toBe(false);
+  expect(contract.LoginContinuationResponseSchema.safeParse({status:'mfa_required',challenge_token:'l'.repeat(43),available_methods:[]}).success).toBe(false);
+});

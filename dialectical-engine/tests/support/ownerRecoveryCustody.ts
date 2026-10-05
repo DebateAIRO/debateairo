@@ -1,4 +1,4 @@
-import { constants } from 'node:fs';
+import { constants, realpathSync } from 'node:fs';
 import { lstat, open, realpath, rename, unlink } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { OwnerRecoveryCustody, type OwnerFileStat, type OwnerRecoveryFiles } from '../../apps/runner/src/owner-recovery-custody.js';
@@ -7,7 +7,7 @@ import type { StaffAlertConfigFiles } from '../../apps/api/src/staff/alerts.js';
  * UID0 is projected ONLY from this process-owned fixture or the explicitly named source helper;
  * ancestors outside the fixture form its virtual protected root. Never injected by the CLI. */
 export function syntheticOwnerFiles(root:string,fault?:(operation:string,path:string)=>void):OwnerRecoveryFiles {
- const helper=resolve('apps/runner/src/owner-recovery-lock.py');
+ const helper=realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'));
  const projected=(path:string,stat:OwnerFileStat):OwnerFileStat=>{
   const owned=path===root||path.startsWith(root+'/')||path===helper;
   if(owned&&stat.uid!==process.getuid!())throw new Error('SYNTHETIC_CUSTODY_NOT_OWNED');

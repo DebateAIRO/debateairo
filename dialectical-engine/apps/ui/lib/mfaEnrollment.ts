@@ -1,3 +1,4 @@
+import { AuthenticationResponseSchema } from "@debateai/contract";
 import { API_BASE, createSameOriginFetch } from "./api.js";
 
 export class MfaEnrollmentHttpError extends Error {
@@ -119,7 +120,7 @@ export async function verifyMfaTotp(enrollmentToken: string, code: string): Prom
     enrollment_token: enrollmentToken,
     code
   }) as Record<string, unknown>;
-  if (payload.status !== "recovery_codes_required") {
+  if (!AuthenticationResponseSchema.safeParse(payload).success) {
     throw new MfaEnrollmentHttpError("MFA_RESPONSE_INVALID", 502);
   }
 }

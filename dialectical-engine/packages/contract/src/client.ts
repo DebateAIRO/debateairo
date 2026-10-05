@@ -2,7 +2,8 @@ import {PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsRe
  type BeginPasskeyEnrollmentRequest,type CompletePasskeyEnrollmentRequest,type BeginPasskeyLoginRequest,type CompletePasskeyLoginRequest,
  type PasskeyRegistrationOptionsResponse,type PasskeyAuthenticationOptionsResponse,type PasskeyEnrollmentResponse} from './consumer-auth.js';
 import {
-  AuthenticationResponseSchema,
+  AuthenticationResponseSchema, BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
+  type BeginTotpEnrollmentRequest, type CompleteTotpEnrollmentRequest, type TotpEnrollmentOptionsResponse, type TotpEnrollmentResponse, type LoginContinuationResponse,
   REGISTRATION_PUBLIC_MESSAGE,
   RESEND_VERIFICATION_PUBLIC_MESSAGE,
   RegisterRequestSchema,
@@ -309,7 +310,9 @@ export interface ContractClient {
   completePasskeyEnrollment(input:CompletePasskeyEnrollmentRequest):Promise<PasskeyEnrollmentResponse>;
   beginPasskeyLogin(input?:BeginPasskeyLoginRequest):Promise<PasskeyAuthenticationOptionsResponse>;
   completePasskeyLogin(input:CompletePasskeyLoginRequest):Promise<AuthenticationResponse>;
-  beginLogin(email: string, password: string): Promise<{ status: "mfa_required"; challenge_token: string }>;
+  beginTotpEnrollment(input:BeginTotpEnrollmentRequest):Promise<TotpEnrollmentOptionsResponse>;
+  completeTotpEnrollment(input:CompleteTotpEnrollmentRequest):Promise<TotpEnrollmentResponse>;
+  beginLogin(email: string, password: string): Promise<LoginContinuationResponse>;
   completeLogin(challengeToken: string, code: string): Promise<AuthenticationResponse>;
   logout(): Promise<void>;
   listSessions(): Promise<SessionList>;
@@ -328,7 +331,7 @@ export interface ContractClient {
       action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
       target_run_id: string;
     }>
-    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" }>): Promise<{
+    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" }>): Promise<{
     status: "step_up_complete";
     csrf_token: string;
     step_up_grant?: ({
@@ -338,7 +341,7 @@ export interface ContractClient {
       expires_at: string;
     } | {
       token: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP";
       expires_at: string;
     }) | undefined;
   }>;
@@ -520,14 +523,9 @@ export function createContractClient(
       { method: "POST", body: JSON.stringify({ email }) },
       202
     ),
-    beginLogin: (email: string, password: string) => request("/v1/auth/login", {
-      parse(value: unknown) {
-        if (typeof value !== "object" || value === null) throw new TypeError("Invalid login challenge response");
-        const row = value as Record<string, unknown>;
-        if (row.status !== "mfa_required" || typeof row.challenge_token !== "string") throw new TypeError("Invalid login challenge response");
-        return { status: "mfa_required" as const, challenge_token: row.challenge_token };
-      }
-    }, { method: "POST", body: JSON.stringify({ email, password }) }),
+    beginTotpEnrollment:(input:BeginTotpEnrollmentRequest)=>request('/v1/auth/mfa/totp/begin',TotpEnrollmentOptionsResponseSchema,{method:'POST',body:JSON.stringify(BeginTotpEnrollmentRequestSchema.parse(input))}),
+    completeTotpEnrollment:(input:CompleteTotpEnrollmentRequest)=>request('/v1/auth/mfa/totp/verify',TotpEnrollmentResponseSchema,{method:'POST',body:JSON.stringify(CompleteTotpEnrollmentRequestSchema.parse(input))}),
+    beginLogin:(email:string,password:string)=>request('/v1/auth/login',LoginContinuationResponseSchema,{method:'POST',body:JSON.stringify({email,password})}),
     completeLogin: (challengeToken: string, code: string) => request(
       "/v1/auth/login", AuthenticationResponseSchema,
       { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }
@@ -570,7 +568,7 @@ export function createContractClient(
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         target_run_id: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" }>) => request(
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" }>) => request(
       "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,

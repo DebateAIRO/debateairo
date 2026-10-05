@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
-import type { AuditContextHasher } from '@debateai/crypto';
+import type { AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext } from './identity.js';
 export type ConsumerLegalPair = Readonly<{
     kind: 'TERMS' | 'PRIVACY';
@@ -96,6 +96,9 @@ export type ConsumerLoginCompletion = ConsumerCredential & Readonly<{
     bindingHash: string;
     material: ConsumerSessionPersistence;
 }>;
+export type TotpEnrollmentAuthority = Readonly<{ enrollmentTokenHash: string }> | Readonly<{ userId: string; sessionId: string; tokenHash: string; grantHash: string }>;
+export type SecureTotpEnrollment = Readonly<{ userId:string; pseudonym:string; factorId:string; secretCiphertext:CryptoEnvelope; lastAcceptedStep:number|null; purpose:'INITIAL_ENROLLMENT'|'ADD_TOTP'; expiresAt:string }>;
+export type TotpEnrollmentLookup = Readonly<{ enrollmentTokenHash:string; additionHandleHash:string; bindingHash:string; sessionId?:string; tokenHash?:string }>;
 /** Execute-only authority. Cleanup commits first; audit reduction holds no connection and precedes its owning transaction/locks. */
 export class PostgresConsumerAuthRepository {
     constructor(private readonly pool: Pool, private readonly auditContext: AuditContextHasher) { }
@@ -121,6 +124,28 @@ export class PostgresConsumerAuthRepository {
         finally {
             client.release();
         }
+    }
+    async prepareTotpEnrollment(input:TotpEnrollmentAuthority):Promise<Readonly<{userId:string;pseudonym:string;expiresAt:string}>|null> {
+        const result=await this.pool.query('SELECT identity.prepare_secure_totp_enrollment($1) AS value',[input]);
+        return result.rows[0]!.value;
+    }
+    async beginTotpEnrollment(input:TotpEnrollmentAuthority & Readonly<{factorId:string;secretCiphertext:CryptoEnvelope;handleHash?:string;bindingHash:string;retentionKey:string;challengeCapacity:number;challengesPerScope:number}>,source:AuthSourceContext):Promise<Readonly<{expiresAt:string}>> {
+        const candidates=await this.pool.query<{user_id:string}>('SELECT user_id FROM identity.expired_totp_addition_candidates($1)',[input.challengesPerScope]);
+        for(const candidate of candidates.rows) await this.pool.query('SELECT identity.prune_totp_addition($1)',[candidate.user_id]);
+        return this.audited(source,async(client,prepared)=>{
+            const result=await client.query('SELECT identity.begin_secure_totp_enrollment($1,$2) AS value',[input,prepared]);
+            return result.rows[0]!.value;
+        });
+    }
+    async readTotpEnrollment(input:TotpEnrollmentLookup):Promise<SecureTotpEnrollment|null> {
+        const result=await this.pool.query('SELECT identity.read_secure_totp_enrollment($1) AS value',[input]);
+        return result.rows[0]!.value;
+    }
+    async completeTotpEnrollment(input:TotpEnrollmentLookup & Readonly<{userId:string;factorId:string;secretCiphertext:CryptoEnvelope;acceptedStep:number;material?:ConsumerSessionPersistence}>,currentLegal:readonly ConsumerLegalPair[],source:AuthSourceContext):Promise<ConsumerSessionCommit> {
+        return this.audited(source,async(client,prepared)=>{
+            const result=await client.query('SELECT identity.complete_secure_totp_enrollment($1,$2,$3) AS value',[input,JSON.stringify(currentLegal),prepared]);
+            return result.rows[0]!.value;
+        });
     }
     async beginEnrollment<T>(input: ConsumerEnrollmentSeed, currentLegal: readonly ConsumerLegalPair[], source: AuthSourceContext, validateOptions: (candidate: ConsumerEnrollmentOptions) => Promise<T>): Promise<T> {
         // A separate transaction prevents cleanup challenge-row locks from being

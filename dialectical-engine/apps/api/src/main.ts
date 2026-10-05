@@ -610,12 +610,6 @@ const legal = new RepositoryLegalAcceptanceApplication({
   recordsKey,
   owedWithoutRecord: environment.DEPLOYMENT_MODE === "hosted"
 });
-const mfa = new MfaEnrollmentService({
-  repository: identityRepository,
-  dekStore,
-  argon2: argon2Pool,
-  policy: mfaPolicy
-});
 const sessions = await boot.run("session-service", () => SessionService.create({
   repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
   ...(environment.STAFF_ACCESS.policyVersion === 2 ? {staffPrerequisites: new PostgresStaffPrerequisiteProducer(pool, auditContextHasher)} : {}),
@@ -630,6 +624,14 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   sessionPolicy,
   blindIndexKey
 }));
+const mfa = new MfaEnrollmentService({
+  repository: identityRepository,
+  consumerRepository: new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),
+  sessions: sessions.consumerProducer(),
+  dekStore,
+  argon2: argon2Pool,
+  policy: mfaPolicy
+});
 // Explicit v2 composition retains current-state checks and refuses unavailable operator readiness.
 const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
   ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;

@@ -1,10 +1,11 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPool, migrate, PostgresConsumerAuthRepository, PostgresSessionRepository, type Pool } from '@debateai/db';
-import { hashToken, Argon2WorkerPool, encrypt, generateTotpSecret, hashPassword, totpCodeAtStep, type AuditContextHasher } from '@debateai/crypto';
-import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_REGISTER_ROW, sessionPolicyFromValue } from '@debateai/register';
+import { hashToken, Argon2WorkerPool, encrypt, generateTotpSecret, hashPassword, totpCodeAtStep, decodeBase32, createEmailBlindIndex, type AuditContextHasher } from '@debateai/crypto';
+import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_REGISTER_ROW, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue } from '@debateai/register';
 import { currentDocument } from '@debateai/legal-manifest';
 import { ConsumerWebAuthnService } from '../../apps/api/src/consumer-webauthn.js';
+import { MfaEnrollmentService } from '../../apps/api/src/mfa.js';
 import { SessionService, type AuthenticatedSession } from '../../apps/api/src/sessions.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 import { consumerFixture, origin, rpId, b64 } from '../support/consumerWebAuthnFixtures.js';
@@ -34,7 +35,7 @@ async function freshSessions() {
         sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value, SESSION_POLICY_REGISTER_ROW.sourceRef), blindIndexKey: Buffer.alloc(32, 5), dummyPasswordHash: 'fixture-password' });
 }
 afterAll(async () => { await runtime?.end(); await database?.stop(); });
-async function account(badLegal = false) {
+async function account(badLegal = false, missingAdult = false) {
     // Independent synthetic clients keep correctness cases independent of the real shared source gate.
     source.ip = `198.51.${Math.floor(++sourceSequence / 256)}.${sourceSequence % 256}`;
     const userId = randomUUID(), bearer = token(), channelId = randomUUID();
@@ -43,6 +44,7 @@ async function account(badLegal = false) {
     await database.pool.query(`INSERT INTO identity.verification_token_credential VALUES($1,$2,now()-interval '1 second',now()+interval '24 hours',now())`, [hashToken('verification', bearer), channelId]);
     await database.pool.query(`INSERT INTO identity.age_check VALUES($1,'passed',18,'RO','fixture-v1','registration',now())`, [userId]);
     for (const kind of ['TERMS', 'ADULT', 'PRIVACY_SHOWN']) {
+        if(missingAdult && kind==='ADULT') continue;
         const pair = currentDocument(kind === 'PRIVACY_SHOWN' ? 'PRIVACY' : 'TERMS', 'en')!;
         await database.pool.query(`INSERT INTO legal.acceptance(acceptance_id,owner_ref,kind,document_version,document_sha256,locale,surface,accepted_at,evidence_ciphertext,key_id) VALUES($1,$2,$3,$4,$5,'en','SIGN_UP',now(),$6,'aaaaaaaaaaaaaaaa')`, [randomUUID(), u.owner_ref, kind, pair.version, badLegal ? 'b'.repeat(64) : pair.sha256, Buffer.alloc(30)]);
     }
@@ -610,4 +612,221 @@ describe('retained ceremony bounds and transaction order', () => {
             beginClient.release();
         }
     });
+});
+
+
+const totpDek=Buffer.alloc(32,29);
+function totpService(repository=repo,producer=sessions.consumerProducer()) {
+  return new MfaEnrollmentService({repository:{recordMfaVerificationFailure:async()=>{}} as never,consumerRepository:repository,sessions:producer,
+    dekStore:{load:async()=>Buffer.from(totpDek)} as never,argon2:{} as never,policy:mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value)});
+}
+const totpCode=(secret:string)=>totpCodeAtStep(decodeBase32(secret),Math.floor(Date.now()/30000));
+const additionHash=(value:string)=>hash('consumer-totp:ADD_TOTP\0'+value);
+describe('direct TOTP activation and addition authority',()=>{
+  it('activates verified TOTP atomically into a usable session without recovery generation',async()=>{
+    const a=await account(),mfa=totpService(),before=risks,b=await mfa.beginTotp({enrollmentToken:a.bearer},source);
+    expect(b.enrollment_token).toBe(a.bearer);
+    const results=await Promise.allSettled([mfa.verifyTotp({enrollmentToken:b.enrollment_token,code:totpCode(b.secret)},source),mfa.verifyTotp({enrollmentToken:b.enrollment_token,code:totpCode(b.secret)},source)]);
+    expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+    const result=results.find(r=>r.status==='fulfilled')!;
+    if(result.status!=='fulfilled'||result.value.status!=='authenticated')throw Error('NO_SESSION');
+    expect(await sessions.authenticate(result.value.sessionToken,source)).toMatchObject({userId:a.userId});
+    expect(await state(a)).toEqual({state:'active',credentials:0,sessions:1});expect(risks).toBe(before+1);
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.recovery_code WHERE user_id=$1',[a.userId])).rows[0].n).toBe(0);
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.audit_event WHERE actor_key_ref=$1 AND event_type=ANY($2)',[a.auditToken,['identity.mfa.totp.verified','identity.mfa.enrollment.activated','identity.session.created']])).rows[0].n).toBe(3);
+  });
+  it.each(['email','consumed','legal','adult','age','hold','expiry'])('refuses changed %s authority at completion and leaves no partial activation',async mutation=>{
+    const a=await account(mutation==='legal',mutation==='adult'),mfa=totpService(),b=await mfa.beginTotp({enrollmentToken:a.bearer},source);
+    if(mutation==='email')await database.pool.query("UPDATE identity.channel_binding SET state='pending_verification' WHERE user_id=$1",[a.userId]);
+    if(mutation==='consumed')await database.pool.query('UPDATE identity.verification_token_credential SET consumed_at=NULL WHERE channel_binding_id=$1',[a.channelId]);
+    if(mutation==='age')await database.pool.query("UPDATE identity.age_check SET outcome='refused' WHERE user_id=$1",[a.userId]);
+    if(mutation==='hold')await database.pool.query("INSERT INTO identity.account_security_hold(user_id,held,security_epoch,changed_at) VALUES($1,true,1,now()) ON CONFLICT(user_id) DO UPDATE SET held=true,security_epoch=1",[a.userId]);
+    if(mutation==='expiry')await database.pool.query("UPDATE identity.verification_token_credential SET expires_at=issued_at+interval '1 microsecond' WHERE channel_binding_id=$1",[a.channelId]);
+    await expect(mfa.verifyTotp({enrollmentToken:a.bearer,code:totpCode(b.secret)},source)).rejects.toThrow();
+    expect((await state(a)).sessions).toBe(0);expect((await state(a)).state).toBe('pending_mfa');
+    expect((await database.pool.query('SELECT state FROM identity.mfa_factor WHERE user_id=$1',[a.userId])).rows[0].state).toBe('pending');
+  });
+  it('rolls back factor, activation, bearer and session on failed durable audit and records risk only after commit',async()=>{
+    const a=await account(),mfa=totpService(),b=await mfa.beginTotp({enrollmentToken:a.bearer},source),before=risks;
+    await database.pool.query(`CREATE FUNCTION identity.totp_fixture_fail() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.event_type='identity.mfa.totp.verified' THEN RAISE EXCEPTION 'TOTP_AUDIT_FAILURE';END IF;RETURN NEW;END$$;CREATE TRIGGER totp_fixture_fail BEFORE INSERT ON identity.audit_event FOR EACH ROW EXECUTE FUNCTION identity.totp_fixture_fail()`);
+    try {
+      await expect(mfa.verifyTotp({enrollmentToken:a.bearer,code:totpCode(b.secret)},source)).rejects.toThrow('TOTP_AUDIT_FAILURE');
+      expect(await state(a)).toEqual({state:'pending_mfa',credentials:0,sessions:0});expect(risks).toBe(before);
+      expect((await database.pool.query('SELECT state,last_accepted_step FROM identity.mfa_factor WHERE user_id=$1',[a.userId])).rows[0]).toEqual({state:'pending',last_accepted_step:null});
+      expect((await database.pool.query('SELECT verification_token_hash FROM identity.channel_binding WHERE user_id=$1',[a.userId])).rows[0].verification_token_hash).toBe(hashToken('verification',a.bearer));
+    } finally {await database.pool.query('DROP TRIGGER totp_fixture_fail ON identity.audit_event;DROP FUNCTION identity.totp_fixture_fail()');}
+  });
+  it('requires exact fresh ADD_TOTP authority and returns enrolled without another session',async()=>{
+    const a=await enrolled(),mfa=totpService(),wrong=await addGrant(a,'ADD_PASSKEY');
+    await expect(mfa.beginTotp({stepUpGrant:wrong.grant},source,wrong.session)).rejects.toThrow();
+    const g=await addGrant({...a,result:{...a.result,sessionToken:wrong.replacement}},'ADD_TOTP'),b=await mfa.beginTotp({stepUpGrant:g.grant},source,g.session);
+    expect(b.enrollment_token).not.toBe(a.bearer);expect(b.enrollment_token).not.toBe(g.grant);
+    await expect(mfa.beginTotp({stepUpGrant:g.grant},source,g.session)).rejects.toThrow();
+    await expect(mfa.verifyTotp({enrollmentToken:b.enrollment_token,code:totpCode(b.secret)},source)).rejects.toThrow();
+    await expect(mfa.verifyTotp({enrollmentToken:b.enrollment_token,code:totpCode(b.secret)},source,g.session)).resolves.toEqual({status:'enrolled'});
+    expect((await state(a)).sessions).toBe(1);
+    await expect(mfa.verifyTotp({enrollmentToken:b.enrollment_token,code:totpCode(b.secret)},source,g.session)).rejects.toThrow();
+    await expect(runtime.query('SELECT * FROM identity.consumer_totp_enrollment')).rejects.toMatchObject({code:'42501'});
+  });
+  it.each(['rotation','revocation','expiry','epoch'])('rechecks added-factor %s after begin',async mutation=>{
+    const a=await enrolled(),mfa=totpService(),g=await addGrant(a,'ADD_TOTP'),b=await mfa.beginTotp({stepUpGrant:g.grant},source,g.session);
+    if(mutation==='rotation')await database.pool.query('UPDATE identity.session SET token_hash=$2 WHERE session_id=$1',[g.session.session.session_id,hash(token())]);
+    if(mutation==='revocation')await database.pool.query('UPDATE identity.session SET revoked_at=clock_timestamp() WHERE session_id=$1',[g.session.session.session_id]);
+    if(mutation==='expiry')await database.pool.query("UPDATE identity.consumer_totp_enrollment SET expires_at=created_at+interval '1 microsecond' WHERE user_id=$1",[a.userId]);
+    if(mutation==='epoch')await database.pool.query('INSERT INTO identity.account_security_hold(user_id,held,security_epoch,changed_at) VALUES($1,false,1,now()) ON CONFLICT(user_id) DO UPDATE SET security_epoch=1',[a.userId]);
+    await expect(mfa.verifyTotp({enrollmentToken:b.enrollment_token,code:totpCode(b.secret)},source,g.session)).rejects.toThrow();
+    expect((await database.pool.query("SELECT count(*)::int AS n FROM identity.mfa_factor WHERE user_id=$1 AND state='pending'",[a.userId])).rows[0].n).toBe(1);
+  });
+  it('removes only an obsolete pending TOTP seed when passkey activation wins',async()=>{
+    const a=await account();await totpService().beginTotp({enrollmentToken:a.bearer},source);
+    const b=await service.beginPasskeyEnrollment({enrollment_token:a.bearer},source),f=consumerFixture();
+    await service.completePasskeyEnrollment({challenge_handle:b.challenge_handle,credential:f.registration(b.options.challenge)},source);
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.mfa_factor WHERE user_id=$1',[a.userId])).rows[0].n).toBe(0);
+  });
+});
+
+it('offers passkey-only password continuation and cancellation cannot produce password-only access',async()=>{
+  const a=await enrolled(),argon2=new Argon2WorkerPool({workers:1});await argon2.ready();
+  try {
+    const authPolicy=authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS),password='Task8 passkey-only password!',email=`task8-${randomUUID()}@example.test`,blindIndexKey=Buffer.alloc(32,5);
+    const passwordHash=await hashPassword(argon2,password,authPolicy.password.argon2id);
+    await database.pool.query('UPDATE identity."user" SET email_blind_index=$2,password_hash=$3 WHERE user_id=$1',[a.userId,createEmailBlindIndex(blindIndexKey,email),passwordHash]);
+    const actual=await SessionService.create({repository:new PostgresSessionRepository(runtime,audit),riskSignals:{recordForSession:async()=> 'recorded'} as never,onRiskSignalFailure:()=>{},dekStore:{} as never,argon2,authPolicy,mfaPolicy:mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value,SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),blindIndexKey,dummyPasswordHash:passwordHash});
+    const begun=await actual.beginLogin({email,password},source);
+    expect(begun.availableMethods).toEqual(['passkey']);expect((await state(a)).sessions).toBe(1);
+    const passkeys=new ConsumerWebAuthnService(repo,actual.consumerProducer(),{publicAppUrl:origin});
+    const cancelled=await passkeys.beginPasskeyLogin({continuation_token:begun.challengeToken},source);
+    expect(cancelled.options.userVerification).toBe('required');
+    await expect(actual.completeLogin({challengeToken:begun.challengeToken,code:''},source)).rejects.toMatchObject({code:'AUTH_CREDENTIALS_INVALID'});
+    await expect(actual.completeLogin({challengeToken:begun.challengeToken,code:'123456'},source)).rejects.toMatchObject({code:'AUTH_CREDENTIALS_INVALID'});
+    expect((await state(a)).sessions).toBe(1);
+    const result=await passkeys.completePasskeyLogin({challenge_handle:cancelled.challenge_handle,credential:a.f.assertion(cancelled.options.challenge,{userHandle:a.userHandle})},source);
+    expect(await actual.authenticate(result.sessionToken,source)).toMatchObject({userId:a.userId});expect((await state(a)).sessions).toBe(2);
+  } finally {await argon2.close();}
+});
+
+it('replaces own pending TOTP at full source capacity and cleans abandoned seeds without touching active factors',async()=>{
+  const owned:Array<{a:Awaited<ReturnType<typeof enrolled>>;g:Awaited<ReturnType<typeof addGrant>>;b:Awaited<ReturnType<MfaEnrollmentService['beginTotp']>>}>=[];
+  const sourceKey='192.0.2.222';
+  try {
+    for(let i=0;i<5;i++) {
+      const a=await enrolled();source.ip=sourceKey;const g=await addGrant(a,'ADD_TOTP');
+      const b=await totpService(repo,(await freshSessions()).consumerProducer()).beginTotp({stepUpGrant:g.grant},source,g.session);owned.push({a,g,b});
+    }
+    const first=owned[0]!;source.ip=sourceKey;
+    const g=await addGrant({...first.a,result:{...first.a.result,sessionToken:first.g.replacement}},'ADD_TOTP');
+    const b=await totpService(repo,(await freshSessions()).consumerProducer()).beginTotp({stepUpGrant:g.grant},source,g.session);
+    expect(b.enrollment_token).not.toBe(first.b.enrollment_token);
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_totp_enrollment WHERE retention_hash=(SELECT retention_hash FROM identity.consumer_totp_enrollment WHERE user_id=$1)',[first.a.userId])).rows[0].n).toBe(5);
+    const extra=await enrolled();source.ip=sourceKey;const extraGrant=await addGrant(extra,'ADD_TOTP');
+    await expect(totpService(repo,(await freshSessions()).consumerProducer()).beginTotp({stepUpGrant:extraGrant.grant},source,extraGrant.session)).rejects.toMatchObject({code:'MFA_RATE_LIMITED'});
+    expect((await database.pool.query('SELECT consumed_at FROM identity.step_up_grant WHERE token_hash=$1',[hashToken('step-up-grant',extraGrant.grant)])).rows[0].consumed_at).toBeNull();
+    const oldFactor=(await database.pool.query('SELECT factor_id FROM identity.consumer_totp_enrollment WHERE user_id=$1',[first.a.userId])).rows[0].factor_id;
+    const activeCount=(await database.pool.query("SELECT count(*)::int AS n FROM identity.mfa_factor WHERE user_id=$1 AND state='active'",[first.a.userId])).rows[0].n;
+    await database.pool.query("UPDATE identity.consumer_totp_enrollment SET expires_at=created_at+interval '1 microsecond' WHERE user_id=$1",[first.a.userId]);
+    await runtime.query('SELECT identity.prune_totp_addition($1)',[first.a.userId]);
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.mfa_factor WHERE mfa_factor_id=$1',[oldFactor])).rows[0].n).toBe(0);
+    expect((await database.pool.query("SELECT count(*)::int AS n FROM identity.mfa_factor WHERE user_id=$1 AND state='active'",[first.a.userId])).rows[0].n).toBe(activeCount);
+    await expect(totpService(repo,(await freshSessions()).consumerProducer()).beginTotp({stepUpGrant:extraGrant.grant},source,extraGrant.session)).resolves.toMatchObject({status:'verification_required'});
+  } finally {for(const {a} of owned) {await database.pool.query("UPDATE identity.consumer_totp_enrollment SET expires_at=created_at+interval '1 microsecond' WHERE user_id=$1",[a.userId]);await runtime.query('SELECT identity.prune_totp_addition($1)',[a.userId]);}}
+});
+
+it('checks the verified TOTP bearer deadline after waiting for a factor lock',async()=>{
+  const a=await account(),mfa=totpService(),b=await mfa.beginTotp({enrollmentToken:a.bearer},source),producer=sessions.consumerProducer();
+  const lookup={enrollmentTokenHash:hashToken('verification',a.bearer),additionHandleHash:additionHash(a.bearer),bindingHash:producer.bindingHash(source)};
+  const e=(await repo.readTotpEnrollment(lookup))!,material=producer.prepare(source),legal=(['TERMS','PRIVACY'] as const).map(kind=>({kind,locale:'en',...currentDocument(kind,'en')!}));
+  const blocker=await database.pool.connect(),client=await runtime.connect();let blockerOpen=false;
+  try {
+    await database.pool.query("UPDATE identity.verification_token_credential SET expires_at=clock_timestamp()+interval '250 milliseconds' WHERE channel_binding_id=$1",[a.channelId]);
+    await blocker.query('BEGIN');blockerOpen=true;await blocker.query('SELECT 1 FROM identity.mfa_factor WHERE mfa_factor_id=$1 FOR UPDATE',[e.factorId]);
+    const facade={connect:async()=>({query:client.query.bind(client),release:()=>{}})} as unknown as Pool;
+    const pid=(await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    const operation=new PostgresConsumerAuthRepository(facade,audit).completeTotpEnrollment({...lookup,userId:e.userId,factorId:e.factorId,secretCiphertext:e.secretCiphertext,acceptedStep:Math.floor(Date.now()/30000),material:{sessionId:material.sessionId,sessionTokenHash:material.sessionTokenHash,csrfTokenHash:material.csrfTokenHash,sessionBindingContext:material.sessionBindingContext,idleExpiresAt:material.idleExpiresAt,absoluteExpiresAt:material.absoluteExpiresAt}},legal,source);
+    const denial=expect(operation).rejects.toThrow('CONSUMER_AUTH_INVALID');await pending(pid);await new Promise(r=>setTimeout(r,300));await blocker.query('ROLLBACK');blockerOpen=false;await denial;
+    expect(await state(a)).toEqual({state:'pending_mfa',credentials:0,sessions:0});
+  } finally {if(blockerOpen)await blocker.query('ROLLBACK');blocker.release();client.release();}
+});
+
+it('retains interrupted enrollment resume while retiring every runtime type-back activation capability',async()=>{
+  for(const pendingState of ['verified_pending_recovery','recovery_pending']) {
+    const a=await account(),mfa=totpService(),b=await mfa.beginTotp({enrollmentToken:a.bearer},source);
+    await database.pool.query('UPDATE identity.mfa_factor SET state=$2 WHERE user_id=$1',[a.userId,pendingState]);
+    await expect(mfa.beginTotp({enrollmentToken:a.bearer},source)).rejects.toMatchObject({code:'MFA_ENROLLMENT_STATE_INVALID'});
+    await expect(mfa.confirmRecoveryCode({enrollmentToken:a.bearer,recoveryCode:'unused'},source)).rejects.toMatchObject({code:'MFA_ENROLLMENT_STATE_INVALID'});
+    await expect(mfa.verifyTotp({enrollmentToken:a.bearer,code:totpCode(b.secret)},source)).resolves.toMatchObject({status:'authenticated'});
+  }
+  expect((await database.pool.query("SELECT has_function_privilege('consumer_test_runtime','identity.activate_mfa_enrollment_with_audit(text,uuid,timestamptz,jsonb)','EXECUTE') AS allowed")).rows[0].allowed).toBe(false);
+  await expect(runtime.query('SELECT identity.activate_mfa_enrollment_with_audit($1,$2,$3,$4)',[hash(token()),randomUUID(),new Date(),{}])).rejects.toMatchObject({code:'42501'});
+});
+
+it('rolls back replacement of a pending addition, including the grant, when begin audit fails',async()=>{
+  const a=await enrolled(),g=await addGrant(a,'ADD_TOTP'),mfa=totpService(),b=await mfa.beginTotp({stepUpGrant:g.grant},source,g.session);
+  const nextGrant=await addGrant({...a,result:{...a.result,sessionToken:g.replacement}},'ADD_TOTP');
+  const before=(await database.pool.query('SELECT * FROM identity.consumer_totp_enrollment WHERE user_id=$1',[a.userId])).rows[0];
+  await database.pool.query(`CREATE FUNCTION identity.totp_begin_fixture_fail() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.event_type='identity.mfa.totp.begin' THEN RAISE EXCEPTION 'TOTP_BEGIN_AUDIT_FAILURE';END IF;RETURN NEW;END$$;CREATE TRIGGER totp_begin_fixture_fail BEFORE INSERT ON identity.audit_event FOR EACH ROW EXECUTE FUNCTION identity.totp_begin_fixture_fail()`);
+  try {
+    await expect(mfa.beginTotp({stepUpGrant:nextGrant.grant},source,nextGrant.session)).rejects.toThrow('TOTP_BEGIN_AUDIT_FAILURE');
+    expect((await database.pool.query('SELECT * FROM identity.consumer_totp_enrollment WHERE user_id=$1',[a.userId])).rows[0]).toEqual(before);
+    expect((await database.pool.query('SELECT consumed_at FROM identity.step_up_grant WHERE token_hash=$1',[hashToken('step-up-grant',nextGrant.grant)])).rows[0].consumed_at).toBeNull();
+    expect((await database.pool.query('SELECT state FROM identity.mfa_factor WHERE mfa_factor_id=$1',[before.factor_id])).rows[0].state).toBe('pending');
+  } finally {await database.pool.query('DROP TRIGGER totp_begin_fixture_fail ON identity.audit_event;DROP FUNCTION identity.totp_begin_fixture_fail()');}
+});
+
+it('cleanup waits for a verified addition account without holding a global or challenge lock',async()=>{
+  const a=await enrolled(),g=await addGrant(a,'ADD_TOTP'),b=await totpService().beginTotp({stepUpGrant:g.grant},source,g.session);
+  const completingClient=await runtime.connect(),cleanupClient=await runtime.connect(),locked=deferred(),resume=deferred();
+  const facade={query:completingClient.query.bind(completingClient),connect:async()=>({query:async(sql:string,values?:unknown[])=>{
+    if(sql.includes('identity.complete_secure_totp_enrollment')) {await completingClient.query('SELECT identity.assert_session_current($1,$2,$3)',[a.userId,g.session.session.session_id,g.session.tokenHash]);locked.resolve();await resume.promise;}
+    return completingClient.query(sql,values);
+  },release:()=>{}})} as unknown as Pool;
+  const result=totpService(new PostgresConsumerAuthRepository(facade,audit)).verifyTotp({enrollmentToken:b.enrollment_token,code:totpCode(b.secret)},source,g.session);
+  const outcome=result.then(value=>value,error=>error);let cleanup:Promise<unknown>|undefined;
+  try {
+    await Promise.race([locked.promise,outcome.then(()=>{throw Error('DID_NOT_PAUSE');})]);
+    await database.pool.query("UPDATE identity.consumer_totp_enrollment SET expires_at=created_at+interval '1 microsecond' WHERE user_id=$1",[a.userId]);
+    const pid=(await cleanupClient.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    cleanup=cleanupClient.query('SELECT identity.prune_totp_addition($1)',[a.userId]);await pending(pid);
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_totp_enrollment WHERE user_id=$1',[a.userId])).rows[0].n).toBe(1);
+    resume.resolve();expect(await outcome).toMatchObject({code:'MFA_ENROLLMENT_INVALID'});await cleanup;
+    expect((await database.pool.query("SELECT count(*)::int AS n FROM identity.mfa_factor WHERE user_id=$1 AND state='pending'",[a.userId])).rows[0].n).toBe(0);
+  } finally {resume.resolve();await Promise.allSettled([result,...(cleanup?[cleanup]:[])]);completingClient.release();cleanupClient.release();}
+});
+
+it('produces ADD_TOTP from genuinely verified password/TOTP step-up and keeps the authenticated session',async()=>{
+  const a=await account(),mfa=totpService(),b=await mfa.beginTotp({enrollmentToken:a.bearer},source),signed=await mfa.verifyTotp({enrollmentToken:a.bearer,code:totpCode(b.secret)},source);
+  if(signed.status!=='authenticated')throw Error('NO_SESSION');
+  const argon2=new Argon2WorkerPool({workers:1});await argon2.ready();
+  try {
+    const authPolicy=authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS),password='Task8 real additional TOTP proof!',passwordHash=await hashPassword(argon2,password,authPolicy.password.argon2id);
+    await database.pool.query('UPDATE identity."user" SET password_hash=$2 WHERE user_id=$1',[a.userId,passwordHash]);
+    const actual=await SessionService.create({repository:new PostgresSessionRepository(runtime,audit),riskSignals:{recordForSession:async()=> 'recorded'} as never,onRiskSignalFailure:()=>{},dekStore:{load:async()=>Buffer.from(totpDek)} as never,argon2,authPolicy,mfaPolicy:mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value),sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value,SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),blindIndexKey:Buffer.alloc(32,5),dummyPasswordHash:passwordHash});
+    const current=(await actual.authenticate(signed.sessionToken,source))!;
+    const rotated=await actual.stepUp({session:current,password,code:totpCodeAtStep(decodeBase32(b.secret),Math.floor(Date.now()/30000)+1),authorization:{action:'ADD_TOTP'}},source);
+    const fresh=(await actual.authenticate(rotated.sessionToken,source))!;expect(fresh).not.toBeNull();
+    const added=await mfa.beginTotp({stepUpGrant:rotated.grantToken!},source,fresh);
+    await expect(mfa.verifyTotp({enrollmentToken:added.enrollment_token,code:totpCode(added.secret)},source,fresh)).resolves.toEqual({status:'enrolled'});
+    expect((await state(a)).sessions).toBe(1);expect((await database.pool.query("SELECT count(*)::int AS n FROM identity.mfa_factor WHERE user_id=$1 AND state='active'",[a.userId])).rows[0].n).toBe(2);
+  } finally {await argon2.close();}
+});
+
+it('enforces the policy8192 addition capacity across fresh processes, admits own replacement and incrementally cleans expired seeds',async()=>{
+  while(true) {const candidates=(await runtime.query('SELECT user_id FROM identity.expired_totp_addition_candidates(5)')).rows;if(!candidates.length)break;for(const c of candidates)await runtime.query('SELECT identity.prune_totp_addition($1)',[c.user_id]);}
+  const a=await enrolled(),g=await addGrant(a,'ADD_TOTP'),b=await totpService().beginTotp({stepUpGrant:g.grant},source,g.session);
+  const extra=await enrolled(),extraGrant=await addGrant(extra,'ADD_TOTP'),sourceForExtra={...source};
+  const retained=(await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_totp_enrollment')).rows[0].n;
+  const ids=Array.from({length:8192-retained},()=>randomUUID());
+  try {
+    await database.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) SELECT id,decode(md5(id::text)||md5('email'||id::text),'hex'),'{}','fixture',id::text,'active',clock_timestamp() FROM unnest($1::uuid[]) id`,[ids]);
+    await database.pool.query(`INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at) SELECT id,id,'totp','{}','pending',clock_timestamp() FROM unnest($1::uuid[]) id`,[ids]);
+    await database.pool.query(`INSERT INTO identity.consumer_totp_enrollment(user_id,factor_id,handle_hash,retention_hash,binding_hash,ordinary_session_id,ordinary_token_hash,account_security_epoch,created_at,expires_at)
+      SELECT id,id,'sha256:'||md5(id::text)||md5('handle'||id::text),'sha256:'||md5(id::text)||md5('source'||id::text),'sha256:'||repeat('a',64),id,'sha256:'||repeat('b',64),0,clock_timestamp(),clock_timestamp()+interval '4 minutes' FROM unnest($1::uuid[]) id`,[ids]);
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_totp_enrollment')).rows[0].n).toBe(8192);
+    await expect(totpService(repo,(await freshSessions()).consumerProducer()).beginTotp({stepUpGrant:extraGrant.grant},sourceForExtra,extraGrant.session)).rejects.toMatchObject({code:'MFA_RATE_LIMITED'});
+    const replacementGrant=await addGrant({...a,result:{...a.result,sessionToken:g.replacement}},'ADD_TOTP');
+    await expect(totpService(repo,(await freshSessions()).consumerProducer()).beginTotp({stepUpGrant:replacementGrant.grant},source,replacementGrant.session)).resolves.toMatchObject({status:'verification_required'});
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.consumer_totp_enrollment')).rows[0].n).toBe(8192);
+    await database.pool.query("UPDATE identity.consumer_totp_enrollment SET expires_at=created_at+interval '1 microsecond' WHERE user_id=ANY($1::uuid[])",[ids.slice(0,5)]);
+    await expect(totpService(repo,(await freshSessions()).consumerProducer()).beginTotp({stepUpGrant:extraGrant.grant},sourceForExtra,extraGrant.session)).resolves.toMatchObject({status:'verification_required'});
+    expect((await database.pool.query('SELECT count(*)::int AS n FROM identity.mfa_factor WHERE mfa_factor_id=ANY($1::uuid[])',[ids.slice(0,5)])).rows[0].n).toBe(0);
+  } finally {await database.pool.query('DELETE FROM identity.consumer_totp_enrollment WHERE user_id=ANY($1::uuid[])',[ids]);await database.pool.query('DELETE FROM identity.mfa_factor WHERE user_id=ANY($1::uuid[])',[ids]);await database.pool.query('DELETE FROM identity."user" WHERE user_id=ANY($1::uuid[])',[ids]);}
 });

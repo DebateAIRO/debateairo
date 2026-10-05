@@ -51,7 +51,7 @@ import {
   AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
   RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
   StepUpAuthorizationRequestSchema,
-  AuthenticationResponseSchema, PasskeyEnrollmentResponseSchema,
+  AuthenticationResponseSchema, PasskeyEnrollmentResponseSchema, BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
   UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
@@ -154,7 +154,7 @@ import {
 } from "./ask-billing.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
-import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
+import type { AuthenticatedSession, SessionApplication, LoginResult } from "./sessions.js";
 import type { StaffCapability } from "@debateai/kernel";
 import { registerStaffRoutes, staffAuthorizationPolicyInventory, type StaffHttpApplication } from "./staff/routes.js";
 import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, streamAuthorizedEvents, type StaffAccessApplication, type StaffAuthentication } from "./staff/access.js";
@@ -1174,8 +1174,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
   { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
-  { route: "POST /v1/auth/mfa/totp/begin", auth: "public", resource: "identity", action: "begin-totp" },
-  { route: "POST /v1/auth/mfa/totp/verify", auth: "public", resource: "identity", action: "verify-totp" },
+  { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "begin-totp" },
+  { route: "POST /v1/auth/mfa/totp/verify", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
   { route: "POST /v1/auth/mfa/recovery-codes/confirm", auth: "public", resource: "identity", action: "confirm-recovery-code" },
   { route: "POST /v1/auth/passkeys/enrollment/options", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "passkey-enrollment-options" },
@@ -1707,6 +1707,14 @@ function csrfCookie(value: string, maxAgeSeconds: number): string {
   return `${CSRF_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAgeSeconds}; Secure; SameSite=Lax`;
 }
 
+/** All verified consumer methods share this sole public bearer/cookie projection. */
+function completeAuthenticatedResponse(reply:FastifyReply,result:LoginResult):FastifyReply {
+  const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session,
+    ...(result.replacementRecoveryCode===undefined?{}:{replacement_recovery_code:result.replacementRecoveryCode})});
+  reply.header("set-cookie",[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS)]);
+  return reply.send(response);
+}
+
 function expiredCookies(): readonly string[] {
   const expired = "Thu, 01 Jan 1970 00:00:00 GMT";
   return Object.freeze([
@@ -2218,15 +2226,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api.post("/v1/auth/passkeys/enrollment/complete",{...routePolicy("POST /v1/auth/passkeys/enrollment/complete"),bodyLimit:32768},async(request,reply)=>{
       const result=await consumer.completePasskeyEnrollment(request.body,sourceFor(request),request.authenticatedSession);
       if(result.status==='enrolled')return reply.send(PasskeyEnrollmentResponseSchema.parse(result));
-      reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS)]);
-      return reply.send(AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session}));
+      return completeAuthenticatedResponse(reply,result);
     });
     api.post("/v1/auth/passkeys/login/options",{...routePolicy("POST /v1/auth/passkeys/login/options"),bodyLimit:32768},async(request,reply)=>
       reply.send(await consumer.beginPasskeyLogin(request.body??{},sourceFor(request))));
     api.post("/v1/auth/passkeys/login/complete",{...routePolicy("POST /v1/auth/passkeys/login/complete"),bodyLimit:32768},async(request,reply)=>{
       const result=await consumer.completePasskeyLogin(request.body,sourceFor(request));
-      reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS)]);
-      return reply.send(AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session}));
+      return completeAuthenticatedResponse(reply,result);
     });
   }
 
@@ -2242,23 +2248,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           challengeToken: body.challenge_token,
           code: typeof body.code === "string" ? body.code : ""
         }, sourceFor(request));
-        reply.header("set-cookie", [
-          sessionCookie(result.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
-          csrfCookie(result.csrfToken, SESSION_IDLE_MAX_AGE_SECONDS)
-        ]);
-        return reply.send({
-          status: result.status,
-          csrf_token: result.csrfToken,
-          session: result.session,
-          ...(result.replacementRecoveryCode === undefined
-            ? {} : { replacement_recovery_code: result.replacementRecoveryCode })
-        });
+        return completeAuthenticatedResponse(reply,result);
       }
       const result = await options.sessions!.beginLogin({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : ""
       }, sourceFor(request));
-      return reply.status(202).send({ status: result.status, challenge_token: result.challengeToken });
+      return reply.status(202).send(LoginContinuationResponseSchema.parse({ status: result.status, challenge_token: result.challengeToken, available_methods:result.availableMethods??["totp"] }));
     });
     api.post("/v1/auth/logout", credentialRoutePolicy("POST /v1/auth/logout"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
@@ -2852,21 +2848,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   if (options.mfa !== undefined) {
     api.post("/v1/auth/mfa/totp/begin", credentialRoutePolicy("POST /v1/auth/mfa/totp/begin"), async (request, reply) => {
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Record<string, unknown>
-        : {};
-      return reply.send(await options.mfa!.beginTotp({
-        enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
-      }, sourceFor(request)));
+      const body=parseRequest(BeginTotpEnrollmentRequestSchema,request.body);
+      const result=await options.mfa!.beginTotp("enrollment_token" in body?{enrollmentToken:body.enrollment_token}:{stepUpGrant:body.step_up_grant},sourceFor(request),request.authenticatedSession);
+      return reply.send(TotpEnrollmentOptionsResponseSchema.parse(result));
     });
     api.post("/v1/auth/mfa/totp/verify", credentialRoutePolicy("POST /v1/auth/mfa/totp/verify"), async (request, reply) => {
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Record<string, unknown>
-        : {};
-      return reply.send(await options.mfa!.verifyTotp({
-        enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : "",
-        code: typeof body.code === "string" ? body.code : ""
-      }, sourceFor(request)));
+      const body=parseRequest(CompleteTotpEnrollmentRequestSchema,request.body);
+      const result=await options.mfa!.verifyTotp({enrollmentToken:body.enrollment_token,code:body.code},sourceFor(request),request.authenticatedSession);
+      return result.status==="authenticated"?completeAuthenticatedResponse(reply,result):reply.send(TotpEnrollmentResponseSchema.parse(result));
     });
     api.post("/v1/auth/mfa/recovery-codes/generate", credentialRoutePolicy("POST /v1/auth/mfa/recovery-codes/generate"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null

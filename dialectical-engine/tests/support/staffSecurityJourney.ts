@@ -1,11 +1,13 @@
+import { currentDocument } from '@debateai/legal-manifest';
+import { canonicalSignup, passedTurnstile } from './turnstileFixtures.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { OwnerCredentialSet } from '@debateai/kernel';
 import { vi, expect } from 'vitest';
 import { buildApi } from '@debateai/api';
 import * as contract from '@debateai/contract';
-import { Argon2WorkerPool, createEmailBlindIndex, encrypt, generateDek, generateTotpSecret, hashPassword, totpCodeAtStep, type ReadableUserDekStore, type AuditContextHasher } from '@debateai/crypto';
-import { createPool, migrate, PostgresStaffRepository, PostgresStaffPrerequisiteProducer, PostgresSessionRepository, PostgresStaffAlertRepository, PostgresIdentityRepository, PostgresOwnerCommandRepository, PostgresStaffIndependentReadinessPublisher, type Pool } from '@debateai/db';
-import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_REGISTER_ROW, sessionPolicyFromValue, loadBootstrapRegister, buildBootstrapRegisterPublicationRows, composeStaffPolicyRegisterPublicationRows, createPostgresRegisterPublicationPort, parseRegisterVersionText } from '@debateai/register';
+import { Argon2WorkerPool, createEmailBlindIndex, encrypt, generateDek, generateTotpSecret, hashPassword, generateRecoveryCodes, hashRecoveryCode, totpCodeAtStep, type ReadableUserDekStore, type AuditContextHasher } from '@debateai/crypto';
+import { createPool, migrate, PostgresStaffRepository, PostgresStaffPrerequisiteProducer, PostgresSessionRepository, PostgresConsumerAuthRepository, PostgresStaffAlertRepository, PostgresIdentityRepository, PostgresOwnerCommandRepository, PostgresStaffIndependentReadinessPublisher, type Pool } from '@debateai/db';
+import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue, loadBootstrapRegister, buildBootstrapRegisterPublicationRows, composeStaffPolicyRegisterPublicationRows, createPostgresRegisterPublicationPort, parseRegisterVersionText } from '@debateai/register';
 import { SessionService } from '../../apps/api/src/sessions.js';
 import { StaffAccessService } from '../../apps/api/src/staff/access.js';
 import { StaffWebAuthnService } from '../../apps/api/src/staff/webauthn.js';
@@ -19,7 +21,7 @@ import { initializeOwnerRecoveryFixture, prepareOwnerRecoveryFixture } from './s
 import { b64, digest, fixture, key, origin, rpId } from './staffWebAuthnFixtures.js';
 
 import { request as httpRequest } from 'node:http';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, realpath } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createOwnerRecoveryMaterial, parseOwnerRecoveryBundle } from '../../apps/runner/src/owner-recovery-material.js';
@@ -56,22 +58,31 @@ let runtimeComposed:Awaited<ReturnType<typeof createStaffRuntime>>|undefined;
 const ordinaryMail=new MemoryMailSender();
 const writableUsers:UserDekStore={...users,store:async(id,dek)=>{deks.set(id,Buffer.from(dek));},destroy:async(id)=>{deks.get(id)?.fill(0);deks.delete(id);return 'DESTROYED';}};
 const identityRepository=new PostgresIdentityRepository(runtime,audit);
-const registration=new RegistrationService({repository:identityRepository,mail:ordinaryMail,dekStore:writableUsers,blindIndexKey,policy:authPolicy,limiter:new InProcessAuthRateLimiter(authPolicy.rateLimits,authPolicy.rateLimitBucketCapacity,authPolicy.rateLimitRefusalAuditIntervalMs,randomBytes(32)),argon2});
-const mfa=new MfaEnrollmentService({repository:identityRepository,dekStore:users,argon2,policy:mfaPolicy,clock:()=>new Date()});
-sessions=await SessionService.create({repository:new PostgresSessionRepository(authorization,audit),staffPrerequisites:new PostgresStaffPrerequisiteProducer(runtime,audit),riskSignals:{recordForSession:async()=>null} as never,onRiskSignalFailure:()=>{},dekStore:users,argon2,authPolicy,mfaPolicy,sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_REGISTER_ROW.value,SESSION_POLICY_REGISTER_ROW.sourceRef),blindIndexKey,dummyPasswordHash:passwordHash,clock:()=>ceremonyClock});
+const registration=new RegistrationService({repository:identityRepository,mail:ordinaryMail,dekStore:writableUsers,blindIndexKey,policy:authPolicy,legalAcceptance:{recordsKey:Buffer.alloc(32,23)},limiter:new InProcessAuthRateLimiter(authPolicy.rateLimits,authPolicy.rateLimitBucketCapacity,authPolicy.rateLimitRefusalAuditIntervalMs,randomBytes(32)),argon2});
+sessions=await SessionService.create({repository:new PostgresSessionRepository(authorization,audit),staffPrerequisites:new PostgresStaffPrerequisiteProducer(runtime,audit),riskSignals:{recordForSession:async()=>null} as never,onRiskSignalFailure:()=>{},dekStore:users,argon2,authPolicy,mfaPolicy,sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value,SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),blindIndexKey,dummyPasswordHash:passwordHash,clock:()=>ceremonyClock});
+const mfa=new MfaEnrollmentService({repository:identityRepository,consumerRepository:new PostgresConsumerAuthRepository(authorization,audit),sessions:sessions.consumerProducer(),dekStore:users,argon2,policy:mfaPolicy,clock:()=>new Date()});
 async function account() {
  const email='task9-'+randomUUID()+'@example.test',f=composition();
- const signup=await f.api.inject({method:'POST',url:'/v1/auth/register',headers:{'user-agent':source.userAgent,origin},payload:{email,password,recovery_email:email,date_of_birth:'1990-01-01'}});expect(signup.statusCode).toBe(202);
+ const signup=await f.api.inject({method:'POST',url:'/v1/auth/register',headers:{'user-agent':source.userAgent,origin},payload:{...canonicalSignup,email,password,terms:currentDocument('TERMS','en')!,privacy:currentDocument('PRIVACY','en')!}});expect(signup.statusCode).toBe(202);
  await registration.drainMailDispatches();const token=ordinaryMail.messages.find(mail=>mail.recipient===email)!.token;
  expect((await f.api.inject({method:'POST',url:'/v1/auth/verify-email',headers:{'user-agent':source.userAgent,origin},payload:{token}})).statusCode).toBe(200);
- const begun=await f.api.inject({method:'POST',url:'/v1/auth/mfa/totp/begin',payload:{enrollment_token:token}});expect(begun.statusCode).toBe(200);const secret=decodeBase32(begun.json().secret);
+ const begun=await f.api.inject({method:'POST',url:'/v1/auth/mfa/totp/begin',headers:{'user-agent':source.userAgent,origin},payload:{enrollment_token:token}});expect(begun.statusCode).toBe(200);const secret=decodeBase32(begun.json().secret);
  const step=Math.floor(Date.now()/(mfaPolicy.totp.periodSeconds*1000));
- expect((await f.api.inject({method:'POST',url:'/v1/auth/mfa/totp/verify',payload:{enrollment_token:token,code:totpCodeAtStep(secret,step)}})).statusCode).toBe(200);
- const generated=await f.api.inject({method:'POST',url:'/v1/auth/mfa/recovery-codes/generate',payload:{enrollment_token:token}});expect(generated.statusCode).toBe(200);const recoveryCodes=generated.json().recoveryCodes as string[];
- expect((await f.api.inject({method:'POST',url:'/v1/auth/mfa/recovery-codes/confirm',payload:{enrollment_token:token,recovery_code:recoveryCodes[0]}})).statusCode).toBe(200);
+ const completed=await f.api.inject({method:'POST',url:'/v1/auth/mfa/totp/verify',headers:{'user-agent':source.userAgent,origin},payload:{enrollment_token:token,code:totpCodeAtStep(secret,step)}});
+ expect(completed.statusCode).toBe(200);const response=contract.AuthenticationResponseSchema.parse(completed.json());
+ const cookies=completed.headers['set-cookie'] as string[],sessionToken=cookies.find(c=>c.startsWith('__Host-debateai-session='))!.split(';')[0]!.split('=')[1]!;
+ expect(completed.body).not.toContain(sessionToken);expect(cookies[0]).toContain('HttpOnly');
+ const logged={sessionToken,csrfToken:response.csrf_token,session:response.session};
+ const own=(await sessions.authenticate(logged.sessionToken,source))!;expect(own).not.toBeNull();
+ // Retain the journey's existing per-account elapsed setup step before later TOTP prerequisites.
  ceremonyClock=new Date(ceremonyClock.getTime()+30000);
- const login=await sessions.beginLogin({email,password},source),logged=await sessions.completeLogin({challengeToken:login.challengeToken,code:totpCodeAtStep(secret,Math.floor(ceremonyClock.getTime()/30000))},source);
- const own=(await sessions.authenticate(logged.sessionToken,source))!;
+ // Synthetic optional backup arrangement only; Task9 owns the real management API.
+ // The later password+saved-code login/replacement and staff refusal remain genuine producers.
+ const recoveryCodes=generateRecoveryCodes();
+ for(const [index,code] of recoveryCodes.entries()) {
+  const encoded=await hashRecoveryCode(argon2,code,mfaPolicy.recoveryCodes.argon2id);
+  await database.pool.query('INSERT INTO identity.recovery_code(user_id,code_slot,code_hash,created_at) VALUES($1,$2,$3,clock_timestamp())',[own.userId,index+1,encoded]);
+ }
  const factorId=(await database.pool.query("SELECT mfa_factor_id FROM identity.mfa_factor WHERE user_id=$1 AND factor_type='totp'",[own.userId])).rows[0].mfa_factor_id as string;
  await f.api.close();
  return {userId:own.userId,ownerRef:own.ownerRef,email,secret,factorId,recoveryCodes,sessionToken:logged.sessionToken,csrfToken:logged.csrfToken,ordinarySessionId:logged.session.session_id,one:{f:fixture(key(),1,randomBytes(32)),factorId:'',counter:1,userHandle:b64(Buffer.alloc(32,9))}};
@@ -95,7 +106,7 @@ function composition() {
     const targetInvitationTransport = runtimeComposed?.targetInvitationTransport ?? new VerifiedStaffTargetInvitationTransport({channels: repository,keys: users,publicAppUrl: origin,
         delivery: {send: async mail => {captured.push(mail);return 'ACK';}}});
     const staff: StaffHttpApplication = {access,sessions,repository,intents,targetInvitationTransport,webauthn: new StaffWebAuthnService(repository,{publicAppUrl: origin})};
-    const api=buildApi({application: staffHttpAskApplication(),registration,mfa,allowedOrigin: origin,sessions,staffAccess: access,staffPolicyVersion: 2,staff});
+    const api=buildApi({application: staffHttpAskApplication(),registration,mfa,turnstile:passedTurnstile,allowedOrigin: origin,sessions,staffAccess: access,staffPolicyVersion: 2,staff});
     api.addHook('onSend',async (_request,_reply,payload)=>{responses.push(typeof payload==='string' ? payload : String(payload));return payload;});
     return {staff,alertRepository,api};
 }
@@ -120,7 +131,7 @@ async function action(api: ReturnType<typeof buildApi>, a: Account, elevated: {t
 }
 async function prerequisite(api:ReturnType<typeof buildApi>,a:Account,purpose:{purpose:'KEY_PREREGISTRATION'}|{purpose:'OWNER_POSSESSION';command_id:string;command_nonce:string}) {
  ceremonyClock=new Date(ceremonyClock.getTime()+30000);
- const result=await api.inject({method:'POST',url:'/v1/admin/prerequisites/step-up',headers:headers(a),payload:{...purpose,password,totp_code:totpCodeAtStep(a.secret,Math.floor(ceremonyClock.getTime()/30000))}});expect(result.statusCode).toBe(200);
+ const result=await api.inject({method:'POST',url:'/v1/admin/prerequisites/step-up',headers:headers(a),payload:{...purpose,password,totp_code:totpCodeAtStep(a.secret,Math.floor(ceremonyClock.getTime()/30000))}});expect(result.statusCode,result.body).toBe(200);
  const cookies=result.headers['set-cookie'] as string[];
  a.sessionToken=cookies.find(c=>c.startsWith('__Host-debateai-session='))!.split(';')[0]!.split('=')[1]!;
  a.csrfToken=cookies.find(c=>c.startsWith('__Host-debateai-csrf='))!.split(';')[0]!.split('=')[1]!;
@@ -156,7 +167,7 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
  return selectedSet(receipts);
 }
 
- const root=await mkdtemp(join(tmpdir(),'task9-journey-custody-')),custody=syntheticOwnerCustody(root),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:'/usr/bin/python3',helperPath:resolve('apps/runner/src/owner-recovery-lock.py')});
+ const root=await realpath(await mkdtemp(join(tmpdir(),'task9-journey-custody-'))),custody=syntheticOwnerCustody(root),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:'/usr/bin/python3',helperPath:await realpath(resolve('apps/runner/src/owner-recovery-lock.py'))});
  let jit:Pool|undefined;const errorLog=vi.spyOn(console,'error').mockImplementation((...args)=>applicationLogs.push(args));
  let api=composition().api;
  try {

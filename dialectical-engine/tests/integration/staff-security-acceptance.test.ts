@@ -1,3 +1,4 @@
+import { readdir } from 'node:fs/promises';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPool, migrate, PostgresStaffPrerequisiteProducer, prepareLeasedContentEncryptionForRun, type Pool, type StaffPrerequisiteInput } from '@debateai/db';
@@ -129,5 +130,5 @@ it('keeps recorded fresh Staff migration replay inert, including exact function/
   migrations:(await database.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows,
   lineage:(await database.pool.query('SELECT lineage_id,staff_id FROM staff.owner_lineage ORDER BY lineage_id')).rows
  });
- const before=await catalog();expect(before.migrations).toHaveLength(102);await migrate(database.pool);expect(await catalog()).toEqual(before);
+ const before=await catalog();expect(before.migrations.map(row=>row.name)).toEqual((await readdir(new URL('../../migrations/',import.meta.url))).filter(name=>/^\d+.*\.sql$/.test(name)).sort());expect(before.migrations.map(row=>row.name)).toEqual(expect.arrayContaining(['0095_phone_profile_optional_recovery.sql', '0096_verification_delivery_budget.sql', '0097_recovery_email_verification.sql', '0098_consumer_passkeys.sql', '0099_direct_secure_sessions.sql']));await migrate(database.pool);expect(await catalog()).toEqual(before);
 });

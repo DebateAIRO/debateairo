@@ -26,6 +26,8 @@ const variants = (...names: EndpointSchemaName[]) => ({ anyOf: names.map(referen
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
 const response = (schema: unknown, status = "200") => ({ responses: { [status]: { description: status === "202" ? "Generic verification acknowledgement" : "Current selected policy response", content: { "application/json": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
+  "POST /v1/auth/mfa/totp/begin": {...request(reference("BeginTotpEnrollmentRequestSchema")),...response(reference("TotpEnrollmentOptionsResponseSchema"))},
+  "POST /v1/auth/mfa/totp/verify": {...request(reference("CompleteTotpEnrollmentRequestSchema")),...response(reference("TotpEnrollmentResponseSchema"))},
   "POST /v1/auth/passkeys/enrollment/options": {...request(reference("BeginPasskeyEnrollmentRequestSchema")),...response(reference("PasskeyRegistrationOptionsResponseSchema"))},
   "POST /v1/auth/passkeys/enrollment/complete": {...request(reference("CompletePasskeyEnrollmentRequestSchema")),...response(reference("PasskeyEnrollmentResponseSchema"))},
   "POST /v1/auth/passkeys/login/options": {...request(reference("BeginPasskeyLoginRequestSchema")),...response(reference("PasskeyAuthenticationOptionsResponseSchema"))},
