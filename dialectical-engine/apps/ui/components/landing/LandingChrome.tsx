@@ -1,3 +1,4 @@
+import { AccountMenu } from "@/components/AccountMenu";
 import type { JSX } from "react";
 import { ModeToggle } from "@/components/ModeToggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -29,7 +30,7 @@ export function LandingChrome({ catalog }: { catalog: MessageCatalog }): JSX.Ele
             fontVariationSettings: "var(--fvs-display)"
           }}
         >
-          DebateAI
+          Dialectical Engine
         </a>
         <nav aria-label={t(catalog, "chrome.landingNavigation")} className="lpNavLinks">
           <a href="#method">{t(catalog, "chrome.method")}</a>
@@ -37,6 +38,7 @@ export function LandingChrome({ catalog }: { catalog: MessageCatalog }): JSX.Ele
           <a href="#pricing">{t(catalog, "chrome.pricing")}</a>
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <AccountMenu catalog={catalog} />
           <LanguageSwitcher />
           <ModeToggle />
           <a className="lpCta lpCtaNav" href="/login?next=%2Fnew">

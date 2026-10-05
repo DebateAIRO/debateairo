@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -30,6 +31,8 @@ export function LanguageSwitcher() {
   const panelId = useId();
   const listId = `${panelId}-list`;
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 12, width: 470 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -47,13 +50,20 @@ export function LanguageSwitcher() {
 
   useEffect(() => {
     if (!open) return;
+    const place = () => {
+      const rect = buttonRef.current?.getBoundingClientRect(); if (!rect) return;
+      const width = Math.min(470, window.innerWidth - 24);
+      const height = panelRef.current?.offsetHeight ?? 424;
+      setPosition({ top: Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - height - 12)), left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)), width });
+    };
+    place(); window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
     searchRef.current?.focus();
     const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return;
+      if (rootRef.current?.contains(event.target as Node) || panelRef.current?.contains(event.target as Node)) return;
       close(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    return () => { document.removeEventListener("pointerdown", onPointerDown); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
   }, [close, open]);
 
   useEffect(() => {
@@ -91,7 +101,7 @@ export function LanguageSwitcher() {
       ref={rootRef}
       onKeyDown={open ? onKeyDown : undefined}
       onBlur={(event) => {
-        if (!rootRef.current?.contains(event.relatedTarget as Node | null)) close(false);
+        if (!rootRef.current?.contains(event.relatedTarget as Node | null) && !panelRef.current?.contains(event.relatedTarget as Node | null)) close(false);
       }}
     >
       <button
@@ -115,8 +125,10 @@ export function LanguageSwitcher() {
         <span className="languageSwitcherCaret" aria-hidden>{languageSwitcherCaret(open)}</span>
       </button>
 
-      {open ? (
+      {open ? createPortal(
         <div
+          ref={panelRef}
+          style={{ position: "fixed", top: position.top, left: position.left, right: "auto", bottom: "auto", width: position.width }}
           id={panelId}
           className="languageSwitcherPanel"
           role="dialog"
@@ -175,7 +187,7 @@ export function LanguageSwitcher() {
               })}
             </div>
           </div>
-        </div>
+        </div>, document.body
       ) : null}
     </div>
   );

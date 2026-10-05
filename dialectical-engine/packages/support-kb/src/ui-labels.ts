@@ -15,7 +15,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "الإعدادات",
     "active-sessions": "الجلسات النشطة",
     "privacy-preferences": "الخصوصية",
-    "claim-legacy": "المطالبة بالمناظرات القديمة",
+    "security": "الأمان",
     "delete-account": "حذف الحساب",
     "public-catalog": "المناظرات العامة",
     "your-debates": "مناظراتك",
@@ -34,7 +34,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Настройки",
     "active-sessions": "Активни сесии",
     "privacy-preferences": "Поверителност",
-    "claim-legacy": "Заявяване на наследени дебати",
+    "security": "Сигурност",
     "delete-account": "Изтриване на профила",
     "public-catalog": "Публични дебати",
     "your-debates": "Вашите дебати",
@@ -53,7 +53,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Nastavení",
     "active-sessions": "Aktivní relace",
     "privacy-preferences": "Ochrana soukromí",
-    "claim-legacy": "Převzít starší debaty",
+    "security": "Zabezpečení",
     "delete-account": "Smazat účet",
     "public-catalog": "Veřejné debaty",
     "your-debates": "Vaše debaty",
@@ -72,7 +72,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Indstillinger",
     "active-sessions": "Aktive sessioner",
     "privacy-preferences": "Privatliv",
-    "claim-legacy": "Gør krav på ældre debatter",
+    "security": "Sikkerhed",
     "delete-account": "Slet konto",
     "public-catalog": "Offentlige debatter",
     "your-debates": "Dine debatter",
@@ -91,7 +91,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Einstellungen",
     "active-sessions": "Aktive Sitzungen",
     "privacy-preferences": "Datenschutz",
-    "claim-legacy": "Ältere Debatten übernehmen",
+    "security": "Sicherheit",
     "delete-account": "Konto löschen",
     "public-catalog": "Öffentliche Debatten",
     "your-debates": "Ihre Debatten",
@@ -110,7 +110,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Ρυθμίσεις",
     "active-sessions": "Ενεργές συνεδρίες",
     "privacy-preferences": "Απόρρητο",
-    "claim-legacy": "Διεκδίκηση παλαιότερων αντιπαραθέσεων",
+    "security": "Ασφάλεια",
     "delete-account": "Διαγραφή λογαριασμού",
     "public-catalog": "Δημόσιες αντιπαραθέσεις",
     "your-debates": "Οι αντιπαραθέσεις σας",
@@ -129,7 +129,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Settings",
     "active-sessions": "Active sessions",
     "privacy-preferences": "Privacy",
-    "claim-legacy": "Claim legacy debates",
+    "security": "Security",
     "delete-account": "Delete account",
     "public-catalog": "Public debates",
     "your-debates": "Your debates",
@@ -148,7 +148,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Configuración",
     "active-sessions": "Sesiones activas",
     "privacy-preferences": "Privacidad",
-    "claim-legacy": "Reclamar debates heredados",
+    "security": "Seguridad",
     "delete-account": "Eliminar cuenta",
     "public-catalog": "Debates públicos",
     "your-debates": "Sus debates",
@@ -167,7 +167,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Seaded",
     "active-sessions": "Aktiivsed seansid",
     "privacy-preferences": "Privaatsus",
-    "claim-legacy": "Omandage pärandväitlused",
+    "security": "Turvalisus",
     "delete-account": "Konto kustutamine",
     "public-catalog": "Avalikud väitlused",
     "your-debates": "Teie väitlused",
@@ -186,7 +186,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Asetukset",
     "active-sessions": "Aktiiviset istunnot",
     "privacy-preferences": "Tietosuoja",
-    "claim-legacy": "Liitä vanhat väittelyt tiliin",
+    "security": "Turvallisuus",
     "delete-account": "Poista tili",
     "public-catalog": "Julkiset väittelyt",
     "your-debates": "Omat väittelysi",
@@ -205,7 +205,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Paramètres",
     "active-sessions": "Sessions actives",
     "privacy-preferences": "Confidentialité",
-    "claim-legacy": "Rattacher des débats anciens",
+    "security": "Sécurité",
     "delete-account": "Supprimer le compte",
     "public-catalog": "Débats publics",
     "your-debates": "Vos débats",
@@ -224,7 +224,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Socruithe",
     "active-sessions": "Seisiúin ghníomhacha",
     "privacy-preferences": "Príobháideachas",
-    "claim-legacy": "Éiligh díospóireachtaí oidhreachta",
+    "security": "Slándáil",
     "delete-account": "Scrios an cuntas",
     "public-catalog": "Díospóireachtaí poiblí",
     "your-debates": "Do chuid díospóireachtaí",
@@ -243,7 +243,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "הגדרות",
     "active-sessions": "הפעלות פעילות",
     "privacy-preferences": "פרטיות",
-    "claim-legacy": "שיוך דיונים ישנים",
+    "security": "אבטחה",
     "delete-account": "מחיקת החשבון",
     "public-catalog": "דיונים ציבוריים",
     "your-debates": "הדיונים שלכם",
@@ -262,7 +262,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "सेटिंग्स",
     "active-sessions": "सक्रिय सत्र",
     "privacy-preferences": "गोपनीयता",
-    "claim-legacy": "पुराने वाद-विवाद अपने खाते से जोड़ें",
+    "security": "सुरक्षा",
     "delete-account": "खाता मिटाएँ",
     "public-catalog": "सार्वजनिक वाद-विवाद",
     "your-debates": "आपके वाद-विवाद",
@@ -281,7 +281,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Postavke",
     "active-sessions": "Aktivne sesije",
     "privacy-preferences": "Privatnost",
-    "claim-legacy": "Pridružite naslijeđene rasprave",
+    "security": "Sigurnost",
     "delete-account": "Izbrišite račun",
     "public-catalog": "Javne rasprave",
     "your-debates": "Vaše rasprave",
@@ -300,7 +300,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Beállítások",
     "active-sessions": "Aktív munkamenetek",
     "privacy-preferences": "Adatvédelem",
-    "claim-legacy": "Régi viták átvétele",
+    "security": "Biztonság",
     "delete-account": "Fiók törlése",
     "public-catalog": "Nyilvános viták",
     "your-debates": "Saját viták",
@@ -319,7 +319,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Pengaturan",
     "active-sessions": "Sesi aktif",
     "privacy-preferences": "Privasi",
-    "claim-legacy": "Klaim debat lama",
+    "security": "Keamanan",
     "delete-account": "Hapus akun",
     "public-catalog": "Debat publik",
     "your-debates": "Debat Anda",
@@ -338,7 +338,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Impostazioni",
     "active-sessions": "Sessioni attive",
     "privacy-preferences": "Privacy",
-    "claim-legacy": "Rivendica i dibattiti preesistenti",
+    "security": "Sicurezza",
     "delete-account": "Elimina account",
     "public-catalog": "Dibattiti pubblici",
     "your-debates": "I tuoi dibattiti",
@@ -357,7 +357,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "設定",
     "active-sessions": "有効なセッション",
     "privacy-preferences": "プライバシー",
-    "claim-legacy": "以前のディベートを紐付ける",
+    "security": "セキュリティ",
     "delete-account": "アカウントを削除",
     "public-catalog": "公開ディベート",
     "your-debates": "自分のディベート",
@@ -376,7 +376,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "설정",
     "active-sessions": "활성 세션",
     "privacy-preferences": "개인정보",
-    "claim-legacy": "기존 토론 소유권 확인",
+    "security": "보안",
     "delete-account": "계정 삭제",
     "public-catalog": "공개 토론",
     "your-debates": "내 토론",
@@ -395,7 +395,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Nustatymai",
     "active-sessions": "Aktyvūs seansai",
     "privacy-preferences": "Privatumas",
-    "claim-legacy": "Perimti senus debatus",
+    "security": "Saugumas",
     "delete-account": "Ištrinti paskyrą",
     "public-catalog": "Vieši debatai",
     "your-debates": "Jūsų debatai",
@@ -414,7 +414,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Iestatījumi",
     "active-sessions": "Aktīvās sesijas",
     "privacy-preferences": "Privātums",
-    "claim-legacy": "Pieprasīt mantotās debates",
+    "security": "Drošība",
     "delete-account": "Dzēst kontu",
     "public-catalog": "Publiskās debates",
     "your-debates": "Jūsu debates",
@@ -433,7 +433,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Issettjar",
     "active-sessions": "Sessjonijiet attivi",
     "privacy-preferences": "Privatezza",
-    "claim-legacy": "Itlob id-dibattiti storiċi",
+    "security": "Sigurtà",
     "delete-account": "Ħassar il-kont",
     "public-catalog": "Dibattiti pubbliċi",
     "your-debates": "Id-dibattiti tiegħek",
@@ -452,7 +452,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Instellingen",
     "active-sessions": "Actieve sessies",
     "privacy-preferences": "Privacy",
-    "claim-legacy": "Eerdere debatten koppelen",
+    "security": "Beveiliging",
     "delete-account": "Account verwijderen",
     "public-catalog": "Openbare debatten",
     "your-debates": "Uw debatten",
@@ -471,7 +471,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Ustawienia",
     "active-sessions": "Aktywne sesje",
     "privacy-preferences": "Prywatność",
-    "claim-legacy": "Przejmij starsze debaty",
+    "security": "Bezpieczeństwo",
     "delete-account": "Usuń konto",
     "public-catalog": "Debaty publiczne",
     "your-debates": "Twoje debaty",
@@ -490,7 +490,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Definições",
     "active-sessions": "Sessões ativas",
     "privacy-preferences": "Privacidade",
-    "claim-legacy": "Reivindicar debates antigos",
+    "security": "Segurança",
     "delete-account": "Eliminar conta",
     "public-catalog": "Debates públicos",
     "your-debates": "Os seus debates",
@@ -509,7 +509,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Setări",
     "active-sessions": "Sesiuni active",
     "privacy-preferences": "Confidențialitate",
-    "claim-legacy": "Revendicați dezbaterile vechi",
+    "security": "Securitate",
     "delete-account": "Ștergeți contul",
     "public-catalog": "Dezbateri publice",
     "your-debates": "Dezbaterile dvs.",
@@ -528,7 +528,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Настройки",
     "active-sessions": "Активные сеансы",
     "privacy-preferences": "Конфиденциальность",
-    "claim-legacy": "Привязать прежние дебаты",
+    "security": "Безопасность",
     "delete-account": "Удалить учётную запись",
     "public-catalog": "Публичные дебаты",
     "your-debates": "Ваши дебаты",
@@ -547,7 +547,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Nastavenia",
     "active-sessions": "Aktívne relácie",
     "privacy-preferences": "Súkromie",
-    "claim-legacy": "Prevziať staršie debaty",
+    "security": "Zabezpečenie",
     "delete-account": "Odstrániť účet",
     "public-catalog": "Verejné debaty",
     "your-debates": "Vaše debaty",
@@ -566,7 +566,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Nastavitve",
     "active-sessions": "Aktivne seje",
     "privacy-preferences": "Zasebnost",
-    "claim-legacy": "Prevzem podedovanih razprav",
+    "security": "Varnost",
     "delete-account": "Izbris računa",
     "public-catalog": "Javne razprave",
     "your-debates": "Vaše razprave",
@@ -585,7 +585,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Inställningar",
     "active-sessions": "Aktiva sessioner",
     "privacy-preferences": "Integritet",
-    "claim-legacy": "Ta över äldre debatter",
+    "security": "Säkerhet",
     "delete-account": "Radera konto",
     "public-catalog": "Offentliga debatter",
     "your-debates": "Dina debatter",
@@ -604,7 +604,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Ayarlar",
     "active-sessions": "Etkin oturumlar",
     "privacy-preferences": "Gizlilik",
-    "claim-legacy": "Eski tartışmaları sahiplen",
+    "security": "Güvenlik",
     "delete-account": "Hesabı sil",
     "public-catalog": "Herkese açık tartışmalar",
     "your-debates": "Tartışmalarınız",
@@ -623,7 +623,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Налаштування",
     "active-sessions": "Активні сеанси",
     "privacy-preferences": "Конфіденційність",
-    "claim-legacy": "Заявити права на попередні дебати",
+    "security": "Безпека",
     "delete-account": "Видалити обліковий запис",
     "public-catalog": "Оприлюднені дебати",
     "your-debates": "Ваші дебати",
@@ -642,7 +642,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Cài đặt",
     "active-sessions": "Phiên đang hoạt động",
     "privacy-preferences": "Quyền riêng tư",
-    "claim-legacy": "Nhận quyền sở hữu cuộc tranh luận cũ",
+    "security": "Bảo mật",
     "delete-account": "Xóa tài khoản",
     "public-catalog": "Các cuộc tranh luận công khai",
     "your-debates": "Các cuộc tranh luận của bạn",
@@ -661,7 +661,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "设置",
     "active-sessions": "活跃会话",
     "privacy-preferences": "隐私",
-    "claim-legacy": "认领旧版辩论",
+    "security": "安全",
     "delete-account": "删除账户",
     "public-catalog": "公开辩论",
     "your-debates": "您的辩论",
@@ -708,8 +708,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "الخصوصية"
     ],
-    "claim-legacy": [
-      "المطالبة بالمناظرات القديمة"
+    "security": [
+      "الأمان"
     ],
     "delete-account": [
       "حذف الحساب"
@@ -764,8 +764,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Поверителност"
     ],
-    "claim-legacy": [
-      "Заявяване на наследени дебати"
+    "security": [
+      "Сигурност"
     ],
     "delete-account": [
       "Изтриване на профила"
@@ -820,8 +820,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Ochrana soukromí"
     ],
-    "claim-legacy": [
-      "Převzít starší debaty"
+    "security": [
+      "Zabezpečení"
     ],
     "delete-account": [
       "Smazat účet"
@@ -876,8 +876,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privatliv"
     ],
-    "claim-legacy": [
-      "Gør krav på ældre debatter"
+    "security": [
+      "Sikkerhed"
     ],
     "delete-account": [
       "Slet konto"
@@ -932,8 +932,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Datenschutz"
     ],
-    "claim-legacy": [
-      "Ältere Debatten übernehmen"
+    "security": [
+      "Sicherheit"
     ],
     "delete-account": [
       "Konto löschen"
@@ -988,8 +988,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Απόρρητο"
     ],
-    "claim-legacy": [
-      "Διεκδίκηση παλαιότερων αντιπαραθέσεων"
+    "security": [
+      "Ασφάλεια"
     ],
     "delete-account": [
       "Διαγραφή λογαριασμού"
@@ -1044,8 +1044,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacy"
     ],
-    "claim-legacy": [
-      "Claim legacy debates"
+    "security": [
+      "Security"
     ],
     "delete-account": [
       "Delete account"
@@ -1100,8 +1100,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacidad"
     ],
-    "claim-legacy": [
-      "Reclamar debates heredados"
+    "security": [
+      "Seguridad"
     ],
     "delete-account": [
       "Eliminar cuenta"
@@ -1156,8 +1156,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privaatsus"
     ],
-    "claim-legacy": [
-      "Omandage pärandväitlused"
+    "security": [
+      "Turvalisus"
     ],
     "delete-account": [
       "Konto kustutamine"
@@ -1212,8 +1212,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Tietosuoja"
     ],
-    "claim-legacy": [
-      "Liitä vanhat väittelyt tiliin"
+    "security": [
+      "Turvallisuus"
     ],
     "delete-account": [
       "Poista tili"
@@ -1268,8 +1268,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Confidentialité"
     ],
-    "claim-legacy": [
-      "Rattacher des débats anciens"
+    "security": [
+      "Sécurité"
     ],
     "delete-account": [
       "Supprimer le compte"
@@ -1324,8 +1324,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Príobháideachas"
     ],
-    "claim-legacy": [
-      "Éiligh díospóireachtaí oidhreachta"
+    "security": [
+      "Slándáil"
     ],
     "delete-account": [
       "Scrios an cuntas"
@@ -1380,8 +1380,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "פרטיות"
     ],
-    "claim-legacy": [
-      "שיוך דיונים ישנים"
+    "security": [
+      "אבטחה"
     ],
     "delete-account": [
       "מחיקת החשבון"
@@ -1436,8 +1436,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "गोपनीयता"
     ],
-    "claim-legacy": [
-      "पुराने वाद-विवाद अपने खाते से जोड़ें"
+    "security": [
+      "सुरक्षा"
     ],
     "delete-account": [
       "खाता मिटाएँ"
@@ -1492,8 +1492,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privatnost"
     ],
-    "claim-legacy": [
-      "Pridružite naslijeđene rasprave"
+    "security": [
+      "Sigurnost"
     ],
     "delete-account": [
       "Izbrišite račun"
@@ -1548,8 +1548,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Adatvédelem"
     ],
-    "claim-legacy": [
-      "Régi viták átvétele"
+    "security": [
+      "Biztonság"
     ],
     "delete-account": [
       "Fiók törlése"
@@ -1604,8 +1604,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privasi"
     ],
-    "claim-legacy": [
-      "Klaim debat lama"
+    "security": [
+      "Keamanan"
     ],
     "delete-account": [
       "Hapus akun"
@@ -1660,8 +1660,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacy"
     ],
-    "claim-legacy": [
-      "Rivendica i dibattiti preesistenti"
+    "security": [
+      "Sicurezza"
     ],
     "delete-account": [
       "Elimina account"
@@ -1716,8 +1716,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "プライバシー"
     ],
-    "claim-legacy": [
-      "以前のディベートを紐付ける"
+    "security": [
+      "セキュリティ"
     ],
     "delete-account": [
       "アカウントを削除"
@@ -1772,8 +1772,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "개인정보"
     ],
-    "claim-legacy": [
-      "기존 토론 소유권 확인"
+    "security": [
+      "보안"
     ],
     "delete-account": [
       "계정 삭제"
@@ -1828,8 +1828,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privatumas"
     ],
-    "claim-legacy": [
-      "Perimti senus debatus"
+    "security": [
+      "Saugumas"
     ],
     "delete-account": [
       "Ištrinti paskyrą"
@@ -1884,8 +1884,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privātums"
     ],
-    "claim-legacy": [
-      "Pieprasīt mantotās debates"
+    "security": [
+      "Drošība"
     ],
     "delete-account": [
       "Dzēst kontu"
@@ -1940,8 +1940,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privatezza"
     ],
-    "claim-legacy": [
-      "Itlob id-dibattiti storiċi"
+    "security": [
+      "Sigurtà"
     ],
     "delete-account": [
       "Ħassar il-kont"
@@ -1996,8 +1996,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacy"
     ],
-    "claim-legacy": [
-      "Eerdere debatten koppelen"
+    "security": [
+      "Beveiliging"
     ],
     "delete-account": [
       "Account verwijderen"
@@ -2052,8 +2052,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Prywatność"
     ],
-    "claim-legacy": [
-      "Przejmij starsze debaty"
+    "security": [
+      "Bezpieczeństwo"
     ],
     "delete-account": [
       "Usuń konto"
@@ -2108,8 +2108,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacidade"
     ],
-    "claim-legacy": [
-      "Reivindicar debates antigos"
+    "security": [
+      "Segurança"
     ],
     "delete-account": [
       "Eliminar conta"
@@ -2164,8 +2164,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Confidențialitate"
     ],
-    "claim-legacy": [
-      "Revendicați dezbaterile vechi"
+    "security": [
+      "Securitate"
     ],
     "delete-account": [
       "Ștergeți contul"
@@ -2220,8 +2220,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Конфиденциальность"
     ],
-    "claim-legacy": [
-      "Привязать прежние дебаты"
+    "security": [
+      "Безопасность"
     ],
     "delete-account": [
       "Удалить учётную запись"
@@ -2276,8 +2276,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Súkromie"
     ],
-    "claim-legacy": [
-      "Prevziať staršie debaty"
+    "security": [
+      "Zabezpečenie"
     ],
     "delete-account": [
       "Odstrániť účet"
@@ -2332,8 +2332,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Zasebnost"
     ],
-    "claim-legacy": [
-      "Prevzem podedovanih razprav"
+    "security": [
+      "Varnost"
     ],
     "delete-account": [
       "Izbris računa"
@@ -2388,8 +2388,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Integritet"
     ],
-    "claim-legacy": [
-      "Ta över äldre debatter"
+    "security": [
+      "Säkerhet"
     ],
     "delete-account": [
       "Radera konto"
@@ -2444,8 +2444,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Gizlilik"
     ],
-    "claim-legacy": [
-      "Eski tartışmaları sahiplen"
+    "security": [
+      "Güvenlik"
     ],
     "delete-account": [
       "Hesabı sil"
@@ -2500,8 +2500,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Конфіденційність"
     ],
-    "claim-legacy": [
-      "Заявити права на попередні дебати"
+    "security": [
+      "Безпека"
     ],
     "delete-account": [
       "Видалити обліковий запис"
@@ -2556,8 +2556,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Quyền riêng tư"
     ],
-    "claim-legacy": [
-      "Nhận quyền sở hữu cuộc tranh luận cũ"
+    "security": [
+      "Bảo mật"
     ],
     "delete-account": [
       "Xóa tài khoản"
@@ -2612,8 +2612,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "隐私"
     ],
-    "claim-legacy": [
-      "认领旧版辩论"
+    "security": [
+      "安全"
     ],
     "delete-account": [
       "删除账户"

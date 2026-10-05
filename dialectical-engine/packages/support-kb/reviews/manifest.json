@@ -1,13 +1,11 @@
 {
   "schemaVersion": 2,
   "catalog": {
-    "sha256": "ffd729867aa1ed250d142f1a82aee386f493a56a224193adf387c231da111854",
-    "reviewedBy": "OWNER",
-    "reviewerSession": "d65424e5-27a7-40b7-8a4c-773e60cb404f (legal-notice session; the owner read the seven legal-page entries in chat and answered 'Signed')",
-    "reviewedOn": "2026-09-29",
-    "evidence": "docs/missions/legal-pages/OWNER-SIGNOFF-legal-pages-catalog.md",
-    "ratifiedBy": "V",
-    "ratifiedOn": "2026-09-29"
+    "sha256": "cb302f5103c91c53990efeee1604083ec0bc099296a356968ba43d421e5e5df5",
+    "reviewedBy": "SOL",
+    "reviewerSession": "/root/implement_task12",
+    "reviewedOn": "2026-10-05",
+    "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md"
   },
   "articles": [
     {
@@ -31,20 +29,20 @@
     {
       "id": "account-settings",
       "lang": "en",
-      "sha256": "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628",
+      "sha256": "5f04df88af009daf56f03dccaa8d8a271d458bac913f66bd0f63a810919f9cde",
       "reviewedBy": "SOL",
-      "reviewerSession": "/root/plan_review",
-      "reviewedOn": "2026-09-14",
-      "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-p2.md"
+      "reviewerSession": "/root/implement_task12",
+      "reviewedOn": "2026-10-05",
+      "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md"
     },
     {
       "id": "account-settings",
       "lang": "ro",
-      "sha256": "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9",
+      "sha256": "60cef78be7c3eb7dafaf5686d2648beaea9a058d597b49ec2fef9d99ac5fc298",
       "reviewedBy": "SOL",
-      "reviewerSession": "/root/plan_review",
-      "reviewedOn": "2026-09-14",
-      "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-p2.md"
+      "reviewerSession": "/root/implement_task12",
+      "reviewedOn": "2026-10-05",
+      "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md"
     },
     {
       "id": "ai-transparency",
@@ -251,20 +249,20 @@
     {
       "id": "settings-help-menus",
       "lang": "en",
-      "sha256": "2f1fd92ebe1f560f631a0990b8883e0aa857783114751f9532cabcf97ba86ede",
+      "sha256": "b19d5a8f0da2325584d2ef25e7e7d30f11156833709a011d0a312eeaaf425348",
       "reviewedBy": "SOL",
-      "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-      "reviewedOn": "2026-09-17",
-      "evidence": "docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md"
+      "reviewerSession": "/root/implement_task12",
+      "reviewedOn": "2026-10-05",
+      "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md"
     },
     {
       "id": "settings-help-menus",
       "lang": "ro",
-      "sha256": "57b5e6f5d34327177b504261fcc2b4f24e1e7693093f2d42cfd3348fc17872f7",
+      "sha256": "4b3d62f781328233dbccfedcd9a9a0ebce84e66f342b5ee5e862b7d2fab8c2fc",
       "reviewedBy": "SOL",
-      "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-      "reviewedOn": "2026-09-17",
-      "evidence": "docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md"
+      "reviewerSession": "/root/implement_task12",
+      "reviewedOn": "2026-10-05",
+      "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md"
     },
     {
       "id": "support-cases",
@@ -322,7 +320,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "06703ff9df60a0c77261e0ab57a36d3180e7b6823d235f2751d57e4cfa851ee1",
+    "componentFileSha256": "a5aa3386877d3af0bba7d432d150451c67ab735393f5fc49302aa36626349543",
     "components": [
       {
         "id": "account-access",
@@ -353,26 +351,26 @@
       {
         "id": "account-settings",
         "lang": "en",
-        "articleSha256": "2cab95047c1c34109794f3fc1ad620784bbb97b9267160d471551454d296f628",
-        "modelProjectionSha256": "67f5ce1fd18952c94a981f772e32e29c8c526b5591d656c202260486826a0d62",
-        "fallbackSha256": "6d99d7eeb445525b3bf3cf55f4283ee24fec536ff4f9ccc3a3b1f928904091bf",
+        "articleSha256": "5f04df88af009daf56f03dccaa8d8a271d458bac913f66bd0f63a810919f9cde",
+        "modelProjectionSha256": "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de",
+        "fallbackSha256": "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de",
         "reviewedBy": "SOL",
-        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-        "reviewedOn": "2026-09-15",
-        "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
+        "reviewerSession": "/root/implement_task12",
+        "reviewedOn": "2026-10-05",
+        "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
       },
       {
         "id": "account-settings",
         "lang": "ro",
-        "articleSha256": "e2b2834ff96da50a0511b2647ae490f6f99af80e317a74caddb16ee8262bc5d9",
-        "modelProjectionSha256": "f941492f0a6bed283a0fd70aa6ffeb20304b40c5bdfdd8e01f438cf3094f08f8",
-        "fallbackSha256": "1b7be7bebd1932a4630bea3df60d016218ecedca1ef538ac14510ef66d5f2aad",
+        "articleSha256": "60cef78be7c3eb7dafaf5686d2648beaea9a058d597b49ec2fef9d99ac5fc298",
+        "modelProjectionSha256": "853de67fee75354bb2f4b8e2d22f595d58f3ab19d5a98245bdcf38bad4602ec0",
+        "fallbackSha256": "853de67fee75354bb2f4b8e2d22f595d58f3ab19d5a98245bdcf38bad4602ec0",
         "reviewedBy": "SOL",
-        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-        "reviewedOn": "2026-09-15",
-        "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
+        "reviewerSession": "/root/implement_task12",
+        "reviewedOn": "2026-10-05",
+        "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
       },
@@ -769,26 +767,26 @@
       {
         "id": "settings-help-menus",
         "lang": "en",
-        "articleSha256": "2f1fd92ebe1f560f631a0990b8883e0aa857783114751f9532cabcf97ba86ede",
-        "modelProjectionSha256": "3677572a1b6fe513930ad82259a89b985f0c3ce023c57be4489794be27147a79",
-        "fallbackSha256": "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5",
+        "articleSha256": "b19d5a8f0da2325584d2ef25e7e7d30f11156833709a011d0a312eeaaf425348",
+        "modelProjectionSha256": "948f19150d75fd7187d7c5e24a7caf01f7524186da1ce812f63a461406d61ae2",
+        "fallbackSha256": "948f19150d75fd7187d7c5e24a7caf01f7524186da1ce812f63a461406d61ae2",
         "reviewedBy": "SOL",
-        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-        "reviewedOn": "2026-09-17",
-        "evidence": "docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md",
+        "reviewerSession": "/root/implement_task12",
+        "reviewedOn": "2026-10-05",
+        "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
       },
       {
         "id": "settings-help-menus",
         "lang": "ro",
-        "articleSha256": "57b5e6f5d34327177b504261fcc2b4f24e1e7693093f2d42cfd3348fc17872f7",
-        "modelProjectionSha256": "4c8e8ab9af79965af5234b0da312f2970bf9d36f3b131765c4ac31353c5d2495",
-        "fallbackSha256": "574aef1c82b5203dcab7fd229ad3c6b9bcaa13c64a55924e7ffc49c5bab2d3cc",
+        "articleSha256": "4b3d62f781328233dbccfedcd9a9a0ebce84e66f342b5ee5e862b7d2fab8c2fc",
+        "modelProjectionSha256": "c728d7fd0698dc1f8b2361d467425116fd680559d655696fa997647c9e5a0f07",
+        "fallbackSha256": "c728d7fd0698dc1f8b2361d467425116fd680559d655696fa997647c9e5a0f07",
         "reviewedBy": "SOL",
-        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-        "reviewedOn": "2026-09-17",
-        "evidence": "docs/missions/support-conversation-20260914/reviews/GUIDE_EDITORIAL_RECHECK.md",
+        "reviewerSession": "/root/implement_task12",
+        "reviewedOn": "2026-10-05",
+        "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
       },

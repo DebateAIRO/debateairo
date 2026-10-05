@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "Transparentnosť AI",
   "chrome.workers": "Pracovné procesy",
   "chrome.account": "Účet",
-  "chrome.asker": "PÝTAJÚCI SA",
-  "chrome.askerRolePlaceholder": "Zástupný text roly pýtajúceho sa",
   "chrome.publicViewLocked": "Verejné zobrazenie · akcie uzamknuté",
   "chrome.openScoringDiagnostics": "Otvoriť diagnostiku hodnotenia",
   "chrome.scoring": "Hodnotenie · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Ako to funguje",
   "chrome.moreDebateActions": "Ďalšie akcie debaty",
   "chrome.help": "Pomoc",
-  "chrome.signedInAsker": "Prihlásený pýtajúci sa",
-  "chrome.guestSession": "Relácia hosťa",
   "chrome.languageOffer.label": "Jazyk stránky",
   "chrome.languageOffer.text": "Jazyk tejto debaty: {language} ({nativeName}). Zobraziť stránku v jazyku: {language}?",
   "chrome.languageOffer.textNative": "Jazyk tejto debaty: {language}. Zobraziť stránku v jazyku: {language}?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukurešť, Rumunsko",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Domov",
-  "chrome.footer.cookiePreferences": "Nastavenia súborov cookie"
+  "chrome.footer.cookiePreferences": "Nastavenia súborov cookie",
+  "chrome.security": "Zabezpečenie",
+  "chrome.logout": "Odhlásiť sa",
+  "chrome.accountError": "Nepodarilo sa to. Znova načítajte stránku a skúste to znova."
 }

@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "MI pārredzamība",
   "chrome.workers": "Izpildes procesi",
   "chrome.account": "Konts",
-  "chrome.asker": "JAUTĀTĀJS",
-  "chrome.askerRolePlaceholder": "Jautātāja lomas vietturis",
   "chrome.publicViewLocked": "Publiskais skats · darbības bloķētas",
   "chrome.openScoringDiagnostics": "Atvērt vērtēšanas diagnostiku",
   "chrome.scoring": "Vērtēšana · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Kā tas darbojas",
   "chrome.moreDebateActions": "Citas debašu darbības",
   "chrome.help": "Palīdzība",
-  "chrome.signedInAsker": "Pierakstījies jautātājs",
-  "chrome.guestSession": "Viesa sesija",
   "chrome.languageOffer.label": "Lapas valoda",
   "chrome.languageOffer.text": "Šīs debates notiek {language} valodā ({nativeName}). Vai rādīt lapu {language} valodā?",
   "chrome.languageOffer.textNative": "Šīs debates notiek {language} valodā. Vai rādīt lapu {language} valodā?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukareste, Rumānija",
   "chrome.footer.product": "Produkts",
   "chrome.footer.home": "Sākums",
-  "chrome.footer.cookiePreferences": "Sīkdatņu preferences"
+  "chrome.footer.cookiePreferences": "Sīkdatņu preferences",
+  "chrome.security": "Drošība",
+  "chrome.logout": "Izrakstīties",
+  "chrome.accountError": "Tas neizdevās. Pārlādējiet lapu un mēģiniet vēlreiz."
 }

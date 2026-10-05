@@ -27,20 +27,11 @@ describe("Support-visible global Account navigation",() => {
     vi.stubGlobal("fetch",fetchMock);
   });
 
-  it("opens the signed-in Account surface without changing the other global actions",() => {
+  it("retains new-debate navigation and removes synthetic identity",() => {
     const document = render("/");
-    const account = linkByText(document,"Account");
-    const newDebate = linkByText(document,"+ New debate");
-    const settings = document.querySelector<HTMLAnchorElement>('a[aria-label="Settings"]');
-    const asker = [...document.querySelectorAll<HTMLElement>(".roleChip")]
-      .find(element => element.textContent?.trim() === "ASKER");
-
-    expect(account?.getAttribute("href")).toBe("/settings");
-    expect(newDebate?.getAttribute("href")).toBe("/new");
-    expect(settings?.getAttribute("href")).toBe("/settings");
-    expect(asker?.tagName).toBe("SPAN");
-    expect(asker?.closest("a,button")).toBeNull();
-    expect(asker?.getAttribute("title")).toBe("Asker role placeholder");
+    expect(linkByText(document,"+ New debate")?.getAttribute("href")).toBe("/new");
+    expect(document.querySelector(".roleChip")).toBeNull();
+    expect(document.querySelector('a[aria-label="Settings"]')).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

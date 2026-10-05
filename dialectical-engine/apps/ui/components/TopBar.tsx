@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountMenu } from "@/components/AccountMenu";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ModeToggle } from "@/components/ModeToggle";
@@ -11,7 +12,8 @@ import { t } from "@/lib/i18n/translate";
 const SCREEN_TITLES: Record<string, string> = {
   "/": "chrome.library",
   "/new": "chrome.newDebate",
-  "/settings": "chrome.settings",
+  "/settings": "chrome.account",
+  "/settings/security": "chrome.security",
   "/ai-transparency": "chrome.aiTransparency",
   "/admin/workers": "chrome.workers",
   "/legal": "chrome.legalPages",
@@ -95,18 +97,13 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
-        <Link className="btn" href="/settings">
-          {t(catalog, "chrome.account")}
-        </Link>
+        <AccountMenu catalog={catalog} />
         <Link className="btn btnDark" href="/new">
           + {t(catalog, "chrome.newDebate")}
         </Link>
-        <span className="roleChip" title={t(catalog, "chrome.askerRolePlaceholder")}>{t(catalog, "chrome.asker")}</span>
         <LanguageSwitcher />
         <ModeToggle />
-        <Link className="iconBtn" href="/settings" aria-label={t(catalog, "chrome.settings")} title={t(catalog, "chrome.settings")}>
-          ⚙
-        </Link>
+
       </div>
     </header>
   );

@@ -1,4 +1,5 @@
 "use client";
+import { AccountMenu } from "@/components/AccountMenu";
 import { fundingFailureMessage } from "@/lib/billing/fundingFailure";
 
 import { AiNotice } from "@/components/AiNotice";
@@ -1553,6 +1554,7 @@ export default function DebatePageClient({
               </button>
             </div>
           ) : null}
+          <AccountMenu catalog={chromeCatalog} />
           <LanguageSwitcher />
           <ModeToggle compact />
           <div className="debateUtilityActions" ref={debateHeaderInlineActionsRef}>
@@ -1580,7 +1582,6 @@ export default function DebatePageClient({
               </a>
             ) : null}
             <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
-            {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label={t(chromeCatalog, "chrome.settings")}>⚙</Link>}
           </div>
           <details className="debateUtilityOverflow">
             <summary className="iconBtn" role="button" aria-label={t(chromeCatalog, "chrome.moreDebateActions")} title={t(chromeCatalog, "chrome.moreDebateActions")}>
@@ -1611,7 +1612,6 @@ export default function DebatePageClient({
                 </a>
               ) : null}
               <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
-              {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label={t(chromeCatalog, "chrome.settings")}>⚙</Link>}
             </div>
           </details>
         </div>

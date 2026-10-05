@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "Tekoälyn läpinäkyvyys",
   "chrome.workers": "Toimijat",
   "chrome.account": "Tili",
-  "chrome.asker": "KYSYJÄ",
-  "chrome.askerRolePlaceholder": "Kysyjän roolin paikkamerkki",
   "chrome.publicViewLocked": "Julkinen näkymä · toiminnot lukittu",
   "chrome.openScoringDiagnostics": "Avaa pisteytyksen diagnostiikka",
   "chrome.scoring": "Pisteytys · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Näin se toimii",
   "chrome.moreDebateActions": "Lisää väittelyn toimintoja",
   "chrome.help": "Ohje",
-  "chrome.signedInAsker": "Kirjautunut kysyjä",
-  "chrome.guestSession": "Vierasistunto",
   "chrome.languageOffer.label": "Sivun kieli",
   "chrome.languageOffer.text": "Tämän väittelyn kieli on {language} ({nativeName}). Näytetäänkö sivu kielellä {language}?",
   "chrome.languageOffer.textNative": "Tämän väittelyn kieli on {language}. Näytetäänkö sivu kielellä {language}?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukarest, Romania",
   "chrome.footer.product": "Tuote",
   "chrome.footer.home": "Etusivu",
-  "chrome.footer.cookiePreferences": "Evästeasetukset"
+  "chrome.footer.cookiePreferences": "Evästeasetukset",
+  "chrome.security": "Turvallisuus",
+  "chrome.logout": "Kirjaudu ulos",
+  "chrome.accountError": "Toiminto epäonnistui. Lataa sivu uudelleen ja yritä uudestaan."
 }

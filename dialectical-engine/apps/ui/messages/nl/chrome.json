@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "AI-transparantie",
   "chrome.workers": "Werkprocessen",
   "chrome.account": "Account",
-  "chrome.asker": "VRAAGSTELLER",
-  "chrome.askerRolePlaceholder": "Tijdelijke aanduiding voor vraagstellerrol",
   "chrome.publicViewLocked": "Openbare weergave · acties vergrendeld",
   "chrome.openScoringDiagnostics": "Scorediagnostiek openen",
   "chrome.scoring": "Scores · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Hoe het werkt",
   "chrome.moreDebateActions": "Meer debatacties",
   "chrome.help": "Hulp",
-  "chrome.signedInAsker": "Aangemelde vraagsteller",
-  "chrome.guestSession": "Gastsessie",
   "chrome.languageOffer.label": "Paginataal",
   "chrome.languageOffer.text": "Dit debat is in het {language} ({nativeName}). Wilt u de pagina in het {language} weergeven?",
   "chrome.languageOffer.textNative": "Dit debat is in het {language}. Wilt u de pagina in het {language} weergeven?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Boekarest, Roemenië",
   "chrome.footer.product": "Product",
   "chrome.footer.home": "Startpagina",
-  "chrome.footer.cookiePreferences": "Cookievoorkeuren"
+  "chrome.footer.cookiePreferences": "Cookievoorkeuren",
+  "chrome.security": "Beveiliging",
+  "chrome.logout": "Uitloggen",
+  "chrome.accountError": "Dat is niet gelukt. Laad de pagina opnieuw en probeer het nog eens."
 }

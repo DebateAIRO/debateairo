@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "الشفافية بشأن الذكاء الاصطناعي",
   "chrome.workers": "العاملون",
   "chrome.account": "الحساب",
-  "chrome.asker": "صاحب السؤال",
-  "chrome.askerRolePlaceholder": "عنصر نائب لدور صاحب السؤال",
   "chrome.publicViewLocked": "عرض عام · الإجراءات مقفلة",
   "chrome.openScoringDiagnostics": "فتح تشخيص الدرجات",
   "chrome.scoring": "التقييم · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "آلية العمل",
   "chrome.moreDebateActions": "المزيد من إجراءات المناظرة",
   "chrome.help": "المساعدة",
-  "chrome.signedInAsker": "صاحب سؤال مسجل الدخول",
-  "chrome.guestSession": "جلسة ضيف",
   "chrome.languageOffer.label": "لغة الصفحة",
   "chrome.languageOffer.text": "هذه المناظرة باللغة {language} ({nativeName}). هل تودّ عرض الصفحة باللغة {language}؟",
   "chrome.languageOffer.textNative": "هذه المناظرة باللغة {language}. هل تودّ عرض الصفحة باللغة {language}؟",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "بوخارست، رومانيا",
   "chrome.footer.product": "المنتج",
   "chrome.footer.home": "الرئيسية",
-  "chrome.footer.cookiePreferences": "تفضيلات ملفات تعريف الارتباط"
+  "chrome.footer.cookiePreferences": "تفضيلات ملفات تعريف الارتباط",
+  "chrome.security": "الأمان",
+  "chrome.logout": "تسجيل الخروج",
+  "chrome.accountError": "لم ينجح ذلك. أعد تحميل الصفحة وحاول مجددًا."
 }

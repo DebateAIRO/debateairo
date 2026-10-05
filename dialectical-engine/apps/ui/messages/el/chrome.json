@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "Διαφάνεια ΤΝ",
   "chrome.workers": "Διεργασίες",
   "chrome.account": "Λογαριασμός",
-  "chrome.asker": "ΕΡΩΤΩΝ",
-  "chrome.askerRolePlaceholder": "Σύμβολο κράτησης θέσης ρόλου ερωτώντος",
   "chrome.publicViewLocked": "Δημόσια προβολή · ενέργειες κλειδωμένες",
   "chrome.openScoringDiagnostics": "Άνοιγμα διαγνωστικών βαθμολόγησης",
   "chrome.scoring": "Βαθμολόγηση · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Πώς λειτουργεί",
   "chrome.moreDebateActions": "Περισσότερες ενέργειες αντιπαράθεσης",
   "chrome.help": "Βοήθεια",
-  "chrome.signedInAsker": "Συνδεδεμένος ερωτών",
-  "chrome.guestSession": "Συνεδρία επισκέπτη",
   "chrome.languageOffer.label": "Γλώσσα σελίδας",
   "chrome.languageOffer.text": "Αυτή η αντιπαράθεση είναι στα {language} ({nativeName}). Να εμφανιστεί η σελίδα στα {language};",
   "chrome.languageOffer.textNative": "Αυτή η αντιπαράθεση είναι στη γλώσσα {language}. Να εμφανιστεί η σελίδα στη γλώσσα {language};",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Βουκουρέστι, Ρουμανία",
   "chrome.footer.product": "Προϊόν",
   "chrome.footer.home": "Αρχική",
-  "chrome.footer.cookiePreferences": "Προτιμήσεις cookie"
+  "chrome.footer.cookiePreferences": "Προτιμήσεις cookie",
+  "chrome.security": "Ασφάλεια",
+  "chrome.logout": "Αποσύνδεση",
+  "chrome.accountError": "Κάτι δεν λειτούργησε. Φορτώστε ξανά τη σελίδα και δοκιμάστε πάλι."
 }

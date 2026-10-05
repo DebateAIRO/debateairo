@@ -21,7 +21,7 @@ export type EnrollmentAuthority = {
     totpUnavailableReason?: 'PASSWORD_UNAVAILABLE' | null;
 };
 export type EnrollmentClient = Pick<ContractClient, 'beginPasskeyEnrollment' | 'completePasskeyEnrollment' | 'beginTotpEnrollment' | 'completeTotpEnrollment' | 'beginRecoveryEnrollment' | 'completeRecoveryEnrollment'>;
-export function SecurityEnrollment({ authority, client = contractClient, catalog = authEnglish, browser: provided, onAuthenticated, onEnrolled, onExpired, offerRecoveryCodes = false }: {
+export function SecurityEnrollment({ authority, client = contractClient, catalog = authEnglish, browser: provided, onAuthenticated, onEnrolled, onExpired, offerRecoveryCodes = false, availableMethods }: {
     authority: EnrollmentAuthority;
     client?: EnrollmentClient;
     catalog?: MessageCatalog;
@@ -30,6 +30,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     onEnrolled?: () => void;
     onExpired?: () => void;
     offerRecoveryCodes?: boolean;
+    availableMethods?: readonly ('passkey' | 'totp')[];
 }) {
     const browser = useRef(provided ?? createConsumerWebAuthnBrowser()).current;
     const sequence = useRef(0);
@@ -48,7 +49,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         token: string;
         expiresAt: string;
     } | null>(null);
-    const allowed = authority.kind === 'recovery' ? authority.availableMethods : ['passkey', 'totp'];
+    const allowed = authority.kind === 'recovery' ? authority.availableMethods : authority.kind === 'grant' ? availableMethods ?? ['passkey', 'totp'] : ['passkey', 'totp'];
     function clearCeremony() {
         sequence.current++;
         browser.cancel();

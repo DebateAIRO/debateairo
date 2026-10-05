@@ -207,7 +207,7 @@ describe("CP1 composed answer context", () => {
   it("grounds a Settings menu question and returns only the server-resolved section action", async () => {
     const guide = entry(
       "settings-help-menus",
-      "Settings contains Active sessions, Privacy, Claim legacy debates, and Delete account."
+      "Settings contains Active sessions, Privacy, Security, and Delete account."
     );
     const snapshot = corpus([guide],"5".repeat(64));
     const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
@@ -234,7 +234,7 @@ describe("CP1 composed answer context", () => {
   it("repairs omitted visible Account authority through the actual answer boundary",async () => {
     const snapshot = corpus([
       Object.freeze({
-        ...entry("settings-help-menus","Account Settings Active sessions Privacy Claim legacy debates Delete account."),
+        ...entry("settings-help-menus","Account Settings Active sessions Privacy Security Delete account."),
         lang:"ro" as const
       }),
       Object.freeze({
@@ -244,7 +244,7 @@ describe("CP1 composed answer context", () => {
     ],"account-authority");
     const complete = vi.fn(async () => Object.freeze({ text:JSON.stringify({
       kind:"answer",
-      text:"Account deschide setările contului autentificat. De acolo poți gestiona sesiunile active prin Active sessions (examinare sau revocare), preferințele cookie prin Privacy, revendica dezbateri vechi prin Claim legacy debates și programa sau anula ștergerea contului prin Delete account.",
+      text:"Account deschide setările contului autentificat. De acolo poți gestiona sesiunile active prin Active sessions (examinare sau revocare), preferințele cookie prin Privacy, deschide Securitate prin Security și programa sau anula ștergerea contului prin Delete account.",
       sourceIds:[SECOND_SOURCE_REFERENCE],actionIds:[]
     }) }));
     const service = createSupportAnswerService({

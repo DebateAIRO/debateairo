@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "AIの透明性",
   "chrome.workers": "ワーカー",
   "chrome.account": "アカウント",
-  "chrome.asker": "質問者",
-  "chrome.askerRolePlaceholder": "質問者ロールのプレースホルダー",
   "chrome.publicViewLocked": "公開表示 · 操作はロックされています",
   "chrome.openScoringDiagnostics": "採点診断を開く",
   "chrome.scoring": "採点 · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "仕組み",
   "chrome.moreDebateActions": "その他のディベート操作",
   "chrome.help": "ヘルプ",
-  "chrome.signedInAsker": "ログイン済みの質問者",
-  "chrome.guestSession": "ゲストセッション",
   "chrome.languageOffer.label": "ページの言語",
   "chrome.languageOffer.text": "このディベートは{language}（{nativeName}）で行われています。ページを{language}で表示しますか？",
   "chrome.languageOffer.textNative": "このディベートは{language}で行われています。ページを{language}で表示しますか？",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "ルーマニア、ブカレスト",
   "chrome.footer.product": "製品",
   "chrome.footer.home": "ホーム",
-  "chrome.footer.cookiePreferences": "Cookieの設定"
+  "chrome.footer.cookiePreferences": "Cookieの設定",
+  "chrome.security": "セキュリティ",
+  "chrome.logout": "ログアウト",
+  "chrome.accountError": "処理できませんでした。ページを再読み込みして、もう一度お試しください。"
 }

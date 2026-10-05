@@ -19,7 +19,7 @@ const actionKeys = Object.freeze({
   settings: ["chrome", "chrome.settings"],
   "active-sessions": ["settings", "settings.sessions.title"],
   "privacy-preferences": ["consent", "consent.settings.title"],
-  "claim-legacy": ["settings", "settings.legacy.title"],
+  security: ["chrome", "chrome.security"],
   "delete-account": ["settings", "settings.erasure.title"],
   "public-catalog": ["home", "home.publicDebates"],
   "your-debates": ["home", "home.yourDebates"],

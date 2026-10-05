@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "Minh bạch về AI",
   "chrome.workers": "Tác vụ",
   "chrome.account": "Tài khoản",
-  "chrome.asker": "NGƯỜI ĐẶT CÂU HỎI",
-  "chrome.askerRolePlaceholder": "Chỗ giữ vai trò người đặt câu hỏi",
   "chrome.publicViewLocked": "Chế độ xem công khai · thao tác bị khóa",
   "chrome.openScoringDiagnostics": "Mở chẩn đoán chấm điểm",
   "chrome.scoring": "Chấm điểm · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Cách hoạt động",
   "chrome.moreDebateActions": "Thêm thao tác tranh luận",
   "chrome.help": "Trợ giúp",
-  "chrome.signedInAsker": "Người đặt câu hỏi đã đăng nhập",
-  "chrome.guestSession": "Phiên khách",
   "chrome.languageOffer.label": "Ngôn ngữ của trang",
   "chrome.languageOffer.text": "Cuộc tranh luận này được viết bằng {language} ({nativeName}). Bạn có muốn hiển thị trang bằng {language} không?",
   "chrome.languageOffer.textNative": "Cuộc tranh luận này được viết bằng {language}. Bạn có muốn hiển thị trang bằng {language} không?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bucharest, Romania",
   "chrome.footer.product": "Sản phẩm",
   "chrome.footer.home": "Trang chủ",
-  "chrome.footer.cookiePreferences": "Tùy chọn cookie"
+  "chrome.footer.cookiePreferences": "Tùy chọn cookie",
+  "chrome.security": "Bảo mật",
+  "chrome.logout": "Đăng xuất",
+  "chrome.accountError": "Thao tác không thành công. Hãy tải lại trang và thử lại."
 }

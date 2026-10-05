@@ -109,8 +109,9 @@ describe("Support knowledge context", () => {
     // article, projection or fallback byte changed.
     // 2026-09-24: the owner signed the /ai-transparency article pair and the catalogue
     // (OWNER records in the review manifest; the version binds the session, dates and evidence).
-    // 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
-    expect(corpus.kbVersion).toBe("3ba3bdb5bf4359a412b50054dfd50ae0ed816f492e29656e9bd39ef7726ef881");
+    // 2026-10-05: changed menu/article/recovery bytes have SOL evidence; unchanged legal entries retain OWNER signatures.
+    // Prior 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
+    expect(corpus.kbVersion).toBe("048d25ece59ef431f4c80922783116e0718dfa57eff9dc49942662f7a9d3269e");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 
@@ -422,7 +423,7 @@ describe("Support knowledge context", () => {
     entry("app-navigation","ro","Navighează în aplicație","Acasă bibliotecă dezbateri publice pornește dezbatere ajutor temă prețuri."),
     entry("debate-workspace-menus","en","Use debate views","Thread Split Tree Map scoring Replay Workspace Honesty."),
     entry("debate-workspace-menus","ro","Folosește vizualizările dezbaterii","Fir Împărțit Arbore Hartă evaluare Repetă Spațiu Transparență."),
-    entry("settings-help-menus","en","Use Settings and Help","Settings Active sessions Privacy Claim legacy debates Delete account human cases."),
+    entry("settings-help-menus","en","Use Settings and Help","Settings Active sessions Privacy Security Delete account human cases."),
     entry("settings-help-menus","ro","Folosește Setări și Ajutor","Setări Sesiuni active Confidențialitate Revendică dezbateri vechi Șterge contul cazuri umane."),
     entry("support-status-limits","en","Understand Support status","Service status Debate engine Scoring queue Model fleet published public state."),
     entry("support-status-limits","ro","Înțelege starea Asistenței","Starea serviciului motor de dezbatere coadă de evaluare flotă de modele informații publice.")
@@ -480,8 +481,8 @@ describe("Support knowledge context", () => {
     ["ro" as const,"Unde pot gestiona sesiunile active?",["active-sessions"]],
     ["en" as const,"Where are the privacy preferences?",["privacy-preferences"]],
     ["ro" as const,"Unde sunt preferințele de confidențialitate?",["privacy-preferences"]],
-    ["en" as const,"Where can I claim legacy debates?",["claim-legacy"]],
-    ["ro" as const,"Unde pot revendica dezbaterile vechi?",["claim-legacy"]],
+    ["en" as const,"Where can I claim legacy debates?",[]],
+    ["ro" as const,"Unde pot revendica dezbaterile vechi?",[]],
     ["en" as const,"Where can I find account deletion controls?",["delete-account"]],
     ["ro" as const,"Unde găsesc opțiunile de ștergere a contului?",["delete-account"]],
     ["en" as const,"How is this public guide different from a human support case?",[]],

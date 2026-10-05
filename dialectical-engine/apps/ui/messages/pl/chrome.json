@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "Przejrzystość AI",
   "chrome.workers": "Agenci",
   "chrome.account": "Konto",
-  "chrome.asker": "PYTAJĄCY",
-  "chrome.askerRolePlaceholder": "Symbol zastępczy roli pytającego",
   "chrome.publicViewLocked": "Widok publiczny · działania zablokowane",
   "chrome.openScoringDiagnostics": "Otwórz diagnostykę oceniania",
   "chrome.scoring": "Ocena · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Jak to działa",
   "chrome.moreDebateActions": "Więcej działań debaty",
   "chrome.help": "Pomoc",
-  "chrome.signedInAsker": "Zalogowany pytający",
-  "chrome.guestSession": "Sesja gościa",
   "chrome.languageOffer.label": "Język strony",
   "chrome.languageOffer.text": "Język tej debaty: {language} ({nativeName}). Czy wyświetlić stronę w języku: {language}?",
   "chrome.languageOffer.textNative": "Język tej debaty: {language}. Czy wyświetlić stronę w języku: {language}?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukareszt, Rumunia",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Strona główna",
-  "chrome.footer.cookiePreferences": "Ustawienia plików cookie"
+  "chrome.footer.cookiePreferences": "Ustawienia plików cookie",
+  "chrome.security": "Bezpieczeństwo",
+  "chrome.logout": "Wyloguj się",
+  "chrome.accountError": "Nie udało się. Odśwież stronę i spróbuj ponownie."
 }

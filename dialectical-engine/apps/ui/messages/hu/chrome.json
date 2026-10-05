@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "MI-átláthatóság",
   "chrome.workers": "Ügynökök",
   "chrome.account": "Fiók",
-  "chrome.asker": "KÉRDEZŐ",
-  "chrome.askerRolePlaceholder": "Kérdezői szerep helyőrzője",
   "chrome.publicViewLocked": "Nyilvános nézet · műveletek zárolva",
   "chrome.openScoringDiagnostics": "Pontozási diagnosztika megnyitása",
   "chrome.scoring": "Pontozás · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Hogyan működik?",
   "chrome.moreDebateActions": "További vitaműveletek",
   "chrome.help": "Súgó",
-  "chrome.signedInAsker": "Bejelentkezett kérdező",
-  "chrome.guestSession": "Vendégmunkamenet",
   "chrome.languageOffer.label": "Az oldal nyelve",
   "chrome.languageOffer.text": "Ez a vita {language} nyelvű ({nativeName}). Szeretné {language} nyelven megjeleníteni az oldalt?",
   "chrome.languageOffer.textNative": "Ez a vita {language} nyelvű. Szeretné {language} nyelven megjeleníteni az oldalt?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukarest, Románia",
   "chrome.footer.product": "Termék",
   "chrome.footer.home": "Kezdőlap",
-  "chrome.footer.cookiePreferences": "Sütibeállítások"
+  "chrome.footer.cookiePreferences": "Sütibeállítások",
+  "chrome.security": "Biztonság",
+  "chrome.logout": "Kijelentkezés",
+  "chrome.accountError": "Ez nem sikerült. Töltse be újra az oldalt, és próbálja újra."
 }

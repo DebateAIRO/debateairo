@@ -1,0 +1,27 @@
+// @vitest-environment jsdom
+import {act} from 'react';import {createRoot,type Root} from 'react-dom/client';import {beforeEach,afterEach,it,expect,vi} from 'vitest';
+import {ContractHttpError} from '@debateai/contract';
+import NewDebatePage from '../../apps/ui/app/new/NewDebatePageClient';
+import catalog from '../../apps/ui/messages/en/newDebate.json';import homeCatalog from '../../apps/ui/messages/en/home.json';import chromeCatalog from '../../apps/ui/messages/en/chrome.json';import settingsCatalog from '../../apps/ui/messages/en/settings.json';import authCatalog from '../../apps/ui/messages/en/auth.json';
+const state=vi.hoisted(()=>({create:vi.fn(),update:vi.fn(),step:vi.fn(),push:vi.fn()}));
+vi.mock('next/navigation',()=>({useRouter:()=>({push:state.push}),useSearchParams:()=>new URLSearchParams('topic=My%20original%20question'),usePathname:()=>'/new'}));
+vi.mock('@/components/AuthGate',()=>({AuthGate:({children}:any)=>children('session-marker')}));
+vi.mock('@/components/support/SupportWidget',()=>({SupportWidget:()=>null}));
+vi.mock('@/components/SensitiveDataConsent',()=>({useSensitiveDataConsent:()=>({ensureConsent:async()=>true,modal:null}),isSensitiveDataConsentRefusal:()=>false}));
+vi.mock('@/components/CrisisSupport',()=>({useCrisisSupport:()=>({offerIfCrisis:()=>false,flags:()=>false,offer(){},modal:null}),isCrisisSupportRefusal:()=>false}));
+vi.mock('@/lib/billing/room',()=>({useAskRoom:()=>[null,()=>{},async()=>null],readAskRoom:async()=>null,waitingRoomOf:()=>null}));
+vi.mock('@/lib/api',async(original)=>({...await original<typeof import('../../apps/ui/lib/api')>(),createDebate:state.create,contractClient:{
+ readSession:async()=>({asker_id:'fixture',session_id:'11111111-1111-4111-8111-111111111111',caller_scope:'ASKER',ownership_provenance:'server_session',provisional_identity_model:false}),
+ getBillingUsage:async()=>({plan_id:null,windows:[]}),phoneProfile:async()=>({phone_present:false,phone_masked:null,phone_verified:false,updated_at:null}),
+ authMethods:async()=>({methods:[],available_step_up_methods:['password_totp'],step_up_providers:[],recovery_codes_remaining:0}),stepUp:state.step,updatePhoneProfile:state.update,
+}}));
+let root:Root;
+beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);document.body.innerHTML='<div id="root"></div>';root=createRoot(document.getElementById('root')!);state.create.mockReset();state.update.mockReset();state.step.mockReset();state.push.mockReset();state.create.mockRejectedValueOnce(new ContractHttpError('UNPROCESSABLE',422,'safe','ACCOUNT_PHONE_REQUIRED')).mockResolvedValue({id:'fixture-debate'});state.step.mockResolvedValue({status:'step_up_complete',csrf_token:'c'.repeat(43),step_up_grant:{action:'CHANGE_PHONE_PROFILE',token:'g'.repeat(43),expires_at:new Date(Date.now()+300000).toISOString()}});state.update.mockResolvedValue({phone_present:true,phone_masked:'+40 ••• 678',phone_verified:false,updated_at:null});});
+afterEach(async()=>{await act(async()=>root.unmount());vi.unstubAllGlobals();});
+async function mount(){await act(async()=>root.render(<NewDebatePage catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} settingsCatalog={settingsCatalog} authCatalog={authCatalog}/>));await act(async()=>document.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));}
+async function input(selector:string,value:string){await act(async()=>{const field=document.querySelector<HTMLInputElement>(selector)!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(field,value);field.dispatchEvent(new Event('input',{bubbles:true}));});}
+async function click(text:string){const button=[...document.querySelectorAll('button')].find(x=>x.textContent?.trim()===text)!;expect(button).toBeDefined();await act(async()=>button.click());}
+async function update(){await input('input[type=tel]','+40 712 345 678');await click('Password · 6-digit authentication code');await input('input[type=password]','long password');await input('input[autocomplete=one-time-code]','123456');}
+it('cancel preserves the complete mounted draft without another debate request',async()=>{await mount();expect(document.body.textContent).toContain('Add your phone');expect(state.create).toHaveBeenCalledTimes(1);expect(document.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('My original question');await click('Cancel');expect(document.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('My original question');expect(state.create).toHaveBeenCalledTimes(1);expect(state.update).not.toHaveBeenCalled();});
+it('successful encrypted update retries the real original question/config and navigates only on success',async()=>{await mount();const original=state.create.mock.calls[0];await update();expect(state.update).toHaveBeenCalledWith({phone:'+40712345678',grantToken:'g'.repeat(43)});expect(state.create).toHaveBeenCalledTimes(2);expect(state.create.mock.calls[1]).toEqual(original);expect(state.push).toHaveBeenCalledWith('/debate/fixture-debate?starting=1');});
+it('failed encrypted update keeps draft/options and makes no retry request',async()=>{state.update.mockRejectedValueOnce(new Error('PRIVATE FAILURE'));await mount();await update();expect(state.update).toHaveBeenCalledTimes(1);expect(state.create).toHaveBeenCalledTimes(1);expect(document.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('My original question');expect(document.body.textContent).not.toContain('PRIVATE FAILURE');expect(state.push).not.toHaveBeenCalled();});

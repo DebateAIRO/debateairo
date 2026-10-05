@@ -284,6 +284,7 @@ apps/ui/app/verify-email/page.tsx
 apps/ui/app/verify-recovery-email/layout.tsx
 apps/ui/app/verify-recovery-email/page.tsx
 apps/ui/components/AccountErasureControls.tsx
+apps/ui/components/AccountMenu.tsx
 apps/ui/components/AgeConfirmationFlow.tsx
 apps/ui/components/AgeRefusal.tsx
 apps/ui/components/AiNotice.tsx
@@ -309,12 +310,12 @@ apps/ui/components/FloorAnswer.tsx
 apps/ui/components/GuideModal.tsx
 apps/ui/components/InvestigationDrawer.tsx
 apps/ui/components/LanguageSwitcher.tsx
-apps/ui/components/LegacyRunClaimControls.tsx
 apps/ui/components/LibraryComposer.tsx
 apps/ui/components/LoginFlow.tsx
 apps/ui/components/ModeToggle.tsx
 apps/ui/components/ModelPresentation.tsx
 apps/ui/components/NodeDetailDrawer.tsx
+apps/ui/components/PhoneProfileCard.tsx
 apps/ui/components/PublicAnswerDisclosure.tsx
 apps/ui/components/PublicDebateOverview.tsx
 apps/ui/components/PublicHonestyDrawer.tsx
@@ -323,6 +324,7 @@ apps/ui/components/QuestionLanguageOffer.tsx
 apps/ui/components/RecommendedInvestigations.tsx
 apps/ui/components/ReferenceNodeMeta.tsx
 apps/ui/components/ScoringErrorBoundary.tsx
+apps/ui/components/SecuritySettings.tsx
 apps/ui/components/SensitiveDataConsent.tsx
 apps/ui/components/SessionControls.tsx
 apps/ui/components/SettingsPageClient.tsx
@@ -334,6 +336,7 @@ apps/ui/components/SynthesisPanel.tsx
 apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
+apps/ui/components/accountNavigation.source-test.mjs
 apps/ui/components/auth/EmailPendingScreen.tsx
 apps/ui/components/auth/EphemeralCodes.tsx
 apps/ui/components/auth/InlineFieldMessage.tsx
@@ -414,6 +417,7 @@ apps/ui/lib/debatePresentation.ts
 apps/ui/lib/debateTreeUtils.ts
 apps/ui/lib/dob/dobLocale.ts
 apps/ui/lib/edgeUpgrade.test.mjs
+apps/ui/lib/endSession.ts
 apps/ui/lib/format.ts
 apps/ui/lib/i18n/I18nProvider.tsx
 apps/ui/lib/i18n/auth.test.mjs

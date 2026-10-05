@@ -6,7 +6,7 @@ import { contractClient } from "../lib/api.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import settingsEnglish from "../messages/en/settings.json";
-import { clearStoredSupportConversation } from "./support/conversation.js";
+import { endSession, finishSessionCleanup } from "../lib/endSession";
 
 export type SessionControlClient = Pick<ContractClient,
   "listSessions" | "logout" | "revokeSession" | "revokeAllSessions"
@@ -77,13 +77,8 @@ export function SessionControls({
   const [deviceLabel, setDeviceLabel] = useState<string | null>(null);
   useEffect(() => { setDeviceLabel(currentDeviceLabel()); }, []);
   const finishSession = () => {
-    // DL3-F3: the support widget's transcript is tab-scoped, so without this it
-    // outlived the account that produced it — the next person to sign in on this
-    // browser opened Help and read the previous person's support conversation.
-    clearStoredSupportConversation();
-    window.dispatchEvent(new Event("debateai:staff-session-ended"));
-    if (onSessionEnded !== undefined) onSessionEnded();
-    else if (typeof window !== "undefined") window.location.assign("/settings");
+    finishSessionCleanup(onSessionEnded ? null : "/settings");
+    onSessionEnded?.();
   };
 
   async function refresh(): Promise<void> {
@@ -118,9 +113,9 @@ export function SessionControls({
     setBusy("all");
     setError(null);
     try {
-      await client.revokeAllSessions();
+      await endSession(client, { all: true, redirectTo: onSessionEnded ? null : "/settings" });
       setSessions([]);
-      finishSession();
+      onSessionEnded?.();
     } catch (failure) {
       setError(describeFailure(failure, catalog));
     } finally {
@@ -132,9 +127,9 @@ export function SessionControls({
     setBusy("logout");
     setError(null);
     try {
-      await client.logout();
+      await endSession(client, { redirectTo: onSessionEnded ? null : "/settings" });
       setSessions([]);
-      finishSession();
+      onSessionEnded?.();
     } catch (failure) {
       setError(describeFailure(failure, catalog));
     } finally {

@@ -4,13 +4,15 @@ lang: ro
 title: "Folosește setările contului"
 status: shipped
 sources:
-  - apps/ui/app/settings/page.tsx:53
-  - apps/ui/components/SessionControls.tsx:77
-  - apps/ui/components/LegacyRunClaimControls.tsx:23
-  - apps/ui/components/AccountErasureControls.tsx:49
-verified_against: "b7ca2c41"
+  - apps/ui/components/AccountMenu.tsx:10
+  - apps/ui/components/SecuritySettings.tsx:17
+  - apps/ui/components/PhoneProfileCard.tsx:13
+  - apps/ui/components/SettingsPageClient.tsx:57
+  - apps/ui/components/SessionControls.tsx:65
+  - apps/ui/components/AccountErasureControls.tsx:66
+verified_against: "Task 12 working tree based on 903407d27b1b66bdcd1b724bb87d0580ca94658f; exact source hashes in docs/missions/account-onboarding/task-12-kb-editorial.md"
 ratified_by: ""
 ratified_on: ""
 ---
 
-După autentificare, `/settings` conține revizuirea și revocarea sesiunilor, preferințele de consimțământ din browser, revendicarea dezbaterilor vechi și controalele pentru ștergerea contului. Acțiunile sensibile cer o autentificare recentă în pagina care le gestionează. Pagina obișnuită de setări nu oferă acum controale active pentru schimbarea emailului, înlocuirea parolei, regenerarea MFA activă sau modificarea rutării implementării. Asistența poate explica aceste controale, dar nu le poate executa și nu poate primi parolele, codurile, tokenii sau frazele de confirmare.
+După autentificare, Cont deschide `/settings` cu schimbarea emailului, Sesiuni active, preferințele de consimțământ și ștergerea contului. Securitate deschide `/settings/security` cu numărul de telefon mascat și neverificat, emailul opțional de recuperare, cheile de acces sau aplicația de autentificare, codurile de recuperare și furnizorii configurați conectați. Afișarea ori schimbarea numărului și celelalte acțiuni sensibile cer confirmarea acțiunii exacte. Eliminarea unei metode ori a unui furnizor nu poate elimina ultima cale completă de autentificare. Deconectare încheie sesiunea curentă și șterge conversația Ajutor din această filă după succes. Asistența poate explica și naviga, dar nu execută operații asupra contului și nu primește parole, coduri, tokenuri sau fraze de confirmare.

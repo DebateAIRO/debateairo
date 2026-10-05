@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "AI-gennemsigtighed",
   "chrome.workers": "Arbejdere",
   "chrome.account": "Konto",
-  "chrome.asker": "SPØRGER",
-  "chrome.askerRolePlaceholder": "Pladsholder for spørgerrolle",
   "chrome.publicViewLocked": "Offentlig visning · handlinger låst",
   "chrome.openScoringDiagnostics": "Åbn bedømmelsesdiagnostik",
   "chrome.scoring": "Bedømmelse · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Hvordan det virker",
   "chrome.moreDebateActions": "Flere debataktioner",
   "chrome.help": "Hjælp",
-  "chrome.signedInAsker": "Spørger, der er logget ind",
-  "chrome.guestSession": "Gæstesession",
   "chrome.languageOffer.label": "Sidens sprog",
   "chrome.languageOffer.text": "Denne debat er på {language} ({nativeName}). Vil du vise siden på {language}?",
   "chrome.languageOffer.textNative": "Denne debat er på {language}. Vil du vise siden på {language}?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukarest, Rumænien",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Forside",
-  "chrome.footer.cookiePreferences": "Cookieindstillinger"
+  "chrome.footer.cookiePreferences": "Cookieindstillinger",
+  "chrome.security": "Sikkerhed",
+  "chrome.logout": "Log ud",
+  "chrome.accountError": "Det virkede ikke. Genindlæs siden, og prøv igen."
 }

@@ -10,6 +10,8 @@ const ownedFiles = [
   "components/SignUpFlow.tsx",
   "components/auth/EmailPendingScreen.tsx",
   "components/auth/PhoneField.tsx",
+  "components/PhoneProfileCard.tsx",
+  "components/SecuritySettings.tsx",
   "components/auth/InlineFieldMessage.tsx",
   "components/auth/SecurityEnrollment.tsx",
   "components/auth/OnboardingEvidence.tsx",

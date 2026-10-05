@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "Tehisintellekti läbipaistvus",
   "chrome.workers": "Tööprotsessid",
   "chrome.account": "Konto",
-  "chrome.asker": "KÜSIJA",
-  "chrome.askerRolePlaceholder": "Küsija rolli kohatäide",
   "chrome.publicViewLocked": "Avalik vaade · toimingud lukustatud",
   "chrome.openScoringDiagnostics": "Avage hindamisdiagnostika",
   "chrome.scoring": "Hindamine · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Kuidas see toimib",
   "chrome.moreDebateActions": "Rohkem väitlustoiminguid",
   "chrome.help": "Abi",
-  "chrome.signedInAsker": "Sisselogitud küsija",
-  "chrome.guestSession": "Külalisseanss",
   "chrome.languageOffer.label": "Lehe keel",
   "chrome.languageOffer.text": "See väitlus on {language} keeles ({nativeName}). Kas soovite lehte näha {language} keeles?",
   "chrome.languageOffer.textNative": "See väitlus on {language} keeles. Kas soovite lehte näha {language} keeles?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukarest, Rumeenia",
   "chrome.footer.product": "Toode",
   "chrome.footer.home": "Avaleht",
-  "chrome.footer.cookiePreferences": "Küpsiste eelistused"
+  "chrome.footer.cookiePreferences": "Küpsiste eelistused",
+  "chrome.security": "Turvalisus",
+  "chrome.logout": "Logi välja",
+  "chrome.accountError": "Toiming ebaõnnestus. Laadige leht uuesti ja proovige veel kord."
 }

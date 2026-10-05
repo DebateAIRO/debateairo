@@ -19,7 +19,7 @@ const LABEL_SOURCES = {
   method: ["chrome","chrome.howItWorks"],"sample-transcript": ["chrome","chrome.transcripts"],
   settings: ["chrome","chrome.settings"],"active-sessions": ["settings","settings.sessions.title"],
   "privacy-preferences": ["consent","consent.settings.title"],
-  "claim-legacy": ["settings","settings.legacy.title"],
+  "security": ["chrome","chrome.security"],
   "delete-account": ["settings","settings.erasure.title"],
   "public-catalog": ["home","home.publicDebates"],"your-debates": ["home","home.yourDebates"],
   "owner-debate": ["support","support.action.openYourDebate"],
@@ -131,11 +131,11 @@ describe("Support navigation", () => {
   });
 
   it("resolves the three static Settings sections only for signed-in visitors", () => {
-    const ids = ["active-sessions","claim-legacy","delete-account"] as const;
+    const ids = ["active-sessions","security","delete-account"] as const;
     expect(resolveSupportActions(ids,{ signedIn:false,language:"en" })).toEqual([]);
     expect(resolveSupportActions(ids,{ signedIn:true,language:"ro" })).toEqual([
       { id:"active-sessions",label:"Sesiuni active",href:"/settings#active-sessions-heading" },
-      { id:"claim-legacy",label:"Revendică dezbaterile vechi",href:"/settings#legacy-run-claim-heading" },
+      { id:"security",label:"Securitate",href:"/settings/security" },
       { id:"delete-account",label:"Șterge contul",href:"/settings#account-deletion-heading" }
     ]);
   });

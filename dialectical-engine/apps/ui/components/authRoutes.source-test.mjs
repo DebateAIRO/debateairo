@@ -47,10 +47,8 @@ test("auth screens share the reference hierarchy and replace the inline gate", (
 });
 
 test("every public and protected entry point reaches the dedicated auth routes", () => {
-  // SYNC3: dev's 163f15c5 routes the top bar's Account entry to /settings (pinned by
-  // dev's tests/render/support-topbar.test.tsx); /settings is behind the AuthGate,
-  // which sends a signed-out visitor to /login (the `gate` line below).
-  assert.match(topBar, /href="\/settings"[\s\S]*?>\s*\{t\(catalog, "chrome\.account"\)\}\s*</);
+  // AccountMenu reads current session metadata; both account routes retain the real gate.
+  assert.match(topBar, /<AccountMenu catalog=\{catalog\}/);
   // Review F2 (REV-FIX-CATALOGS): the gate now receives the served newDebate
   // catalogue; the route (settings behind the AuthGate) is unchanged.
   // L4: the settings page is never covered by the accept screen.
@@ -134,11 +132,14 @@ test("desktop auth content is the document's 540px card", () => {
 test("auth failures retain public generic copy",()=>{assert.doesNotMatch(login,/failure\.message/);assert.doesNotMatch(signUp,/failure\.message/);assert.match(login,/auth\.login\.tooManyAttempts/);assert.match(login,/auth\.login\.recoveryCodeRejected/);assert.match(signUp,/auth\.signUp\.creationFailed/);});
 test("signup uses password-manager autofill without recovery or confirmation fields",()=>{assert.match(signUp,/autoComplete="username"/);assert.match(signUp,/autoComplete="new-password"/);assert.doesNotMatch(signUp,/name="recovery-email"/);});
 
-test("ordinary top bar exposes a neutral account entry without inventing session state", () => {
-  // SYNC3: the entry is dev's /settings (163f15c5); still neutral, still no session guess.
-  assert.match(topBar, /href="\/settings"[\s\S]*?>\s*\{t\(catalog, "chrome\.account"\)\}\s*</);
-  assert.doesNotMatch(topBar, />\s*Log in\s*</);
-  assert.doesNotMatch(topBar, /Signed in|Signed out|authenticated|useSession/);
+test("ordinary top bar delegates authenticated account navigation to the shared menu", () => {
+  assert.match(topBar, /<AccountMenu catalog=\{catalog\}/);
+  assert.doesNotMatch(topBar, /chrome.askerRolePlaceholder|chrome.asker/);
+  const menu = read("./AccountMenu.tsx");
+  assert.match(menu, /client.readSession/);
+  assert.match(menu, /href="\/settings\/security"/);
+  assert.match(menu, /endSession/);
+  assert.doesNotMatch(menu, /localStorage|sessionStorage/);
 });
 
 test("every credential-bearing auth form has an explicit query-free POST fallback", () => {

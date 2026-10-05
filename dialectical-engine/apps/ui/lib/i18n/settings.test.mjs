@@ -11,7 +11,9 @@ const ownedFiles = [
   "app/settings/page.tsx",
   "components/AccountErasureControls.tsx",
   "components/SessionControls.tsx",
-  "components/LegacyRunClaimControls.tsx",
+  "components/PhoneProfileCard.tsx",
+  "components/SecuritySettings.tsx",
+  "app/settings/security/page.tsx",
   "app/ai-transparency/page.tsx",
   "app/admin/workers/page.tsx",
   "components/SettingsPageClient.tsx",
@@ -151,7 +153,7 @@ test("server settings routes load settings while client controls receive their c
     assert.match(sources.get(path), /loadNamespace\(locale, "settings"\)/, path);
   }
   const client = sources.get("components/SettingsPageClient.tsx");
-  for (const component of ["SessionControls", "LegacyRunClaimControls", "AccountErasureControls"]) {
+  for (const component of ["SessionControls", "AccountErasureControls"]) {
     assert.match(client, new RegExp(`<${component} catalog=\\{catalog\\}`), component);
   }
 });
@@ -180,7 +182,7 @@ test("security and transparency behavior survives the copy migration", () => {
   assert.doesNotMatch(sessions,/current-password|one-time-code|data-session-step-up/);
   const confirmation=source("components/auth/SecurityConfirmation.tsx");
   assert.match(confirmation,/beginPasskeyStepUp/);assert.match(confirmation,/matchingSecurityGrant/);assert.match(confirmation,/authorization/);
-  assert.match(sessions, /revokeAllSessions\(\)/);
+  assert.match(sessions, /endSession\(client, \{ all: true/);
 
   const transparency = sources.get("app/ai-transparency/page.tsx");
   assert.match(transparency, /data-ai-generated/);
@@ -201,14 +203,9 @@ test("security and transparency behavior survives the copy migration", () => {
   assert.match(operatorSettings, /getSettingsView/);
   assert.doesNotMatch(operatorSettings, /apiFetch|saveSettings|method:\s*"PUT"/);
 
-  assert.match(settingsClient, /<LegacyRunClaimControls catalog=\{catalog\}/);
-  const legacy = sources.get("components/LegacyRunClaimControls.tsx");
-  assert.match(legacy, /client\.claimLegacyRuns\(submittedToken\)/);
-  assert.ok(
-    legacy.indexOf('setLegacyToken("")') < legacy.indexOf("client.claimLegacyRuns(submittedToken)"),
-    "legacy token must clear before the claim request"
-  );
-  assert.doesNotMatch(legacy, /localStorage|sessionStorage|console\./);
+  assert.doesNotMatch(settingsClient, /LegacyRunClaimControls|settings.identity/);
+  assert.match(source("components/SecuritySettings.tsx"), /matchingSecurityGrant/);
+
 });
 
 test("the English allowlist no longer exempts S2-settings files", () => {

@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "KI-Transparenz",
   "chrome.workers": "Agenten",
   "chrome.account": "Konto",
-  "chrome.asker": "FRAGENDE PERSON",
-  "chrome.askerRolePlaceholder": "Platzhalter für die Rolle der fragenden Person",
   "chrome.publicViewLocked": "Öffentliche Ansicht · Aktionen gesperrt",
   "chrome.openScoringDiagnostics": "Bewertungsdiagnose öffnen",
   "chrome.scoring": "Bewertung · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Funktionsweise",
   "chrome.moreDebateActions": "Weitere Debattenaktionen",
   "chrome.help": "Hilfe",
-  "chrome.signedInAsker": "Angemeldete fragende Person",
-  "chrome.guestSession": "Gastsitzung",
   "chrome.languageOffer.label": "Seitensprache",
   "chrome.languageOffer.text": "Diese Debatte wurde auf {language} ({nativeName}) geführt. Möchten Sie die Seite auf {language} anzeigen?",
   "chrome.languageOffer.textNative": "Diese Debatte wurde auf {language} geführt. Möchten Sie die Seite auf {language} anzeigen?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukarest, Rumänien",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Startseite",
-  "chrome.footer.cookiePreferences": "Cookie-Einstellungen"
+  "chrome.footer.cookiePreferences": "Cookie-Einstellungen",
+  "chrome.security": "Sicherheit",
+  "chrome.logout": "Abmelden",
+  "chrome.accountError": "Das hat nicht funktioniert. Laden Sie die Seite neu und versuchen Sie es erneut."
 }

@@ -71,7 +71,7 @@ const MFA_POLICY_PUBLICATION_ROW = Object.freeze({
   "rowKey": "mfaPolicy",
   "value": Object.freeze({
     "kind": "MFA_POLICY",
-    "issuer": "DebateAIRO",
+    "issuer": "Dialectical Engine",
     "enrollment_credential_ttl_ms": canonicalDecimal("86400000"),
     "totp": Object.freeze({
       "algorithm": "SHA1",

@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountMenu } from "@/components/AccountMenu";
 import { useEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
 import { redactSupportText } from "@debateai/kernel";
 import type { SupportAction } from "@debateai/support-kb/catalog";
@@ -745,12 +746,10 @@ export function Assistant({
       <span className="supportHeaderDivider" aria-hidden />
       <span className="supportHeaderTitle">{t(chromeCatalog, "chrome.help")}</span>
       <div className="supportHeaderActions">
+        <AccountMenu authenticated={identityAvailable} catalog={chromeCatalog} />
         <LanguageSwitcher />
         <ModeToggle compact />
-        <span className="supportIdentity">
-          <span className="supportIdentityMark" aria-hidden>{identityAvailable ? "A" : "G"}</span>
-          <span>{t(chromeCatalog, identityAvailable ? "chrome.signedInAsker" : "chrome.guestSession")}</span>
-        </span>
+
       </div>
     </header>
 

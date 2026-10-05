@@ -22,8 +22,6 @@
   "chrome.aiTransparency": "Transparentnost umjetne inteligencije",
   "chrome.workers": "Radnici",
   "chrome.account": "Račun",
-  "chrome.asker": "POSTAVLJAČ PITANJA",
-  "chrome.askerRolePlaceholder": "Rezervirano mjesto za ulogu postavljača pitanja",
   "chrome.publicViewLocked": "Javni prikaz · radnje zaključane",
   "chrome.openScoringDiagnostics": "Otvorite dijagnostiku bodovanja",
   "chrome.scoring": "Bodovanje · {scored}/{total}",
@@ -41,8 +39,6 @@
   "chrome.howItWorks": "Kako radi",
   "chrome.moreDebateActions": "Više radnji rasprave",
   "chrome.help": "Pomoć",
-  "chrome.signedInAsker": "Prijavljeni postavljač pitanja",
-  "chrome.guestSession": "Gostujuća sesija",
   "chrome.languageOffer.label": "Jezik stranice",
   "chrome.languageOffer.text": "Jezik ove rasprave: {language} ({nativeName}). Želite li prikazati stranicu na jeziku: {language}?",
   "chrome.languageOffer.textNative": "Jezik ove rasprave: {language}. Želite li prikazati stranicu na jeziku: {language}?",
@@ -60,5 +56,8 @@
   "chrome.footer.location": "Bukurešt, Rumunjska",
   "chrome.footer.product": "Proizvod",
   "chrome.footer.home": "Početna",
-  "chrome.footer.cookiePreferences": "Postavke kolačića"
+  "chrome.footer.cookiePreferences": "Postavke kolačića",
+  "chrome.security": "Sigurnost",
+  "chrome.logout": "Odjava",
+  "chrome.accountError": "Nije uspjelo. Ponovno učitajte stranicu i pokušajte ponovno."
 }
