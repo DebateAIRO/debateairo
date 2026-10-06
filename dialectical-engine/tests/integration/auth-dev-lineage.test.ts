@@ -25,6 +25,19 @@ async function seedInstalled106(target:TestDatabase):Promise<void>{
   await target.pool.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[name]);
  }
 }
+async function seedIntegratedOriginal(target:TestDatabase):Promise<void>{
+ const manifest=JSON.parse(await readFile(new URL('../../migrations/lineage/auth-dev-20261006.json',import.meta.url),'utf8')) as {
+  order:string[];sources:Array<{name:string;sha256:string}>;
+ };
+ expect(manifest.order).toHaveLength(128);
+ await target.pool.query('CREATE TABLE public.debateai_schema_migration(name text PRIMARY KEY, applied_at timestamptz NOT NULL)');
+ for(const name of manifest.order){
+  const bytes=await readFile(new URL(`../../migrations/${name}`,import.meta.url));
+  expect(createHash('sha256').update(bytes).digest('hex'),name).toBe(manifest.sources.find(source=>source.name===name)?.sha256);
+  await target.pool.query(bytes.toString('utf8'));
+  await target.pool.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[name]);
+ }
+}
 async function waitForLock(target:TestDatabase,pid:number):Promise<void>{
  for(let attempt=0;attempt<200;attempt++){
   const row=(await target.pool.query<{blocked:boolean}>("SELECT wait_event_type='Lock' blocked FROM pg_stat_activity WHERE pid=$1",[pid])).rows[0];
@@ -48,6 +61,19 @@ async function insertLegacyAccount(client:PoolClient,user:string):Promise<void>{
   VALUES($1,'email','{}','verified',clock_timestamp(),clock_timestamp())`,[user]);
  await client.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,created_at,verified_at)
   VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[user]);
+}
+async function migrationState(target:TestDatabase):Promise<string>{
+ const ledger=(await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
+ const hasResolutions=(await target.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;
+ const resolutions=hasResolutions?(await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows:null;
+ return JSON.stringify({ledger,resolutions});
+}
+async function ownerAgeAsApi(target:TestDatabase):Promise<boolean>{
+ const client=await target.pool.connect();
+ try{
+  await client.query('BEGIN');await client.query('SET LOCAL ROLE debateai_billing_runtime');
+  return (await client.query("SELECT billing.owner_age_frozen('11111111-1111-4111-8111-111111111111'::uuid) frozen")).rows[0].frozen as boolean;
+ }finally{await client.query('ROLLBACK');client.release();}
 }
 
 describe('native auth106 to Dev integration lineage',()=>{
@@ -135,6 +161,158 @@ describe('native auth106 to Dev integration lineage',()=>{
    await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
    expect((await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows).toEqual(before);
    expect((await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows).toEqual(receipts);
+  }finally{await target.stop();}
+ },120000);
+ it('rejects owner drift for every API-only definer on fresh replay while preserving its ledger and receipts',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await migrate(target.pool);
+   expect(await ownerAgeAsApi(target)).toBe(false);
+   const before=await migrationState(target);
+   const installer=(await target.pool.query("SELECT pg_get_userbyid(relowner) owner FROM pg_class WHERE oid='public.debateai_schema_migration'::regclass")).rows[0].owner as string;
+   await target.pool.query('CREATE ROLE fix2_wrong_billing_owner NOLOGIN');
+   for(const signature of [
+    'billing.purge_expired_records(timestamptz)',
+    'billing.consume_withdrawal_grant(uuid,uuid,uuid,text)',
+    'billing.owner_erasure_pending(uuid)',
+    'billing.pending_erasure_owner_refs(uuid,integer)',
+    'billing.owner_age_frozen(uuid)',
+    'billing.owner_erasure_committed(uuid)',
+    'billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)'
+   ]){
+    const expectedOwner=signature.startsWith('billing.record_internal_charge_scope')?'debateai_staff_security_owner':installer;
+    expect((await target.pool.query('SELECT pg_get_userbyid(proowner) owner FROM pg_proc WHERE oid=$1::regprocedure',[signature])).rows[0].owner).toBe(expectedOwner);
+    const wrong=(await target.pool.query("SELECT format('ALTER FUNCTION %s OWNER TO fix2_wrong_billing_owner',$1::regprocedure) statement",[signature])).rows[0].statement as string;
+    const restore=(await target.pool.query("SELECT format('ALTER FUNCTION %s OWNER TO %I',$1::regprocedure,$2::text) statement",[signature,expectedOwner])).rows[0].statement as string;
+    await target.pool.query(wrong);
+    await expect(migrate(target.pool),signature).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+    expect(await migrationState(target)).toBe(before);
+    await target.pool.query(restore);
+   }
+   await migrate(target.pool);
+   expect(await ownerAgeAsApi(target)).toBe(false);
+  }finally{await target.stop();}
+ },120000);
+ it('keeps the API age helper usable after an actual Auth106 upgrade and rejects later owner drift',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await seedInstalled106(target);
+   expect((await target.pool.query("SELECT to_regprocedure('billing.owner_age_frozen(uuid)') helper")).rows[0].helper).toBeNull();
+   await migrate(target.pool);
+   expect(await ownerAgeAsApi(target)).toBe(false);
+   const upgraded=await migrationState(target);
+   await target.pool.query('CREATE ROLE fix2_wrong_billing_owner NOLOGIN');
+   await target.pool.query('ALTER FUNCTION billing.owner_age_frozen(uuid) OWNER TO fix2_wrong_billing_owner');
+   await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+   expect(await migrationState(target)).toBe(upgraded);
+  }finally{await target.stop();}
+ },120000);
+ it('rejects a preexisting Dev95 API definer owner drift before the integrated upgrade',async()=>{
+  const target=await startTestDatabase();
+  try{
+   expect(devNames).toHaveLength(103);
+   await target.pool.query('CREATE TABLE public.debateai_schema_migration(name text PRIMARY KEY, applied_at timestamptz NOT NULL)');
+   for(const name of devNames){
+    await target.pool.query(await readFile(new URL(`../../migrations/${name}`,import.meta.url),'utf8'));
+    await target.pool.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[name]);
+   }
+   const before=await migrationState(target);
+   await target.pool.query('CREATE ROLE fix2_wrong_billing_owner NOLOGIN');
+   await target.pool.query('ALTER FUNCTION billing.owner_age_frozen(uuid) OWNER TO fix2_wrong_billing_owner');
+   await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+   expect(await migrationState(target)).toBe(before);
+  }finally{await target.stop();}
+ },120000);
+ it('rejects a foreign original-ledger or billing-schema owner during fresh initial validation',async()=>{
+  for(const drift of ['ledger','schema'] as const){
+   const target=await startTestDatabase();
+   try{
+    await target.pool.query('CREATE ROLE fix2_wrong_installation_owner NOLOGIN');
+    if(drift==='ledger'){
+     await target.pool.query('CREATE TABLE public.debateai_schema_migration(name text PRIMARY KEY,applied_at timestamptz NOT NULL)');
+     await target.pool.query('ALTER TABLE public.debateai_schema_migration OWNER TO fix2_wrong_installation_owner');
+    }else{
+     await target.pool.query('CREATE SCHEMA billing');
+     await target.pool.query('ALTER SCHEMA billing OWNER TO fix2_wrong_installation_owner');
+    }
+    await expect(migrate(target.pool),drift).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+    const ledgerPresent=(await target.pool.query("SELECT to_regclass('public.debateai_schema_migration') IS NOT NULL present")).rows[0].present as boolean;
+    if(ledgerPresent) expect((await target.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration')).rows[0].n).toBe(0);
+    expect((await target.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') receipt")).rows[0].receipt).toBeNull();
+   }finally{await target.stop();}
+  }
+ },120000);
+ it('rejects original-ledger and billing-schema owner drift on replay without changing history',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await migrate(target.pool);
+   const before=await migrationState(target);
+   const installer=(await target.pool.query("SELECT pg_get_userbyid(relowner) owner FROM pg_class WHERE oid='public.debateai_schema_migration'::regclass")).rows[0].owner as string;
+   await target.pool.query('CREATE ROLE fix2_wrong_installation_owner NOLOGIN');
+   for(const object of ['TABLE public.debateai_schema_migration','SCHEMA billing']){
+    await target.pool.query(`ALTER ${object} OWNER TO fix2_wrong_installation_owner`);
+    await expect(migrate(target.pool),object).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+    expect(await migrationState(target)).toBe(before);
+    const restore=(await target.pool.query("SELECT format('ALTER %s OWNER TO %I',$1::text,$2::text) statement",[object,installer])).rows[0].statement as string;
+    await target.pool.query(restore);
+   }
+   await migrate(target.pool);
+  }finally{await target.stop();}
+ },120000);
+ it('refuses MFA recovery owner LOGIN, SUPERUSER, BYPASSRLS and direct or inherited membership on fresh replay',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await migrate(target.pool);
+   const before=await migrationState(target);
+   for(const [drift,restore,reason] of [
+    ['ALTER ROLE debateai_mfa_recovery_owner LOGIN','ALTER ROLE debateai_mfa_recovery_owner NOLOGIN','AUTH_DEV_107_RECOVERY_COHORT_DRIFT'],
+    ['ALTER ROLE debateai_mfa_recovery_owner SUPERUSER','ALTER ROLE debateai_mfa_recovery_owner NOSUPERUSER','MIGRATION_RESOLUTION_ACL_DRIFT'],
+    ['ALTER ROLE debateai_mfa_recovery_owner BYPASSRLS','ALTER ROLE debateai_mfa_recovery_owner NOBYPASSRLS','AUTH_DEV_107_RECOVERY_COHORT_DRIFT']
+   ] as const){
+    await target.pool.query(drift);
+    await expect(migrate(target.pool),drift).rejects.toThrow(reason);
+    expect(await migrationState(target)).toBe(before);
+    await target.pool.query(restore);
+   }
+   await target.pool.query('CREATE ROLE fix2_mfa_member NOLOGIN');
+   await target.pool.query('GRANT debateai_mfa_recovery_owner TO fix2_mfa_member');
+   await expect(migrate(target.pool)).rejects.toThrow('AUTH_DEV_107_RECOVERY_COHORT_DRIFT');
+   expect(await migrationState(target)).toBe(before);
+   await target.pool.query('GRANT fix2_mfa_member TO debateai_runtime');
+   expect((await target.pool.query("SELECT pg_has_role('debateai_runtime','debateai_mfa_recovery_owner','MEMBER') member")).rows[0].member).toBe(true);
+   await expect(migrate(target.pool)).rejects.toThrow('AUTH_DEV_107_RECOVERY_COHORT_DRIFT');
+   expect(await migrationState(target)).toBe(before);
+  }finally{await target.stop();}
+ },120000);
+ it('rejects MFA owner membership before an actual Auth106 compatibility upgrade with its ledger intact',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await seedInstalled106(target);
+   const before=await migrationState(target);
+   await target.pool.query('CREATE ROLE fix2_mfa_member NOLOGIN');
+   await target.pool.query('GRANT debateai_mfa_recovery_owner TO fix2_mfa_member');
+   await expect(migrate(target.pool)).rejects.toThrow('AUTH_DEV_107_RECOVERY_COHORT_DRIFT');
+   expect(await migrationState(target)).toBe(before);
+  }finally{await target.stop();}
+ },120000);
+ it('checks both owner boundaries on a replay of all actually executed original SQL',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await seedIntegratedOriginal(target);
+   await migrate(target.pool);
+   expect(await ownerAgeAsApi(target)).toBe(false);
+   const before=await migrationState(target);
+   expect((await target.pool.query('SELECT logical_name FROM public.debateai_schema_migration_resolution')).rows).toEqual([]);
+   await target.pool.query('CREATE ROLE fix2_wrong_billing_owner NOLOGIN');
+   await target.pool.query('ALTER FUNCTION billing.owner_age_frozen(uuid) OWNER TO fix2_wrong_billing_owner');
+   await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+   expect(await migrationState(target)).toBe(before);
+   const installer=(await target.pool.query("SELECT pg_get_userbyid(relowner) owner FROM pg_class WHERE oid='public.debateai_schema_migration'::regclass")).rows[0].owner as string;
+   const restore=(await target.pool.query("SELECT format('ALTER FUNCTION billing.owner_age_frozen(uuid) OWNER TO %I',$1::text) statement",[installer])).rows[0].statement as string;
+   await target.pool.query(restore);
+   await target.pool.query('ALTER ROLE debateai_mfa_recovery_owner LOGIN');
+   await expect(migrate(target.pool)).rejects.toThrow('AUTH_DEV_107_RECOVERY_COHORT_DRIFT');
+   expect(await migrationState(target)).toBe(before);
   }finally{await target.stop();}
  },120000);
  it('executes actual historical SQL, then records one explicit compatibility resolution and replays without mutation',async()=>{

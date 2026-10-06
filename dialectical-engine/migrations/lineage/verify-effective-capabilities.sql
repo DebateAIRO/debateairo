@@ -38,6 +38,7 @@ DECLARE
   v_outbox_update_cols text[];
   v_api_callable oid[];
   v_role text;
+  v_install_owner oid;
 BEGIN
   IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='debateai_billing_runtime'
     AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreaterole AND NOT rolcreatedb)
@@ -47,6 +48,9 @@ BEGIN
     RAISE EXCEPTION 'AUTH_DEV_107_ROLE_DRIFT';
   END IF;
   IF pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid='identity.mfa_recovery_legacy_cohort'::regclass))<>'debateai_mfa_recovery_owner'
+    OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='debateai_mfa_recovery_owner'
+      AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls)
+    OR EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid='debateai_mfa_recovery_owner'::regrole)
     OR has_table_privilege('debateai_runtime','identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     OR has_table_privilege('debateai_billing_runtime','identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     OR has_table_privilege('debateai_authorization_runtime','identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -167,13 +171,25 @@ BEGIN
       RAISE EXCEPTION 'AUTH_DEV_107_INTERNAL_FUNCTION';
     END IF;
   END LOOP;
+  -- The six Dev API definers have no source-declared OWNER or SET ROLE. The
+  -- frozen Auth/Dev runners create this original ledger and execute their SQL
+  -- on the same client; 0084 creates billing under that installer. Refuse a
+  -- different executor or drifted installation anchor instead of trusting a
+  -- function's mutable current proowner as its own expected value.
+  SELECT relowner INTO v_install_owner FROM pg_class
+    WHERE oid='public.debateai_schema_migration'::regclass;
+  IF v_install_owner IS NULL OR v_install_owner IS DISTINCT FROM to_regrole(current_user)
+    OR v_install_owner IS DISTINCT FROM (SELECT nspowner FROM pg_namespace WHERE oid='billing'::regnamespace) THEN
+    RAISE EXCEPTION 'MIGRATION_EFFECTIVE_CAPABILITY_DRIFT';
+  END IF;
   FOREACH v_name IN ARRAY v_api_only_functions LOOP
-    IF v_name<>'billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)'
-      AND (NOT (SELECT prosecdef FROM pg_proc WHERE oid=v_name::regprocedure)
-        OR (SELECT proconfig FROM pg_proc WHERE oid=v_name::regprocedure)
-          IS DISTINCT FROM (CASE WHEN v_name='billing.purge_expired_records(timestamptz)'
-            THEN ARRAY['search_path=pg_catalog','debateai.retention_purge=on']
-            ELSE ARRAY['search_path=pg_catalog'] END)) THEN
+    IF (SELECT proowner IS DISTINCT FROM (CASE WHEN v_name='billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)'
+          THEN 'debateai_staff_security_owner'::regrole ELSE v_install_owner END)
+        OR NOT prosecdef
+        OR proconfig IS DISTINCT FROM (CASE WHEN v_name='billing.purge_expired_records(timestamptz)'
+          THEN ARRAY['search_path=pg_catalog','debateai.retention_purge=on']
+          ELSE ARRAY['search_path=pg_catalog'] END)
+        FROM pg_proc WHERE oid=v_name::regprocedure) IS DISTINCT FROM false THEN
       RAISE EXCEPTION 'MIGRATION_EFFECTIVE_CAPABILITY_DRIFT %',v_name;
     END IF;
   END LOOP;
