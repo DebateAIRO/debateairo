@@ -159,11 +159,92 @@ describe('actual AUTH106 forward recovery and current account authority',()=>{
 
 });
 
-async function seedOriginal107(db:TestDatabase){
+async function seedOriginal107(db:TestDatabase,beforeSnapshot?:()=>Promise<void>){
  const manifest=JSON.parse(await readFile(new URL('../../migrations/lineage/auth-dev-20261006.json',import.meta.url),'utf8')) as {order:string[]};
  await db.pool.query('CREATE TABLE public.debateai_schema_migration(name text PRIMARY KEY,applied_at timestamptz NOT NULL)');
- for(const name of manifest.order){await db.pool.query(await readFile(new URL(`../../migrations/${name}`,import.meta.url),'utf8'));await db.pool.query('INSERT INTO public.debateai_schema_migration VALUES($1,statement_timestamp())',[name]);}
+ for(const name of manifest.order){if(name==='0107_auth_dev_integration.sql')await beforeSnapshot?.();await db.pool.query(await readFile(new URL(`../../migrations/${name}`,import.meta.url),'utf8'));await db.pool.query('INSERT INTO public.debateai_schema_migration VALUES($1,statement_timestamp())',[name]);}
 }
+const quoteRole=(name:string)=>'"'+name.replaceAll('"','""')+'"';
+async function seedReceiptBoundary107(db:TestDatabase):Promise<void>{
+ await seedOriginal107(db,async()=>{
+  const user=randomUUID();
+  await db.pool.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at) VALUES($1::uuid,$2,'{}','synthetic-owner-boundary',$1::text,'active',clock_timestamp())`,[user,createHash('sha256').update(user).digest()]);
+  await db.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,verified_at) VALUES($1,'email','{}','verified',clock_timestamp())`,[user]);
+  await db.pool.query(`INSERT INTO identity.mfa_factor(user_id,factor_type,secret_ciphertext,state,verified_at) VALUES($1,'totp','{}','active',clock_timestamp())`,[user]);
+ });
+ expect((await db.pool.query('SELECT count(*)::int n FROM identity.mfa_recovery_legacy_cohort')).rows[0].n).toBe(1);
+}
+async function receiptBoundaryState(db:TestDatabase):Promise<string>{
+ const state:Record<string,unknown>={};
+ for(const [key,table,order] of [
+  ['ledger','public.debateai_schema_migration','name'],
+  ['resolutions','public.debateai_schema_migration_resolution','logical_name'],
+  ['forward','public.debateai_schema_migration_forward','source_name'],
+  ['cohort','identity.mfa_recovery_legacy_cohort','user_id']
+ ] as const){
+  state[key]=(await db.pool.query('SELECT to_regclass($1) IS NOT NULL present',[table])).rows[0].present
+   ?(await db.pool.query(`SELECT * FROM ${table} ORDER BY ${order}`)).rows:null;
+ }
+ return createHash('sha256').update(JSON.stringify(state)).digest('hex');
+}
+async function receiptBoundaryAlias(db:TestDatabase,admission:'inherited'|'set-only'):Promise<{name:string;pool:Pool}>{
+ if(admission==='inherited')return{name:'preview_recovery_fixture_api',pool:createPool(await createPreviewRecoveryApiFixture(db.pool,db.connectionString),{max:1})};
+ await db.pool.query(`CREATE ROLE preview_fix1_capability_bridge NOLOGIN;CREATE ROLE preview_fix1_indirect_api LOGIN PASSWORD 'preview-fix1-test-only';GRANT debateai_billing_runtime,debateai_password_reset_runtime,debateai_backup_email_runtime,debateai_mfa_recovery_runtime TO preview_fix1_capability_bridge WITH INHERIT FALSE, SET TRUE;GRANT preview_fix1_capability_bridge TO preview_fix1_indirect_api WITH INHERIT FALSE, SET TRUE`);
+ const url=new URL(db.connectionString);url.username='preview_fix1_indirect_api';url.password='preview-fix1-test-only';
+ return{name:'preview_fix1_indirect_api',pool:createPool(url.toString(),{max:1})};
+}
+describe('private forward108 receipt owner boundary',()=>{
+ for(const phase of ['initial','replay'] as const)for(const admission of ['inherited','set-only'] as const){
+  it.each(['direct','indirect'] as const)(`${phase} refuses %s SET-only installer ownership for a nonprefixed ${admission} runtime alias without changing native state`,async path=>{
+   const db=await startTestDatabase();let alias:Awaited<ReturnType<typeof receiptBoundaryAlias>>|undefined;
+   try{
+    await seedReceiptBoundary107(db);if(phase==='replay')await migrate(db.pool);
+    alias=await receiptBoundaryAlias(db,admission);
+    const owner=(await db.pool.query('SELECT current_user AS name')).rows[0].name as string;
+    const before=await receiptBoundaryState(db);
+    expect(alias.name.startsWith('debateai_')).toBe(false);
+    if(path==='direct')await db.pool.query(`GRANT ${quoteRole(owner)} TO ${quoteRole(alias.name)} WITH INHERIT FALSE, SET TRUE`);
+    else await db.pool.query(`CREATE ROLE preview_fix1_owner_bridge NOLOGIN;GRANT ${quoteRole(owner)} TO preview_fix1_owner_bridge WITH INHERIT FALSE, SET TRUE;GRANT preview_fix1_owner_bridge TO ${quoteRole(alias.name)} WITH INHERIT FALSE, SET TRUE`);
+    expect((await alias.pool.query(`SELECT pg_has_role(current_user,$1,'MEMBER') member,pg_has_role(current_user,$1,'USAGE') inherited,pg_has_role(current_user,$1,'SET') switchable,pg_has_role(current_user,'debateai_billing_runtime','MEMBER') runtime`,[owner])).rows[0]).toEqual({member:true,inherited:false,switchable:true,runtime:true});
+    if(phase==='replay')expect((await alias.pool.query("SELECT has_table_privilege(current_user,'public.debateai_schema_migration_forward','SELECT') readable")).rows[0].readable).toBe(false);
+    await expect(migrate(db.pool)).rejects.toThrow('MIGRATION_FORWARD108_RECEIPT_ACL_DRIFT');
+    expect(await receiptBoundaryState(db)).toBe(before);
+    await db.pool.query(`REVOKE ${quoteRole(path==='direct'?owner:'preview_fix1_owner_bridge')} FROM ${quoteRole(alias.name)}`);
+    await migrate(db.pool);
+    expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n).toBe(1);
+    expect((await db.pool.query('SELECT count(*)::int n FROM identity.mfa_recovery_legacy_cohort')).rows[0].n).toBe(1);
+   }finally{await alias?.pool.end();await db.stop();}
+  });
+ }
+ it('admits clean nonprefixed aliases and the trusted native creator without giving aliases private table, column or owner authority',async()=>{
+  const db=await startTestDatabase();const aliases:Array<Awaited<ReturnType<typeof receiptBoundaryAlias>>>=[];
+  try{
+   await seedReceiptBoundary107(db);
+   for(const admission of ['inherited','set-only'] as const)aliases.push(await receiptBoundaryAlias(db,admission));
+   // This unrelated native operator is not a runtime alias. Actual graph membership
+   // avoids classifying the native creator or this actor via implicit superuser rights.
+   const owner=(await db.pool.query('SELECT current_user AS name')).rows[0].name as string;
+   await db.pool.query(`CREATE ROLE native_fix1_operator NOLOGIN;GRANT ${quoteRole(owner)} TO native_fix1_operator WITH INHERIT FALSE, SET TRUE`);
+   await migrate(db.pool);const before=await receiptBoundaryState(db);await migrate(db.pool);expect(await receiptBoundaryState(db)).toBe(before);
+   for(const alias of aliases){
+    expect((await alias.pool.query(`SELECT has_table_privilege(current_user,'public.debateai_schema_migration_forward','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') table_rights,has_any_column_privilege(current_user,'public.debateai_schema_migration_forward','SELECT,INSERT,UPDATE,REFERENCES') column_rights,pg_has_role(current_user,$1,'MEMBER') owner_member`,[owner])).rows[0]).toEqual({table_rights:false,column_rights:false,owner_member:false});
+    await expect(alias.pool.query('SELECT source_name FROM public.debateai_schema_migration_forward')).rejects.toMatchObject({code:'42501'});
+    await expect(alias.pool.query('UPDATE public.debateai_schema_migration_forward SET source_name=source_name')).rejects.toMatchObject({code:'42501'});
+    await expect(alias.pool.query(`SET ROLE ${quoteRole(owner)}`)).rejects.toMatchObject({code:'42501'});
+   }
+   expect(await receiptBoundaryState(db)).toBe(before);
+  }finally{await Promise.all(aliases.map(alias=>alias.pool.end()));await db.stop();}
+ });
+ it('retains named production-principal denial even without runtime group membership',async()=>{
+  const db=await startTestDatabase();
+  try{
+   await seedReceiptBoundary107(db);await migrate(db.pool);const before=await receiptBoundaryState(db);
+   const owner=(await db.pool.query('SELECT current_user AS name')).rows[0].name as string;
+   await db.pool.query(`CREATE ROLE debateai_fix1_named_probe NOLOGIN;GRANT ${quoteRole(owner)} TO debateai_fix1_named_probe WITH INHERIT FALSE, SET TRUE`);
+   await expect(migrate(db.pool)).rejects.toThrow('MIGRATION_RESOLUTION_ACL_DRIFT');expect(await receiptBoundaryState(db)).toBe(before);
+  }finally{await db.stop();}
+ });
+});
 describe('closed original107 append and native atomicity',()=>{
  it('concurrent migrators append exactly once to an exact original107 ledger',async()=>{
   const db=await startTestDatabase();const second=createPool(db.connectionString,{max:1});

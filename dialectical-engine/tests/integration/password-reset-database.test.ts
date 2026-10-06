@@ -148,33 +148,42 @@ describe("ordinary password-only reset database authority", () => {
   });
   it("serializes current recovery-token admission with the canonical reset subject lock without minting paired authority",async()=>{
     const a=await account();await db.pool.query(`INSERT INTO identity.recovery_code(user_id,code_hash,code_slot) VALUES($1,'saved-code',1)`,[a.id]);await open(a);
-    const lock=await db.pool.connect();await lock.query('BEGIN');let pending:Promise<unknown>|undefined;
+    const lock=await db.pool.connect();let transactionOpen=false;let pending:Promise<unknown>|undefined;
     try{
+      await lock.query('BEGIN');transactionOpen=true;
       await lock.query('SELECT identity.lock_security_subjects($1)',[[a.id]]);pending=startCurrentRecovery(a);
       let blocked=false;for(let i=0;i<100;i++){if((await db.pool.query("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE usename='reset_general_fixture' AND wait_event_type='Lock' AND query LIKE '%start_consumer_recovery%') waiting")).rows[0].waiting){blocked=true;break;}await new Promise(r=>setTimeout(r,10));}expect(blocked).toBe(true);
-      await lock.query('COMMIT');expect(await pending).toMatchObject({userId:a.id});
+      await lock.query('COMMIT');transactionOpen=false;expect(await pending).toMatchObject({userId:a.id});
       expect((await db.pool.query('SELECT count(*)::int n FROM identity.consumer_recovery_gate WHERE user_id=$1 AND active',[a.id])).rows[0].n).toBe(0);
       expect((await db.pool.query('SELECT identity.password_reset_read($1) receipt',[a.session])).rows[0].receipt).toMatchObject({stage:'PASSWORD_REQUIRED'});
-    }finally{await lock.query('ROLLBACK');lock.release();await pending?.catch(()=>{});}
+    }finally{try{if(transactionOpen)await lock.query('ROLLBACK');}finally{lock.release();await pending;}}
   });
   it("rechecks expiry after waiting for the shared subject lock", async () => {
     const a = await account();
     await open(a);
     const lock = await db.pool.connect();
-    await lock.query("BEGIN");
+    let transactionOpen = false;
+    let pending: Promise<unknown> | undefined;
     try {
+      await lock.query("BEGIN");
+      transactionOpen = true;
       await lock.query(`SELECT identity.lock_security_subjects($1)`, [[a.id]]);
       await lock.query(`UPDATE identity.password_reset_control SET expires_at=clock_timestamp()+interval '300 milliseconds' WHERE user_id=$1`, [a.id]);
-      const pending = complete(a);
+      pending = complete(a);
       await new Promise(r => setTimeout(r, 100));
       expect((await db.pool.query(`SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%password_reset_complete%'`)).rows[0].n).toBeGreaterThan(0);
       await new Promise(r => setTimeout(r, 250));
       await lock.query("COMMIT");
+      transactionOpen = false;
       expect(await pending).toBe("INVALID");
     }
     finally {
-      await lock.query("ROLLBACK");
-      lock.release();
+      try {
+        if (transactionOpen) await lock.query("ROLLBACK");
+      } finally {
+        lock.release();
+        await pending;
+      }
     }
     expect((await db.pool.query(`SELECT password_hash FROM identity."user" WHERE user_id=$1`, [a.id])).rows[0].password_hash).toBe("old-password-hash");
   });
@@ -196,20 +205,28 @@ describe("ordinary password-only reset database authority", () => {
     const refresh = { ...source, ipArgon2id: `argon2id-audit:v1:${"c".repeat(64)}` };
     await db.pool.query(`INSERT INTO identity.password_reset_source_window(source_digest,window_started_at,uses) VALUES($1,clock_timestamp()-interval '6 minutes',20)`, [refresh.ipArgon2id]);
     const lock = await db.pool.connect();
-    await lock.query("BEGIN");
+    let transactionOpen = false;
+    let pending: Promise<unknown> | undefined;
     try {
+      await lock.query("BEGIN");
+      transactionOpen = true;
       await lock.query(`SELECT pg_advisory_xact_lock(hashtextextended('password-reset:source:'||$1,0))`, [refresh.ipArgon2id]);
-      const cleanup = db.pool.query(`SELECT identity.expire_password_reset(100)`);
+      pending = db.pool.query(`SELECT identity.expire_password_reset(100)`);
       await new Promise(r => setTimeout(r, 100));
       expect((await db.pool.query(`SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%expire_password_reset%'`)).rows[0].n).toBeGreaterThan(0);
       expect((await lock.query(`SELECT identity.password_reset_admit($1,3) AS allowed`, [refresh])).rows[0].allowed).toBe(true);
       await lock.query("COMMIT");
-      await cleanup;
+      transactionOpen = false;
+      await pending;
       expect((await db.pool.query(`SELECT uses FROM identity.password_reset_source_window WHERE source_digest=$1`, [refresh.ipArgon2id])).rows).toEqual([{ uses: 1 }]);
     }
     finally {
-      await lock.query("ROLLBACK");
-      lock.release();
+      try {
+        if (transactionOpen) await lock.query("ROLLBACK");
+      } finally {
+        lock.release();
+        await pending;
+      }
     }
   });
 });

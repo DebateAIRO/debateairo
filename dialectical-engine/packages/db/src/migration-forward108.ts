@@ -63,11 +63,28 @@ async function anchor(client:PoolClient):Promise<Readonly<{oid:string;name:strin
  if(row?.valid!==true||row.oid===undefined)return fail('EXECUTOR_DRIFT');return {oid:row.oid,name:row.name,attributes:row.attributes};
 }
 async function assertReceiptAcl(client:PoolClient,owner:Readonly<{oid:string}>):Promise<void>{
+ // The actual membership graph includes indirect and SET-only runtime aliases.
+ // Unlike pg_has_role(...,'MEMBER'), its roots do not implicitly include every
+ // superuser/native operator. Keep the existing named production principal gate.
  const row=(await client.query<{valid:boolean}>(`
+  WITH RECURSIVE runtime_aliases(oid) AS (
+   SELECT oid FROM pg_roles WHERE rolname=ANY(ARRAY[
+    'debateai_runtime','debateai_billing_runtime','debateai_authorization_runtime',
+    'debateai_erasure_runtime','debateai_publication_cleanup','debateai_content_provision',
+    'debateai_replay','debateai_settlement_watch','debateai_evaluator_worker',
+    'debateai_evaluator_api','debateai_evaluator_reader','debateai_support',
+    'debateai_support_config_operator','debateai_staff_recovery',
+    'debateai_password_reset_runtime','debateai_backup_email_runtime','debateai_mfa_recovery_runtime'
+   ])
+   UNION
+   SELECT membership.member FROM pg_auth_members membership JOIN runtime_aliases parent ON parent.oid=membership.roleid
+  )
   SELECT c.relowner IS NOT DISTINCT FROM $1::oid AND c.relkind='r' AND c.relpersistence='p' AND NOT c.relrowsecurity
    AND NOT EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner)
    AND NOT EXISTS(SELECT 1 FROM pg_attribute col CROSS JOIN LATERAL aclexplode(NULLIF(col.attacl,'{}'::aclitem[])) a WHERE col.attrelid=c.oid AND col.attnum>0 AND NOT col.attisdropped AND a.grantee<>c.relowner)
-   AND NOT EXISTS(SELECT 1 FROM pg_roles service WHERE left(service.rolname,9)='debateai_' AND service.oid<>c.relowner AND pg_has_role(service.oid,c.relowner,'MEMBER'))
+   AND NOT EXISTS(SELECT 1 FROM pg_roles service WHERE service.oid<>c.relowner
+    AND (left(service.rolname,9)='debateai_' OR service.oid IN(SELECT oid FROM runtime_aliases))
+    AND pg_has_role(service.oid,c.relowner,'MEMBER'))
    AND (SELECT jsonb_agg(jsonb_build_object('name',a.attname,'type',format_type(a.atttypid,a.atttypmod),'required',a.attnotnull,'identity',a.attidentity,'generated',a.attgenerated,'default',a.atthasdef) ORDER BY a.attnum) FROM pg_attribute a WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped)=$2::jsonb
    AND (SELECT count(*) FROM pg_constraint k WHERE k.conrelid=c.oid AND k.contype IN('c','p'))=8
    AND NOT EXISTS(SELECT 1 FROM pg_constraint k WHERE k.conrelid=c.oid AND k.contype NOT IN('c','p','n'))
