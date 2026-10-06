@@ -20,8 +20,8 @@ export class AccountProfileService {
     readonly users: ReadableUserDekStore;
   }) {
   }
-  async phoneProfile(session: ProfileSession): Promise<PhoneProfile | null> {
-    const record = await this.dependencies.repository.read(session);
+  async phoneProfile(session: ProfileSession, source: AuthSourceContext): Promise<PhoneProfile | null> {
+    const record = await this.dependencies.repository.read(session, source);
     return record === null ? null : this.mask(session.userId, record);
   }
   async revealPhoneProfile(session: ProfileSession, grantToken: unknown, source: AuthSourceContext): Promise<Readonly<{

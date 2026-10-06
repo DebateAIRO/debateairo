@@ -28,6 +28,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
 }) {
     const browser = useRef(provided ?? createConsumerWebAuthnBrowser()).current;
     const flight = useRef(false);
+    const dispatched = useRef(false);
+    const [completing, setCompleting] = useState(false);
     const sequence = useRef(0);
     const conditional = useRef<AbortController | null>(null);
     const conditionalOptions = useRef<Promise<unknown> | null>(null);
@@ -66,6 +68,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             return;
         cancelConditional();
         flight.current = false;
+        dispatched.current = false;
+        setCompleting(false);
         setBusy(false);
         setContinuation(null);
         setPassword('');
@@ -104,6 +108,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 if (abort.signal.aborted || owner !== sequence.current || flight.current)
                     return;
                 flight.current = true;
+                dispatched.current = true;
+                setCompleting(true);
                 setBusy(true);
                 const result = await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
                 if (owner === sequence.current && !abort.signal.aborted)
@@ -114,6 +120,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             finally {
                 if (owner === sequence.current) {
                     flight.current = false;
+                    dispatched.current = false;
+                    setCompleting(false);
                     setBusy(false);
                 }
             }
@@ -140,6 +148,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             const credential = await browser.authenticate(options.options);
             if (owner !== sequence.current)
                 return;
+            dispatched.current = true;
+            setCompleting(true);
             const result = await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
             if (owner === sequence.current)
                 finish(result);
@@ -151,6 +161,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         finally {
             if (owner === sequence.current) {
                 flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
                 setBusy(false);
             }
         }
@@ -195,6 +207,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         finally {
             if (owner === sequence.current) {
                 flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
                 setBusy(false);
             }
         }
@@ -211,16 +225,22 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         setError(null);
         const owner = sequence.current;
         try {
+            dispatched.current = true;
+            setCompleting(true);
             const result = await client.completeLogin(continuation.challenge_token, value.trim());
             if (owner === sequence.current)
                 finish(result);
         }
         catch (failure) {
-            setError(failure instanceof ContractHttpError && failure.status === 429 ? t(catalog, "auth.login.tooManyAttempts") : method === 'recovery_code' ? t(catalog, "auth.login.recoveryCodeRejected") : t(catalog, "auth.login.authenticationCodeRejected"));
+            if (owner === sequence.current) setError(failure instanceof ContractHttpError && failure.status === 429 ? t(catalog, "auth.login.tooManyAttempts") : method === 'recovery_code' ? t(catalog, "auth.login.recoveryCodeRejected") : t(catalog, "auth.login.authenticationCodeRejected"));
         }
         finally {
-            flight.current = false;
-            setBusy(false);
+            if (owner === sequence.current) {
+                flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
+                setBusy(false);
+            }
         }
     }
     const offered = continuation?.available_methods ?? [];
@@ -238,7 +258,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                     void submitCode(code);
                 }} aria-busy={busy}>
  <label htmlFor="login-code">{method === 'totp' ? t(catalog, "auth.login.authenticationCodeLabel") : t(catalog, "auth.login.recoveryCodeLabel")}</label>
- <input id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? 6 : 128} disabled={busy} autoFocus onChange={e => {
+ <p id="login-code-help" hidden={method !== 'totp'}>{t(catalog, "auth.login.authenticatorInstruction")}</p>
+ <input aria-describedby={method === 'totp' ? 'login-code-help' : undefined} id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? 6 : 128} disabled={busy} autoFocus onChange={e => {
                     const value = method === 'totp' ? e.target.value.replace(/\D/g, '').slice(0, 6) : e.target.value;
                     if (value !== code)
                         attempt.current.edited();
@@ -248,14 +269,20 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 }}/>
  <button className="authPrimary" type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button>
  </form>
- {offered.includes('recovery_code') && method !== 'recovery_code' ? <button type="button" onClick={() => {
+ {offered.includes('recovery_code') && method !== 'recovery_code' ? <button type="button" disabled={completing} onClick={() => {
+                        if (dispatched.current) return;
                         cancelConditional();
+                        flight.current = false;
+                        setBusy(false);
                         setMethod('recovery_code');
                         setCode('');
                         attempt.current.edited();
                     }}>{t(catalog, "auth.login.useRecoveryCode")}</button> : null}
- {offered.includes('totp') && method !== 'totp' ? <button type="button" onClick={() => {
+ {offered.includes('totp') && method !== 'totp' ? <button type="button" disabled={completing} onClick={() => {
+                        if (dispatched.current) return;
                         cancelConditional();
+                        flight.current = false;
+                        setBusy(false);
                         setMethod('totp');
                         setCode('');
                         attempt.current.edited();
@@ -269,7 +296,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             }}>{t(catalog, "auth.login.backToSignIn")}</button>
  </div> : <>
  <button type="button" className="authPrimary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button>
- <SocialProviderButtons client={client} catalog={catalog} onBegin={cancelConditional}/>
+ <SocialProviderButtons disabled={completing} client={client} catalog={catalog} onBegin={cancelConditional}/>
  <form className="authForm" noValidate method="post" action="/login" onSubmit={submitCredentials} aria-busy={busy}>
  <label htmlFor="login-email">{t(catalog, "auth.email")}</label><input id="login-email" name="email" type="email" autoComplete="username webauthn" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={e => {
                 cancelConditional();

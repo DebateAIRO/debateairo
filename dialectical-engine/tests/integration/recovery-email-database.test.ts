@@ -1,3 +1,6 @@
+import { ConsumerSecurityNoticeReconciler } from '../../apps/api/src/consumer-security-notices.js';
+import { PostgresConsumerSecurityNoticeRepository } from '@debateai/db';
+import { renderAccountEmail } from '../../apps/api/src/account-mail-template.mjs';
 import type {PoolClient} from "pg";
 import { EmailChangeService } from "../../apps/api/src/email-change.js";
 import { randomUUID } from "node:crypto";
@@ -54,11 +57,49 @@ function recovery() {
     })
   };
 }
+it('masked reads audit before loading the DEK and fail closed for authorization or audit errors', async()=>{
+ const a=await profileAccount(db.pool),b=await profileAccount(db.pool);let loads=0;
+ const service=new AccountProfileService({repository:new PostgresAccountProfileRepository(auth,profileAudit),users:{...profileUsers,load:async(id:string)=>{loads++;const rows=(await db.pool.query("SELECT success FROM identity.audit_event WHERE actor_key_ref=(SELECT audit_token::text FROM identity.\"user\" WHERE user_id=$1) AND event_type='identity.phone_profile.READ_PHONE_PROFILE'",[id])).rows;expect(rows.some(r=>r.success)).toBe(true);return profileUsers.load(id);}}});
+ expect(await service.phoneProfile({...a,sessionId:b.sessionId},profileSource)).toBeNull();expect(loads).toBe(0);
+ await db.pool.query("CREATE FUNCTION identity.final_profile_audit_fail() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.event_type='identity.phone_profile.READ_PHONE_PROFILE' THEN RAISE EXCEPTION 'FINAL_PROFILE_AUDIT_FAIL';END IF;RETURN NEW;END$$");
+ await db.pool.query('CREATE TRIGGER final_profile_audit_fail BEFORE INSERT ON identity.audit_event FOR EACH ROW EXECUTE FUNCTION identity.final_profile_audit_fail()');
+ try{await expect(service.phoneProfile(a,profileSource)).rejects.toThrow('FINAL_PROFILE_AUDIT_FAIL');expect(loads).toBe(0);}finally{await db.pool.query('DROP TRIGGER final_profile_audit_fail ON identity.audit_event');await db.pool.query('DROP FUNCTION identity.final_profile_audit_fail()');}
+ expect((await service.phoneProfile(a,profileSource))?.phone_present).toBe(true);expect(loads).toBe(1);
+ const rows=(await db.pool.query("SELECT source_context FROM identity.audit_event WHERE actor_key_ref=(SELECT audit_token::text FROM identity.\"user\" WHERE user_id=$1) AND event_type='identity.phone_profile.READ_PHONE_PROFILE'",[a.userId])).rows;
+ expect(JSON.stringify(rows)).not.toMatch(/phone|ciphertext|masked/);
+});
+it('recovery channel changes atomically enqueue only the verified primary notice, with replay and no-op removal excluded',async()=>{
+ const a=await profileAccount(db.pool),{service,mail}=recovery();
+ await db.pool.query('DELETE FROM identity.consumer_security_notice WHERE user_id=$1',[a.userId]);
+ await service.requestRecoveryEmail(a,{email:'backup@example.test',grantToken:await profileGrant(db.pool,a,'CHANGE_RECOVERY_EMAIL')},profileSource);
+ expect((await db.pool.query('SELECT * FROM identity.consumer_security_notice WHERE user_id=$1',[a.userId])).rows).toHaveLength(0);
+ const token=mail.messages[0]!.token;
+ await service.confirmRecoveryEmail({token},profileSource);
+ const notices=async()=>(await db.pool.query('SELECT n.*,c.channel_type FROM identity.consumer_security_notice n JOIN identity.channel_binding c USING(channel_binding_id) WHERE n.user_id=$1',[a.userId])).rows;
+ expect(await notices()).toMatchObject([{event_kind:'METHOD_CHANGED',channel_type:'email',revision:'1'}]);
+ await expect(service.confirmRecoveryEmail({token},profileSource)).rejects.toThrow();expect((await notices())[0].revision).toBe('1');
+ await service.removeRecoveryEmail(a,{grantToken:await profileGrant(db.pool,a,'CHANGE_RECOVERY_EMAIL')},profileSource);expect((await notices())[0].revision).toBe('2');
+ await service.removeRecoveryEmail(a,{grantToken:await profileGrant(db.pool,a,'CHANGE_RECOVERY_EMAIL')},profileSource);expect((await notices())[0].revision).toBe('2');
+ const delivered:string[]=[];
+ const reconciler=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(auth),profileUsers,{sendConsumerSecurityNotice:async(message)=>{expect(message.recipient).toBe(a.email);expect(message.eventKind).toBe('METHOD_CHANGED');const mail=renderAccountEmail({template:'security-method-changed-v1',recipient:message.recipient,messageId:message.messageId,expiresAt:message.happenedAt});delivered.push(mail.text);}});
+ // Other independently-created fixture accounts are excluded from this controlled run.
+ await db.pool.query('DELETE FROM identity.consumer_security_notice WHERE user_id<>$1',[a.userId]);
+ await reconciler.reconcile(1);expect(delivered).toHaveLength(1);expect(await notices()).toHaveLength(0);
+});
+it('recovery confirmation notice failure rolls back the channel and leaves the proof usable',async()=>{
+ const a=await profileAccount(db.pool),{service,mail}=recovery();
+ await service.requestRecoveryEmail(a,{email:'rollback-backup@example.test',grantToken:await profileGrant(db.pool,a,'CHANGE_RECOVERY_EMAIL')},profileSource);
+ const token=mail.messages[0]!.token;
+ await db.pool.query("CREATE FUNCTION identity.final_notice_fail() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'FINAL_NOTICE_FAIL';END$$");await db.pool.query('CREATE TRIGGER final_notice_fail BEFORE INSERT ON identity.consumer_security_notice FOR EACH ROW EXECUTE FUNCTION identity.final_notice_fail()');
+ try{await expect(service.confirmRecoveryEmail({token},profileSource)).rejects.toThrow('FINAL_NOTICE_FAIL');}finally{await db.pool.query('DROP TRIGGER final_notice_fail ON identity.consumer_security_notice');await db.pool.query('DROP FUNCTION identity.final_notice_fail()');}
+ expect((await service.recoveryEmail(a))?.state).toBe('pending');
+ await service.confirmRecoveryEmail({token},profileSource);expect((await service.recoveryEmail(a))?.state).toBe('verified');
+});
 describe("0097 restricted profile and recovery capabilities", () => {
   it("reads masked phone, consumes a purpose-bound reveal once, and audits without values", async () => {
     const a = await profileAccount(db.pool);
     const s = profile();
-    expect(await s.phoneProfile(a)).toMatchObject({
+    expect(await s.phoneProfile(a,profileSource)).toMatchObject({
       phone_present: true, phone_masked: "••••••••3456", phone_verified: false
     });
     const token = await profileGrant(db.pool, a, "READ_PHONE_PROFILE");
@@ -92,7 +133,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
   it("encrypts normalized changes and rejects rotated session tokens and held accounts", async () => {
     const a = await profileAccount(db.pool, null), s = profile();
     expect(await s.hasPhone(a.ownerRef)).toBe(false);
-    expect(await s.phoneProfile(a)).toEqual({
+    expect(await s.phoneProfile(a,profileSource)).toEqual({
       phone_present: false, phone_masked: null, phone_verified: false, updated_at: null
     });
     await s.updatePhoneProfile(a, {
@@ -109,7 +150,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
     await expect(s.revealPhoneProfile(a, g, profileSource)).rejects.toMatchObject({
       code: "STEP_UP_REQUIRED"
     });
-    expect(await s.phoneProfile(a)).toBeNull();
+    expect(await s.phoneProfile(a,profileSource)).toBeNull();
   });
   it("retains the verified recovery channel while a separately confirmed replacement is pending", async () => {
     const a = await profileAccount(db.pool, null, "old@example.test"), { service, mail } = recovery();
@@ -227,7 +268,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
     const g = await profileGrant(db.pool, a, "READ_PHONE_PROFILE"), id = randomUUID();
     await db.pool.query("INSERT INTO identity.account_erasure_request(erasure_id,user_id,requested_at,execute_at) VALUES($1,$2,clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second')", [id, a.userId]);
     expect((await db.pool.query("SELECT identity.prepare_account_erasure($1,'{}'::uuid[],'{}'::uuid[],'{}'::uuid[]) AS outcome", [id])).rows[0].outcome).toBe("PREPARED");
-    expect(await profile().phoneProfile(a)).toBeNull();
+    expect(await profile().phoneProfile(a,profileSource)).toBeNull();
     await expect(profile().revealPhoneProfile(a, g, profileSource)).rejects.toMatchObject({
       code: "STEP_UP_REQUIRED"
     });
@@ -330,7 +371,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
       await expect(confirm).rejects.toMatchObject({
         code: "LINK_INVALID"
       });
-      expect(await profile().phoneProfile(a)).toBeNull();
+      expect(await profile().phoneProfile(a,profileSource)).toBeNull();
       expect((await db.pool.query("SELECT 1 FROM identity.channel_binding WHERE user_id=$1 AND channel_type='recovery_email'", [a.userId])).rows).toHaveLength(0);
     }
     finally {
@@ -391,7 +432,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
       });
       expect(Number(grant.ttl)).toBeGreaterThan(299);
       expect(Number(grant.ttl)).toBeLessThanOrEqual(300);
-      expect(await profile().phoneProfile(a)).toBeNull();
+      expect(await profile().phoneProfile(a,profileSource)).toBeNull();
       const current = {
         ...a, tokenHash: replacementTokenHash
       };
@@ -451,7 +492,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
       await expect(auth.query(`SELECT * FROM ${table}`)).rejects.toMatchObject({
         code: "42501"
       });
-    for (const signature of ["identity.has_phone_profile(uuid)", "identity.read_phone_profile(uuid,uuid,text)", "identity.use_phone_profile_with_audit(uuid,uuid,text,text,text,jsonb,jsonb)", "identity.read_recovery_email(uuid,uuid,text)", "identity.request_recovery_email_with_audit(uuid,uuid,text,text,uuid,bytea,jsonb,text,timestamptz,jsonb)", "identity.confirm_recovery_email_with_audit(text,jsonb)", "identity.remove_recovery_email_with_audit(uuid,uuid,text,text,jsonb)"]) {
+    for (const signature of ["identity.has_phone_profile(uuid)", "identity.read_phone_profile_with_audit(uuid,uuid,text,jsonb)", "identity.use_phone_profile_with_audit(uuid,uuid,text,text,text,jsonb,jsonb)", "identity.read_recovery_email(uuid,uuid,text)", "identity.request_recovery_email_with_audit(uuid,uuid,text,text,uuid,bytea,jsonb,text,timestamptz,jsonb)", "identity.confirm_recovery_email_with_audit(text,jsonb)", "identity.remove_recovery_email_with_audit(uuid,uuid,text,text,jsonb)"]) {
       expect((await db.pool.query("SELECT has_function_privilege('debateai_authorization_runtime',$1,'EXECUTE') AS ok", [signature])).rows[0].ok).toBe(true);
       const metadata = (await db.pool.query("SELECT prosecdef,proconfig,proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure) AS same_owner FROM pg_proc WHERE oid=$1::regprocedure", [signature])).rows[0];
       expect(metadata.prosecdef).toBe(true);
@@ -460,7 +501,7 @@ describe("0097 restricted profile and recovery capabilities", () => {
       for (const role of ["public", "debateai_runtime", "debateai_replay", "debateai_erasure_runtime", "debateai_staff_security_owner"])
         expect((await db.pool.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS ok", [role, signature])).rows[0].ok).toBe(false);
     }
-    for (const helper of ["identity.consume_profile_grant_internal(uuid,uuid,text,text,text)", "identity.append_profile_audit_internal(uuid,text,jsonb,boolean)"]) {
+    for (const helper of ["identity.read_phone_profile(uuid,uuid,text)","identity.enqueue_recovery_method_notice_internal(uuid)","identity.consume_profile_grant_internal(uuid,uuid,text,text,text)", "identity.append_profile_audit_internal(uuid,text,jsonb,boolean)"]) {
       for (const role of ["public", "debateai_authorization_runtime", "debateai_runtime", "debateai_replay", "debateai_erasure_runtime", "debateai_staff_security_owner"])
         expect((await db.pool.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS ok", [role, helper])).rows[0].ok).toBe(false);
     }

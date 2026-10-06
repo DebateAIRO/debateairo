@@ -21,7 +21,7 @@ export type EnrollmentAuthority = {
     totpUnavailableReason?: 'PASSWORD_UNAVAILABLE' | null;
 };
 export type EnrollmentClient = Pick<ContractClient, 'beginPasskeyEnrollment' | 'completePasskeyEnrollment' | 'beginTotpEnrollment' | 'completeTotpEnrollment' | 'beginRecoveryEnrollment' | 'completeRecoveryEnrollment'>;
-export function SecurityEnrollment({ authority, client = contractClient, catalog = authEnglish, browser: provided, onAuthenticated, onEnrolled, onExpired, offerRecoveryCodes = false, availableMethods }: {
+export function SecurityEnrollment({ authority, client = contractClient, catalog = authEnglish, browser: provided, onAuthenticated, onEnrolled, onExpired, availableMethods }: {
     authority: EnrollmentAuthority;
     client?: EnrollmentClient;
     catalog?: MessageCatalog;
@@ -29,19 +29,19 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     onAuthenticated?: (result: AuthenticationResponse) => void;
     onEnrolled?: () => void;
     onExpired?: () => void;
-    offerRecoveryCodes?: boolean;
     availableMethods?: readonly ('passkey' | 'totp')[];
 }) {
     const browser = useRef(provided ?? createConsumerWebAuthnBrowser()).current;
     const sequence = useRef(0);
     const flight = useRef(false);
+    const dispatched = useRef(false);
+    const [completing, setCompleting] = useState(false);
     const attempt = useRef(createCodeAttempt());
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [code, setCode] = useState('');
     const [showKey, setShowKey] = useState(false);
     const [expired, setExpired] = useState(false);
-    const [authenticatedResult, setAuthenticatedResult] = useState<AuthenticationResponse | null>(null);
     const [enrolled, setEnrolled] = useState(false);
     const [totp, setTotp] = useState<{
         secret: string;
@@ -54,6 +54,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         sequence.current++;
         browser.cancel();
         flight.current = false;
+        dispatched.current = false;
+        setCompleting(false);
         setBusy(false);
         setTotp(null);
         setCode('');
@@ -64,11 +66,12 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         clearCeremony();
         setExpired(false);
         setEnrolled(false);
-        setAuthenticatedResult(null);
         return () => {
             sequence.current++;
             browser.cancel();
             flight.current = false;
+            dispatched.current = false;
+            setCompleting(false);
         };
     }, [authority.token, browser]);
     useEffect(() => {
@@ -85,10 +88,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     function finish(result: TotpEnrollmentResponse) {
         clearCeremony();
         if (result.status === 'authenticated') {
-            if (offerRecoveryCodes && authority.kind === 'pending')
-                setAuthenticatedResult(result);
-            else
-                onAuthenticated?.(result);
+            onAuthenticated?.(result);
         }
         else {
             setEnrolled(true);
@@ -113,6 +113,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
             const credential = await browser.register(options.options);
             if (owner !== sequence.current)
                 return;
+            dispatched.current = true;
+            setCompleting(true);
             const result = authority.kind === 'recovery' ? await client.completeRecoveryEnrollment({ recovery_capability: authority.token, challenge_handle: options.challenge_handle, credential }) : await client.completePasskeyEnrollment({ challenge_handle: options.challenge_handle, credential });
             if (owner === sequence.current)
                 finish(result);
@@ -124,12 +126,14 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         finally {
             if (owner === sequence.current) {
                 flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
                 setBusy(false);
             }
         }
     }
     async function beginTotp() {
-        if (expired)
+        if (expired || dispatched.current)
             return;
         clearCeremony();
         flight.current = true;
@@ -157,6 +161,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         finally {
             if (owner === sequence.current) {
                 flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
                 setBusy(false);
             }
         }
@@ -169,6 +175,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         setError(null);
         const owner = sequence.current;
         try {
+            dispatched.current = true;
+            setCompleting(true);
             const result = authority.kind === 'recovery' ? await client.completeRecoveryEnrollment({ recovery_capability: authority.token, challenge_handle: totp.token, code: value }) : await client.completeTotpEnrollment({ enrollment_token: totp.token, code: value });
             if (owner === sequence.current)
                 finish(result);
@@ -180,17 +188,13 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         finally {
             if (owner === sequence.current) {
                 flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
                 setBusy(false);
             }
         }
     }
     const matrix = totp ? totpQrMatrix(totp.uri) : null;
-    if (authenticatedResult)
-        return <section><p role="status">{t(catalog, "auth.enroll.methodAdded")}</p><a href="/settings/security">{t(catalog, "auth.enroll.recoveryCodesSettings")}</a><button type="button" className="authPrimary" onClick={() => {
-            const result = authenticatedResult;
-            setAuthenticatedResult(null);
-            onAuthenticated?.(result);
-        }}>{t(catalog, "auth.continue")}</button></section>;
     if (expired)
         return <p role="alert">{t(catalog, "auth.enroll.expired")}</p>;
     if (enrolled)
@@ -198,8 +202,9 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     return <section aria-label={t(catalog, "auth.enroll.securityTitle")}>
     {error ? <p role="alert">{error}</p> : null}
     <p>{t(catalog, "auth.enroll.passkeyPreferred")}</p>
-    {allowed.includes('passkey') ? <button type="button" className="authPrimary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.create")}</button> : null}
-    {allowed.includes('totp') ? <button type="button" className="authTextButton" onClick={() => void beginTotp()}>{t(catalog, "auth.enroll.useAuthenticator")}</button> : null}
+    {allowed.includes('passkey') ? <p id="enrollment-passkey-help">{t(catalog, "auth.enroll.passkeyExplanation")}</p> : null}
+    {allowed.includes('passkey') ? <button type="button" className="authPrimary" aria-describedby="enrollment-passkey-help" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.create")}</button> : null}
+    {allowed.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => void beginTotp()}>{t(catalog, "auth.enroll.useAuthenticator")}</button> : null}
     {authority.kind === 'recovery' && authority.totpUnavailableReason === 'PASSWORD_UNAVAILABLE' ? <p>{t(catalog, "auth.recovery.passwordUnavailable")}</p> : null}
     {totp ? <div>
       {matrix ? <svg width="180" height="180" viewBox={`0 0 ${matrix.length + 8} ${matrix.length + 8}`} role="img" aria-label={t(catalog, "auth.enroll.scanQr")}><rect width="100%" height="100%" fill="white"/><path fill="black" d={matrix.flatMap((row, y) => row.flatMap((v, x) => v ? [`M${x + 4} ${y + 4}h1v1h-1z`] : [])).join('')}/></svg> : null}

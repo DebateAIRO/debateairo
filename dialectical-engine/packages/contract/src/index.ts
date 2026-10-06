@@ -1072,6 +1072,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/auth/social/{provider}/callback",
     "POST /v1/auth/social/apple/callback",
     "POST /v1/auth/social/signup/status",
+    "POST /v1/auth/social/login/status",
     "POST /v1/auth/social/signup/complete",
     "GET /v1/account/social-providers",
     "POST /v1/account/social/{provider}/link",

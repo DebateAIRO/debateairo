@@ -470,3 +470,55 @@ describe('actual signed-provider and restricted-database journeys', () => {
     });
 
 });
+
+it.each([[9,9,true],[9,0,true],[0,0,false]] as const)('provider synced counter %s to %s keeps maximum and the anomaly signal',async(oldCounter,nextCounter,anomaly)=>{
+ const h=await harness();try{
+  const signup=await h.signup();if(!('status' in signup.result))throw new Error('EXPECTED_ENROLLMENT');
+  const key=consumerFixture(),enroll=await h.passkeys.beginPasskeyEnrollment({enrollment_token:signup.result.enrollment_token},signup.bound),login=await h.passkeys.completePasskeyEnrollment({challenge_handle:enroll.challenge_handle,credential:key.registration(enroll.options.challenge)},signup.bound);
+  if(login.status!=='authenticated')throw new Error('EXPECTED_SESSION');const session=(await h.sessions.authenticate(login.sessionToken,h.source))!;
+  await db.pool.query('UPDATE identity.consumer_passkey_credential SET signature_counter=$2 WHERE user_id=$1',[session.userId,oldCounter]);
+  const cb=await h.callback({},session,{action:'READ_PHONE_PROFILE'}),source={...h.source,socialBrowserHash:socialHash('browser',cb.browserCookie)},options=await h.stepUp.beginPasskey({continuation_token:cb.token},session,source);
+  await h.stepUp.complete({continuation_token:cb.token,challenge_handle:options.challenge_handle,credential:key.assertion(options.options.challenge,{userHandle:enroll.options.user.id,counter:nextCounter})},session,source);
+  expect(Number((await db.pool.query('SELECT signature_counter FROM identity.consumer_passkey_credential WHERE user_id=$1',[session.userId])).rows[0].signature_counter)).toBe(Math.max(oldCounter,nextCounter));
+  const rows=(await db.pool.query("SELECT event_type FROM identity.audit_event WHERE actor_key_ref=(SELECT audit_token::text FROM identity.\"user\" WHERE user_id=$1) AND event_type LIKE '%counter_anomaly'",[session.userId])).rows;
+  expect(rows).toHaveLength(anomaly?1:0);
+ }finally{await h.registration.drainMailDispatches();}
+});
+
+it.each(['passkey','totp'] as const)('provider login status derives current %s availability without advertising absent backup codes',async(method)=>{
+ const h=await harness();try{
+  const signup=await h.signup();if(!('status' in signup.result))throw new Error('EXPECTED_ENROLLMENT');
+  if(method==='passkey') {const key=consumerFixture(),enroll=await h.passkeys.beginPasskeyEnrollment({enrollment_token:signup.result.enrollment_token},signup.bound);await h.passkeys.completePasskeyEnrollment({challenge_handle:enroll.challenge_handle,credential:key.registration(enroll.options.challenge)},signup.bound);}
+  else {const options=await h.mfa.beginTotp({enrollmentToken:signup.result.enrollment_token},signup.bound),secret=decodeBase32(options.secret);try{await h.mfa.verifyTotp({enrollmentToken:signup.result.enrollment_token,code:totpCodeAtStep(secret,Math.floor(Date.now()/30000))},signup.bound);}finally{secret.fill(0);}}
+  const cb=await h.callback(),source={...h.source,socialBrowserHash:socialHash('browser',cb.browserCookie)},input={continuation_token:cb.token};
+  expect(await h.social.loginStatus(input,source)).toEqual({available_methods:[method],expires_at:cb.expiresAt});
+  await expect(h.social.loginStatus({...input,available_methods:['recovery_code']},source)).rejects.toThrow();
+  await expect(h.social.loginStatus(input,h.source)).rejects.toThrow();
+  await expect(h.social.loginStatus(input,{...source,socialBrowserHash:socialHash('browser','a'.repeat(43))})).rejects.toThrow();
+  await db.pool.query('UPDATE identity.login_challenge SET consumed_at=clock_timestamp() WHERE token_hash=$1',[hashToken('login-challenge',cb.token)]);
+  await expect(h.social.loginStatus(input,source)).rejects.toThrow();
+ }finally{await h.registration.drainMailDispatches();}
+});
+it('provider synced anomaly audit failure rolls back counter, continuation, session and grant',async()=>{
+ const h=await harness();try{
+  const signup=await h.signup();if(!('status' in signup.result))throw new Error('EXPECTED_ENROLLMENT');
+  const key=consumerFixture(),enroll=await h.passkeys.beginPasskeyEnrollment({enrollment_token:signup.result.enrollment_token},signup.bound),login=await h.passkeys.completePasskeyEnrollment({challenge_handle:enroll.challenge_handle,credential:key.registration(enroll.options.challenge)},signup.bound);
+  if(login.status!=='authenticated')throw new Error('EXPECTED_SESSION');const session=(await h.sessions.authenticate(login.sessionToken,h.source))!;
+  await db.pool.query('UPDATE identity.consumer_passkey_credential SET signature_counter=9 WHERE user_id=$1',[session.userId]);
+  const cb=await h.callback({},session,{action:'READ_PHONE_PROFILE'}),source={...h.source,socialBrowserHash:socialHash('browser',cb.browserCookie)},options=await h.stepUp.beginPasskey({continuation_token:cb.token},session,source),input={continuation_token:cb.token,challenge_handle:options.challenge_handle,credential:key.assertion(options.options.challenge,{userHandle:enroll.options.user.id,counter:0})};
+  await db.pool.query("CREATE FUNCTION identity.final_anomaly_fail() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.event_type LIKE '%counter_anomaly' THEN RAISE EXCEPTION 'FINAL_ANOMALY_FAIL';END IF;RETURN NEW;END$$");await db.pool.query('CREATE TRIGGER final_anomaly_fail BEFORE INSERT ON identity.audit_event FOR EACH ROW EXECUTE FUNCTION identity.final_anomaly_fail()');
+  try{await expect(h.stepUp.complete(input,session,source)).rejects.toThrow('FINAL_ANOMALY_FAIL');}finally{await db.pool.query('DROP TRIGGER final_anomaly_fail ON identity.audit_event');await db.pool.query('DROP FUNCTION identity.final_anomaly_fail()');}
+  expect((await db.pool.query('SELECT consumed_at FROM identity.social_flow WHERE proof_hash=$1',[socialHash('step-up',cb.token)])).rows[0].consumed_at).toBeNull();
+  expect((await db.pool.query('SELECT token_hash FROM identity.session WHERE session_id=$1',[session.session.session_id])).rows[0].token_hash).toBe(session.tokenHash);
+  expect((await db.pool.query('SELECT count(*)::int n FROM identity.step_up_grant WHERE user_id=$1',[session.userId])).rows[0].n).toBe(0);
+  expect((await h.stepUp.complete(input,session,source)).response.step_up_grant?.action).toBe('READ_PHONE_PROFILE');
+ }finally{await h.registration.drainMailDispatches();}
+});
+it('provider single-device counter nonincrease is refused without consuming its continuation',async()=>{
+ const h=await harness();try{
+  const signup=await h.signup();if(!('status' in signup.result))throw new Error('EXPECTED_ENROLLMENT');const key=consumerFixture(),enroll=await h.passkeys.beginPasskeyEnrollment({enrollment_token:signup.result.enrollment_token},signup.bound),login=await h.passkeys.completePasskeyEnrollment({challenge_handle:enroll.challenge_handle,credential:key.registration(enroll.options.challenge,0x45,9)},signup.bound);
+  if(login.status!=='authenticated')throw new Error('EXPECTED_SESSION');const session=(await h.sessions.authenticate(login.sessionToken,h.source))!,cb=await h.callback({},session,{action:'READ_PHONE_PROFILE'}),source={...h.source,socialBrowserHash:socialHash('browser',cb.browserCookie)},options=await h.stepUp.beginPasskey({continuation_token:cb.token},session,source);
+  await expect(h.stepUp.complete({continuation_token:cb.token,challenge_handle:options.challenge_handle,credential:key.assertion(options.options.challenge,{flags:0x05,counter:9,userHandle:enroll.options.user.id})},session,source)).rejects.toThrow();
+  expect((await db.pool.query('SELECT consumed_at FROM identity.social_flow WHERE proof_hash=$1',[socialHash('step-up',cb.token)])).rows[0].consumed_at).toBeNull();
+ }finally{await h.registration.drainMailDispatches();}
+});

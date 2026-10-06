@@ -1183,6 +1183,7 @@ export const authorizationPolicyInventory = Object.freeze([
   {route:'POST /v1/auth/social/{provider}/begin',auth:'public',origin:'trusted',resource:'identity',action:'social-begin'},
   {route:'GET /v1/auth/social/{provider}/callback',auth:'public',resource:'identity',action:'social-callback'},
   {route:'POST /v1/auth/social/apple/callback',auth:'public',resource:'identity',action:'social-callback'},
+  {route:'POST /v1/auth/social/login/status',auth:'public',origin:'trusted',resource:'identity',action:'social-signup'},
   {route:'POST /v1/auth/social/signup/status',auth:'public',origin:'trusted',resource:'identity',action:'social-signup'},
   {route:'POST /v1/auth/social/signup/complete',auth:'public',origin:'trusted',resource:'identity',action:'social-signup'},
   {route:'GET /v1/account/social-providers',auth:'user',resource:'identity',action:'social-links'},
@@ -2293,6 +2294,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if(request.headers['content-type']?.split(';')[0]?.trim()!=='application/x-www-form-urlencoded')throw new SocialAuthError('SOCIAL_PROOF_INVALID');return socialCallback('apple',request.body,request,reply);
     });
   });
+  api.post('/v1/auth/social/login/status',credentialRoutePolicy('POST /v1/auth/social/login/status'),async(request,reply)=>{if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialAuth.loginStatus(request.body,sourceFor(request)));});
   api.post('/v1/auth/social/signup/status',credentialRoutePolicy('POST /v1/auth/social/signup/status'),async(request,reply)=>{if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialAuth.signupStatus(request.body,sourceFor(request)));});
   api.post('/v1/auth/social/signup/complete',credentialRoutePolicy('POST /v1/auth/social/signup/complete'),async(request,reply)=>{
     if(!options.socialAuth||!sourceAdmissions.get(request))throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
@@ -2595,7 +2597,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(503).send({
         error: "ACCOUNT_PROFILE_UNAVAILABLE"
       });
-    const result = await options.accountProfile.phoneProfile(profileSession(request.authenticatedSession!));
+    const result = await options.accountProfile.phoneProfile(profileSession(request.authenticatedSession!),sourceFor(request));
     return result === null ? reply.status(401).send({
       error: "SESSION_REQUIRED"
     }) : reply.send(AccountPhoneProfileSchema.parse(result));

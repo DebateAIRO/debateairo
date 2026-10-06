@@ -40,7 +40,7 @@ export default function EnrollMfaPage() {
         })();
     }, [catalog]);
     return <AuthShell eyebrow={t(catalog, "auth.signUp.eyebrow")} title={t(catalog, "auth.enroll.securityTitle")} description={t(catalog, "auth.enroll.passkeyPreferred")} footer={null}>
- {error ? <p role="alert">{error}</p> : !token ? <p role="status">{t(catalog, "auth.enroll.verifyingEmail")}</p> : ready ? <SecurityEnrollment offerRecoveryCodes catalog={catalog} authority={{ kind: 'pending', token }} onAuthenticated={() => {
+ {error ? <p role="alert">{error}</p> : !token ? <p role="status">{t(catalog, "auth.enroll.verifyingEmail")}</p> : ready ? <SecurityEnrollment catalog={catalog} authority={{ kind: 'pending', token }} onAuthenticated={() => {
                 setToken('');
                 window.location.assign(safeReturnPath(new URLSearchParams(window.location.search).get('next')));
             }}/> : <OnboardingEvidence catalog={catalog} locale={locale} authority={{ kind: 'pending', token }} onReady={() => setReady(true)}/>}

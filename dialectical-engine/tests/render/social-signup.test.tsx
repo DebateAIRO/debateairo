@@ -55,7 +55,7 @@ it('unmounted social login ignores a late final passkey response',async()=>{
  let release!:(value:any)=>void;
  const completed=new Promise(r=>{release=r;}),done=vi.fn();
  webauthn.browser.authenticate.mockReset().mockResolvedValue({});webauthn.browser.cancel.mockClear();
- const client={beginPasskeyLogin:vi.fn().mockResolvedValue({challenge_handle:'b'.repeat(43),options:{}}),completePasskeyLogin:vi.fn().mockReturnValue(completed)};
+ const client={socialLoginStatus:vi.fn().mockResolvedValue({expires_at:new Date(Date.now()+300000).toISOString(),available_methods:['passkey']}),beginPasskeyLogin:vi.fn().mockResolvedValue({challenge_handle:'b'.repeat(43),options:{}}),completePasskeyLogin:vi.fn().mockReturnValue(completed)};
  const {host,root}=await mount(<SocialCompleteFlow client={client as any} onAuthenticated={done}/>);
  await click(host,'Use a passkey');
  expect(client.completePasskeyLogin).toHaveBeenCalledOnce();
@@ -83,7 +83,7 @@ it('original provider step-up expiry invalidates a late final passkey response',
  }finally{await unmount(root,host);window.history.replaceState(null,'','/');vi.useRealTimers();}
 });
 
-it('step-up code method switch invalidates a late final server response',async()=>{
+it('step-up code dispatch disables method switching and retains a completed grant',async()=>{
  window.history.replaceState(null,'','/social/complete#kind=stepup&token='+'a'.repeat(43));
  let release!:(value:any)=>void;
  const completed=new Promise(r=>{release=r;}),done=vi.fn();
@@ -93,17 +93,20 @@ it('step-up code method switch invalidates a late final server response',async()
  try{
   await input(host,'[name=code]','123456');
   expect(client.completeSocialStepUp).toHaveBeenCalledOnce();
+  expect([...host.querySelectorAll('button')].find(b=>b.textContent==='Use a recovery code')?.disabled).toBe(true);
   await click(host,'Use a recovery code');
   await act(async()=>{release({status:'step_up_complete',csrf_token:'c'.repeat(43),step_up_grant:{action:'CHANGE_EMAIL',token:'g'.repeat(43),expires_at:new Date(Date.now()+300000).toISOString()}});await Promise.resolve();await Promise.resolve();});
   expect(done).not.toHaveBeenCalled();
-  expect(host.textContent).not.toContain('Fresh authentication complete');
+  expect(host.textContent).toContain('Fresh authentication complete');
+  await click(host,'‹ Settings');
+  expect(done).toHaveBeenCalledOnce();
  }finally{await unmount(root,host);window.history.replaceState(null,'','/');}
 });
 
 it('social login remains usable after Strict Mode effect replay',async()=>{
  window.history.replaceState(null,'','/social/complete#kind=login&token='+'a'.repeat(43));
  webauthn.browser.authenticate.mockReset().mockResolvedValue({});webauthn.browser.cancel.mockClear();
- const done=vi.fn(),client={beginPasskeyLogin:vi.fn().mockResolvedValue({challenge_handle:'b'.repeat(43),options:{}}),completePasskeyLogin:vi.fn().mockResolvedValue({status:'authenticated',csrf_token:'c'.repeat(43)})};
+ const done=vi.fn(),client={socialLoginStatus:vi.fn().mockResolvedValue({expires_at:new Date(Date.now()+300000).toISOString(),available_methods:['passkey']}),beginPasskeyLogin:vi.fn().mockResolvedValue({challenge_handle:'b'.repeat(43),options:{}}),completePasskeyLogin:vi.fn().mockResolvedValue({status:'authenticated',csrf_token:'c'.repeat(43)})};
  const {host,root}=await mount(<StrictMode><SocialCompleteFlow client={client as any} onAuthenticated={done}/></StrictMode>);
  try{
   await click(host,'Use a passkey');
@@ -132,4 +135,37 @@ it('Strict Mode replays provider step-up status from the scrubbed in-memory auth
   expect(host.querySelector<HTMLInputElement>('[name=code]')).not.toBeNull();
   expect(host.querySelector<HTMLInputElement>('[name=code]')?.disabled).toBe(false);
  }finally{await unmount(root,host);window.history.replaceState(null,'','/');}
+});
+
+it.each([['passkey'],['totp'],['recovery_code']] as const)('social login offers only bound server methods %j',async(methods)=>{
+ window.history.replaceState(null,'','/social/complete#kind=login&token='+'a'.repeat(43));
+ const client={socialLoginStatus:vi.fn().mockResolvedValue({expires_at:new Date(Date.now()+300000).toISOString(),available_methods:methods})};
+ const {host,root}=await mount(<SocialCompleteFlow client={client as any}/>);
+ try{
+  expect(host.textContent?.includes('Use a passkey')).toBe(methods.includes('passkey' as never));
+  expect(!!host.querySelector('[name=code]')).toBe(!methods.includes('passkey' as never));
+  expect(host.textContent).not.toContain('Use a recovery code');
+  if(methods.includes('recovery_code' as never))expect(host.querySelector('[name=code]')?.getAttribute('inputmode')).toBe('text');
+ }finally{await unmount(root,host);window.history.replaceState(null,'','/');}
+});
+it.each(['login','stepup'] as const)('social %s refusal unlocks an edited-code retry without discarding dispatched state',async(kind)=>{
+ window.history.replaceState(null,'','/social/complete#kind='+kind+'&token='+'a'.repeat(43));
+ let reject!:(e:Error)=>void;const pending=new Promise((_r,no)=>reject=no),done=vi.fn();
+ const status={expires_at:new Date(Date.now()+300000).toISOString(),available_methods:['totp','recovery_code'],authorization:{action:'CHANGE_EMAIL'}};
+ const result=kind==='login'?{status:'authenticated'}:{status:'step_up_complete',csrf_token:'c'.repeat(43),step_up_grant:{action:'CHANGE_EMAIL',token:'g'.repeat(43),expires_at:status.expires_at}};
+ const complete=vi.fn().mockReturnValueOnce(pending).mockResolvedValue(result);
+ const client={socialLoginStatus:async()=>status,socialStepUpStatus:async()=>status,completeLogin:complete,completeSocialStepUp:complete};
+ const {host,root}=await mount(<SocialCompleteFlow client={client as any} onAuthenticated={done} onStepUp={done}/>);
+ try{
+  await input(host,'[name=code]','123456');const alternate=[...host.querySelectorAll('button')].find(b=>b.textContent==='Use a recovery code')!;expect(alternate.disabled).toBe(true);
+  await act(async()=>reject(new Error('refused')));expect(host.querySelector('[role=alert]')).not.toBeNull();expect(alternate.disabled).toBe(false);
+  await input(host,'[name=code]','654321');if(kind==='stepup')await click(host,'‹ Settings');expect(done).toHaveBeenCalledOnce();
+ }finally{await unmount(root,host);window.history.replaceState(null,'','/');}
+});
+
+it('provider prompt cancellation before dispatch permits a current method and fences the old failure',async()=>{
+ window.history.replaceState(null,'','/social/complete#kind=login&token='+'a'.repeat(43));let rejectPrompt!:(e:Error)=>void,finish!:(v:any)=>void;const prompt=new Promise((_r,no)=>rejectPrompt=no),completion=new Promise(r=>finish=r),done=vi.fn();
+ webauthn.browser.authenticate.mockReset().mockReturnValue(prompt);const client={socialLoginStatus:async()=>({expires_at:new Date(Date.now()+300000).toISOString(),available_methods:['passkey','totp','recovery_code']}),beginPasskeyLogin:async()=>({challenge_handle:'b'.repeat(43),options:{}}),completePasskeyLogin:vi.fn(),completeLogin:()=>completion};
+ const {host,root}=await mount(<SocialCompleteFlow client={client as any} onAuthenticated={done}/>);
+ try{await click(host,'Use a passkey');await click(host,'Use a recovery code');await input(host,'[name=code]','saved-code');await act(async()=>host.querySelector('form')!.requestSubmit());await act(async()=>rejectPrompt(new Error('cancelled old prompt')));expect(host.querySelector<HTMLInputElement>('[name=code]')?.disabled).toBe(true);expect(host.querySelector('[role=alert]')).toBeNull();await act(async()=>finish({status:'authenticated'}));expect(done).toHaveBeenCalledOnce();expect(client.completePasskeyLogin).not.toHaveBeenCalled();}finally{await unmount(root,host);window.history.replaceState(null,'','/');}
 });

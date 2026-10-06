@@ -82,6 +82,9 @@ export class PostgresSocialIdentityRepository {
     }
     async claim(input: Pick<SocialFlowSeed, 'stateHash' | 'cookieHash' | 'bindingHash' | 'provider' | 'configuration'>): Promise<SocialFlowClaim | null> { return (await this.pool.query('SELECT identity.claim_social_flow($1) value', [input])).rows[0].value; }
     async callback(input: Readonly<Record<string, unknown>>, source: AuthSourceContext): Promise<SocialCallbackResult> { return this.tx.audited(source, async (c, audit) => (await c.query('SELECT identity.finish_social_callback($1,$2) value', [input, audit])).rows[0].value); }
+    async loginStatus(input: Readonly<{ challengeHash:string; browserHash:string; bindingHash:string; admittedProviders:readonly string[] }>): Promise<{expiresAt:string;availableMethods:readonly ('passkey'|'totp'|'recovery_code')[]}|null> {
+        return (await this.pool.query('SELECT identity.read_social_login_status($1) value',[input])).rows[0].value;
+    }
     async signup(input: SocialSignupAuthority): Promise<{
         provider: string;
         configuration: string;

@@ -53,3 +53,26 @@ it('unmounting while an explicit passkey waits for conditional settlement preven
  expect(browser.authenticate).not.toHaveBeenCalled();
  host.remove();vi.unstubAllGlobals();
 });
+
+it.each(['success','refusal'] as const)('keeps a dispatched TOTP completion owned through an attempted method switch: %s',async(outcome)=>{
+ let resolve!:(v:any)=>void,reject!:(e:Error)=>void;
+ const pending=new Promise((ok,no)=>{resolve=ok;reject=no;});
+ const browser={supportsConditional:async()=>false,cancel:vi.fn()},done=vi.fn();
+ const client={beginLogin:vi.fn().mockResolvedValue({status:'mfa_required',challenge_token:'a'.repeat(43),available_methods:['totp','recovery_code']}),completeLogin:vi.fn().mockReturnValueOnce(pending).mockResolvedValue({status:'authenticated'})};
+ const {host,root}=await mount(<LoginFlow client={client as any} browser={browser as any} onAuthenticated={done}/>);
+ try{
+  await input(host,'[name=email]','person@example.test');await input(host,'[name=password]','password');await act(async()=>host.querySelector('form')!.requestSubmit());
+  await input(host,'[name=code]','123456');
+  const alternate=[...host.querySelectorAll('button')].find(b=>b.textContent==='Use a recovery code')!;
+  expect(alternate.disabled).toBe(true);await click(host,'Use a recovery code');
+  if(outcome==='success'){await act(async()=>resolve({status:'authenticated'}));expect(done).toHaveBeenCalledOnce();}
+  else{await act(async()=>reject(new Error('refused')));expect(done).not.toHaveBeenCalled();expect(host.querySelector('[role=alert]')).not.toBeNull();expect(alternate.disabled).toBe(false);await input(host,'[name=code]','654321');expect(done).toHaveBeenCalledOnce();}
+ }finally{await unmount(root,host);}
+});
+
+it('can cancel passkey preparation before dispatch without letting its stale failure clear a new completion',async()=>{
+ let rejectOptions!:(e:Error)=>void,finish!:(v:any)=>void;const options=new Promise((_r,no)=>rejectOptions=no),completion=new Promise(r=>finish=r),done=vi.fn();
+ const browser={supportsConditional:async()=>false,authenticate:vi.fn(),cancel:vi.fn()};const client={beginLogin:async()=>({status:'mfa_required',challenge_token:'a'.repeat(43),available_methods:['passkey','totp','recovery_code']}),beginPasskeyLogin:()=>options,completePasskeyLogin:vi.fn(),completeLogin:()=>completion};
+ const {host,root}=await mount(<LoginFlow client={client as any} browser={browser as any} onAuthenticated={done}/>);
+ try{await input(host,'[name=email]','person@example.test');await input(host,'[name=password]','password');await act(async()=>host.querySelector('form')!.requestSubmit());const described=host.querySelector('[name=code]')!.getAttribute('aria-describedby');expect(host.querySelector('#'+described)?.textContent).toContain('authenticator app');await click(host,'Sign in with a passkey');await click(host,'Use a recovery code');await input(host,'[name=code]','saved-code');await act(async()=>host.querySelector('form')!.requestSubmit());await act(async()=>rejectOptions(new Error('cancelled old options')));expect(host.querySelector<HTMLInputElement>('[name=code]')?.disabled).toBe(true);expect(host.querySelector('[role=alert]')).toBeNull();await act(async()=>finish({status:'authenticated'}));expect(done).toHaveBeenCalledOnce();expect(client.completePasskeyLogin).not.toHaveBeenCalled();}finally{await unmount(root,host);}
+});

@@ -109,9 +109,10 @@ describe("Support knowledge context", () => {
     // article, projection or fallback byte changed.
     // 2026-09-24: the owner signed the /ai-transparency article pair and the catalogue
     // (OWNER records in the review manifest; the version binds the session, dates and evidence).
+    // 2026-10-06: updated account access and recovery navigation have current SOL evidence.
     // 2026-10-05: changed menu/article/recovery bytes have SOL evidence; unchanged legal entries retain OWNER signatures.
     // Prior 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
-    expect(corpus.kbVersion).toBe("86989bbd451a7cee8528d9754666de54c80a5e029f03051a0d008acf1a282ca5");
+    expect(corpus.kbVersion).toBe("78cab229e79d44caaf546d3305342900809d7759c9a4c64ee81605d61f8aa239");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 
@@ -572,7 +573,7 @@ describe("Support knowledge context", () => {
     ["en","support.topic.publishing.prompt",["unpublish-a-debate","delete-a-private-debate","public-answer-disclosure"],[],[]],
     ["en","support.topic.account.prompt",["settings-help-menus","account-settings","privacy-consent"],["settings-help-menus"],["active-sessions"]],
     ["en","support.topic.privacy.prompt",["app-navigation","settings-help-menus","support-cases"],[],[]],
-    ["ro","support.topic.gettingStarted.prompt",["getting-started-debate","account-access"],[],[]],
+    ["ro","support.topic.gettingStarted.prompt",["getting-started-debate"],[],[]],
     ["ro","support.topic.reading.prompt",[],[],[]],
     ["ro","support.topic.scores.prompt",[],[],[]],
     ["ro","support.topic.publishing.prompt",["public-answer-disclosure","view-public-debate","browse-public-debates"],[],[]],

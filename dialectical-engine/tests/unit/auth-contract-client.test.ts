@@ -41,7 +41,7 @@ describe("auth registration contract client", () => {
     const client = createContractClient("https://api.debateai.test", fetchImplementation);
 
     await expect(client.register({email:"person@example.test",password:"correct horse battery staple",phone:"+40712345678",date_of_birth:"1990-01-01",terms:{version:"2.0",sha256:"a".repeat(64)},privacy:{version:"3.0",sha256:"b".repeat(64)},locale:"en",ui_locale:"en",time_zone:"Europe/Bucharest",turnstile_token:"test-proof"})).resolves.toEqual({ message: REGISTRATION_MESSAGE, retry_after_seconds: 60 });
-    await expect(client.resendVerification("person@example.test"))
+    await expect(client.resendVerification(RESEND_INPUT))
       .resolves.toEqual({ message: RESEND_MESSAGE, retry_after_seconds: 60 });
     await expect(client.startRecovery("person@example.test"))
       .resolves.toEqual({ message: RECOVERY_START_MESSAGE });
@@ -65,7 +65,7 @@ describe("auth registration contract client", () => {
     expect(calls[1]).toMatchObject({
       path: "/v1/auth/resend-verification",
       method: "POST",
-      body: { email: "person@example.test" },
+      body: RESEND_INPUT,
       credentials: "same-origin"
     });
     expect(calls[2]).toMatchObject({
@@ -96,7 +96,7 @@ describe("auth registration contract client", () => {
       (async () => Response.json({ message: RESEND_MESSAGE, retry_after_seconds: 60 }, { status: 200 })) as typeof fetch
     );
 
-    await expect(client.resendVerification("person@example.test"))
+    await expect(client.resendVerification(RESEND_INPUT))
       .rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 200 });
   });
 
@@ -109,7 +109,7 @@ describe("auth registration contract client", () => {
       )) as typeof fetch
     );
 
-    const failure = await client.resendVerification("person@example.test").catch((error: unknown) => error);
+    const failure = await client.resendVerification(RESEND_INPUT).catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(ContractHttpError);
     expect(failure).toMatchObject({
       code: "RATE_LIMITED",

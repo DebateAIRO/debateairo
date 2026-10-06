@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { contractInventory, staffContractInventory, fundedStaffContractInventory,
-  consumerAuthContractSchemas, consumerSecurityContractSchemas, accountProfileContractSchemas,
+  consumerAuthContractSchemas, consumerSecurityContractSchemas, accountProfileContractSchemas, SocialLoginStatusRequestSchema, SocialLoginStatusResponseSchema,
   BillingUsageResponseSchema, AskRoomResponseSchema,
   StaffEnrollmentResponseSchema, FundedStaffEnrollmentResponseSchema,
   StaffElevationResponseSchema, FundedStaffElevationResponseSchema, StaffTeamPageSchema, FundedStaffTeamPageSchema,
@@ -11,6 +11,7 @@ import { contractInventory, staffContractInventory, fundedStaffContractInventory
   InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema } from "./index.js";
 
 const endpointSchemas = {
+  SocialLoginStatusRequestSchema, SocialLoginStatusResponseSchema,
   ...consumerAuthContractSchemas,
   ...consumerSecurityContractSchemas,
   ...accountProfileContractSchemas,
@@ -27,6 +28,7 @@ const variants = (...names: EndpointSchemaName[]) => ({ anyOf: names.map(referen
 const request = (schema: unknown) => ({ requestBody: { required: true, content: { "application/json": { schema } } } });
 const response = (schema: unknown, status = "200") => ({ responses: { [status]: { description: status === "202" ? "Generic verification acknowledgement" : "Current selected policy response", content: { "application/json": { schema } } } } });
 const staffEndpointContracts: Record<string, Record<string, unknown>> = {
+  "POST /v1/auth/social/login/status": {...request(reference("SocialLoginStatusRequestSchema")),...response(reference("SocialLoginStatusResponseSchema"))},
   "POST /v1/auth/recovery/prove": {...request(reference("ConsumerRecoveryProveRequestSchema")),...response(reference("ConsumerRecoveryProofResponseSchema"))},
   "POST /v1/auth/recovery/enrollment/options": {...request(reference("RecoveryEnrollmentBeginRequestSchema")),...response(reference("RecoveryEnrollmentOptionsResponseSchema"))},
   "POST /v1/auth/recovery/enrollment/complete": {...request(reference("RecoveryEnrollmentCompleteRequestSchema")),...response(reference("AuthenticationResponseSchema"))},

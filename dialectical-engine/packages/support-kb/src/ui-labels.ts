@@ -7,6 +7,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — الصفحة الرئيسية",
     "start-debate": "بدء مناظرة",
     "sign-in": "الحساب",
+    "forgot-password": "الدخول عبر الاسترداد",
     "sign-up": "أنشئ حسابًا",
     "help": "المساعدة",
     "support-status": "حالة الخدمة",
@@ -26,6 +27,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — начална страница",
     "start-debate": "Започнете дебат",
     "sign-in": "Профил",
+    "forgot-password": "Достъп за възстановяване",
     "sign-up": "Създайте профил",
     "help": "Помощ",
     "support-status": "Състояние на услугата",
@@ -45,6 +47,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — domů",
     "start-debate": "Začněte debatu",
     "sign-in": "Účet",
+    "forgot-password": "Obnovení přístupu",
     "sign-up": "Vytvořit účet",
     "help": "Nápověda",
     "support-status": "Stav služby",
@@ -64,6 +67,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — hjem",
     "start-debate": "Start en debat",
     "sign-in": "Konto",
+    "forgot-password": "Gendannelsesadgang",
     "sign-up": "Opret en",
     "help": "Hjælp",
     "support-status": "Tjenestestatus",
@@ -83,6 +87,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine – Startseite",
     "start-debate": "Debatte beginnen",
     "sign-in": "Konto",
+    "forgot-password": "Wiederherstellungszugang",
     "sign-up": "Konto erstellen",
     "help": "Hilfe",
     "support-status": "Dienststatus",
@@ -102,6 +107,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — αρχική σελίδα",
     "start-debate": "Έναρξη αντιπαράθεσης",
     "sign-in": "Λογαριασμός",
+    "forgot-password": "Πρόσβαση ανάκτησης",
     "sign-up": "Δημιουργήστε έναν",
     "help": "Βοήθεια",
     "support-status": "Κατάσταση υπηρεσίας",
@@ -121,6 +127,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — home",
     "start-debate": "Start a debate",
     "sign-in": "Account",
+    "forgot-password": "Recovery access",
     "sign-up": "Create one",
     "help": "Help",
     "support-status": "Service status",
@@ -140,6 +147,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — inicio",
     "start-debate": "Iniciar un debate",
     "sign-in": "Cuenta",
+    "forgot-password": "Acceso de recuperación",
     "sign-up": "Crear una",
     "help": "Ayuda",
     "support-status": "Estado del servicio",
@@ -159,6 +167,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — avaleht",
     "start-debate": "Alustage väitlust",
     "sign-in": "Konto",
+    "forgot-password": "Juurdepääsu taastamine",
     "sign-up": "Looge konto",
     "help": "Abi",
     "support-status": "Teenuse olek",
@@ -178,6 +187,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — etusivu",
     "start-debate": "Aloita väittely",
     "sign-in": "Tili",
+    "forgot-password": "Palautuspääsy",
     "sign-up": "Luo tili",
     "help": "Ohje",
     "support-status": "Palvelun tila",
@@ -197,6 +207,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — accueil",
     "start-debate": "Lancer un débat",
     "sign-in": "Compte",
+    "forgot-password": "Accès de récupération",
     "sign-up": "Créer un compte",
     "help": "Aide",
     "support-status": "État du service",
@@ -216,6 +227,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — baile",
     "start-debate": "Tosaigh díospóireacht",
     "sign-in": "Cuntas",
+    "forgot-password": "Rochtain athshlánaithe",
     "sign-up": "Cruthaigh ceann",
     "help": "Cabhair",
     "support-status": "Stádas seirbhíse",
@@ -235,6 +247,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — דף הבית",
     "start-debate": "התחלת דיון",
     "sign-in": "חשבון",
+    "forgot-password": "גישה באמצעות שחזור",
     "sign-up": "יצירת חשבון",
     "help": "עזרה",
     "support-status": "מצב השירות",
@@ -254,6 +267,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — मुख्य पृष्ठ",
     "start-debate": "वाद-विवाद शुरू करें",
     "sign-in": "खाता",
+    "forgot-password": "पुनर्प्राप्ति पहुँच",
     "sign-up": "खाता बनाएँ",
     "help": "सहायता",
     "support-status": "सेवा की स्थिति",
@@ -273,6 +287,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — početna stranica",
     "start-debate": "Započnite raspravu",
     "sign-in": "Račun",
+    "forgot-password": "Pristup za oporavak",
     "sign-up": "Izradite ga",
     "help": "Pomoć",
     "support-status": "Stanje usluge",
@@ -292,6 +307,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — kezdőlap",
     "start-debate": "Vita indítása",
     "sign-in": "Fiók",
+    "forgot-password": "Helyreállítási hozzáférés",
     "sign-up": "Hozzon létre egyet",
     "help": "Súgó",
     "support-status": "Szolgáltatás állapota",
@@ -311,6 +327,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — beranda",
     "start-debate": "Mulai debat",
     "sign-in": "Akun",
+    "forgot-password": "Akses pemulihan",
     "sign-up": "Buat akun",
     "help": "Bantuan",
     "support-status": "Status layanan",
@@ -330,6 +347,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — pagina iniziale",
     "start-debate": "Avvia un dibattito",
     "sign-in": "Account",
+    "forgot-password": "Accesso di recupero",
     "sign-up": "Creane uno",
     "help": "Aiuto",
     "support-status": "Stato del servizio",
@@ -349,6 +367,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — ホーム",
     "start-debate": "ディベートを開始",
     "sign-in": "アカウント",
+    "forgot-password": "リカバリーアクセス",
     "sign-up": "アカウントを作成",
     "help": "ヘルプ",
     "support-status": "サービス状況",
@@ -368,6 +387,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — 홈",
     "start-debate": "토론 시작",
     "sign-in": "계정",
+    "forgot-password": "복구 액세스",
     "sign-up": "계정 만들기",
     "help": "도움말",
     "support-status": "서비스 상태",
@@ -387,6 +407,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — pradžia",
     "start-debate": "Pradėti debatus",
     "sign-in": "Paskyra",
+    "forgot-password": "Prieigos atkūrimas",
     "sign-up": "Sukurti paskyrą",
     "help": "Pagalba",
     "support-status": "Paslaugos būsena",
@@ -406,6 +427,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — sākums",
     "start-debate": "Sākt debates",
     "sign-in": "Konts",
+    "forgot-password": "Piekļuves atkopšana",
     "sign-up": "Izveidot kontu",
     "help": "Palīdzība",
     "support-status": "Pakalpojuma statuss",
@@ -425,6 +447,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — paġna ewlenija",
     "start-debate": "Ibda dibattitu",
     "sign-in": "Kont",
+    "forgot-password": "Aċċess għall-irkupru",
     "sign-up": "Oħloq wieħed",
     "help": "Għajnuna",
     "support-status": "Stat tas-servizz",
@@ -444,6 +467,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — startpagina",
     "start-debate": "Een debat starten",
     "sign-in": "Account",
+    "forgot-password": "Toegang herstellen",
     "sign-up": "Account aanmaken",
     "help": "Hulp",
     "support-status": "Servicestatus",
@@ -463,6 +487,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — strona główna",
     "start-debate": "Rozpocznij debatę",
     "sign-in": "Konto",
+    "forgot-password": "Dostęp awaryjny",
     "sign-up": "Utwórz konto",
     "help": "Pomoc",
     "support-status": "Stan usługi",
@@ -482,6 +507,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — início",
     "start-debate": "Iniciar um debate",
     "sign-in": "Conta",
+    "forgot-password": "Acesso de recuperação",
     "sign-up": "Criar uma",
     "help": "Ajuda",
     "support-status": "Estado do serviço",
@@ -501,6 +527,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — pagina principală",
     "start-debate": "Începeți o dezbatere",
     "sign-in": "Cont",
+    "forgot-password": "Acces de recuperare",
     "sign-up": "Creați unul",
     "help": "Ajutor",
     "support-status": "Starea serviciului",
@@ -520,6 +547,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — главная",
     "start-debate": "Начать дебаты",
     "sign-in": "Учётная запись",
+    "forgot-password": "Восстановление доступа",
     "sign-up": "Создать",
     "help": "Помощь",
     "support-status": "Состояние сервиса",
@@ -539,6 +567,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — domovská stránka",
     "start-debate": "Začať debatu",
     "sign-in": "Účet",
+    "forgot-password": "Obnovenie prístupu",
     "sign-up": "Vytvorte si ho",
     "help": "Pomoc",
     "support-status": "Stav služby",
@@ -558,6 +587,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — domača stran",
     "start-debate": "Začni razpravo",
     "sign-in": "Račun",
+    "forgot-password": "Obnovitev dostopa",
     "sign-up": "Ustvari ga",
     "help": "Pomoč",
     "support-status": "Stanje storitve",
@@ -577,6 +607,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — startsida",
     "start-debate": "Starta en debatt",
     "sign-in": "Konto",
+    "forgot-password": "Återställningsåtkomst",
     "sign-up": "Skapa ett",
     "help": "Hjälp",
     "support-status": "Tjänstestatus",
@@ -596,6 +627,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — ana sayfa",
     "start-debate": "Tartışma başlat",
     "sign-in": "Hesap",
+    "forgot-password": "Kurtarma erişimi",
     "sign-up": "Hesap oluşturun",
     "help": "Yardım",
     "support-status": "Hizmet durumu",
@@ -615,6 +647,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — головна",
     "start-debate": "Почати дебати",
     "sign-in": "Обліковий запис",
+    "forgot-password": "Доступ для відновлення",
     "sign-up": "Створити",
     "help": "Довідка",
     "support-status": "Стан сервісу",
@@ -634,6 +667,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — trang chủ",
     "start-debate": "Bắt đầu một cuộc tranh luận",
     "sign-in": "Tài khoản",
+    "forgot-password": "Truy cập khôi phục",
     "sign-up": "Tạo tài khoản",
     "help": "Trợ giúp",
     "support-status": "Trạng thái dịch vụ",
@@ -653,6 +687,7 @@ export const SUPPORT_UI_LABELS = {
     "home": "Dialectical Engine — 首页",
     "start-debate": "开始辩论",
     "sign-in": "账户",
+    "forgot-password": "恢复访问权限",
     "sign-up": "创建账户",
     "help": "帮助",
     "support-status": "服务状态",
@@ -668,7 +703,7 @@ export const SUPPORT_UI_LABELS = {
     "owner-debate": "打开您的辩论",
     "public-debate": "打开公开辩论"
   }
-} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<Exclude<SupportActionId, "forgot-password">, string>>>>;
+} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<SupportActionId, string>>>>;
 
 export const SUPPORT_UI_LABEL_ALIASES = {
   "ar": {
@@ -682,6 +717,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "الحساب"
+    ],
+    "forgot-password": [
+      "الدخول عبر الاسترداد"
     ],
     "sign-up": [
       "أنشئ حسابًا"
@@ -739,6 +777,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Профил"
     ],
+    "forgot-password": [
+      "Достъп за възстановяване"
+    ],
     "sign-up": [
       "Създайте профил"
     ],
@@ -794,6 +835,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Účet"
+    ],
+    "forgot-password": [
+      "Obnovení přístupu"
     ],
     "sign-up": [
       "Vytvořit účet"
@@ -851,6 +895,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Konto"
     ],
+    "forgot-password": [
+      "Gendannelsesadgang"
+    ],
     "sign-up": [
       "Opret en"
     ],
@@ -906,6 +953,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Konto"
+    ],
+    "forgot-password": [
+      "Wiederherstellungszugang"
     ],
     "sign-up": [
       "Konto erstellen"
@@ -963,6 +1013,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Λογαριασμός"
     ],
+    "forgot-password": [
+      "Πρόσβαση ανάκτησης"
+    ],
     "sign-up": [
       "Δημιουργήστε έναν"
     ],
@@ -1018,6 +1071,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Account"
+    ],
+    "forgot-password": [
+      "Recovery access"
     ],
     "sign-up": [
       "Create one"
@@ -1075,6 +1131,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Cuenta"
     ],
+    "forgot-password": [
+      "Acceso de recuperación"
+    ],
     "sign-up": [
       "Crear una"
     ],
@@ -1130,6 +1189,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Konto"
+    ],
+    "forgot-password": [
+      "Juurdepääsu taastamine"
     ],
     "sign-up": [
       "Looge konto"
@@ -1187,6 +1249,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Tili"
     ],
+    "forgot-password": [
+      "Palautuspääsy"
+    ],
     "sign-up": [
       "Luo tili"
     ],
@@ -1242,6 +1307,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Compte"
+    ],
+    "forgot-password": [
+      "Accès de récupération"
     ],
     "sign-up": [
       "Créer un compte"
@@ -1299,6 +1367,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Cuntas"
     ],
+    "forgot-password": [
+      "Rochtain athshlánaithe"
+    ],
     "sign-up": [
       "Cruthaigh ceann"
     ],
@@ -1354,6 +1425,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "חשבון"
+    ],
+    "forgot-password": [
+      "גישה באמצעות שחזור"
     ],
     "sign-up": [
       "יצירת חשבון"
@@ -1411,6 +1485,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "खाता"
     ],
+    "forgot-password": [
+      "पुनर्प्राप्ति पहुँच"
+    ],
     "sign-up": [
       "खाता बनाएँ"
     ],
@@ -1466,6 +1543,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Račun"
+    ],
+    "forgot-password": [
+      "Pristup za oporavak"
     ],
     "sign-up": [
       "Izradite ga"
@@ -1523,6 +1603,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Fiók"
     ],
+    "forgot-password": [
+      "Helyreállítási hozzáférés"
+    ],
     "sign-up": [
       "Hozzon létre egyet"
     ],
@@ -1578,6 +1661,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Akun"
+    ],
+    "forgot-password": [
+      "Akses pemulihan"
     ],
     "sign-up": [
       "Buat akun"
@@ -1635,6 +1721,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Account"
     ],
+    "forgot-password": [
+      "Accesso di recupero"
+    ],
     "sign-up": [
       "Creane uno"
     ],
@@ -1690,6 +1779,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "アカウント"
+    ],
+    "forgot-password": [
+      "リカバリーアクセス"
     ],
     "sign-up": [
       "アカウントを作成"
@@ -1747,6 +1839,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "계정"
     ],
+    "forgot-password": [
+      "복구 액세스"
+    ],
     "sign-up": [
       "계정 만들기"
     ],
@@ -1802,6 +1897,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Paskyra"
+    ],
+    "forgot-password": [
+      "Prieigos atkūrimas"
     ],
     "sign-up": [
       "Sukurti paskyrą"
@@ -1859,6 +1957,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Konts"
     ],
+    "forgot-password": [
+      "Piekļuves atkopšana"
+    ],
     "sign-up": [
       "Izveidot kontu"
     ],
@@ -1914,6 +2015,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Kont"
+    ],
+    "forgot-password": [
+      "Aċċess għall-irkupru"
     ],
     "sign-up": [
       "Oħloq wieħed"
@@ -1971,6 +2075,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Account"
     ],
+    "forgot-password": [
+      "Toegang herstellen"
+    ],
     "sign-up": [
       "Account aanmaken"
     ],
@@ -2026,6 +2133,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Konto"
+    ],
+    "forgot-password": [
+      "Dostęp awaryjny"
     ],
     "sign-up": [
       "Utwórz konto"
@@ -2083,6 +2193,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Conta"
     ],
+    "forgot-password": [
+      "Acesso de recuperação"
+    ],
     "sign-up": [
       "Criar uma"
     ],
@@ -2138,6 +2251,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Cont"
+    ],
+    "forgot-password": [
+      "Acces de recuperare"
     ],
     "sign-up": [
       "Creați unul"
@@ -2195,6 +2311,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Учётная запись"
     ],
+    "forgot-password": [
+      "Восстановление доступа"
+    ],
     "sign-up": [
       "Создать"
     ],
@@ -2250,6 +2369,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Účet"
+    ],
+    "forgot-password": [
+      "Obnovenie prístupu"
     ],
     "sign-up": [
       "Vytvorte si ho"
@@ -2307,6 +2429,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Račun"
     ],
+    "forgot-password": [
+      "Obnovitev dostopa"
+    ],
     "sign-up": [
       "Ustvari ga"
     ],
@@ -2362,6 +2487,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Konto"
+    ],
+    "forgot-password": [
+      "Återställningsåtkomst"
     ],
     "sign-up": [
       "Skapa ett"
@@ -2419,6 +2547,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Hesap"
     ],
+    "forgot-password": [
+      "Kurtarma erişimi"
+    ],
     "sign-up": [
       "Hesap oluşturun"
     ],
@@ -2474,6 +2605,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-in": [
       "Обліковий запис"
+    ],
+    "forgot-password": [
+      "Доступ для відновлення"
     ],
     "sign-up": [
       "Створити"
@@ -2531,6 +2665,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "Tài khoản"
     ],
+    "forgot-password": [
+      "Truy cập khôi phục"
+    ],
     "sign-up": [
       "Tạo tài khoản"
     ],
@@ -2587,6 +2724,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-in": [
       "账户"
     ],
+    "forgot-password": [
+      "恢复访问权限"
+    ],
     "sign-up": [
       "创建账户"
     ],
@@ -2631,7 +2771,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "打开公开辩论"
     ]
   }
-} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<Exclude<SupportActionId, "forgot-password">, readonly string[]>>>>;
+} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<SupportActionId, readonly string[]>>>>;
 
 export const SUPPORT_TOPIC_PROMPTS = {
   "ar": [

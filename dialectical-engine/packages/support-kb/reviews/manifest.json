@@ -1,30 +1,30 @@
 {
   "schemaVersion": 2,
   "catalog": {
-    "sha256": "cb302f5103c91c53990efeee1604083ec0bc099296a356968ba43d421e5e5df5",
+    "sha256": "1f725017e21d1c65fd660b40b9ab88214fa8ddcd26a8fd40b4f1185cc172fee7",
     "reviewedBy": "SOL",
-    "reviewerSession": "/root/implement_task12",
-    "reviewedOn": "2026-10-05",
-    "evidence": "docs/missions/account-onboarding/task-12-kb-editorial.md"
+    "reviewerSession": "/root/final_auth_fix",
+    "reviewedOn": "2026-10-06",
+    "evidence": "docs/missions/account-onboarding/final-account-access-editorial.md"
   },
   "articles": [
     {
       "id": "account-access",
       "lang": "en",
-      "sha256": "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7",
+      "sha256": "234f548224b976669d1a6ee9a38400fed2047e4207ffe2208f0c9bf4f837efce",
       "reviewedBy": "SOL",
-      "reviewerSession": "/root/plan_review",
-      "reviewedOn": "2026-09-14",
-      "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-p2.md"
+      "reviewerSession": "/root/final_auth_fix",
+      "reviewedOn": "2026-10-06",
+      "evidence": "docs/missions/account-onboarding/final-account-access-editorial.md"
     },
     {
       "id": "account-access",
       "lang": "ro",
-      "sha256": "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410",
+      "sha256": "673a1db25672323d14e3a4c1a6a59c56e95a3f159beb43b5d184e05f36a2b186",
       "reviewedBy": "SOL",
-      "reviewerSession": "/root/plan_review",
-      "reviewedOn": "2026-09-14",
-      "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-p2.md"
+      "reviewerSession": "/root/final_auth_fix",
+      "reviewedOn": "2026-10-06",
+      "evidence": "docs/missions/account-onboarding/final-account-access-editorial.md"
     },
     {
       "id": "account-settings",
@@ -320,31 +320,31 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "53ba9f42e9984a5c152f55934f6c47bb517e16d5adffdb23e85f07f5759e20dc",
+    "componentFileSha256": "88f28406156f961609850d3a806faca6e8eb514871418bf435c1b6d8f6d4cf0c",
     "components": [
       {
         "id": "account-access",
         "lang": "en",
-        "articleSha256": "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7",
-        "modelProjectionSha256": "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a",
-        "fallbackSha256": "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d",
+        "articleSha256": "234f548224b976669d1a6ee9a38400fed2047e4207ffe2208f0c9bf4f837efce",
+        "modelProjectionSha256": "57f2565e54ea4bde4fbf624dcc8ccddfc1c2e7d67eac18052470dd511962975c",
+        "fallbackSha256": "57f2565e54ea4bde4fbf624dcc8ccddfc1c2e7d67eac18052470dd511962975c",
         "reviewedBy": "SOL",
-        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-        "reviewedOn": "2026-09-15",
-        "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
+        "reviewerSession": "/root/final_auth_fix",
+        "reviewedOn": "2026-10-06",
+        "evidence": "docs/missions/account-onboarding/final-account-access-editorial.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
       },
       {
         "id": "account-access",
         "lang": "ro",
-        "articleSha256": "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410",
-        "modelProjectionSha256": "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98",
-        "fallbackSha256": "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0",
+        "articleSha256": "673a1db25672323d14e3a4c1a6a59c56e95a3f159beb43b5d184e05f36a2b186",
+        "modelProjectionSha256": "73af487d0a2fbd1f4824f678bf78cd756deee6ab4190d467f26a777d4e5e331a",
+        "fallbackSha256": "73af487d0a2fbd1f4824f678bf78cd756deee6ab4190d467f26a777d4e5e331a",
         "reviewedBy": "SOL",
-        "reviewerSession": "01a09ef7-e096-7c31-9b35-806840028cf0",
-        "reviewedOn": "2026-09-15",
-        "evidence": "docs/missions/support-conversation-20260914/reviews/EDITORIAL-RECOVERY-p2.md",
+        "reviewerSession": "/root/final_auth_fix",
+        "reviewedOn": "2026-10-06",
+        "evidence": "docs/missions/account-onboarding/final-account-access-editorial.md",
         "ratifiedBy": "",
         "ratifiedOn": ""
       },

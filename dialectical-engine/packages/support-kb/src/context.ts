@@ -233,7 +233,7 @@ function actionEvidenceScore(
   corpusLocale: SupportCorpusLanguage
 ): number {
   const legacy = isLegacyLanguage(language);
-  const uiAliases = legacy || definition.id === "forgot-password"
+  const uiAliases = legacy
     ? [] : SUPPORT_UI_LABEL_ALIASES[language][definition.id];
   const hasIntent = ACTION_INTENT.test(query)
     || !legacy && uiAliases.some((label) => phraseScore(query,label) > 0);
@@ -284,7 +284,7 @@ function baseSection(
     const available = item.actionIds.filter((id) => availableActionIds.has(id));
     const actions = available.length === 0 ? "none" : available
       .map((id) => isLegacyLanguage(language) ? actionById.get(id)?.labels[language]
-        : id === "forgot-password" || actionById.get(id) === undefined
+        : actionById.get(id) === undefined
           ? undefined : SUPPORT_UI_LABELS[language][id])
       .filter((label): label is string => label !== undefined).join(", ");
     return `- ${item.labels[corpusLocale]} | ${availability[item.availability][corpusLocale]} | actions=${actions}`;
@@ -348,7 +348,6 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const guideMatches = SUPPORT_GUIDE_LABELS.map((item) => {
     if (item.requiresNavigationIntent && !hasActionIntent) return Object.freeze({ item,score:0 });
     const uiAliases = isLegacyLanguage(input.language) || item.actionId === null
-      || item.actionId === "forgot-password"
       ? [] : SUPPORT_UI_LABEL_ALIASES[input.language][item.actionId];
     const score = Math.max(0,...[...item.labels[corpusLocale],...uiAliases].map((label) => {
       const matched = item.actionId === null

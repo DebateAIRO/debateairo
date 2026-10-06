@@ -137,7 +137,7 @@ export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object
   action({ id: "your-debates", labels: labels("Your debates", "Dezbaterile tale"), availability: "signed-in", href: "/?tab=yours" }),
   action({ id: "owner-debate", labels: labels("Open your debate", "Deschide dezbaterea ta"), availability: "owner", href: null }),
   action({ id: "public-debate", labels: labels("Open public debate", "Deschide dezbaterea publică"), availability: "public-reference", href: null }),
-  action({ id: "forgot-password", labels: labels("Forgot password", "Am uitat parola"), availability: "unresolved", href: null }),
+  action({ id: "forgot-password", labels: labels("Recovery access", "Acces de recuperare"), availability: "signed-out", href: "/recover" }),
 ]);
 
 /** Closed visitor-visible labels copied from the reviewed public menu inventory. */
@@ -159,7 +159,7 @@ export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze(
   guideLabel("account-access","sign-up",["Create account","Sign up","Register"],["Creează un cont","Înregistrare"]),
   guideLabel("guide-how-it-works","owner-debate",["Open your debate","Owner debate"],["Deschide dezbaterea ta","Dezbaterea proprietarului"]),
   guideLabel("view-public-debate","public-debate",["Open public debate"],["Deschide dezbaterea publică"]),
-  guideLabel("account-access","forgot-password",["Forgot password"],["Am uitat parola"]),
+  guideLabel("account-access","forgot-password",["Forgot password", "Recovery access"],["Am uitat parola", "Acces de recuperare"]),
   guideLabel("getting-started-debate","start-debate",["Create a debate"],["Creez o dezbatere","Creează o dezbatere"],false),
   guideLabel("getting-started-debate","start-debate",["New debate"],["Dezbatere nouă"],false,true),
   guideLabel("app-navigation",null,["Pricing","Theme","Identity chip","Compact Help","Topic primers","Cookie preferences"],["Prețuri","Temă","Indicator de identitate","Ajutor compact","Sugestii de subiect","Preferințe cookie"]),

@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react';
 import { AuthProvidersResponseSchema, type AuthProvidersResponse, type ContractClient } from '@debateai/contract';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeSocialReturnPath } from '@/lib/returnPath';
-export function SocialProviderButtons({ client, catalog, navigate = (url: string) => window.location.assign(url), onBegin }: {
+export function SocialProviderButtons({ client, catalog, navigate = (url: string) => window.location.assign(url), onBegin, disabled = false }: {
     client: Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin'>>;
     catalog: MessageCatalog;
     navigate?: (url: string) => void;
     onBegin?: () => void;
+    disabled?: boolean;
 }) {
     const [providers, setProviders] = useState<AuthProvidersResponse['providers']>([]);
     const [busy, setBusy] = useState(false);
@@ -28,8 +29,8 @@ export function SocialProviderButtons({ client, catalog, navigate = (url: string
     }, [client]);
     if (!providers.length || !client.beginSocialLogin)
         return null;
-    return <div aria-label={t(catalog, "auth.social.methods")}>{providers.map(provider => <button key={provider.id} type="button" className="authSecondaryButton" disabled={busy} onClick={async () => {
-                if (flight.current)
+    return <div aria-label={t(catalog, "auth.social.methods")}>{providers.map(provider => <button key={provider.id} type="button" className="authSecondaryButton" disabled={busy || disabled} onClick={async () => {
+                if (flight.current || disabled)
                     return;
                 flight.current = true;
                 onBegin?.();

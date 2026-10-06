@@ -1,5 +1,5 @@
 import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type CompleteSocialStepUpRequest } from './index.js';
-import { AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
+import { SocialLoginStatusResponseSchema, type SocialLoginStatusResponse, AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
 import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
  type ConsumerRecoveryProveRequest,type ConsumerRecoveryProofResponse,type RecoveryEnrollmentBeginRequest,type RecoveryEnrollmentCompleteRequest,type RecoveryEnrollmentOptionsResponse,type PendingOnboardingStatusRequest,type PendingOnboardingCompleteRequest,type RecoveryEvidenceStatusRequest,type RecoveryEvidenceCompleteRequest,type OnboardingRequirementsResponse} from './consumer-auth.js';
 import {AuthMethodsResponseSchema,RecoveryCodesResponseSchema,type AuthMethodsResponse} from "./index.js";
@@ -301,8 +301,6 @@ export interface ContractClient {
   checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
   register(input: RegisterRequest): Promise<VerificationAck>;
   resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
-  /** @deprecated Branch migration adapter; remove when the resend UI sends its full request. */
-  resendVerification(email: string): Promise<VerificationAck>;
   startRecovery(email: string): Promise<Readonly<{
     message: typeof RECOVERY_START_PUBLIC_MESSAGE;
   }>>;
@@ -312,6 +310,7 @@ export interface ContractClient {
   completeSocialStepUp(input:CompleteSocialStepUpRequest):Promise<StepUpResponse>;
   authProviders():Promise<AuthProvidersResponse>;
   beginSocialLogin(provider:'google'|'apple'|'facebook'|'x',input?:{next?:'/'|'/new'|'/settings'|'/settings/security'|'/account'}):Promise<{authorization_url:string}>;
+  socialLoginStatus(continuationToken:string):Promise<SocialLoginStatusResponse>;
   socialSignupStatus(input:{continuation_token:string}):Promise<SocialSignupStatusResponse>;
   completeSocialSignup(input:CompleteSocialSignupRequest):Promise<CompleteSocialSignupResponse>;
   linkedSocialProviders():Promise<SocialLinksResponse>;
@@ -447,15 +446,9 @@ export function createContractClient(
     return request("/v1/auth/register", RegistrationVerificationAckSchema,
       {method:"POST",body:JSON.stringify(RegisterRequestSchema.parse(input))},202);
   }
-  function resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
-  function resendVerification(email: string): Promise<VerificationAck>;
-  async function resendVerification(input: ResendVerificationRequest | string): Promise<VerificationAck> {
-    if (typeof input !== "string") {
-      return request("/v1/auth/resend-verification", ResendVerificationAckSchema,
-        { method: "POST", body: JSON.stringify(ResendVerificationRequestSchema.parse(input)) }, 202);
-    }
+  async function resendVerification(input: ResendVerificationRequest): Promise<VerificationAck> {
     return request("/v1/auth/resend-verification", ResendVerificationAckSchema,
-      { method: "POST", body: JSON.stringify({ email: input }) }, 202);
+      { method: "POST", body: JSON.stringify(ResendVerificationRequestSchema.parse(input)) }, 202);
   }
   const eventResponse = async (runId: string, signal?: AbortSignal): Promise<Response> => {
     let response: Response;
@@ -546,6 +539,7 @@ export function createContractClient(
     completeSocialStepUp:(input:CompleteSocialStepUpRequest)=>request('/v1/account/social/step-up/complete',StepUpResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     authProviders:()=>request('/v1/auth/providers',AuthProvidersResponseSchema),
     beginSocialLogin:(provider:"google"|"apple"|"facebook"|"x",input:{next?:"/"|"/new"|"/settings"|"/settings/security"|"/account"}={})=>request(`/v1/auth/social/${provider}/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    socialLoginStatus:(continuationToken:string)=>request('/v1/auth/social/login/status',SocialLoginStatusResponseSchema,{method:'POST',body:JSON.stringify({continuation_token:continuationToken})}),
     socialSignupStatus:(input:{continuation_token:string})=>request('/v1/auth/social/signup/status',SocialSignupStatusResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     completeSocialSignup:(input:CompleteSocialSignupRequest)=>request('/v1/auth/social/signup/complete',CompleteSocialSignupResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     linkedSocialProviders:()=>request('/v1/account/social-providers',SocialLinksResponseSchema),

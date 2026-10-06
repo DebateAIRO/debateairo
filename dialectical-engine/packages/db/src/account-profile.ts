@@ -46,14 +46,12 @@ export class PostgresAccountProfileRepository {
   constructor(private readonly pool: Pool, audit: AuditContextHasher) {
     this.transactions = new ProfileTransactions(pool, audit);
   }
-  async read(session: ProfileSession): Promise<PhoneProfileRecord | null> {
-    const row = (await this.pool.query<{
-      phone_ciphertext: CryptoEnvelope | null;
-      phone_updated_at: Date | null;
-    }>("SELECT * FROM identity.read_phone_profile($1,$2,$3)", [session.userId, session.sessionId, session.tokenHash])).rows[0];
-    return row === undefined ? null : {
-      ciphertext: row.phone_ciphertext, updatedAt: row.phone_updated_at
-    };
+  async read(session: ProfileSession, source: AuthSourceContext): Promise<PhoneProfileRecord | null> {
+    return this.transactions.audited(source, async (client, context) => {
+      const row = (await client.query<{ phone_ciphertext: CryptoEnvelope | null; phone_updated_at: Date | null }>(
+        "SELECT * FROM identity.read_phone_profile_with_audit($1,$2,$3,$4::jsonb)", [session.userId,session.sessionId,session.tokenHash,context])).rows[0];
+      return row === undefined ? null : {ciphertext:row.phone_ciphertext,updatedAt:row.phone_updated_at};
+    });
   }
   async use(session: ProfileSession, input: Readonly<{
     action: "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE";

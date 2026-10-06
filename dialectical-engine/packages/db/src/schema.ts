@@ -24,7 +24,7 @@ export const identityUser = identity.table("user", {
   phoneSource: text("phone_source"),
   phoneVerificationStatus: text("phone_verification_status"),
   phoneUpdatedAt: timestamp("phone_updated_at", { withTimezone: true }),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
   pseudonym: text("pseudonym").notNull().unique(),
   auditToken: uuid("audit_token").notNull().defaultRandom().unique(),
   ownerRef: uuid("owner_ref").notNull().defaultRandom().unique(),

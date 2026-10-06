@@ -14,6 +14,7 @@ import { SUPPORT_UI_LABELS } from "../../packages/support-kb/src/ui-labels.js";
 
 const LABEL_SOURCES = {
   home: ["chrome","chrome.brandHome"],"start-debate": ["home","home.startDebateLabel"],
+  "forgot-password": ["auth","auth.login.recoveryAccess"],
   "sign-in": ["chrome","chrome.account"],"sign-up": ["auth","auth.login.createOne"],
   help: ["chrome","chrome.help"],"support-status": ["support","support.serviceStatus"],
   method: ["chrome","chrome.howItWorks"],"sample-transcript": ["chrome","chrome.transcripts"],
@@ -69,7 +70,7 @@ describe("Support navigation", () => {
     for (const language of SUPPORT_LOCALES.filter((code) => code !== "en" && code !== "ro")) {
       const actions = resolveSupportActions(SUPPORT_ACTION_IDS, { signedIn: false, language });
       expect(actions.map(({ id }) => id)).toEqual([
-        "home","start-debate","sign-in","sign-up","help","support-status","method","sample-transcript"
+        "home","start-debate","sign-in","sign-up","help","support-status","method","sample-transcript","forgot-password"
       ]);
       for (const action of actions) {
         expect(action.label).toBe(SUPPORT_UI_LABELS[language][action.id as keyof typeof LABEL_SOURCES]);
@@ -90,6 +91,7 @@ describe("Support navigation", () => {
       { id: "support-status", label: "Support status", href: "/help#service-status" },
       { id: "method", label: "How it works", href: "/#method" },
       { id: "sample-transcript", label: "Sample debate", href: "/#transcripts" },
+      { id: "forgot-password", label: "Recovery access", href: "/recover" },
     ]);
     expect(actions.every(({ href }) => href.startsWith("/") && !href.startsWith("//"))).toBe(true);
   });
@@ -165,4 +167,9 @@ describe("Support navigation", () => {
     expect(Object.isFrozen(actions)).toBe(true);
     expect(Object.isFrozen(actions[0])).toBe(true);
   });
+});
+
+it('resolves the current first-party recovery action only while signed out',()=>{
+ expect(resolveSupportActions(['forgot-password'],{signedIn:false,language:'en'})).toEqual([{id:'forgot-password',label:'Recovery access',href:'/recover'}]);
+ expect(resolveSupportActions(['forgot-password'],{signedIn:true,language:'en'})).toEqual([]);
 });

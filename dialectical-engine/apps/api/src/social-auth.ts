@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, randomUUID, hkdfSync } from 'node:crypto';
-import { BeginSocialStepUpRequestSchema, BeginSocialLoginRequestSchema, BeginSocialLinkRequestSchema, SocialSignupStatusRequestSchema, CompleteSocialSignupRequestSchema, UnlinkSocialProviderRequestSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type SocialLinksResponse } from '@debateai/contract';
+import { SocialLoginStatusRequestSchema, SocialLoginStatusResponseSchema, type SocialLoginStatusResponse, BeginSocialStepUpRequestSchema, BeginSocialLoginRequestSchema, BeginSocialLinkRequestSchema, SocialSignupStatusRequestSchema, CompleteSocialSignupRequestSchema, UnlinkSocialProviderRequestSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type SocialLinksResponse } from '@debateai/contract';
 import { createEmailBlindIndex, hashToken } from '@debateai/crypto';
 import type { AuthSourceContext, PostgresSocialIdentityRepository, PostgresConsumerSecurityRepository } from '@debateai/db';
 import type { AuthPolicy } from '@debateai/register';
@@ -37,6 +37,7 @@ export interface SocialAuthApplication {
         next: string;
         expiresAt: string;
     }>;
+    loginStatus(input: unknown, source: AuthSourceContext): Promise<SocialLoginStatusResponse>;
     signupStatus(input: unknown, source: AuthSourceContext): Promise<SocialSignupStatusResponse>;
     completeSignup(input: unknown, source: RegistrationSource, admission: AuthSourceAdmission): Promise<SocialRegistrationResult>;
     linked(session: AuthenticatedSession): Promise<SocialLinksResponse>;
@@ -128,6 +129,14 @@ export class SocialAuthService implements SocialAuthApplication {
     }
     private async authority(token: string, source: AuthSourceContext) { if (!source.socialBrowserHash)
         throw new SocialAuthError('SOCIAL_PROOF_INVALID'); return { proofHash: socialHash('signup', token), browserHash: source.socialBrowserHash, bindingHash: this.sessions.bindingHash(source), admittedProviders: (await this.providers.available()).map(p => p.configuration) }; }
+    async loginStatus(input: unknown, source: AuthSourceContext): Promise<SocialLoginStatusResponse> {
+        const p=parseConsumerSecurityInput(SocialLoginStatusRequestSchema,input);
+        if (!source.socialBrowserHash) throw new SocialAuthError('SOCIAL_PROOF_INVALID');
+        await this.sessions.admit('SOCIAL_SIGNUP',p.continuation_token,source);
+        const record=await this.repository.loginStatus({challengeHash:hashToken('login-challenge',p.continuation_token),browserHash:source.socialBrowserHash,bindingHash:this.sessions.bindingHash(source),admittedProviders:(await this.providers.available()).map(p=>p.configuration)});
+        if (!record) throw new SocialAuthError('SOCIAL_PROOF_INVALID');
+        return SocialLoginStatusResponseSchema.parse({expires_at:new Date(record.expiresAt).toISOString(),available_methods:record.availableMethods});
+    }
     async signupStatus(input: unknown, source: AuthSourceContext): Promise<SocialSignupStatusResponse> {
         const p = parseConsumerSecurityInput(SocialSignupStatusRequestSchema, input);
         await this.sessions.admit('SOCIAL_SIGNUP', p.continuation_token, source);

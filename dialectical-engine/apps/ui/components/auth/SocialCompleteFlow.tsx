@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ContractClient, LocaleCode, CatalogLocaleCode, StepUpResponse, SocialStepUpStatusResponse, AuthenticationResponse } from '@debateai/contract';
+import type { ContractClient, LocaleCode, CatalogLocaleCode, StepUpResponse, SocialStepUpStatusResponse, SocialLoginStatusResponse, AuthenticationResponse } from '@debateai/contract';
 import { dobToIso, type DobParts } from '@debateai/kernel';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
@@ -47,6 +47,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const router = useRouter();
     const started = useRef(false);
     const flight = useRef(false);
+    const dispatched = useRef(false);
+    const [completing, setCompleting] = useState(false);
     const sequence = useRef(0);
     const browser = useRef(createConsumerWebAuthnBrowser()).current;
     const attempt = useRef(createCodeAttempt());
@@ -69,6 +71,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [pending, setPending] = useState<string | null>(null);
     const [backup, setBackup] = useState<string | null>(null);
     const [stepUpResult, setStepUpResult] = useState<StepUpResponse | null>(null);
+    const [loginStatus, setLoginStatus] = useState<SocialLoginStatusResponse | null>(null);
     const [stepUpStatus, setStepUpStatus] = useState<SocialStepUpStatusResponse | null>(null);
     const [flowExpiry, setFlowExpiry] = useState<string | null>(null);
     const [authenticated, setAuthenticated] = useState(false);
@@ -128,11 +131,19 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     setName(status.name);
                     setFlowExpiry(status.expires_at);
                 }
+                else if (initialKind === 'login') {
+                    const status = await client.socialLoginStatus(value);
+                    if (!owns(owner, value, initialKind)) return;
+                    setLoginStatus(status);
+                    setRecoveryMode(!status.available_methods.includes('totp'));
+                    setFlowExpiry(status.expires_at);
+                }
                 else if (initialKind === 'stepup') {
                     const status = await client.socialStepUpStatus(value);
                     if (!owns(owner, value, initialKind))
                         return;
                     setStepUpStatus(status);
+                    setRecoveryMode(!status.available_methods.includes('totp'));
                     setFlowExpiry(status.expires_at);
                 }
             }
@@ -153,6 +164,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         sequence.current++;
         authority.current = { token: '', kind: null };
         flight.current = false;
+        dispatched.current = false;
+        setCompleting(false);
         browser.cancel();
     }, [browser]);
     useEffect(() => {
@@ -166,6 +179,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             setCode('');
             setBusy(false);
             flight.current = false;
+            dispatched.current = false;
+            setCompleting(false);
             setError(t(catalog, 'auth.enroll.invalidLink'));
         }, Math.max(0, Date.parse(flowExpiry) - Date.now()));
         return () => clearTimeout(timer);
@@ -246,6 +261,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                 setProof(null);
                 setReset(x => x + 1);
                 flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
                 setBusy(false);
             }
         }
@@ -266,6 +283,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             const credential = await browser.authenticate(options.options);
             if (!owns(owner, ownedToken, ownedKind))
                 return;
+            dispatched.current = true;
+            setCompleting(true);
             const result = ownedKind === 'stepup'
                 ? await client.completeSocialStepUp({ continuation_token: ownedToken, challenge_handle: options.challenge_handle, credential })
                 : await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
@@ -283,6 +302,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         finally {
             if (owner === sequence.current) {
                 flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
                 setBusy(false);
             }
         }
@@ -299,6 +320,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         const ownedToken = token;
         const ownedKind = kind;
         try {
+            dispatched.current = true;
+            setCompleting(true);
             const result = ownedKind === 'stepup'
                 ? await client.completeSocialStepUp({ continuation_token: ownedToken, code: value.trim() })
                 : await client.completeLogin(ownedToken, value.trim());
@@ -316,13 +339,15 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         finally {
             if (owner === sequence.current) {
                 flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
                 setBusy(false);
             }
         }
     }
     if (pending)
         return <EmailPendingScreen email={pending} retryAfterSeconds={60} client={client} catalog={catalog} locale={uiLocale} turnstile={turnstile} onDifferentEmail={() => window.location.assign('/sign-up')}/>;
-    const methods = kind === 'stepup' ? stepUpStatus?.available_methods ?? [] : ['passkey', 'totp', 'recovery_code'];
+    const methods = kind === 'stepup' ? stepUpStatus?.available_methods ?? [] : loginStatus?.available_methods ?? [];
     return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
  {error ? <p role="alert">{error}</p> : null}
  {returnToQuestion && !stepUpResult && !backup ? <a href="/new">{t(catalog, 'auth.continue')}</a> : null}
@@ -354,24 +379,27 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     setProof(null);
                     setError(t(catalog, "auth.pending.proofUnavailable"));
                 }}/> : null}<button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form> : null}
- {token && kind === 'enroll' ? <SecurityEnrollment offerRecoveryCodes catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={finish}/> : null}
+ {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={finish}/> : null}
  {token && (kind === 'login' || kind === 'stepup') ? <div>
  {methods.includes('passkey') ? <button type="button" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button> : null}
  {methods.includes('totp') || methods.includes('recovery_code') ? <><form method="post" action="/social/complete" noValidate onSubmit={e => {
                     e.preventDefault();
                     void submitCode(code);
-                }}><label htmlFor="social-code">{recoveryMode ? t(catalog, "auth.login.recoveryCodeLabel") : t(catalog, "auth.login.authenticationCodeLabel")}</label><input id="social-code" name="code" autoComplete="one-time-code" inputMode={recoveryMode ? 'text' : 'numeric'} maxLength={recoveryMode ? 128 : 6} value={code} disabled={busy} onChange={e => {
+                }}><label htmlFor="social-code">{recoveryMode ? t(catalog, "auth.login.recoveryCodeLabel") : t(catalog, "auth.login.authenticationCodeLabel")}</label>{!recoveryMode ? <p id="social-code-help">{t(catalog, 'auth.login.authenticatorInstruction')}</p> : null}<input aria-describedby={!recoveryMode ? 'social-code-help' : undefined} id="social-code" name="code" autoComplete="one-time-code" inputMode={recoveryMode ? 'text' : 'numeric'} maxLength={recoveryMode ? 128 : 6} value={code} disabled={busy} onChange={e => {
                     const value = recoveryMode ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 6);
                     if (value !== code)
                         attempt.current.edited();
                     setCode(value);
                     if (!recoveryMode && value.length === 6)
                         void submitCode(value);
-                }}/><button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form>{methods.includes('recovery_code') ? <button type="button" onClick={() => {
+                }}/><button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form>{methods.includes('recovery_code') && methods.includes('totp') ? <button type="button" disabled={completing} onClick={() => {
+                        if (dispatched.current) return;
                         sequence.current++;
                         browser.cancel();
                         startup.current = null;
                         flight.current = false;
+                        dispatched.current = false;
+                        setCompleting(false);
                         setBusy(false);
                         setError(null);
                         setRecoveryMode(!recoveryMode);
