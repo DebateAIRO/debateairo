@@ -1,5 +1,5 @@
 import { afterEach,describe,expect,it } from 'vitest';
-import { mkdtemp,mkdir,writeFile,readFile,cp,rm,realpath,symlink } from 'node:fs/promises';
+import { mkdtemp,mkdir,writeFile,readFile,cp,rm,realpath,symlink,lstat,chmod } from 'node:fs/promises';
 import { join,resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -18,6 +18,16 @@ async function fixture(){
  await mkdir(join(root,'dialectical-engine/node_modules/.pnpm/example/node_modules/example'),{recursive:true});
  await mkdir(join(root,'dialectical-engine/packages/example'),{recursive:true});
  await writeFile(join(root,'dialectical-engine/package.json'),'{"private":true}');
+ await mkdir(join(root,'dialectical-engine/packages/contract/src'),{recursive:true});
+ await mkdir(join(root,'dialectical-engine/packages/contract/generated'),{recursive:true});
+ await mkdir(join(root,'dialectical-engine/node_modules/tsx/dist'),{recursive:true});
+ await writeFile(join(root,'dialectical-engine/node_modules/tsx/dist/loader.mjs'),'export {};');
+ await writeFile(join(root,'dialectical-engine/packages/contract/src/generate.ts'),'// synthetic metadata fixture; no producer execution claim');
+ await writeFile(join(root,'dialectical-engine/packages/contract/package.json'),'{"type":"module"}');
+ await writeFile(join(root,'dialectical-engine/tsconfig.json'),'{}');
+ for(const name of ['client.ts','field-inventory.json','openapi.json'])await writeFile(join(root,'dialectical-engine/packages/contract/generated',name),'{}');
+ await symlink('../packages/contract/generated/client.ts',join(root,'dialectical-engine/node_modules/generated-client'));
+
  await writeFile(join(root,'dialectical-engine/apps/api/src/main.cjs'),'module.exports=1;\n');
  await writeFile(join(root,'dialectical-engine/node_modules/.pnpm/example/node_modules/example/index.js'),'module.exports="bound";\n');
  await writeFile(join(root,'dialectical-engine/packages/example/index.js'),'export const value=1;\n');
@@ -30,10 +40,18 @@ async function fixture(){
  return root;
 }
 async function freeze(root:string,role='api'){
- const uid=process.getuid!(),files=await source.buildInventory(root,uid);
+ const uid=process.getuid!(),files=await source.buildInventory(root,uid,{excludedDirectories:['dialectical-engine/packages/contract/generated',...(role==='ui'?['dialectical-engine/apps/ui/.next']:[])]});
  const dependencies=await source.buildInventory(join(root,'dialectical-engine/node_modules'),uid,{dependencies:true,allowedRoot:root});
  const packageLinks=dependencies.filter((f:any)=>f.realpath).map((f:any)=>({path:`dialectical-engine/node_modules/${f.path}`,realpath:f.realpath}));
- const manifest={schema:'preview-auth-dev-source-v2',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),sourceRoot:root,role,uid,nodeVersion:process.version,pnpmVersion:'11.20.0',files,packageLinks,dependencyInventory:[{path:'dialectical-engine/node_modules',files:dependencies}],nativeSha256:'c'.repeat(64),contractSha256:'d'.repeat(64),promptStoryProviderSha256:'e'.repeat(64),packageLockSha256:'f'.repeat(64)};
+ const manifest={schema:'preview-auth-dev-source-v3',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),sourceRoot:root,role,uid,nodeVersion:process.version,pnpmVersion:'11.20.0',files,packageLinks,dependencyInventory:[{path:'dialectical-engine/node_modules',files:dependencies}],generatedContract:null as any,nativeSha256:'c'.repeat(64),contractSha256:'d'.repeat(64),promptStoryProviderSha256:'e'.repeat(64),packageLockSha256:'f'.repeat(64)};
+ const dir='dialectical-engine/packages/contract/generated';
+ const derived=(await source.buildInventory(join(root,dir),uid,{complete:true})).map((file:any)=>({...file,path:dir+'/'+file.path}));
+ const executable=await realpath(process.execPath),stat=await lstat(executable);
+ const runtime={nodeVersion:process.version,pnpmVersion:'11.20.0',platform:process.platform,arch:process.arch,nodeExecutable:executable,nodeIdentitySha256:hash(JSON.stringify([stat.dev,stat.ino,stat.uid,stat.gid,stat.mode,stat.nlink,stat.size,stat.mtimeMs,stat.ctimeMs])),tsxLoader:'dialectical-engine/node_modules/tsx/dist/loader.mjs'};
+ const inputSha256=hash(JSON.stringify({producer:'dialectical-engine/packages/contract/src/generate.ts',files,dependencies:manifest.dependencyInventory,packageLinks,runtime})),outputSha256=hash(JSON.stringify(derived));
+ // These are synthetic binding records only. The real producer is exercised in the clean-archive receipt.
+ manifest.generatedContract={schema:'preview-auth-dev-generated-contract-v1',producer:'dialectical-engine/packages/contract/src/generate.ts',files:derived,runtime,inputSha256,outputSha256,reproductions:[outputSha256,outputSha256]};
+ manifest.contractSha256=outputSha256;
  return {manifest,expected:{sourceRevision:manifest.sourceRevision,sourceTree:manifest.sourceTree,sourceRoot:root,role,manifestSha256:hash(JSON.stringify(manifest))},operatorSha256:hash(JSON.stringify(files.filter((f:any)=>f.path.startsWith(operator+'/'))))};
 }
 async function invoke(root:string,packet:unknown,name='launch-api.mjs',entry?:string){
@@ -72,7 +90,7 @@ describe('complete dependency-root and generated-path closure',()=>{
   await expect(source.verifySourceManifest(p.manifest,p.expected)).rejects.toThrow();
  });
  it('refuses the old manifest schema instead of treating old source identity as current',async()=>{
-  const root=await fixture(),p=await freeze(root);p.manifest.schema='preview-auth-dev-source-v1';p.expected.manifestSha256=hash(JSON.stringify(p.manifest));
+  const root=await fixture(),p=await freeze(root);p.manifest.schema='preview-auth-dev-source-v2';p.expected.manifestSha256=hash(JSON.stringify(p.manifest));
   await expect(source.verifySourceManifest(p.manifest,p.expected)).rejects.toThrow('PREVIEW_SOURCE_BINDING_REFUSED');
  });
  it('does not exempt the UI build path from an API package inventory',async()=>{const root=await fixture(),p=await freeze(root);await mkdir(join(root,'dialectical-engine/apps/ui/.next'),{recursive:true});await writeFile(join(root,'dialectical-engine/apps/ui/.next/injected.mjs'),'unlisted');await expect(source.verifySourceManifest(p.manifest,p.expected)).rejects.toThrow();});
@@ -98,7 +116,35 @@ describe('executing identity is wired before protected operations',()=>{
   for(const [file,entry,operation]of [['native-operator.mjs','native-operator.mjs','return withActiveNativePool('],['run-stage.mjs','run-stage.mjs','const probe=new pg.Client(']]){
    const code=await readFile(resolve('deploy/preview-auth-dev/v1',file!),'utf8');const binding=code.indexOf(`entryUrl:import.meta.url,entryName:'${entry}'`);
    expect(binding).toBeGreaterThan(0);expect(binding).toBeLessThan(code.indexOf(operation!));
-   if(file==='run-stage.mjs')expect(code).toContain("operation.schema!=='preview-auth-dev-stage-operation-v2'");
+   if(file==='run-stage.mjs')expect(code).toContain("['preview-auth-dev-stage-operation-v2','preview-auth-dev-stage-operation-v3'].includes(operation.schema)");
   }
+ });
+});
+
+describe('exact separately generated contract binding',()=>{
+ it.each(['missing','extra','hash','mode','symlink','producer','proof'] as const)('refuses %s derived contract drift',async kind=>{
+  const root=await fixture(),p=await freeze(root),dir=join(root,'dialectical-engine/packages/contract/generated'),file=join(dir,'client.ts');
+  await source.verifySourceManifest(p.manifest,p.expected);
+  if(kind==='missing')await rm(file);if(kind==='extra')await writeFile(join(dir,'unknown.ts'),'extra');if(kind==='hash')await writeFile(file,'changed');if(kind==='mode')await chmod(file,0o600);
+  if(kind==='symlink'){await rm(file);await symlink(join(root,'dialectical-engine/packages/example/index.js'),file);}
+  if(kind==='producer')await writeFile(join(root,'dialectical-engine/packages/contract/src/generate.ts'),'changed producer');
+  if(kind==='proof'){p.manifest.generatedContract.reproductions[1]='0'.repeat(64);p.expected.manifestSha256=hash(JSON.stringify(p.manifest));}
+  await expect(source.verifySourceManifest(p.manifest,p.expected)).rejects.toThrow();
+ });
+});
+
+describe('producer loader closure before execution',()=>{
+ it('refuses an excluded UI loader target without running its sentinel',async()=>{
+  const root=await realpath(await mkdtemp(join(tmpdir(),'preview-loader-closure-')));roots.push(root);
+  const reference=join(root,'reference'),packaged=join(root,'package'),marker=join(root,'producer-executed');
+  await mkdir(join(reference,'dialectical-engine/packages/contract/src'),{recursive:true});
+  for(const [path,value]of Object.entries({'dialectical-engine/package.json':'{"type":"module"}','dialectical-engine/tsconfig.json':'{}','dialectical-engine/packages/contract/package.json':'{"type":"module"}','dialectical-engine/packages/contract/src/generate.ts':'// A loader must never execute for this refused fixture.'}))await writeFile(join(reference,path),value);
+  for(const args of [['init','-q'],['add','.'],['-c','user.name=Stage fixture','-c','user.email=fixture@example.test','commit','-qm','synthetic loader closure fixture']])await execute('git',['-C',reference,...args]);
+  await cp(reference,packaged,{recursive:true});await rm(join(packaged,'.git'),{recursive:true});
+  const generated=join(packaged,'dialectical-engine/packages/contract/generated');await mkdir(generated);for(const name of ['client.ts','field-inventory.json','openapi.json'])await writeFile(join(generated,name),'{}');
+  const loader=join(packaged,'dialectical-engine/apps/ui/.next/unlisted-loader.mjs');await mkdir(join(packaged,'dialectical-engine/apps/ui/.next'),{recursive:true});await writeFile(loader,`import{writeFileSync}from'node:fs';writeFileSync(${JSON.stringify(marker)},'executed');`);
+  await mkdir(join(packaged,'dialectical-engine/node_modules/tsx/dist'),{recursive:true});await symlink(loader,join(packaged,'dialectical-engine/node_modules/tsx/dist/loader.mjs'));
+  await expect(source.generateSourceManifest({repositoryRoot:reference,sourceRoot:packaged,role:'ui',uid:process.getuid!()})).rejects.toThrow();
+  await expect(lstat(marker)).rejects.toMatchObject({code:'ENOENT'});
  });
 });

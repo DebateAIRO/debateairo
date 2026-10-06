@@ -9,7 +9,7 @@ export async function withExtractedSecret(raw, consume) {
     if (!Buffer.isBuffer(raw) || raw.length < 1 || raw.length > 2048) refuse();
     const input = exactKeys(strictJson(raw), ['schema','environment','hostname','siteKey','secretKey']);
     if (Object.values(input).some(value => typeof value !== 'string') || input.schema !== 'dialectical-turnstile-credentials-v1'
-      || input.environment !== 'PREVIEW' || input.hostname !== 'v3-preview.dezbatere.ro' || input.siteKey !== PREVIEW_SITE_KEY
+      || input.environment !== 'preview' || input.hostname !== 'v3-preview.dezbatere.ro' || input.siteKey !== PREVIEW_SITE_KEY
       || !/^[A-Za-z0-9_-]{20,2048}$/.test(input.secretKey) || /^[123]x0{30,}/.test(input.secretKey)) refuse();
     secret = Buffer.from(input.secretKey); input.secretKey = '';
     return await consume(secret);

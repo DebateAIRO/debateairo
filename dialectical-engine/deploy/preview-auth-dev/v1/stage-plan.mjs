@@ -21,9 +21,11 @@ export function stageClusterCommands(plan) {
 export const STAGE_REQUIRED_PROOFS=Object.freeze(['candidate-api-listen','candidate-ui-listen','fallback-api-listen','fallback-ui-listen','legacy-primary-recovery','pending-backup-notice-no-cancel','postcutover-legacy-denied','passkey-general-recovery','direct-totp-general-recovery','nullable-provider-general-recovery','retired103-denied','private-table-and-column-denied','scoped-cookie-and-origin','proxy-exact-path-deadline','mail-capture-and-drain','turnstile-mock-refusals']);
 export function assertStageCompletion(receipt,plan) {
  validateStagePlan(plan);
- if(receipt?.schema!=='preview-auth-dev-stage-result-v1'||receipt.platform!=='linux'||receipt.sourceRevision!==plan.sourceRevision||receipt.sourceTree!==plan.sourceTree
+ if(receipt?.schema!=='preview-auth-dev-stage-result-v2'||receipt.platform!=='linux'||receipt.sourceRevision!==plan.sourceRevision||receipt.sourceTree!==plan.sourceTree
   ||receipt.cluster!==STAGE.cluster||receipt.database!==STAGE.database||receipt.postgresMajor!==18||receipt.candidateRoot!==plan.candidateRoot||receipt.fallbackRoot!==plan.fallbackRoot
   ||STAGE_REQUIRED_PROOFS.some(name=>receipt.proofs?.[name]?.passed!==true||!/^[a-f0-9]{64}$/.test(receipt.proofs[name].receiptSha256))
-  ||receipt.runnerStarted!==false||receipt.realMailSent!==false||receipt.providerNetworkCalled!==false)refuse('PREVIEW_STAGE_INCOMPLETE');
+  ||receipt.runnerStarted!==false||receipt.realMailSent!==false||receipt.providerNetworkCalled!==false
+  ||receipt.fullAccountMatrixAccepted!==true||receipt.installedCustodyAccepted!==false||receipt.nativeMailAccepted!==false||receipt.genuineCloudflareAccepted!==false
+  ||['candidate','fallback'].some(artifact=>{const leaf=receipt.receipts?.[artifact];return leaf?.schema!=='preview-auth-dev-full-runtime-v1'||leaf.fullAccountMatrixAccepted!==true||leaf.runnerStarted!==false||leaf.installedCustodyAccepted!==false||leaf.nativeMailAccepted!==false||leaf.genuineCloudflareAccepted!==false||STAGE_REQUIRED_PROOFS.filter(name=>!name.endsWith('-listen')).some(name=>leaf.behaviorProofs?.[name]?.passed!==true||!/^[a-f0-9]{64}$/.test(leaf.behaviorProofs[name].receiptSha256));}))refuse('PREVIEW_STAGE_INCOMPLETE');
  return true;
 }

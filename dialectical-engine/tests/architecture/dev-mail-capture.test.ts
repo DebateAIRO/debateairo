@@ -42,12 +42,12 @@ describe("DEV-06 mail capture executable contract", () => {
       .map((match) => match[1]!.replace(/\s+/g, ""));
     // The account adapters share the same process-only transport.
     expect(spawnArgv).toHaveLength(2);
-    for (const argv of spawnArgv) {
-      // `-t` makes the MTA read recipients from the header block on stdin, so
-      // only the fixed envelope sender may reach argv, which every local user
-      // can read out of `ps`. No `--`, no recipient, nothing else.
-      expect(argv).toBe('"-i","-t","-f",options.from');
-    }
+    // Exactly these two source contexts, not a generic from/recipient expression.
+    // Both keep only -i/-t/-f plus their fixed configured envelope sender.
+    expect(spawnArgv).toEqual([
+      '"-i","-t","-f",options.from',
+      '"-i","-t","-f",this.options.from'
+    ]);
     // Every sender routes the recipient through the one guard that refuses a
     // separator, which would fan the message out to a second mailbox once the
     // MTA parses `To:`. One definition, six call sites: the change-email

@@ -1,4 +1,4 @@
-# Install only after creating debateai-preview-turnstile and the debateai-preview-turnstile-clients group.
+# Install only after creating debateai-preview-turnstile and the debateai-preview-ts-clients group.
 # Only debateai-preview-api joins clients; it cannot read the systemd credential or source secret.
 [Unit]
 Description=Reviewed preview-only Turnstile Siteverify relay
@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=debateai-preview-turnstile
-Group=debateai-preview-turnstile-clients
+Group=debateai-preview-ts-clients
 WorkingDirectory=/opt/debateai-v3-preview/current-api/dialectical-engine
 Environment=NODE_ENV=production
 # This root-owned file contains only PUBLIC_APP_URL, matching the API's exact deployment origin.

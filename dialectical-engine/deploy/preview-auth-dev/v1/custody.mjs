@@ -59,8 +59,12 @@ export async function withPrivateBytes(path, policy, consume) {
 }
 
 /** JSON.parse alone loses duplicate keys. Parse the grammar first and reject ambiguity at every depth. */
-export function strictJson(bytes, maxDepth = 32) {
+export function strictJson(bytes, maxDepth = 32, options = {}) {
   try {
+    if(!(bytes instanceof Uint8Array)||bytes.byteLength>16777216||!Number.isSafeInteger(maxDepth)||maxDepth<1||maxDepth>32
+      ||!options||Object.getPrototypeOf(options)!==Object.prototype||Object.keys(options).some(key=>key!=='publicInventory')
+      ||(options.publicInventory!==undefined&&typeof options.publicInventory!=='boolean'))refuse();
+    const maxNodes=options.publicInventory===true?250000:100000;
     const text = new TextDecoder('utf8', { fatal: true, ignoreBOM: true }).decode(bytes);
     if (text.startsWith('\ufeff')) refuse();
     let i = 0, nodes = 0;
@@ -76,7 +80,7 @@ export function strictJson(bytes, maxDepth = 32) {
       refuse();
     };
     const value = depth => {
-      if (depth > maxDepth || ++nodes > 100_000) refuse();
+      if (depth > maxDepth || ++nodes > maxNodes) refuse();
       ws();
       if (text[i] === '"') return string();
       if (text[i] === '{') {

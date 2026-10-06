@@ -10,7 +10,7 @@ import { authPolicyFromRegisterRows, AUTH_POLICY_REGISTER_ROWS } from "@debateai
 import { RegistrationService, InProcessAuthRateLimiter, sourceContext, REGISTRATION_PUBLIC_RESPONSE, RESEND_PUBLIC_RESPONSE } from "../../apps/api/src/registration.js";
 
 const legal = { terms: { version: "2.0", sha256: "a".repeat(64) }, privacy: { version: "3.0", sha256: "b".repeat(64) } };
-export const signup = { email: "person@example.test", password: "password-123", phone: "+40 722 123 456", date_of_birth: "1990-01-01", ...legal, locale: "ro", ui_locale: "ro", time_zone: "Europe/Bucharest", turnstile_token: "fixture-proof" };
+export const signup = { email: "person@example.test", password: "password-123", phone: "+40 722 123 456", date_of_birth: "1990-01-01", country: "RO", ...legal, locale: "ro", ui_locale: "ro", time_zone: "Europe/Bucharest", turnstile_token: "fixture-proof" };
 const resend = { email: signup.email, locale: "ro", ui_locale: "ro", time_zone: null, turnstile_token: "resend-proof" };
 function harness(result: "passed" | "rejected" | "unavailable" | null = "passed") {
   const work: unknown[] = []; const proofs: unknown[] = [];
@@ -24,10 +24,16 @@ function harness(result: "passed" | "rejected" | "unavailable" | null = "passed"
 
 describe("mandatory proof at the public identity boundary", () => {
   // Removing the canonical parse or gate would reach registration (and its lookup/KDF/mail).
-  it.each(["turnstile_token", "locale", "ui_locale", "time_zone", "phone", "terms", "privacy"])("rejects missing canonical signup field %s before identity", async key => {
+  it.each(["turnstile_token", "locale", "ui_locale", "time_zone", "phone", "terms", "privacy", "country"])("rejects missing canonical signup field %s before identity", async key => {
     const { api, work, proofs } = harness(); const payload: Record<string, unknown> = { ...signup }; delete payload[key];
     try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload });
       expect(response.statusCode).toBe(400); expect(work).toEqual([]); expect(proofs).toEqual([]);
+    } finally { await api.close(); }
+  });
+  it.each(["ZZ", "R0", null])("rejects invalid country before proof or identity: %s", async country => {
+    const { api, work, proofs } = harness();
+    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...signup, country } });
+      expect(response.statusCode).toBe(400); expect(proofs).toEqual([]); expect(work).toEqual([]);
     } finally { await api.close(); }
   });
   it.each(["adult_affirmed", "recovery_email", "phone_source", "hostname", "action", "url", "secret"])("rejects public authority/transport override %s", async key => {
