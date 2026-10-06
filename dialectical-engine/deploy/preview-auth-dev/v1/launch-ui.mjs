@@ -4,7 +4,7 @@ import { prepareLaunch,readPublicArtifact } from './launch-plan.mjs';
 import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment } from './environment.mjs';
 import { verifyUiBuildManifest } from './ui-build.mjs';
 export async function launchUi(argv) {
- const {plan,source}=await prepareLaunch(argv,'ui');
+ const {plan,source}=await prepareLaunch(argv,'ui',import.meta.url);
  await verifyUiBuildManifest(await readPublicArtifact(plan.uiBuild),source);
  const selected=narrowEnvironment('ui',await readEnvironmentFile(plan.environment.path,plan.environment),{},plan.publication,plan);
  process.chdir(join(plan.sourceRoot,'dialectical-engine/apps/ui'));installNarrowEnvironment(selected.environment);

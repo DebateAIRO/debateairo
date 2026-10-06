@@ -6,7 +6,7 @@ import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment } from '
 import { afterApiListen,linuxProcessIdentity } from './runtime-receipt.mjs';
 import { refuse } from './custody.mjs';
 export async function launchApi(argv) {
- const {plan,source}=await prepareLaunch(argv,'api');
+ const {plan,source}=await prepareLaunch(argv,'api',import.meta.url);
  const engine=join(plan.sourceRoot,'dialectical-engine');
  const runtime=await tsImport(join(engine,'packages/register/src/runtime-environment.ts'),import.meta.url);
  const configured=await readEnvironmentFile(plan.environment.path,plan.environment);

@@ -12,7 +12,8 @@ export async function runNativeOperator() {
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  const source=await readPublicArtifact(plan.sourceManifest);
- await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:'api',manifestSha256:plan.sourceManifest.sha256});
+ if(source.uid!==0)refuse('PREVIEW_SOURCE_OWNER_REFUSED');
+ await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:'api',manifestSha256:plan.sourceManifest.sha256,execution:{entryUrl:import.meta.url,entryName:'native-operator.mjs',operatorManifestSha256:plan.operatorManifestSha256}});
  const operator=source.files.filter(file=>file.path.startsWith('dialectical-engine/deploy/preview-auth-dev/v1/'));
  if(sha256(JSON.stringify(operator))!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
  const engine=join(plan.sourceRoot,'dialectical-engine');

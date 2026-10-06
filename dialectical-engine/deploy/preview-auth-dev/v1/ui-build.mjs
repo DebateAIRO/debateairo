@@ -13,7 +13,7 @@ export async function buildUiArtifact(source,environment) {
 export async function inspectUiBuild(source) {
  if(process.platform!=='linux'||process.version!=='v26.8.2')refuse('PREVIEW_LINUX_BUILD_REQUIRED');
  const buildRoot=join(source.sourceRoot,'dialectical-engine/apps/ui/.next');
- const files=await buildInventory(buildRoot,source.uid);
+ const files=await buildInventory(buildRoot,source.uid,{complete:true,allowedRoot:source.sourceRoot});
  const routeBytes=await readFile(join(buildRoot,'server/app-paths-manifest.json'));
  const paths=strictJson(routeBytes),routes=Object.keys(paths).filter(key=>key.endsWith('/page')).map(key=>key.replace(/\/page$/,'')||'/').sort();
  const buildId=(await readFile(join(buildRoot,'BUILD_ID'),'utf8')).trim();
@@ -28,7 +28,7 @@ export async function verifyUiBuildManifest(build,source) {
  if(build.schema!=='preview-auth-dev-ui-build-v1'||build.platform!=='linux'||build.nodeVersion!=='v26.8.2'||build.pnpmVersion!=='11.20.0'
   ||build.sourceRevision!==source.sourceRevision||build.sourceTree!==source.sourceTree||build.sourceRoot!==source.sourceRoot||build.contractSha256!==source.contractSha256
   ||build.buildRoot!==join(source.sourceRoot,'dialectical-engine/apps/ui/.next')||REQUIRED_AUTH_ROUTES.some(route=>!build.routes.includes(route)))refuse('PREVIEW_UI_BUILD_BINDING_REFUSED');
- await verifyInventory(build.buildRoot,source.uid,build.files);
+ await verifyInventory(build.buildRoot,source.uid,build.files,{complete:true,allowedRoot:source.sourceRoot});
  const current=await inspectUiBuild(source);
  if(JSON.stringify(current)!==JSON.stringify(build))refuse('PREVIEW_UI_BUILD_DRIFT');
  return true;

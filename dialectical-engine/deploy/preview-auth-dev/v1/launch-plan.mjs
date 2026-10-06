@@ -26,14 +26,14 @@ export function validateLaunchPlan(plan) {
 export async function readPublicArtifact(file) {
  return withPrivateBytes(file.path,{root:dirname(file.path),uid:0,mode:0o644,maxBytes:16777216},raw=>{if(sha256(raw)!==file.sha256)refuse();return strictJson(raw);});
 }
-export async function prepareLaunch(argv,service) {
+export async function prepareLaunch(argv,service,entryUrl) {
  if(process.platform!=='linux'||process.version!=='v26.8.2'||argv.length!==2||argv[0]!=='--plan'
   ||!/^\/opt\/debateai-v3-preview\/artifacts\/[a-z0-9-]+\/(?:api|ui|runner)-launch\.json$/.test(argv[1]))refuse('PREVIEW_LAUNCH_INPUT_REFUSED');
  const plan=validateLaunchPlan(await withPrivateBytes(argv[1],{root:dirname(argv[1]),uid:0,mode:0o644,maxBytes:32768},raw=>strictJson(raw)));
  if(plan.service!==service||process.getuid?.()!==plan.serviceUid||process.getgid?.()!==plan.serviceGid)refuse('PREVIEW_LAUNCH_ACTOR_REFUSED');
  const source=await readPublicArtifact(plan.sourceManifest);
  if(source.uid!==0)refuse('PREVIEW_SOURCE_OWNER_REFUSED');
- await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:service,manifestSha256:plan.sourceManifest.sha256});
+ await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:service,manifestSha256:plan.sourceManifest.sha256,execution:{entryUrl,entryName:`launch-${service}.mjs`,operatorManifestSha256:plan.operatorManifestSha256}});
  const operator=source.files.filter(file=>file.path.startsWith('dialectical-engine/deploy/preview-auth-dev/v1/'));
  if(sha256(JSON.stringify(operator))!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
  const native=await readPublicArtifact(plan.nativeAttestation);

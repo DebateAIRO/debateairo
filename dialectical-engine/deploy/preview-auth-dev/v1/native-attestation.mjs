@@ -10,6 +10,7 @@ export function validateNativeAttestation(value,binding,now=Date.now()) {
   ||value.forwardCount!==1||value.currentContractVerified!==true||['ledgerCount','resolutionCount','cohortCount'].some(key=>!Number.isSafeInteger(value[key])||value[key]<0)
   ||['nativeSourceSha256','catalogSha256','ledgerSha256','resolutionSha256','forwardSha256'].some(key=>!/^[a-f0-9]{64}$/.test(value[key]))
   ||!value.capabilityCounts||Object.values(value.capabilityCounts).some(count=>!Number.isSafeInteger(count)||count<0)
+  ||new Date(value.publication.recordedAt).getTime()!==new Date(binding.publication.recordedAt).getTime()
   ||['registerVersion','baseRegisterVersion','requestSha256','snapshotSha256','rowCount','publicationId'].some(key=>value.publication[key]!==binding.publication[key]))refuse('PREVIEW_NATIVE_ATTESTATION_REFUSED');
  return value;
 }
