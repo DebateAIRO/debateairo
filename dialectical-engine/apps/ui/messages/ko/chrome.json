@@ -56,8 +56,15 @@
   "chrome.footer.location": "루마니아 부쿠레슈티",
   "chrome.footer.product": "제품",
   "chrome.footer.home": "홈",
-  "chrome.footer.cookiePreferences": "쿠키 환경설정",
+  "chrome.footer.cookiePreferences": "저장하는 쿠키",
   "chrome.security": "보안",
   "chrome.logout": "로그아웃",
-  "chrome.accountError": "처리하지 못했습니다. 페이지를 새로 고친 후 다시 시도하세요."
+  "chrome.accountError": "처리하지 못했습니다. 페이지를 새로 고친 후 다시 시도하세요.",
+  "chrome.footer.pricing": "요금",
+  "chrome.footer.cancel": "요금제 해지",
+  "chrome.footer.withdraw": "요금제 철회",
+  "chrome.footer.paymentMarks": "사용 가능한 카드",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

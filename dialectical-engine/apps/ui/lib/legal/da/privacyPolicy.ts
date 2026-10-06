@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Vi sætter to cookies, som begge er strengt nødvendige: én, der holder dig logget ind, og én, der beskytter formularer mod forfalskning. Vi sætter ingen cookies til analyse, reklame eller sporing. Cookiepolitikken på [dezbatere.ro/cookies] angiver dem og deres varighed, forklarer, hvordan dit valg opbevares, og ændres, før nogen anden cookie tilføjes. Hvor loven i din region behandler visse cookies anderledes — eksempelvis Storbritanniens fravalgsregel for analyse — fremgår det af Cookiepolitikken." }
+      { kind: "p", text: "DebateAI bruger otte elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af DebateAI: fire cookies og fire poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. Cookiepolitikken på [dezbatere.ro/cookies] angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Cookiefil (HttpOnly) — Holder dig logget ind. Den fornyes, mens du bruger tjenesten. — 14 dage",
+        "__Host-debateai-csrf — Cookiefil — Forhindrer andre websteder i at indsende formularer i dit navn. — 14 dage",
+        "__Host-debateai-age-refusal — Cookiefil (HttpOnly) — Når en alderskontrol er afvist, forhindrer den denne browser i at prøve igen i 30 dage. Den indeholder kun ordet „afvist“ og ingen personoplysninger. — 30 dage",
+        "debateai.locale — Cookiefil — Husker det brugerfladesprog, du har valgt. — 1 år",
+        "debateai.consent — Lokal lagring — Husker, at du har set cookiemeddelelsen, så den kun vises én gang. — Indtil du sletter det",
+        "debateai.mode — Lokal lagring — Om du bruger lys eller mørk tilstand. — Indtil du sletter det",
+        "debateai.languageOffer.dismissed — Sessionslagring — Husker for denne fane, at du har takket nej til at se en debat på et andet sprog. — Indtil du lukker fanen",
+        "debateai.support.conversation.v2 — Sessionslagring — Holder din samtale med hjælpechatten på skærmen, så længe fanen er åben. Den slettes, når nogen logger ind eller ud i denne fane. — Indtil du lukker fanen"
+        ]
+      },
+      { kind: "p", text: "Ingen anden part indsamler via DebateAI oplysninger om dine onlineaktiviteter over tid og på tværs af websteder." },
+      { kind: "p", text: "Browsere kan sende et „Do Not Track“-signal eller et lignende signal. DebateAI sporer dig ikke, så der er intet for et sådant signal at slå fra: tjenesten fungerer på samme måde med eller uden det." },
+      { kind: "p", text: "For at afvise disse elementer skal du blokere eller slette cookies og webstedsdata for dette websted i dine browserindstillinger. Hvad der så holder op med at virke: at logge ind og at huske dine valg af sprog og visning; cookiemeddelelsen vises også igen." }
     ]
   },
   {
@@ -272,7 +288,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Schweiz (kun hvis anført)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Den schweiziske forbundslov om databeskyttelse (FADP) gælder. Tilsynsmyndigheden er Federal Data Protection and Information Commissioner (FDPIC), edoeb.admin.ch. Dine data sendes til de lande, der er angivet i Registret — EU-lande og USA. For USA støtter vi os på Swiss–US Data Privacy Framework, hvor udbyderen er certificeret, og ellers på standardkontraktbestemmelser anerkendt af FDPIC. Vi anmelder et brud på datasikkerheden, der sandsynligvis indebærer en høj risiko for dig, til FDPIC så hurtigt som muligt. [We have assessed that we do not need a representative in Switzerland. / Our representative in Switzerland is …]" }
+      { kind: "p", text: "Den schweiziske forbundslov om databeskyttelse (FADP) gælder. Tilsynsmyndigheden er Federal Data Protection and Information Commissioner (FDPIC), edoeb.admin.ch. Dine data sendes til de lande, der er angivet i Registret — EU-lande og USA. For USA støtter vi os på Swiss–US Data Privacy Framework, hvor udbyderen er certificeret, og ellers på standardkontraktbestemmelser anerkendt af FDPIC. Vi anmelder et brud på datasikkerheden, der sandsynligvis indebærer en høj risiko for dig, til FDPIC så hurtigt som muligt. Vi har vurderet, at vi ikke har brug for en repræsentant i Schweiz (Art. 14 FADP). Vi tager dette op til fornyet vurdering hvert år." }
     ]
   },
   {
@@ -280,7 +296,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Moldova (kun hvis anført)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Moldovas lov nr. 195/2024 om beskyttelse af personoplysninger gælder. Den følger GDPR, og denne politiks hovedtekst beskriver dine rettigheder efter den. Tilsynsmyndigheden er Det Nationale Center for Beskyttelse af Personoplysninger (CNPDCP). [We have assessed that we do not need a representative in Moldova. / Our representative in Moldova is …] Overførsler af dine data til USA er baseret på [the mechanism named in the Register]. Vi anmelder brud på persondatasikkerheden til CNPDCP inden for 72 timer, hvor loven kræver det." }
+      { kind: "p", text: "Moldovas lov nr. 195/2024 om beskyttelse af personoplysninger gælder. Den følger GDPR, og denne politiks hovedtekst beskriver dine rettigheder efter den. Tilsynsmyndigheden er Det Nationale Center for Beskyttelse af Personoplysninger (CNPDCP). Vi har ikke brug for en repræsentant i Moldova, fordi vi er etableret i Det Europæiske Økonomiske Samarbejdsområde (Art. 27(2)(c) i lov nr. 195/2024). Vi tager dette op til fornyet vurdering hvert år. Overførsler af dine data til USA er baseret på den mekanisme, der for hver udbyder er angivet i Registret. Vi anmelder brud på persondatasikkerheden til CNPDCP inden for 72 timer, hvor loven kræver det." }
     ]
   },
   {
@@ -296,7 +312,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Israel (kun hvis anført)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Israels Protection of Privacy Law gælder. Du har ingen lovmæssig pligt til at give os dine data; uden kontooplysningerne kan vi ikke oprette en konto til dig. Vi bruger dine data til formålene i afsnit 4 og giver dem til modtagerne i afsnit 5. Du kan bede om at se dem og få dem rettet (afsnit 10). Tilsynsmyndigheden er Privacy Protection Authority." }
+      { kind: "p", text: "Israels Protection of Privacy Law gælder. Den dataansvarlige er DebateAIRO S.R.L.; hvordan du kontakter os, fremgår af afsnit 1. Du har ingen lovmæssig pligt til at give os dine data; uden kontooplysningerne kan vi ikke oprette en konto til dig. Vi bruger dine data til formålene i afsnit 4 og giver dem til modtagerne i afsnit 5. Du kan bede om at se dem og få dem rettet (afsnit 10). Tilsynsmyndigheden er Privacy Protection Authority." }
     ]
   },
   {
@@ -304,7 +320,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Asien og Stillehavsområdet (kun linjerne for anførte regioner)",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Singapore: Vores databeskyttelsesrådgiver er [name, email]; overførsler er baseret på kontraktlige forpligtelser, der giver en beskyttelse svarende til PDPA; vi underretter PDPC om anmeldelsespligtige brud inden for 3 dage. Japan: Vi bruger dine personoplysninger til formålene i afsnit 4 og ingen andre. Vi giver dem til AI-udbyderne og hostingudbyderne i Registret, som befinder sig i USA og EU-lande, i henhold til kontrakter, der kræver, at de beskytter dem på det niveau, som Japans Act on the Protection of Personal Information fastsætter; på anmodning fortæller vi dig, hvad de gør for at beskytte dem, og om privatlivsordningen i deres land. Din overbevisning, herunder religiøs og politisk overbevisning, og dit helbred er personoplysninger, der kræver særlig omhu; vi indsamler dem kun med dit forudgående samtykke (afsnit 3). Vores navn og adresse er DebateAIRO S.R.L., [address], Rumænien, og vores repræsentant er [name], direktør; hvordan du fremsætter en anmodning, fremgår af afsnit 10, vores sikkerhedsforanstaltninger af afsnit 9, og klager sendes til privacy@dezbatere.ro. Vi anmelder brud til Personal Information Protection Commission, som loven kræver. Sydkorea: Vores privatlivsansvarlige er [name], direktør, privacy@dezbatere.ro. Vi overfører personoplysninger til udlandet, fordi det er nødvendigt for at gennemføre dine debatter i henhold til vores aftale med dig: Hver gang en debat kører, sender vi dit spørgsmål og debattens udsagn, og i supportsamtalen dine beskeder, via en krypteret forbindelse til AI-udbyderne og hostingudbyderne i Registret, som angiver hver modtager, dens land, dens kontaktoplysninger, formålet og hvor længe den opbevarer dataene. Du kan afvise overførslen ved ikke at starte debatter eller ved at slette din konto; så kan vi ikke gennemføre debatter for dig. Politiske holdninger, overbevisning og helbred er følsomme oplysninger; vi behandler dem kun med dit særskilte samtykke (afsnit 3). Vi træffer ingen fuldt automatiserede afgørelser om dig (afsnit 8). Vi besvarer anmodninger inden for [10] dage og anmelder brud til Personal Information Protection Commission og til dig, som Personal Information Protection Act kræver. Taiwan: Taiwans Personal Data Protection Act gælder. Vi opbevarer dine data i de perioder, der er angivet i afsnit 7; de bruges i Rumænien, andre EU-lande og USA (se Registret); modtagerne fremgår af afsnit 5; vores systemer og AI-modeller behandler dem automatisk for at gennemføre dine debatter. Du kan spørge, hvilke data vi har om dig, se dem, få en kopi, rette dem, få os til at stoppe med at bruge dem og slette dem (afsnit 10). Det er frivilligt at give os kontooplysningerne, men uden dem kan vi ikke oprette en konto til dig. Vi besvarer anmodninger om indsigt inden for [15] dage. Filippinerne: Vores DPO er [name]; klager kan indgives til National Privacy Commission; afsnit 8 beskriver automatiseret behandling. Thailand: Vores repræsentant er [name] [if appointed]." }
+      { kind: "p", text: "Singapore: Vores databeskyttelsesrådgiver er [name, email]; overførsler er baseret på kontraktlige forpligtelser, der giver en beskyttelse svarende til PDPA; vi underretter PDPC om anmeldelsespligtige brud inden for 3 dage. Japan: Vi bruger dine personoplysninger til formålene i afsnit 4 og ingen andre. Vi giver dem til AI-udbyderne og hostingudbyderne i Registret, som befinder sig i USA og EU-lande, i henhold til kontrakter, der kræver, at de beskytter dem på det niveau, som Japans Act on the Protection of Personal Information fastsætter; på anmodning fortæller vi dig, hvad de gør for at beskytte dem, og om privatlivsordningen i deres land. Din overbevisning, herunder religiøs og politisk overbevisning, og dit helbred er personoplysninger, der kræver særlig omhu; vi indsamler dem kun med dit forudgående samtykke (afsnit 3). Vores navn og adresse er DebateAIRO S.R.L., [address], Rumænien, og vores repræsentant er [name], direktør; hvordan du fremsætter en anmodning, fremgår af afsnit 10, vores sikkerhedsforanstaltninger af afsnit 9, og klager sendes til privacy@dezbatere.ro. Vi anmelder brud til Personal Information Protection Commission, som loven kræver. Sydkorea: Vores privatlivsansvarlige er [name], direktør, privacy@dezbatere.ro. Vi overfører personoplysninger til udlandet, fordi det er nødvendigt for at gennemføre dine debatter i henhold til vores aftale med dig: Hver gang en debat kører, sender vi dit spørgsmål og debattens udsagn, og i supportsamtalen dine beskeder, via en krypteret forbindelse til AI-udbyderne og hostingudbyderne i Registret, som angiver hver modtager, dens land, dens kontaktoplysninger, formålet og hvor længe den opbevarer dataene. Du kan afvise overførslen ved ikke at starte debatter eller ved at slette din konto; så kan vi ikke gennemføre debatter for dig. Politiske holdninger, overbevisning og helbred er følsomme oplysninger; vi behandler dem kun med dit særskilte samtykke (afsnit 3). Vi træffer ingen fuldt automatiserede afgørelser om dig (afsnit 8). Vi besvarer anmodninger inden for [10] dage og anmelder brud til Personal Information Protection Commission og til dig, som Personal Information Protection Act kræver. Taiwan: Taiwans Personal Data Protection Act gælder. Vi opbevarer dine data i de perioder, der er angivet i afsnit 7; de bruges i Rumænien, andre EU-lande og USA (se Registret); modtagerne fremgår af afsnit 5; vores systemer og AI-modeller behandler dem automatisk for at gennemføre dine debatter. Du kan spørge, hvilke data vi har om dig, se dem, få en kopi, rette dem, få os til at stoppe med at bruge dem og slette dem (afsnit 10). Det er frivilligt at give os kontooplysningerne, men uden dem kan vi ikke oprette en konto til dig. Vi besvarer en anmodning om at se eller få en kopi af dine data inden for 15 dage; har vi brug for længere tid, kan vi forlænge fristen én gang med op til 15 dage og giver dig i så fald en skriftlig begrundelse. Filippinerne: Vores DPO er [name]; klager kan indgives til National Privacy Commission; afsnit 8 beskriver automatiseret behandling. Thailand: Vores repræsentant er [name] [if appointed]." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "5788df2f80ea9707505ad1da6de5f5f56c6547161552d75d72977f5d2a9c75b9",
+  sha256: "726b04f7cec6d671f97f2d42e7276918325f9ebeceecec8f251f030a5d9aae14",
   eyebrow: "PRIVATLIVSPOLITIK · v3.0 · GÆLDENDE FRA [DATE]",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",

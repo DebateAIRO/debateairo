@@ -37,16 +37,13 @@ export interface PublicationCheckRecorder { record(row: PublicationCheckRecord):
 export interface PublicationContentCheck {
   check(input: { runId: string; snapshot: PublicDebate }): Promise<PublicationCheckResult>;
 }
-type JudgeOptions = { judge: PublicationJudgePort | null; deadlineMs?: number; maxMaterialCodePoints?: number; maxConcurrentCalls?: number };
-
 /**
- * The deadline D of one publish check (SPEC-v2 R7: D ≤ 60 s): every judge call of the attempt shares ONE
- * `AbortSignal.timeout(D)`. FIX-HS2-p2 ui-B2 / ruling R-D2: 60 000 ms, SPEC-v2 R7's cap. At 50 s the §4 eval against
- * the dev judge still failed one run in three (one call past 50 s); what stays slower than 60 s is the dev judge's
- * own tail (V-15). main.ts wires this constant and the UI proxy's publish ceiling exceeds it
- * (tests/unit/hs-s02-publish-route.test.ts "composition").
+ * `deadlineMs` is D, the deadline of one publish check: every judge call of the attempt shares ONE
+ * `AbortSignal.timeout(D)`. D is the register's `publicationCheckPolicy` row (SPEC-v2 R7's 60 s cap, ruling R-D2;
+ * packages/register/src/publication-check-policy.ts), which main.ts reads at start-up and wires here. The check has
+ * no deadline of its own: without a usable D it refuses rather than run unbounded.
  */
-export const PUBLICATION_CHECK_DEADLINE_MS = 60_000;
+type JudgeOptions = { judge: PublicationJudgePort | null; deadlineMs: number; maxMaterialCodePoints?: number; maxConcurrentCalls?: number };
 
 /**
  * FIX-HS2-t-r1 (TEST rehearsal 2): every judge call of an attempt runs in ONE wave, up to this bound. With one part
@@ -97,7 +94,8 @@ export async function judgeParts(options: JudgeOptions, parts: readonly CheckedT
   const judge = configuredJudge(options.judge);
   if (judge === null) return { result: { outcome: "UNAVAILABLE", cause: "JUDGE_NOT_CONFIGURED" }, rules: [], partKinds: [], ground: null, judgeCallCount: 0 };
   const calls = packJudgeCalls(parts, options.maxMaterialCodePoints);
-  const signal = AbortSignal.timeout(options.deadlineMs ?? PUBLICATION_CHECK_DEADLINE_MS);
+  if (!Number.isSafeInteger(options.deadlineMs) || options.deadlineMs < 1) throw new RangeError("Invalid judge deadline");
+  const signal = AbortSignal.timeout(options.deadlineMs);
   const concurrency = options.maxConcurrentCalls ?? PUBLICATION_CHECK_MAX_CALLS_IN_FLIGHT;
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new RangeError("Invalid judge concurrency");
   const results: JudgeCallResult[] = new Array(calls.length);
@@ -140,7 +138,7 @@ export function createPublicationContentCheck(deps: {
   judge: () => PublicationJudgePort | null;
   recorder: PublicationCheckRecorder;
   clock: () => Date;
-  deadlineMs?: number;
+  deadlineMs: number;
   maxMaterialCodePoints?: number;
   maxConcurrentCalls?: number;
 }): PublicationContentCheck {

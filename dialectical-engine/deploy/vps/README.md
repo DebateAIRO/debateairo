@@ -175,7 +175,7 @@ observation agent's is set separately (§12).
 
 | `EnvironmentFile` key | Principal (P3-01) | Role | Purpose |
 |---|---|---|---|
-| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime |
+| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime, and the owner's five billing commands, the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only), the e-Factura status command `pnpm billing:efactura-status` and the invoice command `pnpm billing:invoice`, all run as the API |
 | `api.env` `CONTENT_PROVISION_DATABASE_URL` | `api-content-provision` | `debateai_prod_api_content_provision` | run content keys, server-side ask admission |
 | `api.env` `SUPPORT_DATABASE_URL` | `api-support` | `debateai_prod_api_support` | **the support database principal**: the support chat's data plane, and the ONLY database the master-key rotation opens (it alone may rewrite the two support key columns) |
 | `api.env` `AUTHORIZATION_DATABASE_URL` | `api-authorization` | `debateai_prod_api_authorization` | step-up session rotation |
@@ -590,11 +590,16 @@ Run every block below as root, from `/opt/debateai/dialectical-engine`.
 **1. Roles and databases**, once, before any migration. The Hatchet role's password is read from
 its file, so it never appears in this document or your shell history. The file is generated only
 if it does not exist yet, because `bootstrap.sql` creates the role once and a second paste must
-not leave a password on disk that the role does not have:
+not leave a password on disk that the role does not have. The password reaches `psql` on its
+standard input, as a `\set` line the shell's builtin `printf` writes ahead of the SQL file — never
+as an argument, so it is not in a process listing or your shell history, nor in the sudo log while
+sudoers' `log_input` stays off (the Debian and Ubuntu default). The line starts with `test -r`
+because standard input cannot fail loudly the way `-f` did: run from the wrong directory, psql
+would get only the `\set` line and exit 0 having created nothing.
 
 ```sh
 test -e /etc/debateai/hatchet.pgpass || (umask 0177 && openssl rand -hex 32 > /etc/debateai/hatchet.pgpass)
-sudo -u postgres psql -v ON_ERROR_STOP=1 -v hatchet_password="$(cat /etc/debateai/hatchet.pgpass)" -f deploy/postgres/bootstrap.sql
+test -r deploy/postgres/bootstrap.sql && { printf '\\set hatchet_password %s\n' "$(cat /etc/debateai/hatchet.pgpass)"; cat deploy/postgres/bootstrap.sql; } | sudo -u postgres psql -v ON_ERROR_STOP=1
 ```
 
 Then write the Hatchet container's `DATABASE_URL` with that same password, so the role and the
@@ -609,6 +614,22 @@ test ! -e /etc/debateai/hatchet.env && (umask 0177 && printf 'DATABASE_URL=postg
 The container reaches the socket through its bind mount (`compose.prod.yaml`). The file's other
 keys (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) are Hatchet's own: add them with an
 editor, `0600 root:root` stays, and no seeded or example value is ever used (audit L7-F3).
+
+**Rotating the Hatchet password — required once if this host ran the older step 1.** An earlier
+version of step 1 passed the password as `-v hatchet_password=...` on psql's command line, where
+`ps` and the sudo log could read it: treat it as exposed. The generator and the `hatchet.env` line
+above both do nothing while their file exists, so move both files aside first, generate a new
+password, and give it to the role through the same standard-input channel:
+
+```sh
+mv /etc/debateai/hatchet.pgpass /etc/debateai/hatchet.pgpass.old && mv /etc/debateai/hatchet.env /etc/debateai/hatchet.env.old
+test -e /etc/debateai/hatchet.pgpass || (umask 0177 && openssl rand -hex 32 > /etc/debateai/hatchet.pgpass)
+{ printf '\\set hatchet_password %s\n' "$(cat /etc/debateai/hatchet.pgpass)"; printf '%s\n' "ALTER ROLE debateai_prod_hatchet PASSWORD :'hatchet_password';"; } | sudo -u postgres psql -v ON_ERROR_STOP=1
+```
+
+Then run the `hatchet.env` line above again, copy Hatchet's own keys (`ADMIN_EMAIL`,
+`ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) from `hatchet.env.old` into the new file with an editor,
+delete both `.old` files, and `systemctl restart debateai-hatchet.service`.
 
 **2. Open the migrator for fifteen minutes.** Its password is NULL between ceremonies, and the
 provisioner refuses an admin whose credential is not bounded (manifest invariant
@@ -709,10 +730,11 @@ the provisioner clears role settings with `ALTER ROLE ... RESET ALL` and refuses
 principal that carries any (`PRODUCTION_DATABASE_PRINCIPAL_DRIFT`, audit L5-F6). The migrator
 raises its own ceiling per session through `options=-c statement_timeout=0` in the URL above.
 
-`hardening.sql` re-opens CONNECT by name after closing it to PUBLIC. The list is the twelve
+`hardening.sql` re-opens CONNECT by name after closing it to PUBLIC. The list is the thirteen
 capability roles the managed principals inherit through — the support data plane
 (`debateai_support`) and the support-config operator among them (`DL5-F7`: without them the API
-boots and then refuses every support request) — plus the roles the migrations mint themselves. The
+boots and then refuses every support request), and billing's role `debateai_billing_runtime`
+(migration 0093) — plus the roles the migrations mint themselves. The
 baseline test checks that list against the P3-01 manifest.
 
 ---
@@ -758,7 +780,7 @@ order in both directions:
 - **The runner is never older than the API.** The API now writes a new member,
   `serve_reserve_attempts` (the calls held back for the answer), into every new debate's cost
   receipt (`envelope_basis`). An older runner reads that receipt strictly and fails the debate
-  with `RUN_COST_ENVELOPE_UNRESOLVED`. To upgrade, update the runner first (or both together), then
+  with `RUN_ENVELOPE_BASIS_INVALID`. To upgrade, update the runner first (or both together), then
   the API. To roll back, roll the API back first.
 - **Never roll the runner back on its own while debates admitted by the new API are still
   queued or running.** Their receipts carry the new member. Roll the API back first. Right after,
@@ -779,6 +801,119 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created
   counts them) until you roll forward again. Nothing is deleted.
 - After the upgrade, every story is stored as failed with `STORY_NOT_CONFIGURED` until the next
   hosted register publish (§11, "What the runner's log says about answers and stories").
+
+### Upgrading to the model-scorecard release
+
+This release adds the per-role model picker (spec 2026-09-26 "model scorecard"). The picker chooses no model until a
+model scorecard is sealed into the hosted register with `--scorecard`, but two things act from the first restart on
+this code, with or without a scorecard and with billing off: every model call's prompt is kept ("The prompt record"
+below), and the Premium plan's roster names `grok-4.7-build` instead of `grok-4.6-build`, for every Premium ask.
+Five things change at once. Do them in this order:
+
+- **Install and migrate first.** Put the new checkout in place with its dependencies installed (`pnpm install
+  --frozen-lockfile`; this release adds the workspace package `@debateai/scorecard`). Open the migrator window (§4
+  step 2), run `pnpm db:migrate` — it applies `migrations/0090_model_scorecard.sql` and any other pending migration
+  — then `hardening.sql` (§4 step 3), and close the window (§4 step 5). The API and runner already running keep
+  working on the migrated database, because every new column is nullable. So do this before either service is
+  updated; neither may start on this code without it. A runner started on this code without it records every debate
+  it picks up as failed, for good, and an API started without it fails to open every answer page, older debates
+  included, until the migration runs.
+- **Change the xAI target to `grok-4.7-build` in the same restart that brings the API onto this release.** The id is
+  the `model` of the xAI entry in `PROVIDER_DISCOVERY_TARGETS_JSON`, in both `runner.env` and `api.env` (§11 "Adding a
+  vendor", step 3), and in the `providerTargets` of `/etc/debateai/register/hosted-register.json`, which must stay
+  equal to them. The sealed provider-set row names no model, so no new provider-set version is needed. The older
+  API's Premium roster names `grok-4.6-build` and this release's names `grok-4.7-build`, so an API whose target
+  serves the other id refuses every Premium ask with `ASK_PLAN_TIER_MODEL_UNAVAILABLE`: with billing on, every paying
+  customer's, because every paying plan (Plus, Pro, Max) asks as Premium, on the roster path until a scorecard is
+  sealed. Edit the three places before the restart of the next bullet, which reads them.
+- **Publish a new hosted register version.** The release edits `packages/serve/src/index.ts`, whose digest is the
+  code-owned row `serveContractHash`. Publish the same `/etc/debateai/register/hosted-register.json` again with
+  `pnpm register:publish-hosted` (§11): the command rebuilds the code-owned rows from this checkout and seals a
+  new version. Pin it in both `EnvironmentFile`s and restart both units. Until then, answer-writing calls are
+  recorded under the old fingerprint.
+- **The runner is never older than the API.** Debates admitted with a runner-up carry a `DR-184-v5` cost receipt
+  and a pinned model assignment; an older runner fails such a debate with `RUN_ENVELOPE_BASIS_INVALID`. Update the
+  runner first, or both together. To roll back, roll the API back first, and the runner only once no debate the
+  newer API admitted is still queued or running: right after the API goes back, run the command in the
+  verdict-story section above and note `newest`, then roll the runner back once `unfinished` is 0, or `oldest` is
+  above the number you noted.
+- **The website ships with, or before, the API.** The session answer gains `model_scorecard_in_force`, which an
+  older website's strict reader refuses. To roll back, the website goes back after the API, never before.
+
+**Rolling the API back past this release** makes every answer a backup model helped write fail to open. Such an
+answer carries the mark `BACKUP-MODEL-USED` (possible only while a scorecard is in force), which the older API does
+not know, so it cannot read the answer until you roll forward again. Nothing is deleted. Put the xAI target back to
+`grok-4.6-build` in the same restart that rolls the API back, for the reason in the second bullet.
+
+**The prompt record.** From the first restart on this code, the runner writes the whole prompt of every model call
+(up to 256 KiB) to `ledger.call_prompt` before it sends the call: one row per attempt sent, a failed one included,
+never changed and never purged (an encrypted debate's prompts are stored encrypted). The database and every nightly
+backup grow by roughly the size of every prompt sent; plan disk and backup space by it (§9).
+
+### Upgrading to the publication-check deadline release
+
+This release moves the deadline of the safety check that runs before a debate is published (60 seconds) out of
+the code and into the register, as the code-owned row `publicationCheckPolicy` (owner's ruling 2026-10-04). The API
+reads it at start-up and refuses a register version without it (`PUBLICATION_CHECK_POLICY_UNRESOLVED`). No migration.
+
+- **Publish a new hosted register version before the API restarts on this code.** From the new checkout, run
+  `pnpm register:publish-hosted` with the same `/etc/debateai/register/hosted-register.json` (§11): it seals this
+  checkout's code-owned rows, `publicationCheckPolicy` among them, as a new version and runs the start-up readers
+  against it. Pin that version in both `EnvironmentFile`s and restart both units. Do this before any later
+  `pnpm hosted:publish-provider-set`: that command copies the rows of the version it starts from, so on an older
+  version it seals one this API refuses.
+- **To change the deadline**, add the optional `publicationCheckPolicy` member to the hosted file
+  (`deploy/vps/register/README.md`) and publish again: whole milliseconds from 1000 to 60000.
+- **Rolling back** needs no register change: an older API does not read the row.
+
+### Upgrading to the billing-role release (go-live row 41)
+
+Migration `migrations/0093_billing_runtime_role.sql` moves every billing privilege from `debateai_runtime`, the
+role the API, the runner and the liveness sweep all hold, to a new role `debateai_billing_runtime` that only the
+API's own login (`debateai_prod_api_runtime`) holds, so the runner and the scheduler can no longer write billing
+rows or queue billing jobs. The migration alone takes the billing privileges away from the API too: the API's
+login gets the new role only when the provisioner runs again. Until it does, the API cannot write billing, **and
+the retention purge fails**: it runs wherever the API runs, whether billing is on or off
+(`apps/api/src/retention-purge.ts`), so `billing.purge_expired_records` is refused (`42501`) and the API logs
+`[RETENTION_PURGE_PENDING]` at every daily check until it succeeds. With billing on, every checkout, renewal and
+billing job would fail the same way. So do these in one sitting, in this order, before the API next starts on
+this code:
+
+1. **Open the migrator window** (§4 step 2).
+2. **Apply the migration, then hardening** (§4 step 3): `pnpm db:migrate`, then `hardening.sql`, which now also
+   opens CONNECT to `debateai_billing_runtime`.
+3. **Re-run the provisioner** (§4 step 4, exactly as written: a fresh envelope, each new password copied into
+   its `EnvironmentFile` before the envelope is destroyed). It moves `debateai_prod_api_runtime` from
+   `debateai_runtime` to `debateai_billing_runtime` and prints `PRODUCTION_DATABASE_PRINCIPALS_READY=18`.
+4. **Close the migrator window** (§4 step 5).
+5. **Restart the API and the runner** (`systemctl restart debateai-api debateai-runner`) so both connect with the
+   passwords step 3 set.
+
+Check: one `retention.purged` line at the API's first purge check after the restart, and no
+`[RETENTION_PURGE_PENDING]`. **Rolling back** the code needs nothing: an older API holds the billing role's
+privileges through the new membership, because the role inherits `debateai_runtime`.
+
+### Upgrading to the legal-role release (migration 0094)
+
+Migration `migrations/0094_legal_runtime_api_only.sql` does for the acceptance record what 0093 did for billing. It
+moves the legal schema, `legal.acceptance`, the legal retention purge (`legal.purge_expired_acceptance`), sign-up
+with consent (`identity.create_pending_account_with_consent`) and the country-gate audit
+(`identity.audit_country_gate_refused`) from `debateai_runtime` to `debateai_billing_runtime`. The runner, the
+liveness sweep and the authorization pool then can no longer forge an acceptance, create an account or write a
+country-gate audit row. It adds no role. Until the API's login holds `debateai_billing_runtime`, every sign-up,
+re-acceptance and checkout is refused (`42501`), and so is the legal half of the retention purge. Do it in one
+sitting, before the API next starts on this code:
+
+1. **Open the migrator window** (§4 step 2) and **migrate**: `pnpm db:migrate`.
+2. **Run `hardening.sql`** (§4 step 3).
+3. **Re-run the provisioner** (§4 step 4), exactly as the 0093 section above says.
+4. **Close the window** (§4 step 5), then **restart the API**: `systemctl restart debateai-api`. If step 3 set new
+   passwords, restart the runner too, as that section says.
+
+If the 0093 steps above have already run on this host, the API's login already holds the role. Then
+`pnpm db:migrate` is the only step needed, and the API keeps working throughout: the privileges reach its role the
+moment the migration commits. If both migrations are pending, one pass through the 0093 steps covers both. The check is the same: one `retention.purged` line at the API's first purge
+check, and a test sign-up that succeeds. **Rolling back** the code needs nothing, for the same reason as 0093.
 
 ### Upgrading an existing host (paid plans Part 1a)
 
@@ -882,11 +1017,11 @@ Publish no register version that carries `countryPolicy` until ALL of these hold
 
 1. **The site shows the DB-IP credit.** DB-IP's Lite data is licensed CC BY 4.0, and its licence
    requires the credit `IP Geolocation by DB-IP` linking to `https://db-ip.com` wherever its results
-   are used. The site does NOT show it yet: task P21 adds it to the full site footer
-   (`apps/ui/components/SiteFooter.tsx`, the footer of the landing page and the legal pages). Open
-   the landing page, signed out, and check that its footer shows `IP Geolocation by DB-IP`
-   linking to `https://db-ip.com`. Whether the one-line footer of the other screens must carry it
-   too is counsel's open question (P21).
+   are used. The full site footer (`apps/ui/components/SiteFooter.tsx`, the footer of the landing
+   page, the legal pages and the paid-plan pages) shows it, billing on or off (task P21). Open the
+   landing page, signed out, and check that its footer shows `IP Geolocation by DB-IP` linking to
+   `https://db-ip.com`. Whether the one-line footer of the other screens must carry it too is
+   counsel's open question (P21).
 2. **The owner has ruled that the Terms' list of served countries and the `countryPolicy` switches
    match.** The Terms' list is filled from `countryPolicy` (spec §2.12 item 1); the Terms' Annex A
    changed on 2026-09-30 and no longer matches the switches in the example. Whichever side changes,
@@ -937,8 +1072,10 @@ their ranges, that range can start debates until the file is replaced.
 **If the API refuses to boot with `GEOIP_COUNTRY_DB_INVALID` after a refresh:**
 
 1. Decide whether to stay down or to bring the site back without the gate; that is the owner's
-   call. Without the gate, until step 4, sign-up is open to every country, Tor included, and the
-   always-blocked countries (`"blocked": true` in `country-policy.example.json`) can start new
+   call. While billing is on, bringing the site back without the gate is not possible: a version
+   without `countryPolicy` is refused (§14.8), so fetch the file again instead (step 2). Without
+   the gate, until step 4, sign-up is open to every country, Tor included, and the always-blocked
+   countries (`"blocked": true` in `country-policy.example.json`) can start new
    debates. To bring it back: in a migrator window remove the `countryPolicy` member from
    `/etc/debateai/register/hosted-register.json`, publish (§11), pin the version it prints in both
    `api.env` and `runner.env`, and restart both units. With no row in force the API does not open
@@ -1009,7 +1146,8 @@ MaxRetentionSec=90day
 - Caddy's access log redacts `Cookie`, `Authorization` and `Set-Cookie` by default and the
   directive that would un-redact them is deliberately absent. Add `logrotate` for `/var/log/caddy`.
 - The container is capped at `max-size: 10m`, `max-file: 3`.
-- Backup receipts: `journalctl -u debateai-backup.service | grep BACKUP_OK`.
+- Backup receipts: `journalctl -u debateai-backup.service | grep BACKUP_OK`; a run that did not
+  reach the off-host copy logs `BACKUP_REFUSED` or `BACKUP_FAILED` instead and the unit fails (§9).
 
 ---
 
@@ -1049,7 +1187,22 @@ privacy notice must not promise more than that (`DL2-F5`).
 
 Retention 14 daily / 8 weekly, then an off-host copy (`rclone copy`, or `scp` — configure exactly
 one in `backup.conf`). Encrypted before it leaves the box, so the remote is untrusted by
-construction. Receipt: `BACKUP_OK <sha256> <bytes> <utc>`.
+construction. Receipt: `BACKUP_OK <sha256> <bytes> <utc>`, printed only after the night's artefact
+(and its escrow envelope, on a night one is written) has been found on the remote: `rclone check`
+for rclone (by hash where the backend keeps one, by size where it does not), a read-back compared
+byte for byte for scp — so the scp account must be able to read what it wrote. **Upgrading:** an
+scp account set up write-only, as the earlier `backup.conf.example` allowed, now fails every night
+at the read-back (`BACKUP_FAILED could not read ...`) until it is given read access. A run with no
+destination, or with both, stops before it dumps anything (`BACKUP_REFUSED ...`); a copy that
+cannot be proved stops with `BACKUP_FAILED ...`; any other failure (`pg_dump`, `tar`, `age`,
+pruning) ends with `BACKUP_FAILED exit=<status> line=<line>`. Either way the service exits nonzero and shows as
+failed in `systemctl --failed`. Nothing pages anyone: the unit has no `OnFailure=` hook, so a
+missing receipt in the journal is the signal to look for.
+
+**The prompt record makes every backup grow.** Since the model-scorecard release (§5), the database
+keeps the whole prompt of every model call a debate makes (`ledger.call_prompt`: one row per call
+attempt sent, up to 256 KiB each, never changed or purged), so the dump, every nightly artefact and
+the off-host copy grow by roughly the size of every prompt sent: plan disk and remote space by it.
 
 ### Restore drill — **quarterly**, and it is not optional
 
@@ -1253,6 +1406,8 @@ The paid-vendor probe spends `max_tokens: 8` per target per staleness window; th
 | `PROVIDER_TARGET_PRICE_REQUIRED:` and the provider ref | a debate target declares no price. Both `input_price_micros_per_million` and `output_price_micros_per_million` are required in hosted mode. |
 | `PROVIDER_TARGET_PRICE_ZERO:` and the provider ref | a declared price of zero, which would bound nothing. The floor is 1. |
 | `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` | a price that is not an integer from 0 through `Number.MAX_SAFE_INTEGER`, or only one of the two price members. |
+| `PROVIDER_DISCOVERY_TARGET_THINKING_INVALID` | only one of `thinking_parameter` and `thinking_levels` is written, the parameter is not one of the two names below, or the level list is empty, longer than 16, repeats a name, or holds a name that is not one short lower-case word. |
+| `PROVIDER_DISCOVERY_TARGET_CONTEXT_WINDOW_INVALID` | a `context_window_tokens` that is not a whole number of at least 1 (and at most 2 147 483 647). |
 | `RUNNER_PRIMARY_PROVIDER_REF_DRIFT` | `PROVIDER_REF` does not name the FIRST entry of `PROVIDER_DISCOVERY_TARGETS_JSON`. |
 | `SUPPORT_MODEL_CREDENTIAL_ABSENT` | the support chat's target names a vendor API and declares no credential at all — no `authorization_file`. Every row above applies to `SUPPORT_MODEL_TARGET_JSON` as well; these last two are the support chat's own. |
 | `SUPPORT_MODEL_PATH_NOT_RATIFIED` | `SUPPORT_MODEL_TARGET_JSON` is neither of the two lawful shapes: a vendor API (`https:`, path ending in `/v1`) or, in LOCAL mode only, the ratified loopback relay. A target that IS an API target but is malformed refuses with the matching `PROVIDER_DISCOVERY_*` code instead, so this one means "this is not a target". |
@@ -1323,6 +1478,9 @@ JSON array; add one object to it. Its members:
 | `authorization_file` | the absolute path from step 2 — **that service's own copy**: the runner's path in `runner.env`, the API's in `api.env` |
 | `input_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million input tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
 | `output_price_micros_per_million` | an integer from 1 through `Number.MAX_SAFE_INTEGER`, in micro-USD per million output tokens. Declaring either price member without the other refuses with `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID`. |
+| `thinking_parameter` | optional, and only with `thinking_levels`: how this vendor's API takes a "thinking level" (how long the model may reason before it answers). `reasoning_effort` for a vendor API; `x_thinking_level` is the local command-line relays' own and has no place on this host. Leave both out and the target runs at its default level only — a model the scorecard wants at a named level is then never seated on it |
+| `thinking_levels` | the level names this vendor accepts, in its own words (for example `["low","medium","high"]`): 1 to 16 short lower-case words, no repeats. A call is refused before it is sent if it asks for a level not listed here, never quietly run at another |
+| `context_window_tokens` | optional: the most tokens this model can take in one call, prompt and answer together, from the vendor's documentation. A prompt that would not fit is refused before it is sent, and the model picker never seats this vendor for a job whose typical call would not fit. Leave it out if the vendor publishes no limit |
 
 For a vendor whose short name was `acme`, the `runner.env` entry reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/runner/providers/acme.header","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000}`,
 and in `api.env` it reads `{"provider_ref":"vendor:acme","base_url":"https://api.acme.example/v1","model":"acme-large","authorization_file":"/etc/debateai/api/providers/acme.header","input_price_micros_per_million":3000000,"output_price_micros_per_million":15000000}`. The prices are the
@@ -1415,8 +1573,8 @@ The three are all or none (`COST_ENVELOPE_POLICY_INVALID` otherwise). Their rang
 - `waiting_line_per_person` from 1 to 10.
 
 **Publishing them** (go-live checklist line 13):
-1. Add them to `costEnvelopePolicy` in `/etc/debateai/register/hosted-register.json`. The kit's example carries `9500`, `11500` and `1`.
-2. Run the dry run. It prints `cost_envelope_band admission_close_basis_points=… finish_up_to_basis_points=… waiting_line_per_person=…`, and `cost_envelope_band absent` while they are missing.
+1. Add them to `costEnvelopePolicy` in `/etc/debateai/register/hosted-register.json`. The kit's example carries `9500`, `11500` and `1`. In the same file, add the top-level `askRoomReads` member too, so the one new version seals the band and the room read's budget together. `askRoomReads` is your budget for the room read (`GET /v1/asks/room`, the "is there room for my question" check), and it is required whenever the band is there. The kit's example carries an EXAMPLE budget: `"key": "owner"`, `"limit": 60`, `"window_ms": 60000`, `"capacity": 65536`; set your own. See "The room read's budget" in `deploy/vps/register/README.md`.
+2. Run the dry run. It prints `cost_envelope_band admission_close_basis_points=… finish_up_to_basis_points=… waiting_line_per_person=…`, and `cost_envelope_band absent` while they are missing. It also prints `ask_room_reads key=owner limit=… window_ms=… capacity=…`. While the band is there and the budget is missing, it refuses with `ASK_ROOM_ADMISSION_UNSEALED`.
 3. Publish.
 4. Pin `REGISTER_VERSION` in both `EnvironmentFile`s.
 5. Restart both units.
@@ -1430,9 +1588,9 @@ Publish them only on a build that runs the whole rule. The waiting line, holds, 
 - the judge's output token ceiling (the runner policy's `JUDGE` bound);
 - the cheapest price among each plan's models; every plan's cheapest must fit (a plan takes part only when every model on its roster is configured).
 
-A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
+While a model scorecard is sealed into the register version both services run, every configured model counts for every plan (the model picker may choose any of them), so the check prices the cheapest configured model; without one, each plan is priced on its own models. A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
 
-The publish command asks the same question before anything is sealed, a dry run included: it prices the opening call on the file's `providerTargets` (which must equal `PROVIDER_DISCOVERY_TARGETS_JSON`) and on the judge bound it is about to seal, and refuses with the same `RUN_CEILING_BELOW_ONE_CALL`. Both units still ask at start-up, because the environment can differ from the file.
+The publish command asks the same question before anything is sealed, a dry run included: it prices the opening call on the file's `providerTargets` (which must equal `PROVIDER_DISCOVERY_TARGETS_JSON`) and on the judge bound it is about to seal, and refuses with the same `RUN_CEILING_BELOW_ONE_CALL`. With `--scorecard`, every configured model counts for every plan, as both services count them while that scorecard is in force; without it, each plan is priced on its own models. Both units still ask at start-up, because the environment can differ from the file.
 
 #### Each person's windows (billing)
 
@@ -1535,8 +1693,8 @@ journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DIS
 | Signal | What it means | What to do |
 |---|---|---|
 | `"kind":"DEBATEAI_SERVE_DISCLOSURE"`, `"event":"SERVE_DISCLOSURE_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `answerId` | The answer's owner-side record (above) could not be written. The answer itself is exactly what it would have been. What is lost is the record. **When no model could write the answer, its floor is lost**: the pages say the verdict is unavailable instead of showing "Our best answer:", the answer gets no story, and `pnpm ops:serve-disclosure` answers `SERVE_DISCLOSURE_NOT_FOUND`. For a written answer, the owner's record and the PDF's lower-cost note are missing. | Nothing writes the row later: it is written once, right after the answer. Keep the line. A typed `code` (for example `SERVE_DISCLOSURE_RECORD_INVALID`) is a defect to report. `UNTYPED` with a `sqlState` is the database refusing (for example `23503`) or a lost connection. More than one in a day is worth investigating. |
-| A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, shown on the owner's page as "Debate generation failed: …" and kept in `core.work_item.terminal_reason` | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
-| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, shown the same way | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
+| A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, kept in `core.work_item.terminal_reason` (the asker sees "This debate reached its limit…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
+| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MODEL_ASSIGNMENT`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees "Something went wrong on our side before this debate began…", or for `PLAN_CHANGED` "Your paid plan ended or was paused while this question waited…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), saving the AI models chosen for the debate (`MODEL_ASSIGNMENT`, only while a model scorecard is in force), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
 | `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
 | `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
 | `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
@@ -1566,6 +1724,27 @@ are read from. Left unset, the runner finds `story-shapes/` in its own checkout,
 `pack.json` is refused when the runner starts: `STORY_PACK_INVALID` with the reason
 `STORY_PACK_DIR_UNRESOLVED`. Stories then fail; debates do not.
 
+#### What the asker sees when a debate fails
+
+A failed debate's reason code is for operators. It stays in `core.work_item.terminal_reason`, in
+the `terminal_reason` field of `GET /v1/runs/:id` and in the logs above. The pages never show it.
+They show one of five fixed sentences in the reader's language instead, picked by the code's
+group (`apps/ui/lib/v3/runFailure.ts`, words in `apps/ui/messages/<locale>/home.json` and
+`debateChrome.json` under `runFailure.*`). When an asker quotes a sentence, this table gives the codes
+to look for:
+
+| The asker sees (English) | Group | Reason codes |
+|---|---|---|
+| "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, every step but `PLAN_CHANGED` (see the row above), and `RUN_ROLE_ASSIGNMENT_INVALID` (the runner, claiming the debate, found the model scorecard's role assignment pinned at the ask corrupt or unable to seat a debate; its job catch then overwrites it with `RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID`, and both forms read the same) |
+| "Your paid plan ended or was paused while this question waited, so the debate didn't start. You can ask it again." | `PLAN_ENDED` | `RUN_SETUP_FAILED:PLAN_CHANGED` only, the whole code (see the row above): not a fault. With billing on, a paid question waited in line, and by the time there was room its owner was on Free, because the plan ended, was withdrawn or erased, or was paused by a card dispute. Nothing to do; the owner can ask again under the plan they have now. Every other `RUN_SETUP_FAILED:<step>` reads `NOT_STARTED`. |
+| "This debate could not start because the AI models it needs were unavailable. Please try again in a while." | `MODELS_UNAVAILABLE` | `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM`, `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:<role>`. The runner writes these first, then its job catch overwrites them with `RUNNER_EXECUTION_FAILED:<the same code>` (the role is lost there). Both forms read the same. |
+| "This debate reached its limit before it could produce an answer." | `RUN_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL` (see the row above) |
+| "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), `DAILY_COST_ENVELOPE_REACHED` and `PERSON_ALLOWANCE_REACHED` (with the budget members published they stop only the arguing and never end a debate; a question the day holds back waits in line, and its page says when it will start), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
+
+A code added to the engine lands in `STOPPED` until it is given a group of its own. The UI's test
+(`apps/ui/lib/v3/runFailure.test.mjs`) reads each code's write site in the runner and the API, and
+fails if one named in this table is renamed or stops being written there.
+
 ### Publishing the settings register on this host
 
 Both services read their settings from ONE register version in the database, named by
@@ -1576,8 +1755,9 @@ version must carry, besides the algorithm's own rows:
 | Row key | Without it |
 |---|---|
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
+| `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
-| `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED` |
+| `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`; and, with the band, `ask_room_reads` (from the file's `askRoomReads`), else the API refuses with `ASK_ROOM_ADMISSION_UNSEALED` |
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
 | the support configuration rows (`support_enabled`, `support_model_ref`, the limits) | the support chat has no configuration; §13's commands change these rows, each change a new version |
 
@@ -1635,18 +1815,20 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `RUN_CEILING_BELOW_ONE_CALL` | with the budget rule's three members in `costEnvelopePolicy`, the arguing ceiling cannot pay for the opening position's call at the cheapest price among one plan's models, priced on `providerTargets` (the start-up check, "The boot check" under the cost envelopes above); raise `per_run_ceiling_micros` or lower `serve_reserve_basis_points` |
 | `BILLING_PLANS_INVALID` / `BILLING_POLICY_INVALID` | a billing row in the file is not the register's shape: prices in whole cents, plans FREE, PLUS, PRO, MAX in price order; the policy is strict (no `xmoney_environment`, no owner address) |
 | `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
+| `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
+| `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
 
-Before restarting anything on a new version, check that the newest version carries the three
+Before restarting anything on a new version, check that the newest version carries the four
 rows a hosted start-up refuses without:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet') ORDER BY row_key"
+sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy') ORDER BY row_key"
 ```
 
-Three rows is the pass. Then set `REGISTER_VERSION` to that version in both `EnvironmentFile`s
+Four rows is the pass. Then set `REGISTER_VERSION` to that version in both `EnvironmentFile`s
 and restart both units.
 
 ---
@@ -1929,3 +2111,998 @@ route/dependency gate. Tasks 9/12 must evaluate dependent cancellation, resource
 future privileged notification fanout. Actual Owner choice, root offline material, independent
 credential operation, external key/destination/ACK setup and Linux/VPS rehearsal stay separate
 reviewed activation decisions at the final handoff.
+---
+
+## 14. Billing (paid plans)
+
+Billing is **off** until you publish a `billingPolicy` version with `enabled: true`. Until then:
+
+- the billing routes answer 404;
+- the pricing page is "not found", and so are `/cancel` and `/withdraw`;
+- the full site footer (on the landing and the legal pages) shows no pricing, cancel or withdraw link and no card
+  marks; every legal link and the DB-IP credit stay;
+- the legal notice (`/legal`) says paid plans are not available yet;
+- Settings shows no subscription card;
+- the site keeps its site-wide daily limit only.
+
+Local mode never has billing at all. Spec: `docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md`.
+
+### 14.1 What you need before you start
+
+- An approved xMoney merchant account. In the xMoney dashboard, under Sites, find the site's id, its private key
+  and its public key.
+- A Quaderno account and its API key (Business plan).
+- A SmartBill account on the Platinum plan, with its API user and token.
+- The company details, filled in (§14.7).
+- The official Visa and Mastercard artwork files (§14.7).
+- Nobody but you ever sees a key. You paste each key into its file yourself, and no agent reads it.
+
+### 14.2 The key files and the API settings
+
+Every secret is a file the API reads as its own user, mode `0600`, in a `0700` directory (§3 "The key-file
+contract"). Create the directory once:
+
+```sh
+install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api/billing
+```
+
+Each file holds **one line** and nothing else:
+
+| File | The one line |
+|---|---|
+| `xmoney-private-key` | the site's private key, as the xMoney dashboard shows it |
+| `quaderno-api-key` | the Quaderno API key |
+| `smartbill-credentials` | `user:token`: the SmartBill API user, a colon, the token |
+| `owner-report-email` | the address the quarterly tax summary goes to |
+
+Run the four lines below as root, **one block at a time**: each asks for its value at a prompt, so the value never
+appears on screen, on a command line, in shell history or in an editor's temporary copy. Paste one, answer its
+prompt, then paste the next (a waiting prompt would take the next pasted line as its answer). Each file is created
+`0600` and owned by `debateai-api`. The single newline the prompt adds is accepted by `readCustodyAuthorizationHeader`
+and by `readCustodyTextSecretBytes` (which trims, A23). A file that already exists is never replaced: to change a key,
+remove its file on purpose, run its line again, then restart `debateai-api`. The address is not a secret, so its
+prompt shows what you type, and a typo is caught at once.
+
+```sh
+test ! -e /etc/debateai/api/billing/xmoney-private-key && (umask 0177 && systemd-ask-password 'xMoney private key' > /etc/debateai/api/billing/xmoney-private-key) && chown debateai-api:debateai-api /etc/debateai/api/billing/xmoney-private-key
+```
+
+```sh
+test ! -e /etc/debateai/api/billing/quaderno-api-key && (umask 0177 && systemd-ask-password 'Quaderno API key' > /etc/debateai/api/billing/quaderno-api-key) && chown debateai-api:debateai-api /etc/debateai/api/billing/quaderno-api-key
+```
+
+```sh
+test ! -e /etc/debateai/api/billing/smartbill-credentials && (umask 0177 && systemd-ask-password 'SmartBill user:token' > /etc/debateai/api/billing/smartbill-credentials) && chown debateai-api:debateai-api /etc/debateai/api/billing/smartbill-credentials
+```
+
+```sh
+test ! -e /etc/debateai/api/billing/owner-report-email && (umask 0177 && systemd-ask-password --echo=yes 'Owner report email address' > /etc/debateai/api/billing/owner-report-email) && chown debateai-api:debateai-api /etc/debateai/api/billing/owner-report-email
+```
+
+The `umask` runs in a subshell, so your own shell session's mask stays as it was. Check the directory — the two
+`find` lines printing nothing is the pass:
+
+```sh
+stat -c '%a %U %G %n' /etc/debateai/api/billing/*
+find /etc/debateai/api/billing -type f ! -perm 0600 -print
+find /etc/debateai/api/billing ! -user debateai-api -print
+```
+
+Add these lines to `/etc/debateai/api.env`. Their shapes are in `deploy/vps/env/api.env.example`:
+
+| Variable | Value |
+|---|---|
+| `XMONEY_PRIVATE_KEY_PATH` | `/etc/debateai/api/billing/xmoney-private-key` |
+| `XMONEY_PUBLIC_KEY` | the site's public key (not a secret) |
+| `XMONEY_SITE_ID` | the site id (not a secret) |
+| `XMONEY_API_BASE_URL` | `https://api-stage.xmoney.com` for the sandbox, `https://api.xmoney.com` for live. This also decides whether the card form is the sandbox one or the live one. |
+| `QUADERNO_API_KEY_PATH` | `/etc/debateai/api/billing/quaderno-api-key` |
+| `QUADERNO_API_BASE_URL` | the API address your Quaderno account shows (its sandbox address while testing) |
+| `SMARTBILL_CREDENTIALS_PATH` | `/etc/debateai/api/billing/smartbill-credentials` |
+| `SMARTBILL_API_BASE_URL` | SmartBill's API address, as X1's facts file records it |
+| `SMARTBILL_SERIES` | the invoice series agreed with the accountant |
+| `OWNER_REPORT_EMAIL_PATH` | `/etc/debateai/api/billing/owner-report-email` |
+
+The company's tax codes are not `api.env` settings. In `COMPANY` (`apps/ui/lib/legal/pages.ts`), fill `cui` with the
+CUI as digits only, never with `RO`, and `vat` with `{ kind: "registered", number: "RO…" }`, the RO VAT code (`RO`
+followed by the same digits). Copy the same values into `SELLER_COMPANY` (`packages/billing-core/src/company.ts`) in
+the same commit. The legal notice shows them on two rows, and every Romanian invoice carries one of them. Until the
+CUI is filled, the API refuses to switch billing on with `BILLING_COMPANY_FACTS_UNVERIFIED:cui`. If SmartBill wants
+the RO form (row 16 of `docs/architecture/smartbill-api-facts.md`), it also refuses with
+`BILLING_COMPANY_FACTS_UNVERIFIED:vat` until the VAT code is filled. Every billing email prints the company's name,
+registered office and general email address, so the API also refuses while one of them is still in square brackets:
+`BILLING_COMPANY_FACTS_UNVERIFIED:legalName`, `:registeredOffice` or `:emails.general`. §14.7 says how.
+
+Three more settings billing relies on are **already** in `api.env`, because the API has refused to start without
+them since the Terms records and the country gate arrived. Check them; do not add them twice:
+
+- `RECORDS_KEY_PATH`: the records key from §3. It keeps acceptance, billing and location evidence readable for 10
+  years, so the nightly backup escrows it as the sixth secret in the same envelope as the other five (§9). The
+  restore drill proves it with the line `RESTORE_DRILL_RECORDS_KEY bytes=32`; confirm that line once, as §9's owner
+  step says, before billing goes on. The API refuses to start without the key, and with
+  `RECORDS_KEY_PATH_MUST_BE_SEPARATE` if it points at another key's file.
+- `GEOIP_COUNTRY_DB_PATH` and `TOR_EXIT_LIST_PATH`: the two country files of §14.3. A hosted API refuses to start
+  without them (`GEOIP_PATHS_REQUIRED`).
+
+Billing needs no address setting of its own. xMoney's return link (`/checkout/return`) and every emailed link
+(`/cancel`, `/terms`, `/settings`, `/settings/card`, `/pricing`) are built from `PUBLIC_APP_URL`, the site address
+`api.env` already carries for the sign-up emails.
+
+When billing is on, the API refuses to start if any of the ten billing lines in the table is missing. It prints
+`BILLING_CONFIGURATION_INCOMPLETE:` followed by the variable's name. The same code with no name means the published
+register version lacks `countryPolicy` (§14.8). It also refuses with
+`BILLING_REQUIRES_ENVELOPE_MEMBERS` if the published `costEnvelopePolicy` lacks the three budget members:
+`admission_close_basis_points`, `finish_up_to_basis_points` and `waiting_line_per_person`.
+
+The website needs one setting too. In `/etc/debateai/ui.env`, add `XMONEY_SDK_ORIGIN`:
+`https://secure-stage.xmoney.com` for the sandbox, `https://secure.xmoney.com` for live. It must match
+`XMONEY_API_BASE_URL`. Only the three card pages (`/checkout`, `/checkout/return` and `/settings/card`) load
+xMoney's form; every other page keeps its old security policy. Then restart both services:
+
+```sh
+systemctl restart debateai-api debateai-ui
+```
+
+### 14.3 The country files
+
+The country gate reads DB-IP's free country database and the Tor exit list.
+§5 "Country data — the GeoIP and Tor refresh" installs them and enables their daily timer; billing needs nothing more.
+Before switching billing on, check that the timer is listed and ran:
+
+```sh
+systemctl list-timers debateai-geoip-refresh.timer
+```
+
+DB-IP's free licence requires a credit link. The full site footer carries it on the landing, on every legal page and
+on every billing page, with the exact text "IP Geolocation by DB-IP", linking to db-ip.com. Do not remove it.
+
+### 14.4 Publishing the billing settings
+
+The hosted register file (§11) has four billing members:
+
+- `billingPlans`: the prices and monthly credits;
+- `billingPolicy`: `enabled`, the retry days and the withdrawal days. Never shorten `dunning_retry_days` while any plan
+  is PAST_DUE (a spent dunning then ends at once, before the retry date its last email promised);
+- `countryPolicy`: each country's two switches (left out, that version has no country gate at all, and billing
+  cannot be switched on);
+- `taxAuthorities`: where each tax is paid, for the summary.
+
+The kit's example (`deploy/vps/register/hosted-register.example.json`) carries `billingPlans` and `billingPolicy`
+with the spec's values and billing **off**: copy those two into `/etc/debateai/register/hosted-register.json`. It
+also carries `taxAuthorities`, equal to the code-owned text; copy that member only to correct the text (the register
+README's `taxAuthorities` row says what carrying it costs). `countryPolicy` is not in that example: it lives in
+`deploy/vps/register/country-policy.example.json`, and goes into the hosted file only once every condition of §5
+"Country data" holds (go-live lines 27–30). Then, inside a migrator window (§4 steps 2 and 5), check and publish:
+
+```sh
+pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json
+```
+
+```sh
+pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
+```
+
+Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`, then restart both. Every change
+below is the same: edit the file, dry-run, publish, pin, restart. A published version is never edited.
+
+**A price change reaches only new subscriptions.** Each subscription keeps the net price it was sold at (its
+`recurring_net_micros`) and renews at that price plus the current tax. So a `billingPlans` version with a new price
+reaches only new subscriptions; existing subscribers keep their price until a price-change command with the 30 days'
+notice of Terms §12 exists (it is not built yet).
+
+### 14.5 Tell xMoney where to send payment notices
+
+In the xMoney dashboard, go to **Sites → Payment Page** and set the notification URL to
+`https://dezbatere.ro/api/v1/billing/xmoney/notify` (use your site's own address when it is not dezbatere.ro). The
+notice travels the normal `/api/*` path through Caddy, so Caddy needs no change.
+
+**What the notice address answers.** It answers `200` with the body `OK` once it has stored the notice, and also to
+one it cannot decrypt, so xMoney stops resending garbage. There are two exceptions, both so that xMoney sends a real
+notice again (after about 1 minute, 5 minutes, 1 hour and 24 hours) instead of the person waiting up to a day for the
+daily reconciliation:
+
+- `429` when one address sends more notices than its admission budget allows (the `billing_notify` row);
+- `500` when the database could not store the notice.
+
+A run of `500` answers in xMoney's dashboard means the site's database is failing, not xMoney. A notice that never
+arrives is still found by the daily reconciliation.
+
+**The card pages' permissions.** Every page sends `Permissions-Policy: …, payment=(), …` (set in
+`apps/ui/next.config.mjs`). X0's recording shows whether xMoney's form needs the Payment Request API. If it does
+not, nothing changes. If it does, a code change (go-live line 20 and its note, item 6) makes the three card pages
+(`/checkout`, `/checkout/return`, `/settings/card`) send `payment=(self "https://secure.xmoney.com")` on live (the
+value of `XMONEY_SDK_ORIGIN`), and every other page keeps `payment=()`; that change ships like any other release.
+The website's middleware sets this on each request from `XMONEY_SDK_ORIGIN` in `ui.env` once that change is in
+(today it sets only the security policy), so moving that setting from the sandbox to live then takes a restart.
+No rebuild is needed for it, and there is nothing else to configure. Go-live
+line 20 checks it.
+
+**The card pages and 3-D Secure pop-ups.** Caddy sends `Cross-Origin-Opener-Policy: same-origin` on every page.
+X0's sandbox recording shows whether the bank's security check opens a pop-up window. If it does, add one path
+matcher to the site block in `/etc/caddy/Caddyfile`:
+
+- a matcher named `cardForm`, for the paths `/checkout`, `/checkout/return` and `/settings/card`;
+- a `header` line that sets `Cross-Origin-Opener-Policy same-origin-allow-popups` for `@cardForm` only.
+
+Then reload Caddy:
+
+```sh
+systemctl reload caddy
+```
+
+Every other page keeps `same-origin`.
+
+### 14.6 Switching a country's payments on
+
+A country in the "pay off until the tax registration is done" group opens like this:
+
+1. Register for tax there.
+2. In the file's `countryPolicy.countries`, set that country's `pay` to `true` and its `reason` to `OFFERED`.
+3. Publish as in §14.4.
+
+Signing up stays as it was. A country can never have `pay: true` with `signup: false`; the publish refuses it.
+
+### 14.7 The company details and the card marks
+
+**The company details.** The legal notice (`/legal`), the footer, the invoices and every email use the company
+details (name, registered office, trade register number, CUI, VAT, share capital, the person responsible, phone,
+emails) from **one place**: the `COMPANY` constant in `apps/ui/lib/legal/pages.ts`. The values in square brackets are
+blanks. They stay visible on the site until you fill them in.
+
+- Fill `cui` with the CUI as digits only, never with `RO` (the legal notice shows it on its CUI row).
+- The company is VAT-registered, so replace `[RO…]` in `vat: Object.freeze({ kind: "registered", number: "[RO…]" })`
+  with the RO VAT code: `RO` followed by the same digits (the legal notice's VAT row). Every Romanian invoice carries
+  one of these two codes.
+
+The API and the emails cannot read the website's files, so they read one copy of these details: `SELLER_COMPANY` in
+`packages/billing-core/src/company.ts`. Copy every value you change into it, exactly as you wrote it in `COMPANY`,
+and commit both files together. Then run the two checks below from the `dialectical-engine` folder. The first fails
+when the copy differs from `COMPANY` or the CUI carries `RO`; the second when the emails would print anything else:
+
+```sh
+pnpm exec vitest run tests/unit/billing-seller-company.test.tsx tests/unit/mail-company-facts.test.tsx
+```
+
+Until the CUI is filled, the API refuses to switch billing on with `BILLING_COMPANY_FACTS_UNVERIFIED:cui`. If SmartBill
+wants the RO form (row 16 of `docs/architecture/smartbill-api-facts.md`), it also refuses with
+`BILLING_COMPANY_FACTS_UNVERIFIED:vat` until the VAT code is filled. Every receipt and the model withdrawal form print
+the company's name (`legalName`), its registered office (`registeredOffice`) and its general email address
+(`emails.general`), so until each is filled the API refuses with `BILLING_COMPANY_FACTS_UNVERIFIED:legalName`,
+`BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice` or `BILLING_COMPANY_FACTS_UNVERIFIED:emails.general`.
+
+**The card marks.** Put the official Visa and Mastercard artwork at `apps/ui/public/payment-marks/visa.svg` and
+`apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only when its file is there. The website reads
+the list of files in that folder only when it starts, so after copying the files in, restart it with
+`systemctl restart debateai-ui`. Until then the footer shows them as broken images. No rebuild is needed.
+
+**The Terms archive.** Every published Terms and Privacy version is kept, by its fingerprint, under
+`apps/ui/legal/archive/` (one folder per language). `pnpm run generate:legal` adds the file for each new version.
+Never delete or edit a file there: each is a version someone accepted, and the confirmation email attaches the
+version the person accepted from there, even after the Terms change. The site lists them at `/terms/versions` and
+`/privacy/versions`, as both documents promise, and shows each one at its own address.
+
+### 14.8 Switching billing on, the tax summary, and disputes
+
+**Switching billing on.** Before this, make sure:
+
+- the go-live checklist's budget and billing rows are proven (rows 13–54);
+- the sandbox run of §14.9 passed, on its own throwaway server, never on this host.
+
+**Going from xMoney's sandbox to live on the same host.** Skip this if this host never ran with
+`XMONEY_API_BASE_URL=https://api-stage.xmoney.com`.
+**Never take this path on a host that has ever run with `BILLING_STAGE_CLOCK_OFFSET_DAYS`** (the sandbox run of §14.9
+sets it, which is why that run has a server of its own). Such a host holds billing rows and queued jobs dated up to a
+month ahead, and once it pointed at live those jobs would wait and then run against the live services. Destroy that
+server instead (§14.9, step 7), and go live on a host whose billing clock never moved. The API refuses to start
+pointed at live while any billing row or open billing job is dated more than one day ahead, and prints
+`BILLING_RECORDS_DATED_AHEAD` with two counts (`rows=` and `jobs=`). That is only a safety net: a month after such a
+run nothing is ahead any more, so the check cannot replace this rule.
+
+The path is for a host that used xMoney's sandbox on the real clock only, for example a quick look at the card form
+before go-live. The sandbox and live are two separate xMoney systems, and the live
+site never renews a sandbox plan, so a sandbox plan left open would stay active for ever. So, while the host still
+points at the sandbox:
+
+1. Sign in as each sandbox test account and cancel its plan in Settings (or withdraw it, within 14 days). A cancelled
+   plan whose month has not ended yet is fine: it is never renewed.
+   If a sandbox withdrawal was handed to you (the quarterly summary lists it as `WITHDRAWAL_BY_OWNER`), settle it now,
+   while the host still points at the sandbox, with `pnpm billing:withdraw --owner ... --refund ... --dashboard ...`
+   (see "A withdrawal sent by email or on the model form" below).
+   After the switch the command refuses a sandbox plan (`NOT_SUBSCRIBED`), and the summary would list it for ever.
+2. Wait until every sandbox charge has an outcome, and every refund, invoice and credit note a sandbox charge queued
+   has run. The payment checks run every few minutes; a charge still waiting the next day is settled by the daily
+   reconciliation.
+   An invoice or credit note that keeps failing is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, and then given up.
+   A payment check is given up after at most about 31 hours.
+   A refund that xMoney's sandbox could not be reached for, or that it refused the sandbox key for, is never given up: it is tried again every 12 hours.
+   The API's journal shows the line `billing.xmoney.credentials_refused` each time the key is refused.
+   Such a refund closes only once the sandbox key and xMoney's sandbox work, so leave the sandbox key in place until the switch is done.
+3. Check that all three of these print 0:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_subscriptions FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'xmoney_environment') = 'stage' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CANCEL_REQUESTED')"
+```
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN'))"
+```
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_jobs FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR (j.kind IN ('QUADERNO_RECORD_SALE', 'SMARTBILL_INVOICE') AND c.charge_id = j.ref)))"
+```
+
+The third counts the sandbox jobs still queued: the refunds, invoices and credit notes of sandbox charges, and the
+payment checks that name a sandbox charge. Once the host points at live, the live site would take such a job. It
+would end it without calling any service
+(the site refuses a refund, invoice, credit note or payment check of the other xMoney system),
+but the start-up check below still refuses to start while any is left, so the switch is never made with sandbox work
+waiting.
+
+4. Only then move every billing setting and key from the sandbox to live, in one sitting. The sandbox and live are
+   two xMoney sites with their own id and keys, and Quaderno's sandbox has its own key:
+   - In `api.env` (§14.2): `XMONEY_API_BASE_URL` to `https://api.xmoney.com`; `XMONEY_SITE_ID` and
+     `XMONEY_PUBLIC_KEY` to the live site's id and public key (the live xMoney dashboard, under Sites);
+     `QUADERNO_API_BASE_URL` to your Quaderno account's live address; and `SMARTBILL_API_BASE_URL` to SmartBill's own
+     address (a host that copied §14.9's settings has `https://smartbill.invalid` there).
+   - In `ui.env`: `XMONEY_SDK_ORIGIN` to `https://secure.xmoney.com`.
+   - The key files: remove `xmoney-private-key` and `quaderno-api-key` on purpose (the two lines below), then run
+     their two lines of §14.2 again and paste the live site's private key and the live Quaderno key at the prompts.
+     A key file that exists is never replaced, so this is the only way in. If `smartbill-credentials` holds a dummy
+     line rather than your SmartBill user and token, replace it the same way.
+   Then restart both services. Pointed at live beside Quaderno's sandbox or a `.invalid` SmartBill address, the API
+   refuses to start with `BILLING_LIVE_SANDBOX_INVOICER_REFUSED`. With a sandbox key left in place, every checkout is
+   refused (`billing.xmoney.credentials_refused` in the journal) or every price quote fails.
+   Finally, set the notification URL in the **live** xMoney dashboard, as §14.5 says. The sandbox dashboard's setting
+   does not carry over, and without it every first payment waits for the daily money check, up to a day, before its
+   plan is active.
+
+```sh
+rm /etc/debateai/api/billing/xmoney-private-key
+```
+
+```sh
+rm /etc/debateai/api/billing/quaderno-api-key
+```
+
+The API checks this itself at start-up: pointed at live while a sandbox plan, charge or queued job is still open, it
+refuses to start and prints `BILLING_STAGE_RECORDS_OPEN` with the three counts. The first query can count a cancelled
+plan that had a later event (a card change, say) as open; the start-up check has the last word. If it refuses, put
+the sandbox address back, restart, close what is left, and try again.
+
+The sandbox plans and charges stay in the database, but they never count as sales:
+the quarterly tax summary and its email read only live charges.
+
+**Read the settings back before switching on.** On every host, the same-host path or not, read back the billing
+lines and the key files' dates on the day (go-live row 23). The site id and the public key must be the live site's,
+as the live xMoney dashboard shows them, and the addresses the live ones above. Each key file must have been written
+for live: after the host's last use of the sandbox, if it ever had one. The two `grep` lines print the lines; the
+`stat` line prints each key file's last change, never its content:
+
+```sh
+grep -E '^(XMONEY_API_BASE_URL|XMONEY_SITE_ID|XMONEY_PUBLIC_KEY|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env
+```
+
+```sh
+grep -E '^XMONEY_SDK_ORIGIN=' /etc/debateai/ui.env
+```
+
+```sh
+stat -c '%y %n' /etc/debateai/api/billing/xmoney-private-key /etc/debateai/api/billing/quaderno-api-key /etc/debateai/api/billing/smartbill-credentials
+```
+
+**No paid question may be waiting when billing goes on.** Before you publish the version that switches billing on,
+check that no question of a paid plan is waiting in line (the waiting line of the budget rule, §11), whatever the
+state of its asker's account. The first number it prints must be 0:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS waiting_premium, count(*) FILTER (WHERE account.state <> 'active') AS of_accounts_not_active FROM core.run_wait w JOIN core.run r ON r.run_id = w.run_id JOIN identity.\"user\" account ON account.owner_ref = COALESCE((SELECT e.owner_ref FROM core.run_ownership_event e WHERE e.run_id = w.run_id ORDER BY e.at_seq DESC LIMIT 1), CASE WHEN r.asker_id LIKE 'owner:%' THEN substr(r.asker_id, 7)::uuid END) WHERE r.plan_tier IS DISTINCT FROM 'free' AND NOT EXISTS (SELECT 1 FROM core.run_wait_start s WHERE s.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM core.work_item f WHERE f.run_id = w.run_id AND f.state = 'FAILED') AND NOT EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent i WHERE i.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone t WHERE t.run_id = w.run_id)"
+```
+
+It counts every signed-in person's question that waits in line, has neither started nor failed, and is not recorded
+as Free. A question with no recorded plan counts as a paid one, as it does for the site. The second number counts the
+questions of accounts that are being deleted or were frozen by the age check. A question of an account being deleted
+leaves the count by itself when the deletion finishes, without ever starting. A frozen account's question never
+starts, but stays counted. A question whose account or private debate was deleted is not counted, because it never
+starts. §11's count of the line, `SELECT count(*) FROM core.run_waiting_v`, does not do here: it leaves out every
+question of an account that is not active.
+
+Why: while billing is off, the server takes the plan the browser sends, so a question can wait in line as a paid one.
+At the first start with billing on, everyone is on Free, because nobody could pay before. Each such question would
+then be ended at once (`RUN_SETUP_FAILED:PLAN_CHANGED`), and its asker would read "Your paid plan ended or was paused
+while this question waited…", which is false for someone who never paid. If the count is not 0, wait for the line to
+empty, check again, then publish. If only questions of accounts that are not active keep the count above 0, check
+again later (for example the next day): a deletion under way finishes by itself. If the second number is still above
+0, those questions belong to frozen accounts and never leave by waiting: do not switch billing on, and report the
+case.
+
+Run the same check again after the publish, just before you copy its `REGISTER_VERSION=` line into both files and
+restart the two services (§14.4): a question can join the line in the minutes between. If it is not 0 then, pin
+nothing yet: any restart, including systemd's own after a failure, starts the services on the version the files name.
+Wait for the line to empty, check again, then pin and restart.
+
+On a host without the band, you can instead publish the band (the three members of go-live line 13, with
+`askRoomReads`, the room read's budget, which every version with the band needs) in the same version that switches
+billing on: a host without the band takes no question into the line, so the count cannot grow between the check
+and the restart. The count must still print 0.
+
+Then set `billingPolicy.enabled` to `true` in the file and publish as in §14.4. The version that switches billing
+on must also carry the `countryPolicy` member, from `deploy/vps/register/country-policy.example.json` with the
+switches the owner ruled under go-live line 28 (go-live lines 27–30 hold by then). A dry run does not catch a missing
+member: it opens no database. The publish then seals the version and refuses it: it prints
+`HOSTED_REGISTER_NOT_BOOT_READY`, and `HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE` on its
+error output. Pin nothing, add the member and publish again (§11). While billing is on, any version without
+`countryPolicy` is refused the same way, so the country gate cannot be removed while billing is on. Also check that
+the published `costEnvelopePolicy` has real per-run and daily ceilings. The site's daily ceiling protects the company: it must be
+at least the expected daily spend of all subscribers. A first estimate is subscribers × day cap × 0.3; better, use
+the figure measured after the first paid debates.
+
+With billing on, read the API's start, not the runner's, as the proof that a Free debate's first call fits. The check
+that one debate's arguing limit pays for its first call (`RUN_CEILING_BELOW_ONE_CALL`, "The boot check" under the cost
+envelopes) is asked by both services. While a model scorecard is in force, the runner's own start-up check prices Free
+over every configured model, because the runner never reads `billingPolicy`; with billing on, the API's start-up and
+the publish price Free on the Free plan's models only. So they can refuse a version that the runner starts with.
+
+After the first live payment, check that its notice reached the site (go-live row 19). The newest row must say
+`live`; no row means the live dashboard's notification URL is missing or wrong (§14.5):
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT received_at, status, xmoney_environment FROM billing.xmoney_notice WHERE xmoney_environment = 'live' ORDER BY received_at DESC LIMIT 1"
+```
+
+**Stopping sales, and switching billing off.** These are two different things. Almost always, you want the first.
+
+*To stop new sales,* publish a `countryPolicy` version that sets `pay: false` for every country, the default rule
+included. Each such row needs a valid reason, such as `TAX_NOT_READY` or `NOT_OFFERED`. Leave every `signup` as it is,
+and publish as in §14.4. Nobody can start a new plan then. Everything that looks after existing subscribers keeps
+running: renewals, the price-change and yearly emails (M3, M4), cancel in Settings, the emailed cancel link,
+withdrawal, xMoney's payment notices, refunds and the daily reconciliation. In plain words, one thing stops for them
+too: upgrades and card changes are refused. So a subscriber whose card is failing cannot replace it, and after the
+payment retries their plan ends and they move to Free.
+
+*To switch billing off* (`billingPolicy.enabled: false`): **Switching billing off once plans are live is not
+supported.** That is the owner's ruling of 3 October 2026 (P2-M41: unsupported, with a warning). Nothing in the code
+refuses it, so this runbook is the only guard. Do it only with no live plan and no open billing job. On the same day,
+check that all three of these print 0:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS live_subscriptions FROM billing.subscription_latest_v WHERE kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')"
+```
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_billing_jobs FROM billing.outbox WHERE done_at IS NULL AND dead_at IS NULL"
+```
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS unsettled_owner_withdrawals FROM billing.subscription_event w WHERE w.kind = 'WITHDRAWN' AND jsonb_extract_path_text(w.data, 'refund_by_owner') = 'true' AND NOT EXISTS (SELECT 1 FROM billing.withdrawal_owner_settlement s WHERE s.subscription_id = w.subscription_id)"
+```
+
+The first counts every subscription that is not over yet: created, active (a pending cancel included), past due and
+suspended. The second counts the refunds, invoices, credit notes, emails and payment checks still waiting. The third
+counts the withdrawals handed to you that you have not settled yet with `pnpm billing:withdraw --refund` (below): the
+first count leaves them out, because a withdrawn plan is over, but their refund is still owed, and the jobs your
+settlement writes would never run with billing off. Only when all three are 0, publish the version with
+`enabled: false`. If any of them is not 0, do not switch billing off: stop new sales instead (above), and check again
+later.
+
+Why they must be 0: with billing off, every billing route answers 404, including xMoney's payment notices, cancel,
+the emailed cancel link and withdraw (a 14-day legal right), and no billing job runs. When billing comes back on, every
+subscription whose period ended in between is charged at once, once for each missed period. A refund or a chargeback
+made at xMoney while billing is off is recorded only if billing comes back on within 120 days, and a payment only
+within 30 days. After that, you record it by hand.
+
+**The tax summary.** The owner's quarterly summary is also emailed on the 5th day after each quarter ends. It is
+built from our own charge records and shows, for each country or state:
+
+- the net sales;
+- the tax collected;
+- whether we are registered there;
+- where and by when to pay.
+
+To print it on demand for a quarter, run it as the API's own user with the API's settings. `sudo -u` does not read
+the unit's `EnvironmentFile`; `systemd-run` does, so the command reaches the database without the credential ever
+being on a command line. Change `2026-Q4` to the quarter you want:
+
+```sh
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:tax-summary --quarter 2026-Q4
+```
+
+**Disputes (chargebacks).** A disputed payment pauses the paid features. xMoney sends no signal when a dispute ends,
+so when xMoney tells you the outcome, record it with `pnpm billing:dispute`, giving the charge reference (find it
+with the command below: the list shows the xMoney transaction id of the payment the dispute is about; a dispute that
+xMoney reports as its own transaction is recorded under the payment it names, so match that payment's id, not the
+dispute's own id) with `--charge` and the outcome with
+`--outcome won` or `--outcome lost`:
+
+- `won` gives the plan back; a plan its person cancelled while it was paused comes back only until its period end,
+  then ends; nobody is emailed;
+- `lost` ends it.
+
+The command below lists the chargebacks not recorded as won, each with its charge reference, the kind of charge,
+xMoney's transaction id, its `error_code`, when it arrived, and the subscription's state now. A charge-back counts as
+won only by a `CHARGEBACK_RESOLVED` on its own transaction. It is not a list of open disputes: a lost dispute writes
+no charge event, so it stays on the list. The state tells you which are still waiting (`SUSPENDED`) and which have
+ended (`ENDED`: either recorded as lost, or ended by the period-end sweep, when a won outcome can still be recorded).
+`CANCEL_REQUESTED` (the person cancelled while the plan was paused) is still waiting for its outcome: record it as
+you would a `SUSPENDED` one. The command:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT e.charge_id, c.kind AS charge_kind, e.xmoney_transaction_id, e.error_code, e.at, s.kind AS subscription_now FROM billing.charge_event e JOIN billing.charge c ON c.charge_id = e.charge_id JOIN billing.subscription_latest_v s ON s.subscription_id = c.subscription_id WHERE e.kind = 'CHARGEBACK' AND NOT EXISTS (SELECT 1 FROM billing.charge_event r WHERE r.charge_id = e.charge_id AND r.kind = 'CHARGEBACK_RESOLVED' AND r.xmoney_transaction_id = e.xmoney_transaction_id) ORDER BY e.at"
+```
+
+An `error_code` of `DUPLICATE_PAYMENT` marks the charge-back of a second payment of the same order, which never paused
+the plan; an empty one is the plan's own payment. When one charge lists both, the command settles the plan's own
+charge-back first, so give the outcome of that dispute first, then run it again for the second payment's.
+
+Then record the outcome. The command asks for the two values at the prompt, so nothing has to be edited inside it:
+
+```sh
+# Paste the charge reference (32 characters) and press Enter; then type won or lost and press Enter.
+read -r CHARGE_REF && read -r OUTCOME && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:dispute --charge "$CHARGE_REF" --outcome "$OUTCOME"
+```
+
+It prints one line saying what it did. Two answers need a word:
+
+- `STILL_DISPUTED`: the dispute was won and is recorded, but another payment of the same subscription is still
+  charged back, so the paid features stay paused until that dispute's outcome is recorded too.
+- `BILLING_DISPUTE_AMBIGUOUS` (a refusal): you recorded `won`, the plan is no longer paused, and the charge still lists
+  more than one open charge-back, so the command cannot tell which one you mean. Nothing is written. Check both
+  disputes in the xMoney dashboard and report the case: it is settled by hand, not by running the command again.
+
+**A withdrawal sent by email or on the model form.** The Terms (§13) let a person in the EU, the EEA or the UK
+withdraw within 14 days by the model form attached to their confirmation email, or by any clear statement, sent to
+the company's address. You carry it out with `pnpm billing:withdraw`, the same day it arrives. It records the
+withdrawal as of the moment the statement arrived (a statement sent in time counts even if you run the command after
+the 14 days), ends the plan, queues the refund, and emails the person at once that their withdrawal was received
+(M8_RECEIVED, "We've received your withdrawal", dated when the statement arrived). The confirmation that the money
+went back (M8) follows once the refund is done; when nothing is due back, M8 goes at once instead and is the only
+email. A withdrawal made in Settings sends the same emails. When the 14th day is a Saturday or a Sunday, the person
+still has until the end of the next Monday; the command counts it the same way.
+
+First find the person's owner reference. If they wrote through the support chat while signed in, it is the
+`identity_owner_ref` of their case. `pnpm support:inbox` has no production credential on this host yet (§13), so
+match the case by when they wrote. Never guess: run `pnpm billing:withdraw` only when exactly one case matches the
+time the person gives, because the command ends that owner's plan and queues the refund. If two cases are close
+together, ask the person for the exact time they wrote from the chat:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT case_id, identity_owner_ref, created_at, state FROM support.\"case\" WHERE identity_owner_ref IS NOT NULL ORDER BY created_at DESC LIMIT 20"
+```
+
+If they wrote only by email, reply and ask them to send the same statement from the support chat while signed in.
+The time you record is still the arrival of their first email. Then record the withdrawal; the command asks for the
+two values at the prompt:
+
+```sh
+# Paste the owner reference and press Enter; then the time the first statement arrived, in UTC (for example 2026-10-12T08:30:00Z), and press Enter.
+read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --received "$RECEIVED_AT"
+```
+
+**If the person has scheduled their account deletion.** Scheduling a deletion only stops the renewal. The plan stays
+live until the deletion runs (at the earliest seven full days after it was scheduled, unless they cancel it), and so
+does the 14-day withdrawal. Settings still shows Withdraw, and the command above takes the statement as usual, so run
+it the same day the statement arrives. Once the deletion has run, billing has ended the plan: the command prints
+`NOT_SUBSCRIBED` and writes nothing. If a statement arrived in time but was not recorded before that, settle it by
+hand: work out what is due exactly as described below, refund it in the xMoney dashboard, and keep the statement with
+the payment records. The site sends no confirmation (M8) and issues no credit note for it, so confirm it in your reply
+to the person's statement and ask the accountant about the credit note.
+
+If it prints that a refund made in the xMoney dashboard already touched one of the payments, nothing is refunded
+automatically. Work out what is still due, then settle it within 14 days of the withdrawal, in this order. Until you
+do, the quarterly summary lists the withdrawal as `WITHDRAWAL_BY_OWNER`. You also get an email at once (O2_WITHDRAWAL,
+"A withdrawal needs you to settle its refund by hand") with the owner reference, the reason code
+`WITHDRAWAL_BY_OWNER`, the day of the withdrawal and the date the refund is due by: 14 days after the withdrawal. The
+same email comes when this happens to a withdrawal made in Settings, so you never learn of one only from the summary.
+The person's own email says that a refund was already made on one of their payments and that you will email them
+within 14 days. What is due is worked out per payment, exactly
+as the site does it. The moment that counts is the withdrawal's: for a statement sent by email or on the form, the
+time it arrived, as you recorded it. Each payment made up to that moment gives back its amount times (1 minus the
+larger of two shares). A payment made after it (its `SUCCEEDED` row in `billing.charge_event` is dated after that
+moment, for example an upgrade paid after the statement was sent) takes no share: it gives back all it still holds.
+- **Its amount** is what it still holds: what it paid, less what was already refunded on it. For the payment the
+  dashboard refund touched, the amount already refunded is the amount the xMoney dashboard shows as refunded.
+- **The first share** is the part of that payment's own days already used at the moment of the withdrawal. The first
+  payment's days run from the start of the period. An upgrade's days run from the moment its price was quoted, shortly
+  before it was paid (the upgrade charge's `period_start` in `billing.charge`), not from the payment. Both run to the
+  end of the period.
+- **The second share** is the credit used from the start of the period to the withdrawal, divided by the month's
+  credit in force when the person withdrew. After an upgrade paid up to that moment, that is the prorated credit the
+  upgrade set (`month_credit_override_micros` on the `UPGRADED` row of `billing.entitlement_event`), never either
+  plan's full monthly credit; an upgrade paid after that moment does not set it.
+
+Add the shared payments' amounts unrounded, round the sum down to the cent once, and add in full what each payment
+made after that moment still holds. That is what is due; the two steps below settle it.
+
+1. **First, in the xMoney dashboard,** refund the part due on the payment the dashboard refund touched. The command
+   cannot take money back from that payment: it refuses it and writes nothing.
+2. **Then run the command** with two amounts: the amount the site refunds on the other payments (`--refund`, `0.00`
+   when nothing is due there), and the amount you just refunded in the dashboard for this withdrawal (`--dashboard`,
+   `0.00` when none). The site records both, and the person's confirmation email (M8) names their sum.
+
+```sh
+# Paste the owner reference and press Enter; then the amount the site refunds (for example 12.10, or 0.00) and press Enter; then the amount you refunded in the xMoney dashboard (for example 5.00, or 0.00) and press Enter.
+read -r OWNER_REF && read -r REFUND && read -r DASHBOARD && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --refund "$REFUND" --dashboard "$DASHBOARD"
+```
+
+A withdrawal is settled once. Running the command a second time for the same withdrawal is refused.
+
+**A refund that could not be completed.** If xMoney refuses a refund the site asked for, or its outcome stays
+unknown after every retry, you get an email at once (O2, "A refund could not be completed and needs your
+attention") with the charge reference, the amount, the reason code and what the refund was for (the refund reason,
+for example `WITHDRAWAL`). No more tries are made by themselves: look the charge up in the xMoney dashboard and
+settle the refund there by hand. The owner summary lists it until then. For a withdrawal's refund the email also says
+the date the law requires it to be made by (14 days after the person withdrew).
+Look at that payment in the xMoney dashboard first. If it already shows a refund of the amount the email names, an
+earlier attempt went through: never refund it again. The site's daily check records it as this refund, and the
+person's confirmation (M8) follows by itself. If it shows no such refund, refund exactly the amount the email names,
+on that payment, in one refund: once xMoney reports it, the site records it as this refund, and M8 follows by itself
+(after the last refund, when the withdrawal refunds two payments). The site records the amount it asked for, so any
+extra refunded over it is in no record. A smaller refund, or one split into several, is not recorded at all: its
+payment check ends as `REFUND_UNRECORDED`, and the owner summary lists it under that code. Then neither M8 nor a
+credit note follows, so you confirm the refund to the person yourself and give its amount to the accountant.
+Three reason codes are exceptions: nothing was sent to xMoney, and there is no refund to make on this host.
+`REFUND_NOT_REQUESTED`: that refund job matches no refund request our records hold for the payment.
+`REFUND_CHARGE_MISSING`: the job names a charge we do not have. For either, do not refund it, and do not treat its
+amount as owed. Something able to write to the billing database queued it, so tell whoever runs the server; they
+check that charge's own refund requests (a request that was never refunded is still owed). The email says the same
+for both, and the owner summary lists both as `REFUND_NOT_REQUESTED`.
+The reason code `OTHER_XMONEY_SYSTEM` means the payment was taken in the other xMoney system (sandbox or live) than
+the one this host uses: nothing was sent and nothing is owed on this host. Its email has no refund reason and no
+deadline paragraph, and the owner summary lists it as `REFUND_OTHER_SYSTEM`. If it was a real customer's payment in
+the other system, refund it in that system's dashboard; a sandbox test payment needs nothing.
+
+**When xMoney or the tax service is down at a renewal.** The plan stays active,
+and the renewal is retried quietly for up to 3 days (72 hours from the end of the paid month). Nobody is charged
+without a fresh price, and no "payment failed" email goes out. Only if there is still no answer after 3 days does the
+normal failed-payment path start: retries on days 1, 3 and 7, each with its email, and then the Free plan.
+
+**What billing writes to the API's journal** (`journalctl -u debateai-api`). The renewal pass runs every minute, the
+money check against xMoney every 10 minutes (its full check once a day, and once at each start of the API), and the
+job queue (payment checks, refunds, invoices, credit notes and emails) every 5 seconds. A marker in square brackets
+carries no detail; a line with `"event"` names what happened in its other fields, and never a person, an email address
+or an amount. Each line below asks you to look, or to act, at least sometimes; a row says so when its line also comes
+in normal running. The billing lines this table leaves out record normal events (they are listed after it). The
+signals that matter:
+
+| Signal | What it means | What to do |
+|---|---|---|
+| `"event":"billing.renewal.report"`, with `failed`, `taxRefused` and `codes` | One line for a minute's pass that had trouble. `failed` counts the renewals (or the pass's own steps) that failed, and `codes` lists their distinct codes, for example `TAX_SERVICE_UNAVAILABLE` while the tax service is down, which the 3 days above cover (an xMoney outage at the rebill is not counted here: it writes `"event":"billing.renewal.unknown"` instead). `taxRefused` counts renewals the tax service refused to price (a wrong or revoked Quaderno key, or a request it rejects): those are not an outage, so nobody is charged, no retry email goes out, and each such renewal also writes `"event":"billing.renewal.tax_refused"` once per period with Quaderno's code. | `failed` during a known outage: nothing. The same code minute after minute with no outage: read the API's other lines from the same minutes, and report the code. Any `taxRefused`: check the Quaderno key file and the Quaderno account at once; fix the key, restart `debateai-api`, and the next pass prices those renewals again. |
+| `[BILLING_RENEWAL_PENDING]` (a bare marker) | The renewal pass catches each of its three steps and reports their failures in the `billing.renewal.report` line, so in practice this marker means the billing upkeep stopped before it finished, most often because the database did not answer. The upkeep is the period-end sweep, the payment retries and the reminders, which the renewal timer runs at most every 10 minutes. It carries no diagnostic. Its next try is the next upkeep, 10 minutes later. | One: nothing. Again at each upkeep, usually with a `billing.renewal.report` line every minute: the database is failing. Check it and the API's other lines from the same minutes; once the database answers, the next pass catches up by itself. |
+| `"event":"billing.renewal.tax_refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price one subscription's renewal: a wrong or revoked Quaderno key (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or a request it rejects. One line per subscription and period (again after a restart of the API). That is not an outage: nobody is charged, no "payment failed" email goes out, and the renewal is priced again every minute. An active plan is kept, as in an outage, for up to 3 days past its due time; after that the person is on Free until it prices again. The owner summary lists it as `RENEWAL_BLOCKED`. | At once: check the Quaderno key file and the Quaderno account; fix the key and restart `debateai-api`, and the next pass prices those renewals again (as for `taxRefused` in the `billing.renewal.report` row). |
+| `"event":"billing.renewal.unknown"`, with `attempt` and `code` | A renewal's charge (`attempt` 1) or a payment retry's (2 and up) got no clear answer from xMoney. `code` `REBILL_NOT_SENT`: xMoney did not answer, or limited our calls, so nothing was charged. `REBILL_CREDENTIALS_REFUSED`: xMoney refused our key (with a `billing.xmoney.credentials_refused` line). `REBILL_OUTCOME_UNKNOWN`, or `SUBMIT_INTERRUPTED` (the call was cut off, for example by a restart): the card may have been charged. Before it calls xMoney again, the site looks there for a payment of that charge, so one that went through is never charged a second time. The renewal itself keeps the plan meanwhile, for up to 3 days past its due time; a payment retry runs on the plan's grace. | During a known xMoney outage, or a single line: nothing; the site catches up by itself. `REBILL_CREDENTIALS_REFUSED`: the `billing.xmoney.credentials_refused` row, below. The same code for hours with no known outage: report it. When the time runs out with no answer, a `billing.renewal.stuck` line follows. |
+| `"event":"billing.renewal.pending"`, with `code` | Something outside the plan holds up its renewal, so the plan is kept for up to 3 days past its due time, with no email: the tax service is down (`TAX_SERVICE_UNAVAILABLE`), xMoney did not answer or refused our key, or lost a charge's answer (`REBILL_NOT_SENT`, `REBILL_CREDENTIALS_REFUSED`, `REBILL_OUTCOME_UNKNOWN`, `SUBMIT_INTERRUPTED`), the tax service refused the price (`TAX_SERVICE_REFUSED`), an upgrade of the same month is still waiting for its payment (`UPGRADE_UNSETTLED`), or xMoney answered the renewal's charge but its payment check has not settled it yet: the payment is still in 3-D Secure or in progress, or xMoney could not be read (`PAYMENT_NOT_VERIFIED`). One line per plan and period. | Nothing on its own: **When xMoney or the tax service is down at a renewal**, above, says what follows. `PAYMENT_NOT_VERIFIED`: its payment check settles it, and a renewal charge still without an outcome 30 days after it was made is counted by `billing.reconcile.expired`. `TAX_SERVICE_REFUSED`: the `billing.renewal.tax_refused` row. Many lines with no known outage: read the API's other lines from the same minutes, and report the codes. |
+| `"event":"billing.renewal.stuck"`, with `attempt` and `code` | A renewal's charge (or a payment retry's) was given up and closed as failed (`NO_TRANSACTION`): it never reached xMoney (`REBILL_NOT_SENT`, which a refused key also leads to), or its outcome stayed unknown (`REBILL_OUTCOME_UNKNOWN`), past its time (the renewal: 3 days past its due time; a payment retry: 24 hours). The normal failed-payment path starts: the plan is past due, the person gets the payment emails, and after the last retry the plan moves to Free. Only with `REBILL_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`, because the card may have been charged. A `REBILL_NOT_SENT` one charged nothing and is not listed there. | `REBILL_OUTCOME_UNKNOWN`: check in the xMoney dashboard whether the card was charged for that renewal, and if it was, report it with the charge reference the summary's `RENEWAL_STUCK` line names. `REBILL_NOT_SENT`: nothing was charged; read the lines before it (an xMoney outage, or `billing.xmoney.credentials_refused`) and fix what they say. |
+| `"event":"billing.payment.failed"`, with `chargeKind` and `code` | A charge was closed as failed. `chargeKind` names it: `INITIAL` (a checkout), `RENEWAL` (a renewal or a payment retry), `UPGRADE` or `CARD_CHECK` (a card change). From a payment check: `PAYMENT_DECLINED` (the card was declined) or `VOIDED` (xMoney voided or cancelled a payment that had not gone through). From a renewal or a payment retry, when the site charged the card: `PAYMENT_DECLINED` (xMoney declined the card); `REBILL_REFUSED`: xMoney refused the renewal request itself, not the card (it answered with an error that is not a decline, a refused key, a timeout or a rate limit); or `NO_TRANSACTION`, which follows a `billing.renewal.stuck` line, or closes a renewal charge none of whose calls reached xMoney once its plan is no longer to be charged (cancelled, ended, or already moved on). A declined checkout changes nothing, and the person may try again; a failed renewal starts the normal failed-payment path (the plan is past due, the payment retries with their emails, then Free). | A decline: nothing; the person is told, and for a renewal the payment retries follow. `REBILL_REFUSED` on more than one renewal: report it at once, with the code. xMoney refuses the request as the site sends it, so the request has to change in the code, and until it is fixed every renewal falls into the failed-payment path. `NO_TRANSACTION`: the `billing.renewal.stuck` row; with no `billing.renewal.stuck` line just before it, no call reached xMoney, nothing was charged, and nothing is needed. |
+| `"event":"billing.renewal.dunning_unpriced"`, with `attempt` and `code` | A renewal (`attempt` 1) or a payment retry could not be priced, so that attempt was counted as failed with nothing charged. `TAX_SERVICE_UNAVAILABLE`: the tax service stayed down 3 days past the renewal's due time, or at a payment retry. `RETRY_TOTAL_CHANGED`: a retry was priced again at a total the person was never told about (a tax change). The person gets the payment emails, and after the last retry day the plan moves to Free. The owner summary lists it as `DUNNING_UNPRICED`, or `ENDED_UNPRICED` once the plan has ended. | `TAX_SERVICE_UNAVAILABLE`: check Quaderno's status page and your Quaderno account; the next retry prices again once it answers. `RETRY_TOTAL_CHANGED`: nothing to fix; the person can subscribe again at the new price. Any other code: report it. |
+| `"event":"billing.renewal.price_missing"` (no other field) | A subscription due for renewal has no recorded net price, so it is not charged at a guessed one. The renewal is tried again every minute, with this line each time (and `BILLING_RECURRING_PRICE_MISSING` among the `billing.renewal.report` codes); nobody is charged, and the plan is not renewed, while it lasts. | Report it at once: that subscription's records are incomplete, and only the developer can find it and repair them. |
+| `"event":"billing.renewal.history_invalid"`, with `count` and `code` | `count` subscriptions whose records do not add up (`BILLING_SUBSCRIPTION_EVENTS_INVALID`), so the renewal pass skips them: they are neither charged nor renewed. One line for each minute's pass while any is left. The owner summary lists each as `SUBSCRIPTION_HISTORY_INVALID`. | Print the summary (**The tax summary**, above), check in the xMoney dashboard what each such subscriber was charged, and report it to the developer. |
+| `"event":"billing.renewal.owner_stopped"` (no other field) | A charge was due (a renewal, a payment retry, or a second try at one) for an account whose deletion is scheduled or done, or which the age check froze, so it was not made. Scheduling a deletion already stops the renewal; this line is the second guard, and it can come in normal running. | Nothing: nobody was charged. If it comes with `[BILLING_ERASURE_SWEEP_PENDING]` or `[BILLING_ERASURE_STOP_PENDING]`, follow those rows. |
+| `"event":"billing.maintenance.report"`, with `failed` and `codes` | One line for an upkeep pass (the period-end sweep, the payment retries and the reminders, at most every 10 minutes) in which some plans could not be looked after: `failed` counts them, and `codes` lists their distinct codes. The others were looked after, and the failed ones are tried again at the next pass. | One: nothing. The same code pass after pass: check the database and the API's other lines from the same minutes, and report the code. |
+| `"event":"billing.reconcile.listing_failed"`, with `listing` and `code` | The daily money check asks xMoney for three lists, each on its own: `creation` (payments made in the last 3 to 30 days), `charge-back` (disputes in the last 120 days) and `refund` (refunds in the last 120 days). The one named in `listing` could not be read. The other two and the rest of the check still ran; this one is asked again on its own every hour, with this line each time it still fails, until it is read. While it fails: without `creation`, no checkout older than 24 hours is closed as abandoned (they wait), and a checkout that was paid but whose payment notice was lost is not found; without `charge-back`, a card dispute is found only through the payment's own notice; without `refund`, a refund made in the xMoney dashboard is found only through its notice. `code` says why: `XMONEY_UNAVAILABLE` (xMoney did not answer, or limited our calls), `XMONEY_CREDENTIALS_REFUSED` (our key, see `billing.xmoney.credentials_refused` below), `XMONEY_REFUSED` (xMoney refused the request itself) or `XMONEY_RESPONSE_INVALID` (an answer the site cannot read). | During a known xMoney outage: nothing; the hourly retry catches up, and nothing inside the windows above is lost. `XMONEY_REFUSED` or `XMONEY_RESPONSE_INVALID` hour after hour: xMoney does not accept that list as the site asks for it (most likely `charge-back`, the one X0 must confirm). Report the listing and the code at once: the request has to change in the code. Until then, look in the xMoney dashboard yourself for what that list would have found (new disputes, dashboard refunds, or payments that gave nobody a plan). Any other code (for example `UNKNOWN`, written for a failure that carries no declared code), or any code that repeats hour after hour with no known xMoney outage: report the listing and the code. |
+| `[BILLING_RECONCILIATION_PENDING]` (a bare marker) | The money check stopped before it finished. A list xMoney refuses never causes it (that is `billing.reconcile.listing_failed`); it means the database did not answer, or a step outside the per-charge handling failed. The quick part of the check (finding the transaction of a renewal or an upgrade whose answer was lost) still ran on that tick. The full check is tried again an hour later, the quick part 10 minutes later. | One: nothing. Every hour (or every 10 minutes): check the database and the API's other lines from the same minutes, and report it if the database is fine; once it works again, the next check catches up by itself. |
+| `"event":"billing.reconcile.errors"`, with `pass`, `count` and `codes` | The money check could not handle `count` charges in one of its loops (`pass`: `FREQUENT`, `DAILY` or `CHECKOUT`), for example a subscription whose records do not add up, or a lock that timed out. It skipped them and went on with every other charge; they are tried again at the next check. | One: nothing. The same codes check after check: print the summary (a subscription whose records do not add up is listed as `SUBSCRIPTION_HISTORY_INVALID`) and report the pass and the codes. |
+| `"event":"billing.reconcile.no_transaction"`, with `kind` | A charge was closed as failed (`NO_TRANSACTION`) because xMoney holds no payment for it: a checkout (`INITIAL`) or a card change (`CARD_CHECK`) that nobody paid within 24 hours, which is how the daily money check closes an abandoned checkout in normal running, or an upgrade (`UPGRADE`) whose charge never reached xMoney. Nothing was charged, and nothing changes for the person: a plan that was not paid for never starts, and an upgrade not paid for leaves the plan as it was. | Nothing: an abandoned checkout is normal. Many `UPGRADE` lines, or a person who says they paid: look the payment up in the xMoney dashboard, and report what you find. |
+| `"event":"billing.reconcile.expired"`, with `count` | Once a day, the money check counts the upgrade and renewal charges still without an outcome 30 days after they were made; it no longer looks them up at xMoney. The owner summary lists each as `PAYMENT_UNSETTLED`. | Print the summary, look each such charge up in the xMoney dashboard (was the card charged?), and report what you find. |
+| `"event":"billing.reconcile.rows_rejected"`, with `count` and `pass` | xMoney sent `count` rows in one money check that the site cannot read, and the check skipped them (`pass` `LISTING`: the daily lists; `ADOPTION`: the look for a payment whose answer was lost). A payment, a refund or a dispute in such a row is not seen by that check. | Report it at once with the pass and the count: xMoney's answers may have changed shape. Until it is fixed, look in the xMoney dashboard for what the check would have found (new disputes, dashboard refunds, or payments that gave nobody a plan). |
+| `"event":"billing.xmoney.row_rejected"`, with `operation`, `count` and `code` | The same, for xMoney rows read outside the money check (`operation` `checkout`, `renewal` or `refund`: a look for a payment or a refund that may already have been made); `code` is `XMONEY_ROW_REJECTED`. | As for `billing.reconcile.rows_rejected`: report it at once, with the operation and the count. |
+| `[BILLING_OUTBOX_PENDING]` (a bare marker) | A round of the job queue stopped before it finished, almost always because the database did not answer. A single job that fails never raises it: that job is tried again on its own schedule. Queued jobs wait meanwhile and run once the queue works again. | One: nothing. Again and again: check the database and the API's other lines from the same minutes. |
+| `[BILLING_ERASURE_SWEEP_PENDING]` (a bare marker) | The sweep that ends the paid plan of an account whose deletion has gone through (or that the age check froze) failed for at least one account. It runs in front of the money check every 10 minutes, the money check still runs, and every such account is tried again on the next sweep. The cause is the database, or one subscription whose history the site cannot read (then the marker repeats every 10 minutes, and the owner summary lists that subscription among the payments to check). | One: nothing. Every 10 minutes while the database is fine: report it, because a deleted account's plan is not being ended. |
+| `[BILLING_ERASURE_STOP_PENDING]` (a bare marker) | Someone scheduled their account's deletion, but stopping their plan's renewal at that moment failed, most often because the database did not answer. The deletion is scheduled anyway, and the sweep in front of the money check stops the renewal on its next run, within 10 minutes. | One: nothing. Again and again, or together with `[BILLING_ERASURE_SWEEP_PENDING]`: check the database, and follow that row. |
+| `[BILLING_OWNER_JOBS_PENDING]` (a bare marker) | The quarterly tax summary email (O1) could not be queued, usually because the database did not answer. It is checked once a day and at each start, so the next try is a day later. | One: nothing. On several days in a row, or when O1 has not arrived by the 6th day after a quarter ends: check the database, and print the summary yourself (**The tax summary**, above). |
+| `"event":"billing.outbox.dead"`, with `kind`, `code` and `attempts` | A job stopped after its last try (or at once, for a code that no retry can change). For an invoice or credit note (`QUADERNO_RECORD_SALE`, `QUADERNO_RECORD_REFUND`, `SMARTBILL_INVOICE`, `SMARTBILL_STORNO`) or an `EMAIL`, you also get the email O3 with the steps, except when the email that died is O3 itself. A refund (`XMONEY_REFUND`) does not send O3. Its email O2 does not come from this line: the refund itself sends O2 at each dead end it decides (xMoney refused the refund, its outcome stayed unknown, its charge cannot be found, no request backs it, and the like). O2 is not sent when the refund job's own content cannot be read (`REFUND_PAYLOAD_INVALID`), nor when the job queue stops a refund whose every one of its six tries failed (the code is then the failure's own, usually `OUTBOX_HANDLER_FAILED`). The owner summary (**The tax summary**, above) lists every dead refund job whatever its code, as long as no refund of that payment is recorded. The codes `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (refund jobs) and `CREDIT_NOTE_REFUND_MISSING` (a credit-note job) mean our records do not back the job: no refund request is recorded for that payment, the job names a charge we do not have, or no refund is recorded for that sale, and nothing was sent to xMoney or to the invoicer. `OTHER_XMONEY_SYSTEM` is a job of the other xMoney system (sandbox or live) than this host's (`billing.outbox.other_system`, below). | An invoice, a credit note or an email: **An invoice, a credit note or an email that was never sent**, below. A refund, with or without O2: **A refund that could not be completed**, above. `REFUND_NOT_REQUESTED`, `REFUND_CHARGE_MISSING` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note; there is nothing to issue or re-queue. Tell whoever runs the server, because something able to write to the billing database queued it. `OTHER_XMONEY_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host. `OWNER_TAX_SUMMARY`: print the summary yourself (**The tax summary**, above). `RENEWAL_NOTICE` with any other code: nothing is charged at a changed amount without its notice; the renewal sends the notice itself when it is due. `VERIFY_PAYMENT`: the daily money check queues the payment check again while the payment is in its lists. Any of these repeating, or any other code: report the kind and the code. |
+| `"event":"billing.outbox.alert_failed"`, with `kind` and `code` | A job died (the `billing.outbox.dead` line just before it) but the owner's email about it, O3, could not be queued, usually because the database did not answer. The job stays dead, and the owner summary still lists it. | Print the summary now (**The tax summary**, above) to see the line, and settle it as **An invoice, a credit note or an email that was never sent** says. If it repeats, check the database. |
+| `"event":"billing.outbox.settle_failed"`, with `kind`, `outcome` and `attempts` | A job ran, but its result could not be saved (usually the database connection was lost). The job runs again after 5 minutes, so an email may arrive twice. | One: nothing. Many, or the same kind again and again: check the database, and report it if the database is fine. |
+| `"event":"billing.outbox.other_system"`, with `kind` and `code` `OTHER_XMONEY_SYSTEM` | A queued job belongs to the other xMoney system (sandbox or live) than the one this host uses, so it was stopped before any call or price quote: a refund, an invoice, a credit note or a payment check whose payment was taken in the other system, or a renewal notice (`RENEWAL_NOTICE`) of a plan of the other system. Normally this happens only on a host that went from the sandbox to live (above). A `billing.outbox.dead` line with the same code follows. For a refund you also get O2, saying nothing was sent and nothing is owed on this host, and the owner summary lists it as `REFUND_OTHER_SYSTEM`. | Nothing to do on this host, whatever the kind. For a refund: if it was a real customer's payment in the other system, refund it in that system's dashboard; a sandbox test payment needs nothing. |
+| `"event":"billing.refund.refused"`, with `reason` | xMoney refused a refund the site asked for (`reason` says what it was for, for example `WITHDRAWAL`). The refund job stops (a `billing.outbox.dead` line with `XMONEY_REFUSED` follows), and you get O2 at once. The money is still owed. | **A refund that could not be completed**, above: settle it in the xMoney dashboard, by its deadline for a withdrawal. |
+| `"event":"billing.refund.outcome_unknown"`, with `reason` | A partial refund whose earlier attempt may already have moved the money (its call was cut off, or got no clear answer), while xMoney does not show it as made. The site never sends it twice: the job stops (`REFUND_OUTCOME_UNKNOWN`), and you get O2 at once. | **A refund that could not be completed**, above: look at that payment in the xMoney dashboard first, and refund only if no such refund is there. |
+| `"event":"billing.refund.unrecorded"`, with `reason` `PROVIDER_REFUND` | xMoney reported another refund on a payment that already has a refund recorded or asked for (for example one made in the xMoney dashboard). Our records cannot hold it, so it is in no figure of the tax summary, and no credit note and no email follow for it. The owner summary lists it as `REFUND_UNRECORDED`, by the refund's xMoney transaction id. | Read its amount on that transaction in the xMoney dashboard, take it off that country's net sales and tax by hand, confirm the refund to the person yourself, and give its amount to the accountant for the credit note. A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures: do not take it off again. |
+| `"event":"billing.refund.dead"`, with `count` | Once a day, the money check counts the refund jobs that stopped for good with no refund recorded since, whatever their code. Not every one is owed: `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (no request of ours backs the job, or it names a charge we do not have) and `OTHER_XMONEY_SYSTEM` (a payment of the other xMoney system) owe nothing on this host; `REFUND_PAYLOAD_INVALID` (a job whose payload cannot be read, so nothing was sent) is listed with the first two, without the reason the job claims, and whoever runs the server checks that charge's own refund requests (one never refunded is still owed); `REFUND_OUTCOME_UNKNOWN` is checked in the dashboard first; every other code is still owed. The owner summary lists each one under "Payments to check by hand in xMoney", by the summary's own names: `REFUND_REFUSED` (still owed), `REFUND_OUTCOME_UNKNOWN`, `REFUND_NOT_REQUESTED` (which covers `REFUND_CHARGE_MISSING` and `REFUND_PAYLOAD_INVALID` too) and `REFUND_OTHER_SYSTEM`. | Print the summary (**The tax summary**, above) and settle each line as its name says, and as **A refund that could not be completed**, above, describes. |
+| `"event":"billing.xmoney.credentials_refused"`, with `operation` | xMoney refused our key (`operation` says on what: `checkout`, `verify`, `rebill`, `refund` or `list`). xMoney processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose rebill is refused this way is kept, as in an xMoney outage, for up to 3 days past its due time (a payment retry: 24 hours). After that it is closed as failed (`NO_TRANSACTION`, with a `"event":"billing.renewal.stuck"` line), and the failed-payment path starts, with its emails. A refund keeps being tried; a payment check stops after its last try (`billing.outbox.dead`, above). New checkouts fail while it lasts. | At once: check the key file `XMONEY_PRIVATE_KEY_PATH` names and the xMoney account (a revoked or replaced key, or a sandbox key beside the live address, or the reverse, §14.2). Fix it and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
+| `"event":"billing.quote.refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price a purchase. That is not an outage: most often the Quaderno key is wrong or revoked (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or Quaderno rejects the request (`QUADERNO_HTTP_422`). The person is told to try again in a minute, and nothing is charged. The same event with `code` `TAX_SERVICE_UNAVAILABLE` is an outage of the tax service; with any other code it is one person's own refusal (for example `ALREADY_SUBSCRIBED` or `TAX_ID_INVALID`). | `TAX_SERVICE_REFUSED`: every purchase fails until it is fixed. Check the Quaderno key file and the Quaderno account at once; fix the key and restart `debateai-api`. `TAX_SERVICE_UNAVAILABLE`: nothing, unless it lasts; then check Quaderno's status page. |
+| `"event":"billing.invoice.unknown"`, with `issuer`, `kind` and `code` | A legal document the site could not settle itself. `INVOICE_UNKNOWN`: SmartBill did not say whether it issued a Romanian invoice or credit note, and cannot be asked afterwards, so it may exist. `CREDIT_NOTE_MANUAL`: a credit note the site cannot issue itself (a second refund of one sale, or a refund made in the xMoney dashboard whose amount the site does not know). The owner summary lists it under "Invoices and credit notes to check by hand". | `INVOICE_UNKNOWN`: look in SmartBill the same day, because a Romanian document must reach e-Factura in time (your accountant knows the deadline). If it was issued, record it with `pnpm billing:invoice --record`; if not, re-queue it with `--requeue --confirm-not-issued` (**An invoice, a credit note or an email that was never sent**, below). `CREDIT_NOTE_MANUAL`: issue it by hand in SmartBill or Quaderno and record it with `--record`; for a `DASHBOARD_REFUND` line, record it with `--record` and the amount you refunded, `--amount` (**An invoice, a credit note or an email that was never sent**, below). |
+| `"event":"billing.payment.mismatch"`, with `code` or `chargeKind` | A payment check found a payment that does not belong to the charge it was matched with, so nothing was recorded and nothing moved. `code` `CUSTOMER_MISMATCH`: the payment was made by another xMoney customer than the one our checkout created; the card **is** charged, and nothing refunds it. `code` `ORDER_REF_MISMATCH`: xMoney's order names another charge than the notice did. A line with `chargeKind` instead: the payment's amount or currency differs from the charge's. | Find the payment: the notices whose check ended this way are listed by the command below (a check the daily money check queued has no notice; look in the xMoney dashboard for a payment that gave nobody a plan). Look the payment up in the xMoney dashboard and, if no plan was given for it, refund it there by hand. Report every such line. `CUSTOMER_MISMATCH` on every first payment means xMoney makes embedded payments from another customer than X0 showed: stop sales (**Stopping sales, and switching billing off**, above) and report it at once. |
+| `"event":"billing.notice.undecryptable"` (no other field) | Something posted a payment notice to the notice address that this host's xMoney private key cannot decrypt. The address answers `200` anyway (§14.5), so xMoney does not send it again, and nothing is stored. Anyone can post to that address, so a stray line now and then means nothing. A real notice that cannot be decrypted means the private key does not belong to the xMoney site whose dashboard sends the notices here (a sandbox key beside the live dashboard, the reverse, or a replaced key); its payment then waits for the daily money check, up to a day, before its plan is active. | A stray line, with no purchase at that moment: nothing. One at each purchase, or at every notice: check the key file `XMONEY_PRIVATE_KEY_PATH` names, and which xMoney dashboard's notification URL points at this site (§14.5); fix it and restart `debateai-api`. |
+| `"event":"billing.chargeback"`, with `chargeKind` | xMoney reported a card dispute (a chargeback) on a payment. An active or past-due plan is paused (`SUSPENDED`): its paid features stop, and the person gets an email (M10). With `code` `DUPLICATE_PAYMENT`, the dispute is on a second payment of the same order, which never pauses the plan. xMoney sends no signal when a dispute ends. | When xMoney tells you the outcome, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above). |
+| `"event":"billing.withdrawal.owner_review"`, with `source` | A withdrawal was recorded and the plan ended, but its refund cannot be worked out from our records (a refund made in the xMoney dashboard, or an earlier refund request, already touched one of the payments), so nothing was refunded. You get O2_WITHDRAWAL at once, and the owner summary lists it as `WITHDRAWAL_BY_OWNER` until you settle it. | Within 14 days of the withdrawal, work out what is due and settle it as **A withdrawal sent by email or on the model form**, above, says. |
+| `"event":"billing.cancel_link.failed"`, with `code` | Someone asked on `/cancel` for an emailed cancel link, and finding their plan or queuing the email failed, most often because the database did not answer. The page had already said a link is on its way, so the person gets no email (M9). | One: nothing; the person can ask again. Several, or the same code again and again: check the database and the API's other lines from the same minutes, and report the code. |
+| `"event":"billing.mail.attachment_missing"`, with `kind` `ACCEPTED_TERMS` and `code` | A confirmation email (M1) went out without the Terms version the person accepted attached. `MAIL_TERMS_NOT_ARCHIVED`: that version's file is missing from the Terms archive (`apps/ui/legal/archive/`, §14.7); `MAIL_TERMS_NOT_RECORDED`: the site holds no record of which version the person accepted. | Report it the same day: the person is owed the Terms they accepted, so whoever runs the server finds the version and the account's address, and you send it to them. `MAIL_TERMS_NOT_ARCHIVED` also means the archive on this host lacks a version someone accepted (§14.7: never delete a file there): report that too, so the file is put back from the repository before the next confirmation email. |
+
+The payment notices whose check ended as a mismatch, newest first. Act only on rows of this host's xMoney system (`live` on the live host, `stage` on the sandbox host):
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.xmoney_environment, n.transaction_id, n.order_id, n.status FROM billing.xmoney_notice n JOIN billing.xmoney_notice_outcome o ON o.notice_id = n.notice_id WHERE o.outcome = 'MISMATCH' ORDER BY n.received_at DESC LIMIT 20"
+```
+
+**Every other billing line records a normal event and needs nothing from you:** `billing.checkout.started` (a
+checkout began), `billing.payment.verified` (a payment went through), `billing.payment.duplicate` (a second
+payment of an order already paid, refunded in full by itself), `billing.refund` (a refund was made),
+`billing.country.refused` (a purchase the country rules refused), `billing.cancel` and `billing.cancel.revoked` (a
+cancel, and its undo), `billing.downgrade.scheduled`, `billing.upgrade.requested`, `billing.withdrawal` and
+`billing.withdrawal.settled` (a withdrawal recorded, and one you settled), `billing.card.change.started`,
+`billing.card.refused` (a new card from a blocked country), `billing.card.change.deferred` (a card change that waited
+for a renewal's outcome; nothing changed), `billing.cancel_link.sent`, `billing.reconcile.adopted` (the money check
+found the payment of a charge whose answer was lost), `billing.erasure.stopped` and `billing.age_frozen.stopped` (the
+plan of a deleted or age-frozen account ended), and `billing.tax_summary.queued` (the quarterly summary was queued).
+
+**e-Factura.** SmartBill sends each Romanian invoice to ANAF itself, through a setting in your SmartBill account. The
+site does not read the e-Factura status back, so check it in SmartBill or in ANAF's SPV, as your accountant advises.
+The quarterly summary lists every Romanian invoice and credit note whose acceptance by ANAF is not recorded yet, the
+quarter's and any earlier quarter's, under "Romanian e-Factura documents to confirm", as the list to check. Each line names the document as its series and
+number joined by a dash (for example `DBAI-0042`).
+
+When you have ANAF's answer for a document, record it with `pnpm billing:efactura-status`, giving the document with
+`--invoice` and the answer with `--status ACCEPTED` or `--status REJECTED`. An accepted document leaves the list; a
+rejected one stays on it with its status, so you can see what still needs your accountant. The command asks for the
+two values at the prompt:
+
+```sh
+# Paste the document exactly as the summary prints it (for example DBAI-0042) and press Enter; then type ACCEPTED or REJECTED and press Enter.
+read -r INVOICE && read -r STATUS && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:efactura-status --invoice "$INVOICE" --status "$STATUS"
+```
+
+It prints one line naming the document it recorded. A document the site never issued is refused
+(`EFACTURA_DOCUMENT_UNKNOWN`) and nothing is written.
+
+**An invoice, a credit note or an email that was never sent.** When a job that issues an invoice or a credit note,
+or that sends an email, stops after its last try, the site emails you at once (O3, "A legal document or a required
+email was not sent and needs your attention"), and the owner summary lists it until it is settled: invoices and
+credit notes under "Invoices and credit notes to check by hand", emails under "Emails that never went out". Below
+each list the summary says what to do for each kind of line, and the email says it for its job. Typical causes: a wrong or revoked Quaderno key (`TAX_SERVICE_REFUSED`), Quaderno or
+SmartBill not answering for more than about 15 hours (`TAX_SERVICE_UNAVAILABLE`, `INVOICE_SERVICE_UNAVAILABLE`), or
+SmartBill not saying whether it issued an invoice (`INVOICE_UNKNOWN`: SmartBill cannot be asked afterwards, so the
+invoice may be there already).
+
+For an invoice or a credit note, settle the line with `pnpm billing:invoice`, giving the charge reference with
+`--charge`, the document with `--kind INVOICE` or `--kind CREDIT_NOTE`, and one of these actions:
+
+- `--record` with a document you issued or found by hand: for SmartBill (a Romanian sale) its series and number
+  joined by a dash, as SmartBill prints it (for example `DBAI-0042`); for Quaderno its document id. The site stores
+  it and, for an invoice, emails the customer the receipt (M2); a SmartBill document also joins the e-Factura list.
+  A SmartBill receipt recorded this way names the invoice number but does not attach the PDF (a number typed by hand
+  is never used to fetch a document for a customer); it tells the customer to write to you for a copy.
+- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only: a refund made in the xMoney dashboard that xMoney
+  reported on the payment itself, so the site does not know its amount and queued no credit note. Issue the credit
+  note by hand in SmartBill (a Romanian sale) or Quaderno, then record it with `--kind CREDIT_NOTE`, its document as
+  above, and the amount you refunded in dollars and cents (for example `12.10`). The amount can be at most what the
+  payment held (the "up to" figure the tax summary gives for that charge). The line then leaves the list, and the
+  quarter's tax summary subtracts the refund at that amount instead of listing it as "amount unknown". A charge has
+  one credit note at most: if it already has one, the command refuses (`BILLING_INVOICE_ALREADY_RECORDED`), and that
+  refund goes to your accountant. A refund transaction of a payment whose dashboard-refund credit note is recorded is
+  already in the figures: do not take it off again. A `REFUNDED_BEFORE_START` line (a payment xMoney refunded before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge (`BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`, or `BILLING_INVOICE_ORIGINAL_MISSING` with `--amount`); take that sale and its refund out of its quarter's figures by hand.
+- `--requeue` to let the site try the job again once the cause is fixed (the Quaderno key replaced, Quaderno or
+  SmartBill answering again). A SmartBill job also needs `--confirm-not-issued`: add it only after you have checked
+  in SmartBill that the document was NOT issued, because SmartBill would issue a second one. A Quaderno job needs no
+  confirmation: Quaderno looks for the payment's document before it creates one.
+
+A credit note that waits for its invoice (`INVOICE_ORIGINAL_MISSING`) comes after the invoice: record or re-queue
+the invoice first, then re-queue the credit note. A line that says "nothing to issue or re-queue" (for example
+`CREDIT_NOTE_REFUND_MISSING`: no refund is recorded for that sale) is not a document to make: the command refuses it,
+and you tell whoever runs the server. The command asks for the values at the prompt. To record a document:
+
+```sh
+# Paste the charge reference as the summary prints it and press Enter; type INVOICE or CREDIT_NOTE and press Enter; then paste the document (for example DBAI-0042, or the Quaderno document id) and press Enter.
+read -r CHARGE_REF && read -r KIND && read -r DOCUMENT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind "$KIND" --record "$DOCUMENT"
+```
+
+To record a dashboard refund's credit note with its amount (`DASHBOARD_REFUND` lines only):
+
+```sh
+# Paste the charge reference as the summary prints it and press Enter; paste the credit note (for example DBAI-0042, or the Quaderno document id) and press Enter; then type the amount you refunded in the xMoney dashboard, in dollars and cents (for example 12.10), and press Enter.
+read -r CHARGE_REF && read -r DOCUMENT && read -r AMOUNT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind CREDIT_NOTE --record "$DOCUMENT" --amount "$AMOUNT"
+```
+
+To re-queue a Quaderno job:
+
+```sh
+# Paste the charge reference as the summary prints it and press Enter; then type INVOICE or CREDIT_NOTE and press Enter.
+read -r CHARGE_REF && read -r KIND && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind "$KIND" --requeue
+```
+
+To re-queue a SmartBill job, only after checking in SmartBill that the document was not issued:
+
+```sh
+# Paste the charge reference as the summary prints it and press Enter; then type INVOICE or CREDIT_NOTE and press Enter.
+read -r CHARGE_REF && read -r KIND && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind "$KIND" --requeue --confirm-not-issued
+```
+
+It prints one line saying what it recorded or queued; a re-queued job that fails again is listed and emailed again.
+A refusal is one code and nothing is written. What each code means, and what to do:
+
+- `BILLING_INVOICE_USAGE`: the command line is not one of the forms above (a missing or repeated value, a kind other
+  than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither, or an `--amount` that is not dollars and
+  cents above zero, such as `12.10`, or that comes without `--record` and `--kind CREDIT_NOTE`). Run it again as shown.
+- `BILLING_INVOICE_CHARGE_UNKNOWN`: no charge has that reference. Paste it again exactly as the summary prints it.
+- `BILLING_INVOICE_OTHER_XMONEY_SYSTEM`: the charge was paid in the other xMoney system (sandbox or live) than the one
+  this host's `XMONEY_API_BASE_URL` names. It owes no document here: nothing to do on this host.
+- `BILLING_INVOICE_CHARGE_NOT_PAID`: our records hold no payment for that charge, so no document is owed. If the
+  xMoney dashboard shows it paid, tell whoever runs the server.
+- `BILLING_INVOICE_ALREADY_RECORDED`: the charge already has that document. Nothing more to do. A charge has one
+  credit note at most, so a credit note for a further refund of the same charge (for example a dashboard refund after
+  one already credited) goes to your accountant.
+- `BILLING_INVOICE_JOB_OPEN`: the job is already queued. Wait for it; if it fails again, it is listed and emailed again.
+- `BILLING_INVOICE_NOTHING_LISTED`: no dead job of that kind is listed for that charge. Check the charge and the kind
+  against the summary's line. A `DASHBOARD_REFUND` line (a refund made in the xMoney dashboard, amount unknown) has no
+  job to re-queue: issue its credit note by hand and record it with `--record` and `--amount` (above).
+- `BILLING_INVOICE_NOTHING_TO_ISSUE`: our records do not back the job (no refund is recorded for the sale, the job is
+  malformed, or no payment is recorded), so there is no document to make. Tell whoever runs the server.
+- `BILLING_INVOICE_CONFIRM_NOT_ISSUED_REQUIRED`: a SmartBill job is re-queued only with `--confirm-not-issued`. Check in
+  SmartBill first; if the document is there, record it with `--record` instead.
+- `BILLING_INVOICE_ORIGINAL_MISSING`: a credit note needs its invoice recorded first. Settle the invoice's own line,
+  then the credit note.
+- `BILLING_INVOICE_REFERENCE_INVALID`: the document does not fit the issuer. SmartBill takes `<series>-<number>` (for
+  example `DBAI-0042`), Quaderno its document id.
+- `BILLING_INVOICE_DOCUMENT_TAKEN`: that document is already recorded for another charge. Check the number in SmartBill
+  or Quaderno and type the right one.
+- `BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN`: the credit note is for a refund made in the xMoney dashboard whose amount
+  our records do not hold. Run the command again with `--amount` and the amount you refunded (above).
+- `BILLING_INVOICE_NO_DASHBOARD_REFUND`: `--amount` is only for a `DASHBOARD_REFUND` line, and that charge holds no
+  refund made in the xMoney dashboard of unknown amount. For any other credit note leave `--amount` out: the site
+  credits the refund it recorded.
+- `BILLING_INVOICE_AMOUNT_ABOVE_PAYMENT`: the amount is more than the payment held (the "up to" figure the tax summary
+  gives for that charge). Check the refund in the xMoney dashboard and type its amount again.
+- `BILLING_INVOICE_DATA_MISSING`: a paid charge without its quote or customer. Tell whoever runs the server.
+- `BILLING_INVOICE_FAILED`, or any other code: the command could not finish (for example, the database did not
+  answer) and wrote nothing. Run it again later; if it repeats, tell whoever runs the server and give the code.
+
+An email that never went out is not sent again by itself, with one exception: the notice of a changed renewal amount
+(M3). The changed amount is never charged until that notice has gone out; the renewal waits and sends it again when
+its 7-business-day wait ends. For the others (the confirmation M1 with the Terms and the withdrawal form, a receipt
+M2, a withdrawal's acknowledgement M8_RECEIVED or refund M8), the line says what to tell the customer yourself; ask
+whoever runs the server for the account's address and report the code.
+
+### 14.9 The sandbox run, end to end (OWNER-RUN)
+
+Do this on a **separate, throwaway server** before switching billing on for real, never on the production host
+(the owner's ruling of 2 October 2026). The run moves the billing clock a month ahead, and a host that ever ran with
+that line must never go live (§14.8). Build the server from this kit like a new host, with its own database and no
+real accounts, and destroy it at the end (step 7). It needs its own:
+
+- **Domain and `PUBLIC_APP_URL`**: for example a `sandbox.` name of your domain pointing at it, with its own Caddy
+  site (§6). xMoney's return link and every emailed link are built from `PUBLIC_APP_URL` (§14.2), so the sandbox's
+  links lead to the sandbox server, never to the live site.
+- **Notice address in xMoney's sandbox dashboard**: in the stage dashboard (Sites → Payment Page), set the
+  notification URL to the sandbox domain followed by `/api/v1/billing/xmoney/notify` (§14.5). The live dashboard is
+  set only when the live site goes on (§14.8).
+- **Sandbox keys**: the stage site's id, public key and private key (the stage dashboard, under Sites) and the
+  Quaderno sandbox key, in the files and lines of §14.2.
+- **Dummy SmartBill line**: the API still reads `smartbill-credentials`, and it refuses a line that is not an
+  email-like user, a colon and a token. Type a dummy line of that shape at §14.2's prompt, for example
+  `sandbox@example.invalid:not-a-token`. With the `.invalid` address below nothing is ever sent, so your real SmartBill
+  token never sits on a throwaway server.
+- **Register version with `countryPolicy`**: publish (§14.4) a version that carries `billingPolicy` with
+  `enabled: true` and the `countryPolicy` member, from `deploy/vps/register/country-policy.example.json`. Without the
+  member the publish seals the version and refuses it
+  (`HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE`, §14.8), and the server cannot start billing.
+  Whether §5's four conditions for that member ("Country data") must hold on a throwaway server that only you use is
+  your call; they do hold for the live site.
+
+In `api.env` set:
+
+- `XMONEY_API_BASE_URL` to `https://api-stage.xmoney.com`;
+- `QUADERNO_API_BASE_URL` to your Quaderno account's sandbox address (its host ends in `.sandbox-quadernoapp.com`);
+- `SMARTBILL_API_BASE_URL=https://smartbill.invalid`. SmartBill has no sandbox: every invoice it issues is a real,
+  numbered fiscal document, and e-Factura sends it to ANAF. The `.invalid` name is reserved and never resolves, so an
+  accidental Romanian purchase fails harmlessly and issues nothing.
+
+The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if the stage API sits beside anything but
+Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
+builds the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the CUI is
+still in square brackets, and likewise while the company's name, registered office or general email address is
+(`BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice`, for example), because the sandbox emails print them too. In `ui.env`, set `XMONEY_SDK_ORIGIN` to `https://secure-stage.xmoney.com`. Write down what
+you see at each step; go-live row 15 needs your notes.
+
+**Before step 1: read the journal of the first start with billing on.** At each start the API runs the daily money
+check at once, so its first start against xMoney's sandbox shows whether xMoney accepts the three lists the check
+asks for (X0 records the `charge-back` one too). Two minutes after that start, run the command below. For the
+API's current start only, it prints the lines that say a list failed or our key was refused, and billing's bracketed
+markers. It should print nothing:
+
+```sh
+journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E 'listing_failed|credentials_refused|BILLING_[A-Z_]+_PENDING'
+```
+
+A `billing.reconcile.listing_failed` line with `"listing":"charge-back"` (or another list) and `XMONEY_REFUSED`
+means xMoney does not accept that list as the site asks for it: stop here, write the line down, and report it, because
+billing must not go on for real until the request is changed. Any other line it prints: look it up in the journal table of
+§14.8 and do what it says before going on. This filter prints nothing else: billing's other lines (a job that died, a
+payment mismatch, a notice the key cannot open, and the rest of the table) never reach it. To read every billing line of
+that start, run the command below as well, and look each line up in the same table; a line the table leaves out is in
+its sentence "Every other billing line records a normal event", and needs nothing:
+
+```sh
+journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E '"event":"billing\.|\[BILLING_'
+```
+
+**Every purchase in steps 1–5 is made as a buyer outside Romania.** Choose a country whose `pay` is on, for example
+Germany (DE), and answer the "Do you live in …" question with yes. The tax then goes to Germany and the invoice to
+Quaderno's sandbox. The Romanian path (SmartBill, the attached PDF) is proven only by the fake stack in step 6 and by
+the SmartBill contract tests, never in this run.
+
+**The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
+steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
+set, the billing jobs record moved times, the API asks xMoney in real time (it translates both ways), Quaderno's
+sandbox invoices carry the moved dates (harmless in a sandbox), and debates are still admitted, and their spend
+recorded, on the real clock, so the new plan's debate limits, its usage bars and a withdrawal's credit-used share are
+not part of this run (the fake stack in step 6 proves the bars and the share). The owner commands
+(`billing:withdraw`, `billing:dispute`, `billing:tax-summary`, `billing:efactura-status`, `billing:invoice`) also
+run on the real clock, so do not run them on this host while the line is set. The line never comes out: at the
+end the whole server is destroyed, its database with it (step 7).
+A host must never go live holding rows written on a moved clock; a live start refuses while any is still dated ahead
+(`BILLING_RECORDS_DATED_AHEAD`, §14.8).
+
+1. **Pay.** Sign up from the pricing page, choose Plus, pick Germany as your country, confirm it, and pay with
+   xMoney's test card 4111 1111 1111 1111 (expiry 12/26, any CVV).
+   - Expect: the plan is active within seconds, and the confirmation (M1) and receipt (M2) emails arrive.
+   - Then, on a second test account (Germany again: this account already has Plus, so a second checkout on it is
+     refused with `ALREADY_SUBSCRIBED`), pay for Plus with the 3-D Secure card 5555 5555 5555 5599 (12/34, CVV 123,
+     code 00000) and note whether the bank's check opened a pop-up window (§14.5).
+2. **Renew.** Move the billing clock forward by a month.
+   - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
+   - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing.
+     (Its second command, which reads every billing line, now shows the renewal's own lines too.)
+   - Within two minutes, a renewal charge appears in the xMoney stage dashboard and a second receipt email arrives.
+   - The API refuses to start with `BILLING_STAGE_CLOCK_LIVE_REFUSED` if the offset is set while
+     `XMONEY_API_BASE_URL` is not the stage API.
+
+```sh
+sudoedit /etc/debateai/api.env
+```
+
+```sh
+systemctl restart debateai-api
+```
+
+3. **A failing card, at the card check.** In Settings, use Update card with the failing test card
+   5168 4948 9505 5780.
+   - Expect xMoney to refuse it at the card check itself: the page says the card couldn't be checked, and the old
+     card stays saved. Write down what you saw (an X0 finding).
+   - A saved card therefore never fails at a renewal in the sandbox. The three "we couldn't take the payment" emails
+     (M5a–c) and the move to Free (M6) are proven by the fake stack in step 6, not here.
+4. **Withdraw.** On a fresh test account (Germany again), pay for Plus, then in Settings press Withdraw within 14 days
+   and confirm with your password and authenticator code.
+   - Expect a partial refund in the xMoney stage dashboard, the refund email (M8), and the Free plan.
+5. **Cancel through the emailed link.** On another test account (Germany again), pay for Plus first: a cancel link is
+   sent only for a plan that is paid and not cancelled yet. Then open `/cancel` signed out and enter the account's
+   email.
+   - Open the link in the email (M9) and press the button.
+   - Expect the cancellation email (M7), and Settings saying when the plan ends.
+6. **What the sandbox cannot show.** The fake stack proves the rest: a failing card through the retries to Free, a
+   card from a blocked country refunded in full and its checkout ended, a rebill whose answer was lost adopted without
+   a second charge, the Romanian invoice (its line at 21 % and its PDF attached to the receipt), the amount a renewal
+   charges (the plan's price plus tax worked out again on the day) and the amount a withdrawal refunds, both checked at
+   the fake xMoney, an upgrade (the part-month price difference charged, and the new plan's extra debate credit for the
+   rest of the month), an account deletion (the renewal stopped at once, the paid plan kept until the deletion runs,
+   then ended), a payment whose notice never arrived found and settled by the daily money check, the quarter's summary
+   email to you and the email you get at once when an invoice job fails,
+   and a card dispute found by the daily money check: the plan paused once, with one email, counted
+   once in the quarter summary, and given back by `billing:dispute --outcome won`. Run both commands below from the
+   repository's `dialectical-engine` folder on your own computer, not on the host (each starts its own database and
+   fakes, and never touches the stage keys). Start the second only after the first has finished, because each starts
+   its own database:
+
+```sh
+pnpm exec vitest run tests/integration/billing-whole-flow.test.ts
+```
+
+```sh
+pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts
+```
+
+After the run, count what the sandbox server's database recorded. You should see one `SUCCEEDED` per paid charge and
+one `REFUNDED` per refund:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT kind, count(*) FROM billing.charge_event GROUP BY kind ORDER BY kind"
+```
+
+No charge may be left with an unknown outcome. This lists each charge that has a `SUBMIT_UNKNOWN` and neither a
+`SUCCEEDED` nor a `FAILED`; it should print no row:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT c.charge_id, c.kind, c.created_at FROM billing.charge c WHERE EXISTS (SELECT 1 FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) ORDER BY c.created_at"
+```
+
+7. **Destroy the sandbox server.** Once your notes are written and both fake-stack runs have passed, delete the server
+   and its disks at your hosting provider, remove the sandbox domain's DNS record, and clear the notification URL in
+   xMoney's stage dashboard. If you set up its nightly backup (§9), it must have had its own storage: delete that
+   too. Never copy its database, a backup of it or its `api.env` to the live host, and never point the sandbox
+   server at live: go live on the production host, as §14.8 says.

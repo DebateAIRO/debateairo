@@ -39,7 +39,7 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   const url = new URL(database.connectionString);
-  url.searchParams.set("options", "-c role=debateai_runtime");
+  url.searchParams.set("options", "-c role=debateai_billing_runtime");
   runtime = createPool(url.toString());
   repository = new PostgresIdentityRepository(runtime, audit);
 }, 120_000);
@@ -47,7 +47,7 @@ afterAll(async () => { await runtime?.end(); await database?.stop(); });
 
 describe("0095 encrypted manual phone and optional recovery", () => {
   it("creates two accounts sharing a phone under runtime privileges with SQL-null recovery and atomic legal evidence", async () => {
-    expect((await runtime.query("SELECT current_user AS role")).rows[0].role).toBe("debateai_runtime");
+    expect((await runtime.query("SELECT current_user AS role")).rows[0].role).toBe("debateai_billing_runtime");
     for (const account of [fixture(), fixture()]) {
       const result = await repository.createPendingAccount(account.input, async () => undefined);
       expect(result.status).toBe("created");
@@ -108,7 +108,8 @@ describe("0095 encrypted manual phone and optional recovery", () => {
       const current = `identity.${name.replace('create_pending_account_','create_pending_account_reserved_')}(${reservedSignature}${suffix})`;
       expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [`identity.${name}(${phoneSignature}${suffix})`])).rows[0].allowed).toBe(false);
       expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [old])).rows[0].allowed).toBe(false);
-      expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [current])).rows[0].allowed).toBe(true);
+      expect((await database.pool.query("SELECT has_function_privilege('debateai_billing_runtime',$1,'EXECUTE') AS allowed", [current])).rows[0].allowed).toBe(true);
+      expect((await database.pool.query("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [current])).rows[0].allowed).toBe(name.endsWith('with_audit'));
       for (const role of ["public", "debateai_replay", "debateai_erasure_runtime", "debateai_publication_cleanup", "debateai_content_provision"]) {
         expect((await database.pool.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS allowed", [role, current])).rows[0].allowed).toBe(false);
       }

@@ -1457,7 +1457,7 @@ html.theme-transition-fallback body *::after {
   align-items: center;
   gap: 14px;
   flex: 1;
-  min-width: 0;
+  min-width: auto;
 }
 
 .topBarDivider {
@@ -1470,6 +1470,12 @@ html.theme-transition-fallback body *::after {
   font-size: 13.5px;
   font-weight: 600;
   color: var(--text-2);
+  flex: 1 1 auto;
+  contain: inline-size;
+  min-width: 1em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topBarActions {
@@ -1477,6 +1483,12 @@ html.theme-transition-fallback body *::after {
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
+}
+.topBarNewLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 769.98px) {
+  .topBarActions > .topBarWide { display: none; }
+  .topBarActions { flex: 0 1 auto; min-width: 0; }
+  .topBarActions > .btnDark { flex: 0 1 auto; min-width: 0; }
 }
 
 /* ============================================================
@@ -4779,7 +4791,7 @@ a:focus-visible {
   .topBarActions {
     min-width: 0;
     gap: 6px;
-    margin-left: auto;
+    margin-inline-start: auto;
   }
   .topBarActions .btn {
     padding-inline: 10px;
@@ -5719,6 +5731,7 @@ a:focus-visible {
   transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .lpCtaNav { gap: 10px; padding: 8px 8px 8px 20px; font-size: 13.5px; }
+.lpCtaLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lpCtaHero { gap: 14px; padding: 12px 12px 12px 30px; font-size: 15.5px; box-shadow: var(--lp-btn-shadow); }
 .lpCtaClosing { gap: 14px; padding: 14px 14px 14px 34px; font-size: 16.5px; box-shadow: var(--lp-btn-shadow); }
 .lpCtaNav:hover { transform: none; }
@@ -5773,6 +5786,12 @@ a:focus-visible {
   font-size: 13.5px;
   font-weight: 500;
   color: var(--muted);
+}
+@media (max-width: 753.98px) {
+  .lpNav { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 10px; row-gap: 6px; padding-left: 14px; max-width: calc(100% - 24px); }
+  .lpNavLinks { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
+  .lpCtaNav { min-width: 0; }
+  .lpCtaNav .lpArrow { display: none; }
 }
 
 /* Hero stat bar */
@@ -6767,6 +6786,11 @@ a:focus-visible {
   color: var(--text-3);
   white-space: nowrap;
 }
+/* Final review C1: the plain line a plan card shows when it names no models. */
+.ndTierModelsNote {
+  font-size: 10.5px;
+  color: var(--text-3);
+}
 .ndSegItem:disabled,
 .ndSlider:disabled,
 .ndSteerInput:disabled,
@@ -6796,6 +6820,55 @@ a:focus-visible {
 
 /* Sign-up stacks its password rules; sign-in wraps them on one line. */
 .authRules[data-stack="true"] { flex-direction: column; gap: 3px; }
+
+/* === region-picker S01 === */
+/* Turn 8 · 8a Region field (docs/missions/region-picker/slices/S01/DONE.md §2-§3). Tokens only. */
+.regionField { position: relative; z-index: 30; }
+.regionPicker { position: relative; z-index: 30; container-type: inline-size; }
+.regionTrigger { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 13px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--shell); color: var(--ink); font-family: var(--font-sans); font-size: 12px; text-align: start; cursor: pointer; }
+.regionTrigger[aria-expanded="true"] { border-color: var(--con); }
+.regionTrigger:disabled { cursor: default; }
+.regionFlag { flex: none; font-size: 15px; line-height: 1; }
+.regionName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.regionPath { flex: 0 1 auto; min-width: 0; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; color: var(--muted); }
+.regionChevron { flex: none; font-size: 9px; color: var(--muted); }
+.regionPopover { position: absolute; left: 0; right: 0; top: calc(100% + 8px); z-index: 30; max-height: 300px; overflow: auto; padding: 8px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--core); box-shadow: var(--shadow-pop); }
+.regionHeader, .regionContinentTitle { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .16em; color: var(--muted); }
+.regionHeader { padding: 4px 8px 8px; }
+.regionContinent { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-sans); text-align: start; cursor: pointer; }
+.regionContinentName { flex: 1; font-size: 12px; font-weight: 500; }
+.regionCount { font-size: 10.5px; color: var(--muted); }
+.regionChevronRight { font-size: 11px; color: var(--muted); }
+.regionTop { display: flex; align-items: center; gap: 8px; padding: 2px 4px 8px; }
+.regionBack { padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink); font-family: var(--font-sans); font-size: 11px; font-weight: 600; cursor: pointer; }
+.regionGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+@container (max-width: 299px) {
+  .regionGrid { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 299px) {
+  .regionTrigger:has(.regionFlag) { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 10px; row-gap: 4px; }
+  .regionTrigger:has(.regionFlag) .regionFlag { grid-column: 1; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionName { grid-column: 2; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionChevron { grid-column: 3; grid-row: 1; }
+  .regionTrigger:has(.regionFlag) .regionPath { grid-column: 2 / 4; grid-row: 2; max-width: none; }
+}
+.regionCountry { min-width: 0; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-sans); text-align: start; cursor: pointer; }
+.regionCountry[data-picked="true"] { background: var(--shell); }
+.regionCellFlag { font-size: 14px; line-height: 1; }
+.regionCellCode { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--muted); }
+.regionCellName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; font-weight: 500; }
+.regionCountry[data-picked="true"] .regionCellName { font-weight: 700; }
+@container (max-width: 299px) {
+  .regionCellName { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+}
+.regionDiamond { flex: 0 0 auto; width: 7px; height: 7px; transform: rotate(45deg); background: var(--gold); opacity: 0; }
+.regionCountry[data-picked="true"] .regionDiamond { opacity: 1; }
+.regionContinent:hover, .regionCountry:hover { background: color-mix(in oklch, var(--muted) 12%, transparent); }
+.regionTrigger:focus-visible, .regionContinent:focus-visible, .regionBack:focus-visible, .regionCountry:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.regionState { margin-top: 10px; }
+.regionStateSelect { width: 100%; height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--shell); color: var(--ink); font-family: var(--font-sans); font-size: 12px; font-weight: 600; cursor: pointer; }
+.regionStateSelect[data-state="bad"] { border-color: var(--dispute-text); }
+/* === end region-picker S01 === */
 
 /* 8b — the enrolment card is wider than the auth card and carries
    three numbered steps whose state is the real enrolment state. */
@@ -7228,7 +7301,23 @@ a:focus-visible {
 }
 
 .libList { display: flex; flex-direction: column; gap: 10px; }
+/* T3-C2-3 (V 2026-09-28): the row is the two-layer card of the tree — a shell
+   tray around a core body. The core keeps the former single box unchanged;
+   the shell radius is the core's 13px plus its 4px padding, so the corners
+   stay concentric. */
 .libRow {
+  display: block;
+  background: var(--shell);
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  padding: 4px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s;
+}
+.libRow:hover { transform: translateX(4px); border-color: var(--line-strong); }
+.libRowCore {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -7236,12 +7325,7 @@ a:focus-visible {
   border: 1px solid var(--line);
   border-radius: 13px;
   padding: 14px 18px;
-  color: inherit;
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s;
 }
-.libRow:hover { transform: translateX(4px); border-color: var(--line-strong); }
 .libRowBody { flex: 1; min-width: 0; }
 .libRowClaim {
   font-family: var(--font-display);
@@ -7323,7 +7407,7 @@ a:focus-visible {
 @media (max-width: 720px) {
   .libScreen { padding: 28px 20px 36px; }
   .libTitle { font-size: 28px; }
-  .libRow { flex-wrap: wrap; gap: 10px; }
+  .libRowCore { flex-wrap: wrap; gap: 10px; }
   .libRowBody { flex: 1 1 100%; }
 }
 
@@ -7960,11 +8044,33 @@ a:focus-visible {
 .nodeArgHeader { justify-content: space-between; }
 .nodeScoreRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  row-gap: 7px;
   min-height: 21px;
   margin-bottom: 11px;
 }
+/* The second-opinion mark (V 2026-09-28) takes its own line under the scores,
+   so BASE and FINAL stay side by side; `order` keeps it after the sourcing pill
+   that follows the scoring boundary. The label carries the outcome colour the
+   dot already uses; the checker reads as the Thread view's reviewer pill. */
+.nodeScoreRow .nodeReviewBadges {
+  order: 1;
+  flex: 1 0 100%;
+  min-width: 0;
+  gap: 4px 6px;
+}
+.nodeReviewLabel {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.nodeReviewBadges[data-review="agreed"] .nodeReviewLabel { color: var(--agree-text); }
+.nodeReviewBadges[data-review="disputed"] .nodeReviewLabel { color: var(--dispute-text); }
+.nodeReviewBadges .reviewerPill { max-width: 100%; background: var(--shell); border-color: var(--line-strong); }
 .roleBadge {
   gap: 5px;
   padding: 3px 9px;
@@ -9771,10 +9877,12 @@ a:focus-visible {
 }
 
 /* === consent-ui S01 === */
-/* Slice S01 — cookie consent: the bar (10a) and the preferences card (10b).
-   The ONE delimited block this slice may append, at the very end of the file
-   (S01-R25). Every colour here is a var(--token) reference; the ten tokens the
-   slice adds live in the two token blocks at the top, which S01 also owns. */
+/* Slice S01 — the cookie notice: the bar (10a) and the storage card (10b), a
+   read-only list of the eight items DebateAI stores (mission cookie-compliance,
+   DONE.md artboards S01-01..S01-18). The ONE delimited block this slice may
+   append, at the very end of the file (S01-R25). Every colour here is a
+   var(--token) reference; the tokens it uses live in the two token blocks at
+   the top. */
 
 .consentBar {
   position: fixed;
@@ -9868,9 +9976,11 @@ a:focus-visible {
 
 .consentGhostStrong { color: var(--ink); }
 
-/* Borderless, because the design is: 10a's `Accept all` and 10b's `Save
-   choices` are drawn with padding and no border (turn-10-cookie-consent.html:39,
-   :130). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
+/* The bar's `Cookie policy` link keeps its label on one line (DONE.md 10a). */
+.consentActions .consentLink { white-space: nowrap; }
+
+/* Borderless, because the design is: 10a's `OK` and 10b's `Close` are drawn
+   with padding and no border (turn-10-cookie-consent.html:39, :130; DONE.md). With `* { box-sizing: border-box }` (:176-177) and `width: auto` the
    used size is content + padding + border, so a 1px edge the artboard omits
    ships the primary 2px taller and 2px wider — and breaks the equality the
    design builds on, where a ghost pill's `9px 15px` + 1px border and a
@@ -9897,7 +10007,7 @@ a:focus-visible {
 
 /* 10a's own spring, transcribed from the artboard
    (turn-10-cookie-consent.html:39) and scoped to the BAR's primary: 10b draws
-   `Save choices` with no transition, and one class serving two artboards must
+   `Close` with no transition, and one class serving two artboards must
    take each artboard's values (CODE-REV-S01-C3C4 r1 N1's class, N4's ruling).
    Its reduced-motion counterpart is the block at the end of this file. */
 .consentBar .consentPrimary {
@@ -9906,9 +10016,8 @@ a:focus-visible {
 
 .consentBar .consentPrimary:hover { transform: scale(1.04); }
 
-/* --- 10b: the preferences card. One presentation serves both entry points
-   (the bar's "Choose what to store" and Settings -> Privacy), because there is
-   no bar in Settings to replace or to grow from (S01-R14). --- */
+/* --- 10b: the storage card. One presentation serves every door (the bar's
+   "What we store", both footers, Settings -> Privacy and /cookies). --- */
 
 .consentScrim {
   position: fixed;
@@ -9983,13 +10092,22 @@ a:focus-visible {
 
 .consentCatMain { flex: 1; min-width: 0; }
 
-.consentCatHead { align-items: center; display: flex; gap: 8px; }
+.consentCatHead {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  row-gap: 4px;
+}
 
-.consentCatName {
+/* The item's stored name, never translated; a long name breaks rather than
+   widening the card (DONE.md 10b, S01-05 at 375). */
+.consentItemName {
   color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 12.5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .consentTag {
@@ -10001,22 +10119,12 @@ a:focus-visible {
   padding: 2px 8px;
 }
 
-.consentTag-essential {
-  background: var(--ok-bg);
-  border: 1px solid var(--ok-border);
-  color: var(--ok-dot);
-}
-
-.consentTag-quality {
-  background: var(--gold-bg);
-  border: 1px solid var(--gold-border);
-  color: var(--gold);
-}
-
-.consentTag-analytics {
+/* The kind pill, in the item's exact case (DONE.md default 5). */
+.consentTag-kind {
   background: var(--muted-bg);
   border: 1px solid var(--muted-border);
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .consentCatDesc {
@@ -10034,46 +10142,6 @@ a:focus-visible {
   margin-top: 5px;
 }
 
-.consentSwitch {
-  align-items: center;
-  background: var(--shell);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-pill);
-  box-sizing: border-box;
-  cursor: pointer;
-  display: flex;
-  flex: 0 0 auto;
-  height: 22px;
-  justify-content: flex-start;
-  margin-top: 2px;
-  padding: 2px;
-  width: 38px;
-}
-
-.consentSwitch[aria-checked="true"] {
-  background: var(--ok-dot);
-  border-color: var(--ok-edge);
-  justify-content: flex-end;
-}
-
-/* The locked track keeps the design's softer fill so "on and not yours to
-   change" reads differently from "on because you chose it" (design-data.js:44). */
-.consentSwitch[aria-checked="true"][aria-disabled="true"] { background: var(--ok-soft); }
-
-.consentSwitch[aria-disabled="true"] { cursor: not-allowed; }
-
-.consentSwitch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-
-.consentKnob {
-  background: var(--muted);
-  border-radius: var(--r-dot);
-  box-shadow: var(--shadow-knob);
-  height: 16px;
-  width: 16px;
-}
-
-.consentSwitch[aria-checked="true"] .consentKnob { background: var(--core); }
-
 .consentCardFooter {
   align-items: center;
   display: flex;
@@ -10081,9 +10149,9 @@ a:focus-visible {
   margin-top: 18px;
 }
 
-/* 10b draws `Save choices` one pixel tighter each side than 10a draws `Accept
-   all` (`padding:10px 18px` at turn-10-cookie-consent.html:130, against
-   `10px 19px` at :39). One class serves both surfaces, so the second artboard
+/* 10b draws `Close` one pixel tighter each side than 10a draws `OK`
+   (`padding:10px 18px` at turn-10-cookie-consent.html:130, against `10px 19px`
+   at :39; DONE.md S01-04). One class serves both surfaces, so the second artboard
    states its own value here rather than inheriting the first's
    (CODE-REV-S01-C3C4 r1 N1). */
 .consentCardFooter .consentPrimary { padding: 10px 18px; }
@@ -10123,6 +10191,8 @@ a:focus-visible {
   }
 
   .consentActions { flex-wrap: wrap; }
+
+  .consentActions .consentLink { flex: 0 0 auto; }
 
   .consentGhost,
   .consentPrimary {

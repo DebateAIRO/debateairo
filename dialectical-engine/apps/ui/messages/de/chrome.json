@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukarest, Rumänien",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Startseite",
-  "chrome.footer.cookiePreferences": "Cookie-Einstellungen",
+  "chrome.footer.cookiePreferences": "Gespeicherte Cookies",
   "chrome.security": "Sicherheit",
   "chrome.logout": "Abmelden",
-  "chrome.accountError": "Das hat nicht funktioniert. Laden Sie die Seite neu und versuchen Sie es erneut."
+  "chrome.accountError": "Das hat nicht funktioniert. Laden Sie die Seite neu und versuchen Sie es erneut.",
+  "chrome.footer.pricing": "Preise",
+  "chrome.footer.cancel": "Tarif kündigen",
+  "chrome.footer.withdraw": "Tarif widerrufen",
+  "chrome.footer.paymentMarks": "Akzeptierte Karten",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

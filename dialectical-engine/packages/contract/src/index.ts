@@ -7,17 +7,25 @@ import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
 export * from "./consumer-auth.js";
-import { ABSTENTION_KINDS, CONDITION_MARKS, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 export * from "./crisis.js";
+export * from "./romania-address.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
 export const AskTierSourceSchema = z.enum(["ASKER", "MACHINE_DEFAULT"]);
 export const CompositionBudgetTierSchema = z.enum(["low", "medium", "high"]);
+/**
+ * Model-scorecard design, the model-strength control (owner ruling R2): Economy, Balanced or
+ * Best, minted in @debateai/kernel. OPTIONAL on the ask, because "absent" must stay
+ * distinguishable: the default is the active scorecard's pickerSettings.defaultStrength, or
+ * BALANCED when there is none.
+ */
+export const ModelStrengthSchema = z.enum(MODEL_STRENGTHS);
 export const WayOfKnowingSchema = z.enum(["LOOKED_UP", "RAN", "REASONING"]);
 export const CheckStatusSchema = z.enum(["PASS", "FAIL", "NOT_SAMPLED"]);
 export const StalenessStateSchema = z.enum(["FRESH", "UNDER_REVIEW", "STALE", "ARCHIVED_REVIVED"]);
@@ -164,6 +172,7 @@ export const AskRequestSchema = z.object({
   as_of: z.iso.datetime(),
   steering_presets: z.array(z.string().trim().min(1)),
   plan_tier: PlanTierSchema,
+  model_strength: ModelStrengthSchema.optional(),
   steering_annotations: z.array(z.string().min(1))
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
@@ -219,7 +228,12 @@ export const AskAcceptedSchema = z.object({
   // Final review Part 1b, Important 1: only on a WAITING answer whose person's
   // own running debates are all that fill their windows (a person scope).
   waits_for: WaitsForSchema.optional(),
-  applied: AskAppliedSchema.optional()
+  applied: AskAppliedSchema.optional(),
+  // Model-scorecard design, cost estimate before a run: the strength the picker applied, and
+  // whether the per-run money ceiling stepped it down. Optional, so an accepted ask without
+  // them reads exactly as before (QUEUED or WAITING alike; paid plans S1a).
+  model_strength_applied: ModelStrengthSchema.optional(),
+  model_strength_stepped_down: z.boolean().optional()
 }).strict().superRefine((accepted, context) => {
   const waiting = accepted.status === "WAITING";
   if (waiting !== (accepted.waits_until !== undefined) || waiting !== (accepted.waiting_scope !== undefined)) {
@@ -322,6 +336,201 @@ const InternalBillingUsageResponseSchema = z.object({
 }).strict();
 export const BillingUsageResponseSchema = z.union([CustomerBillingUsageResponseSchema,InternalBillingUsageResponseSchema]);
 export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
+
+/** Paid-plans spec §2.5.3: money crosses the wire as a decimal string with exactly two places, "20.00". */
+export const BillingDecimalMoneySchema = z.string().regex(/^(?:0|[1-9]\d{0,8})\.\d{2}$/);
+
+/** GET /v1/billing/plans (public). Credit is never shown in dollars: "4" reads "4× the Plus allowance". */
+export const BillingPlansResponseSchema = z.object({
+  currency: z.literal("USD"),
+  plans: z.array(z.object({
+    plan_id: PlanIdSchema,
+    net_price: BillingDecimalMoneySchema,
+    allowance_vs_plus: z.string().regex(/^\d+(?:\.\d+)?$/)
+  }).strict()).min(1)
+}).strict();
+export type BillingPlansResponse = z.infer<typeof BillingPlansResponseSchema>;
+
+const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
+
+/** POST /v1/billing/quote (paid-plans spec §2.5.3; P19's pre-fill makes `country` optional; R-15 adds `name`). */
+export const BillingQuoteRequestSchema = z.object({
+  plan_id: PlanIdSchema.exclude(["FREE"]),
+  /** Absent: the country of the caller's address is used, and answered back as `country`. */
+  country: BillingIso2Schema.optional(),
+  /** The buyer's own name; a Romanian invoice needs it (or the company's). */
+  name: z.string().trim().min(1).max(256).optional(),
+  /** The county (RO) or state (US/CA). */
+  region: z.string().trim().min(1).max(64).optional(),
+  postal_code: z.string().trim().min(1).max(16).optional(),
+  city: z.string().trim().min(1).max(128).optional(),
+  company: z.object({
+    name: z.string().trim().min(1).max(256),
+    vat_id: z.string().trim().min(2).max(32),
+    address: z.string().trim().min(1).max(512)
+  }).strict().optional()
+}).strict();
+export type BillingQuoteRequest = z.infer<typeof BillingQuoteRequestSchema>;
+
+/** The page builds "VAT 21% (Romania)" itself (spec §2.5.3) from tax_name, the rate and the country. */
+export const BillingQuoteResponseSchema = z.object({
+  quote_ref: z.uuid(),
+  plan_id: PlanIdSchema.exclude(["FREE"]),
+  net: BillingDecimalMoneySchema,
+  tax: BillingDecimalMoneySchema,
+  total: BillingDecimalMoneySchema,
+  tax_name: z.string().min(1).max(64),
+  /** Basis points; a US rate may be fractional (8.875 % = 887.5). */
+  tax_rate_bp: z.number().min(0).max(10_000),
+  tax_country: BillingIso2Schema,
+  tax_region: z.string().max(64).nullable(),
+  tax_status: z.enum(["TAXABLE", "NON_TAXABLE", "NOT_REGISTERED", "REVERSE_CHARGE"]),
+  /** The country the quote was made for: the one sent, or the connection's. */
+  country: BillingIso2Schema,
+  /** The connection's country; sentence G3 names it when `country_confirm_needed`. */
+  ip_country: z.string().regex(/^[A-Z]{2}$/),
+  country_confirm_needed: z.boolean(),
+  /** R-15: the invoice issuer needs the buyer's name, city and county before the checkout can start. */
+  address_required: z.boolean(),
+  renews_on: z.iso.datetime(),
+  /** Null where no withdrawal right applies (outside `withdrawalCountries`). */
+  withdrawal_days: z.number().int().positive().nullable(),
+  expires_at: z.iso.datetime()
+}).strict();
+export type BillingQuoteResponse = z.infer<typeof BillingQuoteResponseSchema>;
+
+const BillingDocumentPairSchema = z.object({
+  version: z.string().min(1).max(64),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/)
+}).strict();
+
+export const BillingCheckoutRequestSchema = z.object({
+  quote_ref: z.uuid(),
+  /** The interface locale the consents were shown in; it is also the locale of every billing email. */
+  locale: z.string().regex(/^[a-z]{2}$/),
+  consents: z.object({ renewal_terms: BillingDocumentPairSchema, immediate_start: BillingDocumentPairSchema }).strict(),
+  country_confirmed: z.literal(true).optional()
+}).strict();
+export type BillingCheckoutRequest = z.infer<typeof BillingCheckoutRequestSchema>;
+
+export const BillingCheckoutResponseSchema = z.object({
+  public_key: z.string().min(1).max(256),
+  order_payload: z.string().min(1).max(16_384),
+  order_checksum: z.string().min(1).max(512),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/),
+  sdk_environment: z.enum(["stage", "live"])
+}).strict();
+export type BillingCheckoutResponse = z.infer<typeof BillingCheckoutResponseSchema>;
+
+/**
+ * The 409 body the checkout answers while a payment for the person's open checkout is already on its way (a stored
+ * notice, an open check or an xMoney transaction for that charge): the page waits on `charge_ref` instead of
+ * mounting a second card form (D7 #5).
+ */
+export const BillingCheckoutPendingErrorSchema = z.object({
+  error: z.literal("CHECKOUT_PENDING"),
+  message: z.literal("CHECKOUT_PENDING"),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/)
+}).strict();
+/** What `startBillingCheckout` resolves to for that 409, beside the signed order. */
+export type BillingCheckoutPendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
+
+/** NEEDS_ACTION: the bank declined and the person can try again; FAILED: refused or voided, final. */
+export const BillingChargeStatusResponseSchema = z.object({
+  state: z.enum(["PENDING", "SUCCEEDED", "FAILED", "NEEDS_ACTION"]),
+  reason_code: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/).nullable()
+}).strict();
+export type BillingChargeStatusResponse = z.infer<typeof BillingChargeStatusResponseSchema>;
+
+/**
+ * The paid subset of B7a's `PlanIdSchema`: a subscription is never on Free (0085 CHECKs plan_id IN PLUS/PRO/MAX).
+ * tests/unit/billing-subscription-view.test.ts pins every member to `PlanIdSchema`.
+ */
+export const SubscribedPlanIdSchema = z.enum(["PLUS", "PRO", "MAX"]);
+
+export const BillingSubscriptionResponseSchema = z.object({
+  subscription: z.object({
+    plan_id: SubscribedPlanIdSchema,
+    status: z.enum(["CREATED", "ACTIVE", "PAST_DUE", "SUSPENDED", "ENDED", "WITHDRAWN"]),
+    cancel_requested: z.boolean(),
+    current_period_end: z.iso.datetime().nullable(),
+    renews_on: z.iso.datetime().nullable(),
+    renewal_total: BillingDecimalMoneySchema.nullable(),
+    scheduled_downgrade_plan_id: SubscribedPlanIdSchema.nullable(),
+    withdrawal_open_until: z.iso.datetime().nullable(),
+    /** The window's last day in the consumer's own calendar (the UI's "withdraw until {date}"); null with no window. */
+    withdrawal_last_day: z.iso.date().nullable(),
+    can_upgrade: z.boolean(),
+    can_change_card: z.boolean(),
+    /** C-15: Settings offers "Undo cancellation" only when the revoke route would accept it. */
+    can_revoke_cancel: z.boolean()
+  }).strict().nullable()
+}).strict();
+export type BillingSubscriptionResponse = z.infer<typeof BillingSubscriptionResponseSchema>;
+
+/** A downgrade target is a paid plan below Max; Free is reached by cancelling. */
+export const BillingDowngradeRequestSchema = z.object({ plan_id: z.enum(["PLUS", "PRO"]) }).strict();
+
+export const BillingInvoicesResponseSchema = z.object({
+  invoices: z.array(z.object({
+    number: z.string().min(1).max(64),
+    issued_on: z.iso.date(),
+    total: BillingDecimalMoneySchema,
+    kind: z.enum(["INVOICE", "CREDIT_NOTE"]),
+    url: z.url().nullable()
+  }).strict())
+}).strict();
+export type BillingInvoicesResponse = z.infer<typeof BillingInvoicesResponseSchema>;
+
+/** P12c: an upgrade goes to a dearer paid plan; Plus is never an upgrade target. */
+export const BillingUpgradeQuoteRequestSchema = z.object({ plan_id: z.enum(["PRO", "MAX"]) }).strict();
+/**
+ * P12c (A7): the prorated difference with its tax, and the new plan's full recurring total the next renewal charges.
+ * `tax_rate_basis_points` is not required to be whole: a US combined rate such as 8.875 % is 887.5 basis points
+ * (0085's `numeric(8,2)`).
+ */
+export const BillingUpgradeQuoteResponseSchema = z.object({
+  quote_ref: z.uuid(),
+  plan_id: z.enum(["PRO", "MAX"]),
+  net: BillingDecimalMoneySchema,
+  tax: BillingDecimalMoneySchema,
+  total: BillingDecimalMoneySchema,
+  tax_name: z.string().min(1).max(64),
+  tax_rate_basis_points: z.number().nonnegative().max(10_000),
+  tax_country: z.string().regex(/^[A-Z]{2}$/u),
+  recurring_total: BillingDecimalMoneySchema,
+  renews_on: z.iso.datetime(),
+  expires_at: z.iso.datetime()
+}).strict();
+export type BillingUpgradeQuoteResponse = z.infer<typeof BillingUpgradeQuoteResponseSchema>;
+export const BillingUpgradeRequestSchema = z.object({ plan_id: z.enum(["PRO", "MAX"]), quote_ref: z.uuid() }).strict();
+/** P12c: the upgrade charge's state; the plan changes only once VERIFY_PAYMENT confirms the payment. */
+export const BillingUpgradeResponseSchema = z.object({
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u),
+  state: z.enum(["PENDING", "SUCCEEDED", "FAILED"]),
+  reason_code: z.enum(["PAYMENT_DECLINED", "VOIDED", "REBILL_REFUSED", "NO_TRANSACTION"]).nullable()
+}).strict();
+export type BillingUpgradeResponse = z.infer<typeof BillingUpgradeResponseSchema>;
+/** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
+export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
+/**
+ * `refund`: what goes back to the card. Null when a refund made in the xMoney dashboard already touched a payment:
+ * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).
+ */
+export const BillingWithdrawResponseSchema = z.object({ refund: BillingDecimalMoneySchema.nullable() }).strict();
+export type BillingWithdrawResponse = z.infer<typeof BillingWithdrawResponseSchema>;
+/**
+ * P12e (A12): the card form's signed order, as checkout's, plus the hold the server signed — the amount the page
+ * names before "Save card" ("1.00" today, "0.00" if X0 shows `auth` takes a zero amount).
+ */
+export const BillingCardChangeResponseSchema = BillingCheckoutResponseSchema.extend({
+  hold_amount: BillingDecimalMoneySchema
+}).strict();
+export type BillingCardChangeResponse = z.infer<typeof BillingCardChangeResponseSchema>;
+/** Any string shaped like an address; whether it belongs to anyone is never answered. */
+export const BillingCancelLinkRequestSchema = z.object({ email: z.string().min(3).max(320) }).strict();
+export const BillingCancelLinkAcceptedSchema = z.object({ status: z.literal("ACCEPTED") }).strict();
+export const BillingCancelByTokenRequestSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
 
 /**
  * The language a run's question was argued in (spec 2026-09-26 §14.3): dev's
@@ -453,7 +662,8 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("REMOVE_AUTH_METHOD"), target_factor_id: z.uuid() }).strict(),
   z.object({ action: z.enum(["LINK_PROVIDER", "UNLINK_PROVIDER"]), target_provider: z.enum(["google", "apple", "facebook", "x"]) }).strict(),
   z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
-  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]) }).strict()
+  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]) }).strict(),
+  z.object({ action: z.literal("WITHDRAW_SUBSCRIPTION") }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({ token:z.string().regex(/^[A-Za-z0-9_-]{43}$/), action:z.literal("REMOVE_AUTH_METHOD"), target_factor_id:z.uuid(), expires_at:z.iso.datetime() }).strict(),
@@ -472,6 +682,11 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]),
+    expires_at: z.iso.datetime()
+  }).strict(),
+  z.object({
+    token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    action: z.literal("WITHDRAW_SUBSCRIPTION"),
     expires_at: z.iso.datetime()
   }).strict()
 ]);
@@ -943,6 +1158,41 @@ export const PublicDebateSchema = z.object({
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
+/**
+ * A21 — WHICH MODELS WERE CHOSEN FOR EACH DEBATE JOB, projected from the run's
+ * pinned role assignment (core.run_role_assignment); absent when the run pinned
+ * none (no scorecard was in force) OR its pin could not be read (A21.1 fix
+ * round 1: omitted whole and reported to the operator as
+ * ANSWER_MODEL_ASSIGNMENT_INVALID), so an absent field never proves which of
+ * the two happened. Owner decisions O1/O3: the honesty drawer
+ * shows visitors only the model names per job and never the step-down; this
+ * full detail is for the JSON export and audit. Engine identifiers only —
+ * makers, model ids, thinking levels — never a provider route, a candidate id,
+ * a price or a prompt.
+ */
+const AnswerModelSeatSchema = z.object({
+  maker: z.string().min(1),
+  model_id: z.string().min(1),
+  thinking_level: z.string().min(1)
+}).strict();
+
+export const AnswerModelAssignmentSchema = z.object({
+  strength: ModelStrengthSchema,
+  stepped_down: z.boolean(),
+  scorecard_version: z.number().int().positive().nullable(),
+  roles: z.array(z.object({
+    role: z.enum(DEBATE_ROLES),
+    seats: z.array(z.object({
+      seat_index: z.number().int().nonnegative(),
+      source: z.enum(["SCORECARD", "FALLBACK"]),
+      main: AnswerModelSeatSchema,
+      runner_up: AnswerModelSeatSchema.nullable(),
+      runner_up_share: z.number().min(0).max(1)
+    }).strict())
+  }).strict())
+}).strict();
+export type AnswerModelAssignment = z.infer<typeof AnswerModelAssignmentSchema>;
+
 export const AnswerSchema = z.object({
   answer_id: z.string().min(1),
   answer_version: z.number().int().positive(),
@@ -1013,7 +1263,9 @@ export const AnswerSchema = z.object({
   inspection_handle: z.string().min(1),
   as_of: z.iso.datetime(),
   staleness_state: StalenessStateSchema,
-  relevant_as_of: z.iso.datetime()
+  relevant_as_of: z.iso.datetime(),
+  // A21: optional, so every stored and fixture answer without it still parses.
+  model_assignment: AnswerModelAssignmentSchema.optional()
 }).strict().superRefine((answer, context) => {
   if ((answer.confidence_band === null) !== (answer.band_ceiling === null)) {
     context.addIssue({ code: "custom", message: "confidence_band and band_ceiling must be present together" });
@@ -1171,7 +1423,23 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
     "POST /v1/runs/{id}/unpublish",
-    "GET /v1/billing/usage"
+    "GET /v1/billing/usage",
+    "GET /v1/billing/plans",
+    "POST /v1/billing/quote",
+    "POST /v1/billing/checkout",
+    "GET /v1/billing/charges/{chargeRef}",
+    "POST /v1/billing/xmoney/notify",
+    "GET /v1/billing/subscription",
+    "GET /v1/billing/invoices",
+    "POST /v1/billing/subscription/downgrade",
+    "POST /v1/billing/subscription/cancel",
+    "POST /v1/billing/subscription/cancel-revoke",
+    "POST /v1/billing/subscription/upgrade-quote",
+    "POST /v1/billing/subscription/upgrade",
+    "POST /v1/billing/subscription/withdraw",
+    "POST /v1/billing/subscription/card",
+    "POST /v1/billing/cancel-link",
+    "POST /v1/billing/cancel-by-token"
   ]),
   resources: Object.freeze({
     ...consumerAuthContractSchemas,
@@ -1201,6 +1469,13 @@ export const contractInventory = Object.freeze({
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
-    AnswerStorySchema, AnswerDisclosureSchema
+    AnswerStorySchema, AnswerDisclosureSchema, BillingPlansResponseSchema,
+    BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
+    BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
+    BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
+    BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
+    BillingUpgradeResponseSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
+    BillingCardChangeResponseSchema, BillingCancelLinkRequestSchema, BillingCancelLinkAcceptedSchema,
+    BillingCancelByTokenRequestSchema
   })
 });

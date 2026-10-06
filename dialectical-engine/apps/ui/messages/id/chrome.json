@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukares, Rumania",
   "chrome.footer.product": "Produk",
   "chrome.footer.home": "Beranda",
-  "chrome.footer.cookiePreferences": "Preferensi kuki",
+  "chrome.footer.cookiePreferences": "Kuki yang kami simpan",
   "chrome.security": "Keamanan",
   "chrome.logout": "Keluar",
-  "chrome.accountError": "Tindakan tidak berhasil. Muat ulang halaman dan coba lagi."
+  "chrome.accountError": "Tindakan tidak berhasil. Muat ulang halaman dan coba lagi.",
+  "chrome.footer.pricing": "Harga",
+  "chrome.footer.cancel": "Batalkan paket",
+  "chrome.footer.withdraw": "Menarik diri dari paket",
+  "chrome.footer.paymentMarks": "Kartu yang kami terima",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

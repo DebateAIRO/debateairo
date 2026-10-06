@@ -73,7 +73,11 @@ export interface SocialStepUpRecord {
 }
 export class PostgresSocialIdentityRepository {
     private readonly tx: ProfileTransactions;
-    constructor(private readonly pool: Pool, audit: AuditContextHasher) { this.tx = new ProfileTransactions(pool, audit); }
+    private readonly signupTx: ProfileTransactions;
+    constructor(private readonly pool: Pool, audit: AuditContextHasher, signupPool: Pool = pool) {
+        this.tx = new ProfileTransactions(pool, audit);
+        this.signupTx = new ProfileTransactions(signupPool, audit);
+    }
     async begin(input: SocialFlowSeed): Promise<{
         expiresAt: string;
     }> {
@@ -93,8 +97,9 @@ export class PostgresSocialIdentityRepository {
     async createAccount(input: Omit<PendingAccountInput, 'passwordHash'> & SocialSignupAuthority & Readonly<{
         socialEnrollmentHash: string;
     }>, beforeCommit: () => Promise<void>): Promise<SocialAccountResult> {
-        return this.tx.audited(input.source, async (c, audit) => {
+        return this.signupTx.audited(input.source, async (c, audit) => {
             const p = { proofHash: input.proofHash, browserHash: input.browserHash, bindingHash: input.bindingHash, admittedProviders: input.admittedProviders,
+                declaredRegion: input.declaredRegion,
                 userId: input.userId, emailBlindIndex: input.emailBlindIndex.toString('hex'), emailCiphertext: input.emailCiphertext, phoneCiphertext: input.phoneCiphertext,
                 pseudonym: input.pseudonym, occurredAt: input.occurredAt, verificationTokenHash: input.verificationTokenHash, verificationTokenTtlMs: input.verificationTokenTtlMs,
                 socialEnrollmentHash: input.socialEnrollmentHash, minAgeApplied: input.ageCheck.minAgeApplied, countryCode: input.ageCheck.countryCode, ruleVersion: input.ageCheck.ruleVersion,

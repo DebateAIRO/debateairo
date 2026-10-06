@@ -36,7 +36,7 @@ async function owner() {
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await database.pool.query("CREATE ROLE task10_runtime LOGIN PASSWORD 'task10-private-fixture-only' IN ROLE debateai_runtime");
+  await database.pool.query("CREATE ROLE task10_runtime LOGIN PASSWORD 'task10-private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");
   const url = new URL(database.connectionString);
   url.username = "task10_runtime";
   url.password = "task10-private-fixture-only";

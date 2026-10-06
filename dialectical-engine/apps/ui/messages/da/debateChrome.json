@@ -5,7 +5,6 @@
   "debateChrome.backToLibrary": "← Tilbage til biblioteket",
   "debateChrome.loading": "Indlæser…",
   "debateChrome.error.claimGenerationFailed": "Generering af påstand mislykkedes",
-  "debateChrome.error.debateGenerationFailed": "Generering af debat mislykkedes: {reason}",
   "debateChrome.error.unableToLoadDebate": "Debatten kunne ikke indlæses",
   "debateChrome.error.unableToLoadScoring": "Bedømmelsen kunne ikke indlæses",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Prøvekørslen af adaptiv dybde kunne ikke indlæses",
@@ -281,5 +280,13 @@
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinatoren afviste anmodningen, fordi en model, som denne plan kræver, ikke er tilgængelig lige nu. Prøv igen senere, eller vælg den anden plan.",
   "requestFailure.kind.ALREADY_WAITING": "Kun ét spørgsmål kan vente ad gangen. Stil dette, når din ventende debat er startet.",
   "requestFailure.kind.UNCLASSIFIED": "Anmodningen mislykkedes, før der kom et svar, så udfaldet er ukendt. Det er ikke en afgørelse, som koordinatoren har truffet.",
-  "debateChrome.error.fundingEnded": "Den interne finansiering til denne ventende debat er ophørt. Stil spørgsmålet igen for at bruge din nuværende ramme."
+  "debateChrome.error.fundingEnded": "Den interne finansiering til denne ventende debat er ophørt. Stil spørgsmålet igen for at bruge din nuværende ramme.",
+  "runFailure.NOT_STARTED": "Noget gik galt hos os, før denne debat gik i gang. Prøv venligst at stille spørgsmålet igen.",
+  "runFailure.MODELS_UNAVAILABLE": "Denne debat kunne ikke starte, fordi de AI-modeller, den har brug for, ikke var tilgængelige. Prøv venligst igen om lidt.",
+  "runFailure.RUN_LIMIT_REACHED": "Denne debat nåede sin grænse, før den kunne give et svar.",
+  "runFailure.STOPPED": "Denne debat stoppede halvvejs på grund af et problem hos os. Stil venligst dit spørgsmål igen.",
+  "runFailure.PLAN_ENDED": "Din betalte plan udløb eller blev sat på pause, mens dette spørgsmål ventede, så debatten gik ikke i gang. Du kan stille det igen.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Denne debat ville koste mere, end dette websted tillader for én debat.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinatoren afviste anmodningen: en af debattens opgaver har ingen AI-model, den kan nå lige nu. Prøv igen senere.",
+  "debateChrome.condition.backupModelUsed": "Hvor en planlagt AI-model ikke kunne bruges, trådte en anden til"
 }

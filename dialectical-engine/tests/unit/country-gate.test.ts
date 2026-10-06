@@ -22,6 +22,10 @@ const PLACES: Readonly<Record<string, Readonly<{ country: string; tor: boolean }
   "5.45.1.1": { country: "RU", tor: false },
   "51.140.1.1": { country: "GB", tor: false },
   "31.13.1.1": { country: "CH", tor: false },
+  "84.94.1.1": { country: "IL", tor: false },
+  "1.160.1.1": { country: "TW", tor: false },
+  "89.28.1.1": { country: "MD", tor: false },
+  "46.211.1.1": { country: "UA", tor: false },
   "78.180.1.1": { country: "TR", tor: false },
   "185.220.101.7": { country: "DE", tor: true }
 };
@@ -54,9 +58,13 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
   it("refuses sign-up by code and allows it where the switch is on", () => {
     const { gate: countryGate } = gate();
     expect(countryGate.signup(source("81.196.20.30"))).toBeNull();
-    expect(countryGate.signup(source("51.140.1.1"))).toBeNull();
     expect(countryGate.signup(source("5.45.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
-    expect(countryGate.signup(source("31.13.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
+    expect(countryGate.signup(source("46.211.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
+    // The UK (owner's amendment of 2 October 2026): closed for now, ships after launch.
+    expect(countryGate.signup(source("51.140.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
+    for (const ip of ["31.13.1.1", "84.94.1.1", "1.160.1.1", "89.28.1.1"]) {
+      expect(countryGate.signup(source(ip)), ip).toBeNull();
+    }
     expect(countryGate.signup(source("185.220.101.7"))).toBe("TOR_REFUSED");
     expect(countryGate.signup(source("10.0.0.1"))).toBe("COUNTRY_UNKNOWN");
   });
@@ -72,8 +80,13 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
   it("answers availability as two booleans and nothing else", () => {
     const { gate: countryGate } = gate();
     expect(countryGate.availability("81.196.20.30")).toEqual({ signup: true, pay: true });
-    expect(countryGate.availability("51.140.1.1")).toEqual({ signup: true, pay: false });
-    expect(countryGate.availability("31.13.1.1")).toEqual({ signup: false, pay: false });
+    // The UK (owner's amendment of 2 October 2026): closed for now, same as Ukraine.
+    expect(countryGate.availability("51.140.1.1")).toEqual({ signup: false, pay: false });
+    expect(countryGate.availability("46.211.1.1")).toEqual({ signup: false, pay: false });
+    // Switzerland, Israel, Taiwan, Moldova (owner's amendment of 1 October 2026): sign-up, no payment yet.
+    for (const ip of ["31.13.1.1", "84.94.1.1", "1.160.1.1", "89.28.1.1"]) {
+      expect(countryGate.availability(ip), ip).toEqual({ signup: true, pay: false });
+    }
     expect(countryGate.availability("185.220.101.7")).toEqual({ signup: false, pay: false });
     expect(countryGate.availability("10.0.0.1")).toEqual({ signup: false, pay: false });
   });
@@ -141,7 +154,7 @@ describe("the gate on the routes", () => {
   const REGISTER_BODY = {
     ...canonicalSignup,
     email: "alice@example.test", password: "correct horse battery staple",
-    phone: "+40722123456", date_of_birth: "1990-01-01"
+    phone: "+40722123456", country: "RO", date_of_birth: "1990-01-01"
   };
   const setCookies = (response: { headers: Record<string, unknown> }): string[] => {
     const raw = response.headers["set-cookie"];
@@ -241,7 +254,7 @@ describe("the gate on the routes", () => {
     const { instance } = api({ countryGate: gate().gate, admission });
     const first = await instance.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "51.140.1.1" });
     expect(first.statusCode).toBe(200);
-    expect(first.json()).toEqual({ signup: true, pay: false });
+    expect(first.json()).toEqual({ signup: false, pay: false });
     const second = await instance.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "51.140.1.1" });
     expect(second.statusCode).toBe(429);
     const other = await instance.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "81.196.20.30" });

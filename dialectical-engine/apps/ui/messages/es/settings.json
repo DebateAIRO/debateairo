@@ -34,6 +34,7 @@
   "settings.erasure.title": "Eliminar cuenta",
   "settings.erasure.hint": "La eliminación comienza después de siete días completos. Puede cancelarla antes de que se inicie. Los avisos de programación, cancelación y finalización se envían a todos los correos electrónicos principales o de recuperación vinculados; se requiere al menos una dirección verificada.",
   "settings.erasure.dataWarning": "El contenido privado cifrado queda ilegible de forma permanente cuando se destruyen sus claves. Las instantáneas públicas actuales seguirán siendo públicas bajo un seudónimo retirado, y es posible que se conserven copias descargadas, citadas, almacenadas en caché, indexadas o retenidas por proveedores. El texto sin cifrar heredado reclamado se declara como residuo conservado, no como contenido eliminado por completo.",
+  "settings.erasure.paidPlan": "Programar la eliminación detiene la renovación de su plan de pago, pero el plan sigue funcionando hasta que se realice la eliminación o termine el mes que pagó; si cancela la eliminación, el plan dura hasta el final de ese mes y solo se renueva si deshace la cancelación, y si aún puede desistir dentro de los 14 días posteriores a la compra, puede hacerlo hasta que se realice la eliminación.",
   "settings.erasure.checking": "Comprobando el estado de eliminación de la cuenta…",
   "settings.erasure.status": "Estado: {status}. Hora programada de eliminación: {time}.",
   "settings.erasure.processing": "La eliminación irreversible está en curso. Ya no es posible programarla ni cancelarla.",

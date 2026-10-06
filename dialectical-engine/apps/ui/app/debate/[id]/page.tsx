@@ -8,7 +8,7 @@ import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
 import { questionLocale } from "@/lib/i18n/questionLocale";
 import { loadNamespace } from "@/lib/i18n/server";
-import { t } from "@/lib/i18n/translate";
+import { runFailureMessage } from "@/lib/v3/runFailure";
 
 export const dynamic = "force-dynamic";
 
@@ -109,9 +109,7 @@ export default async function DebatePage({
       initialPending = true;
     } else if (result.kind === "failed") {
       initialDebate = debateDetailFromRunProjection(result.run, composeCatalog, locale);
-      initialError = t(debateChromeCatalog, "debateChrome.error.debateGenerationFailed", {
-        reason: result.reason
-      });
+      initialError = runFailureMessage(result.reason, debateChromeCatalog);
       initialPending = false;
     } else if (result.kind === "not_found") {
       notFound();

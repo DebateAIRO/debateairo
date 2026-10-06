@@ -72,6 +72,8 @@ export interface ReportModel {
   /** Every page's footer; `pageWords` holds {page} and {total}, filled in by reportPageWords as each page is laid out. */
   readonly footer: Readonly<{ text: string; pageWords: string }>;
   readonly cover: Readonly<{
+    /** The fixed "not professional advice" line, printed first on page 1, above the eyebrow. */
+    notAdvice: string;
     eyebrow: string;
     question: string;
     /** The arithmetic label in human words; null for an answer without a verdict (no pill then). */
@@ -416,6 +418,10 @@ function pointNote(mark: ConditionMark): PointNote | null {
     case "DERIVED-STANDING-UNREVIEWED":
     case "HIDDEN-LOW-SCORE":
     case "UNAUTHORED-BRANCH-HALTED":
+    // Model scorecard A16 (merged by paid plans S1a): a planned AI model that
+    // could not be used and a backup that answered instead is said once for the
+    // whole answer (its record names the served root), not about one point.
+    case "BACKUP-MODEL-USED":
       return null;
   }
 }
@@ -577,6 +583,7 @@ export function buildReportModel(
     // No values: the placeholders stay for reportPageWords to fill on each page.
     footer: { text: t(publicCatalog, "public.report.footer"), pageWords: t(publicCatalog, "public.report.pageOf") },
     cover: {
+      notAdvice: t(publicCatalog, "public.report.notAdvice"),
       eyebrow: t(publicCatalog, "public.report.eyebrow"),
       question: answer.question_line,
       labelWords: label === null ? null : storyLabelWords(label, publicCatalog),

@@ -59,6 +59,12 @@ const WITHDRAWAL_LAW = Object.freeze({
  */
 const RENEWAL_NOTICE_RULE = Object.freeze({ leastBusinessDays: 7 });
 
+/**
+ * Spec §1.4: Romanian buyers get SmartBill's e-Factura, every other buyer Quaderno's document. The one issuer map a
+ * row may seal (P2-M23).
+ */
+const INVOICE_ISSUER_SPLIT = Object.freeze({ RO: "SMARTBILL" as const, "*": "QUADERNO" as const });
+
 const billingPolicyValueSchema = z.object({
   kind: z.literal("BILLING_POLICY"),
   enabled: z.boolean(),
@@ -83,6 +89,15 @@ const billingPolicyValueSchema = z.object({
   const ruleKeys = Object.keys(value.invoice_issuer_rules);
   if (!ruleKeys.includes("*") || ruleKeys.some((key) => key !== "*" && !ISO2.test(key))) {
     refuse("invoice_issuer_rules", "rules are ISO-3166 alpha-2 upper case plus the catch-all *");
+  }
+  // P2-M23 (spec §1.4): the split is fixed, so the map is exactly INVOICE_ISSUER_SPLIT. SmartBill writes every buyer
+  // as Romanian (a catch-all SmartBill would place foreign buyers in Romania) and Quaderno issues no e-Factura (RO to
+  // Quaderno would leave Romanian invoices outside ANAF's SPV). A fixed map also means a credit note's issuer, read
+  // from today's rules (P2-M22), is always the issuer of the invoice it credits.
+  const splitKeys = Object.keys(INVOICE_ISSUER_SPLIT) as Array<keyof typeof INVOICE_ISSUER_SPLIT>;
+  if (ruleKeys.length !== splitKeys.length
+    || splitKeys.some((key) => value.invoice_issuer_rules[key] !== INVOICE_ISSUER_SPLIT[key])) {
+    refuse("invoice_issuer_rules", "rules are exactly RO to SMARTBILL and every other country (*) to QUADERNO");
   }
   if (new Set(value.withdrawal_countries).size !== value.withdrawal_countries.length) {
     refuse("withdrawal_countries", "each country once");

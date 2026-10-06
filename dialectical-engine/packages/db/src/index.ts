@@ -1,6 +1,6 @@
-import { readFile, readdir } from "node:fs/promises";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
+import { assertAuth106Catalog, assertIntegratedCatalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256 } from "./migration-lineage.js";
 import type { Pool, PoolClient } from "pg";
 import pg from "pg";
 import type {
@@ -9,7 +9,7 @@ import type {
   CryptoEnvelope,
   PreparedRunContentCipher
 } from "@debateai/crypto";
-import { TypedDomainError, type ActivationState, type CompositionBudgetTier, type RiskTier, type TierSource } from "@debateai/kernel";
+import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
@@ -68,6 +68,34 @@ export {
   type EntitlementCause,
   type EntitlementPlanId
 } from "./billing-entitlement.js";
+
+// Paid plans (spec 2026-09-29 §2.5.2): every billing.* statement except the entitlement (migrations 0085–0087).
+export {
+  BillingRepository,
+  type BillingReadExecutor,
+  type ChargeEventInput,
+  type ChargeEventKind,
+  type ChargeEventRow,
+  type ChargeKind,
+  type ChargeRow,
+  type CustomerXMoneyEnvironment,
+  type DueRenewalCursor,
+  type DueRenewalsOptions,
+  type InvoiceIntentRow,
+  type InvoiceIssuerName,
+  type InvoiceKind,
+  type InvoiceRow,
+  type LocationEvidenceRow,
+  type LocationVerdict,
+  type NoticeRow,
+  type OutboxClaimFence,
+  type OutboxJob,
+  type OutboxKind,
+  type OutboxPayload,
+  type QuoteKind,
+  type QuoteRow,
+  type TaxSummaryRow
+} from "./billing.js";
 
 // Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0083).
 // B8 records the interim roster swap; B9c the runner's cheaper-model calls.
@@ -833,11 +861,16 @@ function wrapClientQueries(client: PoolClient): PoolClient {
 
 export function createPool(
   connectionString: string,
-  options: Readonly<{ max?: number }> = {}
+  options: Readonly<{ max?: number; connectionTimeoutMillis?: number }> = {}
 ): Pool {
   if (options.max !== undefined
     && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
     throw new TypeError("DATABASE_POOL_MAX_INVALID");
+  }
+  if (options.connectionTimeoutMillis !== undefined
+    && (!Number.isSafeInteger(options.connectionTimeoutMillis)
+      || options.connectionTimeoutMillis < 1 || options.connectionTimeoutMillis > 600_000)) {
+    throw new TypeError("DATABASE_POOL_CONNECTION_TIMEOUT_INVALID");
   }
   const pool = new PgPool({ connectionString,...options });
   let terminalFailure: TypedDomainError | undefined;
@@ -911,11 +944,14 @@ export function createSupportControlPlanePool(connectionString: string): Pool {
 }
 
 export async function migrate(pool: Pool): Promise<void> {
-  const directory = new URL("../../../migrations/", import.meta.url);
-  const migrations = (await readdir(directory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
+  const plan = await loadMigrationPlan();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const isolation = await client.query<{ transaction_isolation: string }>("SHOW transaction_isolation");
+    if (isolation.rows[0]?.transaction_isolation !== "read committed") {
+      throw new Error("MIGRATION_ISOLATION_REQUIRES_READ_COMMITTED");
+    }
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('debateai:schema-migrations', 0))");
     await client.query(`
       CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
@@ -923,15 +959,93 @@ export async function migrate(pool: Pool): Promise<void> {
         applied_at timestamptz NOT NULL
       )
     `);
-    for (const name of migrations) {
-      const applied = await client.query("SELECT 1 FROM public.debateai_schema_migration WHERE name=$1", [name]);
-      if (applied.rowCount !== 0) continue;
-      await client.query(await readFile(new URL(name, directory), "utf8"));
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.debateai_schema_migration_resolution (
+        logical_name text PRIMARY KEY,
+        original_source_sha256 text NOT NULL CHECK(original_source_sha256 ~ '^[0-9a-f]{64}$'),
+        resolution_id text NOT NULL,
+        recipe_sha256 text NOT NULL CHECK(recipe_sha256 ~ '^[0-9a-f]{64}$'),
+        executable_path text NOT NULL,
+        executable_sha256 text NOT NULL CHECK(executable_sha256 ~ '^[0-9a-f]{64}$'),
+        precondition_evidence_digest text NOT NULL CHECK(precondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+        postcondition_evidence_digest text NOT NULL CHECK(postcondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+        executed_at timestamptz NOT NULL
+      )
+    `);
+    await client.query("REVOKE ALL ON public.debateai_schema_migration_resolution FROM PUBLIC");
+    const resolutionAcl = await client.query<{ valid: boolean }>(`
+      SELECT pg_get_userbyid(c.relowner)=current_user
+        AND NOT EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
+          WHERE a.grantee<>c.relowner)
+        AND NOT EXISTS(SELECT 1 FROM pg_roles service WHERE service.rolname LIKE 'debateai\\_%'
+          AND service.oid<>c.relowner AND pg_has_role(service.oid,c.relowner,'MEMBER')) AS valid
+      FROM pg_class c WHERE c.oid='public.debateai_schema_migration_resolution'::regclass
+    `);
+    if (resolutionAcl.rows[0]?.valid !== true) throw new Error("MIGRATION_RESOLUTION_ACL_DRIFT");
+    const applied = (await client.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map(({ name }) => name);
+    const resolutions = (await client.query<{
+      logical_name: string; original_source_sha256: string; resolution_id: string; recipe_sha256: string;
+      executable_path: string; executable_sha256: string; precondition_evidence_digest: string;
+      postcondition_evidence_digest: string;
+    }>("SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows;
+    const lineage = identifyLineage(plan, applied, resolutions.map(({ logical_name }) => logical_name));
+    const authLineage = lineage === "auth94" || lineage === "auth103" || lineage === "auth106";
+    if (lineage === "auth106" || lineage === "integrated-original" || lineage === "integrated-compatibility") await assertAuth106Catalog(client);
+    if (lineage === "integrated-original" || lineage === "integrated-compatibility") await assertIntegratedCatalog(client);
+    if (lineage === "dev95") {
+      // Retained active, expired and consumed withdrawal grants all block the
+      // immutable Auth CHECK replacements. The lock keeps the predicate stable.
+      await client.query("LOCK TABLE identity.step_up_grant IN SHARE ROW EXCLUSIVE MODE");
+      const retained = await client.query<{ retained: boolean }>(
+        "SELECT EXISTS(SELECT 1 FROM identity.step_up_grant WHERE action='WITHDRAW_SUBSCRIPTION') retained"
+      );
+      if (retained.rows[0]?.retained) throw new Error("MIGRATION_WITHDRAWAL_ROWS_RETAINED");
+    }
+    const compat = plan.manifest.compatibility;
+    if (lineage === "integrated-compatibility") {
+      const receipt = resolutions[0];
+      const source = plan.sources.get(compat.logicalName)!;
+      if (receipt?.original_source_sha256 !== source.sha256 || receipt.resolution_id !== compat.resolutionId
+        || receipt.recipe_sha256 !== plan.recipeSha256 || receipt.executable_path !== compat.executablePath
+        || receipt.executable_sha256 !== compat.executableSha256
+        || !(["auth94", "auth103", "auth106"] as const)
+          .some((cohort) => receipt.precondition_evidence_digest === compatibilityPreconditionDigest(plan, cohort))
+        || receipt.postcondition_evidence_digest !== await lineageEvidence(client)) {
+        throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
+      }
+    }
+    const appliedSet = new Set(applied);
+    for (const name of plan.manifest.order) {
+      if (appliedSet.has(name) || (name === compat.logicalName && lineage === "integrated-compatibility")) continue;
+      if (name === compat.logicalName && authLineage) {
+        const source = plan.sources.get(name)!;
+        const preconditionEvidence = compatibilityPreconditionDigest(plan, lineage);
+        if (preconditionEvidence !== sha256(JSON.stringify({ lineage, applied: [...appliedSet].sort(), source: source.sha256 }))) {
+          throw new Error("MIGRATION_COMPATIBILITY_ORDER_DRIFT");
+        }
+        await client.query(plan.compatibilitySql);
+        const postconditionEvidence = await lineageEvidence(client);
+        await client.query(`
+          INSERT INTO public.debateai_schema_migration_resolution
+          (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
+           precondition_evidence_digest,postcondition_evidence_digest,executed_at)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
+        `,[name,source.sha256,compat.resolutionId,plan.recipeSha256,compat.executablePath,
+          compat.executableSha256,preconditionEvidence,postconditionEvidence]);
+        continue;
+      }
+      await client.query(plan.sources.get(name)!.sql);
       await client.query(
         "INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())",
         [name]
       );
+      appliedSet.add(name);
     }
+    if (authLineage) {
+      const final = await lineageEvidence(client);
+      await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
+    }
+    await assertIntegratedCatalog(client);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -959,6 +1073,27 @@ export async function withWriteTransaction<T>(
   }
 }
 
+/**
+ * `withWriteTransaction` on a connection the caller already holds (a session lease's): BEGIN, the operation, COMMIT,
+ * or ROLLBACK on failure, under the same write-transaction marker, so `assertNoOpenWriteTransaction` refuses a
+ * provider call inside it exactly as it does inside `withWriteTransaction`. The connection is NOT released here: its
+ * owner (the lease) releases it after its own last use.
+ */
+export async function withWriteTransactionOn<T>(
+  client: PoolClient,
+  operation: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  try {
+    await client.query("BEGIN");
+    const result = await writeTransaction.run(true, () => operation(client));
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
+}
+
 export function assertNoOpenWriteTransaction(): void {
   if (writeTransaction.getStore() === true) {
     throw new TypedDomainError("PROVIDER_CALL_INSIDE_TRANSACTION", "A provider call cannot run inside a write transaction");
@@ -970,6 +1105,173 @@ export async function allocateSequence(client: PoolClient): Promise<number> {
   const value = result.rows[0]?.sequence;
   if (value === undefined) throw new TypedDomainError("SEQUENCE_ALLOCATION_FAILED", "No sequence was allocated");
   return Number(value);
+}
+
+/**
+ * Model scorecard §2.3 (migration 0090) — THE PROMPT OF ONE MODEL-CALL ATTEMPT.
+ *
+ * `ledger.call_prompt` is a content carrier in 0063's mechanism. For a run with
+ * content encryption the stored row carries the sentinel and a NULL
+ * fingerprint, and BOTH the prompt text and its fingerprint live inside the
+ * attested envelope: a readable fingerprint would be a digest of private
+ * content, the locator 0040 replaced with random bytes on
+ * `ledger_entry.input_hash`. A legacy run keeps both in the clear. Erasure is
+ * inherited: the envelope is unreadable once the run key is shredded, and the
+ * erasure barrier (with the content lease below) refuses a new row once the
+ * run's private content is gone.
+ */
+export interface CallPromptInput {
+  readonly runId: string;
+  /** The gateway attempt the prompt was sent on: the row's primary key, a lower-case uuid. */
+  readonly attemptId: string;
+  /** The `messages` member exactly as it was serialised into the request body. */
+  readonly promptText: string;
+  /** `canonicalPromptFingerprint(messages)` (@debateai/scorecard): 64 lower-case hex characters. */
+  readonly promptFingerprint: string;
+}
+
+export type CallPromptRecord = Readonly<{
+  runId: string;
+  attemptId: string;
+  promptText: string;
+  promptFingerprint: string;
+}>;
+
+const CALL_PROMPT_ATTEMPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const CALL_PROMPT_FINGERPRINT = /^[0-9a-f]{64}$/u;
+
+export async function insertCallPrompt(pool: Pool, input: CallPromptInput): Promise<void> {
+  // The attestation binds the envelope to `attempt_id::text`, which Postgres
+  // renders lower-case; an upper-case id would seal an envelope no row accepts.
+  if (!CALL_PROMPT_ATTEMPT_ID.test(input.attemptId)
+    || !CALL_PROMPT_FINGERPRINT.test(input.promptFingerprint)
+    || typeof input.promptText !== "string" || input.promptText.length === 0) {
+    throw new TypeError("CALL_PROMPT_INPUT_INVALID");
+  }
+  await withRunContentLease(pool, [input.runId], async () => {
+    const content = await encryptAttestedContentForRun(
+      pool, input.runId, "ledger.call_prompt", input.attemptId,
+      { promptText: input.promptText, promptFingerprint: input.promptFingerprint }
+    );
+    await pool.query(
+      `INSERT INTO ledger.call_prompt (
+         attempt_id, run_id, prompt_fingerprint, prompt_text,
+         content_ciphertext, content_attestation
+       ) VALUES ($1,$2,$3,$4,$5::jsonb,$6)`,
+      [
+        input.attemptId, input.runId,
+        content === null ? input.promptFingerprint : null,
+        content === null ? input.promptText : CONTENT_CIPHERTEXT_SENTINEL,
+        content === null ? null : JSON.stringify(content.envelope),
+        content?.attestation ?? null
+      ]
+    );
+  });
+}
+
+export async function readCallPrompt(pool: Pool, attemptId: string): Promise<CallPromptRecord | null> {
+  if (!CALL_PROMPT_ATTEMPT_ID.test(attemptId)) throw new TypeError("CALL_PROMPT_INPUT_INVALID");
+  const row = (await pool.query<{
+    run_id: string;
+    prompt_fingerprint: string | null;
+    prompt_text: string;
+    content_ciphertext: CryptoEnvelope | null;
+  }>(
+    `SELECT run_id, prompt_fingerprint, prompt_text, content_ciphertext
+     FROM ledger.call_prompt WHERE attempt_id=$1`,
+    [attemptId]
+  )).rows[0];
+  if (row === undefined) return null;
+  const content = await decryptContentForRun<Readonly<{ promptText?: unknown; promptFingerprint?: unknown }>>(
+    pool, row.run_id, "ledger.call_prompt", attemptId, row.content_ciphertext,
+    { promptText: row.prompt_text, promptFingerprint: row.prompt_fingerprint }
+  );
+  if (typeof content.promptText !== "string"
+    || typeof content.promptFingerprint !== "string"
+    || !CALL_PROMPT_FINGERPRINT.test(content.promptFingerprint)) {
+    throw new TypeError("CALL_PROMPT_RECORD_INVALID");
+  }
+  return Object.freeze({
+    runId: row.run_id,
+    attemptId,
+    promptText: content.promptText,
+    promptFingerprint: content.promptFingerprint
+  });
+}
+
+/**
+ * Model scorecard §2.4 (migration 0090) — THE ROLE ASSIGNMENT PINNED ON A RUN.
+ *
+ * An append-only side table the API writes ONCE, after the run row exists and
+ * before its first work item is enqueued. It is not a column of core.run,
+ * because a column would need the in-database encrypted-run creator redefined,
+ * and a replay of 0040 or 0067 would silently restore the older body. The
+ * assignment holds engine identifiers only — provider refs, model ids,
+ * candidate ids, levels — never debate text. Its shape is `RoleAssignmentSchema`
+ * (@debateai/scorecard), which this package cannot import: the writer takes
+ * an already validated object and the reader returns it undecoded.
+ */
+export interface RunRoleAssignmentInput {
+  readonly runId: string;
+  /** A `RoleAssignment` (@debateai/scorecard), validated by the caller. */
+  readonly assignment: Readonly<Record<string, unknown>>;
+  readonly strength: ModelStrength;
+  readonly steppedDown: boolean;
+}
+
+export type RunRoleAssignmentRecord = Readonly<{
+  runId: string;
+  assignment: unknown;
+  strength: ModelStrength;
+  steppedDown: boolean;
+  createdAt: Date;
+}>;
+
+function isModelStrength(value: unknown): value is ModelStrength {
+  return typeof value === "string" && (MODEL_STRENGTHS as readonly string[]).includes(value);
+}
+
+export async function insertRunRoleAssignment(
+  executor: Pick<Pool, "query"> | PoolClient,
+  input: RunRoleAssignmentInput
+): Promise<void> {
+  if (typeof input.assignment !== "object" || input.assignment === null
+    || Array.isArray(input.assignment)
+    || !isModelStrength(input.strength)
+    || typeof input.steppedDown !== "boolean") {
+    throw new TypeError("RUN_ROLE_ASSIGNMENT_INVALID");
+  }
+  await executor.query(
+    `INSERT INTO core.run_role_assignment (run_id, assignment, strength, stepped_down)
+     VALUES ($1,$2::jsonb,$3,$4)`,
+    [input.runId, JSON.stringify(input.assignment), input.strength, input.steppedDown]
+  );
+}
+
+export async function readRunRoleAssignment(
+  executor: Pick<Pool, "query"> | PoolClient,
+  runId: string
+): Promise<RunRoleAssignmentRecord | null> {
+  const row = (await executor.query<{
+    run_id: string;
+    assignment: unknown;
+    strength: string;
+    stepped_down: boolean;
+    created_at: Date;
+  }>(
+    `SELECT run_id, assignment, strength, stepped_down, created_at
+     FROM core.run_role_assignment WHERE run_id=$1`,
+    [runId]
+  )).rows[0];
+  if (row === undefined) return null;
+  if (!isModelStrength(row.strength)) throw new TypeError("RUN_ROLE_ASSIGNMENT_INVALID");
+  return Object.freeze({
+    runId: row.run_id,
+    assignment: row.assignment,
+    strength: row.strength,
+    steppedDown: row.stepped_down,
+    createdAt: row.created_at
+  });
 }
 
 export interface InitialBatteryRow {
@@ -1239,6 +1541,48 @@ export interface RunSynthesisRoleRefusalValue {
 
 export type RunLifecycleEventValue = RunCooldownLifecycleValue | RunSynthesisRoleRefusalValue;
 
+/**
+ * Model scorecard A16 (owner ruling R4): a seat moved to its other member. Kept
+ * OUT of `RunLifecycleEventValue` on purpose — that union is the set of shapes
+ * 0069 admits for a content-encrypted run, and this one is not among them (see
+ * `RunRepository.recordBackupSwitchEvent`). This is the OWNER/ADMIN side of the
+ * disclosure: it names routes, keys and causes, which the answer's own
+ * BACKUP-MODEL-USED record may not (A16c, controller carry 15).
+ */
+export interface RunBackupSwitchLifecycleValue {
+  readonly state: "BACKUP_MODEL_ENGAGED";
+  readonly role: string;
+  /** The seat index the assignment PINNED. */
+  readonly seat_index: number;
+  readonly from_provider_ref: string;
+  readonly to_provider_ref: string;
+  /**
+   * TRANSPORT_FAILURE / USAGE_CAP: during a call (R4). ABSENT_AT_CLAIM: the main
+   * was not claim-eligible, so its runner-up sits in the seat. SPENT_ON_EARLIER_PASS:
+   * a resumed pass found the planned member's key at this site already at its
+   * allowance (A16c, carry 8c) — the ledger rows under `call_site_key` say why.
+   */
+  readonly cause: "TRANSPORT_FAILURE" | "USAGE_CAP" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
+  /** The planned member's key at the site; null for a switch made at claim. */
+  readonly call_site_key: string | null;
+}
+
+/**
+ * Model scorecard A16c (controller carry 8d): every seat the assignment pinned
+ * for a multi-seat role was absent at claim, so the DEBATERS sit in that role
+ * (today's rule, A15d's `fallbackRoles`). Not a per-seat switch — the planned
+ * seats and the debaters need not pair up — so it has its own shape.
+ */
+export interface RunRoleFallbackLifecycleValue {
+  readonly state: "ROLE_FELL_BACK_TO_DEBATERS";
+  readonly role: "SUPPORT_ATTACK" | "JUDGE" | "REVIEWER";
+  /** Every route the role's pinned seats named (mains, then their runner-ups, seat by seat). */
+  readonly from_provider_refs: readonly string[];
+  /** Every route now sitting in the role (the debaters' members, seat by seat). */
+  readonly to_provider_refs: readonly string[];
+  readonly cause: "ABSENT_AT_CLAIM";
+}
+
 export interface CompletionActivationResolution {
   readonly batteryRowId: string;
   readonly state: Exclude<ActivationState, "WAIT">;
@@ -1274,6 +1618,74 @@ export class RunRepository {
          VALUES ($1,$2,$3,$4::jsonb)`,
         [input.runId, await allocateSequence(client), input.kind, JSON.stringify(input.value)]
       );
+    });
+  }
+
+  /**
+   * Model scorecard A16 — the lifecycle event for a backup switch, or for a
+   * role that fell back to the debaters, on the `ledger.could_not_do` stream the UI
+   * already reads. WITHHELD — never refused — for a content-encrypted run:
+   * 0069's `core.progress_value_is_code_shaped` admits a closed set of value
+   * shapes there and may never be redefined, so a new shape would turn a
+   * disclosure into a crashed run. Every run discloses the switch on its answer
+   * through the BACKUP-MODEL-USED records.
+   *
+   * A16c (controller carry 8: one disclosure per real switch; fix rounds 1
+   * and 2) — an event this run already holds is not written twice
+   * (`ALREADY_RECORDED`):
+   *  · a BACKUP_MODEL_ENGAGED switch is the same switch when it matches on
+   *    run, role, seat_index, call_site_key (null-safe; null for a switch made
+   *    at claim), from_provider_ref and to_provider_ref — every field but
+   *    `cause`, which alone is ignored. So a seat switched at claim is told
+   *    once however many passes re-make the claim, and an outage switch whose
+   *    pass died while the runner-up's first call was in flight — told as
+   *    TRANSPORT_FAILURE — is not told again when the next pass hands the same
+   *    key over, between the same two routes, as SPENT_ON_EARLIER_PASS. The
+   *    routes are part of the match because a key names a member SLOT, and
+   *    across a claim-shape flip (a role that fell back to the debaters on one
+   *    pass and not the next) the same slot and key can hold other routes: that
+   *    is a different switch, and it is recorded.
+   *  · a ROLE_FELL_BACK_TO_DEBATERS event is the same event when its whole
+   *    value is equal.
+   */
+  async recordBackupSwitchEvent(input: {
+    readonly runId: string;
+    readonly value: RunBackupSwitchLifecycleValue | RunRoleFallbackLifecycleValue;
+  }): Promise<"RECORDED" | "ALREADY_RECORDED" | "WITHHELD_ENCRYPTED_RUN"> {
+    return withWriteTransaction(this.pool, async (client) => {
+      const encryption = await client.query<{ encrypted: boolean | null }>(
+        "SELECT core.run_uses_content_encryption($1::uuid) AS encrypted",
+        [input.runId]
+      );
+      if (encryption.rows[0]?.encrypted !== false) return "WITHHELD_ENCRYPTED_RUN" as const;
+      const value = JSON.stringify(input.value);
+      const existing = input.value.state === "BACKUP_MODEL_ENGAGED"
+        ? await client.query(
+          `SELECT 1 FROM core.run_progress_event
+            WHERE run_id=$1 AND kind='ledger.could_not_do'
+              AND value_json->>'state'='BACKUP_MODEL_ENGAGED'
+              AND value_json->>'role'=$2
+              AND value_json->'seat_index'=to_jsonb($3::integer)
+              AND value_json->>'call_site_key' IS NOT DISTINCT FROM $4::text
+              AND value_json->>'from_provider_ref'=$5
+              AND value_json->>'to_provider_ref'=$6`,
+          [
+            input.runId, input.value.role, input.value.seat_index, input.value.call_site_key,
+            input.value.from_provider_ref, input.value.to_provider_ref
+          ]
+        )
+        : await client.query(
+          `SELECT 1 FROM core.run_progress_event
+            WHERE run_id=$1 AND kind='ledger.could_not_do' AND value_json=$2::jsonb`,
+          [input.runId, value]
+        );
+      if ((existing.rowCount ?? 0) > 0) return "ALREADY_RECORDED" as const;
+      await client.query(
+        `INSERT INTO core.run_progress_event (run_id, at_seq, kind, value_json)
+         VALUES ($1,$2,'ledger.could_not_do',$3::jsonb)`,
+        [input.runId, await allocateSequence(client), value]
+      );
+      return "RECORDED" as const;
     });
   }
 
@@ -1905,6 +2317,7 @@ export {
   type SignUpAcceptanceRow
 } from "./legal-acceptance.js";
 export * from "./obs-schema.js";
+export { BillingJobQueries } from "./billing-jobs.js";
 export {
   accountRecoveryChannelRefsAad,
   PostgresRecoveryStartRepository

@@ -172,11 +172,15 @@ describe("BUG-02 rendered refresh behaviour", () => {
     mocks.readRun.mockResolvedValue({
       ...runningRun,
       state: "FAILED",
-      terminal_reason: "TOTAL_REVIEW_COVERAGE_UNSATISFIED",
+      terminal_reason: "RUNNER_EXECUTION_FAILED:RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
       hold_until: null
     });
     await mount();
-    expect(document.body.textContent).toContain("Debate generation failed: TOTAL_REVIEW_COVERAGE_UNSATISFIED");
+    expect(document.body.textContent).toContain(
+      "This debate could not start because the AI models it needs were unavailable. Please try again in a while."
+    );
+    expect(document.body.textContent).not.toContain("RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM");
+    expect(document.body.textContent).not.toContain("RUNNER_EXECUTION_FAILED");
     expect(document.querySelector(".progressFillIndeterminate")).toBeNull();
     // MUT-BUG02-B4-DELETE-CLIENT-FAILED: treat FAILED as loading -> RED.
   });

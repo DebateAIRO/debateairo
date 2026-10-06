@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukareszt, Rumunia",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Strona główna",
-  "chrome.footer.cookiePreferences": "Ustawienia plików cookie",
+  "chrome.footer.cookiePreferences": "Przechowywane pliki cookie",
   "chrome.security": "Bezpieczeństwo",
   "chrome.logout": "Wyloguj się",
-  "chrome.accountError": "Nie udało się. Odśwież stronę i spróbuj ponownie."
+  "chrome.accountError": "Nie udało się. Odśwież stronę i spróbuj ponownie.",
+  "chrome.footer.pricing": "Cennik",
+  "chrome.footer.cancel": "Rezygnacja z planu",
+  "chrome.footer.withdraw": "Odstąpienie od planu",
+  "chrome.footer.paymentMarks": "Akceptowane karty",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

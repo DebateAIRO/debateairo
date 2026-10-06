@@ -175,7 +175,8 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
           FROM unnest($1::text[]) AS ruled(role_name) ORDER BY role_name
         `,[capabilities]);
         const expectedEffective = new Set([principal.capabilityRole]);
-        if (principal.capabilityRole === "debateai_authorization_runtime") {
+        if (principal.capabilityRole === "debateai_authorization_runtime"
+          || principal.capabilityRole === "debateai_billing_runtime") {
           expectedEffective.add("debateai_runtime");
         }
         expect(effective.rows).toEqual(capabilities.map((role_name) => ({
@@ -518,8 +519,46 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       rolcreaterole: false,
       rolreplication: false,
       rolbypassrls: false,
-      direct_roles: ["debateai_runtime"]
+      direct_roles: ["debateai_billing_runtime"]
     });
+  });
+
+  it("moves a pre-0093 runtime login to billing's role and still refuses any other shape (go-live row 41)", async () => {
+    const directRoles = async (): Promise<unknown> => (await database.pool.query<{ direct_roles: unknown }>(`
+      SELECT COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'roleName',capability.rolname,'adminOption',membership.admin_option,
+          'inheritOption',membership.inherit_option,'setOption',membership.set_option
+        ) ORDER BY capability.rolname)
+        FROM pg_catalog.pg_auth_members AS membership
+        JOIN pg_catalog.pg_roles AS capability ON capability.oid=membership.roleid
+        JOIN pg_catalog.pg_roles AS target ON target.oid=membership.member
+        WHERE target.rolname='debateai_dev_runtime'
+      ),'[]'::jsonb) AS direct_roles
+    `)).rows[0]?.direct_roles;
+    const provision = () => provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const billingOnly = [{
+      roleName: "debateai_billing_runtime", adminOption: false, inheritOption: true, setOption: true
+    }];
+
+    // The shape every development database had before 0093.
+    await database.pool.query(`
+      REVOKE debateai_billing_runtime FROM debateai_dev_runtime;
+      GRANT debateai_runtime TO debateai_dev_runtime WITH INHERIT TRUE, SET TRUE
+    `);
+    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 11 });
+    expect(await directRoles()).toEqual(billingOnly);
+
+    // Anything else is drift, as before: here, both roles at once.
+    await database.pool.query("GRANT debateai_runtime TO debateai_dev_runtime WITH INHERIT TRUE, SET TRUE");
+    await expect(provision()).rejects.toThrow("DEV_DATABASE_PRINCIPAL_DRIFT");
+    await database.pool.query("REVOKE debateai_runtime FROM debateai_dev_runtime");
+    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 11 });
+    expect(await directRoles()).toEqual(billingOnly);
   });
 
   it("refuses a service principal as the provisioning authority", async () => {

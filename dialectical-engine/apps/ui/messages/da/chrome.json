@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukarest, Rumænien",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Forside",
-  "chrome.footer.cookiePreferences": "Cookieindstillinger",
+  "chrome.footer.cookiePreferences": "Cookies, vi gemmer",
   "chrome.security": "Sikkerhed",
   "chrome.logout": "Log ud",
-  "chrome.accountError": "Det virkede ikke. Genindlæs siden, og prøv igen."
+  "chrome.accountError": "Det virkede ikke. Genindlæs siden, og prøv igen.",
+  "chrome.footer.pricing": "Priser",
+  "chrome.footer.cancel": "Opsig en plan",
+  "chrome.footer.withdraw": "Fortryd en plan",
+  "chrome.footer.paymentMarks": "Kort, vi tager imod",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

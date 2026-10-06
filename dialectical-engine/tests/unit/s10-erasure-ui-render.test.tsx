@@ -3,8 +3,10 @@ import { JSDOM } from "jsdom";
 import { act,useState } from "react";
 import { createRoot,type Root } from "react-dom/client";
 import { afterEach,beforeEach,describe,expect,it,vi } from "vitest";
+import { ContractHttpError } from "@debateai/contract";
 import { PublicationControl as AppPublicationControl } from "../../apps/ui/components/PublicationControl.js";
 import { AccountErasureControls as AppAccountErasureControls } from "../../apps/ui/components/AccountErasureControls.js";
+import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { type: "json" };
 
 const RUN_ID="11111111-1111-4111-8111-111111111111";
 const CANCELLATION_REF="55555555-5555-4555-8555-555555555555";
@@ -146,7 +148,57 @@ describe("S10 rendered erasure boundaries",()=>{
       await act(async ()=>{ await vi.advanceTimersByTimeAsync(5_000); });
       expect(document.body.textContent).toContain("Irreversible deletion is processing");
       expect(document.body.textContent).not.toContain("Cancel account deletion");
-      expect(document.body.textContent).not.toContain("Schedule account deletion");
+      expect(document.body.textContent).not.toContain(settingsEnglish["settings.erasure.schedule"]);
+    });
+
+    // W7 (P2-I10): while a paid plan is live, one sentence says what scheduling does to it.
+    const PAID_PLAN_SENTENCE=settingsEnglish["settings.erasure.paidPlan"];
+    const liveSubscription=(status:string)=>({ subscription:{
+      plan_id:"MAX",status,cancel_requested:false,current_period_end:"2026-10-29T10:00:00.000Z",
+      renews_on:"2026-10-29T10:00:00.000Z",renewal_total:"242.00",scheduled_downgrade_plan_id:null,
+      withdrawal_open_until:"2026-10-13T21:00:00.000Z",withdrawal_last_day:"2026-10-13",
+      can_upgrade:false,can_change_card:true,can_revoke_cancel:false
+    } });
+    const erasureClient=(getBillingSubscription:()=>Promise<unknown>,scheduled=false)=>({
+      readAccountErasure:vi.fn(async ()=>scheduled
+        ? { status:"SCHEDULED" as const,execute_at:"2026-08-31T00:00:00.000Z",cancellation_ref:CANCELLATION_REF }
+        : { status:"NONE" as const }),
+      stepUp:vi.fn(),scheduleAccountErasure:vi.fn(),cancelAccountErasure:vi.fn(),
+      getBillingSubscription:vi.fn(getBillingSubscription)
+    });
+
+    it(`${name} says what deletion does to a live paid plan, before and after scheduling`,async ()=>{
+      expect(PAID_PLAN_SENTENCE).toContain("renew");
+      for (const scheduled of [false,true]) {
+        const client=erasureClient(async ()=>liveSubscription("ACTIVE"),scheduled);
+        root=createRoot(document.getElementById("root")!);
+        await act(async ()=>{ root!.render(<Control client={client as never} />); });
+        await flush();
+        expect(client.getBillingSubscription).toHaveBeenCalledTimes(1);
+        expect(document.body.textContent).toContain(PAID_PLAN_SENTENCE);
+        await act(async ()=>{ root?.unmount(); });
+        root=null;
+      }
+    });
+
+    it(`${name} says nothing about a plan with billing off, without a plan, or once the plan has ended`,async ()=>{
+      for (const answer of [
+        async ()=>{ throw new ContractHttpError("NOT_FOUND",404,"Not found"); },
+        async ()=>({ subscription:null }),
+        async ()=>liveSubscription("ENDED"),
+        async ()=>liveSubscription("SUSPENDED")
+      ]) {
+        const client=erasureClient(answer);
+        root=createRoot(document.getElementById("root")!);
+        await act(async ()=>{ root!.render(<Control client={client as never} />); });
+        await flush();
+        // The form is there (the read settled), and still no sentence about a plan.
+        expect(document.body.textContent).toContain(settingsEnglish["settings.erasure.schedule"]);
+        expect(client.getBillingSubscription).toHaveBeenCalledTimes(1);
+        expect(document.body.textContent).not.toContain(PAID_PLAN_SENTENCE);
+        await act(async ()=>{ root?.unmount(); });
+        root=null;
+      }
     });
   }
 });

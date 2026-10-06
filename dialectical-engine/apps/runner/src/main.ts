@@ -20,6 +20,8 @@ import {
   loadRunnerEnvironment,
   readBillingPlans,
   readCostEnvelopePolicy,
+  readEngineVersion,
+  readModelScorecard,
   readStoryPolicyFromRegister
 } from "@debateai/register";
 import {
@@ -32,11 +34,12 @@ import {
 } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
+import { firstCallPlanModels } from "@debateai/scorecard";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -266,17 +269,29 @@ const costEnvelopeGuard = costEnvelopePolicy === null
  * same `envelopeBand` that builds the shared wall's site-day half, B9b).
  * Priced per plan: the cheapest price among each plan's models, and every
  * plan's cheapest must fit.
+ * Paid plans S2: while the sealed model scorecard at this register version is
+ * VALID (the row the hosted API's picker reads), each plan's models are every
+ * configured model, because the picker seats from all of them. Paid plans S4b:
+ * with billing on the picker seats Free from the Free roster only, but this
+ * process never reads billingPolicy (amendment A20), so it keeps the looser
+ * all-models groups; the API's boot and the hosted publish, which know billing,
+ * price Free on its own roster (`ownRosterOnly`).
  */
 if (costEnvelopePolicy !== null && envelopeBand !== null) {
+  const firstCalls = firstPositionCallProjections({
+    targets: declaredProviderTargets,
+    judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
+    questionMaxBytes: askQuestionMaxBytes()
+  });
   assertRunCeilingCoversOneCall({
     bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,
     firstCallsByRoster: firstCallsByPlanRoster({
-      projections: firstPositionCallProjections({
-        targets: declaredProviderTargets,
-        judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
-        questionMaxBytes: askQuestionMaxBytes()
-      }),
-      rosters: PLAN_TIER_ROSTERS
+      projections: firstCalls,
+      rosters: firstCallPlanModels({
+        scorecardInForce: (await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID",
+        rosters: PLAN_TIER_ROSTERS,
+        models: firstCalls.map((call) => call.model)
+      })
     })
   });
 }
@@ -289,6 +304,8 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
     endpoint: target.baseUrl,
     model: target.model,
     maker: target.maker,
+    // Model scorecard §2.2/§2.10: the levels this target can set and its window.
+    ...providerTargetGatewayControls(target),
     ...(target.authorizationHeader === undefined
       ? {} : { authorizationHeader: target.authorizationHeader }),
     ...(costEnvelopeGuard === undefined || price === null ? {} : {

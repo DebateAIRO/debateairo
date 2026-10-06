@@ -1,4 +1,7 @@
 "use client";
+import {ContractHttpError} from "@debateai/contract";
+import {clearStoredSupportConversation} from "../support/conversation";
+import {announceSessionChange} from "../support/sessionChange";
 import { useEffect, useRef, useState } from 'react';
 import type { AuthenticationResponse, ContractClient, TotpEnrollmentResponse } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
@@ -88,6 +91,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     function finish(result: TotpEnrollmentResponse) {
         clearCeremony();
         if (result.status === 'authenticated') {
+            clearStoredSupportConversation();
+            announceSessionChange();
             onAuthenticated?.(result);
         }
         else {
@@ -119,7 +124,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
             if (owner === sequence.current)
                 finish(result);
         }
-        catch {
+        catch (failure) {
+            if (dispatched.current && authority.kind !== 'grant' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owner === sequence.current)
                 setError(t(catalog, "auth.passkey.cancelled"));
         }
@@ -154,7 +160,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
                     setTotp({ secret: result.secret, uri: result.otpauthUri, token: result.enrollment_token, expiresAt: result.expires_at });
             }
         }
-        catch {
+        catch (failure) {
+            if (dispatched.current && authority.kind !== 'grant' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owner === sequence.current)
                 setError(t(catalog, "auth.enroll.totpUnavailable"));
         }
@@ -181,7 +188,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
             if (owner === sequence.current)
                 finish(result);
         }
-        catch {
+        catch (failure) {
+            if (dispatched.current && authority.kind !== 'grant' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owner === sequence.current)
                 setError(t(catalog, "auth.login.authenticationCodeRejected"));
         }

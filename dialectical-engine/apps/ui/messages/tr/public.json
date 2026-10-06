@@ -126,6 +126,7 @@
   "public.report.models": "Katılan modeller: {models}",
   "public.report.modelsNotRecorded": "Katılan modeller: kaydedilmedi",
   "public.report.disclosure": "Bu rapor, tartışmanın argümanlarından yola çıkılarak yapay zekâ modelleri tarafından yazıldı.",
+  "public.report.notAdvice": "Yapay zekâ tarafından üretilen rapor. Tıbbi, hukuki, mali veya başka türde mesleki tavsiye değildir.",
   "public.report.title.inShort": "Kısaca",
   "public.report.title.story": "Hikâyenin tamamı",
   "public.report.title.why": "Neden bu yanıt",

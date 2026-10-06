@@ -610,8 +610,12 @@ describe("M3 · the answer-writer and checker adapters: a money refusal tries th
     expect(runner.split("onFallbackFailure: fallbackContentRefusal").length - 1).toBe(2);
     // The draft and the verdict are parsed inside the call a fallback makes, so
     // a fallback's content that fails the engine's own reading is mapped too.
-    expect(runner).toContain("return Object.freeze({ response, composedSegments: composedSegmentsOf(response.content) });");
-    expect(runner).toContain("return Object.freeze({ response, verdict: evaluatorVerdictOf(response.content) });");
+    // Paid plans S1a: the planned call is the role's SEAT, so each adapter reads the
+    // seat's answer and a fallback's alike, and names who answered and under which key.
+    expect(runner).toContain("composedSegments: composedSegmentsOf(answered.value.content)");
+    expect(runner).toContain("response, recordedKey: call.callSiteKey, servedRef: maker.providerRef, composedSegments: composedSegmentsOf(response.content)");
+    expect(runner).toContain("verdict: evaluatorVerdictOf(answered.value.content)");
+    expect(runner).toContain("return Object.freeze({ response, recordedKey: call.callSiteKey, servedRef: maker.providerRef, verdict: evaluatorVerdictOf(response.content) });");
   });
 });
 

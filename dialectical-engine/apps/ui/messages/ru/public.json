@@ -126,6 +126,7 @@
   "public.report.models": "Модели-участники: {models}",
   "public.report.modelsNotRecorded": "Модели-участники: нет данных",
   "public.report.disclosure": "Этот отчёт написан моделями ИИ на основе доводов, прозвучавших в дебатах.",
+  "public.report.notAdvice": "Отчёт создан ИИ. Он не является медицинской, юридической, финансовой или иной профессиональной консультацией.",
   "public.report.title.inShort": "Коротко",
   "public.report.title.story": "Полная история",
   "public.report.title.why": "Почему такой ответ",

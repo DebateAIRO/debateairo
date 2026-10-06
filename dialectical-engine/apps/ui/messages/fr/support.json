@@ -79,8 +79,8 @@
   "support.conversationDetails": "Détails de la conversation",
   "support.shortcutsLabel": "Raccourcis de l’assistance",
   "support.answerRating": "Évaluation de la réponse",
-  "support.privacyPreferences": "Préférences de confidentialité",
+  "support.privacyPreferences": "Confidentialité",
   "support.aiBanner": "Les réponses sont générées par l’IA, signalées dans un format lisible par machine et peuvent être erronées. Demandez l’intervention d’une personne à tout moment.",
-  "support.cookiePreferences": "Préférences relatives aux cookies",
+  "support.cookiePreferences": "Les cookies que nous stockons",
   "support.recoverAccount": "Récupérer votre compte"
 }

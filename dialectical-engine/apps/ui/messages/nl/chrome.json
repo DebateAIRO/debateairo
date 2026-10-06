@@ -56,8 +56,15 @@
   "chrome.footer.location": "Boekarest, Roemenië",
   "chrome.footer.product": "Product",
   "chrome.footer.home": "Startpagina",
-  "chrome.footer.cookiePreferences": "Cookievoorkeuren",
+  "chrome.footer.cookiePreferences": "Cookies die we opslaan",
   "chrome.security": "Beveiliging",
   "chrome.logout": "Uitloggen",
-  "chrome.accountError": "Dat is niet gelukt. Laad de pagina opnieuw en probeer het nog eens."
+  "chrome.accountError": "Dat is niet gelukt. Laad de pagina opnieuw en probeer het nog eens.",
+  "chrome.footer.pricing": "Prijzen",
+  "chrome.footer.cancel": "Abonnement opzeggen",
+  "chrome.footer.withdraw": "Abonnement herroepen",
+  "chrome.footer.paymentMarks": "Kaarten die wij accepteren",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

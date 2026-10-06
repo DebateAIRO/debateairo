@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bucharest, Romania",
   "chrome.footer.product": "Sản phẩm",
   "chrome.footer.home": "Trang chủ",
-  "chrome.footer.cookiePreferences": "Tùy chọn cookie",
+  "chrome.footer.cookiePreferences": "Các cookie chúng tôi lưu",
   "chrome.security": "Bảo mật",
   "chrome.logout": "Đăng xuất",
-  "chrome.accountError": "Thao tác không thành công. Hãy tải lại trang và thử lại."
+  "chrome.accountError": "Thao tác không thành công. Hãy tải lại trang và thử lại.",
+  "chrome.footer.pricing": "Bảng giá",
+  "chrome.footer.cancel": "Hủy gói",
+  "chrome.footer.withdraw": "Rút lại gói",
+  "chrome.footer.paymentMarks": "Các thẻ chúng tôi chấp nhận",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

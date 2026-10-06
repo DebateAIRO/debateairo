@@ -471,6 +471,21 @@ describe("V-30 local: the user's own API key is admitted", () => {
     )).toMatchObject({ authorizationFile: "/etc/debateai/api/providers/acme.header" });
   });
 
+  it("accepts a vendor row that also declares thinking and a window, and carries neither into the support target", () => {
+    // Model scorecard §2.2/§2.10: the debate parser admits the three new keys,
+    // and the support chat reuses that parser. The support target keeps only
+    // its own members, so the support chat never sends a level.
+    expect(parseSupportModelTargetJson(vendorTarget(
+      { authorization_header: VENDOR_CREDENTIAL },
+      { thinking_parameter: "reasoning_effort", thinking_levels: ["low"], context_window_tokens: 16_000 }
+    ), LOCAL)).toEqual({
+      providerRef: "vendor:acme",
+      baseUrl: "https://api.acme.example/v1",
+      model: "acme-large",
+      authorizationHeader: VENDOR_CREDENTIAL
+    });
+  });
+
   /**
    * Review finding 4. A row that is unambiguously an API target — its base URL
    * is `https:` — keeps the refusal the REUSED parser raised. Collapsing those

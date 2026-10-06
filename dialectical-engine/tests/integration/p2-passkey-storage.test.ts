@@ -156,11 +156,7 @@ describe("P2-10 passkey credential storage on real PostgreSQL",()=>{
         const directRead=principal.query(
           "SELECT credential_id FROM identity.mfa_factor WHERE factor_type='passkey' LIMIT 1"
         );
-        if(memberRole!=="debateai_erasure_runtime"){
-          await expect(directRead).resolves.toMatchObject({rowCount:1});
-        }else{
-          await expect(directRead).rejects.toMatchObject({code:"42501"});
-        }
+        await expect(directRead).rejects.toMatchObject({code:"42501"});
         await expect(principal.query(`
           UPDATE identity.mfa_factor SET signature_counter=signature_counter+1
           WHERE factor_type='passkey'

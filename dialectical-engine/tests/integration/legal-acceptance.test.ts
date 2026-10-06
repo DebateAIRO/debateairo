@@ -121,7 +121,7 @@ afterAll(async () => {
 });
 
 describe("0080 legal.acceptance (paid plans L3a)", () => {
-  it("installs the guards it claims, and runtime may only read and insert", async () => {
+  it("installs the guards it claims, and the API's runtime role may only read and insert", async () => {
     const triggers = await database.pool.query<{ relation: string; fn: string }>(`
       SELECT trigger.tgrelid::regclass::text AS relation, trigger.tgfoid::regprocedure::text AS fn
       FROM pg_trigger AS trigger
@@ -136,11 +136,17 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
     ]);
     const grants = await database.pool.query<{ privilege_type: string }>(`
       SELECT privilege_type FROM information_schema.role_table_grants
-      WHERE table_schema='legal' AND table_name='acceptance' AND grantee='debateai_runtime'
+      WHERE table_schema='legal' AND table_name='acceptance' AND grantee='debateai_billing_runtime'
       ORDER BY 1`);
     expect(grants.rows.map((row) => row.privilege_type)).toEqual(["INSERT", "SELECT"]);
     // Current issuance uses the reserved consent capability; the unreserved
     // compatibility overload must remain inaccessible to ordinary callers.
+    // 0094: the shared debateai_runtime (the runner's and the liveness sweep's role too) holds nothing here.
+    expect((await database.pool.query(`
+      SELECT privilege_type FROM information_schema.role_table_grants
+      WHERE table_schema='legal' AND grantee='debateai_runtime'`)).rows).toEqual([]);
+    // Every caller in the suites runs these two as the superuser, so only this pin would notice
+    // a later migration taking EXECUTE away from the API (every sign-up would then fail 42501).
     const can = async (role: string, fn: string) => (await database.pool.query<{ ok: boolean }>(
       "SELECT has_function_privilege($1,$2,'EXECUTE') AS ok", [role, fn]
     )).rows[0]!.ok;
@@ -153,10 +159,12 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
     }
     const countryGateRefused = "identity.audit_country_gate_refused(jsonb,text)";
     for (const fn of [reservedSignUpWithConsent, countryGateRefused]) {
-      expect(await can("debateai_runtime", fn), fn).toBe(true);
+      // 0094: the API's own role (0093, held by api-runtime alone), and not the shared runtime role that
+      // runner-runtime, scheduler-liveness and (through 0039) api-authorization inherit.
+      expect(await can("debateai_billing_runtime", fn), fn).toBe(true);
+      expect(await can("debateai_runtime", fn), fn).toBe(false);
+      expect(await can("debateai_authorization_runtime", fn), fn).toBe(false);
       expect(await can("public", fn), fn).toBe(false);
-      // The control: a principal 0080 revokes reads false, so this check can fail.
-      // (debateai_authorization_runtime is not pinned: it inherits debateai_runtime since 0039.)
       expect(await can("debateai_replay", fn), fn).toBe(false);
     }
   });
@@ -301,7 +309,7 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
     const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query("SET LOCAL ROLE debateai_billing_runtime");
       await client.query("SET LOCAL debateai.retention_purge='on'");
       expect(await sqlState(() => client.query("DELETE FROM legal.acceptance WHERE owner_ref=$1", [ownerRef])))
         .toBe("42501");
@@ -395,14 +403,26 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
     await expect(database.pool.query<{ purged: string }>(
       "SELECT legal.purge_expired_acceptance(now() - interval '2 years')::text AS purged"))
       .resolves.toMatchObject({ rows: [{ purged: "0" }] });
+    // 0094: the shared runtime role (the runner's, the liveness sweep's) may not call the purge at all.
+    const shared = await database.pool.connect();
+    try {
+      await shared.query("BEGIN");
+      await shared.query("SET LOCAL ROLE debateai_runtime");
+      expect(await sqlState(() => shared.query(
+        "SELECT legal.purge_expired_acceptance('3000-01-01T00:00:00Z')"))).toBe("42501");
+    } finally {
+      await shared.query("ROLLBACK");
+      shared.release();
+    }
     // A clock far in the future is clamped to now: the five-year closure survives. R-36: the
-    // runtime role (P16c's yearly job) may call the function, though it may not DELETE itself.
+    // API's runtime role (P16c's yearly job; debateai_billing_runtime since 0094) may call the function,
+    // though it may not DELETE itself.
     // Two rows go: the old owner's one acceptance row and its closure date (A15: the record, and
     // the date that links the erased owner_ref to its closure, end together).
     const runtime = await database.pool.connect();
     try {
       await runtime.query("BEGIN");
-      await runtime.query("SET LOCAL ROLE debateai_runtime");
+      await runtime.query("SET LOCAL ROLE debateai_billing_runtime");
       await expect(runtime.query<{ purged: string }>(
         "SELECT legal.purge_expired_acceptance('3000-01-01T00:00:00Z')::text AS purged"))
         .resolves.toMatchObject({ rows: [{ purged: "2" }] });

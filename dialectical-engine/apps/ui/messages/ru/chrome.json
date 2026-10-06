@@ -56,8 +56,15 @@
   "chrome.footer.location": "Бухарест, Румыния",
   "chrome.footer.product": "Продукт",
   "chrome.footer.home": "Главная",
-  "chrome.footer.cookiePreferences": "Настройки файлов cookie",
+  "chrome.footer.cookiePreferences": "Файлы cookie, которые мы храним",
   "chrome.security": "Безопасность",
   "chrome.logout": "Выйти",
-  "chrome.accountError": "Не получилось. Перезагрузите страницу и повторите попытку."
+  "chrome.accountError": "Не получилось. Перезагрузите страницу и повторите попытку.",
+  "chrome.footer.pricing": "Цены",
+  "chrome.footer.cancel": "Отменить тариф",
+  "chrome.footer.withdraw": "Отказаться от тарифа",
+  "chrome.footer.paymentMarks": "Принимаемые карты",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

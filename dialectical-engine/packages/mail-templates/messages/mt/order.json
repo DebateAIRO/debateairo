@@ -1,0 +1,5 @@
+{
+  "order.planDescription": "Pjan ta’ kull xahar DebateAI {plan}",
+  "order.cardCheck": "Verifika tal-karta DebateAI",
+  "invoice.line": "Pjan DebateAI {plan}, minn {from} sa {to}"
+}

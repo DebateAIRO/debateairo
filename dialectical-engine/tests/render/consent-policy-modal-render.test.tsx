@@ -180,8 +180,8 @@ describe("privacy policy modal — rendered", () => {
         ),
       0
     );
-    expect(expectedParagraphs).toBe(47);
-    expect(expectedBullets).toBe(38);
+    expect(expectedParagraphs).toBe(50);
+    expect(expectedBullets).toBe(46);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 

@@ -296,7 +296,13 @@ export const ledgerEntry = ledger.table("ledger_entry", {
   contractHash: text("contract_hash").notNull(),
   rawArtifactRef: uuid("raw_artifact_ref"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
-  finishedAt: timestamp("finished_at", { withTimezone: true }).notNull()
+  finishedAt: timestamp("finished_at", { withTimezone: true }).notNull(),
+  // Model scorecard (0090): the debate job, scorecard candidate, scorecard
+  // version and thinking level of the attempt. NULL on legacy and non-model rows.
+  modelRole: text("model_role"),
+  candidateId: text("candidate_id"),
+  scorecardVersion: integer("scorecard_version"),
+  thinkingLevel: text("thinking_level")
 });
 
 export const rawArtifact = ledger.table("raw_artifact", {
@@ -319,7 +325,32 @@ export const rawArtifact = ledger.table("raw_artifact", {
   contentHashVersion: integer("content_hash_version").notNull(),
   atSeq: bigint("at_seq", { mode: "number" }).notNull(),
   contentCiphertext: jsonb("content_ciphertext"),
-  contentAttestation: bytea("content_attestation")
+  contentAttestation: bytea("content_attestation"),
+  // Model scorecard (0090): the vendor-reported thinking tokens of this attempt.
+  thinkingTokens: integer("thinking_tokens")
+});
+
+// Model scorecard (0090): the exact prompt of ONE model-call attempt. A content
+// carrier in 0063's mechanism: for an encrypted run prompt_text is the
+// sentinel, prompt_fingerprint is NULL, and both live inside the envelope.
+export const callPrompt = ledger.table("call_prompt", {
+  attemptId: uuid("attempt_id").primaryKey(),
+  runId: uuid("run_id").notNull(),
+  promptFingerprint: text("prompt_fingerprint"),
+  promptText: text("prompt_text").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
+// Model scorecard (0090): the role assignment pinned on a run at admission.
+// An append-only side table: the in-database run creator is never redefined.
+export const runRoleAssignment = core.table("run_role_assignment", {
+  runId: uuid("run_id").primaryKey(),
+  assignment: jsonb("assignment").notNull(),
+  strength: text("strength").notNull(),
+  steppedDown: boolean("stepped_down").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });
 
 export const nodeReview = ledger.table("node_review", {

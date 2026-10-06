@@ -115,14 +115,15 @@ describe("reviewed Support recovery components", () => {
     const document = JSON.parse(readFileSync(new URL(
       "../../packages/support-kb/recovery/components.json",import.meta.url
     ),"utf8")) as { components: Array<Readonly<{ id:string;lang:string;modelProjection:string }>> };
-    for (const lang of ["en","ro"] as const) {
+    // V-17 (V 2026-10-01): each text names the label its own language renders (chrome.transcripts).
+    for (const [lang,label] of [["en","Transcripts"],["ro","„Transcrieri”"]] as const) {
       const article = readFileSync(new URL(
         `../../packages/support-kb/content/app-navigation.${lang}.md`,import.meta.url
       ),"utf8");
       const component = document.components.find(({ id,lang: candidate }) =>
         id === "app-navigation" && candidate === lang)!;
-      expect(article).toContain("Transcripts");
-      expect(component.modelProjection).toContain("Transcripts");
+      expect(article).toContain(label);
+      expect(component.modelProjection).toContain(label);
       expect(article).not.toMatch(/links to Method and a Sample debate|legături către Method și Sample debate/u);
       expect(component.modelProjection).not.toMatch(/links to Method and a Sample debate|oferă Method și Sample debate/u);
     }
@@ -136,7 +137,7 @@ describe("reviewed Support recovery components", () => {
     }>> };
     const expectations = {
       en:["Report a bug primes ordinary public-guide text","does not create a human case"],
-      ro:["Report a bug completează text obișnuit pentru ghidul public","nu creează un caz uman"]
+      ro:["„Raportați o eroare” completează text obișnuit pentru ghidul public","nu creează un caz uman"]
     } as const;
     for (const id of ["app-navigation","settings-help-menus"] as const) {
       for (const lang of ["en","ro"] as const) {

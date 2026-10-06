@@ -9,7 +9,7 @@ import { startTestDatabase,type TestDatabase } from "../support/testDatabase.js"
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
 let database:TestDatabase,runtime:Pool,fixture:ReturnType<typeof internalFundingFixture>;
 const plans=billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value,"test:task11");
-beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);await database.pool.query("CREATE ROLE task11_admission LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime");const url=new URL(database.connectionString);url.username="task11_admission";url.password="private-fixture-only";runtime=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
+beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);await database.pool.query("CREATE ROLE task11_admission LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_admission";url.password="private-fixture-only";runtime=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
 afterEach(async()=>{await database.pool.query("INSERT INTO core.run_wait_start(run_id,started_at) SELECT run_id,clock_timestamp() FROM core.run_waiting_v");});
 afterAll(async()=>{await runtime?.end();await database?.stop();});
 function source(){const C=(billing as unknown as {FundingAwarePersonAllowanceSource:new(input:unknown)=>any}).FundingAwarePersonAllowanceSource;return new C({allowances:new PostgresInternalAllowanceRepository(runtime,{registerVersion:2}),entitlements:new EntitlementRepository(runtime),plans,closeBasisPoints:9500,registerVersion:2});}

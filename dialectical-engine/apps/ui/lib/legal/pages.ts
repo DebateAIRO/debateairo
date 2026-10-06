@@ -3,9 +3,12 @@
  * footers link to, and the facts the legal notice, cookie, provider and versions pages state.
  *
  * Every fact here describes the running product, and `tests/render/legal-pages.test.tsx` pins
- * each one to the code that makes it true — the cookie names and lifetimes to the API and the
- * locale switcher, the storage keys to the consent store and the mode toggle, the model
- * families to `lib/models.ts`, the terms version to the terms document. The design's own
+ * each one to the code that makes it true — the lifetimes to the Max-Age the API, the contract
+ * and the locale switcher set, the model families to `lib/models.ts`, the terms version to the
+ * terms document. The eight stored items (four cookies, four browser-storage keys) are the
+ * inventory of record: `tests/unit/cookie-inventory-drift.test.ts` scans the source for every
+ * cookie and storage write and fails when the product stores a name not listed here, or this
+ * file lists a name nothing stores. The design's own
  * tables (`de_session`, an analytics cookie, five terms versions) were illustrations of a
  * product that does not exist yet, so they are not reproduced.
  *
@@ -13,8 +16,10 @@
  * confirm is shown bracketed, so the page never claims a fact nobody has verified.
  */
 
-import { CONSENT_KEY } from "../consent";
-import { LOCALE_COOKIE, type LocaleCode } from "../i18n/locales";
+import { CONSENT_KEY } from "../consent.js";
+import { LANGUAGE_OFFER_DISMISSED_KEY } from "../i18n/localeChoice.js";
+import { LOCALE_COOKIE, type LocaleCode } from "../i18n/locales.js";
+import type { MessageCatalog } from "../i18n/translate.js";
 
 export type LegalPageKey = "notice" | "terms" | "versions" | "privacy" | "cookies" | "providers" | "health";
 
@@ -73,7 +78,8 @@ export const COMPANY: Company = Object.freeze({
   registeredOffice: "[…], București, România",
   tradeRegisterNo: "[J40/…/…]",
   cui: "[…]",
-  vat: Object.freeze({ kind: "unconfirmed" }),
+  // The company is VAT-registered (owner, 29 September 2026); the RO VAT code stays bracketed until the owner fills it.
+  vat: Object.freeze({ kind: "registered", number: "[RO…]" }),
   shareCapital: "[RON …]",
   representative: "[…]",
   phone: "[+40 …]",
@@ -96,26 +102,58 @@ export const isUnverified = (value: string): boolean => value.includes("[");
  */
 export const ANPC_ADR_URL = "https://reclamatiisal.anpc.ro";
 
-export type LegalCookie = Readonly<{ name: string; purposeKey: string; lifeKey: string }>;
+/**
+ * One stored item /cookies and the storage card list: its name as the code writes it, and the
+ * `legal.json` keys of its kind, purpose and lifetime (each item has its own), plus who receives it.
+ */
+export type LegalInventoryItem = Readonly<{
+  name: string;
+  kindKey: string;
+  purposeKey: string;
+  lifeKey: string;
+  recipientKey: "legal.cookies.recipient.server" | "legal.cookies.recipient.browser";
+}>;
 
 /**
- * The cookies the product sets, all strictly necessary. The session and CSRF names are the
- * API's (`apps/api/src/index.ts`, 14-day idle Max-Age); the locale cookie is written by the
- * language switcher (`lib/i18n/localeChoice.ts`, Max-Age one year).
+ * The four cookies the product sets, all strictly necessary. The session and CSRF names are the
+ * API's (`apps/api/src/index.ts`, 14-day idle Max-Age), the age-refusal cookie is set by the API
+ * when an age check is refused (`AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS`, 30 days, in
+ * `packages/contract`), and the locale cookie is written by the language switcher
+ * (`lib/i18n/localeChoice.ts`, Max-Age one year).
  */
-export const LEGAL_COOKIES: readonly LegalCookie[] = Object.freeze([
-  { name: "__Host-debateai-session", purposeKey: "legal.cookies.session.purpose", lifeKey: "legal.cookies.session.life" },
-  { name: "__Host-debateai-csrf", purposeKey: "legal.cookies.csrf.purpose", lifeKey: "legal.cookies.csrf.life" },
-  { name: LOCALE_COOKIE, purposeKey: "legal.cookies.locale.purpose", lifeKey: "legal.cookies.locale.life" }
+export const LEGAL_COOKIES: readonly LegalInventoryItem[] = Object.freeze([
+  { name: "__Host-debateai-session", kindKey: "legal.cookies.session.kind", purposeKey: "legal.cookies.session.purpose", lifeKey: "legal.cookies.session.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-csrf", kindKey: "legal.cookies.csrf.kind", purposeKey: "legal.cookies.csrf.purpose", lifeKey: "legal.cookies.csrf.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-age-refusal", kindKey: "legal.cookies.ageRefusal.kind", purposeKey: "legal.cookies.ageRefusal.purpose", lifeKey: "legal.cookies.ageRefusal.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: LOCALE_COOKIE, kindKey: "legal.cookies.locale.kind", purposeKey: "legal.cookies.locale.purpose", lifeKey: "legal.cookies.locale.life", recipientKey: "legal.cookies.recipient.server" }
 ]);
 
-export type LegalStorageItem = Readonly<{ name: string; purposeKey: string }>;
-
-/** The browser-storage keys the UI writes; neither is ever sent to a server. */
-export const LEGAL_BROWSER_STORAGE: readonly LegalStorageItem[] = Object.freeze([
-  { name: CONSENT_KEY, purposeKey: "legal.cookies.consent.purpose" },
-  { name: "debateai.mode", purposeKey: "legal.cookies.mode.purpose" }
+/**
+ * The four browser-storage keys the UI writes, none ever sent to a server: two in local storage
+ * (the notice acknowledgement, the display mode) and two in session storage (the declined
+ * language offer, the help-chat conversation — `components/support/conversation.ts`, named here
+ * as a literal so the page does not pull the support widget in).
+ */
+export const LEGAL_BROWSER_STORAGE: readonly LegalInventoryItem[] = Object.freeze([
+  { name: CONSENT_KEY, kindKey: "legal.cookies.consent.kind", purposeKey: "legal.cookies.consent.purpose", lifeKey: "legal.cookies.consent.life", recipientKey: "legal.cookies.recipient.browser" },
+  { name: "debateai.mode", kindKey: "legal.cookies.mode.kind", purposeKey: "legal.cookies.mode.purpose", lifeKey: "legal.cookies.mode.life", recipientKey: "legal.cookies.recipient.browser" },
+  { name: LANGUAGE_OFFER_DISMISSED_KEY, kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.languageOffer.purpose", lifeKey: "legal.cookies.languageOffer.life", recipientKey: "legal.cookies.recipient.browser" },
+  { name: "debateai.support.conversation.v2", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportConversation.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" }
 ]);
+
+/** All eight stored items, cookies first, in the order /cookies and the storage card list them. */
+export const LEGAL_INVENTORY: readonly LegalInventoryItem[] = Object.freeze([...LEGAL_COOKIES, ...LEGAL_BROWSER_STORAGE]);
+
+/** The 24 kind/purpose/life strings of LEGAL_INVENTORY picked out of a legal catalogue (missing keys are left out). */
+export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
+  const copy: Record<string, string> = {};
+  for (const { kindKey, purposeKey, lifeKey } of LEGAL_INVENTORY) {
+    for (const key of [kindKey, purposeKey, lifeKey]) {
+      if (Object.hasOwn(legal, key)) copy[key] = legal[key]!;
+    }
+  }
+  return Object.freeze(copy);
+}
 
 /** The jobs a provider can be given, and so why it receives text (PP §5 "what it receives and for what purpose"). */
 export type ProviderPurpose = "arguments" | "judging" | "story" | "support";

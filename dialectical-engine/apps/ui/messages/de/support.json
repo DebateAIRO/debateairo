@@ -79,8 +79,8 @@
   "support.conversationDetails": "Gesprächsdetails",
   "support.shortcutsLabel": "Support-Schnellzugriffe",
   "support.answerRating": "Bewertung der Antwort",
-  "support.privacyPreferences": "Datenschutzeinstellungen",
+  "support.privacyPreferences": "Datenschutz",
   "support.aiBanner": "Antworten werden von KI erzeugt, maschinenlesbar gekennzeichnet und können fehlerhaft sein. Sie können jederzeit einen Menschen verlangen.",
-  "support.cookiePreferences": "Cookie-Einstellungen",
+  "support.cookiePreferences": "Gespeicherte Cookies",
   "support.recoverAccount": "Konto wiederherstellen"
 }

@@ -79,8 +79,8 @@
   "support.conversationDetails": "Сведения о разговоре",
   "support.shortcutsLabel": "Быстрые ссылки поддержки",
   "support.answerRating": "Оценка ответа",
-  "support.privacyPreferences": "Настройки конфиденциальности",
+  "support.privacyPreferences": "Конфиденциальность",
   "support.aiBanner": "Ответы создаются ИИ, имеют машиночитаемую маркировку и могут быть ошибочными. В любой момент можно попросить подключить человека.",
-  "support.cookiePreferences": "Настройки файлов cookie",
+  "support.cookiePreferences": "Файлы cookie, которые мы храним",
   "support.recoverAccount": "Восстановить аккаунт"
 }

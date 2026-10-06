@@ -6,17 +6,20 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { TopBar } from "@/components/TopBar";
 import { CookieConsent } from "@/components/consent/CookieConsent";
 import { LegalDocumentsProvider } from "@/components/consent/LegalDocumentsProvider";
+import { SupportConversationGuard } from "@/components/support/SupportConversationGuard";
 import { ConsentCatalogProvider } from "@/components/consent/useConsentCatalog";
 import { cookies } from "next/headers";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { getLocale, isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
+import { inventoryCopy } from "@/lib/legal/pages";
 import { loadLegalDocument } from "@/lib/legal/server";
 import { NONCE_REQUEST_HEADER } from "../content-security-policy.mjs";
 import "./globals.css";
 import "./language-switcher.css";
 import "./legal.css";
+import "./billing.css";
 
 const display = Fraunces({
   subsets: ["latin"],
@@ -58,18 +61,21 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await requestLocale();
   const localeDefinition = getLocale(locale);
-  const [chrome, debateViews, support, consent, privacy, terms, auth] = await Promise.all([
+  const [chrome, debateViews, support, consentNamespace, legalNamespace, privacy, terms, auth] = await Promise.all([
     loadNamespace(locale, "chrome"),
     loadNamespace(locale, "debateViews"),
     loadNamespace(locale, "support"),
     // Served with the render so every consent surface paints in the reader's locale
     // on its first render, with no client chunk load and no English in between.
     loadNamespace(locale, "consent"),
+    // The storage card's eight rows read the legal catalogue's inventory strings (D-28).
+    loadNamespace(locale, "legal"),
     loadLegalDocument(locale, "privacy"),
     loadLegalDocument(locale, "terms"),
     loadNamespace(locale, "auth")
   ]);
   const sharedCatalog = Object.freeze({ ...chrome, ...debateViews, ...support });
+  const consent = Object.freeze({ ...consentNamespace, ...inventoryCopy(legalNamespace) });
 
   // F-08: the per-request nonce the middleware stamped on the request. Reading
   // headers() also makes every route dynamic, so no prerendered HTML can ever
@@ -111,6 +117,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <AuthCatalogProvider catalog={auth}>{children}</AuthCatalogProvider>
                 <CookieConsent />
                 <SiteFooter variant="line" />
+                <SupportConversationGuard />
               </div>
             </LegalDocumentsProvider>
           </ConsentCatalogProvider>

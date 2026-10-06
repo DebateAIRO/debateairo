@@ -34,6 +34,7 @@
   "settings.erasure.title": "Konto kustutamine",
   "settings.erasure.hint": "Kustutamine algab pärast seitsme täispäeva möödumist. Enne selle algust saate toimingu tühistada. Ajastamise, tühistamise ja lõpuleviimise teated saadetakse igale kontoga seotud e-posti põhi- või taasteaadressile; nõutav on vähemalt üks kinnitatud kanal.",
   "settings.erasure.dataWarning": "Krüpteeritud privaatne sisu muutub võtmete hävitamisel jäädavalt loetamatuks. Praegused avalikud hetktõmmised jäävad kasutuselt kõrvaldatud pseudonüümi all avalikuks ning allalaaditud, tsiteeritud, vahemällu salvestatud, indekseeritud või teenusepakkuja säilitatud koopiad võivad alles jääda. Omandatud pärandandmete avatekst esitatakse säilinud jäägina, mitte täielikult puhastatud sisuna.",
+  "settings.erasure.paidPlan": "Kustutamise ajastamine peatab teie tasulise paketi pikendamise, kuid pakett töötab edasi, kuni kustutamine tehakse või makstud kuu lõpeb; kui tühistate kustutamise, kehtib pakett selle kuu lõpuni ja pikeneb ainult siis, kui võtate tühistamise tagasi, ning kui saate veel 14 päeva jooksul pärast ostu taganeda, saate seda teha kuni kustutamiseni.",
   "settings.erasure.checking": "Konto kustutamise oleku kontrollimine…",
   "settings.erasure.status": "Olek: {status}. Ajastatud kustutamisaeg: {time}.",
   "settings.erasure.processing": "Pöördumatu kustutamine on pooleli. Ajastamine ja tühistamine pole enam võimalikud.",

@@ -126,6 +126,7 @@
   "public.report.models": "Modeller, der deltog: {models}",
   "public.report.modelsNotRecorded": "Modeller, der deltog: ikke registreret",
   "public.report.disclosure": "Denne rapport er skrevet af AI-modeller ud fra debattens argumenter.",
+  "public.report.notAdvice": "AI-genereret rapport. Den udgør ikke lægelig, juridisk, finansiel eller anden professionel rådgivning.",
   "public.report.title.inShort": "Kort fortalt",
   "public.report.title.story": "Hele historien",
   "public.report.title.why": "Hvorfor dette svar",

@@ -45,6 +45,7 @@ import {
 } from "@/lib/debateHeaderOverflow";
 import { classifyTokenUnlockFailure } from "@/lib/v3/tokenUnlock";
 import { requestFailureMessage } from "@/lib/v3/requestFailure";
+import { runFailureMessage } from "@/lib/v3/runFailure";
 import {
   applyRunEvent,
   createLiveRunState,
@@ -177,9 +178,7 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
       }
       input.writeError(next.terminalFailure === null
         ? null
-        : t(input.catalog ?? debateChromeEnglish, "debateChrome.error.debateGenerationFailed", {
-            reason: next.terminalFailure
-          }));
+        : runFailureMessage(next.terminalFailure, input.catalog ?? debateChromeEnglish));
     }
     if (refreshTriggeredBy(event.event_type)) void input.refresh(event.event_type === "run.terminal");
   };
@@ -762,9 +761,7 @@ export default function DebatePageClient({
       // poll). Without this, a debate that arrives after a transient failure
       // would stay stuck behind an old error (see the `error && !debate` gate).
       setError(bundle.kind === "failed"
-        ? fundingFailureMessage(bundle.run.terminal_reason,debateChromeCatalog) ?? t(debateChromeCatalog, "debateChrome.error.debateGenerationFailed", {
-            reason: bundle.run.terminal_reason ?? ""
-          })
+        ? fundingFailureMessage(bundle.run.terminal_reason, debateChromeCatalog) ?? runFailureMessage(bundle.run.terminal_reason, debateChromeCatalog)
         : null);
     } catch (exc) {
       if (privateDeletionRef.current!==null) return;

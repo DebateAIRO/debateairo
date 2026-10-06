@@ -126,6 +126,7 @@
   "public.report.models": "Các mô hình đã tham gia: {models}",
   "public.report.modelsNotRecorded": "Các mô hình đã tham gia: không được ghi nhận",
   "public.report.disclosure": "Báo cáo này do các mô hình AI viết dựa trên các lập luận của cuộc tranh luận.",
+  "public.report.notAdvice": "Báo cáo do AI tạo. Báo cáo này không phải là tư vấn y tế, pháp lý, tài chính hoặc tư vấn chuyên môn khác.",
   "public.report.title.inShort": "Tóm lại",
   "public.report.title.story": "Toàn bộ diễn biến",
   "public.report.title.why": "Vì sao có câu trả lời này",

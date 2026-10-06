@@ -105,6 +105,7 @@ import {
   RunCostSubstitutionRepository,
   RunRepository,
   decryptLeasedContentForRun,
+  insertRunRoleAssignment,
   prepareLeasedContentEncryptionForRun,
   queryPrivateStream,
   withOwnerAskAdmissionLease,
@@ -116,6 +117,55 @@ import {
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
+export {
+  ASK_MODEL_ASSIGNMENT_INVALID,
+  ASK_MODEL_REFUSALS,
+  answerTokenCeilingsByRole,
+  askModelPickerSettings,
+  askTargetFacts,
+  debaterSeatCount,
+  describeModelScorecard,
+  expectedCallsByRoleFromBasis,
+  isUsablePerRunCeiling,
+  reachableInTodaysOrder,
+  seatDemandForDebaters,
+  targetPricesOf,
+  type AdmittedModelAssignment,
+  type AskModelPickerSettings,
+  type AskMoneyPolicy,
+  type AskTargetFacts,
+  type CallTokenCeilings
+} from "./ask-model-picker.js";
+export {
+  hostedMoneyOf,
+  personRoomMicrosAt,
+  personRoomOf,
+  pickWithinPersonRoom,
+  pickerMoneyLimits,
+  type PersonRoomInput,
+  type PersonRoomPick
+} from "./person-room-picker.js";
+import {
+  hostedMoneyOf,
+  personRoomMicrosAt,
+  personRoomOf,
+  pickWithinPersonRoom,
+  type PersonRoomInput,
+  type PersonRoomPick
+} from "./person-room-picker.js";
+import { RoleAssignmentSchema, type RoleAssignment, type Scorecard } from "@debateai/scorecard";
+import {
+  ASK_MODEL_ASSIGNMENT_INVALID,
+  ASK_MODEL_REFUSALS,
+  debaterSeatCount,
+  expectedCallsByRoleFromBasis,
+  isUsablePerRunCeiling,
+  reachableInTodaysOrder,
+  seatDemandForDebaters,
+  targetPricesOf,
+  type AdmittedModelAssignment,
+  type AskModelPickerSettings
+} from "./ask-model-picker.js";
 import {
   AGE_RULE_VERSION,
   checkDob,
@@ -123,7 +173,9 @@ import {
   dobFromIso,
   meetsMinimumAge,
   MIN_AGE,
+  parseDeclaredRegion,
   TypedDomainError,
+  type DeclaredRegion,
   type RiskTier,
   type TierSource
 } from "@debateai/kernel";
@@ -189,7 +241,13 @@ import {
   type SupportApplication,
   type SupportRoutePath
 } from "./support/index.js";
-import { installBillingRoutes, type BillingRouteOptions } from "./billing/index.js";
+import {
+  installBillingRoutes,
+  type BillingAdmission,
+  type BillingRouteOptions,
+  type BillingRoutePath
+} from "./billing/index.js";
+import type { BillingErasureHook } from "./billing/erasure-hook.js";
 
 type RouteAuthPolicy = "public" | "user" | "operator" | "staff";
 type RouteOriginPolicy = "trusted";
@@ -302,10 +360,14 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "AMENDMENT_REASON_REQUIRED",
   "ANSWER_INDEX_PAGE_INVALID",
   "ANSWER_MEMORY_OBSERVATION_FAILED",
+  "ANSWER_MODEL_ASSIGNMENT_INVALID",
   "ANSWER_PERSIST_FAILED",
   "ARROW_ENDPOINT_ABSENT",
   "ASK_ALREADY_WAITING",
   "ASK_COARSE_FIT_INPUT_INVALID",
+  "ASK_MODEL_ASSIGNMENT_INVALID",
+  "ASK_MODEL_CANDIDATE_UNAVAILABLE",
+  "ASK_MODEL_STRENGTH_BUDGET_TOO_SMALL",
   "ASK_ROOM_DAY_UNSETTLED",
   "ATTEMPT_ACCESS_DEPTH_MISSING",
   "AUTH_POLICY_INVALID",
@@ -339,6 +401,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "BUDGET_SKIP_AFFECTED_NODES_REQUIRED",
   "CALIBRATION_STRATEGY_INVALID",
   "CALL_BUDGET_EXHAUSTED",
+  "CALL_SITE_SEAT_ALREADY_MARKED",
+  "CALL_SITE_SEAT_MARKER_REQUIRED",
   "CATCH_UP_ANSWER_NOT_FOUND",
   "CATCH_UP_DISCLOSURE_MISMATCH",
   "CATCH_UP_SOURCE_VERSION_CHANGED",
@@ -588,7 +652,11 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PROVIDER_CALL_FAILED",
   "PROVIDER_CALL_INSIDE_TRANSACTION",
   "PROVIDER_CONTENT_UNACCEPTED",
+  "PROVIDER_CONTEXT_WINDOW_EXCEEDED",
   "PROVIDER_RUN_REQUIRED",
+  "PROVIDER_THINKING_LEVEL_CHANGED",
+  "PROVIDER_THINKING_LEVEL_UNSUPPORTED",
+  "PROVIDER_USAGE_CAP",
   "PROVIDER_USAGE_INVALID",
   "PROVIDER_USAGE_UNREPORTED",
   "PUBLICATION_LEASE_SCOPE_EXPANSION_FORBIDDEN",
@@ -631,6 +699,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_OWNER_RAW_ID_FORBIDDEN",
   "RUN_OWNER_REF_INVALID",
   "RUN_PRINCIPAL_SESSION_MISMATCH",
+  "RUN_ROLE_ASSIGNMENT_INVALID",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",
@@ -685,6 +754,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "STORY_PROVIDER_SCOPE_UNAUTHORIZED",
   "STORY_ROW_INVALID",
   "STRENGTH_LINEAGE_UNRESOLVED",
+  "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID",
   "STRUCTURAL_CEILING_BRANCHINGFACTOR_INVALID",
   "STRUCTURAL_CEILING_COMPOSITIONSEGMENTCAP_INVALID",
   "STRUCTURAL_CEILING_COMPOSITION_SHAPE_INCOHERENT",
@@ -1289,6 +1359,27 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
+  { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
+  { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
+  { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
+  { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
+  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  // P12: the subscriber's own subscription. Every mutation carries the CSRF pair like any user route.
+  { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
+  { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },
+  { route: "POST /v1/billing/subscription/downgrade", auth: "user", resource: "billing", action: "downgrade" },
+  { route: "POST /v1/billing/subscription/cancel", auth: "user", resource: "billing", action: "cancel" },
+  { route: "POST /v1/billing/subscription/cancel-revoke", auth: "user", resource: "billing", action: "cancel-revoke" },
+  // P12c: the upgrade's quote (prorated, taxed, with the new plan's recurring total) and the charge that spends it.
+  { route: "POST /v1/billing/subscription/upgrade-quote", auth: "user", resource: "billing", action: "quote-upgrade" },
+  { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
+  // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
+  { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
+  // P12e (A12): the card change's signed authorization order; the CSRF pair like any user mutation.
+  { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
+  // P13: cancel without signing in (Terms §12). First-party Origin only; never a session.
+  { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
+  { route: "POST /v1/billing/cancel-by-token", auth: "public", origin: "trusted", resource: "billing", action: "cancel-by-token" },
   ...staffAuthorizationPolicyInventory
 ] as const satisfies readonly Readonly<{
   route: string;
@@ -1554,12 +1645,25 @@ export interface ApiOptions {
    * absent answers the house 404, which is local mode and billing off alike.
    */
   readonly billing?: BillingRouteOptions;
+  /**
+   * P15, W7 (P2-I10): scheduling an erasure stops the owner's renewal at once; the paid plan runs until the erasure
+   * commits, when the reconciler's sweep ends it. Present only when hosted with billing on; the sweep also repeats a
+   * renewal stop that failed here.
+   */
+  readonly billingErasure?: Pick<BillingErasureHook, "stop">;
   readonly support?: SupportApplication;
   /**
    * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
    * register version in force publishes `countryPolicy`; absent, every route behaves exactly as before.
    */
   readonly countryGate?: CountryGate;
+  /**
+   * A21 (owner decision O4): whether a VALID model scorecard is in force — the yes/no
+   * GET /v1/session tells the /new page, which marks the model-strength control "not in
+   * effect" when it is not. Composed from the same scorecard read admission runs under
+   * (apps/api/src/main.ts, acceptance/main.ts). Absent means no.
+   */
+  readonly modelScorecardInForce?: boolean;
 }
 
 /**
@@ -1875,6 +1979,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   const sourceAdmissions = new WeakMap<object, AuthSourceAdmission>();
   api.addHook("onResponse", async request => { sourceAdmissions.get(request)?.release(); sourceAdmissions.delete(request); });
   const mailDisplays = new WeakMap<object, Readonly<{ locale: string; timeZone: string | null }>>();
+  // Region picker S01: parsed region for the current register request only.
+  const registerDeclaredRegions = new WeakMap<object, DeclaredRegion>();
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
@@ -1891,6 +1997,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const countryCode = edgeCountry(request.headers) ?? options.countryGate?.recordedCountry(ip) ?? null;
     // Paid plans L3b: present only on a register request whose hook parsed a well-formed triple.
     const legal = registerLegalDocuments.get(request);
+    const region = registerDeclaredRegions.get(request);
     return Object.freeze({
       ip,
       userAgent: typeof request.headers["user-agent"] === "string"
@@ -1902,7 +2009,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // left out when neither gives one.
       ...(countryCode === null ? {} : { countryCode }),
       ...(legal === undefined ? {} : { legal }),
-      ...(mailDisplays.get(request) === undefined ? {} : { mailDisplay: mailDisplays.get(request)! })
+      ...(mailDisplays.get(request) === undefined ? {} : { mailDisplay: mailDisplays.get(request)! }),
+      ...(region === undefined ? {} : { region })
     });
   };
   const admissionRefusalAuditedUntil = new Map<string, number>();
@@ -2086,6 +2194,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (request.method !== "POST" || !["/v1/auth/register","/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
     if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
+  });
+  /** Region picker S01 (SPEC R17, R18): parse the declared region after the IP gate and before age. */
+  api.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || !["/v1/auth/register", "/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
+    const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
+      ? request.body as Record<string, unknown> : null;
+    const region = body === null ? null : parseDeclaredRegion(body);
+    if (region === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    if (options.countryGate?.declaredSignupRefusal(region.country) === "COUNTRY_SIGNUP_UNAVAILABLE") {
+      return reply.status(403).send({ error: "COUNTRY_SIGNUP_UNAVAILABLE" });
+    }
+    registerDeclaredRegions.set(request, region);
   });
   /**
    * Age gate (8d → 8j) in front of register. The registration mount region is frozen (S04), so
@@ -2287,6 +2407,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success||provider.data==='apple')throw new SocialAuthError('SOCIAL_PROOF_INVALID');return socialCallback(provider.data,request.query,request,reply);
   });
   void api.register(async apple=>{
+    // Replace the inherited billing-only parser in this callback's encapsulated scope.
+    // The parent still refuses form bodies on all routes except the xMoney notification.
+    if (apple.hasContentTypeParser('application/x-www-form-urlencoded')) apple.removeContentTypeParser('application/x-www-form-urlencoded');
     apple.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string',bodyLimit:8192},(_request,body,done)=>{
       try {const form=new URLSearchParams(body as string);const value:Record<string,string>={};for(const [key,member] of form){if(Object.hasOwn(value,key)||!['state','code','error','error_description','user'].includes(key))throw new SocialAuthError('SOCIAL_PROOF_INVALID');value[key]=member;}done(null,value);}catch{done(new SocialAuthError('SOCIAL_PROOF_INVALID'));}
     });
@@ -2517,6 +2640,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     if (scheduled===null || scheduled.status==="NONE" || scheduled.executeAt===undefined) {
       return reply.status(404).send({ error:"NOT_FOUND" });
+    }
+    if (options.billingErasure!==undefined) {
+      try {
+        await options.billingErasure.stop(authenticated.ownerRef);
+      } catch {
+        // The erasure is scheduled either way; the billing sweep repeats this renewal stop within minutes.
+        console.error("[BILLING_ERASURE_STOP_PENDING]");
+      }
     }
     return reply.status(202).send(AccountErasureStatusSchema.parse({
       status:scheduled.status,execute_at:scheduled.executeAt.toISOString(),
@@ -2992,7 +3123,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   }
 
   api.get("/v1/session", routePolicy("GET /v1/session"), async (request, reply) => {
-    return reply.send(request.session);
+    // A21 (owner decision O4): the one deployment fact /new reads with the session — a strict
+    // boolean, so nothing but yes or no can leave here, whatever a composition passed in.
+    return reply.send({ ...request.session, model_scorecard_in_force: options.modelScorecardInForce === true });
   });
 
   api.get("/v1/deployment", routePolicy("GET /v1/deployment"), async (request, reply) => {
@@ -3088,6 +3221,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   api.get<{ Querystring: Record<string, unknown> }>("/v1/asks/room", routePolicy("GET /v1/asks/room"), async (request, reply) => {
+    // Paid plans P4-G (go-live row 31): the room read is the estimator and the room's reads on every call, so it
+    // charges its own owner-keyed budget when the version in force seals one (required with the band, ruling C7).
+    // The page treats the 429 as "no word", and the ask itself stays authoritative.
+    if (options.admission?.configured("askRoomReads") === true
+      && !admitOrRefuse(reply, "askRoomReads", "GET /v1/asks/room",
+        request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
@@ -3485,7 +3624,26 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
   );
   // Paid plans (R-3): the one billing routes module, always installed.
-  installBillingRoutes(api, { ...options.billing, policy: (route) => routePolicy(route) });
+  const admitBilling: BillingAdmission = Object.freeze({
+    gate: (reply, scope, route, key) => options.admission?.configured(scope) !== true
+      || admitOrRefuse(reply, scope, route, key)
+  });
+  // P8c (R3-2, the age gate): the checkout refuses an account that still owes its one-time age check. Bound, because
+  // SessionService reads its repository through `this` (apps/api/src/sessions.ts:561-564).
+  const billingSessions = options.sessions;
+  const billingAgeConfirmation = billingSessions?.readAgeConfirmation?.bind(billingSessions);
+  installBillingRoutes(api, {
+    ...(options.billing ?? {}),
+    policy: (route: BillingRoutePath) => routePolicy(route),
+    admission: admitBilling,
+    // R3-3: only the address and the agent. `sourceFor` also carries the age gate's `cf-ipcountry` value;
+    // billing's IP country is the DB-IP lookup's, never the edge header.
+    source: (request) => {
+      const { ip, userAgent } = sourceFor(request);
+      return Object.freeze({ ip, userAgent });
+    },
+    ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation })
+  });
   if (options.staffPolicyVersion === 2) registerStaffRoutes(api, options.staff,
     route => routePolicy(route as AuthorizationRoute), {sourceFor, refreshedCookies});
   return api;
@@ -3559,13 +3717,50 @@ export interface RunCreationSettings {
     readonly depthParams: Readonly<Record<string, unknown>>;
     readonly riskTier: RiskTier;
     readonly panelSize: number;
+    /**
+     * A14/A20 (pre-flight ruling F17): 1 only when the run's pinned role
+     * assignment gives a seat a runner-up (DR-184-v5), else 0 (DR-184-v4, the
+     * number V ruled on 2026-09-05 to seal without padding). Admission decides
+     * it; the composition passes it to `computeStructuralCeilingBasis`.
+     */
+    readonly backupSequencesProvisioned: 0 | 1;
   }) => Promise<Readonly<Record<string, unknown>>>;
   readonly resolveRisk: (askerRiskTier: RiskTier, tierSource: AskRequest["tier_source"], provenanceRef: string) => {
     readonly effectiveRiskTier: RiskTier;
     readonly tierSource: TierSource;
     readonly tierProvenanceRef: string;
   };
+  /**
+   * A20 — THE PER-ROLE MODEL PICKER (spec 2026-09-26 §2.4), asked only when the
+   * scorecard it carries is VALID. Absent, or present with an ABSENT or REFUSED
+   * scorecard, admission is today's plan-roster filter byte for byte and no role
+   * assignment is pinned.
+   */
+  readonly modelPicker?: AskModelPickerSettings;
 }
+
+/** One planned admission: the run's basis, panel and (with a VALID scorecard) its assignment. */
+export type PlannedAskAdmission = {
+  readonly risk: ReturnType<RunCreationSettings["resolveRisk"]>;
+  readonly envelopeBasis: Readonly<Record<string, unknown>>;
+  readonly discoveredPanel: readonly DiscoveredPanelMember[];
+  readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
+  /** A20: present only when a VALID scorecard drove admission. */
+  readonly modelAssignment?: AdmittedModelAssignment;
+  /** S2: the figure the run's hold opens with when the picker planned it (hosted); B6 uses its estimator otherwise. */
+  readonly pickedHoldMicros?: number;
+  /** S2 / A5: nothing fitted the person's room at any strength; the debate starts on the cheapest choice the site allows (logged when it does). */
+  readonly personRoomTight?: boolean;
+};
+
+export type AskAdmission = PlannedAskAdmission & {
+  /**
+   * S2: only for a WAIT preview with a person measured — the same ask planned as if
+   * it started NOW (the preview's own instant). `#submitWithRoom` pins it when the
+   * LOCKED decision starts the debate after all.
+   */
+  readonly ifStartsNow?: PlannedAskAdmission;
+};
 
 export function preserveSubmittedTierSource<T extends { readonly tierSource: TierSource }>(
   resolved: T,
@@ -3579,15 +3774,249 @@ export function preserveSubmittedTierSource<T extends { readonly tierSource: Tie
   };
 }
 
+/** Pre-flight ruling F17: 1 when any seat of the assignment has a runner-up — the only runs a backup can serve. */
+function backupSequencesFor(assignment: RoleAssignment): 0 | 1 {
+  return Object.values(assignment.roles).some((seats) => seats.some((seat) => seat.runnerUp !== null)) ? 1 : 0;
+}
+
+function makerAvailabilityFor(panel: readonly DiscoveredPanelMember[]) {
+  const makers = Object.freeze([...new Set(panel.map((member) => member.maker))]);
+  return Object.freeze({
+    deploymentMakerCapability: makers.length > 0,
+    runMakerReachability: makers.length >= 2,
+    classification: makers.length >= 2 ? "CAPABLE" as const : "TRANSIENT_OUTAGE" as const,
+    configuredMakers: makers,
+    reachedMakers: makers,
+    registerRef: panel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
+  });
+}
+
+/**
+ * Carry 15 m1 / carry 16 m3–m4. `askModelPickerSettings` refuses a HOSTED boot
+ * with no usable per-run ceiling, but the settings are a plain interface: ones
+ * built any other way would switch the picker's step-down and its
+ * BUDGET_TOO_SMALL refusal off without a word. Admission refuses them as an
+ * engine fault (a 500), through the same test the boot guard asks.
+ */
+function assertHostedPickerCeiling(picker: AskModelPickerSettings): void {
+  if (picker.mode === "HOSTED" && !isUsablePerRunCeiling(picker.perRunCeilingMicros)) {
+    throw new TypedDomainError(
+      ASK_MODEL_ASSIGNMENT_INVALID,
+      "Hosted admission needs a positive safe-integer per-run money ceiling"
+    );
+  }
+}
+
+/**
+ * A20 — ADMISSION WITH A MODEL SCORECARD (spec 2026-09-26 §2.4–2.6).
+ *
+ * Replaces ONLY the roster filter. The day's money (asked first), the risk
+ * resolution, the plan vocabulary and discovery ran before this, unchanged.
+ * The debaters the picker seats become the run's pinned `discovered_panel`, in
+ * seat order, so `agent_count`, the envelope's panel size and the runner's
+ * legacy panel all keep meaning "the debaters". The whole assignment is pinned
+ * beside the run by `submit` (core.run_role_assignment); core.run is never
+ * updated. A picker refusal reaches the asker as a constant sentence.
+ */
+async function admitWithScorecard(input: Readonly<{
+  settings: RunCreationSettings;
+  ask: AskRequest;
+  risk: ReturnType<RunCreationSettings["resolveRisk"]>;
+  discoveredPanel: readonly DiscoveredPanelMember[];
+  rosterModelIds: readonly string[];
+  picker: AskModelPickerSettings;
+  scorecard: Scorecard;
+  /** S2: the person the room's preview measured; null for no person scope (local, billing off, legacy asker). */
+  personRoom: PersonRoomInput | null;
+}>): Promise<AskAdmission> {
+  const { settings, ask, risk, discoveredPanel, picker } = input;
+  // Carry 15 (A20.2 review m1): first, as an engine fault. `evaluateAskAdmission`
+  // already asked it before discovery (carry 16 m3); this keeps the promise local.
+  assertHostedPickerCeiling(picker);
+  // Paid plans S4b (final review P3-I2; the owner's ruling of 3 October 2026): on a
+  // site that sells plans a Free ask is seated, backed up and fallen back from the
+  // Free roster only, and its ECONOMY pick reads Free's own caps (the picker's
+  // `plansSold`). With no Free-roster model reachable it takes the path of a role
+  // with no eligible model below; no premium-roster model ever takes a Free seat.
+  // S4b fix round 1: its answer writer and answer checker never fall back, since a
+  // FALLBACK answer seat is served by the register's sealed refs (F18), which no
+  // roster bounds. With no scored Free-roster model for one of them the picker
+  // leaves the role empty and refuses NO_REACHABLE_CANDIDATE, which the asker reads
+  // as ASK_MODEL_CANDIDATE_UNAVAILABLE.
+  // B8 already rewrote `ask.plan_tier` to the person's plan's tier with billing on.
+  const plansSold = picker.mode === "HOSTED" && picker.plansSold === true;
+  const freeRosterOnly = plansSold && ask.plan_tier === "free";
+  const reachable = reachableInTodaysOrder(discoveredPanel, input.rosterModelIds, picker.targetFacts, freeRosterOnly);
+  const plannedDebaters = debaterSeatCount(reachable, input.rosterModelIds.length);
+  // Carry 10: zero reachable makers (an empty discovery, or — S4b — a Free ask on a
+  // site that sells plans with no Free-roster model discovered) is refused HERE,
+  // before the basis and before the picker, so neither ever sees the incoherent
+  // demand "no debaters, but a writer and a checker". Makers are counted by
+  // exact string, as the roster filter counts them.
+  if (plannedDebaters === 0) {
+    markAskRefusal(new TypedDomainError(
+      ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE.code, ASK_MODEL_REFUSALS.NO_REACHABLE_CANDIDATE.message
+    ));
+  }
+  const resolveBasis = async (
+    panelSize: number,
+    backupSequencesProvisioned: 0 | 1
+  ): Promise<Readonly<Record<string, unknown>>> => {
+    try {
+      return await settings.resolveEnvelopeBasis({
+        depthParams: ask.depth_params,
+        riskTier: risk.effectiveRiskTier,
+        panelSize,
+        backupSequencesProvisioned
+      });
+    } catch (error) {
+      return markAskRefusal(error);
+    }
+  };
+  // The planned basis sizes the picker's expected calls only. Its call-site
+  // counts do not depend on the backup provision, so it is asked without one.
+  const plannedBasis = await resolveBasis(plannedDebaters, 0);
+  // S2: a hosted plan cap is read by the plan's TIER. With billing on, B8 already
+  // rewrote `ask.plan_tier` to the person's plan's tier (R-28).
+  const hostedPlanTier = picker.mode === "HOSTED" ? ask.plan_tier : null;
+  const money = hostedMoneyOf(picker);
+  const pickerInput = Object.freeze({
+    scorecard: input.scorecard,
+    mode: picker.mode,
+    strength: ask.model_strength ?? null,
+    planTier: hostedPlanTier,
+    reachable,
+    seatDemand: seatDemandForDebaters(plannedDebaters),
+    expectedCallsByRole: expectedCallsByRoleFromBasis(plannedBasis),
+    perRunCeilingMicros: picker.perRunCeilingMicros,
+    plansSold,
+    prices: targetPricesOf(picker.targetFacts),
+    // Final review I3: the gateway's window wall adds each call's sealed answer bound.
+    answerTokenCeilingByRole: picker.answerTokenCeilings
+  });
+  /** S2: the pick for the person's room at `at` (null: no person scope). */
+  const pickAt = (at: Date | null): PersonRoomPick => pickWithinPersonRoom({
+    picker: pickerInput,
+    moneyPolicy: money?.moneyPolicy ?? null,
+    runMaximumMicros: money?.runMaximumMicros ?? null,
+    personRoomMicros: input.personRoom === null || at === null ? null : personRoomMicrosAt(input.personRoom.uses, at)
+  });
+  /** Everything the scorecard's admission did after its pick, for ONE plan. */
+  const admitPicked = async (picked: PersonRoomPick): Promise<PlannedAskAdmission> => {
+    if (picked.state === "REFUSED") {
+      picker.log?.(`MODEL_PICKER refused reason=${picked.outcome.reason} detail=${picked.outcome.detail}`);
+      const refusal = ASK_MODEL_REFUSALS[picked.outcome.reason];
+      markAskRefusal(new TypedDomainError(refusal.code, refusal.message));
+    }
+    const outcome = picked.outcome;
+    // Pre-flight fix F19: the assignment is pinned append-only, and the runner and
+    // the answer index read it back through RoleAssignmentSchema. One the schema
+    // refuses must never be pinned: it is an engine fault (a 500), not an ask refusal.
+    const checked = RoleAssignmentSchema.safeParse(outcome.assignment);
+    if (!checked.success) {
+      throw new TypedDomainError(
+        ASK_MODEL_ASSIGNMENT_INVALID,
+        `The picker produced an assignment the pinned-assignment schema refuses: ${checked.error.issues[0]?.message ?? "invalid"}`
+      );
+    }
+    // Carry 4 (pre-flight I8): migration 0090 CHECKs strength = assignment->>'strength',
+    // but only at the pin, after startRun has created the run; a mismatch there
+    // would leave a run with no work item. Admission runs before startRun, so the
+    // same law is refused here, as the same engine fault.
+    if (outcome.assignment.strength !== outcome.appliedStrength) {
+      throw new TypedDomainError(
+        ASK_MODEL_ASSIGNMENT_INVALID,
+        `The picker applied ${outcome.appliedStrength} but built its assignment at ${outcome.assignment.strength}`
+      );
+    }
+    const byProviderRef = new Map(discoveredPanel.map((member) => [member.provider_ref, member] as const));
+    const discovered = (seated: Readonly<{ providerRef: string }>): DiscoveredPanelMember => {
+      const member = byProviderRef.get(seated.providerRef);
+      if (member === undefined) {
+        throw new TypedDomainError(
+          ASK_MODEL_ASSIGNMENT_INVALID,
+          `The picker seated ${seated.providerRef}, which discovery did not return`
+        );
+      }
+      return member;
+    };
+    // Carry 15 (A20.2 review m2): every seat of every role, mains and runner-ups
+    // alike, sits on a route discovery returned, and the picker seats no more
+    // debaters than the estimate counted. The real picker draws only from the
+    // reachable targets and stops at the demand; these catch a picker defect, as
+    // the same engine fault.
+    for (const seats of Object.values(outcome.assignment.roles)) {
+      for (const seat of seats) {
+        discovered(seat.main);
+        if (seat.runnerUp !== null) discovered(seat.runnerUp);
+      }
+    }
+    if (outcome.assignment.roles.POSITION.length > plannedDebaters) {
+      throw new TypedDomainError(
+        ASK_MODEL_ASSIGNMENT_INVALID,
+        `The picker seated ${String(outcome.assignment.roles.POSITION.length)} debaters where ${String(plannedDebaters)} were planned`
+      );
+    }
+    const debaters = outcome.assignment.roles.POSITION.map((seat) => discovered(seat.main));
+    const makerAvailability = makerAvailabilityFor(debaters);
+    try {
+      assertMakerAdmission(risk.effectiveRiskTier, makerAvailability);
+    } catch (error) {
+      markAskRefusal(error);
+    }
+    // Pre-flight ruling F17: a backup sequence is provisioned only when some seat
+    // has a runner-up; any other run keeps DR-184-v4 exactly (no padding, V's
+    // 2026-09-05 ruling). The receipt names the formula it was minted with.
+    const backupSequencesProvisioned = backupSequencesFor(outcome.assignment);
+    const envelopeBasis = debaters.length === plannedDebaters && backupSequencesProvisioned === 0
+      ? plannedBasis
+      : await resolveBasis(debaters.length, backupSequencesProvisioned);
+    // Carry 15 (A20.2 review m3): a required input field does not force a
+    // composition to read it. One that drops the provision would mint DR-184-v4
+    // for a run whose runner-ups need v5's backup allowance, and that run could
+    // exhaust its ceiling part-way. The receipt names its formula, so it is checked.
+    if (backupSequencesProvisioned === 1 && envelopeBasis.formula_version !== "DR-184-v5") {
+      throw new TypedDomainError(
+        ASK_MODEL_ASSIGNMENT_INVALID,
+        "The attempt ceiling was minted without the backup sequence a runner-up needs"
+      );
+    }
+    // Carry 16 (A20.3 review m2): "assigned" means ADMITTED. It is written only
+    // now, after every check above has passed, so an engine fault (m2, m3) or a
+    // maker refusal never reads in the operator's log as an assignment.
+    for (const note of outcome.notes) picker.log?.(`MODEL_PICKER note ${note}`);
+    picker.log?.(`MODEL_PICKER assigned strength=${outcome.appliedStrength} stepped_down=${String(outcome.steppedDown)}`
+      + ` estimate_money_micros=${String(outcome.estimate.moneyMicros)} estimate_seconds=${String(outcome.estimate.seconds)}`);
+    return Object.freeze({
+      risk,
+      envelopeBasis,
+      discoveredPanel: Object.freeze(debaters),
+      criticUnavailableCap: applyCriticUnavailableCap(makerAvailability),
+      modelAssignment: Object.freeze({
+        assignment: outcome.assignment,
+        appliedStrength: outcome.appliedStrength,
+        steppedDown: outcome.steppedDown
+      }),
+      ...(picked.holdMicros === null ? {} : { pickedHoldMicros: picked.holdMicros }),
+      personRoomTight: picked.personRoomTight
+    });
+  };
+  const planned = await admitPicked(pickAt(input.personRoom?.at ?? null));
+  const nowAt = input.personRoom?.ifStartsNowAt;
+  if (nowAt === undefined) return planned;
+  // S2: a WAIT preview — the same ask planned for NOW, from the same discovery. A
+  // refusal here is the SITE's: A5 starts every person-tight ask on the cheapest
+  // strength that fits the site's ceiling (P3-I1), and refuses only when no strength
+  // up to the ask's own fits it — exactly when the site alone would refuse the ask,
+  // so it refuses the ask exactly as the wake plan's would.
+  return Object.freeze({ ...planned, ifStartsNow: await admitPicked(pickAt(nowAt)) });
+}
+
 export async function evaluateAskAdmission(
   settings: RunCreationSettings,
-  ask: AskRequest
-): Promise<{
-  readonly risk: ReturnType<RunCreationSettings["resolveRisk"]>;
-  readonly envelopeBasis: Readonly<Record<string, unknown>>;
-  readonly discoveredPanel: readonly DiscoveredPanelMember[];
-  readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
-}> {
+  ask: AskRequest,
+  personRoom: PersonRoomInput | null = null
+): Promise<AskAdmission> {
   /**
    * V-28(2) — FIRST, before anything is discovered or probed.
    *
@@ -3615,8 +4044,23 @@ export async function evaluateAskAdmission(
       "The plan tier must be free or premium"
     ));
   }
+  // A20: a VALID scorecard replaces the roster filter below; anything else
+  // (no picker, ABSENT, REFUSED) keeps it byte for byte.
+  const modelPicker = settings.modelPicker;
+  // Carry 16 (A20.3 review m3): in HOSTED mode discovery probes paid vendors, so
+  // a picker with no usable per-run ceiling is refused BEFORE it, not after a
+  // paid probe round. Only a picker that will be asked is checked.
+  if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
+    assertHostedPickerCeiling(modelPicker);
+  }
   const discoveredPanel = await settings.resolveDiscoveredPanel();
   const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
+  if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
+    return admitWithScorecard({
+      settings, ask, risk, discoveredPanel, rosterModelIds: roster,
+      picker: modelPicker, scorecard: modelPicker.scorecard.scorecard, personRoom
+    });
+  }
   const filteredPanel = roster
     .map((modelId) => discoveredPanel.find((member) => member.model_id === modelId))
     .filter((member): member is typeof discoveredPanel[number] => member !== undefined);
@@ -3631,15 +4075,7 @@ export async function evaluateAskAdmission(
       } not available right now`
     ));
   }
-  const makers = Object.freeze([...new Set(filteredPanel.map((member) => member.maker))]);
-  const makerAvailability = Object.freeze({
-    deploymentMakerCapability: makers.length > 0,
-    runMakerReachability: makers.length >= 2,
-    classification: makers.length >= 2 ? "CAPABLE" as const : "TRANSIENT_OUTAGE" as const,
-    configuredMakers: makers,
-    reachedMakers: makers,
-    registerRef: filteredPanel.map((member) => member.probe_evidence_ref).join(",") || "provider_probe:empty"
-  });
+  const makerAvailability = makerAvailabilityFor(filteredPanel);
   try {
     assertMakerAdmission(risk.effectiveRiskTier, makerAvailability);
   } catch (error) {
@@ -3650,7 +4086,9 @@ export async function evaluateAskAdmission(
     envelopeBasis = await settings.resolveEnvelopeBasis({
       depthParams: ask.depth_params,
       riskTier: risk.effectiveRiskTier,
-      panelSize: filteredPanel.length
+      panelSize: filteredPanel.length,
+      // F17: no pinned assignment, so no runner-up: DR-184-v4 exactly, as today.
+      backupSequencesProvisioned: 0
     });
   } catch (error) {
     markAskRefusal(error);
@@ -3685,11 +4123,13 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
  * (B7b): `PLAN_CHANGED`, a waiting premium question whose owner's plan dropped
  * to Free before room freed up. And one with billing on (B8): `COST_RECORD`,
  * the owner's record of the interim roster swap, written before the run's first
- * job on either path; no run spends on the swapped roster without it.
+ * job on either path; no run spends on the swapped roster without it. And the
+ * pinned model assignment (A20, paid plans S1a): `MODEL_ASSIGNMENT`, on either
+ * path after `COST_RECORD` and before the memory question.
  */
 type RunSetupStep =
   | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED"
-  | "COST_RECORD";
+  | "COST_RECORD" | "MODEL_ASSIGNMENT";
 
 /**
  * What `evaluateAskAdmission` admits an ask with. B8 keeps two inside
@@ -3699,9 +4139,13 @@ type RunSetupStep =
 type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
 
 /** An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. */
-async function evaluationOrRefusal(settings: RunCreationSettings, ask: AskRequest): Promise<AskEvaluation | AskRefusal> {
+async function evaluationOrRefusal(
+  settings: RunCreationSettings,
+  ask: AskRequest,
+  personRoom: PersonRoomInput | null = null
+): Promise<AskEvaluation | AskRefusal> {
   try {
-    return await evaluateAskAdmission(settings, ask);
+    return await evaluateAskAdmission(settings, ask, personRoom);
   } catch (error) {
     if (error instanceof AskRefusal) return error;
     throw error;
@@ -3832,7 +4276,12 @@ export class PostgresAskApplication implements AskApplication {
       ask = resolved.ask;
       plannedAsk = resolved.ask;
       applied = appliedAskOf(resolved.ask);
-      if (await coarseFitFor(ask, principal.ownerRef, billing, now) === "FREE_ROSTER") {
+      // Paid plans S2 (spec §2.6 item 7, "until the picker is live"): with a VALID
+      // model scorecard the picker plans inside the person's room (the third argument
+      // of `evaluateAskAdmission`), so the interim roster swap — which would also put a
+      // paid person under the Free cap — never runs on the picker path.
+      const pickerPlans = this.settings.modelPicker?.scorecard.state === "VALID";
+      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now) === "FREE_ROSTER") {
         ask = Object.freeze({ ...ask, plan_tier: "free" as const });
         substitutedAt = now;
       }
@@ -3851,7 +4300,7 @@ export class PostgresAskApplication implements AskApplication {
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
-    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap } = await evaluateAskAdmission(this.settings, ask);
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment } = await evaluateAskAdmission(this.settings, ask);
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
@@ -3919,6 +4368,25 @@ export class PostgresAskApplication implements AskApplication {
         await this.#recordRosterSubstitution(runId, substitutedAt);
         setupStep = "MEMORY_QUESTION";
       }
+      // A20: the role assignment is pinned beside the run (core.run_role_assignment,
+      // append-only) the moment the run exists and BEFORE its work is queued, so no
+      // runner can claim a scorecard-admitted run without it. core.run is never
+      // updated. No scorecard: nothing is pinned and the runner keeps today's seats.
+      // Paid plans S1a: a setup step after B8's swap record, so a failed pin
+      // records the run FAILED (RUN_SETUP_FAILED:MODEL_ASSIGNMENT).
+      if (modelAssignment !== undefined) {
+        setupStep = "MODEL_ASSIGNMENT";
+        await insertRunRoleAssignment(this.pool, {
+          runId,
+          // A plain copy: the writer takes a JSON object, and a copy of the
+          // assignment is assignable to it whether RoleAssignment is a type or
+          // an interface.
+          assignment: { ...modelAssignment.assignment },
+          strength: modelAssignment.appliedStrength,
+          steppedDown: modelAssignment.steppedDown
+        });
+        setupStep = "MEMORY_QUESTION";
+      }
       await this.#serve.recordMemoryQuestion({
         runId,
         questionLine: ask.question_line,
@@ -3940,7 +4408,15 @@ export class PostgresAskApplication implements AskApplication {
       await this.#recordRunSetupFailure(runId, setupStep);
       throw error;
     }
-    return { run_ref: runId, status: "QUEUED", ...appliedField };
+    return modelAssignment === undefined
+      ? { run_ref: runId, status: "QUEUED", ...appliedField }
+      : {
+          run_ref: runId,
+          status: "QUEUED",
+          model_strength_applied: modelAssignment.appliedStrength,
+          model_strength_stepped_down: modelAssignment.steppedDown,
+          ...appliedField
+        };
   }
 
   /**
@@ -4014,6 +4490,11 @@ export class PostgresAskApplication implements AskApplication {
    * dropped: no substitution is recorded, and the precheck is taken again and
    * the decision made for the plan's own ask and settings class, so the
    * question starts (CLOSE) or waits on its own roster (A5).
+   * Paid plans S2 (spec §2.6; A5): with a VALID scorecard the picker plans the
+   * debate inside the person's room as the precheck measured it, at the instant
+   * the debate would start; a question previewed to WAIT is also planned for NOW,
+   * and a locked START pins that plan. A START's hold opens with the pinned
+   * plan's figure.
    */
   async #submitWithRoom(
     ask: AskRequest,
@@ -4035,9 +4516,15 @@ export class PostgresAskApplication implements AskApplication {
     let createdRunId: string | undefined;
     let setupStep: RunSetupStep = "ADMISSION_RELEASE";
     let outcome: RoomOutcome;
+    // A20 (S1a): the assignment the decision pinned, read after the lease; a holder, so
+    // the closure's assignment is never narrowed away by the compiler.
+    // S2: it is the plan the decision actually pinned — the wake plan, or the plan for NOW.
+    const pinned: { assignment?: AdmittedModelAssignment; personRoomTight?: boolean } = {};
     try {
       outcome = await withOwnerAskAdmissionLease(admissionPool, ownership, async (lease) => {
-        await room.precheck(question);
+        // S2: the room's unlocked first look measured the person's windows; the
+        // picker plans for the room at the instant this debate would start.
+        const preview = await room.precheck(question);
         // B8 (A5): the locked decision may still say WAIT (the site's day, the
         // line, or a person window that turned FULL after the coarse fit's
         // unlocked read), and a waiting question keeps its plan's ask. So when
@@ -4046,11 +4533,12 @@ export class PostgresAskApplication implements AskApplication {
         // within probeFreshnessMs). Both refusals are kept as values, not
         // thrown: the plan's matters only if the decision says WAIT, and the
         // swapped one only if the plan's own roster cannot run either. Without
-        // a swap `plannedAsk` is `ask`, and so is its evaluation.
+        // a swap `plannedAsk` is `ask`, and so is its evaluation. (S2: a swap
+        // happens only on the roster path, which reads no person room.)
         let startAsk = ask;
         let swappedAt = substitutedAt;
         let decisionQuestion = question;
-        let swappedEvaluation = await evaluationOrRefusal(this.settings, ask);
+        let swappedEvaluation = await evaluationOrRefusal(this.settings, ask, personRoomOf(preview));
         const plannedEvaluation = substitutedAt === null
           ? swappedEvaluation
           : await evaluationOrRefusal(this.settings, plannedAsk);
@@ -4071,7 +4559,12 @@ export class PostgresAskApplication implements AskApplication {
           // rolls the decision back and no run exists.
           const keepsPlan = swappedAt !== null && admission.kind === "WAIT";
           const runAsk = keepsPlan ? plannedAsk : startAsk;
-          const evaluated = keepsPlan ? plannedEvaluation : startEvaluation;
+          // S2: the preview said WAIT and the LOCKED decision starts it after all: the plan
+          // made for NOW, never one sized for a window that has not reset yet.
+          const chosen: PlannedAskAdmission = admission.kind === "START" && startEvaluation.ifStartsNow !== undefined
+            ? startEvaluation.ifStartsNow
+            : startEvaluation;
+          const evaluated: PlannedAskAdmission | AskRefusal = keepsPlan ? plannedEvaluation : chosen;
           if (evaluated instanceof AskRefusal) throw evaluated;
           await this.#liveness.recordQuery(ask.question_line, ownership, new Date(ask.as_of));
           const runId = await this.#runs.startRun({
@@ -4112,6 +4605,24 @@ export class PostgresAskApplication implements AskApplication {
             setupStep = "COST_RECORD";
             await this.#recordRosterSubstitution(runId, swappedAt, tx);
           }
+          // A20 x PR #33 (S1a): the pin is a setup step here too, for START and WAIT
+          // alike and before the first job, so no runner can claim or wake a
+          // scorecard-admitted run without its assignment, and a failed pin records
+          // MODEL_ASSIGNMENT. B8's swap record (COST_RECORD, on `tx`, START only) comes
+          // first. The assignment is `evaluated`'s, the admission the run was created
+          // from: after an interim swap a WAIT keeps the plan's own (B8, A5), so a
+          // waiting question keeps its plan's roster, settings and models together.
+          if (evaluated.modelAssignment !== undefined) {
+            setupStep = "MODEL_ASSIGNMENT";
+            await insertRunRoleAssignment(this.pool, {
+              runId,
+              assignment: { ...evaluated.modelAssignment.assignment },
+              strength: evaluated.modelAssignment.appliedStrength,
+              steppedDown: evaluated.modelAssignment.steppedDown
+            });
+            pinned.assignment = evaluated.modelAssignment;
+          }
+          pinned.personRoomTight = admission.kind === "START" && evaluated.personRoomTight === true;
           setupStep = "MEMORY_QUESTION";
           await this.#serve.recordMemoryQuestion({
             runId,
@@ -4131,7 +4642,10 @@ export class PostgresAskApplication implements AskApplication {
             });
           }
           setupStep = "ROOM_HOLD";
-          await room.openStart(tx, { runId, access: ownership, heldMicros: estimateMicros, now });
+          // S2: the chosen plan's figure when the picker planned the run (its estimate, or
+          // the run maximum when it could not make one); B6b's settings-class estimate otherwise.
+          // A START never keeps the plan's ask, so `evaluated` is S2's `chosen` here.
+          await room.openStart(tx, { runId, access: ownership, heldMicros: evaluated.pickedHoldMicros ?? estimateMicros, now });
           // LAST: nothing may follow the first job inside the decision (see RunSetupStep).
           setupStep = "WORK_QUEUE";
           const workItemId = await this.#work.enqueueOn(tx, { runId, ...firstRunJob(runId), nodeSet: [] });
@@ -4149,6 +4663,10 @@ export class PostgresAskApplication implements AskApplication {
       }
       throw error;
     }
+    const strengthFields = pinned.assignment === undefined ? {} : {
+      model_strength_applied: pinned.assignment.appliedStrength,
+      model_strength_stepped_down: pinned.assignment.steppedDown
+    };
     if (outcome.kind === "WAIT") {
       console.info(JSON.stringify(Object.freeze({ event: "api.ask.waiting", runId: outcome.runId, scope: outcome.scope })));
       return Object.freeze({
@@ -4156,7 +4674,8 @@ export class PostgresAskApplication implements AskApplication {
         status: "WAITING" as const,
         waits_until: outcome.waitsUntil.toISOString(),
         waiting_scope: outcome.scope,
-        ...(outcome.waitsFor === null ? {} : { waits_for: outcome.waitsFor })
+        ...(outcome.waitsFor === null ? {} : { waits_for: outcome.waitsFor }),
+        ...strengthFields
       });
     }
     try {
@@ -4165,7 +4684,11 @@ export class PostgresAskApplication implements AskApplication {
       await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
       throw error;
     }
-    return Object.freeze({ run_ref: outcome.runId, status: "QUEUED" as const });
+    // A5: nothing fitted the person's room at any strength, and it started on the cheapest choice (content-free: ids only).
+    if (pinned.personRoomTight === true) {
+      console.info(JSON.stringify(Object.freeze({ event: "api.ask.person_room_tight", runId: outcome.runId })));
+    }
+    return Object.freeze({ run_ref: outcome.runId, status: "QUEUED" as const, ...strengthFields });
   }
 
   /**
@@ -4309,7 +4832,8 @@ export class PostgresAskApplication implements AskApplication {
   async readRun(runId: string, _session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null> {
     const run = await this.#runs.readLoadingProjection(runId, ownership);
     if (run === null) return null;
-    // Budget spec §2.7: a waiting run's expected start, recomputed on every read.
+    // Budget spec §2.7: a waiting run's expected start. The room keeps it per run for a short window (thirty
+    // seconds, or until the waker's next tick) so a page polling this read does not recompute it every poll (P4-G).
     let waitsUntil: Date | null = null;
     let waitsFor: WaitsFor | null = null;
     if (run.state === "WAITING") {

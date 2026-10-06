@@ -477,6 +477,22 @@ describe("the report in the question's own script (R-fonts)", () => {
     expect(romanianFooter.indexOf("Dialectical Engine")).toBeLessThan(romanianFooter.indexOf("1"));
   }, 120_000);
 
+  it.each(["en", "he"] as const)("starts page 1 of the %s report with the not-professional-advice line, before the eyebrow", async (locale) => {
+    const reportCatalogs = await catalogs(locale);
+    const { answer, story } = locale === "en"
+      ? { answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY") }
+      : storyScriptSample(locale);
+    const first = drawnLines(await renderReportPdf({ answer, story, generatedAt: GENERATED, catalogs: reportCatalogs }))[0]!;
+    const eyebrow = first.findIndex((line) => line.includes("DEBATEAI"));
+    expect(eyebrow).toBeGreaterThan(0);
+    // Everything above the eyebrow is the notice, and nothing else. A right-to-left line is drawn from the
+    // right, so each of its lines reads back reversed; the line breaks drop the spaces they fall on.
+    const bare = (text: string) => text.replace(/\s/gu, "");
+    const above = first.slice(0, eyebrow).map((line) => (locale === "he" ? [...line].reverse().join("") : line)).join("");
+    expect(bare(above)).toBe(bare(reportCatalogs.publicCatalog["public.report.notAdvice"]!));
+    if (locale === "en") expect(above).toContain("It is not medical, legal, financial or other professional advice.");
+  }, 120_000);
+
   it.each(["hi", "he"] as const)("hands react-pdf every face of the %s report through the glyph fix (reportGlyphs.ts), never the bare font", async (locale) => {
     const { answer, story } = storyScriptSample(locale);
     const reportCatalogs = await catalogs(locale);

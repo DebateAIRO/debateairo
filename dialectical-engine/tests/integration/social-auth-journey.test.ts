@@ -32,7 +32,7 @@ beforeAll(async () => {
     db = await startTestDatabase();
     await migrate(db.pool);
     await db.pool.query("CREATE ROLE social_journey LOGIN PASSWORD 'journey-test-only' IN ROLE debateai_authorization_runtime");
-    await db.pool.query("CREATE ROLE social_registration LOGIN PASSWORD 'journey-test-only' IN ROLE debateai_runtime");
+    await db.pool.query("CREATE ROLE social_registration LOGIN PASSWORD 'journey-test-only' IN ROLE debateai_runtime,debateai_billing_runtime");
     await db.pool.query("CREATE ROLE social_erasure LOGIN PASSWORD 'journey-test-only' IN ROLE debateai_erasure_runtime");
     const url = new URL(db.connectionString);
     url.username = 'social_journey';
@@ -69,7 +69,7 @@ async function harness() {
             throw new Error('UNEXPECTED_EXTERNAL_OPERATION');
         } });
     const sessions = await SessionService.create({ repository: new PostgresSessionRepository(runtime, audit), riskSignals: { recordForSession: async () => 'recorded' } as never, onRiskSignalFailure: () => { }, dekStore: users as never, argon2, authPolicy, mfaPolicy, sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef), blindIndexKey: blindKey, dummyPasswordHash: dummy, socialProviderBindings: async () => (await providers.available()).map(c => c.configuration) });
-    const repository = new PostgresSocialIdentityRepository(runtime, audit);
+    const repository = new PostgresSocialIdentityRepository(runtime, audit, registrationRuntime);
     const registration = new RegistrationService({ repository: new PostgresIdentityRepository(registrationRuntime, audit), socialRepository: repository, mail: { sendVerification: async (m: {
                 token: string;
                 recipient: string;
@@ -92,7 +92,7 @@ async function harness() {
     const finishFlow=async(begin:{authorization_url:string;flowCookie:string},extra:Record<string,unknown>={},metadata:Record<string,string>={})=>{const url=new URL(begin.authorization_url);assertion={...assertion,nonce:url.searchParams.get('nonce')!,...extra};return social.callback('google',{state:url.searchParams.get('state'),code:'link-code',...metadata},begin.flowCookie,source);};
     const signup = async (email?: string) => {
         const cb = await callback(), bound = { ...source, socialBrowserHash: socialHash('browser', cb.browserCookie), legal: { terms, privacy, locale: 'en' as const } };
-        const input = { continuation_token: cb.token, email: email ?? assertion.email, phone: '+40212345678', date_of_birth: '1990-01-01', terms, privacy, locale: 'en', ui_locale: 'en', time_zone: 'Europe/Bucharest', turnstile_token: 'isolated-test-proof' };
+        const input = { continuation_token: cb.token, email: email ?? assertion.email, phone: '+40212345678', country:'RO', date_of_birth: '1990-01-01', terms, privacy, locale: 'en', ui_locale: 'en', time_zone: 'Europe/Bucharest', turnstile_token: 'isolated-test-proof' };
         const admission = await registration.admitSource({ route: 'social', input: { email: input.email, phone: input.phone, adultAffirmed: true }, source: bound });
         return { cb, bound, input, result: await social.completeSignup(input, bound, admission) };
     };
@@ -418,7 +418,7 @@ describe('actual signed-provider and restricted-database journeys', () => {
             const signup = await h.signup();
             if (!('status' in signup.result))
                 throw new Error('EXPECTED_ENROLLMENT');
-            await db.pool.query("UPDATE identity.social_enrollment SET created_at=clock_timestamp()-interval '6 minutes',expires_at=clock_timestamp()-interval '1 minute' WHERE token_hash=$1", [socialHash('enrollment', signup.result.enrollment_token)]);
+            await db.pool.query("WITH moment AS (SELECT clock_timestamp() AS t) UPDATE identity.social_enrollment SET created_at=moment.t-interval '6 minutes',expires_at=moment.t-interval '1 minute' FROM moment WHERE token_hash=$1", [socialHash('enrollment', signup.result.enrollment_token)]);
             h.disable();
             if(passwordState!==null)await db.pool.query('UPDATE identity."user" SET password_hash=$1 WHERE email_blind_index=$2',[passwordState,createEmailBlindIndex(blindKey,signup.input.email)]);
             await expect(h.passkeys.beginPasskeyEnrollment({ enrollment_token: signup.result.enrollment_token }, signup.bound)).rejects.toThrow();

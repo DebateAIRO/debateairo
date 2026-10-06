@@ -450,6 +450,35 @@ describe("card anatomy", () => {
     expect(new Set(rendered).size).toBe(4);
   });
 
+  it("labels every review state in plain words beside the checking model", async () => {
+    // PROPERTY (V's ruling of 2026-09-28, wording column C): the compact mark
+    // says what the second model concluded in the reader's words, never the
+    // engine's "REVIEW <OUTCOME>" vocabulary, and names the model that checked;
+    // with no completed review the checker's house is an honest absence.
+    const container = await mountDebate(answerWithEveryReviewState());
+    // The checker is the REVIEWER's house, never the author's: node:position is
+    // written by OpenAI and checked by Reviewer-B (support/v2uiFixtures.ts).
+    const expected = [
+      ["node:position", "Second opinion: agrees", "Reviewer-B"],
+      ["node:defeater", "Second opinion: disagrees", "Reviewer-A"],
+      ["node:unassessed", "Second opinion: unsure", "Reviewer-B"],
+      ["node:unreviewed", "No second opinion yet", undefined]
+    ] as const;
+
+    for (const [nodeId, label, reviewer] of expected) {
+      const mark = container.querySelector<HTMLElement>(
+        `[data-node-id="${nodeId}"] .nodeReviewBadges`
+      );
+      expect(mark, `${nodeId} review mark`).not.toBeNull();
+      expect(mark?.textContent).toContain(label);
+      expect(mark?.textContent).not.toMatch(/REVIEW/);
+      const checker = mark?.querySelector<HTMLElement>(".modelPill.reviewerPill");
+      expect(checker, `${nodeId} checking model`).not.toBeNull();
+      expect(checker?.dataset.maker).toBe(reviewer);
+      expect(checker?.dataset.makerAbsence).toBe(reviewer === undefined ? "true" : undefined);
+    }
+  });
+
   it("binds rendered maker dots to maker-owned model tokens only", async () => {
     // PROPERTY (B3): a recorded maker selects its own --m-* identity token;
     // makers without a dedicated token share only the honest default.

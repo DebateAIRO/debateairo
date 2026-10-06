@@ -56,8 +56,15 @@
   "chrome.footer.location": "Búcairist, an Rómáin",
   "chrome.footer.product": "Táirge",
   "chrome.footer.home": "Baile",
-  "chrome.footer.cookiePreferences": "Sainroghanna fianán",
+  "chrome.footer.cookiePreferences": "Na fianáin a stórálaimid",
   "chrome.security": "Slándáil",
   "chrome.logout": "Logáil amach",
-  "chrome.accountError": "Níor oibrigh sé sin. Athlódáil an leathanach agus bain triail eile as."
+  "chrome.accountError": "Níor oibrigh sé sin. Athlódáil an leathanach agus bain triail eile as.",
+  "chrome.footer.pricing": "Praghsanna",
+  "chrome.footer.cancel": "Cuir plean ar ceal",
+  "chrome.footer.withdraw": "Tarraing siar ó phlean",
+  "chrome.footer.paymentMarks": "Cártaí a nglacaimid leo",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

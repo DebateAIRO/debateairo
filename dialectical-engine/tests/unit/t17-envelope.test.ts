@@ -85,47 +85,68 @@ function ceilingInput(panelSize: number, depth: number) {
 
 type SiteKind = "AUTHOR" | "PANEL" | "REVIEW" | "SERVE";
 
+/** Which runner plan materialized a node — the only thing that decides whether its author seat can switch. */
+type NodeKind = "ROOT" | "CHILD" | "EXCHANGE";
+
 /**
  * An INDEPENDENT enumeration of the maximum path: it builds the actual call
  * sites the runner opens, one row each, and reads the worst case off each row.
- * It shares no arithmetic with the closed form under test — it walks the
- * runner's OWN exported plans and counts.
+ * It shares no SITE COUNTING with the closed form under test: it walks the
+ * runner's OWN exported plans, tags every node with the plan that made it, and
+ * gives each row the candidate keys its seat can call. What it does share is
+ * the per-key allowance (`BOUNDS`), which is an input to both, not the formula.
  */
 function enumerateMaximumPathSites(
   panelSize: number,
-  depth: number
+  depth: number,
+  backupSequences: 0 | 1 = 0
 ): readonly { readonly kind: SiteKind; readonly worstCaseAttempts: number }[] {
   const sites: { kind: SiteKind; worstCaseAttempts: number }[] = [];
-  const materializedNodeIds: string[] = [];
+  const materializedNodes: { readonly id: string; readonly kind: NodeKind }[] = [];
   if (panelSize === 1) {
     // S2-2: the walking-skeleton literal is reachable at M=1 only — one node.
-    materializedNodeIds.push("root:0");
+    materializedNodes.push({ id: "root:0", kind: "ROOT" });
   } else {
     for (let rootIndex = 0; rootIndex < panelSize; rootIndex += 1) {
-      materializedNodeIds.push(`root:${rootIndex}`);
+      materializedNodes.push({ id: `root:${rootIndex}`, kind: "ROOT" });
     }
     for (const leg of buildMultiMakerExpansionPlan(depth, panelSize)) {
-      materializedNodeIds.push(`child:${leg.childIndex}`);
+      materializedNodes.push({ id: `child:${leg.childIndex}`, kind: "CHILD" });
     }
     for (const leg of buildCrossRootExchangePlan(panelSize)) {
-      materializedNodeIds.push(`exchange:${leg.authorRootIndex}->${leg.targetRootIndex}`);
+      materializedNodes.push({ id: `exchange:${leg.authorRootIndex}->${leg.targetRootIndex}`, kind: "EXCHANGE" });
     }
   }
   /**
    * Attempts are counted CUMULATIVELY per call-site key, so a cooldown-wrapped
    * site's two sequences share ONE allowance — never two fresh ones.
    * Measured at 4 in tests/integration/t17-envelope-ledger.test.ts.
+   *
+   * A14 (DR-184-v5, only for a run with a runner-up — pre-flight ruling F17):
+   * a seat with a runner-up has TWO candidate keys (`:seat:main` and
+   * `:seat:runnerUp`), each with its own allowance. At a cooldown-wrapped site,
+   * sequence 1 spends `judgeMaxAttempts` on EACH candidate key, and the
+   * post-cooldown sequence reaches ONE key, whose remainder is the final retry.
+   * The retraction above still stands for ONE key. A CROSS-EXCHANGE author
+   * seat is built with `runnerUp: null` (the planned runner's E17: it is written
+   * by its root's own answerer, with no backup of its own), so an EXCHANGE
+   * node's author site has ONE candidate key — v4's allowance — whatever the
+   * run provisions. Its panel and review sites are ordinary judge seats.
    */
-  const cooldownSite = BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts;
-  for (const _nodeId of materializedNodeIds) {
-    sites.push({ kind: "AUTHOR", worstCaseAttempts: cooldownSite });
+  const seatCandidates = backupSequences === 1 ? 2 : 1;
+  const authorCandidates = (node: { readonly kind: NodeKind }): number =>
+    node.kind === "EXCHANGE" ? 1 : seatCandidates;
+  const cooldownSite = (candidates: number): number =>
+    candidates * BOUNDS.judgeMaxAttempts + BOUNDS.finalRetryAttempts;
+  for (const node of materializedNodes) {
+    sites.push({ kind: "AUTHOR", worstCaseAttempts: cooldownSite(authorCandidates(node)) });
     if (panelSize === 1) continue;
     // runJudgePanel calls every non-author member once; no cooldown wrapper.
     for (let member = 1; member < panelSize; member += 1) {
-      sites.push({ kind: "PANEL", worstCaseAttempts: BOUNDS.judgeMaxAttempts });
+      sites.push({ kind: "PANEL", worstCaseAttempts: seatCandidates * BOUNDS.judgeMaxAttempts });
     }
     for (let visit = 0; visit < SEALED.reviewerCallsPerNode; visit += 1) {
-      sites.push({ kind: "REVIEW", worstCaseAttempts: cooldownSite });
+      sites.push({ kind: "REVIEW", worstCaseAttempts: cooldownSite(seatCandidates) });
     }
   }
   /**
@@ -147,13 +168,14 @@ function enumerateMaximumPathSites(
     for (const role of SYNTHESIS_ROLES) serveSiteKeys.push(`${role}:${round}`);
   }
   for (let site = 0; site < serveSiteKeys.length; site += 1) {
-    sites.push({ kind: "SERVE", worstCaseAttempts: BOUNDS.organMaxAttempts });
+    // A14: with a runner-up, the synthesis seat's two candidate keys, main then backup.
+    sites.push({ kind: "SERVE", worstCaseAttempts: seatCandidates * BOUNDS.organMaxAttempts });
   }
   return Object.freeze(sites);
 }
 
-function enumerateMaximumPathAttempts(panelSize: number, depth: number): number {
-  return enumerateMaximumPathSites(panelSize, depth)
+function enumerateMaximumPathAttempts(panelSize: number, depth: number, backupSequences: 0 | 1 = 0): number {
+  return enumerateMaximumPathSites(panelSize, depth, backupSequences)
     .reduce((total, site) => total + site.worstCaseAttempts, 0);
 }
 
@@ -556,5 +578,180 @@ describe("F-T17T9-3 · the serve rule has ONE home", () => {
     const basis = computeStructuralCeilingBasis(ceilingInput(2, 1));
     expect(parseCostEnvelopeBasis(basis).serveLeg)
       .toEqual({ synthesisLoopSites: SERVE_LEG.sites(SEALED), selected: SERVE_LEG.chain });
+  });
+});
+
+/**
+ * A14 — DR-184-v5 BESIDE DR-184-v4 (model scorecard; pre-flight ruling F17).
+ *
+ * V ruled on 2026-09-05 to seal the TRUE maximum, with no padding. A run whose
+ * pinned assignment has no runner-up can never spend a backup sequence, so it
+ * keeps DR-184-v4 exactly; admission passes `backupSequencesProvisioned: 1`
+ * only when some seat has a runner-up, and the receipt names which formula
+ * minted it. The same ruling binds INSIDE a v5 run (A14 fix round 1): a
+ * cross-exchange author seat never has a runner-up, so its sites keep v4's
+ * allowance rather than a backup sequence nobody can spend. Both receipts
+ * parse at the run head; v5 adds ONE per-site key, `cross_exchange_site`, so
+ * the receipt still explains its own sum.
+ */
+
+/** A DR-184-v4 receipt exactly as the constructor mints it (M=2, depth=1), key order included — Task M1's reserve beside its serve leg. */
+const V4_RECEIPT = Object.freeze({
+  kind: "COMPUTED_STRUCTURAL_CEILING",
+  max_model_attempts: 106,
+  panel_size: 2,
+  depth: 1,
+  per_site_attempts: { judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 },
+  call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 },
+  serve_leg: { synthesis_loop_sites: 6, selected: "SYNTHESIS_LOOP" },
+  serve_reserve_attempts: 18,
+  hold_cap: 2,
+  final_retry_attempts: 1,
+  formula_version: "DR-184-v4",
+  bounds_source_ref: "engine-exports+register"
+});
+
+/** A v4 receipt a run head stored before Task M1: no reserve member. It must still parse unchanged. */
+const PRE_M1_V4_RECEIPT = Object.freeze(Object.fromEntries(
+  Object.entries(V4_RECEIPT).filter(([key]) => key !== "serve_reserve_attempts")
+));
+
+/** The DR-184-v5 receipt for the same topology: v4's shape plus its one added per-site key, and the reserve at the v5 serve site (6 x 6). */
+const V5_RECEIPT = Object.freeze({
+  ...V4_RECEIPT,
+  max_model_attempts: 190,
+  per_site_attempts: { judge: 3, organ: 6, panel_member: 6, cooldown_site: 7, cross_exchange_site: 4 },
+  serve_reserve_attempts: 36,
+  formula_version: "DR-184-v5"
+});
+
+/** The receipt fields a reader needs to re-derive the sum. */
+interface DisclosedReceipt {
+  readonly max_model_attempts: number;
+  readonly per_site_attempts: {
+    readonly organ: number;
+    readonly panel_member: number;
+    readonly cooldown_site: number;
+    readonly cross_exchange_site?: number;
+  };
+  readonly call_sites: { readonly author: number; readonly panel: number; readonly reviewer: number; readonly serve: number };
+}
+
+describe("A14 · one backup sequence per seat call that can switch, only when admission provisions it", () => {
+  const withBackup = (panelSize: number, depth: number) => ({ ...ceilingInput(panelSize, depth), backupSequencesProvisioned: 1 as const });
+  const withoutBackup = (panelSize: number, depth: number) => ({ ...ceilingInput(panelSize, depth), backupSequencesProvisioned: 0 as const });
+
+  it("mints DR-184-v4 exactly when no backup is provisioned — absent or 0 — and DR-184-v5 when one is", () => {
+    const absent = computeStructuralCeilingBasis(ceilingInput(2, 1));
+    const undefinedKey = computeStructuralCeilingBasis({ ...ceilingInput(2, 1), backupSequencesProvisioned: undefined } as never);
+    const zero = computeStructuralCeilingBasis(withoutBackup(2, 1));
+    const one = computeStructuralCeilingBasis(withBackup(2, 1));
+    // Byte for byte, key order included: the receipt the constructor mints without a backup.
+    for (const v4 of [absent, undefinedKey, zero]) {
+      expect(JSON.stringify(v4)).toBe(JSON.stringify(V4_RECEIPT));
+    }
+    // DR-184-v4's 106 plus one backup sequence (3 attempts) at 22 judge sites —
+    // 6 author (the 2 cross-exchange authors have no backup), 8 review and
+    // 8 panel — and at 6 serve sites (3 each): 106 + 66 + 18.
+    expect(one).toMatchObject({ max_model_attempts: 190, formula_version: "DR-184-v5" });
+    expect(enumerateMaximumPathAttempts(2, 1, 1)).toBe(190);
+  });
+
+  it("EQUALS the enumerated maximum path with every switchable seat backed up — no padding — M=1..8, depth=1..5", () => {
+    for (let panelSize = 1; panelSize <= 8; panelSize += 1) {
+      for (let depth = 1; depth <= 5; depth += 1) {
+        expect({ panelSize, depth, attempts: computeStructuralCeilingBasis(withBackup(panelSize, depth)).max_model_attempts })
+          .toEqual({ panelSize, depth, attempts: enumerateMaximumPathAttempts(panelSize, depth, 1) });
+      }
+    }
+  });
+
+  it("pins the DR-184-v5 grid: v4 plus one sequence at every site except the cross-exchange authors", () => {
+    const expected = [
+      [43, 43, 43, 43, 43],
+      [190, 350, 670, 1310, 2590],
+      [408, 720, 1344, 2592, 5088],
+      [768, 1280, 2304, 4352, 8448]
+    ];
+    for (let panelSize = 1; panelSize <= 4; panelSize += 1) {
+      for (let depth = 1; depth <= 5; depth += 1) {
+        const basis = computeStructuralCeilingBasis(withBackup(panelSize, depth));
+        expect(basis.max_model_attempts).toBe(expected[panelSize - 1]![depth - 1]);
+        expect(basis.formula_version).toBe("DR-184-v5");
+      }
+    }
+  });
+
+  it("discloses v4's four per-site keys, v5's four plus cross_exchange_site, and v4's call sites", () => {
+    const v4 = computeStructuralCeilingBasis(withoutBackup(2, 1));
+    const v5 = computeStructuralCeilingBasis(withBackup(2, 1));
+    // `judge` stays the sequence bound. `organ` is the per-round serve limit in
+    // v4 and the serve site's total, backup included, in v5: read it with
+    // `formula_version`. `panel_member` and `cooldown_site` are per site.
+    expect(v5.per_site_attempts).toEqual({ judge: 3, organ: 6, panel_member: 6, cooldown_site: 7, cross_exchange_site: 4 });
+    expect(v4.per_site_attempts).toEqual({ judge: 3, organ: 3, panel_member: 3, cooldown_site: 4 });
+    expect(v4.per_site_attempts).not.toHaveProperty("cross_exchange_site");
+    expect(v5.call_sites).toEqual(v4.call_sites);
+    expect(Object.keys(v5).sort()).toEqual(Object.keys(v4).sort());
+  });
+
+  it("explains its own sum from what it discloses, the cross-exchange count read off the runner's plan", () => {
+    for (let panelSize = 1; panelSize <= 8; panelSize += 1) {
+      const crossExchangeAuthors = panelSize === 1 ? 0 : buildCrossRootExchangePlan(panelSize).length;
+      for (let depth = 1; depth <= 5; depth += 1) {
+        const v4 = computeStructuralCeilingBasis(withoutBackup(panelSize, depth)) as unknown as DisclosedReceipt;
+        const v5 = computeStructuralCeilingBasis(withBackup(panelSize, depth)) as unknown as DisclosedReceipt;
+        expect((v4.call_sites.author + v4.call_sites.reviewer) * v4.per_site_attempts.cooldown_site
+          + v4.call_sites.panel * v4.per_site_attempts.panel_member
+          + v4.call_sites.serve * v4.per_site_attempts.organ).toBe(v4.max_model_attempts);
+        expect((v5.call_sites.author - crossExchangeAuthors + v5.call_sites.reviewer) * v5.per_site_attempts.cooldown_site
+          + crossExchangeAuthors * v5.per_site_attempts.cross_exchange_site!
+          + v5.call_sites.panel * v5.per_site_attempts.panel_member
+          + v5.call_sites.serve * v5.per_site_attempts.organ).toBe(v5.max_model_attempts);
+      }
+    }
+  });
+
+  it("parses an existing v4 receipt unchanged, and a v5 receipt with its added key", () => {
+    const v4 = parseCostEnvelopeBasis(PRE_M1_V4_RECEIPT);
+    expect(JSON.stringify(v4.wire)).toBe(JSON.stringify(PRE_M1_V4_RECEIPT));
+    expect(Object.keys(v4.wire.per_site_attempts as object)).toEqual(["judge", "organ", "panel_member", "cooldown_site"]);
+    expect(v4).toMatchObject({ maxModelAttempts: 106, panelSize: 2, depth: 1 });
+    expect(parseCostEnvelopeBasis(V4_RECEIPT)).toMatchObject({ maxModelAttempts: 106, serveReserveAttempts: 18 });
+    const v5 = parseCostEnvelopeBasis(V5_RECEIPT);
+    expect(v5).toMatchObject({
+      maxModelAttempts: 190,
+      panelSize: 2,
+      depth: 1,
+      serveReserveAttempts: 36,
+      wire: { formula_version: "DR-184-v5", per_site_attempts: { cross_exchange_site: 4 } }
+    });
+    expect(Object.keys(v5).sort()).toEqual(Object.keys(v4).sort());
+    // …and those are exactly the receipts the constructor mints and the run head re-reads.
+    expect(computeStructuralCeilingBasis(withBackup(2, 1))).toEqual(V5_RECEIPT);
+    expect(parseCostEnvelopeBasis(computeStructuralCeilingBasis(withBackup(2, 1))).wire).toEqual(V5_RECEIPT);
+  });
+
+  it.each([0, 1.5, "4"])("still refuses a cross_exchange_site of %s: optional, never loose", (value) => {
+    expect(() => parseCostEnvelopeBasis({
+      ...V5_RECEIPT,
+      per_site_attempts: { ...V5_RECEIPT.per_site_attempts, cross_exchange_site: value }
+    })).toThrowError(expect.objectContaining({ code: "RUN_COST_ENVELOPE_UNRESOLVED" }));
+  });
+
+  it.each([
+    ["2", 2],
+    ["-1", -1],
+    ["0.5", 0.5],
+    ["null", null],
+    ["the string \"1\"", "1"],
+    ["true", true],
+    ["NaN", Number.NaN]
+  ])("refuses a backup provision of %s: a switch, never a count", (_label, value) => {
+    expect(() => computeStructuralCeilingBasis({ ...ceilingInput(2, 1), backupSequencesProvisioned: value } as never))
+      .toThrowError(expect.objectContaining({
+        name: "TypedDomainError",
+        code: "STRUCTURAL_CEILING_BACKUPSEQUENCESPROVISIONED_INVALID"
+      }));
   });
 });

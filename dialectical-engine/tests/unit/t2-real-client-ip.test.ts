@@ -75,7 +75,7 @@ async function observedAuthSource(input: Readonly<{
         ...canonicalSignup,
         email: "alice@example.test",
         password: "correct horse battery staple",
-        date_of_birth: "1990-01-01"
+        country: "RO", date_of_birth: "1990-01-01"
       }
     });
     expect(response.statusCode).toBe(202);

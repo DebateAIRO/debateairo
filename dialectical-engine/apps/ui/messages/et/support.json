@@ -79,8 +79,8 @@
   "support.conversationDetails": "Vestluse üksikasjad",
   "support.shortcutsLabel": "Kasutajatoe otseteed",
   "support.answerRating": "Vastuse hinnang",
-  "support.privacyPreferences": "Privaatsuseelistused",
+  "support.privacyPreferences": "Privaatsus",
   "support.aiBanner": "Vastused on tehisintellekti loodud, masinloetavalt märgistatud ja võivad olla valed. Võite igal ajal paluda inimesega rääkida.",
-  "support.cookiePreferences": "Küpsiste eelistused",
+  "support.cookiePreferences": "Küpsised, mida salvestame",
   "support.recoverAccount": "Taasta konto"
 }

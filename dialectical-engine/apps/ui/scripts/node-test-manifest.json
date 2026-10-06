@@ -31,6 +31,7 @@
   "components/support/supportConversation.test.mjs",
   "lib/contentSecurityPolicy.test.mjs",
   "lib/edgeUpgrade.test.mjs",
+  "lib/modelStrength.test.mjs",
   "lib/publicDebatePresentation.test.mjs",
   "lib/report/fonts.test.mjs",
   "lib/recommendation.test.mjs",
@@ -38,5 +39,6 @@
   "lib/serverApi.test.mjs",
   "lib/sessionProxy.test.mjs",
   "lib/trustedClientIp.test.mjs",
+  "lib/v3/runFailure.test.mjs",
   "scripts/next-config-csp.test.mjs"
 ]

@@ -79,8 +79,8 @@
   "support.conversationDetails": "A beszélgetés részletei",
   "support.shortcutsLabel": "Ügyfélszolgálati gyorshivatkozások",
   "support.answerRating": "A válasz értékelése",
-  "support.privacyPreferences": "Adatvédelmi beállítások",
+  "support.privacyPreferences": "Adatvédelem",
   "support.aiBanner": "A válaszokat MI hozza létre, géppel olvashatóan jelöljük őket, és tévesek lehetnek. Bármikor kérhet emberi segítséget.",
-  "support.cookiePreferences": "Sütibeállítások",
+  "support.cookiePreferences": "Az általunk tárolt sütik",
   "support.recoverAccount": "Fiók helyreállítása"
 }

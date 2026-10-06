@@ -5,7 +5,6 @@
   "debateChrome.backToLibrary": "← Volver a la biblioteca",
   "debateChrome.loading": "Cargando…",
   "debateChrome.error.claimGenerationFailed": "No se pudo generar la afirmación",
-  "debateChrome.error.debateGenerationFailed": "No se pudo generar el debate: {reason}",
   "debateChrome.error.unableToLoadDebate": "No se pudo cargar el debate",
   "debateChrome.error.unableToLoadScoring": "No se pudo cargar la puntuación",
   "debateChrome.error.unableToLoadAdaptiveDepth": "No se pudo cargar la simulación de profundidad adaptativa",
@@ -288,5 +287,13 @@
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "El coordinador rechazó la solicitud: un modelo que necesita este plan no está disponible en este momento. Inténtelo de nuevo más tarde o elija el otro plan.",
   "requestFailure.kind.ALREADY_WAITING": "Solo una pregunta puede esperar a la vez. Haga esta cuando haya empezado su debate en espera.",
   "requestFailure.kind.UNCLASSIFIED": "La solicitud falló antes de que llegara ninguna respuesta, por lo que se desconoce el resultado. No se trata de una decisión del coordinador.",
-  "debateChrome.error.fundingEnded": "La financiación interna de este debate en espera ha terminado. Vuelve a preguntar para usar tu asignación actual."
+  "debateChrome.error.fundingEnded": "La financiación interna de este debate en espera ha terminado. Vuelve a preguntar para usar tu asignación actual.",
+  "runFailure.NOT_STARTED": "Algo falló por nuestra parte antes de que comenzara este debate. Por favor, vuelva a preguntar.",
+  "runFailure.MODELS_UNAVAILABLE": "Este debate no pudo comenzar porque los modelos de IA que necesita no estaban disponibles. Por favor, inténtelo de nuevo dentro de un rato.",
+  "runFailure.RUN_LIMIT_REACHED": "Este debate alcanzó su límite antes de poder ofrecer una respuesta.",
+  "runFailure.STOPPED": "Este debate se interrumpió a medias por un problema por nuestra parte. Por favor, vuelva a hacer su pregunta.",
+  "runFailure.PLAN_ENDED": "Su plan de pago terminó o se pausó mientras esta pregunta esperaba, así que el debate no comenzó. Puede volver a hacerla.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Este debate costaría más de lo que este sitio permite para un debate.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "El coordinador rechazó la solicitud: una de las tareas del debate no tiene ningún modelo de IA al que pueda acceder en este momento. Inténtelo de nuevo más tarde.",
+  "debateChrome.condition.backupModelUsed": "Donde no se pudo usar un modelo de IA previsto, otro ocupó su lugar"
 }

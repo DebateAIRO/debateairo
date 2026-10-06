@@ -2,7 +2,9 @@ import type { CompositionBudgetTier, WayOfKnowing } from "@debateai/kernel";
 import {
   withoutStoryNodeIds,
   type StoryCostFallback,
+  type StoryRoleMaker,
   type StoryRoleResolver,
+  type StoryRunRoleMakers,
   type StoryStepLease,
   type StoryWriteInput
 } from "@debateai/story";
@@ -116,6 +118,34 @@ export interface StorySnapshotSource {
    * by the runner's price map (`storyCostFallback`).
    */
   readonly costFallback: StoryCostFallback;
+  /**
+   * Part 4, P4-D (P3-N1): the run's own story roles — set by the runner only
+   * for a pinned assignment whose answer job has a SCORECARD seat
+   * (`storySeatRoleMaker`); absent on every other run, whose story keeps the
+   * register's refs.
+   */
+  readonly roleMakers?: StoryRunRoleMakers | undefined;
+}
+
+/**
+ * Part 4, P4-D (P3-N1; controller C3, 3 October 2026): the story role a
+ * SCORECARD answer seat hands the story — the seat member the served round
+ * recorded (`writerPlannedByRound` / `checkerPlannedByRound`: the member that
+ * answered last, main or runner-up). No answered round (a floor answer), or a
+ * ref that names neither member: the seat's main. No seat — a legacy run, or a
+ * FALLBACK answer seat — null, so the register's ref decides as before.
+ *
+ * The member's gateway is the seat's own (`stampCandidateGateway` over the
+ * configured gateway), so the story lane's money ceiling and the ledger apply
+ * to every story call it makes, with the candidate stamped on the row.
+ */
+export function storySeatRoleMaker(
+  seat: Readonly<{ main: StoryRoleMaker; runnerUp: StoryRoleMaker | null }> | null,
+  plannedRef: string | undefined
+): StoryRoleMaker | null {
+  if (seat === null) return null;
+  const member = seat.runnerUp !== null && seat.runnerUp.providerRef === plannedRef ? seat.runnerUp : seat.main;
+  return Object.freeze({ provider: member.provider, providerRef: member.providerRef });
 }
 
 /**
@@ -198,6 +228,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     judgeArtifactRefs: new Map(source.authored.map((node) => [node.nodeId, node.provenanceRef] as const)),
     resolveProvider: source.resolveProvider,
     stepLease: source.stepLease,
-    costFallback: source.costFallback
+    costFallback: source.costFallback,
+    ...(source.roleMakers === undefined ? {} : { roleMakers: source.roleMakers })
   });
 }

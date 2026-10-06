@@ -126,6 +126,7 @@
   "public.report.models": "Моделі-учасники: {models}",
   "public.report.modelsNotRecorded": "Моделі-учасники: немає даних",
   "public.report.disclosure": "Цей звіт написали моделі ШІ на основі аргументів, що прозвучали в дебатах.",
+  "public.report.notAdvice": "Звіт створено ШІ. Він не є медичною, юридичною, фінансовою чи іншою професійною консультацією.",
   "public.report.title.inShort": "Коротко",
   "public.report.title.story": "Повна історія",
   "public.report.title.why": "Чому така відповідь",

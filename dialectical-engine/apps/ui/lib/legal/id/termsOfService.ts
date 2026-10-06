@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Tempat kami menawarkan DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Kami menawarkan DebateAI kepada orang yang tinggal di [the European Union and the European Economic Area] [and: the United Kingdom / the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
+      { kind: "p", text: "Kami menawarkan DebateAI kepada orang yang tinggal di [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
     ]
   },
   {
@@ -381,7 +381,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.0",
-  sha256: "b328390f33a7d03397928d9fef2dcef98ea583adc7c16ef058d10c7b7078763c",
+  sha256: "0a0a774c3af30ea5494c4b16c005369bf72d1b5ccc007209be4dca099c59848b",
   eyebrow: "KETENTUAN LAYANAN · v2.0 · BERLAKU [DATE]",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DebateAIRO S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",

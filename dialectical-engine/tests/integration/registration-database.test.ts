@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { createReadStream } from "node:fs";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
@@ -1152,17 +1152,9 @@ setTimeout(() => undefined, 500);
   it("S3a A1 migrates legacy audit history and enforces both erasure checks on every new row", async () => {
     const upgrade = await startTestDatabase();
     try {
-      await migrate(upgrade.pool);
-      await upgrade.pool.query(`
-        ALTER TABLE identity.audit_event DROP CONSTRAINT audit_event_actor_ciphertext_null
-      `);
-      await upgrade.pool.query(`
-        ALTER TABLE identity.audit_event DROP CONSTRAINT audit_event_target_id_no_email
-      `);
-      await upgrade.pool.query(`
-        DELETE FROM public.debateai_schema_migration
-        WHERE name='0032_registration_audit_erasure_checks.sql'
-      `);
+      const directory=new URL('../../migrations/',import.meta.url);
+      const historical=(await readdir(directory)).filter(name=>/^\d+.*\.sql$/.test(name) && name<'0032_').sort();
+      for(const name of historical) await upgrade.pool.query(await readFile(new URL(name,directory),'utf8'));
       await upgrade.pool.query(`
         INSERT INTO identity.audit_event (
           this_hash,actor_ciphertext,actor_key_ref,event_type,target_type,target_id,
@@ -1173,7 +1165,12 @@ setTimeout(() => undefined, 500);
         )
       `, [Buffer.alloc(32, 0xa0)]);
 
-      await expect(migrate(upgrade.pool)).resolves.toBeUndefined();
+      const c=await upgrade.pool.connect();
+      try{
+        await c.query('BEGIN');
+        await c.query(await readFile(new URL('0032_registration_audit_erasure_checks.sql',directory),'utf8'));
+        await c.query('COMMIT');
+      }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 
       const constraints = await upgrade.pool.query<{ conname: string; convalidated: boolean }>(`
         SELECT conname,convalidated FROM pg_constraint
@@ -5622,7 +5619,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           email,
           password: "correct horse battery staple",
           phone: "+40722123456",
-          date_of_birth: "1990-01-01"
+          country: "RO", date_of_birth: "1990-01-01"
         },
         remoteAddress: ip,
         headers: { "user-agent": "vitest-t9" }

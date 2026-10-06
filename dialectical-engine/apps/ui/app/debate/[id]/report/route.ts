@@ -31,6 +31,8 @@ async function reportInput(request: Request, context: RouteContext): Promise<Rep
     sessionCookie,
     interfaceLocale: interfaceLocaleFromCookieHeader(cookieHeader),
     now: new Date(),
+    // A download the browser abandons stops waiting for a render place, and is never rendered.
+    signal: request.signal,
     client: () => createServerContractClient(fetch, sessionCookie ?? undefined, userAgent, clientIp)
   };
 }

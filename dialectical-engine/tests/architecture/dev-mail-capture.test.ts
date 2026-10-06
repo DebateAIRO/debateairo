@@ -40,8 +40,8 @@ describe("DEV-06 mail capture executable contract", () => {
     // The argv array literal of each `spawn(...)`, whitespace removed.
     const spawnArgv = [...mailer.matchAll(/spawn\([\s\S]{0,200}?\[([^\]]*)\]/g)]
       .map((match) => match[1]!.replace(/\s+/g, ""));
-    // All four adapters share the same process-only transport.
-    expect(spawnArgv).toHaveLength(1);
+    // The account adapters share the same process-only transport.
+    expect(spawnArgv).toHaveLength(2);
     for (const argv of spawnArgv) {
       // `-t` makes the MTA read recipients from the header block on stdin, so
       // only the fixed envelope sender may reach argv, which every local user
@@ -55,7 +55,7 @@ describe("DEV-06 mail capture executable contract", () => {
     const templates = readFileSync("apps/api/src/account-mail-template.mjs", "utf8");
     expect(templates).toContain("[,;");
     expect(mailer).toContain("return singleRecipient(recipient)");
-    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(7);
+    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(8);
 
     const capture = readFileSync("deploy/dev-auth/sendmail-capture.mjs", "utf8");
     expect(capture).toContain('argv[1] !== "-t"');

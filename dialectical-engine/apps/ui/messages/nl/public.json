@@ -126,6 +126,7 @@
   "public.report.models": "Deelnemende modellen: {models}",
   "public.report.modelsNotRecorded": "Deelnemende modellen: niet vastgelegd",
   "public.report.disclosure": "Dit verslag is door AI-modellen geschreven op basis van de argumenten uit het debat.",
+  "public.report.notAdvice": "Door AI gegenereerd verslag. Het is geen medisch, juridisch, financieel of ander professioneel advies.",
   "public.report.title.inShort": "In het kort",
   "public.report.title.story": "Het volledige verhaal",
   "public.report.title.why": "Waarom dit antwoord",

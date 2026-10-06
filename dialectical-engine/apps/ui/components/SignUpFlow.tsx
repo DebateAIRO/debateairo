@@ -1,8 +1,8 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
 import { ContractHttpError, type ContractClient } from '@debateai/contract';
-import { checkDob, dobToIso, meetsMinimumAge, type DobErrorCode, type DobParts } from '@debateai/kernel';
+import { checkDob, declaredRegionFromPick, dobToIso, meetsMinimumAge, type DobErrorCode, type DobParts } from '@debateai/kernel';
+import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '@/components/RegionField';
 import { AgeRefusal } from '@/components/AgeRefusal';
 import { AuthShell } from '@/components/AuthShell';
 import { DateOfBirthField, EMPTY_DOB } from '@/components/DateOfBirthField';
@@ -81,6 +81,8 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
 }) {
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
+    const [region, setRegion] = useState<RegionPick>(EMPTY_REGION_PICK);
+    const declaredRegion = declaredRegionFromPick(region.country, region.usState);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
@@ -137,6 +139,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             form.querySelector<HTMLElement>(selector)?.focus();
             return;
         }
+        if (declaredRegion === null) return;
         if (!proof) {
             setError(t(catalog, "auth.pending.proofUnavailable"));
             return;
@@ -152,9 +155,10 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setRefused(true);
                 return;
             }
-            const acknowledgement = await client.register({ email: submitted, password: rawPassword, phone: rawPhone, date_of_birth: isoDate, terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(locale), ui_locale: locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            const acknowledgement = await client.register({ email: submitted, password: rawPassword, phone: rawPhone, country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: isoDate, terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(locale), ui_locale: locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
             setEmail('');
             setPhone('');
+            setRegion(EMPTY_REGION_PICK);
             setPassword('');
             setDateOfBirth(EMPTY_DOB);
             setDateOfBirthError(null);
@@ -226,6 +230,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             setPassword(e.target.value);
             edit('password');
         }} required disabled={busy} aria-invalid={!!errors.password || undefined} aria-describedby={errors.password ? 'signup-password-error' : 'signup-password-hint'}/><button type="button" aria-controls="signup-password" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t(catalog, "auth.password.hide") : t(catalog, "auth.password.show")}</button><p id="signup-password-hint">{t(catalog, "auth.signUp.passwordInvalid")}</p><InlineFieldMessage id="signup-password-error" message={fieldError('password')}/></div>
+ <RegionField catalog={catalog} locale={locale} value={region} onChange={setRegion} disabled={busy}/>
  <div className="authField"><DateOfBirthField catalog={catalog} locale={dobLocale} value={dateOfBirth} error={dateOfBirthError} onChange={next => {
             setDateOfBirth(next);
             setDateOfBirthError(null);
@@ -239,8 +244,8 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setProof(null);
                 setError(t(catalog, "auth.pending.proofUnavailable"));
             }}/> : null}
- <button className="authPrimary" type="submit" disabled={busy || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth))}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
- <p className="authPanelFooter">{t(catalog, "auth.signUp.alreadyHaveOne")} <Link href={loginHref}>{t(catalog, "auth.signUp.logIn")}</Link></p>
+ <button className="authPrimary" type="submit" disabled={busy || declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth))}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
+ <p className="authPanelFooter">{t(catalog, "auth.signUp.alreadyHaveOne")} <a href={loginHref}>{t(catalog, "auth.signUp.logIn")}</a></p>
  </form>
  {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => {
                 setPrivacyAccepted(privacyInputRef.current?.checked ?? false);

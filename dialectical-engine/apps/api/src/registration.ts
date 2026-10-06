@@ -19,7 +19,7 @@ import {
   type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
-import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
+import { AGE_RULE_VERSION, MIN_AGE, isDeclaredRegion, type DeclaredRegion } from "@debateai/kernel";
 import type { RegisterLegalDocuments } from "@debateai/contract";
 import { LocaleCodeSchema } from "@debateai/contract/locale";
 import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
@@ -50,13 +50,13 @@ export interface RegisterInput {
  * Paid plans L3b: legal evidence travels on the request source, separately from account profile input.
  * The S04 gate pins the auth route region (apps/api/src/index.ts). The age gate's
  * edge country already rides here (AuthSourceContext.countryCode); the Terms and Privacy pairs the page
- * displayed ride here too, parsed by the register preHandler hook and added by sourceFor.
+ * displayed and the declared region ride here too, parsed by register preHandler hooks and added by sourceFor.
  */
 export type VerificationMailSource = AuthSourceContext & Readonly<{
   /** Validated UI language/time zone for delivery only; carries no identity authority. */
   mailDisplay?: Readonly<{ locale: string; timeZone: string | null }>;
 }>;
-export type RegistrationSource = VerificationMailSource & Readonly<{ legal?: RegisterLegalDocuments }>;
+export type RegistrationSource = VerificationMailSource & Readonly<{ legal?: RegisterLegalDocuments; region?: DeclaredRegion }>;
 
 export type SocialRegisterInput = Omit<RegisterInput, "password" | "recoveryEmail">;
 export type SocialRegistrationResult = typeof REGISTRATION_PUBLIC_RESPONSE | Readonly<{status:"mfa_required";enrollment_token:string;expires_at:string}>;
@@ -180,7 +180,7 @@ function asAuthFlowFailure(error: unknown): unknown {
 
 type AuthRoute = "register" | "verify" | "resend";
 const AUTH_ROUTES = Object.freeze(["register", "verify", "resend"] as const);
-export const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
+const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
 
 interface RefusalEligibility {
   pending: number;
@@ -496,6 +496,7 @@ interface PendingRegistration {
   readonly requestedAt: Date;
   readonly countryCode: string | null;
   readonly documents: SignUpDocuments | null;
+  readonly region: DeclaredRegion | null;
   readonly source: VerificationMailSource;
 }
 
@@ -706,7 +707,9 @@ export class RegistrationService implements RegistrationApplication {
       throw new AuthFlowError("LEGAL_DOCUMENT_STALE");
     }
     const source = sourceContext(rawSource);
-    return { phone, countryCode, documents, source };
+    if (rawSource.region !== undefined && !isDeclaredRegion(rawSource.region)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    const region = rawSource.region ?? null;
+    return { phone, countryCode, documents, source, region };
   }
 
   async admitSource(request: AuthSourceAdmissionRequest): Promise<AuthSourceAdmission> {
@@ -1530,7 +1533,8 @@ export class RegistrationService implements RegistrationApplication {
           verificationTokenTtlMs: this.dependencies.policy.verification.tokenTtlMs,
           occurredAt: input.requestedAt,
           source: input.source,
-          ...(acceptances === undefined ? {} : { acceptances })
+          ...(acceptances === undefined ? {} : { acceptances }),
+          ...(input.region === null ? {} : { declaredRegion: input.region })
         };
         const created = input.social === undefined
           ? await this.dependencies.repository.createPendingAccount({...accountInput,passwordHash:input.passwordHash!}, () => this.dependencies.dekStore.store(userId,dek))
@@ -1640,7 +1644,7 @@ export class RegistrationService implements RegistrationApplication {
       const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
       releaseAdmission = granted?.releaseStructural;
       try {
-        const { phone, countryCode, documents, source } = this.validateRegistration(input, rawSource, social !== undefined);
+        const { phone, countryCode, documents, source, region } = this.validateRegistration(input, rawSource, social !== undefined);
         if (admission !== undefined) this.assertSourceAdmission("register", source, granted);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
@@ -1708,7 +1712,7 @@ export class RegistrationService implements RegistrationApplication {
         mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-            email, recoveryEmail, phone, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents, ...(social===undefined?{}:{social})
+            email, recoveryEmail, phone, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents, region, ...(social===undefined?{}:{social})
           }));
           const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
           if (preTransportWorkMs

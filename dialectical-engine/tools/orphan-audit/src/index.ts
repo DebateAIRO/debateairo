@@ -14,8 +14,11 @@ const rows: readonly Row[] = [
   ["propagation", "packages/propagation", ["kernel", "published-arithmetic"]],
   ["battery-decision", "packages/battery/decision", ["kernel"]],
   ["contract", "packages/contract", ["kernel"]],
-  ["db", "packages/db", ["kernel", "crypto"]],
-  ["register", "packages/register", ["kernel", "db", "contract"]],
+  // Model-scorecard design (2026-09-26): the scorecard format, its parser and the pure
+  // per-role picker. Kernel only, so register, api and runner can all import it.
+  ["scorecard", "packages/scorecard", ["kernel"]],
+  ["db", "packages/db", ["kernel", "crypto", "billing-core"]],
+  ["register", "packages/register", ["kernel", "db", "contract", "scorecard"]],
   ["geo", "packages/geo", ["kernel", "register"]],
   ["ledger", "packages/ledger", ["kernel", "db", "register"]],
   ["providers", "packages/providers", ["kernel", "register", "ledger"]],
@@ -33,20 +36,30 @@ const rows: readonly Row[] = [
   // types (budget) are TYPE imports, so db and the connector packages may depend
   // on billing-core without a cycle (register already depends on db).
   ["billing-core", "packages/billing-core", ["kernel"]],
+  // Paid plans (A26(a)): xMoney order signing, notice decryption and (P3b) the HTTP client.
+  ["payments-xmoney", "packages/payments-xmoney", ["kernel"]],
+  // Paid plans (A26(a)): the Quaderno tax connector over plain fetch (P4).
+  ["tax-quaderno", "packages/tax-quaderno", ["kernel", "billing-core"]],
+  // Paid plans (A26(a)): the SmartBill invoice connector over plain fetch (P5).
+  ["invoice-smartbill", "packages/invoice-smartbill", ["kernel", "billing-core"]],
   ["battery", "packages/battery", ["kernel", "db", "ledger", "register", "budget", "graph", "battery-decision", "evidence", "judgement", "critique", "valuation", "serve", "settlement"]],
-  ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness"]],
+  ["serve", "packages/serve", ["kernel", "db", "ledger", "register", "graph", "propagation", "providers", "contract", "valuation", "memory", "liveness", "scorecard"]],
   // Verdict story (2026-09-26): the story package. The edges its later tasks need
   // (register for the policy rows, db/crypto/ledger for the repository and the
   // enrichment reader) are declared with it, so the row is written once.
   ["story", "packages/story", ["kernel", "contract", "providers", "budget", "register", "db", "crypto", "ledger"]],
+  // Paid plans (spec 2026-09-29 §2.5.10, AMENDMENTS-R1 A26(a)): the email catalogues and renderer. Pure data plus
+  // node:fs reads of its own catalogues; its one workspace edge is billing-core, for SELLER_COMPANY (P6a's mirror of
+  // the legal notice's company facts, ruling R3-4). billing-core depends on kernel alone, so there is no cycle.
+  ["mail-templates", "packages/mail-templates", ["billing-core"]],
   // `support-kb` is DECLARED, not a violation: V's support program depends on
   // the package in shipped code. `@debateai/support-kb` entered apps/api's and
   // apps/runner's manifests on the second merge parent at 9c68ceb3 ("feat(support):
   // SUP-01 C1 — schema, role grants, kill switch, reservation, status"); the table
   // lagged the product only because this audit was crashing on the retired `web`
   // manifest read and had never reported a verdict. Both rows are the same commit.
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo"]],
-  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story"]],
+  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-xmoney", "tax-quaderno", "invoice-smartbill", "mail-templates", "scorecard"]],
+  ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story", "scorecard"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
   // The `web` row retired with its surface: `web/` is retired in favour of
@@ -667,6 +680,20 @@ const GOAL_RULED_LAW_CARRIERS: ReadonlyMap<string, readonly string[]> = new Map(
   ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]]
 ]);
 
+/**
+ * The law's numeric arm for one file. A literal may carry digit separators (`30_000`), the house
+ * style for large numbers: `\d+` alone stopped at the `_`, so such an export was never seen
+ * (.hermes/TOOLING-TRAPS.md, "The source-purity law does not see a NUMERIC SEPARATOR").
+ */
+export function auditNumericSourceLiteralExports(name: string, source: string): readonly string[] {
+  if (name.startsWith("packages/published-arithmetic/")) return [];
+  const carriers = GOAL_RULED_LAW_CARRIERS.get(name) ?? [];
+  const numericExports = [...source.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?\s*[;\n]/g)]
+    .map((match) => match[1]!)
+    .filter((exported) => !carriers.includes(exported));
+  return numericExports.length > 0 ? [`${name} exports a numeric source literal instead of a register/law carrier`] : [];
+}
+
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
   const engineFiles = withoutUiSurface([
@@ -701,12 +728,7 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
-    const numericExports = [...source.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*-?\d+(?:\.\d+)?\s*[;\n]/g)]
-      .map((match) => match[1]!)
-      .filter((name) => !(GOAL_RULED_LAW_CARRIERS.get(where) ?? []).includes(name));
-    if (numericExports.length > 0 && !where.startsWith("packages/published-arithmetic/")) {
-      blocking.push(`${where} exports a numeric source literal instead of a register/law carrier`);
-    }
+    blocking.push(...auditNumericSourceLiteralExports(where, source));
   }
   const reachability = await auditSurfaceReachability();
   blocking.push(...reachability.blocking);

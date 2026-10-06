@@ -35,6 +35,7 @@ export function conditionMarkLabel(
     case "LEVERAGE_UNRESOLVED": return t(catalog, "debateChrome.condition.leverageUnresolved");
     case "BRANCH-FROZEN-LOW-LEVERAGE": return t(catalog, "debateChrome.condition.branchFrozenLowLeverage");
     case "DEGRADED-DIVERSITY": return t(catalog, "debateChrome.condition.degradedDiversity");
+    case "BACKUP-MODEL-USED": return t(catalog, "debateChrome.condition.backupModelUsed");
     case "SINGLE-LINEAGE": return t(catalog, "debateChrome.condition.singleLineage");
     case "CRITIQUE-UNAVAILABLE": return t(catalog, "debateChrome.condition.critiqueUnavailable");
     case "PANEL-PARTIAL": return t(catalog, "debateChrome.condition.panelPartial");

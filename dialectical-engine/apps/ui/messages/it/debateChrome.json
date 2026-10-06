@@ -5,7 +5,6 @@
   "debateChrome.backToLibrary": "← Torna alla raccolta",
   "debateChrome.loading": "Caricamento…",
   "debateChrome.error.claimGenerationFailed": "Generazione dell’affermazione non riuscita",
-  "debateChrome.error.debateGenerationFailed": "Generazione del dibattito non riuscita: {reason}",
   "debateChrome.error.unableToLoadDebate": "Impossibile caricare il dibattito",
   "debateChrome.error.unableToLoadScoring": "Impossibile caricare i punteggi",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Impossibile caricare la simulazione della profondità adattiva",
@@ -288,5 +287,13 @@
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Il coordinatore ha rifiutato la richiesta: un modello necessario per questo piano non è al momento disponibile. Riprova più tardi oppure scegli l’altro piano.",
   "requestFailure.kind.ALREADY_WAITING": "Può restare in attesa una sola domanda alla volta. Fai questa domanda dopo l’avvio del tuo dibattito in attesa.",
   "requestFailure.kind.UNCLASSIFIED": "Si è verificato un errore prima che arrivasse una risposta, quindi l’esito è sconosciuto. Non si tratta di una decisione del coordinatore.",
-  "debateChrome.error.fundingEnded": "Il finanziamento interno per questo dibattito in attesa è terminato. Ripeti la domanda per usare la tua disponibilità attuale."
+  "debateChrome.error.fundingEnded": "Il finanziamento interno per questo dibattito in attesa è terminato. Ripeti la domanda per usare la tua disponibilità attuale.",
+  "runFailure.NOT_STARTED": "Si è verificato un problema da parte nostra prima che questo dibattito iniziasse. La preghiamo di porre di nuovo la domanda.",
+  "runFailure.MODELS_UNAVAILABLE": "Questo dibattito non è potuto iniziare perché i modelli di IA necessari non erano disponibili. La preghiamo di riprovare tra un po’.",
+  "runFailure.RUN_LIMIT_REACHED": "Questo dibattito ha raggiunto il suo limite prima di poter dare una risposta.",
+  "runFailure.STOPPED": "Questo dibattito si è interrotto a metà per un problema da parte nostra. La preghiamo di porre di nuovo la Sua domanda.",
+  "runFailure.PLAN_ENDED": "Il Suo piano a pagamento è terminato o è stato sospeso mentre questa domanda era in attesa, quindi il dibattito non è iniziato. Può porla di nuovo.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Questo dibattito costerebbe più di quanto questo sito consenta per un singolo dibattito.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Il coordinatore ha rifiutato la richiesta: per uno dei compiti del dibattito non è raggiungibile al momento alcun modello di IA. Riprova più tardi.",
+  "debateChrome.condition.backupModelUsed": "Dove non è stato possibile usare un modello di IA previsto, ne è subentrato un altro"
 }

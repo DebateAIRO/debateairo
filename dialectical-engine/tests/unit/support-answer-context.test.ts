@@ -174,7 +174,7 @@ describe("CP1 composed answer context", () => {
 
     expect(result).toMatchObject({
       outcome:"ANSWER_GROUNDED",text:"設定を開いてください。",
-      sources:[{ id:"settings-help-menus",label:"Settings and help" }],
+      sources:[{ id:"settings-help-menus",label:`${jaChrome["chrome.settings"]} and help` }],
       actions:[{ id:"settings",label:jaChrome["chrome.settings"],href:"/settings" }]
     });
     expect(result.sources?.[0]?.id).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u);

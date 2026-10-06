@@ -22,6 +22,7 @@ const styles = read("../app/globals.css");
 const home = read("../app/page.tsx");
 const verifyEmail = read("../app/verify-email/page.tsx");
 const enrollMfa = read("../app/enroll-mfa/page.tsx");
+const returnPath = read("../lib/returnPath.ts");
 const packageJson = read("../package.json");
 const authMessages = JSON.parse(read("../messages/en/auth.json"));
 
@@ -61,6 +62,13 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(login, /href=\{signUpHref\}/);
   assert.match(signUp, /useState\(["']\/login["']\)/);
   assert.match(signUp, /href=\{loginHref\}/);
+  // W11 fix 1: /login redirects a signed-in visitor to its ?next, which can be a card page
+  // (/checkout?plan=…). A client-side <Link> would carry that redirect out inside the /sign-up
+  // document, under the strict policy that blocks xMoney's frame. A plain <a> makes /login a
+  // full page load, so the card page arrives as a new document with its own policy.
+  assert.match(signUp, /<a href=\{loginHref\}>/);
+  assert.doesNotMatch(signUp, /<Link\b/);
+  assert.doesNotMatch(signUp, /from "next\/link"/);
   assert.match(gate, /window\.location\.replace\("\/login"\)/);
 });
 
@@ -87,7 +95,7 @@ test("the login route sends an already-authenticated browser back to its debate 
   assert.match(loginPage, /const cookieStore = await cookies\(\);[\s\S]*?readSessionCookie\(cookieStore\)/);
   assert.match(loginPage, /createServerContractClient/);
   assert.match(loginPage, /\.readSession\(\)/);
-  assert.match(loginPage, /redirect\("\/new"\)/);
+  assert.match(loginPage, /redirect\(safeReturnPath\(typeof requested === "string" \? requested : null\)\)/);
   assert.match(loginPage, /catch \{/);
   assert.match(loginPage, /return <LoginFlow catalog=\{catalog\} \/>/);
 });

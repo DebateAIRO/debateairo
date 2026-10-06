@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukareštas, Rumunija",
   "chrome.footer.product": "Produktas",
   "chrome.footer.home": "Pradžia",
-  "chrome.footer.cookiePreferences": "Slapukų nuostatos",
+  "chrome.footer.cookiePreferences": "Mūsų saugomi slapukai",
   "chrome.security": "Saugumas",
   "chrome.logout": "Atsijungti",
-  "chrome.accountError": "Nepavyko. Iš naujo įkelkite puslapį ir bandykite dar kartą."
+  "chrome.accountError": "Nepavyko. Iš naujo įkelkite puslapį ir bandykite dar kartą.",
+  "chrome.footer.pricing": "Kainos",
+  "chrome.footer.cancel": "Atšaukti planą",
+  "chrome.footer.withdraw": "Atsisakyti plano",
+  "chrome.footer.paymentMarks": "Priimamos kortelės",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

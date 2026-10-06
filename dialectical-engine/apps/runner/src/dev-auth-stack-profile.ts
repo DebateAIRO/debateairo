@@ -6,8 +6,14 @@ export type DevelopmentAuthStackProfile = Readonly<{
   publicPort: number;
   uiPort: number;
   apiPort: number;
-  providerPorts: readonly [number, number, number, number, number];
+  providerPorts: readonly [number, number, number, number, number, number, number];
   supportModelPort: number;
+  /**
+   * Paid plans (P6b): fake xMoney, Quaderno and SmartBill, started only with DEBATEAI_BILLING_FAKES=1.
+   * Paid plans S1a: moved past the scorecard's two new relay slots (agy and pi-glm, the last two
+   * `providerPorts`), which had taken the first two of these ports on their own branch.
+   */
+  billingFakePorts: readonly [number, number, number];
   postgresPort: number;
   hatchetGrpcPort: number;
   hatchetApiPort: number;
@@ -20,8 +26,9 @@ export const DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE: DevelopmentAuthStackProfile
   publicPort: 3000,
   uiPort: 3001,
   apiPort: 8790,
-  providerPorts: Object.freeze([8791, 8795, 8792, 8796, 8793] as const),
+  providerPorts: Object.freeze([8791, 8795, 8792, 8796, 8793, 8797, 8798] as const),
   supportModelPort: 8794,
+  billingFakePorts: Object.freeze([8799, 8800, 8801] as const),
   postgresPort: 55432,
   hatchetGrpcPort: 7077,
   hatchetApiPort: 8888,
@@ -35,8 +42,9 @@ export const SUPPORT_PREVIEW_DEVELOPMENT_AUTH_STACK_PROFILE: DevelopmentAuthStac
     publicPort: 3100,
     uiPort: 3101,
     apiPort: 8890,
-    providerPorts: Object.freeze([8891, 8895, 8892, 8896, 8893] as const),
+    providerPorts: Object.freeze([8891, 8895, 8892, 8896, 8893, 8897, 8898] as const),
     supportModelPort: 8894,
+    billingFakePorts: Object.freeze([8899, 8900, 8901] as const),
     postgresPort: 55433,
     hatchetGrpcPort: 7177,
     hatchetApiPort: 8988,

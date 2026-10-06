@@ -5,7 +5,6 @@
   "debateChrome.backToLibrary": "← Späť do knižnice",
   "debateChrome.loading": "Načítava sa…",
   "debateChrome.error.claimGenerationFailed": "Generovanie tvrdenia zlyhalo",
-  "debateChrome.error.debateGenerationFailed": "Generovanie debaty zlyhalo: {reason}",
   "debateChrome.error.unableToLoadDebate": "Debatu sa nepodarilo načítať",
   "debateChrome.error.unableToLoadScoring": "Hodnotenie sa nepodarilo načítať",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Skúšobný chod adaptívnej hĺbky sa nepodarilo načítať",
@@ -295,5 +294,13 @@
   "debateChrome.scoring.unavailableClaim.many": "{count} nedostupného tvrdenia",
   "debateChrome.scoring.realScoresDetail.few": "Z odpovede hodnotenia sa zobrazujú {count} uložené ohodnotené tvrdenia.",
   "debateChrome.scoring.realScoresDetail.many": "Z odpovede hodnotenia sa zobrazuje {count} uloženého ohodnoteného tvrdenia.",
-  "debateChrome.error.fundingEnded": "Interné financovanie tejto čakajúcej debaty sa skončilo. Položte otázku znova a využite svoj aktuálny limit."
+  "debateChrome.error.fundingEnded": "Interné financovanie tejto čakajúcej debaty sa skončilo. Položte otázku znova a využite svoj aktuálny limit.",
+  "runFailure.NOT_STARTED": "Ešte pred začiatkom tejto debaty sa na našej strane niečo pokazilo. Opýtajte sa, prosím, znova.",
+  "runFailure.MODELS_UNAVAILABLE": "Táto debata sa nemohla začať, pretože modely AI, ktoré potrebuje, neboli dostupné. Skúste to, prosím, o chvíľu znova.",
+  "runFailure.RUN_LIMIT_REACHED": "Táto debata dosiahla svoj limit skôr, ako mohla priniesť odpoveď.",
+  "runFailure.STOPPED": "Táto debata sa zastavila v polovici pre problém na našej strane. Položte, prosím, svoju otázku znova.",
+  "runFailure.PLAN_ENDED": "Váš platený program sa skončil alebo bol pozastavený, kým táto otázka čakala, a preto sa debata nezačala. Môžete ju položiť znova.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Táto debata by stála viac, než táto stránka povoľuje na jednu debatu.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinátor požiadavku odmietol: pre jednu z úloh debaty teraz nie je dostupný žiadny model AI. Skúste to znova neskôr.",
+  "debateChrome.condition.backupModelUsed": "Kde plánovaný model AI nebolo možné použiť, zastúpil ho iný"
 }

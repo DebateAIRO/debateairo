@@ -34,6 +34,7 @@
   "settings.erasure.title": "Odstrániť účet",
   "settings.erasure.hint": "Odstraňovanie sa začne po uplynutí siedmich celých dní. Dovtedy ho môžete zrušiť. Oznámenia o naplánovaní, zrušení a dokončení sa odošlú na každú e-mailovú adresu alebo e-mailovú adresu na obnovenie prepojenú s účtom; vyžaduje sa aspoň jedna overená adresa.",
   "settings.erasure.dataWarning": "Po zničení kľúčov sa šifrovaný súkromný obsah stane natrvalo nečitateľným. Aktuálne verejné snímky zostanú verejné pod vyradeným pseudonymom a stiahnuté, citované, uložené vo vyrovnávacej pamäti, indexované alebo poskytovateľmi uchované kópie môžu pretrvať. Prevzatý starší nezašifrovaný text sa vykazuje ako pretrvávajúci zvyšok, nie ako úplne vyčistený obsah.",
+  "settings.erasure.paidPlan": "Naplánovaním odstránenia sa zastaví obnovovanie vášho plateného plánu, plán však funguje až do vykonania odstránenia alebo do konca zaplateného mesiaca; ak odstránenie zrušíte, plán trvá do konca tohto mesiaca a obnoví sa len vtedy, ak zrušenie vrátite, a ak ešte môžete odstúpiť do 14 dní od nákupu, môžete tak urobiť až do vykonania odstránenia.",
   "settings.erasure.checking": "Kontroluje sa stav odstránenia účtu…",
   "settings.erasure.status": "Stav: {status}. Naplánovaný čas odstránenia: {time}.",
   "settings.erasure.processing": "Prebieha nezvratné odstraňovanie. Naplánovanie ani zrušenie už nie je možné.",

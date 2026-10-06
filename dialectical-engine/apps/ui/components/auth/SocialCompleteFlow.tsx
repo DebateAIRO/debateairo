@@ -1,8 +1,11 @@
 "use client";
+import {ContractHttpError} from "@debateai/contract";
+import {clearStoredSupportConversation} from "../support/conversation";
+import {announceSessionChange} from "../support/sessionChange";
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ContractClient, LocaleCode, CatalogLocaleCode, StepUpResponse, SocialStepUpStatusResponse, SocialLoginStatusResponse, AuthenticationResponse } from '@debateai/contract';
-import { dobToIso, type DobParts } from '@debateai/kernel';
+import { dobToIso, declaredRegionFromPick, type DobParts } from '@debateai/kernel';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { ownedPhoneCompletionDraft } from '@/lib/phoneCompletionDraft';
@@ -18,6 +21,7 @@ import { SecurityEnrollment } from './SecurityEnrollment';
 import { PhoneField } from './PhoneField';
 import { InlineFieldMessage } from './InlineFieldMessage';
 import { EphemeralCodes } from './EphemeralCodes';
+import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '../RegionField';
 import { DateOfBirthField, EMPTY_DOB } from '../DateOfBirthField';
 import { resolveDobLocale } from '@/lib/dob/dobLocale';
 import { AuthShell } from '../AuthShell';
@@ -60,6 +64,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [email, setEmail] = useState('');
     const [name, setName] = useState<string | null>(null);
     const [phone, setPhone] = useState('');
+    const [region, setRegion] = useState<RegionPick>(EMPTY_REGION_PICK);
+    const declaredRegion = declaredRegionFromPick(region.country, region.usState);
     const [birth, setBirth] = useState<DobParts>(EMPTY_DOB);
     const [errors, setErrors] = useState<SignupFieldErrors>({});
     const [error, setError] = useState<string | null>(null);
@@ -185,9 +191,10 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         }, Math.max(0, Date.parse(flowExpiry) - Date.now()));
         return () => clearTimeout(timer);
     }, [flowExpiry, token, browser, catalog]);
-    function finish(result: AuthenticationResponse) {
+    function finish(result: AuthenticationResponse, sessionAlreadyAnnounced = false) {
         if (result.status !== 'authenticated')
             return;
+        if (!sessionAlreadyAnnounced) { clearStoredSupportConversation(); announceSessionChange(); }
         startup.current = null;
         replaceAuthority('', null);
         setCode('');
@@ -223,6 +230,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy]' : '[name=terms]')?.focus();
             return;
         }
+        if (declaredRegion === null) return;
         if (!proof) {
             setError(t(catalog, "auth.pending.proofUnavailable"));
             return;
@@ -234,11 +242,12 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         const ownedToken = token;
         const ownedKind = kind;
         try {
-            const response = await client.completeSocialSignup({ continuation_token: ownedToken, email: address, phone: rawPhone, date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(chrome.locale), ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            const response = await client.completeSocialSignup({ continuation_token: ownedToken, email: address, phone: rawPhone, country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: dobToIso(birth), terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(chrome.locale), ui_locale: chrome.locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
             if (!owns(owner, ownedToken, ownedKind))
                 return;
             startup.current = null;
             setBirth(EMPTY_DOB);
+            setRegion(EMPTY_REGION_PICK);
             setPhone('');
             setPrivacyAccepted(false);
             setTermsAccepted(false);
@@ -252,7 +261,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                 replaceAuthority('', null);
             }
         }
-        catch {
+        catch (failure) {
+            if (dispatched.current && ownedKind !== 'stepup' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owns(owner, ownedToken, ownedKind))
                 setError(t(catalog, "auth.signUp.creationFailed"));
         }
@@ -295,7 +305,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             else
                 finish(result as AuthenticationResponse);
         }
-        catch {
+        catch (failure) {
+            if (dispatched.current && ownedKind !== 'stepup' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owns(owner, ownedToken, ownedKind))
                 setError(t(catalog, "auth.passkey.cancelled"));
         }
@@ -332,7 +343,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             else
                 finish(result as AuthenticationResponse);
         }
-        catch {
+        catch (failure) {
+            if (dispatched.current && ownedKind !== 'stepup' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owns(owner, ownedToken, ownedKind))
                 setError(t(catalog, "auth.login.authenticationCodeRejected"));
         }
@@ -372,6 +384,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
             }} aria-busy={busy}>
  <label htmlFor="social-email">{t(catalog, "auth.email")}</label><input id="social-email" name="email" type="email" autoComplete="email" value={email} disabled={busy} onChange={e => setEmail(e.target.value)} aria-invalid={!!errors.email || undefined} aria-describedby={errors.email ? 'social-email-error' : undefined}/><InlineFieldMessage id="social-email-error" message={fieldError('email')}/>
  <PhoneField id="social-phone" catalog={catalog} value={phone} onChange={setPhone} error={fieldError('phone')} disabled={busy}/>
+ <RegionField catalog={catalog} locale={chrome.locale} value={region} onChange={setRegion} disabled={busy}/>
  <DateOfBirthField catalog={catalog} locale={resolveDobLocale(uiLocale)} value={birth} onChange={setBirth} error={errors.dateOfBirth ? 'incomplete' : null} disabled={busy} minimumAgeMessage={t(catalog, "auth.dob.underAge")}/>
  <div><input name="privacy" type="checkbox" checked={privacyAccepted} disabled={busy} aria-labelledby="social-privacy-label" aria-invalid={!!errors.privacy || undefined} aria-describedby={errors.privacy ? "social-privacy-error" : undefined} onChange={() => privacyAccepted ? setPrivacyAccepted(false) : setPolicyOpen(true)}/><span id="social-privacy-label">{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" onClick={() => setPolicyOpen(true)}>{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span><InlineFieldMessage id="social-privacy-error" message={fieldError('privacy')}/></div>
  <div><input name="terms" type="checkbox" checked={termsAccepted} disabled={busy} aria-labelledby="social-terms-label" aria-invalid={!!errors.terms || undefined} aria-describedby={errors.terms ? "social-terms-error" : undefined} onChange={() => termsAccepted ? setTermsAccepted(false) : setTermsOpen(true)}/><span id="social-terms-label">{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" onClick={() => setTermsOpen(true)}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span><InlineFieldMessage id="social-terms-error" message={fieldError('terms')}/></div>
@@ -379,7 +392,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     setProof(null);
                     setError(t(catalog, "auth.pending.proofUnavailable"));
                 }}/> : null}<button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form> : null}
- {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={finish}/> : null}
+ {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={result => finish(result, true)}/> : null}
  {token && (kind === 'login' || kind === 'stepup') ? <div>
  {methods.includes('passkey') ? <button type="button" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button> : null}
  {methods.includes('totp') || methods.includes('recovery_code') ? <><form method="post" action="/social/complete" noValidate onSubmit={e => {

@@ -421,7 +421,8 @@ describe("S02 severity and unordered condition marks", () => {
     // from these comments. Every new mark was minted MID-LIST, so the DR-176
     // severity map is DERIVED from CONDITION_MARKS, so it grew with the
     // vocabulary; only this count pin is stated by hand.
-    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(37);
+    // Model scorecard A16 minted BACKUP-MODEL-USED mid-list: 37 -> 38.
+    expect(Object.keys(CONDITION_MARK_SEVERITY)).toHaveLength(38);
     expect(Object.values(CONDITION_MARK_SEVERITY).every((value) => value === "DEGRADED")).toBe(
       true,
     );

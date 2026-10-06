@@ -5,6 +5,7 @@ import { modelMeta } from "@/lib/models";
 import { isComplete, relativeTime, statusLabel } from "@/lib/format";
 import type { DebateSummary } from "@/lib/types";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { runFailureMessage } from "@/lib/v3/runFailure";
 import composeEnglish from "@/messages/en/compose.json";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
 
@@ -48,32 +49,34 @@ function LibraryRow({
 }) {
   const [byBefore, byAfter] = t(catalog, "home.by", { name: "\u0000" }).split("\u0000");
   return (
-    <Link className="libRow" href={href} data-library-row>
-      <div className="libRowBody">
-        <div className="libRowClaim">{claim}</div>
-        <p className="libRowMeta">
-          {by === undefined ? null : <>{byBefore}<span className="libRowBy">{by}</span>{byAfter} · </>}
-          {meta}
-          {confidenceBand ? <> · <span data-ai-generated="true">{confidenceBand}</span></> : null}
-        </p>
-      </div>
-      {models.length > 0 ? (
-        <div className="libDots" aria-hidden>
-          {models.slice(0, 5).map((model) => {
-            const meta = modelMeta(model, composeCatalog);
-            return (
-              <span
-                key={model}
-                className="libDot"
-                title={meta.name}
-                style={{ "--dot": meta.dot } as CSSProperties}
-              />
-            );
-          })}
+    <Link className="libRow" href={href} data-library-row data-bezel="shell" style={{ background: "var(--shell)" }}>
+      <div className="libRowCore" data-bezel="core" style={{ background: "var(--core)" }}>
+        <div className="libRowBody">
+          <div className="libRowClaim">{claim}</div>
+          <p className="libRowMeta">
+            {by === undefined ? null : <>{byBefore}<span className="libRowBy">{by}</span>{byAfter} · </>}
+            {meta}
+            {confidenceBand ? <> · <span data-ai-generated="true">{confidenceBand}</span></> : null}
+          </p>
         </div>
-      ) : null}
-      <span className="libStatus" data-state={state} data-ai-generated={generatedStatus ? "true" : undefined}>{status}</span>
-      <span className="libArrow" aria-hidden>→</span>
+        {models.length > 0 ? (
+          <div className="libDots" aria-hidden>
+            {models.slice(0, 5).map((model) => {
+              const meta = modelMeta(model, composeCatalog);
+              return (
+                <span
+                  key={model}
+                  className="libDot"
+                  title={meta.name}
+                  style={{ "--dot": meta.dot } as CSSProperties}
+                />
+              );
+            })}
+          </div>
+        ) : null}
+        <span className="libStatus" data-state={state} data-ai-generated={generatedStatus ? "true" : undefined}>{status}</span>
+        <span className="libArrow" aria-hidden>→</span>
+      </div>
     </Link>
   );
 }
@@ -102,16 +105,18 @@ export function DebatesBuffer({
     // is formatted in the reader's browser, in their own zone. Final review
     // Part 1b, Important 1: one that waits only for its person's own running
     // debates says so in C's place, with no time.
+    // A failed row says what happened in the reader's words; its terminal
+    // reason code is for operators and never reaches the page.
     const meta: ReactNode = waitsUntil !== null && debate.waits_for === "OWN_DEBATES"
       ? t(catalog, "home.status.waitingOwnDebates")
       : waitsUntil !== null
       ? <ResetSentence text={t(catalog, "home.status.waiting", { time: RESET_TIME_MARK })} at={waitsUntil} locale={locale} />
-      : debate.terminal_reason === null || debate.terminal_reason === undefined
-        ? joinMeta([relativeTime(debate.created_at, timeCatalog, locale),
+      : failed
+        ? runFailureMessage(debate.terminal_reason, catalog)
+        : joinMeta([relativeTime(debate.created_at, timeCatalog, locale),
            debate.models.length > 0
              ? tPlural(catalog, "home.models", debate.models.length, locale)
-             : null])
-        : t(catalog, "home.generationFailed", { reason: debate.terminal_reason });
+             : null]);
     return (
       <LibraryRow
         key={debate.id}

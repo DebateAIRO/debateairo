@@ -186,23 +186,23 @@ const DEV_SUPPORT_TEMPLATES = Object.freeze({
   }),
   NO_SOURCE: Object.freeze({
     en: "I don't have a source for that, so I won't guess. Ask me something else about how debates work, or choose 'Talk to a human'.",
-    ro: "Nu am o sursă pentru asta, așa că nu voi ghici. Întreabă-mă altceva despre cum funcționează dezbaterile sau alege „Vorbește cu o persoană”."
+    ro: "Nu am o sursă pentru asta, așa că nu voi ghici. Întreabă-mă altceva despre cum funcționează dezbaterile sau alege „Vorbiți cu o persoană”."
   }),
   REFUSE_ZONE: Object.freeze({
     en: "I can't help with sign-in, passwords, verification codes, two-factor, account recovery, email changes or account deletion — not even to check them. Those live only in your account pages: {link}. If that page doesn't work for you, choose 'Talk to a human'.",
-    ro: "Nu pot ajuta cu autentificarea, parolele, codurile de verificare, autentificarea în doi pași, recuperarea contului, schimbarea emailului sau ștergerea contului — nici măcar să le verific. Acestea se fac doar din paginile contului tău: {link}. Dacă pagina nu funcționează, alege „Vorbește cu o persoană”."
+    ro: "Nu pot ajuta cu autentificarea, parolele, codurile de verificare, autentificarea în doi pași, recuperarea contului, schimbarea emailului sau ștergerea contului — nici măcar să le verific. Acestea se fac doar din paginile contului tău: {link}. Dacă pagina nu funcționează, alege „Vorbiți cu o persoană”."
   }),
   REFUSE_INJECTION: Object.freeze({
     en: "I only follow the product's own instructions, so I'll skip that request. Your message has been recorded. Ask me about the product, or choose 'Talk to a human'.",
-    ro: "Urmez doar instrucțiunile produsului, așa că voi sări peste această cerere. Mesajul tău a fost înregistrat. Întreabă-mă despre produs sau alege „Vorbește cu o persoană”."
+    ro: "Urmez doar instrucțiunile produsului, așa că voi sări peste această cerere. Mesajul tău a fost înregistrat. Întreabă-mă despre produs sau alege „Vorbiți cu o persoană”."
   }),
   REFUSE_SAFETY: Object.freeze({
     en: "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
-    ro: "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbește cu o persoană” și o persoană îți va citi mesajul."
+    ro: "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbiți cu o persoană” și o persoană îți va citi mesajul."
   }),
   DEGRADED: Object.freeze({
     en: "The assistant's model is unavailable right now. You can still leave a message for a person: choose 'Talk to a human'.",
-    ro: "Modelul asistentului nu este disponibil acum. Poți totuși lăsa un mesaj pentru o persoană: alege „Vorbește cu o persoană”."
+    ro: "Modelul asistentului nu este disponibil acum. Poți totuși lăsa un mesaj pentru o persoană: alege „Vorbiți cu o persoană”."
   }),
   DISABLED: Object.freeze({
     en: "The support assistant is switched off at the moment.",
@@ -214,7 +214,7 @@ const DEV_SUPPORT_TEMPLATES = Object.freeze({
   }),
   RATING: Object.freeze({
     en: "Did this answer your question? Yes · No · Talk to a human",
-    ro: "Ți-a răspuns la întrebare? Da · Nu · Vorbește cu o persoană"
+    ro: "Ți-a răspuns la întrebare? Da · Nu · Vorbiți cu o persoană"
   }),
   CASE_OPENED_MINIMAL: Object.freeze({
     en: "I've saved this conversation for a person as case {token}. Keep the code; replies will appear here once a person has answered.",
@@ -246,11 +246,11 @@ const DEV_SUPPORT_TEMPLATES = Object.freeze({
   }),
   INCIDENT_ACTIVE: Object.freeze({
     en: "Known incident since {started_at}: {summary_en} (published by the team). If your problem matches, no need to report it; otherwise choose 'Talk to a human'.",
-    ro: "Incident cunoscut din {started_at}: {summary_ro} (publicat de echipă). Dacă problema ta se potrivește, nu e nevoie să o raportezi; altfel alege „Vorbește cu o persoană”."
+    ro: "Incident cunoscut din {started_at}: {summary_ro} (publicat de echipă). Dacă problema ta se potrivește, nu e nevoie să o raportezi; altfel alege „Vorbiți cu o persoană”."
   }),
   NO_INCIDENT: Object.freeze({
     en: "I have no record of a current known incident. That doesn't rule one out — if something looks broken, choose 'Talk to a human' and describe it.",
-    ro: "Nu am nicio înregistrare a unui incident cunoscut în acest moment. Asta nu exclude unul — dacă ceva pare stricat, alege „Vorbește cu o persoană” și descrie problema."
+    ro: "Nu am nicio înregistrare a unui incident cunoscut în acest moment. Asta nu exclude unul — dacă ceva pare stricat, alege „Vorbiți cu o persoană” și descrie problema."
   }),
   INCIDENT_NOTICE: Object.freeze({
     en: "Note: there is a known incident affecting {surface} since {started_at}.",
@@ -1038,9 +1038,9 @@ describe("OWNER review records: the owner read the exact bytes and signed", () =
   });
 });
 
-it('Task12 durable SOL evidence identifies exact recovery model/fallback and component bytes',()=>{
- const base=resolve(process.cwd(),'packages/support-kb');const doc=readFileSync(resolve(process.cwd(),'docs/missions/account-onboarding/task-12-kb-editorial.md'),'utf8');const labels=new Map([...doc.matchAll(/^- `([^`]+)`: `([a-f0-9]{64})`/gm)].map(m=>[m[1],m[2]]));const raw=readFileSync(resolve(base,'recovery/components.json'));const data=JSON.parse(raw.toString());const manifest=JSON.parse(readFileSync(resolve(base,'reviews/manifest.json'),'utf8'));
- const currentDoc=readFileSync(resolve(process.cwd(),'docs/missions/account-onboarding/final-account-access-editorial.md'),'utf8');expect(currentDoc).toContain(sha256(raw));expect(manifest.recovery.componentFileSha256).toBe(sha256(raw));
- for(const row of data.components.filter((r:any)=>['account-settings','settings-help-menus'].includes(r.id))){const review=manifest.recovery.components.find((r:any)=>r.id===row.id&&r.lang===row.lang);expect(labels.get(`recovery:${row.id}.${row.lang}:modelProjection`)).toBe(sha256(row.modelProjection));expect(labels.get(`recovery:${row.id}.${row.lang}:fallback`)).toBe(sha256(row.fallback));expect(review.modelProjectionSha256).toBe(sha256(row.modelProjection));expect(review.fallbackSha256).toBe(sha256(row.fallback));expect(review.articleSha256).toBe(row.articleSha256);}
+it('current integration SOL evidence identifies exact changed recovery text and component bytes',()=>{
+ const base=resolve(process.cwd(),'packages/support-kb');const doc=readFileSync(resolve(process.cwd(),'docs/missions/account-onboarding/dev-integration-kb-editorial.md'),'utf8');const labels=new Map([...doc.matchAll(/^- `([^`]+)`: `([a-f0-9]{64})`/gm)].map(m=>[m[1],m[2]]));const raw=readFileSync(resolve(base,'recovery/components.json'));const data=JSON.parse(raw.toString());const manifest=JSON.parse(readFileSync(resolve(base,'reviews/manifest.json'),'utf8'));
+ expect(doc).toContain(sha256(raw));expect(manifest.recovery.componentFileSha256).toBe(sha256(raw));
+ for(const row of data.components.filter((r:any)=>['account-access','account-settings','settings-help-menus'].includes(r.id))){const review=manifest.recovery.components.find((r:any)=>r.id===row.id&&r.lang===row.lang);expect(labels.get(`recovery:${row.id}.${row.lang}:modelProjection`)).toBe(sha256(row.modelProjection));expect(labels.get(`recovery:${row.id}.${row.lang}:fallback`)).toBe(sha256(row.fallback));expect(review.modelProjectionSha256).toBe(sha256(row.modelProjection));expect(review.fallbackSha256).toBe(sha256(row.fallback));expect(review.articleSha256).toBe(row.articleSha256);}
 });
 it('Romanian account recovery projection is ordinary route-free Romanian',()=>{const doc=JSON.parse(readFileSync(resolve(process.cwd(),'packages/support-kb/recovery/components.json'),'utf8'));const row=doc.components.find((r:any)=>r.id==='account-settings'&&r.lang==='ro');for(const field of ['modelProjection','fallback']){expect(row[field]).not.toMatch(/the (?:Account|Security) page/);expect(row[field]).toContain('pagina contului');expect(row[field]).toContain('pagina de securitate');}});

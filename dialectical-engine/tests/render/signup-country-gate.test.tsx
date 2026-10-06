@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE, ContractHttpError } from "@debateai/contract";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 const mocks = vi.hoisted(() => ({
   availability: vi.fn(),
@@ -114,6 +115,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
         field(name).dispatchEvent(new Event("input", { bubbles: true }));
       });
     }
+    await pickRegion("RO");
     field("email").value = "person@example.test";
     field("phone").value = "+40712345678";
     field("password").value = "Correct horse 7!";

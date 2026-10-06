@@ -32,9 +32,14 @@ describe("Support catalog route coverage", () => {
     expect([...SUPPORT_PAGE_ROUTES].sort()).toEqual(discovered);
     expect(SUPPORT_PAGE_ROUTES).toEqual([
       "/",
+      "/admin/invitation",
+      "/admin/team",
       "/admin/workers",
       "/ai-transparency",
       "/social/complete",
+      "/cancel",
+      "/checkout",
+      "/checkout/return",
       "/cookies",
       "/debate/[id]",
       "/enroll-mfa",
@@ -42,18 +47,24 @@ describe("Support catalog route coverage", () => {
       "/legal",
       "/login",
       "/new",
+      "/pricing",
       "/privacy",
       "/privacy/us-health-data",
+      "/privacy/versions",
+      "/privacy/versions/[sha256]",
       "/providers",
       "/public/debate/[id]",
       "/recover",
       "/settings",
       "/settings/security",
+      "/settings/card",
       "/sign-up",
       "/terms",
       "/terms/versions",
+      "/terms/versions/[sha256]",
       "/verify-email",
       "/verify-recovery-email",
+      "/withdraw",
     ].sort());
   });
 
@@ -75,6 +86,27 @@ describe("Support catalog route coverage", () => {
       expect(SUPPORT_CAPABILITIES.find((capability) => capability.route === route), route).toMatchObject({
         audience: "any", availability: "public", actionIds: [], articleIds: ["privacy-consent"]
       });
+    }
+  });
+
+  it("keeps the paid-plan pages actionless, and the card pages out of Support", () => {
+    // Property: the assistant may name a paid-plan page but never act through one, and it never names the pages
+    // that carry xMoney's card form (A11).
+    const byRoute = new Map(SUPPORT_CAPABILITIES.map((capability) => [capability.route, capability]));
+    const publicPages = ["/cancel", "/pricing", "/withdraw", "/privacy/versions", "/terms/versions/[sha256]", "/privacy/versions/[sha256]"];
+    for (const route of publicPages) {
+      expect(byRoute.get(route), route).toMatchObject({
+        audience: "any", availability: "public", disposition: "action", actionIds: []
+      });
+    }
+    const cardPages = ["/checkout", "/checkout/return", "/settings/card"];
+    for (const route of cardPages) {
+      expect(byRoute.get(route), route).toMatchObject({
+        audience: "member", availability: "excluded", disposition: "excluded", actionIds: []
+      });
+    }
+    for (const route of ["/privacy/versions", "/terms/versions/[sha256]", "/privacy/versions/[sha256]"]) {
+      expect(byRoute.get(route)?.articleIds, route).toEqual(["privacy-consent"]);
     }
   });
 

@@ -158,6 +158,14 @@
       ]
     },
     {
+      "roleName": "debateai_billing_runtime",
+      "login": false,
+      "inherit": true,
+      "directMemberships": [
+        "debateai_runtime"
+      ]
+    },
+    {
       "roleName": "debateai_content_provision",
       "login": false,
       "inherit": false,
@@ -512,9 +520,10 @@
       "replication": false,
       "bypassRls": false,
       "directMemberships": [
-        "debateai_runtime"
+        "debateai_billing_runtime"
       ],
       "effectiveMemberships": [
+        "debateai_billing_runtime",
         "debateai_runtime"
       ],
       "forbiddenMemberships": [
@@ -527,6 +536,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -554,6 +564,46 @@
           "environmentKey": "DATABASE_URL",
           "purpose": "LEGACY_ASK_ADMISSION_POOL",
           "binding": "WIRED"
+        },
+        {
+          "component": "apps/api:billing-dispute-cli",
+          "sourceFile": "apps/api/src/billing/dispute-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_DISPUTE_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:dispute"
+        },
+        {
+          "component": "apps/api:billing-withdraw-cli",
+          "sourceFile": "apps/api/src/billing/withdraw-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_WITHDRAW_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:withdraw"
+        },
+        {
+          "component": "apps/api:billing-tax-summary-cli",
+          "sourceFile": "apps/api/src/billing/tax-summary-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_TAX_SUMMARY_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:tax-summary"
+        },
+        {
+          "component": "apps/api:billing-efactura-status-cli",
+          "sourceFile": "apps/api/src/billing/efactura-status-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_EFACTURA_STATUS_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:efactura-status"
+        },
+        {
+          "component": "apps/api:billing-invoice-cli",
+          "sourceFile": "apps/api/src/billing/invoice-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_INVOICE_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:invoice"
         }
       ]
     },
@@ -577,6 +627,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -584,6 +635,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -635,6 +687,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -642,6 +695,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -686,6 +740,7 @@
         "debateai_runtime"
       ],
       "forbiddenMemberships": [
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -694,6 +749,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -737,6 +793,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -745,6 +802,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_register_publication_owner",
         "debateai_replay",
@@ -789,6 +847,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -797,6 +856,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -854,6 +914,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -862,6 +923,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -913,6 +975,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -921,6 +984,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -964,6 +1028,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -972,6 +1037,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1015,6 +1081,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1023,6 +1090,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1066,6 +1134,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1073,6 +1142,7 @@
         "debateai_evaluator_reader",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1116,6 +1186,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_ddl",
@@ -1123,6 +1194,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1166,6 +1238,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1173,6 +1246,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1212,6 +1286,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1220,6 +1295,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1259,6 +1335,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1267,6 +1344,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1306,6 +1384,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1314,6 +1393,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1353,6 +1433,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1361,6 +1442,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1400,6 +1482,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1408,6 +1491,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1448,6 +1532,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1456,6 +1541,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1500,6 +1586,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1508,6 +1595,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1551,6 +1639,7 @@
       ],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1559,6 +1648,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1603,6 +1693,7 @@
       "effectiveMemberships": [],
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
+        "debateai_billing_runtime",
         "debateai_content_provision",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
@@ -1611,6 +1702,7 @@
         "debateai_evaluator_worker",
         "debateai_obs_stats_owner",
         "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
         "debateai_prod_*",
         "debateai_publication_cleanup",
         "debateai_register_publication_owner",
@@ -1660,8 +1752,15 @@
       "setOption": true
     },
     {
-      "memberRole": "debateai_prod_api_runtime",
+      "memberRole": "debateai_billing_runtime",
       "grantedRole": "debateai_runtime",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_runtime",
+      "grantedRole": "debateai_billing_runtime",
       "adminOption": false,
       "inheritOption": true,
       "setOption": true
@@ -2018,6 +2117,8 @@
     "NO_SERVICE_TO_SERVICE_MEMBERSHIP",
     "NO_PREDEFINED_PG_ROLE_MEMBERSHIP_EXCEPT_OBSERVATION_AGENT_PG_MONITOR",
     "AUTHORIZATION_EFFECTIVE_MEMBERSHIP_IS_AUTHORIZATION_PLUS_RUNTIME_ONLY",
+    "BILLING_CAPABILITY_HELD_BY_API_RUNTIME_ONLY",
+    "LEGAL_ACCEPTANCE_SIGN_UP_AND_COUNTRY_GATE_WRITES_HELD_BY_API_RUNTIME_ONLY",
     "PRODUCTION_EVALUATOR_DEV_MENU_FORBIDDEN"
   ],
   "independentOwnerRecovery": {

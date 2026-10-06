@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukurešť, Rumunsko",
   "chrome.footer.product": "Produkt",
   "chrome.footer.home": "Domov",
-  "chrome.footer.cookiePreferences": "Nastavenia súborov cookie",
+  "chrome.footer.cookiePreferences": "Súbory cookie, ktoré ukladáme",
   "chrome.security": "Zabezpečenie",
   "chrome.logout": "Odhlásiť sa",
-  "chrome.accountError": "Nepodarilo sa to. Znova načítajte stránku a skúste to znova."
+  "chrome.accountError": "Nepodarilo sa to. Znova načítajte stránku a skúste to znova.",
+  "chrome.footer.pricing": "Cenník",
+  "chrome.footer.cancel": "Zrušenie programu",
+  "chrome.footer.withdraw": "Odstúpenie od programu",
+  "chrome.footer.paymentMarks": "Karty, ktoré prijímame",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

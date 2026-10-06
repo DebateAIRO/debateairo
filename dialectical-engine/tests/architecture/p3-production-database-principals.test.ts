@@ -108,6 +108,8 @@ const manifestPath =
 
 const capabilityRoles = [
   "debateai_authorization_runtime",
+  // Go-live row 41 (migration 0093): billing's privileges, held by api-runtime alone.
+  "debateai_billing_runtime",
   "debateai_content_provision",
   "debateai_erasure_runtime",
   "debateai_evaluator_api",
@@ -127,8 +129,18 @@ const ownershipRoles = [
   // V-29: owns obs.postgres_capacity(...), the observation agent's statistics window.
   "debateai_obs_stats_owner",
   "debateai_obs_view_owner",
+  "debateai_password_recovery_owner",
   "debateai_register_publication_owner",
   "debateai_staff_security_owner"
+] as const;
+
+// Exact external104-106 SQL is retained for the installed preview lineage.
+// These NOLOGIN recovery owners/runtimes are outside the historical P3-01
+// provisioner inventory; the preview overlay/launcher handoff remains separate.
+const externalRecoveryRoles = [
+  "debateai_backup_email_owner", "debateai_backup_email_runtime",
+  "debateai_mfa_recovery_owner", "debateai_mfa_recovery_runtime",
+  "debateai_password_reset_owner", "debateai_password_reset_runtime"
 ] as const;
 
 // V-29 removed the one exception (the observation agent's pg_monitor login): no
@@ -164,6 +176,7 @@ describe("P3-01 production database-principal manifest", () => {
       directMemberships
     }))).toEqual([
       { roleName: "debateai_authorization_runtime", inherit: true, directMemberships: ["debateai_runtime"] },
+      { roleName: "debateai_billing_runtime", inherit: true, directMemberships: ["debateai_runtime"] },
       { roleName: "debateai_content_provision", inherit: false, directMemberships: [] },
       { roleName: "debateai_erasure_runtime", inherit: false, directMemberships: [] },
       { roleName: "debateai_evaluator_api", inherit: true, directMemberships: [] },
@@ -280,7 +293,7 @@ describe("P3-01 production database-principal manifest", () => {
     }) => ({ id, database, inherit, directMemberships, effectiveMemberships })))
       .toEqual([
         { id: "migration-admin", database: "debateai", inherit: true, directMemberships: [], effectiveMemberships: [] },
-        { id: "api-runtime", database: "debateai", inherit: true, directMemberships: ["debateai_runtime"], effectiveMemberships: ["debateai_runtime"] },
+        { id: "api-runtime", database: "debateai", inherit: true, directMemberships: ["debateai_billing_runtime"], effectiveMemberships: ["debateai_billing_runtime", "debateai_runtime"] },
         { id: "api-content-provision", database: "debateai", inherit: true, directMemberships: ["debateai_content_provision"], effectiveMemberships: ["debateai_content_provision"] },
         { id: "api-erasure", database: "debateai", inherit: true, directMemberships: ["debateai_erasure_runtime"], effectiveMemberships: ["debateai_erasure_runtime"] },
         { id: "api-authorization", database: "debateai", inherit: true, directMemberships: ["debateai_authorization_runtime"], effectiveMemberships: ["debateai_authorization_runtime", "debateai_runtime"] },
@@ -421,6 +434,35 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/runner:hosted-register-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_REGISTER_PUBLICATION", binding: "WIRED", condition: "package script register:publish-hosted" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },
+        // Paid plans, Task P14b: the owner's dispute command (`pnpm billing:dispute`)
+        // runs as the API, with the API's own EnvironmentFile, under systemd-run,
+        // and writes only billing rows that principal already writes
+        // (billing.charge_event, billing.subscription_event, billing.entitlement_event);
+        // no privilege is added.
+        { component: "apps/api:billing-dispute-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_DISPUTE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:dispute" },
+        // Paid plans, Task P14c: the owner's withdrawal command (`pnpm billing:withdraw`)
+        // runs as the API, with the API's own EnvironmentFile, under systemd-run,
+        // and writes only billing rows that principal already writes
+        // (billing.subscription_event, billing.entitlement_event, billing.charge_event,
+        // billing.outbox, and billing.withdrawal_owner_settlement, on which 0088 grants
+        // SELECT, INSERT; since 0093 each to debateai_billing_runtime); no privilege is added.
+        { component: "apps/api:billing-withdraw-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_WITHDRAW_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:withdraw" },
+        // Paid plans, Task P16b: the owner's tax summary (`pnpm billing:tax-summary`)
+        // runs as the API under systemd-run on a READ-ONLY one-connection pool
+        // (billing rows and the register's taxAuthorities row); it writes nothing.
+        { component: "apps/api:billing-tax-summary-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_TAX_SUMMARY_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:tax-summary" },
+        // Paid plans, Task P16b: the owner's e-Factura status command
+        // (`pnpm billing:efactura-status`) runs as the API under systemd-run and
+        // appends one billing.invoice_status_event, on which 0086 grants SELECT,
+        // INSERT (since 0093 to debateai_billing_runtime); no privilege is added.
+        { component: "apps/api:billing-efactura-status-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_EFACTURA_STATUS_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:efactura-status" },
+        // Paid plans, Task W12 (P2-I17): the owner's invoice command
+        // (`pnpm billing:invoice`) runs as the API under systemd-run and writes
+        // only billing rows that principal already writes (billing.invoice_intent,
+        // billing.invoice and billing.invoice_status_event, on which 0086 grants
+        // SELECT, INSERT, and billing.outbox, on which 0087 grants SELECT, INSERT;
+        // since 0093 both to debateai_billing_runtime); no privilege is added.
+        { component: "apps/api:billing-invoice-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_INVOICE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:invoice" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
@@ -629,8 +671,17 @@ describe("P3-01 production database-principal manifest", () => {
       "NO_SERVICE_TO_SERVICE_MEMBERSHIP",
       "NO_PREDEFINED_PG_ROLE_MEMBERSHIP_EXCEPT_OBSERVATION_AGENT_PG_MONITOR",
       "AUTHORIZATION_EFFECTIVE_MEMBERSHIP_IS_AUTHORIZATION_PLUS_RUNTIME_ONLY",
+      "BILLING_CAPABILITY_HELD_BY_API_RUNTIME_ONLY",
+      // Migration 0094: legal.acceptance, the legal retention purge, sign-up with consent and the country-gate
+      // audit sit on debateai_billing_runtime too, not on the shared debateai_runtime.
+      "LEGAL_ACCEPTANCE_SIGN_UP_AND_COUNTRY_GATE_WRITES_HELD_BY_API_RUNTIME_ONLY",
       "PRODUCTION_EVALUATOR_DEV_MENU_FORBIDDEN"
     ]);
+    // Go-live row 41: runner-runtime and scheduler-liveness hold debateai_runtime, which since 0093 writes
+    // nothing in billing; the billing role is api-runtime's alone, so only the API writes billing rows.
+    expect(manifest.principals
+      .filter(({ effectiveMemberships }) => effectiveMemberships.includes("debateai_billing_runtime"))
+      .map(({ id }) => id)).toEqual(["api-runtime"]);
   });
 
   it("maps the manifest to current migrations and executable connection seams without inventing completion", async () => {
@@ -680,7 +731,7 @@ describe("P3-01 production database-principal manifest", () => {
         .map(({ roleName }) => roleName)
         .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator|debateai_prod_staff_recovery)$/u.test(roleName))
     ].sort();
-    expect(sourceCreatedRoles).toEqual(manifestMigrationRoles);
+    expect(sourceCreatedRoles).toEqual([...manifestMigrationRoles,...externalRecoveryRoles].sort());
     expect(manifest.retiredCapabilityRoles).toEqual([{roleName:"debateai_password_recovery_runtime",login:false,inherit:false,directMemberships:[],status:"RETIRED_BY_0104",reason:expect.any(String)}]);
 
     const sourceDatabaseKeys = [...new Set([
@@ -715,7 +766,10 @@ describe("P3-01 production database-principal manifest", () => {
     const sourceConnectionPairs: string[] = [];
     for (const sourceFile of appSourcePaths) {
       const source = await readFile(sourceFile, "utf8");
-      if (!source.includes("createPool") && !source.includes("new pg.Pool")) continue;
+      // `openBillingOperatorPool(` (apps/api/src/billing/operator-connection.ts) wraps createPool for
+      // the owner's billing commands, which pass it the URL they name.
+      if (!source.includes("createPool") && !source.includes("new pg.Pool")
+        && !source.includes("openBillingOperatorPool(")) continue;
       for (const [environmentKey] of source.matchAll(
         /\b(?:[A-Z][A-Z0-9_]*_)?DATABASE_URL\b/gu
       )) sourceConnectionPairs.push(`${sourceFile}::${environmentKey}`);

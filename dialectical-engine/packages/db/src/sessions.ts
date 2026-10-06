@@ -574,7 +574,7 @@ export class PostgresSessionRepository {
     }> | Readonly<{
       grantId: string;
       grantTokenHash: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" | "REMOVE_AUTH_METHOD" | "LINK_PROVIDER" | "UNLINK_PROVIDER";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" | "REMOVE_AUTH_METHOD" | "LINK_PROVIDER" | "UNLINK_PROVIDER";
       targetFactorId?:string; targetProvider?:"google"|"apple"|"facebook"|"x";
       expiresAt: Date;
     }>;

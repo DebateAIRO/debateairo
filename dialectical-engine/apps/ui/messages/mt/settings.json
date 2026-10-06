@@ -34,6 +34,7 @@
   "settings.erasure.title": "Ħassar il-kont",
   "settings.erasure.hint": "It-tħassir jibda wara sebat ijiem sħaħ. Tista’ tikkanċellah qabel jibda. Avviżi dwar l-iskedar, il-kanċellazzjoni u t-tlestija jintbagħtu lil kull indirizz elettroniku jew indirizz elettroniku ta’ rkupru marbut; huwa meħtieġ mill-inqas kanal wieħed ivverifikat.",
   "settings.erasure.dataWarning": "Il-kontenut privat kriptat ma jkun jista’ jinqara qatt aktar meta jinqerdu ċ-ċwievet tiegħu. L-istampi pubbliċi attwali jibqgħu pubbliċi taħt psewdonimu rtirat, u kopji li tniżżlu, ġew ikkwotati, inħażnu temporanjament, ġew indiċjati jew inżammu mill-fornitur jistgħu jibqgħu jeżistu. Test ċar storiku mitlub jiġi rrappurtat bħala residwu miżmum, mhux bħala kontenut imnaddaf kollu.",
+  "settings.erasure.paidPlan": "L-ippjanar tat-tħassir iwaqqaf it-tiġdid tal-pjan imħallas tiegħek, iżda l-pjan jibqa’ jaħdem sakemm isir it-tħassir jew jispiċċa x-xahar li ħallast għalih; jekk tikkanċella t-tħassir, il-pjan idum sal-aħħar ta’ dak ix-xahar u jiġġedded biss jekk tħassar il-kanċellazzjoni, u jekk għadek tista’ tirtira fi żmien 14-il jum mix-xiri, tista’ tagħmel dan sakemm isir it-tħassir.",
   "settings.erasure.checking": "Qed jiġi vverifikat l-istat tat-tħassir tal-kont…",
   "settings.erasure.status": "Stat: {status}. Ħin skedat tat-tħassir: {time}.",
   "settings.erasure.processing": "Qed jiġi pproċessat tħassir irriversibbli. L-iskedar u l-kanċellazzjoni ma għadhomx disponibbli.",

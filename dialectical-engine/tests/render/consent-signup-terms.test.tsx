@@ -22,6 +22,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 const PRIVACY_ROW_TEXT = "I have read the Privacy Policy.";
 const TERMS_ROW_TEXT = "I have read and agree to the Terms of Service.";
@@ -180,6 +181,7 @@ async function mount(client?: {
   };
   await act(async () => root!.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={stub} />));
   await settle();
+  await pickRegion("RO");
 }
 
 describe("sign-up — the Terms of Service row", () => {
@@ -337,6 +339,7 @@ describe("sign-up — the Terms of Service row", () => {
   // birth does not gate the button.
   it("keeps Create account disabled until both boxes are ticked", async () => {
     await mount();
+    await pickRegion("RO");
 
     await acknowledgePolicy();
     expect(field("privacy-accepted").checked).toBe(true);
@@ -358,6 +361,7 @@ describe("sign-up — the Terms of Service row", () => {
 
     // First: its re-renders would reset the controlled fields assigned directly below.
     await fillAdultDateOfBirth();
+    await pickRegion("RO");
     field("email").value = "person@example.test";
     field("phone").value = "+40712345678";
     field("password").value = "Correct horse 7!";
@@ -368,7 +372,7 @@ describe("sign-up — the Terms of Service row", () => {
     field("terms-accepted").checked = true;
     await submit();
     expect(register).toHaveBeenCalledTimes(1);
-    expect(register).toHaveBeenCalledWith(expect.objectContaining({email:"person@example.test",password:"Correct horse 7!",phone:"+40712345678",date_of_birth:"1990-01-01",...DISPLAYED_LEGAL_EN,turnstile_token:"test-proof"}));
+    expect(register).toHaveBeenCalledWith(expect.objectContaining({email:"person@example.test",password:"Correct horse 7!",phone:"+40712345678",country: "RO", date_of_birth:"1990-01-01",...DISPLAYED_LEGAL_EN,turnstile_token:"test-proof"}));
     expect(document.querySelector('input[name="terms-accepted"]')).toBeNull();
   });
 });

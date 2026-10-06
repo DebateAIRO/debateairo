@@ -79,8 +79,8 @@
   "support.conversationDetails": "تفاصيل المحادثة",
   "support.shortcutsLabel": "اختصارات الدعم",
   "support.answerRating": "تقييم الإجابة",
-  "support.privacyPreferences": "تفضيلات الخصوصية",
+  "support.privacyPreferences": "الخصوصية",
   "support.aiBanner": "الردود مولّدة بالذكاء الاصطناعي وموسومة بما يمكن للآلة قراءته، وقد تكون خاطئة. اطلب التحدث إلى إنسان في أي وقت.",
-  "support.cookiePreferences": "تفضيلات ملفات تعريف الارتباط",
+  "support.cookiePreferences": "ملفات تعريف الارتباط التي نخزّنها",
   "support.recoverAccount": "استرداد حسابك"
 }

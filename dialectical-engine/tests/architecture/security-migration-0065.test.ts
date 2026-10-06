@@ -65,6 +65,7 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.account_recovery_binding": "recovery binding is rotated in place",
   "identity.age_check": "0077 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.sensitive_data_consent": "0078 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
+  "identity.registration_region": "0090 written once per account; erasure deletes it with the account (ON DELETE CASCADE)",
   "identity.account_erasure_request": "erasure request state machine",
   "identity.account_erasure_notification_outbox": "outbox rows are sent then cleared",
   "identity.private_erasure_audit_binding": "erasure binding is cleared by the sweep",
@@ -455,6 +456,39 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
         // (publication check record) and B3's 0083. No pair.
         "0084_billing_entitlement.sql",
+        // Paid plans, Part 2 (spec 2026-09-29 §2.5.2; R1 A3, A15, A17, A19, A21): customers, quotes and the
+        // subscription log; charges, invoices and notices; the outbox and the cancel tokens. No pair.
+        "0085_billing_customers_subscriptions.sql",
+        "0086_billing_charges_invoices.sql",
+        "0087_billing_outbox_cancel.sql",
+        // Paid plans P12a (amendments R1 A18, ruling R-31; number by R3-1): the
+        // WITHDRAW_SUBSCRIPTION step-up purpose and its one-shot consume function.
+        // The next free prefix after the billing tables, no pair.
+        "0088_billing_withdrawal_step_up.sql",
+        // Paid plans P15 (ruling R-31; number by R3-1): billing learns that an owner's
+        // account is being erased, or was frozen by the age gate (R3-2), as three
+        // content-free lookups. The next free prefix, no pair.
+        "0089_billing_erasure_hook.sql",
+        // Model scorecard (spec 2026-09-26, ruling R8): the per-call record columns, the
+        // encrypted prompt carrier and the pinned role assignment. Written as 0072 on its
+        // branch; renamed to 0090, the next free prefix after the billing migrations
+        // 0084-0089, when it merged (paid plans S1a, rulings R-31 and R3-1). No pair.
+        "0090_model_scorecard.sql",
+        // Paid plans Part 2b W7 (P2-I10): billing tells a committed erasure from a pending one (the plan now ends
+        // at the commit). 0090 is Part 3's scorecard; the next free prefix, no pair.
+        "0091_billing_erasure_commit.sql",
+        // Paid plans Part 4 P4-M (P2-M43, the owner's ruling of 3 October 2026): indexes for the recurring billing
+        // queries. The next free prefix, no pair.
+        "0092_billing_query_indexes.sql",
+        // Go-live row 41 (Part 2's final review P2-I5, part 3): billing's privileges move from debateai_runtime
+        // to debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
+        "0093_billing_runtime_role.sql",
+        // The 2026-10-04 review of 0080: the legal schema, legal.acceptance and the three SECURITY DEFINER functions
+        // (the retention purge, sign-up with consent, the country-gate audit) move from debateai_runtime to
+        // debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
+        "0094_legal_runtime_api_only.sql",
+        // Region picker S01: identity.registration_region and its definer writer. Next free prefix after dev's 0094; no pair.
+        "0095_registration_region.sql",
         // Account-flow plan: exact new source and checksum-preserved external103.
         // Historical85–94 inventory debt remains visible, not absorbed by a count.
         "0095_phone_profile_optional_recovery.sql",
@@ -466,7 +500,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         "0101_social_identities.sql",
         "0102_consumer_auth_method_availability.sql",
         "0103_password_recovery_t2.sql",
-        "0104_account_flow_recovery_bridge.sql"
+        "0104_account_flow_recovery_bridge.sql",
+        "0105_account_authentication_corrections.sql"
       ]);
   });
 });

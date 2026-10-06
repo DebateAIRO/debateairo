@@ -227,8 +227,8 @@ describe("CP1 support model response policy", () => {
     expect(bindSupportDraftAuthority({
       ...valid,
       sourceIds: ["account-access"],
-      actionIds: ["forgot-password"],
-    },["account-access"],["forgot-password"],"ja")).toBeNull();
+      actionIds: ["home"],
+    },["account-access"],["home"],"ja")).toBeNull();
   });
 
   it.each(["en","ro"] as const)(
@@ -519,7 +519,7 @@ describe("CP1 support model response policy", () => {
       ...SUPPORT_ACTION_CATALOG.flatMap(({ labels }) => [labels.en,labels.ro]),
       ...SUPPORT_CAPABILITIES.flatMap(({ labels }) => [labels.en,labels.ro])
     ];
-    expect(labels).toHaveLength(76);
+    expect(labels).toHaveLength(94);
     for (const label of labels) {
       expect(parseSupportDraft(raw(`Available feature: ${label}.`,{ actionIds: [] })),label)
         .not.toBeNull();

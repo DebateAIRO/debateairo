@@ -152,7 +152,7 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
     const body = {
       ...canonicalSignup,
       email: "alice@example.test", password: "correct horse battery staple",
-      phone: "+40722123456", date_of_birth: "1990-01-01"
+      phone: "+40722123456", country: "RO", date_of_birth: "1990-01-01"
     };
     const stale = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...body, terms: undefined } });
     expect(stale.statusCode).toBe(400);

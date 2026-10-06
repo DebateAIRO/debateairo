@@ -387,24 +387,89 @@ const LEFT_OUT_SEAT_SPEND_CODES: ReadonlyMap<string, string> = new Map([
  */
 export type PanelRunLevelSpendStopRule = "RETHROW" | "RETURN_HEARD";
 
+/**
+ * One panel note. `MEMBER_FAILED` is a member that fell over; the two FX-HR-H6
+ * kinds are the author's own maker or route: `PRODUCER_GRADING_FORBIDDEN` is
+ * the expected skip BEFORE any call, and `PRODUCER_GRADING_REFUSED_AFTER_CALL`
+ * is a seat whose answer came back from the author (a backup) — a billed call
+ * and a lost voice — naming the seat (`memberRole`) and who answered.
+ */
+type PanelNote =
+  | { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }
+  | { readonly memberRole: string; readonly answeringMemberRole: string; readonly contractHash: string; readonly kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL"; readonly failureKind: "PRODUCER_GRADING_FORBIDDEN"; readonly reason: string };
+
 export async function runJudgePanel(input: {
   readonly artifactProducerRef: string;
   readonly primary: { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string };
-  readonly members: readonly { readonly memberRole: string; readonly actorRef: string; readonly contractHash: string; readonly judge: () => Promise<{ readonly judgementRef: string; readonly assessment: JudgeAssessment }> }[];
+  readonly members: readonly {
+    readonly memberRole: string;
+    readonly actorRef: string;
+    readonly contractHash: string;
+    /**
+     * Model scorecard A15 (R5): a member may be answered by its seat's backup,
+     * so its judge reports WHO answered — the route (`actorRef`) and its maker
+     * (`memberRole`). Absent, the member's own values stand. The family
+     * discount keys on this route, never on a maker name looked up in a list.
+     */
+    readonly judge: () => Promise<{
+      readonly judgementRef: string;
+      readonly assessment: JudgeAssessment;
+      readonly actorRef?: string;
+      readonly memberRole?: string;
+    }>;
+  }[];
   readonly onRunLevelSpendStop?: PanelRunLevelSpendStopRule;
   readonly leaveOutMoneyRefusedSeats?: boolean;
-}): Promise<{ readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly contractHash: string | null }[]; readonly notes: readonly { readonly memberRole: string; readonly contractHash: string; readonly kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; readonly failureKind: PanelMemberFailureKind; readonly reason: string }[]; readonly stoppedBy?: unknown }> {
+}): Promise<{
+  readonly judgements: readonly { readonly judgementRef: string; readonly assessment: JudgeAssessment; readonly memberRole: string; readonly actorRef: string; readonly contractHash: string | null }[];
+  readonly notes: readonly PanelNote[];
+  readonly stoppedBy?: unknown;
+}> {
   let stoppedBy: { readonly error: unknown } | null = null;
-  const judgements = [{ ...input.primary, contractHash: null as string | null }];
-  const notes: { memberRole: string; contractHash: string; kind: "MEMBER_FAILED" | "PRODUCER_GRADING_FORBIDDEN"; failureKind: PanelMemberFailureKind; reason: string }[] = [];
+  const judgements: { judgementRef: string; assessment: JudgeAssessment; memberRole: string; actorRef: string; contractHash: string | null }[] = [
+    { ...input.primary, actorRef: input.artifactProducerRef, contractHash: null }
+  ];
+  const notes: PanelNote[] = [];
+  // FX-HR-H6 is "no MAKER grades its own artifact" — the law the database
+  // enforces by maker (migrations 0019/0023/0026) and the evaluator checks by
+  // maker. `memberRole` is the maker here, so the author's maker is
+  // `input.primary.memberRole`; the author's route is `artifactProducerRef`.
+  // A seat is refused on EITHER: the author's maker on another route (a second
+  // endpoint a deployment configured, or a picker's runner-up of that maker)
+  // is still the author's maker, and the author's route is the author.
+  const isTheAuthor = (actorRef: string, memberRole: string): boolean =>
+    actorRef === input.artifactProducerRef || memberRole === input.primary.memberRole;
   for (const member of input.members) {
-    if (member.actorRef === input.artifactProducerRef) {
+    if (isTheAuthor(member.actorRef, member.memberRole)) {
       notes.push({ memberRole: member.memberRole, contractHash: member.contractHash, kind: "PRODUCER_GRADING_FORBIDDEN", failureKind: "PRODUCER_GRADING_FORBIDDEN", reason: "FX-HR-H6" });
       continue;
     }
     try {
       const judged = await member.judge();
-      judgements.push({ ...judged, memberRole: member.memberRole, contractHash: member.contractHash });
+      const actorRef = judged.actorRef ?? member.actorRef;
+      const memberRole = judged.memberRole ?? member.memberRole;
+      // FX-HR-H6 holds for WHOEVER answered: a backup on the author's route or
+      // of the author's maker is refused as the author's own seat is. It is not
+      // the expected skip above — a call was made and a voice was lost — so it
+      // has its own kind, naming the seat AND the maker that answered.
+      if (isTheAuthor(actorRef, memberRole)) {
+        notes.push({
+          memberRole: member.memberRole,
+          answeringMemberRole: memberRole,
+          contractHash: member.contractHash,
+          kind: "PRODUCER_GRADING_REFUSED_AFTER_CALL",
+          failureKind: "PRODUCER_GRADING_FORBIDDEN",
+          reason: "FX-HR-H6"
+        });
+        continue;
+      }
+      judgements.push({
+        judgementRef: judged.judgementRef,
+        assessment: judged.assessment,
+        memberRole,
+        actorRef,
+        contractHash: member.contractHash
+      });
     } catch (error) {
       // V-28: a RUN-LEVEL spend stop is not this member's failure, it is the
       // run's, and noting it would carry the panel on to the next member — one
@@ -461,8 +526,18 @@ export const PANEL_MEMBER_FAILURE_KINDS = [
 export type PanelMemberFailureKind = typeof PANEL_MEMBER_FAILURE_KINDS[number];
 
 export class PanelMemberFailure extends Error {
-  constructor(readonly failureKind: Exclude<PanelMemberFailureKind, "PRODUCER_GRADING_FORBIDDEN" | "SPEND_REFUSED">, message: string) {
-    super(message);
+  /**
+   * Model scorecard A16: the provider failure this wraps travels as `cause`,
+   * so a seat can tell a dead transport or a usage cap (R4: switch to the
+   * runner-up) from a refused answer (never switch). The reason text the panel
+   * records is unchanged: it is still read from `failureKind` alone.
+   */
+  constructor(
+    readonly failureKind: Exclude<PanelMemberFailureKind, "PRODUCER_GRADING_FORBIDDEN" | "SPEND_REFUSED">,
+    message: string,
+    options?: { readonly cause?: unknown }
+  ) {
+    super(message, options);
     this.name = "PanelMemberFailure";
   }
 }

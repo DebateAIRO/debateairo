@@ -25,7 +25,13 @@ const ownedFiles = [
   "app/privacy/us-health-data/page.tsx",
   "app/cookies/page.tsx",
   "app/providers/page.tsx",
-  "app/legal/page.tsx"
+  "app/legal/page.tsx",
+  // Paid plans (P21, R3-4): the Privacy Policy's previous versions and one page per archived text.
+  "components/legal/LegalArchiveBodies.tsx",
+  "lib/legal/archive.ts",
+  "app/privacy/versions/page.tsx",
+  "app/terms/versions/[sha256]/page.tsx",
+  "app/privacy/versions/[sha256]/page.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const english = JSON.parse(source(`messages/en/${namespace}.json`));
@@ -81,7 +87,8 @@ test("all 35 locales carry the exact legal contract and a translated sample", ()
 
 test("every locale translates the footer and navigation labels", () => {
   const added = Object.keys(chromeEnglish).filter((key) => key.startsWith("chrome.legal") || key.startsWith("chrome.footer."));
-  assert.equal(added.length, 13);
+  // 13 -> 20: the paid-plans footer (P21, R3-4): pricing, cancel, withdraw, the card marks' group and names, DB-IP.
+  assert.equal(added.length, 20);
   for (const locale of locales.filter((code) => code !== "en")) {
     const chrome = JSON.parse(source(`messages/${locale}/chrome.json`));
     for (const key of added) {

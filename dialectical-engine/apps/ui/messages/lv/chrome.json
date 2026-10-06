@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukareste, Rumānija",
   "chrome.footer.product": "Produkts",
   "chrome.footer.home": "Sākums",
-  "chrome.footer.cookiePreferences": "Sīkdatņu preferences",
+  "chrome.footer.cookiePreferences": "Mūsu glabātās sīkdatnes",
   "chrome.security": "Drošība",
   "chrome.logout": "Izrakstīties",
-  "chrome.accountError": "Tas neizdevās. Pārlādējiet lapu un mēģiniet vēlreiz."
+  "chrome.accountError": "Tas neizdevās. Pārlādējiet lapu un mēģiniet vēlreiz.",
+  "chrome.footer.pricing": "Cenas",
+  "chrome.footer.cancel": "Atcelt plānu",
+  "chrome.footer.withdraw": "Atteikties no plāna",
+  "chrome.footer.paymentMarks": "Kartes, ko pieņemam",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

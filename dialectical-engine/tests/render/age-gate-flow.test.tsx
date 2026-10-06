@@ -10,6 +10,7 @@ import { AgeConfirmationFlow } from "../../apps/ui/components/AgeConfirmationFlo
 import { resolveDobLocale } from "../../apps/ui/lib/dob/dobLocale.js";
 import english from "../../apps/ui/messages/en/auth.json";
 import german from "../../apps/ui/messages/de/auth.json";
+import { pickRegion } from "../support/signupRegion.js";
 
 /* Age gate — the sign-up flow (8a → 8j) and the existing-account interstitial (8k). */
 
@@ -50,8 +51,15 @@ async function fillForm(dateOfBirth: readonly [string, string, string] | null): 
     await setValue("dob-m", dateOfBirth[1]);
     await setValue("dob-y", dateOfBirth[2]);
   }
-  field("privacy-accepted").checked = true;
-  field("terms-accepted").checked = true;
+  await pickRegion("RO");
+  for (const name of ["privacy-accepted", "terms-accepted"]) {
+    await act(async () => field(name).click());
+    const acknowledgement = [...host.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
+      .find((button) => button.textContent === "I have read it");
+    expect(acknowledgement, `missing ${name} acknowledgement`).toBeDefined();
+    await act(async () => acknowledgement!.click());
+    expect(field(name).checked).toBe(true);
+  }
 }
 
 async function submit(): Promise<void> {

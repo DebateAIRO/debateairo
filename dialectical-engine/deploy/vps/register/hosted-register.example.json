@@ -40,6 +40,7 @@
     "finish_up_to_basis_points": 11500,
     "waiting_line_per_person": 1
   },
+  "askRoomReads": { "key": "owner", "limit": 60, "window_ms": 60000, "capacity": 65536 },
   "billingPlans": {
     "kind": "BILLING_PLANS",
     "currency": "USD",
@@ -65,6 +66,355 @@
     "invoice_issuer_rules": { "RO": "SMARTBILL", "*": "QUADERNO" },
     "withdrawal_countries": ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
       "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB"]
+  },
+  "taxAuthorities": {
+    "kind": "TAX_AUTHORITIES",
+    "entries": [
+      {
+        "scheme": "RO_D300",
+        "countries": [
+          "RO"
+        ],
+        "tax_statuses": null,
+        "registration": "REGISTERED",
+        "where": "ANAF, in your normal Romanian VAT return (form D300). The accountant uses SmartBill's data.",
+        "when": "By the 25th of the month after each VAT period (monthly or quarterly, as you are registered).",
+        "due": {
+          "rule": "FOLLOWING_MONTH_DAY",
+          "day": 25
+        }
+      },
+      {
+        "scheme": "EU_REVERSE_CHARGE_D390",
+        "countries": [
+          "AT",
+          "BE",
+          "BG",
+          "HR",
+          "CY",
+          "CZ",
+          "DK",
+          "EE",
+          "FI",
+          "FR",
+          "DE",
+          "GR",
+          "HU",
+          "IE",
+          "IT",
+          "LV",
+          "LT",
+          "LU",
+          "MT",
+          "NL",
+          "PL",
+          "PT",
+          "SK",
+          "SI",
+          "ES",
+          "SE"
+        ],
+        "tax_statuses": [
+          "REVERSE_CHARGE"
+        ],
+        "registration": "REGISTERED",
+        "where": "Nothing to pay: the invoice says \"Reverse charge\" and the buying company accounts for the VAT. Declare these sales to ANAF in the recapitulative statement (form D390); the accountant uses Quaderno's list.",
+        "when": "By the 25th of the month after the month of the sale.",
+        "due": {
+          "rule": "FOLLOWING_MONTH_DAY",
+          "day": 25
+        }
+      },
+      {
+        "scheme": "EU_OSS",
+        "countries": [
+          "AT",
+          "BE",
+          "BG",
+          "HR",
+          "CY",
+          "CZ",
+          "DK",
+          "EE",
+          "FI",
+          "FR",
+          "DE",
+          "GR",
+          "HU",
+          "IE",
+          "IT",
+          "LV",
+          "LT",
+          "LU",
+          "MT",
+          "NL",
+          "PL",
+          "PT",
+          "SK",
+          "SI",
+          "ES",
+          "SE"
+        ],
+        "tax_statuses": null,
+        "registration": "REGISTERED",
+        "where": "ANAF, once for all EU countries, through the EU One-Stop Shop return (form 398), in euro at the ECB rate of the quarter's last day. ANAF passes each country its share. Quaderno's \"EU OSS report\" has the figures.",
+        "when": "Every quarter, by the end of the following month (30 April, 31 July, 31 October, 31 January).",
+        "due": {
+          "rule": "QUARTER_FOLLOWING_MONTH_END"
+        }
+      },
+      {
+        "scheme": "NO_VOEC",
+        "countries": [
+          "NO"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales to Norway pass NOK 50,000 in a year; after that, register with Norway's VOEC scheme (Skatteetaten) and pay there. Quaderno watches the threshold and warns you.",
+        "when": "After registration: the returns and payment dates Norway's VOEC scheme (Skatteetaten) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "IS_VOES",
+        "countries": [
+          "IS"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales to Iceland pass ISK 2,000,000 in a year; after that, register with Iceland's VOES scheme (Skatturinn) and pay there. Quaderno watches the threshold and warns you.",
+        "when": "After registration: the returns and payment dates Iceland's VOES scheme (Skatturinn) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "GB_HMRC",
+        "countries": [
+          "GB"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "HM Revenue & Customs (HMRC), for UK VAT. Tax is due there from the first sale, so payment stays switched off for the UK until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates HM Revenue & Customs (HMRC), for UK VAT gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "US_STATE",
+        "countries": [
+          "US"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales into a state pass that state's threshold; after that, register with that state's tax department and pay there. Quaderno watches every state's threshold and warns you.",
+        "when": "After registration: the filing calendar that state gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "CA_GST",
+        "countries": [
+          "CA"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales to Canada pass CAD 30,000 in a year; after that, register with the Canada Revenue Agency (GST/HST) and, for Quebec, Revenu Québec (QST) and pay there. Quaderno watches the threshold and warns you.",
+        "when": "After registration: the returns and payment dates the Canada Revenue Agency (GST/HST) and, for Quebec, Revenu Québec (QST) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "AU_GST",
+        "countries": [
+          "AU"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales to Australia pass AUD 75,000 in a year; after that, register with the Australian Taxation Office (GST) and pay there. Quaderno watches the threshold and warns you.",
+        "when": "After registration: the returns and payment dates the Australian Taxation Office (GST) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "NZ_GST",
+        "countries": [
+          "NZ"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales to New Zealand pass NZD 60,000 in a year; after that, register with Inland Revenue (GST) and pay there. Quaderno watches the threshold and warns you.",
+        "when": "After registration: the returns and payment dates Inland Revenue (GST) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "SG_GST",
+        "countries": [
+          "SG"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales to Singapore pass Singapore's threshold for overseas sellers; after that, register with the Inland Revenue Authority of Singapore (GST) and pay there. Quaderno watches the threshold and warns you.",
+        "when": "After registration: the returns and payment dates the Inland Revenue Authority of Singapore (GST) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "JP_CONSUMPTION_TAX",
+        "countries": [
+          "JP"
+        ],
+        "tax_statuses": null,
+        "registration": "AFTER_THRESHOLD",
+        "where": "Nothing until your sales to Japan pass Japan's threshold for foreign sellers; after that, register with Japan's National Tax Agency (consumption tax) and pay there. Quaderno watches the threshold and warns you.",
+        "when": "After registration: the returns and payment dates Japan's National Tax Agency (consumption tax) gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "KR_VAT",
+        "countries": [
+          "KR"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "South Korea's National Tax Service, for VAT on electronic services. Tax is due there from the first sale, so payment stays switched off for South Korea until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates South Korea's National Tax Service, for VAT on electronic services gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "IN_GST",
+        "countries": [
+          "IN"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "India's GST authorities, for GST on online services. Tax is due there from the first sale, so payment stays switched off for India until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates India's GST authorities, for GST on online services gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "AE_VAT",
+        "countries": [
+          "AE"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "the UAE Federal Tax Authority, for VAT. Tax is due there from the first sale, so payment stays switched off for the United Arab Emirates until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates the UAE Federal Tax Authority, for VAT gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "SA_VAT",
+        "countries": [
+          "SA"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "Saudi Arabia's Zakat, Tax and Customs Authority, for VAT. Tax is due there from the first sale, so payment stays switched off for Saudi Arabia until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates Saudi Arabia's Zakat, Tax and Customs Authority, for VAT gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "MX_IVA",
+        "countries": [
+          "MX"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "Mexico's Tax Administration Service (SAT), for IVA on digital services. Tax is due there from the first sale, so payment stays switched off for Mexico until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates Mexico's Tax Administration Service (SAT), for IVA on digital services gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "AR_IVA",
+        "countries": [
+          "AR"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "Argentina's federal tax authority (ARCA), for IVA on digital services. Tax is due there from the first sale, so payment stays switched off for Argentina until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates Argentina's federal tax authority (ARCA), for IVA on digital services gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "CO_IVA",
+        "countries": [
+          "CO"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "Colombia's tax authority (DIAN), for IVA on digital services. Tax is due there from the first sale, so payment stays switched off for Colombia until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates Colombia's tax authority (DIAN), for IVA on digital services gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "CL_IVA",
+        "countries": [
+          "CL"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "Chile's Internal Revenue Service (SII), for IVA on digital services. Tax is due there from the first sale, so payment stays switched off for Chile until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates Chile's Internal Revenue Service (SII), for IVA on digital services gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "TH_VAT",
+        "countries": [
+          "TH"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "Thailand's Revenue Department, for VAT on e-services. Tax is due there from the first sale, so payment stays switched off for Thailand until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates Thailand's Revenue Department, for VAT on e-services gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      },
+      {
+        "scheme": "PH_VAT",
+        "countries": [
+          "PH"
+        ],
+        "tax_statuses": null,
+        "registration": "FROM_FIRST_SALE",
+        "where": "the Philippines' Bureau of Internal Revenue, for VAT on digital services. Tax is due there from the first sale, so payment stays switched off for the Philippines until you register there and mark it done in the country settings.",
+        "when": "After registration: the returns and payment dates the Philippines' Bureau of Internal Revenue, for VAT on digital services gives you.",
+        "due": {
+          "rule": "NONE"
+        }
+      }
+    ],
+    "fallback": {
+      "where": "No entry for this place yet: ask the accountant before paying anything.",
+      "when": "Ask the accountant."
+    }
   },
   "providerTargets": [
     {

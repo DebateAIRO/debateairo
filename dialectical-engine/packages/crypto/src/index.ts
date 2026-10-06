@@ -2397,7 +2397,9 @@ export const CONTENT_CARRIERS = Object.freeze([
   "core.run_progress_event",
   "memory.alias_row",
   // Verdict story (migration 0074): the story, its reservation and its verdict basis.
-  "serve.answer_story"
+  "serve.answer_story",
+  // Model scorecard (migration 0090): the exact prompt of one model-call attempt.
+  "ledger.call_prompt"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

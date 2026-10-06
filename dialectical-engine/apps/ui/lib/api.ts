@@ -20,6 +20,7 @@ import type {
   WorkerStatus
 } from "./types.js";
 import { readAnswerFloor, type AnswerFloorRead } from "./v3/floorAnswer.js";
+import { isModelStrength } from "./modelStrength.js";
 import {
   adaptiveDepthUnavailable,
   debateDetailFromAnswer,
@@ -407,6 +408,14 @@ const RISK_TIERS = new Set(["casual", "standard", "high-stakes"]);
 const BUDGET_TIERS = new Set(["low", "medium", "high"]);
 const PLAN_TIERS_SET: ReadonlySet<string> = new Set(PLAN_TIERS);
 
+/** A21: optional — absent means the deployment's default strength; anything else must be a known strength. */
+function optionalModelStrength(config: AskConfig): AskRequest["model_strength"] {
+  const value = config.model_strength;
+  if (value === undefined || value === null) return undefined;
+  if (isModelStrength(value)) return value;
+  throw new Error("ASK_FIELD_REQUIRED: model_strength must be ECONOMY, BALANCED or BEST when supplied.");
+}
+
 /**
  * Builds the V3 ask strictly from user-supplied fields (S14 precedent: every
  * contract value is explicit input — no hidden defaults, no invented
@@ -431,6 +440,7 @@ export async function createDebate(
   if (!BUDGET_TIERS.has(budgetTier)) throw new Error("ASK_FIELD_REQUIRED: composition_budget_tier must be low, medium, or high.");
   const asOf = new Date(requiredString(config, "as_of"));
   if (Number.isNaN(asOf.valueOf())) throw new Error("ASK_FIELD_REQUIRED: as_of must be an explicit date and time.");
+  const modelStrength = optionalModelStrength(config);
   const ask: AskRequest = {
     question_line: topic,
     plan_tier: planTier as AskRequest["plan_tier"],
@@ -442,7 +452,8 @@ export async function createDebate(
     decision_scope: requiredString(config, "decision_scope"),
     as_of: asOf.toISOString(),
     steering_presets: optionalLines(config, "steering_presets"),
-    steering_annotations: optionalLines(config, "steering_annotations")
+    steering_annotations: optionalLines(config, "steering_annotations"),
+    ...(modelStrength === undefined ? {} : { model_strength: modelStrength })
   };
   requireToken(token);
   const accepted = await client.submitAsk(ask);

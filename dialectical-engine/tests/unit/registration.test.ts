@@ -28,7 +28,6 @@ import {
   type UserDekStoreFileSystem
 } from "../../packages/crypto/src/index.js";
 import {
-  AUTH_REFUSAL_DISTINCT_SOURCE_CAP,
   AUTH_RETRYABLE_UNAVAILABLE_CODE,
   AuthFlowError,
   InProcessAuthRateLimiter,
@@ -43,6 +42,7 @@ import {
 } from "../../apps/api/src/mail-channel.js";
 import { channelBinding, mfaFactor } from "../../packages/db/src/schema.js";
 import { buildApi, type AskApplication } from "@debateai/api";
+import { currentDocument } from "@debateai/legal-manifest";
 
 type TestAuthRoute = "register" | "verify" | "resend";
 const execFileAsync = promisify(execFile);
@@ -1225,6 +1225,10 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
   });
 
   it("T4 counts distinct refusal sources exactly until the fixed cap and then says it saturated", () => {
+    // The fixed cap is module-private in apps/api/src/registration.ts (the source-purity law refuses
+    // an exported numeric literal); tests/architecture/t1-argon2-worker-contract.test.ts pins its
+    // declaration to this value.
+    const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
     const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
     const limiter = new InProcessAuthRateLimiter(
       base.rateLimits,
@@ -1437,7 +1441,7 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
     payload: {
       ...canonicalSignup,
       email: "alice@example.test", password: "correct horse battery staple",
-      phone: "+40722123456", date_of_birth: "1990-01-01"
+      phone: "+40722123456", country: "RO", date_of_birth: "1990-01-01"
     }
   }),
   Object.freeze({
@@ -1692,6 +1696,7 @@ interface Rework7Harness {
   readonly service: RegistrationService;
   readonly policy: Rework7Policy;
   readonly counters: Rework7Counters;
+  readonly createdInputs: unknown[];
   readonly sleeps: number[];
   readonly errorLog: string[];
   readonly admittedDuringSleep: number[];
@@ -1746,6 +1751,7 @@ function rework7Harness(options: {
   readonly clampFails?: boolean;
   readonly password?: string;
   readonly deferHash?: boolean;
+  readonly legalAcceptance?: boolean;
 } = {}): Rework7Harness {
   const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
   const policy = Object.freeze({
@@ -1760,6 +1766,7 @@ function rework7Harness(options: {
     mailReservation: 0, mailRelease: 0, tokenMint: 0, send: 0, mutation: 0, deliveryAudit: 0,
     registrationFailureAudit: 0
   };
+  const createdInputs: unknown[] = [];
   const sleeps: number[] = [];
   const errorLog: string[] = [];
   const admittedDuringSleep: number[] = [];
@@ -1786,9 +1793,10 @@ function rework7Harness(options: {
       return null;
     },
     createPendingAccount: async (
-      _input: unknown,
+      input: unknown,
       storeDek: () => Promise<void>
     ): Promise<unknown> => {
+      createdInputs.push(input);
       counters.repository += 1;
       counters.mutation += 1;
       admittedAtCommit.push(occupancy().admitted);
@@ -1803,7 +1811,7 @@ function rework7Harness(options: {
             status: "created",
             userId: "22222222-2222-4222-8222-222222222222",
             channelBindingId: "33333333-3333-4333-8333-333333333333",
-            verificationExpiresAt: (_input as { verificationExpiresAt: Date }).verificationExpiresAt,
+            verificationExpiresAt: (input as { verificationExpiresAt: Date }).verificationExpiresAt,
             reservationId: "44444444-4444-4444-8444-444444444444"
           });
     },
@@ -1898,7 +1906,8 @@ function rework7Harness(options: {
     verificationTokenFactory: () => {
       counters.tokenMint += 1;
       return "r7".padEnd(43, "T");
-    }
+    },
+    ...(options.legalAcceptance === true ? { legalAcceptance: { recordsKey: Buffer.alloc(32, 0x7d) } } : {})
   });
 
   interface Rework7Inspected {
@@ -1957,6 +1966,7 @@ function rework7Harness(options: {
     service,
     policy,
     counters,
+    createdInputs,
     sleeps,
     errorLog,
     admittedDuringSleep,
@@ -2011,6 +2021,32 @@ function rework7Harness(options: {
     }
   };
 }
+
+describe("region at the registration service", () => {
+  const input = { phone: "+40722123456", email: "region@example.test", recoveryEmail: "region-recovery@example.test", password: REWORK7_PASSWORD, adultAffirmed: true };
+  it("D1 maps the declared region to the repository without changing the edge country", async () => {
+    const harness = rework7Harness();
+    try {
+      await harness.service.register(input, { ip: "81.196.1.2", userAgent: "test/1", requestId: "region-d1", countryCode: "DE", region: { country: "RO", usState: null } });
+      expect(harness.createdInputs[0]).toMatchObject({ ageCheck: { countryCode: "DE" }, declaredRegion: { country: "RO", usState: null } });
+      await harness.service.register({ ...input, email: "region-2@example.test" }, { ip: "81.196.1.2", userAgent: "test/1", requestId: "region-d1-second" });
+      expect(harness.createdInputs[1]).not.toHaveProperty("declaredRegion");
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("D2 refuses a malformed source region before admission and repository work", async () => {
+    const harness = rework7Harness({ legalAcceptance: true });
+    const legal = { terms: currentDocument("TERMS", "en")!, privacy: currentDocument("PRIVACY", "en")!, locale: "en" };
+    try {
+      await expect(harness.service.register(input, { ip: "81.196.1.2", userAgent: "test/1", requestId: "region-d2", legal, region: { country: "RO", usState: "CA" } })).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
+      expect(harness.counters.repository).toBe(0);
+      expect(harness.createdInputs).toEqual([]);
+      await harness.service.register(input, { ip: "81.196.1.2", userAgent: "test/1", requestId: "region-d2-control", legal, region: { country: "RO", usState: null } });
+      expect(harness.createdInputs[0]).toMatchObject({ declaredRegion: { country: "RO", usState: null } });
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+});
 
 async function rework7Settle(): Promise<void> {
   for (let turn = 0; turn < 8; turn += 1) {

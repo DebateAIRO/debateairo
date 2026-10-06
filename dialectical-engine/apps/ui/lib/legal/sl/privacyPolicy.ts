@@ -206,7 +206,23 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Piškotki",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Nastavimo dva piškotka, oba nujno potrebna: eden ohranja vašo prijavo, drugi pa varuje obrazce pred ponarejanjem. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. Pravilnik o piškotkih na [dezbatere.ro/cookies] jih navaja skupaj z obdobjem veljavnosti, pojasnjuje, kako se shrani vaša izbira, in bo spremenjen, preden bo dodan kateri koli drug piškotek. Če pravo vaše regije nekatere piškotke obravnava drugače — na primer pravilo Združenega kraljestva o zavrnitvi analitike — je to navedeno v Pravilniku o piškotkih." }
+      { kind: "p", text: "DebateAI uporablja osem elementov, ki so vsi nujno potrebni za storitev, ki ste jo zahtevali, in jih vse nastavlja izključno DebateAI: štiri piškotke in štiri vnose v shrambi vašega brskalnika. Ne nastavljamo analitičnih, oglaševalskih ali sledilnih piškotkov. Pravilnik o piškotkih na [dezbatere.ro/cookies] jih navaja skupaj s tem, kaj vsak od njih počne in kdo ga prejme, in bo spremenjen, preden bo dodano karkoli drugega." },
+      {
+        kind: "list",
+        items: [
+        "__Host-debateai-session — Piškotek (HttpOnly) — Ohranja vašo prijavo. Obnavlja se, dokler uporabljate storitev. — 14 dni",
+        "__Host-debateai-csrf — Piškotek — Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. — 14 dni",
+        "__Host-debateai-age-refusal — Piškotek (HttpOnly) — Po zavrnjenem preverjanju starosti temu brskalniku 30 dni preprečuje nov poskus. Vsebuje le besedo »zavrnjeno«, nobenih osebnih podatkov. — 30 dni",
+        "debateai.locale — Piškotek — Zapomni si jezik vmesnika, ki ste ga izbrali. — 1 leto",
+        "debateai.consent — Lokalna shramba — Zapomni si, da ste obvestilo o piškotkih že videli, zato se prikaže le enkrat. — Dokler ga ne izbrišete",
+        "debateai.mode — Lokalna shramba — Ali uporabljate svetli ali temni način prikaza. — Dokler ga ne izbrišete",
+        "debateai.languageOffer.dismissed — Shramba seje — Za ta zavihek si zapomni, da ste zavrnili ponudbo, da se razprava prikaže v drugem jeziku. — Dokler ne zaprete zavihka",
+        "debateai.support.conversation.v2 — Shramba seje — Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se v tem zavihku kdor koli prijavi ali odjavi. — Dokler ne zaprete zavihka"
+        ]
+      },
+      { kind: "p", text: "Nobena druga stran prek DebateAI ne zbira informacij o vaših spletnih dejavnostih skozi čas in na različnih spletnih mestih." },
+      { kind: "p", text: "Brskalniki lahko pošiljajo signal »Do Not Track« ali podoben signal. DebateAI vam ne sledi, zato takšen signal nima česa izklopiti: storitev deluje enako z njim ali brez njega." },
+      { kind: "p", text: "Če želite te elemente zavrniti, v nastavitvah brskalnika blokirajte ali izbrišite piškotke in podatke spletnega mesta za to spletno mesto. Kaj takrat preneha delovati: prijava ter pomnjenje vaše izbire jezika in načina prikaza; obvestilo o piškotkih se bo prav tako znova prikazalo." }
     ]
   },
   {
@@ -272,7 +288,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Švica (samo če je navedena)",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Velja švicarski zvezni zakon o varstvu podatkov (FADP). Nadzorni organ je Zvezni pooblaščenec za varstvo podatkov in informacij (FDPIC), edoeb.admin.ch. Vaši podatki gredo v države, navedene v Registru — države EU in Združene države. Za Združene države se opiramo na okvir Švica-ZDA za zasebnost podatkov, kadar je ponudnik certificiran, sicer pa na standardne pogodbene klavzule, ki jih priznava FDPIC. Kršitev varstva podatkov, ki bo za vas verjetno pomenila veliko tveganje, čim prej prijavimo FDPIC. [We have assessed that we do not need a representative in Switzerland. / Our representative in Switzerland is …]" }
+      { kind: "p", text: "Velja švicarski zvezni zakon o varstvu podatkov (FADP). Nadzorni organ je Zvezni pooblaščenec za varstvo podatkov in informacij (FDPIC), edoeb.admin.ch. Vaši podatki gredo v države, navedene v Registru — države EU in Združene države. Za Združene države se opiramo na okvir Švica-ZDA za zasebnost podatkov, kadar je ponudnik certificiran, sicer pa na standardne pogodbene klavzule, ki jih priznava FDPIC. Kršitev varstva podatkov, ki bo za vas verjetno pomenila veliko tveganje, čim prej prijavimo FDPIC. Ocenili smo, da predstavnika v Švici ne potrebujemo (Art. 14 FADP). To oceno vsako leto ponovno preverimo." }
     ]
   },
   {
@@ -280,7 +296,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Moldavija (samo če je navedena)",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Velja moldavski zakon št. 195/2024 o varstvu osebnih podatkov. Sledi GDPR, osrednji del tega pravilnika pa opisuje vaše pravice po njem. Nadzorni organ je Nacionalni center za varstvo osebnih podatkov (CNPDCP). [We have assessed that we do not need a representative in Moldova. / Our representative in Moldova is …] Prenosi vaših podatkov v Združene države temeljijo na [the mechanism named in the Register]. Kršitev varstva osebnih podatkov prijavimo CNPDCP v 72 urah, kadar to zahteva zakon." }
+      { kind: "p", text: "Velja moldavski zakon št. 195/2024 o varstvu osebnih podatkov. Sledi GDPR, osrednji del tega pravilnika pa opisuje vaše pravice po njem. Nadzorni organ je Nacionalni center za varstvo osebnih podatkov (CNPDCP). Predstavnika v Moldaviji ne potrebujemo, ker smo ustanovljeni v Evropskem gospodarskem prostoru (Art. 27(2)(c) zakona št. 195/2024). To oceno vsako leto ponovno preverimo. Prenosi vaših podatkov v Združene države temeljijo na mehanizmu, ki je v Registru naveden za vsakega ponudnika. Kršitev varstva osebnih podatkov prijavimo CNPDCP v 72 urah, kadar to zahteva zakon." }
     ]
   },
   {
@@ -296,7 +312,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Izrael (samo če je naveden)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Velja izraelski zakon o varstvu zasebnosti. Zakonsko nam niste dolžni dati svojih podatkov; brez podatkov računa vam ne moremo odpreti računa. Vaše podatke uporabljamo za namene iz razdelka 4 in jih posredujemo prejemnikom iz razdelka 5. Zahtevate lahko vpogled vanje in njihov popravek (razdelek 10). Nadzorni organ je Urad za varstvo zasebnosti." }
+      { kind: "p", text: "Velja izraelski zakon o varstvu zasebnosti. Upravljavec je DebateAIRO S.R.L.; kako stopite v stik z nami, je opisano v razdelku 1. Zakonsko nam niste dolžni dati svojih podatkov; brez podatkov računa vam ne moremo odpreti računa. Vaše podatke uporabljamo za namene iz razdelka 4 in jih posredujemo prejemnikom iz razdelka 5. Zahtevate lahko vpogled vanje in njihov popravek (razdelek 10). Nadzorni organ je Urad za varstvo zasebnosti." }
     ]
   },
   {
@@ -304,7 +320,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Azijsko-pacifiška regija (samo vrstice za navedene regije)",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je [name, email]; prenosi temeljijo na pogodbenih obveznostih, ki zagotavljajo zaščito, primerljivo s PDPA; o kršitvah, za katere velja obveznost obvestila, obvestimo PDPC v 3 dneh. Japonska: vaše osebne podatke uporabljamo za namene iz razdelka 4 in za nobene druge. Posredujemo jih ponudnikom umetne inteligence in gostovanja iz Registra, ki se nahajajo v Združenih državah in državah EU, na podlagi pogodb, ki od njih zahtevajo, da jih varujejo v skladu s standardom japonskega zakona o varstvu osebnih podatkov; na zahtevo vam povemo, kaj storijo za njihovo varstvo, in vas obvestimo o sistemu varstva zasebnosti v njihovi državi. Vaša prepričanja, vključno z verskimi in političnimi, ter vaše zdravje so osebni podatki, ki zahtevajo posebno skrbnost; zbiramo jih samo z vašo predhodno privolitvijo (razdelek 3). Naše ime in naslov sta DebateAIRO S.R.L., [address], Romunija, naš predstavnik pa je [name], direktor; kako vložiti zahtevo, je opisano v razdelku 10, naši varnostni ukrepi v razdelku 9, pritožbe pa pošljite na privacy@dezbatere.ro. Kršitve prijavimo Komisiji za varstvo osebnih podatkov, kot zahteva zakon. Južna Koreja: naša oseba, odgovorna za zasebnost, je [name], direktor, privacy@dezbatere.ro. Osebne podatke prenašamo v tujino, ker to zahteva izvajanje vaših razprav po naši pogodbi z vami: ob vsakem zagonu razprave vaše vprašanje in trditve razprave, v klepetu s podporo pa vaša sporočila, prek šifrirane povezave pošljemo ponudnikom umetne inteligence in gostovanja iz Registra, ki za vsakega prejemnika navaja njegovo državo, kontakt, namen in čas hrambe podatkov. Prenos lahko zavrnete tako, da ne začenjate razprav ali izbrišete svoj račun; takrat za vas ne moremo izvajati razprav. Politična mnenja, prepričanja in zdravje so občutljivi podatki; obdelujemo jih samo z vašo ločeno privolitvijo (razdelek 3). O vas ne sprejemamo popolnoma avtomatiziranih odločitev (razdelek 8). Na zahteve odgovorimo v [10] dneh, kršitve pa prijavimo Komisiji za varstvo osebnih podatkov in vam, kot zahteva zakon o varstvu osebnih podatkov. Tajvan: velja tajvanski zakon o varstvu osebnih podatkov. Vaše podatke hranimo v obdobjih iz razdelka 7; uporabljajo se v Romuniji, drugih državah EU in Združenih državah (glejte Register); prejemniki so navedeni v razdelku 5; naši sistemi in modeli umetne inteligence jih samodejno obdelujejo za izvajanje vaših razprav. Zahtevate lahko, da izveste, katere podatke hranimo, vpogled vanje, kopijo, popravek, prenehanje njihove uporabe in izbris (razdelek 10). Posredovanje podatkov računa je vaša izbira, vendar vam brez njih ne moremo odpreti računa. Na zahteve za dostop odgovorimo v [15] dneh. Filipini: naša pooblaščena oseba za varstvo podatkov je [name]; pritožbe se lahko vložijo pri nacionalni komisiji za zasebnost; razdelek 8 opisuje avtomatizirano obdelavo. Tajska: naš predstavnik je [name] [if appointed]." }
+      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je [name, email]; prenosi temeljijo na pogodbenih obveznostih, ki zagotavljajo zaščito, primerljivo s PDPA; o kršitvah, za katere velja obveznost obvestila, obvestimo PDPC v 3 dneh. Japonska: vaše osebne podatke uporabljamo za namene iz razdelka 4 in za nobene druge. Posredujemo jih ponudnikom umetne inteligence in gostovanja iz Registra, ki se nahajajo v Združenih državah in državah EU, na podlagi pogodb, ki od njih zahtevajo, da jih varujejo v skladu s standardom japonskega zakona o varstvu osebnih podatkov; na zahtevo vam povemo, kaj storijo za njihovo varstvo, in vas obvestimo o sistemu varstva zasebnosti v njihovi državi. Vaša prepričanja, vključno z verskimi in političnimi, ter vaše zdravje so osebni podatki, ki zahtevajo posebno skrbnost; zbiramo jih samo z vašo predhodno privolitvijo (razdelek 3). Naše ime in naslov sta DebateAIRO S.R.L., [address], Romunija, naš predstavnik pa je [name], direktor; kako vložiti zahtevo, je opisano v razdelku 10, naši varnostni ukrepi v razdelku 9, pritožbe pa pošljite na privacy@dezbatere.ro. Kršitve prijavimo Komisiji za varstvo osebnih podatkov, kot zahteva zakon. Južna Koreja: naša oseba, odgovorna za zasebnost, je [name], direktor, privacy@dezbatere.ro. Osebne podatke prenašamo v tujino, ker to zahteva izvajanje vaših razprav po naši pogodbi z vami: ob vsakem zagonu razprave vaše vprašanje in trditve razprave, v klepetu s podporo pa vaša sporočila, prek šifrirane povezave pošljemo ponudnikom umetne inteligence in gostovanja iz Registra, ki za vsakega prejemnika navaja njegovo državo, kontakt, namen in čas hrambe podatkov. Prenos lahko zavrnete tako, da ne začenjate razprav ali izbrišete svoj račun; takrat za vas ne moremo izvajati razprav. Politična mnenja, prepričanja in zdravje so občutljivi podatki; obdelujemo jih samo z vašo ločeno privolitvijo (razdelek 3). O vas ne sprejemamo popolnoma avtomatiziranih odločitev (razdelek 8). Na zahteve odgovorimo v [10] dneh, kršitve pa prijavimo Komisiji za varstvo osebnih podatkov in vam, kot zahteva zakon o varstvu osebnih podatkov. Tajvan: velja tajvanski zakon o varstvu osebnih podatkov. Vaše podatke hranimo v obdobjih iz razdelka 7; uporabljajo se v Romuniji, drugih državah EU in Združenih državah (glejte Register); prejemniki so navedeni v razdelku 5; naši sistemi in modeli umetne inteligence jih samodejno obdelujejo za izvajanje vaših razprav. Zahtevate lahko, da izveste, katere podatke hranimo, vpogled vanje, kopijo, popravek, prenehanje njihove uporabe in izbris (razdelek 10). Posredovanje podatkov računa je vaša izbira, vendar vam brez njih ne moremo odpreti računa. Na zahtevo za vpogled v vaše podatke ali njihovo kopijo odgovorimo v 15 dneh; če potrebujemo več časa, lahko ta rok enkrat podaljšamo za največ 15 dni in vam razlog pisno sporočimo. Filipini: naša pooblaščena oseba za varstvo podatkov je [name]; pritožbe se lahko vložijo pri nacionalni komisiji za zasebnost; razdelek 8 opisuje avtomatizirano obdelavo. Tajska: naš predstavnik je [name] [if appointed]." }
     ]
   },
   {
@@ -320,7 +336,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "3d53aa04ab517e5cdd7000e4345f282ddfa3c548170f3506337b639427ec87f4",
+  sha256: "31aadb0536fcb73cc9e9aadba1dad0428c52575090a0fc55dcd6e970d73b0464",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.0 · VELJA OD [DATE]",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

@@ -1,0 +1,1205 @@
+{
+  "version": "auth-dev-20261006-v1",
+  "sources": [
+    {
+      "name": "0000_s00.sql",
+      "sha256": "d79a8ef0d56de16df775181403e53f5dcb400f93367ff826495a193567a1d7b8",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0001_s01.sql",
+      "sha256": "4b8afa89cddddbb5d994edb3b7c5158389f41da707702964d1e824ec3dc8600e",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0002_s02.sql",
+      "sha256": "e6166c2a35b18493b34fa770a8893d2d34469a17a3dab0b07ac9dfe937d810ca",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0003_s03.sql",
+      "sha256": "4541343a70eb2373d507864ee8a06484b0e3f182f81d674b4cdbd956a0d9df49",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0004_s04.sql",
+      "sha256": "95cea2c9407d3edb35f9e82836e0275ae47e8630f81e9554a6aab3d6f26455dc",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0005_s04_rework.sql",
+      "sha256": "9ebc3da6759659b8140fb3640e48c120927e168cc56c4c8fe3b53de4bed7255a",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0006_s05.sql",
+      "sha256": "e4e98b1cfb7f219e78fa48df8f0e90a8ad67bea1bc121e189a9f97fdf5a9356f",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0007_s05_rework.sql",
+      "sha256": "b39087d595c754d6a06ee7847b69c93d354f79c3b79b851b12b1afcb03b669f9",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0008_s06.sql",
+      "sha256": "f705b0b2c1b04ec1002f552aa37f281a9aa6ca6805375a09c7ba1c7ab542c795",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0009_s06_rework.sql",
+      "sha256": "090d04610dc5ad9d00770765930b5766efd7fdfd7bc557cb3f62d3d52252ad86",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0010_s07.sql",
+      "sha256": "cff69d2894154f6d3d90c20adfc1f804ef0d9d2cef525a8e4d9dbad852fd3c1a",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0011_s08.sql",
+      "sha256": "bd2dc729822b0ef7fb2c07f5c2fe079db75ab9494270ff41369d9df2267cd5f9",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0012_s09.sql",
+      "sha256": "977bd8a904a044a3aa3eab1edb0b21bd8a6d376e778ed86646d55578efc0cbbd",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0013_s10.sql",
+      "sha256": "5edcc1243e72bac6ac601ed2bc5d9e70d4a5158e01349861b72b4f70e502259b",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0014_s11.sql",
+      "sha256": "42b217a1abc38fb3a128944914e27becadba53850196ae9544460947e86c165d",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0015_s12.sql",
+      "sha256": "7640060fb001fbc3a55f9c52d17440e5929d4d6daa992f8178cf199e1da97656",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0016_s13.sql",
+      "sha256": "d6914b788016c9d6d39de2184c9dda67d2670d4a9e8de8b7e32a0dbe9d94177b",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0017_s14.sql",
+      "sha256": "661bf1dd6a12f4b3616403a2a8bad527d8ef3248fcc6755d9ff1d421af725945",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0018_panel01_rework.sql",
+      "sha256": "7fd3b5f1890ce59796d30ed1d21eb06bb6e64375e61c12da43479f2ad626dfd7",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0019_xrev01_node_review.sql",
+      "sha256": "1c325db096446b8948b884cf38c6f828683d151928fc6928223bdb873631b11a",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0020_prov01_machine_default.sql",
+      "sha256": "bda013a1010807c6dce0ee33bcbe2458f9bf1ceae95fbebc03b18cdaf75dc116",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0021_dr174_cooldown_prune.sql",
+      "sha256": "62c1b4cd649ec7f07722251ed02cb322fb25e633510403c584b7e28b5ae98fab",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0022_dr181_discovery.sql",
+      "sha256": "b04c3a5e37720e2a63a411187594c1a9311ee903a73d056ed45602e22633d3c0",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0023_evaluator_foundation.sql",
+      "sha256": "0ab03086a6396f1320ff993646dade9f2daa394efd5b639392151e964367af67",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0024_evaluator_domain_seed.sql",
+      "sha256": "4aa3951cd90ab3c8b843a050607da0c396129ccb01674034748f009a5890d6fb",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0025_dr184_derived_standing.sql",
+      "sha256": "50fdbeff3e7324900ce8df890b36918cd997d904855afcaa276cee4630e64c35",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0025_evaluator_domain_refusal_receipts.sql",
+      "sha256": "0b3c0c5a8737768a0654ae78674e1c2e9e37c0c498f99671ae80d70629e4ab33",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0026_evaluator_judge_addon.sql",
+      "sha256": "8e42bb07520f5f46d738384ddca4893678e55fd21c030d6c50e608c23bbc9efb",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0027_evaluator_rank_metric.sql",
+      "sha256": "1b0582660e7384e9b8dc1c4acd3f9aa3d2f6d63aed985267655e8c5326239679",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0028_evaluator_consumer_refresh.sql",
+      "sha256": "621edc059eec0ebe873162495bd879d3892ef983bd7465288a79541c6cbe8058",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0029_evaluator_dev_menu_grants.sql",
+      "sha256": "211591ac8e05bf55b3e217a97bd0d35360f67029e638a723076506d381eee204",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0030_identity_foundation.sql",
+      "sha256": "04a380ae5df3dc316103f578127058b4c8950c514d5981d2560db34b9c59856b",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0031_registration_verification.sql",
+      "sha256": "f7883bdef15e9e2b56238e484de3b865ec638a24b870c02740a9d431c76bcf24",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0032_registration_audit_erasure_checks.sql",
+      "sha256": "bdf5c856a40859fa4023820e4387337f75258942ab8a2488b9e1ac48d5034497",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0033_verification_token_credentials.sql",
+      "sha256": "34fadf7cd618c165d82d71536001628f7dff9165648c10c03f51beb6c4d94e2f",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0034_obs_foundation.sql",
+      "sha256": "ffea9b5f8daa4428d7f93603de6823570323ff2463ad9cee8a3912207f592be8",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0035_mfa_enrollment.sql",
+      "sha256": "48bdc39ee18d16cd3fc98e2b8f7d3d268ac0693890cf21377640190500971a92",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0036_sessions.sql",
+      "sha256": "900d6af3be7a47d784b51d79e318b452089e71bfc06c5d314de5487e06f085b4",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0037_run_ownership.sql",
+      "sha256": "8ebd8735270adf0b758cc37c0bf39f5f94e3a265e57e7f8e68656a46c8c49f5c",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0038_content_encryption.sql",
+      "sha256": "eccf0d1007442975639dc029a52406b5229850d5badf1f25b928a5be404e7f42",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0039_publication_visibility.sql",
+      "sha256": "d202a2522309aee37afc514710191eb714a6d3873261506b54194a979a1e73f2",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0040_account_erasure.sql",
+      "sha256": "17b45ec9a15c3617fcfcd6ff5d41fa871c71250ed1b98dc2b31fc14a9a37cead",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0041_dev_token_retirement.sql",
+      "sha256": "5a2e4bd3db85c785c5dc7013e2886ffdb9399da3e0047680d113a91c6e88e45e",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0042_refusal_audit_forensics.sql",
+      "sha256": "12b4cd524be7a302b34e615f0e097066f66517cbe7acc41b36f1dcf9c96f2633",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0043_legacy_audit_erasure_residual.sql",
+      "sha256": "1999596c9832e67867556e89f4a25ce85219c40c3b9d6e627900b83f1d475dca",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0044_account_recovery_persistence.sql",
+      "sha256": "2519e7875d6a538ff6892be6b1314d3356ade11a76603076f8d69c0ad108b5b5",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0045_account_recovery_start.sql",
+      "sha256": "4a70b662cc0bdd6a99b92d934f497787b134262399541f9a78a23231398ab564",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0046_authentication_risk_signals.sql",
+      "sha256": "e4b4b953967a2e3eeacf469cded6956509dc3ecb00d3e806bebcc719b0b0c3dc",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0047_passkey_credential_storage.sql",
+      "sha256": "8cadeffc3a1a161ba1a4606bb368ea8952b726b1ae8381a864fb9da3d49b1210",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0048_provider_probe_capability.sql",
+      "sha256": "5ad5e60888c4c2e005d5355ffa73554fa89d9250ed605a508a3f9a031c4f0ab3",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0049_terminal_recorded_facts.sql",
+      "sha256": "4ab9757996ddbccb742c422fd42271333125576fa1b8564a3edc8977674f0251",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0050_support_foundation.sql",
+      "sha256": "fff406537325bd52eea77d1028d7b4f6b2ee99740548c11c8eab9641a604d271",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0050_t16_algorithm_register_rows.sql",
+      "sha256": "fc25eb674c63c1ab47790968cdee6499e913dc774e68a562cf28c23ac2fc2b32",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0051_support_cases.sql",
+      "sha256": "7e2c0f5dd6af1fbd2c13caa1794b01b89a0649bb43ce73205757031ddc8cccde",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0051_t8_remove_strict_and.sql",
+      "sha256": "a2e1f4b2046d4f067c13c6cfb648601567c5af6729ad612a419843ba26570aaf",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0052_support_tool_calls.sql",
+      "sha256": "fee54935eb56f1694c8eb6c1c4210f99b2c17d77dc7fed951bd647123d8245fe",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0052_t5_reviewer_measured_edges.sql",
+      "sha256": "8bac8db7f2091ae3689857afa060510a3ee44be427ec0d14e0ef78b65d03e8f3",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0053_support_public_incident.sql",
+      "sha256": "4a1f84b400f2802b149e32a0a471c04f880cce0dddd8d40cf98899b604deee33",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0053_t06_review_outcome_disclosure.sql",
+      "sha256": "d24a6c6c96cdf9b384137e17e2f7e655432616a5e63682b8984dcc6e8050135a",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0054_support_keys_audit.sql",
+      "sha256": "11f0808ca522285448493fc59352977fe79630f29bf75f13d0c940baeadaf095",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0054_tint1_reject_edge_mutation_public_revoke.sql",
+      "sha256": "a8d0efc52c0262e890151244f56f50ceb04de4e7fb3c7be882b3f9ca10d53fb4",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0055_register_support_publication.sql",
+      "sha256": "c75235f4b33009fdea08290661fc8538e64dedf2dc699524cb0234f6817370d0",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0055_t10_served_root_selection.sql",
+      "sha256": "32dcf447fae69e67bc60b4b4b75d501f4c092d3c4a39f38096f51c7be12c8da3",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0056_security_truncate_definer_searchpath.sql",
+      "sha256": "790bdb2bc4529a5c42a8c0d26eacde250202f90dd898013d133cc1d8886ef804",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0057_observation_foundation.sql",
+      "sha256": "2f67d8d5d2e7b45b86cacc3b9ca39d1934d268db9f1b2e3b09251147e4177c43",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0057_t09_synthesis_round.sql",
+      "sha256": "105a818738c87c4d81d5fb5b7e28bcadcd224a04b663aa2b7f502fe852bd267e",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0058_observation_safe_views.sql",
+      "sha256": "8430472442b9392c85f8817f28b6ffd16494ed671686ca54d92174f99e0a9d03",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0059_observation_pg_monitor.sql",
+      "sha256": "6f41646f40741470a60902d7d1382620a1739e71c0e68576a5a41dee4e548d65",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0060_observation_throughput_views.sql",
+      "sha256": "e6bff0acc9fb014d52d5adda75af64367a0b48996042d61a1025a84b5e67928d",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0061_algorithm_publication_profiles.sql",
+      "sha256": "2016a42fdeef103c3b8ee232eb6d4e48bd555b63842f778ec9f6d933900c4fc2",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0062_obs_view_owner_column_floor.sql",
+      "sha256": "02946a63bc89f847d6f5159e6dc7ea8100a5016bffe924ef40bb5385b98f6af4",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0063_serve_answer_content_carrier.sql",
+      "sha256": "06eae3914bdd444cd5cf111a723dce54fa9761d675814acc5b090e961210d5f7",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0064_synthesis_role_cost_rows.sql",
+      "sha256": "1848126f92ba0eafada19442c34b68ac07351c31e6ec1c6597a26d38925ede9c",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0065_security_delta_guards.sql",
+      "sha256": "b575cab22b3ad6c5478fc88c03b36a018a7d79ed71bf66b6a2230dbc22a6ab15",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0066_model_spend_ledger.sql",
+      "sha256": "1321b10d4917e515e1ad5631132b58395f9ac18dd9b612cabeb4ad9ce5d2bd55",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0067_plan_tier_on_run.sql",
+      "sha256": "bf97776a359bdcc8777d18ab076f201f5a7d582782adcaf23df0b7daaa0c3c19",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0068_observation_stats_window.sql",
+      "sha256": "a98502cfd6a03c7ab6c807d647ff760e06c5391a7cabd4571542690106b234ce",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0069_remaining_content_carriers.sql",
+      "sha256": "07d868a938da8ed14aff650225e8785afaa5c45856dd6e0bfb15103b64744c8e",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0071_observation_threshold_operator.sql",
+      "sha256": "6f52785ed60173124c82b1db27ddbacf3a99a707a330958715948fed9557c3ec",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0072_argument_language.sql",
+      "sha256": "896e2692af477464eb61d7b2a4136a84576b6e7c869c9a17fdcf227aa919c15c",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0073_support_interface_locale.sql",
+      "sha256": "1b57dc6bf738ca73da5a71c22457f0db0d9fb06bb4c1836d2f0e4e41c82047b5",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0074_answer_story.sql",
+      "sha256": "dffc237e62548df81a31ae6de85934fb5bec61c9558f284b4280f362488ad0de",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0075_model_spend_phase.sql",
+      "sha256": "e8d33062295a338ce679d4ead7e8f90c81ef948170aac2e73ada1e1efc7dbce3",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0076_serve_disclosure.sql",
+      "sha256": "35cbc48f285920f8e0fe415fd288227d3ecc1b8ed48999735ed73489ce14ae4d",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0077_age_gate.sql",
+      "sha256": "f2ced039cf1a1b9b290ff742be37a3501cd8641b44534cea4cc0cedcecd3d17b",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0078_sensitive_data_consent.sql",
+      "sha256": "7ae5443e0e4770285e466273011dd958431fd1eebea83276285f7a989507b1d7",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0079_email_change.sql",
+      "sha256": "3e2eada7826b77e104382ba7d746bd7b65c506024db2edbb7bc558025a2d35b7",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0080_legal_acceptance.sql",
+      "sha256": "214d37ececcc1c55a98a31cd061ebdf73bbb5bda7b3adb6d9b60f082baf666e9",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0081_publication_check_record.sql",
+      "sha256": "e21400fba50db15bece32810ce5eb0cd70498a6c7e05c9ed64272cc09c1898a5",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0082_publication_check_record_identifiers.sql",
+      "sha256": "eca4d6038d1e144f8c259ddc68e18f428135f582aed89fd7559dabce9ceb70f5",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0083_budget_holds_waiting_line.sql",
+      "sha256": "69123884d7ad2e87b11ee0094f5e34ec99fe6bc8637e6a8b19a937f6f60600f9",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0084_billing_entitlement.sql",
+      "sha256": "ab263dddcee413ec8972494c215df3176a71f13c8b87ce2ca5b4c6b6a23599e4",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8+7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0085_billing_customers_subscriptions.sql",
+      "sha256": "7e8b5b69b85f3fc345ee064fe73eb564c461553c2a929867428bc53485f854ba",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0085_staff_access_foundation.sql",
+      "sha256": "378115d3423fd6a5f118110fd318725d7a375cf0a2302e9a4011d1d9fbb68085",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0086_billing_charges_invoices.sql",
+      "sha256": "559bfd7dfbca4e3f94fe42c1996eb3293f0d34de910d4543c89ced1f43cb9259",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0086_staff_webauthn.sql",
+      "sha256": "48ff09b8caaea36240b089d7ae099713704dc8931cf2902ad8056ef0f756e821",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0087_billing_outbox_cancel.sql",
+      "sha256": "8a41e383e07e60252b833e94d0e98da4e89c594c381bdc32be99165f8fd46daa",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0087_staff_authorization_guards.sql",
+      "sha256": "1590b04f3fc0579919eb13ef0cd60e88679ac23b590a850bc4983bc5528858f0",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0088_billing_withdrawal_step_up.sql",
+      "sha256": "cc38e1ddbe5f8de175990f95bb97bf7c01f4d6a737eb352a2075ad60a761066f",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0088_staff_alert_delivery.sql",
+      "sha256": "2de3103b8861a43c42629ed9865ab87b9ed43163142d8ef50bba465016f58ac9",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0089_billing_erasure_hook.sql",
+      "sha256": "8c40b0664b44f58a9bc6d420c21d8c09e997612b9c0e0865ed75a6c7fd4d12e0",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0089_owner_recovery.sql",
+      "sha256": "926942069ffff4c0f11ce1cd7dfcf1aa13da85db1bfc46ca6b33524d693a802c",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0090_model_scorecard.sql",
+      "sha256": "3c855f76aae98c10fe64620e9d82331629c10383797c6e673737cc682390dfb1",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0090_staff_http_projections.sql",
+      "sha256": "db094b114d5ccd407f68309994a766abccb96d9ac596ca45bd8808b06e4e7ceb",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0091_billing_erasure_commit.sql",
+      "sha256": "f0baaa29642efb3a0f588c3077795771d5a94dd2a4eecf6be5522fbb6514a357",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0091_staff_activation_receipt.sql",
+      "sha256": "3a40e17d1157b01d2959d4040a359dab19901e6b7bc8844ead5a0d8b0a18595b",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0092_billing_query_indexes.sql",
+      "sha256": "1788cb43f4474fffc37b030d78e15ae58aa954188c6589983a7e4e9102bcf9ec",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0092_internal_funded_allowance.sql",
+      "sha256": "3f6655439738d94122c083d8caaf3b5bcae73b0d5ffa73987375a977c33e0a65",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0093_billing_runtime_role.sql",
+      "sha256": "7810a0730579fdc06316a932f8de9c873aa992cf6f849da843ceb7e652dae5fa",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0093_internal_provider_admission.sql",
+      "sha256": "6b941117f89fba41dcefe70dfd730288d3e7d41671776bbc9dffad1ad195ee6a",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0094_legal_runtime_api_only.sql",
+      "sha256": "1b421892490b3c5734160d0d4eda530fdebd626f818921d27c20bbf72c583282",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0094_owner_one_verified_key.sql",
+      "sha256": "a5c69805da6652f043fdb17b7099f3e6dfad0112837669fcae1749075530fbaf",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0095_phone_profile_optional_recovery.sql",
+      "sha256": "c61f4b261ac8daf4460fb883402861c3e5e85f6fda190e6220e24773ea2df9d5",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0095_registration_region.sql",
+      "sha256": "a9225cc940937169e5fe1346dabf937164ecbfeb5453688af03cd8c7f6fa2ba6",
+      "provenance": "7b91df4f101a3880ef57e11231443689dabac0e1"
+    },
+    {
+      "name": "0096_verification_delivery_budget.sql",
+      "sha256": "e1d5cfcfd2bee9b67edea77586b92bc79b469a7afcaeed9f09fb6747f478df6d",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0097_recovery_email_verification.sql",
+      "sha256": "3a8ffcd4ae92c4b4308f043d2a75a351577e53d3dee4c0ae137f24f420258b53",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0098_consumer_passkeys.sql",
+      "sha256": "e61274a1c7180b450ce1bd82cdfacadabe6bd3cd0945d2b7a373f6baab2833d4",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0099_direct_secure_sessions.sql",
+      "sha256": "923c87dacb8c30f64ad8a3d2812c05a86ce87a376e276d0d0bb5004b675036bd",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0100_consumer_security_recovery.sql",
+      "sha256": "41c44a2cedda95907bcfa6c333fa59471a1718ad2c8261d89888cc9539bb9e44",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0101_social_identities.sql",
+      "sha256": "6d84a2c80f3349aa7ea67e83ee0282a39e8d5938e650bc3cfffd584d8406892f",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0102_consumer_auth_method_availability.sql",
+      "sha256": "3ede1d7c9f15f0638bb54c0606468c3fcb8a20886318bcf5ea78ecac88d36789",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0103_password_recovery_t2.sql",
+      "sha256": "d90e9eaef8ffd4e21f86e99f2f9c669e0cb61897f89da4a8f15f1f1c857e082f",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0104_account_flow_recovery_bridge.sql",
+      "sha256": "4650a5ac2cf402faaedfe437b71e9143ecaa1f0a00a2c775160383ff37727bcc",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0104_password_only_reset.sql",
+      "sha256": "3132f6a7cb54c1d89a4a58c0fedf45d426211b79be11659aa5222f1b2521ea89",
+      "provenance": "5c9589aa9b092840af87bb218a78cf30a773be8f"
+    },
+    {
+      "name": "0105_account_authentication_corrections.sql",
+      "sha256": "c76bcd56f8d8ca15f5773bb1a6222f5e73e7dfa2ed2fcdee9d608091167b75a1",
+      "provenance": "cba421c5fb8ede48a19ce0de3ca09b046f47f6b8"
+    },
+    {
+      "name": "0105_backup_email_verification.sql",
+      "sha256": "ddef059bc65ea7654231514b1c307b7c1edf1fd2516284f3d3a828fbc7005eb3",
+      "provenance": "5c9589aa9b092840af87bb218a78cf30a773be8f"
+    },
+    {
+      "name": "0106_known_password_mfa_recovery.sql",
+      "sha256": "9ee1d203f6c091c9e0205daae64c588e191942dad2267dfb8963a57baabfa486",
+      "provenance": "5c9589aa9b092840af87bb218a78cf30a773be8f"
+    },
+    {
+      "name": "0107_auth_dev_integration.sql",
+      "sha256": "96a24beb9887049767dccaac82e52269e373fe37da27632a05b2ebe40903399c",
+      "provenance": "auth-dev-20261006-v1"
+    }
+  ],
+  "order": [
+    "0000_s00.sql",
+    "0001_s01.sql",
+    "0002_s02.sql",
+    "0003_s03.sql",
+    "0004_s04.sql",
+    "0005_s04_rework.sql",
+    "0006_s05.sql",
+    "0007_s05_rework.sql",
+    "0008_s06.sql",
+    "0009_s06_rework.sql",
+    "0010_s07.sql",
+    "0011_s08.sql",
+    "0012_s09.sql",
+    "0013_s10.sql",
+    "0014_s11.sql",
+    "0015_s12.sql",
+    "0016_s13.sql",
+    "0017_s14.sql",
+    "0018_panel01_rework.sql",
+    "0019_xrev01_node_review.sql",
+    "0020_prov01_machine_default.sql",
+    "0021_dr174_cooldown_prune.sql",
+    "0022_dr181_discovery.sql",
+    "0023_evaluator_foundation.sql",
+    "0024_evaluator_domain_seed.sql",
+    "0025_dr184_derived_standing.sql",
+    "0025_evaluator_domain_refusal_receipts.sql",
+    "0026_evaluator_judge_addon.sql",
+    "0027_evaluator_rank_metric.sql",
+    "0028_evaluator_consumer_refresh.sql",
+    "0029_evaluator_dev_menu_grants.sql",
+    "0030_identity_foundation.sql",
+    "0031_registration_verification.sql",
+    "0032_registration_audit_erasure_checks.sql",
+    "0033_verification_token_credentials.sql",
+    "0034_obs_foundation.sql",
+    "0035_mfa_enrollment.sql",
+    "0036_sessions.sql",
+    "0037_run_ownership.sql",
+    "0038_content_encryption.sql",
+    "0039_publication_visibility.sql",
+    "0040_account_erasure.sql",
+    "0041_dev_token_retirement.sql",
+    "0042_refusal_audit_forensics.sql",
+    "0043_legacy_audit_erasure_residual.sql",
+    "0044_account_recovery_persistence.sql",
+    "0045_account_recovery_start.sql",
+    "0046_authentication_risk_signals.sql",
+    "0047_passkey_credential_storage.sql",
+    "0048_provider_probe_capability.sql",
+    "0049_terminal_recorded_facts.sql",
+    "0050_support_foundation.sql",
+    "0050_t16_algorithm_register_rows.sql",
+    "0051_support_cases.sql",
+    "0051_t8_remove_strict_and.sql",
+    "0052_support_tool_calls.sql",
+    "0052_t5_reviewer_measured_edges.sql",
+    "0053_support_public_incident.sql",
+    "0053_t06_review_outcome_disclosure.sql",
+    "0054_support_keys_audit.sql",
+    "0054_tint1_reject_edge_mutation_public_revoke.sql",
+    "0055_register_support_publication.sql",
+    "0055_t10_served_root_selection.sql",
+    "0056_security_truncate_definer_searchpath.sql",
+    "0057_observation_foundation.sql",
+    "0057_t09_synthesis_round.sql",
+    "0058_observation_safe_views.sql",
+    "0059_observation_pg_monitor.sql",
+    "0060_observation_throughput_views.sql",
+    "0061_algorithm_publication_profiles.sql",
+    "0062_obs_view_owner_column_floor.sql",
+    "0063_serve_answer_content_carrier.sql",
+    "0064_synthesis_role_cost_rows.sql",
+    "0065_security_delta_guards.sql",
+    "0066_model_spend_ledger.sql",
+    "0067_plan_tier_on_run.sql",
+    "0068_observation_stats_window.sql",
+    "0069_remaining_content_carriers.sql",
+    "0071_observation_threshold_operator.sql",
+    "0072_argument_language.sql",
+    "0073_support_interface_locale.sql",
+    "0074_answer_story.sql",
+    "0075_model_spend_phase.sql",
+    "0076_serve_disclosure.sql",
+    "0077_age_gate.sql",
+    "0078_sensitive_data_consent.sql",
+    "0079_email_change.sql",
+    "0080_legal_acceptance.sql",
+    "0081_publication_check_record.sql",
+    "0082_publication_check_record_identifiers.sql",
+    "0083_budget_holds_waiting_line.sql",
+    "0084_billing_entitlement.sql",
+    "0085_billing_customers_subscriptions.sql",
+    "0085_staff_access_foundation.sql",
+    "0086_billing_charges_invoices.sql",
+    "0086_staff_webauthn.sql",
+    "0087_billing_outbox_cancel.sql",
+    "0087_staff_authorization_guards.sql",
+    "0088_billing_withdrawal_step_up.sql",
+    "0088_staff_alert_delivery.sql",
+    "0089_billing_erasure_hook.sql",
+    "0089_owner_recovery.sql",
+    "0090_model_scorecard.sql",
+    "0090_staff_http_projections.sql",
+    "0091_billing_erasure_commit.sql",
+    "0091_staff_activation_receipt.sql",
+    "0092_billing_query_indexes.sql",
+    "0093_billing_runtime_role.sql",
+    "0094_legal_runtime_api_only.sql",
+    "0095_registration_region.sql",
+    "0092_internal_funded_allowance.sql",
+    "0093_internal_provider_admission.sql",
+    "0094_owner_one_verified_key.sql",
+    "0095_phone_profile_optional_recovery.sql",
+    "0096_verification_delivery_budget.sql",
+    "0097_recovery_email_verification.sql",
+    "0098_consumer_passkeys.sql",
+    "0099_direct_secure_sessions.sql",
+    "0100_consumer_security_recovery.sql",
+    "0101_social_identities.sql",
+    "0102_consumer_auth_method_availability.sql",
+    "0103_password_recovery_t2.sql",
+    "0104_password_only_reset.sql",
+    "0105_backup_email_verification.sql",
+    "0106_known_password_mfa_recovery.sql",
+    "0104_account_flow_recovery_bridge.sql",
+    "0105_account_authentication_corrections.sql",
+    "0107_auth_dev_integration.sql"
+  ],
+  "cohorts": {
+    "auth94": [
+      "0000_s00.sql",
+      "0001_s01.sql",
+      "0002_s02.sql",
+      "0003_s03.sql",
+      "0004_s04.sql",
+      "0005_s04_rework.sql",
+      "0006_s05.sql",
+      "0007_s05_rework.sql",
+      "0008_s06.sql",
+      "0009_s06_rework.sql",
+      "0010_s07.sql",
+      "0011_s08.sql",
+      "0012_s09.sql",
+      "0013_s10.sql",
+      "0014_s11.sql",
+      "0015_s12.sql",
+      "0016_s13.sql",
+      "0017_s14.sql",
+      "0018_panel01_rework.sql",
+      "0019_xrev01_node_review.sql",
+      "0020_prov01_machine_default.sql",
+      "0021_dr174_cooldown_prune.sql",
+      "0022_dr181_discovery.sql",
+      "0023_evaluator_foundation.sql",
+      "0024_evaluator_domain_seed.sql",
+      "0025_dr184_derived_standing.sql",
+      "0025_evaluator_domain_refusal_receipts.sql",
+      "0026_evaluator_judge_addon.sql",
+      "0027_evaluator_rank_metric.sql",
+      "0028_evaluator_consumer_refresh.sql",
+      "0029_evaluator_dev_menu_grants.sql",
+      "0030_identity_foundation.sql",
+      "0031_registration_verification.sql",
+      "0032_registration_audit_erasure_checks.sql",
+      "0033_verification_token_credentials.sql",
+      "0034_obs_foundation.sql",
+      "0035_mfa_enrollment.sql",
+      "0036_sessions.sql",
+      "0037_run_ownership.sql",
+      "0038_content_encryption.sql",
+      "0039_publication_visibility.sql",
+      "0040_account_erasure.sql",
+      "0041_dev_token_retirement.sql",
+      "0042_refusal_audit_forensics.sql",
+      "0043_legacy_audit_erasure_residual.sql",
+      "0044_account_recovery_persistence.sql",
+      "0045_account_recovery_start.sql",
+      "0046_authentication_risk_signals.sql",
+      "0047_passkey_credential_storage.sql",
+      "0048_provider_probe_capability.sql",
+      "0049_terminal_recorded_facts.sql",
+      "0050_support_foundation.sql",
+      "0050_t16_algorithm_register_rows.sql",
+      "0051_support_cases.sql",
+      "0051_t8_remove_strict_and.sql",
+      "0052_support_tool_calls.sql",
+      "0052_t5_reviewer_measured_edges.sql",
+      "0053_support_public_incident.sql",
+      "0053_t06_review_outcome_disclosure.sql",
+      "0054_support_keys_audit.sql",
+      "0054_tint1_reject_edge_mutation_public_revoke.sql",
+      "0055_register_support_publication.sql",
+      "0055_t10_served_root_selection.sql",
+      "0056_security_truncate_definer_searchpath.sql",
+      "0057_observation_foundation.sql",
+      "0057_t09_synthesis_round.sql",
+      "0058_observation_safe_views.sql",
+      "0059_observation_pg_monitor.sql",
+      "0060_observation_throughput_views.sql",
+      "0061_algorithm_publication_profiles.sql",
+      "0062_obs_view_owner_column_floor.sql",
+      "0063_serve_answer_content_carrier.sql",
+      "0064_synthesis_role_cost_rows.sql",
+      "0065_security_delta_guards.sql",
+      "0066_model_spend_ledger.sql",
+      "0067_plan_tier_on_run.sql",
+      "0068_observation_stats_window.sql",
+      "0069_remaining_content_carriers.sql",
+      "0071_observation_threshold_operator.sql",
+      "0072_argument_language.sql",
+      "0073_support_interface_locale.sql",
+      "0074_answer_story.sql",
+      "0075_model_spend_phase.sql",
+      "0076_serve_disclosure.sql",
+      "0077_age_gate.sql",
+      "0078_sensitive_data_consent.sql",
+      "0079_email_change.sql",
+      "0080_legal_acceptance.sql",
+      "0081_publication_check_record.sql",
+      "0082_publication_check_record_identifiers.sql",
+      "0083_budget_holds_waiting_line.sql",
+      "0084_billing_entitlement.sql",
+      "0085_staff_access_foundation.sql",
+      "0086_staff_webauthn.sql",
+      "0087_staff_authorization_guards.sql",
+      "0088_staff_alert_delivery.sql",
+      "0089_owner_recovery.sql",
+      "0090_staff_http_projections.sql",
+      "0091_staff_activation_receipt.sql",
+      "0092_internal_funded_allowance.sql",
+      "0093_internal_provider_admission.sql",
+      "0094_owner_one_verified_key.sql"
+    ],
+    "auth103": [
+      "0000_s00.sql",
+      "0001_s01.sql",
+      "0002_s02.sql",
+      "0003_s03.sql",
+      "0004_s04.sql",
+      "0005_s04_rework.sql",
+      "0006_s05.sql",
+      "0007_s05_rework.sql",
+      "0008_s06.sql",
+      "0009_s06_rework.sql",
+      "0010_s07.sql",
+      "0011_s08.sql",
+      "0012_s09.sql",
+      "0013_s10.sql",
+      "0014_s11.sql",
+      "0015_s12.sql",
+      "0016_s13.sql",
+      "0017_s14.sql",
+      "0018_panel01_rework.sql",
+      "0019_xrev01_node_review.sql",
+      "0020_prov01_machine_default.sql",
+      "0021_dr174_cooldown_prune.sql",
+      "0022_dr181_discovery.sql",
+      "0023_evaluator_foundation.sql",
+      "0024_evaluator_domain_seed.sql",
+      "0025_dr184_derived_standing.sql",
+      "0025_evaluator_domain_refusal_receipts.sql",
+      "0026_evaluator_judge_addon.sql",
+      "0027_evaluator_rank_metric.sql",
+      "0028_evaluator_consumer_refresh.sql",
+      "0029_evaluator_dev_menu_grants.sql",
+      "0030_identity_foundation.sql",
+      "0031_registration_verification.sql",
+      "0032_registration_audit_erasure_checks.sql",
+      "0033_verification_token_credentials.sql",
+      "0034_obs_foundation.sql",
+      "0035_mfa_enrollment.sql",
+      "0036_sessions.sql",
+      "0037_run_ownership.sql",
+      "0038_content_encryption.sql",
+      "0039_publication_visibility.sql",
+      "0040_account_erasure.sql",
+      "0041_dev_token_retirement.sql",
+      "0042_refusal_audit_forensics.sql",
+      "0043_legacy_audit_erasure_residual.sql",
+      "0044_account_recovery_persistence.sql",
+      "0045_account_recovery_start.sql",
+      "0046_authentication_risk_signals.sql",
+      "0047_passkey_credential_storage.sql",
+      "0048_provider_probe_capability.sql",
+      "0049_terminal_recorded_facts.sql",
+      "0050_support_foundation.sql",
+      "0050_t16_algorithm_register_rows.sql",
+      "0051_support_cases.sql",
+      "0051_t8_remove_strict_and.sql",
+      "0052_support_tool_calls.sql",
+      "0052_t5_reviewer_measured_edges.sql",
+      "0053_support_public_incident.sql",
+      "0053_t06_review_outcome_disclosure.sql",
+      "0054_support_keys_audit.sql",
+      "0054_tint1_reject_edge_mutation_public_revoke.sql",
+      "0055_register_support_publication.sql",
+      "0055_t10_served_root_selection.sql",
+      "0056_security_truncate_definer_searchpath.sql",
+      "0057_observation_foundation.sql",
+      "0057_t09_synthesis_round.sql",
+      "0058_observation_safe_views.sql",
+      "0059_observation_pg_monitor.sql",
+      "0060_observation_throughput_views.sql",
+      "0061_algorithm_publication_profiles.sql",
+      "0062_obs_view_owner_column_floor.sql",
+      "0063_serve_answer_content_carrier.sql",
+      "0064_synthesis_role_cost_rows.sql",
+      "0065_security_delta_guards.sql",
+      "0066_model_spend_ledger.sql",
+      "0067_plan_tier_on_run.sql",
+      "0068_observation_stats_window.sql",
+      "0069_remaining_content_carriers.sql",
+      "0071_observation_threshold_operator.sql",
+      "0072_argument_language.sql",
+      "0073_support_interface_locale.sql",
+      "0074_answer_story.sql",
+      "0075_model_spend_phase.sql",
+      "0076_serve_disclosure.sql",
+      "0077_age_gate.sql",
+      "0078_sensitive_data_consent.sql",
+      "0079_email_change.sql",
+      "0080_legal_acceptance.sql",
+      "0081_publication_check_record.sql",
+      "0082_publication_check_record_identifiers.sql",
+      "0083_budget_holds_waiting_line.sql",
+      "0084_billing_entitlement.sql",
+      "0085_staff_access_foundation.sql",
+      "0086_staff_webauthn.sql",
+      "0087_staff_authorization_guards.sql",
+      "0088_staff_alert_delivery.sql",
+      "0089_owner_recovery.sql",
+      "0090_staff_http_projections.sql",
+      "0091_staff_activation_receipt.sql",
+      "0092_internal_funded_allowance.sql",
+      "0093_internal_provider_admission.sql",
+      "0094_owner_one_verified_key.sql",
+      "0103_password_recovery_t2.sql"
+    ],
+    "auth106": [
+      "0000_s00.sql",
+      "0001_s01.sql",
+      "0002_s02.sql",
+      "0003_s03.sql",
+      "0004_s04.sql",
+      "0005_s04_rework.sql",
+      "0006_s05.sql",
+      "0007_s05_rework.sql",
+      "0008_s06.sql",
+      "0009_s06_rework.sql",
+      "0010_s07.sql",
+      "0011_s08.sql",
+      "0012_s09.sql",
+      "0013_s10.sql",
+      "0014_s11.sql",
+      "0015_s12.sql",
+      "0016_s13.sql",
+      "0017_s14.sql",
+      "0018_panel01_rework.sql",
+      "0019_xrev01_node_review.sql",
+      "0020_prov01_machine_default.sql",
+      "0021_dr174_cooldown_prune.sql",
+      "0022_dr181_discovery.sql",
+      "0023_evaluator_foundation.sql",
+      "0024_evaluator_domain_seed.sql",
+      "0025_dr184_derived_standing.sql",
+      "0025_evaluator_domain_refusal_receipts.sql",
+      "0026_evaluator_judge_addon.sql",
+      "0027_evaluator_rank_metric.sql",
+      "0028_evaluator_consumer_refresh.sql",
+      "0029_evaluator_dev_menu_grants.sql",
+      "0030_identity_foundation.sql",
+      "0031_registration_verification.sql",
+      "0032_registration_audit_erasure_checks.sql",
+      "0033_verification_token_credentials.sql",
+      "0034_obs_foundation.sql",
+      "0035_mfa_enrollment.sql",
+      "0036_sessions.sql",
+      "0037_run_ownership.sql",
+      "0038_content_encryption.sql",
+      "0039_publication_visibility.sql",
+      "0040_account_erasure.sql",
+      "0041_dev_token_retirement.sql",
+      "0042_refusal_audit_forensics.sql",
+      "0043_legacy_audit_erasure_residual.sql",
+      "0044_account_recovery_persistence.sql",
+      "0045_account_recovery_start.sql",
+      "0046_authentication_risk_signals.sql",
+      "0047_passkey_credential_storage.sql",
+      "0048_provider_probe_capability.sql",
+      "0049_terminal_recorded_facts.sql",
+      "0050_support_foundation.sql",
+      "0050_t16_algorithm_register_rows.sql",
+      "0051_support_cases.sql",
+      "0051_t8_remove_strict_and.sql",
+      "0052_support_tool_calls.sql",
+      "0052_t5_reviewer_measured_edges.sql",
+      "0053_support_public_incident.sql",
+      "0053_t06_review_outcome_disclosure.sql",
+      "0054_support_keys_audit.sql",
+      "0054_tint1_reject_edge_mutation_public_revoke.sql",
+      "0055_register_support_publication.sql",
+      "0055_t10_served_root_selection.sql",
+      "0056_security_truncate_definer_searchpath.sql",
+      "0057_observation_foundation.sql",
+      "0057_t09_synthesis_round.sql",
+      "0058_observation_safe_views.sql",
+      "0059_observation_pg_monitor.sql",
+      "0060_observation_throughput_views.sql",
+      "0061_algorithm_publication_profiles.sql",
+      "0062_obs_view_owner_column_floor.sql",
+      "0063_serve_answer_content_carrier.sql",
+      "0064_synthesis_role_cost_rows.sql",
+      "0065_security_delta_guards.sql",
+      "0066_model_spend_ledger.sql",
+      "0067_plan_tier_on_run.sql",
+      "0068_observation_stats_window.sql",
+      "0069_remaining_content_carriers.sql",
+      "0071_observation_threshold_operator.sql",
+      "0072_argument_language.sql",
+      "0073_support_interface_locale.sql",
+      "0074_answer_story.sql",
+      "0075_model_spend_phase.sql",
+      "0076_serve_disclosure.sql",
+      "0077_age_gate.sql",
+      "0078_sensitive_data_consent.sql",
+      "0079_email_change.sql",
+      "0080_legal_acceptance.sql",
+      "0081_publication_check_record.sql",
+      "0082_publication_check_record_identifiers.sql",
+      "0083_budget_holds_waiting_line.sql",
+      "0084_billing_entitlement.sql",
+      "0085_staff_access_foundation.sql",
+      "0086_staff_webauthn.sql",
+      "0087_staff_authorization_guards.sql",
+      "0088_staff_alert_delivery.sql",
+      "0089_owner_recovery.sql",
+      "0090_staff_http_projections.sql",
+      "0091_staff_activation_receipt.sql",
+      "0092_internal_funded_allowance.sql",
+      "0093_internal_provider_admission.sql",
+      "0094_owner_one_verified_key.sql",
+      "0103_password_recovery_t2.sql",
+      "0104_password_only_reset.sql",
+      "0105_backup_email_verification.sql",
+      "0106_known_password_mfa_recovery.sql"
+    ],
+    "dev95": [
+      "0000_s00.sql",
+      "0001_s01.sql",
+      "0002_s02.sql",
+      "0003_s03.sql",
+      "0004_s04.sql",
+      "0005_s04_rework.sql",
+      "0006_s05.sql",
+      "0007_s05_rework.sql",
+      "0008_s06.sql",
+      "0009_s06_rework.sql",
+      "0010_s07.sql",
+      "0011_s08.sql",
+      "0012_s09.sql",
+      "0013_s10.sql",
+      "0014_s11.sql",
+      "0015_s12.sql",
+      "0016_s13.sql",
+      "0017_s14.sql",
+      "0018_panel01_rework.sql",
+      "0019_xrev01_node_review.sql",
+      "0020_prov01_machine_default.sql",
+      "0021_dr174_cooldown_prune.sql",
+      "0022_dr181_discovery.sql",
+      "0023_evaluator_foundation.sql",
+      "0024_evaluator_domain_seed.sql",
+      "0025_dr184_derived_standing.sql",
+      "0025_evaluator_domain_refusal_receipts.sql",
+      "0026_evaluator_judge_addon.sql",
+      "0027_evaluator_rank_metric.sql",
+      "0028_evaluator_consumer_refresh.sql",
+      "0029_evaluator_dev_menu_grants.sql",
+      "0030_identity_foundation.sql",
+      "0031_registration_verification.sql",
+      "0032_registration_audit_erasure_checks.sql",
+      "0033_verification_token_credentials.sql",
+      "0034_obs_foundation.sql",
+      "0035_mfa_enrollment.sql",
+      "0036_sessions.sql",
+      "0037_run_ownership.sql",
+      "0038_content_encryption.sql",
+      "0039_publication_visibility.sql",
+      "0040_account_erasure.sql",
+      "0041_dev_token_retirement.sql",
+      "0042_refusal_audit_forensics.sql",
+      "0043_legacy_audit_erasure_residual.sql",
+      "0044_account_recovery_persistence.sql",
+      "0045_account_recovery_start.sql",
+      "0046_authentication_risk_signals.sql",
+      "0047_passkey_credential_storage.sql",
+      "0048_provider_probe_capability.sql",
+      "0049_terminal_recorded_facts.sql",
+      "0050_support_foundation.sql",
+      "0050_t16_algorithm_register_rows.sql",
+      "0051_support_cases.sql",
+      "0051_t8_remove_strict_and.sql",
+      "0052_support_tool_calls.sql",
+      "0052_t5_reviewer_measured_edges.sql",
+      "0053_support_public_incident.sql",
+      "0053_t06_review_outcome_disclosure.sql",
+      "0054_support_keys_audit.sql",
+      "0054_tint1_reject_edge_mutation_public_revoke.sql",
+      "0055_register_support_publication.sql",
+      "0055_t10_served_root_selection.sql",
+      "0056_security_truncate_definer_searchpath.sql",
+      "0057_observation_foundation.sql",
+      "0057_t09_synthesis_round.sql",
+      "0058_observation_safe_views.sql",
+      "0059_observation_pg_monitor.sql",
+      "0060_observation_throughput_views.sql",
+      "0061_algorithm_publication_profiles.sql",
+      "0062_obs_view_owner_column_floor.sql",
+      "0063_serve_answer_content_carrier.sql",
+      "0064_synthesis_role_cost_rows.sql",
+      "0065_security_delta_guards.sql",
+      "0066_model_spend_ledger.sql",
+      "0067_plan_tier_on_run.sql",
+      "0068_observation_stats_window.sql",
+      "0069_remaining_content_carriers.sql",
+      "0071_observation_threshold_operator.sql",
+      "0072_argument_language.sql",
+      "0073_support_interface_locale.sql",
+      "0074_answer_story.sql",
+      "0075_model_spend_phase.sql",
+      "0076_serve_disclosure.sql",
+      "0077_age_gate.sql",
+      "0078_sensitive_data_consent.sql",
+      "0079_email_change.sql",
+      "0080_legal_acceptance.sql",
+      "0081_publication_check_record.sql",
+      "0082_publication_check_record_identifiers.sql",
+      "0083_budget_holds_waiting_line.sql",
+      "0084_billing_entitlement.sql",
+      "0085_billing_customers_subscriptions.sql",
+      "0086_billing_charges_invoices.sql",
+      "0087_billing_outbox_cancel.sql",
+      "0088_billing_withdrawal_step_up.sql",
+      "0089_billing_erasure_hook.sql",
+      "0090_model_scorecard.sql",
+      "0091_billing_erasure_commit.sql",
+      "0092_billing_query_indexes.sql",
+      "0093_billing_runtime_role.sql",
+      "0094_legal_runtime_api_only.sql",
+      "0095_registration_region.sql"
+    ]
+  },
+  "compatibility": {
+    "logicalName": "0093_billing_runtime_role.sql",
+    "executablePath": "compatibility/auth-dev-20261006/0093_billing_runtime_role.sql",
+    "executableSha256": "253d188697be7f16054c047834819f9f15dfaddbee32556a3e2c4c10696cbe68",
+    "resolutionId": "auth106-dev0093-v1"
+  }
+}

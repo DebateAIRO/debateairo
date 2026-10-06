@@ -30,7 +30,7 @@ import consentEnglish from "../../apps/ui/messages/en/consent.json" with { type:
  * S01-S40 pins the EVENT, which is the helper's. `onDismiss` is the exact
  * callback `useModalSurface` will invoke; the double below records the props the
  * machine passes and then renders the REAL card, so every other assertion in
- * this file — the scrim, the three switches, the footer labels — is still made
+ * this file — the scrim, the eight rows, the footer labels — is still made
  * against the shipped component.
  */
 const recorder = vi.hoisted(() => ({ props: [] as { onDismiss: () => void }[] }));
@@ -82,65 +82,59 @@ afterEach(() => {
 });
 
 const bar = (): HTMLElement | null =>
-  document.querySelector<HTMLElement>('[role="region"][aria-label="Cookie consent"]');
+  document.querySelector<HTMLElement>(
+    `[role="region"][aria-label="${(consentEnglish as Record<string, string>)["consent.bar.label"]}"]`
+  );
 const card = (): HTMLElement | null => document.querySelector<HTMLElement>('[role="dialog"]');
 const scrims = (): number => document.querySelectorAll(".consentScrim").length;
-const switches = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>('[role="switch"]')];
-const checked = (): string[] =>
-  switches().map((control) => control.getAttribute("aria-checked") ?? "");
 
-/** A valid `v: 1` decision, as `writeConsent` would leave it. */
-const seed = (quality: boolean, analytics: boolean, decidedAt = "2026-01-01T00:00:00.000Z"): string => {
-  const value = JSON.stringify({ v: 1, essential: true, quality, analytics, decidedAt });
+const ACK_AT = "2026-09-29T00:00:00.000Z";
+
+/** A v2 acknowledgement, as `writeConsent(acknowledgementNow())` would leave it (SPEC-v2 R06). */
+const seed = (acknowledgedAt = ACK_AT): string => {
+  const value = JSON.stringify({ v: 2, acknowledgedAt });
   localStorage.setItem(CONSENT_KEY, value);
   return value;
 };
 
 /**
- * V-19's strict shape read in the FAILURE direction: ten values that are PRESENT
- * under `debateai.consent` and are still not a decision.
- *
- * Every other case in this file seeds `null` or a valid decision, so the suite
- * could tell *absent* from *valid* and could not tell *invalid* from *valid* —
- * `readConsent()` answers "is a valid `v: 1` decision stored?" while
- * `localStorage.getItem(CONSENT_KEY) !== null` answers "is anything stored?",
- * and the two agree on every seed the file had (CODE-REV-S01-C5 r1 **N1**,
- * measured: the presence mutants at `CookieConsent.tsx:87` and `:130` left this
- * file at `11 passed (11)` and `CMD-C5` at verdict 0). S01-R14 and S01-R02 are
- * written on the VALID predicate, so these ten seeds are what makes the
- * assertions below derive from the requirement rather than from the narrative of
- * the finding that produced them.
- *
- * The shapes are the class the reviewer's promoted probe
- * (`.hermes/reports/consent-ui/probes/code-rev-s01-c5-r1-rev-state-machine.test.tsx`)
- * enumerates; the property is re-expressed here in this file's own idiom rather
- * than copied, so the seeds run through `mountConsent` / `mountSettings` /
- * `dismissCard` and are read by the same helpers as every other case.
+ * SPEC-v2 R06's fourteen STORED fixtures whose ACK is false (all "bar" fixtures but the absent
+ * key): each is PRESENT under `debateai.consent` and is still not an acknowledgement, so the
+ * machine shows the bar at mount and after every dismissal. The absent key is covered by the
+ * cases above; the two ACK fixtures by `consent-storage.test.tsx`.
  */
 const INVALID_SEEDS: [string, string][] = [
-  ["a future version", JSON.stringify({ v: 2, essential: true, quality: true, analytics: true, decidedAt: "2026-01-01T00:00:00.000Z" })],
-  ["essential denied", JSON.stringify({ v: 1, essential: false, quality: true, analytics: true, decidedAt: "2026-01-01T00:00:00.000Z" })],
-  ["a sixth member", JSON.stringify({ v: 1, essential: true, quality: true, analytics: true, decidedAt: "2026-01-01T00:00:00.000Z", tracking: true })],
-  ["a missing member", JSON.stringify({ v: 1, essential: true, quality: true, decidedAt: "2026-01-01T00:00:00.000Z" })],
-  ["a non-boolean toggle", JSON.stringify({ v: 1, essential: true, quality: "yes", analytics: true, decidedAt: "2026-01-01T00:00:00.000Z" })],
-  ["a non-ISO instant", JSON.stringify({ v: 1, essential: true, quality: true, analytics: true, decidedAt: "yesterday" })],
-  ["a local-time instant", JSON.stringify({ v: 1, essential: true, quality: true, analytics: true, decidedAt: "2026-01-01T00:00:00+02:00" })],
-  ["malformed JSON", "{not json"],
-  ["a bare string", JSON.stringify("accepted")],
-  ["an array", JSON.stringify([1, true, true])]
+  ["the old three-choice record", '{"v":1,"essential":true,"quality":true,"analytics":false,"decidedAt":"2026-09-01T00:00:00.000Z"}'],
+  ["a v1 record without toggles", '{"v":1,"essential":true,"decidedAt":"2026-09-01T00:00:00.000Z"}'],
+  ["v1 with acknowledgedAt", '{"v":1,"acknowledgedAt":"2026-09-29T00:00:00.000Z"}'],
+  ["v2 with no acknowledgedAt", '{"v":2}'],
+  ["v2 with a date-only acknowledgedAt", '{"v":2,"acknowledgedAt":"2026-09-29"}'],
+  ["v2 with a third member", '{"v":2,"acknowledgedAt":"2026-09-29T00:00:00.000Z","quality":false}'],
+  ["v as the string \"2\"", '{"v":"2","acknowledgedAt":"2026-09-29T00:00:00.000Z"}'],
+  ["v2 with decidedAt instead", '{"v":2,"decidedAt":"2026-09-29T00:00:00.000Z"}'],
+  ["an acknowledged flag", '{"acknowledged":true}'],
+  ["an array", "[]"],
+  ["the null literal", "null"],
+  ["a JSON string", '"ok"'],
+  ["not JSON", "ok"],
+  ["the true literal", "true"]
 ];
 
 const raw = (): string | null => localStorage.getItem(CONSENT_KEY);
 const parsed = (): Record<string, unknown> => JSON.parse(raw() ?? "null") as Record<string, unknown>;
 
-function clickLabelled(label: string): void {
-  const button = [...document.querySelectorAll("button")].find(
-    (candidate) => candidate.textContent?.trim() === label
-  );
-  expect(button, `missing rendered control ${label}`).toBeDefined();
-  act(() => {
-    (button as HTMLButtonElement).click();
-  });
+/** The bar's card button (DONE.md 10a: the strong ghost pill), clicked. */
+function openFromBar(): void {
+  const button = document.querySelector<HTMLButtonElement>(".consentBar button.consentGhostStrong");
+  expect(button, "the bar renders its card button").not.toBeNull();
+  act(() => button!.click());
+}
+
+/** The bar's acknowledgement (DONE.md 10a: the dark primary pill), clicked. */
+function acknowledgeOnBar(): void {
+  const button = document.querySelector<HTMLButtonElement>(".consentBar button.consentPrimary");
+  expect(button, "the bar renders its acknowledgement").not.toBeNull();
+  act(() => button!.click());
 }
 
 function mountConsent(): void {
@@ -255,9 +249,9 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     // so removing the key and remounting reproduces a first visit exactly.
     // jsdom's `localStorage.clear()` is the stand-in for the browser's own
     // "Clear site data"; the real one is V's, acceptance step 5.
-    seed(true, true);
+    seed();
     mountConsent();
-    expect(bar(), "a stored decision keeps the bar away").toBeNull();
+    expect(bar(), "a stored acknowledgement keeps the bar away").toBeNull();
 
     localStorage.clear();
     act(() => root!.unmount());
@@ -270,76 +264,31 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     expect(raw(), "nothing was re-written by the remount").toBeNull();
   });
 
-  it("opens the card over a hidden bar, and each terminal control writes R04's own row", () => {
-    // PROPERTY (S01-R14, S01-R04): the machine's three states are mutually
-    // exclusive — with the card open the bar is not rendered ANYWHERE in the
-    // app — and each terminal control writes the object R04's table names and
-    // lands in Silent. The z-order between scrim and card, and whether the scrim
-    // actually dims, are V's: acceptance step 6.
+  it("opens the card over a hidden bar, and the acknowledgement writes the v2 record and lands in silence", () => {
+    // PROPERTY (S01-R14, SPEC-v2 R06): the machine's three states are mutually exclusive —
+    // with the card open the bar is not rendered ANYWHERE in the app — and the one terminal
+    // control, the bar's acknowledgement, writes exactly the v2 record and lands in Silent.
     mountConsent();
     expect(bar(), "first visit shows the bar").not.toBeNull();
     expect(scrims(), "no scrim before the card is opened").toBe(0);
 
-    clickLabelled("Choose what to store");
+    openFromBar();
     expect(bar(), "the bar is not rendered while the card is open").toBeNull();
     expect(card(), "the card is open").not.toBeNull();
     expect(scrims(), "exactly one scrim").toBe(1);
 
-    // R04 row 4 — `Save choices` writes the CURRENT toggles.
-    const [, quality, analytics] = switches() as [HTMLElement, HTMLElement, HTMLElement];
-    act(() => quality.click());
-    act(() => analytics.click());
-    clickLabelled("Save choices");
-    expect(card(), "Save choices closes the card").toBeNull();
-    expect(bar(), "Save choices leaves no bar behind").toBeNull();
-    expect(parsed(), "R04 row 4").toMatchObject({
-      v: 1,
-      essential: true,
-      quality: false,
-      analytics: true
-    });
-    expect(Object.keys(parsed()).sort(), "the five members and no others").toEqual([
-      "analytics",
-      "decidedAt",
-      "essential",
-      "quality",
-      "v"
-    ]);
-    expect(String(parsed().decidedAt), "decidedAt is an ISO-8601 UTC instant").toMatch(
+    dismissCard();
+    expect(bar(), "closing the card without acknowledging returns the bar").not.toBeNull();
+    expect(raw(), "and writes nothing").toBeNull();
+
+    acknowledgeOnBar();
+    expect(bar(), "the acknowledgement leaves no bar").toBeNull();
+    expect(card(), "and no card").toBeNull();
+    expect(Object.keys(parsed()).sort(), "exactly the two members of the v2 record").toEqual(["acknowledgedAt", "v"]);
+    expect(parsed().v, "v is the number 2").toBe(2);
+    expect(String(parsed().acknowledgedAt), "acknowledgedAt is ISO_UTC_MS").toMatch(
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
     );
-
-    // R04 row 1 — `Accept all`, from the bar.
-    localStorage.clear();
-    act(() => root!.unmount());
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
-    mountConsent();
-    clickLabelled("Accept all");
-    expect(bar(), "Accept all closes the bar").toBeNull();
-    expect(parsed(), "R04 row 1").toMatchObject({
-      v: 1,
-      essential: true,
-      quality: true,
-      analytics: true
-    });
-
-    // R04 row 2 — `Essential only`, from the bar.
-    localStorage.clear();
-    act(() => root!.unmount());
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
-    mountConsent();
-    clickLabelled("Essential only");
-    expect(bar(), "Essential only closes the bar").toBeNull();
-    expect(parsed(), "R04 row 2").toMatchObject({
-      v: 1,
-      essential: true,
-      quality: false,
-      analytics: false
-    });
   });
 
   it("returns the bar when the card is dismissed from the first-visit entry, and writes nothing", () => {
@@ -349,7 +298,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     // gestures reach it is the shared helper's, pinned in C6 and by V's
     // acceptance step 11.
     mountConsent();
-    clickLabelled("Choose what to store");
+    openFromBar();
     expect(card(), "the card is open").not.toBeNull();
 
     dismissCard();
@@ -375,7 +324,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     // Escape moves the visitor exactly ONE surface, with the policy modal open
     // over the card — is S01-S40's, pinned in `tests/render/consent-policy-link.test.tsx`.
     mountConsent();
-    clickLabelled("Choose what to store");
+    openFromBar();
 
     pressEscape();
 
@@ -384,43 +333,34 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     expect(raw(), "and nothing was written").toBeNull();
   });
 
-  it("gives Settings one Privacy panel whose button opens the same card, pre-filled", () => {
-    // PROPERTY (S01-R21, S01-S33): the promise the 10b lede makes — `Revisit any
-    // time from Settings → Privacy` — is kept by a real surface, in the page's
-    // own vocabulary, and the panel is present whether or not a decision is
-    // stored. It is its own component and not inline JSX because
-    // `AccountSettingsScreen` is a non-exported local function inside a page
-    // wrapped in `<AuthGate>`: an inline panel could only be tested by mounting
-    // the whole page through the auth gate, and a cluster whose test needs the
-    // whole app is not independently verifiable. Whether the panel LOOKS like the
-    // rest of the page is V's, acceptance step 9.
-    seed(false, true);
+  it("gives Settings one Privacy panel whose button opens the same card", () => {
+    // PROPERTY (R07, S01-R21): Settings keeps one Privacy panel, present whether or not an
+    // acknowledgement is stored, whose hint and button promise no choice, and whose button opens
+    // the same read-only card without writing anything. Whether the panel LOOKS like the rest
+    // of the page is V's, DONE.md step 11.
+    const before = seed();
     mountSettings();
 
+    const catalog = consentEnglish as Record<string, string>;
     expect(document.querySelector(".setSectionTitle")?.textContent, "section title").toBe("Privacy");
-    expect(consentEnglish["consent.settings.title"]).toBe("Privacy");
+    expect(catalog["consent.settings.title"]).toBe("Privacy");
     expect(document.querySelector(".setSectionHint")?.textContent, "section hint").toBe(
-      "Choose what this browser stores. Asked once; change it here any time."
+      catalog["consent.settings.hint"]
+    );
+    expect(catalog["consent.settings.hint"]).toBe(
+      "This browser keeps only what DebateAI needs to work. See the full list here any time."
     );
     const opener = document.querySelector<HTMLButtonElement>("button.setBtn");
     expect(opener, "one .setBtn opener").not.toBeNull();
-    expect(opener!.textContent?.trim(), "its label").toBe("Cookie preferences");
-    expect(consentEnglish["consent.settings.button"]).toBe("Cookie preferences");
+    expect(opener!.textContent?.trim(), "its label").toBe(catalog["consent.settings.button"]);
+    expect(catalog["consent.settings.button"]).toBe("What we store");
     expect(card(), "no card before the button is pressed").toBeNull();
 
     act(() => opener!.click());
 
     expect(card(), "the same card opens").not.toBeNull();
-    expect(checked(), "pre-filled from the stored decision").toEqual(["true", "false", "true"]);
-    expect(raw(), "opening the card writes nothing").toBe(
-      JSON.stringify({
-        v: 1,
-        essential: true,
-        quality: false,
-        analytics: true,
-        decidedAt: "2026-01-01T00:00:00.000Z"
-      })
-    );
+    expect(card()!.querySelectorAll(".consentCatRow").length, "the eight items").toBe(8);
+    expect(raw(), "opening the card writes nothing").toBe(before);
 
     // One panel, mounted once, in the page the SPEC names.
     const source = settingsSource();
@@ -433,7 +373,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     // **the discriminator is the stored decision, never the entry point.** A
     // signed-in visitor who deletes `debateai.consent` in DevTools still holds an
     // HttpOnly session cookie, so they can reach `/settings` → Privacy →
-    // `Cookie preferences` with nothing stored. Under the entry-point rule this
+    // `What we store` with nothing stored. Under the entry-point rule this
     // replaced, dismissing there made a consent gate disappear in one gesture.
     mountSettings();
     expect(bar(), "the bar is showing behind Settings, because nothing is stored").not.toBeNull();
@@ -453,7 +393,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     // PROPERTY (S01-R14, S01-S32): the same rule read the other way — a valid
     // stored decision means no surface returns, from any entry point, and the
     // stored bytes are the ones that were there before.
-    const before = seed(true, true);
+    const before = seed();
     mountSettings();
     expect(bar(), "a stored decision means no bar").toBeNull();
 
@@ -467,70 +407,14 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     expect(raw(), "byte-for-byte what was seeded").toBe(before);
   });
 
-  it("opens at R17's defaults from EITHER entry when nothing is stored", () => {
-    // PROPERTY (S01-R17, S01-R21, S01-S34 — the second member of B1's class):
-    // with no valid stored decision the card opens at R17's defaults regardless
-    // of which control opened it. Asserted against BOTH openers in one case, so
-    // a divergence cannot hide in the gap between two tests. It does not assert
-    // that the defaults are the RIGHT ones — `consent-card.test.tsx` does.
-    mountSettings();
-    act(() => document.querySelector<HTMLButtonElement>("button.setBtn")!.click());
-    const fromSettings = checked();
-    dismissCard();
-
-    clickLabelled("Choose what to store");
-    const fromBar = checked();
-
-    expect(fromSettings, "the Settings opener, nothing stored").toEqual(["true", "true", "false"]);
-    expect(fromBar, "the bar opener, nothing stored").toEqual(fromSettings);
-  });
-
-  it("mounts a FRESH card per open, so a reopen shows what was last saved", () => {
-    // PROPERTY (CODE-REV-S01-C3C4 r1 **N6**): `initial` feeds a `useState`
-    // initialiser and is therefore read at MOUNT and never again. The concrete
-    // failure this pins: the visitor saves {quality:false, analytics:true},
-    // reopens from Settings → Privacy, is shown the OLD {true,false}, presses
-    // `Save choices` — and a consent record the visitor never chose is written.
-    // The reviewer's probe measured the card side ("a remount DOES pick the new
-    // initial up (the shape C5 must use)"); this is that shape, asserted through
-    // the machine that mounts it.
-    mountSettings();
-    act(() => document.querySelector<HTMLButtonElement>("button.setBtn")!.click());
-    expect(checked(), "first open, nothing stored").toEqual(["true", "true", "false"]);
-
-    const [, quality, analytics] = switches() as [HTMLElement, HTMLElement, HTMLElement];
-    act(() => quality.click());
-    act(() => analytics.click());
-    clickLabelled("Save choices");
-    expect(parsed(), "the decision the visitor actually made").toMatchObject({
-      quality: false,
-      analytics: true
-    });
-
-    act(() => document.querySelector<HTMLButtonElement>("button.setBtn")!.click());
-    expect(checked(), "the reopened card shows what was saved, not what was there first").toEqual([
-      "true",
-      "false",
-      "true"
-    ]);
-
-    // And re-saving it unchanged rewrites the SAME booleans, which is the write
-    // the stale-initial defect would have corrupted.
-    clickLabelled("Save choices");
-    expect(parsed(), "re-saving an untouched reopened card changes no boolean").toMatchObject({
-      quality: false,
-      analytics: true
-    });
-  });
-
   it.each(INVALID_SEEDS)(
     "shows the bar at mount with %s stored — present is not valid",
     (_shape, value) => {
       // PROPERTY (S01-R14, S01-R02, V-19 — the CODE-REV-S01-C5 r1 **N1** pin, the
       // FIRST of the machine's two decision points, `CookieConsent.tsx:87`): the
-      // mount asks whether a VALID `v: 1` decision is stored, never whether the
+      // mount asks whether an acknowledgement (R06 ACK) is stored, never whether the
       // key is merely present. A value this product cannot write but a future
-      // version, a hand edit or an extension can — `{"v":2,…}` is the concrete
+      // version, a hand edit or an extension can — the old three-choice record is the concrete
       // one — is no decision, so the bar is shown and the caller re-asks. Under
       // the presence mutant the same value silences the bar from the first paint
       // and R02's "the caller re-asks" is unpinned at the machine level.
@@ -551,7 +435,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
       // point, `CookieConsent.tsx:130`): dismissing without deciding asks the same
       // VALID question, so a signed-in visitor whose `debateai.consent` holds an
       // invalid value cannot reach Silence through Settings → Privacy →
-      // `Cookie preferences` → back out. That is B1's own failure mode reached by
+      // `What we store` → back out. That is B1's own failure mode reached by
       // a different route: under the presence mutant the bar never returns and no
       // valid decision is stored. The bar showing BEHIND Settings is the same
       // predicate read at mount, which is why one case can carry both halves.

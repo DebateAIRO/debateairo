@@ -12,17 +12,20 @@ const api = await readFile(new URL("../../apps/api/src/index.ts", import.meta.ur
 const runbook = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
 
 describe("the setup step B8 adds, beside B6b's and B7b's (budget spec §2.9)", () => {
-  it("keeps every earlier step in the union and appends COST_RECORD", () => {
+  it("keeps every earlier step in the union and appends COST_RECORD, then the scorecard's MODEL_ASSIGNMENT (paid plans S1a)", () => {
     expect(api).toContain(
       '  | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED"\n'
-      + '  | "COST_RECORD";'
+      + '  | "COST_RECORD" | "MODEL_ASSIGNMENT";'
     );
   });
 
   it("names it in the operator runbook's RUN_SETUP_FAILED row, after B7b's PLAN_CHANGED", () => {
     const row = runbook.split("\n").find((line) => line.startsWith("| A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`"));
     expect(row).toBeDefined();
-    expect(row).toContain("`RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, shown the same way");
+    // The pages show a plain sentence, never the code (apps/ui/lib/v3/runFailure.ts), so the row says
+    // what the asker sees instead of the old "shown the same way" ("Debate generation failed: …").
+    // Part 4 (part4-scope.md §4.1): PLAN_CHANGED has its own sentence, so the row says so.
+    expect(row).toContain("`RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees \"Something went wrong on our side before this debate began…\", or for `PLAN_CHANGED` \"Your paid plan ended or was paused while this question waited…\"");
     expect(row).toContain("`COST_RECORD` means a paid question that did not fit its owner's remaining allowance");
   });
 });

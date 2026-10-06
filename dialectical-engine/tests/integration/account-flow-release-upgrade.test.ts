@@ -32,8 +32,9 @@ it('upgrades populated installed103 in place, refuses active work, and retires a
   const passwordHash=await crypto.hashPassword(argon,password,authPolicy.password.argon2id);
   let current:ReturnType<typeof createPool>|undefined;
   try {
-    const names=(await readdir('migrations')).filter(name=>/^\d+.*\.sql$/.test(name)).sort();
-    const historical=names.filter(name=>Number(name.split('_')[0])<=94||name==='0103_password_recovery_t2.sql');expect(historical).toHaveLength(103);
+    const historical=(JSON.parse(await readFile(new URL('../fixtures/auth106-ledger-names.json',import.meta.url),'utf8')) as string[]).slice(0,103);
+    expect(historical).toHaveLength(103);
+    expect(historical.at(-1)).toBe('0103_password_recovery_t2.sql');
     await old.pool.query('CREATE TABLE debateai_schema_migration(name text PRIMARY KEY,applied_at timestamptz NOT NULL)');
     for(const name of historical){await old.pool.query(await readFile('migrations/'+name,'utf8'));await old.pool.query('INSERT INTO debateai_schema_migration VALUES($1,clock_timestamp())',[name]);}
     const originalLedger=(await old.pool.query('SELECT name,applied_at FROM debateai_schema_migration ORDER BY name')).rows;
@@ -124,16 +125,22 @@ it('protects all six retained103 tables from owner and ordinary TRUNCATE while p
 });
 
 it('refuses wrong existing column, index and constraint shapes in the read-only release catalog probe',async()=>{
+  const release=await startTestDatabase();
+  try{
+  const frozen=JSON.parse(await readFile(new URL('../fixtures/auth-release-ledger-names.json',import.meta.url),'utf8')) as string[];
+  expect(frozen).toHaveLength(113);
+  for(const name of frozen) await release.pool.query(await readFile(new URL(`../../migrations/${name}`,import.meta.url),'utf8'));
   const verifier=await readFile('docs/operations/account-flow-release-2026-10-05/verify-catalog-shape.sql','utf8');
-  const verify=async()=>{const c=await database.pool.connect();try{await c.query('BEGIN READ ONLY');await c.query(verifier);}finally{await c.query('ROLLBACK');c.release();}};
+  const verify=async()=>{const c=await release.pool.connect();try{await c.query('BEGIN READ ONLY');await c.query(verifier);}finally{await c.query('ROLLBACK');c.release();}};
   await verify();
-  await database.pool.query('ALTER TABLE identity.consumer_passkey_subject ADD COLUMN task13_wrongshape text');
-  try {await expect(verify()).rejects.toThrow('ACCOUNT_FLOW_CATALOG_DRIFT');}finally{await database.pool.query('ALTER TABLE identity.consumer_passkey_subject DROP COLUMN task13_wrongshape');}
-  const index=(await database.pool.query("SELECT pg_get_indexdef('identity.consumer_passkey_user'::regclass) definition")).rows[0].definition;
-  await database.pool.query('DROP INDEX identity.consumer_passkey_user');await database.pool.query('CREATE INDEX consumer_passkey_user ON identity.consumer_passkey_credential(signature_counter)');
-  try {await expect(verify()).rejects.toThrow('ACCOUNT_FLOW_CATALOG_DRIFT');}finally{await database.pool.query('DROP INDEX identity.consumer_passkey_user');await database.pool.query(index);}
-  const constraint=(await database.pool.query("SELECT pg_get_constraintdef(oid) definition FROM pg_constraint WHERE conrelid='identity.user'::regclass AND conname='identity_user_phone_profile_consistent'")).rows[0].definition;
-  await database.pool.query('ALTER TABLE identity."user" DROP CONSTRAINT identity_user_phone_profile_consistent');await database.pool.query('ALTER TABLE identity."user" ADD CONSTRAINT identity_user_phone_profile_consistent CHECK(true)');
-  try {await expect(verify()).rejects.toThrow('ACCOUNT_FLOW_CATALOG_DRIFT');}finally{await database.pool.query('ALTER TABLE identity."user" DROP CONSTRAINT identity_user_phone_profile_consistent');await database.pool.query('ALTER TABLE identity."user" ADD CONSTRAINT identity_user_phone_profile_consistent '+constraint);}
+  await release.pool.query('ALTER TABLE identity.consumer_passkey_subject ADD COLUMN task13_wrongshape text');
+  try {await expect(verify()).rejects.toThrow('ACCOUNT_FLOW_CATALOG_DRIFT');}finally{await release.pool.query('ALTER TABLE identity.consumer_passkey_subject DROP COLUMN task13_wrongshape');}
+  const index=(await release.pool.query("SELECT pg_get_indexdef('identity.consumer_passkey_user'::regclass) definition")).rows[0].definition;
+  await release.pool.query('DROP INDEX identity.consumer_passkey_user');await release.pool.query('CREATE INDEX consumer_passkey_user ON identity.consumer_passkey_credential(signature_counter)');
+  try {await expect(verify()).rejects.toThrow('ACCOUNT_FLOW_CATALOG_DRIFT');}finally{await release.pool.query('DROP INDEX identity.consumer_passkey_user');await release.pool.query(index);}
+  const constraint=(await release.pool.query("SELECT pg_get_constraintdef(oid) definition FROM pg_constraint WHERE conrelid='identity.user'::regclass AND conname='identity_user_phone_profile_consistent'")).rows[0].definition;
+  await release.pool.query('ALTER TABLE identity."user" DROP CONSTRAINT identity_user_phone_profile_consistent');await release.pool.query('ALTER TABLE identity."user" ADD CONSTRAINT identity_user_phone_profile_consistent CHECK(true)');
+  try {await expect(verify()).rejects.toThrow('ACCOUNT_FLOW_CATALOG_DRIFT');}finally{await release.pool.query('ALTER TABLE identity."user" DROP CONSTRAINT identity_user_phone_profile_consistent');await release.pool.query('ALTER TABLE identity."user" ADD CONSTRAINT identity_user_phone_profile_consistent '+constraint);}
   await verify();
+  }finally{await release.stop();}
 });

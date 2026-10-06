@@ -254,6 +254,27 @@
 .legalCookieTable td:last-child { width: 90px; }
 .legalTagEssential { font-size: 11px; font-weight: 700; color: var(--ok-text) !important; }
 .legalTagPreference { font-size: 11px; font-weight: 700; color: var(--gold-text) !important; }
+.legalCookieTable td:nth-child(4) { width: 104px; }
+/* A stored item's name breaks only after a dot (DONE.md default 8): each dot-ended part is one unbreakable run. */
+.legalNamePart { white-space: nowrap; }
+/* cookie-compliance S01 (/cookies artboards S01-14): the kind cell, and the two refusal sentences under the tables. */
+.legalKindCell { font-size: 11px; font-weight: 700; color: var(--ink) !important; }
+.legalRefuse { margin: 18px 0 0; }
+.legalRefuse + .legalRefuse { margin-top: 7px; }
+/* V-10 (REV-S01 p2 PT2-N3): the four fixed columns take 192.2+86+104+90 = 472.2px (the name column is 192.2, V-9) of a
+   .legalMain that is the viewport minus 372px, so below 995px the Purpose column gets under 150px (25px at 800). Up to
+   999px the cookie tables stack one card per row, exactly as the 760px block below stacks every legal table at 375. */
+@media (max-width: 999px) {
+  .legalCookieTable thead { display: none; }
+  .legalCookieTable,
+  .legalCookieTable tbody,
+  .legalCookieTable tr,
+  .legalCookieTable th,
+  .legalCookieTable td { display: block; width: auto !important; }
+  .legalCookieTable tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .legalCookieTable th,
+  .legalCookieTable td { padding: 2px 0; border: 0; }
+}
 .legalProviderEntry { margin-top: 28px; }
 .legalProviderEntry h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--ink); }
 .legalProviderEntry .legalTable { margin-top: 10px; }
@@ -443,3 +464,9 @@
   .appShell:has(.debateView) > .siteFooterLine { display: none; }
   .appShell:has(.debateView) .debateView { height: 100vh; height: 100dvh; }
 }
+
+/* ---------- Paid plans (P21, R3-4): the card marks, the DB-IP credit, one archived text ---------- */
+.siteFooterMarks { display: flex; gap: 10px; align-items: center; max-width: 1180px; margin: 22px auto 0; }
+.siteFooterMarks img { width: auto; height: 24px; }
+.siteFooterBase .siteFooterCredit { font-size: 11px; color: var(--muted); }
+.legalArchiveText { margin-top: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

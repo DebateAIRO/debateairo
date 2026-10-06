@@ -126,6 +126,7 @@
   "public.report.models": "참여한 모델: {models}",
   "public.report.modelsNotRecorded": "참여한 모델: 기록되지 않음",
   "public.report.disclosure": "이 보고서는 AI 모델이 토론의 논거를 바탕으로 작성했습니다.",
+  "public.report.notAdvice": "AI가 생성한 보고서입니다. 의료, 법률, 금융 또는 그 밖의 전문적 자문이 아닙니다.",
   "public.report.title.inShort": "핵심 요약",
   "public.report.title.story": "전체 흐름",
   "public.report.title.why": "이 답이 나온 이유",

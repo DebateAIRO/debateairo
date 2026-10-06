@@ -106,7 +106,7 @@ describe("POST /v1/auth/register behind the age gate", () => {
   const body = (dateOfBirth: string) => ({
     ...canonicalSignup,
     email: "alice@example.test", password: "password-123",
-    phone: "+40722123456", date_of_birth: dateOfBirth
+    phone: "+40722123456", country: "RO", date_of_birth: dateOfBirth
   });
 
   it("passes an adult through with the canonical public acknowledgement", async () => {

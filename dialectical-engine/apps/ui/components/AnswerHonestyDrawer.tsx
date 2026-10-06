@@ -15,6 +15,8 @@ import {
   summarizeFreshness,
   type PanelSpendStopKind
 } from "@/lib/v3/labels";
+import { ModelMetaLine } from "@/components/ModelPresentation";
+import { modelAssignmentJobs } from "@/lib/modelStrength";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
@@ -62,6 +64,29 @@ function panelStoppedWords(kind: PanelSpendStopKind, catalog: MessageCatalog): s
     case "BUDGET": return t(catalog, "misc.answerHonesty.panelStoppedEarly");
     case "SERVICE": return t(catalog, "misc.answerHonesty.panelStoppedService");
   }
+}
+
+/**
+ * S1b: the two BACKUP-MODEL-USED records the runner writes (apps/runner/src/run-seats.ts
+ * BACKUP_MODEL_USED_WORDING), keyed by their fixed subjects. The engine's record text stays
+ * English, like every other mark's record; only these two known records are worded at render
+ * time, in the page's language. A reworded runner subject fails tests/unit/s1b-scorecard-catalogues.
+ */
+const BACKUP_RECORD_KEYS: Readonly<Record<string, Readonly<{ subject: string; reason: string; liftPath: string }>>> = Object.freeze({
+  "Planned AI models": Object.freeze({
+    subject: "misc.answerHonesty.backupRecord.standIn.subject",
+    reason: "misc.answerHonesty.backupRecord.standIn.reason",
+    liftPath: "misc.answerHonesty.backupRecord.standIn.liftPath"
+  }),
+  "Extra AI model": Object.freeze({
+    subject: "misc.answerHonesty.backupRecord.usual.subject",
+    reason: "misc.answerHonesty.backupRecord.usual.reason",
+    liftPath: "misc.answerHonesty.backupRecord.usual.liftPath"
+  })
+});
+
+function backupRecordKeysFor(record: { readonly mark: string; readonly subject_ref: string }) {
+  return record.mark === "BACKUP-MODEL-USED" ? BACKUP_RECORD_KEYS[record.subject_ref] ?? null : null;
 }
 
 export function AnswerHonestyDrawer({
@@ -219,22 +244,29 @@ export function AnswerHonestyDrawer({
             )}
             {answer.condition_mark_records.length > 0 ? (
               <ul className="drawerFindingList" aria-label={t(catalog, "misc.answerHonesty.namedConditionMarks")}>
-                {answer.condition_mark_records.map((record) => (
-                  <li key={`${record.mark}:${record.subject_ref}`} className="drawerFindingItem">
-                    <div className="drawerFindingMeta">
-                      <span>{conditionRecordLabel(record, debateChromeCatalog)}</span>
-                      <span>{record.scope}</span>
-                      <span>{record.subject_ref}</span>
-                    </div>
-                    <div className="drawerFindingText">{record.reason}</div>
-                    {panelSpendStopKind(record) !== null ? (
-                      // A panel a spend stop cut short: the runner's remedy blames failed members (M2 carry).
-                      <div className="drawerFindingText">{panelStoppedWords(panelSpendStopKind(record)!, catalog)}</div>
-                    ) : record.lift_path !== null && !liftPathIsOperatorOnly(record) ? (
-                      <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.liftPath", { liftPath: record.lift_path })}</div>
-                    ) : null}
-                  </li>
-                ))}
+                {answer.condition_mark_records.map((record) => {
+                  // S1b: the runner's two BACKUP-MODEL-USED records in the page's language; every
+                  // other record exactly as the engine wrote it.
+                  const backupKeys = backupRecordKeysFor(record);
+                  return (
+                    <li key={`${record.mark}:${record.subject_ref}`} className="drawerFindingItem">
+                      <div className="drawerFindingMeta">
+                        <span>{conditionRecordLabel(record, debateChromeCatalog)}</span>
+                        <span>{record.scope}</span>
+                        <span>{backupKeys === null ? record.subject_ref : t(catalog, backupKeys.subject)}</span>
+                      </div>
+                      <div className="drawerFindingText">{backupKeys === null ? record.reason : t(catalog, backupKeys.reason)}</div>
+                      {panelSpendStopKind(record) !== null ? (
+                        // A panel a spend stop cut short: the runner's remedy blames failed members (M2 carry).
+                        <div className="drawerFindingText">{panelStoppedWords(panelSpendStopKind(record)!, catalog)}</div>
+                      ) : backupKeys !== null ? (
+                        <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.liftPath", { liftPath: t(catalog, backupKeys.liftPath) })}</div>
+                      ) : record.lift_path !== null && !liftPathIsOperatorOnly(record) ? (
+                        <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.liftPath", { liftPath: record.lift_path })}</div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             ) : null}
           </section>
@@ -302,6 +334,43 @@ export function AnswerHonestyDrawer({
             <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.protectedCore", { core: answer.cost_envelope.protected_core })}</div>
             <div className="drawerFindingText">{t(catalog, "misc.answerHonesty.basis", { basis: JSON.stringify(answer.cost_envelope.basis) })}</div>
           </section>
+
+          {/* A21.3 · owner decisions O1-O3: a plain list of the models chosen per debate job,
+              named as the node badges name them. No seat, thinking level, share, strength,
+              step-down or scorecard version; that detail stays in the JSON export.
+              Final review I4: an answer with no assignment — every answer without a scorecard
+              in force, and one whose pin could not be read — adds no section at all, so the
+              legacy drawer is exactly what it was. */}
+          {answer.model_assignment === undefined ? null : (
+            <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.modelsChosen.title")}>
+              <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.modelsChosen.title")}</div>
+              <ul className="drawerFindingList">
+                {modelAssignmentJobs(answer.model_assignment).map((job) => (
+                  <li key={job.role} className="drawerFindingItem">
+                    <div className="drawerFindingMeta">
+                      <span>{t(catalog, job.labelKey)}</span>
+                    </div>
+                    {job.noteKey !== null ? (
+                      <div className="drawerFindingText">{t(catalog, job.noteKey)}</div>
+                    ) : (
+                      <div className="roleChips">
+                        {job.models.map((model) => (
+                          <ModelMetaLine
+                            key={JSON.stringify([model.maker, model.modelId])}
+                            modelId={model.modelId}
+                            maker={model.maker}
+                            catalog={catalog}
+                            composeCatalog={composeCatalog}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="drawerHintMuted">{t(catalog, "misc.answerHonesty.modelsChosen.standIn")}</div>
+            </section>
+          )}
 
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.graphEdges")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.graphEdges")}</div>

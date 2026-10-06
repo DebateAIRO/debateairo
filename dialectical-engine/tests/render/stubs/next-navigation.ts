@@ -46,3 +46,18 @@ export function resetRefreshes(): void {
 export function readRefreshes(): readonly string[] {
   return [...refreshes];
 }
+
+let redirects: string[] = [];
+
+export function redirect(url: string): never {
+  redirects.push(url);
+  throw new Error("NEXT_REDIRECT");
+}
+
+export function resetRedirects(): void {
+  redirects = [];
+}
+
+export function readRedirects(): readonly string[] {
+  return [...redirects];
+}

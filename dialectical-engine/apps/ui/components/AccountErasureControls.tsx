@@ -48,9 +48,13 @@ export function confirmationPhraseMatches(typed: string, phrase: string, locale:
 }
 
 type ErasureStatus = Awaited<ReturnType<ContractClient["readAccountErasure"]>>;
+/**
+ * `getBillingSubscription` is optional: without it (or with billing off, a 404) the panel says nothing about a plan.
+ * The default client has it.
+ */
 type AccountErasureClient = Pick<ContractClient,
   "scheduleAccountErasure" | "readAccountErasure" | "cancelAccountErasure"
-> & SecurityConfirmationClient;
+> & SecurityConfirmationClient & Partial<Pick<ContractClient, "getBillingSubscription">>;
 
 function failureMessage(failure: unknown, catalog: MessageCatalog): string {
   if (failure instanceof ContractHttpError
@@ -77,8 +81,21 @@ export function AccountErasureControls({
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // W7 (P2-I10): an ACTIVE paid plan keeps working until the deletion runs; the panel says so in one sentence.
+  const [paidPlanLive, setPaidPlanLive] = useState(false);
   const confirmationPhrase = t(catalog, "settings.erasure.confirmationPhrase");
   const confirmed = confirmationPhraseMatches(confirmation, confirmationPhrase, locale);
+
+  useEffect(() => {
+    if (client.getBillingSubscription === undefined) return;
+    let active = true;
+    client.getBillingSubscription().then(
+      (current) => { if (active) setPaidPlanLive(current.subscription?.status === "ACTIVE"); },
+      // Billing off (404) or a failed read: no sentence about a plan the page cannot see.
+      () => { if (active) setPaidPlanLive(false); }
+    );
+    return () => { active = false; };
+  }, [client]);
 
   useEffect(() => {
     let active = true;
@@ -143,6 +160,11 @@ export function AccountErasureControls({
       <p className="setCardNote">
         {t(catalog, "settings.erasure.dataWarning")}
       </p>
+      {paidPlanLive ? (
+        <p className="setCardNote">
+          {t(catalog, "settings.erasure.paidPlan")}
+        </p>
+      ) : null}
       {status === null
         ? <p className="setStatus">{t(catalog, "settings.erasure.checking")}</p>
         : null}

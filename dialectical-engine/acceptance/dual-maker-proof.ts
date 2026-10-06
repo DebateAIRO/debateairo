@@ -8,6 +8,7 @@ import { buildFramedPrompt, type PromptContract } from "@debateai/providers";
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startModelShim, type ModelShimHandle } from "./model-shim.js";
 import type { CommandSpec } from "./relay-core.js";
+import { assertRelayRuntime } from "./relay-deployment-guard.js";
 import {
   computeAcceptanceStructuralCeiling,
   readAcceptanceRuntimePolicy,
@@ -92,6 +93,8 @@ export interface DualMakerProofOptions {
    */
   readonly testOnlyCodexSessionsRoot?: string;
   readonly testOnlyClaudeCommand?: CommandSpec;
+  /** Where the deployment mode is read from; absent ⇒ the process environment. */
+  readonly environment?: Readonly<Record<string, string | undefined>>;
 }
 
 async function callThroughMaker(input: {
@@ -138,7 +141,12 @@ async function callThroughMaker(input: {
   });
 }
 
+/**
+ * V-9(c): the proof starts the local mode's relays, so it refuses the hosted
+ * deployment (relay-deployment-guard.ts) before it starts the database or a CLI.
+ */
 export async function runDualMakerProof(options: DualMakerProofOptions): Promise<DualMakerProofReport> {
+  assertRelayRuntime(options.environment ?? process.env);
   let ownedDatabase: StandingDatabase | null = null;
   let shim: ModelShimHandle | null = null;
   let relay: ClaudeRelayHandle | null = null;

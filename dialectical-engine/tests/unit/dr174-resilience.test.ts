@@ -214,7 +214,9 @@ describe("RESIL-01 / DR-174-A hidden-frame mutation ledger", () => {
     // count at this tree is 37 — counted from the shipped array, not summed
     // from these comments. Every new mark was minted MID-LIST, so the DR-176
     // positional tail `CONDITION_MARKS.slice(-4)` is unchanged.
-    expect(CONDITION_MARKS).toHaveLength(37);
+    // Model scorecard A16: 37 -> 38 (BACKUP-MODEL-USED, minted mid-list beside
+    // DEGRADED-DIVERSITY); the tail below is still read and still unchanged.
+    expect(CONDITION_MARKS).toHaveLength(38);
     expect(CONDITION_MARKS).toEqual(expect.arrayContaining([
       "HIDDEN-UNJUDGEABLE", "HIDDEN-LOW-SCORE", "UNAUTHORED-BRANCH-HALTED"
     ]));

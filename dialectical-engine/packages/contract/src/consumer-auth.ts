@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseDeclaredRegion } from "@debateai/kernel";
 import { LegalDocumentPairSchema, SessionSchema } from "./auth-shared.js";
 
 import { CatalogLocaleCodeSchema, LocaleCodeSchema } from "./locale.js";
@@ -14,15 +15,18 @@ const LocalePreferenceShape = {
 };
 
 /** Submitted facts only: age, account identity and verification are server decisions. */
-export const RegisterRequestSchema = z.object({
+export const RegisterRequestFieldsSchema = z.object({
   email: EmailSchema,
   password: z.string().min(1).max(1024),
   phone: z.string().trim().min(1).max(128),
   date_of_birth: z.iso.date(),
+  country: z.string().regex(/^[A-Z]{2}$/u),
+  us_state: z.string().regex(/^[A-Z]{2}$/u).nullable().optional(),
   terms: LegalDocumentPairSchema,
   privacy: LegalDocumentPairSchema,
   ...LocalePreferenceShape
 }).strict();
+export const RegisterRequestSchema = RegisterRequestFieldsSchema.refine(input => parseDeclaredRegion(input) !== null, { message: "Invalid declared region" });
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
 export const ResendVerificationRequestSchema = z.object({ email: EmailSchema, ...LocalePreferenceShape }).strict();
 export type ResendVerificationRequest = z.infer<typeof ResendVerificationRequestSchema>;

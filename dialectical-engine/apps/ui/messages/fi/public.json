@@ -126,6 +126,7 @@
   "public.report.models": "Mukana olleet mallit: {models}",
   "public.report.modelsNotRecorded": "Mukana olleet mallit: ei kirjattu",
   "public.report.disclosure": "Tämän raportin kirjoittivat tekoälymallit väittelyn argumenttien pohjalta.",
+  "public.report.notAdvice": "Tekoälyn tuottama raportti. Se ei ole lääketieteellistä, oikeudellista, taloudellista tai muuta ammatillista neuvontaa.",
   "public.report.title.inShort": "Lyhyesti",
   "public.report.title.story": "Koko tarina",
   "public.report.title.why": "Miksi tämä vastaus",

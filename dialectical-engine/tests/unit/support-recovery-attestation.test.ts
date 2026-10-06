@@ -69,13 +69,39 @@ const OWNER_REVIEW = Object.freeze({
   ratifiedOn: "2026-09-24",
 });
 
-// 2026-09-29: the owner read the seven Turn 15 legal-page entries (EN + RO labels) in chat
-// and signed the catalogue that adds them; the article pairs keep their earlier signatures.
-const CATALOG_REVIEW = Object.freeze({
-  reviewedBy:"SOL",reviewerSession:"/root/implement_task12",reviewedOn:"2026-10-05",
-  evidence:"docs/missions/account-onboarding/task-12-kb-editorial.md"
+// The merged catalogue (paid plans P24, 2026-10-02): #62's signed catalogue plus the nine paid-plan pages under #62's
+// per-locale names. The owner read the nine entries (EN + RO labels) and the merged fingerprint in chat and signed it
+// (docs/missions/paid-plans/OWNER-SIGNOFF-billing-pages-catalog.md, "Merge with origin/dev"); #62's articles and recovery rows keep S02's and S05's signatures below.
+const CATALOG_REVIEW = Object.freeze({"reviewedBy": "SOL", "reviewerSession": "/root/dev_auth_integration_recovery", "reviewedOn": "2026-10-06", "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"});
+const ACCOUNT_FLOW_REVIEW = Object.freeze({...CATALOG_REVIEW, ratifiedBy:"", ratifiedOn:""});
+// cookie-compliance S02 (SPEC-v2 R10): the owner's V0 signature of the catalogue, the 8 rewritten articles and
+// their 8 recovery rows. The orchestrator writes reviewerSession, reviewedOn and ratifiedOn at V0
+// (probes/ARCH-CC-S02/s02-sign.py); until then this case is RED on the branch by design. The session is
+// blank on purpose: the loader refuses a blank session, so no manifest can match this pin before V0
+// writes V's (REV-S02 p1 SD-N1 — a placeholder string here was itself a loader-valid OWNER record).
+const S02_OWNER_REVIEW = Object.freeze({
+  reviewedBy: "OWNER",
+  reviewerSession: "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
+  reviewedOn: "2026-10-01",
+  evidence: "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
+  ratifiedBy: "V",
+  ratifiedOn: "2026-10-01",
 });
-const ACCOUNT_FLOW_REVIEW=Object.freeze({...CATALOG_REVIEW,ratifiedBy:"",ratifiedOn:""});
+// cookie-compliance S05 (SPEC-v4 R08): the owner's V1 signature of 12 article files and 13 recovery rows. The
+// orchestrator writes reviewerSession, reviewedOn and ratifiedOn at V1 (probes/ARCH-CC-S05/s05-sign.py); until then
+// this case is RED on the branch by design (blank session: the loader refuses it, so no manifest can match early).
+const S05_OWNER_REVIEW = Object.freeze({
+  reviewedBy: "OWNER",
+  reviewerSession: "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V1 question on 2026-10-01)",
+  reviewedOn: "2026-10-01",
+  evidence: "docs/missions/cookie-compliance/OWNER-SIGNOFF-S05-support-kb.md",
+  ratifiedBy: "V",
+  ratifiedOn: "2026-10-01",
+});
+const S05_KEYS = new Set(["account-access.en", "account-access.ro", "ai-transparency.ro", "budget-tier-choice.ro",
+  "debate-topic-and-description.ro", "debate-workspace-menus.ro", "getting-started-debate.ro", "guide-how-it-works.ro",
+  "risk-tier-choice.ro", "support-cases.ro", "support-status-limits.en", "support-status-limits.ro", "unsupported-capabilities.ro"]);
+const S02_IDS = new Set(["privacy-consent", "settings-help-menus", "app-navigation", "account-settings"]);
 
 const QUALITY_REVIEW = Object.freeze({
   reviewedBy: "SOL",
@@ -100,32 +126,32 @@ const GUIDE_IDS = new Set([
 ]);
 
 const EXPECTED = [
-  ["account-access", "en", "17aac248d75d7ad161fba2a44068d20743a9759ae56c9b30359c7e1d5550c2e7", "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a", "6b5d2dcff5c21d11eae6c6a92cabea39ec253e8e54b5d890d9b25d56f9eab32d"],
-  ["account-access", "ro", "5048de52b22b474fb8185e718fcaf235cd23896eff8fd7e42f4399d5266e9410", "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98", "47d2b4b41acc0d0ef976bab9e08e5f617303612bfeda2b969a2958d6618ad8c0"],
-  ["account-settings", "en", "5f04df88af009daf56f03dccaa8d8a271d458bac913f66bd0f63a810919f9cde", "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de", "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de"],
-  ["account-settings", "ro", "60cef78be7c3eb7dafaf5686d2648beaea9a058d597b49ec2fef9d99ac5fc298", "87365bf4a4e5448ce92a556b2d8d9dc810e1da8257e1b29770415a9a5c2ad89f", "87365bf4a4e5448ce92a556b2d8d9dc810e1da8257e1b29770415a9a5c2ad89f"],
+  ["account-access", "en", "819d4fe7ce40b241a28f26122c4ba81e9b2b05071604c47358fc0c5ef0af6498", "57f2565e54ea4bde4fbf624dcc8ccddfc1c2e7d67eac18052470dd511962975c", "57f2565e54ea4bde4fbf624dcc8ccddfc1c2e7d67eac18052470dd511962975c"],
+  ["account-access", "ro", "a0f08ec4f5862b24350a6a8e750d688be0e45337a3d0fab055ecd541f35f1f72", "73af487d0a2fbd1f4824f678bf78cd756deee6ab4190d467f26a777d4e5e331a", "73af487d0a2fbd1f4824f678bf78cd756deee6ab4190d467f26a777d4e5e331a"],
+  ["account-settings", "en", "41e826b5d3c07aa6b2f9651072aa4902babb66dd2a5f4f5e41dd5e15106433b2", "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de", "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de"],
+  ["account-settings", "ro", "f887ccbfcc05fb99a095a451e6b2b872cdc3d85135a3e3eadd0496d80d10b21c", "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958", "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958"],
   ["ai-transparency", "en", "e7deab21d5d105769017fc40431c26ec94f3b8ea4385b2547d0eceac8a7f92a6", "fc313334a897d806c7c968752fb16eac7cb8ca4e5535ae18dc7b1ff89362c879", "611cf0c13e949362a3bd17c4e1c899fa291b9f6ed249b007ecc216de7601999a"],
-  ["ai-transparency", "ro", "df69c138d5166b5070ff3156e2ce205e3f9509f7accb89fd4dcbe254af1f9822", "4c7cd7c97c6a43f34083acb72adb6dbf2f2fd4ad9b363601a7fb19d0f8ae7d7f", "ef0e8df3377df3e5c2cdb37ac04c4b1f479f5ec09c2ab1ba744773d8fc04fd82"],
-  ["app-navigation", "en", "a92e96c24c3df6d7a9b3e73a3fafde79321cd7445612588024ea205fb5c6e6db", "3f17d7323fcd88f34b6f9f1a4da904b0da28a18a09f6fa7f814e6333f4b83b29", "4264551f61745540e92932ee99a99405152e94edf8b167e0ee19c5463526411d"],
-  ["app-navigation", "ro", "a6f79cd55e0856780bff01ec3134df02a068b41453f44a8847c5c58050af8a23", "04001a0ddc6b3f743946fec81d2d3d5caed672f5f14d430eb3af74dc1421e3a3", "e6a00272d90624b8367c54d60b8ecad42ee69ddf8155729b972eb8463a2d1cde"],
+  ["ai-transparency", "ro", "718eac9d78a08da5c2ecb66f4a9671213cb0ee71a020bf81bc57f1c282602857", "f748a1052e62a6498393eb93f57378e09efa1f4f61568b43880179beb470b6d0", "b983acd7d0168ad805ac73d049060bd9c7ca8c4cc28e29ee0933688e8430a3fe"],
+  ["app-navigation", "en", "e7be9ec44ca612d536736680bacd3b111c0871c41b1392bf40910b991974e6e6", "5e2c92c70089eb7124914df7f803715793b8995f6d20508b12f288df1e875a54", "5f72d0d447cb61481951585f2bc42d3a0c5450ab504c1c8204a0c1a78505360a"],
+  ["app-navigation", "ro", "53b85f28ff47512609e8c445e5e4542f4c47a948e38ac165604dabc86fdd95c8", "40203477a47372b13d7620dc056006a2adfd69d3de733bc3b054a8713e9aafaa", "ce9355e41bd2e02b7197e69b09391bc44c4e3f5dfd57859ae54aca289df630c1"],
   ["browse-public-debates", "en", "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad", "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034", "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"],
   ["browse-public-debates", "ro", "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241", "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897", "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d"],
   ["budget-tier-choice", "en", "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683", "e6d5adf85f44c3fd1aaa2c70d095f6f2474723a5b72393d4a006f0206fa64104", "cb920483c56311f42b1adf89c581320a4a5344dcc90028fa458ad6028867d601"],
-  ["budget-tier-choice", "ro", "e648150ae607bb98c55059eaea6162ffc2cd09df437721b75c8c7b226ef4984d", "d8648bd28c6eddb018f6508c7c1eed9e0a20941807979d42701e35e4351ea371", "1496048887bc41ba3968fdaf7d0fe17e43feffaba1f1c997f46f0b420d30652f"],
+  ["budget-tier-choice", "ro", "cf06b479e61a00510082943d904c7999e2375fba942c6fd2670894e34b20b89a", "b593d7c0ed2d166849df568cb76bf3873a04d4fca4604908ccf6cd626d67e892", "c32cf5a845ad6fa8d51cef9952430b27c8579ca9f4d42e8dfcb2e1ef58d10690"],
   ["debate-topic-and-description", "en", "695b7b405e599260acd7c5a51f897f46b52b238f2860a20168cd14cfdc176bad", "290097ca24858424c4bc2a6845182a9c1cbcd0214c6a3109e2b32cf7e0bd0f56", "7234ce24457ad97fe943e93b1caf0e28a8d74e30aa1748f1d29b158cdcba67b7"],
-  ["debate-topic-and-description", "ro", "90f1fff60a4245eeda7b5131b671772b425e8ab682f967c4c31c2ad42c7207a2", "8cd97dedffdf9b059f4d809b73f60f59174007b42a7a99998989c354af93bee8", "c6470bf637f904245f4c5f468c1b33c1d43d03fa0b45d1d3ba32eb47f12840f7"],
+  ["debate-topic-and-description", "ro", "1a07bb0133eca4b8039984945b3f58137f1b6c1d77d74b59b30c37cb2aec2a64", "0dfb64e716c3c402ff62538e682d8b2ca04edfc45d840a140f20e4120585db32", "7b8d200c8c31b60c633111556f4957847a0194069c4596be88600383d554cc6c"],
   ["debate-workspace-menus", "en", "e3f92be13a7d880e259c331e2c5dc3881abd9693e1846b90fcddafeda151170d", "d4da3f54b348b1c78dad80b67cbe1db12d196f396e6385c2dc0d2fd0ef5d0f34", "28525e3135cc7b623a00f52d7f9aa520579959f4238bb51117866ad3ba89bcce"],
-  ["debate-workspace-menus", "ro", "eb2b85327509e4e9e0e4b29009af11b109e225f70e784b09f447d17ed7aa162a", "095fe2fae248ca61c4b7e99100ab4bc4343d0ab7e525576bf747baa79d6816c8", "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97"],
+  ["debate-workspace-menus", "ro", "8ad990c00886c52fb547cac2d5f4d3351d5c0fc48b937d36ec8e3459fedbf6b1", "b9a0bf0de664fcb0b6548121e532e4bcbf27861d68614fef9cbb00563f3f87ec", "5e558ff25dda284435df41eca3e9de5f6b1f940f95cb0b8a3126801bba415e97"],
   ["delete-a-private-debate", "en", "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26", "9ae0d23732c129d4b3e3e06b4c81833a5546b214506ecc53c3b531b4856dc49c", "92409ee15ce6ed5f380136ab090d3ce2a82ee355e379e7d068609baf9e92365b"],
   ["delete-a-private-debate", "ro", "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9", "1f4b3b1719c76d8223159dd73049c47761dd4fd6482103d40cf31d53fd2b54a3", "46037245889b3c11b737e40222ce1c6d1b800020a92ee4e92725ad03d8338727"],
   ["export-json", "en", "c31c5bd3a2eb80e1352f27431e459f8272ae37605a9988210cff2aa82d6b7ea5", "690569195ed4098fd00b5bf102658f9bd26b2610897ca816163f8abb2a47946d", "6abec339af9fc96715c8964a17341461db4042701acb1f54e1e9deea37421afb"],
   ["export-json", "ro", "5016b1370fbbd83ed2e647cfdeb8a2c10b4052ef8861807abed2ee4b0ae8f02b", "70c63bd09f0577e45c6c20ab542013cf6caba0e2f0290782f4d6589ef868720f", "78dc48a23f8a2de1e4af205d26f1d743a9000ed2c375437b0cfe2acb66d82cd3"],
   ["getting-started-debate", "en", "a438b7c7a91342dee7c5edb2efe48e586be2cc33d9a2eafabaadad2882f6f9e8", "059900a11c6ec871145ee61e4aaca7214c76c02e8dab61dbec67eb08e6a3017e", "c844161c3430edcfb0a195df7ffff6bcf82c0826ab454bf817631933649bed48"],
-  ["getting-started-debate", "ro", "f2a848dbaa9131d3165f50ce2004f1fba874032a48d7bdf1ba90f96c8aa205af", "23c930ba398c6bdf4c119b30bae509946ca8a483c9b0cb18e9ac6bd238220d80", "ef982f6420391eeaaf23c475afb230fcee91afc2183c4b945403283802d09e8a"],
+  ["getting-started-debate", "ro", "1edec9fe3ae21b3f1f4ea59e6be3e4124be7b5332bf5b29e1e2d31977cd4deca", "33a8fc6a0bd1dd38de5e0bdea12600a422f00d7d0d4819c7bc182554e0d9d734", "a5d2d9f051896716213aabe9f48c97257778ded6cb054dec0d7b32d615549c4a"],
   ["guide-how-it-works", "en", "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5", "758085d81051393bd3520c43c84a23689a652c5dc6b15e0154a46a1fcf7cd528", "c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265"],
-  ["guide-how-it-works", "ro", "94acc4db2ccecb9a0d4f5b82350e91d26643b76c6caff879019edc107a3e3000", "65482fb1f90d62942b4e6f87a289c151978250fb385efc10d12c8e239780c195", "cb344a791adc4616c177c993b4f186595725f6ea3de8b1f95fcd8a6f0ff07ed8"],
-  ["privacy-consent", "en", "54cca7dbfb790c9d6aac077b00775e5ac6d5bc277be38733e92047bc63c262d5", "5de30c60b097bc464f12d9aef13fbc67e0c15c6d5aa4ca1a91f82fe77fc394ae", "419fbdd08f1d581b9484d6df1cb6b63077aef93ab627b9ab87c0c6054ce66d49"],
-  ["privacy-consent", "ro", "e9b04331a2aa76d3ed9bd45c2199263dc476ae62d15c33db30ed537fedeb5c5d", "7db208bec972f230adaddf05162305126e6aeeb431fd66bad468886e2c62710e", "940316e6b1a66598baa91183116c92477be57df65885dc22b1ce4954393e11f6"],
+  ["guide-how-it-works", "ro", "c396a00502bb96aaf7e981d20482a4068ba14f4d796fb1f8079162d3aa5b0568", "f34118491cc1fdfd73f1a810c00e6acd298928a51cb906710179ec8e644599b7", "cbf7d875d34bbb3a6a9ae338cb47a622340ddb3de3f6c1278336b1515d52a872"],
+  ["privacy-consent", "en", "0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f", "8ba452e770941a43e53f7131cb1513f34ee787755d71a8b1900e171e5fbe269e", "3fe7da1ecfe2848622b10234fac52d5283a30a4473a0adada8eb9e6555b24824"],
+  ["privacy-consent", "ro", "a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6", "e64bb25be8385d23793bf41fb6e5c9d439ae56e47b9568fc9fba0d13bd407b33", "d90423906e3d6502ae6585462f2a8e4fca9608c6c2bc99fba4be6e4c74ea0c4c"],
   ["product-identity", "en", "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa", "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64", "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032"],
   ["product-identity", "ro", "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391", "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40", "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812"],
   ["public-answer-disclosure", "en", "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea", "1ee826de541e74d701fd502bfe70e85c009da2b94d3e6d38c1fc98924f251670", "9c733e8f40697f0cd9f15f5984947edaff532a10bc3375d10ca94747e10cc569"],
@@ -133,17 +159,17 @@ const EXPECTED = [
   ["publish-a-debate", "en", "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29", "83119e6803f854c04ad0153b55cc69212563a92f6b7e350ef29f656ff6c90a3c", "b2974fdf83f15e7142380698b7b21a95bd9efe7cbcfaa5d07028f292bcfd53ef"],
   ["publish-a-debate", "ro", "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c", "834ec781e6645753549cfca72d8d7bdc70ecb425f1eba125b25c5e04410ea598", "a6f1ef4a94b53df2d77fdd63a14c3f596adaac6b437ab3586424d21815284b26"],
   ["risk-tier-choice", "en", "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715", "37a5e399d53e5c284febfd79f40fe36bfc611eddb254ccb9a758469e66557929", "7908d0b36c5c62a863ee064095bc3f528792d9588fba9f88c523ea978dffb7f2"],
-  ["risk-tier-choice", "ro", "f40e8583d9ec012f6510c4f6ae6a6527680bc279f393388dc8cd2a31762f4d96", "0845807a9ba9cc68c608a5be752fdbaa08147fe8aed5a06a61021bb91675a34a", "d35f24c30f5998d0a8945f6efdd97cbebf45c0612b6181ff47c48c81951b02ab"],
-  ["settings-help-menus", "en", "b19d5a8f0da2325584d2ef25e7e7d30f11156833709a011d0a312eeaaf425348", "948f19150d75fd7187d7c5e24a7caf01f7524186da1ce812f63a461406d61ae2", "948f19150d75fd7187d7c5e24a7caf01f7524186da1ce812f63a461406d61ae2"],
-  ["settings-help-menus", "ro", "4b3d62f781328233dbccfedcd9a9a0ebce84e66f342b5ee5e862b7d2fab8c2fc", "c728d7fd0698dc1f8b2361d467425116fd680559d655696fa997647c9e5a0f07", "c728d7fd0698dc1f8b2361d467425116fd680559d655696fa997647c9e5a0f07"],
+  ["risk-tier-choice", "ro", "00cffb0532c7f79072da508618c3f2f0b5d93fac02dc5c574b662f3355032173", "cbdf51987dff98813c12728216ba81b88559869d2e165018698ed286dcb928a5", "3d938be89e4673f9958381aa1e652ce2ee377d38cb5701c689701391f8774874"],
+  ["settings-help-menus", "en", "cc1e1a979bf1e138a7e44b19ebc86f67417245b9741a6d6094c9dbf44ed5f839", "2e9dcfcaa8f0ea5b99e38439a48f0139665894ad180ebb113642550e79dcc101", "2e9dcfcaa8f0ea5b99e38439a48f0139665894ad180ebb113642550e79dcc101"],
+  ["settings-help-menus", "ro", "e4cb119bcbb186db0e0904a0aae4829b63c057385b3232a7edccb3e18ae7667a", "740bd73c42eb1b5bec8dece0ef18cacabc373ad14e125ba551a516f2e661f500", "740bd73c42eb1b5bec8dece0ef18cacabc373ad14e125ba551a516f2e661f500"],
   ["support-cases", "en", "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e", "04ff511b177c062b1fa66397db84ac7295b75319e2c27fc870aaff171c43ae76", "df37d0f11029ff345c6f303c425bdeb36435ab0a51e0dbddf22ffd0877ca49a1"],
-  ["support-cases", "ro", "4073ca95886bd56063c9f6ff49b959e3affa5c5a0a9000b6ecf6ff2171535977", "23df826d8a8701abb080a371df942b978885224bb612140c54221f2806615c2a", "62bbe76506089edca69ffca3d820f7ebd9610f831cf6a3b007efe00125cb971f"],
-  ["support-status-limits", "en", "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7", "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385", "3aafc3b34626b517e8827a8ff0ab9fa6deadf978dee235bd6d78936f37354375"],
-  ["support-status-limits", "ro", "0ba2909d0b6bf0dbb731e6c19ceff73cd99babbfed69949aec3b28d57f732bfa", "05ede1015a5f66f5a5e2e564d061353d433c3af82ea2871bf9489764a27915f0", "b14e495dcccbcf8d01c1e6213e28ee4c738ee405c6ea8eb4cc572d79f7a73b5e"],
+  ["support-cases", "ro", "94112fb709ec5cf8a408106eef2d9efc43e51cfcd74b25cc7d6a41912a054749", "752edeef206e2675bed63f5c2179f287e66db694e4243df56dbd97382d586eb9", "6a6d5f9d737e0e0c692a7ae9b0dc24434ba5871de62b3fcd0e955e6fe1894a9f"],
+  ["support-status-limits", "en", "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7", "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385", "875854ecea195464759705f8035052bd5389c71a1acc439713326784bb5e2981"],
+  ["support-status-limits", "ro", "ca0b2c95cbce0f684867a92c6f2551829b89c0c18e83b9c1af921a9f8af3d2be", "6976ed6a37edafff50ea7d0e82d31cc2fc82a6ee4f194cc1e13aa911904a093e", "f4a18f49bb1010aa86579a2eac64761a0ac85f6fbbe2afeba8495acbe2e084da"],
   ["unpublish-a-debate", "en", "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2", "64f871c823dd78f05d18f50ec45373fa07a9ad79f72b4234c8adc9aae443db0b", "db2b5340f4c9089567e0c8b4559cc9ac4749039b91bd3a8b2fbbd5c799991c1f"],
   ["unpublish-a-debate", "ro", "a741f94571245aadbb6f25d6da5c3c5b87bdf5bf72fa4c5aaf8e03980abce9d0", "9be645d5de8cd8f8c26603966f9e9b8f3d58b7cb7c8a95e9cb7b0fd71289fe25", "b8e1ec1cf886a71658412f2b4bcfdb0dd8c91cd424c94aad3df4c377ecd2af7f"],
   ["unsupported-capabilities", "en", "6e7f19d6d7c00fe4d10660e4dff7ad52e16ae8ff3d85cea13717780af586ec6f", "784bf45291c975c87dd6bb1a11f5b1812ecbefc7f0f52ee5cfb66dbdb4f6e9bd", "4feec8aa3b78a1d52916a3484adce247fb94a68b2107c1d5816fdc9c29e7f41f"],
-  ["unsupported-capabilities", "ro", "c07bb1a6a85f14a034a134a08250f22721f772ce54bd77d18ff63f7df93d350b", "c9865d48ace58951f1c0c5bf85cd99b50dd6985d276fdeff7d4094e060c9acb5", "48de85c1329b80861e5bc5a7d1e2ce2dee433ec1f7bfd67ce0cd4596644702d2"],
+  ["unsupported-capabilities", "ro", "b2ebdc765ec96488ec564c1b5cd00d9d3f9e390abaf17cd5868ec7b505197f85", "b8d3adac101ca1f2814fa32e3b7cd307ed497f3158881dc834ea7cd2d5136da4", "b223418e6d366bd25ac2d36bfc64b43c40206776c1fc298839327349e721b8d0"],
   ["view-public-debate", "en", "995068c814cec3ba1dd0f0ecf320bea04fc8c66acc9703b8cd70cec72cfca053", "c0185e375681e9d609b041f1e7fbbc1e33bd4c4c6489a3ea715fd52797ba35ab", "6d06676fd87b3c96b5194ea459eec98846f322ef28a7890a1261667a37f71ac5"],
   ["view-public-debate", "ro", "9faf157365acb8b560208eb822cda7cd42c83e845d2a551853ea5c97ccf9c260", "b084890fbed2cc9e663966f07ddeff0be6c3bef33bbfb9edfb6b8f38d579df40", "a69efa62f629372892e35d12f5d258c93409e4ca585205c7616bb637e01e7de6"],
 ] as const;
@@ -175,7 +201,11 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(["account-settings","settings-help-menus"].includes(id) ? ACCOUNT_FLOW_REVIEW : id === "ai-transparency"
+        ...(["account-access","account-settings","settings-help-menus"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
+          ? S05_OWNER_REVIEW
+          : S02_IDS.has(id)
+          ? S02_OWNER_REVIEW
+          : id === "ai-transparency"
           ? OWNER_REVIEW
           : id === "debate-workspace-menus"
           ? QUALITY_REVIEW
@@ -192,12 +222,12 @@ describe("production Support recovery attestation", () => {
       schemaVersion: 2,
       catalog: {
         sha256:
-          "cb302f5103c91c53990efeee1604083ec0bc099296a356968ba43d421e5e5df5",
+          "b07e81ae502bd9f5d2928d5689ca110ea2bcd639039803888a19f2f8f2b595c6",
         ...CATALOG_REVIEW,
       },
       recovery: {
         componentFileSha256:
-          "53ba9f42e9984a5c152f55934f6c47bb517e16d5adffdb23e85f07f5759e20dc",
+          "9085ddb2f2b8fc9b743be89e304a089b5a10f094cf636cdfb72c0167ca6c11bd",
         components: expectedRows,
       },
     });
@@ -211,7 +241,7 @@ describe("production Support recovery attestation", () => {
       previewReviewedCount: 17,
       ownerRatifiedCount: 6,
       recoveryReviewedCount: 23,
-      recoveryOwnerRatifiedCount: 1,
+      recoveryOwnerRatifiedCount: 4,
     });
 
     for (const [index, expected] of EXPECTED.entries()) {

@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { RegisterRequestSchema, RegistrationVerificationAckSchema } from './consumer-auth.js';
+import { parseDeclaredRegion } from "@debateai/kernel";
+import { RegisterRequestFieldsSchema, RegistrationVerificationAckSchema } from './consumer-auth.js';
 export const SocialProviderSchema = z.enum(['google', 'apple', 'facebook', 'x']);
 const Handle = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const AuthProvidersResponseSchema = z.object({ providers: z.array(z.object({ id: SocialProviderSchema, name: z.enum(['Google', 'Apple', 'Facebook', 'X']) }).strict()).max(4) }).strict();
@@ -11,7 +12,7 @@ export const SocialLoginStatusResponseSchema = z.object({ expires_at: z.iso.date
 export type SocialLoginStatusResponse = z.infer<typeof SocialLoginStatusResponseSchema>;
 export const SocialSignupStatusRequestSchema = z.object({ continuation_token: Handle }).strict();
 export const SocialSignupStatusResponseSchema = z.object({ provider: SocialProviderSchema, email: z.email().max(254).nullable(), name: z.string().max(256).nullable(), expires_at: z.iso.datetime() }).strict();
-export const CompleteSocialSignupRequestSchema = RegisterRequestSchema.omit({ password: true }).extend({ continuation_token: Handle }).strict();
+export const CompleteSocialSignupRequestSchema = RegisterRequestFieldsSchema.omit({ password: true }).extend({ continuation_token: Handle }).strict().refine(input => parseDeclaredRegion(input) !== null, { message: "Invalid declared region" });
 export const CompleteSocialSignupResponseSchema = z.union([RegistrationVerificationAckSchema, z.object({ status: z.literal('mfa_required'), enrollment_token: Handle, expires_at: z.iso.datetime() }).strict()]);
 export const UnlinkSocialProviderRequestSchema = z.object({ provider: SocialProviderSchema, step_up_grant: Handle }).strict();
 export const SocialLinksResponseSchema = z.object({ providers: z.array(z.object({ provider: SocialProviderSchema, linked_at: z.iso.datetime(), removable: z.boolean() }).strict()).max(4) }).strict();

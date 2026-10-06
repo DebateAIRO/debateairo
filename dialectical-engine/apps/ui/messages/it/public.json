@@ -126,6 +126,7 @@
   "public.report.models": "Modelli che hanno partecipato: {models}",
   "public.report.modelsNotRecorded": "Modelli che hanno partecipato: non registrati",
   "public.report.disclosure": "Questo rapporto è stato scritto da modelli di IA a partire dagli argomenti del dibattito.",
+  "public.report.notAdvice": "Rapporto generato dall’IA. Non costituisce consulenza medica, legale, finanziaria o altra consulenza professionale.",
   "public.report.title.inShort": "In breve",
   "public.report.title.story": "La storia completa",
   "public.report.title.why": "Perché questa risposta",

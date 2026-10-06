@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "DEBATEAI_REPLAY_RESULT"
+    },
+    "formatVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "momentId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "candidate": {
+      "type": "object",
+      "properties": {
+        "providerRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maker": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thinkingLevel": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "providerRef",
+        "maker",
+        "modelId",
+        "thinkingLevel"
+      ],
+      "additionalProperties": false
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "FAILED",
+        "TIMED_OUT",
+        "REFUSED",
+        "CONTEXT_TOO_LARGE",
+        "USAGE_CAP"
+      ]
+    },
+    "replyText": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "parsed": {},
+    "usage": {
+      "type": "object",
+      "properties": {
+        "reportedInputTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outputTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "thinkingTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "reportedInputTokens",
+        "outputTokens",
+        "thinkingTokens"
+      ],
+      "additionalProperties": false
+    },
+    "promptTokensEstimate": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "promptFingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "fingerprintMatchesRecorded": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "contractHashMatches": {
+      "type": "boolean"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+    }
+  },
+  "required": [
+    "kind",
+    "formatVersion",
+    "momentId",
+    "candidate",
+    "outcome",
+    "replyText",
+    "parsed",
+    "usage",
+    "promptTokensEstimate",
+    "seconds",
+    "promptFingerprint",
+    "fingerprintMatchesRecorded",
+    "contractHashMatches",
+    "startedAt"
+  ],
+  "additionalProperties": false
+}

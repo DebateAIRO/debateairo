@@ -5,7 +5,6 @@
   "debateChrome.backToLibrary": "← Natrag u knjižnicu",
   "debateChrome.loading": "Učitavanje…",
   "debateChrome.error.claimGenerationFailed": "Stvaranje tvrdnje nije uspjelo",
-  "debateChrome.error.debateGenerationFailed": "Stvaranje rasprave nije uspjelo: {reason}",
   "debateChrome.error.unableToLoadDebate": "Nije moguće učitati raspravu",
   "debateChrome.error.unableToLoadScoring": "Nije moguće učitati bodovanje",
   "debateChrome.error.unableToLoadAdaptiveDepth": "Nije moguće učitati probni rad prilagodljive dubine",
@@ -288,5 +287,13 @@
   "requestFailure.kind.PLAN_TIER_UNAVAILABLE": "Koordinator je odbio zahtjev: model potreban za ovaj plan trenutačno nije dostupan. Pokušajte ponovno kasnije ili odaberite drugi plan.",
   "requestFailure.kind.ALREADY_WAITING": "Samo jedno pitanje može čekati u isto vrijeme. Ovo postavite nakon što započne vaša rasprava na čekanju.",
   "requestFailure.kind.UNCLASSIFIED": "Došlo je do pogreške prije nego što je stigao odgovor, pa je ishod nepoznat. To nije odluka koordinatora.",
-  "debateChrome.error.fundingEnded": "Interno financiranje ove rasprave na čekanju završilo je. Ponovno postavite pitanje kako biste koristili trenutačnu kvotu."
+  "debateChrome.error.fundingEnded": "Interno financiranje ove rasprave na čekanju završilo je. Ponovno postavite pitanje kako biste koristili trenutačnu kvotu.",
+  "runFailure.NOT_STARTED": "Nešto je pošlo po zlu na našoj strani prije nego što je ova rasprava počela. Molimo, pitajte ponovno.",
+  "runFailure.MODELS_UNAVAILABLE": "Ova rasprava nije mogla započeti jer modeli umjetne inteligencije koji su joj potrebni nisu bili dostupni. Molimo, pokušajte ponovno malo kasnije.",
+  "runFailure.RUN_LIMIT_REACHED": "Ova je rasprava dosegnula svoje ograničenje prije nego što je mogla dati odgovor.",
+  "runFailure.STOPPED": "Ova je rasprava prekinuta na pola puta zbog problema na našoj strani. Molimo, ponovno postavite svoje pitanje.",
+  "runFailure.PLAN_ENDED": "Vaš plaćeni plan je istekao ili je pauziran dok je ovo pitanje čekalo, pa rasprava nije počela. Možete ga ponovno postaviti.",
+  "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Ova bi rasprava stajala više nego što ova stranica dopušta za jednu raspravu.",
+  "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinator je odbio zahtjev: za jedan od zadataka rasprave trenutačno nije dostupan nijedan model umjetne inteligencije. Pokušajte ponovno kasnije.",
+  "debateChrome.condition.backupModelUsed": "Gdje se planirani model umjetne inteligencije nije mogao upotrijebiti, zamijenio ga je drugi"
 }

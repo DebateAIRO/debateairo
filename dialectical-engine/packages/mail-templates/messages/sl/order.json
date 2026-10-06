@@ -1,0 +1,5 @@
+{
+  "order.planDescription": "Mesečni paket DebateAI {plan}",
+  "order.cardCheck": "Preverjanje kartice DebateAI",
+  "invoice.line": "Paket DebateAI {plan}, od {from} do {to}"
+}

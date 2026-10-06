@@ -11,6 +11,7 @@ import {
   AUTH_POLICY_REGISTER_ROWS,
   AUTH_POLICY_ROW_KEYS,
   MFA_POLICY_REGISTER_ROW,
+  MODEL_SCORECARD_ROW_KEY,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   RECOVERY_POLICY_REGISTER_ROW,
   SESSION_POLICY_REGISTER_ROW,
@@ -279,7 +280,8 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     ]) expect(statusBlock).toContain(`${field}:`);
     expect(statusBlock).not.toMatch(/(?:password|connection[_ ]?url|token|transcript|ip_address|identity|raw_response)/iu);
 
-    expect(runtimeEnvironment.match(/REGISTER_VERSION: legacyRegisterVersion/gu)).toHaveLength(2);
+    // The API, the runner and (paid plans P14b) the owner's billing commands each read an explicit REGISTER_VERSION.
+    expect(runtimeEnvironment.match(/REGISTER_VERSION: legacyRegisterVersion/gu)).toHaveLength(3);
     expect(runtimeEnvironment).not.toMatch(
       /REGISTER_VERSION:\s*legacyRegisterVersion\s*[.]\s*(?:default|optional|catch)/u
     );
@@ -447,14 +449,31 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     // DEPLOYMENT rows, so `historicalRows` stays 14 and the legacy hash is
     // untouched. MEASURED: the port emits 60 with no duplicate keys, and 58 with
     // exactly the two billing keys removed.
+    //
+    // PAID PLANS (spec 2026-09-29 §2.5.9, Task P16a): +1. The deployment now also seals
+    // `taxAuthorities`. A DEPLOYMENT row, so `historicalRows` stays 14 and the legacy hash is untouched.
+    // MEASURED: the port emits 61 with no duplicate keys, and 60 with the key removed.
+    //
+    // hate-speech S02 x THE OWNER'S RULING OF 2026-10-04: +1. The deployment now also seals `publicationCheckPolicy`
+    // (the pre-publish check's deadline; packages/register/src/publication-check-policy.ts). A DEPLOYMENT row, so
+    // `historicalRows` stays 14 and the legacy hash is untouched. MEASURED: the port emits 62 with no duplicate keys,
+    // and 61 with the key removed.
     const storyKeys: readonly string[] = STORY_ROW_KEYS;
-    expect(developmentRows).toHaveLength(61);
-    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(55);
-    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(60);
-    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(60);
-    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(60);
-    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(59);
-    expect(developmentRows.filter(row=>row.rowKey!=="consumerRecoveryPolicy")).toHaveLength(60);
+    expect(developmentRows).toHaveLength(63);
+    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(57);
+    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(62);
+    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(62);
+    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(62);
+    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(61);
+    expect(developmentRows.filter((row) => row.rowKey !== "taxAuthorities")).toHaveLength(62);
+    expect(developmentRows.filter((row) => row.rowKey !== "publicationCheckPolicy")).toHaveLength(62);
+    // A19 x MODEL SCORECARD: it adds no row to these counts, deliberately (paid plans S1a: +0). `modelScorecard` is NOT a
+    // code-owned deployment row: local mode reads the bundled public file
+    // (scorecards/current.json), and the hosted scorecard is an ADDITIVE operator
+    // row published with `--scorecard`. A code-owned default would seal the
+    // one-version-behind public scorecard wherever an operator forgot the flag.
+    expect(developmentRows.map((row) => row.rowKey)).not.toContain(MODEL_SCORECARD_ROW_KEY);
+    expect(developmentRows.filter(row=>row.rowKey!=="consumerRecoveryPolicy")).toHaveLength(62);
     expect(developmentRows.filter(row=>row.rowKey==="consumerRecoveryPolicy")).toHaveLength(1);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
@@ -594,9 +613,10 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     const db=await startTestDatabase();
     try {
       await migrate(db.pool);
-      const state=async()=> (await db.pool.query(`SELECT r.rolcanlogin AS "ownerLogin",(SELECT count(*)::int FROM pg_auth_members WHERE roleid=r.oid) AS "ownerMemberships",EXISTS(SELECT 1 FROM pg_roles caller CROSS JOIN pg_proc f WHERE NOT caller.rolsuper AND caller.oid<>r.oid AND f.oid=ANY($1::regprocedure[]) AND has_function_privilege(caller.oid,f.oid,'EXECUTE')) AS "ordinaryCallable" FROM pg_roles r WHERE r.rolname='debateai_password_recovery_owner'`,[HISTORICAL_READER_SITES.map(x=>x.signature)])).rows[0];
+      const state=async()=> (await db.pool.query(`SELECT r.rolcanlogin AS "ownerLogin",(SELECT count(*)::int FROM pg_auth_members WHERE roleid=r.oid) AS "ownerMemberships",EXISTS(SELECT 1 FROM pg_roles caller CROSS JOIN pg_proc f WHERE NOT caller.rolsuper AND caller.oid<>r.oid AND caller.rolname<>'debateai_mfa_recovery_owner' AND f.oid=ANY($1::regprocedure[]) AND has_function_privilege(caller.oid,f.oid,'EXECUTE')) AS "ordinaryCallable" FROM pg_roles r WHERE r.rolname='debateai_password_recovery_owner'`,[HISTORICAL_READER_SITES.map(x=>x.signature)])).rows[0];
       const evidence=await state(),historical=await readFile(HISTORICAL_READER_FILE,'utf8');
       expect(evidence).toEqual({ownerLogin:false,ownerMemberships:0,ordinaryCallable:false});
+      expect((await db.pool.query("SELECT has_function_privilege('debateai_mfa_recovery_owner','identity.password_recovery_rules(bigint)','EXECUTE') policy,has_function_privilege('debateai_mfa_recovery_owner','identity.password_recovery_start(bytea,uuid,uuid[],jsonb,text,text,jsonb,jsonb,bigint)','EXECUTE') mutator")).rows[0]).toEqual({policy:true,mutator:false});
       const retired=sites.filter(site=>readerClassification(site,census.sources.get(site.file)??'',evidence)==='RETIRED_HISTORICAL_READER');
       expect(retired).toEqual(HISTORICAL_READER_SITES.map(site=>({file:HISTORICAL_READER_FILE,...site})));
       expect(sites.filter(site=>!retired.includes(site))).toEqual([]);

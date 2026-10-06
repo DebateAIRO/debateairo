@@ -56,8 +56,15 @@
   "chrome.footer.location": "Βουκουρέστι, Ρουμανία",
   "chrome.footer.product": "Προϊόν",
   "chrome.footer.home": "Αρχική",
-  "chrome.footer.cookiePreferences": "Προτιμήσεις cookie",
+  "chrome.footer.cookiePreferences": "Τα cookies που αποθηκεύουμε",
   "chrome.security": "Ασφάλεια",
   "chrome.logout": "Αποσύνδεση",
-  "chrome.accountError": "Κάτι δεν λειτούργησε. Φορτώστε ξανά τη σελίδα και δοκιμάστε πάλι."
+  "chrome.accountError": "Κάτι δεν λειτούργησε. Φορτώστε ξανά τη σελίδα και δοκιμάστε πάλι.",
+  "chrome.footer.pricing": "Τιμές",
+  "chrome.footer.cancel": "Ακύρωση προγράμματος",
+  "chrome.footer.withdraw": "Υπαναχώρηση από πρόγραμμα",
+  "chrome.footer.paymentMarks": "Κάρτες που δεχόμαστε",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

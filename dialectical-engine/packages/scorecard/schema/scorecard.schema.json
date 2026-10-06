@@ -1,0 +1,581 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "DEBATEAI_SCORECARD"
+    },
+    "formatVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "scorecardVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "createdAt": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(?:T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:\\d{2}))?$"
+    },
+    "testSetVersion": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "engineCompatibility": {
+      "type": "object",
+      "properties": {
+        "minEngineVersion": {
+          "type": "string",
+          "pattern": "^\\d{1,9}(?:\\.\\d{1,9}){0,7}$"
+        },
+        "maxEngineVersion": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^\\d{1,9}(?:\\.\\d{1,9}){0,7}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "minEngineVersion",
+        "maxEngineVersion"
+      ]
+    },
+    "languages": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "ro",
+          "en"
+        ]
+      }
+    },
+    "candidates": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$"
+          },
+          "vendor": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "maker": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "modelId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$"
+          },
+          "thinkingLevel": {
+            "type": "string",
+            "pattern": "^(?:[a-z][a-z0-9_-]{0,31}|DEFAULT_ONLY)$"
+          },
+          "accessRoutes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "API"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "SUBSCRIPTION"
+                    },
+                    "tool": {
+                      "type": "string",
+                      "enum": [
+                        "claude",
+                        "codex",
+                        "grok",
+                        "agy",
+                        "pi"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "tool"
+                  ]
+                }
+              ]
+            }
+          },
+          "apiPrice": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "inputMicrosPerMTok": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "outputMicrosPerMTok": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "asOf": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}(?:T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:\\d{2}))?$"
+                  },
+                  "source": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  }
+                },
+                "required": [
+                  "inputMicrosPerMTok",
+                  "outputMicrosPerMTok",
+                  "asOf",
+                  "source"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contextWindowTokens": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "candidateId",
+          "vendor",
+          "maker",
+          "modelId",
+          "thinkingLevel",
+          "accessRoutes",
+          "apiPrice"
+        ]
+      }
+    },
+    "roles": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "POSITION",
+          "SUPPORT_ATTACK",
+          "CROSS_EXCHANGE",
+          "JUDGE",
+          "REVIEWER",
+          "ANSWER_WRITER",
+          "ANSWER_CHECKER"
+        ]
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "candidateId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$"
+            },
+            "tier": {
+              "type": "string",
+              "enum": [
+                "TOP",
+                "GOOD_VALUE",
+                "AVOID",
+                "UNTESTED"
+              ]
+            },
+            "quality": {
+              "type": "object",
+              "properties": {
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "low": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "high": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              },
+              "required": [
+                "score",
+                "low",
+                "high"
+              ]
+            },
+            "qualityByLanguage": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "ro": {
+                      "type": "object",
+                      "properties": {
+                        "score": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "low": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "high": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        }
+                      },
+                      "required": [
+                        "score",
+                        "low",
+                        "high"
+                      ]
+                    },
+                    "en": {
+                      "type": "object",
+                      "properties": {
+                        "score": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "low": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "high": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        }
+                      },
+                      "required": [
+                        "score",
+                        "low",
+                        "high"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "typicalCall": {
+              "type": "object",
+              "properties": {
+                "inputTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "outputTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "thinkingTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "seconds": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "inputTokens",
+                "outputTokens",
+                "thinkingTokens",
+                "seconds"
+              ]
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+                  },
+                  "strength": {
+                    "type": "string",
+                    "enum": [
+                      "STRONG",
+                      "WEAK"
+                    ]
+                  },
+                  "text": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  }
+                },
+                "required": [
+                  "code",
+                  "strength",
+                  "text"
+                ]
+              }
+            },
+            "promptVersion": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "itemsMeasured": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "measuredAt": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}(?:T\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,9})?)?(?:Z|[+-]\\d{2}:\\d{2}))?$"
+            }
+          },
+          "required": [
+            "candidateId",
+            "tier",
+            "quality",
+            "typicalCall",
+            "tags",
+            "promptVersion",
+            "itemsMeasured",
+            "measuredAt"
+          ]
+        }
+      },
+      "required": [
+        "POSITION",
+        "SUPPORT_ATTACK",
+        "CROSS_EXCHANGE",
+        "JUDGE",
+        "REVIEWER",
+        "ANSWER_WRITER",
+        "ANSWER_CHECKER"
+      ]
+    },
+    "pickerSettings": {
+      "type": "object",
+      "properties": {
+        "balancedMargin": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "economyCap": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "POSITION",
+              "SUPPORT_ATTACK",
+              "CROSS_EXCHANGE",
+              "JUDGE",
+              "REVIEWER",
+              "ANSWER_WRITER",
+              "ANSWER_CHECKER"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "moneyMicrosPerCall": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "secondsPerCall": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "moneyMicrosPerCall",
+              "secondsPerCall"
+            ]
+          },
+          "required": [
+            "POSITION",
+            "SUPPORT_ATTACK",
+            "CROSS_EXCHANGE",
+            "JUDGE",
+            "REVIEWER",
+            "ANSWER_WRITER",
+            "ANSWER_CHECKER"
+          ]
+        },
+        "freeCap": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "POSITION",
+              "SUPPORT_ATTACK",
+              "CROSS_EXCHANGE",
+              "JUDGE",
+              "REVIEWER",
+              "ANSWER_WRITER",
+              "ANSWER_CHECKER"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "moneyMicrosPerCall": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "moneyMicrosPerCall"
+            ]
+          },
+          "required": [
+            "POSITION",
+            "SUPPORT_ATTACK",
+            "CROSS_EXCHANGE",
+            "JUDGE",
+            "REVIEWER",
+            "ANSWER_WRITER",
+            "ANSWER_CHECKER"
+          ]
+        },
+        "planStrengthCaps": {
+          "type": "object",
+          "properties": {
+            "free": {
+              "type": "string",
+              "enum": [
+                "ECONOMY",
+                "BALANCED",
+                "BEST"
+              ]
+            },
+            "premium": {
+              "type": "string",
+              "enum": [
+                "ECONOMY",
+                "BALANCED",
+                "BEST"
+              ]
+            }
+          }
+        },
+        "defaultStrength": {
+          "type": "string",
+          "enum": [
+            "ECONOMY",
+            "BALANCED",
+            "BEST"
+          ]
+        },
+        "diversityShare": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5
+        },
+        "runnerUpCostTolerance": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "balancedMargin",
+        "economyCap",
+        "planStrengthCaps",
+        "defaultStrength",
+        "diversityShare",
+        "runnerUpCostTolerance"
+      ]
+    }
+  },
+  "required": [
+    "kind",
+    "formatVersion",
+    "scorecardVersion",
+    "createdAt",
+    "testSetVersion",
+    "engineCompatibility",
+    "languages",
+    "candidates",
+    "roles",
+    "pickerSettings"
+  ]
+}

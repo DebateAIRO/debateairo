@@ -126,6 +126,7 @@
   "public.report.models": "भाग लेने वाले मॉडल: {models}",
   "public.report.modelsNotRecorded": "भाग लेने वाले मॉडल: दर्ज नहीं",
   "public.report.disclosure": "यह रिपोर्ट AI मॉडलों ने वाद-विवाद के तर्कों के आधार पर लिखी है।",
+  "public.report.notAdvice": "AI द्वारा जनरेट की गई रिपोर्ट। यह चिकित्सीय, विधिक, वित्तीय या अन्य व्यावसायिक सलाह नहीं है।",
   "public.report.title.inShort": "संक्षेप में",
   "public.report.title.story": "पूरी कहानी",
   "public.report.title.why": "यही उत्तर क्यों",

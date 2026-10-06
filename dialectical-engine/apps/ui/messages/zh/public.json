@@ -126,6 +126,7 @@
   "public.report.models": "参与的模型：{models}",
   "public.report.modelsNotRecorded": "参与的模型：未记录",
   "public.report.disclosure": "本报告由 AI 模型根据辩论中的论点撰写。",
+  "public.report.notAdvice": "AI 生成的报告。本报告不构成医疗、法律、财务或其他专业建议。",
   "public.report.title.inShort": "简而言之",
   "public.report.title.story": "完整经过",
   "public.report.title.why": "为何得出这个答案",

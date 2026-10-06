@@ -5,6 +5,7 @@ import {
   type CryptoEnvelope
 } from "@debateai/crypto";
 import type { SignUpAcceptanceRow } from "./legal-acceptance.js";
+import type { DeclaredRegion } from "@debateai/kernel";
 
 export interface AuthSourceContext {
   readonly ip: string;
@@ -18,6 +19,8 @@ export interface AuthSourceContext {
 
 export interface PendingAccountInput {
   readonly userId: string;
+  /** Region picker S01: the declared region; absent only in compositions that bypass the register hook. */
+  readonly declaredRegion?: DeclaredRegion;
   readonly emailBlindIndex: Buffer;
   readonly emailCiphertext: CryptoEnvelope;
   readonly recoveryEmailCiphertext: CryptoEnvelope | null;
@@ -277,6 +280,12 @@ export class PostgresIdentityRepository {
           input.occurredAt
         ]);
       }
+      // Region picker S01 (SPEC R19): the declared region, in this transaction, on both creation paths.
+      if (input.declaredRegion !== undefined) {
+        await client.query("SELECT identity.record_registration_region($1,$2,$3)", [
+          row.user_id, input.declaredRegion.country, input.declaredRegion.usState
+        ]);
+      }
       await beforeCommit();
       return Object.freeze({
         status: "created" as const,
@@ -301,6 +310,18 @@ export class PostgresIdentityRepository {
       auditToken: row.audit_token,
       addressKey: row.address_key
     });
+  }
+
+  /**
+   * P13: the owner of an ACTIVE account whose sign-up address has this blind index. Used only by the public cancel
+   * link, whose route has already answered; the result never reaches the caller. Every other state
+   * (pending_verification, pending_mfa, suspended, deleted, and 0077's age_frozen) answers null.
+   */
+  async ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> {
+    const result = await this.pool.query<{ owner_ref: string }>(
+      `SELECT owner_ref FROM identity."user" WHERE email_blind_index=$1 AND state='active'`, [emailBlindIndex]
+    );
+    return result.rows[0]?.owner_ref ?? null;
   }
 
   async findAuditIdentityByVerificationHash(tokenHash: string): Promise<{

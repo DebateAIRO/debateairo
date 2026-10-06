@@ -20,11 +20,13 @@ import {
   parseCanonicalRegisterJson,
   persistBootstrapRegister,
   readAuthPolicy,
+  readCallTokenCeilings,
   readDeploymentRiskTier,
   readMfaPolicy,
   readLivenessPolicy,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
+  readPublicationCheckPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -441,7 +443,7 @@ describe("DEV-05 complete development deployment register", () => {
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
     const registerVersion = registerVersionToSafeLegacyNumber(first.registerVersion);
     await expect(readConsumerRecoveryPolicy(database.pool,registerVersion)).resolves.toMatchObject({kind:'CONSUMER_RECOVERY_POLICY',token_ttl_ms:900000,capability_ttl_ms:300000,maximum_send_attempts:3,dispatch:'SHARED_SELECTED_AUTH_MAIL_PERMIT_BEFORE_BOTH_MECHANISMS_WITH_PRETRANSPORT_RESPONSE_FLOOR'});
-    const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk] = await Promise.all([
+    const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk, callTokenCeilings, publicationCheck] = await Promise.all([
       readAuthPolicy(database.pool, registerVersion),
       readMfaPolicy(database.pool, registerVersion),
       readSessionPolicy(database.pool, registerVersion),
@@ -450,8 +452,14 @@ describe("DEV-05 complete development deployment register", () => {
       readDeploymentMakerCapability(database.pool, registerVersion),
       readPanelDiscoveryPolicy(database.pool, registerVersion),
       readStructuralCeilingPolicyInputs(database.pool, registerVersion),
-      readDeploymentRiskTier(database.pool, registerVersion)
+      readDeploymentRiskTier(database.pool, registerVersion),
+      // Final review I3: the API's "call-token-ceilings" boot stage resolves on the sealed rows.
+      readCallTokenCeilings(database.pool, registerVersion),
+      // Owner's ruling 2026-10-04: the API's "publication-check-policy" boot stage reads the sealed deadline back.
+      readPublicationCheckPolicy(database.pool, registerVersion)
     ]);
+    expect(callTokenCeilings).toEqual({ judge: 2048, synthesizer: 2048, evaluator: 2048 });
+    expect(publicationCheck).toEqual({ deadlineMs: 60_000 });
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);
     expect(auth.verification).toMatchObject({ resendCooldownMs: 60_000, outboundSendWindowMs: 3_600_000,
       outboundSendMax: 3, outboundSendMechanism: "atomic_rolling_reservation_ledger" });
@@ -475,13 +483,15 @@ describe("DEV-05 complete development deployment register", () => {
     expect(roles.roles.slice(2).every((role) => role.grants.length === 0)).toBe(true);
     expect(makers).toMatchObject({
       deploymentMakerCapability: true,
-      configuredMakers: ["Anthropic", "OpenAI", "xAI"],
+      configuredMakers: ["Anthropic", "Google", "OpenAI", "Z.AI", "xAI"],
       configuredProviders: [
         { providerRef: "development:codex-cli", maker: "OpenAI" },
         { providerRef: "development:codex-premium-cli", maker: "OpenAI" },
         { providerRef: "development:claude-cli", maker: "Anthropic" },
         { providerRef: "development:claude-premium-cli", maker: "Anthropic" },
-        { providerRef: "development:grok-cli", maker: "xAI" }
+        { providerRef: "development:grok-cli", maker: "xAI" },
+        { providerRef: "development:agy-cli", maker: "Google" },
+        { providerRef: "development:pi-glm-cli", maker: "Z.AI" }
       ]
     });
     expect(discovery).toMatchObject({ probeFreshnessMs: 600_000, probeMaxAttempts: 1 });

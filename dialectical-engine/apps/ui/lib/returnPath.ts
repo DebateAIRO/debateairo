@@ -1,4 +1,4 @@
-export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/settings", "/settings/security", "/account"] as const;
+export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/settings", "/settings/security", "/account", "/checkout", "/checkout/return", "/settings/card"] as const;
 
 export const DEFAULT_RETURN_PATH = "/new";
 
@@ -26,4 +26,4 @@ export function safeReturnPath(raw: string | null | undefined): string {
 }
 
 /** OAuth callbacks accept only exact route constants; query and fragment suffixes are excluded. */
-export function safeSocialReturnPath(raw:string|null|undefined): "/new"|"/"|"/settings"|"/settings/security"|"/account" {return RETURN_PATH_ALLOW_LIST.find(path=>path===raw)??"/new";}
+export function safeSocialReturnPath(raw:string|null|undefined): "/new"|"/"|"/settings"|"/settings/security"|"/account" {return (["/new", "/", "/settings", "/settings/security", "/account"] as const).find(path=>path===raw)??"/new";}

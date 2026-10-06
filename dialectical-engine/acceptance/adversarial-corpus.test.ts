@@ -11,6 +11,7 @@ import { readFramedMaterial, wirePacket } from "../tests/support/framed-packet.j
 import { startClaudeRelay, type ClaudeRelayHandle } from "./claude-relay.js";
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import {
+  RELAY_MINIMAL_SYSTEM_PROMPT,
   RELAY_REQUEST_MAX_BYTES,
   startCliRelayServer,
   type CliRelayAdapter,
@@ -615,6 +616,8 @@ describe("P4-13 approved adversarial relay corpus", () => {
     expect(observed.argumentList).toEqual([
       "-p", observed.prompt,
       "--output-format", "json",
+      // D8 (Task A12b): Claude Code's own system prompt is replaced.
+      "--system-prompt", RELAY_MINIMAL_SYSTEM_PROMPT,
       // D18: "user", not "" — "" severed the CLI's keychain login. The
       // security property this case exists for is untouched: the adversarial
       // `--setting-sources user,project` text stays INSIDE the -p value, which
@@ -655,6 +658,8 @@ describe("P4-13 approved adversarial relay corpus", () => {
       "--single", observed.prompt,
       "--output-format", "json",
       "--verbatim",
+      // D8 (Task A12b): grok's own system prompt is replaced.
+      "--system-prompt-override", RELAY_MINIMAL_SYSTEM_PROMPT,
       "--sandbox", "read-only",
       "--no-memory",
       "--no-subagents",

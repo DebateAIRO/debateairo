@@ -34,6 +34,7 @@
   "settings.erasure.title": "Fiók törlése",
   "settings.erasure.hint": "A törlés hét teljes nap után kezdődik. Addig megszakíthatja. Az ütemezésről, a megszakításról és a befejezésről minden kapcsolt e-mail- vagy helyreállítási címre értesítést küldünk; legalább egy igazolt csatorna szükséges.",
   "settings.erasure.dataWarning": "A titkosított privát tartalom a kulcsok megsemmisítésekor végleg olvashatatlanná válik. A jelenlegi nyilvános pillanatképek visszavont álnév alatt nyilvánosak maradnak, és a letöltött, idézett, gyorsítótárazott, indexelt vagy szolgáltató által megőrzött másolatok is fennmaradhatnak. Az átvett régi egyszerű szöveget megőrzött maradványként, nem pedig teljesen törölt tartalomként jelentjük.",
+  "settings.erasure.paidPlan": "A törlés ütemezése leállítja a fizetős csomag megújítását, de a csomag a törlés végrehajtásáig vagy a kifizetett hónap végéig működik; ha megszakítja a törlést, a csomag annak a hónapnak a végéig tart, és csak akkor újul meg, ha visszavonja a lemondást, és ha a vásárlástól számított 14 napon belül még elállhat, ezt a törlés végrehajtásáig megteheti.",
   "settings.erasure.checking": "A fióktörlés állapotának ellenőrzése…",
   "settings.erasure.status": "Állapot: {status}. Ütemezett törlési idő: {time}.",
   "settings.erasure.processing": "A visszafordíthatatlan törlés folyamatban van. Az ütemezés és a megszakítás már nem érhető el.",

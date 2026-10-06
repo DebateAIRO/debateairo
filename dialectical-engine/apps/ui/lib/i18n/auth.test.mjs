@@ -28,6 +28,7 @@ const ownedFiles = [
   "app/social/complete/page.tsx",
   "components/AuthShell.tsx",
   "components/DateOfBirthField.tsx",
+  "components/RegionField.tsx",
   "components/AgeRefusal.tsx",
   "components/AgeConfirmationFlow.tsx",
   "lib/dob/dobLocale.ts",

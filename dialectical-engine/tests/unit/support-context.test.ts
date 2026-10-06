@@ -112,7 +112,7 @@ describe("Support knowledge context", () => {
     // 2026-10-06: updated account access and recovery navigation have current SOL evidence.
     // 2026-10-05: changed menu/article/recovery bytes have SOL evidence; unchanged legal entries retain OWNER signatures.
     // Prior 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
-    expect(corpus.kbVersion).toBe("78cab229e79d44caaf546d3305342900809d7759c9a4c64ee81605d61f8aa239");
+    expect(corpus.kbVersion).toBe("f65033fa2929ec4f3c83efded440d3d7b74c2a18830c7f969c0bc21b2132a5a9");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 
@@ -504,9 +504,9 @@ describe("Support knowledge context", () => {
     expect(result.requestedActionIds).toEqual(expectedActionIds);
     if (expectedActionIds.includes("help")) {
       const [action] = resolveSupportActions(result.requestedActionIds,{ signedIn:false,language });
-      // Scope audit B6: en/ro keep dev's reviewed catalog labels.
-      expect(action?.label).toBe(language === "ro" ? "Centrul de ajutor" : "Help desk");
-      expect(result.text).toContain(language === "ro" ? "Centrul de ajutor" : "Help desk");
+      // en/ro catalog labels equal the label the screen renders (chrome.help; cookie-compliance S02 FIX, V-17).
+      expect(action?.label).toBe(language === "ro" ? "Ajutor" : "Help");
+      expect(result.text).toContain(language === "ro" ? "Ajutor" : "Help");
     }
   });
 

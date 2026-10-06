@@ -137,7 +137,7 @@ export interface SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" }>
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" }>
       | Readonly<{action:"REMOVE_AUTH_METHOD";targetFactorId:string}>
       | Readonly<{action:"LINK_PROVIDER"|"UNLINK_PROVIDER";targetProvider:"google"|"apple"|"facebook"|"x"}>;
   }>, source: AuthSourceContext): Promise<Readonly<{
@@ -674,7 +674,7 @@ export class SessionService implements SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" }>
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" }>
       | Readonly<{action:"REMOVE_AUTH_METHOD";targetFactorId:string}>
       | Readonly<{action:"LINK_PROVIDER"|"UNLINK_PROVIDER";targetProvider:"google"|"apple"|"facebook"|"x"}>;
   }>, source: AuthSourceContext): Promise<Readonly<{

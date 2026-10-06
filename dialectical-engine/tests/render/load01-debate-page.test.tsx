@@ -7,6 +7,7 @@ import DebatePageClient, * as DebatePageModule from "../../apps/ui/app/debate/[i
 import { createLiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "json" };
+import homeEnglish from "../../apps/ui/messages/en/home.json" with { type: "json" };
 import { readNotFoundCalls, resetNotFoundCalls } from "./stubs/next-navigation.js";
 
 const mocks = vi.hoisted(() => ({
@@ -24,6 +25,24 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => ({ value: "t".repeat(43) }) }),
   headers: async () => new Headers({ "user-agent": "vitest-render-browser" })
 }));
+
+/** Every sentence a failed debate can be told in (apps/ui/lib/v3/runFailure.ts). */
+const RUN_FAILURE_SENTENCES = Object.entries(homeEnglish)
+  .filter(([key]) => key.startsWith("runFailure."))
+  .map(([, value]) => value);
+
+/**
+ * A sentence as React writes it into server-rendered HTML text: PLAN_ENDED's "didn't" reaches the
+ * page as "didn&#x27;t", so a negative check on the plain string could never fail.
+ */
+function escapeText(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#x27;");
+}
 
 const queuedRun = {
   run_ref: "run:queued",
@@ -130,7 +149,10 @@ describe("LOAD-01 real debate-page render", () => {
     expect(html).toContain("Provider recovery hold");
     expect(html).toContain("10 minutes remaining");
     expect(html).toContain("one final attempt is scheduled");
-    expect(html).not.toContain("Debate generation failed");
+    // Four groups since the day's-limit sentence was retired (budget spec 2026-09-28 §2.11), and a
+    // fifth since Part 4: a waiting question whose paid plan ended (part4-scope.md §4.1).
+    expect(RUN_FAILURE_SENTENCES).toHaveLength(5);
+    for (const sentence of RUN_FAILURE_SENTENCES) expect(html).not.toContain(escapeText(sentence));
   });
 
   it("renders a mid-session run.terminal failure as failed with no live progress", () => {
@@ -156,13 +178,32 @@ describe("LOAD-01 real debate-page render", () => {
       event_type: "run.terminal",
       run_ref: debate.id,
       at_sequence: 1,
-      payload: { state: "FAILED", reason: "NODE_REVIEW_UNAVAILABLE" }
+      payload: { state: "FAILED", reason: "RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL" }
     }));
     const html = renderClient(debate, error);
     expect(html).toContain("Failed");
-    expect(html).toContain("Debate generation failed: NODE_REVIEW_UNAVAILABLE");
+    expect(html).toContain("This debate reached its limit before it could produce an answer.");
+    expect(html).not.toContain("RUN_CEILING_BELOW_FIRST_CALL");
+    expect(html).not.toContain("RUNNER_EXECUTION_FAILED");
     expect(html).not.toContain("Generating");
     expect(html).not.toContain("progressStrip");
+  });
+
+  it("opens a failed debate on its plain sentence, never its code", async () => {
+    const failedRun = {
+      ...queuedRun,
+      run_ref: "run:setup-failed",
+      state: "FAILED" as const,
+      terminal_reason: "RUN_SETUP_FAILED:DISPATCH"
+    };
+    mocks.getDebateServer.mockResolvedValue({
+      ok: false, kind: "failed", run: failedRun, reason: failedRun.terminal_reason
+    });
+    const { default: DebatePage } = await import("../../apps/ui/app/debate/[id]/page.js");
+    const html = renderToStaticMarkup(await DebatePage({ params: Promise.resolve({ id: "run:setup-failed" }) }));
+    expect(html).toContain("Something went wrong on our side before this debate began. Please ask again.");
+    expect(html).not.toContain("RUN_SETUP_FAILED");
+    expect(html).not.toContain("DISPATCH");
   });
 
   it("behaviorally throws Next notFound for a genuinely nonexistent id", async () => {

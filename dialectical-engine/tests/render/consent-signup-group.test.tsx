@@ -18,6 +18,7 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 /** Copy — byte-exact from SPEC.md §Copy / turn-8a-checkbox-group.html:4,8. */
 const PRIVACY_ROW_TEXT = "I have read the Privacy Policy.";
@@ -82,6 +83,7 @@ async function registerSuccessfully(): Promise<void> {
   await mount({ register, checkAge });
   // First: its re-renders would reset the controlled fields assigned directly below.
   await fillAdultDateOfBirth();
+  await pickRegion("RO");
   field("email").value = "person@example.test";
   field("phone").value = "+40712345678";
   field("password").value = "Correct horse 7!";

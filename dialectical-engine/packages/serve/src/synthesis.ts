@@ -959,6 +959,67 @@ export type SynthesizerRequest =
     };
 
 /**
+ * Model scorecard A15 (owner rulings R3/R4, 2026-09-26) — THE SEAT MARKER.
+ *
+ * A run with a pinned role assignment calls each seat's main OR its
+ * runner-up, and the gateway counts attempts cumulatively PER KEY: a runner-up
+ * recorded under its main's key would inherit an exhausted allowance and die as
+ * CALL_BUDGET_EXHAUSTED instead of answering. Every key such a run records
+ * therefore ends in `:seat:<main|runnerUp>`. It is a SUFFIX on purpose, so
+ * every prefix reader keeps matching: 0049's `COMPOSER:%` / `POST_COMPOSE_R9:%`
+ * counts and the `JUDGE:%` / `PANEL:%` readers. A run without an assignment
+ * records the bare key, exactly as before.
+ *
+ * The format lives in TWO places: here (`CALL_SITE_SEATS`, `SEAT_MARKER`),
+ * which builds and reads the marker, and the kernel's `SEAT_SUFFIX`
+ * (packages/kernel/src/debate-roles.ts), which strips it before reading a
+ * key's role. tests/unit/a15-seat-call-site-keys.test.ts pins that the two
+ * agree: the kernel strips exactly the markers this module recognises.
+ *
+ * A cross-exchange site uses one key; its marker is the pinned slot of the
+ * member that wrote the root, so `:seat:runnerUp` is possible.
+ */
+export const CALL_SITE_SEATS = Object.freeze(["main", "runnerUp"] as const);
+export type CallSiteSeat = typeof CALL_SITE_SEATS[number];
+const SEAT_MARKER = ":seat:";
+
+/**
+ * `<base>:seat:<seat>`. A base that already ENDS in a seat marker is refused:
+ * `JUDGE:seat:main:seat:runnerUp` would strip to `JUDGE:seat:main`, whose role
+ * the kernel reads as null, so a root call would lose its role.
+ */
+export function seatCallSiteKey(base: string, seat: CallSiteSeat): string {
+  const marked = seatOfCallSiteKey(base);
+  if (marked !== null) {
+    throw new TypedDomainError(
+      "CALL_SITE_SEAT_ALREADY_MARKED",
+      `Call site ${base} already carries the ${marked} seat marker; a key carries at most one`
+    );
+  }
+  return `${base}${SEAT_MARKER}${seat}`;
+}
+
+/** The seat a key was recorded under, or null for a bare key. */
+export function seatOfCallSiteKey(key: string): CallSiteSeat | null {
+  return CALL_SITE_SEATS.find((seat) => key.endsWith(`${SEAT_MARKER}${seat}`)) ?? null;
+}
+
+/** The key without its seat marker; a bare key comes back unchanged. */
+export function seatBaseCallSiteKey(key: string): string {
+  const seat = seatOfCallSiteKey(key);
+  return seat === null ? key : key.slice(0, key.length - SEAT_MARKER.length - seat.length);
+}
+
+export type SynthesisCallSiteBinding =
+  | {
+      readonly role: "SYNTHESIZER";
+      readonly stage: "INITIAL" | "RETRY";
+      readonly round: number;
+      readonly seat?: CallSiteSeat;
+    }
+  | { readonly role: "EVALUATOR"; readonly round: number; readonly seat?: CallSiteSeat };
+
+/**
  * THE ONE call-site key builder, used by BOTH the runner that RECORDS the call
  * and the persistence that VERIFIES it (codex r4 B1).
  *
@@ -978,10 +1039,6 @@ export type SynthesizerRequest =
  * `COMPOSER:%` into `composer_calls` and `POST_COMPOSE_R9:%` into `r9_calls`,
  * which battery-row predicates read.
  */
-export type SynthesisCallSiteBinding =
-  | { readonly role: "SYNTHESIZER"; readonly stage: "INITIAL" | "RETRY"; readonly round: number }
-  | { readonly role: "EVALUATOR"; readonly round: number };
-
 export function synthesisCallSiteKey(binding: SynthesisCallSiteBinding): string {
   if (!Number.isInteger(binding.round) || binding.round < 1) {
     throw new TypedDomainError(
@@ -989,9 +1046,24 @@ export function synthesisCallSiteKey(binding: SynthesisCallSiteBinding): string 
       `A synthesis call site needs a positive integer round, not ${String(binding.round)}`
     );
   }
-  return binding.role === "SYNTHESIZER"
+  const base = binding.role === "SYNTHESIZER"
     ? `COMPOSER:SYNTHESIZER:${binding.stage}:${binding.round}`
     : `POST_COMPOSE_R9:EVALUATOR:${binding.round}`;
+  return binding.seat === undefined ? base : seatCallSiteKey(base, binding.seat);
+}
+
+/**
+ * A15: the keys a round's role may lawfully have been recorded under — the
+ * bare key (no assignment) and its two seat forms. Persistence binds each
+ * loop-round reference to ONE of these, so the role is still a predicate: a
+ * SYNTHESIZER artifact can never pass as an EVALUATOR verdict, marked or not.
+ * A seat named on the binding does not widen the set.
+ */
+export function acceptedSynthesisCallSiteKeys(binding: SynthesisCallSiteBinding): readonly string[] {
+  const base = binding.role === "SYNTHESIZER"
+    ? synthesisCallSiteKey({ role: "SYNTHESIZER", stage: binding.stage, round: binding.round })
+    : synthesisCallSiteKey({ role: "EVALUATOR", round: binding.round });
+  return Object.freeze([base, ...CALL_SITE_SEATS.map((seat) => seatCallSiteKey(base, seat))]);
 }
 
 export interface EvaluatorRequest {

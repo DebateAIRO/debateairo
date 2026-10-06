@@ -25,7 +25,7 @@ async function noRetainedQuery(pattern:string):Promise<void> {
 }
 beforeAll(async()=>{
  database=await startTestDatabase();await migrate(database.pool);
- await database.pool.query("CREATE ROLE task9_acceptance_runtime LOGIN PASSWORD 'task9-disposable-only' IN ROLE debateai_runtime");
+ await database.pool.query("CREATE ROLE task9_acceptance_runtime LOGIN PASSWORD 'task9-disposable-only' IN ROLE debateai_runtime,debateai_billing_runtime");
  const url=new URL(database.connectionString);url.username='task9_acceptance_runtime';url.password='task9-disposable-only';runtime=createPool(url.toString());
 });
 afterAll(async()=>{await runtime?.end();await database?.stop();});

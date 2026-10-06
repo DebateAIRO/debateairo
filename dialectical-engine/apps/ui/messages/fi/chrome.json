@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukarest, Romania",
   "chrome.footer.product": "Tuote",
   "chrome.footer.home": "Etusivu",
-  "chrome.footer.cookiePreferences": "Evästeasetukset",
+  "chrome.footer.cookiePreferences": "Tallentamamme evästeet",
   "chrome.security": "Turvallisuus",
   "chrome.logout": "Kirjaudu ulos",
-  "chrome.accountError": "Toiminto epäonnistui. Lataa sivu uudelleen ja yritä uudestaan."
+  "chrome.accountError": "Toiminto epäonnistui. Lataa sivu uudelleen ja yritä uudestaan.",
+  "chrome.footer.pricing": "Hinnat",
+  "chrome.footer.cancel": "Peruuta tilaus",
+  "chrome.footer.withdraw": "Peru tilaus peruuttamisoikeudella",
+  "chrome.footer.paymentMarks": "Hyväksymämme kortit",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

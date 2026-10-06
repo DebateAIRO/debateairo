@@ -126,6 +126,7 @@
   "public.report.models": "参加したモデル：{models}",
   "public.report.modelsNotRecorded": "参加したモデル：記録されていません",
   "public.report.disclosure": "このレポートは、ディベートの論拠をもとにAIモデルが作成しました。",
+  "public.report.notAdvice": "AIが作成したレポートです。医療、法律、金融その他の専門的助言ではありません。",
   "public.report.title.inShort": "要点",
   "public.report.title.story": "詳しい経緯",
   "public.report.title.why": "この回答になった理由",

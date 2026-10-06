@@ -6,7 +6,9 @@ export const SessionSchema = z.object({
   session_id: z.uuid(),
   caller_scope: z.literal("ASKER"),
   ownership_provenance: z.literal("server_session"),
-  provisional_identity_model: z.literal(false)
+  provisional_identity_model: z.literal(false),
+  /** Whether the deployment currently has a valid model scorecard, without exposing its internals. */
+  model_scorecard_in_force: z.boolean().optional()
 }).strict();
 export type Session = z.infer<typeof SessionSchema>;
 

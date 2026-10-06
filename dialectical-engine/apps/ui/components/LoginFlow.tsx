@@ -1,5 +1,7 @@
 "use client";
 import Link from 'next/link';
+import { clearStoredSupportConversation } from '@/components/support/conversation';
+import { announceSessionChange } from '@/components/support/sessionChange';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ContractHttpError, type ContractClient, type LoginContinuationResponse, type AuthenticationResponse } from '@debateai/contract';
 import { AuthShell } from '@/components/AuthShell';
@@ -66,6 +68,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     function finish(result: AuthenticationResponse) {
         if (result.status !== 'authenticated')
             return;
+        clearStoredSupportConversation();
+        announceSessionChange();
         cancelConditional();
         flight.current = false;
         dispatched.current = false;
@@ -115,7 +119,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 if (owner === sequence.current && !abort.signal.aborted)
                     finish(result);
             }
-            catch {
+            catch (failure) {
+                if (dispatched.current && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             }
             finally {
                 if (owner === sequence.current) {
@@ -154,7 +159,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             if (owner === sequence.current)
                 finish(result);
         }
-        catch {
+        catch (failure) {
+            if (dispatched.current && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owner === sequence.current)
                 setError(t(catalog, "auth.passkey.cancelled"));
         }
@@ -232,6 +238,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 finish(result);
         }
         catch (failure) {
+            if (!(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owner === sequence.current) setError(failure instanceof ContractHttpError && failure.status === 429 ? t(catalog, "auth.login.tooManyAttempts") : method === 'recovery_code' ? t(catalog, "auth.login.recoveryCodeRejected") : t(catalog, "auth.login.authenticationCodeRejected"));
         }
         finally {

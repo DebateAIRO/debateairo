@@ -40,7 +40,7 @@ describe("auth registration contract client", () => {
     }) as typeof fetch;
     const client = createContractClient("https://api.debateai.test", fetchImplementation);
 
-    await expect(client.register({email:"person@example.test",password:"correct horse battery staple",phone:"+40712345678",date_of_birth:"1990-01-01",terms:{version:"2.0",sha256:"a".repeat(64)},privacy:{version:"3.0",sha256:"b".repeat(64)},locale:"en",ui_locale:"en",time_zone:"Europe/Bucharest",turnstile_token:"test-proof"})).resolves.toEqual({ message: REGISTRATION_MESSAGE, retry_after_seconds: 60 });
+    await expect(client.register({email:"person@example.test",password:"correct horse battery staple",phone:"+40712345678",country: "RO", date_of_birth:"1990-01-01",terms:{version:"2.0",sha256:"a".repeat(64)},privacy:{version:"3.0",sha256:"b".repeat(64)},locale:"en",ui_locale:"en",time_zone:"Europe/Bucharest",turnstile_token:"test-proof"})).resolves.toEqual({ message: REGISTRATION_MESSAGE, retry_after_seconds: 60 });
     await expect(client.resendVerification(RESEND_INPUT))
       .resolves.toEqual({ message: RESEND_MESSAGE, retry_after_seconds: 60 });
     await expect(client.startRecovery("person@example.test"))
@@ -55,13 +55,14 @@ describe("auth registration contract client", () => {
         password: "correct horse battery staple",
         phone: "+40712345678",
         ui_locale: "en", time_zone: "Europe/Bucharest",turnstile_token:"test-proof",
-        date_of_birth: "1990-01-01",
+        country: "RO", date_of_birth: "1990-01-01",
         terms: { version: "2.0", sha256: "a".repeat(64) },
         privacy: { version: "3.0", sha256: "b".repeat(64) },
         locale: "en"
       },
       credentials: "same-origin"
     });
+    expect("us_state" in (calls[0]!.body as Record<string, unknown>)).toBe(false);
     expect(calls[1]).toMatchObject({
       path: "/v1/auth/resend-verification",
       method: "POST",
@@ -80,13 +81,36 @@ describe("auth registration contract client", () => {
     }
   });
 
+  it("sends the exact US region members in the registration body", async () => {
+    let body: unknown;
+    const client = createContractClient("https://api.debateai.test", (async (_input, init) => {
+      body = JSON.parse(String(init?.body));
+      return Response.json({ message: REGISTRATION_MESSAGE, retry_after_seconds:60 }, { status: 202 });
+    }) as typeof fetch);
+
+    await client.register({...REGISTRATION_INPUT, country:"US", us_state:"TX"});
+
+    expect(body).toEqual({
+      email: "person@example.test",
+      password: "correct horse battery staple",
+      phone: "+40722123456",
+      ui_locale: "en-US", time_zone: "America/New_York", turnstile_token: "test-proof",
+      date_of_birth: "1990-01-01",
+      terms: { version: "2.0", sha256: "a".repeat(64) },
+      privacy: { version: "3.0", sha256: "b".repeat(64) },
+      locale: "en",
+      country: "US",
+      us_state: "TX"
+    });
+  });
+
   it("rejects success-shaped enumeration leaks instead of widening the public contract", async () => {
     const client = createContractClient(
       "https://api.debateai.test",
       (async () => Response.json({ message: "That account already exists." }, { status: 202 })) as typeof fetch
     );
 
-    await expect(client.register({email:"person@example.test",password:"password",phone:"+40712345678",date_of_birth:"1990-01-01",terms:{version:"2.0",sha256:"a".repeat(64)},privacy:{version:"3.0",sha256:"b".repeat(64)},locale:"en",ui_locale:"en",time_zone:null,turnstile_token:"test-proof"}))
+    await expect(client.register({email:"person@example.test",password:"password",phone:"+40712345678",country: "RO", date_of_birth:"1990-01-01",terms:{version:"2.0",sha256:"a".repeat(64)},privacy:{version:"3.0",sha256:"b".repeat(64)},locale:"en",ui_locale:"en",time_zone:null,turnstile_token:"test-proof"}))
       .rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 202 });
   });
 
@@ -122,7 +146,7 @@ describe("auth registration contract client", () => {
 
 const REGISTRATION_INPUT = {
   email: "person@example.test", password: "correct horse battery staple", phone: "+40722123456",
-  date_of_birth: "1990-01-01",
+  country: "RO", date_of_birth: "1990-01-01",
   terms: { version: "2.0", sha256: "a".repeat(64) },
   privacy: { version: "3.0", sha256: "b".repeat(64) },
   locale: "en", ui_locale: "en-US", time_zone: "America/New_York", turnstile_token: "test-proof"
@@ -165,7 +189,7 @@ describe("streamlined consumer auth boundary", () => {
     expect(bodies).toEqual([
       {
         email: "person@example.test", password: "correct horse battery staple", phone: "+40722123456",
-        date_of_birth: "1990-01-01", terms: { version: "2.0", sha256: "a".repeat(64) },
+        country: "RO", date_of_birth: "1990-01-01", terms: { version: "2.0", sha256: "a".repeat(64) },
         privacy: { version: "3.0", sha256: "b".repeat(64) }, locale: "en", ui_locale: "en-US",
         time_zone: "America/New_York", turnstile_token: "test-proof"
       },

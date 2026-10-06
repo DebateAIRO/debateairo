@@ -8,6 +8,7 @@ import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
+import { pickRegion } from "../support/signupRegion.js";
 
 let root: Root | null = null;
 const checkAge = vi.fn();
@@ -32,6 +33,7 @@ async function fillAndSubmit(): Promise<void> {
   await type("dob-d", "01");
   await type("dob-m", "01");
   await type("dob-y", "1990");
+  await pickRegion("RO");
   field("email").value = "person@example.test";
   field("phone").value = "+40712345678";
   field("password").value = "Correct horse 7!";
@@ -63,7 +65,7 @@ describe("sign-up sends the pairs of the documents it displayed (paid plans L3b)
     await act(async () => root!.render(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={{ register, checkAge }} />));
     await fillAndSubmit();
     expect(checkAge).toHaveBeenCalledWith("1990-01-01");
-    expect(register).toHaveBeenCalledWith(expect.objectContaining({email:"person@example.test",password:"Correct horse 7!",phone:"+40712345678",date_of_birth:"1990-01-01",terms:{version:TERMS_OF_SERVICE.version,sha256:TERMS_OF_SERVICE.sha256},privacy:{version:PRIVACY_POLICY.version,sha256:PRIVACY_POLICY.sha256},locale:"en",ui_locale:"en",turnstile_token:"test-proof"}));
+    expect(register).toHaveBeenCalledWith(expect.objectContaining({email:"person@example.test",password:"Correct horse 7!",phone:"+40712345678",country: "RO", date_of_birth:"1990-01-01",terms:{version:TERMS_OF_SERVICE.version,sha256:TERMS_OF_SERVICE.sha256},privacy:{version:PRIVACY_POLICY.version,sha256:PRIVACY_POLICY.sha256},locale:"en",ui_locale:"en",turnstile_token:"test-proof"}));
     // The shared fixture the four pinned render tests use is exactly this argument.
     expect(register.mock.calls[0]![0]).toMatchObject(DISPLAYED_LEGAL_EN);
   });

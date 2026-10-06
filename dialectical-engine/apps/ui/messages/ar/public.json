@@ -126,6 +126,7 @@
   "public.report.models": "النماذج المشاركة: {models}",
   "public.report.modelsNotRecorded": "النماذج المشاركة: غير مسجّلة",
   "public.report.disclosure": "كتبت نماذج ذكاء اصطناعي هذا التقرير استنادًا إلى حجج المناظرة.",
+  "public.report.notAdvice": "تقرير أنشأه الذكاء الاصطناعي. وهو ليس مشورة طبية أو قانونية أو مالية أو أي مشورة مهنية أخرى.",
   "public.report.title.inShort": "باختصار",
   "public.report.title.story": "القصة الكاملة",
   "public.report.title.why": "لماذا هذه الإجابة",

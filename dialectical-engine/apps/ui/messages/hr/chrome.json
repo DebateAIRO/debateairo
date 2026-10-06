@@ -56,8 +56,15 @@
   "chrome.footer.location": "Bukurešt, Rumunjska",
   "chrome.footer.product": "Proizvod",
   "chrome.footer.home": "Početna",
-  "chrome.footer.cookiePreferences": "Postavke kolačića",
+  "chrome.footer.cookiePreferences": "Kolačići koje pohranjujemo",
   "chrome.security": "Sigurnost",
   "chrome.logout": "Odjava",
-  "chrome.accountError": "Nije uspjelo. Ponovno učitajte stranicu i pokušajte ponovno."
+  "chrome.accountError": "Nije uspjelo. Ponovno učitajte stranicu i pokušajte ponovno.",
+  "chrome.footer.pricing": "Cijene",
+  "chrome.footer.cancel": "Otkazivanje plana",
+  "chrome.footer.withdraw": "Raskid ugovora o planu",
+  "chrome.footer.paymentMarks": "Kartice koje prihvaćamo",
+  "chrome.footer.visa": "Visa",
+  "chrome.footer.mastercard": "Mastercard",
+  "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"
 }

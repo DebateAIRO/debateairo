@@ -79,8 +79,8 @@
   "support.conversationDetails": "Відомості про розмову",
   "support.shortcutsLabel": "Швидкі посилання підтримки",
   "support.answerRating": "Оцінка відповіді",
-  "support.privacyPreferences": "Налаштування конфіденційності",
+  "support.privacyPreferences": "Конфіденційність",
   "support.aiBanner": "Відповіді створює ШІ; вони мають машинозчитуване маркування й можуть бути помилковими. Будь-коли попросіть залучити людину.",
-  "support.cookiePreferences": "Налаштування файлів cookie",
+  "support.cookiePreferences": "Файли cookie, які ми зберігаємо",
   "support.recoverAccount": "Відновити обліковий запис"
 }

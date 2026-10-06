@@ -20,7 +20,22 @@
  *    when the file carries the member, the `countryPolicy` (paid plans G2, checked by
  *    the register's own schema and sealed under the file's `sourceRef`). Without the
  *    member the seeder's code-owned `countryPolicy` row is dropped, so that version has
- *    no country gate (A14).
+ *    no country gate (A14). Likewise optional, the `taxAuthorities` (paid plans P16a,
+ *    checked by the register's own parser); without the member the seeder's code-owned
+ *    `taxAuthorities` row is sealed as it is. And optional, the room read's admission budget
+ *    `askRoomReads` (paid plans P4-G, go-live row 31): supplied, the code-owned `admissionPolicy`
+ *    row is sealed with that one member added (`ask_room_reads`, checked by the register's own
+ *    parser); left out, the code-owned row is sealed as it is. A version that seals the budget
+ *    band must carry it (ruling C7, `ASK_ROOM_ADMISSION_UNSEALED`). Likewise optional, the
+ *    `publicationCheckPolicy` (the pre-publish check's deadline, owner's ruling 2026-10-04,
+ *    checked by the register's own parser); without the member the seeder's code-owned row is
+ *    sealed as it is.
+ *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
+ *    own `--scorecard` file: the owners' approved document, sealed as it is,
+ *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
+ *    ruling 2026-09-27). It has no code-owned twin by design: a publication without
+ *    `--scorecard` seals a version with no scorecard, and asks then keep the
+ *    plan rosters. A new scorecard is a new version; the old one stays sealed.
  * The historical bootstrap is imported first, exactly as the seeder imports it,
  * and stays the sealed base: these rows are DEPLOYMENT rows, never bootstrap rows.
  *
@@ -53,26 +68,38 @@ import { custodyAccepts } from "@debateai/crypto";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import {
+  firstCallPlanModels, freeAnswerJobsFollowPaidSiteRule, freeCapsFollowPaidSiteRule, planCapsFollowPaidSiteRule,
+  SCORECARD_FREE_ANSWER_UNSCORED, SCORECARD_FREE_CAPS_INVALID, SCORECARD_PLAN_CAPS_INVALID, type PickerSettings,
+  type Scorecard
+} from "@debateai/scorecard";
+import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
   parseProviderDiscoveryTargets,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import {
+  ADMISSION_POLICY_ROW_KEY,
   ALGORITHM_REGISTER_ROW_KEYS,
   BILLING_PLANS_ROW_KEY,
   BILLING_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
   COST_ENVELOPE_POLICY_ROW_KEY,
   COUNTRY_POLICY_ROW_KEY,
+  MODEL_SCORECARD_MAX_BYTES,
+  MODEL_SCORECARD_ROW_KEY,
+  PUBLICATION_CHECK_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
+  TAX_AUTHORITIES_ROW_KEY,
   admissionPolicyFromValue,
+  assertAskRoomAdmissionSealed,
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
   billingPlansFromValue,
   billingPolicyFromValue,
   buildConfiguredProviderSetDeploymentRow,
+  callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
   composeStaffPolicyRegisterPublicationRows,
   parseStaffAccessEnvironment,
@@ -83,10 +110,12 @@ import {
   createPostgresRegisterPublicationPort,
   judgeTokenCeilingFromValue,
   loadBootstrapRegister,
+  modelScorecardFromValue,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
   persistBootstrapRegister,
   planCapMicros,
+  publicationCheckPolicyFromValue,
   readAdmissionPolicy,
   readAuthPolicy,
   readBillingPlans,
@@ -94,16 +123,21 @@ import {
   readCostEnvelopePolicy,
   readCountryPolicy,
   readDeploymentRiskTier,
+  readEngineVersion,
   readEnvelopeFormulaInputs,
   readMfaPolicy,
+  readModelScorecard,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
+  readPublicationCheckPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStoryPolicy,
   readStructuralCeilingPolicyInputs,
   registerVersionToSafeLegacyNumber,
+  taxAuthoritiesFromValue,
   warnOnIdenticalSynthesisRoleRefs,
+  type AdmissionPolicy,
   type BillingPlans,
   type BillingPolicy,
   type BootstrapRegister,
@@ -141,13 +175,24 @@ const EXAMPLE_PROVIDER_REF_PREFIX = "vendor:example-";
 const EXAMPLE_MAKER_PREFIX = "Example";
 
 const MAX_FILE_BYTES = 64 * 1_024;
+// A19: the scorecard file has its OWN bound, `MODEL_SCORECARD_MAX_BYTES` from
+// @debateai/register (64 KiB, owner ruling 2026-09-27) — the one constant local
+// mode also reads its bundled file under. It equals MAX_FILE_BYTES today by
+// ruling, not by coincidence of code: the two can change separately.
 const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
   "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy", "countryPolicy",
   "providerTargets", "synthesisRoles",
   // Paid plans (spec 2026-09-29 §2.5.1): OPTIONAL. Left out, the engine's own
   // rows are sealed (billing OFF); supplied, they supersede them.
-  "billingPlans", "billingPolicy"
+  "billingPlans", "billingPolicy",
+  // Paid plans P16a: OPTIONAL. Left out, the code-owned taxAuthorities row is sealed as it is.
+  "taxAuthorities",
+  // Paid plans P4-G (go-live row 31): OPTIONAL, the room read's admission budget. Left out, the
+  // code-owned admissionPolicy row is sealed as it is; required with the budget band (ruling C7).
+  "askRoomReads",
+  // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
+  "publicationCheckPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -205,7 +250,12 @@ function refuse(code: string): never {
 
 // At least one separator: a SQLSTATE (`P0001`) or an errno name (`ENOENT`) is
 // not a refusal code, and must fall through to the message it came with.
-const TYPED_CODE = /^[A-Z][A-Z0-9]*(?:[_-][A-Z0-9]+)+(?::[A-Za-z0-9_.:-]+)?$/u;
+// `*` is admitted after the colon for one fixed marker only, and only in its two
+// forms: the unknown-field refusal's "a key here" as a trailing `.*`
+// (`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:candidates.1.*`) or a bare `*`. Any
+// other `*` (an operator's `providerRef`, say) still falls through to the
+// generic line, as it did before the marker existed.
+const TYPED_CODE = /^[A-Z][A-Z0-9]*(?:[_-][A-Z0-9]+)+(?::(?:[A-Za-z0-9_.:-]+(?:\.\*)?|\*))?$/u;
 const TYPED_CODE_PREFIX = /^([A-Z][A-Z0-9_]*):\s/u;
 
 /**
@@ -237,27 +287,38 @@ export function hostedRegisterRefusalCode(error: unknown): string {
   return "HOSTED_REGISTER_PUBLISH_FAILED";
 }
 
-export type HostedRegisterArguments = Readonly<{ filePath: string; dryRun: boolean }>;
+export type HostedRegisterArguments = Readonly<{ filePath: string; dryRun: boolean; scorecardPath: string | null }>;
 
-/** `--file <path>` once, `--dry-run` at most once, nothing else. */
+/** `--file <path>` once, `--scorecard <path>` at most once (A19), `--dry-run` at most once, nothing else. */
 export function parseHostedRegisterArguments(args: readonly string[]): HostedRegisterArguments {
   let filePath: string | undefined;
+  let scorecardPath: string | undefined;
   let dryRun = false;
+  const valueAfter = (index: number): string | undefined => {
+    const value = args[index + 1];
+    return value !== undefined && value.length > 0 && !value.startsWith("--") ? value : undefined;
+  };
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
+    const value = valueAfter(index);
     if (argument === "--dry-run" && !dryRun) {
       dryRun = true;
-    } else if (argument === "--file" && filePath === undefined
-      && args[index + 1] !== undefined && args[index + 1]!.length > 0
-      && !args[index + 1]!.startsWith("--")) {
-      filePath = args[index + 1]!;
+    } else if (argument === "--file" && filePath === undefined && value !== undefined) {
+      filePath = value;
+      index += 1;
+    } else if (argument === "--scorecard" && scorecardPath === undefined && value !== undefined) {
+      scorecardPath = value;
       index += 1;
     } else {
       refuse("HOSTED_REGISTER_USAGE");
     }
   }
   if (filePath === undefined) refuse("HOSTED_REGISTER_USAGE");
-  return Object.freeze({ filePath: resolve(filePath), dryRun });
+  return Object.freeze({
+    filePath: resolve(filePath),
+    dryRun,
+    scorecardPath: scorecardPath === undefined ? null : resolve(scorecardPath)
+  });
 }
 
 const boundedText = z.string().min(1).max(256)
@@ -310,6 +371,15 @@ export type HostedRegisterFile = Readonly<{
   /** Paid plans: OPTIONAL operator rows, checked in the plan by the register's own parsers. */
   billingPlans: Readonly<{ value: unknown }> | null;
   billingPolicy: Readonly<{ value: unknown }> | null;
+  /** Optional (P16a): the operator's own where-and-when text; absent = the code-owned row. */
+  taxAuthorities?: unknown;
+  /**
+   * Optional (P4-G): the room read's admission budget, `{ key: "owner", limit, window_ms, capacity }`,
+   * added to the code-owned admissionPolicy row as `ask_room_reads`; absent = the code-owned row as it is.
+   */
+  askRoomReads?: unknown;
+  /** Optional (2026-10-04): the pre-publish check's deadline; absent = the code-owned row. */
+  publicationCheckPolicy?: unknown;
 }>;
 
 /**
@@ -366,7 +436,10 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     providerTargets: record.providerTargets,
     synthesisRoles,
     billingPlans: Object.hasOwn(record, BILLING_PLANS_ROW_KEY) ? Object.freeze({ value: record.billingPlans }) : null,
-    billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null
+    billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null,
+    ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
+    ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
+    ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {})
   });
 }
 
@@ -374,24 +447,42 @@ function isFileSystemError(error: unknown, code: string): boolean {
   return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
 }
 
+/** The refusal codes one custody-checked operator file answers with. */
+type CustodyRefusals = Readonly<{ absent: string; custody: string; invalid: string }>;
+
+const REGISTER_FILE_REFUSALS: CustodyRefusals = Object.freeze({
+  absent: "HOSTED_REGISTER_FILE_ABSENT",
+  custody: "HOSTED_REGISTER_FILE_CUSTODY_INVALID",
+  invalid: "HOSTED_REGISTER_FILE_INVALID"
+});
+
+const SCORECARD_FILE_REFUSALS: CustodyRefusals = Object.freeze({
+  absent: "HOSTED_REGISTER_SCORECARD_FILE_ABSENT",
+  custody: "HOSTED_REGISTER_SCORECARD_FILE_CUSTODY_INVALID",
+  invalid: "HOSTED_REGISTER_SCORECARD_FILE_INVALID"
+});
+
 /**
- * The operator's file, read under the codebase's ONE custody decision
+ * An operator's file, read under the codebase's ONE custody decision
  * (`custodyAccepts`, single-owner contract): a regular file, one link, mode 0600
  * owned by the caller, inside a 0700 directory owned by the caller, opened with
- * `O_NOFOLLOW` and judged on the descriptor actually read. The file holds no
- * secret, but it decides what every service runs under — prices, ceilings,
- * vendors — so a file another principal could replace is refused.
+ * `O_NOFOLLOW` and judged on the descriptor actually read. Neither operator file
+ * holds a secret, but each decides what every service runs under — prices,
+ * ceilings, vendors, which models answer — so a file another principal could
+ * replace is refused. Each file answers with its own codes and its own bound.
  */
-export async function readHostedRegisterFile(path: string): Promise<HostedRegisterFile> {
+async function readCustodiedBytes(path: string, maxBytes: number, refusals: CustodyRefusals): Promise<Buffer> {
   const resolved = resolve(path);
   let handle;
   try {
-    handle = await open(resolved, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    // Fix round 1 (review Minor 1): `O_NONBLOCK` so a FIFO opens at once and is
+    // refused below as not a regular file, instead of the command waiting for a
+    // writer. It changes nothing for a regular file.
+    handle = await open(resolved, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   } catch (error) {
-    if (isFileSystemError(error, "ENOENT")) refuse("HOSTED_REGISTER_FILE_ABSENT");
-    return refuse("HOSTED_REGISTER_FILE_CUSTODY_INVALID");
+    if (isFileSystemError(error, "ENOENT")) refuse(refusals.absent);
+    return refuse(refusals.custody);
   }
-  let bytes: Buffer;
   try {
     const metadata = await handle.stat();
     const parent = await stat(dirname(resolved));
@@ -407,22 +498,157 @@ export async function readHostedRegisterFile(path: string): Promise<HostedRegist
         expectedSize: undefined
       }
     )) {
-      refuse("HOSTED_REGISTER_FILE_CUSTODY_INVALID");
+      refuse(refusals.custody);
     }
-    if (metadata.size < 1 || metadata.size > MAX_FILE_BYTES) refuse("HOSTED_REGISTER_FILE_INVALID");
-    const bounded = Buffer.alloc(MAX_FILE_BYTES + 1);
+    if (metadata.size < 1 || metadata.size > maxBytes) refuse(refusals.invalid);
+    const bounded = Buffer.alloc(maxBytes + 1);
     let offset = 0;
     while (offset < bounded.length) {
       const { bytesRead } = await handle.read(bounded, offset, bounded.length - offset, offset);
       if (bytesRead === 0) break;
       offset += bytesRead;
     }
-    if (offset !== metadata.size) refuse("HOSTED_REGISTER_FILE_INVALID");
-    bytes = bounded.subarray(0, offset);
+    if (offset !== metadata.size) refuse(refusals.invalid);
+    return bounded.subarray(0, offset);
   } finally {
     await handle.close();
   }
-  return parseHostedRegisterFile(bytes);
+}
+
+/** The register file: at most 64 KiB, its own codes. */
+export async function readHostedRegisterFile(path: string): Promise<HostedRegisterFile> {
+  return parseHostedRegisterFile(await readCustodiedBytes(path, MAX_FILE_BYTES, REGISTER_FILE_REFUSALS));
+}
+
+/**
+ * A19 — THE OWNERS' APPROVED MODEL SCORECARD, as it will be sealed.
+ * `valueJsonText` is the operator's document in the register's canonical form
+ * (sorted keys, no whitespace), so the sealed row IS what was approved; the
+ * numbers the plan prints come from the engine's own validation of it.
+ * `apiCandidateCount` (carry 8) is how many candidates list an API route: the
+ * hosted site reaches models only that way, since relays never run hosted.
+ */
+export type HostedModelScorecard = Readonly<{
+  valueJsonText: RegisterPublicationRow["valueJsonText"];
+  scorecardVersion: number;
+  candidateCount: number;
+  apiCandidateCount: number;
+  /** Paid plans S2: the scorecard's plan caps, checked against the owners' rule when the sealed version sells plans. */
+  planStrengthCaps: PickerSettings["planStrengthCaps"];
+  /** Paid plans S4b: Free's own caps and the Economy caps, checked against the owners' Free rule when the version sells plans. */
+  freeCap: PickerSettings["freeCap"];
+  economyCap: PickerSettings["economyCap"];
+  /** Paid plans P4-E: the validated scorecard, which the Free answer-job rule reads through the picker's own eligibility. */
+  scorecard: Scorecard;
+  sha256: string;
+  bytes: number;
+}>;
+
+/**
+ * One DEFINED path segment (a schema field, a role-enum key or an index) in the
+ * printable code alphabet — already true of every such segment today; kept as
+ * a guard so the refusal line always stays a typed code.
+ */
+function printableKeySegment(segment: string): string {
+  return segment.replace(/[^A-Za-z0-9_-]/gu, "_").slice(0, 64) || "_";
+}
+
+/**
+ * Fix round 1 (review Minor 2): the first key of the operator's document that
+ * the engine's own validation DROPPED — a field the scorecard format does not
+ * define — as its DEFINED parent path plus the fixed marker `*` (just `*` at
+ * the top level), or null. `validated` is `parseScorecard`'s output for the
+ * same document: the format ignores (strips) an unknown field, so any key
+ * present in `raw` and absent at the same place in `validated` is one the
+ * schema does not define, at any depth. The schema is never restated here.
+ * Nothing the operator chose reaches the path: not the unknown key's name, not
+ * any value (fix round 2). If the scorecard schema ever gains a transform, a
+ * rename or `.passthrough()`, this comparison changes meaning: update it and
+ * its tests with the schema (packages/scorecard/src/schema.ts says so too).
+ */
+function firstUndefinedScorecardKey(raw: unknown, validated: unknown, path: readonly string[] = []): string | null {
+  if (Array.isArray(raw)) {
+    if (!Array.isArray(validated)) return null;
+    for (let index = 0; index < raw.length; index += 1) {
+      const found = firstUndefinedScorecardKey(raw[index], validated[index], [...path, String(index)]);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (raw === null || typeof raw !== "object" || validated === null || typeof validated !== "object") return null;
+  for (const key of Object.keys(raw)) {
+    const at = [...path, key];
+    // Fix round 2 (re-review Minor 1): the unknown key's NAME is operator text
+    // and could be secret-shaped, so only its DEFINED parent is printed, then a
+    // fixed marker. Every segment of `path` is a key validation kept (a schema
+    // field, a role-enum key) or an array index — never operator-chosen text.
+    if (!Object.hasOwn(validated, key)) {
+      return path.length === 0 ? "*" : `${path.map(printableKeySegment).join(".").slice(0, 200)}.*`;
+    }
+    const found = firstUndefinedScorecardKey(
+      (raw as Readonly<Record<string, unknown>>)[key], (validated as Readonly<Record<string, unknown>>)[key], at
+    );
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/**
+ * The scorecard file's bytes -> what will be sealed. The file must fit the
+ * scorecard bound (`MODEL_SCORECARD_MAX_BYTES`, 64 KiB). The register's
+ * canonical parser runs next: a duplicate key or an exponent number refuses
+ * before `JSON.parse` could pick one, and the canonical text that will be
+ * sealed must fit the same bound (escapes can make it longer than the file).
+ * Then the engine's own scorecard validation runs, and its reason is the
+ * refusal's suffix. Last, a field that validation would ignore is refused by
+ * where it is (`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:<defined parent>.*`), because the
+ * document is sealed as it is.
+ */
+export function parseHostedScorecardFile(bytes: Uint8Array, engineVersion: string): HostedModelScorecard {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength < 1 || bytes.byteLength > MODEL_SCORECARD_MAX_BYTES) {
+    refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  }
+  let valueJsonText: RegisterPublicationRow["valueJsonText"];
+  try {
+    valueJsonText = parseCanonicalRegisterJson(bytes);
+  } catch {
+    return refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  }
+  if (Buffer.byteLength(valueJsonText, "utf8") > MODEL_SCORECARD_MAX_BYTES) {
+    refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  }
+  const raw = JSON.parse(valueJsonText) as unknown;
+  const read = modelScorecardFromValue(raw, HOSTED_REGISTER_DEPLOYMENT_REF, engineVersion);
+  if (read.state === "REFUSED") refuse(`HOSTED_REGISTER_SCORECARD_REFUSED:${read.reason}`);
+  if (read.state !== "VALID") return refuse("HOSTED_REGISTER_SCORECARD_FILE_INVALID");
+  // Fix round 1 (review Minor 2): what is sealed is the operator's document
+  // itself, and a sealed row is never edited, so a field the format does not
+  // define is refused here rather than sealed forever.
+  const unknownKey = firstUndefinedScorecardKey(raw, read.scorecard);
+  if (unknownKey !== null) refuse(`HOSTED_REGISTER_SCORECARD_KEY_UNKNOWN:${unknownKey}`);
+  return Object.freeze({
+    valueJsonText,
+    scorecardVersion: read.scorecard.scorecardVersion,
+    candidateCount: read.scorecard.candidates.length,
+    // Carry 8: the picker's own hosted rule (packages/scorecard/src/picker.ts,
+    // `eligiblePool`): a candidate is reachable hosted only through an API route.
+    apiCandidateCount: read.scorecard.candidates
+      .filter((candidate) => candidate.accessRoutes.some((route) => route.kind === "API")).length,
+    planStrengthCaps: read.scorecard.pickerSettings.planStrengthCaps,
+    freeCap: read.scorecard.pickerSettings.freeCap,
+    economyCap: read.scorecard.pickerSettings.economyCap,
+    scorecard: read.scorecard,
+    sha256: createHash("sha256").update(valueJsonText).digest("hex"),
+    bytes: Buffer.byteLength(valueJsonText, "utf8")
+  });
+}
+
+/** The scorecard file: the register file's custody rule, the scorecard's 64 KiB bound, its own codes. */
+export async function readHostedScorecardFile(path: string, engineVersion: string): Promise<HostedModelScorecard> {
+  return parseHostedScorecardFile(
+    await readCustodiedBytes(path, MODEL_SCORECARD_MAX_BYTES, SCORECARD_FILE_REFUSALS),
+    engineVersion
+  );
 }
 
 /**
@@ -458,6 +684,17 @@ export type HostedRegisterPlan = Readonly<{
   billingPolicy: BillingPolicy | null;
   /** Things to know, never refusals: `BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` (spec §2.5.1). */
   warnings: readonly string[];
+  /** P4-G: the room read's admission budget as sealed, or null when this version seals none. */
+  askRoomReads: AdmissionPolicy["askRoomReads"];
+  /** A19: what the additive `modelScorecard` row carries, or null when this publication seals none. */
+  modelScorecard: Readonly<{
+    scorecardVersion: number;
+    candidateCount: number;
+    /** Carry 8: candidates with an API route, the only kind the hosted site can seat. */
+    apiCandidateCount: number;
+    sha256: string;
+    bytes: number;
+  }> | null;
 }>;
 
 function canonicalRowValue(value: unknown): RegisterPublicationRow["valueJsonText"] {
@@ -500,7 +737,10 @@ function resolveSynthesisRoles(
  * Everything decided before a connection exists. A refusal here has published
  * nothing and opened nothing; a plan that returns is exactly what would be sealed.
  */
-export async function planHostedRegisterPublication(file: HostedRegisterFile): Promise<HostedRegisterPlan> {
+export async function planHostedRegisterPublication(
+  file: HostedRegisterFile,
+  scorecard: HostedModelScorecard | null = null
+): Promise<HostedRegisterPlan> {
   // V-9(4): the vetted DEPLOYMENT shape, by its own builder — PROVIDER_VENDOR_NOT_VETTED
   // and CONFIGURED_PROVIDER_SET_INVALID are its codes.
   const providerSetRow = buildConfiguredProviderSetDeploymentRow({
@@ -515,6 +755,12 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
+  // Paid plans P16a: the operator's where-and-when text, by the register's own parser
+  // (TAX_AUTHORITIES_INVALID). Absent member = the code-owned row, sealed as it is.
+  if (file.taxAuthorities !== undefined) taxAuthoritiesFromValue(file.taxAuthorities, file.sourceRef);
+  // hate-speech S02: the operator's deadline, by the register's own parser (PUBLICATION_CHECK_POLICY_INVALID).
+  // Absent member = the code-owned row, sealed as it is.
+  if (file.publicationCheckPolicy !== undefined) publicationCheckPolicyFromValue(file.publicationCheckPolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -583,20 +829,70 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
       }));
     }
   }
+  if (file.taxAuthorities !== undefined) {
+    operatorRows.set(TAX_AUTHORITIES_ROW_KEY, Object.freeze({
+      rowKey: TAX_AUTHORITIES_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.taxAuthorities),
+      sourceRef: file.sourceRef
+    }));
+  }
+  // Paid plans P4-G (go-live row 31): the owner's room-read budget joins the code-owned admission row as
+  // its one added member; every other member stays byte for byte. The register's own parser checks the
+  // composed value (ADMISSION_POLICY_INVALID). The file's sourceRef is the version's own; the row names
+  // the member's origin in a fixed suffix, which keeps it inside the register's 1024-character bound.
+  if (file.askRoomReads !== undefined) {
+    const codeOwnedAdmission = codeOwnedRows.find((row) => row.rowKey === ADMISSION_POLICY_ROW_KEY);
+    if (codeOwnedAdmission === undefined) refuse(`HOSTED_REGISTER_ROW_MISSING:${ADMISSION_POLICY_ROW_KEY}`);
+    const composed = {
+      ...(JSON.parse(codeOwnedAdmission.valueJsonText) as Readonly<Record<string, unknown>>),
+      ask_room_reads: file.askRoomReads
+    };
+    const sourceRef = `${codeOwnedAdmission.sourceRef}`
+      + " + paid plans P4-G ask_room_reads, the owner's value from the hosted register file";
+    admissionPolicyFromValue(composed, sourceRef);
+    operatorRows.set(ADMISSION_POLICY_ROW_KEY, Object.freeze({
+      rowKey: ADMISSION_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(composed),
+      sourceRef
+    }));
+  }
+  if (file.publicationCheckPolicy !== undefined) {
+    operatorRows.set(PUBLICATION_CHECK_POLICY_ROW_KEY, Object.freeze({
+      rowKey: PUBLICATION_CHECK_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.publicationCheckPolicy),
+      sourceRef: file.sourceRef
+    }));
+  }
   const replaced = codeOwnedRows.filter((row) => operatorRows.has(row.rowKey));
   if (replaced.length !== operatorRows.size) refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
-  const rows = Object.freeze(codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row));
+  // A19 — THE ONE ADDITIVE OPERATOR ROW. The two rows above REPLACE a
+  // code-owned twin; the model scorecard has none, by design: a publication
+  // without `--scorecard` then seals a version whose scorecard is ABSENT (asks
+  // keep the plan rosters), never a default the owners did not approve for the
+  // site. A builder that ever minted a twin would make two sources compete for
+  // one key, so that is refused before anything is sealed.
+  if (codeOwnedRows.some((row) => row.rowKey === MODEL_SCORECARD_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const scorecardRows: readonly RegisterPublicationRow[] = scorecard === null ? [] : [Object.freeze({
+    rowKey: MODEL_SCORECARD_ROW_KEY,
+    valueJsonText: scorecard.valueJsonText,
+    sourceRef: `${file.sourceRef} | ${MODEL_SCORECARD_ROW_KEY} v${scorecard.scorecardVersion} sha256:${scorecard.sha256}`
+  })];
+  const rows = Object.freeze([
+    ...codeOwnedRows.map((row) => operatorRows.get(row.rowKey) ?? row),
+    ...scorecardRows
+  ]);
   const keys = new Set(rows.map((row) => row.rowKey));
   if (keys.size !== rows.length || ALGORITHM_REGISTER_ROW_KEYS.some((key) => !keys.has(key))) {
     refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
   }
   // The hosted boot refuses a register whose admission row lacks the support
   // budgets; asked here of the value about to be sealed, so a dry run says so.
-  const admission = rows.find((row) => row.rowKey === "admissionPolicy");
-  if (admission === undefined) refuse("HOSTED_REGISTER_ROW_MISSING:admissionPolicy");
-  assertHostedSupportAdmissionSealed("hosted", admissionPolicyFromValue(
-    JSON.parse(admission.valueJsonText) as unknown, admission.sourceRef
-  ));
+  const admissionRow = rows.find((row) => row.rowKey === ADMISSION_POLICY_ROW_KEY);
+  if (admissionRow === undefined) refuse(`HOSTED_REGISTER_ROW_MISSING:${ADMISSION_POLICY_ROW_KEY}`);
+  const admission = admissionPolicyFromValue(JSON.parse(admissionRow.valueJsonText) as unknown, admissionRow.sourceRef);
+  assertHostedSupportAdmissionSealed("hosted", admission);
   // Engine money rule, Task M7 (spec §14.4.1): the operator's cost row checks
   // its day against one run only; the code-owned story row lands in the same
   // version, so the day is checked against one run AND its story, over both
@@ -617,29 +913,73 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
   // boots run (RUN_CEILING_BELOW_ONE_CALL), asked of the version about to be
   // sealed, by the same functions over the same inputs: the file's priced
   // targets (they must equal PROVIDER_DISCOVERY_TARGETS_JSON, which the units
-  // read), the composed JUDGE bound, the ask's largest question and each plan's
-  // roster. Only with the band, as at boot. The boots keep asking: the
-  // environment can still differ from the file.
-  if (costEnvelopeBand(costEnvelope) !== null) {
-    assertRunCeilingCoversOneCall({
-      bodyCeilingMicros: costEnvelopeCeilings(costEnvelope).bodyMicros,
-      firstCallsByRoster: firstCallsByPlanRoster({
-        projections: firstPositionCallProjections({
-          targets,
-          judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
-          questionMaxBytes: askQuestionMaxBytes()
-        }),
-        rosters: PLAN_TIER_ROSTERS
-      })
-    });
-  }
+  // read), the composed JUDGE bound, the ask's largest question and the models
+  // each plan can seat, by the boots' own rule (`firstCallPlanModels`, paid
+  // plans S2): while the version's sealed scorecard is VALID, every configured
+  // model counts for every plan, because the picker seats from all of them;
+  // without one, each plan's own roster. `scorecard !== null` is the boots'
+  // `state === "VALID"` for this version: `parseHostedScorecardFile` admits
+  // only a VALID scorecard. Only with the band, as at boot. The boots keep
+  // asking: the environment can still differ from the file. Paid plans S4b: a
+  // version that sells plans prices Free on the Free roster alone, as the API's
+  // boot does, because the picker seats a Free ask from it only then.
   const plansRow = sealed(BILLING_PLANS_ROW_KEY);
   const policyRow = sealed(BILLING_POLICY_ROW_KEY);
   const billingPlans = plansRow === null ? null : billingPlansFromValue(plansRow.value, plansRow.sourceRef);
   const billingPolicy = policyRow === null ? null : billingPolicyFromValue(policyRow.value, policyRow.sourceRef);
+  if (costEnvelopeBand(costEnvelope) !== null) {
+    const firstCalls = firstPositionCallProjections({
+      targets,
+      judgeTokenCeiling: judgeTokenCeilingFromValue(sealed("acceptanceOrganCostBounds")?.value),
+      questionMaxBytes: askQuestionMaxBytes()
+    });
+    assertRunCeilingCoversOneCall({
+      bodyCeilingMicros: costEnvelopeCeilings(costEnvelope).bodyMicros,
+      firstCallsByRoster: firstCallsByPlanRoster({
+        projections: firstCalls,
+        rosters: firstCallPlanModels({
+          scorecardInForce: scorecard !== null,
+          rosters: PLAN_TIER_ROSTERS,
+          models: firstCalls.map((call) => call.model),
+          ownRosterOnly: billingPolicy?.enabled === true ? ["free"] : []
+        })
+      })
+    });
+  }
   // R1 A22: billing may be switched on only with its plans and the three budget
   // members, asked here of the version about to be sealed, so a dry run says so.
   assertBillingReady({ policy: billingPolicy, plans: billingPlans, envelope: costEnvelope });
+  // Paid plans S2 (spec §2.6 item 6): a version that sells plans seals only a
+  // scorecard that follows the owners' plan-cap rule — a sealed row is never edited.
+  if (billingPolicy?.enabled === true && scorecard !== null && !planCapsFollowPaidSiteRule(scorecard.planStrengthCaps)) {
+    refuse(SCORECARD_PLAN_CAPS_INVALID);
+  }
+  // Paid plans S4b (final review P3-I2): and only one whose Free caps follow the
+  // owners' Free rule — every role's Free money cap set, at or below its Economy cap.
+  if (billingPolicy?.enabled === true && scorecard !== null && !freeCapsFollowPaidSiteRule(scorecard)) {
+    refuse(SCORECARD_FREE_CAPS_INVALID);
+  }
+  // Paid plans P4-E (Part 3b re-review M-4; ruling C4): and only one under which a Free ask
+  // can seat its answer writer and answer checker. With billing on those two take a scored
+  // Free-roster model or none, so a scorecard where no configured Free-roster model can take
+  // one of them would refuse every Free question. Asked by the picker's own eligibility over
+  // the file's targets and the version's sealed answer bounds (the writer's call runs under
+  // the synthesizer bound, the checker's under the evaluator bound, as the API's
+  // `answerTokenCeilingsByRole` maps them); the API's boot asks the same.
+  if (billingPolicy?.enabled === true && scorecard !== null) {
+    const ceilings = callTokenCeilingsFromValues((rowKey) => sealed(rowKey)?.value);
+    if (!freeAnswerJobsFollowPaidSiteRule({
+      scorecard: scorecard.scorecard,
+      targets,
+      freeRosterModelIds: PLAN_TIER_ROSTERS.free,
+      answerTokenCeilingByRole: { ANSWER_WRITER: ceilings.synthesizer, ANSWER_CHECKER: ceilings.evaluator }
+    })) {
+      refuse(SCORECARD_FREE_ANSWER_UNSCORED);
+    }
+  }
+  // Paid plans P4-G, ruling C7 (go-live row 31): a version that seals the band seals the room read's own
+  // admission budget too, as the API's boot asks (ASK_ROOM_ADMISSION_UNSEALED), so a dry run says so.
+  assertAskRoomAdmissionSealed({ envelope: costEnvelope, admission });
   // §2.5.1: WARN, never refuse, when a plan's smallest window (the day cap, or
   // Free's whole month) is below what one debate may spend.
   const warnings = Object.freeze(billingPlans === null ? [] : billingPlans.plans
@@ -674,8 +1014,40 @@ export async function planHostedRegisterPublication(file: HostedRegisterFile): P
     providerTargetsJson: targetsJson,
     billingPlans,
     billingPolicy,
-    warnings
+    warnings,
+    askRoomReads: admission.askRoomReads,
+    modelScorecard: scorecard === null ? null : Object.freeze({
+      scorecardVersion: scorecard.scorecardVersion,
+      candidateCount: scorecard.candidateCount,
+      apiCandidateCount: scorecard.apiCandidateCount,
+      sha256: scorecard.sha256,
+      bytes: scorecard.bytes
+    })
   });
+}
+
+/**
+ * A19: the scorecard line the plan prints, and carry 8's API-route count. A
+ * scorecard none of whose candidates has an API route is still VALID and still
+ * sealed — it is NOT a refusal — but the hosted site can seat none of its
+ * models, so the plan says so in plain words.
+ */
+function renderModelScorecardLines(scorecard: HostedRegisterPlan["modelScorecard"]): readonly string[] {
+  if (scorecard === null) return ["model_scorecard=none (asks keep the plan rosters)"];
+  const lines = [
+    `model_scorecard version=${scorecard.scorecardVersion}`
+      + ` candidates=${scorecard.candidateCount}`
+      + ` bytes=${scorecard.bytes} sha256=${scorecard.sha256}`,
+    `model_scorecard api_candidates=${scorecard.apiCandidateCount}`
+      + ` (${scorecard.apiCandidateCount} of the ${scorecard.candidateCount} scored models`
+      + " can be reached through an API; the hosted site reaches models only that way)"
+  ];
+  if (scorecard.apiCandidateCount === 0) {
+    lines.push("model_scorecard note: none of these models can be reached through an API, so the hosted site will keep"
+      + " using the plan's usual models until a model it can reach through an API is scored."
+      + " The scorecard is still valid and can still be published.");
+  }
+  return lines;
 }
 
 /** The plan as the operator reads it. Refs, counts, hashes and money — no path, no URL, no credential. */
@@ -707,11 +1079,17 @@ export function renderHostedRegisterPlan(plan: HostedRegisterPlan): string {
       : `cost_envelope_band admission_close_basis_points=${plan.costEnvelope.closeBasisPoints}`
         + ` finish_up_to_basis_points=${String(plan.costEnvelope.finishBasisPoints)}`
         + ` waiting_line_per_person=${String(plan.costEnvelope.waitingLinePerPerson)}`,
+    // P4-G: the room read's admission budget, which a version with the band must seal (ruling C7).
+    plan.askRoomReads === null
+      ? "ask_room_reads absent"
+      : `ask_room_reads key=${plan.askRoomReads.key} limit=${plan.askRoomReads.limit}`
+        + ` window_ms=${plan.askRoomReads.windowMs} capacity=${plan.askRoomReads.capacity}`,
     `billing_policy ${plan.billingPolicy === null ? "absent" : `enabled=${String(plan.billingPolicy.enabled)}`}`,
     `billing_plans ${plan.billingPlans === null ? "absent" : `plan_ids=${plan.billingPlans.plans.map((entry) => entry.planId).join(",")}`}`,
     ...plan.warnings.map((warning) => `warning=${warning}`),
     `synthesis_roles synthesizer=${plan.synthesisRoles.synthesizerRoleRef}`
       + ` evaluator=${plan.synthesisRoles.evaluatorRoleRef}`,
+    ...renderModelScorecardLines(plan.modelScorecard),
     `row_keys=${plan.rows.map((row) => row.rowKey).sort().join(",")}`
   ].join("\n") + "\n";
 }
@@ -806,16 +1184,26 @@ export async function verifyHostedRegisterBootReadiness(
   await readRecoveryPolicy(pool, version);
   const admission = await readAdmissionPolicy(pool, version);
   // Paid plans G3a: main.ts's country-policy and country-gate-admission stages, in their order.
-  if (await readCountryPolicy(pool, version) !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
+  const countryPolicy = await readCountryPolicy(pool, version);
+  if (countryPolicy !== null && admission.geoAvailability === null) refuse("GEO_AVAILABILITY_ADMISSION_UNSEALED");
   assertHostedSupportAdmissionSealed("hosted", admission);
   const envelope = await readCostEnvelopePolicy(pool, version);
   // Paid plans (R1 A22, R-5): the readiness question the API asks at boot (B6b's
   // ask-room step, P6a). The runner never asks it: it reads no billingPolicy (A20).
+  const billingPolicy = await readBillingPolicy(pool, version);
   assertBillingReady({
-    policy: await readBillingPolicy(pool, version),
+    policy: billingPolicy,
     plans: await readBillingPlans(pool, version),
     envelope
   });
+  // Paid plans P4-G, ruling C7: the API boot's ask-room stage asks this next, of the same rows.
+  assertAskRoomAdmissionSealed({ envelope, admission });
+  // Paid plans P7/P8b/P8c/P9a/P13: main.ts's billing-runtime stage, in its order (country policy first, then the admission scopes).
+  if (billingPolicy?.enabled === true && countryPolicy === null) refuse("BILLING_CONFIGURATION_INCOMPLETE");
+  if (billingPolicy?.enabled === true && admission.billingQuote === null) refuse("BILLING_ADMISSION_UNSEALED");
+  if (billingPolicy?.enabled === true && admission.billingCheckout === null) refuse("BILLING_ADMISSION_UNSEALED");
+  if (billingPolicy?.enabled === true && admission.billingNotify === null) refuse("BILLING_ADMISSION_UNSEALED");
+  if (billingPolicy?.enabled === true && admission.billingCancelLink === null) refuse("BILLING_ADMISSION_UNSEALED");
   await readProductRolePolicy(pool, version);
   const makers = await readDeploymentMakerCapability(pool, version);
   if (!makers.deploymentMakerCapability) refuse("HOSTED_REGISTER_MAKER_CAPABILITY_INSUFFICIENT");
@@ -823,6 +1211,14 @@ export async function verifyHostedRegisterBootReadiness(
   await readStructuralCeilingPolicyInputs(pool, version);
   await readEnvelopeFormulaInputs(pool, version);
   await readDeploymentRiskTier(pool, version);
+  // hate-speech S02: main.ts's publication-check-policy stage (the pre-publish check's deadline).
+  await readPublicationCheckPolicy(pool, version);
+  // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
+  // sealed one the API would refuse at start-up is refused here, by its reason.
+  const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());
+  if (modelScorecard.state === "REFUSED") {
+    refuse(`HOSTED_REGISTER_MODEL_SCORECARD_REFUSED:${modelScorecard.reason}`);
+  }
   await readDevelopmentRunnerPolicy(pool, version);
   const targets = parseProviderDiscoveryTargets(providerTargetsJson, makers.configuredProviders);
   assertDeploymentProviderTargets(targets, { mode: "hosted", nodeEnv: "production" });

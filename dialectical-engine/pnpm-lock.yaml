@@ -68,6 +68,9 @@ importers:
       '@debateai/graph':
         specifier: workspace:*
         version: link:packages/graph
+      '@debateai/invoice-smartbill':
+        specifier: workspace:*
+        version: link:packages/invoice-smartbill
       '@debateai/judgement':
         specifier: workspace:*
         version: link:packages/judgement
@@ -83,12 +86,18 @@ importers:
       '@debateai/liveness':
         specifier: workspace:*
         version: link:packages/liveness
+      '@debateai/mail-templates':
+        specifier: workspace:*
+        version: link:packages/mail-templates
       '@debateai/memory':
         specifier: workspace:*
         version: link:packages/memory
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:packages/obs-capture
+      '@debateai/payments-xmoney':
+        specifier: workspace:*
+        version: link:packages/payments-xmoney
       '@debateai/propagation':
         specifier: workspace:*
         version: link:packages/propagation
@@ -104,6 +113,9 @@ importers:
       '@debateai/runner':
         specifier: workspace:*
         version: link:apps/runner
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:packages/scorecard
       '@debateai/serve':
         specifier: workspace:*
         version: link:packages/serve
@@ -113,6 +125,9 @@ importers:
       '@debateai/story':
         specifier: workspace:*
         version: link:packages/story
+      '@debateai/tax-quaderno':
+        specifier: workspace:*
+        version: link:packages/tax-quaderno
       '@debateai/valuation':
         specifier: workspace:*
         version: link:packages/valuation
@@ -152,6 +167,9 @@ importers:
       '@debateai/battery':
         specifier: workspace:*
         version: link:../../packages/battery
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../../packages/billing-core
       '@debateai/contract':
         specifier: workspace:*
         version: link:../../packages/contract
@@ -170,6 +188,9 @@ importers:
       '@debateai/geo':
         specifier: workspace:*
         version: link:../../packages/geo
+      '@debateai/invoice-smartbill':
+        specifier: workspace:*
+        version: link:../../packages/invoice-smartbill
       '@debateai/judgement':
         specifier: workspace:*
         version: link:../../packages/judgement
@@ -185,15 +206,24 @@ importers:
       '@debateai/liveness':
         specifier: workspace:*
         version: link:../../packages/liveness
+      '@debateai/mail-templates':
+        specifier: workspace:*
+        version: link:../../packages/mail-templates
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:../../packages/obs-capture
+      '@debateai/payments-xmoney':
+        specifier: workspace:*
+        version: link:../../packages/payments-xmoney
       '@debateai/providers':
         specifier: workspace:*
         version: link:../../packages/providers
       '@debateai/register':
         specifier: workspace:*
         version: link:../../packages/register
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../../packages/scorecard
       '@debateai/serve':
         specifier: workspace:*
         version: link:../../packages/serve
@@ -206,6 +236,9 @@ importers:
       '@debateai/support-kb':
         specifier: workspace:*
         version: link:../../packages/support-kb
+      '@debateai/tax-quaderno':
+        specifier: workspace:*
+        version: link:../../packages/tax-quaderno
       '@hatchet-dev/typescript-sdk':
         specifier: 1.28.1
         version: 1.28.1(@grpc/grpc-js@1.14.5)(debug@4.4.3)(zod@4.4.3)
@@ -309,6 +342,9 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../../packages/register
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../../packages/scorecard
       '@debateai/serve':
         specifier: workspace:*
         version: link:../../packages/serve
@@ -520,6 +556,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
       '@debateai/crypto':
         specifier: workspace:*
         version: link:../crypto
@@ -599,6 +638,15 @@ importers:
         specifier: workspace:*
         version: link:../register
 
+  packages/invoice-smartbill:
+    dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
   packages/judgement:
     dependencies:
       '@debateai/db':
@@ -658,6 +706,12 @@ importers:
         specifier: workspace:*
         version: link:../register
 
+  packages/mail-templates:
+    dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
+
   packages/memory:
     dependencies:
       '@debateai/db':
@@ -684,6 +738,12 @@ importers:
       pg:
         specifier: 8.22.0
         version: 8.22.0
+
+  packages/payments-xmoney:
+    dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
 
   packages/propagation:
     dependencies:
@@ -719,6 +779,18 @@ importers:
       '@debateai/db':
         specifier: workspace:*
         version: link:../db
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../scorecard
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+
+  packages/scorecard:
+    dependencies:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel
@@ -758,6 +830,9 @@ importers:
       '@debateai/register':
         specifier: workspace:*
         version: link:../register
+      '@debateai/scorecard':
+        specifier: workspace:*
+        version: link:../scorecard
       '@debateai/valuation':
         specifier: workspace:*
         version: link:../valuation
@@ -809,6 +884,15 @@ importers:
 
   packages/support-kb:
     dependencies:
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+
+  packages/tax-quaderno:
+    dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel

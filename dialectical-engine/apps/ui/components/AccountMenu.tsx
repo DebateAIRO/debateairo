@@ -1,5 +1,4 @@
 "use client";
-import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ContractClient } from '@debateai/contract';
@@ -67,8 +66,8 @@ export function AccountMenu({ authenticated, catalog: provided, client = contrac
     }}>
         <button ref={trigger} type="button" className="btn" aria-haspopup="menu" aria-expanded={open} aria-controls={id} onClick={() => { if (open) close(); else setOpen(true); }}>{t(catalog, 'chrome.account')}</button>
         {open ? createPortal(<div ref={panel} style={{position: 'fixed', top: position.top, left: position.left, right: 'auto', bottom: 'auto', width: position.width}} id={id} role="menu" aria-label={t(catalog, 'chrome.account')} className="accountMenuPanel">
-            <Link role="menuitem" href="/settings" onClick={() => close(false)}>{t(catalog, 'chrome.account')}</Link>
-            <Link role="menuitem" href="/settings/security" onClick={() => close(false)}>{t(catalog, 'chrome.security')}</Link>
+            <a role="menuitem" href="/settings" onClick={() => close(false)}>{t(catalog, 'chrome.account')}</a>
+            <a role="menuitem" href="/settings/security" onClick={() => close(false)}>{t(catalog, 'chrome.security')}</a>
             <button role="menuitem" type="button" data-account-logout disabled={busy} onClick={() => void logout()}>{t(catalog, 'chrome.logout')}</button>
             {error ? <p role="alert">{t(catalog, 'chrome.accountError')}</p> : null}
         </div>, document.body) : null}

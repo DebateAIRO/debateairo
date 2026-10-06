@@ -114,4 +114,33 @@ describe("S01 tier ask wire", () => {
       }
     ]);
   });
+
+  it("A21 carries a chosen model strength and omits an unchosen one", () => {
+    const submitTime = new Date("2026-09-10T00:00:00.000Z");
+    const base = {
+      riskTier: "standard", budgetTier: "low", decisionScope: "strength wire",
+      asOf: "2026-09-09T00:00:00.000Z", depth: 2, asOfWasEdited: false, planTier: "premium"
+    } as const;
+    expect(buildNewDebateAskConfig({ ...base, modelStrength: "BEST" }, submitTime))
+      .toMatchObject({ model_strength: "BEST" });
+    expect(buildNewDebateAskConfig({ ...base, modelStrength: null }, submitTime)).not.toHaveProperty("model_strength");
+    expect(buildNewDebateAskConfig(base, submitTime)).not.toHaveProperty("model_strength");
+  });
+
+  it("A21 forwards a known strength and refuses an unknown one before any network call", async () => {
+    const config = {
+      plan_tier: "premium", risk_tier: "standard", tier_source: "ASKER", tier_provenance_ref: "asker:ui-selection",
+      composition_budget_tier: "low", depth: 2, decision_scope: "strength wire", as_of: "2026-09-10T00:00:00.000Z"
+    };
+    const submitAsk = vi.fn().mockResolvedValue({ run_ref: "run:strength", status: "QUEUED" as const });
+    const client = { submitAsk } as unknown as ContractClient;
+    await createDebate("Which strength is sent?", { ...config, model_strength: "ECONOMY" }, "token", client);
+    await createDebate("Which strength is sent?", config, "token", client);
+    expect(submitAsk.mock.calls[0]?.[0]).toMatchObject({ model_strength: "ECONOMY" });
+    expect(submitAsk.mock.calls[1]?.[0]).not.toHaveProperty("model_strength");
+    submitAsk.mockClear();
+    await expect(createDebate("Which strength is sent?", { ...config, model_strength: "TURBO" }, "token", client))
+      .rejects.toThrow(/^ASK_FIELD_REQUIRED: model_strength/u);
+    expect(submitAsk).not.toHaveBeenCalled();
+  });
 });

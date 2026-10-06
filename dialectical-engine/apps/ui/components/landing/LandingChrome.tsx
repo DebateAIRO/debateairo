@@ -42,7 +42,7 @@ export function LandingChrome({ catalog }: { catalog: MessageCatalog }): JSX.Ele
           <LanguageSwitcher />
           <ModeToggle />
           <a className="lpCta lpCtaNav" href="/login?next=%2Fnew">
-            {t(catalog, "chrome.startRound")}
+            <span className="lpCtaLabel">{t(catalog, "chrome.startRound")}</span>
             <span className="lpArrow" aria-hidden="true">
               →
             </span>

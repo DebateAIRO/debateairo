@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -9,9 +9,11 @@ import {
   isUnverified,
   LEGAL_BROWSER_STORAGE,
   LEGAL_COOKIES,
+  LEGAL_INVENTORY,
   LEGAL_PAGES,
   PROVIDER_REGISTER,
   TERMS_VERSIONS,
+  type LegalInventoryItem,
   type LegalPageKey,
   type ProviderPurpose,
   type ProviderRegisterEntry
@@ -39,6 +41,25 @@ function LegalSection({ no, title, children }: { no: string; title: string; chil
   );
 }
 
+/** The eight stored-item names of record, longest first, as one alternation (a fixed allow-list, never a pattern). */
+const INVENTORY_NAMES = new RegExp(
+  `(${LEGAL_INVENTORY.map(({ name }) => name)
+    .sort((a, b) => b.length - a.length)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})`
+);
+
+/**
+ * Document text with every stored-item name (the privacy policy's §13 lines) as its own left-to-right run: on a
+ * right-to-left page a bare `__Host-debateai-session` line is drawn `Host-debateai-session__` (REV-S01 p2 PT2-N2).
+ * The ONE place this is done: the legal pages below and the policy modal (`consent/LegalDocumentModal.tsx`) both call it.
+ */
+export function withNames(text: string): ReactNode {
+  const parts = text.split(INVENTORY_NAMES);
+  if (parts.length === 1) return text;
+  return parts.map((part, index) => (index % 2 === 1 ? <bdi dir="ltr" key={index}>{part}</bdi> : part));
+}
+
 function NumberedSections({ sections }: { sections: readonly NumberedSection[] }) {
   return (
     <div className="legalSections">
@@ -46,12 +67,15 @@ function NumberedSections({ sections }: { sections: readonly NumberedSection[] }
         <LegalSection no={no} title={title} key={no}>
           {blocks.map((block, index) =>
             block.kind === "p" ? (
-              <p key={index}>{block.text}</p>
+              <p key={index}>{withNames(block.text)}</p>
             ) : (
               <ul key={index}>
-                {block.items.map((item, itemIndex) => (
-                  <li key={itemIndex}>{item}</li>
-                ))}
+                {block.items.map((item, itemIndex) => {
+                  // `.legalSection li` is a flex row: a line with an isolated name goes in ONE span, or the name's <bdi>
+                  // becomes its own flex item, gets a column of its own and breaks mid-word (REV-S01 p3 PT3-B1).
+                  const line = withNames(item);
+                  return <li key={itemIndex}>{typeof line === "string" ? line : <span>{line}</span>}</li>;
+                })}
               </ul>
             )
           )}
@@ -97,11 +121,14 @@ const READ_MORE: readonly LegalPageKey[] = ["terms", "privacy", "cookies", "prov
 export function LegalNoticeBody({
   legalCatalog,
   chromeCatalog,
-  locale
+  locale,
+  billingOn = false
 }: {
   legalCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
   locale: LocaleCode;
+  /** Paid plans (P21, R3-4): §01 names the seller, §04 and §05 describe the paid plans. Off: the free-product text. */
+  billingOn?: boolean;
 }) {
   const [product = COMPANY.legalName, ...otherNames] = COMPANY.tradingNames;
   const vat =
@@ -136,6 +163,7 @@ export function LegalNoticeBody({
             company: COMPANY.legalName
           })}
         </p>
+        {billingOn ? <p>{withFacts(t(legalCatalog, "legal.notice.s01.seller"), { company: COMPANY.legalName })}</p> : null}
         <table className="legalTable legalFactTable">
           <tbody>
             {companyRows.map(([labelKey, value]) => (
@@ -185,11 +213,29 @@ export function LegalNoticeBody({
       </LegalSection>
 
       <LegalSection no="04" title={t(legalCatalog, "legal.notice.s04.title")}>
-        <p>{withFacts(t(legalCatalog, "legal.notice.s04.body"), { product })}</p>
+        {billingOn ? (
+          <>
+            <p>{t(legalCatalog, "legal.notice.s04.bodyPaid")}</p>
+            <p>{t(legalCatalog, "legal.notice.s04.payments")}</p>
+            <p>
+              <a href="/pricing">{t(legalCatalog, "legal.notice.s04.pricingLink")}</a>
+            </p>
+            <p>
+              <a href="/cancel">{t(legalCatalog, "legal.notice.s04.cancelLink")}</a>
+            </p>
+          </>
+        ) : (
+          <p>{withFacts(t(legalCatalog, "legal.notice.s04.body"), { product })}</p>
+        )}
       </LegalSection>
 
       <LegalSection no="05" title={t(legalCatalog, "legal.notice.s05.title")}>
-        <p>{t(legalCatalog, "legal.notice.s05.body")}</p>
+        <p>{t(legalCatalog, billingOn ? "legal.notice.s05.bodyPaid" : "legal.notice.s05.body")}</p>
+        {billingOn ? (
+          <p>
+            <a href="/withdraw">{t(legalCatalog, "legal.notice.s05.withdrawLink")}</a>
+          </p>
+        ) : null}
         <p>
           <a href="/terms#legal-section-13">{t(legalCatalog, "legal.notice.s05.link")}</a>
         </p>
@@ -255,6 +301,45 @@ export function LegalVersionsBody({ legalCatalog }: { legalCatalog: MessageCatal
   );
 }
 
+/**
+ * A stored item's name, breakable only after a dot (DONE.md default 8): each dot-ended part is one run that
+ * `legal.css` keeps from wrapping, with a <wbr> after it. The text is the name exactly, so a copy is the real key.
+ * `dir="ltr"` makes it its own left-to-right run (DONE screen 18, as the card draws it): on a right-to-left page the
+ * neutral leading `__` of a `__Host-` name would otherwise be drawn at its right end (REV-S01 p2 PT2-N2).
+ */
+function InventoryName({ name }: { name: string }) {
+  const parts = name.split(/(?<=\.)/);
+  return (
+    <code dir="ltr">
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          <span className="legalNamePart">{part}</span>
+          {index < parts.length - 1 ? <wbr /> : null}
+        </Fragment>
+      ))}
+    </code>
+  );
+}
+
+/** One /cookies row: the name as the code writes it, then kind, purpose, who receives it, and lifetime. */
+function InventoryRow({ item, legalCatalog }: { item: LegalInventoryItem; legalCatalog: MessageCatalog }) {
+  return (
+    <tr>
+      <th scope="row">
+        <InventoryName name={item.name} />
+      </th>
+      <td className="legalKindCell">{t(legalCatalog, item.kindKey)}</td>
+      <td>{t(legalCatalog, item.purposeKey)}</td>
+      <td>{t(legalCatalog, item.recipientKey)}</td>
+      <td>{t(legalCatalog, item.lifeKey)}</td>
+    </tr>
+  );
+}
+
+/**
+ * The cookie policy (`/cookies`): the eight stored items of record, the four cookies in one table and
+ * the four browser-storage keys in another, then how to refuse them and what then stops working.
+ */
 export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalog }) {
   const head = (
     <thead>
@@ -262,6 +347,7 @@ export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalo
         <th scope="col">{t(legalCatalog, "legal.cookies.colName")}</th>
         <th scope="col">{t(legalCatalog, "legal.cookies.colType")}</th>
         <th scope="col">{t(legalCatalog, "legal.cookies.colPurpose")}</th>
+        <th scope="col">{t(legalCatalog, "legal.cookies.colRecipient")}</th>
         <th scope="col">{t(legalCatalog, "legal.cookies.colLasts")}</th>
       </tr>
     </thead>
@@ -272,15 +358,8 @@ export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalo
       <table className="legalTable legalCookieTable">
         {head}
         <tbody>
-          {LEGAL_COOKIES.map(({ name, purposeKey, lifeKey }) => (
-            <tr key={name}>
-              <th scope="row">
-                <code>{name}</code>
-              </th>
-              <td className="legalTagEssential">{t(legalCatalog, "legal.cookies.essential")}</td>
-              <td>{t(legalCatalog, purposeKey)}</td>
-              <td>{t(legalCatalog, lifeKey)}</td>
-            </tr>
+          {LEGAL_COOKIES.map((item) => (
+            <InventoryRow item={item} legalCatalog={legalCatalog} key={item.name} />
           ))}
         </tbody>
       </table>
@@ -289,18 +368,13 @@ export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalo
       <table className="legalTable legalCookieTable">
         {head}
         <tbody>
-          {LEGAL_BROWSER_STORAGE.map(({ name, purposeKey }) => (
-            <tr key={name}>
-              <th scope="row">
-                <code>{name}</code>
-              </th>
-              <td className="legalTagPreference">{t(legalCatalog, "legal.cookies.preference")}</td>
-              <td>{t(legalCatalog, purposeKey)}</td>
-              <td>{t(legalCatalog, "legal.cookies.untilCleared")}</td>
-            </tr>
+          {LEGAL_BROWSER_STORAGE.map((item) => (
+            <InventoryRow item={item} legalCatalog={legalCatalog} key={item.name} />
           ))}
         </tbody>
       </table>
+      <p className="legalRefuse">{t(legalCatalog, "legal.cookies.refuse")}</p>
+      <p className="legalRefuse">{t(legalCatalog, "legal.cookies.refuseEffect")}</p>
       <CookiePreferencesButton className="btn btnDark legalAction" label={t(legalCatalog, "legal.cookies.change")} />
     </>
   );

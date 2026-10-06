@@ -3,23 +3,28 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { TypedDomainError } from "../../../../packages/kernel/src/index.js";
 import { createSupportModelAdapter, type SupportModelTarget } from "../support/model.js";
-import { PUBLICATION_CHECK_DEADLINE_MS, PublicationJudgeFailure, type JudgeFailureCause, type PublicationJudgePort } from "./check.js";
+import { PublicationJudgeFailure, type JudgeFailureCause, type PublicationJudgePort } from "./check.js";
 
 /**
  * FIX-HS2-p1 pt-N4: the adapter's own timeout is a BACKSTOP strictly above the check's deadline D, so the only
  * clock that can end a call inside D is the check's shared signal, and every expiry is recorded as JUDGE_DEADLINE.
+ * FIX-HS2-p2 (REV p2 survivor M4c): D + 10 s, so a hung call never holds the relay much past D. D is the register's
+ * publicationCheckPolicy row, which the composition root passes in.
  */
-const ADAPTER_BACKSTOP_MS = PUBLICATION_CHECK_DEADLINE_MS + 10_000;
+const ADAPTER_BACKSTOP_MARGIN_MS = 10_000;
 
 /** FIX-HS2-p1 sd-N6: the judge's diagnostics carry the judge's name, never the support chat's. */
 const JUDGE_DIAGNOSTIC_PREFIX = "PUBLICATION_JUDGE:";
 
 export function createPublicationJudgeTransport(target: SupportModelTarget, options: {
   readAuthorizationHeader: (path: string) => string;
+  /** D, the check's deadline (the register's publicationCheckPolicy row); the adapter's backstop is D + 10 s. */
+  deadlineMs: number;
   fetchImplementation?: typeof fetch;
   reportDiagnostic?: (diagnostic: Readonly<{ code: string }>) => void;
 }): PublicationJudgePort {
   const report = options.reportDiagnostic;
+  const backstopMs = options.deadlineMs + ADAPTER_BACKSTOP_MARGIN_MS;
   return {
     providerRef: target.providerRef, modelId: target.model,
     async complete(input) {
@@ -27,7 +32,7 @@ export function createPublicationJudgeTransport(target: SupportModelTarget, opti
       try {
         const adapter = createSupportModelAdapter(target, {
           readAuthorizationHeader: options.readAuthorizationHeader,
-          timeoutMs: ADAPTER_BACKSTOP_MS,
+          timeoutMs: backstopMs,
           ...(report === undefined ? {} : {
             reportDiagnostic: (diagnostic: Readonly<{ code: string }>) => { report({ code: `${JUDGE_DIAGNOSTIC_PREFIX}${diagnostic.code}` }); }
           }),
