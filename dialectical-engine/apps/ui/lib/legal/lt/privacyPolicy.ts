@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Paskyra — El. pašto adresas ir atkūrimo el. pašto adresas (saugomi užšifruoti, su raktiniu indeksu, kad galėtume rasti paskyrą neskaitydami adreso); slaptažodis (saugomas kaip maiša, niekada atviruoju tekstu); jūsų dviejų veiksnių autentifikavimo paslaptis (užšifruota); dešimt atkūrimo kodų (saugomi kaip maišos); jūsų slapyvardis; laikas, kada patvirtinote, kad jums yra 18 metų ar daugiau — Jūs, registracijos metu",
+        "Paskyra — El. pašto adresas ir atkūrimo el. pašto adresas (saugomi užšifruoti, su raktiniu indeksu, kad galėtume rasti paskyrą neskaitydami adreso); slaptažodis (saugomas kaip maiša, niekada atviruoju tekstu); jūsų dviejų veiksnių autentifikavimo paslaptis (užšifruota); dešimt atkūrimo kodų (saugomi kaip maišos); jūsų slapyvardis — Jūs ir paslauga, registracijos metu",
+        "IP adreso šalies patikra registruojantis ir pradedant naujus debatus — Registruojantis IP adreso šalį ir Tor išėjimo mazgus vietoje tikriname naudodami DB-IP Lite ir Tor sąrašą. Prieš kiekvienus naujus debatus IP adreso šalį vėl patikriname vietoje ir debatus atmetame, jei šalis yra visada blokuojamų šalių sąraše. Registraciją iš neaptarnaujamų šalių, Tor ar IP adresų, kurių šalies negalime nustatyti atmetame; IP adreso trečiosioms šalims nesiunčiame. Atmetimai apibendrinami pagal maršrutą, kodą, šalį ir laiko intervalą; IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą. Įrodymo rūšis nurodoma kaip „IP adresas“. — Jūsų ryšys",
+        "Amžiaus patikra — Įvedate gimimo datą, tačiau jos nesaugome. Sėkmingai užsiregistravus išsaugomas teigiamas rezultatas; esamos paskyros patikra gali būti teigiama arba neigiama. Įraše nurodomas minimalus amžius, IP adreso šalis, jei žinoma, taisyklės versija, patikros aplinkybės ir laikas — Jūs ir registracijos sistema",
+        "Deklaruota gyvenamoji vieta — Registruojantis pasirinkta gyvenamoji šalis ir, jei gyvenate JAV, valstija — Jūs",
         "Seansai ir saugumas — Seanso prieigos rakto maiša; jūsų naršyklės naudotojo agento eilutės raktinė maiša, naudojama pastebėti, kai seansas perkeliamas į kitą naršyklę; sukūrimo, paskutinio naudojimo ir galiojimo pabaigos laiko žymos. Su seansu nesaugome jūsų IP adreso, įrenginio pavadinimo ar naršyklės duomenų, o Nustatymuose matomame seansų sąraše rodomos tik laiko žymos — Jūsų naršyklė",
         "Saugumo audito žurnalas — Žurnalas, į kurį tik pridedami su saugumu susijusių įvykių įrašai — registracija, patvirtinimas, bandymai prisijungti, atkūrimas, paskelbimas, ištrynimas. Kiekvieno įvykio IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės raktinės santraukos (Argon2id), todėl jų negalima atkurti, tačiau per tam tikrą laikotarpį galima palyginti. Prisijungimo ir atkūrimo rizikos signalai 90 dienų saugomi užšifruoti — Jūsų naršyklė kiekvieno įvykio metu",
         "Debatų turinys — Jūsų įvestas klausimas; jūsų nustatytos valdymo pastabos; variklio sugeneruoti teiginiai, kritika, įrodymų nuorodos, įverčiai ir verdiktai; pažodinis kiekvieno DI paslaugų teikėjo atsakymo įrašas; paieškos užklausos ir šaltinių nuorodos. Visa tai saugoma užšifruota jūsų paskyrai būdingu raktu — Jūs ir su jūsų klausimu dirbantys DI modeliai",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Asmenys, kurie nėra mūsų naudotojai — Kitų asmenų duomenys, kuriuos įtraukiate į klausimą arba kuriuos variklis sugeneruoja į jį atsakydamas. Prašome to nedaryti; 11 skyriuje paaiškinta, ką darome, jei taip vis dėlto nutinka — Netiesiogiai iš jūsų"
         ]
       },
+      { kind: "p", text: "Registruojantis tikriname IP adreso šalį ir amžių. Gimimo data perduodama tik patikrai ir nesaugoma. IP patikra atliekama vietoje, nesiunčiant adreso trečiajai šaliai. Prieš kiekvienus naujus debatus taip pat vietoje tikriname IP adreso šalį; debatus atmetame, jei šalis visada blokuojama." },
       { kind: "p", text: "Nerenkame analitikos ar telemetrijos duomenų apie tai, kaip naudojatės produktu, ir šiuo tikslu nenustatome slapukų. Jei tai pasikeis, pirmiausia bus pakeista ši politika ir Slapukų politika, o jūsų bus paprašyta pasirinkti." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Debatų variklis skatina kelti klausimus apie politiką, religiją, sveikatą, seksualumą ir įsitikinimus. Pagal GDPR 9 straipsnį tai yra specialių kategorijų duomenys, kurie gali patekti į jūsų klausimus nepriklausomai nuo to, ar ketiname juos rinkti." },
-      { kind: "p", text: "Apie jus. Prieš pirmuosius savo debatus atskirame ekrane duodate aiškų sutikimą, kad debatų vykdymo tikslu tvarkytume neskelbtiną informaciją, kurią nusprendžiate įtraukti į savo klausimus. Užfiksuojame formuluotės, su kuria sutikote, versiją, jūsų kalbą ir laiką. Be šio sutikimo negalite pradėti debatų. Sutikimą galite bet kada atšaukti tokios informacijos neįtraukdami arba ištrindami debatus. Tai, ką paskelbiate apie save, yra duomenys, kuriuos patys nusprendėte paviešinti." },
+      { kind: "p", text: "Apie jus. Prieš pirmuosius savo debatus atskirame ekrane duodate aiškų sutikimą, kad debatų vykdymo tikslu tvarkytume neskelbtiną informaciją, kurią nusprendžiate įtraukti į savo klausimus. Užfiksuojame formuluotės, su kuria sutikote, versiją, jūsų kalbą ir laiką. Be šio sutikimo negalite pradėti debatų. Sutikimą galite bet kada atšaukti uždarydami savo paskyrą. Tokios informacijos taip pat galite neįtraukti arba ištrinti debatus, kuriuose ji yra. Tai, ką paskelbiate apie save, yra duomenys, kuriuos patys nusprendėte paviešinti." },
       { kind: "p", text: "Apie kitus asmenis. Jokia teisinė sąlyga neleidžia mums tvarkyti neskelbtinų duomenų apie trečiąjį asmenį, kurį įvardijate klausime, ir tokios sąlygos neturi nė vienas mūsų DI paslaugų teikėjas. Todėl Sąlygos tai draudžia, todėl kuo labiau ribojame siunčiamus duomenis ir todėl gavę prašymą tokį turinį greitai pašaliname — žr. 11 skyrių." },
       { kind: "p", text: "Sveikatos informacija. Kai kurios šalys su sveikata susijusius duomenis, įskaitant išvadas, reglamentuoja specialiais įstatymais. Jei gyvenate [the State of Washington], taikomas atskiras [Consumer Health Data Privacy Notice]." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kodėl naudojame jūsų duomenis ir kokiu pagrindu",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Kiekvienas tikslas turi vieną teisinį pagrindą pagal GDPR 6 straipsnio 1 dalį, o vienu tikslu surinktų duomenų pakartotinai nenaudojame kitu tikslu." },
+      { kind: "p", text: "Toliau nurodome kiekvienam tikslui taikomus teisinius pagrindus pagal GDPR 6 straipsnio 1 dalį. Vienu tikslu surinktų duomenų pakartotinai nenaudojame kitu tikslu." },
       {
         kind: "list",
         items: [
         "Sukurti ir tvarkyti jūsų paskyrą, patvirtinti jūsų tapatybę, vykdyti ir saugoti debatus, kad galėtumėte juos vėl atverti ir pakartoti — Paskyra, seansai, debatų turinys — Sutartis — Art. 6(1)(b)",
+        "IP šalies ir Tor patikra registruojantis adresams iš neaptarnaujamų šalių arba IP adresams, kurių šalies negalime nustatyti, atmesti ir IP šalies patikra prieš kiekvienus naujus debatus visada blokuojamoms šalims atmesti — IP patikra ir atmetimų auditas — Teisėti interesai — Art. 6(1)(f), saugi ir teisės aktus atitinkanti paslauga; teisinė prievolė — Art. 6(1)(c), kai taikomi apribojimai",
+        "Amžiaus patikra registruojantis ar esamoje paskyroje — Amžiaus patikros rezultatas; gimimo data tik patikros metu — Sutartis — Art. 6(1)(b); teisėti interesai — Art. 6(1)(f), nepilnamečių apsauga",
+        "Gyvenamosios vietos vartotojų, privatumo ir mokesčių taisyklių taikymas — Deklaruota šalis ir JAV valstija — Sutartis — Art. 6(1)(b); teisinė prievolė — Art. 6(1)(c)",
         "Siųsti jūsų klausimą ir variklio teiginius DI paslaugų teikėjams, kad būtų sugeneruoti debatai — Debatų turinys — Sutartis — Art. 6(1)(b)",
         "Užtikrinti paslaugos saugumą, nustatyti piktnaudžiavimą, leisti jums pastebėti ne jūsų atliktą prisijungimą, tvarkyti audito žurnalą — Seansai, saugumo audito žurnalas, pagalbos piktnaudžiavimo maišos — Teisėti interesai — Art. 6(1)(f): mūsų ir jūsų interesas naudotis saugia paslauga. Galite nesutikti; žr. 10 skyrių",
         "Įrodyti, kad sutikote su Sąlygomis ir davėte arba atšaukėte sutikimą — Sutikimo su sąlygomis ir kitų sutikimų įrašai — Teisinė prievolė — Art. 6(1)(c), mūsų pareiga įrodyti sutikimą pagal Art. 7(1), ir teisėtas interesas įrodyti sutarties sudarymą",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Paskelbimas ir matomumas",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Debatai yra privatūs, kol jų nepaskelbiate. Paskelbimas yra sąmoningas, atskirai patvirtinamas veiksmas. Paskelbtuose debatuose rodomas jūsų slapyvardis, jūsų klausimas toks, kokį jį parašėte, argumentų medis, įverčiai, verdiktas bei pasitikėjimo lygis ir aiškiai nurodoma, kad turinį sugeneravo DI. Juose niekada nerodomas jūsų el. pašto adresas, seansų įrašai ar paskyros istorija. [Published debates are / are not] indeksuojami paieškos sistemų [unless you choose]." },
+      { kind: "p", text: "Debatai yra privatūs, kol jų nepaskelbiate. Paskelbimas yra sąmoningas, atskirai patvirtinamas veiksmas. Paskelbtuose debatuose rodomas jūsų slapyvardis, jūsų klausimas toks, kokį jį parašėte, argumentų medis, įverčiai, verdiktas bei pasitikėjimo lygis ir aiškiai nurodoma, kad turinį sugeneravo DI. Juose niekada nerodomas jūsų el. pašto adresas, seansų įrašai ar paskyros istorija. Paieškos sistemos gali indeksuoti paskelbtus debatus." },
       { kind: "p", text: "Atšaukus paskelbimą debatai pašalinami iš DebateAI ir sunaikinamas mūsų viešos kopijos raktas. Skaitytojų, paieškos sistemų ar archyvų jau padarytos kopijos nuo mūsų nepriklauso ir negalime jų atšaukti." },
       { kind: "p", text: "Kai ištrinate paskyrą, nepagrįstai nedelsdami ir ne vėliau kaip per 30 dienų pašaliname iš viešos prieigos visus jūsų paskelbtus debatus, nebent pagal įstatymus privalome išsaugoti konkretų elementą. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Paskyra — Kol paskyra egzistuoja, ir dar 7 dienų lengvatinį laikotarpį po prašymo ją uždaryti — Raktai sunaikinami; įrašas ištrinamas",
+        "Amžiaus patikros rezultatas ir aplinkybės — Kol egzistuoja paskyra — Ištrinamas kartu su paskyra",
+        "Deklaruota gyvenamoji šalis ir JAV valstija — Kol egzistuoja paskyra — Ištrinamos kartu su paskyra",
         "Seansų įrašai — 14 dienų nuo paskutinio naudojimo arba 90 dienų nuo sukūrimo, atsižvelgiant į tai, kuris terminas sueina pirmas — Ištrinami",
         "El. pašto patvirtinimo nuorodos — 24 valandas — Ištrinamos",
         "Prisijungimo ir atkūrimo rizikos signalai — 90 dienų; terminą užtikrina duomenų bazė — Ištrinami",
         "Saugumo audito žurnalas — Visą paslaugos gyvavimo laiką — Įrašai tik pridedami; IP adresai ir naudotojo agentai yra vienkryptės santraukos ir negali būti atkurti",
+        "IP šalies patikros atmetimo audito įrašas — Visą paslaugos gyvavimo laiką — Tik papildomas; įrašomas maršrutas, atmetimo kodas, šalis, laiko intervalas ir įrodymo rūšis „IP adresas“; IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą",
+        "Neapdorotas IP adresas šalies patikrai registruojantis arba pradedant naujus debatus — Tik atitinkamos užklausos metu — Ši patikra nesaugo skaitomo IP; atmetimo audite IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą, o IP šalis gali būti amžiaus patikros įraše",
         "Debatų turinys (privatus) — Kol paskyra egzistuoja — Uždarius paskyrą raktai sunaikinami ir turinio perskaityti nebegalima",
         "Debatų turinys (paskelbtas) — Kol yra paskelbtas ir kol paskyra egzistuoja — Atšaukus paskelbimą ar uždarius paskyrą pašalinamas iš viešos prieigos; raktai sunaikinami",
         "Paslaugų teikėjų atsakymų įrašai ir paieškos nuorodos — Tiek pat, kiek saugomi debatai, kuriems jie priklauso — Tas pats",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Teisė apriboti duomenų tvarkymą (Art. 18) — Paprašykite sustabdyti konkrečių duomenų tvarkymą, kol bus išspręstas dėl jų kilęs ginčas",
         "Teisė nesutikti (Art. 21) — Nesutikite, kad duomenys būtų tvarkomi remiantis teisėtais interesais — 4 skyriuje aprašytas saugumo ir audito duomenų tvarkymas — ir mes sustabdysime tvarkymą, nebent galėsime įrodyti įtikinamas priežastis. Bet kada nesutikite su rinkodara, ir ją nutrauksime",
         "Teisė į duomenų perkeliamumą (Art. 20) — Jūsų debatai ir paskyros duomenys įprastai naudojamu, kompiuterio skaitomu formatu. [Pending: same export as Access.] Jūsų sukurtas neasmeninis turinys, pavyzdžiui, jūsų klausimai, pasibaigus sutarčiai jūsų prašymu grąžinamas jums",
-        "Sutikimo atšaukimas (Art. 7(3)) — Atšaukite rinkodaros sutikimą bet kuriame el. laiške arba Nustatymuose; atšaukite sutikimą tvarkyti neskelbtinus duomenis jų neįtraukdami arba ištrindami debatus. Atšaukimas neturi įtakos jau atliktam tvarkymui",
+        "Sutikimo atšaukimas (Art. 7(3)) — Atšaukite rinkodaros sutikimą bet kuriame el. laiške arba Nustatymuose; atšaukite sutikimą tvarkyti neskelbtinus duomenis uždarydami paskyrą (tokių duomenų galite ir neįtraukti arba ištrinti debatus, kuriuose jie yra). Atšaukimas neturi įtakos jau atliktam tvarkymui",
         "Skundo pateikimas — Rumunijos priežiūros institucijai ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukareštas, anspdcp@dataprotection.ro, arba šalies, kurioje gyvenate, institucijai. Norėtume, kad pirmiausia kreiptumėtės į mus"
         ]
       },
@@ -263,7 +274,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Jungtinės Amerikos Valstijos (tik jei nurodyta)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Pranešimas duomenų rinkimo metu. 2 skyriaus lentelėje nurodytos kiekviena renkamos asmeninės informacijos kategorija, jos tikslas ir saugojimo trukmė (7 skyrius). Šių kategorijų neskelbtiną asmeninę informaciją renkame tik tada, kai ją įtraukiate į savo klausimus apie save: sveikata, religiniai ar filosofiniai įsitikinimai, lytinis gyvenimas ar lytinė orientacija, politinės pažiūros, narystė profesinėse sąjungose ir rasinė ar etninė kilmė. Ją naudojame tik jūsų debatams vykdyti ir tik gavę atskirą sutikimą, nurodytą 3 skyriuje. Asmeninės informacijos neparduodame ir neperduodame dalijimosi tikslais, taip pat to nedarėme per ankstesnius dvylika mėnesių. Asmeninės informacijos nenaudojame tikslinei reklamai, o neskelbtinos asmeninės informacijos nenaudojame jokiam kitam tikslui, išskyrus jūsų prašomos paslaugos teikimą. Atsisakymo nuostatos signalai: kadangi asmeninės informacijos neparduodame, neperduodame dalijimosi tikslais ir nenaudojame tikslinei reklamai, nėra ko atsisakyti, o Global Privacy Control signalas nieko nekeičia. Jūsų teisės: žinoti, ištrinti, ištaisyti, atsisakyti, apriboti neskelbtinos asmeninės informacijos naudojimą ir nepatirti diskriminacijos naudojantis šiomis teisėmis; pateikite prašymą adresu privacy@dezbatere.ro. Finansinės paskatos: jų nesiūlome; mūsų tikslai ir apsaugos priemonės nemokamame ir mokamame planuose yra tokie patys. Saugojimas aprašytas 7 skyriuje. Pažeidimai: gyventojams ir valstijų institucijoms pranešame taip, kaip reikalauja kiekvienos valstijos įstatymas dėl duomenų saugumo pažeidimų. Šis pranešimas atnaujinamas bent kas dvylika mėnesių; paskutinį kartą atnaujintas [date]." },
+      { kind: "p", text: "Pranešimas duomenų rinkimo metu. 2 skyriaus lentelėje nurodytos mūsų renkamos asmeninės informacijos kategorijos ir jų šaltiniai; tvarkymo tikslai pateikti 4 skyriuje, o saugojimo terminai – 7 skyriuje. Šių kategorijų neskelbtiną asmeninę informaciją renkame tik tada, kai ją įtraukiate į savo klausimus apie save: sveikata, religiniai ar filosofiniai įsitikinimai, lytinis gyvenimas ar lytinė orientacija, politinės pažiūros, narystė profesinėse sąjungose ir rasinė ar etninė kilmė. Ją naudojame tik jūsų debatams vykdyti ir tik gavę atskirą sutikimą, nurodytą 3 skyriuje. Asmeninės informacijos neparduodame ir neperduodame dalijimosi tikslais, taip pat to nedarėme per ankstesnius dvylika mėnesių. Asmeninės informacijos nenaudojame tikslinei reklamai, o neskelbtinos asmeninės informacijos nenaudojame jokiam kitam tikslui, išskyrus jūsų prašomos paslaugos teikimą. Atsisakymo nuostatos signalai: Kadangi šiuo metu asmens informacijos neparduodame, nesidalijame ja ir nenaudojame tikslinei reklamai, nėra ko atsisakyti. Jei ateityje pradėtume ją parduoti arba ja dalytis, Global Privacy Control signalus laikysime atsisakymo prašymu. Jūsų teisės: žinoti, ištrinti, ištaisyti, atsisakyti, apriboti neskelbtinos asmeninės informacijos naudojimą ir nepatirti diskriminacijos naudojantis šiomis teisėmis; pateikite prašymą adresu privacy@dezbatere.ro. Finansinės paskatos: jų nesiūlome; mūsų tikslai ir apsaugos priemonės nemokamame ir mokamame planuose yra tokie patys. Saugojimas aprašytas 7 skyriuje. Pažeidimai: gyventojams ir valstijų institucijoms pranešame taip, kaip reikalauja kiekvienos valstijos įstatymas dėl duomenų saugumo pažeidimų. Šis pranešimas atnaujinamas bent kas dvylika mėnesių; paskutinį kartą atnaujintas [date]." },
       { kind: "p", text: "Konektikutas: neskelbtinus duomenis tvarkome tik gavę jūsų aktyvų sutikimą, kurį duodate atskirame ekrane prieš pirmuosius savo debatus (3 skyrius); jūsų asmens duomenų nenaudojame DI modeliams mokyti. Vašingtonas: mūsų atskiras Vartotojų sveikatos duomenų privatumo pranešimas adresu [URL] taikomas visai su sveikata susijusiai informacijai, įskaitant išvadas. Teksasas ir Nebraska: neparduodame neskelbtinų asmens duomenų. Koloradas, Konektikutas, Virdžinija ir kitos išsamius privatumo įstatymus turinčios valstijos: pirmiau nurodytos teisės taikomos jums, kai mums taikomas atitinkamas įstatymas. Jei atsisakome patenkinti prašymą, galite tai apskųsti atsakydami į mūsų atsakymą adresu privacy@dezbatere.ro; jei jūsų skundą atmetame, galite kreiptis į savo valstijos generalinį prokurorą." }
     ]
   },
@@ -336,7 +347,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "6b44b7de38069c4155b15ba69d6638503704be745378a4aa89383b2e2fe7ed46",
+  sha256: "98b7cf889b6a1004c43353903be6863d60c76933abae79ed03dca4dc24fd43b4",
   eyebrow: "PRIVATUMO POLITIKA · v3.0 · ĮSIGALIOJA [DATE]",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",

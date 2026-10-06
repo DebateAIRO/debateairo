@@ -228,12 +228,12 @@ describe("legal documents — generated data", () => {
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
-    it("turns the collection table into eight rows joined with em dashes", () => {
+    it("turns the collection table into eleven rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
-      expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p"]);
+      expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(8);
+      expect(table.items).toHaveLength(11);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
       expect(table.items[0]!.endsWith("— You, at registration")).toBe(true);
     });

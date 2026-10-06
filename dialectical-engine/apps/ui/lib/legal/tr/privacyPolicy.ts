@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Hesap — E-posta adresi ve kurtarma e-posta adresi (şifrelenmiş olarak ve adresi okumadan hesabı bulabilmemizi sağlayan anahtarlı bir dizinle saklanır); parola (karma değer olarak saklanır, hiçbir zaman açık metin hâlinde saklanmaz); iki faktörlü kimlik doğrulama sırrınız (şifreli); on kurtarma kodu (karma değerler olarak saklanır); takma adınız; 18 yaşında veya daha büyük olduğunuzu doğruladığınız zaman — Siz, kayıt sırasında",
+        "Hesap — E-posta adresi ve kurtarma e-posta adresi (şifrelenmiş olarak ve adresi okumadan hesabı bulabilmemizi sağlayan anahtarlı bir dizinle saklanır); parola (karma değer olarak saklanır, hiçbir zaman açık metin hâlinde saklanmaz); iki faktörlü kimlik doğrulama sırrınız (şifreli); on kurtarma kodu (karma değerler olarak saklanır); takma adınız; yaş kontrolünün sonucu; doğum tarihiniz değil — Siz, kayıt sırasında",
+        "IP adresinin ülke kontrolü — Kayıt sırasında IP adresinin ülkesini DB-IP Lite ile yerel olarak belirler, Tor çıkış adresleri listesini ayrıca kontrol ederiz. Her yeni tartışma başlamadan önce IP adresinin ülkesini yine yerel olarak kontrol eder ve ülke her zaman engellenenler listesindeyse tartışmayı reddedebiliriz. Retlerde güzergâhı, kodu, ülkeyi, zaman aralığını ve kanıtın IP adresi olduğunu toplulaştırarak kaydederiz; Denetim kaydında IP adresi ve kullanıcı aracısı (user-agent) yalnızca anahtarlı, tek yönlü özetler olarak tutulur. — Kayıtta ve her yeni tartışmanın başlangıcında kullanılan IP adresi",
+        "Yaş kontrolü — Sonuç (kayıtta yalnızca geçti; mevcut hesap için geçti veya reddedildi), uygulanan asgari yaş, biliniyorsa IP ülkesi, kural sürümü, bağlam ve kontrol zamanı. Doğum tarihini saklamayız — Kontrol için verdiğiniz doğum tarihi; IP adresinden belirlenen ülke",
+        "Beyan edilen bölge — Kayıtta seçtiğiniz ikamet ülkesi ve ABD için eyalet — Siz, kayıt sırasında",
         "Oturumlar ve güvenlik — Karma değere dönüştürülmüş bir oturum belirteci; bir oturumun farklı bir tarayıcıya geçtiğini fark etmek için kullanılan, tarayıcınızın kullanıcı aracısı dizisinin anahtarlı karması; oluşturma, son kullanım ve sona erme zaman damgaları. IP adresinizi, cihaz adınızı veya tarayıcı ayrıntılarınızı bir oturumla birlikte saklamayız ve Ayarlar'da gördüğünüz oturum listesi yalnızca zaman damgalarını gösterir — Tarayıcınız",
         "Güvenlik denetim izi — Güvenlikle ilgili olayların — kayıt, doğrulama, oturum açma girişimleri, kurtarma, yayımlama, silme — yalnızca ekleme yapılabilen günlüğü. Her olayın IP adresi ve kullanıcı aracısı yalnızca tek yönlü, anahtarlı özetler (Argon2id) olarak saklanır; dolayısıyla geri okunamaz ancak belirli bir dönem içinde eşleştirilebilir. Oturum açma ve kurtarma risk sinyalleri 90 gün boyunca şifreli olarak saklanır — Tarayıcınız, her olayın gerçekleştiği anda",
         "Tartışma içeriği — Yazdığınız soru; belirlediğiniz yönlendirme notları; motorun oluşturduğu iddialar, eleştiriler, kanıt referansları, puanlar ve hükümler; her yapay zekâ sağlayıcısının döndürdüğü yanıtın kelimesi kelimesine kaydı; erişim sorguları ve kaynak referansları. Bunların tümü hesabınıza özgü bir anahtar altında şifrelenmiş olarak saklanır — Siz ve sorunuz üzerinde çalışan yapay zekâ modelleri",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kullanıcımız olmayan kişiler — Bir soruya dâhil ettiğiniz veya motorun soruyu yanıtlarken oluşturduğu, başka kişilere ait kişisel veriler. Bunu yapmamanızı isteriz; yine de gerçekleştiğinde ne yaptığımız bölüm 11'de açıklanır — Dolaylı olarak siz"
         ]
       },
+      { kind: "p", text: "Kayıt sırasında IP adresinizin ülkesini DB-IP Lite ile yerel olarak belirler, Tor çıkış adresleri listesini ayrıca kontrol ederiz; adresi üçüncü tarafa göndermeyiz. Hizmet sunmadığımız ülkelerden, Tor çıkış adreslerinden ve ülkesi bilinmeyen adreslerden kaydı reddederiz. Her yeni tartışma başlamadan önce IP adresinin ülkesini yine yerel olarak kontrol eder ve ülke her zaman engellenenler listesindeyse tartışmayı reddedebiliriz. Doğum tarihinizi yalnızca yaş kontrolü için girersiniz; saklamayız. Başarılı kayıtta saklanan sonuç “geçti”dir; mevcut hesapların kontrolünde sonuç “geçti” veya “reddedildi” olabilir. Tüketici, gizlilik ve vergi kurallarını uygulamak için ikamet ülkenizi, ABD’deyseniz eyaletinizi de seçersiniz." },
       { kind: "p", text: "Ürünü nasıl kullandığınıza ilişkin analitik veya telemetri toplamayız ve bu amaçla hiçbir çerez yerleştirmeyiz. Bu değişecek olursa önce bu politika ve Çerez Politikası değişir ve size sorulur." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Bir tartışma motoru siyaset, din, sağlık, cinsellik ve inanç hakkında sorular sorulmasına imkân verir. Bunlar GDPR'ın 9. maddesi kapsamında özel veri kategorileridir ve toplamayı amaçlayıp amaçlamadığımıza bakılmaksızın sorularınızda yer alabilirler." },
-      { kind: "p", text: "Sizin hakkınızda. İlk tartışmanızdan önce, kendi sorularınıza dâhil etmeyi seçtiğiniz hassas bilgileri tartışmalarınızı yürütme amacıyla işlememize ayrı bir ekranda açık rıza verirsiniz. Kabul ettiğiniz metnin sürümünü, dilinizi ve zamanı kaydederiz. Bu rıza olmadan tartışma başlatamazsınız. Bu tür bilgilere yer vermeyerek veya bir tartışmayı silerek rızanızı istediğiniz zaman geri çekebilirsiniz. Kendiniz hakkında yayımladığınız bilgiler, alenileştirmeyi seçtiğiniz verilerdir." },
+      { kind: "p", text: "Sizin hakkınızda. İlk tartışmanızdan önce, kendi sorularınıza dâhil etmeyi seçtiğiniz hassas bilgileri tartışmalarınızı yürütme amacıyla işlememize ayrı bir ekranda açık rıza verirsiniz. Kabul ettiğiniz metnin sürümünü, dilinizi ve zamanı kaydederiz. Bu rıza olmadan tartışma başlatamazsınız. Hesabınızı kapatarak rızanızı istediğiniz zaman geri çekebilirsiniz. Ayrıca bu tür bilgilere yer vermeyebilir veya bunları içeren bir tartışmayı silebilirsiniz. Kendiniz hakkında yayımladığınız bilgiler, alenileştirmeyi seçtiğiniz verilerdir." },
       { kind: "p", text: "Diğer kişiler hakkında. Bir soruda adını verdiğiniz üçüncü kişiye ait hassas verileri işlememize izin veren hiçbir hukuki şart yoktur; yapay zekâ sağlayıcılarımızdan hiçbiri için de böyle bir şart bulunmamaktadır. Koşulların bunu yasaklamasının, gönderdiklerimizi asgariye indirmemizin ve talep üzerine bu tür içeriği hızla kaldırmamızın nedeni budur — bölüm 11." },
       { kind: "p", text: "Sağlık bilgileri. Bazı ülkeler, çıkarımlar da dâhil olmak üzere sağlıkla ilgili verileri özel kanunlar kapsamında ele alır. [the State of Washington]'da yaşıyorsanız ayrı bir [Consumer Health Data Privacy Notice] geçerlidir." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Verilerinizi neden ve hangi dayanakla kullanıyoruz",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Her amacın GDPR'ın 6(1). maddesi kapsamında tek bir hukuki dayanağı vardır ve bir amaç için toplanan verileri başka bir amaç için yeniden kullanmayız." },
+      { kind: "p", text: "Her amaç için GDPR’ın 6(1). maddesi kapsamındaki uygun hukuki dayanağı veya dayanakları belirtiriz. Bir amaç için toplanan verileri başka bir amaç için yeniden kullanmayız." },
       {
         kind: "list",
         items: [
         "Hesabınızı oluşturmak ve işletmek, kimliğinizi doğrulamak, yeniden açıp oynatabilmeniz için tartışmalarınızı yürütmek ve saklamak — Hesap, oturumlar, tartışma içeriği — Sözleşme — Art. 6(1)(b)",
+        "Kayıt için IP ülkesini, Tor kullanımını ve bilinmeyen adresleri; yeni tartışmalar için her zaman engellenen ülkeler listesini kontrol etmek ve retleri belgelemek — IP adresinin ülke kontrolü — Meşru menfaatler — Art. 6(1)(f), hizmeti güvenle sunmak; ve hukuki yükümlülük — Art. 6(1)(c), yaptırımlara ve hizmet verilen ülkelerin kurallarına uymak",
+        "Hizmet için gereken asgari yaşı kontrol etmek — Yaş kontrolü — Sözleşme — Art. 6(1)(b), sözleşmenin kurulması; ve meşru menfaatler — Art. 6(1)(f), çocukların korunması",
+        "İlgili tüketici, gizlilik ve vergi kurallarını uygulamak — Beyan edilen bölge — Sözleşme — Art. 6(1)(b); ve hukuki yükümlülük — Art. 6(1)(c)",
         "Bir tartışma oluşturmak üzere sorunuzu ve motorun ifadelerini yapay zekâ sağlayıcılarına göndermek — Tartışma içeriği — Sözleşme — Art. 6(1)(b)",
         "Hizmeti güvenli tutmak, kötüye kullanımı tespit etmek, yapmadığınız bir oturum açma işlemini fark etmenizi sağlamak, denetim izi tutmak — Oturumlar, güvenlik denetim izi, desteğe iletilen kötüye kullanım içeriklerinin karmaları — Meşru menfaatler — Art. 6(1)(f): güvenli bir hizmet konusunda bizim ve sizin menfaatiniz. İtiraz edebilirsiniz; bölüm 10",
         "Koşulları kabul ettiğinizi ve bir rıza verdiğinizi veya geri çektiğinizi kanıtlamak — Kabul ve rıza kayıtları — Hukuki yükümlülük — Art. 6(1)(c), Art. 7(1) kapsamında rızayı kanıtlama görevimiz — ve sözleşmeyi belgelendirmeye yönelik meşru menfaatler",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Yayımlama ve görünürlük",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Tartışmalar siz yayımlayana kadar gizlidir. Yayımlama, bilinçli olarak yapılan ve ayrıca onaylanan bir işlemdir. Yayımlanmış bir tartışma takma adınızı, sorunuzu yazdığınız şekliyle, argüman ağacını, puanları, hükmü ve güven aralığını gösterir ve içeriğin yapay zekâ tarafından oluşturulduğunu belirten görünür bir etiket taşır. E-posta adresinizi, oturum kayıtlarınızı veya hesap geçmişinizi hiçbir zaman göstermez. [Published debates are / are not] arama motorları tarafından dizine eklenir [unless you choose]." },
+      { kind: "p", text: "Tartışmalar siz yayımlayana kadar gizlidir. Yayımlama, bilinçli olarak yapılan ve ayrıca onaylanan bir işlemdir. Yayımlanmış bir tartışma takma adınızı, sorunuzu yazdığınız şekliyle, argüman ağacını, puanları, hükmü ve güven aralığını gösterir ve içeriğin yapay zekâ tarafından oluşturulduğunu belirten görünür bir etiket taşır. E-posta adresinizi, oturum kayıtlarınızı veya hesap geçmişinizi hiçbir zaman göstermez. Arama motorları yayımlanmış tartışmaları dizine ekleyebilir." },
       { kind: "p", text: "Yayından kaldırma, tartışmayı DebateAI'dan kaldırır ve herkese açık kopyamıza ait anahtarı imha eder. Okuyucuların, arama motorlarının veya arşivlerin daha önce oluşturduğu kopyalar kontrolümüz dışındadır ve bunları geri alamayız." },
       { kind: "p", text: "Hesabınızı sildiğinizde, kanun belirli bir öğeyi saklamamızı gerektirmedikçe yayımladığınız her tartışmayı gereksiz gecikme olmaksızın ve en geç 30 gün içinde kamunun erişiminden kaldırırız. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Hesap — Hesap var olduğu sürece ve kapatma talebinizden sonra 7 günlük ek süre boyunca — Anahtarlar imha edilir; kayıt silinir",
+        "Yaş kontrolü sonucu ve kural bilgileri — Hesap var olduğu sürece — Hesapla birlikte silinir; doğum tarihi saklanmaz",
+        "Beyan edilen ikamet ülkesi ve ABD eyaleti — Hesap var olduğu sürece — Hesapla birlikte silinir",
         "Oturum kayıtları — Son kullanımdan 14 gün sonra veya oluşturulmasından 90 gün sonra; hangisi önceyse — Silinir",
         "E-posta doğrulama bağlantıları — 24 saat — Silinir",
         "Oturum açma ve kurtarma risk sinyalleri — Veri tabanı tarafından uygulanan 90 gün — Temizlenir",
         "Güvenlik denetim izi — Hizmetin ömrü boyunca — Yalnızca ekleme yapılabilir; IP ve kullanıcı aracısı tek yönlü özetlerdir ve geri okunamaz",
+        "Kayıtta ve yeni bir tartışmanın başlangıcında ülkeyi yerel olarak belirlemek için kullanılan IP adresi — Yalnızca isteğin işlendiği süre boyunca — Bu kontrol için açık biçimde saklanmaz; ret yalnızca toplulaştırılmış olarak ve aşağıda açıklanan özetle kaydedilir",
+        "IP ülkesine göre toplulaştırılmış ret denetim kayıtları — Hizmetin ömrü boyunca — Kayıt; ret kodunu, ülkeyi, IP adresinin kanıt olarak kullanıldığı bilgisini ve IP adresi ile kullanıcı aracısının (user-agent) anahtarlı, tek yönlü özetlerini içerir; denetim kaydına yalnızca ekleme yapılır.",
         "Tartışma içeriği (gizli) — Hesap var olduğu sürece — Kapatma sırasında anahtarlar imha edilir ve içerik okunamaz hâle gelir",
         "Tartışma içeriği (yayımlanmış) — Yayımlanmış olduğu ve hesap var olduğu sürece — Yayından kaldırma veya kapatma hâlinde kamunun erişiminden kaldırılır; anahtarlar imha edilir",
         "Sağlayıcı yanıt kayıtları ve erişim referansları — Ait oldukları tartışmayla aynı süre — Aynı işlem uygulanır",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kısıtlama (Art. 18) — Bir uyuşmazlık çözümlenene kadar belirli verileri işlemeyi durdurmamızı isteyin",
         "İtiraz (Art. 21) — Meşru menfaatlere dayalı işlemeye — bölüm 4'teki güvenlik ve denetim işlemesine — itiraz edin; zorlayıcı gerekçeler gösterebilmediğimiz sürece işlemeyi durdururuz. Pazarlamaya istediğiniz zaman itiraz edin; durdururuz",
         "Taşınabilirlik (Art. 20) — Tartışmalarınız ve hesap verileriniz yaygın kullanılan, makinece okunabilir bir biçimde sağlanır. [Pending: same export as Access.] Sorularınız gibi oluşturduğunuz kişisel olmayan içerik, sözleşme sona erdiğinde talebiniz üzerine size iade edilir",
-        "Rızayı geri çekme (Art. 7(3)) — Pazarlama rızasını herhangi bir e-postadan veya Ayarlar'dan geri çekin; hassas veri rızasını bu tür verilere yer vermeyerek veya bir tartışmayı silerek geri çekin. Geri çekme, daha önce gerçekleşmiş işlemeyi etkilemez",
+        "Rızayı geri çekme (Art. 7(3)) — Pazarlama rızasını herhangi bir e-postadan veya Ayarlar'dan geri çekin; hassas veri rızasını hesabınızı kapatarak geri çekin (bu tür verilere yer vermeyebilir veya bunları içeren bir tartışmayı silebilirsiniz). Geri çekme, daha önce gerçekleşmiş işlemeyi etkilemez",
         "Şikâyet — Romanya denetim makamı ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bükreş, anspdcp@dataprotection.ro adresine veya yaşadığınız ülkedeki makama. Önce bizden haber almayı tercih ederiz"
         ]
       },
@@ -263,7 +274,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Amerika Birleşik Devletleri (yalnızca listelenmişse)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Toplama anında bildirim. Bölüm 2'deki tablo, topladığımız her kişisel bilgi kategorisini, amacını ve ne kadar süreyle sakladığımızı (bölüm 7) listeler. Şu hassas kişisel bilgi kategorilerini yalnızca kendinizle ilgili sorularınıza dâhil etmeniz durumunda toplarız: sağlık, dinî veya felsefi inançlar, cinsel yaşam veya cinsel yönelim, siyasi görüşler, sendika üyeliği ve ırk veya etnik köken. Bunları yalnızca tartışmalarınızı yürütmek için ve yalnızca bölüm 3'teki ayrı rızanızdan sonra kullanırız. Kişisel bilgileri satmayız veya paylaşmayız ve önceki on iki ay içinde de bunu yapmadık. Kişisel bilgileri hedefli reklamcılık için kullanmayız ve hassas kişisel bilgileri talep ettiğiniz hizmeti sağlamanın ötesinde hiçbir amaçla kullanmayız. Vazgeçme tercih sinyalleri: kişisel bilgileri satmadığımız, paylaşmadığımız veya hedefli reklamcılık için kullanmadığımız için vazgeçilecek bir şey yoktur ve bir Global Privacy Control sinyali hiçbir şeyi değiştirmez. Haklarınız: bilgi edinme, silme, düzeltme, vazgeçme, hassas kişisel bilgilerin kullanımını sınırlama ve bunları kullandığınız için ayrımcılığa uğramama; privacy@dezbatere.ro adresinden talepte bulunun. Mali teşvikler: hiçbir teşvik sunmuyoruz; amaçlarımız ve korumalarımız ücretsiz ve ücretli planlarda aynıdır. Saklama, bölüm 7'de açıklanmıştır. İhlaller: her eyaletin ihlal kanununun gerektirdiği şekilde eyalet sakinlerini ve eyalet makamlarını bilgilendiririz. Bu bildirim en az on iki ayda bir güncellenir; son güncelleme [date]." },
+      { kind: "p", text: "Toplama anında bildirim. Bölüm 2'deki tablo, topladığımız kişisel bilgi kategorilerini ve bunların kaynaklarını gösterir. İşleme amaçları ve hukuki dayanaklar bölüm 4'te, saklama süreleri bölüm 7'de açıklanır. Şu hassas kişisel bilgi kategorilerini yalnızca kendinizle ilgili sorularınıza dâhil etmeniz durumunda toplarız: sağlık, dinî veya felsefi inançlar, cinsel yaşam veya cinsel yönelim, siyasi görüşler, sendika üyeliği ve ırk veya etnik köken. Bunları yalnızca tartışmalarınızı yürütmek için ve yalnızca bölüm 3'teki ayrı rızanızdan sonra kullanırız. Kişisel bilgileri satmayız veya paylaşmayız ve önceki on iki ay içinde de bunu yapmadık. Kişisel bilgileri hedefli reklamcılık için kullanmayız ve hassas kişisel bilgileri talep ettiğiniz hizmeti sağlamanın ötesinde hiçbir amaçla kullanmayız. Vazgeçme tercih sinyalleri: kişisel bilgileri satmadığımız, paylaşmadığımız veya hedefli reklamcılık için kullanmadığımız için vazgeçilecek bir şey yoktur. İleride kişisel bilgileri satmaya veya paylaşmaya başlarsak Global Privacy Control sinyallerini vazgeçme talebi olarak kabul edeceğiz. Haklarınız: bilgi edinme, silme, düzeltme, vazgeçme, hassas kişisel bilgilerin kullanımını sınırlama ve bunları kullandığınız için ayrımcılığa uğramama; privacy@dezbatere.ro adresinden talepte bulunun. Mali teşvikler: hiçbir teşvik sunmuyoruz; amaçlarımız ve korumalarımız ücretsiz ve ücretli planlarda aynıdır. Saklama, bölüm 7'de açıklanmıştır. İhlaller: her eyaletin ihlal kanununun gerektirdiği şekilde eyalet sakinlerini ve eyalet makamlarını bilgilendiririz. Bu bildirim en az on iki ayda bir güncellenir; son güncelleme [date]." },
       { kind: "p", text: "Connecticut: hassas verileri yalnızca ilk tartışmanızdan önceki ayrı ekranda verdiğiniz açık rızanızla işleriz (bölüm 3); kişisel verilerinizi yapay zekâ modellerini eğitmek için kullanmayız. Washington: [URL] adresindeki Tüketici Sağlık Verileri Gizlilik Bildirimimiz, çıkarımlar dâhil olmak üzere sağlıkla ilgili her bilgi için geçerli ayrı bir belgedir. Teksas ve Nebraska: hassas kişisel verileri satmayız. Colorado, Connecticut, Virginia ve kapsamlı gizlilik kanunlarına sahip diğer eyaletler: kanun bizim için geçerli olduğunda yukarıdaki haklar sizin için de geçerlidir. Bir talebi reddedersek, privacy@dezbatere.ro adresinden verdiğimiz yanıtı cevaplayarak itiraz edebilirsiniz; itirazı reddedersek eyaletinizin Başsavcısına başvurabilirsiniz." }
     ]
   },
@@ -336,7 +347,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "1a74244744af81ad533de872dd25390e5e3f7aaba97e79d68a0dca068e0443e7",
+  sha256: "3534f26ef1c724c0186ab40dda64db084ecdd6b0eeb64f2250563cb1d6d69acd",
   eyebrow: "GİZLİLİK POLİTİKASI · v3.0 · YÜRÜRLÜK TARİHİ [DATE]",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",

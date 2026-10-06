@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Účet — E-mailová adresa a e-mailová adresa pro obnovení (uložené šifrovaně, s indexem založeným na klíči, abychom mohli účet vyhledat bez přečtení adresy); heslo (uložené jako hash, nikdy v otevřené podobě); tajný údaj pro dvoufaktorové ověřování (šifrovaný); deset obnovovacích kódů (uložených jako hashe); váš pseudonym; okamžik, kdy jste potvrdili, že je vám alespoň 18 let — Vy při registraci",
+        "Účet — E-mailová adresa a e-mailová adresa pro obnovení (uložené šifrovaně, s indexem založeným na klíči, abychom mohli účet vyhledat bez přečtení adresy); heslo (uložené jako hash, nikdy v otevřené podobě); tajný údaj pro dvoufaktorové ověřování (šifrovaný); deset obnovovacích kódů (uložených jako hashe); váš pseudonym; výsledek ověření vašeho věku — Vy při registraci",
+        "Kontrola země podle IP adresy — Při registraci určujeme zemi podle IP adresy místně pomocí DB-IP Lite a kontrolujeme seznam výstupních adres sítě Tor. Při zahájení každé nové debaty zemi podle IP adresy znovu místně ověřujeme a můžeme ji odmítnout, pokud je země trvale blokována. Při odmítnutí agregujeme auditní záznamy podle cesty, kódu, země a časového okna; IP adresa se v něm uchovává jen jako jednosměrný digest s klíčem. Záznam o odmítnutí obsahuje kód, zemi a údaj, že podkladem byla IP adresa; IP adresu a řetězec user-agent uchováváme pouze jako jednosměrné otisky s klíčem. — Váš prohlížeč při registraci a při zahájení nové debaty",
+        "Ověření věku — Datum narození zadáváte jen pro kontrolu; neukládáme je. Uchováváme výsledek, požadovaný minimální věk, zemi podle IP adresy, je-li dostupná, verzi pravidla, kontext a čas kontroly. U úspěšné registrace se ukládá pouze výsledek „vyhověl“; u stávajících účtů může být výsledek „vyhověl“ nebo „odmítnut“ — Vy a váš prohlížeč",
+        "Deklarované bydliště — Země, v níž podle svého prohlášení žijete, a stát USA, pokud žijete ve Spojených státech — Vy při registraci",
         "Relace a zabezpečení — Hashovaný token relace; hash řetězce user-agent vašeho prohlížeče založený na klíči, který slouží ke zjištění přesunu relace do jiného prohlížeče; časové údaje o vytvoření, posledním použití a skončení platnosti. S relací neukládáme vaši IP adresu, název zařízení ani podrobnosti o prohlížeči a seznam relací, který vidíte v Nastavení, zobrazuje pouze časové údaje — Váš prohlížeč",
         "Bezpečnostní auditní stopa — Protokol bezpečnostně významných událostí pouze s možností připojování — registrace, ověření, pokusy o přihlášení, obnovení, zveřejnění a výmaz. IP adresa a user-agent každé události se ukládají pouze jako jednosměrné hashe založené na klíči (Argon2id), takže je nelze zpětně přečíst, ale lze je v určitém období porovnat. Rizikové signály přihlášení a obnovení se uchovávají šifrovaně po dobu 90 dnů — Váš prohlížeč v okamžiku každé události",
         "Obsah debaty — Otázka, kterou zadáte; řídicí anotace, které nastavíte; tvrzení, kritiky, odkazy na důkazy, hodnocení a závěry vytvořené systémem; doslovný záznam odpovědí jednotlivých poskytovatelů AI; vyhledávací dotazy a odkazy na zdroje. Vše je uloženo šifrovaně pod klíčem určeným konkrétně pro váš účet — Vy a modely AI pracující na vaší otázce",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Osoby, které nejsou našimi uživateli — Osobní údaje o jiných osobách, které uvedete v otázce nebo které systém vytvoří při odpovědi. Žádáme vás, abyste tak nečinili; oddíl 11 vysvětluje, jak postupujeme, pokud k tomu přesto dojde — Vy, nepřímo"
         ]
       },
+      { kind: "p", text: "Při registraci místně ověřujeme zemi podle IP adresy a odmítáme registrace ze zemí, kde službu neposkytujeme, z výstupních adres sítě Tor a z adres, jejichž zemi nelze určit. IP adresu k této kontrole neposíláme třetí straně. Datum narození použijeme k ověření věku, ale neuložíme je; uvádíte také zemi svého bydliště a případný stát USA. Při zahájení každé nové debaty zemi podle IP adresy také místně ověřujeme a debatu můžeme odmítnout, je-li země trvale blokována; odmítnutí kvůli Tor nebo neznámé zemi se týká registrace." },
       { kind: "p", text: "Neshromažďujeme analytické ani telemetrické údaje o vašem používání produktu a za tímto účelem nenastavujeme žádné soubory cookie. Pokud se to změní, nejprve změníme tyto zásady a Zásady používání souborů cookie a požádáme vás o vyjádření." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Debatní systém vybízí k otázkám o politice, náboženství, zdraví, sexualitě a přesvědčení. Jde o zvláštní kategorie údajů podle článku 9 GDPR a mohou se objevit ve vašich otázkách bez ohledu na to, zda je zamýšlíme shromažďovat." },
-      { kind: "p", text: "O vás. Před svou první debatou udělujete na samostatné obrazovce výslovný souhlas se zpracováním citlivých informací, které se rozhodnete zahrnout do vlastních otázek, za účelem vedení vašich debat. Zaznamenáváme verzi znění, se kterým jste souhlasili, váš jazyk a čas. Bez tohoto souhlasu nemůžete zahájit debatu. Souhlas můžete kdykoli odvolat tím, že takové informace nebudete uvádět, nebo výmazem debaty. Informace, které o sobě zveřejníte, jsou údaje, které jste se rozhodli zveřejnit." },
+      { kind: "p", text: "O vás. Před svou první debatou udělujete na samostatné obrazovce výslovný souhlas se zpracováním citlivých informací, které se rozhodnete zahrnout do vlastních otázek, za účelem vedení vašich debat. Zaznamenáváme verzi znění, se kterým jste souhlasili, váš jazyk a čas. Bez tohoto souhlasu nemůžete zahájit debatu. Souhlas můžete kdykoli odvolat uzavřením účtu. Takové informace také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje. Informace, které o sobě zveřejníte, jsou údaje, které jste se rozhodli zveřejnit." },
       { kind: "p", text: "O jiných osobách. Žádná právní podmínka nám neumožňuje zpracovávat citlivé údaje o třetí osobě, kterou uvedete v otázce, a žádnou takovou podmínku nemá ani žádný z našich poskytovatelů AI. Proto to Podmínky zakazují, proto minimalizujeme předávané údaje a proto takový obsah na žádost rychle odstraňujeme — viz oddíl 11." },
       { kind: "p", text: "Informace o zdravotním stavu. Některé země upravují údaje související se zdravím, včetně odvozených závěrů, zvláštními právními předpisy. Pokud žijete ve [the State of Washington], použije se samostatné [Consumer Health Data Privacy Notice]." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Proč vaše údaje používáme a na jakém základě",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Každý účel má jeden právní základ podle článku 6 odst. 1 GDPR a údaje shromážděné pro jeden účel nepoužíváme znovu pro jiný účel." },
+      { kind: "p", text: "U každého účelu uvádíme příslušné právní základy podle článku 6 odst. 1 GDPR a údaje shromážděné pro jeden účel nepoužíváme znovu pro jiný účel." },
       {
         kind: "list",
         items: [
         "Vytvoření a provoz vašeho účtu, ověřování vaší totožnosti a vedení a ukládání vašich debat, abyste je mohli znovu otevřít a přehrát — Účet, relace, obsah debaty — Smlouva — Art. 6(1)(b)",
+        "Ověření přípustnosti registrace a zahájení nové debaty podle země IP adresy a územních omezení — Země podle IP adresy, záznam odmítnutí — Oprávněné zájmy — Art. 6(1)(f) při ochraně a provozu služby, pokud to právo dovoluje, a právní povinnost — Art. 6(1)(c), pokud poskytování služby omezují sankce",
+        "Ověření minimálního věku — Údaje o ověření věku — Smlouva — Art. 6(1)(b), a oprávněné zájmy — Art. 6(1)(f)",
+        "Použití spotřebitelských pravidel, pravidel ochrany osobních údajů a daňových pravidel podle bydliště — Deklarovaná země a případný stát USA — Smlouva — Art. 6(1)(b), a právní povinnost — Art. 6(1)(c)",
         "Předávání vaší otázky a výroků systému poskytovatelům AI za účelem vytvoření debaty — Obsah debaty — Smlouva — Art. 6(1)(b)",
         "Zajištění bezpečnosti služby, odhalování zneužití, možnost rozpoznat přihlášení, které jste neprovedli, a vedení auditní stopy — Relace, bezpečnostní auditní stopa, hashe podpory související se zneužitím — Oprávněné zájmy — Art. 6(1)(f): naše i vaše na bezpečné službě. Můžete vznést námitku; viz oddíl 10",
         "Prokázání, že jste přijali Podmínky a udělili nebo odvolali souhlas — Záznamy o přijetí a souhlasech — Právní povinnost — Art. 6(1)(c), naše povinnost prokázat souhlas podle Art. 7(1) — a oprávněné zájmy na doložení smlouvy",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Zveřejňování a viditelnost",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Debaty jsou soukromé, dokud je nezveřejníte. Zveřejnění je úmyslný, samostatně potvrzený úkon. Zveřejněná debata zobrazuje váš pseudonym, otázku přesně tak, jak jste ji napsali, strom argumentů, hodnocení, závěr a interval spolehlivosti a nese viditelné označení, že obsah vytvořila AI. Nikdy nezobrazuje vaši e-mailovou adresu, záznamy relací ani historii účtu. [Published debates are / are not] indexovány vyhledávači [unless you choose]." },
+      { kind: "p", text: "Debaty jsou soukromé, dokud je nezveřejníte. Zveřejnění je úmyslný, samostatně potvrzený úkon. Zveřejněná debata zobrazuje váš pseudonym, otázku přesně tak, jak jste ji napsali, strom argumentů, hodnocení, závěr a interval spolehlivosti a nese viditelné označení, že obsah vytvořila AI. Nikdy nezobrazuje vaši e-mailovou adresu, záznamy relací ani historii účtu. Vyhledávače mohou zveřejněné debaty indexovat." },
       { kind: "p", text: "Zrušení zveřejnění odstraní debatu z DebateAI a zničí klíč k naší veřejné kopii. Kopie, které již vytvořili čtenáři, vyhledávače nebo archivy, jsou mimo naši kontrolu a nemůžeme je vzít zpět." },
       { kind: "p", text: "Když svůj účet vymažete, bez zbytečného odkladu a nejpozději do 30 dnů odstraníme z veřejného přístupu každou vámi zveřejněnou debatu, pokud nám zákon neukládá uchovat konkrétní položku. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,6 +133,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Účet — Po dobu existence účtu a sedmidenní ochrannou lhůtu poté, co požádáte o jeho uzavření — Klíče jsou zničeny; záznam je vymazán",
+        "IP adresa použitá k místnímu určení země — Jen po dobu zpracování registrace nebo zahájení nové debaty — Po kontrole se IP adresa neuchovává v čitelné podobě; při odmítnutí auditní záznam uchovává pouze jednosměrné otisky IP adresy a řetězce user-agent s klíčem, jak je popsáno níže",
+        "Auditní záznam odmítnutí při kontrole země IP adresy — Po dobu existence služby — Záznam obsahuje kód odmítnutí, zemi, údaj, že podkladem byla IP adresa, a jednosměrné otisky IP adresy a řetězce user-agent s klíčem; do auditního záznamu lze jen přidávat",
+        "Výsledek a údaje o ověření věku — Po dobu existence účtu — Smazány s účtem",
+        "Deklarovaná země a stát USA — Po dobu existence účtu — Smazány s účtem",
         "Záznamy relací — 14 dnů od posledního použití nebo 90 dnů od vytvoření, podle toho, co nastane dříve — Vymazány",
         "Odkazy pro ověření e-mailu — 24 hodin — Vymazány",
         "Rizikové signály přihlášení a obnovení — 90 dnů, vynuceno databází — Odstraněny",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Omezení zpracování (Art. 18) — Požádejte nás, abychom přestali zpracovávat určité údaje, dokud nebude vyřešen spor, který se jich týká",
         "Námitka (Art. 21) — Vzneste námitku proti zpracování založenému na oprávněných zájmech — bezpečnostnímu a auditnímu zpracování podle oddílu 4 — a my je ukončíme, pokud neprokážeme závažné oprávněné důvody. Proti marketingu můžete vznést námitku kdykoli a my jej ukončíme",
         "Přenositelnost (Art. 20) — Vaše debaty a údaje účtu v běžně používaném, strojově čitelném formátu. [Pending: same export as Access.] Neosobní obsah, který jste vytvořili, například vaše otázky, vám na požádání vrátíme při skončení smlouvy",
-        "Odvolání souhlasu (Art. 7(3)) — Odvolejte souhlas s marketingem v kterémkoli e-mailu nebo v Nastavení; souhlas s citlivými údaji odvolejte tím, že takové údaje nebudete uvádět, nebo výmazem debaty. Odvolání nemá vliv na zpracování, které již proběhlo",
+        "Odvolání souhlasu (Art. 7(3)) — Odvolejte souhlas s marketingem v kterémkoli e-mailu nebo v Nastavení; souhlas se zpracováním citlivých údajů odvolejte uzavřením účtu (takové údaje také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje). Odvolání nemá vliv na zpracování, které již proběhlo",
         "Stížnost — Rumunskému dozorovému úřadu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, anspdcp@dataprotection.ro, nebo úřadu v zemi vašeho bydliště. Budeme raději, když se nejprve obrátíte na nás"
         ]
       },
@@ -263,7 +274,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Spojené státy (pouze jsou-li uvedeny)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Oznámení při shromažďování. Tabulka v oddílu 2 uvádí jednotlivé kategorie osobních údajů, které shromažďujeme, jejich účel a dobu uchovávání (oddíl 7). Tyto kategorie citlivých osobních údajů shromažďujeme pouze tehdy, pokud je uvedete ve vlastních otázkách o sobě: zdraví, náboženské nebo filozofické přesvědčení, sexuální život nebo sexuální orientace, politické názory, členství v odborech a rasový nebo etnický původ. Používáme je pouze k vedení vašich debat, a to až po samostatném souhlasu podle oddílu 3. Osobní údaje neprodáváme ani nesdílíme a nečinili jsme tak ani v předchozích dvanácti měsících. Osobní údaje nepoužíváme k cílené reklamě a citlivé osobní údaje nepoužíváme k žádnému účelu nad rámec poskytování služby, kterou požadujete. Signály preferencí pro odhlášení: protože osobní údaje neprodáváme, nesdílíme ani nepoužíváme k cílené reklamě, není se z čeho odhlásit a signál Global Privacy Control nic nemění. Vaše práva: právo vědět, právo na výmaz a opravu, právo odhlásit se, omezit používání citlivých osobních údajů a nebýt diskriminován za jejich uplatnění; žádost podejte na privacy@dezbatere.ro. Finanční pobídky: žádné nenabízíme; naše účely a ochrana jsou u bezplatného i placeného tarifu stejné. Doba uchovávání je uvedena v oddílu 7. Porušení zabezpečení: obyvatele a státní orgány informujeme tak, jak to vyžaduje zákon o porušení zabezpečení údajů příslušného státu. Toto oznámení se aktualizuje nejméně jednou za dvanáct měsíců; naposledy aktualizováno [date]." },
+      { kind: "p", text: "Oznámení při shromažďování. Tabulka v oddílu 2 uvádí kategorie osobních údajů, které shromažďujeme, a jejich zdroje. Účely a právní základy zpracování jsou v oddílu 4, doby uchování v oddílu 7. Tyto kategorie citlivých osobních údajů shromažďujeme pouze tehdy, pokud je uvedete ve vlastních otázkách o sobě: zdraví, náboženské nebo filozofické přesvědčení, sexuální život nebo sexuální orientace, politické názory, členství v odborech a rasový nebo etnický původ. Používáme je pouze k vedení vašich debat, a to až po samostatném souhlasu podle oddílu 3. Osobní údaje neprodáváme ani nesdílíme a nečinili jsme tak ani v předchozích dvanácti měsících. Osobní údaje nepoužíváme k cílené reklamě a citlivé osobní údaje nepoužíváme k žádnému účelu nad rámec poskytování služby, kterou požadujete. Signály preferencí pro odhlášení: Nyní není z čeho se odhlásit, protože osobní údaje neprodáváme ani nesdílíme. Pokud je někdy začneme prodávat nebo sdílet, budeme signály Global Privacy Control respektovat jako žádost o odhlášení. Vaše práva: právo vědět, právo na výmaz a opravu, právo odhlásit se, omezit používání citlivých osobních údajů a nebýt diskriminován za jejich uplatnění; žádost podejte na privacy@dezbatere.ro. Finanční pobídky: žádné nenabízíme; naše účely a ochrana jsou u bezplatného i placeného tarifu stejné. Doba uchovávání je uvedena v oddílu 7. Porušení zabezpečení: obyvatele a státní orgány informujeme tak, jak to vyžaduje zákon o porušení zabezpečení údajů příslušného státu. Toto oznámení se aktualizuje nejméně jednou za dvanáct měsíců; naposledy aktualizováno [date]." },
       { kind: "p", text: "Connecticut: citlivé údaje zpracováváme pouze s vaším výslovným souhlasem (opt-in), uděleným na samostatné obrazovce před vaší první debatou (oddíl 3); vaše osobní údaje nepoužíváme k trénování modelů AI. Washington: naše samostatné Oznámení o ochraně osobních údajů spotřebitelů v oblasti zdraví na [URL] se vztahuje na veškeré informace související se zdravím včetně odvozených závěrů. Texas a Nebraska: citlivé osobní údaje neprodáváme. Colorado, Connecticut, Virginia a další státy s komplexními zákony o ochraně soukromí: výše uvedená práva se na vás vztahují tam, kde se na nás vztahuje zákon. Pokud žádost zamítneme, můžete se odvolat odpovědí na naši odpověď na privacy@dezbatere.ro; pokud zamítneme i odvolání, můžete se obrátit na nejvyššího státního zástupce (Attorney General) svého státu." }
     ]
   },
@@ -336,7 +347,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "4ee76ddc6efd89b8f1ec3d15e1f756cd0b63eda17d4aecad25b4e09062eff867",
+  sha256: "8693d0bba47e9f55e534859b31b2bd09ea2aec64143b8f380e24cb10d1e5b1b5",
   eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.0 · ÚČINNÉ OD [DATE]",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",

@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Račun — E-poštni naslov in e-poštni naslov za obnovitev (shranjena šifrirano, z indeksom s ključem, da lahko račun najdemo, ne da bi naslov prebrali); geslo (shranjeno kot zgoščena vrednost, nikoli v čisti obliki); vaša skrivnost za dvostopenjsko preverjanje pristnosti (šifrirana); deset obnovitvenih kod (shranjenih kot zgoščene vrednosti); vaš psevdonim; čas, ko ste potrdili, da ste stari najmanj 18 let — Vi, ob registraciji",
+        "Račun — E-poštni naslov in e-poštni naslov za obnovitev (shranjena šifrirano, z indeksom s ključem, da lahko račun najdemo, ne da bi naslov prebrali); geslo (shranjeno kot zgoščena vrednost, nikoli v čisti obliki); vaša skrivnost za dvostopenjsko preverjanje pristnosti (šifrirana); deset obnovitvenih kod (shranjenih kot zgoščene vrednosti); vaš psevdonim; rezultat preverjanja starosti, ne pa rojstnega datuma — Vi, ob registraciji",
+        "Preverjanje države naslova IP — Ob registraciji lokalno določimo državo naslova IP s podatki DB-IP Lite in seznamom izhodnih vozlišč Tor. Pred vsako novo razpravo prav tako lokalno preverimo državo naslova IP in lahko razpravo zavrnemo, če je država na seznamu vedno blokiranih. Ob zavrnitvi združeno zabeležimo pot, kodo, državo, časovno okno in podatek, da je bil dokaz naslov IP; V revizijski sledi sta naslov IP in niz user-agent shranjena le kot enosmerni zgoščeni vrednosti s ključem. — Naslov IP ob registraciji in začetku nove razprave",
+        "Preverjanje starosti — Rezultat (ob registraciji samo uspešen; pri obstoječem računu uspešen ali zavrnjen), uporabljena najnižja starost, država naslova IP, če je znana, različica pravila, kontekst in čas preverjanja. Rojstnega datuma ne shranimo — Rojstni datum, vnesen za preverjanje; država iz naslova IP",
+        "Navedena regija — Država prebivališča, izbrana ob registraciji, in za ZDA tudi zvezna država — Vi, ob registraciji",
         "Seje in varnost — Zgoščen žeton seje; zgoščena vrednost s ključem, izračunana iz niza user-agent vašega brskalnika, s katero zaznavamo prenos seje v drug brskalnik; časovni žigi nastanka, zadnje uporabe in poteka veljavnosti. Znotraj seje ne hranimo vašega naslova IP, imena naprave ali podatkov o brskalniku, seznam sej v Nastavitvah pa prikazuje samo časovne žige — Vaš brskalnik",
         "Varnostna revizijska sled — Dnevnik varnostno pomembnih dogodkov, ki omogoča samo dodajanje — registracije, preverjanja, poskusov prijave, obnovitve, objave in izbrisa. Naslov IP in user-agent vsakega dogodka sta shranjena samo kot enosmerna povzetka s ključem (Argon2id), zato ju ni mogoče prebrati, mogoče pa ju je primerjati znotraj določenega obdobja. Signali tveganja ob prijavi in obnovitvi se šifrirano hranijo 90 dni — Vaš brskalnik ob vsakem dogodku",
         "Vsebina razprave — Vprašanje, ki ga vnesete; usmerjevalne opombe, ki jih nastavite; trditve, kritike, sklici na dokaze, ocene in razsodbe, ki jih ustvari sistem; dobesedni zapis odgovora vsakega ponudnika umetne inteligence; iskalne poizvedbe in sklici na vire. Vse to je shranjeno šifrirano s ključem, ki je poseben za vaš račun — Vi in modeli umetne inteligence, ki obravnavajo vaše vprašanje",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Osebe, ki niso naši uporabniki — Osebni podatki o drugih osebah, ki jih vključite v vprašanje ali jih sistem ustvari pri odgovarjanju. Prosimo vas, da tega ne počnete; razdelek 11 pojasnjuje, kako ravnamo, če se to kljub temu zgodi — Vi, posredno"
         ]
       },
+      { kind: "p", text: "Ob registraciji lokalno preverimo državo naslova IP s podatki DB-IP Lite in seznamom izhodnih vozlišč Tor; naslova ne pošljemo tretji osebi. Registracijo zavrnemo iz držav, kjer storitev ni na voljo, z izhodnih vozlišč Tor in z naslovov, katerih države ne poznamo. Pred vsako novo razpravo prav tako lokalno preverimo državo naslova IP in lahko razpravo zavrnemo, če je država na seznamu vedno blokiranih. Rojstni datum vnesete samo zaradi preverjanja starosti; ne shranimo ga. Ob uspešni registraciji shranimo rezultat »uspešen«; pri obstoječih računih je lahko rezultat tudi »zavrnjen«. Navedete še državo prebivališča in v ZDA zvezno državo, da uporabimo ustrezna pravila varstva potrošnikov, zasebnosti in davkov." },
       { kind: "p", text: "Ne zbiramo analitičnih ali telemetričnih podatkov o vaši uporabi izdelka in v ta namen ne nameščamo piškotkov. Če se to spremeni, bomo najprej spremenili ta pravilnik in Pravilnik o piškotkih ter vas prosili za odločitev." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Sistem za razprave spodbuja vprašanja o politiki, veri, zdravju, spolnosti in prepričanjih. Po členu 9 GDPR so to posebne vrste podatkov, ki se lahko pojavijo v vaših vprašanjih ne glede na to, ali jih nameravamo zbirati." },
-      { kind: "p", text: "O vas. Pred svojo prvo razpravo na ločenem zaslonu podate izrecno privolitev, da obdelujemo občutljive podatke, ki jih po lastni izbiri vključite v svoja vprašanja, zaradi izvajanja vaših razprav. Zabeležimo različico besedila, v katero ste privolili, vaš jezik in čas. Brez te privolitve ne morete začeti razprave. Privolitev lahko kadar koli prekličete tako, da takih podatkov ne vključite, ali tako, da izbrišete razpravo. Kar objavite o sebi, so podatki, za katere ste se odločili, da jih boste javno objavili." },
+      { kind: "p", text: "O vas. Pred svojo prvo razpravo na ločenem zaslonu podate izrecno privolitev, da obdelujemo občutljive podatke, ki jih po lastni izbiri vključite v svoja vprašanja, zaradi izvajanja vaših razprav. Zabeležimo različico besedila, v katero ste privolili, vaš jezik in čas. Brez te privolitve ne morete začeti razprave. Privolitev lahko kadar koli prekličete tako, da zaprete račun. Take podatke lahko tudi izpustite ali izbrišete razpravo, ki jih vsebuje. Kar objavite o sebi, so podatki, za katere ste se odločili, da jih boste javno objavili." },
       { kind: "p", text: "O drugih osebah. Noben pravni pogoj nam ne dovoljuje obdelave občutljivih podatkov o tretji osebi, ki jo navedete v vprašanju, prav tako ga nima noben od naših ponudnikov umetne inteligence. Zato Pogoji to prepovedujejo, zato zmanjšujemo količino poslanih podatkov in zato tako vsebino na zahtevo hitro odstranimo — glejte razdelek 11." },
       { kind: "p", text: "Zdravstveni podatki. Nekatere države podatke, povezane z zdravjem, vključno z izpeljanimi sklepi, urejajo s posebnimi zakoni. Če živite v [the State of Washington], se uporablja ločeno [Consumer Health Data Privacy Notice]." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Zakaj uporabljamo vaše podatke in na kateri podlagi",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Vsak namen ima eno pravno podlago po členu 6(1) GDPR in podatkov, zbranih za en namen, ne uporabimo za drugega." },
+      { kind: "p", text: "Za vsak namen navedemo ustrezno pravno podlago ali podlage po členu 6(1) GDPR. Podatkov, zbranih za en namen, ne uporabimo za drugega." },
       {
         kind: "list",
         items: [
         "Ustvarjanje in upravljanje računa, preverjanje vaše pristnosti, izvajanje in shranjevanje razprav, da jih lahko znova odprete in si ogledate njihovo ponovitev — Račun, seje, vsebina razprave — Pogodba — Art. 6(1)(b)",
+        "Preverjanje razpoložljivosti registracije glede na državo IP, Tor in neznane naslove ter novih razprav glede na seznam vedno blokiranih držav; beleženje zavrnitev — Preverjanje države naslova IP — Zakoniti interesi — Art. 6(1)(f), varno zagotavljanje storitve; in zakonska obveznost — Art. 6(1)(c), spoštovanje sankcij in pravil držav, kjer delujemo",
+        "Preverjanje najnižje starosti za uporabo storitve — Preverjanje starosti — Pogodba — Art. 6(1)(b), sklenitev pogodbe; in zakoniti interesi — Art. 6(1)(f), varstvo mladoletnikov",
+        "Uporaba ustreznih pravil varstva potrošnikov, zasebnosti in davkov — Navedena regija — Pogodba — Art. 6(1)(b); in zakonska obveznost — Art. 6(1)(c)",
         "Pošiljanje vašega vprašanja in izjav sistema ponudnikom umetne inteligence za pripravo razprave — Vsebina razprave — Pogodba — Art. 6(1)(b)",
         "Zagotavljanje varnosti storitve, odkrivanje zlorab, omogočanje prepoznave prijave, ki je niste izvedli, in vodenje revizijske sledi — Seje, varnostna revizijska sled, zgoščene vrednosti v podpori, povezane z zlorabo — Zakoniti interesi — Art. 6(1)(f): naši in vaši interesi za varno storitev. Ugovarjate lahko; glejte razdelek 10",
         "Dokazovanje, da ste sprejeli Pogoje ter dali ali preklicali privolitev — Evidence sprejetja in privolitev — Pravna obveznost — Art. 6(1)(c), naša dolžnost dokazati privolitev po Art. 7(1) — in zakoniti interesi za dokazovanje pogodbe",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Objava in vidnost",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Razprave so zasebne, dokler jih ne objavite. Objava je namerno in ločeno potrjeno dejanje. Objavljena razprava prikazuje vaš psevdonim, vaše vprašanje v obliki, v kateri ste ga vnesli, drevo argumentov, ocene, razsodbo in pas gotovosti ter ima vidno oznako, da je vsebino ustvarila umetna inteligenca. Nikoli ne prikazuje vašega e-poštnega naslova, zapisov o sejah ali zgodovine računa. [Published debates are / are not] indeksirane v iskalnikih [unless you choose]." },
+      { kind: "p", text: "Razprave so zasebne, dokler jih ne objavite. Objava je namerno in ločeno potrjeno dejanje. Objavljena razprava prikazuje vaš psevdonim, vaše vprašanje v obliki, v kateri ste ga vnesli, drevo argumentov, ocene, razsodbo in pas gotovosti ter ima vidno oznako, da je vsebino ustvarila umetna inteligenca. Nikoli ne prikazuje vašega e-poštnega naslova, zapisov o sejah ali zgodovine računa. Iskalniki lahko indeksirajo objavljene razprave." },
       { kind: "p", text: "Umik objave odstrani razpravo iz storitve DebateAI in uniči ključ do naše javne kopije. Kopije, ki so jih že naredili bralci, iskalniki ali arhivi, niso pod našim nadzorom in jih ne moremo priklicati." },
       { kind: "p", text: "Ko izbrišete račun, brez nepotrebnega odlašanja in najpozneje v 30 dneh iz javnega dostopa odstranimo vse razprave, ki ste jih objavili, razen če nam zakon nalaga hrambo posamezne postavke. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Račun — Dokler račun obstaja, in 7-dnevno obdobje odloga po vaši zahtevi za zaprtje — Ključi se uničijo; zapis se izbriše",
+        "Rezultat preverjanja starosti in podatki o pravilu — Dokler obstaja račun — Izbrisani skupaj z računom; rojstnega datuma ne shranimo",
+        "Navedena država prebivališča in zvezna država ZDA — Dokler obstaja račun — Izbrisani skupaj z računom",
         "Evidence sej — 14 dni po zadnji uporabi ali 90 dni po nastanku, kar nastopi prej — Izbrišejo se",
         "Povezave za preverjanje e-pošte — 24 ur — Izbrišejo se",
         "Signali tveganja ob prijavi in obnovitvi — 90 dni, kar zagotavlja podatkovna zbirka — Odstranijo se",
         "Varnostna revizijska sled — Za celotno življenjsko dobo storitve — Omogoča samo dodajanje; naslov IP in user-agent sta enosmerna povzetka in ju ni mogoče prebrati",
+        "Naslov IP za lokalno določitev države ob registraciji in začetku nove razprave — Samo med obdelavo zahtevka — Za to preverjanje ga ne hranimo v berljivi obliki; zavrnitev zabeležimo le združeno in z zgoščeno vrednostjo, opisano spodaj",
+        "Združeni revizijski zapisi zavrnitev glede na državo IP — Za celotno življenjsko dobo storitve — Zapis vsebuje kodo zavrnitve, državo, oznako naslova IP kot dokaza ter enosmerni zgoščeni vrednosti naslova IP in niza user-agent s ključem; v revizijsko sled je mogoče le dodajati.",
         "Vsebina razprave (zasebna) — Dokler račun obstaja — Ob zaprtju se ključi uničijo, zato vsebine ni mogoče prebrati",
         "Vsebina razprave (objavljena) — Dokler je objavljena in račun obstaja — Ob umiku objave ali zaprtju se odstrani iz javnega dostopa; ključi se uničijo",
         "Evidence odgovorov ponudnikov in sklici za pridobivanje — Enako kot razprava, ki ji pripadajo — Enako",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Omejitev (Art. 18) — Prosite nas lahko, naj prenehamo obdelovati določene podatke, dokler se spor o njih ne razreši",
         "Ugovor (Art. 21) — Ugovarjate lahko obdelavi na podlagi zakonitih interesov — varnostni in revizijski obdelavi iz razdelka 4 — in prenehali bomo, razen če lahko dokažemo nujne razloge. Trženju lahko ugovarjate kadar koli in prenehali bomo",
         "Prenosljivost (Art. 20) — Vaše razprave in podatki računa v splošno uporabljani, strojno berljivi obliki. [Pending: same export as Access.] Neosebna vsebina, ki ste jo ustvarili, na primer vaša vprašanja, vam bo na zahtevo vrnjena ob prenehanju pogodbe",
-        "Preklic privolitve (Art. 7(3)) — Privolitev za trženje prekličete v katerem koli e-poštnem sporočilu ali Nastavitvah; privolitev za občutljive podatke prekličete tako, da takih podatkov ne vključujete, ali tako, da izbrišete razpravo. Preklic ne vpliva na obdelavo, ki je že bila izvedena",
+        "Preklic privolitve (Art. 7(3)) — Privolitev za trženje prekličete v katerem koli e-poštnem sporočilu ali Nastavitvah; privolitev za občutljive podatke prekličete z zaprtjem računa (take podatke lahko tudi izpustite ali izbrišete razpravo, ki jih vsebuje). Preklic ne vpliva na obdelavo, ki je že bila izvedena",
         "Pritožba — Romunskemu nadzornemu organu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarešta, anspdcp@dataprotection.ro, ali organu v državi, v kateri živite. Raje bi videli, da se najprej obrnete na nas"
         ]
       },
@@ -263,7 +274,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Združene države (samo če so navedene)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Obvestilo ob zbiranju. Preglednica v razdelku 2 navaja vsako kategorijo osebnih podatkov, ki jih zbiramo, njen namen in obdobje hrambe (razdelek 7). Te kategorije občutljivih osebnih podatkov zbiramo le, kadar jih vključite v svoja vprašanja o sebi: zdravje, verska ali filozofska prepričanja, spolno življenje ali spolna usmerjenost, politična stališča, članstvo v sindikatu ter rasno ali etnično poreklo. Uporabljamo jih samo za izvajanje vaših razprav in šele po ločeni privolitvi iz razdelka 3. Osebnih podatkov ne prodajamo ali delimo in tega nismo storili niti v preteklih dvanajstih mesecih. Osebnih podatkov ne uporabljamo za ciljno oglaševanje, občutljivih osebnih podatkov pa ne uporabljamo za noben namen, ki presega zagotavljanje storitve, ki jo zahtevate. Signali želje za zavrnitev: ker osebnih podatkov ne prodajamo ali delimo in jih ne uporabljamo za ciljno oglaševanje, ni ničesar, kar bi lahko zavrnili, signal Global Privacy Control pa ničesar ne spremeni. Vaše pravice: izvedeti, izbrisati, popraviti, zavrniti, omejiti uporabo občutljivih osebnih podatkov in ne biti diskriminirani zaradi njihovega uveljavljanja; zahtevo vložite na privacy@dezbatere.ro. Finančne spodbude: ne ponujamo jih; naši nameni in zaščitni ukrepi so pri brezplačnih in plačljivih paketih enaki. Hramba je navedena v razdelku 7. Kršitve: prebivalce in organe zveznih držav obveščamo, kot zahteva zakon o kršitvah varnosti podatkov posamezne zvezne države. To obvestilo se posodobi najmanj vsakih dvanajst mesecev; nazadnje posodobljeno [date]." },
+      { kind: "p", text: "Obvestilo ob zbiranju. Preglednica v razdelku 2 navaja kategorije osebnih podatkov, ki jih zbiramo, in njihove vire. Nameni in pravne podlage obdelave so v razdelku 4, obdobja hrambe pa v razdelku 7. Te kategorije občutljivih osebnih podatkov zbiramo le, kadar jih vključite v svoja vprašanja o sebi: zdravje, verska ali filozofska prepričanja, spolno življenje ali spolna usmerjenost, politična stališča, članstvo v sindikatu ter rasno ali etnično poreklo. Uporabljamo jih samo za izvajanje vaših razprav in šele po ločeni privolitvi iz razdelka 3. Osebnih podatkov ne prodajamo ali delimo in tega nismo storili niti v preteklih dvanajstih mesecih. Osebnih podatkov ne uporabljamo za ciljno oglaševanje, občutljivih osebnih podatkov pa ne uporabljamo za noben namen, ki presega zagotavljanje storitve, ki jo zahtevate. Signali želje za zavrnitev: ker osebnih podatkov ne prodajamo ali delimo in jih ne uporabljamo za ciljno oglaševanje, ni ničesar, kar bi lahko zavrnili. Če bi jih kdaj začeli prodajati ali deliti, bomo signale Global Privacy Control upoštevali kot zavrnitev. Vaše pravice: izvedeti, izbrisati, popraviti, zavrniti, omejiti uporabo občutljivih osebnih podatkov in ne biti diskriminirani zaradi njihovega uveljavljanja; zahtevo vložite na privacy@dezbatere.ro. Finančne spodbude: ne ponujamo jih; naši nameni in zaščitni ukrepi so pri brezplačnih in plačljivih paketih enaki. Hramba je navedena v razdelku 7. Kršitve: prebivalce in organe zveznih držav obveščamo, kot zahteva zakon o kršitvah varnosti podatkov posamezne zvezne države. To obvestilo se posodobi najmanj vsakih dvanajst mesecev; nazadnje posodobljeno [date]." },
       { kind: "p", text: "Connecticut: občutljive podatke obdelujemo samo z vašo izrecno privolitvijo, dano na ločenem zaslonu pred vašo prvo razpravo (razdelek 3); vaših osebnih podatkov ne uporabljamo za učenje modelov umetne inteligence. Washington: naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na [URL] je ločen dokument, ki velja za vse podatke, povezane z zdravjem, vključno z izpeljanimi sklepi. Teksas in Nebraska: občutljivih osebnih podatkov ne prodajamo. Kolorado, Connecticut, Virginija in druge zvezne države s celovitimi zakoni o zasebnosti: navedene pravice veljajo za vas, kjer zakon velja za nas. Če zahtevo zavrnemo, se lahko pritožite tako, da odgovorite na naš odgovor na privacy@dezbatere.ro; če zavrnemo pritožbo, se lahko obrnete na generalnega državnega tožilca (Attorney General) svoje zvezne države." }
     ]
   },
@@ -336,7 +347,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "31aadb0536fcb73cc9e9aadba1dad0428c52575090a0fc55dcd6e970d73b0464",
+  sha256: "50e10a56cc2d50b30ef7b205bb5f06cf66f2ccd0301eb5cca6c294e2e86de375",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.0 · VELJA OD [DATE]",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

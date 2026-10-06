@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Account — Email address and recovery email address (stored encrypted, with a keyed index so we can find the account without reading the address); password (stored as a hash, never in clear); your two-factor authentication secret (encrypted); ten recovery codes (stored as hashes); your pseudonym; the time you confirmed you are 18 or over — You, at registration",
+        "Account — Email address and recovery email address (stored encrypted, with a keyed index so we can find the account without reading the address); password (stored as a hash, never in clear); your two-factor authentication secret (encrypted); ten recovery codes (stored as hashes); your pseudonym — You, at registration",
+        "IP country checks — At sign-up and when you start a new debate, we use your IP address to look up its country locally with DB-IP Lite; at sign-up we also check a locally held Tor exit list. If we refuse access, an aggregated audit entry records the refusal code, country and that the IP was the evidence; the audit trail holds one-way keyed digests of the IP address and user-agent, not readable addresses — Your connection at sign-up or when you start a debate",
+        "Age check — The result (passed or refused), the minimum age applied, the IP country if available, the rule version, whether the check was at registration or for an existing account, and the time. We do not store your date of birth — You, when you enter your date of birth",
+        "Declared location — The country where you say you live and, if that is the United States, your state — You, at registration",
         "Sessions and security — A hashed session token; a keyed hash of your browser's user-agent string, used to notice when a session moves to a different browser; timestamps of creation, last use and expiry. We do not store your IP address, device name or browser details with a session, and the session list you see in Settings shows only timestamps — Your browser",
         "Security audit trail — An append-only log of security-relevant events — registration, verification, login attempts, recovery, publication, deletion. The IP address and user-agent of each event are stored only as one-way keyed digests (Argon2id), so they cannot be read back but can be matched within a period. Login and recovery risk signals are stored encrypted for 90 days — Your browser, at the time of each event",
         "Debate content — The question you type; the steering annotations you set; the claims, critiques, evidence references, scores and verdicts the engine generates; a verbatim record of what each AI provider returned; retrieval queries and source references. All of this is stored encrypted under a key specific to your account — You, and the AI models working on your question",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "People who are not our users — Personal data about other people that you include in a question or that the engine generates in answering it. We ask you not to do this; section 11 explains what we do when it happens anyway — You, indirectly"
         ]
       },
+      { kind: "p", text: "At sign-up, we refuse access from countries we do not serve, Tor exit addresses and IP addresses whose country we cannot determine. When you start a new debate, we check the IP country again and may refuse the request from a blocked country. These checks run locally; we do not send your IP address to DB-IP or another third party for them. We aggregate refusal audit entries by route, code, country and time window. You enter your date of birth so we can check your age, but we do not keep the date. A successful registration stores a passed age-check result; for an existing account, the check may record passed or refused. You also choose your country of residence and, if it is the United States, your state." },
       { kind: "p", text: "We do not collect analytics or telemetry about how you use the product, and we set no cookies for that purpose. If that changes, this policy and the Cookie Policy change first, and you will be asked." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "A debate engine invites questions about politics, religion, health, sexuality and belief. Those are special categories of data under Article 9 GDPR, and they can arrive in your questions whether or not we intend to collect them." },
-      { kind: "p", text: "About you. Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by not including such information, or by deleting a debate. What you publish about yourself is data you have chosen to make public." },
+      { kind: "p", text: "About you. Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by closing your account. You can also leave such information out, or delete a debate that contains it. What you publish about yourself is data you have chosen to make public." },
       { kind: "p", text: "About other people. No legal condition allows us to process sensitive data about a third party you name in a question, and none of our AI providers has one either. That is why the Terms prohibit it, why we minimise what we send, and why we remove such content quickly on request — section 11." },
       { kind: "p", text: "Health information. Some countries treat health-related data, including inferences, under specific laws. If you live in [the State of Washington], a separate [Consumer Health Data Privacy Notice] applies." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Why we use your data, and on what basis",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Each purpose has one legal basis under Article 6(1) GDPR, and we do not reuse data collected for one purpose for another." },
+      { kind: "p", text: "The table sets out the purposes and legal bases under Article 6(1) GDPR. We do not reuse data collected for one purpose for another." },
       {
         kind: "list",
         items: [
         "Creating and running your account, authenticating you, running and storing your debates so you can reopen and replay them — Account, sessions, debate content — Contract — Art. 6(1)(b)",
+        "Checking the IP country at sign-up and at the start of a new debate, checking Tor status at sign-up, refusing access where we cannot serve or lawfully provide the service, and recording aggregated refusals — IP address for the local check; country, refusal code and one-way keyed IP and user-agent digests in the audit trail — Legitimate interests — Art. 6(1)(f), in protecting and operating the service where we can comply; legal obligation — Art. 6(1)(c), where sanctions restrict service",
+        "Checking whether you meet the minimum age to use the service and protecting minors from access — Date of birth for the check only; stored age-check result and rule details for accounts — Contract — Art. 6(1)(b), checking eligibility to create and use an account; legitimate interests — Art. 6(1)(f), protecting minors",
+        "Applying the consumer, privacy and tax rules for where you live — Declared country and, for US residents, state — Contract — Art. 6(1)(b), applying the rules for your account; legal obligation — Art. 6(1)(c), meeting applicable consumer, privacy and tax duties",
         "Sending your question and the engine's statements to AI providers to generate a debate — Debate content — Contract — Art. 6(1)(b)",
         "Keeping the service secure, detecting abuse, letting you spot a login you did not make, keeping an audit trail — Sessions, security audit trail, support abuse hashes — Legitimate interests — Art. 6(1)(f): ours and yours in a secure service. You may object; section 10",
         "Proving that you accepted the Terms and gave or withdrew a consent — Acceptance and consent records — Legal obligation — Art. 6(1)(c), our duty to demonstrate consent under Art. 7(1) — and legitimate interests in evidencing the contract",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Publishing and visibility",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Debates are private until you publish them. Publishing is a deliberate, separately confirmed action. A published debate shows your pseudonym, your question as you wrote it, the argument tree, the scores, the verdict and the confidence band, and carries a visible label that the content is AI-generated. It never shows your email address, your session records or your account history. [Published debates are / are not] indexed by search engines [unless you choose]." },
+      { kind: "p", text: "Debates are private until you publish them. Publishing is a deliberate, separately confirmed action. A published debate shows your pseudonym, your question as you wrote it, the argument tree, the scores, the verdict and the confidence band, and carries a visible label that the content is AI-generated. It never shows your email address, your session records or your account history. Search engines may index published debates." },
       { kind: "p", text: "Unpublishing removes the debate from DebateAI and destroys the key to our public copy. Copies already made by readers, search engines or archives are outside our control, and we cannot recall them." },
       { kind: "p", text: "When you delete your account, we remove every debate you published from public access without undue delay and within 30 days at most, unless the law requires us to keep a specific item. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,6 +133,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Account — While the account exists, plus a 7-day grace period after you ask to close it — Keys destroyed; record deleted",
+        "IP country lookup at sign-up and the start of a new debate; Tor check at sign-up — For each decision only; not retained as a standalone lookup record — The country may also appear in the age-check record and an aggregated refusal audit entry",
+        "Aggregated country-check refusal entries — For the life of the service, as part of the append-only security audit trail — The entry retains the refusal code, country, IP evidence label and one-way keyed IP and user-agent digests",
+        "Age-check result and rule details — Until the account is deleted after the closure grace period — Deleted with the account; date of birth is never stored",
+        "Declared country of residence and US state — Until the account is deleted after the closure grace period — Deleted with the account",
         "Session records — 14 days after last use, or 90 days after creation, whichever is first — Deleted",
         "Email verification links — 24 hours — Deleted",
         "Login and recovery risk signals — 90 days, enforced by the database — Purged",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Restriction (Art. 18) — Ask us to stop processing particular data while a dispute about it is resolved",
         "Objection (Art. 21) — Object to processing based on legitimate interests — the security and audit processing in section 4 — and we stop unless we can show compelling grounds. Object to marketing at any time, and we stop",
         "Portability (Art. 20) — Your debates and account data in a commonly used, machine-readable format. [Pending: same export as Access.] Non-personal content you created, such as your questions, is returned to you on request when the contract ends",
-        "Withdraw consent (Art. 7(3)) — Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by not including such data, or by deleting a debate. Withdrawal does not affect processing that already happened",
+        "Withdraw consent (Art. 7(3)) — Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by closing your account (you can also leave such data out or delete a debate). Withdrawal does not affect processing that already happened",
         "Complain — To the Romanian supervisory authority, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, anspdcp@dataprotection.ro, or to the authority in the country where you live. We would rather hear from you first"
         ]
       },
@@ -263,7 +274,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "United States (only if listed)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Notice at collection. The table in section 2 lists each category of personal information we collect, its purpose, and how long we keep it (section 7). We collect these categories of sensitive personal information only where you include them in your own questions about yourself: health, religious or philosophical beliefs, sex life or sexual orientation, political views, union membership, and racial or ethnic origin. We use them only to run your debates, and only after the separate consent in section 3. We do not sell or share personal information, and have not done so in the preceding twelve months. We do not use personal information for targeted advertising, and we do not use sensitive personal information for any purpose beyond providing the service you request. Opt-out preference signals: because we do not sell or share personal information or use it for targeted advertising, there is nothing to opt out of, and a Global Privacy Control signal changes nothing. Your rights: to know, to delete, to correct, to opt out, to limit use of sensitive personal information, and not to be discriminated against for exercising them; make a request at privacy@dezbatere.ro. Financial incentives: we offer none; our purposes and protections are the same on the free and paid plans. Retention is in section 7. Breaches: we notify residents and state authorities as each state's breach law requires. This notice is updated at least every twelve months; last updated [date]." },
+      { kind: "p", text: "Notice at collection. The table in section 2 lists the categories of personal information we collect, what they contain and where they come from. Section 4 explains the purposes and legal bases; section 7 says how long we keep the data. We collect these categories of sensitive personal information only where you include them in your own questions about yourself: health, religious or philosophical beliefs, sex life or sexual orientation, political views, union membership, and racial or ethnic origin. We use them only to run your debates, and only after the separate consent in section 3. We do not sell or share personal information, and have not done so in the preceding twelve months. We do not use personal information for targeted advertising, and we do not use sensitive personal information for any purpose beyond providing the service you request. Opt-out preference signals: because we do not sell or share personal information or use it for targeted advertising, there is nothing to opt out of. If we ever start selling or sharing, we will honour Global Privacy Control signals as an opt-out. Your rights: to know, to delete, to correct, to opt out, to limit use of sensitive personal information, and not to be discriminated against for exercising them; make a request at privacy@dezbatere.ro. Financial incentives: we offer none; our purposes and protections are the same on the free and paid plans. Retention is in section 7. Breaches: we notify residents and state authorities as each state's breach law requires. This notice is updated at least every twelve months; last updated [date]." },
       { kind: "p", text: "Connecticut: we process sensitive data only with your opt-in consent, given on the separate screen before your first debate (section 3); we do not use your personal data to train AI models. Washington: our Consumer Health Data Privacy Notice at [URL] is a separate document that applies to any health-related information, including inferences. Texas and Nebraska: we do not sell sensitive personal data. Colorado, Connecticut, Virginia and other states with comprehensive privacy laws: the rights above apply to you where the law applies to us. If we refuse a request, you can appeal by replying to our answer at privacy@dezbatere.ro; if we refuse the appeal, you can contact the Attorney General of your state." }
     ]
   },
@@ -336,7 +347,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.0",
-  sha256: "8e5ad8287f4ebc0d08fe1f55dfea5f36cc4a78d9d9aea32753c1e126beeaab2f",
+  sha256: "e32b3a90e411c6eb6f0d35462555e0750c56b4665097cc7725fe01b532e5d554",
   eyebrow: "PRIVACY POLICY · v3.0 · EFFECTIVE [DATE]",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
