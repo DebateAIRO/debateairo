@@ -75,6 +75,11 @@ async function ownerAgeAsApi(target:TestDatabase):Promise<boolean>{
   return (await client.query("SELECT billing.owner_age_frozen('11111111-1111-4111-8111-111111111111'::uuid) frozen")).rows[0].frozen as boolean;
  }finally{await client.query('ROLLBACK');client.release();}
 }
+function rolePool(target:TestDatabase,role:string):ReturnType<typeof createPool>{
+ const url=new URL(target.connectionString);
+ url.username=role;url.password='fixture-only';
+ return createPool(url.toString(),{max:1});
+}
 
 describe('native auth106 to Dev integration lineage',()=>{
  it('rolls a late fresh refusal back to an empty ledger and retries after the role is corrected',async()=>{
@@ -258,6 +263,43 @@ describe('native auth106 to Dev integration lineage',()=>{
    }
    await migrate(target.pool);
   }finally{await target.stop();}
+ },120000);
+ it('accepts a quoted mixed-case executor with matching anchors before and after a lowercase role appears',async()=>{
+  const target=await startTestDatabase();let mixed:ReturnType<typeof createPool>|undefined;
+  try{
+   await target.pool.query("CREATE ROLE \"Fix2MixedExecutor\" LOGIN SUPERUSER PASSWORD 'fixture-only'");
+   mixed=rolePool(target,'Fix2MixedExecutor');
+   expect((await mixed.query('SELECT current_user actor')).rows[0].actor).toBe('Fix2MixedExecutor');
+   expect((await target.pool.query("SELECT 1 FROM pg_roles WHERE rolname='fix2mixedexecutor'")).rows).toEqual([]);
+   await migrate(mixed);
+   const before=await migrationState(target);
+   expect((await target.pool.query("SELECT pg_get_userbyid(relowner) owner FROM pg_class WHERE oid='public.debateai_schema_migration'::regclass")).rows[0].owner).toBe('Fix2MixedExecutor');
+   await target.pool.query('CREATE ROLE fix2mixedexecutor NOLOGIN');
+   expect((await target.pool.query("SELECT count(DISTINCT oid)::int n FROM pg_roles WHERE rolname IN('Fix2MixedExecutor','fix2mixedexecutor')")).rows[0].n).toBe(2);
+   await migrate(mixed);
+   expect(await migrationState(target)).toBe(before);
+  }finally{await mixed?.end();await target.stop();}
+ },120000);
+ it('refuses a mixed-case executor when a distinct lowercase role owns the original installation',async()=>{
+  const target=await startTestDatabase();let lower:ReturnType<typeof createPool>|undefined,mixed:ReturnType<typeof createPool>|undefined;
+  try{
+   await target.pool.query("CREATE ROLE fix2mixedexecutor LOGIN SUPERUSER PASSWORD 'fixture-only'");
+   await target.pool.query("CREATE ROLE \"Fix2MixedExecutor\" LOGIN SUPERUSER PASSWORD 'fixture-only'");
+   lower=rolePool(target,'fix2mixedexecutor');mixed=rolePool(target,'Fix2MixedExecutor');
+   expect((await lower.query('SELECT current_user actor')).rows[0].actor).toBe('fix2mixedexecutor');
+   expect((await mixed.query('SELECT current_user actor')).rows[0].actor).toBe('Fix2MixedExecutor');
+   expect(devNames).toHaveLength(103);
+   await lower.query('CREATE TABLE public.debateai_schema_migration(name text PRIMARY KEY, applied_at timestamptz NOT NULL)');
+   for(const name of devNames){
+    await lower.query(await readFile(new URL(`../../migrations/${name}`,import.meta.url),'utf8'));
+    await lower.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[name]);
+   }
+   expect((await target.pool.query("SELECT pg_get_userbyid(relowner) owner FROM pg_class WHERE oid='public.debateai_schema_migration'::regclass")).rows[0].owner).toBe('fix2mixedexecutor');
+   expect((await target.pool.query("SELECT pg_get_userbyid(nspowner) owner FROM pg_namespace WHERE nspname='billing'")).rows[0].owner).toBe('fix2mixedexecutor');
+   const before=await migrationState(target);
+   await expect(migrate(mixed)).rejects.toThrow('MIGRATION_EXECUTOR_OWNER_DRIFT');
+   expect(await migrationState(target)).toBe(before);
+  }finally{await mixed?.end();await lower?.end();await target.stop();}
  },120000);
  it('refuses MFA recovery owner LOGIN, SUPERUSER, BYPASSRLS and direct or inherited membership on fresh replay',async()=>{
   const target=await startTestDatabase();

@@ -178,9 +178,15 @@ BEGIN
   -- function's mutable current proowner as its own expected value.
   SELECT relowner INTO v_install_owner FROM pg_class
     WHERE oid='public.debateai_schema_migration'::regclass;
-  IF v_install_owner IS NULL OR v_install_owner IS DISTINCT FROM to_regrole(current_user)
+  IF v_install_owner IS NULL
     OR v_install_owner IS DISTINCT FROM (SELECT nspowner FROM pg_namespace WHERE oid='billing'::regnamespace) THEN
     RAISE EXCEPTION 'MIGRATION_EFFECTIVE_CAPABILITY_DRIFT';
+  END IF;
+  -- current_user is an exact catalog name, not an unquoted SQL identifier.
+  -- to_regrole(current_user) folds a quoted mixed-case executor to a different
+  -- lower-case role when one exists.
+  IF v_install_owner IS DISTINCT FROM (SELECT oid FROM pg_roles WHERE rolname=current_user) THEN
+    RAISE EXCEPTION 'MIGRATION_EXECUTOR_OWNER_DRIFT';
   END IF;
   FOREACH v_name IN ARRAY v_api_only_functions LOOP
     IF (SELECT proowner IS DISTINCT FROM (CASE WHEN v_name='billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)'

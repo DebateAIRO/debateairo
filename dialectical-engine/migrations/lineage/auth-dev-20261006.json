@@ -1218,6 +1218,6 @@
   ],
   "effectiveCapabilityVerifier": {
     "executablePath": "lineage/verify-effective-capabilities.sql",
-    "executableSha256": "0c71b94c357c9f39e1b898be1c931e7e988f92f00f49a73afb0bc848be0ad919"
+    "executableSha256": "efeddf3d398eef8f6b47e1b1c5820f9ee5f551a7404e65135b5a4e0c70157944"
   }
 }
