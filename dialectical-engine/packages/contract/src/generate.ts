@@ -1,3 +1,5 @@
+import { passwordResetEndpointContracts, passwordResetContractSchemas } from "./password-reset.js";
+import { mfaRecoveryEndpointContracts, backupEmailEndpointContracts, mfaRecoveryContractSchemas } from "./mfa-recovery.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -11,6 +13,8 @@ import { contractInventory, staffContractInventory, fundedStaffContractInventory
   InternalAllowanceConfigureRequestSchema, InternalAllowanceRevokeRequestSchema, SecurityReceiptSchema } from "./index.js";
 
 const endpointSchemas = {
+  ...passwordResetContractSchemas,
+  ...mfaRecoveryContractSchemas,
   SocialLoginStatusRequestSchema, SocialLoginStatusResponseSchema,
   ...consumerAuthContractSchemas,
   ...consumerSecurityContractSchemas,
@@ -98,6 +102,9 @@ await writeFile(
       (paths[path] ??= {})[method] = {
         operationId: route.replaceAll(/[^A-Za-z0-9]+/g, "_"),
         ...staffEndpointContracts[route],
+        ...passwordResetEndpointContracts[route],
+        ...mfaRecoveryEndpointContracts[route],
+        ...backupEmailEndpointContracts[route],
         ...(staffContractInventory.routes.includes(route) || fundedStaffContractInventory.routes.some(funded => funded === route)
           ? { "x-required-product-role-policy-version": staffContractInventory.policyVersion } : {}),
         ...(fundedStaffContractInventory.routes.some(funded => funded === route) ? { "x-required-internal-funding-policy-version": 1 } : {}),

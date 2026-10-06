@@ -1,3 +1,4 @@
+import { loadForward108, type Forward108Plan } from "./migration-forward108.js";
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import type { PoolClient } from "pg";
@@ -19,6 +20,7 @@ export type MigrationPlan = Readonly<{
   compatibilitySql: string;
   transactionBodySql: ReadonlyMap<string, string>;
   effectiveCapabilityVerifierSql: string;
+  forward108: Forward108Plan;
 }>;
 
 const migrationsDirectory = new URL("../../../migrations/", import.meta.url);
@@ -33,8 +35,9 @@ export async function loadMigrationPlan(): Promise<MigrationPlan> {
   const manifest = JSON.parse(recipeBytes.toString("utf8")) as Manifest;
   if (manifest.version !== "auth-dev-20261006-v2") fail("RECIPE_VERSION");
   const discovered = (await readdir(migrationsDirectory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
+  const forward108=await loadForward108(sha256(recipeBytes),manifest.effectiveCapabilityVerifier.executableSha256);
   const declared = manifest.sources.map(({ name }) => name);
-  if (!sameSet(discovered, declared) || new Set(declared).size !== declared.length
+  if (!sameSet(discovered, [...declared,forward108.name]) || new Set(declared).size !== declared.length
     || !sameSet(manifest.order, declared) || new Set(manifest.order).size !== manifest.order.length) {
     fail("SOURCE_INVENTORY");
   }
@@ -79,10 +82,10 @@ export async function loadMigrationPlan(): Promise<MigrationPlan> {
   }
   return { manifest, recipeSha256: sha256(recipeBytes), sources,
     compatibilitySql: compatibilityBytes.toString("utf8"), transactionBodySql,
-    effectiveCapabilityVerifierSql: verifierBytes.toString("utf8") };
+    effectiveCapabilityVerifierSql: verifierBytes.toString("utf8"),forward108 };
 }
 
-export type Lineage = "fresh" | "auth94" | "auth103" | "auth106" | "dev95" | "integrated-original" | "integrated-compatibility" | "integrated-fresh-resolutions";
+export type Lineage = "fresh" | "auth94" | "auth103" | "auth106" | "dev95" | "integrated-original" | "integrated-compatibility" | "integrated-fresh-resolutions" | "integrated-original-108" | "integrated-compatibility-108" | "integrated-fresh-resolutions-108";
 export function transactionBodyPreconditionDigest(plan: MigrationPlan, name: string): string {
   const body = plan.manifest.transactionBodies.find(({ logicalName }) => logicalName === name);
   if (body === undefined) return fail("TRANSACTION_BODY_DECLARATION");
@@ -97,7 +100,7 @@ export function compatibilityPreconditionDigest(plan: MigrationPlan, cohort: "au
   return sha256(JSON.stringify({ lineage: cohort, applied, source: plan.sources.get(name)!.sha256 }));
 }
 export function identifyLineage(plan: MigrationPlan, applied: readonly string[], resolutionNames: readonly string[]): Lineage {
-  if (applied.length !== new Set(applied).size || applied.some((name) => !plan.sources.has(name))) fail("UNKNOWN_APPLIED_NAME");
+  if (applied.length !== new Set(applied).size || applied.some((name) => !plan.sources.has(name)&&name!==plan.forward108.name)) fail("UNKNOWN_APPLIED_NAME");
   if (applied.length === 0 && resolutionNames.length === 0) return "fresh";
   for (const cohort of ["auth94", "auth103", "auth106", "dev95"] as const) {
     if (resolutionNames.length === 0 && sameSet(applied, plan.manifest.cohorts[cohort] ?? [])) return cohort;
@@ -110,6 +113,10 @@ export function identifyLineage(plan: MigrationPlan, applied: readonly string[],
   const wrappers = plan.manifest.transactionBodies.map(({ logicalName }) => logicalName);
   if (sameSet(resolutionNames, wrappers)
     && sameSet(applied, all.filter((name) => !wrappers.includes(name)))) return "integrated-fresh-resolutions";
+  const forward=plan.forward108.name;
+  if(resolutionNames.length===0&&sameSet(applied,[...all,forward]))return "integrated-original-108";
+  if(resolutionNames.length===1&&resolutionNames[0]===logicalName&&sameSet(applied,[...all.filter(name=>name!==logicalName),forward]))return "integrated-compatibility-108";
+  if(sameSet(resolutionNames,wrappers)&&sameSet(applied,[...all.filter(name=>!wrappers.includes(name)),forward]))return "integrated-fresh-resolutions-108";
   return fail("UNKNOWN_MIXED_LINEAGE");
 }
 

@@ -1,3 +1,4 @@
+import { previewAskProxyCeiling } from "../../../lib/previewAskProxyCeiling.js";
 import {
   AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
   AGE_REFUSAL_COOKIE_NAME,
@@ -25,7 +26,9 @@ const REQUEST_HEADER_ALLOWLIST = Object.freeze([
   "range",
   "user-agent",
   "x-csrf-token",
-  "x-staff-csrf-token"
+  "x-staff-csrf-token",
+  "x-password-reset-csrf-token",
+  "x-mfa-recovery-csrf-token"
   ,"x-support-session-token"
   // DL1-F5c/DL3-F4: the case bearer travels in a header now, never in a path.
   ,"x-support-case-token"
@@ -59,7 +62,11 @@ const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
 const STAFF_COOKIE_NAME = "__Host-debateai-staff";
 const STAFF_CSRF_COOKIE_NAME = "__Host-debateai-staff-csrf";
-const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME] as const;
+const PASSWORD_RESET_COOKIE_NAME = "__Host-debateai-password-reset";
+const PASSWORD_RESET_CSRF_COOKIE_NAME = "__Host-debateai-password-reset-csrf";
+const MFA_RECOVERY_COOKIE_NAME = "__Host-debateai-mfa-recovery";
+const MFA_RECOVERY_CSRF_COOKIE_NAME = "__Host-debateai-mfa-recovery-csrf";
+const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, PASSWORD_RESET_COOKIE_NAME, PASSWORD_RESET_CSRF_COOKIE_NAME, MFA_RECOVERY_COOKIE_NAME, MFA_RECOVERY_CSRF_COOKIE_NAME] as const;
 const STAFF_ABSOLUTE_MAX_AGE_SECONDS = 28800;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 /** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
@@ -176,6 +183,15 @@ function lawfulSetCookie(value: string): boolean {
     return (cookieValue === "" ? seconds === 0 : /^[A-Za-z0-9_-]{43}$/.test(cookieValue) && seconds > 0 && seconds <= STAFF_ABSOLUTE_MAX_AGE_SECONDS)
       && attributes.length === expected.length && attributes.every((attribute, index) => attribute === expected[index]);
   }
+  if ([PASSWORD_RESET_COOKIE_NAME,PASSWORD_RESET_CSRF_COOKIE_NAME,MFA_RECOVERY_COOKIE_NAME,MFA_RECOVERY_CSRF_COOKIE_NAME].some(allowed=>allowed===name)) {
+    if(value.split(";",1)[0]!==pair) return false;
+    const cookieValue=pair.slice(pairSeparator+1),attributes=members.slice(1);
+    const match=attributes[1]?.match(/^Max-Age=(0|[1-9][0-9]{0,4})$/u);
+    if(!match) return false;
+    const seconds=Number(match[1]),reset=name===PASSWORD_RESET_COOKIE_NAME||name===PASSWORD_RESET_CSRF_COOKIE_NAME;
+    const expected=["Path=/",`Max-Age=${seconds}`,...(name===PASSWORD_RESET_COOKIE_NAME||name===MFA_RECOVERY_COOKIE_NAME?["HttpOnly"]:[]),"Secure","SameSite=Strict"];
+    return (cookieValue===""?seconds===0:/^[A-Za-z0-9_-]{43}$/.test(cookieValue)&&seconds>0&&seconds<=(reset?1800:299))&&attributes.length===expected.length&&attributes.every((attribute,index)=>attribute===expected[index]);
+  }
   if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) return false;
   const cookieValue = pair.slice(pairSeparator + 1);
   const attributes = members.slice(1).map((member) => member.toLowerCase());
@@ -275,7 +291,7 @@ function upstreamSignal(request: Request, path: readonly string[]): AbortSignal 
   const streaming = (request.headers.get("accept") ?? "").includes("text/event-stream")
     || path[path.length - 1] === "events";
   const ceiling = request.method === "POST" && RUN_PUBLISH_PATH.test(path.join("/"))
-    ? PUBLISH_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS;
+    ? PUBLISH_UPSTREAM_TIMEOUT_MS : previewAskProxyCeiling({method:request.method,path,origin:request.headers.get("origin")},process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) ?? UPSTREAM_TIMEOUT_MS;
   return streaming
     ? request.signal
     : AbortSignal.any([request.signal, AbortSignal.timeout(ceiling)]);

@@ -1,3 +1,8 @@
+import { validatePreviewProviderTestConfig, previewPlanTierRosters, type PreviewProviderTestConfig } from "@debateai/providers";
+import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
+import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
+import type { PasswordResetApplication } from "./password-reset.js";
+import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
 import type { SocialStepUpApplication } from './social-step-up.js';
 import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
 import { socialBrowserHash } from './social-providers/hashes.js';
@@ -1245,6 +1250,8 @@ export function apiOperationalErrorDiagnostic(error: unknown): string {
 }
 
 export const authorizationPolicyInventory = Object.freeze([
+  ...passwordResetPolicyInventory,
+  ...emailMfaPolicyInventory,
   {route:'POST /v1/account/social/{provider}/step-up/begin',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
   {route:'POST /v1/account/social/step-up/status',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
   {route:'POST /v1/account/social/step-up/passkey-options',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
@@ -1578,11 +1585,15 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
 });
 
 export interface ApiOptions {
+  readonly previewProviderTestConfig?: PreviewProviderTestConfig;
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
   /** Mandatory for signup and resend; absent configuration fails closed. */
   readonly turnstile?: TurnstileVerifier;
   readonly recovery?: RecoveryApplication;
+  readonly passwordReset?: PasswordResetApplication;
+  readonly backupEmail?: BackupEmailApplication;
+  readonly mfaRecovery?: MfaRecoveryApplication;
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
   readonly consumerWebAuthn?: ConsumerWebAuthnApplication;
@@ -1928,6 +1939,7 @@ function refreshedCookies(input: Readonly<{
 }
 
 export function buildApi(options: ApiOptions): FastifyInstance {
+  const previewConfig=validatePreviewProviderTestConfig(options.previewProviderTestConfig);
   // Crisis check: compile its patterns now, not on the first question (about a second, once).
   warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
@@ -3071,6 +3083,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ));
   });
 
+  if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",sourceFor(request).ip)});
+  registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",sourceFor(request).ip)});
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
       // L1-F3: this route had no per-source admission control at all — only a
@@ -3239,7 +3253,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
             plan_tier: query.data.plan_tier,
             composition_budget_tier: query.data.composition_budget_tier,
             depth_params: { depth: query.data.depth }
-          }, access.ownerRef, options.askBilling))
+          }, access.ownerRef, options.askBilling),previewConfig)
         });
     return reply.send(AskRoomResponseSchema.parse({
       room: answer.room,
@@ -3676,6 +3690,7 @@ export class HatchetDispatcher implements Dispatcher {
 }
 
 export interface RunCreationSettings {
+  readonly previewProviderTestConfig?: PreviewProviderTestConfig;
   readonly strangerSampleRate: number;
   readonly registerVersion: number;
   readonly batteryVersion: string;
@@ -4017,6 +4032,9 @@ export async function evaluateAskAdmission(
   ask: AskRequest,
   personRoom: PersonRoomInput | null = null
 ): Promise<AskAdmission> {
+  const previewConfig=validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
+  if(previewConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")
+    markAskRefusal(new TypedDomainError("PREVIEW_SCORECARD_CONFLICT","Preview roster cannot override a valid scorecard"));
   /**
    * V-28(2) — FIRST, before anything is discovered or probed.
    *
@@ -4054,7 +4072,7 @@ export async function evaluateAskAdmission(
     assertHostedPickerCeiling(modelPicker);
   }
   const discoveredPanel = await settings.resolveDiscoveredPanel();
-  const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
+  const roster = previewPlanTierRosters(previewConfig,PLAN_TIER_ROSTERS)[planTier as keyof typeof PLAN_TIER_ROSTERS];
   if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
     return admitWithScorecard({
       settings, ask, risk, discoveredPanel, rosterModelIds: roster,
@@ -4216,6 +4234,8 @@ export class PostgresAskApplication implements AskApplication {
     runProvisionPool:Pool,
     askAdmissionPools:Readonly<{ server:Pool;legacy:Pool }>
   ) {
+    validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
+    if(settings.previewProviderTestConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT","Preview roster cannot override a valid scorecard");
     if (askAdmissionPools.server===pool || askAdmissionPools.legacy===pool
       || askAdmissionPools.server===runProvisionPool
       || askAdmissionPools.legacy===runProvisionPool
@@ -4509,7 +4529,7 @@ export class PostgresAskApplication implements AskApplication {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
     }
-    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask,this.settings.previewProviderTestConfig), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
@@ -4547,7 +4567,7 @@ export class PostgresAskApplication implements AskApplication {
           startAsk = plannedAsk;
           swappedAt = null;
           swappedEvaluation = plannedEvaluation;
-          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk,this.settings.previewProviderTestConfig), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
           await room.precheck(decisionQuestion);
         }
         if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;

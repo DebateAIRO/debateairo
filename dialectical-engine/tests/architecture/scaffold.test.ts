@@ -10,6 +10,7 @@ import {
   auditSurfaceAttachmentLiterals,
   auditSurfaceReachability,
   auditSourceRules,
+  auditProductionFixtureImports,
   surfaceReachabilityTarget
 } from "../../tools/orphan-audit/src/index.js";
 
@@ -336,4 +337,10 @@ describe("S00 composition roots", () => {
     expect(runnerMain).toContain("loadRunnerEnvironment");
     expect(runnerMain).toContain("new WalkingSkeletonRunner");
   });
+});
+
+describe('exact frozen preview runtime import boundary',()=>{
+ it.each(['packages/providers/src/index.ts','packages/providers/src/provider-probe.ts'])('admits only the exact reviewed runtime import from %s',where=>{expect(auditProductionFixtureImports(where,'import { x } from "./preview-test.js";')).toEqual([]);});
+ it.each([['apps/api/src/index.ts','./preview-test.js'],['packages/providers/src/index.ts','../src/preview-test.js'],['packages/providers/src/index.ts','./other-test.js'],['packages/providers/src/index.ts','../../../tests/unit/fake.js'],['packages/providers/src/index.ts','./fixtures/fake.js']])('retains fixture denial for %s importing %s',(where,specifier)=>{expect(auditProductionFixtureImports(where,`import { x } from "${specifier}";`)).toEqual([`${where} imports a test/fixture module from production code`]);});
+ it('an allowed runtime import cannot hide a following fixture import',()=>{expect(auditProductionFixtureImports('packages/providers/src/index.ts','import { x } from "./preview-test.js"; import { fixture } from "../../../tests/unit/fake.js";')).toEqual(['packages/providers/src/index.ts imports a test/fixture module from production code']);});
 });

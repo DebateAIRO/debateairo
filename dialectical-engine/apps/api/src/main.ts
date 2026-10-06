@@ -1,3 +1,10 @@
+import { PasswordResetService } from "./password-reset.js";
+import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
+import { BackupEmailService, MfaRecoveryService } from "./email-mfa-recovery.js";
+import { EmailRecoveryNotificationWorker, SendmailEmailRecoverySender } from "./email-mfa-mail.js";
+import { PostgresPasswordResetRepository } from "../../../packages/db/src/password-reset.js";
+import { PostgresBackupEmailRepository, PostgresMfaRecoveryRepository } from "../../../packages/db/src/email-mfa-recovery.js";
+import { readPasswordResetPolicy, readBackupEmailPolicy, readMfaRecoveryPolicy } from "@debateai/register";
 import { SocialStepUpService } from './social-step-up.js';
 import { SocialAuthService } from './social-auth.js';
 import { SocialProviders, UnixSocialTransport, socialConfigurations } from './social-providers/provider.js';
@@ -307,6 +314,9 @@ await boot.run("database-roles", () => Promise.all([
 const authPolicy = await boot.run("auth-policy", () => readAuthPolicy(pool, environment.REGISTER_VERSION));
 const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environment.REGISTER_VERSION));
 const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(pool, environment.REGISTER_VERSION));
+const passwordResetPolicy = await boot.run("password-reset-policy", () => readPasswordResetPolicy(pool, environment.REGISTER_VERSION));
+const backupEmailPolicy = await boot.run("backup-email-policy", () => readBackupEmailPolicy(pool, environment.REGISTER_VERSION));
+const mfaRecoveryPolicy = await boot.run("mfa-recovery-policy", () => readMfaRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const recoveryPolicy = await boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION));
 /**
@@ -762,6 +772,25 @@ const consumerAccountMail=new SendmailConsumerAccountSender({executable:environm
 const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy,authPolicy,policy:consumerRecoveryPolicy,blindIndexKey,mail:consumerAccountMail,onMailFailure:()=>console.error('[CONSUMER_RECOVERY_MAIL_FAILED]')});
 const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
 const consumerSecurityNotices=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authorizationPool),dekStore,consumerAccountMail);
+const passwordResetRepository=passwordResetPolicy?new PostgresPasswordResetRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
+if(passwordResetRepository)await boot.run("password-reset-role",()=>passwordResetRepository.assertRole());
+const passwordReset=passwordResetRepository&&passwordResetPolicy?new PasswordResetService({repository:passwordResetRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,passwordResetPolicy,blindIndexKey,reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const triggerPasswordResetReconciliation=passwordResetNotices?createSingleFlightErasureReconciler(()=>passwordResetNotices.reconcile(100),()=>console.error("[PASSWORD_RESET_RECONCILIATION_PENDING]")):undefined;
+let passwordResetTimer:ReturnType<typeof setInterval>|undefined;
+const backupEmailRepository=backupEmailPolicy?new PostgresBackupEmailRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
+const mfaRecoveryRepository=mfaRecoveryPolicy?new PostgresMfaRecoveryRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
+if(backupEmailRepository)await boot.run("backup-email-role",()=>backupEmailRepository.assertRole());
+if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>mfaRecoveryRepository.assertRole());
+const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
+const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
+const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs});
+const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
+const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(async()=>{for(const worker of emailRecoveryWorkers)await worker.reconcile(100);},()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
+let emailRecoveryTimer:ReturnType<typeof setInterval>|undefined;
+
+boot.hold({end:async()=>{await passwordResetNotices?.close();for(const worker of emailRecoveryWorkers)await worker.close();}});
+
 const mfa = new MfaEnrollmentService({
   repository: identityRepository,
   consumerRepository: new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),
@@ -1289,6 +1318,9 @@ const api = buildApi({
   socialStepUp:new SocialStepUpService(socialRepository,socialProviders,sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy}),
   turnstile: new UnixTurnstileVerifier({ publicAppUrl: environment.PUBLIC_APP_URL, ...(environment.TURNSTILE_SOCKET_PATH === undefined ? {} : { socketPath: environment.TURNSTILE_SOCKET_PATH }) }),
   recovery,
+  ...(passwordReset?{passwordReset}:{}),
+  ...(backupEmail?{backupEmail}:{}),
+  ...(mfaRecovery?{mfaRecovery}:{}),
   consumerRecovery,
   onboardingEvidence,
   mfa,
@@ -1362,6 +1394,12 @@ api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer))
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => askWaker?.stop());
 api.addHook("onClose",async () => staffAlerts?.close());
+api.addHook("onClose",async()=>{
+ if(passwordResetTimer)clearInterval(passwordResetTimer);
+ if(emailRecoveryTimer)clearInterval(emailRecoveryTimer);
+ await passwordResetNotices?.close();
+ for(const worker of emailRecoveryWorkers)await worker.close();
+});
 const startup = installStartupResourceOwner({
   api,
   registration,
@@ -1443,3 +1481,6 @@ if (askRoom !== undefined) {
 }
 
 staffAlerts?.start();
+
+if(triggerPasswordResetReconciliation){passwordResetTimer=setInterval(triggerPasswordResetReconciliation,30_000);passwordResetTimer.unref();triggerPasswordResetReconciliation();}
+if(triggerEmailRecoveryReconciliation){emailRecoveryTimer=setInterval(triggerEmailRecoveryReconciliation,30_000);emailRecoveryTimer.unref();triggerEmailRecoveryReconciliation();}

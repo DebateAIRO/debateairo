@@ -1,3 +1,7 @@
+import { passwordResetEndpointContracts, passwordResetContractSchemas } from "./password-reset.js";
+import { mfaRecoveryEndpointContracts, backupEmailEndpointContracts, mfaRecoveryContractSchemas } from "./mfa-recovery.js";
+export * from "./password-reset.js";
+export * from "./mfa-recovery.js";
 import { socialAuthContractSchemas } from './social-auth.js';
 export * from './social-auth.js';
 import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
@@ -1316,6 +1320,9 @@ export type RunEvent = z.infer<typeof RunEventSchema>;
 
 export const contractInventory = Object.freeze({
   routes: Object.freeze([
+    ...Object.keys(passwordResetEndpointContracts),
+    ...Object.keys(mfaRecoveryEndpointContracts),
+    ...Object.keys(backupEmailEndpointContracts),
     ...staffContractInventory.routes,
     ...fundedStaffContractInventory.routes,
     // Current social account surfaces are governed and documented like every other route.
@@ -1442,6 +1449,8 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/cancel-by-token"
   ]),
   resources: Object.freeze({
+    ...passwordResetContractSchemas,
+    ...mfaRecoveryContractSchemas,
     ...consumerAuthContractSchemas,
     ...socialAuthContractSchemas,
     ...staffContractInventory.resources,

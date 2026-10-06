@@ -1,3 +1,4 @@
+import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type CompleteSocialStepUpRequest } from './index.js';
 import { SocialLoginStatusResponseSchema, type SocialLoginStatusResponse, AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
 import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
@@ -124,40 +125,7 @@ import {
 } from "./index.js";
 import type { DeclaredRegion } from "@debateai/kernel";
 
-export type ContractErrorCode =
-  | "SESSION_REQUIRED"
-  | "RATE_LIMITED"
-  | "NOT_FOUND"
-  | "MALFORMED_REQUEST"
-  | "UNPROCESSABLE"
-  | "FORBIDDEN"
-  | "SERVER_FAILURE"
-  | "NETWORK_FAILURE"
-  | "INVALID_RESPONSE";
-
-/** What a 422 ASK_ALREADY_WAITING says about the person's waiting run. */
-export type ContractWaitingRefusal = Readonly<{ runRef: string; waitsUntil: string; waitsFor?: "OWN_DEBATES" }>;
-
-export class ContractHttpError extends Error {
-  constructor(
-    readonly code: ContractErrorCode,
-    readonly status: number,
-    message: string,
-    readonly serverCode: string | null = null,
-    readonly statement: PublicationRefusalStatement | null = null,
-    /**
-     * Budget spec §2.7: set only for 422 ASK_ALREADY_WAITING whose body parses
-     * as `AskAlreadyWaitingSchema`: the waiting run and its expected start (no
-     * figure), and `waitsFor` when that start waits on the person's own running
-     * debates rather than a reset (final review Part 1b, Important 1). The ask
-     * page shows sentence D with that time when its room re-read fails.
-     */
-    readonly waiting: ContractWaitingRefusal | null = null
-  ) {
-    super(message);
-    this.name = "ContractHttpError";
-  }
-}
+export { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 
 function codeForStatus(status: number): ContractErrorCode {
   if (status === 400) return "MALFORMED_REQUEST";
@@ -843,3 +811,6 @@ export function createContractClient(
     }
   });
 }
+
+export { createPasswordResetClient } from "./password-reset.js";
+export { createMfaRecoveryClient, createBackupEmailClient } from "./mfa-recovery.js";

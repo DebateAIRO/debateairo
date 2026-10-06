@@ -18,6 +18,26 @@ const ANSWER_ID = "22222222-2222-4222-8222-222222222222";
 const NODE_ID = "33333333-3333-4333-8333-333333333333";
 
 const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
+  { route: "POST /v1/auth/password-reset/start", auth: "public", origin: "trusted", resource: "identity", action: "start-password-reset" },
+  { route: "POST /v1/auth/password-reset/exchange", auth: "public", origin: "trusted", resource: "identity", action: "exchange-password-reset" },
+  { route: "GET /v1/auth/password-reset/status", auth: "public", resource: "identity", action: "read-password-reset" },
+  { route: "POST /v1/auth/password-reset/complete", auth: "public", origin: "trusted", resource: "identity", action: "complete-password-reset" },
+  { route: "POST /v1/auth/password-reset/cancel", auth: "public", origin: "trusted", resource: "identity", action: "cancel-password-reset" },
+  { route: "POST /v1/auth/password-reset/cancel-current", auth: "public", origin: "trusted", resource: "identity", action: "cancel-current-password-reset" },
+  { route: "GET /v1/account/backup-email", auth: "user", resource: "identity", action: "read-backup-email" },
+  { route: "POST /v1/account/backup-email/verify/start", auth: "user", origin: "trusted", resource: "identity", action: "start-backup-email-verification" },
+  { route: "POST /v1/account/backup-email/verify/confirm", auth: "public", origin: "trusted", resource: "identity", action: "confirm-backup-email-verification" },
+  { route: "POST /v1/auth/mfa-recovery/start", auth: "public", origin: "trusted", resource: "identity", action: "start-mfa-recovery" },
+  { route: "POST /v1/auth/mfa-recovery/exchange", auth: "public", origin: "trusted", resource: "identity", action: "exchange-mfa-recovery" },
+  { route: "GET /v1/auth/mfa-recovery/status", auth: "public", resource: "identity", action: "read-mfa-recovery" },
+  { route: "POST /v1/auth/mfa-recovery/totp/begin", auth: "public", origin: "trusted", resource: "identity", action: "bind-mfa-recovery-factor" },
+  { route: "POST /v1/auth/mfa-recovery/totp/verify", auth: "public", origin: "trusted", resource: "identity", action: "verify-mfa-recovery-factor" },
+  { route: "POST /v1/auth/mfa-recovery/codes/generate", auth: "public", origin: "trusted", resource: "identity", action: "generate-mfa-recovery-codes" },
+  { route: "POST /v1/auth/mfa-recovery/codes/confirm", auth: "public", origin: "trusted", resource: "identity", action: "confirm-mfa-recovery-codes" },
+  { route: "POST /v1/auth/mfa-recovery/complete", auth: "public", origin: "trusted", resource: "identity", action: "complete-mfa-recovery" },
+  { route: "POST /v1/auth/mfa-recovery/cancel", auth: "public", origin: "trusted", resource: "identity", action: "cancel-mfa-recovery" },
+  { route: "POST /v1/auth/mfa-recovery/cancel-current", auth: "public", origin: "trusted", resource: "identity", action: "cancel-current-mfa-recovery" },
+
   // Approved account-flow capabilities: exact authority and Origin classes, independent of declaration order.
   ...['begin','status','passkey-options','complete'].map((step,index)=>({route:index===0?'POST /v1/account/social/{provider}/step-up/begin':`POST /v1/account/social/step-up/${step}`,auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'})),
   {route:'GET /v1/auth/providers',auth:'public',resource:'identity',action:'social-providers'},
@@ -247,7 +267,7 @@ describe("S7 deny-by-default authorization", () => {
     expect(new Set(contractInventory.routes).size).toBe(contractInventory.routes.length);
     expect(new Set(governed).size).toBe(governed.length);
     expect(new Set(governed)).toEqual(new Set(contractInventory.routes));
-    const api = buildApi({application: fixtureApplication(), sessions: testSessionApplication([USER_IDENTITY]), allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, consumerRecovery:{} as never,onboardingEvidence:{} as never,consumerSecurity:{} as never,consumerWebAuthn:{} as never, registration: {} as never, recovery: {} as never, mfa: {} as never, support: {} as never, evaluatorDevMenu: {} as never, evaluatorDevMenuRegisterVersion: 1});
+    const api = buildApi({application: fixtureApplication(), sessions: testSessionApplication([USER_IDENTITY]), allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, passwordReset:{} as never,backupEmail:{} as never,mfaRecovery:{} as never,consumerRecovery:{} as never,onboardingEvidence:{} as never,consumerSecurity:{} as never,consumerWebAuthn:{} as never, registration: {} as never, recovery: {} as never, mfa: {} as never, support: {} as never, evaluatorDevMenu: {} as never, evaluatorDevMenuRegisterVersion: 1});
     await api.ready();
     for (const route of contractInventory.routes) {
       const [method, path] = route.split(" ");
@@ -258,9 +278,9 @@ describe("S7 deny-by-default authorization", () => {
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...ordinary].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
     expect(staffContractInventory.routes).toHaveLength(18);
-    // The merged closed inventory has 119 ordinary routes and 20 staff/internal
+    // The merged closed inventory adds the nineteen external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one.
-    expect(contractInventory.routes).toHaveLength(139);
+    expect(contractInventory.routes).toHaveLength(158);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
@@ -269,6 +289,9 @@ describe("S7 deny-by-default authorization", () => {
       application: fixtureApplication(),
       consumerRecovery:{} as never,onboardingEvidence:{} as never,consumerSecurity:{} as never,consumerWebAuthn:{} as never,
       registration: {} as never,
+      passwordReset: {} as never,
+      backupEmail: {} as never,
+      mfaRecovery: {} as never,
       recovery: {} as never,
       mfa: {} as never,
       sessions: {} as never,

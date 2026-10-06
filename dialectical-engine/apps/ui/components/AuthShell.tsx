@@ -34,19 +34,21 @@ export function useSelectedAuthCatalog(locale: LocaleCode): MessageCatalog {
    block, and a shell-around-core bezel panel that carries the form. */
 export function AuthShell({
   eyebrow,
+  lang,
   title,
   description,
   children,
   footer
 }: Readonly<{
   eyebrow: string;
+  lang?: string;
   title: string;
   description: string;
   children: ReactNode;
   footer: ReactNode;
 }>) {
   return (
-    <main className="authScreen scroll" aria-labelledby="auth-title">
+    <main lang={lang} className="authScreen scroll" aria-labelledby="auth-title">
       <div className="authCard">
         <div className="authCardInner">
           <div className="authBrand">

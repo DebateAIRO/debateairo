@@ -27,7 +27,7 @@ describe('restricted-role social browser flow authority', () => {
         await expect(runtime.query('SELECT * FROM identity.social_flow')).rejects.toMatchObject({ code: '42501' });
     });
 });
-it('keeps every new table/helper private and exposes only fixed authorization-runtime capabilities', async () => {
+it('keeps every new table/helper private and separates API signup from authorization-runtime capabilities', async () => {
     for (const table of ['social_flow', 'social_identity', 'social_enrollment'])
         for (const role of ['debateai_runtime', 'debateai_authorization_runtime', 'debateai_erasure_runtime', 'debateai_replay']) {
             const r = (await database.pool.query("SELECT has_table_privilege($1,$2,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE') allowed", [role, 'identity.' + table])).rows[0];
@@ -35,7 +35,8 @@ it('keeps every new table/helper private and exposes only fixed authorization-ru
         }
     for (const signature of ['prune_social_flows()', 'begin_social_flow(jsonb)', 'claim_social_flow(jsonb)', 'finish_social_callback(jsonb,jsonb)', 'read_social_signup(jsonb)', 'create_social_account(jsonb,jsonb)', 'complete_social_login(jsonb,jsonb)', 'read_social_links(jsonb)', 'unlink_social_identity(jsonb,jsonb)', 'read_social_step_up(jsonb)', 'begin_social_step_up_passkey(jsonb)', 'complete_social_step_up(jsonb,jsonb)']) {
         const r = (await database.pool.query("SELECT prosecdef,proconfig,proowner=(SELECT proowner FROM pg_proc WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure) owner,has_function_privilege('social_test_runtime',oid,'EXECUTE') allowed,has_function_privilege('debateai_runtime',oid,'EXECUTE') app_allowed FROM pg_proc WHERE oid=$1::regprocedure", ['identity.' + signature])).rows[0];
-        expect(r).toMatchObject({ prosecdef: true, owner: true, allowed: true, app_allowed: false });
+        expect(r).toMatchObject({ prosecdef: true, owner: true, allowed: signature!=='create_social_account(jsonb,jsonb)', app_allowed: false });
+        if(signature==='create_social_account(jsonb,jsonb)')expect((await database.pool.query("SELECT has_function_privilege('debateai_billing_runtime',$1,'EXECUTE') allowed",['identity.'+signature])).rows[0].allowed).toBe(true);
         expect(r.proconfig).toContain('search_path=pg_catalog');
     }
     for (const signature of ['guard_social_parent()', 'require_social_password_origin()', 'social_first_step_current_internal(uuid,jsonb,text)', 'login_first_step_current_internal(uuid,jsonb,text)', 'lock_consumer_enrollment_internal(text,text,text,text,jsonb)', 'consumer_social_path_internal(uuid,uuid,text,text,boolean,jsonb)', 'append_social_audit_internal(uuid,text,jsonb)'])

@@ -48,7 +48,10 @@ describe("auth front-door parity", () => {
       "/recover",
       "/verify-recovery-email",
       "/social/complete",
-      "/settings/security"
+      "/settings/security",
+      "/reset-password",
+      "/recover-authenticator",
+      "/verify-backup-email"
     ]);
     const packageJson = JSON.parse(await read("apps/ui/package.json")) as { scripts: { build: string } };
     expect(packageJson.scripts.build).toContain("assert-auth-front-door-routes.mjs");
@@ -106,5 +109,8 @@ describe("auth front-door parity", () => {
     expect(shared).toContain('id="enrollment-code"');
     expect(shared).not.toContain('recovery-typeback');
     expect(enroll).not.toMatch(/<form\b/);
+  });
+  it.each(['/reset-password','/recover-authenticator','/verify-backup-email'])('refuses a production build missing external recovery route %s',async route=>{
+    await expect(assertProductionAuthRoutes(await fakeBuild(REQUIRED_AUTH_ROUTES.filter(candidate=>candidate!==route)),'mutant')).rejects.toThrow(`${route} is absent`);
   });
 });

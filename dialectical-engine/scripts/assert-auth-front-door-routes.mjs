@@ -11,7 +11,10 @@ export const REQUIRED_AUTH_ROUTES = Object.freeze([
   "/recover",
   "/verify-recovery-email",
   "/social/complete",
-  "/settings/security"
+  "/settings/security",
+  "/reset-password",
+  "/recover-authenticator",
+  "/verify-backup-email"
 ]);
 
 export async function assertProductionAuthRoutes(appRoot, appName) {

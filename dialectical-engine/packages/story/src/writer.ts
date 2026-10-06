@@ -259,6 +259,7 @@ function storyCallRequest(input: {
     callSiteKey: storyCallSiteKey(input.site, input.round),
     role: STORY_SITE_ROLES[input.site],
     lane: "story",
+    preferredResponseFormat: "json_object",
     bound: input.bound,
     contractHash: input.contractHash,
     providerRef: input.providerRef,

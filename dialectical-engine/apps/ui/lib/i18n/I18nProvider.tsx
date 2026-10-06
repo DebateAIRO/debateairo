@@ -20,7 +20,9 @@ export type I18nNamespace =
   | "compose"
   | "misc"
   | "legal"
-  | "billing";
+  | "billing"
+  | "password-reset"
+  | "mfa-recovery";
 
 type I18nContextValue = Readonly<{
   locale: LocaleCode;

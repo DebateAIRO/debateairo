@@ -1,3 +1,4 @@
+import { OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, PREVIEW_GLM_PROVIDER_REFS, PREVIEW_GLM_MODEL, PREVIEW_GLM_BASE_URL, PREVIEW_GLM_TARGET } from "@debateai/providers";
 import { createHash } from "node:crypto";
 import {
   CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF,
@@ -30,8 +31,12 @@ export type HostedRosterProvider = Readonly<{
   vetting: unknown;
   base_url: unknown;
   model: unknown;
-  runner_authorization_file: unknown;
-  api_authorization_file: unknown;
+  runner_authorization_file?: unknown;
+  api_authorization_file?: unknown;
+  preview_budget_authority?: true;
+  thinking_parameter?: unknown;
+  thinking_levels?: unknown;
+  context_window_tokens?: unknown;
   input_price_micros_per_million: unknown;
   output_price_micros_per_million: unknown;
 }>;
@@ -56,6 +61,7 @@ const ROSTER_KEYS = [
   "runner_authorization_file", "api_authorization_file",
   "input_price_micros_per_million", "output_price_micros_per_million"
 ] as const;
+const OPTIONAL_TARGET_KEYS = ["thinking_parameter", "thinking_levels", "context_window_tokens"] as const;
 const VETTING_KEYS = [
   "data_use_terms_reviewed_on", "retention_terms_reviewed_on", "named_in_privacy_notice"
 ] as const;
@@ -78,8 +84,11 @@ export function gateHostedRoster(text: string): HostedRoster {
     const refuse = () => { throw new TypeError(`PES_PUBLISH_ROSTER_INVALID:${suffix}`); };
     if (!isRecord(element)) refuse();
     const provider = element as Record<string, unknown>;
-    if (Object.keys(provider).length !== ROSTER_KEYS.length
-      || !ROSTER_KEYS.every(key => Object.hasOwn(provider, key))) refuse();
+    const rootBroker=provider.preview_budget_authority===true;
+    const required=rootBroker?ROSTER_KEYS.filter(key=>key!=="runner_authorization_file"&&key!=="api_authorization_file"):ROSTER_KEYS;
+    if(!required.every(key=>Object.hasOwn(provider,key))||Object.keys(provider).some(key=>!([...ROSTER_KEYS,...OPTIONAL_TARGET_KEYS,"preview_budget_authority"] as readonly string[]).includes(key)))refuse();
+    if(Object.hasOwn(provider,"preview_budget_authority")&&!rootBroker)refuse();
+    if(rootBroker&&(provider.adapter_kind!==OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND||!(PREVIEW_GLM_PROVIDER_REFS as readonly unknown[]).includes(provider.provider_ref)||provider.model!==PREVIEW_GLM_MODEL||provider.base_url!==PREVIEW_GLM_BASE_URL||provider.maker!=="Z.AI"||Object.hasOwn(provider,"runner_authorization_file")||Object.hasOwn(provider,"api_authorization_file")||provider.thinking_parameter!=="reasoning_effort"||JSON.stringify(provider.thinking_levels)!=='["high"]'||provider.context_window_tokens!==PREVIEW_GLM_TARGET.context_window_tokens||provider.input_price_micros_per_million!==150000||provider.output_price_micros_per_million!==500000))refuse();
     if (!BUILT_IN_PROVIDER_ADAPTERS.some(adapter => adapter.adapterKind === provider.adapter_kind)) refuse();
     if (!isRecord(provider.vetting)
       || !Object.keys(provider.vetting).every(key => (VETTING_KEYS as readonly string[]).includes(key))) refuse();
@@ -110,6 +119,7 @@ export function hostedConfiguredProviders(roster: HostedRoster): VettedConfigure
   });
 }
 export function deriveHostedProviderTargets(roster: HostedRoster): Readonly<{ runner: string; api: string }> {
+  for(const provider of roster.providers)if(provider.preview_budget_authority===true&&(Object.hasOwn(provider,"runner_authorization_file")||Object.hasOwn(provider,"api_authorization_file")))throw new TypeError("PES_PUBLISH_ROSTER_INVALID:PREVIEW_CREDENTIAL_PRESENT");
   const derive = (authorizationKey: "runner_authorization_file" | "api_authorization_file") =>
     JSON.stringify(roster.providers.map(provider => ({
       provider_ref: provider.provider_ref,
@@ -117,7 +127,10 @@ export function deriveHostedProviderTargets(roster: HostedRoster): Readonly<{ ru
       model: provider.model,
       authorization_file: provider[authorizationKey],
       input_price_micros_per_million: provider.input_price_micros_per_million,
-      output_price_micros_per_million: provider.output_price_micros_per_million
+      output_price_micros_per_million: provider.output_price_micros_per_million,
+      ...(provider.thinking_parameter===undefined?{}:{thinking_parameter:provider.thinking_parameter}),
+      ...(provider.thinking_levels===undefined?{}:{thinking_levels:provider.thinking_levels}),
+      ...(provider.context_window_tokens===undefined?{}:{context_window_tokens:provider.context_window_tokens})
     })));
   return { runner: derive("runner_authorization_file"), api: derive("api_authorization_file") };
 }

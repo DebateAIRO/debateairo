@@ -9,6 +9,7 @@ import { matchingSecurityGrant, type ConfirmedSecurityAction } from '@/lib/secur
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import type { LocaleCode } from '@/lib/i18n/locales';
 import { PhoneProfileCard, type SecurityResume } from './PhoneProfileCard';
+import { BackupEmailVerification } from './BackupEmailVerification';
 import { SessionControls } from './SessionControls';
 import { AuthGate } from './AuthGate';
 import { SecurityConfirmation } from './auth/SecurityConfirmation';
@@ -151,6 +152,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
             <button type="button" disabled={busy} onClick={() => choose({ action: 'CHANGE_RECOVERY_EMAIL' })}>{t(catalog, 'settings.email.change')}</button>
             {recovery && recovery.state !== 'absent' ? <button type="button" disabled={busy} onClick={() => choose({ action: 'CHANGE_RECOVERY_EMAIL' }, true)}>{t(catalog, 'settings.sessions.revoke')}</button> : null}
         </section>
+        <section className="setList"><BackupEmailVerification locale={locale}/></section>
         <section className="setList"><h2>{t(authCatalog, 'auth.social.methods')}</h2>
             {(links?.providers ?? []).map(link => <div key={link.provider}><span>{providerName(link.provider)}</span><button type="button" disabled={busy || !link.removable} onClick={() => choose({ action: 'UNLINK_PROVIDER', target_provider: link.provider })}>{t(catalog, 'settings.sessions.revoke')}</button>{!link.removable ? <p>{t(catalog, 'settings.security.lastPath')}</p> : null}</div>)}
             {(providers?.providers ?? []).filter(provider => !links?.providers.some(link => link.provider === provider.id)).map(provider => <button type="button" key={provider.id} disabled={busy || !links} onClick={() => choose({ action: 'LINK_PROVIDER', target_provider: provider.id })}>{t(authCatalog, 'auth.social.continue', { provider: provider.name })}</button>)}

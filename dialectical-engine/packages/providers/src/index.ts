@@ -117,6 +117,7 @@ export interface ProviderCallRequest {
   readonly contractHash: string;
   readonly providerRef: string;
   readonly packet: PromptPacket;
+  readonly preferredResponseFormat?: "json_object";
   readonly classifyContent?: (content: string) => ContentClassification;
   readonly buildRepairPacket?: (rejected: RejectedProviderContent) => PromptPacket;
   /**
@@ -276,14 +277,19 @@ export function providerTargetPrice(target: ProviderDiscoveryTarget): Readonly<{
 export type ProviderTargetGatewayControls = Readonly<{
   thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   contextWindowTokens?: number;
+  supportsJsonObjectResponse?: boolean;
 }>;
 
+function isJsonObjectResponseTarget(endpoint:string,model:string):boolean {
+  return endpoint === "https://api.deepinfra.com/v1/openai" && model === "zai-org/GLM-5.3-Flash";
+}
 export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): ProviderTargetGatewayControls {
   return Object.freeze({
     ...(target.thinkingParameter === undefined || target.thinkingLevels === undefined ? {} : {
       thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
     }),
-    ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens })
+    ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
+    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{})
   });
 }
 
@@ -356,7 +362,7 @@ function normalizedProviderBaseUrl(value: unknown): string {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   parsed.pathname = parsed.pathname.replace(/\/+$/u, "");
-  if (!parsed.pathname.endsWith("/v1")) {
+  if (!parsed.pathname.endsWith("/v1") && parsed.toString() !== "https://api.deepinfra.com/v1/openai") {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   return parsed.toString().replace(/\/$/u, "");
@@ -957,8 +963,9 @@ export interface ProviderAdapterRegistration {
   readonly maker: string;
 }
 
+export const OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND = "openai-compatible-http" as const;
 export const BUILT_IN_PROVIDER_ADAPTERS = Object.freeze([
-  Object.freeze({ adapterKind: "openai-compatible-http", implementation: "OpenAICompatibleProviderGateway" }),
+  Object.freeze({ adapterKind: OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, implementation: "OpenAICompatibleProviderGateway" }),
   Object.freeze({ adapterKind: "vllm-openai-compatible-http", implementation: "VllmOpenAICompatibleProviderGateway" })
 ] as const);
 
@@ -1094,6 +1101,7 @@ export interface ProviderCostEnvelopeSeam {
 }
 
 export interface OpenAICompatibleGatewayOptions {
+  readonly supportsJsonObjectResponse?: boolean;
   readonly endpoint: string;
   readonly model: string;
   readonly maker: string;
@@ -1449,6 +1457,12 @@ function assertBoundedProviderResponse(decoded: unknown): void {
   }
 }
 
+function assertJsonObjectResponseCapability(options:OpenAICompatibleGatewayOptions):void {
+ if ((options.supportsJsonObjectResponse !== undefined && typeof options.supportsJsonObjectResponse !== "boolean")
+  || (options.supportsJsonObjectResponse === true && !isJsonObjectResponseTarget(options.endpoint,options.model)))
+  throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_CAPABILITY_INVALID","Invalid JSON object response capability");
+}
+
 export class OpenAICompatibleProviderGateway implements ProviderGateway {
   readonly #options: OpenAICompatibleGatewayOptions;
 
@@ -1463,11 +1477,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (options.contextWindowTokens !== undefined && !isContextWindowTokens(options.contextWindowTokens)) {
       throw new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID");
     }
+    assertJsonObjectResponseCapability(options);
     this.#options = options;
   }
 
   async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
     this.#options.assertNoOpenWriteTransaction();
+    assertJsonObjectResponseCapability(this.#options);
+    if(request.preferredResponseFormat!==undefined&&request.preferredResponseFormat!=="json_object") throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_INVALID","Unsupported preferred response format");
+    const responseFormat=request.lane==="story"&&request.preferredResponseFormat==="json_object"&&this.#options.supportsJsonObjectResponse===true?{type:"json_object"} as const:undefined;
     if (!Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 1) {
       throw new TypeError("CallBound.maxAttempts must be a positive integer");
     }
@@ -1548,7 +1566,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,
         ...thinking.wire,
-        messages: attemptPacket.messages
+        messages: attemptPacket.messages,
+        ...(responseFormat===undefined?{}:{response_format:responseFormat})
       });
       /**
        * V-28 (DL4-F2) — THE MONEY DECISION, TAKEN BEFORE THE CALL.
@@ -1566,7 +1585,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         completionTokenCeiling: attemptTokenCeiling
       });
       attemptsMade = attempt;
-      const inputHash = digest(JSON.stringify(attemptPacket));
+      const inputHash = digest(JSON.stringify(responseFormat===undefined?attemptPacket:{...attemptPacket,response_format:responseFormat}));
       const attemptId = randomUUID();
       const startedAt = new Date();
       let rawArtifactRef: string | null = null;
@@ -2123,3 +2142,5 @@ export {
   type ProviderProbeObservation,
   type ProviderProbeRecorder
 } from "./provider-probe.js";
+
+export * from "./preview-test.js";

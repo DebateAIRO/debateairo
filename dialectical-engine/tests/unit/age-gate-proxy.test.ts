@@ -30,7 +30,7 @@ async function proxied(cookie: string, upstreamSetCookies: readonly string[]) {
     }),
     { params: Promise.resolve({ path: ["v1", "auth", "age-check"] }) }
   );
-  return { forwardedCookie: new Headers(calls[0]!.headers).get("cookie"), setCookies: response.headers.getSetCookie() };
+  return { status:response.status,forwardedCookie: new Headers(calls[0]!.headers).get("cookie"), setCookies: response.headers.getSetCookie() };
 }
 
 describe("age-gate lockout through the proxy", () => {
@@ -46,14 +46,14 @@ describe("age-gate lockout through the proxy", () => {
     expect(forwardedCookie).toBeNull();
   });
 
-  it("passes the API's exact lockout Set-Cookie down, and nothing that merely shares its name", async () => {
-    const { setCookies } = await proxied("", [
-      LOCKOUT,
-      "__Host-debateai-age-refusal=refused; Path=/; Max-Age=99999999; HttpOnly; Secure; SameSite=Lax",
-      "__Host-debateai-age-refusal=other; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax",
-      "__Host-debateai-age-refusal=refused; Path=/; Max-Age=2592000; Secure; SameSite=Lax",
-      "tracking=1; Path=/"
-    ]);
-    expect(setCookies).toEqual([LOCKOUT]);
+  it("passes one exact lockout and filters unrelated cookies",async()=>{
+    const {status,setCookies}=await proxied("",[LOCKOUT,"tracking=1; Path=/"]);expect(status).toBe(200);expect(setCookies).toEqual([LOCKOUT]);
   });
-});
+  it.each([
+    "__Host-debateai-age-refusal=refused; Path=/; Max-Age=99999999; HttpOnly; Secure; SameSite=Lax",
+    "__Host-debateai-age-refusal=other; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax",
+    "__Host-debateai-age-refusal=refused; Path=/; Max-Age=2592000; Secure; SameSite=Lax",
+    LOCKOUT
+  ])("rejects an upstream success with duplicate or unlawful protected lockout %s",async bad=>{
+    const {status,setCookies}=await proxied("",[LOCKOUT,bad]);expect(status).toBe(502);expect(setCookies).toEqual([]);
+  });});

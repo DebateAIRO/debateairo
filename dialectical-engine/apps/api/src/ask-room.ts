@@ -1,3 +1,4 @@
+import { validatePreviewProviderTestConfig, previewPlanTierRosters, type PreviewProviderTestConfig } from "@debateai/providers";
 import type { Pool, PoolClient } from "pg";
 import { PLAN_TIER_ROSTERS, type AskRequest } from "@debateai/contract";
 import { exhaustive, TypedDomainError, type FundingBasis, type InternalGrant, type InternalRunFundingState } from "@debateai/kernel";
@@ -274,12 +275,13 @@ export function nextUtcMidnight(now: Date): Date {
  * for; a stored run counts its panel's models the same way, B2) and its depth.
  */
 export function runSettingsClassOfAsk(
-  ask: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">
+  ask: Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params">,
+  previewConfig?: PreviewProviderTestConfig
 ): RunSettingsClass {
   return Object.freeze({
     planTier: ask.plan_tier,
     compositionBudgetTier: ask.composition_budget_tier,
-    makerCount: PLAN_TIER_ROSTERS[ask.plan_tier].length,
+    makerCount: previewPlanTierRosters(validatePreviewProviderTestConfig(previewConfig),PLAN_TIER_ROSTERS)[ask.plan_tier].length,
     depth: ask.depth_params.depth
   });
 }

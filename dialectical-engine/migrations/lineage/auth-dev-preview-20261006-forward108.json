@@ -1,0 +1,73 @@
+{
+  "version": "auth-dev-preview-20261006-forward108-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "baseVerifierSha256": "efeddf3d398eef8f6b47e1b1c5820f9ee5f551a7404e65135b5a4e0c70157944",
+  "migration": {
+    "name": "0108_preview_recovery_verified_bindings.sql",
+    "sha256": "3a3e4ab7178aecf98dfce25523f23b4f2caecd9bb2054f9c950ba8f88d34789f"
+  },
+  "verifier": {
+    "path": "lineage/verify-auth108-recovery-bindings.sql",
+    "sha256": "5a719632d28d31336ad66aad57d6a97578574e2d1b676e3b9dc6119b473f609e"
+  },
+  "functions": [
+    {
+      "signature": "identity.password_reset_prepare(bytea)",
+      "args": [
+        "p_index"
+      ],
+      "result": "jsonb",
+      "owner": "debateai_password_reset_owner",
+      "originalBodySha256": "c424f5e809bb90ea48582f4b07be45a3e0d3b989a06d2e426bedfd8da226ebff",
+      "currentBodySha256": "4bbc75b4638c3430547c359e3ace8c68f40a8a66c5c66ac47dfb00d650e98e03"
+    },
+    {
+      "signature": "identity.password_reset_start(bytea,uuid,uuid[],jsonb,text,text,jsonb,jsonb,bigint)",
+      "args": [
+        "p_index",
+        "p_candidate",
+        "p_channels",
+        "p_refs",
+        "p_link",
+        "p_cancel",
+        "p_notices",
+        "p_source",
+        "p_register"
+      ],
+      "result": "boolean",
+      "owner": "debateai_password_reset_owner",
+      "originalBodySha256": "685c3dcab8d7c6aecce2017a4089cf4d25a092ba0f97906e64b7be4ee53347d2",
+      "currentBodySha256": "ac7ca640c6b315531b398df4a037060be5085b1bfd070e2174b32adc79685331"
+    },
+    {
+      "signature": "identity.mfa_recovery_prepare_exchange(text)",
+      "args": [
+        "p_link"
+      ],
+      "result": "jsonb",
+      "owner": "debateai_mfa_recovery_owner",
+      "originalBodySha256": "88c3a5f1a8ac5eb1b848fcee158adfe7566a49e8334e6f7c44943d62aa7c1d82",
+      "currentBodySha256": "a32d68aa51ec9d8c794a214c642db79d7c77777661aa00a07ff72e14c953e2c8"
+    },
+    {
+      "signature": "identity.mfa_recovery_exchange(text,text,text,text,jsonb,text,jsonb)",
+      "args": [
+        "p_link",
+        "p_password",
+        "p_session",
+        "p_csrf",
+        "p_refs",
+        "p_risk",
+        "p_source"
+      ],
+      "result": "text",
+      "owner": "debateai_mfa_recovery_owner",
+      "originalBodySha256": "cb31d53c6c6034324b1f63e03536f0f2e3c778b4e0a7b88e556c8a7b623a4f5e",
+      "currentBodySha256": "c1de7cdd58b87614e83ef504ed77ebe48bd1acb5e4cc429f8e3996bf9c098898"
+    }
+  ],
+  "sharedBinding": {
+    "signature": "identity.start_account_recovery(bytea,uuid,uuid[],jsonb,jsonb)",
+    "bodySha256": "7d094f0d071dc5cc033cfd0d3c537dfd2ff4caed21350a118aa5308b8d5d0d0a"
+  }
+}

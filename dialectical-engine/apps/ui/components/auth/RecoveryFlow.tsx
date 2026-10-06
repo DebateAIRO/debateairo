@@ -7,6 +7,9 @@ import { safeReturnPath } from '@/lib/returnPath';
 import { emailShape } from '@/lib/authFormValidation';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import type { LocaleCode } from '@/lib/i18n/locales';
+import { KnownPasswordRecoveryLink } from '../KnownPasswordRecoveryLink';
+import resetEn from '@/messages/en/password-reset.json';
+import resetRo from '@/messages/ro/password-reset.json';
 import { AuthShell } from '../AuthShell';
 import { OnboardingEvidence } from './OnboardingEvidence';
 import { SecurityEnrollment } from './SecurityEnrollment';
@@ -108,7 +111,7 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
             setBusy(false);
         }
     }
-    return <AuthShell eyebrow={t(catalog, "auth.login.recoveryAccess")} title={t(catalog, "auth.recovery.title")} description={t(catalog, "auth.recovery.description")} footer={null}>
+    return <AuthShell eyebrow={t(catalog, "auth.login.recoveryAccess")} title={t(catalog, "auth.recovery.title")} description={t(catalog, "auth.recovery.description")} footer={!proof&&!token?<p><a href="/reset-password">{t(locale==='ro'?resetRo:resetEn,"request.title")}</a> · <KnownPasswordRecoveryLink/></p>:null}>
  {error ? <p role="alert">{error}</p> : null}{backup ? <EphemeralCodes codes={[backup]} catalog={catalog}/> : null}
  {expired ? <p role="alert">{t(catalog, "auth.recovery.restart")}</p> : null}
  {proof ? ready ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'recovery', token: proof.recovery_capability, expiresAt: proof.expires_at, availableMethods: proof.available_methods, totpUnavailableReason: proof.totp_unavailable_reason }} onAuthenticated={() => {

@@ -27,7 +27,7 @@ const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta
 describe("verdict story — the storyteller and checker contracts", () => {
   it("puts the owners' pack in the instruction slot and code's form in the answer slot", () => {
     expect(buildStorytellerContract(PACK)).toEqual({
-      contractId: "story.storyteller.v1",
+      contractId: "story.storyteller.v2",
       instruction: assembleStorytellerInstruction(PACK),
       answerForm: STORYTELLER_ANSWER_FORM
     });
@@ -195,3 +195,5 @@ describe("verdict story — the verdict basis the story explains", () => {
     expect(StoryVerdictBasisSchema.safeParse({ ...basis, band: "HIGH" }).success).toBe(false);
   });
 });
+
+it("preserves the installed concise storyteller answer form fingerprint",()=>{expect(createHash("sha256").update(STORYTELLER_ANSWER_FORM).digest("hex")).toBe("0e7ec7acc8a69057e6f23d1623cea3516925da8b72f310a06b33b859fa2d68e5");});

@@ -1253,3 +1253,6 @@ export {
 export { internalAllowancePolicyValue } from "./internal-allowance-policy.js";
 
 export * from "./consumer-recovery-policy.js";
+
+export * from "./password-reset-policy.js";
+export * from "./email-mfa-policy.js";

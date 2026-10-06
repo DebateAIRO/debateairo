@@ -1,5 +1,9 @@
 "use client";
 import Link from 'next/link';
+import { KnownPasswordRecoveryLink } from './KnownPasswordRecoveryLink';
+import resetEn from '@/messages/en/password-reset.json';
+import resetRo from '@/messages/ro/password-reset.json';
+import { useChromeI18n } from '@/lib/i18n/I18nProvider';
 import { clearStoredSupportConversation } from '@/components/support/conversation';
 import { announceSessionChange } from '@/components/support/sessionChange';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -28,6 +32,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     onAuthenticated?: () => void | Promise<void>;
     browser?: ConsumerWebAuthnBrowser;
 }) {
+    const {locale}=useChromeI18n();
+    const resetCatalog=locale==='ro'?resetRo:resetEn;
     const browser = useRef(provided ?? createConsumerWebAuthnBrowser()).current;
     const flight = useRef(false);
     const dispatched = useRef(false);
@@ -251,7 +257,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         }
     }
     const offered = continuation?.available_methods ?? [];
-    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={replacement ? t(catalog, "auth.login.replacementTitle") : continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={null}>
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={replacement ? t(catalog, "auth.login.replacementTitle") : continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={!replacement&&!dispatched.current?<p><Link href="/reset-password" onClick={()=>{cancelConditional();}}>{t(resetCatalog,"request.title")}</Link> · <KnownPasswordRecoveryLink onClick={()=>{cancelConditional();}}/></p>:null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
  {replacement ? <div><EphemeralCodes codes={[replacement]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
                 setRecoveryAcknowledgementPending(false);

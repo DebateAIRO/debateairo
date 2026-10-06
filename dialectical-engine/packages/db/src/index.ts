@@ -1,3 +1,4 @@
+import { applyForward108, base108Lineage } from "./migration-forward108.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
@@ -989,8 +990,9 @@ export async function migrate(pool: Pool): Promise<void> {
       postcondition_evidence_digest: string;
     }>("SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows;
     const lineage = identifyLineage(plan, applied, resolutions.map(({ logical_name }) => logical_name));
+    const baseLineage=base108Lineage(lineage);
     const authLineage = lineage === "auth94" || lineage === "auth103" || lineage === "auth106";
-    if (lineage === "auth106" || lineage === "integrated-original" || lineage === "integrated-compatibility" || lineage === "integrated-fresh-resolutions") await assertAuth106Catalog(client);
+    if (baseLineage === "auth106" || baseLineage === "integrated-original" || baseLineage === "integrated-compatibility" || baseLineage === "integrated-fresh-resolutions") await assertAuth106Catalog(client);
     if (lineage === "dev95") {
       // Retained active, expired and consumed withdrawal grants all block the
       // immutable Auth CHECK replacements. The lock keeps the predicate stable.
@@ -1001,7 +1003,7 @@ export async function migrate(pool: Pool): Promise<void> {
       if (retained.rows[0]?.retained) throw new Error("MIGRATION_WITHDRAWAL_ROWS_RETAINED");
     }
     const compat = plan.manifest.compatibility;
-    if (lineage === "integrated-fresh-resolutions") {
+    if (baseLineage === "integrated-fresh-resolutions") {
       for (const body of plan.manifest.transactionBodies) {
         const receipt = resolutions.find(({ logical_name }) => logical_name === body.logicalName);
         if (receipt?.original_source_sha256 !== plan.sources.get(body.logicalName)!.sha256
@@ -1013,7 +1015,7 @@ export async function migrate(pool: Pool): Promise<void> {
         }
       }
     }
-    if (lineage === "integrated-compatibility") {
+    if (baseLineage === "integrated-compatibility") {
       const receipt = resolutions[0];
       const source = plan.sources.get(compat.logicalName)!;
       if (receipt?.original_source_sha256 !== source.sha256 || receipt.resolution_id !== compat.resolutionId
@@ -1078,6 +1080,7 @@ export async function migrate(pool: Pool): Promise<void> {
       await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
     }
     await client.query(plan.effectiveCapabilityVerifierSql);
+    await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
