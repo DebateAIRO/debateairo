@@ -1,3 +1,4 @@
+import { parsePreviewProviderTestConfig } from "@debateai/providers";
 import { isAbsolute } from "node:path";
 import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
 import type { StaffAccessEnvironment } from "@debateai/kernel";
@@ -378,6 +379,7 @@ const hatchetShape = {
 } as const;
 
 const apiEnvironmentShape = {
+    PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
     KEK_PATH: kekPath,
     SUPPORT_KEK_PATH: kekPath,
     /**
@@ -641,7 +643,8 @@ export function parseApiEnvironment(
   source: Readonly<Record<string, string | undefined>>
 ) {
   const staffAccess = parseStaffAccessEnvironment(source);
-  return { ...validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source)), STAFF_ACCESS: staffAccess };
+  return { ...validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source)), STAFF_ACCESS: staffAccess,
+    PREVIEW_PROVIDER_TEST_CONFIG: parsePreviewProviderTestConfig(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON) };
 }
 
 /** Paid plans: the ten keys of the billing group, in the order a missing one is reported. */
@@ -773,6 +776,7 @@ export function loadRunnerEnvironment() {
 }
 
 const runnerEnvironmentShape = {
+    PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
     KEK_PATH: kekPath,
     /**
      * V-3, fix wave A-C2. The runner's half of a changeover. It holds ONE
@@ -849,6 +853,7 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
   assertProductionFloors(environment);
   return {
     ...environment,
+    PREVIEW_PROVIDER_TEST_CONFIG: parsePreviewProviderTestConfig(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON),
     DEPLOYMENT_MODE: resolveDeploymentMode(
       environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
     )

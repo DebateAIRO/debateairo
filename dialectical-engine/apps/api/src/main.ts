@@ -1,3 +1,5 @@
+import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
+import { readModelScorecard, readEngineVersion } from "@debateai/register";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
 import { BackupEmailService, MfaRecoveryService } from "./email-mfa-recovery.js";
@@ -175,6 +177,10 @@ import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
+const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
+if (previewConfig !== undefined && environment.PUBLIC_APP_URL !== "https://v3-preview.dezbatere.ro") {
+  throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
+}
 // V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
 // vendor, which is itself a model call — until the per-run and daily cost
 // envelopes are sealed. The seam is `readSealedCostEnvelopeStatus` in
@@ -467,6 +473,13 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
 });
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.
+if (previewConfig !== undefined) {
+  assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
+  if ((await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID") {
+    throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
+  }
+}
+const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPort(previewConfig));
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
   resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
 const resolveProviderPanel = createProviderDiscoveryResolver({
@@ -474,7 +487,8 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   targets: providerDiscoveryTargets,
   probes,
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
-  probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
+  probeTimeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
+  ...(previewConfig === undefined ? {} : { thinkingLevel: "high", probeTokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR, fetchImplementation: previewFetch! })
 });
 /**
  * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM.
@@ -845,6 +859,7 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
 const application = new PostgresAskApplication(pool, dispatcher, {
+  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,
@@ -1304,6 +1319,7 @@ const billingRouteOptions: BillingRouteOptions | undefined =
         ...(billingRuntime === undefined ? {} : billingRuntime.routes)
       });
 const api = buildApi({
+  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
   application,
   stories: new RepositoryAnswerStoryApplication(storyRepository),
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of

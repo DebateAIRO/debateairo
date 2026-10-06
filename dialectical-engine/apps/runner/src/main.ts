@@ -39,7 +39,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, previewRunnerPolicy, withPreviewProviderCallPolicy, PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -56,6 +56,7 @@ import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 
 const environment = loadRunnerEnvironment();
+const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
 // V-9(c) / V-28: a hosted deployment spends money on paid vendor APIs, so it may
 // not claim work until the per-run and daily cost envelopes are sealed. The seam
 // is `readSealedCostEnvelopeStatus` in @debateai/register — task 11 publishes the
@@ -92,7 +93,7 @@ if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
     )
   ));
 }
-const policy = await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION);
+const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);
 /**
  * VERDICT STORY (spec 2026-09-26 §9): the story's register rows are OPTIONAL.
  * A register that never sealed them — every version before this feature,
@@ -164,6 +165,13 @@ assertDeploymentProviderTargets(declaredProviderTargets, {
 // because the support chat's target shares that one and keeps its own accounting.
 assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
 // V-9(2): each vendor's credential file, read once under the custody contract.
+if (previewConfig !== undefined) {
+  assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
+  if ((await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID") {
+    throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
+  }
+}
+const previewFetch = previewConfig === undefined ? fetch : createPreviewGuardedFetch(createPreviewBudgetRpcPort(previewConfig));
 const providerTargets = resolveProviderTargetCredentials(
   declaredProviderTargets, readCustodyAuthorizationHeader
 );
@@ -300,7 +308,8 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
   if (costEnvelopeGuard !== undefined && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
   }
-  return createPostgresProviderGateway(pool, {
+  const gateway = createPostgresProviderGateway(pool, {
+    ...(previewConfig === undefined ? {} : { fetchImplementation: previewFetch }),
     endpoint: target.baseUrl,
     model: target.model,
     maker: target.maker,
@@ -328,6 +337,7 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       })
     })
   });
+  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig);
 });
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
@@ -414,8 +424,9 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     // twice under two evidence refs — codex r1 B1.
     const observation = await observeProviderTarget({
       target,
-      timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
-      fetchImplementation: fetch,
+      timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
+      ...(previewConfig === undefined ? {} : { thinkingLevel: "high", tokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR }),
+      fetchImplementation: previewFetch,
       clock: () => new Date()
     });
     return {
@@ -459,8 +470,9 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     // The same target probe validates the configured model identity. The runner
     // persists this observation separately from the selected debate panel.
     const observation = await observeProviderTarget({
-      target, timeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS,
-      fetchImplementation: fetch, clock: () => new Date()
+      target, timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
+      ...(previewConfig === undefined ? {} : { thinkingLevel: "high", tokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR }),
+      fetchImplementation: previewFetch, clock: () => new Date()
     });
     return { state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode };
   },
@@ -484,6 +496,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   }
 });
 const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
+  ...(previewConfig === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
   failures: new WorkItemRepository(pool),
   workflowName: environment.HATCHET_WORKFLOW_NAME, engineRetries: environment.HATCHET_ENGINE_RETRIES });
 const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME);
