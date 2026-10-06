@@ -51,6 +51,92 @@ async function insertLegacyAccount(client:PoolClient,user:string):Promise<void>{
 }
 
 describe('native auth106 to Dev integration lineage',()=>{
+ it('rolls a late fresh refusal back to an empty ledger and retries after the role is corrected',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await target.pool.query('CREATE ROLE debateai_mfa_recovery_owner LOGIN');
+   await expect(migrate(target.pool)).rejects.toThrow('AUTH_DEV_107_RECOVERY_POLICY_DRIFT');
+   expect((await target.pool.query("SELECT to_regclass('public.debateai_schema_migration') old_ledger,to_regclass('public.debateai_schema_migration_resolution') resolutions,to_regclass('billing.customer') retail")).rows[0]).toEqual({old_ledger:null,resolutions:null,retail:null});
+   await target.pool.query('ALTER ROLE debateai_mfa_recovery_owner NOLOGIN');
+   await migrate(target.pool);
+   const recipe=await readFile(new URL('../../migrations/lineage/auth-dev-20261006.json',import.meta.url));
+   const recipeDigest=createHash('sha256').update(recipe).digest('hex');
+   const receipts=(await target.pool.query('SELECT logical_name,original_source_sha256,executable_sha256,recipe_sha256,resolution_id FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows;
+   expect(receipts.map(row=>row.logical_name)).toEqual(['0025_evaluator_domain_refusal_receipts.sql','0029_evaluator_dev_menu_grants.sql']);
+   for(const receipt of receipts){
+    const source=await readFile(new URL(`../../migrations/${receipt.logical_name}`,import.meta.url));
+    const body=await readFile(new URL(`../../migrations/compatibility/auth-dev-20261006/${receipt.logical_name}`,import.meta.url));
+    expect(source.toString('utf8')).toBe(`BEGIN;\n\n${body.toString('utf8')}\nCOMMIT;\n`);
+    expect(receipt.original_source_sha256).toBe(createHash('sha256').update(source).digest('hex'));
+    expect(receipt.executable_sha256).toBe(createHash('sha256').update(body).digest('hex'));
+    expect(receipt.recipe_sha256).toBe(recipeDigest);
+    expect(receipt.resolution_id).toBe(`auth-dev-${receipt.logical_name.slice(0,4)}-transaction-body-v1`);
+   }
+   expect((await target.pool.query("SELECT name FROM public.debateai_schema_migration WHERE name IN ('0025_evaluator_domain_refusal_receipts.sql','0029_evaluator_dev_menu_grants.sql')")).rows).toEqual([]);
+  }finally{await target.stop();}
+ },120000);
+ it('serializes concurrent fresh migrators with exactly two declared wrapper resolutions',async()=>{
+  const target=await startTestDatabase(),second=createPool(target.connectionString,{max:1});
+  try{
+   await expect(Promise.all([migrate(target.pool),migrate(second)])).resolves.toEqual([undefined,undefined]);
+   expect((await target.pool.query('SELECT logical_name FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows).toEqual([
+    {logical_name:'0025_evaluator_domain_refusal_receipts.sql'},
+    {logical_name:'0029_evaluator_dev_menu_grants.sql'}
+   ]);
+   expect((await target.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name='0107_auth_dev_integration.sql'")).rows[0].n).toBe(1);
+  }finally{await second.end();await target.stop();}
+ },120000);
+ it('rejects a partially removed fresh resolution set instead of reapplying a wrapped original',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await migrate(target.pool);
+   const ledger=(await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
+   await target.pool.query("DELETE FROM public.debateai_schema_migration_resolution WHERE logical_name='0029_evaluator_dev_menu_grants.sql'");
+   await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE');
+   expect((await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows).toEqual(ledger);
+   expect((await target.pool.query('SELECT logical_name FROM public.debateai_schema_migration_resolution')).rows).toEqual([{logical_name:'0025_evaluator_domain_refusal_receipts.sql'}]);
+  }finally{await target.stop();}
+ },120000);
+ it('refuses a fresh-lineage replay after an inherited API raw internal-table grant',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await migrate(target.pool);
+   const before=(await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
+   const receipts=(await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows;
+   await target.pool.query('GRANT SELECT ON billing.internal_grant TO debateai_billing_runtime');
+   await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+   expect((await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows).toEqual(before);
+   expect((await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows).toEqual(receipts);
+   await target.pool.query('REVOKE SELECT ON billing.internal_grant FROM debateai_billing_runtime');
+   await target.pool.query('GRANT SELECT(grant_id) ON billing.internal_grant TO debateai_runtime');
+   await expect(migrate(target.pool)).rejects.toThrow('AUTH_DEV_107_RETAIL_RUNTIME_PRIVILEGE');
+   expect((await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows).toEqual(before);
+   expect((await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows).toEqual(receipts);
+   await target.pool.query('REVOKE SELECT(grant_id) ON billing.internal_grant FROM debateai_runtime');
+   await target.pool.query('CREATE ROLE debateai_prod_probe LOGIN');
+   await target.pool.query('GRANT SELECT(grant_id) ON billing.internal_grant TO debateai_prod_probe');
+   await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+   expect((await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows).toEqual(before);
+   expect((await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows).toEqual(receipts);
+  }finally{await target.stop();}
+ },120000);
+ it('refuses an Auth106 compatibility replay after a column-only API raw internal grant',async()=>{
+  const target=await startTestDatabase();
+  try{
+   await seedInstalled106(target);await migrate(target.pool);
+   const before=(await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
+   const receipts=(await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows;
+   await target.pool.query('GRANT SELECT(grant_id) ON billing.internal_grant TO debateai_billing_runtime');
+   await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+   expect((await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows).toEqual(before);
+   expect((await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows).toEqual(receipts);
+   await target.pool.query('REVOKE SELECT(grant_id) ON billing.internal_grant FROM debateai_billing_runtime');
+   await target.pool.query('GRANT SELECT ON billing.internal_grant TO debateai_authorization_runtime');
+   await expect(migrate(target.pool)).rejects.toThrow('MIGRATION_EFFECTIVE_CAPABILITY_DRIFT');
+   expect((await target.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows).toEqual(before);
+   expect((await target.pool.query('SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows).toEqual(receipts);
+  }finally{await target.stop();}
+ },120000);
  it('executes actual historical SQL, then records one explicit compatibility resolution and replays without mutation',async()=>{
   db=await startTestDatabase();
   await seedInstalled106(db);
@@ -186,21 +272,23 @@ describe('native auth106 to Dev integration lineage',()=>{
   try{
    await seedInstalled106(prior);
    const writer=await prior.pool.connect(),user=randomUUID();
+   let writerOpen=false;
    try{
-    await writer.query('BEGIN');await insertLegacyAccount(writer,user);
+    await writer.query('BEGIN');writerOpen=true;await insertLegacyAccount(writer,user);
     const migration=migrate(prior.pool);
     await waitForOtherLock(prior,(await writer.query('SELECT pg_backend_pid() pid')).rows[0].pid as number);
-    await writer.query('COMMIT');await migration;
+    await writer.query('COMMIT');writerOpen=false;await migration;
     expect((await prior.pool.query('SELECT user_id FROM identity.mfa_recovery_legacy_cohort WHERE user_id=$1',[user])).rows).toEqual([{user_id:user}]);
-   }finally{await writer.query('ROLLBACK').catch(()=>{});writer.release();}
+   }finally{if(writerOpen)await writer.query('ROLLBACK').catch(()=>{});writer.release();}
   }finally{await prior.stop();}
 
   const after=await startTestDatabase();
   let migration:Promise<void>|undefined,insert:Promise<unknown>|undefined;
   const barrier=await after.pool.connect(),writer=await after.pool.connect();
+  let barrierOpen=false;
   try{
    await seedInstalled106(after);
-   await barrier.query('BEGIN');await barrier.query('LOCK TABLE identity."user" IN SHARE MODE');
+   await barrier.query('BEGIN');barrierOpen=true;await barrier.query('LOCK TABLE identity."user" IN SHARE MODE');
    migration=migrate(after.pool);
    const barrierPid=(await barrier.query('SELECT pg_backend_pid() pid')).rows[0].pid as number;
    await waitForOtherLock(after,barrierPid);
@@ -208,7 +296,7 @@ describe('native auth106 to Dev integration lineage',()=>{
    insert=writer.query(`INSERT INTO identity."user"(user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at,created_at)
     VALUES($1,$2,'{}','{}','synthetic-legacy-password',$3,'active',clock_timestamp(),'2020-01-01T00:00:00Z')`,[user,createHash('sha256').update(user).digest(),user]);
    await waitForLock(after,writerPid);
-   await barrier.query('COMMIT');
+   await barrier.query('COMMIT');barrierOpen=false;
    await migration;await insert;
    const times=(await after.pool.query("SELECT u.created_at,m.applied_at FROM identity.\"user\" u CROSS JOIN public.debateai_schema_migration m WHERE u.user_id=$1 AND m.name='0107_auth_dev_integration.sql'",[user])).rows[0];
    expect(new Date(times.created_at).getTime()).toBeLessThan(new Date(times.applied_at).getTime());
@@ -218,7 +306,7 @@ describe('native auth106 to Dev integration lineage',()=>{
     VALUES($1,'totp','{}','active',clock_timestamp(),clock_timestamp())`,[user]);
    expect((await after.pool.query('SELECT user_id FROM identity.mfa_recovery_legacy_cohort WHERE user_id=$1',[user])).rows).toEqual([]);
    expect((await after.pool.query('SELECT identity.mfa_recovery_eligible($1) allowed',[user])).rows[0].allowed).toBe(false);
-  }finally{await barrier.query('ROLLBACK').catch(()=>{});await Promise.allSettled([migration,insert]);barrier.release();writer.release();await after.stop();}
+  }finally{if(barrierOpen)await barrier.query('ROLLBACK').catch(()=>{});await Promise.allSettled([migration,insert]);barrier.release();writer.release();await after.stop();}
  },120000);
  it('rolls back the compatibility execution and receipt when a late cohort-owner gate refuses',async()=>{
   const target=await startTestDatabase();

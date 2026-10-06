@@ -2,6 +2,7 @@ import type { Pool } from 'pg';
 import type { AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext, PendingAccountInput } from './identity.js';
 import { ProfileTransactions, type ProfileSession } from './account-profile.js';
+import { isDeclaredRegion } from '@debateai/kernel';
 export interface SocialSignupAuthority {
     readonly proofHash: string;
     readonly browserHash: string;
@@ -97,15 +98,20 @@ export class PostgresSocialIdentityRepository {
     async createAccount(input: Omit<PendingAccountInput, 'passwordHash'> & SocialSignupAuthority & Readonly<{
         socialEnrollmentHash: string;
     }>, beforeCommit: () => Promise<void>): Promise<SocialAccountResult> {
+        const region=input.declaredRegion;
+        if (!isDeclaredRegion(region)) throw new TypeError('SOCIAL_REGION_INVALID');
         return this.signupTx.audited(input.source, async (c, audit) => {
             const p = { proofHash: input.proofHash, browserHash: input.browserHash, bindingHash: input.bindingHash, admittedProviders: input.admittedProviders,
-                declaredRegion: input.declaredRegion,
+                declaredRegion: region,
                 userId: input.userId, emailBlindIndex: input.emailBlindIndex.toString('hex'), emailCiphertext: input.emailCiphertext, phoneCiphertext: input.phoneCiphertext,
                 pseudonym: input.pseudonym, occurredAt: input.occurredAt, verificationTokenHash: input.verificationTokenHash, verificationTokenTtlMs: input.verificationTokenTtlMs,
                 socialEnrollmentHash: input.socialEnrollmentHash, minAgeApplied: input.ageCheck.minAgeApplied, countryCode: input.ageCheck.countryCode, ruleVersion: input.ageCheck.ruleVersion,
                 acceptances: input.acceptances?.map(r => ({ acceptance_id: r.acceptanceId, kind: r.kind, document_version: r.documentVersion, document_sha256: r.documentSha256, locale: r.locale, evidence_ciphertext: r.evidenceCiphertext.toString('base64'), key_id: r.keyId })) };
             const result = (await c.query('SELECT identity.create_social_account($1,$2) value', [p, audit])).rows[0].value;
             if (result.status === 'created' || result.status === 'enrollment') {
+                await c.query('SELECT identity.record_social_registration_region($1::uuid,$2::text,$3::text,$4::text,$5::text)',[
+                    result.userId,region.country,region.usState,input.proofHash,input.socialEnrollmentHash
+                ]);
                 await beforeCommit();
                 return { ...result, verificationExpiresAt: new Date(result.verificationExpiresAt) };
             }

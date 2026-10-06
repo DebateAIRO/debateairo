@@ -796,8 +796,8 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     return result.rows[0].internal;
   }
   async settleInternalCall(callId: string, entry: ModelSpendEntry): Promise<void> {
-    await this.pool.query("SELECT billing.settle_internal_provider_call($1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::bigint,$7::bigint,$8::bigint)",
-      [callId,entry.runId,entry.spendSource,entry.spendPhase ?? null,entry.providerRef,entry.chargeMicros,entry.inputTokens,entry.outputTokens]);
+    await this.pool.query("SELECT billing.settle_internal_provider_call($1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::bigint,$7::bigint,$8::bigint,$9::uuid)",
+      [callId,entry.runId,entry.spendSource,entry.spendPhase ?? null,entry.providerRef,entry.chargeMicros,entry.inputTokens,entry.outputTokens,entry.attemptId ?? null]);
   }
 
   async recordSpend(entry: ModelSpendEntry): Promise<void> {

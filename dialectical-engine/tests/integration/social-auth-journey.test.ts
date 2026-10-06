@@ -13,6 +13,7 @@ import { createPool, migrate, PostgresSocialIdentityRepository, PostgresConsumer
 import { Argon2WorkerPool, createEmailBlindIndex, hashPassword, hashToken, decrypt, decodeBase32, totpCodeAtStep, type AuditContextHasher } from '@debateai/crypto';
 import { AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue, CONSUMER_RECOVERY_POLICY_REGISTER_ROW, consumerRecoveryPolicyFromValue } from '@debateai/register';
 import { currentDocument } from '@debateai/legal-manifest';
+import { parseDeclaredRegion } from '@debateai/kernel';
 import { RegistrationService, InProcessAuthRateLimiter } from '../../apps/api/src/registration.js';
 import { SessionService } from '../../apps/api/src/sessions.js';
 import { SocialAuthService } from '../../apps/api/src/social-auth.js';
@@ -90,9 +91,14 @@ async function harness() {
         return social.callback('google', prepared.input, prepared.begin.flowCookie, source);
     };
     const finishFlow=async(begin:{authorization_url:string;flowCookie:string},extra:Record<string,unknown>={},metadata:Record<string,string>={})=>{const url=new URL(begin.authorization_url);assertion={...assertion,nonce:url.searchParams.get('nonce')!,...extra};return social.callback('google',{state:url.searchParams.get('state'),code:'link-code',...metadata},begin.flowCookie,source);};
-    const signup = async (email?: string) => {
-        const cb = await callback(), bound = { ...source, socialBrowserHash: socialHash('browser', cb.browserCookie), legal: { terms, privacy, locale: 'en' as const } };
-        const input = { continuation_token: cb.token, email: email ?? assertion.email, phone: '+40212345678', country:'RO', date_of_birth: '1990-01-01', terms, privacy, locale: 'en', ui_locale: 'en', time_zone: 'Europe/Bucharest', turnstile_token: 'isolated-test-proof' };
+    const signup = async (email?: string, region:{country:string;usState?:string}={country:'RO'}) => {
+        const cb = await callback();
+        const input = { continuation_token: cb.token, email: email ?? assertion.email, phone: '+40212345678', country:region.country,
+            ...(region.usState===undefined?{}:{us_state:region.usState}), date_of_birth: '1990-01-01', terms, privacy,
+            locale: 'en', ui_locale: 'en', time_zone: 'Europe/Bucharest', turnstile_token: 'isolated-test-proof' };
+        const declaredRegion=parseDeclaredRegion(input);
+        if(declaredRegion===null)throw new Error('SYNTHETIC_SOCIAL_REGION_INVALID');
+        const bound = { ...source, socialBrowserHash: socialHash('browser', cb.browserCookie), legal: { terms, privacy, locale: 'en' as const }, region:declaredRegion };
         const admission = await registration.admitSource({ route: 'social', input: { email: input.email, phone: input.phone, adultAffirmed: true }, source: bound });
         return { cb, bound, input, result: await social.completeSignup(input, bound, admission) };
     };
@@ -109,6 +115,8 @@ describe('actual signed-provider and restricted-database journeys', () => {
             const row = (await db.pool.query('SELECT * FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, signup.input.email)])).rows[0];
             expect(row.password_hash).toBeNull();
             expect(row.state).toBe('pending_mfa');
+            expect((await db.pool.query('SELECT country_code,us_state FROM identity.registration_region WHERE user_id=$1',[row.user_id])).rows)
+                .toEqual([{country_code:'RO',us_state:null}]);
             expect(h.sent).toHaveLength(0);
             const dek = await h.users.load(row.user_id);
             const phone = decrypt(dek, row.phone_ciphertext, ['identity', 'user.phone_ciphertext', row.user_id, 'run:none', row.user_id, `user-dek:${row.user_id}`, '1']);
@@ -134,6 +142,36 @@ describe('actual signed-provider and restricted-database journeys', () => {
             await h.registration.drainMailDispatches();
         }
     });
+    it('persists the complete US/TX declaration for trusted-provider signup',async()=>{
+        const h=await harness();
+        try{
+            const signup=await h.signup(undefined,{country:'US',usState:'TX'});
+            expect(signup.result).toHaveProperty('status','mfa_required');
+            const row=(await db.pool.query('SELECT user_id FROM identity."user" WHERE email_blind_index=$1',[createEmailBlindIndex(blindKey,signup.input.email)])).rows[0];
+            expect((await db.pool.query('SELECT country_code,us_state FROM identity.registration_region WHERE user_id=$1',[row.user_id])).rows)
+                .toEqual([{country_code:'US',us_state:'TX'}]);
+        }finally{await h.registration.drainMailDispatches();}
+    });
+    it('rolls back social account, provider and region rows if the API signup capability loses the region join',async()=>{
+        const h=await harness();
+        const before=(await db.pool.query(`SELECT
+            (SELECT count(*)::int FROM identity."user") users,
+            (SELECT count(*)::int FROM identity.social_identity) identities,
+            (SELECT count(*)::int FROM identity.registration_region) regions,
+            (SELECT count(*)::int FROM identity.audit_event WHERE event_type='identity.registration' AND success=true) registration_success_audit`)).rows[0];
+        await db.pool.query('REVOKE EXECUTE ON FUNCTION identity.record_social_registration_region(uuid,text,text,text,text) FROM debateai_billing_runtime');
+        try{
+            await expect(h.signup()).rejects.toThrow();
+            expect((await db.pool.query(`SELECT
+                (SELECT count(*)::int FROM identity."user") users,
+                (SELECT count(*)::int FROM identity.social_identity) identities,
+                (SELECT count(*)::int FROM identity.registration_region) regions,
+                (SELECT count(*)::int FROM identity.audit_event WHERE event_type='identity.registration' AND success=true) registration_success_audit`)).rows[0]).toEqual(before);
+        }finally{
+            await db.pool.query('GRANT EXECUTE ON FUNCTION identity.record_social_registration_region(uuid,text,text,text,text) TO debateai_billing_runtime');
+            await h.registration.drainMailDispatches();
+        }
+    });
     it('requires local mail for an edited signed address and never turns an existing-email collision into linking', async () => {
         const h = await harness();
         try {
@@ -144,6 +182,8 @@ describe('actual signed-provider and restricted-database journeys', () => {
             expect(h.sent[0]!.recipient).toBe('edited@example.test');
             const row = (await db.pool.query('SELECT user_id,state FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, 'edited@example.test')])).rows[0];
             expect(row.state).toBe('pending_verification');
+            expect((await db.pool.query('SELECT country_code,us_state FROM identity.registration_region WHERE user_id=$1',[row.user_id])).rows)
+                .toEqual([{country_code:'RO',us_state:null}]);
             const second = await harness();
             try {
                 const collision = await second.signup('edited@example.test');

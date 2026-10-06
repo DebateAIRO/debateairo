@@ -1,5 +1,5 @@
 {
-  "version": "auth-dev-20261006-v1",
+  "version": "auth-dev-20261006-v2",
   "sources": [
     {
       "name": "0000_s00.sql",
@@ -638,7 +638,7 @@
     },
     {
       "name": "0107_auth_dev_integration.sql",
-      "sha256": "96a24beb9887049767dccaac82e52269e373fe37da27632a05b2ebe40903399c",
+      "sha256": "4cc303e162c7969fe1cd02b8b7cde4623cdc3c142035f78a7f90b7289da92640",
       "provenance": "auth-dev-20261006-v1"
     }
   ],
@@ -1201,5 +1201,23 @@
     "executablePath": "compatibility/auth-dev-20261006/0093_billing_runtime_role.sql",
     "executableSha256": "253d188697be7f16054c047834819f9f15dfaddbee32556a3e2c4c10696cbe68",
     "resolutionId": "auth106-dev0093-v1"
+  },
+  "transactionBodies": [
+    {
+      "logicalName": "0025_evaluator_domain_refusal_receipts.sql",
+      "executablePath": "compatibility/auth-dev-20261006/0025_evaluator_domain_refusal_receipts.sql",
+      "executableSha256": "48361826289fa9eec6764993a4da8e775492a158d3bd017c0a9122e374044e5c",
+      "resolutionId": "auth-dev-0025-transaction-body-v1"
+    },
+    {
+      "logicalName": "0029_evaluator_dev_menu_grants.sql",
+      "executablePath": "compatibility/auth-dev-20261006/0029_evaluator_dev_menu_grants.sql",
+      "executableSha256": "d248e724838094a21f61cc62fd2e733ff7eb7473eafd2b840041d15b3201d45b",
+      "resolutionId": "auth-dev-0029-transaction-body-v1"
+    }
+  ],
+  "effectiveCapabilityVerifier": {
+    "executablePath": "lineage/verify-effective-capabilities.sql",
+    "executableSha256": "0b1b723b00c315c7610d74518713cf5ecd1b77779a23f42a916b01121a50a26c"
   }
 }

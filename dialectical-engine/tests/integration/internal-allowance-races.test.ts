@@ -14,7 +14,7 @@ beforeAll(async()=>{database=await startTestDatabase();await migrate(database.po
 afterAll(async()=>{await runtime?.end();await database?.stop();});
 async function pinned(change:Record<string,unknown>={}){const actor=await fixture.fundedActor(),command=fixture.configureCommand(actor,change);await fixture.configure(actor,command);const allowances=new PostgresInternalAllowanceRepository(runtime,{registerVersion:2}),grant=(await allowances.current(actor.ownerRef,new Date()))!;const runId=await fixture.run(actor.ownerRef),entitlements=new EntitlementRepository(runtime),tx=await runtime.connect();try{await entitlements.recordRunChargeScope(tx,{runId,ownerRef:actor.ownerRef,basis:{kind:"INTERNAL",grantId:grant.grantId,grantEventId:grant.grantEventId},admittedAt:new Date()});}finally{tx.release();}return {actor,command,runId,grant,allowances,entitlements};}
 const reserve=(call:string,run:string,amount:number)=>runtime.query("SELECT billing.reserve_internal_provider_call($1::uuid,$2::uuid,$3::bigint,'RUN','BODY') AS internal",[call,run,amount]);
-const settle=(call:string,amount:number,runId:string)=>runtime.query("SELECT billing.settle_internal_provider_call($1::uuid,$2::uuid,'RUN','BODY','fake-provider',$3::bigint,1::bigint,1::bigint)",[call,runId,amount]);
+const settle=(call:string,amount:number,runId:string,attempt:string|null=null)=>runtime.query("SELECT billing.settle_internal_provider_call($1::uuid,$2::uuid,'RUN','BODY','fake-provider',$3::bigint,1::bigint,1::bigint,$4::uuid)",[call,runId,amount,attempt]);
 describe("finite grants serialize fake provider admissions and settle admitted cost once",()=>{
  it("admits only one competing projection and rejects call replay before provider bytes",async()=>{
   const p=await pinned({amountMicros:100,dayMicros:100,weekMicros:100}),a=randomUUID(),b=randomUUID();
@@ -25,9 +25,11 @@ describe("finite grants serialize fake provider admissions and settle admitted c
   expect((await database.pool.query("SELECT count(*)::int AS n FROM billing.internal_provider_admission WHERE run_id=$1",[p.runId])).rows[0].n).toBe(1);
  });
  it("settles exactly once after revocation and keeps actual cost above projection",async()=>{
-  const p=await pinned({amountMicros:100,dayMicros:100,weekMicros:100}),call=randomUUID();await reserve(call,p.runId,60);await fixture.revoke(p.actor,p.grant.grantId);
-  await settle(call,110,p.runId);await settle(call,110,p.runId);await expect(settle(call,109,p.runId)).rejects.toThrow("INTERNAL_PROVIDER_SETTLEMENT_CONFLICT");
-  expect((await database.pool.query("SELECT charge_micros::text AS amount FROM ledger.model_spend WHERE spend_id=$1",[call])).rows).toEqual([{amount:"110"}]);
+  const p=await pinned({amountMicros:100,dayMicros:100,weekMicros:100}),call=randomUUID(),attempt=randomUUID();await reserve(call,p.runId,60);await fixture.revoke(p.actor,p.grant.grantId);
+  await settle(call,110,p.runId,attempt);await settle(call,110,p.runId,attempt);
+  await expect(settle(call,110,p.runId,randomUUID())).rejects.toThrow("INTERNAL_PROVIDER_SETTLEMENT_CONFLICT");
+  await expect(settle(call,109,p.runId,attempt)).rejects.toThrow("INTERNAL_PROVIDER_SETTLEMENT_CONFLICT");
+  expect((await database.pool.query("SELECT charge_micros::text AS amount,attempt_id FROM ledger.model_spend WHERE spend_id=$1",[call])).rows).toEqual([{amount:"110",attempt_id:attempt}]);
   await expect(reserve(randomUUID(),p.runId,1)).rejects.toThrow();
  });
  it("counts late settlements beyond grant expiry in the grant total",async()=>{
@@ -82,13 +84,17 @@ describe("finite grants serialize fake provider admissions and settle admitted c
  it("associates overlapping delayed fake gateway responses with each immutable admission frame",async()=>{
   const p=await pinned(),store=new PostgresModelSpendStore(runtime),guard=new CostEnvelopeGuard({store,policy:{perRunCeilingMicros:250000,dailyCeilingMicros:10000000}}),seam=guard.providerSeam({runId:p.runId,price:{inputMicrosPerMillionTokens:1000000,outputMicrosPerMillionTokens:1000000},phase:"BODY",requireReportedUsage:true});
   const pending:Array<{bytes:number;finish:(r:Response)=>void;completion:number}>=[];let entered!:()=>void;const bothEntered=new Promise<void>(resolve=>{entered=resolve;});
-  const gateway=new OpenAICompatibleProviderGateway({endpoint:"https://fake-provider.test/v1",model:"configured/model",maker:"fixture",persistRawArtifact:async a=>a.artifactId,appendLedgerEntry:async()=>"fixture-ledger",assertNoOpenWriteTransaction:()=>{},sleepImplementation:async()=>{},fetchImplementation:(async(_input,init)=>new Promise<Response>(resolve=>{const body=String(init?.body),completion=body.includes("BBBBBBBBBB")?19:1;pending.push({bytes:Buffer.byteLength(body),finish:resolve,completion});if(pending.length===2)entered();})) as typeof fetch});
+  const attemptIds=new Set<string>();
+  const gateway=new OpenAICompatibleProviderGateway({endpoint:"https://fake-provider.test/v1",model:"configured/model",maker:"fixture",persistRawArtifact:async a=>a.artifactId,appendLedgerEntry:async entry=>{attemptIds.add(entry.attemptId);return "fixture-ledger";},assertNoOpenWriteTransaction:()=>{},sleepImplementation:async()=>{},fetchImplementation:(async(_input,init)=>new Promise<Response>(resolve=>{const body=String(init?.body),completion=body.includes("BBBBBBBBBB")?19:1;pending.push({bytes:Buffer.byteLength(body),finish:resolve,completion});if(pending.length===2)entered();})) as typeof fetch});
   const request=(packet:string)=>({runId:p.runId,subjectItemId:"node:test",callSiteKey:"fixture:judge",role:"JUDGE" as const,lane:"served" as const,bound:{maxAttempts:1,tokenCeiling:64,deadlineMs:5000},contractHash:"contract:test",providerRef:"fake-provider",packet:framedFixturePacket(packet),costEnvelope:seam});
   const a=gateway.call(request("A")),b=gateway.call(request("B".repeat(100)));await bothEntered;
   const reply=(completion:number)=>Response.json({id:"fixture",model:"configured/model",usage:{prompt_tokens:1,completion_tokens:completion,total_tokens:completion+1},choices:[{message:{content:'{"ok":true}'},finish_reason:"stop"}]});
   pending[1]!.finish(reply(pending[1]!.completion));await b;pending[0]!.finish(reply(pending[0]!.completion));await a;
   const rows=(await database.pool.query("SELECT a.projected_micros::text AS projected,s.charge_micros::text AS charged FROM billing.internal_provider_admission a LEFT JOIN ledger.model_spend s ON s.spend_id=a.call_id WHERE a.run_id=$1 ORDER BY projected_micros",[p.runId])).rows;
   expect(rows).toEqual(pending.map(call=>({projected:String(Math.ceil(call.bytes/2)+64),charged:String(call.completion+1)})).sort((x,y)=>Number(x.projected)-Number(y.projected)));
+  const chargedAttempts=(await database.pool.query('SELECT s.attempt_id FROM ledger.model_spend s JOIN billing.internal_provider_admission a ON a.call_id=s.spend_id WHERE a.run_id=$1',[p.runId])).rows.map(row=>row.attempt_id as string|null);
+  expect(attemptIds.size).toBe(2);
+  expect(new Set(chargedAttempts)).toEqual(attemptIds);
  });
  it("does not retry paid bytes when INTERNAL settlement has an unknown committed outcome",async()=>{
   const p=await pinned(),actual=new PostgresModelSpendStore(runtime);let captured:{id:string;entry:any}|undefined,bytes=0;
@@ -107,7 +113,7 @@ describe("finite grants serialize fake provider admissions and settle admitted c
   await expect(second.recordCall({...observed,admission:admission as never})).rejects.toMatchObject({code:"INTERNAL_PROVIDER_FRAME_INVALID"});
   const call=(admission as {callId:string}).callId;
   for(const [runId,source,phase] of [[randomUUID(),"RUN","BODY"],[p.runId,"STORY",null],[p.runId,"RUN","SERVE"]])
-   await expect(runtime.query("SELECT billing.settle_internal_provider_call($1::uuid,$2::uuid,$3::text,$4::text,'fake-provider',2::bigint,1::bigint,1::bigint)",[call,runId,source,phase])).rejects.toThrow("INTERNAL_PROVIDER_FRAME_INVALID");
+   await expect(runtime.query("SELECT billing.settle_internal_provider_call($1::uuid,$2::uuid,$3::text,$4::text,'fake-provider',2::bigint,1::bigint,1::bigint,NULL::uuid)",[call,runId,source,phase])).rejects.toThrow("INTERNAL_PROVIDER_FRAME_INVALID");
   await first.recordCall({...observed,admission:admission as never});expect((await database.pool.query("SELECT count(*)::int AS n FROM ledger.model_spend WHERE run_id=$1",[p.runId])).rows[0].n).toBe(1);
  });
 
@@ -127,14 +133,19 @@ describe("finite grants serialize fake provider admissions and settle admitted c
   expect(await store.readOwnerCountedHoldsMicros(p.actor.ownerRef,basis)).toBe(800);await reserve(randomUUID(),p.runId,200);expect(await store.readOwnerCountedHoldsMicros(p.actor.ownerRef,basis)).toBe(1000);
   await expect(reserve(randomUUID(),p.runId,1)).rejects.toThrow("INTERNAL_ALLOWANCE_REACHED");
  });
- it("keeps the new admission table private, immutable and recovery-closed with exactly five scoped definers",async()=>{
+ it("keeps the admission table private with five runtime definers and one retired owner-only overload",async()=>{
   for(const sql of ["SELECT * FROM billing.internal_provider_admission","INSERT INTO billing.internal_provider_admission(call_id) VALUES(gen_random_uuid())","DELETE FROM billing.internal_provider_admission","TRUNCATE billing.internal_provider_admission"])
    await expect(runtime.query(sql)).rejects.toMatchObject({code:"42501"});
   const functions=(await database.pool.query(`SELECT p.oid::regprocedure::text AS signature,p.proname,pg_get_userbyid(p.proowner) AS owner,p.prosecdef AS definer,p.proconfig AS settings,
    EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner)))a WHERE a.grantee=0 AND a.privilege_type='EXECUTE') AS public,
    has_function_privilege('debateai_runtime',p.oid,'EXECUTE') AS runtime,has_function_privilege('debateai_staff_recovery',p.oid,'EXECUTE') AS recovery
    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='billing' AND p.proname=ANY($1::text[]) ORDER BY p.proname`,[['reserve_internal_provider_call','settle_internal_provider_call','read_internal_grant_spent','read_internal_grant_commitments','read_internal_run_state']])).rows;
-  expect(functions).toHaveLength(5);for(const f of functions)expect(f).toMatchObject({owner:"debateai_staff_security_owner",definer:true,settings:["search_path=pg_catalog"],public:false,runtime:true,recovery:false});
+  expect(functions).toHaveLength(6);
+  const retired='billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint)';
+  const current='billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)';
+  expect(functions.map(f=>f.signature)).toContain(retired);
+  expect(functions.map(f=>f.signature)).toContain(current);
+  for(const f of functions)expect(f).toMatchObject({owner:"debateai_staff_security_owner",definer:true,settings:["search_path=pg_catalog"],public:false,runtime:f.signature!==retired,recovery:false});
   await expect(database.pool.query("UPDATE billing.internal_provider_admission SET projected_micros=1")).rejects.toThrow();await expect(database.pool.query("TRUNCATE billing.internal_provider_admission")).rejects.toThrow();
   console.info("[TASK11_SQL_CAPABILITIES]",JSON.stringify(functions));
  });

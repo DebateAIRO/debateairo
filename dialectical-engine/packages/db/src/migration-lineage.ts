@@ -9,12 +9,16 @@ type Manifest = Readonly<{
   order: readonly string[];
   cohorts: Readonly<Record<string, readonly string[]>>;
   compatibility: Readonly<{ logicalName: string; executablePath: string; executableSha256: string; resolutionId: string }>;
+  transactionBodies: ReadonlyArray<Readonly<{ logicalName: string; executablePath: string; executableSha256: string; resolutionId: string }>>;
+  effectiveCapabilityVerifier: Readonly<{ executablePath: string; executableSha256: string }>;
 }>;
 export type MigrationPlan = Readonly<{
   manifest: Manifest;
   recipeSha256: string;
   sources: ReadonlyMap<string, MigrationSource>;
   compatibilitySql: string;
+  transactionBodySql: ReadonlyMap<string, string>;
+  effectiveCapabilityVerifierSql: string;
 }>;
 
 const migrationsDirectory = new URL("../../../migrations/", import.meta.url);
@@ -27,7 +31,7 @@ const sameSet = (a: readonly string[], b: readonly string[]): boolean =>
 export async function loadMigrationPlan(): Promise<MigrationPlan> {
   const recipeBytes = await readFile(manifestUrl);
   const manifest = JSON.parse(recipeBytes.toString("utf8")) as Manifest;
-  if (manifest.version !== "auth-dev-20261006-v1") fail("RECIPE_VERSION");
+  if (manifest.version !== "auth-dev-20261006-v2") fail("RECIPE_VERSION");
   const discovered = (await readdir(migrationsDirectory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
   const declared = manifest.sources.map(({ name }) => name);
   if (!sameSet(discovered, declared) || new Set(declared).size !== declared.length
@@ -46,13 +50,46 @@ export async function loadMigrationPlan(): Promise<MigrationPlan> {
     || !/^compatibility\/auth-dev-20261006\/[\w.-]+\.sql$/.test(compat.executablePath)) fail("COMPATIBILITY_DECLARATION");
   const compatibilityBytes = await readFile(new URL(compat.executablePath, migrationsDirectory));
   if (sha256(compatibilityBytes) !== compat.executableSha256) fail("COMPATIBILITY_DIGEST");
+  const wrapperNames = ["0025_evaluator_domain_refusal_receipts.sql", "0029_evaluator_dev_menu_grants.sql"];
+  if (!sameSet(manifest.transactionBodies.map(({ logicalName }) => logicalName), wrapperNames)
+    || manifest.transactionBodies.length !== 2) fail("TRANSACTION_BODY_DECLARATION");
+  const transactionBodySql = new Map<string, string>();
+  for (const body of manifest.transactionBodies) {
+    const expectedPath = `compatibility/auth-dev-20261006/${body.logicalName}`;
+    if (body.executablePath !== expectedPath
+      || body.resolutionId !== `auth-dev-${body.logicalName.slice(0,4)}-transaction-body-v1`) fail("TRANSACTION_BODY_DECLARATION");
+    const bytes = await readFile(new URL(body.executablePath, migrationsDirectory));
+    if (sha256(bytes) !== body.executableSha256
+      || sources.get(body.logicalName)?.sql !== `BEGIN;\n\n${bytes.toString("utf8")}\nCOMMIT;\n`) {
+      fail(`TRANSACTION_BODY_DIGEST ${body.logicalName}`);
+    }
+    transactionBodySql.set(body.logicalName, bytes.toString("utf8"));
+  }
+  const compatibilityFiles = (await readdir(new URL("compatibility/auth-dev-20261006/", migrationsDirectory)))
+    .filter((name) => name.endsWith(".sql"));
+  if (!sameSet(compatibilityFiles, [compat.executablePath.split("/").at(-1)!, ...wrapperNames])) {
+    fail("COMPATIBILITY_INVENTORY");
+  }
+  const verifier = manifest.effectiveCapabilityVerifier;
+  if (verifier.executablePath !== "lineage/verify-effective-capabilities.sql") fail("EFFECTIVE_VERIFIER_DECLARATION");
+  const verifierBytes = await readFile(new URL(verifier.executablePath, migrationsDirectory));
+  if (sha256(verifierBytes) !== verifier.executableSha256) fail("EFFECTIVE_VERIFIER_DIGEST");
   for (const [name, cohort] of Object.entries(manifest.cohorts)) {
     if (new Set(cohort).size !== cohort.length || cohort.some((entry) => !sources.has(entry))) fail(`COHORT ${name}`);
   }
-  return { manifest, recipeSha256: sha256(recipeBytes), sources, compatibilitySql: compatibilityBytes.toString("utf8") };
+  return { manifest, recipeSha256: sha256(recipeBytes), sources,
+    compatibilitySql: compatibilityBytes.toString("utf8"), transactionBodySql,
+    effectiveCapabilityVerifierSql: verifierBytes.toString("utf8") };
 }
 
-export type Lineage = "fresh" | "auth94" | "auth103" | "auth106" | "dev95" | "integrated-original" | "integrated-compatibility";
+export type Lineage = "fresh" | "auth94" | "auth103" | "auth106" | "dev95" | "integrated-original" | "integrated-compatibility" | "integrated-fresh-resolutions";
+export function transactionBodyPreconditionDigest(plan: MigrationPlan, name: string): string {
+  const body = plan.manifest.transactionBodies.find(({ logicalName }) => logicalName === name);
+  if (body === undefined) return fail("TRANSACTION_BODY_DECLARATION");
+  const preceding = plan.manifest.order.slice(0, plan.manifest.order.indexOf(name)).sort();
+  return sha256(JSON.stringify({ lineage: "fresh", terminal: preceding,
+    source: plan.sources.get(name)!.sha256, executable: body.executableSha256, recipe: plan.recipeSha256 }));
+}
 export function compatibilityPreconditionDigest(plan: MigrationPlan, cohort: "auth94" | "auth103" | "auth106"): string {
   const name = plan.manifest.compatibility.logicalName;
   const preceding = plan.manifest.order.slice(0, plan.manifest.order.indexOf(name));
@@ -70,7 +107,40 @@ export function identifyLineage(plan: MigrationPlan, applied: readonly string[],
   const logicalName = plan.manifest.compatibility.logicalName;
   if (resolutionNames.length === 1 && resolutionNames[0] === logicalName
     && sameSet(applied, all.filter((name) => name !== logicalName))) return "integrated-compatibility";
+  const wrappers = plan.manifest.transactionBodies.map(({ logicalName }) => logicalName);
+  if (sameSet(resolutionNames, wrappers)
+    && sameSet(applied, all.filter((name) => !wrappers.includes(name)))) return "integrated-fresh-resolutions";
   return fail("UNKNOWN_MIXED_LINEAGE");
+}
+
+export async function transactionBodyPostconditionEvidence(client: PoolClient, name: string): Promise<string> {
+  if (name === "0025_evaluator_domain_refusal_receipts.sql") {
+    const result = await client.query<{ name: string; definition: string }>(`
+      SELECT conname AS name, pg_get_constraintdef(oid) AS definition FROM pg_constraint
+      WHERE conrelid='evaluator.domain_admission'::regclass
+        AND conname IN ('domain_admission_proposed_name_check','domain_admission_normalized_name_check')
+      ORDER BY conname
+    `);
+    if (result.rows.length !== 2 || result.rows.some(({ definition }) => !definition.includes("decision") || !definition.includes("REFUSED"))) {
+      fail("TRANSACTION_BODY_POSTCONDITION 0025");
+    }
+    return sha256(JSON.stringify(result.rows));
+  }
+  if (name === "0029_evaluator_dev_menu_grants.sql") {
+    const result = await client.query<{ relation: string; allowed: boolean }>(`
+      SELECT relation, CASE WHEN relation='register' THEN has_schema_privilege('debateai_evaluator_api','register','USAGE')
+        ELSE has_table_privilege('debateai_evaluator_api',relation,'SELECT') END AS allowed
+      FROM unnest(ARRAY['register','register.register_row','register.register_version',
+        'evaluator.domain','evaluator.pipeline_event','evaluator.observation','evaluator.profile_cell',
+        'evaluator.rank_snapshot','evaluator.vllm_probe','evaluator.vllm_catalog_model',
+        'evaluator.consumer_selection']) relation ORDER BY relation
+    `);
+    if (result.rows.length !== 11 || result.rows.some(({ allowed }) => allowed !== true)) {
+      fail("TRANSACTION_BODY_POSTCONDITION 0029");
+    }
+    return sha256(JSON.stringify(result.rows));
+  }
+  return fail("TRANSACTION_BODY_DECLARATION");
 }
 
 export async function lineageEvidence(client: PoolClient): Promise<string> {
@@ -110,21 +180,4 @@ export async function assertAuth106Catalog(client: PoolClient): Promise<void> {
       AND encode(sha256(convert_to(pg_get_functiondef('identity.password_recovery_rules(bigint)'::regprocedure),'UTF8')),'hex')='cf20a27feb71512c4c786161c415b0ac537f5c029e52341c993197e1c0540334' AS ok
   `);
   if (result.rows[0]?.ok !== true) fail("AUTH106_CATALOG_DRIFT");
-}
-
-export async function assertIntegratedCatalog(client: PoolClient): Promise<void> {
-  const result = await client.query<{ ok: boolean }>(`
-    SELECT pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid=to_regclass('identity.mfa_recovery_legacy_cohort')))='debateai_mfa_recovery_owner'
-      AND (SELECT NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls FROM pg_roles WHERE rolname='debateai_mfa_recovery_owner')
-      AND NOT EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid=to_regrole('debateai_mfa_recovery_owner'))
-      AND NOT coalesce(has_table_privilege('debateai_runtime',to_regclass('identity.mfa_recovery_legacy_cohort'),'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'),true)
-      AND NOT coalesce(has_table_privilege('debateai_billing_runtime',to_regclass('identity.mfa_recovery_legacy_cohort'),'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'),true)
-      AND NOT coalesce(has_table_privilege('debateai_authorization_runtime',to_regclass('identity.mfa_recovery_legacy_cohort'),'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'),true)
-      AND (SELECT pg_get_userbyid(proowner)='debateai_mfa_recovery_owner' AND prosecdef AND proconfig=ARRAY['search_path=pg_catalog']
-        FROM pg_proc WHERE oid=to_regprocedure('identity.mfa_recovery_eligible(uuid)'))
-      AND has_function_privilege('debateai_mfa_recovery_owner','identity.password_recovery_rules(bigint)','EXECUTE')
-      AND NOT has_function_privilege('debateai_password_recovery_runtime','identity.password_recovery_rules(bigint)','EXECUTE')
-      AS ok
-  `);
-  if (result.rows[0]?.ok !== true) fail("INTEGRATED_CATALOG_DRIFT");
 }

@@ -212,118 +212,78 @@ LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  OR (a->>'action' IN ('LINK_PROVIDER','UNLINK_PROVIDER') AND core.jsonb_has_exact_keys(a,ARRAY['action','target_provider']) AND a->>'target_provider' IN ('google','apple','facebook','x')),false)
 $$;
 
-DO $auth_dev_107_contract$
-DECLARE
-  v_retail text[] := ARRAY[
-    'cancel_token','cancel_token_use','charge','charge_event','customer','customer_profile_event',
-    'customer_xmoney','entitlement_event','invoice','invoice_intent','invoice_status_event',
-    'location_evidence','outbox','person_windows_v','quote','quote_use','run_charge_scope',
-    'subscription_event','subscription_latest_v','withdrawal_owner_settlement',
-    'xmoney_notice','xmoney_notice_outcome'
-  ];
-  v_internal text[] := ARRAY['internal_grant','internal_grant_event','internal_provider_admission'];
-  v_internal_functions text[] := ARRAY[
-    'billing.read_internal_allowance(uuid,timestamptz)',
-    'billing.read_internal_allowance_for_run(uuid,timestamptz)',
-    'billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)',
-    'billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)',
-    'billing.read_internal_run_state(uuid)',
-    'billing.read_run_funding_basis(uuid)',
-    'billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)',
-    'billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint)'
-  ];
-  v_name text;
-  v_callable oid[];
-  v_actual text[];
-  v_runtime_reads text;
-  v_runtime_writes text;
-  v_api_missing text;
+-- The immutable101 social constructor can move a trusted provider account to
+-- pending_mfa before returning. This exact follow-up runs in the same API
+-- signup transaction, before DEK publication/commit, and binds the new row to
+-- that consumed provider proof. It does not relax the ordinary pending-only
+-- record_registration_region helper or grant raw table writes to the API.
+CREATE OR REPLACE FUNCTION identity.record_social_registration_region(
+ p_user uuid,p_country text,p_us_state text,p_proof text,p_enrollment text
+) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_state text;
 BEGIN
-  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='debateai_billing_runtime'
-    AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreaterole AND NOT rolcreatedb)
-    OR EXISTS(SELECT 1 FROM pg_auth_members WHERE roleid IN
-      ('debateai_staff_security_owner'::regrole,'debateai_password_recovery_owner'::regrole)
-      AND member IN ('debateai_runtime'::regrole,'debateai_billing_runtime'::regrole,'debateai_authorization_runtime'::regrole)) THEN
-    RAISE EXCEPTION 'AUTH_DEV_107_ROLE_DRIFT';
-  END IF;
-  IF pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid='identity.mfa_recovery_legacy_cohort'::regclass))<>'debateai_mfa_recovery_owner'
-    OR has_table_privilege('debateai_runtime','identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-    OR has_table_privilege('debateai_billing_runtime','identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-    OR has_table_privilege('debateai_authorization_runtime','identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-    OR has_table_privilege('debateai_mfa_recovery_runtime','identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-    OR NOT EXISTS(SELECT 1 FROM pg_trigger WHERE tgrelid='identity.mfa_recovery_legacy_cohort'::regclass
-      AND tgname='mfa_recovery_legacy_cohort_immutable' AND tgenabled IN('O','A'))
-    OR (SELECT pg_get_userbyid(proowner)='debateai_mfa_recovery_owner' AND prosecdef
-       AND proconfig=ARRAY['search_path=pg_catalog'] FROM pg_proc
-       WHERE oid='identity.mfa_recovery_eligible(uuid)'::regprocedure) IS DISTINCT FROM true THEN
-    RAISE EXCEPTION 'AUTH_DEV_107_RECOVERY_COHORT_DRIFT';
-  END IF;
-  SELECT array_agg(c.relname::text ORDER BY c.relname) INTO v_actual
-    FROM pg_class c WHERE c.relnamespace='billing'::regnamespace AND c.relkind IN ('r','p','v','m','f');
-  IF v_actual IS DISTINCT FROM ARRAY(SELECT x FROM unnest(v_retail || v_internal) x ORDER BY x)
-    OR (SELECT array_agg(c.relname::text ORDER BY c.relname) FROM pg_class c
-        WHERE c.relnamespace='billing'::regnamespace AND c.relkind='S')
-       IS DISTINCT FROM ARRAY['charge_event_seq_seq','customer_profile_event_seq_seq','subscription_event_seq_seq'] THEN
-    RAISE EXCEPTION 'AUTH_DEV_107_RELATION_INVENTORY';
-  END IF;
-  SELECT string_agg(c.relname,',' ORDER BY c.relname) INTO v_runtime_writes
-    FROM pg_class c WHERE c.relnamespace='billing'::regnamespace
-      AND ((c.relkind IN ('r','p','v','m','f') AND (
-        has_table_privilege('debateai_runtime',c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER,REFERENCES')
-        OR has_any_column_privilege('debateai_runtime',c.oid,'INSERT,UPDATE,REFERENCES')))
-        OR (CASE WHEN c.relkind='S' THEN has_sequence_privilege('debateai_runtime',c.oid,'USAGE,UPDATE') ELSE false END));
-  SELECT string_agg(c.relname,',' ORDER BY c.relname) INTO v_runtime_reads
-    FROM pg_class c WHERE c.relnamespace='billing'::regnamespace AND c.relkind IN ('r','p','v','m','f')
-      AND has_any_column_privilege('debateai_runtime',c.oid,'SELECT');
-  IF v_runtime_writes IS NOT NULL OR v_runtime_reads IS DISTINCT FROM 'entitlement_event,person_windows_v,run_charge_scope' THEN
-    RAISE EXCEPTION 'AUTH_DEV_107_RETAIL_RUNTIME_PRIVILEGE';
-  END IF;
-  SELECT string_agg(c.relname,',' ORDER BY c.relname) INTO v_api_missing
-    FROM pg_class c WHERE c.relnamespace='billing'::regnamespace AND c.relname=ANY(v_retail)
-      AND ((c.relkind IN ('r','p') AND (NOT has_table_privilege('debateai_billing_runtime',c.oid,'SELECT')
-        OR NOT has_table_privilege('debateai_billing_runtime',c.oid,'INSERT')))
-      OR (c.relkind='v' AND NOT has_table_privilege('debateai_billing_runtime',c.oid,'SELECT')));
-  IF v_api_missing IS NOT NULL
-    OR NOT has_column_privilege('debateai_billing_runtime','billing.outbox','done_at','UPDATE')
-    OR has_column_privilege('debateai_billing_runtime','billing.outbox','payload','UPDATE')
-    OR EXISTS(SELECT 1 FROM pg_class c WHERE c.relnamespace='billing'::regnamespace
-      AND CASE WHEN c.relkind='S' THEN has_sequence_privilege('debateai_runtime',c.oid,'USAGE,UPDATE') ELSE false END) THEN
-    RAISE EXCEPTION 'AUTH_DEV_107_RETAIL_API_PRIVILEGE';
-  END IF;
-  FOREACH v_name IN ARRAY v_internal LOOP
-    IF pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid=('billing.'||v_name)::regclass))<>'debateai_staff_security_owner'
-      OR has_table_privilege('debateai_runtime',('billing.'||v_name)::regclass,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-      OR has_table_privilege('debateai_billing_runtime',('billing.'||v_name)::regclass,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
-      RAISE EXCEPTION 'AUTH_DEV_107_INTERNAL_RAW_PRIVILEGE';
-    END IF;
-  END LOOP;
-  FOREACH v_name IN ARRAY v_internal_functions LOOP
-    IF NOT has_function_privilege('debateai_runtime',v_name::regprocedure,'EXECUTE')
-      OR pg_get_userbyid((SELECT proowner FROM pg_proc WHERE oid=v_name::regprocedure))<>'debateai_staff_security_owner'
-      OR NOT (SELECT prosecdef FROM pg_proc WHERE oid=v_name::regprocedure)
-      OR (SELECT proconfig FROM pg_proc WHERE oid=v_name::regprocedure) IS DISTINCT FROM ARRAY['search_path=pg_catalog'] THEN
-      RAISE EXCEPTION 'AUTH_DEV_107_INTERNAL_FUNCTION';
-    END IF;
-  END LOOP;
-  SELECT array_agg(p.oid ORDER BY p.oid) INTO v_callable
-  FROM pg_proc p WHERE p.pronamespace='billing'::regnamespace
-    AND has_function_privilege('debateai_runtime',p.oid,'EXECUTE');
-  IF v_callable IS DISTINCT FROM ARRAY(SELECT x::regprocedure::oid FROM unnest(v_internal_functions || ARRAY['billing.entitlement_at(uuid,timestamptz)']) x ORDER BY x::regprocedure::oid) THEN
-    RAISE EXCEPTION 'AUTH_DEV_107_RUNTIME_FUNCTION_INVENTORY';
-  END IF;
-  IF has_schema_privilege('debateai_runtime','billing','CREATE')
-    OR has_schema_privilege('debateai_billing_runtime','billing','CREATE')
-    OR has_function_privilege('debateai_runtime','billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)','EXECUTE')
-    OR NOT has_function_privilege('debateai_billing_runtime','billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)','EXECUTE')
-    OR NOT has_column_privilege('debateai_staff_security_owner','ledger.model_spend','attempt_id','SELECT')
-    OR has_function_privilege('debateai_runtime','identity.create_social_account(jsonb,jsonb)','EXECUTE')
-    OR has_function_privilege('debateai_authorization_runtime','identity.create_social_account(jsonb,jsonb)','EXECUTE')
-    OR NOT has_function_privilege('debateai_billing_runtime','identity.create_social_account(jsonb,jsonb)','EXECUTE')
-    OR NOT has_function_privilege('debateai_billing_runtime','identity.record_registration_region(uuid,text,text)','EXECUTE')
-    OR has_function_privilege('debateai_runtime','identity.record_registration_region(uuid,text,text)','EXECUTE')
-    OR has_function_privilege('debateai_password_recovery_runtime','identity.password_recovery_rules(bigint)','EXECUTE')
-    OR NOT has_function_privilege('debateai_mfa_recovery_owner','identity.password_recovery_rules(bigint)','EXECUTE') THEN
-    RAISE EXCEPTION 'AUTH_DEV_107_CAPABILITY_DRIFT';
-  END IF;
-END
-$auth_dev_107_contract$;
+ IF p_user IS NULL OR p_country IS NULL OR p_country !~ '^[A-Z]{2}$'
+  OR (p_country='US' AND p_us_state IS NULL) OR (p_country<>'US' AND p_us_state IS NOT NULL)
+  OR p_proof IS NULL OR p_proof !~ '^sha256:[0-9a-f]{64}$'
+  OR p_enrollment IS NULL OR p_enrollment !~ '^sha256:[0-9a-f]{64}$' THEN
+  RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='SOCIAL_REGION_INVALID';
+ END IF;
+ PERFORM identity.lock_security_subjects(ARRAY[p_user]);
+ SELECT state INTO v_state FROM identity."user" WHERE user_id=p_user FOR UPDATE;
+ IF v_state NOT IN ('pending_verification','pending_mfa') OR v_state IS NULL
+  OR EXISTS(SELECT 1 FROM identity.registration_region WHERE user_id=p_user)
+  OR NOT EXISTS(
+   SELECT 1 FROM identity.social_flow f JOIN identity.social_identity s
+    ON s.provider=f.provider AND s.issuer=f.issuer AND s.app_scope=f.app_scope AND s.subject=f.subject
+   WHERE f.proof_hash=p_proof AND f.purpose='LOGIN' AND f.consumed_at IS NOT NULL
+     AND s.user_id=p_user AND s.revoked_at IS NULL)
+  OR (v_state='pending_mfa' AND NOT EXISTS(
+   SELECT 1 FROM identity.social_enrollment e WHERE e.token_hash=p_enrollment
+     AND e.user_id=p_user AND e.consumed_at IS NULL)) THEN
+  RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='SOCIAL_REGION_INVALID';
+ END IF;
+ INSERT INTO identity.registration_region(user_id,country_code,us_state)
+ VALUES(p_user,p_country,p_us_state);
+END $$;
+REVOKE ALL ON FUNCTION identity.record_social_registration_region(uuid,text,text,text,text)
+ FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,debateai_erasure_runtime;
+GRANT EXECUTE ON FUNCTION identity.record_social_registration_region(uuid,text,text,text,text)
+ TO debateai_billing_runtime;
+
+-- Dev0090 added the gateway attempt UUID. The immutable Auth0093 settlement
+-- accepted eight arguments and could not persist that field. This forward
+-- overload preserves its admitted-call, charge and replay rules while binding
+-- a ninth, nullable attempt identity exactly on first insert and every replay.
+GRANT INSERT(attempt_id) ON ledger.model_spend TO debateai_staff_security_owner;
+CREATE OR REPLACE FUNCTION billing.settle_internal_provider_call(
+ p_call uuid,p_run uuid,p_source text,p_phase text,p_provider text,
+ p_charge bigint,p_input bigint,p_output bigint,p_attempt uuid
+) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_call billing.internal_provider_admission%ROWTYPE;v_spend ledger.model_spend%ROWTYPE;
+BEGIN
+ IF p_provider IS NULL OR btrim(p_provider)='' OR p_charge IS NULL OR p_charge<0 OR p_charge>9007199254740991
+  OR p_input IS NULL OR p_input<0 OR p_input>9007199254740991 OR p_output IS NULL OR p_output<0 OR p_output>9007199254740991 THEN
+  RAISE EXCEPTION 'INTERNAL_PROVIDER_SETTLEMENT_INVALID';END IF;
+ SELECT * INTO v_call FROM billing.internal_provider_admission WHERE call_id=p_call;
+ IF NOT FOUND THEN RAISE EXCEPTION 'INTERNAL_PROVIDER_ADMISSION_REQUIRED';END IF;
+ IF v_call.run_id IS DISTINCT FROM p_run OR v_call.spend_source IS DISTINCT FROM p_source OR v_call.spend_phase IS DISTINCT FROM p_phase THEN RAISE EXCEPTION 'INTERNAL_PROVIDER_FRAME_INVALID';END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('funding:provider:'||v_call.grant_id::text,0));
+ SELECT * INTO v_spend FROM ledger.model_spend WHERE spend_id=p_call;
+ IF FOUND THEN
+  IF v_spend.run_id IS DISTINCT FROM v_call.run_id OR v_spend.spend_source IS DISTINCT FROM v_call.spend_source
+   OR v_spend.spend_phase IS DISTINCT FROM v_call.spend_phase OR v_spend.provider_ref IS DISTINCT FROM p_provider
+   OR v_spend.charge_micros IS DISTINCT FROM p_charge OR v_spend.input_tokens IS DISTINCT FROM p_input
+   OR v_spend.output_tokens IS DISTINCT FROM p_output OR v_spend.attempt_id IS DISTINCT FROM p_attempt THEN
+   RAISE EXCEPTION 'INTERNAL_PROVIDER_SETTLEMENT_CONFLICT';END IF;
+  RETURN;
+ END IF;
+ INSERT INTO ledger.model_spend(spend_id,run_id,spend_source,spend_phase,provider_ref,charged_on,charge_micros,input_tokens,output_tokens,attempt_id)
+  VALUES(p_call,v_call.run_id,v_call.spend_source,v_call.spend_phase,p_provider,(clock_timestamp() AT TIME ZONE 'UTC')::date,p_charge,p_input,p_output,p_attempt);
+END $$;
+ALTER FUNCTION billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint)
+ FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_staff_recovery;
+REVOKE ALL ON FUNCTION billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)
+ FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)
+ TO debateai_runtime;
