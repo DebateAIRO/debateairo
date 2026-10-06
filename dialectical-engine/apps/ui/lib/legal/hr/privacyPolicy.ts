@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Sustav za rasprave potiče pitanja o politici, vjeri, zdravlju, seksualnosti i uvjerenjima. To su posebne kategorije podataka prema članku 9. GDPR-a i mogu se pojaviti u vašim pitanjima neovisno o tome namjeravamo li ih prikupljati." },
-      { kind: "p", text: "O vama. Prije svoje prve rasprave na zasebnom zaslonu dajete izričitu privolu za našu obradu osjetljivih informacija koje odlučite uključiti u vlastita pitanja radi vođenja vaših rasprava. Bilježimo verziju teksta na koji ste pristali, vaš jezik i vrijeme. Bez te privole ne možete započeti raspravu. Možete je povući u bilo kojem trenutku zatvaranjem računa. Takve informacije možete i izostaviti ili izbrisati raspravu koja ih sadržava. Ono što objavite o sebi podaci su koje ste odlučili učiniti javnima." },
+      { kind: "p", text: "O vama. Prije svoje prve rasprave na zasebnom zaslonu dajete izričitu privolu za našu obradu osjetljivih informacija koje odlučite uključiti u vlastita pitanja radi vođenja vaših rasprava. Bilježimo verziju teksta na koji ste pristali, vaš jezik i vrijeme. Bez te privole ne možete započeti raspravu. Možete je povući u bilo kojem trenutku pisanjem na privacy@dezbatere.ro. Takve informacije možete i izostaviti ili izbrisati raspravu koja ih sadržava. Ono što objavite o sebi podaci su koje ste odlučili učiniti javnima." },
       { kind: "p", text: "O drugim osobama. Nijedan pravni uvjet ne dopušta nam obradu osjetljivih podataka o trećoj osobi koju imenujete u pitanju, a takav uvjet nema ni jedan od naših pružatelja usluga umjetne inteligencije. Zato je to zabranjeno Uvjetima, zato svodimo na najmanju mjeru ono što šaljemo i zato takav sadržaj brzo uklanjamo na zahtjev — odjeljak 11." },
       { kind: "p", text: "Zdravstvene informacije. Neke države podatke povezane sa zdravljem, uključujući zaključke, uređuju posebnim zakonima. Ako živite u [the State of Washington], primjenjuje se zasebna [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Ograničenje (Art. 18) — Zatražite da prestanemo obrađivati određene podatke dok se ne riješi spor o njima",
         "Prigovor (Art. 21) — Uložite prigovor na obradu koja se temelji na legitimnim interesima — sigurnosnu i revizijsku obradu iz odjeljka 4 — i prestat ćemo osim ako možemo dokazati uvjerljive razloge. Uložite prigovor na marketing u bilo kojem trenutku i prestat ćemo",
         "Prenosivost (Art. 20) — Vaše rasprave i podaci o računu u uobičajenom, strojno čitljivom formatu. [Pending: same export as Access.] Neosobni sadržaj koji ste stvorili, kao što su vaša pitanja, vraća vam se na zahtjev nakon prestanka ugovora",
-        "Povlačenje privole (Art. 7(3)) — Povucite privolu za marketing iz bilo koje poruke e-pošte ili u Postavkama; povucite privolu za osjetljive podatke zatvaranjem računa (takve podatke možete i izostaviti ili izbrisati raspravu koja ih sadržava). Povlačenje ne utječe na obradu koja je već provedena",
+        "Povlačenje privole (Art. 7(3)) — Povucite privolu za marketing iz bilo koje poruke e-pošte ili u Postavkama; povucite privolu za osjetljive podatke pisanjem na privacy@dezbatere.ro (takve podatke možete i izostaviti ili izbrisati raspravu koja ih sadržava). Povlačenje ne utječe na obradu koja je već provedena",
         "Pritužba — Rumunjskom nadzornom tijelu, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukurešt, anspdcp@dataprotection.ro, ili tijelu u državi u kojoj živite. Radije bismo da nam se prvo obratite"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kada izmijenimo ova pravila, objavljujemo novu verziju sa sažetkom izmjena i novim datumom stupanja na snagu te čuvamo prethodne verzije na [dezbatere.ro/privacy/versions]. Za izmjenu kojom se dodaje nova svrha ili novi primatelj obavještavamo vas prije početka nove obrade, e-poštom i u proizvodu, te vam dajemo vrijeme za prigovor. Ako nova svrha ovisi o vašoj privoli — primjerice ako ikada poželimo upotrebljavati sadržaj za poboljšavanje modela — tu privolu tražimo zasebno i određeno; prihvaćanje ažuriranih Uvjeta nikada ne smatramo privolom za novu obradu. Za pojašnjenja koja ništa ne mijenjaju u vezi s našim postupanjem jednostavno objavljujemo novu verziju." },
-      { kind: "p", text: "Ova su pravila posljednji put ažurirana [date]. Verzija 3.0 zamijenila je verziju 2.1, koja je podatke o sesijama, rokove čuvanja, analitiku, izvoz i učinak brisanja na objavljene rasprave opisivala na načine koji više nisu odražavali uslugu." }
+      { kind: "p", text: "Ova su pravila posljednji put ažurirana [date]. Verzija 3.1 zamijenila je verziju 2.1, koja je podatke o sesijama, rokove čuvanja, analitiku, izvoz i učinak brisanja na objavljene rasprave opisivala na načine koji više nisu odražavali uslugu." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "73d88a210b149f44a2e36683f28cb1ddf526aef134a175fbfebfa2e2e5a5ceee",
-  eyebrow: "PRAVILA O PRIVATNOSTI · v3.0 · NA SNAZI OD [DATE]",
+  version: "3.1",
+  sha256: "7b695ff6d9cbd52d56037a33f50c7eb06a6de357c2524714845802db507fb7e9",
+  eyebrow: "PRAVILA O PRIVATNOSTI · v3.1 · NA SNAZI OD [DATE]",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",
-  endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Pravila o privatnosti",
   sectionIdPrefix: "policy-section-",

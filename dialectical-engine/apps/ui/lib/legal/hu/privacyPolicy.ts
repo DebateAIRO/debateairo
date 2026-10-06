@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Egy vitamotor politikával, vallással, egészséggel, szexualitással és meggyőződéssel kapcsolatos kérdésekre ösztönöz. Ezek a GDPR 9. cikke szerinti különleges adatkategóriák, és attól függetlenül megjelenhetnek a kérdéseiben, hogy szándékunkban áll-e gyűjteni őket." },
-      { kind: "p", text: "Önről. Első vitája előtt, külön képernyőn adja meg kifejezett hozzájárulását ahhoz, hogy a saját kérdéseiben önként megadott különleges adatokat vitái futtatása céljából kezeljük. Rögzítjük a szöveg Ön által elfogadott verzióját, az Ön nyelvét és az időpontot. E hozzájárulás nélkül nem indíthat vitát. Ezt bármikor visszavonhatja a fiókja megszüntetésével. Az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát. Amit saját magáról közzétesz, olyan adat, amelyet Ön döntött úgy, hogy nyilvánosságra hoz." },
+      { kind: "p", text: "Önről. Első vitája előtt, külön képernyőn adja meg kifejezett hozzájárulását ahhoz, hogy a saját kérdéseiben önként megadott különleges adatokat vitái futtatása céljából kezeljük. Rögzítjük a szöveg Ön által elfogadott verzióját, az Ön nyelvét és az időpontot. E hozzájárulás nélkül nem indíthat vitát. Ezt bármikor visszavonhatja a privacy@dezbatere.ro címre írva. Az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát. Amit saját magáról közzétesz, olyan adat, amelyet Ön döntött úgy, hogy nyilvánosságra hoz." },
       { kind: "p", text: "Más személyekről. Semmilyen jogi feltétel nem teszi lehetővé számunkra, hogy az Ön által egy kérdésben megnevezett harmadik személy különleges adatait kezeljük, és MI-szolgáltatóink egyike sem rendelkezik ilyen feltétellel. Ezért tiltják ezt a Feltételek, ezért minimalizáljuk az általunk továbbított adatokat, és ezért távolítjuk el kérésre gyorsan az ilyen tartalmat — lásd a 11. szakaszt." },
       { kind: "p", text: "Egészségügyi adatok. Egyes országok külön jogszabályok alapján kezelik az egészséggel kapcsolatos adatokat, beleértve a következtetéseket is. Ha Ön [the State of Washington] területén él, külön [Consumer Health Data Privacy Notice] alkalmazandó." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Az adatkezelés korlátozása (Art. 18; a GDPR 18. cikke) — Kérheti, hogy állítsuk le meghatározott adatok kezelését, amíg az azokkal kapcsolatos vita rendeződik",
         "Tiltakozás (Art. 21; a GDPR 21. cikke) — Tiltakozhat a jogos érdeken alapuló adatkezelés — a 4. szakasz szerinti biztonsági és auditcélú adatkezelés — ellen, és azt leállítjuk, kivéve, ha kényszerítő erejű okokat tudunk igazolni. A marketing ellen bármikor tiltakozhat, és azt leállítjuk",
         "Adathordozhatóság (Art. 20; a GDPR 20. cikke) — Vitái és fiókadatai széles körben használt, géppel olvasható formátumban. [Pending: same export as Access.] Az Ön által létrehozott nem személyes tartalmat, például kérdéseit, a szerződés megszűnésekor kérésére visszaadjuk Önnek",
-        "Hozzájárulás visszavonása (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) — A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása a fiók megszüntetésével (az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát). A visszavonás nem érinti a már megtörtént adatkezelést",
+        "Hozzájárulás visszavonása (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) — A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása a privacy@dezbatere.ro címre írva (az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát). A visszavonás nem érinti a már megtörtént adatkezelést",
         "Panasztétel — A román felügyeleti hatóságnál, az ANSPDCP-nél, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, vagy a lakóhelye szerinti ország hatóságánál. Örömmel vennénk, ha először bennünket keresne meg"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a [dezbatere.ro/privacy/versions] címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot." },
-      { kind: "p", text: "Ezt a szabályzatot legutóbb [date] napján frissítettük. A 3.0-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le." }
+      { kind: "p", text: "Ezt a szabályzatot legutóbb [date] napján frissítettük. A 3.1-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "3d0afd9ad9bf5d23bd3f356ba9bdfccd3dbe34193df90f9f4615e5aa88f0f7a0",
-  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.0 · HATÁLYOS [DATE]",
+  version: "3.1",
+  sha256: "ec42fa591bbc9f3ac390a2a4a11cb1f233377f2ebc9d115ab128d33967af0d29",
+  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.1 · HATÁLYOS [DATE]",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",
-  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Az Adatvédelmi szabályzat szövege",
   sectionIdPrefix: "policy-section-",

@@ -380,12 +380,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.0",
-  sha256: "782dee7adb1f945a30183604c7a89d56047c54775f9f8dcf45c6253042155920",
-  eyebrow: "TERMENII SERVICIULUI · v2.0 · ÎN VIGOARE DE LA [DATE]",
+  version: "2.1",
+  sha256: "2f145d1297d60a0b7742286cb6e8e570fc533881d9ed555f19651a6fdae98dc8",
+  eyebrow: "TERMENII SERVICIULUI · v2.1 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DebateAIRO S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
-  endMarker: "SFÂRȘITUL TERMENILOR · v2.0",
+  endMarker: "SFÂRȘITUL TERMENILOR · v2.1",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Textul Termenilor serviciului",
   sectionIdPrefix: "terms-section-",

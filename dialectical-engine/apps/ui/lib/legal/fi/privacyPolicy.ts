@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Väittelyjärjestelmä kannustaa esittämään kysymyksiä politiikasta, uskonnosta, terveydestä, seksuaalisuudesta ja vakaumuksesta. Nämä ovat GDPR:n 9 artiklassa tarkoitettuja erityisiä henkilötietoryhmiä, ja niitä voi sisältyä kysymyksiisi riippumatta siitä, aiommeko kerätä niitä." },
-      { kind: "p", text: "Sinua koskevat tiedot. Ennen ensimmäistä väittelyäsi annat erillisessä näkymässä nimenomaisen suostumuksesi siihen, että käsittelemme omiin kysymyksiisi halutessasi sisällyttämiäsi arkaluonteisia tietoja väittelyjesi toteuttamista varten. Tallennamme hyväksymäsi sanamuodon version, kielesi ja ajankohdan. Ilman tätä suostumusta et voi aloittaa väittelyä. Voit peruuttaa suostumuksesi milloin tahansa sulkemalla tilisi. Voit myös jättää tällaiset tiedot pois tai poistaa väittelyn, jossa niitä on. Itsestäsi julkaisemasi tiedot ovat tietoja, jotka olet päättänyt julkistaa." },
+      { kind: "p", text: "Sinua koskevat tiedot. Ennen ensimmäistä väittelyäsi annat erillisessä näkymässä nimenomaisen suostumuksesi siihen, että käsittelemme omiin kysymyksiisi halutessasi sisällyttämiäsi arkaluonteisia tietoja väittelyjesi toteuttamista varten. Tallennamme hyväksymäsi sanamuodon version, kielesi ja ajankohdan. Ilman tätä suostumusta et voi aloittaa väittelyä. Voit peruuttaa suostumuksesi milloin tahansa kirjoittamalla osoitteeseen privacy@dezbatere.ro. Voit myös jättää tällaiset tiedot pois tai poistaa väittelyn, jossa niitä on. Itsestäsi julkaisemasi tiedot ovat tietoja, jotka olet päättänyt julkistaa." },
       { kind: "p", text: "Muita henkilöitä koskevat tiedot. Mikään oikeudellinen edellytys ei anna meille lupaa käsitellä kysymyksessä nimeämäsi kolmannen osapuolen arkaluonteisia tietoja, eikä tällainen edellytys koske myöskään tekoälypalveluntarjoajiamme. Siksi Ehdot kieltävät sen, siksi minimoimme lähettämämme tiedot ja siksi poistamme tällaisen sisällön pyynnöstä nopeasti — osio 11." },
       { kind: "p", text: "Terveystiedot. Joissakin maissa terveyteen liittyviin tietoihin, päätelmät mukaan lukien, sovelletaan erityislakeja. Jos asut [the State of Washington], sinuun sovelletaan erillistä asiakirjaa [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Oikeus käsittelyn rajoittamiseen (Art. 18) — Pyydä meitä lopettamaan tiettyjen tietojen käsittely siksi aikaa, kun niitä koskeva erimielisyys ratkaistaan",
         "Vastustamisoikeus (Art. 21) — Vastusta oikeutettuihin etuihin perustuvaa käsittelyä — osiossa 4 tarkoitettua turvallisuus- ja kirjauskäsittelyä — jolloin lopetamme käsittelyn, ellemme voi osoittaa pakottavia perusteita. Vastusta markkinointia milloin tahansa, jolloin lopetamme sen",
         "Oikeus siirtää tiedot järjestelmästä toiseen (Art. 20) — Väittelysi ja tilitietosi yleisesti käytetyssä, koneellisesti luettavassa muodossa. [Pending: same export as Access.] Luomasi muu kuin henkilötieto, kuten kysymyksesi, palautetaan sinulle pyynnöstä sopimuksen päättyessä",
-        "Suostumuksen peruuttaminen (Art. 7(3)) — Peruuta markkinointisuostumus mistä tahansa sähköpostista tai Asetuksista; peruuta arkaluonteisia tietoja koskeva suostumus sulkemalla tilisi (voit myös jättää tiedot pois tai poistaa niitä sisältävän väittelyn). Peruuttaminen ei vaikuta jo tapahtuneeseen käsittelyyn",
+        "Suostumuksen peruuttaminen (Art. 7(3)) — Peruuta markkinointisuostumus mistä tahansa sähköpostista tai Asetuksista; peruuta arkaluonteisia tietoja koskeva suostumus kirjoittamalla osoitteeseen privacy@dezbatere.ro (voit myös jättää tiedot pois tai poistaa niitä sisältävän väittelyn). Peruuttaminen ei vaikuta jo tapahtuneeseen käsittelyyn",
         "Valituksen tekeminen — Romanian valvontaviranomaiselle ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, tai asuinmaasi viranomaiselle. Toivomme kuitenkin, että otat ensin yhteyttä meihin"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kun muutamme tätä käytäntöä, julkaisemme uuden version, yhteenvedon muutoksista ja uuden voimaantulopäivän sekä säilytämme aiemmat versiot osoitteessa [dezbatere.ro/privacy/versions]. Jos muutos lisää uuden tarkoituksen tai uuden vastaanottajan, ilmoitamme sinulle sähköpostitse ja tuotteessa ennen uuden käsittelyn aloittamista ja annamme aikaa vastustaa sitä. Jos uusi tarkoitus perustuu suostumukseesi — esimerkiksi jos joskus haluaisimme käyttää sisältöä mallien parantamiseen — pyydämme suostumuksen erikseen ja yksilöidysti; emme koskaan pidä päivitettyjen Ehtojen hyväksymistä suostumuksena uuteen käsittelyyn. Jos selvennykset eivät muuta toimintaamme, julkaisemme vain uuden version." },
-      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi [date]. Versio 3.0 korvasi version 2.1, jossa istuntotiedot, säilytysajat, analytiikka, tietojen vienti ja poistamisen vaikutus julkaistuihin väittelyihin kuvattiin tavalla, joka ei enää vastannut palvelua." }
+      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi [date]. Versio 3.1 korvasi version 2.1, jossa istuntotiedot, säilytysajat, analytiikka, tietojen vienti ja poistamisen vaikutus julkaistuihin väittelyihin kuvattiin tavalla, joka ei enää vastannut palvelua." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "348d5e52faee689d1a124d0106f1930f5ab0eb410ec5d8465d3f1ae7b35ff0e3",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.0 · VOIMASSA [DATE]",
+  version: "3.1",
+  sha256: "1fb3044bd29396641a988de3393762854221a13340151acd261fd2c7f9146067",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.1 · VOIMASSA [DATE]",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
-  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tietosuojakäytännön teksti",
   sectionIdPrefix: "policy-section-",

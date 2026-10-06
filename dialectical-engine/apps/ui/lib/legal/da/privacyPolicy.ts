@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Et debatsystem indbyder til spørgsmål om politik, religion, sundhed, seksualitet og overbevisning. Det er særlige kategorier af oplysninger efter artikel 9 i GDPR, og de kan forekomme i dine spørgsmål, uanset om vi har til hensigt at indsamle dem." },
-      { kind: "p", text: "Om dig. Før din første debat giver du på en særskilt skærm udtrykkeligt samtykke til, at vi behandler følsomme oplysninger, som du vælger at medtage i dine egne spørgsmål, med det formål at gennemføre dine debatter. Vi registrerer den version af ordlyden, som du accepterede, dit sprog og tidspunktet. Uden dette samtykke kan du ikke starte en debat. Du kan til enhver tid trække samtykket tilbage ved at lukke din konto. Du kan også undlade at medtage sådanne oplysninger eller slette en debat, der indeholder dem. Det, du offentliggør om dig selv, er oplysninger, som du har valgt at gøre offentligt tilgængelige." },
+      { kind: "p", text: "Om dig. Før din første debat giver du på en særskilt skærm udtrykkeligt samtykke til, at vi behandler følsomme oplysninger, som du vælger at medtage i dine egne spørgsmål, med det formål at gennemføre dine debatter. Vi registrerer den version af ordlyden, som du accepterede, dit sprog og tidspunktet. Uden dette samtykke kan du ikke starte en debat. Du kan til enhver tid trække samtykket tilbage ved at skrive til privacy@dezbatere.ro. Du kan også undlade at medtage sådanne oplysninger eller slette en debat, der indeholder dem. Det, du offentliggør om dig selv, er oplysninger, som du har valgt at gøre offentligt tilgængelige." },
       { kind: "p", text: "Om andre personer. Ingen retlig betingelse giver os adgang til at behandle følsomme oplysninger om en tredjepart, som du nævner i et spørgsmål, og ingen af vores AI-udbydere har en sådan adgang. Derfor forbyder Vilkårene det, derfor minimerer vi det, vi sender, og derfor fjerner vi hurtigt sådant indhold efter anmodning — se afsnit 11." },
       { kind: "p", text: "Helbredsoplysninger. Nogle lande behandler helbredsrelaterede oplysninger, herunder følgeslutninger, efter særlige love. Hvis du bor i [the State of Washington], finder en særskilt [Consumer Health Data Privacy Notice] anvendelse." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Begrænsning (Art. 18) — Bed os om at standse behandlingen af bestemte data, mens en tvist om dem afgøres",
         "Indsigelse (Art. 21) — Gør indsigelse mod behandling baseret på legitime interesser — sikkerheds- og revisionsbehandlingen i afsnit 4 — hvorefter vi standser, medmindre vi kan påvise vægtige grunde. Gør til enhver tid indsigelse mod markedsføring, hvorefter vi standser den",
         "Dataportabilitet (Art. 20) — Dine debatter og kontodata i et almindeligt anvendt, maskinlæsbart format. [Pending: same export as Access.] Ikke-personligt indhold, du har skabt, såsom dine spørgsmål, returneres til dig efter anmodning, når kontrakten ophører",
-        "Tilbagetrækning af samtykke (Art. 7(3)) — Træk samtykke til markedsføring tilbage fra enhver e-mail eller fra Indstillinger; træk samtykket til følsomme data tilbage ved at lukke din konto (du kan også undlade at medtage dem eller slette en debat, der indeholder dem). Tilbagetrækningen påvirker ikke behandling, der allerede er sket",
+        "Tilbagetrækning af samtykke (Art. 7(3)) — Træk samtykke til markedsføring tilbage fra enhver e-mail eller fra Indstillinger; træk samtykket til følsomme data tilbage ved at skrive til privacy@dezbatere.ro (du kan også undlade at medtage dem eller slette en debat, der indeholder dem). Tilbagetrækningen påvirker ikke behandling, der allerede er sket",
         "Klage — Til den rumænske tilsynsmyndighed, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, eller til myndigheden i det land, hvor du bor. Vi ser helst, at du kontakter os først"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på [dezbatere.ro/privacy/versions]. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version." },
-      { kind: "p", text: "Denne politik blev senest opdateret den [date]. Version 3.0 erstattede version 2.1, som beskrev sessionsdata, opbevaringsperioder, analyse, eksport og virkningen af sletning på offentliggjorte debatter på måder, der ikke længere afspejlede tjenesten." }
+      { kind: "p", text: "Denne politik blev senest opdateret den [date]. Version 3.1 erstattede version 2.1, som beskrev sessionsdata, opbevaringsperioder, analyse, eksport og virkningen af sletning på offentliggjorte debatter på måder, der ikke længere afspejlede tjenesten." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "f02a06a6583817689c740a2e3bcb37a6c3c12528ec971fadabfe37a9934191bf",
-  eyebrow: "PRIVATLIVSPOLITIK · v3.0 · GÆLDENDE FRA [DATE]",
+  version: "3.1",
+  sha256: "cb435b02808c2c49bea5b53e83dc2088e936c833eb54855406015684a4dda258",
+  eyebrow: "PRIVATLIVSPOLITIK · v3.1 · GÆLDENDE FRA [DATE]",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",
-  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatlivspolitikkens tekst",
   sectionIdPrefix: "policy-section-",

@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Debatní systém vybízí k otázkám o politice, náboženství, zdraví, sexualitě a přesvědčení. Jde o zvláštní kategorie údajů podle článku 9 GDPR a mohou se objevit ve vašich otázkách bez ohledu na to, zda je zamýšlíme shromažďovat." },
-      { kind: "p", text: "O vás. Před svou první debatou udělujete na samostatné obrazovce výslovný souhlas se zpracováním citlivých informací, které se rozhodnete zahrnout do vlastních otázek, za účelem vedení vašich debat. Zaznamenáváme verzi znění, se kterým jste souhlasili, váš jazyk a čas. Bez tohoto souhlasu nemůžete zahájit debatu. Souhlas můžete kdykoli odvolat uzavřením účtu. Takové informace také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje. Informace, které o sobě zveřejníte, jsou údaje, které jste se rozhodli zveřejnit." },
+      { kind: "p", text: "O vás. Před svou první debatou udělujete na samostatné obrazovce výslovný souhlas se zpracováním citlivých informací, které se rozhodnete zahrnout do vlastních otázek, za účelem vedení vašich debat. Zaznamenáváme verzi znění, se kterým jste souhlasili, váš jazyk a čas. Bez tohoto souhlasu nemůžete zahájit debatu. Souhlas můžete kdykoli odvolat napsáním na privacy@dezbatere.ro. Takové informace také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje. Informace, které o sobě zveřejníte, jsou údaje, které jste se rozhodli zveřejnit." },
       { kind: "p", text: "O jiných osobách. Žádná právní podmínka nám neumožňuje zpracovávat citlivé údaje o třetí osobě, kterou uvedete v otázce, a žádnou takovou podmínku nemá ani žádný z našich poskytovatelů AI. Proto to Podmínky zakazují, proto minimalizujeme předávané údaje a proto takový obsah na žádost rychle odstraňujeme — viz oddíl 11." },
       { kind: "p", text: "Informace o zdravotním stavu. Některé země upravují údaje související se zdravím, včetně odvozených závěrů, zvláštními právními předpisy. Pokud žijete ve [the State of Washington], použije se samostatné [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Omezení zpracování (Art. 18) — Požádejte nás, abychom přestali zpracovávat určité údaje, dokud nebude vyřešen spor, který se jich týká",
         "Námitka (Art. 21) — Vzneste námitku proti zpracování založenému na oprávněných zájmech — bezpečnostnímu a auditnímu zpracování podle oddílu 4 — a my je ukončíme, pokud neprokážeme závažné oprávněné důvody. Proti marketingu můžete vznést námitku kdykoli a my jej ukončíme",
         "Přenositelnost (Art. 20) — Vaše debaty a údaje účtu v běžně používaném, strojově čitelném formátu. [Pending: same export as Access.] Neosobní obsah, který jste vytvořili, například vaše otázky, vám na požádání vrátíme při skončení smlouvy",
-        "Odvolání souhlasu (Art. 7(3)) — Odvolejte souhlas s marketingem v kterémkoli e-mailu nebo v Nastavení; souhlas se zpracováním citlivých údajů odvolejte uzavřením účtu (takové údaje také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje). Odvolání nemá vliv na zpracování, které již proběhlo",
+        "Odvolání souhlasu (Art. 7(3)) — Odvolejte souhlas s marketingem v kterémkoli e-mailu nebo v Nastavení; souhlas se zpracováním citlivých údajů odvolejte napsáním na privacy@dezbatere.ro (takové údaje také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje). Odvolání nemá vliv na zpracování, které již proběhlo",
         "Stížnost — Rumunskému dozorovému úřadu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, anspdcp@dataprotection.ro, nebo úřadu v zemi vašeho bydliště. Budeme raději, když se nejprve obrátíte na nás"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Při změně těchto zásad zveřejníme novou verzi se shrnutím změn a novým datem účinnosti a předchozí verze ponecháme na [dezbatere.ro/privacy/versions]. O změně, která přidává nový účel nebo nového příjemce, vás informujeme e-mailem a v produktu před zahájením nového zpracování a poskytneme vám čas vznést námitku. Pokud nový účel závisí na vašem souhlasu — například kdybychom někdy chtěli používat obsah ke zlepšování modelů — požádáme o tento souhlas samostatně a konkrétně; přijetí aktualizovaných Podmínek nikdy nepovažujeme za souhlas s novým zpracováním. Upřesnění, která nic nemění na našem postupu, pouze zveřejníme v nové verzi." },
-      { kind: "p", text: "Tyto zásady byly naposledy aktualizovány dne [date]. Verze 3.0 nahradila verzi 2.1, která popisovala údaje o relacích, doby uchovávání, analytiku, export a účinek výmazu na zveřejněné debaty způsobem, jenž již neodpovídal službě." }
+      { kind: "p", text: "Tyto zásady byly naposledy aktualizovány dne [date]. Verze 3.1 nahradila verzi 2.1, která popisovala údaje o relacích, doby uchovávání, analytiku, export a účinek výmazu na zveřejněné debaty způsobem, jenž již neodpovídal službě." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "8693d0bba47e9f55e534859b31b2bd09ea2aec64143b8f380e24cb10d1e5b1b5",
-  eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.0 · ÚČINNÉ OD [DATE]",
+  version: "3.1",
+  sha256: "9ae4c9ec744a7e7a5761616527938b752a2c509dd9ba82c560ea70b98f5ede1e",
+  eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.1 · ÚČINNÉ OD [DATE]",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",
-  endMarker: "KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text zásad ochrany osobních údajů",
   sectionIdPrefix: "policy-section-",

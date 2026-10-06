@@ -380,12 +380,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.0",
-  sha256: "d8374d9cb1b86b9f0a4737fbb45740efe600b680cfa56a7f501e5109ac8b18a2",
-  eyebrow: "ΟΡΟΙ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ · v2.0 · ΙΣΧΥΟΥΝ ΑΠΟ [DATE]",
+  version: "2.1",
+  sha256: "4e122a69cd99831d8a5e129ffd20541081cb969b64fd1a417d4797a1cc8bc187",
+  eyebrow: "ΟΡΟΙ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ · v2.1 · ΙΣΧΥΟΥΝ ΑΠΟ [DATE]",
   title: "Τι αποδέχεστε",
   lede: "Η σύμβαση μεταξύ εσάς και της DebateAIRO S.R.L., σε απλή γλώσσα. Δεκαεννέα ενότητες και Παράρτημα Α — μετακινηθείτε έως το τέλος.",
-  endMarker: "ΤΕΛΟΣ ΤΩΝ ΟΡΩΝ · v2.0",
+  endMarker: "ΤΕΛΟΣ ΤΩΝ ΟΡΩΝ · v2.1",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Κείμενο των Όρων Παροχής Υπηρεσιών",
   sectionIdPrefix: "terms-section-",

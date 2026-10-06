@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Magna tad-dibattitu tħeġġeġ mistoqsijiet dwar il-politika, ir-reliġjon, is-saħħa, is-sesswalità u t-twemmin. Dawn huma kategoriji speċjali ta’ data skont l-Artikolu 9 tal-GDPR, u jistgħu jidħlu fil-mistoqsijiet tiegħek kemm jekk ikollna l-ħsieb li niġbruhom kif ukoll jekk le." },
-      { kind: "p", text: "Dwarek. Qabel l-ewwel dibattitu tiegħek tagħti kunsens espliċitu, fuq skrin separat, biex nipproċessaw informazzjoni sensittiva li tagħżel li tinkludi fil-mistoqsijiet tiegħek stess, għall-finijiet tat-tmexxija tad-dibattiti tiegħek. Inżommu rekord tal-verżjoni tal-kliem li qbilt magħha, tal-lingwa tiegħek u tal-ħin. Mingħajr dan il-kunsens ma tistax tibda dibattitu. Tista’ tirtirah fi kwalunkwe ħin billi tagħlaq il-kont tiegħek. Tista’ wkoll tħalli barra din l-informazzjoni jew tħassar dibattitu li jkun fih din l-informazzjoni. Dak li tippubblika dwarek innifsek huwa data li għażilt li tagħmel pubblika." },
+      { kind: "p", text: "Dwarek. Qabel l-ewwel dibattitu tiegħek tagħti kunsens espliċitu, fuq skrin separat, biex nipproċessaw informazzjoni sensittiva li tagħżel li tinkludi fil-mistoqsijiet tiegħek stess, għall-finijiet tat-tmexxija tad-dibattiti tiegħek. Inżommu rekord tal-verżjoni tal-kliem li qbilt magħha, tal-lingwa tiegħek u tal-ħin. Mingħajr dan il-kunsens ma tistax tibda dibattitu. Tista’ tirtirah fi kwalunkwe ħin billi tikteb lil privacy@dezbatere.ro. Tista’ wkoll tħalli barra din l-informazzjoni jew tħassar dibattitu li jkun fih din l-informazzjoni. Dak li tippubblika dwarek innifsek huwa data li għażilt li tagħmel pubblika." },
       { kind: "p", text: "Dwar persuni oħra. Ebda kundizzjoni legali ma tippermettilna nipproċessaw data sensittiva dwar parti terza li tkun semmejt f’mistoqsija, u lanqas ebda wieħed mill-fornituri tal-IA tagħna ma għandu kundizzjoni bħal din. Għalhekk it-Termini jipprojbixxuha, nimminimizzaw dak li nibagħtu, u nneħħu malajr dan il-kontenut fuq talba — it-taqsima 11." },
       { kind: "p", text: "Informazzjoni dwar is-saħħa. Xi pajjiżi jittrattaw data relatata mas-saħħa, inklużi inferenzi, taħt liġijiet speċifiċi. Jekk tgħix fi [the State of Washington], japplika [Consumer Health Data Privacy Notice] separat." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Restrizzjoni (Art. 18) — Itlobna nieqfu nipproċessaw data partikolari waqt li tiġi solvuta tilwima dwarha",
         "Oġġezzjoni (Art. 21) — Oġġezzjona għall-ipproċessar ibbażat fuq interessi leġittimi — l-ipproċessar tas-sigurtà u tal-awditjar fit-taqsima 4 — u nieqfu sakemm ma nkunux nistgħu nuru raġunijiet konvinċenti. Oġġezzjona għall-kummerċjalizzazzjoni fi kwalunkwe ħin, u nieqfu",
         "Portabbiltà (Art. 20) — Id-dibattiti u d-data tal-kont tiegħek f’format komuni li jista’ jinqara minn magna. [Pending: same export as Access.] Kontenut mhux personali li ħloqt, bħall-mistoqsijiet tiegħek, jingħatalek lura fuq talba meta jintemm il-kuntratt",
-        "Irtirar tal-kunsens (Art. 7(3)) — Irtira l-kunsens għall-kummerċjalizzazzjoni minn kwalunkwe messaġġ elettroniku jew mill-issettjar; irtira l-kunsens għal data sensittiva billi tagħlaq il-kont tiegħek (tista’ wkoll tħalli barra din id-data jew tħassar dibattitu li jkun fiha). L-irtirar ma jaffettwax ipproċessar li jkun diġà sar",
+        "Irtirar tal-kunsens (Art. 7(3)) — Irtira l-kunsens għall-kummerċjalizzazzjoni minn kwalunkwe messaġġ elettroniku jew mill-issettjar; irtira l-kunsens għal data sensittiva billi tikteb lil privacy@dezbatere.ro (tista’ wkoll tħalli barra din id-data jew tħassar dibattitu li jkun fiha). L-irtirar ma jaffettwax ipproċessar li jkun diġà sar",
         "Ilment — Lill-awtorità superviżorja Rumena, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, jew lill-awtorità fil-pajjiż fejn tgħix. Nippreferu li l-ewwel tikkuntattja lilna"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq [dezbatere.ro/privacy/versions]. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida." },
-      { kind: "p", text: "Din il-politika ġiet aġġornata l-aħħar fi [date]. Il-Verżjoni 3.0 issostitwiet il-verżjoni 2.1, li kienet tiddeskrivi d-data tas-sessjoni, il-perjodi taż-żamma, l-analitika, l-esportazzjoni u l-effett tat-tħassir fuq id-dibattiti ppubblikati b’modi li ma baqgħux jirriflettu s-servizz." }
+      { kind: "p", text: "Din il-politika ġiet aġġornata l-aħħar fi [date]. Il-Verżjoni 3.1 issostitwiet il-verżjoni 2.1, li kienet tiddeskrivi d-data tas-sessjoni, il-perjodi taż-żamma, l-analitika, l-esportazzjoni u l-effett tat-tħassir fuq id-dibattiti ppubblikati b’modi li ma baqgħux jirriflettu s-servizz." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "85d4ca04c35be559a12005650c44c1c78cca3fb7cec627c7b77414683541dc53",
-  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.0 · EFFETTIVA [DATE]",
+  version: "3.1",
+  sha256: "81f04e77ee3713d67a3916e5356b4a2935f17913bad535a278902d99db543e7a",
+  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.1 · EFFETTIVA [DATE]",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",
-  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Test tal-Politika dwar il-Privatezza",
   sectionIdPrefix: "policy-section-",

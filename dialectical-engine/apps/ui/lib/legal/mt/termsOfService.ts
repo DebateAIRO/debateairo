@@ -380,12 +380,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.0",
-  sha256: "9ee3195a88c2a442f991384f275a2f97075fa9d6b2505a479668efe4bc3ec01a",
-  eyebrow: "TERMINI TAS-SERVIZZ · v2.0 · EFFETTIVI [DATE]",
+  version: "2.1",
+  sha256: "17b6dad8f564579aef5a71d3f554be31cf7d74438970a8e21c8816d3b5948eb4",
+  eyebrow: "TERMINI TAS-SERVIZZ · v2.1 · EFFETTIVI [DATE]",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DebateAIRO S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",
-  endMarker: "TMIEM IT-TERMINI · v2.0",
+  endMarker: "TMIEM IT-TERMINI · v2.1",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Test tat-Termini tas-Servizz",
   sectionIdPrefix: "terms-section-",

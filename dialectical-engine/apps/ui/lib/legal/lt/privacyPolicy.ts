@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Debatų variklis skatina kelti klausimus apie politiką, religiją, sveikatą, seksualumą ir įsitikinimus. Pagal GDPR 9 straipsnį tai yra specialių kategorijų duomenys, kurie gali patekti į jūsų klausimus nepriklausomai nuo to, ar ketiname juos rinkti." },
-      { kind: "p", text: "Apie jus. Prieš pirmuosius savo debatus atskirame ekrane duodate aiškų sutikimą, kad debatų vykdymo tikslu tvarkytume neskelbtiną informaciją, kurią nusprendžiate įtraukti į savo klausimus. Užfiksuojame formuluotės, su kuria sutikote, versiją, jūsų kalbą ir laiką. Be šio sutikimo negalite pradėti debatų. Sutikimą galite bet kada atšaukti uždarydami savo paskyrą. Tokios informacijos taip pat galite neįtraukti arba ištrinti debatus, kuriuose ji yra. Tai, ką paskelbiate apie save, yra duomenys, kuriuos patys nusprendėte paviešinti." },
+      { kind: "p", text: "Apie jus. Prieš pirmuosius savo debatus atskirame ekrane duodate aiškų sutikimą, kad debatų vykdymo tikslu tvarkytume neskelbtiną informaciją, kurią nusprendžiate įtraukti į savo klausimus. Užfiksuojame formuluotės, su kuria sutikote, versiją, jūsų kalbą ir laiką. Be šio sutikimo negalite pradėti debatų. Sutikimą galite bet kada atšaukti parašydami adresu privacy@dezbatere.ro. Tokios informacijos taip pat galite neįtraukti arba ištrinti debatus, kuriuose ji yra. Tai, ką paskelbiate apie save, yra duomenys, kuriuos patys nusprendėte paviešinti." },
       { kind: "p", text: "Apie kitus asmenis. Jokia teisinė sąlyga neleidžia mums tvarkyti neskelbtinų duomenų apie trečiąjį asmenį, kurį įvardijate klausime, ir tokios sąlygos neturi nė vienas mūsų DI paslaugų teikėjas. Todėl Sąlygos tai draudžia, todėl kuo labiau ribojame siunčiamus duomenis ir todėl gavę prašymą tokį turinį greitai pašaliname — žr. 11 skyrių." },
       { kind: "p", text: "Sveikatos informacija. Kai kurios šalys su sveikata susijusius duomenis, įskaitant išvadas, reglamentuoja specialiais įstatymais. Jei gyvenate [the State of Washington], taikomas atskiras [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Teisė apriboti duomenų tvarkymą (Art. 18) — Paprašykite sustabdyti konkrečių duomenų tvarkymą, kol bus išspręstas dėl jų kilęs ginčas",
         "Teisė nesutikti (Art. 21) — Nesutikite, kad duomenys būtų tvarkomi remiantis teisėtais interesais — 4 skyriuje aprašytas saugumo ir audito duomenų tvarkymas — ir mes sustabdysime tvarkymą, nebent galėsime įrodyti įtikinamas priežastis. Bet kada nesutikite su rinkodara, ir ją nutrauksime",
         "Teisė į duomenų perkeliamumą (Art. 20) — Jūsų debatai ir paskyros duomenys įprastai naudojamu, kompiuterio skaitomu formatu. [Pending: same export as Access.] Jūsų sukurtas neasmeninis turinys, pavyzdžiui, jūsų klausimai, pasibaigus sutarčiai jūsų prašymu grąžinamas jums",
-        "Sutikimo atšaukimas (Art. 7(3)) — Atšaukite rinkodaros sutikimą bet kuriame el. laiške arba Nustatymuose; atšaukite sutikimą tvarkyti neskelbtinus duomenis uždarydami paskyrą (tokių duomenų galite ir neįtraukti arba ištrinti debatus, kuriuose jie yra). Atšaukimas neturi įtakos jau atliktam tvarkymui",
+        "Sutikimo atšaukimas (Art. 7(3)) — Atšaukite rinkodaros sutikimą bet kuriame el. laiške arba Nustatymuose; atšaukite sutikimą tvarkyti neskelbtinus duomenis parašydami adresu privacy@dezbatere.ro (tokių duomenų galite ir neįtraukti arba ištrinti debatus, kuriuose jie yra). Atšaukimas neturi įtakos jau atliktam tvarkymui",
         "Skundo pateikimas — Rumunijos priežiūros institucijai ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukareštas, anspdcp@dataprotection.ro, arba šalies, kurioje gyvenate, institucijai. Norėtume, kad pirmiausia kreiptumėtės į mus"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu [dezbatere.ro/privacy/versions]. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją." },
-      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta [date]. 3.0 versija pakeitė 2.1 versiją, kurioje seanso duomenys, saugojimo laikotarpiai, analitika, eksportas ir ištrynimo poveikis paskelbtiems debatams buvo aprašyti taip, kad tai nebeatitiko paslaugos." }
+      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta [date]. 3.1 versija pakeitė 2.1 versiją, kurioje seanso duomenys, saugojimo laikotarpiai, analitika, eksportas ir ištrynimo poveikis paskelbtiems debatams buvo aprašyti taip, kad tai nebeatitiko paslaugos." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "98b7cf889b6a1004c43353903be6863d60c76933abae79ed03dca4dc24fd43b4",
-  eyebrow: "PRIVATUMO POLITIKA · v3.0 · ĮSIGALIOJA [DATE]",
+  version: "3.1",
+  sha256: "0bcd749e2580e2760260111dba0bcdd4011a1c78bde9bb10e699b9174524c6a1",
+  eyebrow: "PRIVATUMO POLITIKA · v3.1 · ĮSIGALIOJA [DATE]",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
-  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatumo politikos tekstas",
   sectionIdPrefix: "policy-section-",

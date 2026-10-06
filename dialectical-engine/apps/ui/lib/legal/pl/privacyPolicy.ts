@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Silnik debat zachęca do zadawania pytań o politykę, religię, zdrowie, seksualność i przekonania. Są to szczególne kategorie danych w rozumieniu art. 9 RODO i mogą pojawić się w Twoich pytaniach niezależnie od tego, czy zamierzamy je gromadzić." },
-      { kind: "p", text: "Informacje o Tobie. Przed pierwszą debatą udzielasz, na osobnym ekranie, wyraźnej zgody na przetwarzanie przez nas informacji wrażliwych, które zdecydujesz się zawrzeć we własnych pytaniach, w celu prowadzenia Twoich debat. Zapisujemy wersję zaakceptowanej przez Ciebie treści, Twój język oraz czas. Bez tej zgody nie możesz rozpocząć debaty. Możesz w każdej chwili wycofać tę zgodę, zamykając konto. Możesz także nie zamieszczać takich informacji lub usunąć debatę, która je zawiera. Informacje o sobie, które publikujesz, są danymi, które zdecydowałeś się upublicznić." },
+      { kind: "p", text: "Informacje o Tobie. Przed pierwszą debatą udzielasz, na osobnym ekranie, wyraźnej zgody na przetwarzanie przez nas informacji wrażliwych, które zdecydujesz się zawrzeć we własnych pytaniach, w celu prowadzenia Twoich debat. Zapisujemy wersję zaakceptowanej przez Ciebie treści, Twój język oraz czas. Bez tej zgody nie możesz rozpocząć debaty. Możesz w każdej chwili wycofać tę zgodę, pisząc na privacy@dezbatere.ro. Możesz także nie zamieszczać takich informacji lub usunąć debatę, która je zawiera. Informacje o sobie, które publikujesz, są danymi, które zdecydowałeś się upublicznić." },
       { kind: "p", text: "Informacje o innych osobach. Żadna przesłanka prawna nie pozwala nam przetwarzać danych wrażliwych dotyczących osoby trzeciej wymienionej przez Ciebie w pytaniu; takiej przesłanki nie ma też żaden z naszych dostawców AI. Dlatego Warunki świadczenia usług tego zabraniają, minimalizujemy zakres wysyłanych danych i szybko usuwamy takie treści na żądanie — sekcja 11." },
       { kind: "p", text: "Informacje o zdrowiu. Niektóre kraje regulują dane dotyczące zdrowia, w tym wnioski na ich podstawie, w przepisach szczególnych. Jeśli mieszkasz w [the State of Washington], zastosowanie ma odrębna [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Ograniczenie (Art. 18) — Poproś nas o zaprzestanie przetwarzania określonych danych do czasu rozstrzygnięcia sporu, który ich dotyczy",
         "Sprzeciw (Art. 21) — Wnieś sprzeciw wobec przetwarzania opartego na prawnie uzasadnionych interesach — przetwarzania na potrzeby bezpieczeństwa i audytu opisanego w sekcji 4 — a zaprzestaniemy go, chyba że wykażemy istnienie ważnych prawnie uzasadnionych podstaw. W każdej chwili wnieś sprzeciw wobec marketingu, a go zaprzestaniemy",
         "Przenoszenie danych (Art. 20) — Twoje debaty i dane konta w powszechnie używanym formacie nadającym się do odczytu maszynowego. [Pending: same export as Access.] Utworzone przez Ciebie treści niebędące danymi osobowymi, takie jak pytania, zostaną Ci zwrócone na żądanie po zakończeniu umowy",
-        "Wycofanie zgody (Art. 7(3)) — Wycofaj zgodę marketingową z poziomu dowolnego e-maila lub Ustawień; wycofaj zgodę na przetwarzanie danych wrażliwych, zamykając konto (możesz też nie zamieszczać takich danych lub usunąć debatę, która je zawiera). Wycofanie nie wpływa na przetwarzanie, które już miało miejsce",
+        "Wycofanie zgody (Art. 7(3)) — Wycofaj zgodę marketingową z poziomu dowolnego e-maila lub Ustawień; wycofaj zgodę na przetwarzanie danych wrażliwych, pisząc na privacy@dezbatere.ro (możesz też nie zamieszczać takich danych lub usunąć debatę, która je zawiera). Wycofanie nie wpływa na przetwarzanie, które już miało miejsce",
         "Skarga — Do rumuńskiego organu nadzorczego, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukareszt, anspdcp@dataprotection.ro, albo do organu w kraju zamieszkania. Wolelibyśmy jednak, aby najpierw skontaktowano się z nami"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem [dezbatere.ro/privacy/versions]. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję." },
-      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana [date]. Wersja 3.0 zastąpiła wersję 2.1, która opisywała dane sesji, okresy przechowywania, analitykę, eksport oraz wpływ usunięcia konta na opublikowane debaty w sposób nieodzwierciedlający już działania usługi." }
+      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana [date]. Wersja 3.1 zastąpiła wersję 2.1, która opisywała dane sesji, okresy przechowywania, analitykę, eksport oraz wpływ usunięcia konta na opublikowane debaty w sposób nieodzwierciedlający już działania usługi." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "575930ce3cf7f8de86e6d53efa3232e37b9b50444361c70f86b238eca2b02b6f",
-  eyebrow: "POLITYKA PRYWATNOŚCI · v3.0 · OBOWIĄZUJE OD [DATE]",
+  version: "3.1",
+  sha256: "4e82041539c4398066b12da86a12bfd29fff8e36ff72186f6bbe926890cdf5a6",
+  eyebrow: "POLITYKA PRYWATNOŚCI · v3.1 · OBOWIĄZUJE OD [DATE]",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",
-  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.0",
+  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Polityki prywatności",
   sectionIdPrefix: "policy-section-",

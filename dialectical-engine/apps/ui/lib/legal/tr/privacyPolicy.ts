@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Bir tartışma motoru siyaset, din, sağlık, cinsellik ve inanç hakkında sorular sorulmasına imkân verir. Bunlar GDPR'ın 9. maddesi kapsamında özel veri kategorileridir ve toplamayı amaçlayıp amaçlamadığımıza bakılmaksızın sorularınızda yer alabilirler." },
-      { kind: "p", text: "Sizin hakkınızda. İlk tartışmanızdan önce, kendi sorularınıza dâhil etmeyi seçtiğiniz hassas bilgileri tartışmalarınızı yürütme amacıyla işlememize ayrı bir ekranda açık rıza verirsiniz. Kabul ettiğiniz metnin sürümünü, dilinizi ve zamanı kaydederiz. Bu rıza olmadan tartışma başlatamazsınız. Hesabınızı kapatarak rızanızı istediğiniz zaman geri çekebilirsiniz. Ayrıca bu tür bilgilere yer vermeyebilir veya bunları içeren bir tartışmayı silebilirsiniz. Kendiniz hakkında yayımladığınız bilgiler, alenileştirmeyi seçtiğiniz verilerdir." },
+      { kind: "p", text: "Sizin hakkınızda. İlk tartışmanızdan önce, kendi sorularınıza dâhil etmeyi seçtiğiniz hassas bilgileri tartışmalarınızı yürütme amacıyla işlememize ayrı bir ekranda açık rıza verirsiniz. Kabul ettiğiniz metnin sürümünü, dilinizi ve zamanı kaydederiz. Bu rıza olmadan tartışma başlatamazsınız. privacy@dezbatere.ro adresine yazarak rızanızı istediğiniz zaman geri çekebilirsiniz. Ayrıca bu tür bilgilere yer vermeyebilir veya bunları içeren bir tartışmayı silebilirsiniz. Kendiniz hakkında yayımladığınız bilgiler, alenileştirmeyi seçtiğiniz verilerdir." },
       { kind: "p", text: "Diğer kişiler hakkında. Bir soruda adını verdiğiniz üçüncü kişiye ait hassas verileri işlememize izin veren hiçbir hukuki şart yoktur; yapay zekâ sağlayıcılarımızdan hiçbiri için de böyle bir şart bulunmamaktadır. Koşulların bunu yasaklamasının, gönderdiklerimizi asgariye indirmemizin ve talep üzerine bu tür içeriği hızla kaldırmamızın nedeni budur — bölüm 11." },
       { kind: "p", text: "Sağlık bilgileri. Bazı ülkeler, çıkarımlar da dâhil olmak üzere sağlıkla ilgili verileri özel kanunlar kapsamında ele alır. [the State of Washington]'da yaşıyorsanız ayrı bir [Consumer Health Data Privacy Notice] geçerlidir." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kısıtlama (Art. 18) — Bir uyuşmazlık çözümlenene kadar belirli verileri işlemeyi durdurmamızı isteyin",
         "İtiraz (Art. 21) — Meşru menfaatlere dayalı işlemeye — bölüm 4'teki güvenlik ve denetim işlemesine — itiraz edin; zorlayıcı gerekçeler gösterebilmediğimiz sürece işlemeyi durdururuz. Pazarlamaya istediğiniz zaman itiraz edin; durdururuz",
         "Taşınabilirlik (Art. 20) — Tartışmalarınız ve hesap verileriniz yaygın kullanılan, makinece okunabilir bir biçimde sağlanır. [Pending: same export as Access.] Sorularınız gibi oluşturduğunuz kişisel olmayan içerik, sözleşme sona erdiğinde talebiniz üzerine size iade edilir",
-        "Rızayı geri çekme (Art. 7(3)) — Pazarlama rızasını herhangi bir e-postadan veya Ayarlar'dan geri çekin; hassas veri rızasını hesabınızı kapatarak geri çekin (bu tür verilere yer vermeyebilir veya bunları içeren bir tartışmayı silebilirsiniz). Geri çekme, daha önce gerçekleşmiş işlemeyi etkilemez",
+        "Rızayı geri çekme (Art. 7(3)) — Pazarlama rızasını herhangi bir e-postadan veya Ayarlar'dan geri çekin; hassas veri rızasını privacy@dezbatere.ro adresine yazarak geri çekin (bu tür verilere yer vermeyebilir veya bunları içeren bir tartışmayı silebilirsiniz). Geri çekme, daha önce gerçekleşmiş işlemeyi etkilemez",
         "Şikâyet — Romanya denetim makamı ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bükreş, anspdcp@dataprotection.ro adresine veya yaşadığınız ülkedeki makama. Önce bizden haber almayı tercih ederiz"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Bu politikayı değiştirdiğimizde yeni sürümü, değişikliklerin özeti ve yeni bir yürürlük tarihiyle birlikte yayımlar ve önceki sürümleri [dezbatere.ro/privacy/versions] adresinde tutarız. Yeni bir amaç veya yeni bir alıcı ekleyen değişikliklerde, yeni işleme başlamadan önce size e-postayla ve ürün içinde bilgi verir ve itiraz etmeniz için süre tanırız. Yeni bir amaç rızanıza bağlıysa — örneğin bir gün içeriği modelleri geliştirmek için kullanmak istersek — bu rızayı ayrıca ve özel olarak isteriz; güncellenmiş Koşulların kabulünü hiçbir zaman yeni işleme için rıza saymayız. Yaptıklarımızı değiştirmeyen açıklamalar bakımından yeni sürümü yayımlamakla yetiniriz." },
-      { kind: "p", text: "Bu politika en son [date] tarihinde güncellenmiştir. Sürüm 3.0; oturum verilerini, saklama sürelerini, analitiği, dışa aktarmayı ve silmenin yayımlanmış tartışmalar üzerindeki etkisini artık hizmeti yansıtmayan şekillerde açıklayan sürüm 2.1'in yerine geçmiştir." }
+      { kind: "p", text: "Bu politika en son [date] tarihinde güncellenmiştir. Sürüm 3.1; oturum verilerini, saklama sürelerini, analitiği, dışa aktarmayı ve silmenin yayımlanmış tartışmalar üzerindeki etkisini artık hizmeti yansıtmayan şekillerde açıklayan sürüm 2.1'in yerine geçmiştir." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "3534f26ef1c724c0186ab40dda64db084ecdd6b0eeb64f2250563cb1d6d69acd",
-  eyebrow: "GİZLİLİK POLİTİKASI · v3.0 · YÜRÜRLÜK TARİHİ [DATE]",
+  version: "3.1",
+  sha256: "39d135d76003dd26c6b8288b607d8e2751151170eb65e402782f271bae429282",
+  eyebrow: "GİZLİLİK POLİTİKASI · v3.1 · YÜRÜRLÜK TARİHİ [DATE]",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",
-  endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Gizlilik Politikası metni",
   sectionIdPrefix: "policy-section-",

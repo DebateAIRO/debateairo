@@ -380,12 +380,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.0",
-  sha256: "6b2a5fba3acab29a0aaee08c3854e052d122e68232638436504cac6c44e23f12",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.0 · I bhFEIDHM [DATE]",
+  version: "2.1",
+  sha256: "7fb84417265b5ffaa761210b6fdcae06cb053fbe3c0119971b7790f1a9d9d337",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.1 · I bhFEIDHM [DATE]",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DebateAIRO S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH NA dTÉARMAÍ · v2.0",
+  endMarker: "DEIREADH NA dTÉARMAÍ · v2.1",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Téacs na dTéarmaí Seirbhíse",
   sectionIdPrefix: "terms-section-",

@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "A debate engine invites questions about politics, religion, health, sexuality and belief. Those are special categories of data under Article 9 GDPR, and they can arrive in your questions whether or not we intend to collect them." },
-      { kind: "p", text: "About you. Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by closing your account. You can also leave such information out, or delete a debate that contains it. What you publish about yourself is data you have chosen to make public." },
+      { kind: "p", text: "About you. Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by writing to privacy@dezbatere.ro. You can also leave such information out, or delete a debate that contains it. What you publish about yourself is data you have chosen to make public." },
       { kind: "p", text: "About other people. No legal condition allows us to process sensitive data about a third party you name in a question, and none of our AI providers has one either. That is why the Terms prohibit it, why we minimise what we send, and why we remove such content quickly on request — section 11." },
       { kind: "p", text: "Health information. Some countries treat health-related data, including inferences, under specific laws. If you live in [the State of Washington], a separate [Consumer Health Data Privacy Notice] applies." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Restriction (Art. 18) — Ask us to stop processing particular data while a dispute about it is resolved",
         "Objection (Art. 21) — Object to processing based on legitimate interests — the security and audit processing in section 4 — and we stop unless we can show compelling grounds. Object to marketing at any time, and we stop",
         "Portability (Art. 20) — Your debates and account data in a commonly used, machine-readable format. [Pending: same export as Access.] Non-personal content you created, such as your questions, is returned to you on request when the contract ends",
-        "Withdraw consent (Art. 7(3)) — Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by closing your account (you can also leave such data out or delete a debate). Withdrawal does not affect processing that already happened",
+        "Withdraw consent (Art. 7(3)) — Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by writing to privacy@dezbatere.ro (you can also leave such data out or delete a debate). Withdrawal does not affect processing that already happened",
         "Complain — To the Romanian supervisory authority, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, anspdcp@dataprotection.ro, or to the authority in the country where you live. We would rather hear from you first"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at [dezbatere.ro/privacy/versions]. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on [date]. Version 3.0 replaced version 2.1, which described session data, retention periods, analytics, export and the effect of deletion on published debates in ways that no longer reflected the service." }
+      { kind: "p", text: "This policy was last updated on [date]. Version 3.1 replaced version 2.1, which described session data, retention periods, analytics, export and the effect of deletion on published debates in ways that no longer reflected the service." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "e32b3a90e411c6eb6f0d35462555e0750c56b4665097cc7725fe01b532e5d554",
-  eyebrow: "PRIVACY POLICY · v3.0 · EFFECTIVE [DATE]",
+  version: "3.1",
+  sha256: "afd79cebff452800e37ee9dd708957ec0008ee900570919ec82f222e816d929f",
+  eyebrow: "PRIVACY POLICY · v3.1 · EFFECTIVE [DATE]",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
-  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privacy Policy text",
   sectionIdPrefix: "policy-section-",

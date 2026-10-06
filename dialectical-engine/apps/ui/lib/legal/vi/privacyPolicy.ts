@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Một công cụ tranh luận khuyến khích các câu hỏi về chính trị, tôn giáo, sức khỏe, tình dục và niềm tin. Đây là các loại dữ liệu đặc biệt theo Điều 9 GDPR và chúng có thể xuất hiện trong câu hỏi của bạn dù chúng tôi có chủ định thu thập hay không." },
-      { kind: "p", text: "Về bạn. Trước cuộc tranh luận đầu tiên, trên một màn hình riêng biệt, bạn đồng ý rõ ràng cho phép chúng tôi xử lý thông tin nhạy cảm mà bạn lựa chọn đưa vào câu hỏi của mình nhằm vận hành các cuộc tranh luận. Chúng tôi ghi lại phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm đồng ý. Nếu không có sự đồng ý này, bạn không thể bắt đầu một cuộc tranh luận. Bạn có thể rút lại sự đồng ý bất cứ lúc nào bằng cách đóng tài khoản. Bạn cũng có thể không đưa thông tin đó vào hoặc xóa cuộc tranh luận chứa thông tin đó. Nội dung bạn công khai về bản thân là dữ liệu mà bạn đã lựa chọn công khai." },
+      { kind: "p", text: "Về bạn. Trước cuộc tranh luận đầu tiên, trên một màn hình riêng biệt, bạn đồng ý rõ ràng cho phép chúng tôi xử lý thông tin nhạy cảm mà bạn lựa chọn đưa vào câu hỏi của mình nhằm vận hành các cuộc tranh luận. Chúng tôi ghi lại phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm đồng ý. Nếu không có sự đồng ý này, bạn không thể bắt đầu một cuộc tranh luận. Bạn có thể rút lại sự đồng ý bất cứ lúc nào bằng cách viết tới privacy@dezbatere.ro. Bạn cũng có thể không đưa thông tin đó vào hoặc xóa cuộc tranh luận chứa thông tin đó. Nội dung bạn công khai về bản thân là dữ liệu mà bạn đã lựa chọn công khai." },
       { kind: "p", text: "Về người khác. Không có điều kiện pháp lý nào cho phép chúng tôi xử lý dữ liệu nhạy cảm về một bên thứ ba mà bạn nêu tên trong câu hỏi, và các nhà cung cấp AI của chúng tôi cũng không có điều kiện đó. Đây là lý do Điều khoản nghiêm cấm việc này, chúng tôi giảm thiểu dữ liệu gửi đi và nhanh chóng gỡ nội dung đó khi có yêu cầu — mục 11." },
       { kind: "p", text: "Thông tin sức khỏe. Một số quốc gia áp dụng luật cụ thể đối với dữ liệu liên quan đến sức khỏe, bao gồm cả các suy luận. Nếu bạn sống tại [the State of Washington], một [Consumer Health Data Privacy Notice] riêng sẽ được áp dụng." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Hạn chế (Art. 18) — Yêu cầu chúng tôi ngừng xử lý dữ liệu cụ thể trong khi tranh chấp liên quan đến dữ liệu đó được giải quyết",
         "Phản đối (Art. 21) — Phản đối việc xử lý dựa trên lợi ích hợp pháp — hoạt động xử lý bảo mật và kiểm toán tại mục 4 — và chúng tôi sẽ dừng trừ khi có thể chứng minh lý do thuyết phục. Phản đối tiếp thị bất cứ lúc nào và chúng tôi sẽ dừng",
         "Khả năng di chuyển dữ liệu (Art. 20) — Các cuộc tranh luận và dữ liệu tài khoản của bạn ở định dạng thông dụng, máy có thể đọc được. [Pending: same export as Access.] Nội dung không phải dữ liệu cá nhân do bạn tạo, chẳng hạn câu hỏi của bạn, sẽ được trả lại theo yêu cầu khi hợp đồng chấm dứt",
-        "Rút lại sự đồng ý (Art. 7(3)) — Rút lại sự đồng ý tiếp thị từ bất kỳ email nào hoặc trong phần Cài đặt; rút lại sự đồng ý về dữ liệu nhạy cảm bằng cách đóng tài khoản (bạn cũng có thể không đưa dữ liệu đó vào hoặc xóa cuộc tranh luận chứa dữ liệu đó). Việc rút lại không ảnh hưởng đến hoạt động xử lý đã diễn ra",
+        "Rút lại sự đồng ý (Art. 7(3)) — Rút lại sự đồng ý tiếp thị từ bất kỳ email nào hoặc trong phần Cài đặt; rút lại sự đồng ý về dữ liệu nhạy cảm bằng cách viết tới privacy@dezbatere.ro (bạn cũng có thể không đưa dữ liệu đó vào hoặc xóa cuộc tranh luận chứa dữ liệu đó). Việc rút lại không ảnh hưởng đến hoạt động xử lý đã diễn ra",
         "Khiếu nại — Gửi đến cơ quan giám sát Romania, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, anspdcp@dataprotection.ro, hoặc đến cơ quan tại quốc gia nơi bạn sinh sống. Chúng tôi mong bạn liên hệ với chúng tôi trước"
         ]
       },
@@ -242,7 +242,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Khi thay đổi chính sách này, chúng tôi đăng phiên bản mới kèm bản tóm tắt những thay đổi và ngày hiệu lực mới, đồng thời lưu các phiên bản trước tại [dezbatere.ro/privacy/versions]. Đối với thay đổi bổ sung mục đích mới hoặc bên nhận mới, chúng tôi thông báo cho bạn trước khi hoạt động xử lý mới bắt đầu, qua email và trong sản phẩm, đồng thời dành cho bạn thời gian phản đối. Khi mục đích mới phụ thuộc vào sự đồng ý của bạn — ví dụ nếu sau này chúng tôi muốn sử dụng nội dung để cải thiện mô hình — chúng tôi sẽ xin sự đồng ý đó một cách riêng biệt và cụ thể; chúng tôi không bao giờ coi việc chấp nhận Điều khoản cập nhật là sự đồng ý cho hoạt động xử lý mới. Đối với các nội dung làm rõ không làm thay đổi cách chúng tôi hành động, chúng tôi chỉ đăng phiên bản mới." },
-      { kind: "p", text: "Chính sách này được cập nhật lần cuối vào [date]. Phiên bản 3.0 thay thế phiên bản 2.1, vốn mô tả dữ liệu phiên, thời hạn lưu giữ, dữ liệu phân tích, việc xuất dữ liệu và tác dụng của việc xóa đối với các cuộc tranh luận đã công khai theo những cách không còn phản ánh đúng dịch vụ." }
+      { kind: "p", text: "Chính sách này được cập nhật lần cuối vào [date]. Phiên bản 3.1 thay thế phiên bản 2.1, vốn mô tả dữ liệu phiên, thời hạn lưu giữ, dữ liệu phân tích, việc xuất dữ liệu và tác dụng của việc xóa đối với các cuộc tranh luận đã công khai theo những cách không còn phản ánh đúng dịch vụ." }
     ]
   },
   {
@@ -346,12 +346,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "8999f23a08d69181e0c4ae98a3f8718488f3128dbf70c1a754e71ac9f34d9871",
-  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.0 · CÓ HIỆU LỰC [DATE]",
+  version: "3.1",
+  sha256: "037a70a2d7abb78932649c23db1181c6fc5751100b7f89680a52d67f595253b0",
+  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.1 · CÓ HIỆU LỰC [DATE]",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",
-  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Nội dung Chính sách quyền riêng tư",
   sectionIdPrefix: "policy-section-",

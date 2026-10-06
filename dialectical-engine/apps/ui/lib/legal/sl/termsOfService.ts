@@ -380,12 +380,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.0",
-  sha256: "9861a09475cccea1d4282c76fd1cc5f12a62877c11b65968255f364daed8c99d",
-  eyebrow: "POGOJI UPORABE · v2.0 · VELJAVNI OD [DATE]",
+  version: "2.1",
+  sha256: "a82bb30d952d681c2b1839edf00be927141f66ea1e59ca8f3de65132b2d200ca",
+  eyebrow: "POGOJI UPORABE · v2.1 · VELJAVNI OD [DATE]",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DebateAIRO S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.0",
+  endMarker: "KONEC POGOJEV · v2.1",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",
