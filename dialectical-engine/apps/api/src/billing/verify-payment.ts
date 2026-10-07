@@ -14,9 +14,10 @@ import type { BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { PoolClient } from "pg";
 import { credentialsRefused, type BillingAudit } from "./audit.js";
 import { adoptingKindOf, chooseAdoptableToken, writeCardSaved, type AdoptingKind } from "./card-adoption.js";
-import type { NoticeOutcome, RequestedRefundReason } from "./codes.js";
+import { REFUND_REASONS_REFUSING_THE_PAYMENT, type NoticeOutcome, type RequestedRefundReason } from "./codes.js";
 import { enqueueEmail } from "./email-job.js";
 import { locationVerdict } from "./location-verdict.js";
+import { clientIdOf } from "./netopia-payer.js";
 import {
   DONE, notFinalRetryAt, otherPaymentSystem, otherXMoneySystem, type OutboxHandler, type OutboxOutcome
 } from "./outbox.js";
@@ -104,6 +105,13 @@ const sameOrderPayment = (charge: ChargeRow): SecondPayment => Object.freeze({
 const CHARGE_REF = /^[0-9a-f]{32}$/u;
 /** The plan states that keep a card (spec §2.15.4). */
 const CARD_HOLDING: ReadonlySet<string> = new Set(["ACTIVE", "PAST_DUE", "SUSPENDED"]);
+/**
+ * Spec §2.13 / A9: the refund reasons that mean a payment bought nothing (a refusal, a second payment, a card check's
+ * hold). A charge-back of such a payment is recorded with the code DUPLICATE_PAYMENT and never changes a plan.
+ */
+const BOUGHT_NOTHING: ReadonlySet<string> = new Set<string>([
+  ...REFUND_REASONS_REFUSING_THE_PAYMENT, "DUPLICATE_PAYMENT", "UPGRADE_CLOSED", "CARD_CHECK_RELEASE"
+]);
 
 /** Spec §2.8 step 2: a report from the newest stored (signed) notice; it carries no decline code, so never "bank refused". */
 function reportFromNotice(orderId: string, notice: PaymentNoticeRow): PaymentReport | null {
@@ -121,9 +129,6 @@ function reportFromNotice(orderId: string, notice: PaymentNoticeRow): PaymentRep
     declineSide: state === "DECLINED" ? "CARD" as const : null, bankDeclined: false, occurredAt: null, clientId: null
   });
 }
-
-/** Spec §2.6.4: the client id NETOPIA echoes is our customer id as 32 lower-case hex (the same rule as N11's `clientIdOf`). */
-const clientIdMatches = (echoed: string, customerId: string): boolean => echoed === customerId.replaceAll("-", "").toLowerCase();
 
 /** Spec §2.11: how long a paid or authorised 0 card check waits for its saved card before it fails CARD_NOT_SAVED. */
 function cardSaveWaitMs(): number {
@@ -1030,7 +1035,7 @@ export class VerifyPaymentHandler {
     return read;
   }
 
-  /** Spec §2.8 step 3 by state. `fromNotice`: no retry here. REFUNDED is N14's (§2.12.4); CHARGEBACK_* (N15) go to the owner for now. */
+  /** Spec §2.8 step 3 by state. `fromNotice`: no retry here. REFUNDED is N14's (§2.12.4); CHARGEBACK_* are N15's (§2.13). */
   private async decideNetopia(
     job: OutboxJob, charge: ChargeWithEvents, report: PaymentReport, now: Date, fromNotice: boolean
   ): Promise<OutboxOutcome> {
@@ -1066,9 +1071,11 @@ export class VerifyPaymentHandler {
       case "REFUNDED":
         return this.netopiaRefunded(charge, report, now);
       case "CHARGEBACK_OPENED":
+        return this.netopiaChargedBack(charge, report, now, "OPENED");
       case "CHARGEBACK_LOST":
+        return this.netopiaChargedBack(charge, report, now, "LOST");
       case "CHARGEBACK_REPRESENTED":
-        return this.netopiaOwnerReview(charge, report, now, false);
+        return this.netopiaChargedBack(charge, report, now, "REPRESENTED");
       case "UNCLEAR":
         return this.netopiaOwnerReview(charge, report, now, true);
       default:
@@ -1088,7 +1095,8 @@ export class VerifyPaymentHandler {
     if (report.amountMicros === null || report.amountMicros !== charge.totalMicros || report.currency !== charge.currency) {
       return "PAYMENT_AMOUNT_MISMATCH";
     }
-    if (report.clientId !== null && !clientIdMatches(report.clientId, customerId)) return "PAYMENT_CUSTOMER_MISMATCH";
+    // Spec §2.6.4: the client id NETOPIA echoes is our customer id as 32 lower-case hex (PR-7's one rule, PR-37).
+    if (report.clientId !== null && report.clientId !== clientIdOf(customerId)) return "PAYMENT_CUSTOMER_MISMATCH";
     return null;
   }
 
@@ -1284,6 +1292,70 @@ export class VerifyPaymentHandler {
       return DONE;
     }
     await this.deps.refunds.recordNetopiaRefund(open.intent, open.openMicros, now);
+    return DONE;
+  }
+
+  /**
+   * Spec §2.13 (ruling C-7): a charge-back NETOPIA reports as a status of the payment itself. Under the owner lock, the
+   * charge read again on the transaction's own client: one CHARGEBACK per payment (0086's key), written first whatever
+   * the status (a 10 or a 16 whose 9 was never seen still pauses the plan first), then SUSPENDED + Free + M10 for a live
+   * plan; a payment that bought nothing (`BOUGHT_NOTHING`) is coded DUPLICATE_PAYMENT and changes no plan. A 16 then
+   * adds CHARGEBACK_REPRESENTED once. A 10 ("chargeback accepted") is never acted on further by itself (N-8): the
+   * notice's outcome OWNER_REVIEW and one O3 tell the owner, who ends the plan with `pnpm billing:dispute`.
+   */
+  private async netopiaChargedBack(
+    charge: ChargeWithEvents, report: PaymentReport, now: Date, stage: "OPENED" | "LOST" | "REPRESENTED"
+  ): Promise<OutboxOutcome> {
+    const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
+    const paymentId = paid?.providerPaymentId ?? report.providerPaymentId;
+    const owner = await this.owner(charge);
+    const recorded = await this.deps.repository.withTransaction(async (client): Promise<boolean> => {
+      await this.deps.jobs.lockOwner(client, owner.ownerRef);
+      const current = (await this.deps.repository.charge(charge.chargeId, client)) ?? charge;
+      const boughtNothing = charge.kind === "CARD_CHECK" || current.events.some((event) => event.kind === "REFUND_REQUESTED"
+        && event.errorCode !== null && BOUGHT_NOTHING.has(event.errorCode));
+      let written = false;
+      if (!current.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)) {
+        const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
+          providerPaymentId: paymentId, amountMicros: paid?.amountMicros ?? charge.totalMicros,
+          errorCode: boughtNothing ? "DUPLICATE_PAYMENT" : null
+        }));
+        written = inserted === "INSERTED";
+        if (written && !boughtNothing) {
+          const { subscription } = await this.context(client, charge, null, owner, now);
+          if (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE") {
+            await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "SUSPENDED", now, { charge_id: charge.chargeId }));
+            await this.deps.entitlements.append(client, {
+              ownerRef: owner.ownerRef, planId: "FREE", periodAnchorAt: subscription.periodAnchorAt ?? now, cause: "SUSPENDED_CHARGEBACK",
+              effectiveAt: now, subscriptionId: subscription.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
+            });
+            await enqueueEmail(this.deps.repository, client, {
+              template: "M10", recipient: { kind: "CUSTOMER", customerId: owner.customerId }, dedupeRef: charge.chargeId,
+              params: { plan: subscription.planId }, notBefore: now
+            });
+          }
+        }
+      }
+      if (stage === "REPRESENTED"
+        && !current.events.some((event) => event.kind === "CHARGEBACK_REPRESENTED" && event.providerPaymentId === paymentId)) {
+        await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK_REPRESENTED", now, {
+          providerPaymentId: paymentId, amountMicros: paid?.amountMicros ?? charge.totalMicros, errorCode: null
+        }));
+      }
+      return written;
+    });
+    if (recorded) this.deps.audit("billing.chargeback", { chargeKind: charge.kind });
+    if (stage !== "LOST") return DONE;
+    const notice = await this.newestNotice(charge.chargeId);
+    if (notice !== null) await this.noticeOutcome(notice.noticeId, now, "OWNER_REVIEW");
+    this.deps.audit("billing.payment.owner_review", { state: report.state });
+    await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia!.jobs }, {
+      code: "OWNER_REVIEW", reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:CHARGEBACK_LOST`, now,
+      nextSteps: `NETOPIA reports the dispute on this payment (NETOPIA payment ${paymentId}) as lost: status 10,`
+        + " \"chargeback accepted\". The paid features are paused. NETOPIA has not confirmed what this status means, so"
+        + " nothing ends by itself. Once you have checked it in NETOPIA's admin, record the outcome with"
+        + ` pnpm billing:dispute --charge ${charge.chargeId} --outcome lost (or --outcome won).`
+    });
     return DONE;
   }
 

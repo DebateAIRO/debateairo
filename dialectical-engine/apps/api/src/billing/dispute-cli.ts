@@ -1,10 +1,12 @@
 /**
- * A9 — the owner records a card dispute's outcome, which xMoney does not signal:
+ * A9 / spec §2.13 — the owner records a card dispute's outcome, which the payment provider does not signal for certain
+ * (NETOPIA's status 10, "chargeback accepted", is unconfirmed, N-8, so it only pauses the plan and emails the owner):
  *
  *   pnpm billing:dispute --charge <32-hex charge ref> --outcome won|lost
  *
- * On the host it runs under `systemd-run` with the API's EnvironmentFile and writes as the API's own principal.
- * It prints one plain line; a refusal is ONE code on stderr (`BILLING_DISPUTE_USAGE` exits 2, the others exit 1).
+ * Disputes are keyed by the payment (`provider_payment_id`). On the host it runs under `systemd-run` with the API's
+ * EnvironmentFile and writes as the API's own principal. It prints one plain line; a refusal is ONE code on stderr
+ * (`BILLING_DISPUTE_USAGE` exits 2, the others exit 1).
  */
 import { pathToFileURL } from "node:url";
 import type { PoolClient } from "pg";
@@ -63,8 +65,14 @@ export async function recordDisputeOutcome(stores: DisputeStores, input: Dispute
   // plan. One CHARGEBACK_RESOLVED per transaction (0086's (provider_payment_id, kind) key): a charge-back is open
   // while its own transaction has none. The dispute to settle is the newest OPEN charge-back of the subscription's
   // own payment, else the newest open one of a second payment.
-  const secondPayments = new Set(charge.events.filter((event) => event.kind === "DUPLICATE_PAYMENT")
-    .map((event) => event.providerPaymentId));
+  // D5 5f / spec §2.13: a payment that bought nothing — a DUPLICATE_PAYMENT row (xMoney's second payment on an order),
+  // or a CHARGEBACK coded DUPLICATE_PAYMENT (VERIFY_PAYMENT's mark for a refused NETOPIA payment, which has no
+  // DUPLICATE_PAYMENT row) — never changed the plan.
+  const secondPayments = new Set([
+    ...charge.events.filter((event) => event.kind === "DUPLICATE_PAYMENT").map((event) => event.providerPaymentId),
+    ...charge.events.filter((event) => event.kind === "CHARGEBACK" && event.errorCode === "DUPLICATE_PAYMENT")
+      .map((event) => event.providerPaymentId)
+  ]);
   const resolved = new Set(charge.events.filter((event) => event.kind === "CHARGEBACK_RESOLVED")
     .map((event) => event.providerPaymentId));
   const chargebacks = [...charge.events].reverse()
@@ -148,8 +156,11 @@ async function otherOwnChargebackOpen(
   for (const row of await stores.billing.chargesForSubscription(subscriptionId, client)) {
     const other = await stores.billing.charge(row.chargeId, client);
     if (other === null) continue;
-    const duplicates = new Set(other.events.filter((event) => event.kind === "DUPLICATE_PAYMENT")
-      .map((event) => event.providerPaymentId));
+    const duplicates = new Set([
+      ...other.events.filter((event) => event.kind === "DUPLICATE_PAYMENT").map((event) => event.providerPaymentId),
+      ...other.events.filter((event) => event.kind === "CHARGEBACK" && event.errorCode === "DUPLICATE_PAYMENT")
+        .map((event) => event.providerPaymentId)
+    ]);
     const settled = new Set(other.events.filter((event) => event.kind === "CHARGEBACK_RESOLVED")
       .map((event) => event.providerPaymentId));
     if (other.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId !== null
