@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Id-dibattiti huma privati sakemm tippubblikahom. Il-pubblikazzjoni hija azzjoni intenzjonata u kkonfermata separatament. Dibattitu ppubblikat juri l-psewdonimu tiegħek, il-mistoqsija tiegħek kif ktibtha, is-siġra tal-argumenti, il-punteġġi, il-verdett u l-medda ta’ kunfidenza, u jkollu tikketta viżibbli li l-kontenut huwa ġġenerat mill-IA. Qatt ma juri l-indirizz elettroniku tiegħek, ir-rekords tas-sessjoni tiegħek jew l-istorja tal-kont tiegħek. [Published debates are / are not] indiċjati mill-magni tat-tiftix [unless you choose]." },
-      { kind: "p", text: "Meta tneħħi l-pubblikazzjoni, id-dibattitu jitneħħa minn DebateAI u tinqered iċ-ċavetta tal-kopja pubblika tagħna. Kopji li jkunu diġà saru mill-qarrejja, mill-magni tat-tiftix jew mill-arkivji huma barra mill-kontroll tagħna, u ma nistgħux nirtirawhom." },
+      { kind: "p", text: "Meta tneħħi l-pubblikazzjoni, id-dibattitu jitneħħa minn Dialectical Engine u tinqered iċ-ċavetta tal-kopja pubblika tagħna. Kopji li jkunu diġà saru mill-qarrejja, mill-magni tat-tiftix jew mill-arkivji huma barra mill-kontroll tagħna, u ma nistgħux nirtirawhom." },
       { kind: "p", text: "Meta tħassar il-kont tiegħek, inneħħu kull dibattitu li tkun ippubblikajt mill-aċċess pubbliku mingħajr dewmien żejjed u mhux aktar tard minn 30 jum, sakemm il-liġi ma titlobniex inżommu element speċifiku. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Persuni msemmija fid-dibattiti li mhumiex utenti tagħna",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Jekk xi ħadd jistaqsi lil DebateAI mistoqsija li ssemmik, jista’ jkollna data personali dwarek minkejja li qatt ma tkun użajt is-servizz. It-Termini jipprojbixxu lill-utenti milli jagħmlu dan, u nimminimizzaw dak li nibagħtu lill-fornituri tal-IA, iżda xorta jiġri." },
+      { kind: "p", text: "Jekk xi ħadd jistaqsi lil Dialectical Engine mistoqsija li ssemmik, jista’ jkollna data personali dwarek minkejja li qatt ma tkun użajt is-servizz. It-Termini jipprojbixxu lill-utenti milli jagħmlu dan, u nimminimizzaw dak li nibagħtu lill-fornituri tal-IA, iżda xorta jiġri." },
       { kind: "p", text: "Din it-taqsima hija l-avviż li għandna nagħtuk skont l-Artikolu 14 tal-GDPR. Id-data hija dak kollu li ttajpja l-utent u dak kollu li ġġenerat il-magna bħala tweġiba; is-sors huwa dak l-utent; l-iskopijiet u l-bażi legali huma dawk fit-taqsima 4; ir-riċevituri huma l-fornituri tal-IA fir-Reġistru; iż-żamma ssegwi t-taqsima 7. Għandek kull dritt fit-taqsima 10, u b’mod partikolari tista’ titlobna nneħħu dibattitu ppubblikat jew wieħed privat li jkun fih id-data tiegħek, u ngħidulek x’inżommu. Ma għandekx bżonn kont biex tagħmel dan. Ikteb lil privacy@dezbatere.ro jew uża l-kontroll Irrapporta fuq kwalunkwe dibattitu ppubblikat, u naġixxu fuq talbiet sostanzjati mingħajr dewmien żejjed. Ma nistgħux navżawk individwalment meta jiġri dan, għax ma nafux min int jew kif nikkuntattjawk; minflok nieħdu dawn il-miżuri: dan l-avviż pubbliku u l-mezz għat-tneħħija." },
       { kind: "p", text: "L-istess japplika għal informazzjoni sensittiva dwarek — il-politika, is-saħħa, ir-reliġjon — li tidher fil-mistoqsija ta’ xi ħadd ieħor. Ebda kundizzjoni legali ma tippermettilna nkomplu nipproċessawha ladarba toġġezzjona, u mhux se nagħmlu dan." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Tfal",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI hija għall-adulti. Tikkonferma li għandek 18-il sena jew aktar meta tirreġistra, u ma nipproċessawx konxjament id-data ta’ persuni taħt it-18-il sena. Jekk insiru nafu li kont jappartjeni lil xi ħadd taħt it-18-il sena, nagħlquh u nħassru d-data kif deskritt fit-taqsima 7. Xi pajjiżi jqisu konferma bħala insuffiċjenti jew jitolbu aktar; l-Anness B jgħid x’japplika fejn, u t-Termini jispjegaw x’nagħmlu dwar dan." }
+      { kind: "p", text: "Dialectical Engine hija għall-adulti. Tikkonferma li għandek 18-il sena jew aktar meta tirreġistra, u ma nipproċessawx konxjament id-data ta’ persuni taħt it-18-il sena. Jekk insiru nafu li kont jappartjeni lil xi ħadd taħt it-18-il sena, nagħlquh u nħassru d-data kif deskritt fit-taqsima 7. Xi pajjiżi jqisu konferma bħala insuffiċjenti jew jitolbu aktar; l-Anness B jgħid x’japplika fejn, u t-Termini jispjegaw x’nagħmlu dwar dan." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI juża tmien elementi, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn DebateAI: erba’ cookies u erba’ entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-Politika dwar il-Cookies fuq [dezbatere.ro/cookies] telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra." },
+      { kind: "p", text: "Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 5 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-Politika dwar il-Cookies fuq [dezbatere.ro/cookies] telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — 14-il jum",
         "__Host-debateai-age-refusal — Fajl cookie (HttpOnly) — Wara li verifika tal-età tiġi rrifjutata, iżomm lil dan il-browser milli jerġa’ jipprova għal 30 jum. Fih biss il-kelma “irrifjutat”, l-ebda data personali. — 30 jum",
         "debateai.locale — Fajl cookie — Tiftakar il-lingwa tal-interfaċċja li għażilt. — 1 sena",
+        "__Host-debateai-staff — Fajl cookie (HttpOnly) — Aċċess separat għall-persunal — Sa 8 sigħat; 15-il minuta ta’ inattività",
+        "__Host-debateai-staff-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — Sa 8 sigħat; 15-il minuta ta’ inattività",
+        "__Host-debateai-password-reset — Fajl cookie (HttpOnly) — Reset tal-password biss — Sa 30 minuta",
+        "__Host-debateai-password-reset-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — Sa 30 minuta",
+        "__Host-debateai-mfa-recovery — Fajl cookie (HttpOnly) — Irkupru tal-awtentikatur biss — Sa 299 sekonda",
+        "__Host-debateai-mfa-recovery-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — Sa 299 sekonda",
+        "__Host-debateai-social-flow — Fajl cookie (HttpOnly) — Dħul qasir permezz ta’ fornitur jew rabta tal-kont — Sa 5 minuti",
+        "__Host-debateai-social-apple — Fajl cookie (HttpOnly) — Dħul qasir permezz ta’ fornitur jew rabta tal-kont — Sa 5 minuti",
+        "__Host-debateai-social-browser — Fajl cookie (HttpOnly) — Dħul qasir permezz ta’ fornitur jew rabta tal-kont — Sa 5 minuti",
         "debateai.consent — Ħażna lokali — Jiftakar li rajt l-avviż dwar il-cookies, biex jintwera darba biss. — Sakemm tħassarha",
         "debateai.mode — Ħażna lokali — Jekk tużax il-modalità ċara jew dik skura. — Sakemm tħassarha",
         "debateai.languageOffer.dismissed — Ħażna tas-sessjoni — Jiftakar, għal din it-tab, li rrifjutajt l-offerta li jintwera dibattitu b’lingwa oħra. — Sakemm tagħlaq it-tab",
-        "debateai.support.conversation.v2 — Ħażna tas-sessjoni — Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta xi ħadd jidħol jew joħroġ mill-kont f’din it-tab. — Sakemm tagħlaq it-tab"
+        "debateai.support.conversation.v2 — Ħażna tas-sessjoni — Iżomm il-konversazzjoni tiegħek mal-chat tal-għajnuna fuq l-iskrin sakemm it-tab tibqa’ miftuħa. Titħassar meta xi ħadd jidħol jew joħroġ mill-kont f’din it-tab. — Sakemm tagħlaq it-tab",
+        "debateai.phone-completion-draft.v1 — Ħażna tas-sessjoni — Mistoqsija mhux lesta waqt il-pass tat-telefon; titħassar meta tinbidel is-sessjoni, toħroġ jew jinbidel is-sid — 15-il minuta jew sakemm jitħassar qabel"
         ]
       },
-      { kind: "p", text: "L-ebda parti oħra ma tiġbor, permezz ta’ DebateAI, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web." },
-      { kind: "p", text: "Il-browsers jistgħu jibagħtu sinjal “Do Not Track” jew sinjal simili. DebateAI ma jsegwikx, għalhekk m’hemm xejn x’jitfi sinjal bħal dan: is-servizz jaħdem bl-istess mod bih jew mingħajru." },
+      { kind: "p", text: "L-ebda parti oħra ma tiġbor, permezz ta’ Dialectical Engine, informazzjoni dwar l-attivitajiet tiegħek online matul iż-żmien u fuq diversi siti web." },
+      { kind: "p", text: "Il-browsers jistgħu jibagħtu sinjal “Do Not Track” jew sinjal simili. Dialectical Engine ma jsegwikx, għalhekk m’hemm xejn x’jitfi sinjal bħal dan: is-servizz jaħdem bl-istess mod bih jew mingħajru." },
       { kind: "p", text: "Biex tirrifjuta dawn l-elementi, imblokka jew ħassar il-cookies u d-data tas-sit għal dan is-sit fis-settings tal-browser tiegħek. X’jieqaf jaħdem imbagħad: id-dħul fil-kont, u t-tfakkir tal-għażliet tiegħek tal-lingwa u tal-wiri; l-avviż dwar il-cookies jerġa’ jidher ukoll." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "L-Ukrajna (biss jekk elenkata)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tapplika l-Liġi tal-Ukrajna “Dwar il-Protezzjoni tad-Data Personali”. Ma noffrux DebateAI fiż-żoni tal-Ukrajna li mhumiex ikkontrollati mill-gvern tagħha. Id-data tiegħek tmur lejn pajjiżi tal-UE u l-Istati Uniti (ara r-Reġistru). Tista’ tilmenta mal-Kummissarju tal-Parlament Ukren għad-Drittijiet tal-Bniedem." }
+      { kind: "p", text: "Tapplika l-Liġi tal-Ukrajna “Dwar il-Protezzjoni tad-Data Personali”. Ma noffrux Dialectical Engine fiż-żoni tal-Ukrajna li mhumiex ikkontrollati mill-gvern tagħha. Id-data tiegħek tmur lejn pajjiżi tal-UE u l-Istati Uniti (ara r-Reġistru). Tista’ tilmenta mal-Kummissarju tal-Parlament Ukren għad-Drittijiet tal-Bniedem." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "16ff07400b02d96ee9853d0fe724ed60e42af98cc864b24f983aca83e8e0c5e5",
-  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.0 · EFFETTIVA [DATE]",
+  version: "3.1",
+  sha256: "7bee4487ff9de9a616afc6fa8fe0bfb854ea2e020f7e7c40cc6330ea53230202",
+  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.1 · EFFETTIVA [DATE]",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",
-  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Test tal-Politika dwar il-Privatezza",
   sectionIdPrefix: "policy-section-",

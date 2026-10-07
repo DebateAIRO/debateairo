@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountMenu } from "@/components/AccountMenu";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentProps } from "react";
@@ -13,7 +14,8 @@ import { isCardFormPath } from "../content-security-policy.mjs";
 const SCREEN_TITLES: Record<string, string> = {
   "/": "chrome.library",
   "/new": "chrome.newDebate",
-  "/settings": "chrome.settings",
+  "/settings": "chrome.account",
+  "/settings/security": "chrome.security",
   "/ai-transparency": "chrome.aiTransparency",
   "/admin/workers": "chrome.workers",
   "/legal": "chrome.legalPages",
@@ -111,24 +113,13 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
-        <TopBarLink fullDocumentLoad={fullDocumentLoad} className="btn topBarWide" href="/settings">
-          {t(catalog, "chrome.account")}
-        </TopBarLink>
+        <AccountMenu catalog={catalog} />
         <TopBarLink fullDocumentLoad={fullDocumentLoad} className="btn btnDark" href="/new">
           <span className="topBarNewLabel">+ {t(catalog, "chrome.newDebate")}</span>
         </TopBarLink>
-        <span className="roleChip topBarWide" title={t(catalog, "chrome.askerRolePlaceholder")}>{t(catalog, "chrome.asker")}</span>
         <LanguageSwitcher />
         <ModeToggle />
-        <TopBarLink
-          fullDocumentLoad={fullDocumentLoad}
-          className="iconBtn"
-          href="/settings"
-          aria-label={t(catalog, "chrome.settings")}
-          title={t(catalog, "chrome.settings")}
-        >
-          ⚙
-        </TopBarLink>
+
       </div>
     </header>
   );

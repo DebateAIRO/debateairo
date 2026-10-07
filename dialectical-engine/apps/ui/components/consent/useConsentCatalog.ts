@@ -2,6 +2,7 @@
 
 import { createContext, createElement, useContext, type ReactNode } from "react";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { catalogLocale } from "@/lib/i18n/locales";
 import type { MessageCatalog } from "@/lib/i18n/translate";
 import { inventoryCopy } from "@/lib/legal/pages";
 import consentMessages from "@/messages/en/consent.json";
@@ -45,9 +46,9 @@ export function useConsentCatalog(): MessageCatalog {
   const { locale } = useChromeI18n();
   if (served !== null) return served;
   const consentEnglish = englishConsentCatalog();
-  // The English catalogue is the English path only: an "en" reader outside the
-  // provider (isolated component renders) reads it directly.
-  if (locale === "en") return consentEnglish;
+  // Readers of the English catalog, including regional preferences, can render
+  // isolated components without a served provider.
+  if (catalogLocale(locale) === "en") return consentEnglish;
   throw new Error(
     `useConsentCatalog: no consent catalogue was served for "${locale}"; mount ConsentCatalogProvider with the locale's consent namespace`
   );

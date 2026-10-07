@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "在您发布辩论之前，辩论均为私密内容。发布是一项有意作出并须单独确认的操作。已发布的辩论会显示您的化名、您所写的问题、论证树、评分、裁决和置信区间，并带有内容由 AI 生成的醒目标识。它绝不会显示您的电子邮箱地址、会话记录或账户历史。[Published debates are / are not] 被搜索引擎编入索引 [unless you choose]。" },
-      { kind: "p", text: "取消发布会从 DebateAI 移除该辩论，并销毁我们公开副本的密钥。读者、搜索引擎或档案服务已经制作的副本不受我们控制，我们无法将其收回。" },
+      { kind: "p", text: "取消发布会从 Dialectical Engine 移除该辩论，并销毁我们公开副本的密钥。读者、搜索引擎或档案服务已经制作的副本不受我们控制，我们无法将其收回。" },
       { kind: "p", text: "当您删除账户时，我们会在不无故拖延且最迟 30 天内，撤销公众对您所发布全部辩论的访问，除非法律要求我们保留特定项目。[Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "辩论中所提及的非本公司用户",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "如果有人向 DebateAI 提出涉及您姓名的问题，即使您从未使用过本服务，我们也可能持有关于您的个人数据。《条款》禁止用户这样做；我们也会尽量减少向 AI 提供商发送的信息，但这种情况仍可能发生。" },
+      { kind: "p", text: "如果有人向 Dialectical Engine 提出涉及您姓名的问题，即使您从未使用过本服务，我们也可能持有关于您的个人数据。《条款》禁止用户这样做；我们也会尽量减少向 AI 提供商发送的信息，但这种情况仍可能发生。" },
       { kind: "p", text: "本节是我们根据 GDPR 第 14 条应向您提供的通知。相关数据包括用户输入的任何内容及系统针对该内容生成的任何回复；来源为该用户；目的和法律依据见第 4 节；接收方为《名录》中的 AI 提供商；保留方式依照第 7 节。您享有第 10 节中的所有权利，尤其可要求我们移除含有您数据的已发布或私密辩论，并告知我们持有哪些相关数据。您无需账户即可这样做。请发送邮件至 privacy@dezbatere.ro，或使用任何已发布辩论上的举报控件；对于证据充分的请求，我们会及时处理且不无故拖延。发生这种情况时，我们无法逐一通知您，因为我们不知道您是谁或如何与您联系；作为替代措施，我们提供本公开通知及移除途径。" },
       { kind: "p", text: "这同样适用于他人问题中出现的关于您的敏感信息，例如政治、健康或宗教信息。一旦您提出反对，任何法律条件均不允许我们继续处理此类信息，我们也不会继续处理。" }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "儿童",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI 面向成年人。注册时，您须确认自己年满 18 周岁；我们不会在明知的情况下处理任何未满 18 周岁人士的数据。如果我们得知某账户属于未满 18 周岁人士，会按照第 7 节所述关闭该账户并删除数据。某些国家认为仅作确认并不足够，或另有要求；附件 B 说明各区域适用的要求，《条款》则说明我们的处理方式。" }
+      { kind: "p", text: "Dialectical Engine 面向成年人。注册时，您须确认自己年满 18 周岁；我们不会在明知的情况下处理任何未满 18 周岁人士的数据。如果我们得知某账户属于未满 18 周岁人士，会按照第 7 节所述关闭该账户并删除数据。某些国家认为仅作确认并不足够，或另有要求；附件 B 说明各区域适用的要求，《条款》则说明我们的处理方式。" }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI 使用八个项目，全部为您所请求的服务严格必要，且全部仅由 DebateAI 设置：四个 cookie 和您浏览器存储中的四个条目。我们不设置分析、广告或跟踪 cookie。[dezbatere.ro/cookies] 的 Cookie 政策会列出这些项目，并说明每一项的作用及其接收方，且会在添加任何其他内容之前作出修改。" },
+      { kind: "p", text: "Dialectical Engine 使用18个项目，全部为您所请求的服务严格必要，且全部仅由 Dialectical Engine 设置：13个 cookie 和您浏览器存储中的5个条目。我们不设置分析、广告或跟踪 cookie。[dezbatere.ro/cookies] 的 Cookie 政策会列出这些项目，并说明每一项的作用及其接收方，且会在添加任何其他内容之前作出修改。" },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Cookie 文件 — 防止其他网站以您的名义提交表单。 — 14 天",
         "__Host-debateai-age-refusal — Cookie 文件 (HttpOnly) — 年龄验证被拒绝后，在 30 天内阻止此浏览器再次尝试。其中只保存“已拒绝”一词，不含任何个人数据。 — 30 天",
         "debateai.locale — Cookie 文件 — 记住您选择的界面语言。 — 1 年",
+        "__Host-debateai-staff — Cookie 文件 (HttpOnly) — 单独的员工访问 — 最多8小时；闲置15分钟",
+        "__Host-debateai-staff-csrf — Cookie 文件 — 防止其他网站以您的名义提交表单。 — 最多8小时；闲置15分钟",
+        "__Host-debateai-password-reset — Cookie 文件 (HttpOnly) — 仅重置密码 — 最多30分钟",
+        "__Host-debateai-password-reset-csrf — Cookie 文件 — 防止其他网站以您的名义提交表单。 — 最多30分钟",
+        "__Host-debateai-mfa-recovery — Cookie 文件 (HttpOnly) — 仅恢复验证器 — 最多299秒",
+        "__Host-debateai-mfa-recovery-csrf — Cookie 文件 — 防止其他网站以您的名义提交表单。 — 最多299秒",
+        "__Host-debateai-social-flow — Cookie 文件 (HttpOnly) — 短期服务商登录或账户关联流程 — 最多5分钟",
+        "__Host-debateai-social-apple — Cookie 文件 (HttpOnly) — 短期服务商登录或账户关联流程 — 最多5分钟",
+        "__Host-debateai-social-browser — Cookie 文件 (HttpOnly) — 短期服务商登录或账户关联流程 — 最多5分钟",
         "debateai.consent — 本地存储 — 记录您已看过 Cookie 通知，因此该通知只显示一次。 — 直至您将其清除",
         "debateai.mode — 本地存储 — 记录您使用浅色模式还是深色模式。 — 直至您将其清除",
         "debateai.languageOffer.dismissed — 会话存储 — 在此标签页中记录您已拒绝以其他语言显示辩论的提议。 — 直至您关闭标签页",
-        "debateai.support.conversation.v2 — 会话存储 — 在标签页保持打开期间，让您与帮助聊天的对话留在屏幕上。只要有人在此标签页中登录或退出登录，对话就会被清除。 — 直至您关闭标签页"
+        "debateai.support.conversation.v2 — 会话存储 — 在标签页保持打开期间，让您与帮助聊天的对话留在屏幕上。只要有人在此标签页中登录或退出登录，对话就会被清除。 — 直至您关闭标签页",
+        "debateai.phone-completion-draft.v1 — 会话存储 — 电话步骤中未完成的问题；会话变更、退出登录或所有者变更时清除 — 15分钟或提前清除"
         ]
       },
-      { kind: "p", text: "没有任何其他方通过 DebateAI 收集有关您长期以及跨网站的在线活动的信息。" },
-      { kind: "p", text: "浏览器可以发送“Do Not Track”信号或类似信号。DebateAI 不会跟踪您，因此这类信号没有任何可关闭的对象：无论是否发送该信号，服务的运行方式都相同。" },
+      { kind: "p", text: "没有任何其他方通过 Dialectical Engine 收集有关您长期以及跨网站的在线活动的信息。" },
+      { kind: "p", text: "浏览器可以发送“Do Not Track”信号或类似信号。Dialectical Engine 不会跟踪您，因此这类信号没有任何可关闭的对象：无论是否发送该信号，服务的运行方式都相同。" },
       { kind: "p", text: "如需拒绝这些项目，请在浏览器设置中阻止或删除本网站的 cookie 和网站数据。随后将停止运作的功能：登录，以及对您的语言和显示方式选择的记忆；cookie 通知也会再次显示。" }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "乌克兰 (仅在列明时适用)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "适用乌克兰《个人数据保护法》。我们不在乌克兰政府未控制的乌克兰地区提供 DebateAI。您的数据会传输至欧盟国家和美国（见《名录》）。您可以向乌克兰议会人权专员投诉。" }
+      { kind: "p", text: "适用乌克兰《个人数据保护法》。我们不在乌克兰政府未控制的乌克兰地区提供 Dialectical Engine。您的数据会传输至欧盟国家和美国（见《名录》）。您可以向乌克兰议会人权专员投诉。" }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "12a3c78e94c3e56eaaf984cdf29d555f9815948295b73aa2c3025b37e4589036",
-  eyebrow: "隐私政策 · v3.0 · 生效日期 [DATE]",
+  version: "3.1",
+  sha256: "143c0ead0a88f5ae5f19ceb42b08683e07730542c7f93b26fc627b6521d5af86",
+  eyebrow: "隐私政策 · v3.1 · 生效日期 [DATE]",
   title: "我们存储哪些内容及其原因",
   lede: "以通俗语言说明您依据 GDPR (EU) 2016/679 享有的权利及我们承担的义务。共十四节及附件 B — 请滚动至末尾。",
-  endMarker: "政策结束 · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "政策结束 · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "隐私政策正文",
   sectionIdPrefix: "policy-section-",

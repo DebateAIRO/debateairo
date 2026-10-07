@@ -27,8 +27,8 @@ export const SUPPORT_ACTION_IDS = Object.freeze([
   "sample-transcript",
   "settings",
   "active-sessions",
+  "security",
   "privacy-preferences",
-  "claim-legacy",
   "delete-account",
   "public-catalog",
   "your-debates",
@@ -130,14 +130,14 @@ export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object
   action({ id: "sample-transcript", labels: labels("Transcripts", "Transcrieri"), availability: "signed-out", href: "/#transcripts" }),
   action({ id: "settings", labels: labels("Settings", "Setări"), availability: "signed-in", href: "/settings" }),
   action({ id: "active-sessions", labels: labels("Active sessions", "Sesiuni active"), availability: "signed-in", href: "/settings#active-sessions-heading" }),
+  action({ id: "security", labels: labels("Security", "Securitate"), availability: "signed-in", href: "/settings/security" }),
   action({ id: "privacy-preferences", labels: labels("Privacy", "Confidențialitate"), availability: "signed-in", href: "/settings#consent-privacy-heading" }),
-  action({ id: "claim-legacy", labels: labels("Claim legacy debates", "Revendicați dezbaterile vechi"), availability: "signed-in", href: "/settings#legacy-run-claim-heading" }),
   action({ id: "delete-account", labels: labels("Delete account", "Ștergeți contul"), availability: "signed-in", href: "/settings#account-deletion-heading" }),
   action({ id: "public-catalog", labels: labels("Public debates", "Dezbateri publice"), availability: "signed-in", href: "/?tab=public" }),
   action({ id: "your-debates", labels: labels("Your debates", "Dezbaterile dvs."), availability: "signed-in", href: "/?tab=yours" }),
   action({ id: "owner-debate", labels: labels("Open your debate", "Deschideți dezbaterea dumneavoastră"), availability: "owner", href: null }),
   action({ id: "public-debate", labels: labels("Open public debate", "Deschideți dezbaterea publică"), availability: "public-reference", href: null }),
-  action({ id: "forgot-password", labels: labels("Forgot password", "Am uitat parola"), availability: "unresolved", href: null }),
+  action({ id: "forgot-password", labels: labels("Recovery access", "Acces de recuperare"), availability: "signed-out", href: "/recover" }),
 ]);
 
 /** Closed visitor-visible labels copied from the reviewed public menu inventory. */
@@ -150,8 +150,8 @@ export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze(
   guideLabel("app-navigation","method",["How it works","Method"],["Cum funcționează","Metodă"]),
   guideLabel("app-navigation","sample-transcript",["Sample debate","Transcript","Transcripts"],["Exemplu de dezbatere","Transcriere","Transcrieri"]),
   guideLabel("settings-help-menus","active-sessions",["Active sessions"],["Sesiuni active","Sesiunile active"]),
+  guideLabel("settings-help-menus","security",["Security"],["Securitate"]),
   guideLabel("settings-help-menus","privacy-preferences",["Privacy preferences","Privacy"],["Preferințe de confidențialitate","Preferințele de confidențialitate","Confidențialitate"]),
-  guideLabel("settings-help-menus","claim-legacy",["Claim legacy debates"],["Revendică dezbaterile vechi"]),
   guideLabel("settings-help-menus","delete-account",["Delete account","Account deletion","Account deletion controls"],["Șterge contul","Ștergere a contului","Opțiunile de ștergere a contului"]),
   guideLabel("app-navigation","public-catalog",["Public debates","Public debate library","Browse public debates"],["Dezbateri publice","Biblioteca publică","Biblioteca de dezbateri publice"]),
   guideLabel("app-navigation","your-debates",["Your debates","My debates"],["Dezbaterile tale","Dezbaterile mele"],true,true,true),
@@ -159,7 +159,7 @@ export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze(
   guideLabel("account-access","sign-up",["Create account","Sign up","Register"],["Creează un cont","Înregistrare"]),
   guideLabel("guide-how-it-works","owner-debate",["Open your debate","Owner debate"],["Deschide dezbaterea ta","Dezbaterea proprietarului"]),
   guideLabel("view-public-debate","public-debate",["Open public debate"],["Deschide dezbaterea publică"]),
-  guideLabel("account-access","forgot-password",["Forgot password"],["Am uitat parola"]),
+  guideLabel("account-access","forgot-password",["Forgot password", "Recovery access"],["Am uitat parola", "Acces de recuperare"]),
   guideLabel("getting-started-debate","start-debate",["Create a debate"],["Creez o dezbatere","Creează o dezbatere"],false),
   guideLabel("getting-started-debate","start-debate",["New debate"],["Dezbatere nouă"],false,true),
   guideLabel("app-navigation",null,["Pricing","Theme","Identity chip","Compact Help","Topic primers","Cookie preferences"],["Prețuri","Temă","Indicator de identitate","Ajutor compact","Sugestii de subiect","Preferințe cookie"]),
@@ -383,9 +383,9 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
     audience: "member",
     availability: "signed-in",
     disposition: "action",
-    actionIds: ["settings", "active-sessions", "privacy-preferences", "claim-legacy", "delete-account"],
+    actionIds: ["settings", "security", "active-sessions", "privacy-preferences", "delete-account"],
     articleIds: ["settings-help-menus", "account-settings", "privacy-consent"],
-    searchTerms: terms(["settings", "sessions", "privacy", "consent", "legacy", "delete account"], ["setări", "sesiuni", "confidențialitate", "consimțământ", "cont vechi", "ștergere cont"]),
+    searchTerms: terms(["settings", "sessions", "privacy", "consent", "security", "delete account"], ["setări", "sesiuni", "confidențialitate", "consimțământ", "securitate", "ștergere cont"]),
   }),
   capability({
     id: "verify-email",
@@ -534,7 +534,10 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
 ]);
 
 export const SUPPORT_PAGE_ROUTES: readonly string[] = Object.freeze(
-  [...new Set(SUPPORT_CAPABILITIES.map(({ route }) => route))].sort(),
+  // Knowing these stateful routes grants no model-selectable action or private account authority.
+  [...new Set([...SUPPORT_CAPABILITIES.map(({ route }) => route),
+    "/admin/invitation", "/admin/team", "/social/complete", "/recover", "/settings/security", "/verify-recovery-email", "/reset-password", "/recover-authenticator", "/verify-backup-email"
+  ])].sort(),
 );
 
 export const SUPPORT_PROXY_ROUTES: readonly string[] = Object.freeze(["/api/[...path]"]);

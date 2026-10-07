@@ -1,0 +1,22 @@
+import { describe, it, expect } from 'vitest';
+import { decodeBase64url, encodeBase64url, decodeCbor, parseClientData, parseAuthenticatorData } from '../../apps/api/src/staff/webauthn-codec.js';
+import { cbor, fixture } from '../support/staffWebAuthnFixtures.js';
+describe('owned bounded WebAuthn codec', () => {
+    it('round-trips canonical bytes and offset views', () => { const view = Uint8Array.of(0, 1, 2, 3, 4).subarray(1, 4); expect(encodeBase64url(view)).toBe('AQID'); expect([...decodeBase64url('AQID', 3)]).toEqual([1, 2, 3]); });
+    it.each(['', 'A', 'AA=', 'AA+', 'AA/', 'AB', 'A A'])('rejects noncanonical base64url %s', x => expect(() => decodeBase64url(x, 10)).toThrow());
+    it('checks encoded and decoded lengths before accepting data', () => { expect(() => decodeBase64url('AAAA', 2)).toThrow(); expect(() => decodeBase64url('A'.repeat(11000), 8192)).toThrow(); });
+    it('decodes a bounded map from an offset view retaining exact consumed bytes', () => { const wire = cbor(new Map([[1, 2], [3, -7]])), back = Buffer.concat([Buffer.from([9]), wire, Buffer.from([8])]); expect(decodeCbor(back.subarray(1, -1))).toEqual({ value: new Map([[1, 2], [3, -7]]), consumed: wire.length }); });
+    it.each([Buffer.from([0xa2, 1, 2, 1, 3]), Buffer.from([0x18, 1]), Buffer.from([0x59, 0, 1, 0]), Buffer.from([0xbf]), Buffer.from([0xc0, 1]), Buffer.from([0xfa, 0, 0, 0, 0]), Buffer.from([0x61, 0xff]), Buffer.from([0xa1, 1])])('rejects duplicate, nonshortest, indefinite, tag, float, UTF8 and truncation %j', wire => expect(() => decodeCbor(wire)).toThrow());
+    it('rejects deep, oversized maps, excess items and trailing bytes', () => { expect(() => decodeCbor(Buffer.from([...Array(9).fill([0xa1, 0]).flat(), 0]))).toThrow(); expect(() => decodeCbor(Buffer.from([0xb8, 33]))).toThrow(); expect(() => decodeCbor(Buffer.from([0, 0]))).toThrow(); });
+    it('rejects duplicate JSON members including escaped duplicates and prototype ambiguities', () => { for (const x of ['{"type":"webauthn.get","type":"webauthn.create"}', '{"origin":1,"\\u006frigin":2}', '{"__proto__":{}}', '{"x":{"constructor":1}}'])
+        expect(() => parseClientData(Buffer.from(x))).toThrow(); });
+    it('rejects non-object, invalid UTF8 and malformed or excessive JSON', () => { for (const x of [Buffer.from('[]'), Buffer.from([0xff]), Buffer.from('{'), Buffer.from('{"x":' + '['.repeat(9) + '0' + ']'.repeat(9) + '}')])
+        expect(() => parseClientData(x)).toThrow(); expect(() => parseClientData(Buffer.alloc(4097))).toThrow(); });
+    it('enforces exact CBOR nesting and item budgets and detects duplicate empty/escaped JSON names', () => { let bounded: unknown = 0; for (let i = 0; i < 8; i++)
+        bounded = new Map([[0, bounded]]); expect(decodeCbor(cbor(bounded)).consumed).toBe(cbor(bounded).length); bounded = new Map([[0, bounded]]); expect(() => decodeCbor(cbor(bounded))).toThrow(); const inner = new Map(Array.from({ length: 32 }, (_, i) => [i, i])); const max = new Map<number, unknown>([[0, inner], [1, inner]]); expect(() => decodeCbor(cbor(max))).toThrow(); for (const json of ['{"":1,"":2}', '{"x":1,"\\u0078":2}', '{"future":{"a":1,"a":2}}'])
+        expect(() => parseClientData(Buffer.from(json))).toThrow(); });
+    it('allows bounded standard optional JSON while preserving values', () => expect(parseClientData(Buffer.from('{"type":"webauthn.get","challenge":"x","origin":"https://a","tokenBinding":{"status":"supported"},"future":{"array":[true,null,1]}}'))).toMatchObject({ type: 'webauthn.get' }));
+    it('parses exact authData slices with registration COSE wire and no AAGUID output', () => { const f = fixture(); const value = parseAuthenticatorData(f.regAuth, true); expect(value.credentialId).toEqual(f.id); expect(value.coseKey).toEqual(f.k.wire); expect(value).not.toHaveProperty('aaguid'); expect(parseAuthenticatorData(f.auth(5), false).counter).toBe(1); });
+    it.each([0, 1, 4, 0x07, 0x0d, 0x15, 0x25, 0x85, 0x45])('rejects unsafe assertion flags %i', flags => expect(() => parseAuthenticatorData(fixture().auth(flags), false)).toThrow());
+    it('rejects unexpected registration/extension bytes and credential bounds', () => { const f = fixture(); expect(() => parseAuthenticatorData(f.auth(5), true)).toThrow(); expect(() => parseAuthenticatorData(Buffer.concat([f.auth(5), Buffer.from([0])]), false)).toThrow(); const x = Buffer.from(f.regAuth); x.writeUInt16BE(769, 53); expect(() => parseAuthenticatorData(x, true)).toThrow(); });
+});

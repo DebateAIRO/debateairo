@@ -283,7 +283,9 @@ describe("the text pages render the same documents as the sign-up modals", () =>
           }).PRIVACY_POLICY;
       const page = render(<LegalDocumentBody document={document} />);
       for (const { name } of LEGAL_INVENTORY) {
-        const written = (page.textContent ?? "").split(name).length - 1;
+        // A bearer name is a prefix of its CSRF companion; count complete stored-name tokens.
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const written = (page.textContent ?? "").match(new RegExp(`${escaped}(?![A-Za-z0-9_.-])`, "g"))?.length ?? 0;
         const isolated = [...page.querySelectorAll("[dir='ltr']")].filter((node) => node.textContent === name).length;
         expect(written, `${edition}: ${name} is in the policy`).toBeGreaterThan(0);
         expect(isolated, `${edition}: every ${name} is its own left-to-right run`).toBe(written);
@@ -317,14 +319,15 @@ describe("the terms versions page lists only versions that exist", () => {
 
 describe("the cookie policy describes the cookies the product really sets", () => {
   // SPEC-v2 §2, in order: INV 1-4 are cookies, INV 5-8 live in the browser's storage.
-  const INV_COOKIES = ["__Host-debateai-session", "__Host-debateai-csrf", "__Host-debateai-age-refusal", "debateai.locale"];
-  const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2"];
-  // PLAN §2 Key map (SPEC-v2 R09, R10): the en kind, lifetime and recipient of each row, EXACT.
-  const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Local storage", "Local storage", "Session storage", "Session storage"];
-  const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab"];
-  const EN_RECIPIENT = [...Array(4).fill("DebateAI's server only"), ...Array(4).fill("stays in your browser")];
+  const INV_COOKIES = ["__Host-debateai-session", "__Host-debateai-csrf", "__Host-debateai-age-refusal", "debateai.locale",
+    "__Host-debateai-staff", "__Host-debateai-staff-csrf", "__Host-debateai-password-reset", "__Host-debateai-password-reset-csrf",
+    "__Host-debateai-mfa-recovery", "__Host-debateai-mfa-recovery-csrf", "__Host-debateai-social-flow", "__Host-debateai-social-apple", "__Host-debateai-social-browser"];
+  const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2", "debateai.phone-completion-draft.v1"];
+  const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Local storage", "Local storage", "Session storage", "Session storage", "Session storage"];
+  const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Up to 8 hours; 15-minute idle expiry", "Up to 8 hours; 15-minute idle expiry", "Up to 30 minutes", "Up to 30 minutes", "Up to 299 seconds", "Up to 299 seconds", "Up to 5 minutes", "Up to 5 minutes", "Up to 5 minutes", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab", "15 minutes or until earlier clearing"];
+  const EN_RECIPIENT = [...Array(13).fill("DebateAI's server only"), ...Array(5).fill("stays in your browser")];
   const english = legalEnglish as Record<string, string>;
-  const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "consent", "mode", "languageOffer", "supportConversation"];
+  const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "staff", "staff", "passwordReset", "passwordReset", "mfaRecovery", "mfaRecovery", "social", "social", "social", "consent", "mode", "languageOffer", "supportConversation", "phoneDraft"];
 
   it("lists INV 1-4 as cookies and INV 5-8 as browser storage, in SPEC-v2 §2 order", () => {
     expect(LEGAL_COOKIES.map(({ name }) => name)).toEqual(INV_COOKIES);
@@ -344,11 +347,15 @@ describe("the cookie policy describes the cookies the product really sets", () =
     // one the code runs. The stored value carries no person id (conversation.ts), so the row names the two events in
     // this tab that clear it: a sign-in (LoginFlow, once completeLogin succeeds) and a sign-out (SessionControls).
     expect(english["legal.cookies.supportConversation.purpose"]).toMatch(/erased when someone signs in or signs out in this tab/);
-    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/await client\.completeLogin\(challengeToken, code\);(?:\n[ \t]*\/\/[^\n]*)*\n[ \t]*clearStoredSupportConversation\(\);/);
+    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/function finish\(result: AuthenticationResponse\) \{[\s\S]*?clearStoredSupportConversation\(\);/);
+    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/await client\.completeLogin\(continuation\.challenge_token, value\.trim\(\)\);[\s\S]*?finish\(result\);/);
     // REV-S01 p2 SD-N2: a completeLogin that throws after the server set the cookie is a sign-in too; only a 4xx refusal
     // keeps the transcript (behaviour: auth-flow-integration.test.tsx, "erases the help transcript whenever …").
-    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/catch \(failure\) \{(?:\n[ \t]*\/\/[^\n]*)*\n[ \t]*if \(!isRefusal\(failure\)\) clearStoredSupportConversation\(\);/);
-    expect(source("apps/ui/components/SessionControls.tsx")).toMatch(/clearStoredSupportConversation\(\);/);
+    expect(source("apps/ui/components/LoginFlow.tsx")).toMatch(/const credentialRefused = failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500;\s*if \(!credentialRefused\) clearStoredSupportConversation\(\);/);
+    expect(source("apps/ui/components/SessionControls.tsx")).toMatch(/await endSession\(client, \{ all: true/);
+    expect(source("apps/ui/components/SessionControls.tsx")).toMatch(/await endSession\(client, \{ redirectTo:/);
+    expect(source("apps/ui/lib/endSession.ts")).toMatch(/await client\.logout\(\);\s*finishSessionCleanup\(redirectTo\);/);
+    expect(source("apps/ui/lib/endSession.ts")).toMatch(/function finishSessionCleanup[\s\S]*?clearStoredSupportConversation\(\);/);
   });
 
   it("renders every row's name, kind, purpose, sent-to and lifetime from SPEC-v2 §2", () => {
@@ -361,7 +368,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
       );
     }
     const rows = tables.flatMap((table) => [...table.querySelectorAll("tbody tr")]);
-    expect(rows.map((row) => tables.indexOf(row.closest("table") as Element))).toEqual([0, 0, 0, 0, 1, 1, 1, 1]);
+    expect(rows.map((row) => tables.indexOf(row.closest("table") as Element))).toEqual([...Array(13).fill(0), ...Array(5).fill(1)]);
     const cells = rows.map((row) => texts(row.querySelectorAll("th, td")));
     expect(rows.map((row) => row.querySelector("th code")?.textContent)).toEqual([...INV_COOKIES, ...INV_STORAGE]);
     // DONE.md default 8 (REV-S01 p1 PT-B1): a long name breaks only after a dot. Each dot-separated part is one unbreakable
@@ -406,7 +413,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
       .map((rule) => Number(/max-width:\s*(\d+)px/.exec((rule as CSSMediaRule).media.mediaText)?.[1] ?? 0));
     style.remove();
     expect(Math.max(0, ...stackedUpTo), "the cookie tables stack at every width below 995px").toBeGreaterThanOrEqual(994);
-    expect(cells.map((row) => row.length)).toEqual(Array(8).fill(5));
+    expect(cells.map((row) => row.length)).toEqual(Array(18).fill(5));
     expect(cells.map((row) => row[1])).toEqual(EN_KIND);
     expect(cells.map((row) => row[3])).toEqual(EN_RECIPIENT);
     expect(cells.map((row) => row[4])).toEqual(EN_LIFE);
@@ -571,7 +578,7 @@ describe("the footers (15a full, 15b one line)", () => {
 
   it("the layout renders the one-line footer on every page and CSS hides it under a full footer", () => {
     const layout = source("apps/ui/app/layout.tsx");
-    expect(layout).toMatch(/\{children\}\s*<CookieConsent \/>\s*<SiteFooter variant="line" \/>/);
+    expect(layout).toMatch(/\{children\}<\/AuthCatalogProvider>\s*<CookieConsent \/>\s*<SiteFooter variant="line" \/>/);
     const css = source("apps/ui/app/legal.css");
     expect(css).toMatch(/\.appShell:has\(\.siteFooterFull\) > \.siteFooterLine\s*\{\s*display: none;/);
   });

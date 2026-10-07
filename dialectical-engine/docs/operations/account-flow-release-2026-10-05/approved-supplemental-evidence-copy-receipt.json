@@ -1,0 +1,15 @@
+{
+  "schema": "task13-approved-supplemental-evidence-copy-v1",
+  "files": 75,
+  "localCommands": 12,
+  "archive": "approved-supplemental-evidence.tar.xz",
+  "archiveBytes": 1450876,
+  "archiveSha256": "d3bc5bc01ffdfe5405f6561a666a92733767eac4086c6348de50b552c3dbfa0c",
+  "approvedManifestSha256": "9d6da37479a327e94acf854bba280b2782eead68828e1b0f4144032c77e9bc60",
+  "approvedRedactionMapSha256": "928c394a4144d49bad99f2b7b59a481b0d455d9e9099041bbe2b55b054309e89",
+  "readbackEveryCandidateHashMatches": true,
+  "originalFilesModified": false,
+  "laterRootBuildReceiptsIncluded": true,
+  "scope": "Exact controller-approved local synthetic-fixture/report candidates only; changed files are plain .redacted.txt derivatives. No assertion of absolute secret absence; uncertain originals remain outside Git.",
+  "redactedLines": 20587
+}

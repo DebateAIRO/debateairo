@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EVENT_CONSUMERS } from "@debateai/contract";
+import { loadMigrationPlan, sha256, type MigrationPlan } from "../../../packages/db/src/migration-lineage.js";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 type Row = readonly [name: string, directory: string, allowed: readonly string[]];
@@ -634,7 +635,54 @@ function constraintHasReplayGuard(source: string, index: number, name: string): 
   return false;
 }
 
-export function auditMigrationReplaySafety(name: string, source: string): readonly string[] {
+export type NativeMigrationReplayContext = Readonly<{ plan: MigrationPlan; migrateSource: string }>;
+const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2";
+// Finite reviewed executable module: comments/strings/dead code cannot stand in for its controls.
+const NATIVE_MIGRATE_MODULE_SHA256 = "945892e50a4d4c60dd0f5ceec97d61cd8015ac857880c867158d213c46679f4c";
+const NATIVE_ONCE_SOURCES = new Set([
+  "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
+  "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
+]);
+
+/** The frozen native recipe owns replay through an atomic, full-name migration ledger. */
+function assertNativeReplayBinding(name: string, source: string, { plan, migrateSource }: NativeMigrationReplayContext): void {
+  const refused = (): never => { throw new Error("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED"); };
+  const bareName = name.slice("migrations/".length);
+  const declared = plan.sources.get(bareName);
+  if (name !== `migrations/${bareName}` || !NATIVE_ONCE_SOURCES.has(bareName)
+    || plan.recipeSha256 !== NATIVE_ONCE_RECIPE_SHA256
+    || sha256(migrateSource) !== NATIVE_MIGRATE_MODULE_SHA256
+    || sha256(JSON.stringify(plan.manifest, null, 2) + "\n") !== NATIVE_ONCE_RECIPE_SHA256
+    || !plan.manifest.order.includes(bareName) || declared?.sql !== source
+    || declared.sha256 !== sha256(source)
+    || plan.manifest.sources.find((entry) => entry.name === bareName)?.sha256 !== declared.sha256) refused();
+  const begin = migrateSource.indexOf("export async function migrate(pool: Pool): Promise<void> {");
+  const end = migrateSource.indexOf("\nexport ", begin + 1);
+  if (begin < 0 || end < 0) refused();
+  const native = migrateSource.slice(begin, end);
+  const controls = [
+    "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
+    'await client.query("BEGIN")', "pg_advisory_xact_lock",
+    "const lineage = identifyLineage(plan, applied, resolutions.map",
+    "const appliedSet = new Set(applied);", "const resolvedSet = new Set(resolutions.map",
+    "for (const name of plan.manifest.order)", "if (appliedSet.has(name) || resolvedSet.has(name)) continue;",
+    "await client.query(plan.sources.get(name)!.sql);",
+    "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
+    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,",
+    'await client.query("COMMIT")', "} catch (error) {", 'await client.query("ROLLBACK")',
+    "throw error;", "} finally {", "client.release();"
+  ];
+  let cursor = 0;
+  for (const control of controls) {
+    const at = native.indexOf(control, cursor);
+    if (at < 0) refused();
+    cursor = at + control.length;
+  }
+  if (bareName === "0107_auth_dev_integration.sql"
+    && !/ALTER TABLE identity\.step_up_grant DROP CONSTRAINT step_up_grant_action_check;\s*ALTER TABLE identity\.step_up_grant ADD CONSTRAINT step_up_grant_action_check CHECK \(/.test(source)) refused();
+}
+
+export function auditMigrationReplaySafety(name: string, source: string, native?: NativeMigrationReplayContext): readonly string[] {
   const findings: string[] = [];
   const sql = maskSqlComments(source);
   for (const match of sql.matchAll(/\bADD\s+COLUMN\s+(?!IF\s+NOT\s+EXISTS\b)/gi)) {
@@ -652,6 +700,13 @@ export function auditMigrationReplaySafety(name: string, source: string): readon
   for (const match of sql.matchAll(/\bCREATE\s+(UNIQUE\s+)?INDEX\s+(?!IF\s+NOT\s+EXISTS\b)/gi)) {
     const kind = match[1] === undefined ? "CREATE INDEX" : "CREATE UNIQUE INDEX";
     findings.push(`${name}:${lineAt(source, match.index)} has bare ${kind} without IF NOT EXISTS`);
+  }
+  if (native !== undefined && NATIVE_ONCE_SOURCES.has(name.slice("migrations/".length))) {
+    assertNativeReplayBinding(name, source, native);
+    // 107 has exactly one classified DROP/ADD site; its other warnings still refuse.
+    return name === "migrations/0107_auth_dev_integration.sql"
+      ? findings.filter((finding) => !finding.endsWith("has unguarded ADD CONSTRAINT step_up_grant_action_check"))
+      : findings.filter((finding) => !/has bare CREATE (?:FUNCTION without OR REPLACE|(?:UNIQUE )?INDEX without IF NOT EXISTS)$/.test(finding));
   }
   return findings;
 }
@@ -694,6 +749,19 @@ export function auditNumericSourceLiteralExports(name: string, source: string): 
   return numericExports.length > 0 ? [`${name} exports a numeric source literal instead of a register/law carrier`] : [];
 }
 
+/** The deployed preview-test module is a finite production budget/config boundary.
+ * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block. */
+export function auditProductionFixtureImports(where:string,source:string):readonly string[]{
+ const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts";
+ for(const match of source.matchAll(/from\s+["']([^"']+)["']/g)){
+  const specifier=match[1]!;
+  if(!/(?:tests?|fixtures?)/.test(specifier))continue;
+  if(runtimeCaller&&specifier==="./preview-test.js")continue;
+  return [`${where} imports a test/fixture module from production code`];
+ }
+ return [];
+}
+
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
   const engineFiles = withoutUiSurface([
@@ -722,9 +790,7 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     if ((where.startsWith("packages/propagation/") || where.startsWith("packages/battery/decision/")) && /\b(?:Date\s*\(|new\s+Date|Math\.random|performance\.now|randomUUID)\b/.test(source)) {
       blocking.push(`${where} reads a clock or randomness inside the pure core`);
     }
-    if (/from\s+["'][^"']*(?:tests?|fixtures?)[^"']*["']/.test(source)) {
-      blocking.push(`${where} imports a test/fixture module from production code`);
-    }
+    blocking.push(...auditProductionFixtureImports(where,source));
     if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
@@ -735,9 +801,11 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
   const auditSource = await readFile(join(root, "tools/orphan-audit/src/index.ts"), "utf8");
   blocking.push(...auditSurfaceAttachmentLiterals("tools/orphan-audit/src/index.ts", auditSource));
   const migrationsDirectory = join(root, "migrations");
+  const nativePlan = await loadMigrationPlan();
+  const migrateSource = await readFile(join(root, "packages/db/src/index.ts"), "utf8");
   for (const name of (await readdir(migrationsDirectory)).filter((entry) => entry.endsWith(".sql")).sort()) {
     const source = await readFile(join(migrationsDirectory, name), "utf8");
-    blocking.push(...auditMigrationReplaySafety(`migrations/${name}`, source));
+    blocking.push(...auditMigrationReplaySafety(`migrations/${name}`, source, { plan: nativePlan, migrateSource }));
   }
   await auditOrphans();
   if (gatewayDeclarations !== 1) blocking.push(`ProviderGateway declaration count is ${gatewayDeclarations}, expected 1`);

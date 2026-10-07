@@ -66,9 +66,9 @@ test("S5 proxy filters request cookies and response cookies/headers", async () =
   for (const name of ["authorization", RETIRED_DEV_HEADER, "x-forwarded-host"]) assert.equal(forwarded.get(name), null);
   assert.equal(response.headers.get("access-control-allow-origin"), null);
   assert.equal(response.headers.get("x-internal"), null);
-  assert.deepEqual(response.headers.getSetCookie().map((value) => value.split("=", 1)[0]), [
-    "__Host-debateai-session", "__Host-debateai-csrf"
-  ]);
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: "UPSTREAM_AUTH_COOKIES_INVALID" });
+  assert.deepEqual(response.headers.getSetCookie(), []);
 });
 
 // ---------------------------------------------------------------- L3-F1 body cap

@@ -33,6 +33,8 @@ vi.mock("@/lib/i18n/I18nProvider", () => ({
 }));
 
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
+import { useSelectedAuthCatalog } from "../../apps/ui/components/AuthShell.js";
+import { useLegalDocument } from "../../apps/ui/components/consent/useLegalDocument.js";
 import { LegalDocumentsProvider } from "../../apps/ui/components/consent/LegalDocumentsProvider.js";
 import { PrivacyPolicyModal } from "../../apps/ui/components/consent/PrivacyPolicyModal.js";
 import { TermsOfServiceModal } from "../../apps/ui/components/consent/TermsOfServiceModal.js";
@@ -91,22 +93,22 @@ async function render(children: ReactNode): Promise<void> {
   });
 }
 
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+});
+
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  document.body.innerHTML = "";
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
 describe("legal documents follow the interface locale", () => {
-  beforeEach(() => {
-    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
-  });
-
-  afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
-    document.body.innerHTML = "";
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
-  });
-
   it("renders the provider's Japanese section title and jump label", async () => {
     await render(
       <I18nProvider locale="ja" catalog={consentEnglish}>
@@ -186,11 +188,39 @@ describe("legal documents follow the interface locale", () => {
       const dialog = container.querySelector('[role="dialog"]')!;
       expect(dialog.hasAttribute("dir"), `${locale}: the dialog sets no dir`).toBe(false);
       for (const { name } of LEGAL_INVENTORY) {
-        const written = (dialog.textContent ?? "").split(name).length - 1;
+        const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+        const written=(dialog.textContent ?? "").match(new RegExp(`${escaped}(?![A-Za-z0-9_.-])`,"g"))?.length ?? 0;
         const isolated = [...dialog.querySelectorAll("[dir='ltr']")].filter((node) => node.textContent === name).length;
         expect(written, `${locale}: ${name} is in the policy`).toBeGreaterThan(0);
         expect(isolated, `${locale} ${mode}: every ${name} is its own left-to-right run`).toBe(written);
       }
     }
+  });
+});
+
+
+function RegionalCatalogProbe({ locale }: { locale: LocaleCode }) {
+  const catalog = useSelectedAuthCatalog(locale);
+  const privacy = useLegalDocument("privacy");
+  return <p data-hash={privacy.sha256}>{catalog["auth.dob.incomplete"]}</p>;
+}
+
+describe("regional English legal and auth hooks", () => {
+  it.each(["en-US", "en-GB"] as const)("renders %s English legal documents without a provider", async (locale) => {
+    await render(<I18nProvider locale={locale} catalog={consentEnglish}>
+      <PrivacyPolicyModal open mode="read" onClose={vi.fn()} />
+    </I18nProvider>);
+    expect(container.textContent).toContain("In short");
+    expect(container.textContent).toContain("CONTROLLER");
+  });
+
+  it.each(["en-US", "en-GB"] as const)("uses the %s catalog alias and supplied base-English legal evidence", async (locale) => {
+    await render(<I18nProvider locale={locale} catalog={consentEnglish}>
+      <LegalDocumentsProvider locale="en" privacy={localizedPrivacy} terms={localizedTerms}>
+        <RegionalCatalogProbe locale={locale} />
+      </LegalDocumentsProvider>
+    </I18nProvider>);
+    expect(container.querySelector("p")?.textContent).toBe("Enter the day, month and year.");
+    expect(container.querySelector("p")?.getAttribute("data-hash")).toBe("0".repeat(64));
   });
 });

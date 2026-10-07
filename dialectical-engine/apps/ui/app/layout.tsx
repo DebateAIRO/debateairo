@@ -1,3 +1,4 @@
+import { AuthCatalogProvider } from '@/components/AuthShell';
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
@@ -60,7 +61,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await requestLocale();
   const localeDefinition = getLocale(locale);
-  const [chrome, debateViews, support, consentNamespace, legalNamespace, privacy, terms] = await Promise.all([
+  const [chrome, debateViews, support, consentNamespace, legalNamespace, privacy, terms, auth] = await Promise.all([
     loadNamespace(locale, "chrome"),
     loadNamespace(locale, "debateViews"),
     loadNamespace(locale, "support"),
@@ -70,7 +71,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // The storage card's eight rows read the legal catalogue's inventory strings (D-28).
     loadNamespace(locale, "legal"),
     loadLegalDocument(locale, "privacy"),
-    loadLegalDocument(locale, "terms")
+    loadLegalDocument(locale, "terms"),
+    loadNamespace(locale, "auth")
   ]);
   const sharedCatalog = Object.freeze({ ...chrome, ...debateViews, ...support });
   const consent = Object.freeze({ ...consentNamespace, ...inventoryCopy(legalNamespace) });
@@ -89,6 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <script
           nonce={nonce}
+          id="dialectical-document-bootstrap"
           // Browsers blank a nonce attribute once parsed (CSP hiding), so hydration would see
           // nonce="" against the server value; the attribute is still enforced.
           suppressHydrationWarning
@@ -111,7 +114,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <LegalDocumentsProvider locale={locale} privacy={privacy} terms={terms}>
               <div className="appShell">
                 <TopBar />
-                {children}
+                <AuthCatalogProvider catalog={auth}>{children}</AuthCatalogProvider>
                 <CookieConsent />
                 <SiteFooter variant="line" />
                 <SupportConversationGuard />

@@ -426,10 +426,10 @@ export function ReportDocumentView({ model }: { model: ReportModel }): JSX.Eleme
   return (
     <Document
       title={model.documentTitle}
-      author="DebateAI"
+      author="Dialectical Engine"
       subject={model.metadataSubject}
-      creator="DebateAI"
-      producer="DebateAI"
+      creator="Dialectical Engine"
+      producer="Dialectical Engine"
       keywords="AI-generated"
       language={model.language}
     >

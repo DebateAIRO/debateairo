@@ -274,8 +274,18 @@ describe("M1 migration 0075 — ledger.model_spend.spend_phase", () => {
   it("records one BODY and one SERVE call as two RUN rows with their phases, and a STORY row with none", async () => {
     const runId = await createLegacyRun();
     const store = new PostgresModelSpendStore(database.pool);
+    // This historical phase case records ordinary calls directly. The full
+    // store now advertises INTERNAL reservation, whose settlement requires an
+    // admitted frame; omit that optional capability only for this ordinary seam.
+    const ordinaryStore = {
+      recordSpend:store.recordSpend.bind(store),
+      readRunSpentMicros:store.readRunSpentMicros.bind(store),
+      readRunStorySpentMicros:store.readRunStorySpentMicros.bind(store),
+      readDaySpentMicros:store.readDaySpentMicros.bind(store),
+      admitNewRun:store.admitNewRun.bind(store)
+    };
     const guard = new CostEnvelopeGuard({
-      store,
+      store:ordinaryStore,
       policy: {
         perRunCeilingMicros: 250_000, dailyCeilingMicros: 2_000_000,
         serveReserveBasisPoints: 3_000, serveOverrunBasisPoints: 2_000, perStoryCeilingMicros: 50_000

@@ -2,7 +2,7 @@
 
 import { useContext, useEffect, useState } from "react";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
-import type { LocaleCode } from "@/lib/i18n/locales";
+import { legalLocale, type CatalogLocaleCode } from "@/lib/i18n/locales";
 import type { LegalDocument, LegalDocumentKey } from "@/lib/legalDocument";
 import { PRIVACY_POLICY } from "@/lib/privacyPolicy";
 import { TERMS_OF_SERVICE } from "@/lib/termsOfService";
@@ -13,9 +13,9 @@ const ENGLISH_DOCUMENTS = Object.freeze({
   terms: TERMS_OF_SERVICE
 });
 
-const loadPrivacy = (locale: LocaleCode): Promise<LegalDocument> =>
+const loadPrivacy = (locale: CatalogLocaleCode): Promise<LegalDocument> =>
   import(`../../lib/legal/${locale}/privacyPolicy.ts`).then(({ PRIVACY_POLICY }) => PRIVACY_POLICY);
-const loadTerms = (locale: LocaleCode): Promise<LegalDocument> =>
+const loadTerms = (locale: CatalogLocaleCode): Promise<LegalDocument> =>
   import(`../../lib/legal/${locale}/termsOfService.ts`).then(({ TERMS_OF_SERVICE }) => TERMS_OF_SERVICE);
 
 const LEGAL_DOCUMENT_LOADERS = Object.freeze({
@@ -160,31 +160,37 @@ const LEGAL_DOCUMENT_LOADERS = Object.freeze({
     terms: () => loadTerms("zh")
   }
 } satisfies Readonly<
-  Record<LocaleCode, Readonly<Record<LegalDocumentKey, () => Promise<LegalDocument>>>>
+  Record<CatalogLocaleCode, Readonly<Record<LegalDocumentKey, () => Promise<LegalDocument>>>>
 >);
 
-const documentCache: Partial<Record<LocaleCode, Partial<Record<LegalDocumentKey, LegalDocument>>>> = {
+/** Loads the exact edition selected by server onboarding metadata. No fallback hash is accepted. */
+export async function loadClientLegalDocument(locale: CatalogLocaleCode,key: LegalDocumentKey): Promise<LegalDocument> {
+  return LEGAL_DOCUMENT_LOADERS[locale][key]();
+}
+
+const documentCache: Partial<Record<CatalogLocaleCode, Partial<Record<LegalDocumentKey, LegalDocument>>>> = {
   en: ENGLISH_DOCUMENTS
 };
 
 export function useLegalDocument(key: LegalDocumentKey): LegalDocument {
   const { locale } = useChromeI18n();
+  const documentLocale = legalLocale(locale);
   const provided = useContext(LegalDocumentsContext);
-  const serverDocument = provided?.locale === locale ? provided[key] : undefined;
+  const serverDocument = provided !== null && legalLocale(provided.locale) === documentLocale ? provided[key] : undefined;
   const [document, setDocument] = useState<LegalDocument>(
-    serverDocument ?? documentCache[locale]?.[key] ?? ENGLISH_DOCUMENTS[key]
+    serverDocument ?? documentCache[documentLocale]?.[key] ?? ENGLISH_DOCUMENTS[key]
   );
 
   useEffect(() => {
     let active = true;
     if (serverDocument !== undefined) {
-      documentCache[locale] = { ...documentCache[locale], [key]: serverDocument };
+      documentCache[documentLocale] = { ...documentCache[documentLocale], [key]: serverDocument };
       setDocument(serverDocument);
       return () => {
         active = false;
       };
     }
-    const cached = documentCache[locale]?.[key];
+    const cached = documentCache[documentLocale]?.[key];
     if (cached !== undefined) {
       setDocument(cached);
       return () => {
@@ -192,8 +198,8 @@ export function useLegalDocument(key: LegalDocumentKey): LegalDocument {
       };
     }
     setDocument(ENGLISH_DOCUMENTS[key]);
-    void LEGAL_DOCUMENT_LOADERS[locale][key]().then((loaded) => {
-      documentCache[locale] = { ...documentCache[locale], [key]: loaded };
+    void LEGAL_DOCUMENT_LOADERS[documentLocale][key]().then((loaded) => {
+      documentCache[documentLocale] = { ...documentCache[documentLocale], [key]: loaded };
       if (active) setDocument(loaded);
     }).catch(() => {
       // Legal documents retain usable English content if a locale chunk cannot load.
@@ -201,7 +207,7 @@ export function useLegalDocument(key: LegalDocumentKey): LegalDocument {
     return () => {
       active = false;
     };
-  }, [key, locale, serverDocument]);
+  }, [key, documentLocale, serverDocument]);
 
   return serverDocument ?? document;
 }

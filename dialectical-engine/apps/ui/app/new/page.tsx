@@ -9,11 +9,13 @@ export default async function NewDebatePage() {
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   // chrome is served for the AI notice's block label (chrome.aiTransparency), so
   // any variant of it on this page reads the reader's locale (re-check 2, R2).
-  const [catalog, homeCatalog, chromeCatalog, billingCatalog] = await Promise.all([
+  const [catalog, homeCatalog, chromeCatalog, billingCatalog, settingsCatalog, authCatalog] = await Promise.all([
     loadNamespace(locale, "newDebate"),
     loadNamespace(locale, "home"),
     loadNamespace(locale, "chrome"),
-    loadNamespace(locale, "billing")
+    loadNamespace(locale, "billing"),
+    loadNamespace(locale, "settings"),
+    loadNamespace(locale, "auth")
   ]);
-  return <NewDebatePageClient catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} billingCatalog={billingCatalog} crisisCountryHint={readCrisisCountryHint(await headers())} />;
+  return <NewDebatePageClient catalog={catalog} settingsCatalog={settingsCatalog} authCatalog={authCatalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} billingCatalog={billingCatalog} crisisCountryHint={readCrisisCountryHint(await headers())} />;
 }

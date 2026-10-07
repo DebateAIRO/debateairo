@@ -17,7 +17,7 @@ export interface EmailChangePendingRecord {
 
 export interface EmailSettingsRecord {
   readonly emailCiphertext: CryptoEnvelope;
-  readonly recoveryEmailCiphertext: CryptoEnvelope;
+  readonly recoveryEmailCiphertext: CryptoEnvelope | null;
   readonly pending: EmailChangePendingRecord | null;
 }
 
@@ -74,7 +74,7 @@ export class PostgresEmailChangeRepository {
   async readSettings(input: Readonly<{ userId: string; sessionId: string }>): Promise<EmailSettingsRecord | null> {
     const result = await this.pool.query<{
       result_email_ciphertext: CryptoEnvelope;
-      result_recovery_email_ciphertext: CryptoEnvelope;
+      result_recovery_email_ciphertext: CryptoEnvelope | null;
       result_pending_email_change_id: string | null;
       result_pending_new_email_ciphertext: CryptoEnvelope | null;
       result_pending_expires_at: Date | null;

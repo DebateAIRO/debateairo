@@ -122,19 +122,11 @@ describe("chrome", () => {
     const rendered = await renderSignedInRoute();
     const topBar = rendered.querySelector(".topBar");
     const library = rendered.querySelector('.sectionHead[aria-label="Debate library"]');
-    const askerPlaceholder = [...(topBar?.querySelectorAll("span") ?? [])].find(
-      (element) => element.textContent === "ASKER"
-    );
-
     expect(topBar?.textContent).toContain("Library");
     expect(topBar?.textContent).toContain("+ New debate");
-    // Placeholder pending V's Q-13 identity chip (t_afb67c94): this is an
-    // honest, non-interactive role label and makes no signed-in-state claim.
-    expect(askerPlaceholder, "ASKER role placeholder").not.toBeNull();
-    expect(askerPlaceholder?.classList.contains("roleChip")).toBe(true);
-    expect(askerPlaceholder?.classList.contains("btn")).toBe(false);
-    expect(askerPlaceholder?.getAttribute("title")).toBe("Asker role placeholder");
-    expect(askerPlaceholder?.hasAttribute("aria-label")).toBe(false);
+    // AccountMenu resolves the session after hydration; SSR must not invent an identity role.
+    expect(topBar?.querySelector('.roleChip')).toBeNull();
+    expect(topBar?.textContent).not.toContain("ASKER");
     expect(library?.textContent?.includes("Your Debates") || topBar?.textContent?.includes("+ New debate")).toBe(true);
     expect(rendered.body.textContent).not.toContain("Find the weakest claim in your own argument.");
   });

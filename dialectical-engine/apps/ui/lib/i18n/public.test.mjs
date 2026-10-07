@@ -14,6 +14,7 @@ const sourcePaths = [
   "components/PublicAnswerDisclosure.tsx",
   "components/PublicHonestyDrawer.tsx",
   "components/PublicationControl.tsx",
+  "components/auth/SecurityActionResume.tsx",
   "lib/publicDebatePresentation.ts",
   "lib/v3/publicAnswerExport.ts",
   // The verdict story's words (R2): the owner's panel, the shared short-story

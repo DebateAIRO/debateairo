@@ -1,3 +1,4 @@
+import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { currentDocument } from "@debateai/legal-manifest";
@@ -22,7 +23,7 @@ function serviceCapturing(recordsKey: Buffer | undefined) {
       createPendingAccount: async (input: PendingAccountInput, beforeCommit: () => Promise<void>) => {
         captured.push(input);
         await beforeCommit();
-        return { status: "created" as const, userId: input.userId, channelBindingId: randomUUID() };
+        return { status: "created" as const, userId: input.userId, channelBindingId: randomUUID(), verificationExpiresAt: input.verificationExpiresAt, reservationId: randomUUID() };
       },
       recordVerificationDelivery: async () => undefined,
       recordRegistrationFailure: async () => undefined,
@@ -46,11 +47,11 @@ function serviceCapturing(recordsKey: Buffer | undefined) {
   return { service, captured };
 }
 
-/** The four members the frozen register mount builds (RegisterInput is unchanged by L3b). */
+/** Trusted service compositions can still provision optional recovery addresses. */
 const REGISTRATION = Object.freeze({
   email: "alice@example.test",
   password: "correct horse battery staple",
-  recoveryEmail: "alice.recovery@example.test",
+  phone: "+40722123456", recoveryEmail: "alice.recovery@example.test",
   adultAffirmed: true
 });
 /** The pairs ride on the source, as sourceFor sends them (the age gate's countryCode rides there too). */
@@ -135,6 +136,7 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
     const seen: unknown[] = [];
     const api = buildApi({
       application: {} as AskApplication,
+      turnstile: passedTurnstile,
       registration: {
         register: async (input: unknown, source: { legal?: unknown }) => {
           inputs.push(input);
@@ -148,29 +150,31 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
     });
     // The age gate's hook needs an adult date before register runs at all (apps/api/src/index.ts:1711-1729).
     const body = {
+      ...canonicalSignup,
       email: "alice@example.test", password: "correct horse battery staple",
-      recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01", country: "RO"
+      phone: "+40722123456", country: "RO", date_of_birth: "1990-01-01"
     };
-    const stale = await api.inject({ method: "POST", url: "/v1/auth/register", payload: body });
-    expect(stale.statusCode).toBe(409);
-    expect(stale.json()).toMatchObject({ error: "LEGAL_DOCUMENT_STALE" });
+    const stale = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...body, terms: undefined } });
+    expect(stale.statusCode).toBe(400);
+    expect(stale.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" });
+    expect(inputs).toEqual([]);
     const fresh = await api.inject({
       method: "POST", url: "/v1/auth/register",
       payload: { ...body, terms: terms("en"), privacy: privacy("en"), locale: "en" }
     });
     expect(fresh.statusCode).toBe(202);
-    expect(seen[1]).toEqual({ terms: terms("en"), privacy: privacy("en"), locale: "en" });
-    // A malformed triple travels as absent, which the service refuses as stale.
+    expect(seen[0]).toEqual({ terms: terms("en"), privacy: privacy("en"), locale: "en" });
+    // Malformed legal facts are refused before proof or identity work.
     const malformed = await api.inject({
       method: "POST", url: "/v1/auth/register",
       payload: { ...body, terms: { version: "v2", sha256: "x" }, privacy: privacy("en"), locale: "en" }
     });
-    expect(malformed.statusCode).toBe(409);
-    expect(seen[2]).toBeUndefined();
-    // The frozen region still builds exactly its four members (tests/unit/obs-l2-s04-zone.test.ts pins its text).
-    expect(inputs[1]).toEqual({
+    expect(malformed.statusCode).toBe(400);
+    expect(seen).toHaveLength(1);
+    // The public mount sets recovery absent and keeps adult affirmation a server decision.
+    expect(inputs[0]).toEqual({
       email: "alice@example.test", password: "correct horse battery staple",
-      recoveryEmail: "alice.recovery@example.test", adultAffirmed: true
+      phone: "+40722123456", recoveryEmail: null, adultAffirmed: true
     });
     await api.close();
   });

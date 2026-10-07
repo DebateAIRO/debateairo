@@ -1,339 +1,332 @@
 "use client";
-
-import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
-import { ContractHttpError, type ContractClient } from "@debateai/contract";
-import { AuthShell } from "@/components/AuthShell";
-import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmation";
-import { contractClient } from "@/lib/api";
-import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
-import { clearStoredSupportConversation } from "@/components/support/conversation";
-import { announceSessionChange } from "@/components/support/sessionChange";
-import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { safeReturnPath } from "@/lib/returnPath";
-import authEnglish from "@/messages/en/auth.json";
-
-type LoginClient = Pick<ContractClient, "beginLogin" | "completeLogin">;
-type VerificationMethod = "authenticator" | "recovery";
-
-/* The document shows live validity marks under both auth fields (7a, and 8a
-   with two rules unmet). These are presentation only — the server remains the
-   authority on whether any credential is accepted. */
-const passwordRules = (catalog: MessageCatalog) => [
-  { label: t(catalog, "auth.login.passwordRuleEight"), met: (v: string) => v.length >= 8 },
-  { label: t(catalog, "auth.passwordRuleCapital"), met: (v: string) => /[A-Z]/.test(v) },
-  { label: t(catalog, "auth.passwordRuleNumber"), met: (v: string) => /[0-9]/.test(v) },
-  { label: t(catalog, "auth.passwordRuleSpecial"), met: (v: string) => /[^A-Za-z0-9]/.test(v) }
-] as const;
-
-function emailValidity(value: string, catalog: MessageCatalog): { state: "idle" | "ok" | "bad"; text: string } {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return { state: "idle", text: t(catalog, "auth.login.emailHint") };
-  // Deliberately permissive: the address is checked for shape, not existence.
-  const shaped = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(trimmed);
-  return shaped
-    ? { state: "ok", text: t(catalog, "auth.validAddress") }
-    : { state: "bad", text: t(catalog, "auth.invalidEmail") };
+import Link from 'next/link';
+import { KnownPasswordRecoveryLink } from './KnownPasswordRecoveryLink';
+import resetEn from '@/messages/en/password-reset.json';
+import resetRo from '@/messages/ro/password-reset.json';
+import { useChromeI18n } from '@/lib/i18n/I18nProvider';
+import { clearStoredSupportConversation } from '@/components/support/conversation';
+import { announceSessionChange } from '@/components/support/sessionChange';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { ContractHttpError, type ContractClient, type LoginContinuationResponse, type AuthenticationResponse } from '@debateai/contract';
+import { AuthShell } from '@/components/AuthShell';
+import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
+import { InlineFieldMessage } from '@/components/auth/InlineFieldMessage';
+import { EphemeralCodes } from '@/components/auth/EphemeralCodes';
+import { ageConfirmationHref, ageConfirmationRequired } from '@/lib/ageConfirmation';
+import { contractClient } from '@/lib/api';
+import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
+import { createCodeAttempt } from '@/lib/authCodeAttempt';
+import { emailShape } from '@/lib/authFormValidation';
+import { setRecoveryAcknowledgementPending } from '@/lib/authNavigationGuard';
+import { t, type MessageCatalog } from '@/lib/i18n/translate';
+import { safeReturnPath } from '@/lib/returnPath';
+import authEnglish from '@/messages/en/auth.json';
+type LoginClient = Pick<ContractClient, 'beginLogin' | 'completeLogin'> & Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin' | 'beginPasskeyLogin' | 'completePasskeyLogin'>>;
+async function navigateHome() {
+    const next = new URLSearchParams(window.location.search).get('next');
+    window.location.assign(await ageConfirmationRequired() ? ageConfirmationHref(next) : safeReturnPath(next));
 }
-
-/* A 4xx answer is the server refusing the attempt: nobody was signed in. */
-function isRefusal(failure: unknown): boolean {
-  return failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500;
-}
-
-/* After sign-in, before anything else: an account created before the date-of-birth field
-   answers its one-time age check first (8k). */
-async function navigateHome(): Promise<void> {
-  const next = new URLSearchParams(window.location.search).get("next");
-  window.location.assign(await ageConfirmationRequired() ? ageConfirmationHref(next) : safeReturnPath(next));
-}
-
-export function LoginFlow({
-  catalog = authEnglish,
-  client = contractClient,
-  onAuthenticated = navigateHome
-}: Readonly<{
-  catalog?: MessageCatalog;
-  client?: LoginClient;
-  onAuthenticated?: () => void | Promise<void>;
-}>) {
-  const [challengeToken, setChallengeToken] = useState<string | null>(null);
-  const [replacementRecoveryCode, setReplacementRecoveryCode] = useState<string | null>(null);
-  const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>("authenticator");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [signUpHref, setSignUpHref] = useState("/sign-up");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-
-  useEffect(() => {
-    const next = new URLSearchParams(window.location.search).get("next");
-    if (next !== null) setSignUpHref(`/sign-up?next=${encodeURIComponent(next)}`);
-    return () => setRecoveryAcknowledgementPending(false);
-  }, []);
-
-  async function submitCredentials(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await client.beginLogin(
-        String(data.get("email") ?? "").trim(),
-        String(data.get("password") ?? "")
-      );
-      setVerificationMethod("authenticator");
-      setChallengeToken(result.challenge_token);
-    } catch {
-      setError(t(catalog, "auth.login.signInFailed"));
-    } finally {
-      setBusy(false);
+export function LoginFlow({ catalog = authEnglish, client = contractClient, onAuthenticated = navigateHome, browser: provided }: {
+    catalog?: MessageCatalog;
+    client?: LoginClient;
+    onAuthenticated?: () => void | Promise<void>;
+    browser?: ConsumerWebAuthnBrowser;
+}) {
+    const {locale}=useChromeI18n();
+    const resetCatalog=locale==='ro'?resetRo:resetEn;
+    const browser = useRef(provided ?? createConsumerWebAuthnBrowser()).current;
+    const flight = useRef(false);
+    const dispatched = useRef(false);
+    const [completing, setCompleting] = useState(false);
+    const sequence = useRef(0);
+    const conditional = useRef<AbortController | null>(null);
+    const conditionalOptions = useRef<Promise<unknown> | null>(null);
+    const attempt = useRef(createCodeAttempt());
+    const [continuation, setContinuation] = useState<LoginContinuationResponse | null>(null);
+    const [method, setMethod] = useState<'totp' | 'recovery_code'>('totp');
+    const [replacement, setReplacement] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [code, setCode] = useState('');
+    const [emailError, setEmailError] = useState<string | null>(null);
+    const [passwordError, setPasswordError] = useState<string | null>(null);
+    const [signUpHref, setSignUpHref] = useState('/sign-up');
+    function cancelConditional() {
+        sequence.current++;
+        conditional.current?.abort();
+        conditional.current = null;
+        browser.cancel();
     }
-  }
-
-  async function submitMfa(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    if (challengeToken === null) return;
-    const code = String(new FormData(event.currentTarget).get("code") ?? "").trim();
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await client.completeLogin(challengeToken, code);
-      // A new sign-in in this tab: the previous person's help-chat transcript goes now. Its stored value carries no
-      // person id, so this is the moment the tab can tell a person changed (REV-S01 p1 SD-B1; /cookies row 8).
-      clearStoredSupportConversation();
-      // ...and every other tab of this browser drops its copy too (S04-R01). A failure below announces nothing: it is
-      // not a completed sign-in (D-S04-18).
-      announceSessionChange();
-      setChallengeToken(null);
-      if (result.replacement_recovery_code !== undefined) {
-        setRecoveryAcknowledgementPending(true);
-        setReplacementRecoveryCode(result.replacement_recovery_code);
-        return;
-      }
-      void onAuthenticated();
-    } catch (failure) {
-      // Only a 4xx is the server refusing the code. Anything else (a 200 whose body the client rejects, a dropped body
-      // read, a 5xx) can follow a server that has already set the session cookie, so the transcript goes here too
-      // (REV-S01 p2 SD-N2).
-      if (!isRefusal(failure)) clearStoredSupportConversation();
-      if (failure instanceof ContractHttpError && failure.status === 429) {
-        setError(t(catalog, "auth.login.tooManyAttempts"));
-      } else if (failure instanceof ContractHttpError && failure.status === 401
-        && verificationMethod === "recovery") {
-        setError(t(catalog, "auth.login.recoveryCodeRejected"));
-      } else if (failure instanceof ContractHttpError && failure.status === 401) {
-        setError(t(catalog, "auth.login.authenticationCodeRejected"));
-      } else {
-        setError(t(catalog, "auth.login.verificationFailed"));
-      }
-    } finally {
-      setBusy(false);
+    async function waitForConditionalPreparation(owner: number) {
+        const pending = conditionalOptions.current;
+        if (pending) {
+            try {
+                await pending;
+            }
+            catch {
+                // Conditional discovery is only an ordering barrier. Its failure cannot poison an explicit method.
+            }
+        }
+        return owner === sequence.current;
     }
-  }
-
-  const verificationPending = challengeToken !== null;
-  const emailState = emailValidity(email, catalog);
-  const rules = passwordRules(catalog);
-  const shellCopy = replacementRecoveryCode !== null
-    ? {
-        eyebrow: t(catalog, "auth.login.recoveryAccess"),
-        title: t(catalog, "auth.login.replacementTitle"),
-        description: t(catalog, "auth.login.replacementDescription")
-      }
-    : verificationPending
-      ? verificationMethod === "authenticator"
-        ? {
-            eyebrow: t(catalog, "auth.login.twoStepVerification"),
-            title: t(catalog, "auth.login.authenticatorTitle"),
-            description: t(catalog, "auth.login.authenticatorDescription")
-          }
-        : {
-            eyebrow: t(catalog, "auth.login.twoStepVerification"),
-            title: t(catalog, "auth.login.recoveryTitle"),
-            description: t(catalog, "auth.login.recoveryDescription")
-          }
-      : {
-          eyebrow: t(catalog, "auth.login.welcomeBack"),
-          title: t(catalog, "auth.login.backToGraph"),
-          description: t(catalog, "auth.login.securityPolicy")
+    function finish(result: AuthenticationResponse) {
+        if (result.status !== 'authenticated')
+            return;
+        clearStoredSupportConversation();
+        announceSessionChange();
+        cancelConditional();
+        flight.current = false;
+        dispatched.current = false;
+        setCompleting(false);
+        setBusy(false);
+        setContinuation(null);
+        setPassword('');
+        setCode('');
+        if (result.replacement_recovery_code) {
+            setRecoveryAcknowledgementPending(true);
+            setReplacement(result.replacement_recovery_code);
+        }
+        else
+            void onAuthenticated();
+    }
+    useEffect(() => {
+        const next = new URLSearchParams(window.location.search).get('next');
+        if (next !== null)
+            setSignUpHref(`/sign-up?next=${encodeURIComponent(next)}`);
+        const owner = sequence.current;
+        const abort = new AbortController();
+        conditional.current = abort;
+        void (async () => {
+            try {
+                if (!client.beginPasskeyLogin || !client.completePasskeyLogin || !await browser.supportsConditional() || abort.signal.aborted || owner !== sequence.current)
+                    return;
+                const pending = client.beginPasskeyLogin();
+                conditionalOptions.current = pending;
+                let options;
+                try {
+                    options = await pending;
+                }
+                finally {
+                    if (conditionalOptions.current === pending)
+                        conditionalOptions.current = null;
+                }
+                if (abort.signal.aborted || owner !== sequence.current)
+                    return;
+                const credential = await browser.authenticate(options.options, { mediation: 'conditional', signal: abort.signal });
+                if (abort.signal.aborted || owner !== sequence.current || flight.current)
+                    return;
+                flight.current = true;
+                dispatched.current = true;
+                setCompleting(true);
+                setBusy(true);
+                const result = await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
+                if (owner === sequence.current && !abort.signal.aborted)
+                    finish(result);
+            }
+            catch (failure) {
+                if (dispatched.current && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
+            }
+            finally {
+                if (owner === sequence.current) {
+                    flight.current = false;
+                    dispatched.current = false;
+                    setCompleting(false);
+                    setBusy(false);
+                }
+            }
+        })();
+        return () => {
+            cancelConditional();
+            setRecoveryAcknowledgementPending(false);
         };
-
-  return (
-    <AuthShell
-      eyebrow={shellCopy.eyebrow}
-      title={shellCopy.title}
-      description={shellCopy.description}
-      footer={replacementRecoveryCode === null && !verificationPending ? (
-        <p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>
-      ) : null}
-    >
-      {error ? <div className="authAlert" role="alert">{error}</div> : null}
-
-      {replacementRecoveryCode !== null ? (
-        <section className="authSuccessWarning" role="alert" aria-labelledby="replacement-code-title">
-          <span className="authSuccessAccent" aria-hidden />
-          <p className="authNoticeKicker">{t(catalog, "auth.login.signedInSecurely")}</p>
-          <h2 id="replacement-code-title">{t(catalog, "auth.login.recordReplacementCode")}</h2>
-          <p>{t(catalog, "auth.login.replacementCodeNotice")}</p>
-          <code className="authRecoveryCode">{replacementRecoveryCode}</code>
-          <button
-            className="authPrimary"
-            type="button"
-            onClick={() => {
-              setRecoveryAcknowledgementPending(false);
-              setReplacementRecoveryCode(null);
-              void onAuthenticated();
-            }}
-          >
-            {t(catalog, "auth.login.savedContinue")}
-          </button>
-        </section>
-      ) : challengeToken === null ? (
-        <form className="authForm" method="post" action="/login" aria-busy={busy} onSubmit={submitCredentials}>
-          <div className="authField">
-            <label htmlFor="login-email">{t(catalog, "auth.email")}</label>
-            <input
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="username"
-              placeholder={t(catalog, "auth.emailPlaceholder")}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              aria-describedby="login-email-validity"
-              required
-              autoFocus
-              disabled={busy}
-            />
-            <p className="authValidity" id="login-email-validity" data-state={emailState.state}>
-              {emailState.text}
-            </p>
-          </div>
-          <div className="authField">
-            <label htmlFor="login-password">{t(catalog, "auth.password")}</label>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              aria-describedby="login-password-rules"
-              required
-              disabled={busy}
-            />
-            <ul className="authRules" id="login-password-rules">
-              {rules.map((rule) => {
-                const met = rule.met(password);
-                return (
-                  <li
-                    className="authRule"
-                    key={rule.label}
-                    data-met={password.length === 0 ? undefined : String(met)}
-                  >
-                    {password.length === 0 ? "·" : met ? "✓" : "✗"} {rule.label}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-          <button className="authPrimary" type="submit" disabled={busy}>
-            {busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}
-          </button>
-        </form>
-      ) : (
-        <form className="authForm authMfaForm" method="post" action="/login" aria-busy={busy} onSubmit={submitMfa}>
-          <p className="srOnly" role="status">{t(catalog, "auth.login.passwordAcceptedStatus")}</p>
-          <div className="authField">
-            <label htmlFor="login-code">
-              {verificationMethod === "authenticator"
-                ? t(catalog, "auth.login.authenticationCodeLabel")
-                : t(catalog, "auth.login.recoveryCodeLabel")}
-            </label>
-            {verificationMethod === "authenticator" ? (
-              /* Six boxes are the document's presentation; the real control is
-                 a single input beneath them, so one-time-code autofill, paste
-                 and assistive tech all keep working. */
-              <div className="authCodeField">
-                <input
-                  className="authCodeCapture"
-                  id="login-code"
-                  name="code"
-                  type="text"
-                  autoComplete="one-time-code"
-                  inputMode="numeric"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  value={code}
-                  onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-                  aria-describedby="login-code-hint"
-                  aria-label={t(catalog, "auth.login.authenticationCodeLabel")}
-                  spellCheck={false}
-                  required
-                  autoFocus
-                  disabled={busy}
-                />
-                <div className="authCodeBoxes" aria-hidden="true">
-                  {[0, 1, 2, 3, 4, 5].map((slot) => (
-                    <span
-                      className="authCodeBox"
-                      key={slot}
-                      data-filled={code.length > slot ? "true" : undefined}
-                      data-next={code.length === slot ? "true" : undefined}
-                    >
-                      {code[slot] ?? ""}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <input
-                className="authRecoveryInput"
-                id="login-code"
-                name="code"
-                type="text"
-                autoComplete="one-time-code"
-                inputMode="text"
-                placeholder={t(catalog, "auth.login.recoveryCodePlaceholder")}
-                aria-describedby="login-code-hint"
-                spellCheck={false}
-                required
-                autoFocus
-                disabled={busy}
-              />
-            )}
-            <p className="authFieldHint" id="login-code-hint">
-              {verificationMethod === "authenticator"
-                ? t(catalog, "auth.login.authenticatorHint")
-                : t(catalog, "auth.login.recoveryHint")}
-            </p>
-          </div>
-          <button className="authPrimary" type="submit" disabled={busy}>
-            {busy ? t(catalog, "auth.login.verifying") : t(catalog, "auth.continue")}
-          </button>
-          <div className="authMfaAlternatives">
-            <button className="authTextButton" type="button" disabled={busy} onClick={() => {
-              setVerificationMethod((current) => current === "authenticator" ? "recovery" : "authenticator");
-              setCode("");
-              setError(null);
-            }}>
-              {verificationMethod === "authenticator"
-                ? t(catalog, "auth.login.useRecoveryCode")
-                : t(catalog, "auth.login.useAuthenticatorCode")}
-            </button>
-            <button className="authTextButton authBackButton" type="button" disabled={busy} onClick={() => {
-              setChallengeToken(null);
-              setVerificationMethod("authenticator");
-              setCode("");
-              setError(null);
-            }}>
-              {t(catalog, "auth.login.backToSignIn")}
-            </button>
-          </div>
-        </form>
-      )}
-    </AuthShell>
-  );
+    }, [browser, client]);
+    async function passkey() {
+        if (flight.current || !client.beginPasskeyLogin || !client.completePasskeyLogin)
+            return;
+        cancelConditional();
+        const owner = sequence.current;
+        flight.current = true;
+        setBusy(true);
+        setError(null);
+        try {
+            if (!await waitForConditionalPreparation(owner))
+                return;
+            const options = await client.beginPasskeyLogin(continuation ? { continuation_token: continuation.challenge_token } : undefined);
+            if (owner !== sequence.current)
+                return;
+            const credential = await browser.authenticate(options.options);
+            if (owner !== sequence.current)
+                return;
+            dispatched.current = true;
+            setCompleting(true);
+            const result = await client.completePasskeyLogin({ challenge_handle: options.challenge_handle, credential });
+            if (owner === sequence.current)
+                finish(result);
+        }
+        catch (failure) {
+            if (dispatched.current && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
+            if (owner === sequence.current)
+                setError(t(catalog, "auth.passkey.cancelled"));
+        }
+        finally {
+            if (owner === sequence.current) {
+                flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
+                setBusy(false);
+            }
+        }
+    }
+    async function submitCredentials(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (flight.current)
+            return;
+        cancelConditional();
+        const form = event.currentTarget;
+        const data = new FormData(form);
+        const address = String(data.get('email') ?? '').trim();
+        const secret = String(data.get('password') ?? '');
+        setEmail(address);
+        setPassword(secret);
+        setEmailError(emailShape(address) ? null : t(catalog, "auth.invalidEmail"));
+        setPasswordError(secret ? null : t(catalog, "auth.password.required"));
+        if (!emailShape(address) || !secret) {
+            form.querySelector<HTMLElement>(!emailShape(address) ? '[name=email]' : '[name=password]')?.focus();
+            return;
+        }
+        flight.current = true;
+        setBusy(true);
+        setError(null);
+        const owner = sequence.current;
+        try {
+            if (!await waitForConditionalPreparation(owner))
+                return;
+            const result = await client.beginLogin(address, secret);
+            if (owner !== sequence.current)
+                return;
+            setPassword('');
+            setContinuation(result);
+            setMethod(result.available_methods.includes('totp') ? 'totp' : 'recovery_code');
+            setCode('');
+            attempt.current.edited();
+        }
+        catch {
+            if (owner === sequence.current)
+                setError(t(catalog, "auth.login.signInFailed"));
+        }
+        finally {
+            if (owner === sequence.current) {
+                flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
+                setBusy(false);
+            }
+        }
+    }
+    async function submitCode(value: string) {
+        if (!continuation || flight.current)
+            return;
+        if (method === 'totp' && !attempt.current.claim(continuation.challenge_token, value))
+            return;
+        if (method === 'recovery_code' && !value.trim())
+            return;
+        flight.current = true;
+        setBusy(true);
+        setError(null);
+        const owner = sequence.current;
+        try {
+            dispatched.current = true;
+            setCompleting(true);
+            const result = await client.completeLogin(continuation.challenge_token, value.trim());
+            if (owner === sequence.current)
+                finish(result);
+        }
+        catch (failure) {
+            const credentialRefused = failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500;
+            if (!credentialRefused) clearStoredSupportConversation();
+            if (owner === sequence.current) setError(failure instanceof ContractHttpError && failure.status === 429
+                ? t(catalog, "auth.login.tooManyAttempts")
+                : !credentialRefused ? t(catalog, "auth.login.verificationFailed")
+                : method === 'recovery_code' ? t(catalog, "auth.login.recoveryCodeRejected") : t(catalog, "auth.login.authenticationCodeRejected"));
+        }
+        finally {
+            if (owner === sequence.current) {
+                flight.current = false;
+                dispatched.current = false;
+                setCompleting(false);
+                setBusy(false);
+            }
+        }
+    }
+    const offered = continuation?.available_methods ?? [];
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={replacement ? t(catalog, "auth.login.replacementTitle") : continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={!replacement&&!dispatched.current?<p><Link href="/reset-password" onClick={()=>{cancelConditional();}}>{t(resetCatalog,"request.title")}</Link> · <KnownPasswordRecoveryLink onClick={()=>{cancelConditional();}}/></p>:null}>
+ {error ? <div className="authAlert" role="alert">{error}</div> : null}
+ {replacement ? <div><EphemeralCodes codes={[replacement]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
+                setRecoveryAcknowledgementPending(false);
+                setReplacement(null);
+                void onAuthenticated();
+            }}>{t(catalog, "auth.continue")}</button></div> : continuation ? <div>
+ {offered.includes('passkey') ? <button type="button" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button> : null}
+ {offered.includes('totp') || offered.includes('recovery_code') ? <>
+ <form className="authForm authMfaForm" noValidate method="post" action="/login" onSubmit={e => {
+                    e.preventDefault();
+                    void submitCode(code);
+                }} aria-busy={busy}>
+ <label htmlFor="login-code">{method === 'totp' ? t(catalog, "auth.login.authenticationCodeLabel") : t(catalog, "auth.login.recoveryCodeLabel")}</label>
+ <p id="login-code-help" hidden={method !== 'totp'}>{t(catalog, "auth.login.authenticatorInstruction")}</p>
+ <input aria-describedby={method === 'totp' ? 'login-code-help' : undefined} id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? 6 : 128} disabled={busy} autoFocus onChange={e => {
+                    const value = method === 'totp' ? e.target.value.replace(/\D/g, '').slice(0, 6) : e.target.value;
+                    if (value !== code)
+                        attempt.current.edited();
+                    setCode(value);
+                    if (method === 'totp' && value.length === 6)
+                        void submitCode(value);
+                }}/>
+ <button className="authPrimary" type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button>
+ </form>
+ {offered.includes('recovery_code') && method !== 'recovery_code' ? <button type="button" disabled={completing} onClick={() => {
+                        if (dispatched.current) return;
+                        cancelConditional();
+                        flight.current = false;
+                        setBusy(false);
+                        setMethod('recovery_code');
+                        setCode('');
+                        attempt.current.edited();
+                    }}>{t(catalog, "auth.login.useRecoveryCode")}</button> : null}
+ {offered.includes('totp') && method !== 'totp' ? <button type="button" disabled={completing} onClick={() => {
+                        if (dispatched.current) return;
+                        cancelConditional();
+                        flight.current = false;
+                        setBusy(false);
+                        setMethod('totp');
+                        setCode('');
+                        attempt.current.edited();
+                    }}>{t(catalog, "auth.login.useAuthenticatorCode")}</button> : null}
+ </> : null}
+ <button type="button" disabled={busy} onClick={() => {
+                cancelConditional();
+                setContinuation(null);
+                setCode('');
+                setError(null);
+            }}>{t(catalog, "auth.login.backToSignIn")}</button>
+ </div> : <>
+ <button type="button" className="authPrimary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button>
+ <SocialProviderButtons disabled={completing} client={client} catalog={catalog} onBegin={cancelConditional}/>
+ <form className="authForm" noValidate method="post" action="/login" onSubmit={submitCredentials} aria-busy={busy}>
+ <label htmlFor="login-email">{t(catalog, "auth.email")}</label><input id="login-email" name="email" type="email" autoComplete="username webauthn" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={e => {
+                cancelConditional();
+                setEmail(e.target.value);
+                setEmailError(null);
+            }} required aria-invalid={!!emailError || undefined} aria-describedby={emailError ? 'login-email-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-email-error" message={emailError}/>
+ <label htmlFor="login-password">{t(catalog, "auth.password")}</label><input id="login-password" name="password" type="password" autoComplete="current-password" value={password} onChange={e => {
+                cancelConditional();
+                setPassword(e.target.value);
+                setPasswordError(null);
+            }} required aria-invalid={!!passwordError || undefined} aria-describedby={passwordError ? 'login-password-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-password-error" message={passwordError}/>
+ <button type="submit" className="authPrimary" disabled={busy}>{busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}</button>
+ </form><Link href="/recover">{t(catalog, "auth.login.recoveryAccess")}</Link><p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>
+ </>}
+ </AuthShell>;
 }

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadObservationAgentEnvironment } from "../../packages/register/src/runtime-environment.js";
+import { loadApiEnvironment, loadObservationAgentEnvironment } from "../../packages/register/src/runtime-environment.js";
 import {
   parseApiEnvironment,
   parseKeyRotationEnvironment,
@@ -158,17 +158,29 @@ describe("production configuration floors (R2)", () => {
       .toThrowError(/^DATABASE_URL_TLS_REQUIRED:DATABASE_URL$/u);
   });
 
+  it("keeps verified TLS floors on the real API process.env loader", () => {
+    try {
+      for (const [key, value] of Object.entries({ ...validApiEnvironmentFixture(), NODE_ENV: "production", STAFF_ACCESS_POLICY_VERSION: "1" })) {
+        vi.stubEnv(key, value);
+      }
+      expect(loadApiEnvironment().STAFF_ACCESS).toEqual({ policyVersion: 1 });
+      vi.stubEnv("DATABASE_URL", REMOTE_PLAIN);
+      expect(() => loadApiEnvironment()).toThrowError(/^DATABASE_URL_TLS_REQUIRED:DATABASE_URL$/u);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("wires every process.env loader through its source-injecting twin", async () => {
     const source = await readFile(
       new URL("../../packages/register/src/runtime-environment.ts", import.meta.url),
       "utf8"
     );
-    for (const name of ["Migration", "ReplaySelfTest", "Liveness", "Settlement", "Runner", "ServeDisclosureReport"]) {
+    for (const name of ["Api", "Migration", "ReplaySelfTest", "Liveness", "Settlement", "Runner", "ServeDisclosureReport"]) {
       expect(source).toContain(
         `export function load${name}Environment() {\n  return parse${name}Environment(process.env);\n}`
       );
     }
-    expect(source).toContain("validateApiEnvironment(parseEnvironment(apiEnvironmentShape))");
     expect(source).toContain("validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source))");
     expect(source).toContain("assertProductionFloors(environment)");
   });

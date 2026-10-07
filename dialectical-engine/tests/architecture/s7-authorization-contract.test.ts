@@ -182,13 +182,14 @@ describe("Accounts S7 ownership architecture", () => {
 
   it("revalidates ownership after reading the ungated lifecycle projection", async () => {
     const api = await read("apps/api/src/index.ts");
-    const projectionRead = api.indexOf("const projected = await this.#splitLifecycle.read(runId)");
-    const finalRecheck = api.indexOf("const stillOwned = await this.pool.query", projectionRead);
-    const firstYield = api.indexOf("for (const event of events) yield event", projectionRead);
+    const projectionRead = api.indexOf("const projected = await this.#splitLifecycle.read(runId, signal)");
+    const finalRecheck = api.indexOf("const stillOwned = await queryPrivateSnapshot<{ owned: boolean }>(this.pool,", projectionRead);
+    const firstYield = api.indexOf("for (const event of events) { if (signal?.aborted) return; yield event; }", projectionRead);
     expect(projectionRead).toBeGreaterThan(-1);
     expect(finalRecheck).toBeGreaterThan(projectionRead);
     expect(firstYield).toBeGreaterThan(finalRecheck);
     expect(api.slice(finalRecheck, firstYield)).toContain("core.run_is_owned_by");
+    expect(api.slice(finalRecheck, firstYield)).toContain("if (signal?.aborted || stillOwned.rows[0]?.owned !== true) return;");
   });
 
   it("keeps replay-eviction content-key I/O outside the write transaction", async () => {

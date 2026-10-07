@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "să obțineți lista tuturor terților care le-au primit;",
   "legal.health.s05.item3": "să vă retrageți consimțământul și să cereți ștergerea lor.",
   "legal.health.s06.title": "Cum le exercitați",
-  "legal.health.s06.body": "Din Setări sau scriind la privacy@dezbatere.ro. Răspundem în termen de 45 de zile. Dacă refuzăm o solicitare, puteți contesta decizia răspunzând la mesajul nostru."
+  "legal.health.s06.body": "Din Setări sau scriind la privacy@dezbatere.ro. Răspundem în termen de 45 de zile. Dacă refuzăm o solicitare, puteți contesta decizia răspunzând la mesajul nostru.",
+  "legal.cookies.staff.purpose": "Acces separat pentru personal",
+  "legal.cookies.passwordReset.purpose": "Doar resetarea parolei",
+  "legal.cookies.mfaRecovery.purpose": "Doar recuperarea autentificatorului",
+  "legal.cookies.social.purpose": "Flux scurt de autentificare prin furnizor sau asociere a contului",
+  "legal.cookies.phoneDraft.purpose": "Întrebare neterminată în timpul completării telefonului; se șterge la schimbarea sesiunii, deconectare sau schimbarea titularului",
+  "legal.cookies.staff.life": "Cel mult 8 ore; expiră după 15 minute de inactivitate",
+  "legal.cookies.passwordReset.life": "Cel mult 30 de minute",
+  "legal.cookies.mfaRecovery.life": "Cel mult 299 de secunde",
+  "legal.cookies.social.life": "Cel mult 5 minute",
+  "legal.cookies.phoneDraft.life": "15 minute sau până la ștergere"
 }

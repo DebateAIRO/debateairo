@@ -4,7 +4,7 @@ import {
   normalizeEmailForBlindIndex
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "@debateai/db";
-import { AuthFlowError } from "./registration.js";
+import { AuthFlowError, type RecoveryMailWork, type RecoveryMailDispatchPort } from "./registration.js";
 
 export const RECOVERY_START_PUBLIC_RESPONSE = Object.freeze({
   message: "If this account can be recovered, instructions will arrive through an eligible channel."
@@ -40,6 +40,8 @@ export class RecoveryStartService implements RecoveryApplication {
 
   constructor(private readonly dependencies: Readonly<{
     repository: RecoveryStartRepository;
+    consumerPrepare?:(input:Readonly<{email:string}>,source:AuthSourceContext)=>Promise<RecoveryMailWork|null>;
+    mailDispatch?:RecoveryMailDispatchPort;
     riskSignals:RecoveryRiskSignalRecorder;
     onRiskSignalFailure:(error:unknown)=>void;
     blindIndexKey: Uint8Array;
@@ -55,6 +57,7 @@ export class RecoveryStartService implements RecoveryApplication {
     if (dependencies.publicResponsePolicy !== "ENUMERATION_RESISTANT_GENERIC") {
       throw new TypeError("RECOVERY_PUBLIC_RESPONSE_POLICY_INVALID");
     }
+    if((dependencies.consumerPrepare===undefined)!==(dependencies.mailDispatch===undefined))throw new TypeError("RECOVERY_DISPATCH_COMPOSITION_INVALID");
     this.monotonicNow = dependencies.monotonicNow ?? performance.now.bind(performance);
     this.sleep = dependencies.sleep ?? (async (milliseconds) => {
       await new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -69,10 +72,12 @@ export class RecoveryStartService implements RecoveryApplication {
     try {
       let email: string;
       try {
+        if(typeof input.email!=="string"||input.email.length>254)throw new AuthFlowError("AUTH_INPUT_INVALID");
         email = normalizeEmailForBlindIndex(input.email);
       } catch (error) {
         throw new AuthFlowError("AUTH_INPUT_INVALID", { cause: error });
       }
+      const prepare=async():Promise<RecoveryMailWork|null>=>{
       const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
       const outcome=await this.dependencies.repository.start({ emailBlindIndex, source });
       if(outcome.status==="created"){
@@ -83,6 +88,10 @@ export class RecoveryStartService implements RecoveryApplication {
           if(recorded!=="recorded") throw new TypeError("RECOVERY_RISK_SIGNAL_SCOPE_UNRESOLVED");
         }catch(error){this.dependencies.onRiskSignalFailure(error);}
       }
+      return await this.dependencies.consumerPrepare?.({email},source) ?? null;
+      };
+      if(this.dependencies.mailDispatch!==undefined)await this.dependencies.mailDispatch.dispatchRecoveryMail(prepare);
+      else await prepare();
       return RECOVERY_START_PUBLIC_RESPONSE;
     } finally {
       const remaining = this.dependencies.enumerationFloorMs

@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "tikseb il-lista ta’ kull parti terza li rċevietha;",
   "legal.health.s05.item3": "tirtira l-kunsens tiegħek u titlob li titħassar.",
   "legal.health.s06.title": "Kif teżerċitahom",
-  "legal.health.s06.body": "Mill-Issettjar, jew billi tikteb lil privacy@dezbatere.ro. Inwieġbu fi żmien 45 jum. Jekk niċħdu talba, tista’ tappella billi twieġeb għall-messaġġ tagħna."
+  "legal.health.s06.body": "Mill-Issettjar, jew billi tikteb lil privacy@dezbatere.ro. Inwieġbu fi żmien 45 jum. Jekk niċħdu talba, tista’ tappella billi twieġeb għall-messaġġ tagħna.",
+  "legal.cookies.staff.purpose": "Aċċess separat għall-persunal",
+  "legal.cookies.passwordReset.purpose": "Reset tal-password biss",
+  "legal.cookies.mfaRecovery.purpose": "Irkupru tal-awtentikatur biss",
+  "legal.cookies.social.purpose": "Dħul qasir permezz ta’ fornitur jew rabta tal-kont",
+  "legal.cookies.phoneDraft.purpose": "Mistoqsija mhux lesta waqt il-pass tat-telefon; titħassar meta tinbidel is-sessjoni, toħroġ jew jinbidel is-sid",
+  "legal.cookies.staff.life": "Sa 8 sigħat; 15-il minuta ta’ inattività",
+  "legal.cookies.passwordReset.life": "Sa 30 minuta",
+  "legal.cookies.mfaRecovery.life": "Sa 299 sekonda",
+  "legal.cookies.social.life": "Sa 5 minuti",
+  "legal.cookies.phoneDraft.life": "15-il minuta jew sakemm jitħassar qabel"
 }

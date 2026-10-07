@@ -1,58 +1,48 @@
 {
   "schemaVersion": 2,
   "catalog": {
-    "sha256": "55133fc55bf08f45d0cb674c8e89416ae749249eaef4291e985af82a270bb52a",
-    "reviewedBy": "OWNER",
-    "reviewerSession": "b06da770-1b32-42dc-a45d-cbc280fccbe5 (paid-plans session; the owner read the merged catalogue's nine billing-page entries and its fingerprint in chat and answered 'signed')",
-    "reviewedOn": "2026-10-02",
-    "evidence": "docs/missions/paid-plans/OWNER-SIGNOFF-billing-pages-catalog.md",
-    "ratifiedBy": "V",
-    "ratifiedOn": "2026-10-02"
+    "sha256": "b07e81ae502bd9f5d2928d5689ca110ea2bcd639039803888a19f2f8f2b595c6",
+    "reviewedBy": "SOL",
+    "reviewerSession": "/root/dev_auth_integration_recovery",
+    "reviewedOn": "2026-10-06",
+    "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"
   },
   "articles": [
     {
       "id": "account-access",
       "lang": "en",
-      "sha256": "9f7b29640233d9c395a65c9905bd4cec340a1483459550338d1c11bc14b66ac2",
-      "reviewedBy": "OWNER",
-      "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V1 question on 2026-10-01)",
-      "reviewedOn": "2026-10-01",
-      "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S05-support-kb.md",
-      "ratifiedBy": "V",
-      "ratifiedOn": "2026-10-01"
+      "sha256": "819d4fe7ce40b241a28f26122c4ba81e9b2b05071604c47358fc0c5ef0af6498",
+      "reviewedBy": "SOL",
+      "reviewerSession": "/root/dev_auth_integration_recovery",
+      "reviewedOn": "2026-10-06",
+      "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"
     },
     {
       "id": "account-access",
       "lang": "ro",
-      "sha256": "cab1683e79fd20cf4cc1186f9e886acaa588b0fd60f989ce61c9e831116b5ec2",
-      "reviewedBy": "OWNER",
-      "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V1 question on 2026-10-01)",
-      "reviewedOn": "2026-10-01",
-      "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S05-support-kb.md",
-      "ratifiedBy": "V",
-      "ratifiedOn": "2026-10-01"
+      "sha256": "a0f08ec4f5862b24350a6a8e750d688be0e45337a3d0fab055ecd541f35f1f72",
+      "reviewedBy": "SOL",
+      "reviewerSession": "/root/dev_auth_integration_recovery",
+      "reviewedOn": "2026-10-06",
+      "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"
     },
     {
       "id": "account-settings",
       "lang": "en",
-      "sha256": "e4299c87f0dfe85c1063b1f37c1d3206ce5ed8862bbac75333a883cebcd49e81",
-      "reviewedBy": "OWNER",
-      "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-      "reviewedOn": "2026-10-01",
-      "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
-      "ratifiedBy": "V",
-      "ratifiedOn": "2026-10-01"
+      "sha256": "41e826b5d3c07aa6b2f9651072aa4902babb66dd2a5f4f5e41dd5e15106433b2",
+      "reviewedBy": "SOL",
+      "reviewerSession": "/root/dev_auth_integration_recovery",
+      "reviewedOn": "2026-10-06",
+      "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"
     },
     {
       "id": "account-settings",
       "lang": "ro",
-      "sha256": "ef8ba11070890552d5f0ba82c5c50d587f8fed04d05ef0218fb8b7daa1cd616c",
-      "reviewedBy": "OWNER",
-      "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-      "reviewedOn": "2026-10-01",
-      "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
-      "ratifiedBy": "V",
-      "ratifiedOn": "2026-10-01"
+      "sha256": "f887ccbfcc05fb99a095a451e6b2b872cdc3d85135a3e3eadd0496d80d10b21c",
+      "reviewedBy": "SOL",
+      "reviewerSession": "/root/dev_auth_integration_recovery",
+      "reviewedOn": "2026-10-06",
+      "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"
     },
     {
       "id": "ai-transparency",
@@ -279,24 +269,20 @@
     {
       "id": "settings-help-menus",
       "lang": "en",
-      "sha256": "53b4612d883133874617b1a8647df9450dc75e2301e8f93a56e7eceaa169a084",
-      "reviewedBy": "OWNER",
-      "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-      "reviewedOn": "2026-10-01",
-      "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
-      "ratifiedBy": "V",
-      "ratifiedOn": "2026-10-01"
+      "sha256": "cc1e1a979bf1e138a7e44b19ebc86f67417245b9741a6d6094c9dbf44ed5f839",
+      "reviewedBy": "SOL",
+      "reviewerSession": "/root/dev_auth_integration_recovery",
+      "reviewedOn": "2026-10-06",
+      "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"
     },
     {
       "id": "settings-help-menus",
       "lang": "ro",
-      "sha256": "362e226cabd7b26b69638fc8e968325408dfdc4ebcd952ede1510e31daee7711",
-      "reviewedBy": "OWNER",
-      "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-      "reviewedOn": "2026-10-01",
-      "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
-      "ratifiedBy": "V",
-      "ratifiedOn": "2026-10-01"
+      "sha256": "e4cb119bcbb186db0e0904a0aae4829b63c057385b3232a7edccb3e18ae7667a",
+      "reviewedBy": "SOL",
+      "reviewerSession": "/root/dev_auth_integration_recovery",
+      "reviewedOn": "2026-10-06",
+      "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"
     },
     {
       "id": "support-cases",
@@ -360,59 +346,59 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "6c05d583e0afc6683ea63a7163bac38f531964c01117cbed478cc989d29fd41c",
+    "componentFileSha256": "9085ddb2f2b8fc9b743be89e304a089b5a10f094cf636cdfb72c0167ca6c11bd",
     "components": [
       {
         "id": "account-access",
         "lang": "en",
-        "articleSha256": "9f7b29640233d9c395a65c9905bd4cec340a1483459550338d1c11bc14b66ac2",
-        "modelProjectionSha256": "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a",
-        "fallbackSha256": "8d1e8ab2f22c91a590bd7a17b87edd6ffb5a5df3a857655f19da10dcec8c69b5",
-        "reviewedBy": "OWNER",
-        "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V1 question on 2026-10-01)",
-        "reviewedOn": "2026-10-01",
-        "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S05-support-kb.md",
-        "ratifiedBy": "V",
-        "ratifiedOn": "2026-10-01"
+        "articleSha256": "819d4fe7ce40b241a28f26122c4ba81e9b2b05071604c47358fc0c5ef0af6498",
+        "modelProjectionSha256": "57f2565e54ea4bde4fbf624dcc8ccddfc1c2e7d67eac18052470dd511962975c",
+        "fallbackSha256": "57f2565e54ea4bde4fbf624dcc8ccddfc1c2e7d67eac18052470dd511962975c",
+        "reviewedBy": "SOL",
+        "reviewerSession": "/root/dev_auth_integration_recovery",
+        "reviewedOn": "2026-10-06",
+        "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md",
+        "ratifiedBy": "",
+        "ratifiedOn": ""
       },
       {
         "id": "account-access",
         "lang": "ro",
-        "articleSha256": "cab1683e79fd20cf4cc1186f9e886acaa588b0fd60f989ce61c9e831116b5ec2",
-        "modelProjectionSha256": "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98",
-        "fallbackSha256": "aeab73ba56ee61fdf6845823af3ac4361b3ccd1ebb65cea77d10eecf3015351c",
-        "reviewedBy": "OWNER",
-        "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V1 question on 2026-10-01)",
-        "reviewedOn": "2026-10-01",
-        "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S05-support-kb.md",
-        "ratifiedBy": "V",
-        "ratifiedOn": "2026-10-01"
+        "articleSha256": "a0f08ec4f5862b24350a6a8e750d688be0e45337a3d0fab055ecd541f35f1f72",
+        "modelProjectionSha256": "73af487d0a2fbd1f4824f678bf78cd756deee6ab4190d467f26a777d4e5e331a",
+        "fallbackSha256": "73af487d0a2fbd1f4824f678bf78cd756deee6ab4190d467f26a777d4e5e331a",
+        "reviewedBy": "SOL",
+        "reviewerSession": "/root/dev_auth_integration_recovery",
+        "reviewedOn": "2026-10-06",
+        "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md",
+        "ratifiedBy": "",
+        "ratifiedOn": ""
       },
       {
         "id": "account-settings",
         "lang": "en",
-        "articleSha256": "e4299c87f0dfe85c1063b1f37c1d3206ce5ed8862bbac75333a883cebcd49e81",
-        "modelProjectionSha256": "974caea072e110bfa7f8940ab44bb2b60ea35db217c4c7eb4fa460a010ae943c",
-        "fallbackSha256": "cd6f4ffdcb225fa7bd8ca8f92b045f8fd8066288a752b51fa53121716150c852",
-        "reviewedBy": "OWNER",
-        "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-        "reviewedOn": "2026-10-01",
-        "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
-        "ratifiedBy": "V",
-        "ratifiedOn": "2026-10-01"
+        "articleSha256": "41e826b5d3c07aa6b2f9651072aa4902babb66dd2a5f4f5e41dd5e15106433b2",
+        "modelProjectionSha256": "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de",
+        "fallbackSha256": "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de",
+        "reviewedBy": "SOL",
+        "reviewerSession": "/root/dev_auth_integration_recovery",
+        "reviewedOn": "2026-10-06",
+        "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md",
+        "ratifiedBy": "",
+        "ratifiedOn": ""
       },
       {
         "id": "account-settings",
         "lang": "ro",
-        "articleSha256": "ef8ba11070890552d5f0ba82c5c50d587f8fed04d05ef0218fb8b7daa1cd616c",
-        "modelProjectionSha256": "fa20ef501c9e570895a4a849cf0987463be8994a769f1b5c55310cadac3771ff",
-        "fallbackSha256": "f882a60898dc0a73e1ae850f05791a399c4451523afc4a9a7139afea82191e85",
-        "reviewedBy": "OWNER",
-        "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-        "reviewedOn": "2026-10-01",
-        "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
-        "ratifiedBy": "V",
-        "ratifiedOn": "2026-10-01"
+        "articleSha256": "f887ccbfcc05fb99a095a451e6b2b872cdc3d85135a3e3eadd0496d80d10b21c",
+        "modelProjectionSha256": "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958",
+        "fallbackSha256": "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958",
+        "reviewedBy": "SOL",
+        "reviewerSession": "/root/dev_auth_integration_recovery",
+        "reviewedOn": "2026-10-06",
+        "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md",
+        "ratifiedBy": "",
+        "ratifiedOn": ""
       },
       {
         "id": "ai-transparency",
@@ -807,28 +793,28 @@
       {
         "id": "settings-help-menus",
         "lang": "en",
-        "articleSha256": "53b4612d883133874617b1a8647df9450dc75e2301e8f93a56e7eceaa169a084",
-        "modelProjectionSha256": "291f2b5a3c95cf345d3d1794e2e0c2e7e5e88ccff5703a200ef89c8f28ad7108",
-        "fallbackSha256": "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5",
-        "reviewedBy": "OWNER",
-        "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-        "reviewedOn": "2026-10-01",
-        "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
-        "ratifiedBy": "V",
-        "ratifiedOn": "2026-10-01"
+        "articleSha256": "cc1e1a979bf1e138a7e44b19ebc86f67417245b9741a6d6094c9dbf44ed5f839",
+        "modelProjectionSha256": "2e9dcfcaa8f0ea5b99e38439a48f0139665894ad180ebb113642550e79dcc101",
+        "fallbackSha256": "2e9dcfcaa8f0ea5b99e38439a48f0139665894ad180ebb113642550e79dcc101",
+        "reviewedBy": "SOL",
+        "reviewerSession": "/root/dev_auth_integration_recovery",
+        "reviewedOn": "2026-10-06",
+        "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md",
+        "ratifiedBy": "",
+        "ratifiedOn": ""
       },
       {
         "id": "settings-help-menus",
         "lang": "ro",
-        "articleSha256": "362e226cabd7b26b69638fc8e968325408dfdc4ebcd952ede1510e31daee7711",
-        "modelProjectionSha256": "1eba8965421962503b0cb644043404c8e59bdb5722e8adc8999e5679d99520e5",
-        "fallbackSha256": "f3bd7bb6e653e6c62a820d05015043cbe56a9d511e4d3346b6cb36fe3156b578",
-        "reviewedBy": "OWNER",
-        "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-        "reviewedOn": "2026-10-01",
-        "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
-        "ratifiedBy": "V",
-        "ratifiedOn": "2026-10-01"
+        "articleSha256": "e4cb119bcbb186db0e0904a0aae4829b63c057385b3232a7edccb3e18ae7667a",
+        "modelProjectionSha256": "740bd73c42eb1b5bec8dece0ef18cacabc373ad14e125ba551a516f2e661f500",
+        "fallbackSha256": "740bd73c42eb1b5bec8dece0ef18cacabc373ad14e125ba551a516f2e661f500",
+        "reviewedBy": "SOL",
+        "reviewerSession": "/root/dev_auth_integration_recovery",
+        "reviewedOn": "2026-10-06",
+        "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md",
+        "ratifiedBy": "",
+        "ratifiedOn": ""
       },
       {
         "id": "support-cases",

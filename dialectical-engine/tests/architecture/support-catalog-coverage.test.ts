@@ -32,8 +32,11 @@ describe("Support catalog route coverage", () => {
     expect([...SUPPORT_PAGE_ROUTES].sort()).toEqual(discovered);
     expect(SUPPORT_PAGE_ROUTES).toEqual([
       "/",
+      "/admin/invitation",
+      "/admin/team",
       "/admin/workers",
       "/ai-transparency",
+      "/social/complete",
       "/cancel",
       "/checkout",
       "/checkout/return",
@@ -51,15 +54,21 @@ describe("Support catalog route coverage", () => {
       "/privacy/versions/[sha256]",
       "/providers",
       "/public/debate/[id]",
+      "/recover",
+      "/recover-authenticator",
+      "/reset-password",
       "/settings",
+      "/settings/security",
       "/settings/card",
       "/sign-up",
       "/terms",
       "/terms/versions",
       "/terms/versions/[sha256]",
+      "/verify-backup-email",
       "/verify-email",
+      "/verify-recovery-email",
       "/withdraw",
-    ]);
+    ].sort());
   });
 
   it("marks sensitive stateful pages as excluded from ordinary actions", () => {
@@ -68,6 +77,10 @@ describe("Support catalog route coverage", () => {
 
     expect(disposition.get("/verify-email")).toBe("excluded");
     expect(disposition.get("/enroll-mfa")).toBe("excluded");
+    for (const route of ["/reset-password", "/recover-authenticator", "/verify-backup-email"]) {
+      expect(SUPPORT_PAGE_ROUTES).toContain(route);
+      expect(SUPPORT_CAPABILITIES.find(capability => capability.route === route)).toBeUndefined();
+    }
     expect(disposition.get("/admin/workers")).toBe("excluded");
     expect(disposition.get("/debate/[id]")).toBe("trusted-context-only");
     expect(disposition.get("/public/debate/[id]")).toBe("trusted-context-only");
@@ -137,7 +150,7 @@ describe("Support catalog route coverage", () => {
     expect(capabilities.get("owner-debate")?.articleIds).toContain("debate-workspace-menus");
     expect(capabilities.get("settings")).toMatchObject({
       articleIds: expect.arrayContaining(["settings-help-menus"]),
-      actionIds: expect.arrayContaining(["active-sessions","claim-legacy","delete-account"])
+      actionIds: expect.arrayContaining(["active-sessions","security","delete-account"])
     });
     expect(capabilities.get("help-desk")?.articleIds).toEqual(expect.arrayContaining([
       "app-navigation","settings-help-menus","support-status-limits"
@@ -149,9 +162,8 @@ describe("Support catalog route coverage", () => {
     expect(actions.get("active-sessions")).toMatchObject({
       availability:"signed-in",href:"/settings#active-sessions-heading"
     });
-    expect(actions.get("claim-legacy")).toMatchObject({
-      availability:"signed-in",href:"/settings#legacy-run-claim-heading"
-    });
+    expect(actions.get("security")).toMatchObject({availability:"signed-in",href:"/settings/security"});
+    expect(actions.has("claim-legacy")).toBe(false);
     expect(actions.get("delete-account")).toMatchObject({
       availability:"signed-in",href:"/settings#account-deletion-heading"
     });

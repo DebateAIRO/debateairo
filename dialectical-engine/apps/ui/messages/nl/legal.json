@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "een lijst krijgen van alle derden die ze hebben ontvangen;",
   "legal.health.s05.item3": "uw toestemming intrekken en de gegevens laten verwijderen.",
   "legal.health.s06.title": "Hoe u ze uitoefent",
-  "legal.health.s06.body": "Via Instellingen of door te schrijven naar privacy@dezbatere.ro. Wij antwoorden binnen 45 dagen. Als wij een verzoek afwijzen, kunt u beroep aantekenen door op ons antwoord te reageren."
+  "legal.health.s06.body": "Via Instellingen of door te schrijven naar privacy@dezbatere.ro. Wij antwoorden binnen 45 dagen. Als wij een verzoek afwijzen, kunt u beroep aantekenen door op ons antwoord te reageren.",
+  "legal.cookies.staff.purpose": "Afzonderlijke medewerkerstoegang",
+  "legal.cookies.passwordReset.purpose": "Alleen wachtwoordreset",
+  "legal.cookies.mfaRecovery.purpose": "Alleen herstel van de authenticator",
+  "legal.cookies.social.purpose": "Korte aanmelding via aanbieder of accountkoppeling",
+  "legal.cookies.phoneDraft.purpose": "Onvoltooide vraag tijdens de telefoonstap; gewist bij sessiewisseling, afmelden of eigenaarswissel",
+  "legal.cookies.staff.life": "Tot 8 uur; 15 minuten inactiviteit",
+  "legal.cookies.passwordReset.life": "Tot 30 minuten",
+  "legal.cookies.mfaRecovery.life": "Tot 299 seconden",
+  "legal.cookies.social.life": "Tot 5 minuten",
+  "legal.cookies.phoneDraft.life": "15 minuten of tot eerder wissen"
 }

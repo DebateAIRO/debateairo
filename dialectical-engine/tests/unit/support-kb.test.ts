@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -1036,3 +1037,10 @@ describe("OWNER review records: the owner read the exact bytes and signed", () =
     expect(untrackedOwnerEvidence(reviewManifest, tracked)).toEqual([]);
   });
 });
+
+it('current integration SOL evidence identifies exact changed recovery text and component bytes',()=>{
+ const base=resolve(process.cwd(),'packages/support-kb');const doc=readFileSync(resolve(process.cwd(),'docs/missions/account-onboarding/dev-integration-kb-editorial.md'),'utf8');const labels=new Map([...doc.matchAll(/^- `([^`]+)`: `([a-f0-9]{64})`/gm)].map(m=>[m[1],m[2]]));const raw=readFileSync(resolve(base,'recovery/components.json'));const data=JSON.parse(raw.toString());const manifest=JSON.parse(readFileSync(resolve(base,'reviews/manifest.json'),'utf8'));
+ expect(doc).toContain(sha256(raw));expect(manifest.recovery.componentFileSha256).toBe(sha256(raw));
+ for(const row of data.components.filter((r:any)=>['account-access','account-settings','settings-help-menus'].includes(r.id))){const review=manifest.recovery.components.find((r:any)=>r.id===row.id&&r.lang===row.lang);expect(labels.get(`recovery:${row.id}.${row.lang}:modelProjection`)).toBe(sha256(row.modelProjection));expect(labels.get(`recovery:${row.id}.${row.lang}:fallback`)).toBe(sha256(row.fallback));expect(review.modelProjectionSha256).toBe(sha256(row.modelProjection));expect(review.fallbackSha256).toBe(sha256(row.fallback));expect(review.articleSha256).toBe(row.articleSha256);}
+});
+it('Romanian account recovery projection is ordinary route-free Romanian',()=>{const doc=JSON.parse(readFileSync(resolve(process.cwd(),'packages/support-kb/recovery/components.json'),'utf8'));const row=doc.components.find((r:any)=>r.id==='account-settings'&&r.lang==='ro');for(const field of ['modelProjection','fallback']){expect(row[field]).not.toMatch(/the (?:Account|Security) page/);expect(row[field]).toContain('pagina contului');expect(row[field]).toContain('pagina de securitate');}});

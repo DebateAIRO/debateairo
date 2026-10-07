@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "získať zoznam všetkých tretích strán, ktoré ich dostali;",
   "legal.health.s05.item3": "odvolať svoj súhlas a dať ich vymazať.",
   "legal.health.s06.title": "Ako svoje práva uplatniť",
-  "legal.health.s06.body": "V Nastaveniach alebo e-mailom na adresu privacy@dezbatere.ro. Odpovieme do 45 dní. Ak žiadosť zamietneme, môžete sa proti tomu odvolať odpoveďou na naše rozhodnutie."
+  "legal.health.s06.body": "V Nastaveniach alebo e-mailom na adresu privacy@dezbatere.ro. Odpovieme do 45 dní. Ak žiadosť zamietneme, môžete sa proti tomu odvolať odpoveďou na naše rozhodnutie.",
+  "legal.cookies.staff.purpose": "Oddelený prístup pracovníkov",
+  "legal.cookies.passwordReset.purpose": "Iba obnovenie hesla",
+  "legal.cookies.mfaRecovery.purpose": "Iba obnova autentifikátora",
+  "legal.cookies.social.purpose": "Krátke prihlásenie cez poskytovateľa alebo prepojenie účtu",
+  "legal.cookies.phoneDraft.purpose": "Nedokončená otázka počas telefonického kroku; odstránená pri zmene relácie, odhlásení alebo zmene vlastníka",
+  "legal.cookies.staff.life": "Najviac 8 hodín; 15 minút nečinnosti",
+  "legal.cookies.passwordReset.life": "Najviac 30 minút",
+  "legal.cookies.mfaRecovery.life": "Najviac 299 sekúnd",
+  "legal.cookies.social.life": "Najviac 5 minút",
+  "legal.cookies.phoneDraft.life": "15 minút alebo do skoršieho vymazania"
 }

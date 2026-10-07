@@ -16,7 +16,7 @@ import {
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
-const STATIC_TAIL = "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
+const STATIC_TAIL = "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
 
 test("createNonce draws 16 random bytes as 24 base64 characters, fresh every call", () => {
   const nonces = new Set();
@@ -59,7 +59,7 @@ test("a malformed nonce is refused, never interpolated into a policy", () => {
 test("the fallback is exactly the pre-nonce production policy and the API policy denies everything", () => {
   assert.equal(
     FALLBACK_CONTENT_SECURITY_POLICY,
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
   );
   assert.equal(API_CONTENT_SECURITY_POLICY, "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
   assert.equal(NONCE_REQUEST_HEADER, "x-nonce");
@@ -93,7 +93,7 @@ test("the custom server pre-sets the fallback policy on every response before Ne
 });
 
 const STAGE_POLICY = (nonce) =>
-  `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://secure-stage.xmoney.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://secure-stage.xmoney.com https://api-stage.xmoney.com; frame-src 'self' https://secure-stage.xmoney.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://secure-stage.xmoney.com; upgrade-insecure-requests`;
+  `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://secure-stage.xmoney.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com https://secure-stage.xmoney.com https://api-stage.xmoney.com; frame-src https://challenges.cloudflare.com 'self' https://secure-stage.xmoney.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://secure-stage.xmoney.com; upgrade-insecure-requests`;
 
 test("the card form lives on exactly three routes, never on /settings itself (AMENDMENTS-R1 A11)", () => {
   for (const path of ["/checkout", "/checkout/return", "/settings/card"]) assert.equal(isCardFormPath(path), true, path);
@@ -117,11 +117,15 @@ test("the card-form policy is today's policy plus the xMoney origins in four dir
   const nonce = createNonce();
   const policy = cardFormContentSecurityPolicy(nonce, false, cardFormOrigins("https://secure-stage.xmoney.com"));
   assert.equal(policy, STAGE_POLICY(nonce));
-  const withoutAdditions = policy
-    .replace(" https://secure-stage.xmoney.com;", ";")
-    .replace("connect-src 'self' https://secure-stage.xmoney.com https://api-stage.xmoney.com;", "connect-src 'self';")
-    .replace(" frame-src 'self' https://secure-stage.xmoney.com;", "")
-    .replace("form-action 'self' https://secure-stage.xmoney.com;", "form-action 'self';");
+  const directives=policy.split('; '),base=nonceContentSecurityPolicy(nonce,false).split('; ');
+  const names=directives.map(value=>value.split(' ')[0]);assert.equal(new Set(names).size,names.length);
+  const withoutAdditions=directives.map(value=>{
+    const name=value.split(' ')[0],original=base.find(item=>item.split(' ')[0]===name);
+    if(!['script-src','connect-src','frame-src','form-action'].includes(name))assert.equal(value,original);
+    const tokens=value.split(' ').filter(token=>token!=='https://secure-stage.xmoney.com'&&token!=='https://api-stage.xmoney.com');
+    if(name==='frame-src')return tokens.filter(token=>token!=="'self'").join(' ');
+    return tokens.join(' ');
+  }).join('; ');
   assert.equal(withoutAdditions, nonceContentSecurityPolicy(nonce, false));
   assert.throws(() => cardFormContentSecurityPolicy(nonce, false, { sdk: "https://x.test; script-src *", api: null }), /UI_XMONEY_SDK_ORIGIN_INVALID/);
   assert.throws(() => cardFormContentSecurityPolicy("bad", false, cardFormOrigins("https://secure.xmoney.com")), /UI_CSP_NONCE_INVALID/);

@@ -15,11 +15,12 @@ import { SUPPORT_UI_LABELS } from "../../packages/support-kb/src/ui-labels.js";
 const LABEL_SOURCES = {
   home: ["chrome","chrome.footer.home"],"start-debate": ["home","home.startDebateLabel"],
   "sign-in": ["home","home.logIn"],"sign-up": ["home","home.createAccount"],
+  "forgot-password": ["auth","auth.login.recoveryAccess"],
   help: ["chrome","chrome.help"],"support-status": ["support","support.serviceStatus"],
   method: ["chrome","chrome.method"],"sample-transcript": ["chrome","chrome.transcripts"],
   settings: ["chrome","chrome.settings"],"active-sessions": ["settings","settings.sessions.title"],
   "privacy-preferences": ["consent","consent.settings.title"],
-  "claim-legacy": ["settings","settings.legacy.title"],
+  "security": ["chrome","chrome.security"],
   "delete-account": ["settings","settings.erasure.title"],
   "public-catalog": ["home","home.publicDebates"],"your-debates": ["home","home.yourDebates"],
   "owner-debate": ["support","support.action.openYourDebate"],
@@ -69,7 +70,7 @@ describe("Support navigation", () => {
     for (const language of SUPPORT_LOCALES.filter((code) => code !== "en" && code !== "ro")) {
       const actions = resolveSupportActions(SUPPORT_ACTION_IDS, { signedIn: false, language });
       expect(actions.map(({ id }) => id)).toEqual([
-        "home","start-debate","sign-in","sign-up","help","support-status","method","sample-transcript"
+        "home","start-debate","sign-in","sign-up","help","support-status","method","sample-transcript","forgot-password"
       ]);
       for (const action of actions) {
         expect(action.label).toBe(SUPPORT_UI_LABELS[language][action.id as keyof typeof LABEL_SOURCES]);
@@ -90,6 +91,7 @@ describe("Support navigation", () => {
       { id: "support-status", label: "Service status", href: "/help#service-status" },
       { id: "method", label: "Method", href: "/#method" },
       { id: "sample-transcript", label: "Transcripts", href: "/#transcripts" },
+      { id: "forgot-password", label: "Recovery access", href: "/recover" },
     ]);
     expect(actions.every(({ href }) => href.startsWith("/") && !href.startsWith("//"))).toBe(true);
   });
@@ -145,11 +147,11 @@ describe("Support navigation", () => {
   });
 
   it("resolves the three static Settings sections only for signed-in visitors", () => {
-    const ids = ["active-sessions","claim-legacy","delete-account"] as const;
+    const ids = ["active-sessions","security","delete-account"] as const;
     expect(resolveSupportActions(ids,{ signedIn:false,language:"en" })).toEqual([]);
     expect(resolveSupportActions(ids,{ signedIn:true,language:"ro" })).toEqual([
       { id:"active-sessions",label:"Sesiuni active",href:"/settings#active-sessions-heading" },
-      { id:"claim-legacy",label:"Revendicați dezbaterile vechi",href:"/settings#legacy-run-claim-heading" },
+      { id:"security",label:"Securitate",href:"/settings/security" },
       { id:"delete-account",label:"Ștergeți contul",href:"/settings#account-deletion-heading" }
     ]);
   });
@@ -179,4 +181,9 @@ describe("Support navigation", () => {
     expect(Object.isFrozen(actions)).toBe(true);
     expect(Object.isFrozen(actions[0])).toBe(true);
   });
+});
+
+it('resolves the current first-party recovery action only while signed out',()=>{
+ expect(resolveSupportActions(['forgot-password'],{signedIn:false,language:'en'})).toEqual([{id:'forgot-password',label:'Recovery access',href:'/recover'}]);
+ expect(resolveSupportActions(['forgot-password'],{signedIn:true,language:'en'})).toEqual([]);
 });

@@ -90,7 +90,7 @@ describe("privacy policy modal — rendered", () => {
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
-      "PRIVACY POLICY · v3.0 · EFFECTIVE [DATE]"
+      "PRIVACY POLICY · v3.1 · EFFECTIVE [DATE]"
     );
     expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
     expect(dialog.querySelector(".policyLede")!.textContent).toBe(
@@ -181,7 +181,7 @@ describe("privacy policy modal — rendered", () => {
       0
     );
     expect(expectedParagraphs).toBe(50);
-    expect(expectedBullets).toBe(46);
+    expect(expectedBullets).toBe(56);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 
@@ -205,7 +205,7 @@ describe("privacy policy modal — rendered", () => {
 
     const scrollRegion = dialog.querySelector(".policyBody")!;
     const last = scrollRegion.lastElementChild!;
-    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.0");
+    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.1");
 
     // The honesty rule: this repository generates no policy PDF, so no control claims one.
     const pdf = [...dialog.querySelectorAll("*")].filter(

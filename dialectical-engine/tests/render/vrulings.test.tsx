@@ -10,6 +10,7 @@ import {
   AccountErasureControls,
   confirmationPhraseMatches
 } from "../../apps/ui/components/AccountErasureControls.js";
+import {AuthCatalogProvider} from "../../apps/ui/components/AuthShell.js";
 import { LOCALE_COOKIE, type LocaleCode } from "../../apps/ui/lib/i18n/locales.js";
 import { loadNamespace } from "../../apps/ui/lib/i18n/server.js";
 
@@ -79,14 +80,14 @@ describe("ruling 1: the delete-account phrase is the locale's own", () => {
   function erasureClient() {
     return {
       readAccountErasure: vi.fn(async () => ({ status: "NONE" as const })),
+      authMethods:vi.fn(async()=>({methods:[],recovery_codes_remaining:0,available_step_up_methods:["password_totp"],step_up_providers:[]})),
       stepUp: vi.fn(async () => ({
         status: "step_up_complete" as const,
         csrf_token: "c".repeat(43),
         step_up_grant: {
           token: "g".repeat(43),
           action: "DELETE_ACCOUNT" as const,
-          target_run_id: null,
-          expires_at: "2026-09-30T00:00:00.000Z"
+          expires_at: new Date(Date.now()+300000).toISOString()
         }
       })),
       scheduleAccountErasure: vi.fn(async () => ({
@@ -103,10 +104,10 @@ describe("ruling 1: the delete-account phrase is the locale's own", () => {
     const container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    const client = erasureClient();
+    const client = erasureClient(),authCatalog=await loadNamespace(locale,"auth");
     await act(async () => root!.render(
       // The client double covers the four calls the control makes.
-      <AccountErasureControls client={client as never} catalog={catalog} locale={locale} />
+      <AuthCatalogProvider catalog={authCatalog}><AccountErasureControls client={client as never} catalog={catalog} locale={locale} /></AuthCatalogProvider>
     ));
     await act(async () => { await Promise.resolve(); });
     const input = container.querySelector<HTMLInputElement>("#account-deletion-confirmation");
@@ -136,16 +137,10 @@ describe("ruling 1: the delete-account phrase is the locale's own", () => {
     expect(await type("MEIN KONTO LÖSCHEN")).toBe(true);
 
     const form = container.querySelector("form")!;
-    for (const [id, value] of [["account-deletion-password", "pw"], ["account-deletion-code", "123456"]] as const) {
-      const field = container.querySelector<HTMLInputElement>(`#${id}`)!;
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
-      await act(async () => {
-        setter.call(field, value);
-        field.dispatchEvent(new window.Event("input", { bubbles: true }));
-      });
-    }
-    await act(async () => { form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true })); });
-    await act(async () => { await Promise.resolve(); });
+    await act(async()=>form.requestSubmit());
+    const authCatalog=await loadNamespace('de','auth');
+    await act(async()=>[...container.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===authCatalog['auth.security.passwordMethod'])!.click());
+    for(const [name,value] of [['security-password','pw'],['security-code','123456']] as const){const field=container.querySelector<HTMLInputElement>(`[name="${name}"]`)!;await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')!.set!.call(field,value);field.dispatchEvent(new window.Event('input',{bubbles:true}));});}
     // The wire literal is the contract client's business: the control hands over
     // the step-up grant only, never the phrase the reader typed.
     expect(client.scheduleAccountErasure).toHaveBeenCalledWith("g".repeat(43));

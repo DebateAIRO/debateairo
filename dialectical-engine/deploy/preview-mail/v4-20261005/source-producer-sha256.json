@@ -1,0 +1,67 @@
+{
+  "schema": "preview-account-mail-v4-source-provenance",
+  "runtime": "node=26.8.2;icu=78.3;tz=2026a;cldr=48.0;unicode=17.0",
+  "sourceFiles": {
+    "apps/api/src/mail-channel.ts": "41fd0cb732bc8421aecbb036b658fc08c3fad9178415bdc9f69b34e69d5b42f6",
+    "apps/api/src/account-mail-template.mjs": "8c9436739e82efbe13e6f35cee0071262055d846fd55d4cb3493ef6fd5f2a412"
+  },
+  "originalInstalledPublicSource": {
+    "sendmail-two-owned-preview-recovery103.mjs": "bc201edd5875f1aae9984acebc6fa52b484772b06058b00f2cdef1aefcb70edf",
+    "recovery-mail-policy-two-owned103.mjs": "b6ce9c849b3baceead6938db5b97c53bbff46f4bbd3e1fe8856d8c75f129772b"
+  },
+  "redactedInstalledSource": {
+    "installed-recovery-mail-policy-two-owned103.mjs.redacted.txt": "058d6034b914edfb0e1121e0349054c5a91788cd971f856b929427d57c996b30",
+    "installed-sendmail-two-owned-preview-recovery103.mjs.redacted.txt": "a3063f3cddf3eca63ede872814f92104c48cadfab70cc499221cc4fb9d5bddc4"
+  },
+  "sourceMatrix": {
+    "purposes": 13,
+    "cohorts": 4,
+    "cells": 52,
+    "allowed": 23,
+    "intentionalRefusals": 29,
+    "sourceCaptureManifestSha256": "43cba442f969d38c5b18bfa650e8e56c983a1ceaa36db81e90fc30741f52de92",
+    "receiptSha256": "85f1296d22e666416628a1904dd59c830f79ae9771dadfbc4c9bebc089959d40"
+  },
+  "originalAliases": "restricted ignored evidence only; recipient bindings in artifact are SHA-256 digests",
+  "installation": "NOT_INSTALLED",
+  "delivery": "NOT_OBSERVED",
+  "initialSourceMatrix": {
+    "purposes": 13,
+    "cohorts": 4,
+    "cells": 52,
+    "allowed": 23,
+    "intentionalRefusals": 29,
+    "sourceCaptureManifestSha256": "32bab9cfd5f80b4aae6910a8ba74a95ad3211c86794e539d68a762b931c22ef7",
+    "receiptSha256": "278c2a6d7e747e9c960f1dbf9dce1965962b98579f7e5985d73a7a763d8d27b2"
+  },
+  "reviewCaptureRevision": {
+    "reason": "I1: initial To-only derivatives contained installed recipients inside both base64 alternatives in12 captures",
+    "sourceOriginalHashesUnchanged": 52,
+    "redactedCaptures": 52,
+    "changedDerivatives": 12,
+    "plainAndHtmlAlternativesChecked": 104,
+    "installedRecipientDigestMatches": 0,
+    "priorDerivativeManifestSha256": "37e5ba20b605a7a6b3b0060d17a2904a1eb59331bfcac59bbfaf821df16042d5",
+    "currentDerivativeManifestSha256": "381e16fa2cfac3ed6344a3223f912f1e6652b9832fb7b6eacba293cbbba00448",
+    "redactorSha256": "71653c369ecf747bbf90fb284afec7ff4347e5bb4e831d63ce0aeb71d9d4401b",
+    "producerHarnessSha256": "33953d7b3d85a0c62bde66b146e4260f27c5e0ff61e6855d8a1d093f54b9cba9",
+    "redactorTestSha256": "7ed3e53666d95f5577d9bafef91fed1ae32141c74c5d3e1b3de586ec81445a91",
+    "originalCustody": "Fresh0700 directory and0600 originals; old originals untouched; no original or alias file copied to Git",
+    "derivativeMeaning": "Header/decoded text/plain/decoded text/html redaction and valid MIME re-encoding, not unchanged original body bytes"
+  },
+  "privacyCorrection": {
+    "date": "2026-10-06",
+    "status": "source-only; installation and real delivery unverified",
+    "historicalReceiptMeaning": "Existing original fingerprints and capture receipts bind the earlier restricted run, not the corrected source tree.",
+    "forwardTargetBinding": "verification-forward-secondary",
+    "installationCustody": "fixed root-owned 0600/0400 config; no installed file read or write performed",
+    "correctedFileSha256": {
+      "sendmail-owned-preview.mjs": "cdf3cca6619ef99198383b30d8e430839bf1dfb89d1f87395b95265ec9bf1362",
+      "test-mail.mjs": "386e5ea18d18b14b44180c9a4d8fc5c0077bc54cf8ade1496f68e84affe48bb6",
+      "test-policy.mjs": "f0241034063e02bd17c87270427251dd2f9e959897e0c7c646ec16cb2f08351e",
+      "test-source-producer.mjs": "6a84f3aeff245d33b6106de5ecd0f4f92fd65be16c7c93b1d11fb78f55c4e480",
+      "installed-sendmail-two-owned-preview-recovery103.mjs.redacted.txt": "ab5629f99ce2bff1111f6afbf699cbbb50712cb1d8d6cbaa530fb59fb6fd58bd",
+      "synthetic-recipient-fixture.mjs": "c67250510aa164cbdfde85b20b25c8ae342b1490d616a4c997e73ae3d69a005c"
+    }
+  }
+}

@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Tartışmalar siz yayımlayana kadar gizlidir. Yayımlama, bilinçli olarak yapılan ve ayrıca onaylanan bir işlemdir. Yayımlanmış bir tartışma takma adınızı, sorunuzu yazdığınız şekliyle, argüman ağacını, puanları, hükmü ve güven aralığını gösterir ve içeriğin yapay zekâ tarafından oluşturulduğunu belirten görünür bir etiket taşır. E-posta adresinizi, oturum kayıtlarınızı veya hesap geçmişinizi hiçbir zaman göstermez. [Published debates are / are not] arama motorları tarafından dizine eklenir [unless you choose]." },
-      { kind: "p", text: "Yayından kaldırma, tartışmayı DebateAI'dan kaldırır ve herkese açık kopyamıza ait anahtarı imha eder. Okuyucuların, arama motorlarının veya arşivlerin daha önce oluşturduğu kopyalar kontrolümüz dışındadır ve bunları geri alamayız." },
+      { kind: "p", text: "Yayından kaldırma, tartışmayı Dialectical Engine'dan kaldırır ve herkese açık kopyamıza ait anahtarı imha eder. Okuyucuların, arama motorlarının veya arşivlerin daha önce oluşturduğu kopyalar kontrolümüz dışındadır ve bunları geri alamayız." },
       { kind: "p", text: "Hesabınızı sildiğinizde, kanun belirli bir öğeyi saklamamızı gerektirmedikçe yayımladığınız her tartışmayı gereksiz gecikme olmaksızın ve en geç 30 gün içinde kamunun erişiminden kaldırırız. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Tartışmalarda adı geçen ve kullanıcımız olmayan kişiler",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Bir kişi DebateAI'a adınızı içeren bir soru sorarsa hizmeti hiç kullanmamış olsanız bile hakkınızda kişisel veriler tutabiliriz. Koşullar kullanıcıların bunu yapmasını yasaklar ve yapay zekâ sağlayıcılarına gönderdiklerimizi asgariye indiririz; ancak bu gerçekleşebilir." },
+      { kind: "p", text: "Bir kişi Dialectical Engine'a adınızı içeren bir soru sorarsa hizmeti hiç kullanmamış olsanız bile hakkınızda kişisel veriler tutabiliriz. Koşullar kullanıcıların bunu yapmasını yasaklar ve yapay zekâ sağlayıcılarına gönderdiklerimizi asgariye indiririz; ancak bu gerçekleşebilir." },
       { kind: "p", text: "Bu bölüm, GDPR'ın 14. maddesi kapsamında size borçlu olduğumuz bildirimdir. Veriler, kullanıcının yazdıkları ve motorun yanıt olarak oluşturduklarıdır; kaynak o kullanıcıdır; amaçlar ve hukuki dayanak bölüm 4'te belirtilenlerdir; alıcılar Sicildeki yapay zekâ sağlayıcılarıdır; saklama bölüm 7'ye tabidir. Bölüm 10'daki tüm haklara sahipsiniz; özellikle verilerinizi içeren yayımlanmış veya gizli bir tartışmayı kaldırmamızı ve hakkınızda neler tuttuğumuzu söylememizi isteyebilirsiniz. Bunu yapmak için bir hesaba ihtiyacınız yoktur. privacy@dezbatere.ro adresine yazın veya yayımlanmış herhangi bir tartışmadaki Bildir kontrolünü kullanın; dayanaklı talepleri gereksiz gecikme olmaksızın işleme alırız. Bu gerçekleştiğinde size tek tek bildirimde bulunamayız; çünkü kim olduğunuzu veya size nasıl ulaşacağımızı bilmiyoruz. Bunun yerine aldığımız önlemler bu kamuya açık bildirim ve kaldırma yoludur." },
       { kind: "p", text: "Aynı durum, başka bir kişinin sorusunda yer alan sizin hakkınızdaki hassas bilgiler — siyaset, sağlık, din — için de geçerlidir. İtiraz etmenizden sonra bunları işlemeye devam etmemize izin veren hiçbir hukuki şart yoktur ve devam etmeyiz." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Çocuklar",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI yetişkinler içindir. Kayıt olurken 18 yaşında veya daha büyük olduğunuzu doğrularsınız ve 18 yaşın altındaki hiç kimsenin verilerini bilerek işlemeyiz. Bir hesabın 18 yaşın altındaki bir kişiye ait olduğunu öğrenirsek hesabı kapatır ve bölüm 7'de açıklandığı şekilde verileri sileriz. Bazı ülkeler doğrulamayı yetersiz kabul eder veya daha fazlasını şart koşar; her yerde neyin geçerli olduğu Ek B'de, bu konuda ne yaptığımız ise Koşullarda açıklanır." }
+      { kind: "p", text: "Dialectical Engine yetişkinler içindir. Kayıt olurken 18 yaşında veya daha büyük olduğunuzu doğrularsınız ve 18 yaşın altındaki hiç kimsenin verilerini bilerek işlemeyiz. Bir hesabın 18 yaşın altındaki bir kişiye ait olduğunu öğrenirsek hesabı kapatır ve bölüm 7'de açıklandığı şekilde verileri sileriz. Bazı ülkeler doğrulamayı yetersiz kabul eder veya daha fazlasını şart koşar; her yerde neyin geçerli olduğu Ek B'de, bu konuda ne yaptığımız ise Koşullarda açıklanır." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Çerezler",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca DebateAI tarafından yerleştirilen sekiz öğe kullanır: dört çerez ve tarayıcınızın depolama alanında dört kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. [dezbatere.ro/cookies] adresindeki Çerez Politikası bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir." },
+      { kind: "p", text: "Dialectical Engine, tamamı talep ettiğiniz hizmet için kesinlikle gerekli olan ve tamamı yalnızca Dialectical Engine tarafından yerleştirilen 18 öğe kullanır: 13 çerez ve tarayıcınızın depolama alanında 5 kayıt. Analitik, reklam veya izleme çerezi yerleştirmeyiz. [dezbatere.ro/cookies] adresindeki Çerez Politikası bunları, her birinin ne yaptığı ve kimin aldığıyla birlikte listeler ve başka herhangi bir şey eklenmeden önce değiştirilecektir." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Çerez — Başka web sitelerinin sizin adınıza form göndermesini engeller. — 14 gün",
         "__Host-debateai-age-refusal — Çerez (HttpOnly) — Bir yaş kontrolü reddedildikten sonra bu tarayıcının 30 gün boyunca yeniden denemesini engeller. Yalnızca “reddedildi” sözcüğünü içerir, kişisel veri içermez. — 30 gün",
         "debateai.locale — Çerez — Seçtiğiniz arayüz dilini hatırlar. — 1 yıl",
+        "__Host-debateai-staff — Çerez (HttpOnly) — Ayrı personel erişimi — En fazla 8 saat; 15 dakika hareketsizlik",
+        "__Host-debateai-staff-csrf — Çerez — Başka web sitelerinin sizin adınıza form göndermesini engeller. — En fazla 8 saat; 15 dakika hareketsizlik",
+        "__Host-debateai-password-reset — Çerez (HttpOnly) — Yalnızca parola sıfırlama — En fazla 30 dakika",
+        "__Host-debateai-password-reset-csrf — Çerez — Başka web sitelerinin sizin adınıza form göndermesini engeller. — En fazla 30 dakika",
+        "__Host-debateai-mfa-recovery — Çerez (HttpOnly) — Yalnızca kimlik doğrulayıcı kurtarma — En fazla 299 saniye",
+        "__Host-debateai-mfa-recovery-csrf — Çerez — Başka web sitelerinin sizin adınıza form göndermesini engeller. — En fazla 299 saniye",
+        "__Host-debateai-social-flow — Çerez (HttpOnly) — Kısa sağlayıcı oturumu veya hesap bağlama akışı — En fazla 5 dakika",
+        "__Host-debateai-social-apple — Çerez (HttpOnly) — Kısa sağlayıcı oturumu veya hesap bağlama akışı — En fazla 5 dakika",
+        "__Host-debateai-social-browser — Çerez (HttpOnly) — Kısa sağlayıcı oturumu veya hesap bağlama akışı — En fazla 5 dakika",
         "debateai.consent — Yerel depolama — Çerez bildirimini gördüğünüzü hatırlar, böylece bildirim yalnızca bir kez gösterilir. — Siz temizleyene kadar",
         "debateai.mode — Yerel depolama — Açık ve koyu görünümden hangisini kullandığınız. — Siz temizleyene kadar",
         "debateai.languageOffer.dismissed — Oturum depolaması — Bu sekme için bir tartışmayı başka bir dilde gösterme önerisini reddettiğinizi hatırlar. — Sekmeyi kapatana kadar",
-        "debateai.support.conversation.v2 — Oturum depolaması — Sekme açık kaldığı sürece yardım sohbetindeki konuşmanızı ekranda tutar. Bu sekmede biri oturum açtığında veya kapattığında silinir. — Sekmeyi kapatana kadar"
+        "debateai.support.conversation.v2 — Oturum depolaması — Sekme açık kaldığı sürece yardım sohbetindeki konuşmanızı ekranda tutar. Bu sekmede biri oturum açtığında veya kapattığında silinir. — Sekmeyi kapatana kadar",
+        "debateai.phone-completion-draft.v1 — Oturum depolaması — Telefon adımında tamamlanmamış soru; oturum değişikliği, çıkış veya sahip değişikliğiyle silinir — 15 dakika veya daha erken silinene kadar"
         ]
       },
-      { kind: "p", text: "Başka hiçbir taraf, DebateAI aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz." },
-      { kind: "p", text: "Tarayıcılar “Do Not Track” sinyali veya benzeri bir sinyal gönderebilir. DebateAI sizi izlemez, bu nedenle böyle bir sinyalin kapatacağı hiçbir şey yoktur: hizmet, sinyal olsa da olmasa da aynı şekilde çalışır." },
+      { kind: "p", text: "Başka hiçbir taraf, Dialectical Engine aracılığıyla zaman içinde ve farklı web siteleri genelinde çevrimiçi etkinlikleriniz hakkında bilgi toplamaz." },
+      { kind: "p", text: "Tarayıcılar “Do Not Track” sinyali veya benzeri bir sinyal gönderebilir. Dialectical Engine sizi izlemez, bu nedenle böyle bir sinyalin kapatacağı hiçbir şey yoktur: hizmet, sinyal olsa da olmasa da aynı şekilde çalışır." },
       { kind: "p", text: "Bu öğeleri reddetmek için tarayıcı ayarlarınızda bu sitenin çerezlerini ve site verilerini engelleyin veya silin. Bu durumda çalışmayı durduran şeyler: oturum açma ile dil ve görünüm seçimlerinizin hatırlanması; çerez bildirimi de yeniden gösterilir." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukrayna (yalnızca listelenmişse)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ukrayna'nın \"Kişisel Verilerin Korunması Hakkında\" Kanunu uygulanır. DebateAI'ı Ukrayna'nın, hükümetinin kontrolünde olmayan bölgelerinde sunmuyoruz. Verileriniz AB ülkelerine ve Amerika Birleşik Devletleri'ne gider (Sicile bakın). Ukrayna Yüksek Radası İnsan Hakları Komiseri'ne şikâyette bulunabilirsiniz." }
+      { kind: "p", text: "Ukrayna'nın \"Kişisel Verilerin Korunması Hakkında\" Kanunu uygulanır. Dialectical Engine'ı Ukrayna'nın, hükümetinin kontrolünde olmayan bölgelerinde sunmuyoruz. Verileriniz AB ülkelerine ve Amerika Birleşik Devletleri'ne gider (Sicile bakın). Ukrayna Yüksek Radası İnsan Hakları Komiseri'ne şikâyette bulunabilirsiniz." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "1a74244744af81ad533de872dd25390e5e3f7aaba97e79d68a0dca068e0443e7",
-  eyebrow: "GİZLİLİK POLİTİKASI · v3.0 · YÜRÜRLÜK TARİHİ [DATE]",
+  version: "3.1",
+  sha256: "52a584ce05ba2cf32569ad2cc1a059027dbea736e9e87bba8596b3f379786e6f",
+  eyebrow: "GİZLİLİK POLİTİKASI · v3.1 · YÜRÜRLÜK TARİHİ [DATE]",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",
-  endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Gizlilik Politikası metni",
   sectionIdPrefix: "policy-section-",

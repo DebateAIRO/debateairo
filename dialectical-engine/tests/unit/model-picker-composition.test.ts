@@ -37,8 +37,13 @@ describe("A20 · the picker is composed where runs are created", () => {
     expect(source).toMatch(/\n {2}resolveDiscoveredPanel: resolveProviderPanel,\n(?: {2}\/\/[^\n]*\n)* {2}modelPicker,\n/u);
     expect(source.indexOf("const declaredProviderTargets = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
     expect(source.indexOf("await composeAskModelPicker({")).toBeLessThan(source.indexOf("new PostgresAskApplication("));
-    // The stages live in the function now, never beside it in main.ts.
-    expect(source).not.toContain("readModelScorecard(");
+    // The one additional opt-in read refuses preview before provider credentials.
+    const previewRead = source.indexOf('await boot.run("preview-scorecard-conflict"');
+    expect(previewRead).toBeGreaterThan(source.indexOf("if (previewConfig !== undefined) {"));
+    expect(source.slice(previewRead, source.indexOf("const previewFetch =", previewRead)))
+      .toContain('throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT"');
+    expect(previewRead).toBeLessThan(source.indexOf('boot.runSync("provider-credentials"'));
+    expect(source.match(/\breadModelScorecard\(/gu)).toHaveLength(1);
     expect(source).not.toContain("askModelPickerSettings(");
     // Pre-flight ruling F17: admission's backup provision reaches the ceiling.
     expect(source).toContain("backupSequencesProvisioned: input.backupSequencesProvisioned");

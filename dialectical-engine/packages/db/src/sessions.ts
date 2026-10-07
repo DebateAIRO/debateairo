@@ -4,6 +4,7 @@ import {
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
+import { guardedAuthorityQuery } from "./staff-access.js";
 import type { AuthSourceContext } from "./identity.js";
 
 export interface LoginIdentityRecord {
@@ -16,7 +17,17 @@ export interface LoginIdentityRecord {
   readonly lastAcceptedStep: number | null;
 }
 
-export interface LoginChallengeRecord extends LoginIdentityRecord {
+export interface LoginContinuationIdentity extends Omit<LoginIdentityRecord,"factorId"|"secretCiphertext"|"passwordHash"> {
+  readonly factorId: string|null;
+  readonly secretCiphertext: CryptoEnvelope|null;
+  readonly passwordHash:string|null;
+  readonly availableMethods?: readonly ("passkey"|"totp"|"recovery_code")[];
+}
+
+export interface LoginChallengeRecord extends LoginContinuationIdentity {
+  readonly firstStep?:"PASSWORD"|"PROVIDER";
+  readonly socialConfiguration?:string;
+  readonly socialCookieHash?:string;
   readonly challengeId: string;
   readonly challengeTokenHash: string;
   readonly bindingHash: string;
@@ -72,6 +83,20 @@ function versionedAuditDigest(value: string): string {
 }
 
 export class PostgresSessionRepository {
+  async assertSessionCurrent(input: Readonly<{userId:string;sessionId:string;tokenHash:string}>,signal?:AbortSignal):Promise<boolean> {
+    assertCredentialHash(input.tokenHash);
+    const result=await guardedAuthorityQuery<{current:boolean}>(this.pool,
+      'SELECT identity.assert_session_current($1,$2,$3) AS current',[input.userId,input.sessionId,input.tokenHash],signal);
+    return result.rows[0]?.current===true;
+  }
+
+  async readAccountSecurityHold(userId: string): Promise<boolean> {
+    const result = await this.pool.query<{ held: boolean }>(
+      'SELECT identity.read_account_security_hold($1) AS held', [userId]
+    );
+    return result.rows[0]?.held !== false;
+  }
+
   constructor(
     private readonly pool: Pool,
     private readonly auditContext: AuditContextHasher
@@ -135,41 +160,13 @@ export class PostgresSessionRepository {
     throw new TypeError("AUDIT_OPERATION_CAPABILITY_REQUIRED");
   }
 
-  async findLoginIdentity(emailBlindIndex: Buffer): Promise<LoginIdentityRecord | null> {
-    const result = await this.pool.query<{
-      user_id: string;
-      owner_ref: string;
-      audit_token: string;
-      password_hash: string;
-      mfa_factor_id: string;
-      secret_ciphertext: CryptoEnvelope;
-      last_accepted_step: string | number | null;
-    }>(`
-      SELECT u.user_id,u.owner_ref,u.audit_token,u.password_hash,f.mfa_factor_id,
-        f.secret_ciphertext,f.last_accepted_step
-      FROM identity."user" u
-      JOIN LATERAL (
-        SELECT mfa_factor_id,secret_ciphertext,last_accepted_step
-        FROM identity.mfa_factor
-        WHERE user_id=u.user_id AND factor_type='totp' AND state='active'
-        ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
-      ) f ON true
-      WHERE u.email_blind_index=$1 AND u.state='active'
-    `, [emailBlindIndex]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      userId: row.user_id,
-      ownerRef: row.owner_ref,
-      auditToken: row.audit_token,
-      passwordHash: row.password_hash,
-      factorId: row.mfa_factor_id,
-      secretCiphertext: row.secret_ciphertext,
-      lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step)
-    });
+  async findLoginIdentity(emailBlindIndex: Buffer): Promise<LoginContinuationIdentity | null> {
+    const result=await this.pool.query<{value:LoginContinuationIdentity|null}>("SELECT identity.read_secure_login_identity($1) AS value",[emailBlindIndex]);
+    return result.rows[0]?.value??null;
   }
 
   async createLoginChallenge(input: Readonly<{
-    identity: LoginIdentityRecord;
+    identity: LoginContinuationIdentity;
     challengeId: string;
     challengeTokenHash: string;
     bindingHash: string;
@@ -233,45 +230,11 @@ export class PostgresSessionRepository {
     }));
   }
 
-  async readLoginChallenge(challengeTokenHash: string): Promise<LoginChallengeRecord | null> {
+  async readLoginChallenge(challengeTokenHash:string):Promise<LoginChallengeRecord|null> {
     assertCredentialHash(challengeTokenHash);
-    const result = await this.pool.query<{
-      login_challenge_id: string;
-      user_id: string;
-      owner_ref: string;
-      audit_token: string;
-      password_hash_snapshot: string;
-      mfa_factor_id: string;
-      secret_ciphertext: CryptoEnvelope;
-      last_accepted_step: string | number | null;
-      binding_hash: string;
-      expires_at: Date;
-      consumed_at: Date | null;
-    }>(`
-      SELECT c.login_challenge_id,c.user_id,u.owner_ref,u.audit_token,c.password_hash_snapshot,
-        f.mfa_factor_id,f.secret_ciphertext,f.last_accepted_step,
-        c.binding_hash,c.expires_at,c.consumed_at
-      FROM identity.login_challenge c
-      JOIN identity."user" u ON u.user_id=c.user_id AND u.state='active'
-      JOIN identity.mfa_factor f ON f.mfa_factor_id=c.mfa_factor_id
-        AND f.user_id=u.user_id AND f.factor_type='totp' AND f.state='active'
-      WHERE c.token_hash=$1 AND u.password_hash=c.password_hash_snapshot
-    `, [challengeTokenHash]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      challengeId: row.login_challenge_id,
-      challengeTokenHash,
-      userId: row.user_id,
-      ownerRef: row.owner_ref,
-      auditToken: row.audit_token,
-      passwordHash: row.password_hash_snapshot,
-      factorId: row.mfa_factor_id,
-      secretCiphertext: row.secret_ciphertext,
-      lastAcceptedStep: row.last_accepted_step === null ? null : Number(row.last_accepted_step),
-      bindingHash: row.binding_hash,
-      expiresAt: row.expires_at,
-      consumedAt: row.consumed_at
-    });
+    const result=await this.pool.query<{value:(Omit<LoginChallengeRecord,"expiresAt"|"consumedAt">&{expiresAt:string;consumedAt:string|null})|null}>("SELECT identity.read_secure_login_challenge($1) AS value",[challengeTokenHash]);
+    const row=result.rows[0]?.value;
+    return row==null?null:Object.freeze({...row,expiresAt:new Date(row.expiresAt),consumedAt:row.consumedAt===null?null:new Date(row.consumedAt)});
   }
 
   async completeTotpLogin(input: Readonly<{
@@ -286,12 +249,23 @@ export class PostgresSessionRepository {
     idleExpiresAt: Date;
     absoluteExpiresAt: Date;
     source: AuthSourceContext;
+    admittedProviders?:readonly string[];
+    browserHash?:string;
+    recoveryCodeHash?:string;
   }>): Promise<boolean> {
     assertCredentialHash(input.bindingHash);
     assertCredentialHash(input.sessionTokenHash);
     assertCredentialHash(input.csrfTokenHash);
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      if(input.challenge.firstStep==='PROVIDER') {
+        const p={userId:input.challenge.userId,ownerRef:input.challenge.ownerRef,passwordHash:input.challenge.passwordHash,
+          challengeId:input.challenge.challengeId,challengeHash:input.challenge.challengeTokenHash,factorId:input.challenge.factorId,secretCiphertext:input.challenge.secretCiphertext,
+          bindingHash:input.bindingHash,browserHash:input.browserHash,admittedProviders:input.admittedProviders,
+          material:{sessionId:input.sessionId,sessionTokenHash:input.sessionTokenHash,csrfTokenHash:input.csrfTokenHash,sessionBindingContext:input.sessionBindingContext,idleExpiresAt:input.idleExpiresAt,absoluteExpiresAt:input.absoluteExpiresAt},
+          acceptedStep:input.acceptedStep};
+        return (await client.query('SELECT identity.complete_social_login($1,$2) valid',[p,{ipArgon2id:prepared.ipArgon2id,userAgentArgon2id:prepared.userAgentArgon2id}])).rows[0]?.valid===true;
+      }
       const result = await client.query<{ valid: boolean }>(`
         SELECT identity.complete_totp_login_with_audit(
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15,$16::jsonb
@@ -346,9 +320,20 @@ export class PostgresSessionRepository {
     idleExpiresAt: Date;
     absoluteExpiresAt: Date;
     source: AuthSourceContext;
+    admittedProviders?:readonly string[];
+    browserHash?:string;
+    recoveryCodeHash?:string;
   }>): Promise<boolean> {
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      if(input.challenge.firstStep==='PROVIDER') {
+        const p={userId:input.challenge.userId,ownerRef:input.challenge.ownerRef,passwordHash:input.challenge.passwordHash,
+          challengeId:input.challenge.challengeId,challengeHash:input.challenge.challengeTokenHash,factorId:input.challenge.factorId,secretCiphertext:input.challenge.secretCiphertext,
+          bindingHash:input.bindingHash,browserHash:input.browserHash,admittedProviders:input.admittedProviders,
+          material:{sessionId:input.sessionId,sessionTokenHash:input.sessionTokenHash,csrfTokenHash:input.csrfTokenHash,sessionBindingContext:input.sessionBindingContext,idleExpiresAt:input.idleExpiresAt,absoluteExpiresAt:input.absoluteExpiresAt},
+          recoveryCodeId:input.recoveryCodeId,recoveryCodeHash:input.recoveryCodeHash,replacementHash:input.replacementHash};
+        return (await client.query('SELECT identity.complete_social_login($1,$2) valid',[p,{ipArgon2id:prepared.ipArgon2id,userAgentArgon2id:prepared.userAgentArgon2id}])).rows[0]?.valid===true;
+      }
       const result = await client.query<{ valid: boolean }>(`
         SELECT identity.complete_recovery_login_with_audit(
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17::jsonb
@@ -422,11 +407,11 @@ export class PostgresSessionRepository {
       session_id: string; created_at: Date; last_seen_at: Date;
       idle_expires_at: Date; absolute_expires_at: Date; last_mfa_at: Date;
     }>(`
-      SELECT session_id,created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
+      SELECT session_id,created_at,last_seen_at,LEAST(idle_expires_at,absolute_expires_at,created_at+interval '720 hours') AS idle_expires_at,LEAST(absolute_expires_at,created_at+interval '720 hours') AS absolute_expires_at,last_mfa_at
       FROM identity.session
-      WHERE user_id=$1 AND revoked_at IS NULL AND idle_expires_at>$2 AND absolute_expires_at>$2
+      WHERE user_id=$1 AND revoked_at IS NULL AND idle_expires_at>clock_timestamp() AND LEAST(absolute_expires_at,created_at+interval '720 hours')>clock_timestamp()
       ORDER BY last_seen_at DESC,session_id
-    `, [userId, occurredAt]);
+    `, [userId]);
     return Object.freeze(result.rows.map((row) => Object.freeze({
       sessionId: row.session_id,
       createdAt: row.created_at,
@@ -558,7 +543,7 @@ export class PostgresSessionRepository {
         WHERE user_id=u.user_id AND factor_type='totp' AND state='active'
         ORDER BY created_at DESC,mfa_factor_id DESC LIMIT 1
       ) f ON true
-      WHERE u.user_id=$1 AND u.state='active'
+      WHERE u.user_id=$1 AND u.state='active' AND NOT identity.read_account_security_hold(u.user_id)
     `, [userId]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
@@ -589,13 +574,23 @@ export class PostgresSessionRepository {
     }> | Readonly<{
       grantId: string;
       grantTokenHash: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION";
+      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" | "REMOVE_AUTH_METHOD" | "LINK_PROVIDER" | "UNLINK_PROVIDER";
+      targetFactorId?:string; targetProvider?:"google"|"apple"|"facebook"|"x";
       expiresAt: Date;
     }>;
   }>): Promise<boolean> {
     if (input.grant !== undefined) assertCredentialHash(input.grant.grantTokenHash);
     const prepared = await this.prepareAuditContext(input.source);
     return this.transaction(async (client) => {
+      if(input.grant!==undefined && ["REMOVE_AUTH_METHOD","REGENERATE_RECOVERY_CODES","LINK_PROVIDER","UNLINK_PROVIDER"].includes(input.grant.action)) {
+        const g=input.grant;
+        const result=await client.query<{valid:boolean}>('SELECT identity.rotate_consumer_totp_step_up($1,$2) AS valid', [{
+          userId:input.identity.userId,ownerRef:input.identity.ownerRef,passwordHash:input.identity.passwordHash,factorId:input.identity.factorId,acceptedStep:input.acceptedStep,
+          sessionId:input.currentSessionId,tokenHash:input.currentTokenHash,replacementTokenHash:input.replacementTokenHash,replacementCsrfHash:input.replacementCsrfHash,bindingContext:input.bindingContext,idleExpiresAt:input.idleExpiresAt,
+          grantHash:g.grantTokenHash,expiresAt:g.expiresAt,authorization:{action:g.action,...('targetFactorId' in g?{target_factor_id:g.targetFactorId}:{}),...('targetProvider' in g?{target_provider:g.targetProvider}:{})}
+        },JSON.stringify({ipArgon2id:prepared.ipArgon2id,userAgentArgon2id:prepared.userAgentArgon2id})]);
+        return result.rows[0]?.valid===true;
+      }
       const rotated = await client.query<{ valid: boolean }>(`
         SELECT identity.rotate_session_after_step_up_with_audit(
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17::jsonb

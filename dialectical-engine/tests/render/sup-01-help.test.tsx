@@ -364,6 +364,29 @@ describe("SUP-01 /help assistant", () => {
     );
   });
 
+  it.each(["en-US", "en-GB"] as const)("sends %s support through the English catalog language", async (locale) => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
+      calls.push({ url, body: typeof init.body === "string" ? JSON.parse(init.body) : null });
+      if (url === "/api/v1/support/sessions") return Response.json({
+        session: { session_id: "english-session", identity_bound: false }, session_token: "support-token",
+        first_message: { role: "assistant", text: "English server greeting." }
+      }, { status: 201 });
+      if (url === "/api/v1/support/sessions/english-session/messages") return Response.json({
+        message_id: "english-answer", outcome: "NO_SOURCE", text: "English answer.",
+        actions: [{ id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" }]
+      });
+      throw new Error(`UNEXPECTED_FETCH:${url}`);
+    });
+    await render(<I18nProvider locale={locale} catalog={{ ...chromeEnglish, ...supportEnglish }}>
+      <Assistant fullPage client={supportAssistantClient} signedIn={false} />
+    </I18nProvider>);
+    await submit("How do I start?");
+    expect(calls.find(({ url }) => url === "/api/v1/support/sessions")?.body).toEqual({ language: "en" });
+    expect(document.body.textContent).toContain("English answer.");
+    expect(document.querySelector('a[href="/login?next=%2Fnew"]')?.textContent).toBe("Start a debate");
+  });
+
   it("drops a stored conversation from another locale and sends text only", async () => {
     sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
       language: "en",
@@ -1047,5 +1070,13 @@ describe("SUP-01 /help assistant", () => {
     expect(document.querySelector('[aria-label="Acțiuni"]')).toBeNull();
   });
 
-  it.todo("opens the verified first-party Forgot password flow after V-1 supplies its exact destination");
+  it.each(["en","ro"] as const)("opens the verified first-party Forgot password destination in %s",async language=>{
+    vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url==="/api/v1/support/sessions"
+      ? {session:{session_id:"recovery-session",identity_bound:false},session_token:"recovery-token"}
+      : {message_id:"recovery-link",outcome:"REFUSE_ZONE",text:"Support cannot reset credentials.",sources:[],actions:[],refusal_link:"/recover"}),{status:url==="/api/v1/support/sessions"?201:200,headers:{"content-type":"application/json"}})));
+    await renderLocalized(language,<Assistant client={supportAssistantClient} signedIn={false}/>);await submit(language==="ro"?"Am uitat parola":"Forgot password");
+    const link=document.querySelector<HTMLAnchorElement>('a[href="/recover"]');expect(link).not.toBeNull();
+    expect(link!.textContent).toContain(language==="ro"?"Recuperează":"Recover");
+    expect(link!.search).toBe("");expect(link!.hash).toBe("");
+  });
 });

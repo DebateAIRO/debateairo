@@ -1,3 +1,4 @@
+import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -140,6 +141,7 @@ describe("the gate on the routes", () => {
       register, submit,
       instance: buildApi({
         application: { submit } as unknown as AskApplication,
+        turnstile: passedTurnstile,
         registration: { register, verifyEmail: vi.fn(), resendVerification: vi.fn() } as never,
         sessions: options.sessions ?? testSessionApplication([IDENTITY]),
         allowedOrigin: TEST_APP_ORIGIN,
@@ -150,8 +152,9 @@ describe("the gate on the routes", () => {
   }
   // The age gate's register hook (apps/api/src/index.ts:1711-1729) needs a real adult date before register runs.
   const REGISTER_BODY = {
+    ...canonicalSignup,
     email: "alice@example.test", password: "correct horse battery staple",
-    recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01", country: "RO"
+    phone: "+40722123456", country: "RO", date_of_birth: "1990-01-01"
   };
   const setCookies = (response: { headers: Record<string, unknown> }): string[] => {
     const raw = response.headers["set-cookie"];

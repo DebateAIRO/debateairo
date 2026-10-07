@@ -322,8 +322,8 @@ const writers: readonly Writer[] = Object.freeze([
   {
     name: "verification-resend",role: "debateai_runtime",
     invoke: (client,fixture) => runtimeQuery(client,`
-      SELECT status AS value FROM identity.prepare_verification_resend_with_audit(
-        $1,$2,clock_timestamp()+interval '1 hour',clock_timestamp(),0,$3::jsonb
+      SELECT status AS value FROM identity.prepare_verification_resend_reserved_with_audit(
+        $1,$2,3600000,clock_timestamp(),60000,3600000,3,'atomic_rolling_reservation_ledger',$3::jsonb
       )
     `,[fixture.emailBlindIndex,opaqueHash(),sourceContext]),
     assertDeletionWin: (value) => expect(value).toBe("IGNORED")
@@ -349,9 +349,9 @@ const writers: readonly Writer[] = Object.freeze([
   {
     name: "duplicate-registration",role: "debateai_runtime",
     invoke: (client,fixture) => runtimeQuery(client,`
-      SELECT status AS value FROM identity.create_pending_account_with_audit(
+      SELECT status AS value FROM identity.create_pending_account_reserved_with_audit(
         $1,$2,'{}','{}',$3,$4,clock_timestamp(),clock_timestamp(),$5,
-        clock_timestamp()+interval '1 hour',$6::jsonb
+        3600000,$6::jsonb,'{}'::jsonb,'manual','unverified',clock_timestamp()
       )
     `,[randomUUID(),fixture.emailBlindIndex,fixture.passwordHash,
       `duplicate-${randomUUID()}`,opaqueHash(),sourceContext]),
@@ -714,10 +714,12 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
         writer.assertSucceeded(await writer.invoke(first,writerFirst));
         await second.query("BEGIN");
         await second.query("SET LOCAL ROLE debateai_erasure_runtime");
-        const resuming = resumePrivate(second,writerFirst);
-        await expectStillPending(resuming);
+        expect((await resumePrivate(second,writerFirst)).outcome).toBe("CONTENDED");
+        await second.query("COMMIT");
         await first.query("COMMIT");
-        expect((await resuming).outcome).toBe(writer.resumeAfterWriter);
+        await second.query("BEGIN");
+        await second.query("SET LOCAL ROLE debateai_erasure_runtime");
+        expect((await resumePrivate(second,writerFirst)).outcome).toBe(writer.resumeAfterWriter);
         await second.query("COMMIT");
       } finally {
         await first.query("ROLLBACK").catch(() => undefined);
@@ -1021,10 +1023,12 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
         writer.assertSucceeded(await writer.invoke(first,writerFirst));
         await second.query("BEGIN");
         await second.query("SET LOCAL ROLE debateai_erasure_runtime");
-        const finalizing = finalizePrivate(second,writerFirst);
-        await expectStillPending(finalizing);
+        expect(await finalizePrivate(second,writerFirst)).toBe("CONTENDED");
+        await second.query("COMMIT");
         await first.query("COMMIT");
-        expect(await finalizing).toBe("COMMITTED");
+        await second.query("BEGIN");
+        await second.query("SET LOCAL ROLE debateai_erasure_runtime");
+        expect(await finalizePrivate(second,writerFirst)).toBe("COMMITTED");
         await second.query("COMMIT");
       } finally {
         await first.query("ROLLBACK").catch(() => undefined);

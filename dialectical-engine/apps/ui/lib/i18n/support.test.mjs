@@ -95,10 +95,11 @@ const expectedKeys = [
   "support.answerRating",
   "support.privacyPreferences",
   "support.aiBanner",
-  "support.cookiePreferences"
+  "support.cookiePreferences",
+  "support.recoverAccount"
 ].sort();
 
-test("all 35 locales expose the exact 83-key support chrome contract", () => {
+test("all 35 locales expose the exact 84-key support chrome contract", () => {
   assert.deepEqual(Object.keys(english).sort(), expectedKeys);
   const locales = readdirSync(join(root, "messages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -108,6 +109,7 @@ test("all 35 locales expose the exact 83-key support chrome contract", () => {
   for (const locale of locales) {
     const localized = JSON.parse(source(`messages/${locale}/support.json`));
     assertLocalizedCatalog({ english, localized, locale, namespace: "support" });
+    assert.equal(localized["support.recoverAccount"],JSON.parse(source(`messages/${locale}/auth.json`))["auth.recovery.title"]);
   }
 });
 

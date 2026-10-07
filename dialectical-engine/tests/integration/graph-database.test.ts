@@ -100,7 +100,14 @@ describe("S02 migrated graph invariants", () => {
     const applied = await database.pool.query<{ name: string }>(
       "SELECT name FROM public.debateai_schema_migration ORDER BY name"
     );
-    expect(applied.rows.map((row) => row.name)).toEqual(expectedMigrationLedger);
+    const resolved = await database.pool.query<{ logical_name: string }>(
+      "SELECT logical_name FROM public.debateai_schema_migration_resolution ORDER BY logical_name"
+    );
+    expect(resolved.rows.map((row) => row.logical_name)).toEqual([
+      "0025_evaluator_domain_refusal_receipts.sql","0029_evaluator_dev_menu_grants.sql"
+    ]);
+    expect([...applied.rows.map((row) => row.name),...resolved.rows.map((row) => row.logical_name)].sort())
+      .toEqual(expectedMigrationLedger);
   });
 
   it.each([null, "", "   "])("FX-DB-03a rejects non-claims (%j) through raw SQL", async (claimText) => {

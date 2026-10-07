@@ -11,12 +11,15 @@ const ownedFiles = [
   "app/settings/page.tsx",
   "components/AccountErasureControls.tsx",
   "components/SessionControls.tsx",
-  "components/LegacyRunClaimControls.tsx",
+  "components/PhoneProfileCard.tsx",
+  "components/SecuritySettings.tsx",
+  "app/settings/security/page.tsx",
   "app/ai-transparency/page.tsx",
   "app/admin/workers/page.tsx",
   "components/SettingsPageClient.tsx",
   "components/EmailSettings.tsx",
-  "components/EvaluatorDevMenu.tsx"
+  "components/EvaluatorDevMenu.tsx",
+  "components/auth/SecurityActionResume.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const sources = new Map(ownedFiles.map((path) => [path, source(path)]));
@@ -87,7 +90,7 @@ test("every settings translation key used by owned source exists in English", ()
   const english = JSON.parse(readFileSync(englishPath, "utf8"));
   const used = new Set();
   for (const fileSource of sources.values()) {
-    for (const match of fileSource.matchAll(/\bt\(\s*catalog\s*,\s*"(settings\.[A-Za-z0-9.]+)"/g)) {
+    for (const match of fileSource.matchAll(/\bt\(\s*(?:catalog|settingsCatalog)\s*,\s*["'](settings\.[A-Za-z0-9.]+)["']/g)) {
       used.add(match[1]);
     }
     for (const match of fileSource.matchAll(/\btPlural\(\s*catalog\s*,\s*"(settings\.[A-Za-z0-9.]+)"/g)) {
@@ -150,7 +153,7 @@ test("server settings routes load settings while client controls receive their c
     assert.match(sources.get(path), /loadNamespace\(locale, "settings"\)/, path);
   }
   const client = sources.get("components/SettingsPageClient.tsx");
-  for (const component of ["SessionControls", "LegacyRunClaimControls", "AccountErasureControls"]) {
+  for (const component of ["SessionControls", "AccountErasureControls"]) {
     assert.match(client, new RegExp(`<${component} catalog=\\{catalog\\}`), component);
   }
 });
@@ -166,7 +169,7 @@ test("security and transparency behavior survives the copy migration", () => {
   assert.doesNotMatch(erasure, /const CONFIRMATION = "DELETE MY ACCOUNT"/);
   assert.match(erasure, /if \(locale === "en"\) return typed === phrase;/);
   assert.equal(JSON.parse(readFileSync(englishPath, "utf8"))["settings.erasure.confirmationPhrase"], "DELETE MY ACCOUNT");
-  assert.match(erasure, /action: "DELETE_ACCOUNT"/);
+  assert.match(erasure, /action:\s*["']DELETE_ACCOUNT["']/);
   assert.doesNotMatch(erasure, /target_run_id/);
   assert.match(erasure, /scheduleAccountErasure\(grant\.token\)/);
   assert.match(erasure, /readAccountErasure\(\)/);
@@ -176,9 +179,10 @@ test("security and transparency behavior survives the copy migration", () => {
   assert.match(erasure, /window\.setInterval\(\(\)=>\{ void refresh\(\); \},5_000\)/);
 
   const sessions = sources.get("components/SessionControls.tsx");
-  assert.match(sessions, /autoComplete="current-password"/);
-  assert.match(sessions, /autoComplete="one-time-code"/);
-  assert.match(sessions, /revokeAllSessions\(\)/);
+  assert.doesNotMatch(sessions,/current-password|one-time-code|data-session-step-up/);
+  const confirmation=source("components/auth/SecurityConfirmation.tsx");
+  assert.match(confirmation,/beginPasskeyStepUp/);assert.match(confirmation,/matchingSecurityGrant/);assert.match(confirmation,/authorization/);
+  assert.match(sessions, /endSession\(client, \{ all: true/);
 
   const transparency = sources.get("app/ai-transparency/page.tsx");
   assert.match(transparency, /data-ai-generated/);
@@ -199,14 +203,9 @@ test("security and transparency behavior survives the copy migration", () => {
   assert.match(operatorSettings, /getSettingsView/);
   assert.doesNotMatch(operatorSettings, /apiFetch|saveSettings|method:\s*"PUT"/);
 
-  assert.match(settingsClient, /<LegacyRunClaimControls catalog=\{catalog\}/);
-  const legacy = sources.get("components/LegacyRunClaimControls.tsx");
-  assert.match(legacy, /client\.claimLegacyRuns\(submittedToken\)/);
-  assert.ok(
-    legacy.indexOf('setLegacyToken("")') < legacy.indexOf("client.claimLegacyRuns(submittedToken)"),
-    "legacy token must clear before the claim request"
-  );
-  assert.doesNotMatch(legacy, /localStorage|sessionStorage|console\./);
+  assert.doesNotMatch(settingsClient, /LegacyRunClaimControls|settings.identity/);
+  assert.match(source("components/SecuritySettings.tsx"), /matchingSecurityGrant/);
+
 });
 
 test("the English allowlist no longer exempts S2-settings files", () => {

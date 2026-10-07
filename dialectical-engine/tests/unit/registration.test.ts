@@ -1,3 +1,4 @@
+import { canonicalSignup, canonicalResend, passedTurnstile } from "../support/turnstileFixtures.js";
 import { createHmac, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import {
@@ -978,29 +979,26 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       verifyEmail: async () => { calls.push("verify"); return { status: "mfa_required" }; },
       resendVerification: async () => { calls.push("resend"); return RESEND_PUBLIC_RESPONSE; }
     };
-    const api = buildApi({ application: fixtureAskApplication(), registration });
+    const api = buildApi({ application: fixtureAskApplication(), registration, turnstile:passedTurnstile });
     try {
       const register = await api.inject({
         method: "POST", url: "/v1/auth/register",
-        payload: {
-          email: "alice@example.test", password: "password-123",
-          recovery_email: "recovery@example.test", date_of_birth: "1990-01-01", country: "RO"
-        }
+        payload:canonicalSignup
       });
       const verify = await api.inject({
         method: "POST", url: "/v1/auth/verify-email", payload: { token: "opaque-token" }
       });
       const resend = await api.inject({
-        method: "POST", url: "/v1/auth/resend-verification", payload: { email: "alice@example.test" }
+        method: "POST", url: "/v1/auth/resend-verification", payload:canonicalResend
       });
 
       expect(register.statusCode).toBe(202);
-      expect(register.json()).toEqual(REGISTRATION_PUBLIC_RESPONSE);
+      expect(register.json()).toEqual({...REGISTRATION_PUBLIC_RESPONSE,retry_after_seconds:60});
       expect(register.body).toMatch(/spam/i);
       expect(verify.statusCode).toBe(200);
       expect(verify.json()).toEqual({ status: "mfa_required" });
       expect(resend.statusCode).toBe(202);
-      expect(resend.json()).toEqual(RESEND_PUBLIC_RESPONSE);
+      expect(resend.json()).toEqual({...RESEND_PUBLIC_RESPONSE,retry_after_seconds:60});
       expect(resend.body).toMatch(/spam/i);
       expect(calls).toEqual(["register", "verify", "resend"]);
     } finally {
@@ -1441,8 +1439,9 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
     name: "register" as const,
     url: "/v1/auth/register",
     payload: {
+      ...canonicalSignup,
       email: "alice@example.test", password: "correct horse battery staple",
-      recovery_email: "recovery@example.test", date_of_birth: "1990-01-01", country: "RO"
+      phone: "+40722123456", country: "RO", date_of_birth: "1990-01-01"
     }
   }),
   Object.freeze({
@@ -1453,7 +1452,7 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
   Object.freeze({
     name: "resend" as const,
     url: "/v1/auth/resend-verification",
-    payload: { email: "alice@example.test" }
+    payload: canonicalResend
   })
 ]);
 
@@ -1465,7 +1464,7 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
         verifyEmail: async () => { throw new Argon2InfrastructureError(code); },
         resendVerification: async () => { throw new Argon2InfrastructureError(code); }
       };
-      const api = buildApi({ application: fixtureAskApplication(), registration: failing });
+      const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: failing });
       try {
         for (const route of AUTH_ROUTE_REQUESTS) {
           const response = await api.inject({
@@ -1501,7 +1500,7 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
         verifyEmail: async () => { throw expected.error; },
         resendVerification: async () => { throw expected.error; }
       };
-      const api = buildApi({ application: fixtureAskApplication(), registration: failing });
+      const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: failing });
       try {
         const response = await api.inject({
           method: "POST", url: "/v1/auth/register", payload: AUTH_ROUTE_REQUESTS[0]!.payload
@@ -1613,7 +1612,7 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
       const attempt = occurrence.route === "register"
         ? service.register({
           email: "alice@example.test", password: "correct horse battery staple",
-          recoveryEmail: "recovery@example.test", adultAffirmed: true
+          phone: "+40722123456", recoveryEmail: "recovery@example.test", adultAffirmed: true
         }, source)
         : occurrence.route === "verify"
           ? service.verifyEmail({ token: "A".repeat(43) }, source)
@@ -1811,7 +1810,9 @@ function rework7Harness(options: {
         : Object.freeze({
             status: "created",
             userId: "22222222-2222-4222-8222-222222222222",
-            channelBindingId: "33333333-3333-4333-8333-333333333333"
+            channelBindingId: "33333333-3333-4333-8333-333333333333",
+            verificationExpiresAt: (input as { verificationExpiresAt: Date }).verificationExpiresAt,
+            reservationId: "44444444-4444-4444-8444-444444444444"
           });
     },
     recordVerificationDelivery: async () => {
@@ -1988,7 +1989,7 @@ function rework7Harness(options: {
     register: (index: number) => service.register({
       email: `rework7-${index}@example.test`,
       password: options.password ?? REWORK7_PASSWORD,
-      recoveryEmail: `rework7-${index}-recovery@example.test`,
+      phone: "+40722123456", recoveryEmail: `rework7-${index}-recovery@example.test`,
       adultAffirmed: true
     }, {
       ip: `2001:db8:7ea::${(index + 1).toString(16)}`,
@@ -2022,7 +2023,7 @@ function rework7Harness(options: {
 }
 
 describe("region at the registration service", () => {
-  const input = { email: "region@example.test", recoveryEmail: "region-recovery@example.test", password: REWORK7_PASSWORD, adultAffirmed: true };
+  const input = { phone: "+40722123456", email: "region@example.test", recoveryEmail: "region-recovery@example.test", password: REWORK7_PASSWORD, adultAffirmed: true };
   it("D1 maps the declared region to the repository without changing the edge country", async () => {
     const harness = rework7Harness();
     try {
@@ -2108,13 +2109,13 @@ describe("T1 rework7 A1 — the structural admission budget is exactly 103", () 
 
       const invalidInput = await harness.service.register({
         email: "not-an-address", password: REWORK7_PASSWORD,
-        recoveryEmail: "r7-invalid-recovery@example.test", adultAffirmed: true
+        phone: "+40722123456", recoveryEmail: "r7-invalid-recovery@example.test", adultAffirmed: true
       }, { ip: "2001:db8:7ea::ffff", userAgent: "vitest", requestId: "request:invalid" })
         .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
       expect(invalidInput).toBe("AUTH_INPUT_INVALID");
       const invalidSource = await harness.service.register({
         email: "r7-valid@example.test", password: REWORK7_PASSWORD,
-        recoveryEmail: "r7-valid-recovery@example.test", adultAffirmed: true
+        phone: "+40722123456", recoveryEmail: "r7-valid-recovery@example.test", adultAffirmed: true
       }, { ip: "   ", userAgent: "vitest", requestId: "request:invalid-source" })
         .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
       expect(invalidSource).toBe("AUTH_INPUT_INVALID");
@@ -2287,7 +2288,7 @@ describe("T1 rework7 A1 — the admission token is released exactly once, and ne
           harness.service.register({
             email: `rework7-limiter-${attempt}@example.test`,
             password: REWORK7_PASSWORD,
-            recoveryEmail: `rework7-limiter-${attempt}-recovery@example.test`,
+            phone: "+40722123456", recoveryEmail: `rework7-limiter-${attempt}-recovery@example.test`,
             adultAffirmed: true
           }, {
             ip: "2001:db8:7ea::1",
@@ -2869,5 +2870,28 @@ describe("T1 rework7 A3 — admission close-and-drain", () => {
     } finally {
       harness.restore();
     }
+  });
+});
+
+describe("Task5 versioned verification delivery policy", () => {
+  it("selects the independently bounded60-second deployment mechanism while preserving sealed history", () => {
+    const historical = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
+    const deployed = authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS);
+    expect(historical.verification.resendCooldownMs).toBe(1_200_000);
+    expect(deployed.verification).toMatchObject({ resendCooldownMs: 60_000, outboundSendWindowMs: 3_600_000, outboundSendMax: 3, outboundSendMechanism: "atomic_rolling_reservation_ledger" });
+    const old = AUTH_POLICY_REGISTER_ROWS.find(row => row.rowKey === "verificationPolicy")!;
+    const fresh = AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.find(row => row.rowKey === "verificationPolicy")!;
+    expect(old.value.outbound_send_enforcement).toEqual({ mechanism: "per_row_last_sent_timestamp_minimum_spacing", minimum_spacing_ms: 1_200_000 });
+    expect(fresh.sourceRef.startsWith(old.sourceRef)).toBe(true);
+    expect(fresh.value.outbound_send_enforcement).toMatchObject({ mechanism: "atomic_rolling_reservation_ledger", decision_version: 2, minimum_spacing_ms: 60_000 });
+    expect(fresh.value.verification_credentials).toEqual(old.value.verification_credentials);
+  });
+  it.each([
+    { mechanism: "atomic_rolling_reservation_ledger", decision_version: 1, minimum_spacing_ms: 60_000 },
+    { mechanism: "atomic_rolling_reservation_ledger", decision_version: 2, minimum_spacing_ms: 59_999 },
+    { mechanism: "per_row_last_sent_timestamp_minimum_spacing", minimum_spacing_ms: 60_000 }
+  ])("rejects malformed or reinterpreted enforcement%j", (enforcement) => {
+    const rows = AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS.map(row => row.rowKey === "verificationPolicy" ? { ...row, value: { ...row.value, outbound_send_enforcement: enforcement } } : row);
+    expect(() => authPolicyFromRegisterRows(rows)).toThrow();
   });
 });

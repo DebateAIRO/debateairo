@@ -1,0 +1,11 @@
+{
+  "commandReceipt": "final-source-audit.receipt.json",
+  "actualExit": 1,
+  "blocking": [
+    "packages/obs-capture/install/api.ts reads the process environment outside the register loader",
+    "packages/obs-capture/install/runner.ts reads the process environment outside the register loader",
+    "packages/obs-capture/install/scheduler.ts reads the process environment outside the register loader"
+  ],
+  "newDiagnostics": [],
+  "classification": "Exact retained three pre-existing obs-capture environment diagnostics; not a passing source audit"
+}

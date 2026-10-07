@@ -30,7 +30,7 @@ import { COMPANY } from "../../apps/ui/lib/legal/pages.js";
 
 const page = async (render: () => Promise<JSX.Element>): Promise<Document> =>
   new JSDOM(renderToStaticMarkup(await render())).window.document;
-const LEGAL_PAGE_RENDERS = [LegalNoticePage, TermsPage, TermsVersionsPage, PrivacyPage, HealthPage, CookiesPage, ProvidersPage];
+const LEGAL_PAGE_RENDERS = [LegalNoticePage, () => TermsPage({}), TermsVersionsPage, () => PrivacyPage({}), HealthPage, CookiesPage, ProvidersPage];
 const BILLING_LINKS = ["/pricing", "/cancel", "/withdraw"];
 
 describe("P21 the pages xMoney requires, on the colleague's legal pages (R3-4)", () => {

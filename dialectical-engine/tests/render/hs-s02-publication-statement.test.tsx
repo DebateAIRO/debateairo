@@ -43,7 +43,7 @@ let respond: () => Promise<Response>;
 let respondStepUp: () => Promise<Response>;
 const grantedStepUp = async () => Response.json({
   status: "step_up_complete", csrf_token: "c".repeat(43),
-  step_up_grant: { token: "g".repeat(43), action: "PUBLISH", target_run_id: runId, expires_at: "2026-09-29T20:00:00Z" }
+  step_up_grant: { token: "g".repeat(43), action: "PUBLISH", target_run_id: runId, expires_at: new Date(Date.now()+300000).toISOString() }
 });
 
 beforeEach(() => {
@@ -65,6 +65,7 @@ async function mount(catalog: Record<string, string> = english) {
     const body = init.body === undefined ? undefined : JSON.parse(String(init.body));
     requests.push({ path, body });
     if (path.endsWith("/visibility")) return Response.json({ state: "PRIVATE", public_ref: null });
+    if(path==="/v1/account/auth-methods")return Response.json({methods:[],recovery_codes_remaining:0,available_step_up_methods:['password_totp'],step_up_providers:[]});
     if (path === "/v1/auth/step-up") return respondStepUp();
     if (path.endsWith("/publish")) return respond();
     return Response.json({ error: "NOT_FOUND" }, { status: 404 });
@@ -85,13 +86,17 @@ async function fill(selector: string, value: string) {
 }
 async function openAndSubmit(catalog: Record<string, string> = english) {
   await click(catalog["public.publication.publishEllipsis"]!);
-  await fill('input[type="password"]', "test-password");
-  await fill('input[autocomplete="one-time-code"]', "123456");
   await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
   await submit();
 }
-async function submit() {
-  await act(async () => { host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+async function submit(code='123456') {
+  if(!host.querySelector('.authSecurityConfirmation')) {
+    await act(async()=>host.querySelector('form')!.requestSubmit());
+    await click('Password · 6-digit authentication code');
+  }
+  await fill('input[type="password"]','test-password');
+  await fill('input[autocomplete="one-time-code"]','');
+  await fill('input[autocomplete="one-time-code"]',code);
 }
 function statementChildren() {
   return [...(host.querySelector('[role="status"]')?.children ?? [])].map((node) =>
@@ -229,8 +234,6 @@ describe("publication statement", () => {
     const layout = cardLayoutModel();
     try {
       await click("Publish…");
-      await fill('input[type="password"]', "test-password");
-      await fill('input[autocomplete="one-time-code"]', "123456");
       await act(async () => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
       layout.scrollTo(600); // the owner scrolled the card down to reach "Publish publicly"
       respond = async () => Response.json(refusal, { status: 409 });
@@ -238,8 +241,7 @@ describe("publication statement", () => {
       const first = layout.answerTopInView();
       layout.scrollTo(900); // R11's retry in place: the owner scrolls down to the code field and the button again
       respond = answer;
-      await fill('input[autocomplete="one-time-code"]', "654321");
-      await submit();
+      await submit("654321");
       expect({ first, retry: layout.answerTopInView() }).toEqual({ first: true, retry: true });
     } finally { layout.restore(); }
   });
@@ -264,11 +266,10 @@ describe("publication statement", () => {
     });
   });
   // Property: refusal preserves entered credentials and a fresh submit uses the newly entered code.
-  it("keeps the form filled and reauthorizes a retry", async () => {
+  it("keeps acknowledgement, clears proof secrets and reauthorizes a retry", async () => {
     await mount(); await openAndSubmit();
-    expect([...host.querySelectorAll<HTMLInputElement>('form input')].map((input) => input.type === "checkbox" ? input.checked : input.value)).toEqual(["test-password", "123456", true]);
-    await fill('input[autocomplete="one-time-code"]', "654321");
-    await submit();
+    expect([...host.querySelectorAll<HTMLInputElement>('form input')].map((input) => input.type === "checkbox" ? input.checked : input.value)).toEqual([true, "", ""]);
+    await submit("654321");
     expect(requests.filter(({ path }) => path === "/v1/auth/step-up").map(({ body }) => body)).toEqual([
       { password: "test-password", code: "123456", authorization: { action: "PUBLISH", target_run_id: runId } },
       { password: "test-password", code: "654321", authorization: { action: "PUBLISH", target_run_id: runId } }

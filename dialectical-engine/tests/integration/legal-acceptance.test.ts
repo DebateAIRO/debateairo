@@ -73,6 +73,8 @@ function pendingInput(
     emailBlindIndex: createEmailBlindIndex(Buffer.alloc(32, 0x3c), email),
     emailCiphertext: encrypt(dek, Buffer.from(email), ["identity", "user.email_ciphertext", userId, "run:none", userId, keyId, "1"]),
     recoveryEmailCiphertext: encrypt(dek, Buffer.from(`r-${email}`), ["identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"]),
+    phoneCiphertext: encrypt(dek, Buffer.from("+40722123456"), ["identity", "user.phone_ciphertext", userId, "run:none", userId, keyId, "1"]),
+    phoneSource: "manual", phoneVerificationStatus: "unverified", phoneUpdatedAt: new Date(),
     passwordHash: `$argon2id$v=19$m=65536,t=3,p=1$${"A".repeat(22)}$${"A".repeat(43)}`,
     pseudonym: generatePseudonym(),
     adultAffirmedAt: new Date(),
@@ -137,6 +139,8 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
       WHERE table_schema='legal' AND table_name='acceptance' AND grantee='debateai_billing_runtime'
       ORDER BY 1`);
     expect(grants.rows.map((row) => row.privilege_type)).toEqual(["INSERT", "SELECT"]);
+    // Current issuance uses the reserved consent capability; the unreserved
+    // compatibility overload must remain inaccessible to ordinary callers.
     // 0094: the shared debateai_runtime (the runner's and the liveness sweep's role too) holds nothing here.
     expect((await database.pool.query(`
       SELECT privilege_type FROM information_schema.role_table_grants
@@ -147,9 +151,14 @@ describe("0080 legal.acceptance (paid plans L3a)", () => {
       "SELECT has_function_privilege($1,$2,'EXECUTE') AS ok", [role, fn]
     )).rows[0]!.ok;
     const signUpWithConsent =
-      "identity.create_pending_account_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb,smallint,text,text,jsonb)";
+      "identity.create_pending_account_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb,jsonb,text,text,timestamptz,smallint,text,text,jsonb)";
+    const reservedSignUpWithConsent =
+      "identity.create_pending_account_reserved_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,bigint,jsonb,jsonb,text,text,timestamptz,smallint,text,text,jsonb)";
+    for (const role of ["debateai_runtime", "public", "debateai_replay"]) {
+      expect(await can(role, signUpWithConsent), `${role}:${signUpWithConsent}`).toBe(false);
+    }
     const countryGateRefused = "identity.audit_country_gate_refused(jsonb,text)";
-    for (const fn of [signUpWithConsent, countryGateRefused]) {
+    for (const fn of [reservedSignUpWithConsent, countryGateRefused]) {
       // 0094: the API's own role (0093, held by api-runtime alone), and not the shared runtime role that
       // runner-runtime, scheduler-liveness and (through 0039) api-authorization inherit.
       expect(await can("debateai_billing_runtime", fn), fn).toBe(true);

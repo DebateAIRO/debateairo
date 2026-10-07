@@ -116,7 +116,7 @@ describe("the home page's accept screen after sign-in (paid plans L4)", () => {
     mocks.readAgeConfirmation.mockResolvedValue({ status: "required" });
     mocks.serverLegalStatus.mockResolvedValue(OWED_TERMS);
     const markup = renderToStaticMarkup(<>{await home()}</>);
-    expect(markup).toContain("Confirm your date of birth to keep using DebateAI");
+    expect(markup).toContain("Confirm your date of birth to keep using Dialectical Engine");
     expect(markup).not.toContain('id="library-claim"');
     expect(markup).not.toContain('id="legal-gate-title"');
     expect(mocks.serverLegalStatus).not.toHaveBeenCalled();

@@ -18,7 +18,7 @@ import {
 
 type EmailClient = Pick<ContractClient,
   "readAccountEmail" | "requestEmailChange" | "resendEmailChange" | "cancelEmailChange"
-  | "stepUp" | "confirmEmailChange" | "cancelEmailChangeByLink">;
+  | "authMethods" | "stepUp" | "confirmEmailChange" | "cancelEmailChangeByLink">;
 
 const GRANT = "G".repeat(43);
 const LINK = "L".repeat(43);
@@ -71,9 +71,10 @@ function client(overrides: Partial<EmailClient> = {}): EmailClient {
     requestEmailChange: vi.fn().mockResolvedValue(PENDING),
     resendEmailChange: vi.fn().mockResolvedValue(PENDING),
     cancelEmailChange: vi.fn().mockResolvedValue(undefined),
+    authMethods:vi.fn().mockResolvedValue({methods:[],recovery_codes_remaining:0,available_step_up_methods:["password_totp"],step_up_providers:[]}),
     stepUp: vi.fn().mockResolvedValue({
       status: "step_up_complete", csrf_token: "c".repeat(43),
-      step_up_grant: { token: GRANT, action: "CHANGE_EMAIL", expires_at: "2026-09-28T12:05:00.000Z" }
+      step_up_grant: { token: GRANT, action: "CHANGE_EMAIL", expires_at: new Date(Date.now()+300000).toISOString() }
     }),
     confirmEmailChange: vi.fn().mockResolvedValue({ status: "CONFIRMED" }),
     cancelEmailChangeByLink: vi.fn().mockResolvedValue({ status: "CANCELLED" }),
@@ -102,6 +103,15 @@ describe("Turn 14 Email card (14A / 14C)", () => {
     expect(text).toContain("Recovery: a.popescu@proton.me");
     await click("Change email");
     expect(onChange).toHaveBeenCalledWith("ana.popescu@unibuc.ro");
+  });
+
+  it("keeps the primary email and Change action readable when recovery is absent", async () => {
+    await mount(<EmailSettingsCard client={client({ readAccountEmail: vi.fn().mockResolvedValue({
+      email: "ana.popescu@unibuc.ro", recovery_email: null, pending: null
+    }) })} onChange={() => undefined} />);
+    expect(document.body.textContent).toContain("ana.popescu@unibuc.ro");
+    expect(document.body.textContent).not.toContain("Recovery:");
+    expect(button("Change email").disabled).toBe(false);
   });
 
   it("shows a pending change with both addresses, and resends or cancels it", async () => {
@@ -168,9 +178,10 @@ describe("Turn 14 change form (14B)", () => {
       onBack={vi.fn()} onRequested={onRequested} />);
     await type("New email", "ana.popescu@icub.ro");
     await type("Confirm new email", "ana.popescu@icub.ro");
-    await type("Password", "correct horse");
-    await type("6-digit code", "123456");
     await click("Send confirmation link");
+    await click("Password · 6-digit authentication code");
+    await type("Password", "correct horse");
+    await type("6-digit authentication code", "123456");
     expect(api.stepUp).toHaveBeenCalledWith("correct horse", "123456", { action: "CHANGE_EMAIL" });
     expect(api.requestEmailChange).toHaveBeenCalledWith("ana.popescu@icub.ro", GRANT);
     expect(onRequested).toHaveBeenCalledWith(PENDING);
@@ -184,9 +195,10 @@ describe("Turn 14 change form (14B)", () => {
       onBack={vi.fn()} onRequested={vi.fn()} />);
     await type("New email", "ana.popescu@icub.ro");
     await type("Confirm new email", "ana.popescu@icub.ro");
-    await type("Password", "wrong");
-    await type("6-digit code", "000000");
     await click("Send confirmation link");
+    await click("Password · 6-digit authentication code");
+    await type("Password", "wrong");
+    await type("6-digit authentication code", "000000");
     expect(document.body.textContent).toContain("Your password or authenticator code was not accepted.");
     expect(api.requestEmailChange).not.toHaveBeenCalled();
   });

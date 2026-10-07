@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import pg from 'pg';
+import { migrate } from '@debateai/db';
+import { loadBootstrapRegister,createPostgresRegisterPublicationPort,canonicalRegisterJson,computeRegisterSnapshotSha256,parseRegisterVersionText } from '@debateai/register';
+import { STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
+import { buildPreviewSourceRows,composePreviewSnapshot,publishPreviewRegister,readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
+import { verifyNativeState } from '../../deploy/preview-auth-dev/v1/verify-native.js';
+import { startTestDatabase } from '../support/testDatabase.js';
+import { seedInstalledAuth106 } from '../support/auth106.js';
+import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
+const native=await import('../../deploy/'+'preview-auth-dev/v1/native-peer.mjs');
+const observation={nodeVersion:process.version,pnpmVersion:'11.20.0',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),operatorSha256:'c'.repeat(64),observedAt:'2026-10-06T12:00:00.000Z'};
+describe('isolated PG18 native preview publication (source evidence, not Linux startup)',()=>{
+ it('uses the anchored creator on every acquisition, preserves AUTH106 history, publishes next-unused complete snapshot and replays the actual receipt',async()=>{
+  const db=await startTestDatabase();let selected:pg.Pool|undefined;
+  try{
+   await db.pool.query('CREATE ROLE debateai_prod_migrator LOGIN SUPERUSER CREATEROLE CREATEDB INHERIT NOBYPASSRLS');
+   selected=new pg.Pool({connectionString:db.connectionString,options:'-c role=debateai_prod_migrator',max:2});
+   await seedInstalledAuth106(selected);
+   const history=(await selected.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
+   const metadata=(await selected.query("SELECT current_database() database,current_setting('port')::int port,current_setting('cluster_name') cluster,current_setting('data_directory') data_directory,session_user session")).rows[0];
+   const target={database:metadata.database,port:metadata.port,cluster:metadata.cluster,dataDirectory:metadata.data_directory,session:metadata.session,role:'debateai_prod_migrator'};
+   const plan=await loadMigrationPlan();let acquisitions=0;
+   await native.withGuardedPool(selected,async(c:any)=>{acquisitions++;await native.assertNativeConnection(c,target,plan.manifest.cohorts.auth106);},async(pool:any)=>{
+    await Promise.all([migrate(pool),migrate(pool)]);
+    const stableLedger=(await pool.query("SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
+    await db.pool.query("ALTER ROLE debateai_prod_migrator BYPASSRLS");
+    try{await expect(pool.query("SELECT 1")).rejects.toThrow("PREVIEW_NATIVE_IDENTITY_REFUSED");}
+    finally{await db.pool.query("ALTER ROLE debateai_prod_migrator NOBYPASSRLS");}
+    await db.pool.query("ALTER FUNCTION billing.owner_age_frozen(uuid) OWNER TO debateai");
+    try{await expect(pool.query("SELECT 1")).rejects.toThrow("PREVIEW_NATIVE_OWNER_REFUSED");}
+    finally{await db.pool.query("ALTER FUNCTION billing.owner_age_frozen(uuid) OWNER TO debateai_prod_migrator");}
+    expect((await pool.query("SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(stableLedger);
+    await migrate(pool);
+    expect((await pool.query('SELECT name,applied_at FROM public.debateai_schema_migration WHERE name=ANY($1::text[]) ORDER BY name',[history.map(row=>row.name)])).rows).toEqual(history);
+    const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
+    const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+    // Historical import is synthetic fixture setup only; the operator never seeds development/bootstrap.
+    await createPostgresRegisterPublicationPort(pool).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
+    const sealedBefore=await readSealedSnapshot(pool,'4');
+    const snapshot=composePreviewSnapshot({sourceRows:source,baseRows:sealedBefore.rows,baseRegisterVersion:'4',baseSnapshotSha256:computeRegisterSnapshotSha256(base)});
+    const approval={baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256};
+    const input={publicationId:randomUUID(),sourceRef:'isolated native preview operator fixture',snapshot,approval};
+    const receipt=await publishPreviewRegister(pool,input);
+    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(68);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(await publishPreviewRegister(pool,input)).toEqual(receipt);
+    await expect(verifyNativeState(pool,{sourceRevision:observation.sourceRevision,sourceTree:observation.sourceTree,nativeSourceSha256:'d'.repeat(64),publication:{...receipt,requestSha256:'0'.repeat(64)}})).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
+    expect(await readSealedSnapshot(pool,'4')).toEqual(sealedBefore);
+    await expect(publishPreviewRegister(pool,{...input,publicationId:randomUUID(),approval:{...approval,deltaSha256:'0'.repeat(64)}})).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+    const row=(await pool.query("SELECT r.oid::int oid,(SELECT proowner::int FROM pg_proc WHERE oid='billing.owner_age_frozen(uuid)'::regprocedure) owner FROM pg_roles r WHERE r.rolname=current_user")).rows[0];expect(row.owner).toBe(row.oid);
+   });selected=undefined;expect(acquisitions).toBeGreaterThan(8);
+  }finally{await selected?.end().catch(()=>{});await db.stop();}
+ },120000);
+});

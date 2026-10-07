@@ -1,5 +1,6 @@
 [
   "components/authRoutes.source-test.mjs",
+  "components/accountNavigation.source-test.mjs",
   "components/debateReferenceDesign.source-test.mjs",
   "components/debateReferenceDesign.chrome.source-test.mjs",
   "components/debateReferenceDesign.views.source-test.mjs",

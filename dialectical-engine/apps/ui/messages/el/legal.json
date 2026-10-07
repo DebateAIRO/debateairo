@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "να λάβετε τον κατάλογο όλων των τρίτων στους οποίους κοινοποιήθηκαν·",
   "legal.health.s05.item3": "να ανακαλέσετε τη συγκατάθεσή σας και να ζητήσετε τη διαγραφή τους.",
   "legal.health.s06.title": "Πώς να τα ασκήσετε",
-  "legal.health.s06.body": "Από τις Ρυθμίσεις ή γράφοντας στη διεύθυνση privacy@dezbatere.ro. Απαντάμε εντός 45 ημερών. Αν απορρίψουμε ένα αίτημα, μπορείτε να ασκήσετε προσφυγή απαντώντας στο μήνυμά μας."
+  "legal.health.s06.body": "Από τις Ρυθμίσεις ή γράφοντας στη διεύθυνση privacy@dezbatere.ro. Απαντάμε εντός 45 ημερών. Αν απορρίψουμε ένα αίτημα, μπορείτε να ασκήσετε προσφυγή απαντώντας στο μήνυμά μας.",
+  "legal.cookies.staff.purpose": "Ξεχωριστή πρόσβαση προσωπικού",
+  "legal.cookies.passwordReset.purpose": "Μόνο επαναφορά κωδικού",
+  "legal.cookies.mfaRecovery.purpose": "Μόνο ανάκτηση επαληθευτή",
+  "legal.cookies.social.purpose": "Σύντομη σύνδεση μέσω παρόχου ή σύνδεση λογαριασμού",
+  "legal.cookies.phoneDraft.purpose": "Ημιτελής ερώτηση κατά το βήμα τηλεφώνου· διαγράφεται σε αλλαγή συνεδρίας, αποσύνδεση ή αλλαγή κατόχου",
+  "legal.cookies.staff.life": "Έως 8 ώρες· 15 λεπτά αδράνειας",
+  "legal.cookies.passwordReset.life": "Έως 30 λεπτά",
+  "legal.cookies.mfaRecovery.life": "Έως 299 δευτερόλεπτα",
+  "legal.cookies.social.life": "Έως 5 λεπτά",
+  "legal.cookies.phoneDraft.life": "15 λεπτά ή έως την προηγούμενη διαγραφή"
 }

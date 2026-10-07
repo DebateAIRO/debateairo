@@ -101,6 +101,8 @@ import {
   buildConfiguredProviderSetDeploymentRow,
   callTokenCeilingsFromValues,
   computeRegisterSnapshotSha256,
+  composeStaffPolicyRegisterPublicationRows,
+  parseStaffAccessEnvironment,
   costEnvelopeBand,
   costEnvelopeCeilings,
   costEnvelopePolicyFromValue,
@@ -1253,4 +1255,13 @@ export function createPostgresHostedRegisterOperations(pool: Pool): HostedRegist
     verifyBootReadiness: (registerVersion: RegisterVersionText, providerTargetsJson: string) =>
       verifyHostedRegisterBootReadiness(pool, registerVersion, providerTargetsJson)
   });
+}
+
+/** Proposal rows only. No publication/boot path calls this until the later implementation/readiness gates exist. */
+export function buildHostedStaffV2RegisterPublicationRows(
+  v1Rows: readonly RegisterPublicationRow[], source: Readonly<Record<string, string | undefined>>
+): readonly RegisterPublicationRow[] {
+  const configuration = parseStaffAccessEnvironment(source);
+  if (configuration.policyVersion !== 2) throw new TypeError("STAFF_V2_CONFIGURATION_REQUIRED");
+  return composeStaffPolicyRegisterPublicationRows(v1Rows, { policyVersion: 2, ...(configuration.internalAllowancePolicy === undefined ? {} : { internalAllowance: configuration.internalAllowancePolicy }) });
 }

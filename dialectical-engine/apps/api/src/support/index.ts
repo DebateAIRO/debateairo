@@ -571,7 +571,8 @@ export function installSupportRoutes(
         });
         return reply.send({
           message_id: messageId,outcome: "REFUSE_ZONE",text: stored.text,
-          sources: Object.freeze([]),actions: Object.freeze([])
+          sources: Object.freeze([]),actions: Object.freeze([]),
+          ...(classification.securityNavigation === "FORGOT_PASSWORD" ? {refusal_link:"/recover"} : {})
         });
       }
       const previousMessages = application.cases === undefined

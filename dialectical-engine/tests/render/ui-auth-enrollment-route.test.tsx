@@ -14,8 +14,11 @@ describe("MFA enrolment route shape", () => {
     const verifySource = readFileSync(join(process.cwd(), "apps/ui/app/verify-email/page.tsx"), "utf8");
     const enrollSource = readFileSync(join(process.cwd(), "apps/ui/app/enroll-mfa/page.tsx"), "utf8");
 
-    expect(enrollSource).toContain('id="totp-code"');
-    expect(enrollSource).toContain('id="recovery-typeback"');
+    const securitySource=readFileSync(join(process.cwd(),"apps/ui/components/auth/SecurityEnrollment.tsx"),"utf8");
+    expect(securitySource).toContain('id="enrollment-code"');
+    expect(enrollSource).not.toContain('id="recovery-typeback"');
+    expect(enrollSource).toContain("<SecurityEnrollment");
+    expect(securitySource).toMatch(/result.status\s*===\s*["']authenticated["']/);
     expect(verifySource).not.toMatch(/<form\b/);
     expect(enrollSource).not.toMatch(/<form\b/);
     expect(renderToStaticMarkup(<EnrollMfaPage />)).not.toMatch(/<form\b/);

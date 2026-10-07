@@ -8,7 +8,7 @@ type ConnectionPurpose = Readonly<{
   purpose: string;
   binding: "WIRED" | "WIRED_WHEN_ENABLED" | "DEVELOPMENT_ONLY"
     | "DEVELOPMENT_ONLY_UNBOUND" | "REQUIRED_NOT_WIRED"
-    | "EXTERNAL_COMPONENT" | "JIT_HUMAN";
+    | "EXTERNAL_COMPONENT" | "JIT_HUMAN" | "CLOSED_JIT";
   condition?: string;
   unboundReason?: string;
 }>;
@@ -17,7 +17,7 @@ type Principal = Readonly<{
   id: string;
   roleName: string;
   kind: "PERSISTENT_MIGRATION_OWNER" | "SERVICE" | "HUMAN_READ_ONLY"
-    | "HUMAN_EXECUTE_ONLY";
+    | "HUMAN_EXECUTE_ONLY" | "JIT_RECOVERY";
   database: "debateai" | "hatchet";
   login: boolean;
   inherit: boolean;
@@ -46,6 +46,7 @@ type Manifest = Readonly<{
     input: "STDIN_EXACT_JSON_AND_PRIVATE_FILE_ARG";
     managedPrincipalIds: readonly string[];
   }>;
+  retiredCapabilityRoles: readonly Readonly<{roleName:string;login:false;inherit:false;directMemberships:readonly string[];status:string;reason:string}>[];
   principalProvisioning: readonly Readonly<{
     principalId: string;
     state: "SPECIFIED_NOT_PROVISIONED" | "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL"
@@ -118,6 +119,7 @@ const capabilityRoles = [
   "debateai_replay",
   "debateai_runtime",
   "debateai_settlement_watch",
+  "debateai_staff_recovery",
   "debateai_support",
   "debateai_support_config_operator"
 ] as const;
@@ -127,7 +129,18 @@ const ownershipRoles = [
   // V-29: owns obs.postgres_capacity(...), the observation agent's statistics window.
   "debateai_obs_stats_owner",
   "debateai_obs_view_owner",
-  "debateai_register_publication_owner"
+  "debateai_password_recovery_owner",
+  "debateai_register_publication_owner",
+  "debateai_staff_security_owner"
+] as const;
+
+// Exact external104-106 SQL is retained for the installed preview lineage.
+// These NOLOGIN recovery owners/runtimes are outside the historical P3-01
+// provisioner inventory; the preview overlay/launcher handoff remains separate.
+const externalRecoveryRoles = [
+  "debateai_backup_email_owner", "debateai_backup_email_runtime",
+  "debateai_mfa_recovery_owner", "debateai_mfa_recovery_runtime",
+  "debateai_password_reset_owner", "debateai_password_reset_runtime"
 ] as const;
 
 // V-29 removed the one exception (the observation agent's pg_monitor login): no
@@ -154,7 +167,7 @@ describe("P3-01 production database-principal manifest", () => {
   it("defines the exact capability, ownership, service, and connection-purpose inventory", async () => {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
 
-    expect(manifest.format).toBe("debateai.production-database-principals.v3");
+    expect(manifest.format).toBe("debateai.production-database-principals.v4");
     expect(manifest.status).toBe("MIXED_PROVISIONING_STATE");
     expect(manifest.capabilityRoles.map(({ roleName }) => roleName)).toEqual(capabilityRoles);
     expect(manifest.capabilityRoles.every(({ login }) => login === false)).toBe(true);
@@ -173,6 +186,7 @@ describe("P3-01 production database-principal manifest", () => {
       { roleName: "debateai_replay", inherit: true, directMemberships: [] },
       { roleName: "debateai_runtime", inherit: true, directMemberships: [] },
       { roleName: "debateai_settlement_watch", inherit: true, directMemberships: [] },
+      { roleName: "debateai_staff_recovery", inherit: false, directMemberships: [] },
       { roleName: "debateai_support", inherit: false, directMemberships: [] },
       { roleName: "debateai_support_config_operator", inherit: false, directMemberships: [] }
     ]);
@@ -213,6 +227,10 @@ describe("P3-01 production database-principal manifest", () => {
         ownsRelations: [],
         ownsFunctions: []
       }
+       ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"],
+        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'billing.internal_grant', 'billing.internal_grant_event','billing.internal_provider_admission'],
+        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state'] },
+      {"roleName":"debateai_password_recovery_owner","login":false,"inherit":false,"directMemberships":[],"ownsSchemas":[],"ownsRelations":["identity.password_recovery_control","identity.password_recovery_staged_code","identity.password_recovery_retry_lock","identity.password_recovery_source_window","identity.password_recovery_notice","identity.password_recovery_feed"],"ownsFunctions":["identity.password_recovery_rules","identity.password_recovery_eligible","identity.password_recovery_audit","identity.password_recovery_notice_event","identity.password_recovery_close","identity.password_recovery_current","identity.password_recovery_prepare","identity.password_recovery_start","identity.password_recovery_exchange","identity.password_recovery_read","identity.password_recovery_read_code","identity.password_recovery_accept_code","identity.password_recovery_stage_factor","identity.password_recovery_verify_factor","identity.password_recovery_stage_codes","identity.password_recovery_ack_code","identity.password_recovery_complete","identity.password_recovery_cancel","identity.expire_password_recovery","identity.password_recovery_started_scope","identity.password_recovery_admit","identity.password_recovery_failure","identity.password_recovery_cancel_session","identity.password_recovery_read_feed","identity.password_recovery_cancel_own","identity.password_recovery_claim_notice","identity.password_recovery_finish_notice"]}
     ]);
 
     expect(manifest.principals.map(({ id, roleName, kind }) => ({ id, roleName, kind })))
@@ -252,6 +270,7 @@ describe("P3-01 production database-principal manifest", () => {
           roleName: "debateai_prod_support_config_operator",
           kind: "HUMAN_EXECUTE_ONLY"
         },
+        { id: "staff-recovery", roleName: "debateai_prod_staff_recovery", kind: "JIT_RECOVERY" },
         { id: "hatchet", roleName: "debateai_prod_hatchet", kind: "SERVICE" }
       ]);
     expect(manifest.principalProvisioning.map(({ principalId, state, source }) => ({
@@ -261,13 +280,13 @@ describe("P3-01 production database-principal manifest", () => {
       state: id === "observation-agent" || id === "observation-threshold-operator"
         || id.startsWith("obs-")
         ? "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL"
-        : id === "hatchet" ? "EXTERNAL_COMPONENT" : "SPECIFIED_NOT_PROVISIONED",
+        : id === "staff-recovery" ? "CLOSED_MIGRATION_PROVISIONED" : id === "hatchet" ? "EXTERNAL_COMPONENT" : "SPECIFIED_NOT_PROVISIONED",
       source: id === "observation-agent"
         ? "migrations/0057_observation_foundation.sql"
         : id === "observation-threshold-operator"
           ? "migrations/0071_observation_threshold_operator.sql"
         : id.startsWith("obs-") ? "migrations/0034_obs_foundation.sql"
-        : id === "hatchet" ? "compose.dev.yaml" : null
+        : id === "staff-recovery" ? "migrations/0085_staff_access_foundation.sql" : id === "hatchet" ? "compose.dev.yaml" : null
     })));
     expect(manifest.principals.map(({
       id, database, inherit, directMemberships, effectiveMemberships
@@ -294,6 +313,7 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "observation-agent", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "observation-threshold-operator", database: "debateai", inherit: false, directMemberships: [], effectiveMemberships: [] },
         { id: "support-config-operator", database: "debateai", inherit: true, directMemberships: ["debateai_support_config_operator"], effectiveMemberships: ["debateai_support_config_operator"] },
+        { id: "staff-recovery", database: "debateai", inherit: true, directMemberships: ["debateai_staff_recovery"], effectiveMemberships: ["debateai_staff_recovery"] },
         { id: "hatchet", database: "hatchet", inherit: true, directMemberships: [], effectiveMemberships: [] }
       ]);
 
@@ -476,6 +496,8 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "operator:oactl-thresholds-apply", environmentKey: null, purpose: "OBSERVATION_THRESHOLD_RATIFICATION", binding: "WIRED" },
         { component: "operator:support-config", environmentKey: null, purpose: "JIT_SUPPORT_CONFIGURATION", binding: "JIT_HUMAN" },
         { component: "operator:support-status", environmentKey: null, purpose: "SUPPORT_STATUS_DATA", binding: "WIRED" },
+        { component: "operator:staff-recovery", environmentKey: null, purpose: "JIT_OWNER_COMMAND_PREPARE", binding: "CLOSED_JIT" },
+        { component: "operator:staff-independent-alert", environmentKey: null, purpose: "JIT_ALERT_READINESS_PUBLISH_REVOKE", binding: "CLOSED_JIT" },
         { component: "hatchet", environmentKey: "HATCHET_DATABASE_URL", purpose: "HATCHET_INTERNAL_DATABASE", binding: "EXTERNAL_COMPONENT" }
       ].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))));
     expect(manifest.developmentOnlyPrincipalBindings).toEqual([{
@@ -565,29 +587,79 @@ describe("P3-01 production database-principal manifest", () => {
         && currentProvisioner === "migrations/0034_obs_foundation.sql")).toBe(true);
 
     expect(manifest.privilegeDisclosures).toEqual([
-      {
-        roleName: "debateai_evaluator_api",
-        source: "migrations/0023_evaluator_foundation.sql",
-        grants: [
-        "USAGE ON SCHEMA ledger",
-        "SELECT, UPDATE ON ledger.sequence_allocator",
-        "EXECUTE ON FUNCTION ledger.allocate_sequence()"
-        ]
-      },
-      {
-        roleName: "debateai_evaluator_api",
-        source: "migrations/0029_evaluator_dev_menu_grants.sql",
-        grants: [
-          "USAGE ON SCHEMA register",
-          "SELECT ON register.register_row,register.register_version"
-        ]
-      }
-    ]);
+  {
+    "roleName": "debateai_evaluator_api",
+    "source": "migrations/0023_evaluator_foundation.sql",
+    "grants": [
+      "USAGE ON SCHEMA ledger",
+      "SELECT, UPDATE ON ledger.sequence_allocator",
+      "EXECUTE ON FUNCTION ledger.allocate_sequence()"
+    ]
+  },
+  {
+    "roleName": "debateai_evaluator_api",
+    "source": "migrations/0029_evaluator_dev_menu_grants.sql",
+    "grants": [
+      "USAGE ON SCHEMA register",
+      "SELECT ON register.register_row,register.register_version"
+    ]
+  },
+  {
+    "roleName": "debateai_staff_security_owner",
+    "source": "migrations/0092_internal_funded_allowance.sql",
+    "grants": [
+      "USAGE ON SCHEMA register, billing",
+      "SELECT(register_version,row_key,value_json,source_ref) ON register.register_row",
+      "SELECT(register_version,sealed,row_count) ON register.register_version",
+      "SELECT(owner_ref) ON identity.\"user\"",
+      "SELECT,INSERT ON billing.run_charge_scope",
+      "EXECUTE ON FUNCTION register.canonical_json_text(text),register._canonical_json_value(text,integer,integer),register._canonical_decimal(text)"
+    ]
+  },
+  {
+    "roleName": "debateai_runtime",
+    "source": "migrations/0092_internal_funded_allowance.sql",
+    "grants": [
+      "EXECUTE ON FUNCTION staff.read_internal_funding_policy()",
+      "EXECUTE ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid)",
+      "EXECUTE ON FUNCTION staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+      "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+      "EXECUTE ON FUNCTION billing.read_internal_allowance(uuid,timestamptz)",
+      "EXECUTE ON FUNCTION billing.read_internal_allowance_for_run(uuid,timestamptz)",
+      "EXECUTE ON FUNCTION billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)",
+      "EXECUTE ON FUNCTION billing.read_run_funding_basis(uuid)"
+    ]
+  },
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0093_internal_provider_admission.sql",
+  "grants": [
+    "USAGE ON SCHEMA core,ledger",
+    "SELECT(run_id,register_version) ON core.run",
+    "SELECT(run_id,owner_ref,at_seq) ON core.run_ownership_event",
+    "SELECT(run_id,state) ON core.work_item",
+    "SELECT(run_id,held_micros) ON ledger.model_spend_hold",
+    "SELECT(spend_id,run_id,spend_source,provider_ref,charged_on,charge_micros,input_tokens,output_tokens,spend_phase,recorded_at), INSERT(spend_id,run_id,spend_source,provider_ref,charged_on,charge_micros,input_tokens,output_tokens,spend_phase) ON ledger.model_spend"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0093_internal_provider_admission.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean),billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)",
+    "EXECUTE ON FUNCTION billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text),billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION billing.read_internal_run_state(uuid)"
+  ]
+}
+]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
       .toEqual([
         { id: "CREDENTIAL_MATERIAL_PAIRWISE_DISTINCT", ownerTicket: "P3-02" },
         { id: "JIT_HUMAN_CREDENTIAL_HAS_BOUNDED_EXPIRY", ownerTicket: "P3-02" },
-        { id: "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS", ownerTicket: "P3-02" }
+        { id: "SAME_ENVIRONMENT_KEY_ACROSS_COMPONENTS_USES_DISTINCT_CREDENTIALS", ownerTicket: "P3-02" },
+        { id: "STAFF_INDEPENDENT_ACK_AND_ROOT_PUBLICATION", ownerTicket: "P3-02" },
+        { id: "OWNER_RECOVERY_ROOT_CUSTODY_AND_REPLACEMENT_ONLY", ownerTicket: "P3-02" },
+        { id: "INTERNAL_ALLOWANCE_EXPLICIT_FINITE_SEALED_SELECTION", ownerTicket: "P3-02" }
       ]);
     expect(manifest.deploymentObligations.every(({ requiredEvidence }) =>
       requiredEvidence.trim().length > 0)).toBe(true);
@@ -654,11 +726,13 @@ describe("P3-01 production database-principal manifest", () => {
     const manifestMigrationRoles = [
       ...manifest.capabilityRoles.map(({ roleName }) => roleName),
       ...manifest.ownershipRoles.map(({ roleName }) => roleName),
+      ...manifest.retiredCapabilityRoles.map(({roleName})=>roleName),
       ...manifest.principals
         .map(({ roleName }) => roleName)
-        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator)$/u.test(roleName))
+        .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator|debateai_prod_staff_recovery)$/u.test(roleName))
     ].sort();
-    expect(sourceCreatedRoles).toEqual(manifestMigrationRoles);
+    expect(sourceCreatedRoles).toEqual([...manifestMigrationRoles,...externalRecoveryRoles].sort());
+    expect(manifest.retiredCapabilityRoles).toEqual([{roleName:"debateai_password_recovery_runtime",login:false,inherit:false,directMemberships:[],status:"RETIRED_BY_0104",reason:expect.any(String)}]);
 
     const sourceDatabaseKeys = [...new Set([
       ...`${runtimeEnvironment}\n${observationMain}`.matchAll(
@@ -752,6 +826,7 @@ describe("P3-01 production database-principal manifest", () => {
       })
       .sort();
     const manifestEvaluatorCrossSchemaGrants = manifest.privilegeDisclosures
+      .filter(({ roleName }) => roleName === "debateai_evaluator_api")
       .flatMap(({ roleName, grants }) => grants.map((grant) =>
         `GRANT ${grant} TO ${roleName};`))
       .sort();
@@ -767,7 +842,7 @@ describe("P3-01 production database-principal manifest", () => {
     expect(runtimeEnvironment).not.toContain("OBS_LISTENER_DATABASE_URL");
     expect(runtimeEnvironment).not.toContain("OBS_WATCHDOG_DATABASE_URL");
     const sourceSchemas = [...new Set([...migrations.matchAll(
-      /\bCREATE\s+SCHEMA\s+IF\s+NOT\s+EXISTS\s+([a-z_]+)/giu
+      /\bCREATE\s+SCHEMA\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_]+)/giu
     )].map(([, schema]) => schema!))].sort();
     const manifestSchemas = [...new Set([
       ...manifest.principals.flatMap(({ ownsSchemas }) => ownsSchemas),
@@ -814,4 +889,26 @@ describe("P3-01 production database-principal manifest", () => {
     );
     expect(manifest.status).toBe("MIXED_PROVISIONING_STATE");
   });
+  it('pins the independent Owner ceremony lifecycle to only enumerated JIT definers',async()=>{
+    const manifest=JSON.parse(await readFile(manifestPath,'utf8'));
+    expect(manifest.independentOwnerRecovery).toEqual({version:1,loginRole:'debateai_prod_staff_recovery',capabilityRole:'debateai_staff_recovery',maximumLifetimeSeconds:300,defaultPassword:'NULL',defaultValidUntil:'-infinity',exportReusableUrl:false,executeFunctions:['staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.read_committed_owner_operation','staff.commit_owner_command','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness']});
+  });
+
+  it('rejects mixed Owner recovery grants before accepting credential material or touching SQL',async()=>{
+    const {provisionProductionDatabasePrincipals}=await import('../../apps/runner/src/production-database-principals.js');
+    const manifest=JSON.parse(await readFile(manifestPath,'utf8'));manifest.independentOwnerRecovery={version:1,loginRole:'debateai_prod_staff_recovery',capabilityRole:'debateai_staff_recovery',maximumLifetimeSeconds:300,defaultPassword:'NULL',defaultValidUntil:'-infinity',exportReusableUrl:false,executeFunctions:['staff.commit_owner_command','staff.authorize_action']};
+    const {mkdtemp,rm}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),{join}=await import('node:path'),root=await mkdtemp(join(tmpdir(),'task6-p3-'));try{await expect(provisionProductionDatabasePrincipals({adminPool:{} as import('@debateai/db').Pool,adminDatabaseUrl:'postgresql://synthetic:fixture@127.0.0.1/synthetic',manifest,credentialEnvelope:{},supportConfigCredentialFilePath:join(root,'unused-output')})).rejects.toThrow('PRODUCTION_DATABASE_PRINCIPAL_MANIFEST_INVALID');}finally{await rm(root,{recursive:true,force:true});}
+  });
+
+});
+
+it("discloses exactly the reviewed additive funding grants without other principals or selector writes", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0092_internal_funded_allowance.sql", "utf8");
+  const actual = [...sql.matchAll(/^GRANT [^\n]+ TO (?:debateai_runtime|debateai_staff_security_owner);$/gm)]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0092_internal_funded_allowance.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  expect(declared.some(grant => /(?:INSERT|UPDATE|DELETE).*funding_policy_selection/u.test(grant))).toBe(false);
 });

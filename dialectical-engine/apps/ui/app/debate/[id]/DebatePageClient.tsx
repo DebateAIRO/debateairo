@@ -1,4 +1,6 @@
 "use client";
+import { AccountMenu } from "@/components/AccountMenu";
+import { fundingFailureMessage } from "@/lib/billing/fundingFailure";
 
 import { AiNotice } from "@/components/AiNotice";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
@@ -759,7 +761,7 @@ export default function DebatePageClient({
       // poll). Without this, a debate that arrives after a transient failure
       // would stay stuck behind an old error (see the `error && !debate` gate).
       setError(bundle.kind === "failed"
-        ? runFailureMessage(bundle.run.terminal_reason, debateChromeCatalog)
+        ? fundingFailureMessage(bundle.run.terminal_reason, debateChromeCatalog) ?? runFailureMessage(bundle.run.terminal_reason, debateChromeCatalog)
         : null);
     } catch (exc) {
       if (privateDeletionRef.current!==null) return;
@@ -1549,6 +1551,7 @@ export default function DebatePageClient({
               </button>
             </div>
           ) : null}
+          <AccountMenu catalog={chromeCatalog} />
           <LanguageSwitcher />
           <ModeToggle compact />
           <div className="debateUtilityActions" ref={debateHeaderInlineActionsRef}>
@@ -1576,7 +1579,6 @@ export default function DebatePageClient({
               </a>
             ) : null}
             <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
-            {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label={t(chromeCatalog, "chrome.settings")}>⚙</Link>}
           </div>
           <details className="debateUtilityOverflow">
             <summary className="iconBtn" role="button" aria-label={t(chromeCatalog, "chrome.moreDebateActions")} title={t(chromeCatalog, "chrome.moreDebateActions")}>
@@ -1607,7 +1609,6 @@ export default function DebatePageClient({
                 </a>
               ) : null}
               <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
-              {publicMode ? null : <Link className="iconBtn debateOverflowAction" href="/settings" aria-label={t(chromeCatalog, "chrome.settings")}>⚙</Link>}
             </div>
           </details>
         </div>

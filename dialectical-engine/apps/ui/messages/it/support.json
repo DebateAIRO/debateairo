@@ -81,5 +81,6 @@
   "support.answerRating": "Valutazione della risposta",
   "support.privacyPreferences": "Privacy",
   "support.aiBanner": "Le risposte sono generate dall’IA, contrassegnate in un formato leggibile dalle macchine e possono essere errate. Puoi chiedere di parlare con una persona in qualsiasi momento.",
-  "support.cookiePreferences": "I cookie che conserviamo"
+  "support.cookiePreferences": "I cookie che conserviamo",
+  "support.recoverAccount": "Recupera il tuo account"
 }

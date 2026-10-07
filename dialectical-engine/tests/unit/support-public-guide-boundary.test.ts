@@ -26,6 +26,7 @@ describe("Support public-guide boundary", () => {
     ["Where can I manage active sessions?","en"],
     ["Where are the account deletion options?","en"],
     ["Where can I sign in?","en"],
+    ["Where can I sign in to my account?","en"],
     ["Where is the login page?","en"],
     ["Unde pot gestiona sesiunile active?","ro"],
     ["Unde găsesc opțiunile de ștergere a contului?","ro"],

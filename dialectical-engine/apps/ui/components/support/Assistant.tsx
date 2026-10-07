@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountMenu } from "@/components/AccountMenu";
 import { useEffect,useLayoutEffect,useRef,useState,type FormEvent,type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { redactSupportText } from "@debateai/kernel";
@@ -10,7 +11,7 @@ import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { useChromeI18n } from "../../lib/i18n/I18nProvider";
-import type { LocaleCode } from "../../lib/i18n/locales";
+import { catalogLocale, type LocaleCode } from "../../lib/i18n/locales";
 import { t } from "../../lib/i18n/translate";
 import { AiBanner } from "../AiNotice";
 import { supportCaseLink } from "./caseLink.js";
@@ -176,7 +177,7 @@ function relayStateLabel(
   return key === undefined ? relayState : t(catalog,key);
 }
 
-const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help"]);
+const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help","/recover"]);
 const PUBLIC_DEBATE = /^\/public\/debate\/[A-Za-z0-9_-]+$/u;
 /** The API's case-capability grammar (`apps/api/src/support/session.ts`). */
 const CASE_BEARER = /^[A-Za-z0-9_-]{43}$/u;
@@ -396,7 +397,8 @@ export function Assistant({
   auxiliaryContent?: ReactNode;
   onClose?: () => void;
 }>) {
-  const { catalog: chromeCatalog,locale: language } = useChromeI18n();
+  const { catalog: chromeCatalog,locale: uiLocale } = useChromeI18n();
+  const language = catalogLocale(uiLocale);
   const persistent = client === supportAssistantClient;
   // DL3-F3: the capability lives here and nowhere else. It is never written to
   // sessionStorage, so it cannot outlive the page that minted it.
@@ -1006,8 +1008,8 @@ export function Assistant({
                 {actions.map((action) => <a href={action.href} key={action.id}>{action.label}</a>)}
               </nav>}
               {link === null ? null : <>
-                <span>{generated ? "AI · " : ""}{t(chromeCatalog,"support.docsProductGuide")}</span>
-                <a href={link}>{t(chromeCatalog,"support.viewSource")} →</a>
+                {link === "/recover" ? null : <span>{generated ? "AI · " : ""}{t(chromeCatalog,"support.docsProductGuide")}</span>}
+                <a href={link}>{t(chromeCatalog,link === "/recover" ? "support.recoverAccount" : "support.viewSource")} →</a>
               </>}
             </footer>}
           </div>
@@ -1079,12 +1081,10 @@ export function Assistant({
       <span className="supportHeaderDivider" aria-hidden />
       <span className="supportHeaderTitle">{t(chromeCatalog, "chrome.help")}</span>
       <div className="supportHeaderActions">
+        <AccountMenu authenticated={identityAvailable} catalog={chromeCatalog} />
         <LanguageSwitcher />
         <ModeToggle compact />
-        <span className="supportIdentity">
-          <span className="supportIdentityMark" aria-hidden>{identityAvailable ? "A" : "G"}</span>
-          <span>{t(chromeCatalog, identityAvailable ? "chrome.signedInAsker" : "chrome.guestSession")}</span>
-        </span>
+
       </div>
     </header>
 

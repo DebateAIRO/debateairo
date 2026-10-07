@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Debatai yra privatūs, kol jų nepaskelbiate. Paskelbimas yra sąmoningas, atskirai patvirtinamas veiksmas. Paskelbtuose debatuose rodomas jūsų slapyvardis, jūsų klausimas toks, kokį jį parašėte, argumentų medis, įverčiai, verdiktas bei pasitikėjimo lygis ir aiškiai nurodoma, kad turinį sugeneravo DI. Juose niekada nerodomas jūsų el. pašto adresas, seansų įrašai ar paskyros istorija. [Published debates are / are not] indeksuojami paieškos sistemų [unless you choose]." },
-      { kind: "p", text: "Atšaukus paskelbimą debatai pašalinami iš DebateAI ir sunaikinamas mūsų viešos kopijos raktas. Skaitytojų, paieškos sistemų ar archyvų jau padarytos kopijos nuo mūsų nepriklauso ir negalime jų atšaukti." },
+      { kind: "p", text: "Atšaukus paskelbimą debatai pašalinami iš Dialectical Engine ir sunaikinamas mūsų viešos kopijos raktas. Skaitytojų, paieškos sistemų ar archyvų jau padarytos kopijos nuo mūsų nepriklauso ir negalime jų atšaukti." },
       { kind: "p", text: "Kai ištrinate paskyrą, nepagrįstai nedelsdami ir ne vėliau kaip per 30 dienų pašaliname iš viešos prieigos visus jūsų paskelbtus debatus, nebent pagal įstatymus privalome išsaugoti konkretų elementą. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Debatuose įvardyti asmenys, kurie nėra mūsų naudotojai",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Jei kas nors pateikia DebateAI klausimą, kuriame jus įvardija, galime turėti jūsų asmens duomenų, nors paslauga niekada nesinaudojote. Sąlygos draudžia naudotojams taip elgtis, o mes kuo labiau ribojame DI paslaugų teikėjams siunčiamus duomenis, tačiau taip nutinka." },
+      { kind: "p", text: "Jei kas nors pateikia Dialectical Engine klausimą, kuriame jus įvardija, galime turėti jūsų asmens duomenų, nors paslauga niekada nesinaudojote. Sąlygos draudžia naudotojams taip elgtis, o mes kuo labiau ribojame DI paslaugų teikėjams siunčiamus duomenis, tačiau taip nutinka." },
       { kind: "p", text: "Šis skyrius yra pranešimas, kurį privalome jums pateikti pagal GDPR 14 straipsnį. Duomenys yra tai, ką įvedė naudotojas ir ką atsakydamas sugeneravo variklis; šaltinis yra tas naudotojas; tikslai ir teisinis pagrindas nurodyti 4 skyriuje; gavėjai yra Registre nurodyti DI paslaugų teikėjai; saugojimo terminai nustatyti 7 skyriuje. Turite visas 10 skyriuje nurodytas teises, ypač galite prašyti pašalinti paskelbtus ar privačius debatus, kuriuose yra jūsų duomenų, ir pranešti, ką apie jus turime. Tam jums nereikia paskyros. Rašykite privacy@dezbatere.ro arba bet kuriuose paskelbtuose debatuose naudokite valdiklį Pranešti, o mes nepagrįstai nedelsdami imsimės veiksmų pagal pagrįstus prašymus. Negalime jums pranešti asmeniškai, kai taip nutinka, nes nežinome, kas esate ar kaip su jumis susisiekti; vietoje to imamės šio viešo pranešimo ir suteikiame pašalinimo būdą." },
       { kind: "p", text: "Tas pats taikoma neskelbtinai informacijai apie jus — politinėms pažiūroms, sveikatai, religijai — kuri pateikiama kito asmens klausime. Jums paprieštaravus jokia teisinė sąlyga neleidžia mums toliau jos tvarkyti, todėl to nedarysime." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Vaikai",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI skirta suaugusiesiems. Registruodamiesi patvirtinate, kad jums yra 18 metų ar daugiau, ir mes sąmoningai netvarkome jaunesnių nei 18 metų asmenų duomenų. Sužinoję, kad paskyra priklauso jaunesniam nei 18 metų asmeniui, ją uždarome ir duomenis ištriname, kaip aprašyta 7 skyriuje. Kai kuriose šalyse patvirtinimas laikomas nepakankamu arba reikalaujama daugiau; B priede nurodyta, kas taikoma konkrečioje vietoje, o Sąlygose paaiškinta, ką dėl to darome." }
+      { kind: "p", text: "Dialectical Engine skirta suaugusiesiems. Registruodamiesi patvirtinate, kad jums yra 18 metų ar daugiau, ir mes sąmoningai netvarkome jaunesnių nei 18 metų asmenų duomenų. Sužinoję, kad paskyra priklauso jaunesniam nei 18 metų asmeniui, ją uždarome ir duomenis ištriname, kaip aprašyta 7 skyriuje. Kai kuriose šalyse patvirtinimas laikomas nepakankamu arba reikalaujama daugiau; B priede nurodyta, kas taikoma konkrečioje vietoje, o Sąlygose paaiškinta, ką dėl to darome." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Slapukai",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI naudoja aštuonis elementus – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik DebateAI: keturis slapukus ir keturis įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. Slapukų politikoje adresu [dezbatere.ro/cookies] jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita." },
+      { kind: "p", text: "Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 5 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. Slapukų politikoje adresu [dezbatere.ro/cookies] jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Slapukas — Neleidžia kitoms svetainėms jūsų vardu pateikti formų. — 14 dienų",
         "__Host-debateai-age-refusal — Slapukas (HttpOnly) — Atmetus amžiaus patikrą, 30 dienų neleidžia šiai naršyklei bandyti dar kartą. Jame yra tik žodis „atmesta“, jokių asmens duomenų. — 30 dienų",
         "debateai.locale — Slapukas — Įsimena jūsų pasirinktą sąsajos kalbą. — 1 metai",
+        "__Host-debateai-staff — Slapukas (HttpOnly) — Atskira darbuotojų prieiga — Iki 8 valandų; 15 minučių neveiklumo",
+        "__Host-debateai-staff-csrf — Slapukas — Neleidžia kitoms svetainėms jūsų vardu pateikti formų. — Iki 8 valandų; 15 minučių neveiklumo",
+        "__Host-debateai-password-reset — Slapukas (HttpOnly) — Tik slaptažodžio atkūrimas — Iki 30 minučių",
+        "__Host-debateai-password-reset-csrf — Slapukas — Neleidžia kitoms svetainėms jūsų vardu pateikti formų. — Iki 30 minučių",
+        "__Host-debateai-mfa-recovery — Slapukas (HttpOnly) — Tik autentifikatoriaus atkūrimas — Iki 299 sekundžių",
+        "__Host-debateai-mfa-recovery-csrf — Slapukas — Neleidžia kitoms svetainėms jūsų vardu pateikti formų. — Iki 299 sekundžių",
+        "__Host-debateai-social-flow — Slapukas (HttpOnly) — Trumpas prisijungimas per teikėją arba paskyros susiejimas — Iki 5 minučių",
+        "__Host-debateai-social-apple — Slapukas (HttpOnly) — Trumpas prisijungimas per teikėją arba paskyros susiejimas — Iki 5 minučių",
+        "__Host-debateai-social-browser — Slapukas (HttpOnly) — Trumpas prisijungimas per teikėją arba paskyros susiejimas — Iki 5 minučių",
         "debateai.consent — Vietinė saugykla — Įsimena, kad jau matėte pranešimą apie slapukus, todėl jis rodomas tik kartą. — Kol jo neišvalysite",
         "debateai.mode — Vietinė saugykla — Ar naudojate šviesųjį, ar tamsųjį režimą. — Kol jo neišvalysite",
         "debateai.languageOffer.dismissed — Seanso saugykla — Įsimena šiam skirtukui, kad atsisakėte pasiūlymo parodyti debatus kita kalba. — Kol uždarysite skirtuką",
-        "debateai.support.conversation.v2 — Seanso saugykla — Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai šiame skirtuke kas nors prisijungia arba atsijungia. — Kol uždarysite skirtuką"
+        "debateai.support.conversation.v2 — Seanso saugykla — Laiko jūsų pokalbį su pagalbos pokalbių langu ekrane, kol skirtukas atidarytas. Jis ištrinamas, kai šiame skirtuke kas nors prisijungia arba atsijungia. — Kol uždarysite skirtuką",
+        "debateai.phone-completion-draft.v1 — Seanso saugykla — Nebaigtas klausimas telefono veiksmo metu; pašalinamas pasikeitus sesijai, atsijungus ar pasikeitus savininkui — 15 minučių arba iki ankstesnio pašalinimo"
         ]
       },
-      { kind: "p", text: "Jokia kita šalis per DebateAI nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse." },
-      { kind: "p", text: "Naršyklės gali siųsti signalą „Do Not Track“ arba panašų signalą. DebateAI jūsų neseka, todėl tokiam signalui nėra ko išjungti: paslauga veikia vienodai su juo arba be jo." },
+      { kind: "p", text: "Jokia kita šalis per Dialectical Engine nerenka informacijos apie jūsų veiklą internete laikui bėgant ir įvairiose svetainėse." },
+      { kind: "p", text: "Naršyklės gali siųsti signalą „Do Not Track“ arba panašų signalą. Dialectical Engine jūsų neseka, todėl tokiam signalui nėra ko išjungti: paslauga veikia vienodai su juo arba be jo." },
       { kind: "p", text: "Norėdami atsisakyti šių elementų, naršyklės nustatymuose užblokuokite arba ištrinkite šios svetainės slapukus ir svetainės duomenis. Kas tada nustoja veikti: prisijungimas ir jūsų kalbos bei rodymo pasirinkimų įsiminimas; slapukų pranešimas taip pat bus rodomas vėl." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraina (tik jei nurodyta)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Taikomas Ukrainos įstatymas „Dėl asmens duomenų apsaugos“. DebateAI nesiūlome tose Ukrainos teritorijose, kurių nekontroliuoja jos vyriausybė. Jūsų duomenys perduodami į ES šalis ir Jungtines Amerikos Valstijas (žr. Registrą). Skundą galite pateikti Ukrainos Aukščiausiosios Rados žmogaus teisių komisarui." }
+      { kind: "p", text: "Taikomas Ukrainos įstatymas „Dėl asmens duomenų apsaugos“. Dialectical Engine nesiūlome tose Ukrainos teritorijose, kurių nekontroliuoja jos vyriausybė. Jūsų duomenys perduodami į ES šalis ir Jungtines Amerikos Valstijas (žr. Registrą). Skundą galite pateikti Ukrainos Aukščiausiosios Rados žmogaus teisių komisarui." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "6b44b7de38069c4155b15ba69d6638503704be745378a4aa89383b2e2fe7ed46",
-  eyebrow: "PRIVATUMO POLITIKA · v3.0 · ĮSIGALIOJA [DATE]",
+  version: "3.1",
+  sha256: "38475ffbbbff1fa37d433c7c31df9fcc53b5dfb4fa4ec5e41253c5206f4de86c",
+  eyebrow: "PRIVATUMO POLITIKA · v3.1 · ĮSIGALIOJA [DATE]",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
-  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatumo politikos tekstas",
   sectionIdPrefix: "policy-section-",

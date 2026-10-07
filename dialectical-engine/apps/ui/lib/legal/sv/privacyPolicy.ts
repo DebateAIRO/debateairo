@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Debatter är privata tills du publicerar dem. Publicering är en avsiktlig åtgärd som bekräftas separat. En publicerad debatt visar din pseudonym, din fråga såsom du skrev den, argumentträdet, poängen, utslaget och konfidensnivån samt har en synlig märkning om att innehållet är AI-genererat. Den visar aldrig din e-postadress, dina sessionsuppgifter eller din kontohistorik. [Published debates are / are not] indexerade av sökmotorer [unless you choose]." },
-      { kind: "p", text: "När publiceringen återkallas tas debatten bort från DebateAI och nyckeln till vår offentliga kopia förstörs. Kopior som redan har gjorts av läsare, sökmotorer eller arkiv ligger utanför vår kontroll och kan inte återkallas av oss." },
+      { kind: "p", text: "När publiceringen återkallas tas debatten bort från Dialectical Engine och nyckeln till vår offentliga kopia förstörs. Kopior som redan har gjorts av läsare, sökmotorer eller arkiv ligger utanför vår kontroll och kan inte återkallas av oss." },
       { kind: "p", text: "När du raderar ditt konto tar vi bort alla debatter som du har publicerat från allmän åtkomst utan onödigt dröjsmål och senast inom 30 dagar, såvida inte lagen kräver att vi behåller en viss post. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Personer som nämns i debatter men inte är våra användare",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Om någon ställer en fråga till DebateAI där du namnges kan vi inneha personuppgifter om dig trots att du aldrig har använt tjänsten. Villkoren förbjuder användare att göra detta och vi minimerar det vi skickar till AI-leverantörer, men det förekommer." },
+      { kind: "p", text: "Om någon ställer en fråga till Dialectical Engine där du namnges kan vi inneha personuppgifter om dig trots att du aldrig har använt tjänsten. Villkoren förbjuder användare att göra detta och vi minimerar det vi skickar till AI-leverantörer, men det förekommer." },
       { kind: "p", text: "Detta avsnitt är den information som vi är skyldiga att lämna till dig enligt artikel 14 i GDPR. Uppgifterna är det som användaren skrev och det som motorn genererade som svar; källan är den användaren; ändamålen och den rättsliga grunden anges i avsnitt 4; mottagarna är AI-leverantörerna i registret; lagringen följer avsnitt 7. Du har samtliga rättigheter i avsnitt 10 och kan i synnerhet be oss att ta bort en publicerad eller privat debatt som innehåller dina uppgifter och att berätta vilka uppgifter vi har. Du behöver inget konto för att göra detta. Skriv till privacy@dezbatere.ro eller använd knappen Rapportera i en publicerad debatt, så agerar vi utan onödigt dröjsmål på underbyggda begäranden. Vi kan inte underrätta dig individuellt när detta händer eftersom vi inte vet vem du är eller hur vi kan nå dig; denna offentliga information och möjligheten att begära borttagning är de åtgärder vi vidtar i stället." },
       { kind: "p", text: "Detsamma gäller känsliga uppgifter om dig — politik, hälsa eller religion — som förekommer i någon annans fråga. Inget undantag i artikel 9.2 i GDPR tillåter oss att fortsätta behandla dem efter att du invänt, och vi kommer inte att göra det." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Barn",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI är avsett för vuxna. När du registrerar dig bekräftar du att du är minst 18 år, och vi behandlar inte medvetet uppgifter om någon under 18 år. Om vi får kännedom om att ett konto tillhör någon under 18 år avslutar vi det och raderar uppgifterna enligt beskrivningen i avsnitt 7. Vissa länder anser inte att en bekräftelse är tillräcklig eller ställer ytterligare krav; bilaga B anger vad som gäller på olika platser, och villkoren förklarar vad vi gör åt detta." }
+      { kind: "p", text: "Dialectical Engine är avsett för vuxna. När du registrerar dig bekräftar du att du är minst 18 år, och vi behandlar inte medvetet uppgifter om någon under 18 år. Om vi får kännedom om att ett konto tillhör någon under 18 år avslutar vi det och raderar uppgifterna enligt beskrivningen i avsnitt 7. Vissa länder anser inte att en bekräftelse är tillräcklig eller ställer ytterligare krav; bilaga B anger vad som gäller på olika platser, och villkoren förklarar vad vi gör åt detta." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI använder åtta objekt, som alla är strikt nödvändiga för den tjänst du har bett om och som alla placeras endast av DebateAI: fyra cookies och fyra poster i din webbläsares lagring. Vi placerar inga cookies för analys, reklam eller spårning. Cookiepolicyn på [dezbatere.ro/cookies] listar dem med vad vart och ett gör och vem som tar emot det, och kommer att ändras innan något annat läggs till." },
+      { kind: "p", text: "Dialectical Engine använder 18 objekt, som alla är strikt nödvändiga för den tjänst du har bett om och som alla placeras endast av Dialectical Engine: 13 cookies och 5 poster i din webbläsares lagring. Vi placerar inga cookies för analys, reklam eller spårning. Cookiepolicyn på [dezbatere.ro/cookies] listar dem med vad vart och ett gör och vem som tar emot det, och kommer att ändras innan något annat läggs till." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Kaka — Hindrar andra webbplatser från att skicka formulär i ditt namn. — 14 dagar",
         "__Host-debateai-age-refusal — Kaka (HttpOnly) — Efter en nekad ålderskontroll hindrar den den här webbläsaren från att försöka igen i 30 dagar. Den innehåller bara ordet ”nekad”, inga personuppgifter. — 30 dagar",
         "debateai.locale — Kaka — Kommer ihåg vilket gränssnittsspråk du har valt. — 1 år",
+        "__Host-debateai-staff — Kaka (HttpOnly) — Separat personalåtkomst — Upp till 8 timmar; 15 minuters inaktivitet",
+        "__Host-debateai-staff-csrf — Kaka — Hindrar andra webbplatser från att skicka formulär i ditt namn. — Upp till 8 timmar; 15 minuters inaktivitet",
+        "__Host-debateai-password-reset — Kaka (HttpOnly) — Endast lösenordsåterställning — Upp till 30 minuter",
+        "__Host-debateai-password-reset-csrf — Kaka — Hindrar andra webbplatser från att skicka formulär i ditt namn. — Upp till 30 minuter",
+        "__Host-debateai-mfa-recovery — Kaka (HttpOnly) — Endast återställning av autentiseraren — Upp till 299 sekunder",
+        "__Host-debateai-mfa-recovery-csrf — Kaka — Hindrar andra webbplatser från att skicka formulär i ditt namn. — Upp till 299 sekunder",
+        "__Host-debateai-social-flow — Kaka (HttpOnly) — Kort leverantörsinloggning eller kontolänkning — Upp till 5 minuter",
+        "__Host-debateai-social-apple — Kaka (HttpOnly) — Kort leverantörsinloggning eller kontolänkning — Upp till 5 minuter",
+        "__Host-debateai-social-browser — Kaka (HttpOnly) — Kort leverantörsinloggning eller kontolänkning — Upp till 5 minuter",
         "debateai.consent — Lokal lagring — Kommer ihåg att du har sett meddelandet om kakor, så att det bara visas en gång. — Tills du rensar det",
         "debateai.mode — Lokal lagring — Om du använder ljust eller mörkt läge. — Tills du rensar det",
         "debateai.languageOffer.dismissed — Sessionslagring — Kommer ihåg, för den här fliken, att du tackade nej till att visa en debatt på ett annat språk. — Tills du stänger fliken",
-        "debateai.support.conversation.v2 — Sessionslagring — Håller ditt samtal med hjälpchatten på skärmen så länge fliken är öppen. Det raderas när någon loggar in eller ut i den här fliken. — Tills du stänger fliken"
+        "debateai.support.conversation.v2 — Sessionslagring — Håller ditt samtal med hjälpchatten på skärmen så länge fliken är öppen. Det raderas när någon loggar in eller ut i den här fliken. — Tills du stänger fliken",
+        "debateai.phone-completion-draft.v1 — Sessionslagring — Ofärdig fråga under telefonsteget; raderas vid sessionsbyte, utloggning eller ägarbyte — 15 minuter eller tills tidigare radering"
         ]
       },
-      { kind: "p", text: "Ingen annan part samlar via DebateAI in information om dina aktiviteter på nätet över tid och på olika webbplatser." },
-      { kind: "p", text: "Webbläsare kan skicka en ”Do Not Track”-signal eller en liknande signal. DebateAI spårar dig inte, så det finns inget för en sådan signal att stänga av: tjänsten fungerar likadant med eller utan den." },
+      { kind: "p", text: "Ingen annan part samlar via Dialectical Engine in information om dina aktiviteter på nätet över tid och på olika webbplatser." },
+      { kind: "p", text: "Webbläsare kan skicka en ”Do Not Track”-signal eller en liknande signal. Dialectical Engine spårar dig inte, så det finns inget för en sådan signal att stänga av: tjänsten fungerar likadant med eller utan den." },
       { kind: "p", text: "För att vägra dessa objekt blockerar eller raderar du cookies och webbplatsdata för den här webbplatsen i webbläsarens inställningar. Det som då slutar fungera: inloggningen och att komma ihåg dina val av språk och visningsläge; cookiemeddelandet visas också igen." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraina (endast om regionen anges)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ukrainas lag ”Om skydd av personuppgifter” gäller. Vi erbjuder inte DebateAI i de områden i Ukraina som inte kontrolleras av landets regering. Dina uppgifter går till EU-länder och USA (se registret). Du kan lämna klagomål till Ukrainian Parliament Commissioner for Human Rights." }
+      { kind: "p", text: "Ukrainas lag ”Om skydd av personuppgifter” gäller. Vi erbjuder inte Dialectical Engine i de områden i Ukraina som inte kontrolleras av landets regering. Dina uppgifter går till EU-länder och USA (se registret). Du kan lämna klagomål till Ukrainian Parliament Commissioner for Human Rights." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "004f540fe2e0fcf31a595fb0617afc558fb012db1662ac0def168a5c92070778",
-  eyebrow: "INTEGRITETSPOLICY · v3.0 · GÄLLER FRÅN [DATE]",
+  version: "3.1",
+  sha256: "277f99e537160badb54c9562780cd3c727e59567d489c43136ea381975a3873b",
+  eyebrow: "INTEGRITETSPOLICY · v3.1 · GÄLLER FRÅN [DATE]",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",
-  endMarker: "SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Integritetspolicyns text",
   sectionIdPrefix: "policy-section-",

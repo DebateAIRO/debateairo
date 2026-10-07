@@ -40,7 +40,9 @@ function fullSentence(room: AskRoom): RoomSentence | null {
   if (room.waits_for === "OWN_DEBATES") {
     return Object.freeze({ key: "newDebate.room.ownDebatesFull", at: null, upgrade: false, waitingRunRef: null });
   }
-  switch (room.scope) {
+  if ("funding" in room) return Object.freeze({key:room.scope === "PERSON_GRANT" ? "newDebate.room.internalGrantFull" : "newDebate.room.internalWindowFull",at:room.scope === "PERSON_GRANT" ? room.funding.expires_at : room.resets_at,upgrade:false,waitingRunRef:null});
+  const scope = room.scope;
+  switch (scope) {
     case null:
     case "SITE_DAY":
       return Object.freeze({ key: "newDebate.room.siteFull", at: null, upgrade: false, waitingRunRef: null });
@@ -55,7 +57,7 @@ function fullSentence(room: AskRoom): RoomSentence | null {
         room
       );
     default:
-      return exhaustive(room.scope);
+      return exhaustive(scope);
   }
 }
 
@@ -73,12 +75,13 @@ function fullSentence(room: AskRoom): RoomSentence | null {
  */
 export function roomSentence(room: AskRoom | null): RoomSentence | null {
   if (room === null) return null;
-  switch (room.room) {
+  const state = room.room;
+  switch (state) {
     case "FITS":
       return null;
     case "CLOSE":
       return Object.freeze({
-        key: room.scope === null || room.scope === "SITE_DAY" ? "newDebate.room.siteClose" : "newDebate.room.personClose",
+        key: room.scope === null || room.scope === "SITE_DAY" ? "newDebate.room.siteClose" : "funding" in room ? "newDebate.room.internalClose" : "newDebate.room.personClose",
         at: null,
         upgrade: false,
         waitingRunRef: null
@@ -90,7 +93,7 @@ export function roomSentence(room: AskRoom | null): RoomSentence | null {
         ? null
         : Object.freeze({ key: "newDebate.room.alreadyWaiting", at: room.resets_at, upgrade: false, waitingRunRef: room.waiting_run_ref });
     default:
-      return exhaustive(room.room);
+      return exhaustive(state);
   }
 }
 

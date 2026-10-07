@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+vi.mock("@/components/auth/TurnstileChallenge", async()=>{const {useEffect}=await import("react");return {TurnstileChallenge:({onToken}:{onToken:(token:string)=>void})=>{useEffect(()=>onToken("test-proof"),[onToken]);return null;}};});
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,7 +29,7 @@ vi.mock("next/headers", () => ({
 
 import SignUpPage from "../../apps/ui/app/sign-up/page.js";
 
-const G1 = "DebateAI isn't available in your country yet.";
+const G1 = "Dialectical Engine isn't available in your country yet.";
 let root: Root | null = null;
 
 async function mount(element: ReactElement): Promise<void> {
@@ -105,7 +106,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
       new ContractHttpError("FORBIDDEN", 403, "COUNTRY_SIGNUP_UNAVAILABLE", "COUNTRY_SIGNUP_UNAVAILABLE")
     );
     const checkAge = vi.fn().mockResolvedValue({ outcome: "allowed" });
-    await mount(<SignUpFlow client={{ register, checkAge }} />);
+    await mount(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={{ register, checkAge }} />);
     const field = (name: string) => document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
     // The age gate's date is React state: typed first, through the value setter and an `input` event.
     for (const [name, value] of [["dob-d", "01"], ["dob-m", "01"], ["dob-y", "1990"]] as const) {
@@ -116,10 +117,8 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
     }
     await pickRegion("RO");
     field("email").value = "person@example.test";
-    field("confirm-email").value = "person@example.test";
-    field("recovery-email").value = "recovery@example.test";
-    field("password").value = "correct horse battery staple";
-    field("confirm-password").value = "correct horse battery staple";
+    field("phone").value = "+40712345678";
+    field("password").value = "Correct horse 7!";
     for (const box of ["privacy-accepted", "terms-accepted"]) field(box).checked = true;
     await act(async () => {
       document.querySelector<HTMLFormElement>('form[data-form="signup"]')!

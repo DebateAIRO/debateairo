@@ -217,7 +217,7 @@ describe("buildReportModel in the question's language (spec §10, §14.2, §14.3
   });
 
   it("writes the footer and its page numbers in Romanian", () => {
-    expect(model.footer.text).toBe("DebateAI · Raport generat de AI");
+    expect(model.footer.text).toBe("Dialectical Engine · Raport generat de AI");
     expect(reportPageWords(model, 3, 12)).toBe("Pagina 3 din 12");
     expect(reportPageWords(buildReportModel(STORY_FIXTURE_ANSWER, storyFixture("READY"), GENERATED, ENGLISH), 3, 12)).toBe("Page 3 of 12");
   });

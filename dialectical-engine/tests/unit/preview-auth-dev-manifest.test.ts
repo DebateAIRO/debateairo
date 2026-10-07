@@ -1,0 +1,12 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { mkdtemp, writeFile, mkdir, chmod, rm, symlink, realpath } from 'node:fs/promises';
+import { tmpdir } from 'node:os';import { join } from 'node:path';
+const manifest=await import('../../deploy/'+'preview-auth-dev/v1/source-manifest.mjs');
+const roots:string[]=[];
+async function fixture(){const root=await realpath(await mkdtemp(join(tmpdir(),'preview-source-')));roots.push(root);await chmod(root,0o700);await mkdir(join(root,'src'));await writeFile(join(root,'src','main.ts'),'export const current = true;');await writeFile(join(root,'package.json'),'{}');return{root,uid:process.getuid!()};}
+afterEach(async()=>{for(const root of roots.splice(0))await rm(root,{recursive:true,force:true});});
+describe('immutable packaged source inventory',()=>{
+ it('hashes and verifies the complete file set with exact relative names',async()=>{const f=await fixture();const files=await manifest.buildInventory(f.root,f.uid);expect(files.map((x:any)=>x.path)).toEqual(['package.json','src/main.ts']);expect(files[1].sha256).toMatch(/^[a-f0-9]{64}$/);await expect(manifest.verifyInventory(f.root,f.uid,files)).resolves.toBe(true);});
+ it.each(['hash','extra','missing','symlink','mode','traversal'] as const)('refuses %s drift',async kind=>{const f=await fixture();let files=await manifest.buildInventory(f.root,f.uid);if(kind==='hash')await writeFile(join(f.root,'src','main.ts'),'changed');if(kind==='extra')await writeFile(join(f.root,'src','injected.mjs'),'changed');if(kind==='missing')await rm(join(f.root,'src','main.ts'));if(kind==='symlink'){await rm(join(f.root,'src','main.ts'));await symlink('/etc/hosts',join(f.root,'src','main.ts'));}if(kind==='mode')await chmod(join(f.root,'src','main.ts'),0o666);if(kind==='traversal')files=[...files,{path:'../outside',sha256:'a'.repeat(64)}];await expect(manifest.verifyInventory(f.root,f.uid,files)).rejects.toThrow();});
+ it('accepts only exact declared package realpaths and rejects a redirected workspace link',async()=>{const f=await fixture();await mkdir(join(f.root,'node_modules'));await symlink('../src',join(f.root,'node_modules','pkg'));const links=[{path:'node_modules/pkg',realpath:join(f.root,'src')}];await expect(manifest.verifyPackageLinks(f.root,links)).resolves.toBe(true);await rm(join(f.root,'node_modules','pkg'));await symlink('/private/tmp',join(f.root,'node_modules','pkg'));await expect(manifest.verifyPackageLinks(f.root,links)).rejects.toThrow();});
+});
