@@ -88,6 +88,7 @@ describe("N15 charge-backs on NETOPIA's statuses (spec §2.13)", () => {
     expect((await entitlements.current(seeded.ownerRef, new Date())).planId).toBe("FREE");
     expect(await m10(seeded.initialChargeId)).toBe(1);
     expect(audit.events.filter((entry) => entry.event === "billing.chargeback")).toHaveLength(1);
+    expect(audit.events.find((entry) => entry.event === "billing.chargeback")!.fields).toEqual({ chargeKind: "INITIAL" });
     const chargeback = (await repository.charge(seeded.initialChargeId))!.events.find((event) => event.kind === "CHARGEBACK")!;
     expect(chargeback).toMatchObject({ providerPaymentId: seeded.providerPaymentId, amountMicros: seeded.totalMicros, errorCode: null });
   });
@@ -106,6 +107,7 @@ describe("N15 charge-backs on NETOPIA's statuses (spec §2.13)", () => {
     expect(alerts).toHaveLength(1);
     expect(alerts[0]).toMatchObject({ "param.reasonCode": "OWNER_REVIEW", "param.paymentAlert": "true" });
     expect(alerts[0]!["param.nextSteps"]).toContain(`pnpm billing:dispute --charge ${seeded.initialChargeId} --outcome lost`);
+    expect(alerts[0]!["param.nextSteps"]).toContain("The paid features are paused.");
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "lost" })).toBe("ENDED_DISPUTE");
     expect(await status(seeded.subscriptionId)).toBe("ENDED");
   });
@@ -162,15 +164,61 @@ describe("N15 charge-backs on NETOPIA's statuses (spec §2.13)", () => {
       }
     });
     const statuses = new Statuses();
-    const { check } = handler(statuses);
+    const { check, audit } = handler(statuses);
     statuses.set(second, paymentId, "CHARGEBACK_OPENED", seeded.totalMicros);
     await check(second);
     const chargeback = (await repository.charge(second))!.events.find((event) => event.kind === "CHARGEBACK")!;
     expect(chargeback.errorCode).toBe("DUPLICATE_PAYMENT");
+    expect(audit.events.filter((entry) => entry.event === "billing.chargeback").map((entry) => entry.fields))
+      .toEqual([{ chargeKind: "INITIAL", code: "DUPLICATE_PAYMENT" }]);
     expect(await status(seeded.subscriptionId)).toBe("ACTIVE");
     expect(await m10(second)).toBe(0);
     expect(await recordDisputeOutcome(stores(), { chargeRef: second, outcome: "won" })).toBe("SECOND_PAYMENT");
     expect(await recordDisputeOutcome(stores(), { chargeRef: second, outcome: "lost" })).toBe("ALREADY_SETTLED");
+    expect(await status(seeded.subscriptionId)).toBe("ACTIVE");
+  });
+
+  it("never pauses the live plan for a charge-back of a payment never seen paid, and tells the owner nothing was paused", async () => {
+    const seeded = await plan("never-paid");
+    const upgrade = newChargeId();
+    const paymentId = `ntp-upgrade-${upgrade.slice(0, 8)}`;
+    await repository.withTransaction(async (client) => {
+      const first = (await repository.charge(seeded.initialChargeId, client))!;
+      await repository.insertCharge(client, {
+        chargeId: upgrade, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "UPGRADE", attempt: 1,
+        periodStart: new Date(), periodEnd: seeded.periodEnd, quoteId: first.quoteId, netMicros: first.netMicros,
+        taxMicros: first.taxMicros, totalMicros: first.totalMicros, currency: "USD", createdAt: new Date(),
+        paymentProvider: "netopia", paymentEnvironment: "sandbox"
+      });
+      for (const kind of ["REQUESTED", "SUBMITTED"] as const) {
+        await repository.appendChargeEvent(client, chargeEvent(upgrade, kind, new Date(), {
+          providerPaymentId: kind === "REQUESTED" ? null : paymentId, amountMicros: first.totalMicros, errorCode: null
+        }));
+      }
+    });
+    const statuses = new Statuses();
+    const { check, audit } = handler(statuses);
+    statuses.set(upgrade, paymentId, "CHARGEBACK_OPENED", seeded.totalMicros);
+    expect(await check(upgrade)).toEqual({ kind: "DONE" });
+    expect(await check(upgrade)).toEqual({ kind: "DONE" });
+    statuses.set(upgrade, paymentId, "CHARGEBACK_LOST", seeded.totalMicros);
+    expect(await check(upgrade)).toEqual({ kind: "DONE" });
+    expect(await check(upgrade)).toEqual({ kind: "DONE" });
+    const chargebacks = (await repository.charge(upgrade))!.events.filter((event) => event.kind === "CHARGEBACK");
+    expect(chargebacks).toHaveLength(1);
+    expect(chargebacks[0]!.errorCode).toBe("DUPLICATE_PAYMENT");
+    expect(await chargeKinds(upgrade)).not.toContain("SUCCEEDED");
+    expect(await subscriptionKinds(seeded.subscriptionId)).not.toContain("SUSPENDED");
+    expect(await status(seeded.subscriptionId)).toBe("ACTIVE");
+    expect((await entitlements.current(seeded.ownerRef, new Date())).planId).toBe("PLUS");
+    expect(await m10(upgrade)).toBe(0);
+    expect(audit.events.filter((entry) => entry.event === "billing.chargeback").map((entry) => entry.fields))
+      .toEqual([{ chargeKind: "UPGRADE", code: "DUPLICATE_PAYMENT" }]);
+    const alerts = await ownerAlerts(upgrade);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!["param.nextSteps"]).toContain("No plan was paused");
+    expect(alerts[0]!["param.nextSteps"]).not.toContain("The paid features are paused");
+    expect(await recordDisputeOutcome(stores(), { chargeRef: upgrade, outcome: "lost" })).toBe("SECOND_PAYMENT");
     expect(await status(seeded.subscriptionId)).toBe("ACTIVE");
   });
 });

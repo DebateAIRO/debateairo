@@ -107,7 +107,8 @@ const CHARGE_REF = /^[0-9a-f]{32}$/u;
 const CARD_HOLDING: ReadonlySet<string> = new Set(["ACTIVE", "PAST_DUE", "SUSPENDED"]);
 /**
  * Spec §2.13 / A9: the refund reasons that mean a payment bought nothing (a refusal, a second payment, a card check's
- * hold). A charge-back of such a payment is recorded with the code DUPLICATE_PAYMENT and never changes a plan.
+ * hold). A charge-back of such a payment is recorded with the code DUPLICATE_PAYMENT and never changes a plan. So is a
+ * charge-back of a CARD_CHECK charge, and of a charge never seen paid (it holds no SUCCEEDED; none is invented for it).
  */
 const BOUGHT_NOTHING: ReadonlySet<string> = new Set<string>([
   ...REFUND_REASONS_REFUSING_THE_PAYMENT, "DUPLICATE_PAYMENT", "UPGRADE_CLOSED", "CARD_CHECK_RELEASE"
@@ -1299,9 +1300,13 @@ export class VerifyPaymentHandler {
    * Spec §2.13 (ruling C-7): a charge-back NETOPIA reports as a status of the payment itself. Under the owner lock, the
    * charge read again on the transaction's own client: one CHARGEBACK per payment (0086's key), written first whatever
    * the status (a 10 or a 16 whose 9 was never seen still pauses the plan first), then SUSPENDED + Free + M10 for a live
-   * plan; a payment that bought nothing (`BOUGHT_NOTHING`) is coded DUPLICATE_PAYMENT and changes no plan. A 16 then
-   * adds CHARGEBACK_REPRESENTED once. A 10 ("chargeback accepted") is never acted on further by itself (N-8): the
-   * notice's outcome OWNER_REVIEW and one O3 tell the owner, who ends the plan with `pnpm billing:dispute`.
+   * plan; a payment that bought nothing is coded DUPLICATE_PAYMENT and changes no plan, for every charge kind: a
+   * CARD_CHECK charge, a charge holding a refund request of `BOUGHT_NOTHING`, or a charge never seen paid (no SUCCEEDED;
+   * none is invented for it). A 16 then adds CHARGEBACK_REPRESENTED once. A 10 ("chargeback accepted") is never acted
+   * on further by itself (N-8): the notice's outcome OWNER_REVIEW and one O3 tell the owner, who ends the plan with
+   * `pnpm billing:dispute`; the O3 says the paid features are paused only when the plan folds SUSPENDED afterwards.
+   * The audit line billing.chargeback carries `code: "DUPLICATE_PAYMENT"` when the CHARGEBACK written is so coded,
+   * as xMoney's `duplicateChargedBack` writes it.
    */
   private async netopiaChargedBack(
     charge: ChargeWithEvents, report: PaymentReport, now: Date, stage: "OPENED" | "LOST" | "REPRESENTED"
@@ -1309,11 +1314,13 @@ export class VerifyPaymentHandler {
     const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
     const paymentId = paid?.providerPaymentId ?? report.providerPaymentId;
     const owner = await this.owner(charge);
-    const recorded = await this.deps.repository.withTransaction(async (client): Promise<boolean> => {
+    type Recorded = Readonly<{ written: boolean; boughtNothing: boolean }>;
+    const recorded = await this.deps.repository.withTransaction(async (client): Promise<Recorded> => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       const current = (await this.deps.repository.charge(charge.chargeId, client)) ?? charge;
       const boughtNothing = charge.kind === "CARD_CHECK" || current.events.some((event) => event.kind === "REFUND_REQUESTED"
-        && event.errorCode !== null && BOUGHT_NOTHING.has(event.errorCode));
+        && event.errorCode !== null && BOUGHT_NOTHING.has(event.errorCode))
+        || !current.events.some((event) => event.kind === "SUCCEEDED");
       let written = false;
       if (!current.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)) {
         const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
@@ -1342,17 +1349,26 @@ export class VerifyPaymentHandler {
           providerPaymentId: paymentId, amountMicros: paid?.amountMicros ?? charge.totalMicros, errorCode: null
         }));
       }
-      return written;
+      return { written, boughtNothing };
     });
-    if (recorded) this.deps.audit("billing.chargeback", { chargeKind: charge.kind });
+    if (recorded.written) {
+      this.deps.audit("billing.chargeback", recorded.boughtNothing
+        ? { chargeKind: charge.kind, code: "DUPLICATE_PAYMENT" }
+        : { chargeKind: charge.kind });
+    }
     if (stage !== "LOST") return DONE;
+    const paused = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId)).status === "SUSPENDED";
     const notice = await this.newestNotice(charge.chargeId);
     if (notice !== null) await this.noticeOutcome(notice.noticeId, now, "OWNER_REVIEW");
     this.deps.audit("billing.payment.owner_review", { state: report.state });
     await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia!.jobs }, {
       code: "OWNER_REVIEW", reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:CHARGEBACK_LOST`, now,
       nextSteps: `NETOPIA reports the dispute on this payment (NETOPIA payment ${paymentId}) as lost: status 10,`
-        + " \"chargeback accepted\". The paid features are paused. NETOPIA has not confirmed what this status means, so"
+        + " \"chargeback accepted\"."
+        + (paused
+          ? " The paid features are paused."
+          : " No plan was paused for it: the payment bought nothing, or its plan was not active.")
+        + " NETOPIA has not confirmed what this status means, so"
         + " nothing ends by itself. Once you have checked it in NETOPIA's admin, record the outcome with"
         + ` pnpm billing:dispute --charge ${charge.chargeId} --outcome lost (or --outcome won).`
     });
