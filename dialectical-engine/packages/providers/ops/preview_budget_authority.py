@@ -343,10 +343,20 @@ def validate_request(input, go):
             or any(not isinstance(m, dict) or set(m) != {'role', 'content'} or m['role'] not in ('system', 'user', 'assistant')
                    or not isinstance(m['content'], str) for m in body['messages']):
         raise SafetyError('REQUEST_PARAMETERS_INVALID')
-    reserved = (Decimal(len(input['requestBody'].encode()) + 2048) * Decimal('0.15') + Decimal(OUTPUT_BOUND) * Decimal('0.50')) / Decimal(1000000)
+    raw = input['requestBody'].encode()
+    # The exact bytes that will go upstream, fixed before any reservation: a body that cannot be
+    # encoded (a lone UTF-16 surrogate) is refused here, never after the connection opens. The
+    # reservation prices len(raw), so the bytes sent may never be longer than that.
+    try:
+        outgoing = helper.canonical(body)
+    except (UnicodeError, ValueError, TypeError):
+        raise SafetyError('REQUEST_INVALID') from None
+    if not isinstance(outgoing, bytes) or len(outgoing) > len(raw):
+        raise SafetyError('REQUEST_INVALID')
+    reserved = (Decimal(len(raw) + 2048) * Decimal('0.15') + Decimal(OUTPUT_BOUND) * Decimal('0.50')) / Decimal(1000000)
     if helper.decimal_amount(input['reservedUsd']) != reserved:
         raise SafetyError('RESERVATION_MISMATCH')
-    return body, reserved
+    return outgoing, reserved
 
 
 def reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now):
@@ -449,7 +459,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
     accepted = time.monotonic()
     now = now or helper.utc_now
     go, go_sha = load_go(go_path)
-    body, reserved = validate_request(input, go)
+    outgoing, reserved = validate_request(input, go)
     host, platform = host or socket.gethostname(), platform or sys.platform
     if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int or peer_uid not in go['allowed_peer_uids']:
         raise SafetyError('EXECUTION_AUTHORITY_REFUSED')
@@ -467,7 +477,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         budget, started = Decimal(go['daily_budget_usd']), time.monotonic()
         event = {'event': 'preview_provider_paid_post', 'operation_id': input['operationId'], 'day': day}
         try:
-            status, response = dispatch(body, key)
+            status, response = dispatch(outgoing, key)
             response = helper.redact(response if isinstance(response, dict) else {}, key)
         except BaseException as error:
             outcome = settle_or_halt(private, entry_id, day, {

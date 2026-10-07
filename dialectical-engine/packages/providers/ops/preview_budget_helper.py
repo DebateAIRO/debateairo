@@ -200,6 +200,9 @@ class HttpsTransport:
         self.timeout = min(timeout, MAX_TIMEOUT_SECONDS)
 
     def __call__(self, payload, key):
+        # The gate checks and prices these exact bytes before it reserves; they are sent unchanged.
+        if not isinstance(payload, bytes):
+            raise SafetyError('request_bytes_required')
         deadline = time.monotonic() + self.timeout
         connection = http.client.HTTPSConnection('api.deepinfra.com', timeout=self.timeout, context=ssl.create_default_context())
 
@@ -212,7 +215,7 @@ class HttpsTransport:
         try:
             connection.connect()
             remaining()
-            connection.request('POST', '/v1/openai/chat/completions', body=canonical(payload),
+            connection.request('POST', '/v1/openai/chat/completions', body=payload,
                                headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Accept': 'application/json'})
             remaining()
             response = connection.getresponse()

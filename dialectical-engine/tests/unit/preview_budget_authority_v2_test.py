@@ -4,6 +4,7 @@ Offline only: temporary directories, fake dispatch functions, local socket pairs
 No private files, real keys, real ledgers, or upstream calls.
 """
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -27,6 +28,11 @@ from preview_budget_authority_fixture import (  # noqa: E402
 
 bridge = load_bridge()
 SafetyError = bridge.helper.SafetyError
+REAL_TRANSPORT = bridge.helper.HttpsTransport
+
+
+def file_sha_text(text):
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 def no_network(*_args, **_kwargs):
@@ -426,6 +432,91 @@ class DailyPotTests(GateTest):
                                    now=gate.clock)
         self.assertEqual(len(seen), 1)
         self.assertTrue(590 < seen[0] <= 600, seen)
+
+
+class RequestBytesTests(GateTest):
+    def test_prompt_that_cannot_be_encoded_is_refused_before_any_reservation(self):
+        # TS JSON.stringify writes half of a split emoji as the escape \ud83d; Python decodes a lone surrogate.
+        gate = self.gate().ready()
+        value = body(messages=[{'role': 'user', 'content': 'split emoji \ud83d'}])
+        self.assertIn('\\ud83d', envelope(value)['requestBody'])
+        dispatched = []
+        with self.refused('REQUEST_INVALID'):
+            gate.call('op-1', value=value, dispatch=lambda *args: dispatched.append(args))
+        self.assertEqual(dispatched, [])
+        self.assertIsNone(gate.day('2026-10-08'))
+        self.assertEqual((gate.status()['state'], gate.status()['in_flight']), ('active', 0))
+
+    def test_dispatch_receives_exactly_the_bytes_checked_before_reservation(self):
+        gate = self.gate().ready()
+        value = body(messages=[{'role': 'user', 'content': 'café \U0001F600'}])
+        dispatched = []
+
+        def record(request, key):
+            dispatched.append((request, key))
+            return 200, provider_response('0.01')
+        gate.call('op-1', value=value, dispatch=record)
+        self.assertEqual(dispatched, [(bridge.helper.canonical(value), KEY)])
+        self.assertEqual(json.loads(dispatched[0][0]), value)
+
+    def test_outgoing_bytes_longer_than_the_reserved_request_are_refused(self):
+        gate = self.gate().ready()
+        request = envelope(body(), 'op-1')
+        longer = b'x' * (len(request['requestBody'].encode()) + 1)
+        dispatched = []
+        with patch.object(bridge.helper, 'canonical', lambda _value: longer), self.refused('REQUEST_INVALID'):
+            gate.call('op-1', dispatch=lambda *args: dispatched.append(args))
+        self.assertEqual(dispatched, [])
+        self.assertIsNone(gate.day('2026-10-08'))
+
+    def test_https_transport_sends_the_given_bytes_verbatim_and_refuses_anything_else(self):
+        sent = []
+
+        class Response:
+            status = 200
+
+            def __init__(self):
+                self.chunks = [b'{"model": "m"}']
+
+            def read(self, _size):
+                return self.chunks.pop() if self.chunks else b''
+
+        class Connection:
+            def __init__(self, host, timeout, context):
+                self.host, self.sock = host, None
+
+            def connect(self):
+                sent.append(('connect', self.host))
+
+            def request(self, method, path, body, headers):
+                sent.append((method, path, body))
+
+            def getresponse(self):
+                return Response()
+
+            def close(self):
+                pass
+        payload = b'{"exact":"bytes \\ud83d"}'
+        with patch.object(bridge.helper.http.client, 'HTTPSConnection', Connection):
+            self.assertEqual(REAL_TRANSPORT(timeout=5)(payload, KEY), (200, {'model': 'm'}))
+            self.assertEqual(sent, [('connect', 'api.deepinfra.com'), ('POST', '/v1/openai/chat/completions', payload)])
+            with self.refused('request_bytes_required'):
+                REAL_TRANSPORT(timeout=5)({'model': 'm'}, KEY)
+        self.assertEqual(len(sent), 2)
+
+    def test_typescript_nine_decimal_reservation_string_is_accepted(self):
+        # preview-test.ts formats nano-USD with exactly nine decimals, so the string ends in 0.
+        raw = json.dumps(body(), separators=(',', ':'))
+        raw = json.dumps(body(messages=[{'role': 'user', 'content': 'x' * (141 - len(raw) + len('Offline synthetic test'))}]),
+                         separators=(',', ':'))
+        self.assertEqual(len(raw.encode()), 141)
+        nano = (len(raw.encode()) + 2048) * 150 + 163840 * 500
+        typescript = '%d.%09d' % (nano // 10 ** 9, nano % 10 ** 9)
+        self.assertEqual(typescript, '0.082248350')
+        request = {'scope_id': SCOPE, 'operationId': 'op-1', 'requestBody': raw,
+                   'requestSha256': file_sha_text(raw), 'reservedUsd': typescript}
+        _, reserved = bridge.validate_request(request, bridge.read_go(self.gate().go_path))
+        self.assertEqual(reserved, Decimal('0.08224835'))
 
 
 class HaltTests(GateTest):

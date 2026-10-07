@@ -21,18 +21,19 @@ GO = {'scope_id': SCOPE, 'target_host': HOST, 'allowed_peer_uids': [PEER], 'max_
 class RequestModeTests(unittest.TestCase):
     def test_existing_four_field_request_keeps_identical_body_and_reservation(self):
         request = envelope(body())
-        parsed, reserved = bridge.validate_request(request, GO)
-        self.assertEqual(parsed, body())
+        outgoing, reserved = bridge.validate_request(request, GO)
+        self.assertEqual(outgoing, bridge.helper.canonical(body()))
+        self.assertEqual(json.loads(outgoing), body())
         self.assertEqual(str(reserved), request['reservedUsd'])
-        self.assertNotIn('response_format', parsed)
+        self.assertNotIn('response_format', json.loads(outgoing))
 
     def test_exact_json_object_mode_is_accepted_without_normalizing_request_bytes(self):
         value = {**body(), 'response_format': {'type': 'json_object'}}
         compact = envelope(value, separators=(',', ':'))
         spaced = envelope(value, indent=2)
         for request in (compact, spaced):
-            parsed, reserved = bridge.validate_request(request, GO)
-            self.assertEqual(parsed, value)
+            outgoing, reserved = bridge.validate_request(request, GO)
+            self.assertEqual(outgoing, bridge.helper.canonical(value))
             self.assertEqual(str(reserved), request['reservedUsd'])
         self.assertNotEqual(compact['requestSha256'], spaced['requestSha256'])
         self.assertNotEqual(compact['reservedUsd'], spaced['reservedUsd'])
@@ -99,7 +100,7 @@ class RequestModeTests(unittest.TestCase):
                 return 200, provider_response('0.01')
             result = gate.call('json-mode', dispatch=dispatch, value=value)
         self.assertEqual(result['status'], 200)
-        self.assertEqual(dispatched, [(value, KEY)])
+        self.assertEqual(dispatched, [(bridge.helper.canonical(value), KEY)])
         self.assertEqual(json.loads(result['body'])['model'], MODEL)
         self.assertEqual(gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':prior'], prior)
         status = gate.status()
