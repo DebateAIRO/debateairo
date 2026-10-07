@@ -434,6 +434,39 @@ class DailyPotTests(GateTest):
         self.assertEqual(len(seen), 1)
         self.assertTrue(590 < seen[0] <= 600, seen)
 
+    def test_upstream_timeout_is_what_remains_after_the_reservation_lock_wait(self):
+        gate = self.gate().ready()
+        seen, clock = [], [1000.0]
+
+        class Recorder:
+            def __init__(self, timeout):
+                seen.append(timeout)
+
+            def __call__(self, _body, _key):
+                return 200, provider_response('0.01')
+        real_reserve = bridge.reserve_call
+
+        def slow_reserve(*args):
+            clock[0] += bridge.LOCK_TIMEOUT_SECONDS  # The ledger lock took its whole wait.
+            return real_reserve(*args)
+        with patch.object(bridge.helper, 'HttpsTransport', Recorder), patch.object(bridge, 'reserve_call', slow_reserve), \
+                patch.object(bridge.time, 'monotonic', lambda: clock[0]):
+            bridge.execute_request(gate.private, gate.go_path, envelope(body(), 'op-1'), peer_uid=PEER,
+                                   slots=gate.slots, key_loader=lambda _: KEY, host=HOST, platform='linux',
+                                   now=gate.clock)
+        self.assertEqual(seen, [bridge.CALL_DEADLINE_SECONDS - bridge.LOCK_TIMEOUT_SECONDS])
+
+    def test_worst_case_call_fits_inside_the_callers_630_second_timeout(self):
+        # From acceptance: slot wait + reservation lock + upstream share CALL_DEADLINE_SECONDS. After the
+        # upstream deadline: a settlement lock wait, a fallback halt lock wait, the state writes and the reply.
+        caller_timeout = 630  # preview-test.ts: PREVIEW_GLM_DEADLINE_MS + 30_000
+        writes_and_reply = 5
+        self.assertEqual(bridge.REPLY_TIMEOUT_SECONDS, caller_timeout)
+        self.assertLessEqual(bridge.CALL_DEADLINE_SECONDS + 2 * bridge.LOCK_TIMEOUT_SECONDS + writes_and_reply,
+                             caller_timeout)
+        self.assertGreaterEqual(bridge.CALL_DEADLINE_SECONDS - bridge.SLOT_WAIT_SECONDS - bridge.LOCK_TIMEOUT_SECONDS, 500)
+        self.assertLessEqual(bridge.CALL_DEADLINE_SECONDS, bridge.helper.MAX_TIMEOUT_SECONDS)
+
 
 class RequestBytesTests(GateTest):
     def test_prompt_that_cannot_be_encoded_is_refused_before_any_reservation(self):

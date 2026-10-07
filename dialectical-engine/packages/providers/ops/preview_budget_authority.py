@@ -44,7 +44,10 @@ DAY_LEDGER_BYTES = 16 * 1024 * 1024
 DAY_LEDGER_RESERVE_BYTES = 15 * 1024 * 1024  # Headroom so in-flight settlements always fit.
 LOCK_TIMEOUT_SECONDS = 10
 SLOT_WAIT_SECONDS = 60
-CALL_DEADLINE_SECONDS = 600  # Slot wait plus upstream call, inside the caller's 630 s timeout.
+# From acceptance, slot wait + reservation lock + upstream call share this deadline; after it a
+# settlement lock wait and a fallback halt lock wait (2 x 10 s) and the reply still fit inside the
+# caller's 630 s timeout (preview-test.ts: PREVIEW_GLM_DEADLINE_MS + 30 s).
+CALL_DEADLINE_SECONDS = 600
 REPLY_TIMEOUT_SECONDS = 630
 MAX_IPC_BYTES = 1024 * 1024
 STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
@@ -507,8 +510,6 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         if cancelled is not None and cancelled():
             raise SafetyError('CALLER_CANCELED_BEFORE_DISPATCH')
         key = (key_loader or helper.read_key)(private)
-        if dispatch is None:
-            dispatch = helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)))
         if slots.tripped:
             raise SafetyError('AUTHORITY_STOPPED')
         entry_id, day = reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now)
@@ -517,7 +518,9 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         budget, started = Decimal(go['daily_budget_usd']), time.monotonic()
         event = {'event': 'preview_provider_paid_post', 'operation_id': input['operationId'], 'day': day}
         try:
-            status, response = dispatch(outgoing, key)
+            # The upstream timeout is what remains after the slot wait and the reservation lock.
+            send = dispatch or helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)))
+            status, response = send(outgoing, key)
             response = helper.redact(response if isinstance(response, dict) else {}, key)
         except BaseException as error:
             outcome = settle_or_halt(private, entry_id, day, {
