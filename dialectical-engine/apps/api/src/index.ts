@@ -4302,7 +4302,7 @@ export class PostgresAskApplication implements AskApplication {
       // of `evaluateAskAdmission`), so the interim roster swap — which would also put a
       // paid person under the Free cap — never runs on the picker path.
       const pickerPlans = this.settings.modelPicker?.scorecard.state === "VALID";
-      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now) === "FREE_ROSTER") {
+      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now, this.settings.previewProviderTestConfig) === "FREE_ROSTER") {
         ask = Object.freeze({ ...ask, plan_tier: "free" as const });
         substitutedAt = now;
       }

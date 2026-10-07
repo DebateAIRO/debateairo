@@ -46,7 +46,9 @@ export function validatePreviewProviderTestConfig(value: unknown): PreviewProvid
 export function previewPlanTierRosters<T extends Readonly<{ free: readonly string[]; premium: readonly string[] }>>(
   config: PreviewProviderTestConfig | undefined, defaults: T
 ): Readonly<{ free: readonly string[]; premium: readonly string[] }> {
-  return config === undefined ? defaults : Object.freeze({ free: config.free_model_ids, premium: defaults.premium });
+  // Step 1 (owner, 2026-10-08): Premium runs on the same single GLM on the private preview.
+  // One id, never [GLM, GLM]: admission maps each roster id to a panel member.
+  return config === undefined ? defaults : Object.freeze({ free: config.free_model_ids, premium: config.free_model_ids });
 }
 export function assertPreviewProviderTargets(config: PreviewProviderTestConfig | undefined, targets: readonly ProviderDiscoveryTarget[]): void {
   if (config === undefined) return;
