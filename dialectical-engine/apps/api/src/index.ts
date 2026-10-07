@@ -1315,7 +1315,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
   // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
   { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
-  // P12e (A12): the card change's signed authorization order; the CSRF pair like any user mutation.
+  // P12e / N13 (spec §2.11): the card page's details and NETOPIA's 0 check.
+  { route: "GET /v1/billing/subscription/card", auth: "user", resource: "billing", action: "read-card-details" },
   { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
   // P13: cancel without signing in (Terms §12). First-party Origin only; never a session.
   { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },

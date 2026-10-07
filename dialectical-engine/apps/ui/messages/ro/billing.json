@@ -148,6 +148,7 @@
   "billing.card.save": "Salvați cardul",
   "billing.card.saved": "Noul dvs. card a fost salvat. Plățile viitoare îl vor folosi.",
   "billing.card.failed": "Cardul nu a putut fi verificat. Nu s-a schimbat nimic.",
+  "billing.card.notSaved": "Cardul dvs. a fost verificat, dar nu a putut fi salvat pentru plățile lunare. Vă rugăm să încercați din nou cu un card, nu cu un portofel electronic.",
   "billing.card.countryRefused": "Nu putem accepta carduri emise în țara acestui card. Suma blocată pe el se deblochează, iar abonamentul dvs. păstrează cardul pe care îl avea.",
   "billing.card.tryAgainShortly": "Nu am putut salva noul dvs. card acum, pentru că o plată a abonamentului este încă în curs de confirmare. Cardul actual rămâne în folosință; vă rugăm să încercați din nou peste o oră.",
   "billing.card.notSubscribed": "Aveți nevoie de un abonament activ ca să schimbați cardul.",

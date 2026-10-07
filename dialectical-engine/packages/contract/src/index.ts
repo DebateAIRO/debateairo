@@ -505,11 +505,34 @@ export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string()
  */
 export const BillingWithdrawResponseSchema = z.object({ refund: BillingDecimalMoneySchema.nullable() }).strict();
 export type BillingWithdrawResponse = z.infer<typeof BillingWithdrawResponseSchema>;
-/**
- * P12e (A12): the card form's signed order, as checkout's, plus the hold the server signed — the amount the page
- * names before "Save card" ("1.00" today, "0.00" if X0 shows `auth` takes a zero amount).
- */
-export const BillingCardChangeResponseSchema = BillingCheckoutResponseSchema.extend({
+/** N13 (spec §2.11): the billing details the card page pre-fills; country and region are the tax location (read-only). */
+export const BillingCardDetailsResponseSchema = z.object({
+  country: BillingIso2Schema,
+  region: z.string().max(64).nullable(),
+  first_name: z.string().max(128).nullable(),
+  last_name: z.string().max(128).nullable(),
+  phone: z.string().max(16).nullable(),
+  street: z.string().max(256).nullable(),
+  city: z.string().max(128).nullable(),
+  postal_code: z.string().max(16).nullable()
+}).strict();
+export type BillingCardDetailsResponse = z.infer<typeof BillingCardDetailsResponseSchema>;
+/** N13: the card-saving agreement and the corrected payer (spec §2.5.3: the country and the region are never sent). */
+export const BillingCardChangeRequestSchema = z.object({
+  locale: z.string().regex(/^[a-z]{2}$/),
+  renewal_terms: BillingDocumentPairSchema,
+  first_name: z.string().trim().min(1).max(128),
+  last_name: z.string().trim().min(1).max(128),
+  phone: z.string().trim().min(8).max(20),
+  street: z.string().trim().min(1).max(256),
+  city: z.string().trim().min(1).max(128),
+  postal_code: z.string().trim().min(1).max(16).optional()
+}).strict();
+export type BillingCardChangeRequest = z.infer<typeof BillingCardChangeRequestSchema>;
+/** N13: NETOPIA's page for the 0 check; `hold_amount` is what the page names ("0.00": nothing is held). */
+export const BillingCardChangeResponseSchema = z.object({
+  redirect_url: z.url({ protocol: /^https?$/u }).max(2_048),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/),
   hold_amount: BillingDecimalMoneySchema
 }).strict();
 export type BillingCardChangeResponse = z.infer<typeof BillingCardChangeResponseSchema>;
@@ -1371,6 +1394,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/subscription/upgrade-quote",
     "POST /v1/billing/subscription/upgrade",
     "POST /v1/billing/subscription/withdraw",
+    "GET /v1/billing/subscription/card",
     "POST /v1/billing/subscription/card",
     "POST /v1/billing/cancel-link",
     "POST /v1/billing/cancel-by-token"
@@ -1402,7 +1426,7 @@ export const contractInventory = Object.freeze({
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
     BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
     BillingUpgradeResponseSchema, BillingUpgradePendingErrorSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
-    BillingCardChangeResponseSchema, BillingCancelLinkRequestSchema, BillingCancelLinkAcceptedSchema,
+    BillingCardDetailsResponseSchema, BillingCardChangeRequestSchema, BillingCardChangeResponseSchema, BillingCancelLinkRequestSchema, BillingCancelLinkAcceptedSchema,
     BillingCancelByTokenRequestSchema
   })
 });

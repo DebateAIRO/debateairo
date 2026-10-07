@@ -148,6 +148,7 @@
   "billing.card.save": "Sábháil an cárta",
   "billing.card.saved": "Tá do chárta nua sábháilte. Úsáidfidh íocaíochtaí amach anseo é.",
   "billing.card.failed": "Níorbh fhéidir an cárta a sheiceáil. Níor athraigh aon rud.",
+  "billing.card.notSaved": "Seiceáladh do chárta, ach níorbh fhéidir é a shábháil le haghaidh d’íocaíochtaí míosúla. Bain triail eile as le cárta in ionad sparán digiteach.",
   "billing.card.countryRefused": "Ní féidir linn glacadh le cártaí a eisíodh i dtír an chárta sin. Scaoiltear an choinneáil air, agus coinníonn do phlean an cárta a bhí aige.",
   "billing.card.tryAgainShortly": "Níorbh fhéidir linn do chárta nua a shábháil díreach anois toisc go bhfuil íocaíocht ar do phlean fós á deimhniú. Fanann do chárta reatha in úsáid; bain triail eile as i gceann uair an chloig.",
   "billing.card.notSubscribed": "Teastaíonn plean gníomhach uait chun an cárta a athrú.",

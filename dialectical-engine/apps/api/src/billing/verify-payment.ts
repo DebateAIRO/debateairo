@@ -123,6 +123,11 @@ function reportFromNotice(orderId: string, notice: PaymentNoticeRow): PaymentRep
 /** Spec §2.6.4: the client id NETOPIA echoes is our customer id as 32 lower-case hex (the same rule as N11's `clientIdOf`). */
 const clientIdMatches = (echoed: string, customerId: string): boolean => echoed === customerId.replaceAll("-", "").toLowerCase();
 
+/** Spec §2.11: how long a paid or authorised 0 card check waits for its saved card before it fails CARD_NOT_SAVED. */
+function cardSaveWaitMs(): number {
+  return 15 * 60_000;
+}
+
 /**
  * Spec §2.5.4 VERIFY_PAYMENT: the only place a payment changes state. It reads xMoney server to server; the
  * browser and the notice are only triggers.
@@ -1035,16 +1040,16 @@ export class VerifyPaymentHandler {
         if (report.state === "ACTION_REQUIRED" && charge.kind === "RENEWAL") {
           return this.netopiaFailed(charge, report, now, "AUTHENTICATION_REQUIRED");
         }
-        // §2.11: a 0.00 card check is authorised, never captured; that is its success.
+        // §2.11: a 0.00 card check is authorised, never captured; that is its success once its card is stored.
         if (report.state === "AUTHORIZED" && charge.kind === "CARD_CHECK" && charge.totalMicros === 0) {
-          return this.netopiaSucceeded(charge, report, now);
+          return (await this.cardCheckGate(job, charge, now, fromNotice)) ?? this.netopiaSucceeded(charge, report, now);
         }
         const retryAt = fromNotice ? null : notFinalRetryAt(job.attempts, now);
         return retryAt === null ? this.leftToChecks(charge, "PAYMENT_NOT_FINAL")
           : Object.freeze({ kind: "RETRY" as const, code: "PAYMENT_NOT_FINAL", retryAt });
       }
       case "PAID":
-        return this.netopiaSucceeded(charge, report, now);
+        return (await this.cardCheckGate(job, charge, now, fromNotice)) ?? this.netopiaSucceeded(charge, report, now);
       case "DECLINED":
         return this.netopiaFailed(charge, report, now, "PAYMENT_DECLINED");
       case "FAILED":
@@ -1282,5 +1287,45 @@ export class VerifyPaymentHandler {
   /** A21's pattern on NETOPIA's notices: what processing made of one is a following row. */
   private async noticeOutcome(noticeId: string, now: Date, outcome: PaymentNoticeOutcome): Promise<void> {
     await this.deps.repository.withTransaction((client) => this.deps.repository.insertPaymentNoticeOutcome(client, { noticeId, at: now, outcome }));
+  }
+
+  /**
+   * N13 (spec §2.11, SR-12): a card check succeeds only once its saved card has arrived. Without a stored token of this
+   * charge it waits 15 minutes from NETOPIA's first PAID/AUTHORIZED read (the message may come after the status), then
+   * FAILED(CARD_NOT_SAVED). A check closed CARD_NOT_SAVED stays closed: a later token is never adopted (N17 revokes
+   * it). Null: not a card check waiting for its card; decide as usual.
+   */
+  private async cardCheckGate(
+    job: OutboxJob, charge: ChargeWithEvents, now: Date, fromNotice: boolean
+  ): Promise<OutboxOutcome | null> {
+    if (charge.kind !== "CARD_CHECK" || charge.events.some((event) => event.kind === "SUCCEEDED")) return null;
+    if (charge.events.some((event) => event.kind === "FAILED" && event.errorCode === "CARD_NOT_SAVED")) return DONE;
+    const repository = this.deps.repository;
+    const tokens = await repository.withTransaction((client) => repository.cardTokensFromCharge(client, charge.chargeId));
+    if (tokens.length > 0) return null;
+    const first = await repository.withTransaction((client) => repository.firstStatusReadAt(client, charge.chargeId, ["PAID", "AUTHORIZED"]));
+    const deadline = (first ?? now).getTime() + cardSaveWaitMs();
+    if (now.getTime() >= deadline) return this.cardNotSaved(charge, now);
+    const scheduled = fromNotice ? null : notFinalRetryAt(job.attempts, now);
+    const retryAt = new Date(Math.min(scheduled?.getTime() ?? deadline, deadline));
+    return Object.freeze({ kind: "RETRY" as const, code: "CARD_NOT_SAVED_YET", retryAt });
+  }
+
+  /** FAILED(CARD_NOT_SAVED) under the owner lock, once; the card check's `failed` changes nothing else (no dunning retry). */
+  private async cardNotSaved(charge: ChargeWithEvents, now: Date): Promise<OutboxOutcome> {
+    const settlement = this.settlementFor(charge.kind);
+    const owner = await this.owner(charge);
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, owner.ownerRef);
+      const current = await this.deps.repository.charge(charge.chargeId, client);
+      if (current === null || current.events.some((event) => event.kind === "SUCCEEDED"
+        || (event.kind === "FAILED" && event.errorCode === "CARD_NOT_SAVED"))) return;
+      await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "FAILED", now, {
+        providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: "CARD_NOT_SAVED"
+      }));
+      await settlement.failed({ ...(await this.context(client, charge, null, owner, now)), errorCode: "CARD_NOT_SAVED" });
+    });
+    this.deps.audit("billing.payment.failed", { chargeKind: charge.kind, code: "CARD_NOT_SAVED" });
+    return DONE;
   }
 }

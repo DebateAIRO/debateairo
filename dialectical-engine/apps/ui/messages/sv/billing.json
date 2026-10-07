@@ -148,6 +148,7 @@
   "billing.card.save": "Spara kort",
   "billing.card.saved": "Ditt nya kort är sparat. Kommande betalningar använder det.",
   "billing.card.failed": "Kortet kunde inte kontrolleras. Ingenting har ändrats.",
+  "billing.card.notSaved": "Ditt kort har kontrollerats, men det kunde inte sparas för dina månatliga betalningar. Försök igen med ett kort i stället för en digital plånbok.",
   "billing.card.countryRefused": "Vi kan inte godta kort som har utfärdats i det kortets land. Reservationen på det släpps och ditt abonnemang behåller det kort det hade.",
   "billing.card.tryAgainShortly": "Vi kunde inte spara ditt nya kort just nu eftersom en betalning för ditt abonnemang fortfarande bekräftas. Ditt nuvarande kort används fortfarande; försök igen om en timme.",
   "billing.card.notSubscribed": "Du behöver ett aktivt abonnemang för att byta kort.",

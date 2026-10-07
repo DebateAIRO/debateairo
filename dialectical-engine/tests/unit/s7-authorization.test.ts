@@ -100,6 +100,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/billing/subscription/upgrade-quote", auth: "user", resource: "billing", action: "quote-upgrade" },
   { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
   { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
+  { route: "GET /v1/billing/subscription/card", auth: "user", resource: "billing", action: "read-card-details" },
   { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
   // P13: first-party pages only, like the support mutations (DL1-F7), and never a session.
   { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },

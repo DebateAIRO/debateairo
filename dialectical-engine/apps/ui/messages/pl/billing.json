@@ -148,6 +148,7 @@
   "billing.card.save": "Zapisz kartę",
   "billing.card.saved": "Twoja nowa karta jest zapisana. Kolejne płatności będą jej używać.",
   "billing.card.failed": "Nie udało się sprawdzić karty. Nic się nie zmieniło.",
+  "billing.card.notSaved": "Twoja karta została sprawdzona, ale nie udało się jej zapisać na potrzeby Twoich miesięcznych płatności. Spróbuj ponownie, używając karty zamiast portfela cyfrowego.",
   "billing.card.countryRefused": "Nie możemy akceptować kart wydanych w kraju tej karty. Blokada na niej zostaje zwolniona, a Twój plan zachowuje dotychczasową kartę.",
   "billing.card.tryAgainShortly": "Nie mogliśmy teraz zapisać Twojej nowej karty, ponieważ płatność za Twój plan jest jeszcze potwierdzana. Twoja obecna karta pozostaje w użyciu; spróbuj ponownie za godzinę.",
   "billing.card.notSubscribed": "Aby zmienić kartę, potrzebujesz aktywnego planu.",

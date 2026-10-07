@@ -856,6 +856,17 @@ export class BillingRepository {
     return row === undefined ? null : Object.freeze({ at: row.at, outcome: row.outcome });
   }
 
+  /**
+   * N13 (spec §2.11): when a status read first saw one of `outcomes` for this charge (a card check's first PAID or
+   * AUTHORIZED starts its 15-minute wait for the saved card). Null when none did.
+   */
+  async firstStatusReadAt(executor: BillingReadExecutor, chargeId: string, outcomes: ReadonlyArray<string>): Promise<Date | null> {
+    const row = (await executor.query<{ at: Date | null }>(
+      "SELECT min(at) AS at FROM billing.status_read WHERE charge_id = $1 AND outcome = ANY($2::text[])", [chargeId, [...outcomes]]
+    )).rows[0];
+    return row?.at ?? null;
+  }
+
   async insertLocationEvidence(c: PoolClient, e: LocationEvidenceRow): Promise<void> {
     await c.query(`
       INSERT INTO billing.location_evidence (charge_id, ip_country, declared_country, card_country, verdict,

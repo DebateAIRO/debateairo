@@ -148,6 +148,7 @@
   "billing.card.save": "Tallenna kortti",
   "billing.card.saved": "Uusi korttisi on tallennettu. Tulevat maksut käyttävät sitä.",
   "billing.card.failed": "Korttia ei voitu tarkistaa. Mikään ei muuttunut.",
+  "billing.card.notSaved": "Korttisi tarkistettiin, mutta sitä ei voitu tallentaa kuukausimaksujasi varten. Yritä uudelleen kortilla digitaalisen lompakon sijaan.",
   "billing.card.countryRefused": "Emme voi hyväksyä kortteja, jotka on myönnetty kyseisen kortin maassa. Kortin katevaraus vapautetaan, ja tilauksesi säilyttää aiemman korttinsa.",
   "billing.card.tryAgainShortly": "Emme voineet tallentaa uutta korttiasi juuri nyt, koska tilauksesi maksua vahvistetaan vielä. Nykyinen korttisi pysyy käytössä; yritä uudelleen tunnin kuluttua.",
   "billing.card.notSubscribed": "Tarvitset aktiivisen tilauksen vaihtaaksesi kortin.",

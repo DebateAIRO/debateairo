@@ -3,7 +3,9 @@ import {
   BillingCancelByTokenRequestSchema,
   BillingCancelLinkAcceptedSchema,
   BillingCancelLinkRequestSchema,
+  BillingCardChangeRequestSchema,
   BillingCardChangeResponseSchema,
+  BillingCardDetailsResponseSchema,
   BillingDowngradeRequestSchema,
   BillingInvoicesResponseSchema,
   BillingSubscriptionResponseSchema,
@@ -16,7 +18,7 @@ import {
 } from "@debateai/contract";
 import { microsToDecimal } from "@debateai/billing-core";
 import { clientIpNetworkScope } from "../client-ip.js";
-import { startCardChange } from "./card-change.js";
+import { readCardDetails, startCardChange } from "./card-change.js";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
 import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
 import { failureCode } from "./renewal.js";
@@ -37,6 +39,7 @@ export const SUBSCRIPTION_ROUTE_PATHS = Object.freeze([
   "POST /v1/billing/subscription/upgrade-quote",
   "POST /v1/billing/subscription/upgrade",
   "POST /v1/billing/subscription/withdraw",
+  "GET /v1/billing/subscription/card",
   "POST /v1/billing/subscription/card",
   "POST /v1/billing/cancel-link",
   "POST /v1/billing/cancel-by-token"
@@ -152,16 +155,32 @@ export function installSubscriptionRoutes(
       }));
     });
   });
-  // P12e (A12): the card change's signed 1.00 USD authorization for the dedicated /settings/card page.
+  // N13 (spec §2.11): what the card page pre-fills; the person's own billing details, never another's.
+  api.get("/v1/billing/subscription/card", policy("GET /v1/billing/subscription/card"), async (request, reply) => {
+    if (deps === undefined) return notFound(reply);
+    const ownerRef = ownerOf(request);
+    if (ownerRef === null) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+    return answer(reply, async () => reply.send(BillingCardDetailsResponseSchema.parse(await readCardDetails(deps, ownerRef))));
+  });
+  // N13 (spec §2.11): the agreement, the corrected payer, and NETOPIA's check of the new card for 0.
   api.post("/v1/billing/subscription/card", policy("POST /v1/billing/subscription/card"), async (request, reply) => {
     if (deps === undefined) return notFound(reply);
     const authenticated = request.authenticatedSession;
     if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
-    // A card change signs an order and writes a charge row. It spends the owner's billingQuote budget, shared with
-    // quotes, downgrades and cancel-revoke; checkout has its own scope (billingCheckout).
+    const parsed = BillingCardChangeRequestSchema.safeParse(request.body);
+    if (!parsed.success) return malformed(reply);
+    // A card change opens a NETOPIA page and writes a charge row: the owner's billingQuote budget, shared with quotes,
+    // downgrades and cancel-revoke; checkout has its own scope (billingCheckout).
     if (!admit.gate(reply, "billingQuote", "POST /v1/billing/subscription/card", authenticated.ownerRef)) return reply;
+    const from = source(request);
+    const body = parsed.data;
     return answer(reply, async () => reply.send(BillingCardChangeResponseSchema.parse(await startCardChange(deps, {
-      ownerRef: authenticated.ownerRef, userId: authenticated.userId, ip: source(request).ip, now: deps.clock()
+      ownerRef: authenticated.ownerRef, userId: authenticated.userId, ip: from.ip, userAgent: from.userAgent,
+      locale: body.locale, agreement: body.renewal_terms, now: deps.clock(),
+      details: {
+        firstName: body.first_name, lastName: body.last_name, phone: body.phone, street: body.street, city: body.city,
+        postalCode: body.postal_code ?? null
+      }
     }))));
   });
   // P13 (A25, Terms §12): cancel without signing in. Both routes are public, first-party Origin only, and charge the

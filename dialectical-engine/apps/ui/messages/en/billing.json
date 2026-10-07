@@ -148,6 +148,7 @@
   "billing.card.save": "Save card",
   "billing.card.saved": "Your new card is saved. Future payments use it.",
   "billing.card.failed": "The card couldn't be checked. Nothing changed.",
+  "billing.card.notSaved": "Your card was checked, but it couldn't be saved for your monthly payments. Please try again with a card instead of a wallet.",
   "billing.card.countryRefused": "We can't accept cards issued in that card's country. The hold on it is released, and your plan keeps the card it had.",
   "billing.card.tryAgainShortly": "We couldn't save your new card just now because a payment on your plan is still being confirmed. Your current card stays in use; please try again in an hour.",
   "billing.card.notSubscribed": "You need an active plan to change the card.",

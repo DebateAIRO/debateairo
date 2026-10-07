@@ -30,6 +30,8 @@ import {
   AskRoomResponseSchema,
   BillingCancelLinkAcceptedSchema,
   BillingCardChangeResponseSchema,
+  BillingCardChangeRequestSchema,
+  BillingCardDetailsResponseSchema,
   BillingPlansResponseSchema,
   BillingQuoteRequestSchema,
   BillingQuoteResponseSchema,
@@ -73,6 +75,8 @@ import {
   type AskRequest,
   type AskRoomResponse,
   type BillingCardChangeResponse,
+  type BillingCardChangeRequest,
+  type BillingCardDetailsResponse,
   type BillingPlansResponse,
   type BillingQuoteRequest,
   type BillingQuoteResponse,
@@ -441,8 +445,10 @@ export interface ContractClient {
   ): Promise<BillingUpgradeResponse | BillingUpgradePendingResponse>;
   /** P12d: withdraw within the 14 days with a WITHDRAW_SUBSCRIPTION step-up grant; `refund` null = the owner settles it. */
   withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
-  /** P12e: the card form's signed 1.00 USD authorization order, released once the new card is seen. */
-  startCardChange(): Promise<BillingCardChangeResponse>;
+  /** N13 (spec §2.11): the stored billing details the card page pre-fills (country and region read-only). */
+  getBillingCardDetails(): Promise<BillingCardDetailsResponse>;
+  /** N13: NETOPIA's 0 check for the corrected details and the agreement; the browser goes to `redirect_url`. */
+  startCardChange(input: BillingCardChangeRequest): Promise<BillingCardChangeResponse>;
   /** P13 (A25): always `{status: "ACCEPTED"}`; a link reaches the billing address only if there is a plan to cancel. */
   requestCancelLink(email: string): Promise<{ status: "ACCEPTED" }>;
   /**
@@ -793,7 +799,11 @@ export function createContractClient(
       "/v1/billing/subscription/withdraw", BillingWithdrawResponseSchema,
       { method: "POST", body: JSON.stringify({ step_up_grant: stepUpGrant }) }
     ),
-    startCardChange: () => request("/v1/billing/subscription/card", BillingCardChangeResponseSchema, { method: "POST" }),
+    getBillingCardDetails: () => request("/v1/billing/subscription/card", BillingCardDetailsResponseSchema),
+    startCardChange: (input: BillingCardChangeRequest) => request(
+      "/v1/billing/subscription/card", BillingCardChangeResponseSchema,
+      { method: "POST", body: JSON.stringify(BillingCardChangeRequestSchema.parse(input)) }
+    ),
     requestCancelLink: (email: string) => request(
       "/v1/billing/cancel-link", BillingCancelLinkAcceptedSchema,
       { method: "POST", body: JSON.stringify({ email }) }, 202

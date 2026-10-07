@@ -87,7 +87,7 @@ export type HostedStartDeps = Readonly<{
 }>;
 
 /** The flow a hosted start belongs to, as its audit lines name it. */
-export type HostedChargeOperation = "upgrade";
+export type HostedChargeOperation = "upgrade" | "card_check";
 
 export function hostedStartDeps(
   deps: Pick<SubscriptionRouteDeps, "billing" | "jobs" | "payments" | "recordsKey" | "audit">, paymentEnvironment: "sandbox" | "live"
@@ -191,7 +191,7 @@ export function assertCurrentAgreement(deps: Pick<SubscriptionRouteDeps, "consen
 /** Spec §2.18 (SR-20): the card-saving agreement as a RENEWAL_TERMS acceptance with the flow's surface, in the caller's transaction. */
 export async function recordCardAgreement(
   deps: Pick<SubscriptionRouteDeps, "acceptances" | "recordsKey">, client: PoolClient,
-  input: Readonly<{ ownerRef: string; locale: string; agreement: ConsentPair; surface: "UPGRADE"; ip: string; userAgent: string; at: Date }>
+  input: Readonly<{ ownerRef: string; locale: string; agreement: ConsentPair; surface: "UPGRADE" | "CARD_CHANGE"; ip: string; userAgent: string; at: Date }>
 ): Promise<void> {
   const acceptanceId = randomUUID();
   const evidence = sealAcceptanceEvidence(deps.recordsKey, acceptanceId, { ip: input.ip, userAgent: input.userAgent });

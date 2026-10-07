@@ -148,6 +148,7 @@
   "billing.card.save": "Išsaugoti kortelę",
   "billing.card.saved": "Jūsų nauja kortelė išsaugota. Būsimi mokėjimai bus atliekami ja.",
   "billing.card.failed": "Kortelės patikrinti nepavyko. Niekas nepasikeitė.",
+  "billing.card.notSaved": "Jūsų kortelė patikrinta, tačiau jos nepavyko išsaugoti jūsų mėnesiniams mokėjimams. Bandykite dar kartą su kortele, o ne su skaitmenine pinigine.",
   "billing.card.countryRefused": "Negalime priimti kortelių, išduotų tos kortelės šalyje. Rezervacija joje atlaisvinama, o jūsų planas lieka su ankstesne kortele.",
   "billing.card.tryAgainShortly": "Šiuo metu negalėjome išsaugoti jūsų naujos kortelės, nes mokėjimas už jūsų planą dar tvirtinamas. Dabartinė jūsų kortelė lieka naudojama; bandykite dar kartą po valandos.",
   "billing.card.notSubscribed": "Norint pakeisti kortelę, reikia aktyvaus plano.",

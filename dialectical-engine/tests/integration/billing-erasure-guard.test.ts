@@ -79,7 +79,10 @@ describe("P15 no new money while an account erasure is pending", () => {
       ["/v1/billing/subscription/upgrade", {
         plan_id: "PRO", quote_ref: quoted.json().quote_ref as string, locale: "en", renewal_terms: testAgreement("en")
       }],
-      ["/v1/billing/subscription/card", undefined]
+      ["/v1/billing/subscription/card", {
+        locale: "en", renewal_terms: testAgreement("en"), first_name: "Erin", last_name: "Rasure", phone: "+40712345678",
+        street: "Strada Exemplu 1", city: "Bucuresti"
+      }]
     ] as const) {
       const response = await api.inject({ method: "POST", url, headers, ...(payload === undefined ? {} : { payload }) });
       expect(response.statusCode, url).toBe(409);

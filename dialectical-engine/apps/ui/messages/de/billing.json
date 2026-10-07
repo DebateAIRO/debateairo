@@ -148,6 +148,7 @@
   "billing.card.save": "Karte speichern",
   "billing.card.saved": "Ihre neue Karte ist gespeichert. Künftige Zahlungen nutzen sie.",
   "billing.card.failed": "Die Karte konnte nicht geprüft werden. Es hat sich nichts geändert.",
+  "billing.card.notSaved": "Ihre Karte wurde geprüft, konnte aber nicht für Ihre monatlichen Zahlungen gespeichert werden. Bitte versuchen Sie es erneut mit einer Karte statt einer digitalen Geldbörse.",
   "billing.card.countryRefused": "Wir können keine Karten aus dem Ausstellungsland dieser Karte akzeptieren. Die Reservierung darauf wird freigegeben, und Ihr Tarif behält seine bisherige Karte.",
   "billing.card.tryAgainShortly": "Wir konnten Ihre neue Karte gerade nicht speichern, weil eine Zahlung für Ihren Tarif noch bestätigt wird. Ihre aktuelle Karte bleibt in Gebrauch; bitte versuchen Sie es in einer Stunde erneut.",
   "billing.card.notSubscribed": "Sie brauchen einen aktiven Tarif, um die Karte zu ändern.",

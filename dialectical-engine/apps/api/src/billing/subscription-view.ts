@@ -83,13 +83,13 @@ function upgradeOffered(input: WindowInput): boolean {
 }
 
 /**
- * A card change is offered while ACTIVE or PAST_DUE, for a plan of this API's xMoney system only (P2-W3 (a): P12e
- * refuses the other one's NOT_SUBSCRIBED; its order lives in a system this API does not talk to).
+ * A card change is offered while ACTIVE or PAST_DUE, for a plan of a payment system this API serves (spec §2.5.4).
+ * N13's route takes NETOPIA plans only (P2-W3 (a), C-15: offer an action only where its route accepts it), so an
+ * xMoney plan is another system's for the card change, as for the upgrade (N12's ruling).
  */
 function cardChangeOffered(input: WindowInput): boolean {
   const { state } = input;
-  return (state.status === "ACTIVE" || state.status === "PAST_DUE")
-    && state.paymentProvider === "xmoney" && state.paymentEnvironment === input.xmoneyEnvironment;
+  return (state.status === "ACTIVE" || state.status === "PAST_DUE") && state.paymentProvider === "netopia" && served(input);
 }
 
 /**

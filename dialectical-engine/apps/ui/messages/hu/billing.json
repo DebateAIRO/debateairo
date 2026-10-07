@@ -148,6 +148,7 @@
   "billing.card.save": "Kártya mentése",
   "billing.card.saved": "Az új kártyáját elmentettük. A jövőbeli fizetések ezt használják.",
   "billing.card.failed": "A kártyát nem sikerült ellenőrizni. Semmi sem változott.",
+  "billing.card.notSaved": "A kártyáját ellenőriztük, de nem sikerült elmenteni a havi fizetéseihez. Kérjük, próbálja újra kártyával digitális pénztárca helyett.",
   "billing.card.countryRefused": "Nem fogadhatunk el olyan kártyát, amelyet az adott kártya országában bocsátottak ki. A rajta lévő zárolást feloldjuk, és a csomagja megtartja a korábbi kártyáját.",
   "billing.card.tryAgainShortly": "Az új kártyáját most nem tudtuk elmenteni, mert a csomagjához tartozó egyik fizetés még megerősítés alatt áll. A jelenlegi kártyája használatban marad; kérjük, próbálja újra egy óra múlva.",
   "billing.card.notSubscribed": "A kártya módosításához aktív csomag szükséges.",

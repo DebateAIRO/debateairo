@@ -14,6 +14,8 @@ export type BillingRefusalCode =
   | "COUNTRY_BLOCKED"
   | "COUNTRY_CONFIRMATION_REQUIRED"
   | "BILLING_ADDRESS_REQUIRED"
+  /** N13/N18 (spec §2.6.1): the phone is not E.164 (`+` and 8–15 digits) (422). */
+  | "BILLING_PHONE_INVALID"
   | "TAX_ID_INVALID"
   | "TAX_SERVICE_UNAVAILABLE"
   | "ALREADY_SUBSCRIBED"

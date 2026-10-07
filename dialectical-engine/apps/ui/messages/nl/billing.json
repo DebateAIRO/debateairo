@@ -148,6 +148,7 @@
   "billing.card.save": "Kaart opslaan",
   "billing.card.saved": "Uw nieuwe kaart is opgeslagen. Toekomstige betalingen gebruiken deze kaart.",
   "billing.card.failed": "De kaart kon niet worden gecontroleerd. Er is niets veranderd.",
+  "billing.card.notSaved": "Uw kaart is gecontroleerd, maar kon niet worden opgeslagen voor uw maandelijkse betalingen. Probeer het opnieuw met een kaart in plaats van een digitale portemonnee.",
   "billing.card.countryRefused": "Wij kunnen geen kaarten accepteren die zijn uitgegeven in het land van die kaart. De reservering erop wordt vrijgegeven en uw abonnement houdt de kaart die het had.",
   "billing.card.tryAgainShortly": "We konden uw nieuwe kaart nu niet opslaan, omdat een betaling voor uw abonnement nog wordt bevestigd. Uw huidige kaart blijft in gebruik; probeer het over een uur opnieuw.",
   "billing.card.notSubscribed": "U hebt een actief abonnement nodig om de kaart te wijzigen.",

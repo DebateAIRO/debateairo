@@ -148,6 +148,7 @@
   "billing.card.save": "Simpan kartu",
   "billing.card.saved": "Kartu baru Anda telah disimpan. Pembayaran berikutnya akan menggunakannya.",
   "billing.card.failed": "Kartu tidak dapat diperiksa. Tidak ada yang berubah.",
+  "billing.card.notSaved": "Kartu Anda sudah diperiksa, tetapi tidak dapat disimpan untuk pembayaran bulanan Anda. Silakan coba lagi dengan kartu, bukan dompet digital.",
   "billing.card.countryRefused": "Kami tidak dapat menerima kartu yang diterbitkan di negara kartu tersebut. Penahanan pada kartu itu dilepaskan, dan paket Anda tetap memakai kartu sebelumnya.",
   "billing.card.tryAgainShortly": "Kami belum dapat menyimpan kartu baru Anda karena pembayaran untuk paket Anda masih dikonfirmasi. Kartu Anda saat ini tetap digunakan; silakan coba lagi dalam satu jam.",
   "billing.card.notSubscribed": "Anda memerlukan paket aktif untuk mengganti kartu.",

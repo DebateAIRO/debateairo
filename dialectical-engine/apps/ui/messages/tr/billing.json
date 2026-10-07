@@ -148,6 +148,7 @@
   "billing.card.save": "Kartı kaydet",
   "billing.card.saved": "Yeni kartınız kaydedildi. Gelecekteki ödemeler bu kartı kullanacak.",
   "billing.card.failed": "Kart doğrulanamadı. Hiçbir şey değişmedi.",
+  "billing.card.notSaved": "Kartınız doğrulandı, ancak aylık ödemeleriniz için kaydedilemedi. Lütfen dijital cüzdan yerine bir kartla yeniden deneyin.",
   "billing.card.countryRefused": "O kartın ülkesinde çıkarılan kartları kabul edemiyoruz. Karttaki provizyon kaldırılır ve planınız mevcut kartını korur.",
   "billing.card.tryAgainShortly": "Planınızla ilgili bir ödeme hâlâ onaylandığı için yeni kartınızı şu anda kaydedemedik. Mevcut kartınız kullanılmaya devam ediyor; lütfen bir saat sonra yeniden deneyin.",
   "billing.card.notSubscribed": "Kartı değiştirmek için etkin bir planınız olmalı.",

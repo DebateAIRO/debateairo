@@ -148,6 +148,7 @@
   "billing.card.save": "Gem kort",
   "billing.card.saved": "Dit nye kort er gemt. Fremtidige betalinger bruger det.",
   "billing.card.failed": "Kortet kunne ikke tjekkes. Intet er ændret.",
+  "billing.card.notSaved": "Dit kort blev tjekket, men det kunne ikke gemmes til dine månedlige betalinger. Prøv igen med et kort i stedet for en digital tegnebog.",
   "billing.card.countryRefused": "Vi kan ikke acceptere kort, der er udstedt i det korts land. Reservationen på det frigives, og din plan beholder det kort, den havde.",
   "billing.card.tryAgainShortly": "Vi kunne ikke gemme dit nye kort lige nu, fordi en betaling på din plan stadig er ved at blive bekræftet. Dit nuværende kort bruges fortsat; prøv igen om en time.",
   "billing.card.notSubscribed": "Du skal have en aktiv plan for at skifte kort.",

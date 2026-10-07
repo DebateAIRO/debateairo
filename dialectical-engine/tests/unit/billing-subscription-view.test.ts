@@ -31,14 +31,15 @@ const NETOPIA: Partial<SubscriptionState> = Object.freeze({ paymentProvider: "ne
 
 describe("P12b the subscription as the person sees it", () => {
   it("shows the renewal date, the announced total and the open withdrawal window", () => {
-    // Since N12 an xMoney plan is never offered the upgrade (the route serves NETOPIA plans only).
+    // Since N12 an xMoney plan is never offered the upgrade, and since N13 never the card change (both routes serve
+    // NETOPIA plans only).
     expect(view()).toEqual({
       plan_id: "PLUS", status: "ACTIVE", cancel_requested: false,
       current_period_end: "2026-11-01T09:00:00.000Z", renews_on: "2026-11-01T09:00:00.000Z",
       renewal_total: "24.20", scheduled_downgrade_plan_id: null,
       // Romania: the 14 days run 2–15 October, Bucharest time; the window closes at the next local midnight.
       withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15",
-      can_upgrade: false, can_change_card: true, can_revoke_cancel: false
+      can_upgrade: false, can_change_card: false, can_revoke_cancel: false
     });
   });
 
@@ -122,9 +123,10 @@ describe("P12b the subscription as the person sees it", () => {
     const insideLead = new Date(PERIOD_END.getTime() - renewalLeadMs());
     expect(view(NETOPIA, "RO", insideLead).can_upgrade).toBe(false);
     expect(view(NETOPIA, "RO", new Date(insideLead.getTime() - 1)).can_upgrade).toBe(true);
-    // The card change stays on the xMoney plan until N13 moves it.
-    expect(view({ status: "PAST_DUE" }).can_change_card).toBe(true);
-    expect(view({ status: "SUSPENDED" }).can_change_card).toBe(false);
+    // The card change on a NETOPIA plan (the only one N13's route serves).
+    expect(view(NETOPIA).can_change_card).toBe(true);
+    expect(view({ ...NETOPIA, status: "PAST_DUE" }).can_change_card).toBe(true);
+    expect(view({ ...NETOPIA, status: "SUSPENDED" }).can_change_card).toBe(false);
   });
 
   it("offers the upgrade only to a NETOPIA plan of this API's environment (N12, spec §2.5.4, §2.10)", () => {
@@ -143,20 +145,22 @@ describe("P12b the subscription as the person sees it", () => {
     expect(read("sandbox", {}).can_upgrade).toBe(false);
   });
 
-  it("offers no upgrade and no card change for a plan of the other xMoney system (P2-W3 (a), D5 5h)", () => {
-    // README §14.8's same-host switch: a sandbox plan still open, read by the live API. Both routes would refuse it
-    // NOT_SUBSCRIBED (upgrade.ts, card-change.ts), so Settings never offers them.
-    const read = (api: "stage" | "live", overrides: Partial<SubscriptionState> = {}) => subscriptionView({
-      state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now: NOW, xmoneyEnvironment: api,
-      paymentEnvironment: "sandbox"
+  it("offers the card change only to a NETOPIA plan of this API's environment (N13, spec §2.5.4, §2.11)", () => {
+    // Both routes refuse anything else NOT_SUBSCRIBED (upgrade.ts, card-change.ts), so Settings never offers them.
+    const read = (api: "sandbox" | "live" | null, overrides: Partial<SubscriptionState> = {}) => subscriptionView({
+      state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now: NOW, xmoneyEnvironment: "stage",
+      paymentEnvironment: api
     });
-    expect(read("live")).toMatchObject({ can_upgrade: false, can_change_card: false });
-    expect(read("live", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: false });
-    // Control: the plan's own system offers the card change, and a live plan on the live API too. Since N12 an xMoney
-    // plan is never offered the upgrade, in either system (the route serves NETOPIA plans only).
-    expect(read("stage")).toMatchObject({ can_upgrade: false, can_change_card: true });
-    expect(read("stage", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: true });
-    expect(read("live", { paymentEnvironment: "live" })).toMatchObject({ can_upgrade: false, can_change_card: true });
+    // Control: a NETOPIA plan of the API's own environment is offered it, ACTIVE or PAST_DUE, sandbox or live.
+    expect(read("sandbox", NETOPIA).can_change_card).toBe(true);
+    expect(read("sandbox", { ...NETOPIA, status: "PAST_DUE" }).can_change_card).toBe(true);
+    expect(read("live", { paymentProvider: "netopia", paymentEnvironment: "live" }).can_change_card).toBe(true);
+    // A plan of the other NETOPIA environment, or one read by an API that serves no NETOPIA environment, is not.
+    expect(read("live", NETOPIA).can_change_card).toBe(false);
+    expect(read(null, NETOPIA).can_change_card).toBe(false);
+    // An xMoney plan, even of the API's own xMoney system, is offered neither (P2-W3 (a), D5 5h).
+    expect(read("sandbox")).toMatchObject({ can_upgrade: false, can_change_card: false });
+    expect(read("sandbox", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: false });
   });
 
   it("offers Undo only where the revoke route accepts it: ACTIVE, this API's xMoney system, a cancel pending, before the period end (C-15)", () => {

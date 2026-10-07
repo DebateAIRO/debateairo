@@ -124,12 +124,14 @@ export type BillingAuditEvent =
    * is the number of refund intents written through RefundDesk.
    */
   | "billing.withdrawal.settled"
-  /** P12e (A12): a card change's CARD_CHECK charge was written and its order signed; the field is the plan status. */
+  /** P12e/N13: a card change's CARD_CHECK charge was written and NETOPIA's page is about to be opened; the field is the plan status. */
   | "billing.card.change.started"
   /** P12e: a new card from an always-blocked country was refused; the field is its ISO country code. */
   | "billing.card.refused"
   /** P12e (A2): a card change's hold was paid while a renewal's outcome was unknown; nothing changed. No field. */
   | "billing.card.change.deferred"
+  /** N13: a card check was paid and its card stored, but no stored card could be adopted; nothing changed. No field. */
+  | "billing.card.not_adopted"
   /** P13 (A25): an emailed one-time cancel link (M9) was sent. No field: never the address, the owner or the token. */
   | "billing.cancel_link.sent"
   /** P14a (A2): the reconciler adopted the transaction of an unknown submit; the field is the charge kind. */
