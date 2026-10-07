@@ -6,11 +6,12 @@ for open_days; serve is Root-operated Unix IPC and the only reader of Root's pro
 stop halts; status is read-only. Before any phase, the helper's custody (root-owned, writable by
 no one else) and, with a GO, its bound hash are checked; only then do those exact bytes run.
 Each call reserves its worst case under a short ledger lock, the lock is released for the one
-fixed upstream HTTPS request, and the charge is then settled under the lock. Uncertainty, missing usage, overrun, a provider error, another model, a lost
-reply or any failure after the reservation halts every new call until Root re-activates; calls
-already in flight finish and settle. A halt is written before the ledger entry it explains, and
-serve start halts on any call a crash interrupted. If a settlement or a halt cannot be written,
-the running server reserves nothing more until it is restarted.
+fixed upstream HTTPS request, and the charge is then settled under the lock. Uncertainty,
+missing usage, overrun, a provider error, another model, a lost reply or any failure after the
+reservation halts every new call until Root re-activates; calls already in flight finish and
+settle. A halt is written before the ledger entry it explains, and serve start halts on any
+call a crash interrupted. If a settlement or a halt cannot be written, the running server
+reserves nothing more until it is restarted.
 The retired v1 ledger (budget-ledger.json) is never opened.
 
 Day boundary (by design): a call is charged to the Bucharest day on which it was reserved, even
@@ -604,7 +605,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                                                    'uncertain_charge', None, None)
         outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
         log_event({**event, 'status': changes['state'], 'halt_reason': halt_reason, 'guard_charge_usd': charge,
-              'elapsed_seconds': elapsed, **outcome})
+                   'elapsed_seconds': elapsed, **outcome})
         if charge is None:
             raise SafetyError('NEW_CHARGE_UNCERTAIN')
         if halt_reason is not None:
