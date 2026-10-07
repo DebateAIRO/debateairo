@@ -85,7 +85,7 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     const verdict = verifyNetopiaNotice(input.rawBody, input.header, this.deps.trust);
     if (!verdict.ok) return this.rejected(input, verdict.reason);
     try {
-      await this.store(input.rawBody, verdict, input.now);
+      await this.store(input.rawBody, verdict, input.now, "DELIVERED");
     } catch {
       this.deps.audit("billing.notice.store_failed", {});
       return netopiaNoticeAnswer("STORE_FAILED");
@@ -97,7 +97,8 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
   /**
    * §2.7.4 step 2: the quarantine of the last 14 days, verified with the keys read at this start. Read in keyset pages
    * (ruling PR-30), so a flood of stored rejections never sits in memory at once; storing a message adds no
-   * quarantine row, so the pages do not move under the loop.
+   * quarantine row, so the pages do not move under the loop. A row whose body is already stored writes no outcome:
+   * NETOPIA sent nothing, so it is not a DUPLICATE, and it does not count as verified.
    */
   async recheckQuarantine(now: Date): Promise<number> {
     const since = new Date(now.getTime() - QUARANTINE_DAYS * DAY_MS);
@@ -136,7 +137,7 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     try {
       const verdict = verifyNetopiaNotice(opened.rawBody, opened.header, this.deps.trust);
       if (!verdict.ok) return "UNVERIFIED";
-      return await this.store(opened.rawBody, verdict, now) === "DUPLICATE" ? "STORED_BEFORE" : "VERIFIED";
+      return await this.store(opened.rawBody, verdict, now, "RECHECKED") === "DUPLICATE" ? "STORED_BEFORE" : "VERIFIED";
     } catch {
       return "FAILED";
     } finally {
@@ -178,8 +179,12 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     });
   }
 
-  /** §2.7.3: one transaction; a body stored before (same SHA-256) adds only its DUPLICATE outcome. */
-  private async store(rawBody: Buffer, verdict: VerifiedNotice, now: Date): Promise<NoticeOutcome> {
+  /**
+   * §2.7.3: one transaction. A body stored before (same SHA-256) answers DUPLICATE and changes nothing else; it adds
+   * its DUPLICATE outcome only when NETOPIA `DELIVERED` it again, never when the start's re-check re-read it from the
+   * quarantine (`RECHECKED`), so restarts add no outcome rows.
+   */
+  private async store(rawBody: Buffer, verdict: VerifiedNotice, now: Date, arrival: "DELIVERED" | "RECHECKED"): Promise<NoticeOutcome> {
     const parsed = parseNetopiaNotice(rawBody, now);
     const bodySha256 = createHash("sha256").update(rawBody).digest("hex");
     const noticeId = randomUUID();
@@ -194,7 +199,9 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
         allowedCiphertext: allowed.ciphertext, keyId: allowed.keyId
       });
       if (!stored.inserted) {
-        await this.deps.repository.insertPaymentNoticeOutcome(client, { noticeId: stored.noticeId, at: now, outcome: "DUPLICATE" });
+        if (arrival === "DELIVERED") {
+          await this.deps.repository.insertPaymentNoticeOutcome(client, { noticeId: stored.noticeId, at: now, outcome: "DUPLICATE" });
+        }
         return "DUPLICATE" as const;
       }
       const raw = sealNoticeRaw(this.deps.recordsKey, noticeId, rawBody);

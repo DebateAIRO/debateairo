@@ -275,6 +275,8 @@ describe("N9 a message that fails verification", () => {
     // A second start finds every quarantined message already stored.
     expect(await intakeFor().intake.recheckQuarantine(new Date(hour(11).getTime() + 60_000))).toBe(0);
     expect(await noticesFor(chargeId)).toHaveLength(1);
+    // The start re-read its own quarantine; NETOPIA delivered nothing, so no DUPLICATE outcome is written.
+    expect(await outcomesOf(notice!.notice_id)).toEqual(["APPLIED"]);
   });
 });
 
