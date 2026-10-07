@@ -24,6 +24,8 @@ function fakes(rows: TaxSummaryRow[] = []) {
       ref: `M3:${"5".repeat(32)}`, template: "M3", recipient: "CUSTOMER", code: "OUTBOX_HANDLER_FAILED",
       since: new Date("2026-12-21T00:00:00.000Z")
     }]),
+    // N9: the quarantined NETOPIA messages the summary counts by day.
+    quarantineSince: vi.fn(async (_client: unknown, _since: Date) => []),
     deadRefunds: async () => [{
       chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED",
       since: new Date("2026-12-20T00:00:00.000Z")

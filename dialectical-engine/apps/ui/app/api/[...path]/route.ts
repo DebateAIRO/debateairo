@@ -28,6 +28,8 @@ const REQUEST_HEADER_ALLOWLIST = Object.freeze([
   ,"x-support-session-token"
   // DL1-F5c/DL3-F4: the case bearer travels in a header now, never in a path.
   ,"x-support-case-token"
+  // N9 (spec 2026-10-05 §2.7.1): NETOPIA's signed message rides in this header, to the notify route only.
+  ,"verification-token"
 ] as const);
 const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
   "accept-ranges",
@@ -62,6 +64,10 @@ const SUPPORT_SESSION_TOKEN_HEADER = "x-support-session-token";
 /** DL1-F5c/DL3-F4: the case bearer, which used to travel in the path. */
 const SUPPORT_CASE_TOKEN_HEADER = "x-support-case-token";
 const SUPPORT_CAPABILITY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+/** N9: NETOPIA's JWT, forwarded only to NETOPIA's notify route and only when it is of a sane size. */
+const VERIFICATION_TOKEN_HEADER = "verification-token";
+const NETOPIA_NOTIFY_UI_PATH = "/api/v1/billing/netopia/notify";
+const VERIFICATION_TOKEN_MAX_LENGTH = 16_384;
 /**
  * L3-F6: server.mjs strips every inbound forwarded header and re-stamps the client
  * address itself, then sets this marker before Next starts. Without the marker (a bare
@@ -110,6 +116,8 @@ function createUpstreamHeaders(request: Request): Headers {
     // DL3-F5: the support capability travels only in its exact grammar (as the cookies do).
     if ((name === SUPPORT_SESSION_TOKEN_HEADER || name === SUPPORT_CASE_TOKEN_HEADER)
       && !SUPPORT_CAPABILITY_PATTERN.test(value)) continue;
+    if (name === VERIFICATION_TOKEN_HEADER
+      && (new URL(request.url).pathname !== NETOPIA_NOTIFY_UI_PATH || value.length > VERIFICATION_TOKEN_MAX_LENGTH)) continue;
     headers.set(name, value);
   }
   const cookie = filteredSessionCookies(request.headers.get("cookie"));

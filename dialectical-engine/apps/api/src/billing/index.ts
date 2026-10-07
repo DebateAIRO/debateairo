@@ -11,6 +11,7 @@ import type { AuthenticatedSession } from "../sessions.js";
 import type { ChargeStatusPort } from "./charge-status.js";
 import type { CheckoutServicePort } from "./checkout.js";
 import type { NoticeIntakePort } from "./notice-intake.js";
+import type { NetopiaNoticeIntakePort } from "./netopia-intake.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { answerRefusal, BillingRefusal, billingNotFound } from "./refusal.js";
 import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
@@ -34,6 +35,7 @@ export const BILLING_ROUTE_PATHS = Object.freeze([
   "POST /v1/billing/checkout",
   "GET /v1/billing/charges/{chargeRef}",
   "POST /v1/billing/xmoney/notify",
+  "POST /v1/billing/netopia/notify",
   ...SUBSCRIPTION_ROUTE_PATHS
 ] as const);
 export type BillingRoutePath = typeof BILLING_ROUTE_PATHS[number];
@@ -92,6 +94,8 @@ export type BillingRouteDeps = Readonly<{
   charges?: ChargeStatusPort;
   /** P9a. */
   notices?: NoticeIntakePort;
+  /** N9 (spec 2026-10-05 §2.7): NETOPIA's message. Present with billing on, and in the provider-only mode. */
+  netopiaNotices?: NetopiaNoticeIntakePort;
   /**
    * P8c (R3-2): the age gate's reader. Only `buildApi` supplies it, from `options.sessions`; absent, the checkout
    * refuses 503 AGE_CHECK_UNAVAILABLE (this guard fails closed).
@@ -139,6 +143,14 @@ const BILLING_BODY_LIMIT_BYTES = 16_384;
 
 const NOTIFY_PATH = "/v1/billing/xmoney/notify";
 const NOTIFY_BODY_LIMIT_BYTES = 65_536;
+/** N9 (spec 2026-10-05 §2.7.1): the route NETOPIA posts its message to (the public address adds `/api`). */
+export const NETOPIA_NOTIFY_PATH = "/v1/billing/netopia/notify";
+/**
+ * NETOPIA's message must reach its verifier as the exact bytes received, whatever content type it was sent with: the
+ * route's preParsing hook relabels the request with this private type, the one parser registered for it keeps a
+ * Buffer, and every other route refuses the type with the house 415. Fastify's JSON parsing stays for all others.
+ */
+const NETOPIA_NOTICE_MEDIA_TYPE = "application/vnd.debateai.netopia-notice";
 
 /** A transport fault the house error handler already maps to its constant envelope (index.ts TRANSPORT_FAULT_ENVELOPES). */
 function transportFault(code: "FST_ERR_CTP_INVALID_MEDIA_TYPE" | "FST_ERR_CTP_BODY_TOO_LARGE", statusCode: 413 | 415): Error {
@@ -219,6 +231,17 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       (error: Error) => done(error, undefined)
     );
   });
+  // N9: the second root-level parser, for NETOPIA's notify route only (the route relabels its own requests).
+  api.addContentTypeParser(
+    NETOPIA_NOTICE_MEDIA_TYPE, { parseAs: "buffer", bodyLimit: NOTIFY_BODY_LIMIT_BYTES },
+    (request, body, done) => {
+      if (request.routeOptions.url !== NETOPIA_NOTIFY_PATH) {
+        done(transportFault("FST_ERR_CTP_INVALID_MEDIA_TYPE", 415), undefined);
+        return;
+      }
+      done(null, body);
+    }
+  );
 
   // The plans come from the register version read at boot, so one body serves every caller until restart.
   let plansBody: Readonly<Record<string, unknown>> | null = null;
@@ -325,6 +348,33 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     }
     await notices.receive(opensslResultOf(request.body));
     return reply.status(200).header("content-type", "text/plain; charset=utf-8").send("OK");
+  });
+
+  // N9 (spec 2026-10-05 §2.7.1-2.7.2): verification before admission. A verified message is never refused for volume;
+  // only one that fails verification is charged to the source's billingNotify budget (429 over it). Every answer is
+  // JSON; the intake decides it. Installed in BILLING_ROUTE_PATHS order, after xMoney's route.
+  api.post(NETOPIA_NOTIFY_PATH, {
+    ...deps.policy("POST /v1/billing/netopia/notify"),
+    bodyLimit: NOTIFY_BODY_LIMIT_BYTES,
+    preParsing: async (request, _reply, payload) => {
+      request.headers = { ...request.headers, "content-type": NETOPIA_NOTICE_MEDIA_TYPE };
+      return payload;
+    }
+  }, async (request, reply) => {
+    const intake = deps.netopiaNotices;
+    if (intake === undefined) return billingNotFound(reply);
+    const sourceKey = clientIpNetworkScope(source(request).ip);
+    // Node lowercases header names, so NETOPIA's `Verification-token` is read whatever its letter case.
+    const header = request.headers["verification-token"];
+    const answer = await intake.receive({
+      rawBody: Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0),
+      header: typeof header === "string" ? header : undefined,
+      sourceKey,
+      now: clock(),
+      admit: () => admit.gate(reply, "billingNotify", "POST /v1/billing/netopia/notify", sourceKey)
+    });
+    if (reply.sent) return reply;
+    return reply.status(answer.status).header("content-type", "application/json").send(answer.body);
   });
 
   // P12b onward: the subscriber's own routes, in BILLING_ROUTE_PATHS order after the notice route.

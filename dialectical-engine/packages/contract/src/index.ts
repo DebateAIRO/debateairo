@@ -1348,6 +1348,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/checkout",
     "GET /v1/billing/charges/{chargeRef}",
     "POST /v1/billing/xmoney/notify",
+    "POST /v1/billing/netopia/notify",
     "GET /v1/billing/subscription",
     "GET /v1/billing/invoices",
     "POST /v1/billing/subscription/downgrade",

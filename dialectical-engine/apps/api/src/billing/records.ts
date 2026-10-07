@@ -1,5 +1,7 @@
 import { openRecord, sealRecord, type RecordAad } from "@debateai/crypto";
 import type { SecretToken, TaxLocation } from "@debateai/billing-core";
+import type { CardTokenRow, NoticeQuarantineRow } from "@debateai/db";
+import { createSecretToken } from "@debateai/payments-netopia";
 import { z } from "zod";
 
 /**
@@ -118,6 +120,69 @@ export function sealCardToken(key: Buffer, tokenId: string, token: SecretToken):
     return sealRecord(key, cardTokenAad(tokenId), plaintext);
   } finally {
     plaintext.fill(0);
+  }
+}
+
+/**
+ * Spec 2026-10-05 §2.15.1: a saved card opened for the one request that sends it. The text goes straight into a
+ * SecretToken (which prints `[token]` everywhere) and the buffer that held it is wiped.
+ */
+export function openCardToken(key: Buffer, row: Pick<CardTokenRow, "tokenId" | "tokenCiphertext">): SecretToken {
+  const plaintext = openRecord(key, cardTokenAad(row.tokenId), row.tokenCiphertext);
+  try {
+    return createSecretToken(plaintext.toString("utf8"));
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+/** `billing.payment_notice.allowed_ciphertext`: §2.5.2's allow-list of a verified message (never the token). */
+export function sealNoticeAllowed(
+  key: Buffer, noticeId: string, allowed: Readonly<Record<string, string | number | null>>
+): { ciphertext: Buffer; keyId: string } {
+  return seal(key, { table: "billing.payment_notice", column: "allowed_ciphertext", rowId: noticeId }, allowed);
+}
+
+/** `billing.payment_notice_raw.raw_ciphertext`: the verified bytes as received (token included), kept 14 days. */
+export function sealNoticeRaw(key: Buffer, noticeId: string, rawBody: Buffer): { ciphertext: Buffer; keyId: string } {
+  return sealRecord(key, { table: "billing.payment_notice_raw", column: "raw_ciphertext", rowId: noticeId }, rawBody);
+}
+
+const quarantineAad = (quarantineId: string, column: "raw_ciphertext" | "header_ciphertext"): RecordAad =>
+  ({ table: "billing.notice_quarantine", column, rowId: quarantineId });
+
+/** §2.7.4: a message that failed verification, its bytes and its header sealed apart (14 days, never acted on). */
+export function sealQuarantined(
+  key: Buffer, quarantineId: string, rawBody: Buffer, header: string | undefined
+): Readonly<{ rawCiphertext: Buffer; headerCiphertext: Buffer | null; keyId: string }> {
+  const raw = sealRecord(key, quarantineAad(quarantineId, "raw_ciphertext"), rawBody);
+  if (header === undefined) return Object.freeze({ rawCiphertext: raw.ciphertext, headerCiphertext: null, keyId: raw.keyId });
+  const bytes = Buffer.from(header, "utf8");
+  try {
+    const sealed = sealRecord(key, quarantineAad(quarantineId, "header_ciphertext"), bytes);
+    return Object.freeze({ rawCiphertext: raw.ciphertext, headerCiphertext: sealed.ciphertext, keyId: raw.keyId });
+  } finally {
+    bytes.fill(0);
+  }
+}
+
+/** The re-check at every start (§2.7.4 step 2): the caller owns `rawBody` and wipes it when done. */
+export function openQuarantined(
+  key: Buffer, row: Pick<NoticeQuarantineRow, "quarantineId" | "rawCiphertext" | "headerCiphertext">
+): Readonly<{ rawBody: Buffer; header: string | undefined }> {
+  const rawBody = openRecord(key, quarantineAad(row.quarantineId, "raw_ciphertext"), row.rawCiphertext);
+  if (row.headerCiphertext === null) return Object.freeze({ rawBody, header: undefined });
+  let header: Buffer;
+  try {
+    header = openRecord(key, quarantineAad(row.quarantineId, "header_ciphertext"), row.headerCiphertext);
+  } catch (error) {
+    rawBody.fill(0);
+    throw error;
+  }
+  try {
+    return Object.freeze({ rawBody, header: header.toString("utf8") });
+  } finally {
+    header.fill(0);
   }
 }
 

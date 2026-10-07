@@ -16,7 +16,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -88,6 +88,7 @@ import type { AskBilling } from "./ask-billing.js";
 import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { consoleBillingAudit } from "./billing/audit.js";
+import { NetopiaNoticeIntake } from "./billing/netopia-intake.js";
 import { createBillingRuntime } from "./billing/runtime.js";
 import {
   StageShiftedXMoneyClient,
@@ -647,6 +648,16 @@ if (environment.DEPLOYMENT_MODE === "hosted" && billingMode === "OFF") {
   const missing = incompleteNetopiaKey(environment);
   if (missing !== null) console.error(JSON.stringify({ event: "billing.provider_only.incomplete", missing }));
 }
+/**
+ * N9 (spec 2026-10-05 §2.7.3, ruling C-9): in the provider-only mode NETOPIA's message is the one billing route served.
+ * The intake keeps the owner's test-tool orders' cards; every other verified message is stored as BILLING_OFF, with no
+ * card, no job and no email. Nothing drains an outbox here, so the kick does nothing.
+ */
+const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new NetopiaNoticeIntake({
+  repository: new BillingRepository(pool), jobs: new BillingJobQueries(pool), trust: providerOnlyConnectors.noticeTrust,
+  recordsKey: providerOnlyConnectors.recordsKey, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
+  mode: "PROVIDER_ONLY", audit: consoleBillingAudit, kick: () => undefined
+});
 // Going live (spec §2.5.4): anything of another payment system still open (xMoney-era rows, or NETOPIA sandbox rows
 // after the same-host switch) would never be renewed or settled by the live passes. The runbook's step closes it first.
 if (billingConnectors?.paymentEnvironment === "live") {
@@ -1219,11 +1230,12 @@ const billingUsageReader = askRoomComposition === undefined || askRoomCompositio
       spend: askRoomComposition.spend
     });
 const billingRouteOptions: BillingRouteOptions | undefined =
-  billingUsageReader === undefined && billingRuntime === undefined
+  billingUsageReader === undefined && billingRuntime === undefined && providerOnlyIntake === undefined
     ? undefined
     : Object.freeze({
         ...(billingUsageReader === undefined ? {} : { usage: billingUsageReader }),
-        ...(billingRuntime === undefined ? {} : billingRuntime.routes)
+        ...(billingRuntime === undefined ? {} : billingRuntime.routes),
+        ...(providerOnlyIntake === undefined ? {} : { netopiaNotices: providerOnlyIntake })
       });
 const api = buildApi({
   application,
@@ -1375,6 +1387,15 @@ triggerErasureReconciliation();
 triggerAuthenticationRiskCleanup();
 triggerRetentionPurge();
 billingRuntime?.start();
+// N9 (spec 2026-10-05 §2.7.4 step 2): the trusted keys were read at this start, so every quarantined NETOPIA message is
+// verified again with them, and one that now verifies is stored as if it had just arrived. In the background: a slow
+// database never holds the listening API; a failure is one content-free line, and the next start tries again.
+const netopiaIntake = billingRuntime?.netopiaNotices ?? providerOnlyIntake;
+if (netopiaIntake !== undefined) {
+  void netopiaIntake.recheckQuarantine(new Date()).catch(() => {
+    consoleBillingAudit("billing.notice.recheck", { code: "BILLING_NOTICE_RECHECK_FAILED" });
+  });
+}
 if (askRoom !== undefined) {
   triggerAskWake();
   askWaker = everyWholeMinute(triggerAskWake);

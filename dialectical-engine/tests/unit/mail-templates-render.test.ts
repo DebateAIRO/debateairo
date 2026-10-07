@@ -39,6 +39,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   notRequested: "true",
   otherSystem: "true",
   bankDeclined: "true",
+  paymentAlert: "true",
   endedPlan: "PRO",
   invoiceNumber: "DBAI 0042",
   quarter: "2026-Q4",
@@ -51,6 +52,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93",
   jobKind: "SMARTBILL_INVOICE",
   reference: "charge 0123456789abcdef0123456789abcdef",
+  receivedAt: "2026-10-06T18:00:00.000Z",
   nextSteps: "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
     + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>"
 });
@@ -404,8 +406,9 @@ describe("P17 renderMail", () => {
   });
 
   it("tells the owner at once of a legal document or an email that was never sent, and what to do (W12, P2-I16)", () => {
-    const owner = renderMail("O3", "de", { ...paramsFor("O3"), reasonCode: "INVOICE_UNKNOWN" });
-    expect(owner.subject).toBe("A legal document or a required email was not sent and needs your attention");
+    const { paymentAlert: _alert, ...deadJob } = paramsFor("O3");
+    const owner = renderMail("O3", "de", { ...deadJob, reasonCode: "INVOICE_UNKNOWN" });
+    expect(owner.subject).toBe("Billing needs your attention (INVOICE_UNKNOWN)");
     expect(owner.html).toContain('<html lang="en" dir="ltr">');
     expect(owner.html).toContain("<pre");
     expect(owner.text.startsWith([
@@ -532,5 +535,36 @@ describe("P17 renderMail", () => {
     expect(english).toContain("To: DebateAIRO S.R.L.");
     expect(renderWithdrawalForm("ro")).not.toBe(english);
     expect(renderWithdrawalForm("xx")).toBe(english);
+  });
+
+  it("N9/N10: speaks of a payment, not of a dead job, when O3 carries paymentAlert", () => {
+    const owner = renderMail("O3", "en", {
+      jobKind: "PAYMENT_NOTICE", reference: "notice 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", reasonCode: "NOTICE_PARSE_FAILED",
+      nextSteps: "Report the code.", paymentAlert: "true"
+    });
+    expect(owner.subject).toBe("Billing needs your attention (NOTICE_PARSE_FAILED)");
+    expect(owner.text).toContain("A payment needs your attention. Nothing more was charged, and the customer was not emailed about it.");
+    expect(owner.text).toContain("This email is sent once for this reference and reason within the hour.");
+    expect(owner.text).not.toContain("A job that issues an invoice");
+    expect(Object.keys(MAIL_TEMPLATES.O3.optional ?? {})).toEqual(["paymentAlert"]);
+  });
+
+  it("N9: tells the owner at once that NETOPIA's message about an open charge could not be verified (O4)", () => {
+    const owner = renderMail("O4", "ro", paramsFor("O4"));
+    expect(owner.subject).toBe("A NETOPIA payment message could not be verified (XMONEY_REFUSED)");
+    expect(owner.html).toContain('<html lang="en" dir="ltr">');
+    expect(owner.text.startsWith([
+      "Hello,",
+      "NETOPIA sent a message about one of our open payments, and the site could not verify it with the trusted NETOPIA"
+        + " key. It was answered \"try again\", so NETOPIA keeps sending it, and a sealed copy is kept for 14 days.",
+      "Charge reference: 0123456789abcdef0123456789abcdef",
+      "Received at: 2026-10-06T18:00:00.000Z (UTC)",
+      "Reason code: XMONEY_REFUSED",
+      "Check the NETOPIA key with the check command (pnpm billing:check, as the runbook shows). If the key is wrong or"
+        + " out of date, put the right one in place with deploy/vps/billing-setup.sh --replace netopia and restart the"
+        + " API: every kept message is checked again at the start, saved cards included.",
+      "At most one such email is sent an hour; the owner summary (pnpm billing:tax-summary) counts every kept message by day."
+    ].join("\n\n"))).toBe(true);
+    expect(Object.keys(MAIL_TEMPLATES.O4.params).sort()).toEqual(["chargeRef", "reasonCode", "receivedAt"]);
   });
 });

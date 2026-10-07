@@ -9,7 +9,8 @@ import {
   liveQuarterSummaryRows,
   parseTaxQuarter,
   paymentsToCheckFrom,
-  renderTaxSummary
+  renderTaxSummary,
+  unverifiedNoticeDaysFrom
 } from "../../apps/api/src/billing/tax-summary.js";
 
 const authorities = taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test");
@@ -413,6 +414,34 @@ describe("P16b the summary", () => {
       { what: "RENEWAL_BLOCKED", ref: "7d0a3b4c-5e6f-4a7b-8c8d-9e0f1a2b3c4d", reason: null, since: new Date("2027-01-01T00:00:00.000Z") },
       { what: "SUBSCRIPTION_HISTORY_INVALID", ref: "3c9d2b1a-5e4f-4a6b-8c7d-9e0f1a2b3c4d", reason: null, since: now }
     ]);
+  });
+
+  it("N9: counts the NETOPIA messages kept in quarantine by day, and prints nothing when there are none", async () => {
+    const empty = renderTaxSummary(buildTaxSummary({
+      quarter: Q4, rows: [], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
+    }));
+    expect(empty).not.toContain("NETOPIA messages");
+    const since: Date[] = [];
+    const billing = {
+      withTransaction: async <T>(work: (client: never) => Promise<T>) => work({} as never),
+      quarantineSince: async (_client: unknown, from: Date) => {
+        since.push(from);
+        return [
+          { receivedAt: new Date("2026-12-20T23:59:00.000Z") }, { receivedAt: new Date("2026-12-21T00:01:00.000Z") },
+          { receivedAt: new Date("2026-12-21T09:00:00.000Z") }
+        ];
+      }
+    } as unknown as Parameters<typeof unverifiedNoticeDaysFrom>[0];
+    const days = await unverifiedNoticeDaysFrom(billing, new Date("2026-12-22T06:00:00.000Z"));
+    expect(since).toEqual([new Date("2026-12-08T06:00:00.000Z")]);
+    expect(days).toEqual([{ day: "2026-12-20", count: 1 }, { day: "2026-12-21", count: 2 }]);
+    const text = renderTaxSummary(buildTaxSummary({
+      quarter: Q4, rows: [], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: [], unverifiedNotices: days
+    }));
+    expect(text).toContain("NETOPIA messages that could not be verified (kept 14 days and checked again at every API start;"
+      + " check the NETOPIA key with pnpm billing:check):");
+    expect(text).toContain("  2026-12-20: 1 message");
+    expect(text).toContain("  2026-12-21: 2 messages");
   });
 });
 

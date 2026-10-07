@@ -163,6 +163,12 @@ export type NoticeQuarantineInput = Readonly<{
   rawCiphertext: Buffer; headerCiphertext: Buffer | null; keyId: string;
 }>;
 export type NoticeQuarantineRow = NoticeQuarantineInput;
+/**
+ * Ruling PR-30 (N9): where the previous page of the quarantine ended; the order is (receivedAt, quarantineId). A page
+ * holds at most `limit` rows, so a flood of stored rejections is never read into memory at once.
+ */
+export type NoticeQuarantineCursor = Readonly<{ receivedAt: Date; quarantineId: string }>;
+export type NoticeQuarantinePage = Readonly<{ after: NoticeQuarantineCursor | null; limit: number }>;
 /** `billing.card_token`: the caller mints `tokenId`, because the token's seal names the row (AAD). */
 export type CardTokenInput = Readonly<{
   tokenId: string; customerId: string | null; paymentProvider: PaymentProviderName; paymentEnvironment: PaymentEnvironmentName;
@@ -1553,12 +1559,22 @@ export class BillingRepository {
       header_ciphertext, key_id) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
     [row.quarantineId, row.receivedAt, row.reason, row.orderId, row.rawCiphertext, row.headerCiphertext, row.keyId]);
   }
-  /** §2.7.4's re-check: the quarantine received at or after `since`, oldest first. */
-  async quarantineSince(executor: BillingReadExecutor, since: Date): Promise<ReadonlyArray<NoticeQuarantineRow>> {
+  /**
+   * §2.7.4's re-check: the quarantine received at or after `since`, oldest first. With `page` (ruling PR-30), only the
+   * rows after `page.after` in (received_at, quarantine_id) order, at most `page.limit` of them: the caller reads on
+   * until a page comes back shorter than its limit.
+   */
+  async quarantineSince(
+    executor: BillingReadExecutor, since: Date, page?: NoticeQuarantinePage
+  ): Promise<ReadonlyArray<NoticeQuarantineRow>> {
+    const after = page?.after ?? null;
     return (await executor.query<NoticeQuarantineRow>(`SELECT quarantine_id AS "quarantineId", received_at AS "receivedAt",
         reason, order_id AS "orderId", raw_ciphertext AS "rawCiphertext", header_ciphertext AS "headerCiphertext",
         key_id AS "keyId"
-      FROM billing.notice_quarantine WHERE received_at >= $1 ORDER BY received_at, quarantine_id`, [since])).rows.map(frozen);
+      FROM billing.notice_quarantine
+      WHERE received_at >= $1 AND ($2::timestamptz IS NULL OR (received_at, quarantine_id) > ($2::timestamptz, $3::uuid))
+      ORDER BY received_at, quarantine_id LIMIT $4`,
+    [since, after?.receivedAt ?? null, after?.quarantineId ?? null, page?.limit ?? null])).rows.map(frozen);
   }
   /** §2.15.1: a saved card, sealed by the caller under the records key with the AAD naming this row. */
   async insertCardToken(c: PoolClient, row: CardTokenInput): Promise<Readonly<{ tokenId: string }>> {

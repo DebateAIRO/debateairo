@@ -23,6 +23,7 @@ import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoic
 import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillPdfResolver } from "./invoice-smartbill.js";
 import { BillingMaintenance } from "./maintenance.js";
 import { NoticeIntake } from "./notice-intake.js";
+import { NetopiaNoticeIntake } from "./netopia-intake.js";
 import { catalogueOrderText } from "./order-text-catalogue.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { OwnerJobs } from "./owner-jobs.js";
@@ -77,6 +78,8 @@ export type BillingRuntime = Readonly<{
   checkout: CheckoutService;
   /** P8a onward: the billing routes' members this runtime composes (main.ts's `billingRouteOptions`). */
   routes: BillingRouteOptions;
+  /** N9: NETOPIA's message intake (the routes hold it too); main.ts runs its quarantine re-check at every start. */
+  netopiaNotices: NetopiaNoticeIntake;
   /** P9b: VERIFY_PAYMENT; P11a and P12 register their charge kinds' settlements on it. */
   verify: VerifyPaymentHandler;
   /** P9b (R-32): the one refund executor; P12d and P12e move money back through it. */
@@ -253,6 +256,11 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     // P13: the two public cancel routes.
     cancelLinks
   });
+  // N9 (spec 2026-10-05 §2.7.3): `drain` is declared below; the kick only runs once a message is stored.
+  const netopiaNotices = new NetopiaNoticeIntake({
+    repository, jobs, trust: deps.connectors.noticeTrust, recordsKey: deps.connectors.recordsKey,
+    paymentEnvironment: deps.connectors.paymentEnvironment, mode: "ON", audit: deps.audit, kick: () => drain()
+  });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
     plans: deps.plans, legal: deps.legal, clock: deps.clock,
@@ -266,6 +274,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       repository, decrypt: (value) => decryptNotice(value, deps.connectors.xmoneyPrivateKey), audit: deps.audit,
       clock: deps.clock, kick: () => drain(), xmoneyEnvironment: deps.connectors.xmoneyEnvironment
     }),
+    netopiaNotices,
     subscription
   });
   const drain = createCoalescingSingleFlight(() => outbox.drain(10), () => deps.reportPending("BILLING_OUTBOX_PENDING"));
@@ -298,6 +307,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     outbox,
     checkout,
     routes,
+    netopiaNotices,
     verify,
     refunds,
     renewal,

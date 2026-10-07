@@ -20,11 +20,13 @@ import {
   parseTaxQuarter,
   paymentsToCheckFrom,
   renderTaxSummary,
+  unverifiedNoticeDaysFrom,
   type DeadEmailItem,
   type EFacturaCheckItem,
   type InvoiceUnknownItem,
   type PaymentToCheckItem,
-  type TaxQuarter
+  type TaxQuarter,
+  type UnverifiedNoticeDay
 } from "./tax-summary.js";
 
 export type TaxSummaryCliOutput = Readonly<{ stdout(text: string): void; stderr(text: string): void }>;
@@ -36,6 +38,8 @@ export type OpenTaxSummaryReader = () => Promise<Readonly<{
   paymentsToCheck(): Promise<ReadonlyArray<PaymentToCheckItem>>;
   /** W12 (P2-I16): the emails that never went out, of the last 120 days. */
   deadEmails(): Promise<ReadonlyArray<DeadEmailItem>>;
+  /** N9: the quarantined NETOPIA messages by day (absent: none printed). */
+  unverifiedNotices?(): Promise<ReadonlyArray<UnverifiedNoticeDay>>;
   authorities(): Promise<TaxAuthorities | null>;
   close(): Promise<void>;
 }>>;
@@ -65,7 +69,8 @@ export async function runBillingTaxSummaryCli(
       output.stdout(renderTaxSummary(buildTaxSummary({
         quarter, rows: await reader.rows(quarter.from, quarter.to),
         invoiceUnknown: await reader.invoiceUnknown(), efactura: await reader.efactura(quarter.to),
-        paymentsToCheck: await reader.paymentsToCheck(), deadEmails: await reader.deadEmails(), authorities
+        paymentsToCheck: await reader.paymentsToCheck(), deadEmails: await reader.deadEmails(),
+        unverifiedNotices: await reader.unverifiedNotices?.() ?? [], authorities
       })));
       return 0;
     } finally {
@@ -96,6 +101,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       efactura: (before: Date) => efacturaChecksFrom(jobs, before),
       paymentsToCheck: () => paymentsToCheckFrom(billing, new Date()),
       deadEmails: () => deadEmailsFrom(billing, new Date()),
+      unverifiedNotices: () => unverifiedNoticeDaysFrom(billing, new Date()),
       authorities: () => readTaxAuthorities(pool, environment.REGISTER_VERSION),
       close: () => pool.end()
     });

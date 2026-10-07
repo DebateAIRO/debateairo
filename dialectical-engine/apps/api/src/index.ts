@@ -1302,6 +1302,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
   { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  // N9 (spec 2026-10-05 §2.7.1): NETOPIA's signed message; no session, no CSRF, verified by its own signature.
+  { route: "POST /v1/billing/netopia/notify", auth: "public", resource: "billing", action: "notify" },
   // P12: the subscriber's own subscription. Every mutation carries the CSRF pair like any user route.
   { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
   { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },

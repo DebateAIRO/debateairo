@@ -150,6 +150,16 @@ export type BillingAuditEvent =
    * P17 (Q-3): M1's accepted-Terms attachment was not attached. The fields are the attachment kind and a code
    * (MAIL_TERMS_NOT_RECORDED or MAIL_TERMS_NOT_ARCHIVED) only, never a hash, a locale or an address.
    */
+  /** N9 (spec 2026-10-05 §2.7.4): NETOPIA's message failed verification; the reason code only. */
+  | "billing.notice.unverified"
+  /** N9 (§2.7.3 step 2): a verified message names no charge and no tool order of ours. No field. */
+  | "billing.notice.unknown_order"
+  /** N9 (§2.7.3 step 1): a verified message whose body cannot be read; stored, the owner told (O3). No field. */
+  | "billing.notice.parse_failed"
+  /** N9 (§2.7.2): a message could not be stored, so NETOPIA was asked to send it again. No field. */
+  | "billing.notice.store_failed"
+  /** N9 (§2.7.4 step 2): the start's re-check of the quarantine; the counts only, or the failure's code. */
+  | "billing.notice.recheck"
   | "billing.mail.attachment_missing";
 
 export type BillingAuditField = string | number | boolean | null;

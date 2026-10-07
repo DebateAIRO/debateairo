@@ -19,9 +19,16 @@
   "owner.O2_WITHDRAWAL.owner": "Owner reference: {ownerRef}",
   "owner.O2_WITHDRAWAL.deadline": "Withdrawn on {withdrawalDate}. The law requires the refund to be made by {refundDeadline} at the latest (14 days after the withdrawal).",
   "owner.O2_WITHDRAWAL.next": "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"), refund in the xMoney dashboard what the site cannot, then record the settlement with pnpm billing:withdraw --owner {ownerRef} --refund <amount> --dashboard <amount>. The customer's refund email (M8) follows. The owner summary lists it as WITHDRAWAL_BY_OWNER until then.",
-  "owner.O3.subject": "A legal document or a required email was not sent and needs your attention",
+  "owner.O3.subject": "Billing needs your attention ({reasonCode})",
   "owner.O3.intro": "A job that issues an invoice or a credit note, or that sends an email, stopped after its last try. That job is not tried again by itself; only the notice of a changed renewal amount (M3) is sent again, by the renewal.",
   "owner.O3.job": "Job: {jobKind}",
   "owner.O3.reference": "Reference: {reference}",
-  "owner.O3.listed": "The owner summary (pnpm billing:tax-summary, and the quarterly email) lists it until it is settled."
+  "owner.O3.listed": "The owner summary (pnpm billing:tax-summary, and the quarterly email) lists it until it is settled.",
+  "owner.O3.paymentIntro": "A payment needs your attention. Nothing more was charged, and the customer was not emailed about it.",
+  "owner.O3.paymentListed": "This email is sent once for this reference and reason within the hour.",
+  "owner.O4.subject": "A NETOPIA payment message could not be verified ({reasonCode})",
+  "owner.O4.intro": "NETOPIA sent a message about one of our open payments, and the site could not verify it with the trusted NETOPIA key. It was answered \"try again\", so NETOPIA keeps sending it, and a sealed copy is kept for 14 days.",
+  "owner.O4.received": "Received at: {receivedAt} (UTC)",
+  "owner.O4.next": "Check the NETOPIA key with the check command (pnpm billing:check, as the runbook shows). If the key is wrong or out of date, put the right one in place with deploy/vps/billing-setup.sh --replace netopia and restart the API: every kept message is checked again at the start, saved cards included.",
+  "owner.O4.listed": "At most one such email is sent an hour; the owner summary (pnpm billing:tax-summary) counts every kept message by day."
 }

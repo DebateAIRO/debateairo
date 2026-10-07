@@ -79,4 +79,22 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     expect(main.slice(listen, first)).toContain("\ntriggerErasureReconciliation();\n");
     expect(main.slice(listen, first)).not.toContain("billingPolicy");
   });
+
+  it("N9: serves NETOPIA's message in the provider-only mode, and re-checks the quarantine once the API listens", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const connectors = main.indexOf("const providerOnlyConnectors: NetopiaConnectors | null");
+    const intake = main.indexOf("const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new NetopiaNoticeIntake({");
+    expect(intake).toBeGreaterThan(connectors);
+    expect(main.slice(intake, intake + 600)).toContain('mode: "PROVIDER_ONLY"');
+    expect(main.slice(intake, intake + 600)).toContain("trust: providerOnlyConnectors.noticeTrust");
+    expect(main).toContain("...(providerOnlyIntake === undefined ? {} : { netopiaNotices: providerOnlyIntake })");
+    const listen = main.indexOf('await startup.run("listen"');
+    const recheck = main.indexOf("netopiaIntake.recheckQuarantine(new Date())");
+    expect(recheck).toBeGreaterThan(listen);
+    expect(main).toContain("const netopiaIntake = billingRuntime?.netopiaNotices ?? providerOnlyIntake;");
+    const runtime = await readFile("apps/api/src/billing/runtime.ts", "utf8");
+    expect(runtime).toContain("trust: deps.connectors.noticeTrust");
+    expect(runtime).toContain('mode: "ON"');
+    expect(runtime).toMatch(/netopiaNotices,\s*\n\s*subscription\s*\n\s*\}\);/u);
+  });
 });

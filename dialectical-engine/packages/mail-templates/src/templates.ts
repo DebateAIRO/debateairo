@@ -1,11 +1,12 @@
 /**
  * R-8's sixteen ids, ruling Q-5's owner template O2 (a refund that could not be completed), W9's (P2-I11)
  * M8_RECEIVED (a withdrawal's acknowledgement of receipt) and O2_WITHDRAWAL (a withdrawal the owner settles by hand),
- * and W12's (P2-I16) O3 (a legal document or an email that was never sent).
+ * W12's (P2-I16) O3 (a legal document or an email that was never sent), and N9's O4 (NETOPIA's message about an open
+ * charge could not be verified).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3", "O4"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -253,11 +254,27 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // charge id, or the email job's ref of template and ids), the dead job's code, and the steps (`nextSteps`, the same
   // wording the owner summary prints, with the `pnpm billing:invoice` command to copy); never a customer's name, email
   // or card.
+  // N10/N11 (spec §2.8, §2.9, ruling C-8): the same O3 also carries a payment that needs the owner (an amount or customer
+  // NETOPIA reports that our charge does not hold, a status whose meaning NETOPIA has not confirmed, a renewal NETOPIA
+  // refused for our own settings or key, a renewal whose outcome stays open). Those set the optional flag `paymentAlert`
+  // "true": the intro and the closing line then speak of the payment, never of a dead job. The reference is our own
+  // charge id; never a customer's name, email or card.
   O3: define({
     catalogue: "owner", subject: "owner.O3.subject",
     paragraphs: [
-      "owner.O3.intro", "owner.O3.job", "owner.O3.reference", "owner.O2.reason", { block: "nextSteps" }, "owner.O3.listed"
+      { ifParam: "paymentAlert", test: "true", then: "owner.O3.paymentIntro", otherwise: "owner.O3.intro" },
+      "owner.O3.job", "owner.O3.reference", "owner.O2.reason", { block: "nextSteps" },
+      { ifParam: "paymentAlert", test: "true", then: "owner.O3.paymentListed", otherwise: "owner.O3.listed" }
     ],
-    params: { jobKind: "text", reference: "text", reasonCode: "text", nextSteps: "block" }
+    params: { jobKind: "text", reference: "text", reasonCode: "text", nextSteps: "block" },
+    optional: { paymentAlert: "flag" }
+  }),
+  // N9 (spec 2026-10-05 §2.7.4 step 3): NETOPIA's message about one of our open charges failed verification. Sent at
+  // once, at most one an hour (the intake's dedupe ref is the UTC hour). Our charge id, the time and the reason code;
+  // never the message, its token or anything of the customer.
+  O4: define({
+    catalogue: "owner", subject: "owner.O4.subject",
+    paragraphs: ["owner.O4.intro", "owner.O2.charge", "owner.O4.received", "owner.O2.reason", "owner.O4.next", "owner.O4.listed"],
+    params: { chargeRef: "text", receivedAt: "text", reasonCode: "text" }
   })
 });

@@ -1,6 +1,8 @@
 import { exhaustive } from "@debateai/kernel";
 import { microsToDecimal, type TaxStatus } from "@debateai/billing-core";
-import type { BillingJobQueries, BillingRepository, TaxSummaryRow } from "@debateai/db";
+import type {
+  BillingJobQueries, BillingRepository, NoticeQuarantineCursor, NoticeQuarantineRow, TaxSummaryRow
+} from "@debateai/db";
 import {
   taxAuthorityFor,
   type TaxAuthorities,
@@ -21,6 +23,8 @@ export type InvoiceUnknownItem = Readonly<{ chargeId: string; jobKind: string; c
 export type DeadEmailItem = Readonly<{
   ref: string; template: string | null; recipient: string | null; code: string; since: Date;
 }>;
+/** N9 (spec 2026-10-05 §2.7.4 step 3): NETOPIA messages that failed verification and were kept, per UTC day. */
+export type UnverifiedNoticeDay = Readonly<{ day: string; count: number }>;
 /**
  * A Romanian SmartBill document issued by the quarter's end, in it or earlier (P2-M24), whose e-Factura acceptance is
  * not recorded (`status`: the latest one).
@@ -109,6 +113,7 @@ export type TaxSummary = Readonly<{
   efactura: ReadonlyArray<EFacturaCheckItem>;
   paymentsToCheck: ReadonlyArray<PaymentToCheckItem>;
   deadEmails: ReadonlyArray<DeadEmailItem>;
+  unverifiedNotices: ReadonlyArray<UnverifiedNoticeDay>;
   sales: number;
   refunds: number;
 }>;
@@ -231,6 +236,34 @@ export async function deadEmailsFrom(
   return (await billing.deadEmails(new Date(now.getTime() - 120 * 86_400_000))).map((item) => Object.freeze({ ...item }));
 }
 
+/** Ruling PR-30's page, as the start's re-check reads it: a flood of kept messages is never read at once. */
+const QUARANTINE_PAGE_ROWS = 500;
+
+/**
+ * N9: the quarantine of the last 14 days (its whole life), counted by the UTC day it arrived. Read in keyset pages of
+ * at most 500 rows (ruling PR-30) until a short page.
+ */
+export async function unverifiedNoticeDaysFrom(
+  billing: Pick<BillingRepository, "withTransaction" | "quarantineSince">, now: Date
+): Promise<UnverifiedNoticeDay[]> {
+  const since = new Date(now.getTime() - 14 * 86_400_000);
+  const counts = new Map<string, number>();
+  let after: NoticeQuarantineCursor | null = null;
+  for (;;) {
+    const cursor = after;
+    const rows: ReadonlyArray<NoticeQuarantineRow> = await billing.withTransaction((client) =>
+      billing.quarantineSince(client, since, { after: cursor, limit: QUARANTINE_PAGE_ROWS }));
+    for (const row of rows) {
+      const day = row.receivedAt.toISOString().slice(0, 10);
+      counts.set(day, (counts.get(day) ?? 0) + 1);
+    }
+    const last = rows.at(-1);
+    if (rows.length < QUARANTINE_PAGE_ROWS || last === undefined) break;
+    after = Object.freeze({ receivedAt: last.receivedAt, quarantineId: last.quarantineId });
+  }
+  return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, count]) => Object.freeze({ day, count }));
+}
+
 /**
  * Which list a dead XMONEY_REFUND job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
  * (P2-I5) and REFUND_CHARGE_MISSING (P2-W4: the job names a charge we do not have) moved no money and are no refund to
@@ -293,7 +326,9 @@ const zeroCounts = (): Record<TaxStatus, number> => ({ TAXABLE: 0, NON_TAXABLE: 
 export function buildTaxSummary(input: Readonly<{
   quarter: TaxQuarter; rows: ReadonlyArray<TaxSummaryRow>; invoiceUnknown: ReadonlyArray<InvoiceUnknownItem>;
   efactura: ReadonlyArray<EFacturaCheckItem>; paymentsToCheck: ReadonlyArray<PaymentToCheckItem>;
-  deadEmails: ReadonlyArray<DeadEmailItem>; authorities: TaxAuthorities;
+  deadEmails: ReadonlyArray<DeadEmailItem>;
+  unverifiedNotices?: ReadonlyArray<UnverifiedNoticeDay>;
+  authorities: TaxAuthorities;
 }>): TaxSummary {
   type Working = { taxCountry: string; taxRegion: string | null; authority: TaxAuthorityEntry | null;
     netMicros: number; taxMicros: number; sales: number; refunds: number; unknownRefunds: number;
@@ -377,7 +412,9 @@ export function buildTaxSummary(input: Readonly<{
     invoiceUnknown: Object.freeze(input.invoiceUnknown.filter((item) =>
       item.jobKind !== "REFUNDED_BEFORE_START" || soldThisQuarter.has(item.chargeId))),
     efactura: Object.freeze([...input.efactura]), paymentsToCheck: Object.freeze([...input.paymentsToCheck]),
-    deadEmails: Object.freeze([...input.deadEmails]), sales, refunds
+    deadEmails: Object.freeze([...input.deadEmails]),
+    unverifiedNotices: Object.freeze([...(input.unverifiedNotices ?? [])]),
+    sales, refunds
   });
 }
 
@@ -520,6 +557,12 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " below the list):",
     (item) => `${item.template ?? "unknown template"} (job ${item.ref}): ${item.code}, since ${isoDay(item.since)}`),
   emailKey, (item) => deadEmailAction(item.template, item.recipient));
+  // N9: printed only when a NETOPIA message was kept, so a summary without any reads exactly as before.
+  if (summary.unverifiedNotices.length > 0) {
+    out.push("NETOPIA messages that could not be verified (kept 14 days and checked again at every API start; check the"
+      + " NETOPIA key with pnpm billing:check):");
+    for (const item of summary.unverifiedNotices) out.push(`  ${item.day}: ${plural(item.count, "message", "messages")}`);
+  }
   section(summary.efactura, "Romanian e-Factura documents to confirm: none.",
     "Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV (issued this quarter or earlier, and no"
       + " ACCEPTED status recorded yet; record ANAF's answer with pnpm billing:efactura-status --invoice"
