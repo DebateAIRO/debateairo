@@ -378,8 +378,10 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     expect(paged).toEqual(all.map((state) => state.subscriptionId));
   });
 
-  it("renews each xMoney system's subscriptions only there, and counts what is still open in it", async () => {
-    const before = await billing.openRecordCounts("live");
+  it("renews each xMoney system's subscriptions only there, and counts its open records as another payment system's", async () => {
+    // The seeded xMoney live rows are another system to a NETOPIA sandbox deployment, so its view counts them.
+    const otherSystem = { paymentProvider: "netopia", paymentEnvironment: "sandbox" } as const;
+    const before = await billing.openOtherSystemRecordCounts(otherSystem);
     const ownerRef = randomUUID();
     const live = await activeSubscription(ownerRef, anchor, "live");
     const now = new Date(anchor.getTime() + 40 * 86_400_000);
@@ -388,17 +390,17 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     expect(liveDue.every((state) => state.paymentProvider === "xmoney" && state.paymentEnvironment === "live")).toBe(true);
     expect((await billing.dueRenewals(now, 0, 10_000, { provider: "xmoney", environment: "stage" })).map((state) => state.subscriptionId))
       .not.toContain(live);
-    expect(await billing.openRecordCounts("live")).toEqual({ ...before, subscriptions: before.subscriptions + 1 });
+    expect(await billing.openOtherSystemRecordCounts(otherSystem)).toEqual({ ...before, subscriptions: before.subscriptions + 1 });
     const charge = await quoteAndCharge(ownerRef, live, "INITIAL", anchor, "live");
-    expect((await billing.openRecordCounts("live")).charges).toBe(before.charges + 1);
+    expect((await billing.openOtherSystemRecordCounts(otherSystem)).charges).toBe(before.charges + 1);
     await billing.withTransaction((c) => billing.appendChargeEvent(c, {
       chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(), providerPaymentId: "61001", amountMicros: 24_200_000, errorCode: null
     }));
     await billing.withTransaction((c) => billing.appendSubscriptionEvent(c, subscriptionEvent(live, ownerRef, "CANCEL_REQUESTED")));
-    expect(await billing.openRecordCounts("live")).toEqual(before);
+    expect(await billing.openOtherSystemRecordCounts(otherSystem)).toEqual(before);
   });
 
-  it("counts the refund, invoice and credit-note jobs still open on each system's charges (P2-I4)", async () => {
+  it("counts the refund, invoice, credit-note and payment-check jobs still open on another payment system's charges (P2-I4)", async () => {
     const ownerRef = randomUUID();
     const subscription = await activeSubscription(ownerRef, anchor, "live");
     const charge = await quoteAndCharge(ownerRef, subscription, "INITIAL", anchor, "live");
@@ -406,8 +408,12 @@ describe("P1b — one broken history never stops the renewals of everyone else",
       chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(), providerPaymentId: "61002", amountMicros: 24_200_000, errorCode: null
     }));
     await billing.withTransaction((c) => billing.appendSubscriptionEvent(c, subscriptionEvent(subscription, ownerRef, "CANCEL_REQUESTED")));
-    const live = await billing.openRecordCounts("live");
-    const stage = await billing.openRecordCounts("stage");
+    // Seen from a NETOPIA sandbox deployment the seeded xMoney live rows are another system's; from their own system,
+    // xMoney live, they never count.
+    const otherSystem = { paymentProvider: "netopia", paymentEnvironment: "sandbox" } as const;
+    const ownSystem = { paymentProvider: "xmoney", paymentEnvironment: "live" } as const;
+    const live = await billing.openOtherSystemRecordCounts(otherSystem);
+    const own = await billing.openOtherSystemRecordCounts(ownSystem);
     // The plan (a cancel pending) and its paid charge count as closed; what they still queue does not.
     const [invoice, refund] = await billing.withTransaction(async (c) => [
       await billing.enqueue(c, { kind: "SMARTBILL_INVOICE", ref: charge.chargeId, notBefore: anchor, payload: { card_country: "RO" } }),
@@ -419,15 +425,20 @@ describe("P1b — one broken history never stops the renewals of everyone else",
         kind: "QUADERNO_RECORD_REFUND", ref: `${charge.chargeId}:61002`, notBefore: anchor,
         payload: { charge_id: charge.chargeId, transaction_id: "61002", refund_micros: 5_000_000 }
       }),
+      // An xMoney notice's payment check names the charge only as its external order id (notice-intake.ts).
+      await billing.enqueue(c, {
+        kind: "VERIFY_PAYMENT", ref: "61003", notBefore: anchor,
+        payload: { notice_id: null, order_id: "61003", external_order_id: charge.chargeId }
+      }),
       // A job naming no charge (an owner email) is not this count's.
       await billing.enqueue(c, { kind: "EMAIL", ref: `O2:${charge.chargeId}`, notBefore: anchor, payload: {} })
     ]);
-    expect(await billing.openRecordCounts("live")).toEqual({ ...live, jobs: live.jobs + 3 });
-    expect(await billing.openRecordCounts("stage")).toEqual(stage);
+    expect(await billing.openOtherSystemRecordCounts(otherSystem)).toEqual({ ...live, jobs: live.jobs + 4 });
+    expect(await billing.openOtherSystemRecordCounts(ownSystem)).toEqual(own);
     // A job that is done or dead is closed.
     await billing.complete(invoice!, new Date());
     await billing.fail(refund!, "XMONEY_REFUSED", null, new Date());
-    expect((await billing.openRecordCounts("live")).jobs).toBe(live.jobs + 1);
+    expect((await billing.openOtherSystemRecordCounts(otherSystem)).jobs).toBe(live.jobs + 2);
   });
 
   it("counts the billing rows and open jobs dated more than a day ahead of the real clock (W14, P2-I19)", async () => {

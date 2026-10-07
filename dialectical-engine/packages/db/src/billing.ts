@@ -690,60 +690,12 @@ export class BillingRepository {
   }
 
   /**
-   * What is still open in one xMoney system: subscriptions not ENDED/WITHDRAWN and not ACTIVE with a cancel pending
-   * (one whose history does not fold counts as open), charges with no SUCCEEDED/FAILED event whose subscription
-   * is not ENDED/WITHDRAWN, and (P2-I4) outbox jobs neither done nor dead that name one of its charges: the refund,
-   * credit-note and payment-check jobs by their payload's `charge_id`, the two invoice jobs by their ref. P6a refuses
-   * a live boot while anything stage is open, so no sandbox job queued up to a month ahead (the stage clock) is ever
-   * claimed by the live outbox.
-   */
-  async openRecordCounts(
-    environment: CustomerXMoneyEnvironment
-  ): Promise<{ subscriptions: number; charges: number; jobs: number }> {
-    const rows = (await this.pool.query<SubscriptionEventRaw>(`
-      SELECT ${SUBSCRIPTION_EVENT_COLUMNS} FROM billing.subscription_event AS event
-      WHERE event.subscription_id IN (
-        SELECT created.subscription_id FROM billing.subscription_event AS created
-        WHERE created.kind = 'CREATED' AND created.data ->> 'xmoney_environment' = $1
-      )
-      ORDER BY event.subscription_id, event.seq
-    `, [environment])).rows;
-    let subscriptions = 0;
-    const settled = new Set<string>();
-    for (const state of foldEach(rows, () => { subscriptions += 1; })) {
-      if (state.status === "ENDED" || state.status === "WITHDRAWN") settled.add(state.subscriptionId);
-      else if (!(state.status === "ACTIVE" && state.cancelRequested)) subscriptions += 1;
-    }
-    const open = (await this.pool.query<{ subscription_id: string }>(`
-      SELECT charge.subscription_id FROM billing.charge AS charge
-      WHERE charge.payment_provider = 'xmoney' AND charge.payment_environment = $1
-        AND NOT EXISTS (
-          SELECT 1 FROM billing.charge_event AS final
-          WHERE final.charge_id = charge.charge_id AND final.kind IN ('SUCCEEDED','FAILED')
-        )
-    `, [environment])).rows;
-    const jobs = (await this.pool.query<{ open_jobs: string }>(`
-      SELECT count(*) AS open_jobs FROM billing.outbox AS job
-      WHERE job.done_at IS NULL AND job.dead_at IS NULL
-        AND EXISTS (
-          SELECT 1 FROM billing.charge AS charge
-          WHERE charge.payment_provider = 'xmoney' AND charge.payment_environment = $1
-            AND (charge.charge_id = job.payload ->> 'charge_id'
-              OR (job.kind IN ('QUADERNO_RECORD_SALE','SMARTBILL_INVOICE') AND charge.charge_id = job.ref))
-        )
-    `, [environment])).rows[0]?.open_jobs ?? "0";
-    return {
-      subscriptions, charges: open.filter((row) => !settled.has(row.subscription_id)).length, jobs: Number(jobs)
-    };
-  }
-
-  /**
    * NETOPIA (spec 2026-10-05 §2.5.4): what is still open OUTSIDE the deployment's own payment system — xMoney-era
-   * rows and, after a same-host switch, NETOPIA sandbox rows — counted as `openRecordCounts` counts one system's:
-   * subscriptions not ENDED/WITHDRAWN and not ACTIVE with a cancel pending (one whose history does not fold counts as
-   * open), charges with no SUCCEEDED/FAILED event whose subscription is not settled, and outbox jobs neither done nor
-   * dead that name such a charge (by payload `charge_id`, an xMoney notice job's `external_order_id`, or the two
-   * invoice jobs' ref). A CREATED of the xMoney era names no `payment_provider`: it is xMoney's.
+   * rows and, after a same-host switch, NETOPIA sandbox rows: subscriptions not ENDED/WITHDRAWN and not ACTIVE with a
+   * cancel pending (one whose history does not fold counts as open), charges with no SUCCEEDED/FAILED event whose
+   * subscription is not settled, and outbox jobs neither done nor dead that name such a charge (by payload
+   * `charge_id`, an xMoney notice job's `external_order_id`, or the two invoice jobs' ref). A CREATED of the xMoney
+   * era names no `payment_provider`: it is xMoney's.
    */
   async openOtherSystemRecordCounts(own: Readonly<{
     paymentProvider: PaymentProviderName; paymentEnvironment: PaymentEnvironmentName;
