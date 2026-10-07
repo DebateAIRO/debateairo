@@ -29,7 +29,31 @@ def load_bridge():
     spec = importlib.util.spec_from_file_location('production_preview_budget_authority', SOURCE)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    # The offline tests run as the developer, not root, so they use the explicit custody seam that
+    # main() never passes. HelperCustodyTests check the custody path itself on copies.
+    module.load_helper(skip_custody_for_tests=True)
     return module
+
+
+def load_bridge_copy(source):
+    """Imports a copy of the gate exactly as production does: nothing of the helper runs."""
+    spec = importlib.util.spec_from_file_location('copied_preview_budget_authority', source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def custody_copy(root, helper_suffix=b''):
+    """Gate and helper copied into root/ops with safe modes; the caller may spoil them."""
+    ops = Path(root) / 'ops'
+    ops.mkdir()
+    gate, helper = ops / SOURCE.name, ops / HELPER_SOURCE.name
+    gate.write_bytes(SOURCE.read_bytes())
+    helper.write_bytes(HELPER_SOURCE.read_bytes() + helper_suffix)
+    os.chmod(ops, 0o755)
+    os.chmod(gate, 0o644)
+    os.chmod(helper, 0o644)
+    return ops, gate, helper
 
 
 def file_sha(path):

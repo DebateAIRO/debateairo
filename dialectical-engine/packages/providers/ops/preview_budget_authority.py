@@ -16,6 +16,7 @@ import json
 import os
 import re
 import socket
+import stat
 import struct
 import sys
 import threading
@@ -71,22 +72,74 @@ def sha(path):
     return sha_bytes(Path(path).read_bytes())
 
 
-HELPER_PATH = Path(__file__).resolve().parent / 'preview_budget_helper.py'
+class SafetyError(Exception):
+    """A refusal with a fixed code. The gate hands this class to the helper it runs, so both raise it."""
 
 
-def _load_helper():
-    # Execute exactly the bytes that were hashed, so the GO binds the helper that runs.
-    source = HELPER_PATH.read_bytes()
-    module = types.ModuleType('preview_budget_helper')
-    module.__file__ = str(HELPER_PATH)
-    exec(compile(source, str(HELPER_PATH), 'exec'), module.__dict__)
-    return module, sha_bytes(source)
-
-
-helper, HELPER_SHA256 = _load_helper()
-BRIDGE_SHA256 = sha(Path(__file__).resolve())
-SafetyError = helper.SafetyError
+BRIDGE_PATH = Path(__file__).resolve()
+HELPER_PATH = BRIDGE_PATH.parent / 'preview_budget_helper.py'
+BRIDGE_SHA256 = sha(BRIDGE_PATH)
+helper = HELPER_SHA256 = None  # Set by load_helper, which main() runs before any phase.
 _emit_lock = threading.Lock()
+
+
+def _custody_ok(info, kind, owner_uid):
+    if not kind(info.st_mode) or info.st_uid != owner_uid or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise SafetyError('HELPER_CUSTODY_INVALID')
+
+
+def read_helper_in_custody(owner_uid=0):
+    """The helper's bytes, read once from a checked descriptor. The gate's directory, the gate file
+    and the helper must be owned by root (owner_uid), writable by no one else, and not symlinks."""
+    try:
+        dir_fd = os.open(HELPER_PATH.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        raise SafetyError('HELPER_CUSTODY_INVALID') from None
+    try:
+        _custody_ok(os.fstat(dir_fd), stat.S_ISDIR, owner_uid)
+        _custody_ok(os.stat(BRIDGE_PATH.name, dir_fd=dir_fd, follow_symlinks=False), stat.S_ISREG, owner_uid)
+        with os.fdopen(os.open(HELPER_PATH.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd), 'rb') as stream:
+            _custody_ok(os.fstat(stream.fileno()), stat.S_ISREG, owner_uid)
+            return stream.read()
+    except OSError:
+        raise SafetyError('HELPER_CUSTODY_INVALID') from None
+    finally:
+        os.close(dir_fd)
+
+
+def load_helper(expected_sha256=None, *, skip_custody_for_tests=False):
+    """Run the helper once per process, from exactly the bytes that were checked.
+
+    Custody comes first (read_helper_in_custody); with a GO in play the bytes must then match its
+    helper_sha256 before any of them runs. skip_custody_for_tests is the offline tests' seam (they
+    run as the developer, not root); main() never passes it.
+    """
+    global helper, HELPER_SHA256
+    if helper is None:
+        source = HELPER_PATH.read_bytes() if skip_custody_for_tests else read_helper_in_custody()
+        digest = sha_bytes(source)
+        if expected_sha256 is not None and digest != expected_sha256:
+            raise SafetyError('ROOT_GO_INVALID')
+        module = types.ModuleType('preview_budget_helper')
+        module.__file__ = str(HELPER_PATH)
+        module.SafetyError = SafetyError
+        exec(compile(source, str(HELPER_PATH), 'exec'), module.__dict__)
+        helper, HELPER_SHA256 = module, digest
+    elif expected_sha256 is not None and HELPER_SHA256 != expected_sha256:
+        raise SafetyError('ROOT_GO_INVALID')
+    return helper
+
+
+def go_helper_sha256(path):
+    """Only the helper hash a GO binds, read before any helper code runs; load_go validates the rest."""
+    try:
+        go = json.loads(Path(path).read_bytes())
+    except (OSError, ValueError, TypeError):
+        raise SafetyError('ROOT_GO_REQUIRED') from None
+    value = go.get('helper_sha256') if isinstance(go, dict) else None
+    if not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value):
+        raise SafetyError('ROOT_GO_INVALID')
+    return value
 
 
 def emit(value):
@@ -771,8 +824,11 @@ def main(argv=None):
     parser.add_argument('--socket', type=Path, default=Path('/run/debateai-v3-preview/provider-budget.sock'))
     args = parser.parse_args(argv)
     try:
-        if args.phase in ('init', 'activate', 'serve') and args.go is None:
+        uses_go = args.phase in ('init', 'activate', 'serve')
+        if uses_go and args.go is None:
             raise SafetyError('ROOT_GO_REQUIRED')
+        # No helper code runs before its custody, and with a GO its bound hash, are checked.
+        load_helper(go_helper_sha256(args.go) if uses_go else None)
         if args.phase == 'init':
             result = init_state(args.private, args.go)
         elif args.phase == 'activate':

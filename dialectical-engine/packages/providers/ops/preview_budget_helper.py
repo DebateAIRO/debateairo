@@ -1,7 +1,8 @@
 """Custody, accounting and transport primitives for the private preview spending gate.
 
 Adapted from the reviewed DeepInfra benchmark helper; it keeps only what the gate needs.
-The gate loads this file from its own directory and its GO file binds this file's hash.
+The gate runs this file from its own directory, only after checking that root owns it and no one
+else can write it, and that its hash is the one the GO binds. It is never imported on its own.
 No retries, external packages, environment proxies, redirects, or credential artifacts.
 """
 import fcntl
@@ -22,11 +23,11 @@ MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_TIMEOUT_SECONDS = 600
 
 
-class SafetyError(Exception):
-    pass
+# SafetyError is not defined here: the gate checks this file's custody and hash, then runs it with
+# its own SafetyError already in the namespace, so the gate and the helper raise one class.
 
 
-class ResponseTooLarge(SafetyError):
+class ResponseTooLarge(SafetyError):  # noqa: F821 - provided by the gate
     pass
 
 

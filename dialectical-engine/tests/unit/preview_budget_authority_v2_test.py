@@ -9,8 +9,10 @@ import io
 import json
 import os
 import re
+import shutil
 import socket
 import sys
+import tempfile
 import threading
 import time
 import types
@@ -23,8 +25,8 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from preview_budget_authority_fixture import (  # noqa: E402
-    HELPER_SOURCE, HOST, KEY, MODEL, PEER, REMOVE, RESERVED, SCOPE, SOURCE, Gate, body, envelope,
-    file_sha, go_document, load_bridge, provider_response)
+    HELPER_SOURCE, HOST, KEY, MODEL, PEER, REMOVE, RESERVED, SCOPE, SOURCE, Gate, body, custody_copy, envelope,
+    file_sha, go_document, load_bridge, load_bridge_copy, provider_response)
 
 bridge = load_bridge()
 SafetyError = bridge.helper.SafetyError
@@ -86,6 +88,99 @@ class HelperBindingTests(GateTest):
         with patch.object(sys, 'argv', ['gate', 'status', '--private', '/nonexistent', '--helper', 'x']), \
              contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             bridge.main()
+
+
+class HelperCustodyTests(GateTest):
+    def copy(self):
+        root = Path(tempfile.mkdtemp(prefix='preview-custody-'))
+        self.addCleanup(shutil.rmtree, root, True)
+        marker = root / 'helper-ran'
+        suffix = ('\nimport pathlib as _marker\n_marker.Path(%r).write_text("ran")\n' % str(marker)).encode()
+        ops, gate_copy, helper_copy = custody_copy(root, suffix)
+        return root, ops, gate_copy, helper_copy, marker
+
+    def run_main(self, module, argv):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = module.main(argv)
+        return code, json.loads(out.getvalue().splitlines()[-1])
+
+    def go_for(self, root, gate_copy, helper_bytes):
+        path = root / 'go.json'
+        path.write_text(json.dumps(go_document(bridge_sha256=file_sha(gate_copy),
+                                               helper_sha256=hashlib.sha256(helper_bytes).hexdigest())))
+        return path
+
+    @staticmethod
+    def symlinked_helper(root, ops, gate_copy, helper_copy):
+        target = root / 'elsewhere.py'
+        target.write_bytes(helper_copy.read_bytes())
+        helper_copy.unlink()
+        helper_copy.symlink_to(target)
+
+    UNSAFE = {
+        'directory_group_writable': lambda root, ops, gate_copy, helper_copy: os.chmod(ops, 0o775),
+        'directory_other_writable': lambda root, ops, gate_copy, helper_copy: os.chmod(ops, 0o757),
+        'helper_group_writable': lambda root, ops, gate_copy, helper_copy: os.chmod(helper_copy, 0o664),
+        'helper_other_writable': lambda root, ops, gate_copy, helper_copy: os.chmod(helper_copy, 0o646),
+        'gate_group_writable': lambda root, ops, gate_copy, helper_copy: os.chmod(gate_copy, 0o664),
+        'helper_is_a_symlink': symlinked_helper.__func__,
+    }
+
+    def test_every_phase_checks_custody_before_any_helper_code_runs(self):
+        for name, spoil in self.UNSAFE.items():
+            for phase in ('status', 'stop', 'init', 'activate'):
+                with self.subTest(unsafe=name, phase=phase):
+                    root, ops, gate_copy, helper_copy, marker = self.copy()
+                    helper_bytes = helper_copy.read_bytes()
+                    spoil(root, ops, gate_copy, helper_copy)
+                    copied = load_bridge_copy(gate_copy)
+                    self.assertFalse(marker.exists(), 'importing the gate ran helper code')
+                    argv = [phase, '--private', str(root / 'private')]
+                    if phase in ('init', 'activate'):
+                        argv += ['--go', str(self.go_for(root, gate_copy, helper_bytes))]
+                    self.assertEqual(self.run_main(copied, argv), (2, {'status': 'refused', 'error_class': 'SafetyError',
+                                                                       'error': 'HELPER_CUSTODY_INVALID'}))
+                    self.assertFalse(marker.exists())
+
+    def test_main_refuses_a_helper_that_root_does_not_own(self):
+        if os.getuid() == 0:
+            self.skipTest('needs a non-root owner')
+        root, _ops, gate_copy, _helper_copy, marker = self.copy()
+        copied = load_bridge_copy(gate_copy)
+        code, result = self.run_main(copied, ['status', '--private', str(root / 'private')])
+        self.assertEqual((code, result.get('error')), (2, 'HELPER_CUSTODY_INVALID'))
+        self.assertFalse(marker.exists())
+
+    def test_custody_check_returns_the_helper_bytes_only_when_every_path_is_safe(self):
+        root, ops, gate_copy, helper_copy, marker = self.copy()
+        copied = load_bridge_copy(gate_copy)
+        self.assertEqual(copied.read_helper_in_custody(owner_uid=os.getuid()), helper_copy.read_bytes())
+        with self.assertRaisesRegex(copied.SafetyError, '^HELPER_CUSTODY_INVALID$'):
+            copied.read_helper_in_custody(owner_uid=os.getuid() + 1)
+        for name, spoil in list(self.UNSAFE.items()) + [('helper_missing', lambda r, o, g, h: h.unlink())]:
+            with self.subTest(unsafe=name):
+                root, ops, gate_copy, helper_copy, marker = self.copy()
+                copied = load_bridge_copy(gate_copy)
+                spoil(root, ops, gate_copy, helper_copy)
+                with self.assertRaisesRegex(copied.SafetyError, '^HELPER_CUSTODY_INVALID$'):
+                    copied.read_helper_in_custody(owner_uid=os.getuid())
+        self.assertFalse(marker.exists())
+
+    def test_go_bound_helper_hash_is_checked_before_the_helper_runs(self):
+        root, _ops, gate_copy, helper_copy, marker = self.copy()
+        copied = load_bridge_copy(gate_copy)
+        reviewed = root / 'go.json'
+        reviewed.write_text(json.dumps(go_document()))  # Binds the reviewed helper, not this altered copy.
+        with patch.object(copied, 'read_helper_in_custody', lambda owner_uid=0: helper_copy.read_bytes()):
+            result = self.run_main(copied, ['init', '--private', str(root / 'private'), '--go', str(reviewed)])
+        self.assertEqual(result, (2, {'status': 'refused', 'error_class': 'SafetyError', 'error': 'ROOT_GO_INVALID'}))
+        self.assertFalse(marker.exists())
+        self.assertIsNone(copied.helper)
+        copied.load_helper(expected_sha256=file_sha(helper_copy), skip_custody_for_tests=True)
+        self.assertTrue(marker.exists())
+        self.assertEqual(copied.HELPER_SHA256, file_sha(helper_copy))
+        self.assertIs(copied.helper.SafetyError, copied.SafetyError)
 
 
 class GoValidationTests(GateTest):
