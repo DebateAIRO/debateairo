@@ -146,10 +146,6 @@ export type BillingAuditEvent =
   | "billing.age_frozen.stopped"
   /** P16c: the quarter's tax summary was queued as email O1 to the owner; the field is the quarter label only. */
   | "billing.tax_summary.queued"
-  /**
-   * P17 (Q-3): M1's accepted-Terms attachment was not attached. The fields are the attachment kind and a code
-   * (MAIL_TERMS_NOT_RECORDED or MAIL_TERMS_NOT_ARCHIVED) only, never a hash, a locale or an address.
-   */
   /** N9 (spec 2026-10-05 §2.7.4): NETOPIA's message failed verification; the reason code only. */
   | "billing.notice.unverified"
   /** N9 (§2.7.3 step 2): a verified message names no charge and no tool order of ours. No field. */
@@ -160,6 +156,10 @@ export type BillingAuditEvent =
   | "billing.notice.store_failed"
   /** N9 (§2.7.4 step 2): the start's re-check of the quarantine; the counts only, or the failure's code. */
   | "billing.notice.recheck"
+  /**
+   * P17 (Q-3): M1's accepted-Terms attachment was not attached. The fields are the attachment kind and a code
+   * (MAIL_TERMS_NOT_RECORDED or MAIL_TERMS_NOT_ARCHIVED) only, never a hash, a locale or an address.
+   */
   | "billing.mail.attachment_missing";
 
 export type BillingAuditField = string | number | boolean | null;
