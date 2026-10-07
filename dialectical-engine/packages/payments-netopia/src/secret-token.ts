@@ -26,8 +26,13 @@ class RedactedToken implements SecretToken {
   [inspect.custom](): string { return REDACTED; }
 }
 
+/** True exactly when createSecretToken accepts the value: printable ASCII without spaces, 5 to 1024 characters. */
+export function isSecretTokenText(value: unknown): value is string {
+  return typeof value === "string" && TOKEN_TEXT.test(value);
+}
+
 export function createSecretToken(plaintext: string): SecretToken {
-  if (typeof plaintext !== "string" || !TOKEN_TEXT.test(plaintext)) {
+  if (!isSecretTokenText(plaintext)) {
     throw new TypedDomainError("SECRET_TOKEN_INVALID", "the card token is not a valid token text");
   }
   return new RedactedToken(plaintext);

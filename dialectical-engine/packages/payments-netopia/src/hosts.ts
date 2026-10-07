@@ -21,6 +21,12 @@ export function isNetopiaPosSignature(value: string): boolean {
   return typeof value === "string" && POS_SIGNATURE.test(value);
 }
 
+/** Spec §2.4.3: NETOPIA's payment id (ntpID), 1 to 64 characters of letters, digits and _ . : - */
+const PAYMENT_ID = /^[A-Za-z0-9_.:-]{1,64}$/u;
+export function isNetopiaPaymentId(value: unknown): value is string {
+  return typeof value === "string" && PAYMENT_ID.test(value);
+}
+
 const PAYMENT_HOST_SUFFIXES: ReadonlyArray<string> = Object.freeze([".netopia-payments.com", ".mobilpay.ro"]);
 /** Spec §2.2 rule 10: https on a NETOPIA subdomain, no user info, no explicit port (the URL lets anyone pay our order). */
 export function isNetopiaPaymentUrl(url: string): boolean {

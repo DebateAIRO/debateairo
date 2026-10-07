@@ -2,6 +2,7 @@
 import { paymentError, type HostedPaymentStart, type Payer, type SavedCardCharge } from "@debateai/billing-core";
 import { iso2ToNetopiaCountry } from "./countries.js";
 import { NETOPIA_FACTS, netopiaLanguageOf } from "./facts.js";
+import { isNetopiaPaymentId } from "./hosts.js";
 import { microsToNetopiaAmount } from "./money.js";
 
 /*
@@ -19,7 +20,6 @@ const SCA_EXEMPTION_MIT = "MIT";
 /** Our charge id (32 lower-case hex), or an N22 tool order (`t-` + 30 lower-case hex, 0096's CHECK). */
 const ORDER_ID = /^(?:[0-9a-f]{32}|t-[0-9a-f]{30})$/u;
 const CLIENT_ID = /^[0-9a-f]{32}$/u;
-const NTP_ID = /^[A-Za-z0-9_.:-]{1,64}$/u;
 const E164 = /^\+[0-9]{8,15}$/u;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
 const OCTET = "(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
@@ -120,6 +120,6 @@ export function buildSavedCardChargeBody(input: SavedCardCharge, context: Reques
 /** `POST {base}/operation/status`: the POS signature as posID, the best ntpID or "", and our order id. */
 export function buildStatusBody(input: Readonly<{ orderId: string; providerPaymentId: string | null }>, posSignature: string): string {
   checkCommon(input.orderId, DEFAULT_REQUEST_FACTS);
-  if (input.providerPaymentId !== null && !NTP_ID.test(input.providerPaymentId)) throw paymentError("PAYMENT_CONFIGURATION_REFUSED", "ntpID");
+  if (input.providerPaymentId !== null && !isNetopiaPaymentId(input.providerPaymentId)) throw paymentError("PAYMENT_CONFIGURATION_REFUSED", "ntpID");
   return writeJson({ posID: posSignature, ntpID: input.providerPaymentId ?? "", orderID: input.orderId });
 }

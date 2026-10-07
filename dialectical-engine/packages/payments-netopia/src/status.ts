@@ -17,10 +17,13 @@ export function statusToState(status: number): PaymentState {
 
 /** Outcome codes, never a refusal: approved (00, 0), 3-D Secure (100), the page (101), locked (102), the order reused (56). */
 const OUTCOME_CODES: ReadonlySet<string> = new Set(["00", "0", "100", "101", "102", "56"]);
+export function isOutcomeCode(code: string): boolean {
+  return OUTCOME_CODES.has(code);
+}
 /** Spec §2.4.5: a card-side code or a status 12 without a code is the CARD; 32, 33, 99 and unknown codes are the MERCHANT. */
 export function declineSideOf(code: string | null, status: number | null): DeclineSide | null {
   const text = code === null ? "" : code.trim();
-  if (text === "" || OUTCOME_CODES.has(text)) return status === 12 ? "CARD" : null;
+  if (text === "" || isOutcomeCode(text)) return status === 12 ? "CARD" : null;
   return NETOPIA_FACTS.cardDeclineCodes.includes(text) ? "CARD" : "MERCHANT";
 }
 

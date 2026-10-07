@@ -2,11 +2,11 @@
 import { paymentError, type HostedPaymentStarted, type PaymentReport, type PaymentState, type SavedCard, type SecretToken } from "@debateai/billing-core";
 import { netopiaCountryToIso2 } from "./countries.js";
 import { NETOPIA_FACTS } from "./facts.js";
-import { isNetopiaPaymentUrl } from "./hosts.js";
+import { isNetopiaPaymentId, isNetopiaPaymentUrl } from "./hosts.js";
 import { isJsonRecord, valueAtPath } from "./json.js";
 import { netopiaAmountToMicros } from "./money.js";
-import { createSecretToken } from "./secret-token.js";
-import { bankDeclined, declineSideOf, statusToState } from "./status.js";
+import { createSecretToken, isSecretTokenText } from "./secret-token.js";
+import { bankDeclined, declineSideOf, isOutcomeCode, statusToState } from "./status.js";
 import { parseOccurredAt } from "./time.js";
 
 /*
@@ -19,17 +19,14 @@ export type PaymentAnswer =
   | Readonly<{ kind: "ORDER_REUSED_WITHOUT_PAYMENT" }>
   | Readonly<{ kind: "NO_SUCH_ORDER" }>;
 
-const NTP_ID = /^[A-Za-z0-9_.:-]{1,64}$/u;
 const STATUS_TEXT = /^(?:[1-9]|1[0-9]|2[0-3])$/u;
 const CURRENCY = /^[A-Z]{3}$/u;
 const CODE = /^[0-9A-Za-z_-]{1,10}$/u;
-const TOKEN_TEXT = /^[\x21-\x7e]{5,1024}$/u;
 const ECHOED_ID = /^[A-Za-z0-9_.:-]{1,64}$/u;
 const LAST_FOUR = /([0-9]{4})$/u;
 const MONTH_TEXT = /^(?:[1-9]|1[0-2])$/u;
 const YEAR_TEXT = /^20[0-9]{2}$/u;
 const SUCCESS_CODES: ReadonlySet<string> = new Set(["00", "0"]);
-const NOT_A_REFUSAL: ReadonlySet<string> = new Set(["00", "0", "100", "101", "102", "56"]);
 /** The status a report names when NETOPIA gave its state by a code alone: a decline (12), 3-D Secure (15), locked (1). */
 const STATUS_OF_CODE_STATE: Readonly<Partial<Record<PaymentState, string>>> = Object.freeze({ DECLINED: "12", ACTION_REQUIRED: "15", PENDING: "1" });
 
@@ -61,7 +58,7 @@ function statusTextOf(payment: Record<string, unknown> | null): string | null {
 
 function ntpIdOf(payment: Record<string, unknown> | null): string {
   const ntpId = payment?.ntpID;
-  return typeof ntpId === "string" && NTP_ID.test(ntpId) ? ntpId : invalid("ntpID");
+  return isNetopiaPaymentId(ntpId) ? ntpId : invalid("ntpID");
 }
 
 function savedCardOf(json: Record<string, unknown>, payment: Record<string, unknown>): SavedCard | null {
@@ -70,7 +67,7 @@ function savedCardOf(json: Record<string, unknown>, payment: Record<string, unkn
     const value = valueAtPath(json, path);
     if (value === undefined || value === null) continue;
     // Lenient on purpose: a token of an odd shape leaves no saved card; it never rejects the payment it came with.
-    token = typeof value === "string" && TOKEN_TEXT.test(value) ? createSecretToken(value) : null;
+    token = isSecretTokenText(value) ? createSecretToken(value) : null;
     break;
   }
   if (token === null) return null;
@@ -142,7 +139,7 @@ export function readStartAnswer(json: unknown, context: Readonly<{ sameOriginAll
     if (typeof url !== "string" || !(isNetopiaPaymentUrl(url) || sameOrigin(url, context.sameOriginAllowed))) invalid("paymentURL");
     return Object.freeze({ providerPaymentId, redirectUrl: url });
   }
-  if (code === null || (NOT_A_REFUSAL.has(code) && code !== "56") || NETOPIA_FACTS.cardDeclineCodes.includes(code)) invalid(code ?? undefined);
+  if (code === null || (isOutcomeCode(code) && code !== "56") || NETOPIA_FACTS.cardDeclineCodes.includes(code)) invalid(code ?? undefined);
   // 56 (the order exists: nothing new was started), 32/33 (merchant settings), 99, any code we do not know.
   throw paymentError("PAYMENT_CONFIGURATION_REFUSED", code);
 }
@@ -158,7 +155,7 @@ export function readPaymentAnswer(json: unknown, context: Readonly<{ orderId: st
   if (context.purpose === "STATUS") {
     if (code !== null && NETOPIA_FACTS.notFoundCodes.includes(code) && statusText === null) return Object.freeze({ kind: "NO_SUCH_ORDER" });
     if (statusText !== null) return report(null);
-    if (code === null || NOT_A_REFUSAL.has(code) || NETOPIA_FACTS.cardDeclineCodes.includes(code)) invalid();
+    if (code === null || isOutcomeCode(code) || NETOPIA_FACTS.cardDeclineCodes.includes(code)) invalid();
     throw paymentError("PAYMENT_CONFIGURATION_REFUSED", code);
   }
   if (code === null || SUCCESS_CODES.has(code)) return statusText === null ? invalid() : report(null);
@@ -166,7 +163,7 @@ export function readPaymentAnswer(json: unknown, context: Readonly<{ orderId: st
   if (code === "102") return report("PENDING");
   if (code === "56") {
     const ntpId = payment?.ntpID;
-    return statusText !== null && typeof ntpId === "string" && NTP_ID.test(ntpId) ? report(null, true) : Object.freeze({ kind: "ORDER_REUSED_WITHOUT_PAYMENT" });
+    return statusText !== null && isNetopiaPaymentId(ntpId) ? report(null, true) : Object.freeze({ kind: "ORDER_REUSED_WITHOUT_PAYMENT" });
   }
   if (NETOPIA_FACTS.cardDeclineCodes.includes(code)) return report("DECLINED");
   throw paymentError("PAYMENT_CONFIGURATION_REFUSED", code);
