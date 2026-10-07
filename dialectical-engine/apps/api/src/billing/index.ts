@@ -366,14 +366,20 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     const sourceKey = clientIpNetworkScope(source(request).ip);
     // Node lowercases header names, so NETOPIA's `Verification-token` is read whatever its letter case.
     const header = request.headers["verification-token"];
+    let refused = false;
     const answer = await intake.receive({
       rawBody: Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0),
       header: typeof header === "string" ? header : undefined,
       sourceKey,
       now: clock(),
-      admit: () => admit.gate(reply, "billingNotify", "POST /v1/billing/netopia/notify", sourceKey)
+      admit: () => {
+        const admitted = admit.gate(reply, "billingNotify", "POST /v1/billing/netopia/notify", sourceKey);
+        if (!admitted) refused = true;
+        return admitted;
+      }
     });
-    if (reply.sent) return reply;
+    // The gate has already answered 429 with its retry-after; never send twice, whatever the onSend hooks' timing.
+    if (refused || reply.sent) return reply;
     return reply.status(answer.status).header("content-type", "application/json").send(answer.body);
   });
 
