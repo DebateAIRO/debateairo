@@ -1456,14 +1456,18 @@ export class RenewalService {
   /**
    * N11 (spec §2.9.3 step 5): before a dunning retry (a NEW orderID) of a NETOPIA subscription, every earlier attempt of
    * the period that may have reached NETOPIA (a SUBMITTED or a SUBMIT_UNKNOWN) is read again. One that reads PAID gets its
-   * SUBMITTED and VERIFY_PAYMENT (which settles the period, RECOVERED): "PAID", and no retry is made. An attempt that
-   * cannot be read: "UNKNOWN", and no retry this pass (a second payment is never risked). An xMoney plan: "NONE".
+   * SUBMITTED and VERIFY_PAYMENT (which settles the period, RECOVERED): "PAID", at once, and no retry is made. One whose
+   * report is still PENDING or AUTHORIZED at NETOPIA: "PENDING", the owner gets O3 RENEWAL_OUTCOME_OPEN once for that
+   * charge, and no retry this pass (its money could still be taken). An attempt that cannot be read: "UNKNOWN", and no
+   * retry this pass (a second payment is never risked); "PENDING" wins over "UNKNOWN". Every other read (NO_SUCH_ORDER, a
+   * final unpaid state, REFUNDED, CHARGEBACK_*, UNCLEAR) holds nothing. An xMoney plan: "NONE".
    */
   async earlierAttemptPaid(
     state: SubscriptionState, periodStart: Date, attempt: number, now: Date
-  ): Promise<"PAID" | "NONE" | "UNKNOWN"> {
+  ): Promise<"PAID" | "PENDING" | "UNKNOWN" | "NONE"> {
     if (state.paymentProvider !== "netopia") return "NONE";
     let unknown = false;
+    let pending = false;
     const earlier = (await this.deps.repository.chargesForSubscription(state.subscriptionId))
       .filter((row) => row.kind === "RENEWAL" && row.periodStart.getTime() === periodStart.getTime() && row.attempt < attempt)
       .sort((left, right) => left.attempt - right.attempt);
@@ -1487,7 +1491,12 @@ export class RenewalService {
         this.deps.audit("billing.renewal.recovered_earlier", { attempt: charge.attempt });
         return "PAID";
       }
+      if (read !== "NO_SUCH_ORDER" && (read.state === "PENDING" || read.state === "AUTHORIZED")) {
+        await this.outcomeOpen(charge, now);
+        pending = true;
+        continue;
+      }
     }
-    return unknown ? "UNKNOWN" : "NONE";
+    return pending ? "PENDING" : unknown ? "UNKNOWN" : "NONE";
   }
 }

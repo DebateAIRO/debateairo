@@ -549,4 +549,50 @@ describe("N11 a dunning retry first probes the period's earlier attempts (spec Â
     expect(run.payments.chargesOf(retry!.chargeId)).toHaveLength(1);
     expect(foldSubscription(await run.repository.subscriptionEvents(run.seeded.subscriptionId)).status).toBe("PAST_DUE");
   });
+
+  it("makes no retry while an earlier attempt is still pending or authorised at NETOPIA, tells the owner once, and retries once it reads final", async () => {
+    const run = await due();
+    run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
+    const first = await renewNow(run);
+    const reference = `charge ${first.chargeId}`;
+    const renewalAttempts = async () => (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+      .filter((row) => row.kind === "RENEWAL").map((row) => row.attempt);
+    const heldPending = () => run.audit.events.filter((entry) => entry.event === "billing.renewal.retry_held"
+      && entry.fields.code === "EARLIER_ATTEMPT_PENDING");
+    // The window ends on a fresh NO_SUCH_ORDER: attempt 1 closes NO_TRANSACTION and the dunning starts.
+    run.payments.scriptStatus(first.chargeId, "NO_SUCH_ORDER");
+    run.clock.now = new Date(run.seeded.periodEnd.getTime() + 72 * HOUR + MINUTE);
+    expect(await run.renewal.recoverOpenCharge(first.chargeId)).toBe(true);
+    expect((await trail(first.chargeId)).at(-1)).toBe("FAILED:NO_TRANSACTION");
+    expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
+    expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", reference)).toHaveLength(0);
+    // A day later the retry is due, but NETOPIA now reports attempt 1 AUTHORIZED: its money could still be taken.
+    run.payments.scriptStatus(first.chargeId, report(first.chargeId, "AUTHORIZED"));
+    run.clock.now = new Date(run.clock.now.getTime() + DAY + MINUTE);
+    await run.maintenance.runOnce();
+    expect(await renewalAttempts()).toEqual([1]);
+    expect(heldPending()).toHaveLength(1);
+    expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", reference)).toHaveLength(1);
+    // Still PENDING on the next pass: still no retry, and no second O3.
+    run.payments.scriptStatus(first.chargeId, report(first.chargeId, "PENDING"));
+    run.clock.now = new Date(run.clock.now.getTime() + 11 * MINUTE);
+    await run.maintenance.runOnce();
+    expect(await renewalAttempts()).toEqual([1]);
+    expect(heldPending()).toHaveLength(2);
+    expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", reference)).toHaveLength(1);
+    // A final unpaid state (EXPIRED): the retry is made, with a NEW orderID.
+    run.payments.scriptStatus(first.chargeId, report(first.chargeId, "EXPIRED"));
+    run.payments.answer(run.email, (input) => report(input.orderId, "PAID"));
+    run.clock.now = new Date(run.clock.now.getTime() + 11 * MINUTE);
+    await run.maintenance.runOnce();
+    expect(await renewalAttempts()).toEqual([1, 2]);
+    const retry = (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+      .find((row) => row.kind === "RENEWAL" && row.attempt === 2)!;
+    expect(retry.chargeId).not.toBe(first.chargeId);
+    expect(run.payments.chargesOf(retry.chargeId)).toHaveLength(1);
+    expect(run.payments.chargesOf(first.chargeId)).toHaveLength(1);
+    expect(run.payments.reads.filter((read) => read.orderId === first.chargeId)).toHaveLength(4);
+    expect(heldPending()).toHaveLength(2);
+    expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", reference)).toHaveLength(1);
+  });
 });

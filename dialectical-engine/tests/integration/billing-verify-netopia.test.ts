@@ -434,4 +434,33 @@ describe("N10 VERIFY_PAYMENT on NETOPIA: a renewal", () => {
     expect(kindsAfter.slice(-2)).toEqual(["RECOVERED", "CARD_SAVED"]);
     expect((await state(seeded.subscriptionId))).toMatchObject({ status: "ACTIVE", cardTokenId: tokenId });
   });
+
+  it("settles as RECOVERED an earlier attempt closed FAILED(NO_TRANSACTION) that NETOPIA later reports PAID (spec §2.9.3 step 5)", async () => {
+    const { seeded, chargeId, before } = await renewal("failed-then-paid");
+    // Attempt 1 was closed NO_TRANSACTION at its window's end, and the dunning started from it.
+    const failedAt = new Date();
+    await repository.withTransaction(async (client) => {
+      await repository.appendChargeEvent(client, chargeEvent(chargeId, "FAILED", failedAt, {
+        providerPaymentId: null, amountMicros: seeded.totalMicros, errorCode: "NO_TRANSACTION"
+      }));
+      await repository.appendSubscriptionEvent(client, subscriptionEvent(before, "PAST_DUE", failedAt, {
+        charge_id: chargeId, attempt: 1, next_retry_at: new Date(failedAt.getTime() + DAY).toISOString(),
+        first_failed_at: failedAt.toISOString()
+      }));
+    });
+    expect((await state(seeded.subscriptionId)).status).toBe("PAST_DUE");
+    // The retry's probe of the earlier attempt finds it PAID: its SUBMITTED is a replay (DUPLICATE), so the probe's
+    // transaction, and the VERIFY_PAYMENT it queues, stand.
+    const replayed = await repository.withTransaction((client) => repository.appendChargeEvent(client, chargeEvent(chargeId, "SUBMITTED", new Date(), {
+      providerPaymentId: `ntp-${chargeId.slice(0, 12)}`, amountMicros: seeded.totalMicros, errorCode: null
+    })));
+    expect(replayed).toBe("DUPLICATE");
+    const status = new ScriptedStatus();
+    const now = { at: new Date() };
+    status.script(chargeId, report(chargeId, "PAID", { amountMicros: seeded.totalMicros }));
+    expect(await handlerFor(status, now).verify.handle(job(chargeId, 1, now.at), now.at)).toEqual({ kind: "DONE" });
+    expect(await kinds(chargeId)).toEqual(["REQUESTED", "SUBMITTED", "FAILED", "SUCCEEDED"]);
+    expect((await repository.subscriptionEvents(seeded.subscriptionId)).at(-1)?.kind).toBe("RECOVERED");
+    expect((await state(seeded.subscriptionId)).status).toBe("ACTIVE");
+  });
 });

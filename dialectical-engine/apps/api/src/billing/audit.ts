@@ -74,7 +74,7 @@ export type BillingAuditEvent =
   | "billing.renewal.price_missing"
   /** N11 (spec §2.9.3, §2.9.4): a NETOPIA renewal's outcome is still open past its window; O3 was queued. The attempt. */
   | "billing.renewal.outcome_open"
-  /** N11 (spec §2.9.3 step 5): a dunning retry was not made this pass; the code (EARLIER_ATTEMPT_PAID or _UNREADABLE). */
+  /** N11 (spec §2.9.3 step 5): a dunning retry was not made this pass; the code (EARLIER_ATTEMPT_PAID, _PENDING or _UNREADABLE). */
   | "billing.renewal.retry_held"
   /** N11: an earlier attempt of the period read PAID before a retry; its check was queued. The attempt. */
   | "billing.renewal.recovered_earlier"

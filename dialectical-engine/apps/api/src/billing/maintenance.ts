@@ -205,7 +205,8 @@ export class BillingMaintenance {
         ? await this.deps.renewal.earlierAttemptPaid(state, periodStart, next, now) : "NONE";
       if (earlier !== "NONE") {
         this.deps.audit("billing.renewal.retry_held", {
-          code: earlier === "PAID" ? "EARLIER_ATTEMPT_PAID" : "EARLIER_ATTEMPT_UNREADABLE"
+          code: earlier === "PAID" ? "EARLIER_ATTEMPT_PAID"
+            : earlier === "PENDING" ? "EARLIER_ATTEMPT_PENDING" : "EARLIER_ATTEMPT_UNREADABLE"
         });
         return false;
       }
