@@ -188,7 +188,8 @@ class TeamStore:
     while an upstream call runs.
     """
 
-    def __init__(self, private, lock_timeout=LOCK_TIMEOUT_SECONDS, shared=False, create=False):
+    def __init__(self, private, lock_timeout=None, shared=False, create=False):
+        lock_timeout = LOCK_TIMEOUT_SECONDS if lock_timeout is None else lock_timeout
         self.private, self.lock_timeout, self.shared, self.create = Path(private), lock_timeout, shared, create
         self.dir_fd = self.lock_fd = None
 
@@ -412,7 +413,12 @@ def reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now):
 
 
 def record_settlement(private, entry_id, day, changes, halt_reason, budget, now):
-    """Lock, settle the entry on its reservation day (or halt), unlock."""
+    """Lock, settle the entry on its reservation day (or halt), unlock.
+
+    A halt reaches the control file before the ledger entry it explains, and the in-flight id is
+    cleared last: a process that dies between any two writes leaves the id in flight, and the
+    next serve start halts on it.
+    """
     with TeamStore(private) as store:
         control = store.control()
         moment = current(now)
@@ -425,19 +431,22 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
         entry.update(changes, reconciled_at=iso(moment))
         if halt_reason is None and day_spend(ledger) > budget:
             halt_reason = 'charge_overrun'
-        store.save_ledger(ledger)
-        control['in_flight'].pop(entry_id, None)
         if halt_reason is not None:
             _halt(control, halt_reason, moment, entry_id)
+            store.save_control(control)
+        store.save_ledger(ledger)
+        control['in_flight'].pop(entry_id, None)
         store.save_control(control)
         return {'authority': control['state'], 'day_held_usd': str(day_spend(ledger))}
 
 
-def settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now):
+def settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots):
     try:
         return record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
     except BaseException:
         # The pending hold stays in the ledger and in flight; serve start turns it uncertain.
+        # This server reserves nothing more, even when the halt below cannot be written either.
+        slots.trip()
         try:
             halt(private, 'settlement_failure', now=now, entry_id=entry_id)
         except BaseException:
@@ -453,9 +462,17 @@ def bounded_accounting(accounting):
 
 
 class CallSlots:
+    """One server's call slots, plus its trip: after a failed settlement or a failed halt this
+    process reserves nothing more until it is restarted (restart recovery then halts on the
+    interrupted entry)."""
+
     def __init__(self, limit):
         self.limit = limit
         self._semaphore = threading.BoundedSemaphore(limit)
+        self.tripped = False
+
+    def trip(self):
+        self.tripped = True
 
     def acquire(self, wait):
         return self._semaphore.acquire(timeout=wait)
@@ -483,6 +500,8 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         key = (key_loader or helper.read_key)(private)
         if dispatch is None:
             dispatch = helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)))
+        if slots.tripped:
+            raise SafetyError('AUTHORITY_STOPPED')
         entry_id, day = reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now)
         budget, started = Decimal(go['daily_budget_usd']), time.monotonic()
         event = {'event': 'preview_provider_paid_post', 'operation_id': input['operationId'], 'day': day}
@@ -493,7 +512,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             outcome = settle_or_halt(private, entry_id, day, {
                 'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'transport_failure',
                 'error_class': type(error).__name__, 'elapsed_seconds': round(time.monotonic() - started, 6)},
-                'uncertain_charge', budget, now)
+                'uncertain_charge', budget, now, slots)
             emit({**event, 'status': 'uncertain', **outcome})
             raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
         elapsed = round(time.monotonic() - started, 6)
@@ -504,7 +523,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             changes, halt_reason, charge, reply = ({'state': 'uncertain', 'held_usd': str(reserved),
                                                     'reason': 'accounting_failure', 'elapsed_seconds': elapsed},
                                                    'uncertain_charge', None, None)
-        outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now)
+        outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
         emit({**event, 'status': changes['state'], 'halt_reason': halt_reason, 'guard_charge_usd': charge,
               'elapsed_seconds': elapsed, **outcome})
         if charge is None:
@@ -538,26 +557,44 @@ def assess_reply(status, response, reserved, elapsed):
 
 
 def recover_interrupted(private, now=None):
-    """Serve start only (one server per state): leftover holds were interrupted, so their charge is uncertain."""
+    """Serve start only (one server per state).
+
+    Every id still in flight was interrupted. If its entry reached the ledger, its charge, its
+    halt or its reply may be lost whatever state the entry shows, so the gate halts; a pending
+    entry becomes uncertain. An id without an entry was never dispatched and is dropped. An
+    uncertain entry that no recorded halt names (on today's or an in-flight day's ledger) also
+    halts. The halt is written first, so dying here repeats the recovery.
+    """
     now = now or helper.utc_now
     with TeamStore(private) as store:
         control = store.control()
-        if not control['in_flight']:
-            return {'interrupted': 0}
-        moment, interrupted = current(now), 0
-        for entry_id, day in sorted(control['in_flight'].items()):
-            ledger = store.ledger(day)
-            entry = ledger['entries'].get(entry_id)
-            if entry is not None and entry['state'] == 'pending':
+        moment, in_flight = current(now), control['in_flight']
+        ledgers = {day: store.ledger(day) for day in sorted(set(in_flight.values()) | {bucharest_day(moment)})}
+        named = {event.get('entry_id') for event in control.get('halts', [])}
+        interrupted = [(entry_id, day) for entry_id, day in sorted(in_flight.items()) if entry_id in ledgers[day]['entries']]
+        unrecorded = [entry_id for ledger in ledgers.values() for entry_id, entry in sorted(ledger['entries'].items())
+                      if entry['state'] == 'uncertain' and entry_id not in named and entry_id not in in_flight]
+        if not in_flight and not unrecorded:
+            return {'interrupted': 0, 'unrecorded_uncertain': 0}
+        for entry_id, day in interrupted:
+            pending = ledgers[day]['entries'][entry_id]['state'] == 'pending'
+            _halt(control, 'interrupted_call_uncertain' if pending else 'interrupted_after_settlement', moment, entry_id)
+        for entry_id in unrecorded:
+            _halt(control, 'uncertain_entry_unrecorded', moment, entry_id)
+        if interrupted or unrecorded:
+            store.save_control(control)
+        touched = set()
+        for entry_id, day in interrupted:
+            entry = ledgers[day]['entries'][entry_id]
+            if entry['state'] == 'pending':
                 entry.update(state='uncertain', held_usd=entry['reserved_usd'], reason='interrupted_before_reconciliation',
                              reconciled_at=iso(moment))
-                store.save_ledger(ledger)
-                interrupted += 1
+                touched.add(day)
+        for day in sorted(touched):
+            store.save_ledger(ledgers[day])
         control['in_flight'] = {}
-        if interrupted:
-            _halt(control, 'interrupted_call_uncertain', moment)
         store.save_control(control)
-        return {'interrupted': interrupted}
+        return {'interrupted': len(interrupted), 'unrecorded_uncertain': len(unrecorded)}
 
 
 def hold_serve_lock(private):
@@ -664,7 +701,8 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None):
         server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute))
         os.chmod(socket_path, 0o666)
         emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
-              'interrupted_calls_found': recovered['interrupted']})
+              'interrupted_calls_found': recovered['interrupted'],
+              'unrecorded_uncertain_found': recovered['unrecorded_uncertain']})
         try:
             server.serve_forever()
         finally:

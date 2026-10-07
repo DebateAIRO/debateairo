@@ -654,13 +654,13 @@ class HaltTests(GateTest):
         _, reserved = bridge.validate_request(request, go)
         bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, HOST, PEER, gate.clock)
         self.assertEqual(gate.status()['in_flight'], 1)
-        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 1})
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 1, 'unrecorded_uncertain': 0})
         self.assert_halted(gate, 'interrupted_call_uncertain', 'uncertain')
 
     def test_clean_serve_start_recovers_nothing_and_stays_active(self):
         gate = self.gate().ready()
         gate.call('op-1')
-        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0})
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0, 'unrecorded_uncertain': 0})
         self.assertEqual(gate.status()['state'], 'active')
 
     def test_serve_refuses_without_root_linux_exact_host_and_fresh_run_socket(self):
@@ -689,6 +689,127 @@ class HaltTests(GateTest):
         finally:
             os.close(first)
         os.close(bridge.hold_serve_lock(gate.private))
+
+
+class Crash(BaseException):
+    """The process dies: no state write after this point lands."""
+
+
+class CrashRecoveryTests(GateTest):
+    ENTRY = 'preview-test:' + SCOPE + ':op-1'
+
+    def die_during_settlement(self, gate, outcome, writes_before_death):
+        real, written = bridge.helper.write_bytes, []
+
+        def dying(dir_fd, name, data):
+            if len(written) >= writes_before_death:
+                raise Crash()
+            written.append(name)
+            return real(dir_fd, name, data)
+        death = patch.object(bridge.helper, 'write_bytes', dying)
+
+        def dispatch(_body, _key):
+            death.start()  # Reservation is durable; the process dies during settlement.
+            return outcome()
+        try:
+            with self.assertRaises(SafetyError):
+                gate.call('op-1', dispatch=dispatch)
+        finally:
+            death.stop()
+
+    def restart(self, gate):
+        return bridge.recover_interrupted(gate.private, now=gate.clock)
+
+    def test_death_between_any_two_settlement_writes_still_halts_after_restart(self):
+        def transport_failure():
+            raise OSError('synthetic')
+        outcomes = {'uncertain': (transport_failure, 3),
+                    'overrun': (lambda: (200, provider_response(str(RESERVED + Decimal('0.01')))), 3),
+                    'non_200': (lambda: (500, provider_response('0.02')), 3),
+                    'settled_reply_lost': (lambda: (200, provider_response('0.01')), 2)}
+        for name, (outcome, writes) in outcomes.items():
+            for writes_before_death in range(writes):
+                with self.subTest(outcome=name, writes_before_death=writes_before_death):
+                    gate = self.gate().ready()
+                    self.die_during_settlement(gate, outcome, writes_before_death)
+                    self.restart(gate)
+                    status = gate.status()
+                    self.assertEqual((status['state'], status['in_flight']), ('halted', 0))
+                    self.assertIn(gate.day('2026-10-08')['entries'][self.ENTRY]['state'], ('uncertain', 'settled'))
+                    self.assertIn(self.ENTRY, [event.get('entry_id') for event in status['halts']])
+
+    def test_leftover_in_flight_entry_halts_at_serve_start_whatever_its_state(self):
+        for state in ('settled', 'uncertain'):
+            with self.subTest(state=state):
+                gate = self.gate().ready()
+                go = bridge.read_go(gate.go_path)
+                request = envelope(body(), 'op-1')
+                _, reserved = bridge.validate_request(request, go)
+                bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, HOST, PEER, gate.clock)
+                ledger_path = gate.private / 'team-ledger-2026-10-08.json'
+                ledger = json.loads(ledger_path.read_text())
+                entry = ledger['entries'][self.ENTRY]
+                entry.update(state=state, held_usd='0.01' if state == 'settled' else entry['reserved_usd'])
+                ledger_path.write_text(json.dumps(ledger))
+                self.assertEqual(self.restart(gate), {'interrupted': 1, 'unrecorded_uncertain': 0})
+                status = gate.status()
+                self.assertEqual((status['state'], status['reason'], status['in_flight']),
+                                 ('halted', 'interrupted_after_settlement', 0))
+                self.assertEqual(gate.day('2026-10-08')['entries'][self.ENTRY]['state'], state)
+
+    def test_uncertain_entry_without_a_recorded_halt_halts_at_serve_start_once(self):
+        gate = self.gate().ready()
+
+        def broken(_body, _key):
+            raise OSError('synthetic')
+        with self.refused('NEW_CHARGE_UNCERTAIN'):
+            gate.call('op-1', dispatch=broken)
+        control_path = gate.private / 'team-control.json'
+        control = json.loads(control_path.read_text())
+        control.update(state='active', reason=None, halts=[])  # The halt was lost.
+        control_path.write_text(json.dumps(control))
+        self.assertEqual(self.restart(gate), {'interrupted': 0, 'unrecorded_uncertain': 1})
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason']), ('halted', 'uncertain_entry_unrecorded'))
+        self.assertEqual(status['halts'][0]['entry_id'], self.ENTRY)
+        gate.activate()  # Root has seen it; the entry is now named by a halt.
+        self.assertEqual(self.restart(gate), {'interrupted': 0, 'unrecorded_uncertain': 0})
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_failed_settlement_and_failed_halt_trip_the_server_so_nothing_new_is_reserved(self):
+        gate = self.gate().ready()
+
+        def disk_full(*_args):
+            raise OSError('synthetic disk full')
+        failing = patch.object(bridge.helper, 'write_bytes', disk_full)
+
+        def dispatch(_body, _key):
+            failing.start()
+            return 200, provider_response('0.01')
+        try:
+            with self.refused('SETTLEMENT_FAILED'):
+                gate.call('op-1', dispatch=dispatch)
+        finally:
+            failing.stop()
+        self.assertEqual(gate.status()['state'], 'active')  # The disk refused the halt too.
+        dispatched = []
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-2', dispatch=lambda *args: dispatched.append(args))
+        self.assertEqual(dispatched, [])
+        self.assertNotIn('preview-test:' + SCOPE + ':op-2', gate.day('2026-10-08')['entries'])
+
+    def test_settlement_lock_timeout_trips_the_server(self):
+        gate = self.gate().ready()
+        holder = []
+
+        def dispatch(_body, _key):
+            holder.append(bridge.TeamStore(gate.private, lock_timeout=0).__enter__())
+            return 200, provider_response('0.01')
+        with patch.object(bridge, 'LOCK_TIMEOUT_SECONDS', 0.05), self.refused('SETTLEMENT_FAILED'):
+            gate.call('op-1', dispatch=dispatch)
+        holder[0].__exit__()
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-2')
 
 
 class ConcurrencyTests(GateTest):
