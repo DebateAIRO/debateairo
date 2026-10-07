@@ -42,7 +42,7 @@ export async function otherSystemOutcome(
   chargeId: string
 ): Promise<OutboxOutcome | null> {
   const charge = await deps.repository.charge(chargeId);
-  return charge !== null && charge.xmoneyEnvironment !== deps.xmoneyEnvironment
+  return charge !== null && (charge.paymentProvider !== "xmoney" || charge.paymentEnvironment !== deps.xmoneyEnvironment)
     ? otherXMoneySystem(deps.audit, job.kind) : null;
 }
 
@@ -87,7 +87,7 @@ export async function loadPaidCharge(
 ): Promise<PaidCharge | null> {
   const charge = await deps.repository.charge(chargeId);
   const paid = charge?.events.find((event) => event.kind === "SUCCEEDED");
-  if (charge === null || paid === undefined || paid.xmoneyTransactionId === null) return null;
+  if (charge === null || paid === undefined || paid.providerPaymentId === null) return null;
   const quote = charge.quoteId === null ? null : await deps.repository.quote(charge.quoteId, charge.ownerRef);
   const customer = await deps.repository.customerByOwner(charge.ownerRef);
   const latest = customer === null ? null : await deps.repository.latestProfile(customer.customerId);
@@ -156,7 +156,7 @@ export function saleRecordOf(
   const region = PRICED_REGION_COUNTRIES.has(buyer.country) ? paid.quote.taxRegion : buyer.region;
   return Object.freeze({
     chargeId: paid.charge.chargeId,
-    transactionId: paid.paid.xmoneyTransactionId!,
+    transactionId: paid.paid.providerPaymentId!,
     issuedOn: paid.paid.at,
     customer: Object.freeze({
       name: company?.name ?? buyer.name, email: paid.profile.email, country: buyer.country,
@@ -207,7 +207,7 @@ export type SaleRefund =
 export function saleRefundOf(
   charge: Readonly<{ events: readonly ChargeEventRow[] }>, paid: ChargeEventRow, transactionId: string
 ): SaleRefund {
-  const refunded = transactionId === paid.xmoneyTransactionId
+  const refunded = transactionId === paid.providerPaymentId
     ? charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId)
     : undefined;
   if (refunded === undefined || refunded.amountMicros === null || refunded.amountMicros <= 0) {
@@ -239,7 +239,7 @@ export async function creditNoteContext(
   if (issued.some((invoice) => invoice.kind === "CREDIT_NOTE")) {
     // Refunds of the sale itself only: a DUPLICATE_PAYMENT's refund (D5 5f) was never a sale and has no document.
     const saleRefunds = paid.charge.events.filter((event) => event.kind === "REFUNDED"
-      && refundTarget(event) === paid.paid.xmoneyTransactionId).length;
+      && refundTarget(event) === paid.paid.providerPaymentId).length;
     if (saleRefunds <= 1) return DONE;
     deps.audit("billing.invoice.unknown", { issuer, kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
     return Object.freeze({ kind: "DEAD" as const, code: "CREDIT_NOTE_MANUAL" });

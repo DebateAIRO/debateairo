@@ -151,7 +151,7 @@ describe("P12c upgrade on real PostgreSQL", () => {
     const submitted = charge!.events.find((event) => event.kind === "SUBMITTED")!;
     expect(charge!.events.map((event) => event.kind)).toEqual(["REQUESTED", "SUBMITTED"]);
     const verify = await database.pool.query<{ payload: Record<string, unknown> }>(
-      "SELECT payload FROM billing.outbox WHERE kind='VERIFY_PAYMENT' AND ref=$1", [submitted.xmoneyTransactionId]
+      "SELECT payload FROM billing.outbox WHERE kind='VERIFY_PAYMENT' AND ref=$1", [submitted.providerPaymentId]
     );
     expect(verify.rows).toEqual([{ payload: { charge_id: first.json().charge_ref } }]);
     expect(run.kick).toHaveBeenCalledTimes(1);
@@ -167,7 +167,7 @@ describe("P12c upgrade on real PostgreSQL", () => {
     expect(response.json()).toMatchObject({ state: "FAILED", reason_code: "PAYMENT_DECLINED" });
     const billing = new BillingRepository(database.pool);
     expect((await billing.charge(response.json().charge_ref as string))!.events
-      .map((event) => [event.kind, event.errorCode, event.xmoneyTransactionId]))
+      .map((event) => [event.kind, event.errorCode, event.providerPaymentId]))
       .toEqual([["REQUESTED", null, null], ["FAILED", "PAYMENT_DECLINED", run.xmoney.declined[0]]]);
     expect(foldSubscription(await billing.subscriptionEvents(run.seeded.subscriptionId)).planId).toBe("PLUS");
     await run.api.close();
@@ -324,7 +324,7 @@ describe("P12c upgrade on real PostgreSQL", () => {
     const charge = (await billing.charge(chargeRef))!;
     const quote = (await billing.quote(quoteRef, run.identity.authenticated.ownerRef))!;
     const transaction: XMoneyTransaction = Object.freeze({
-      transactionId: charge.events.find((event) => event.kind === "SUBMITTED")!.xmoneyTransactionId!,
+      transactionId: charge.events.find((event) => event.kind === "SUBMITTED")!.providerPaymentId!,
       orderId: run.seeded.xmoneyOrderId, externalOrderId: run.seeded.initialChargeId,
       customerId: run.seeded.xmoneyCustomerId, cardId: run.seeded.cardRef, status: "complete-ok",
       amountDecimal: microsToDecimal(charge.totalMicros), currency: "USD", ip: null,
@@ -377,7 +377,7 @@ describe("P12c upgrade on real PostgreSQL", () => {
     const charge = (await billing.charge(chargeRef))!;
     const quote = (await billing.quote(quoteRef, run.identity.authenticated.ownerRef))!;
     const transaction: XMoneyTransaction = Object.freeze({
-      transactionId: charge.events.find((event) => event.kind === "SUBMITTED")!.xmoneyTransactionId!,
+      transactionId: charge.events.find((event) => event.kind === "SUBMITTED")!.providerPaymentId!,
       orderId: run.seeded.xmoneyOrderId, externalOrderId: run.seeded.initialChargeId,
       customerId: run.seeded.xmoneyCustomerId, cardId: run.seeded.cardRef, status: "complete-ok",
       amountDecimal: microsToDecimal(charge.totalMicros), currency: "USD", ip: null,

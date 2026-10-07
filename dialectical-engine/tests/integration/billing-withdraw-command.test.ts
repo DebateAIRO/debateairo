@@ -68,7 +68,7 @@ const emailOf = async (template: string, ref: string) => (await database.pool.qu
 
 const withdrawalRequests = async (chargeId: string) => ((await rows().charge(chargeId))?.events ?? [])
   .filter((event) => event.kind === "REFUND_REQUESTED" && event.errorCode === "WITHDRAWAL")
-  .map((event) => [event.xmoneyTransactionId, event.amountMicros]);
+  .map((event) => [event.providerPaymentId, event.amountMicros]);
 
 /** P9c's record of a refund made in the xMoney dashboard on the first payment: its true amount is unknown. */
 async function dashboardRefund(seeded: SeededSubscription, at: Date): Promise<void> {
@@ -76,7 +76,7 @@ async function dashboardRefund(seeded: SeededSubscription, at: Date): Promise<vo
   await repository.withTransaction(async (client) => {
     for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
       await repository.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, kind, at, {
-        xmoneyTransactionId: seeded.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
+        providerPaymentId: seeded.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
       }));
     }
   });

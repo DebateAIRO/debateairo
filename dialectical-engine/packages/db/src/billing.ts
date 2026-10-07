@@ -19,10 +19,15 @@ import { withWriteTransaction, withWriteTransactionOn } from "./index.js";
 export type OutboxKind =
   | "VERIFY_PAYMENT" | "QUADERNO_RECORD_SALE" | "QUADERNO_RECORD_REFUND" | "SMARTBILL_INVOICE"
   | "SMARTBILL_STORNO" | "EMAIL" | "RENEWAL_NOTICE" | "OWNER_TAX_SUMMARY"
-  // R-30: the durable refund executor (P9b/P12d) and the yearly retention purge (P16c).
-  | "XMONEY_REFUND" | "RETENTION_PURGE";
+  // R-30: the durable refund executor (P9b/P12d) and the yearly retention purge (P16c). Spec 2026-10-05 §2.12.1:
+  // RefundDesk's job becomes PAYMENT_REFUND; XMONEY_REFUND stays for old rows only (0096's CHECK keeps both).
+  | "XMONEY_REFUND" | "RETENTION_PURGE" | "PAYMENT_REFUND";
 /** R-14: an xMoney customer lives in one environment; the connectors' `xmoneyEnvironment` names it. */
 export type CustomerXMoneyEnvironment = "stage" | "live";
+/** Spec 2026-10-05 §2.5.1: the provider a charge row is paid with (xMoney rows are inert history, §2.5.4). */
+export type PaymentProviderName = "xmoney" | "netopia";
+/** xMoney's systems were stage and live; NETOPIA's are sandbox and live (0096's paired CHECK). */
+export type PaymentEnvironmentName = "stage" | "sandbox" | "live";
 export type ChargeKind = "INITIAL" | "RENEWAL" | "UPGRADE" | "CARD_CHECK";
 export type ChargeEventKind =
   | "REQUESTED" | "SUBMITTED" | "SUBMIT_UNKNOWN" | "SUCCEEDED" | "FAILED" | "REFUND_REQUESTED" | "REFUNDED"
@@ -48,27 +53,26 @@ export type ChargeRow = Readonly<{
   chargeId: string; ownerRef: string; subscriptionId: string; kind: ChargeKind; attempt: number;
   periodStart: Date; periodEnd: Date; quoteId: string | null;
   netMicros: number; taxMicros: number; totalMicros: number; currency: "USD"; createdAt: Date;
-  /** The xMoney system (connectors.xmoneyEnvironment) this charge is paid in; its events inherit it. */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
+  /** Spec 2026-10-05 §2.5.1: the provider and the environment this charge is paid in; its events inherit both. */
+  paymentProvider: PaymentProviderName;
+  paymentEnvironment: PaymentEnvironmentName;
 }>;
 export type ChargeEventRow = Readonly<{
   eventId: string; chargeId: string; kind: ChargeEventKind; at: Date;
-  xmoneyTransactionId: string | null; amountMicros: number | null; errorCode: string | null;
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
-  /** REFUND_REQUESTED/REFUNDED only: the PAID transaction refunded, when it is not the row's own transaction. */
+  /** The provider's payment id (xMoney's transaction id, NETOPIA's ntpID), when the row names a payment. */
+  providerPaymentId: string | null; amountMicros: number | null; errorCode: string | null;
+  paymentProvider: PaymentProviderName;
+  paymentEnvironment: PaymentEnvironmentName;
+  /** REFUND_REQUESTED/REFUNDED only, xMoney rows only: the PAID transaction refunded, when it is not the row's own. */
   refundsTransactionId: string | null;
 }>;
 /**
- * What a caller appends: the repository mints `eventId` when it is left out, takes `xmoneyEnvironment` from the
- * charge (so the two can never disagree), and `refundsTransactionId` defaults to null. `xmoneyCreatedAt` is the
- * xMoney transaction's own `creationDate` (VERIFY_PAYMENT passes `transaction.createdAt`); the tax summary dates the
- * row by it. Only a row that IS that xMoney transaction may carry it (P1a's constraint): a SUCCEEDED, a
- * DUPLICATE_PAYMENT, or a REFUNDED on its own refund transaction (`refundsTransactionId` set). A REFUNDED or
- * CHARGEBACK written for a status change of the payment itself carries none — that transaction's createdAt is the
- * payment's — and is dated by `at`.
+ * What a caller appends: the repository mints `eventId` when it is left out and takes the provider and environment from
+ * the charge. `providerCreatedAt` (the provider's own time for the payment; the tax summary dates by it) is allowed only
+ * on a row that IS the payment (0096's charge_event_provider_time_names_payment).
  */
-export type ChargeEventInput = Omit<ChargeEventRow, "eventId" | "xmoneyEnvironment" | "refundsTransactionId">
-  & Readonly<{ eventId?: string; refundsTransactionId?: string | null; xmoneyCreatedAt?: Date | null }>;
+export type ChargeEventInput = Omit<ChargeEventRow, "eventId" | "paymentProvider" | "paymentEnvironment" | "refundsTransactionId">
+  & Readonly<{ eventId?: string; refundsTransactionId?: string | null; providerCreatedAt?: Date | null }>;
 /**
  * Where a read runs: the pool (the default), or the client of a transaction the caller holds (D6b) — the shape
  * packages/db/src/index.ts:668 already uses.
@@ -98,7 +102,7 @@ export type OutboxJob = Readonly<{
  * charge total), one REFUND per REFUNDED event (`amountMicros` = the refunded amount), one CHARGEBACK per CHARGEBACK
  * event whose own transaction has no CHARGEBACK_RESOLVED (`amountMicros` = the event's amount, else the charge total). Only
  * charges of the xMoney system `quarterSummaryRows` is asked for: a sandbox payment is never a sale. `at` is when
- * xMoney says the money moved (the event's `xmoney_created_at`, present only on a SUCCEEDED or on a REFUNDED that is
+ * xMoney says the money moved (the event's `provider_created_at`, present only on a SUCCEEDED or on a REFUNDED that is
  * its own refund transaction), else when it was recorded — so a refund or charge-back of the payment itself is dated
  * when it was recorded, never by the payment's date. Tax fields come from the charge's quote, money fields from the
  * charge, the verdict from its location evidence (null when none). `amountKnown` is false on exactly one shape: a
@@ -130,6 +134,49 @@ export type DueRenewalsOptions = Readonly<{
 }>;
 /** The claim a worker holds: its id and the attempt number `claim` gave it. */
 export type OutboxClaimFence = Readonly<{ workerId: string; attempts: number }>;
+/** Spec 2026-10-05 §2.7.3: what processing one stored NETOPIA message came to (A21: a following row). */
+export type NoticeOutcome =
+  | "APPLIED" | "UNKNOWN_ORDER" | "TOOL_ORDER" | "BILLING_OFF" | "PARSE_FAILED" | "OTHER_SYSTEM" | "DECIDED_BY_NOTICE"
+  | "OWNER_REVIEW" | "DUPLICATE";
+/** Why a message was quarantined: payments-netopia's NoticeRejectionReason, spelled out (this package has no such dependency). */
+export type NoticeQuarantineReason =
+  | "NOTICE_HEADER_MISSING" | "NOTICE_ALG_REFUSED" | "NOTICE_SIGNATURE_INVALID" | "NOTICE_ISSUER_INVALID"
+  | "NOTICE_AUDIENCE_INVALID" | "NOTICE_BODY_HASH_INVALID";
+/** Spec §2.15.4: why a saved card was revoked. */
+export type CardTokenRevocationReason = "PLAN_ENDED" | "REPLACED" | "NOT_ADOPTED" | "TOOL_ORDER" | "OTHER_SYSTEM" | "ERASURE" | "OWNER";
+/** `billing.payment_notice`: a verified message; every content field may be null (it is stored whatever it holds). */
+export type PaymentNoticeInput = Readonly<{
+  noticeId: string; paymentProvider: PaymentProviderName; paymentEnvironment: PaymentEnvironmentName; receivedAt: Date;
+  bodySha256: string; orderId: string | null; providerPaymentId: string | null; providerStatus: number | null;
+  amountText: string | null; currency: string | null; cardCountry: string | null; keyFingerprint: string;
+  jwtIat: string | null;
+  /** The sealed allow-list of §2.5.2 (never the token). */
+  allowedCiphertext: Buffer; keyId: string;
+}>;
+export type PaymentNoticeRow = PaymentNoticeInput;
+export type NoticeQuarantineInput = Readonly<{
+  quarantineId: string; receivedAt: Date; reason: NoticeQuarantineReason; orderId: string | null;
+  rawCiphertext: Buffer; headerCiphertext: Buffer | null; keyId: string;
+}>;
+export type NoticeQuarantineRow = NoticeQuarantineInput;
+/** `billing.card_token`: the caller mints `tokenId`, because the token's seal names the row (AAD). */
+export type CardTokenInput = Readonly<{
+  tokenId: string; customerId: string | null; paymentProvider: PaymentProviderName; paymentEnvironment: PaymentEnvironmentName;
+  sourceChargeId: string | null; sourceToolOrder: string | null; sourceNoticeId: string | null; sourcePaidAt: Date | null;
+  tokenCiphertext: Buffer; keyId: string; expMonth: number | null; expYear: number | null; last4: string | null;
+  cardCountry: string | null; createdAt: Date;
+}>;
+export type CardTokenRow = CardTokenInput & Readonly<{
+  revokedAt: Date | null; revocationReason: CardTokenRevocationReason | null;
+}>;
+export type HostedPaymentInput = Readonly<{
+  chargeId: string; paymentProvider: PaymentProviderName; paymentEnvironment: PaymentEnvironmentName;
+  providerPaymentId: string; redirectCiphertext: Buffer; keyId: string; startedAt: Date;
+}>;
+export type HostedPaymentRow = HostedPaymentInput;
+export type ToolOrderRow = Readonly<{
+  orderId: string; paymentEnvironment: "sandbox" | "live"; createdAt: Date; purpose: "SANDBOX_RECORDING" | "LIVE_TEST";
+}>;
 
 const CLAIM_LEASE_MS = 300_000;
 const TERMINAL_KINDS = ["ENDED", "WITHDRAWN", "ERASURE_STOPPED"] as const;
@@ -160,12 +207,13 @@ type SubscriptionEventRaw = {
 type ChargeRaw = {
   charge_id: string; owner_ref: string; subscription_id: string; kind: ChargeKind; attempt: number;
   period_start: Date; period_end: Date; quote_id: string | null; net_micros: string; tax_micros: string;
-  total_micros: string; currency: "USD"; created_at: Date; xmoney_environment: CustomerXMoneyEnvironment;
+  total_micros: string; currency: "USD"; created_at: Date; payment_provider: PaymentProviderName;
+  payment_environment: PaymentEnvironmentName;
 };
 type ChargeEventRaw = {
-  event_id: string; charge_id: string; kind: ChargeEventKind; at: Date; xmoney_transaction_id: string | null;
-  amount_micros: string | null; error_code: string | null; xmoney_environment: CustomerXMoneyEnvironment;
-  refunds_transaction_id: string | null;
+  event_id: string; charge_id: string; kind: ChargeEventKind; at: Date; provider_payment_id: string | null;
+  amount_micros: string | null; error_code: string | null; payment_provider: PaymentProviderName;
+  payment_environment: PaymentEnvironmentName; refunds_transaction_id: string | null;
 };
 type QuoteRaw = {
   quote_id: string; owner_ref: string; plan_id: PlanId; kind: QuoteKind; net_micros: string; tax_micros: string;
@@ -187,7 +235,7 @@ const SUBSCRIPTION_EVENT_COLUMNS = `event.event_id, event.seq, event.subscriptio
   event.data`;
 const CHARGE_COLUMNS = `charge.charge_id, charge.owner_ref, charge.subscription_id, charge.kind, charge.attempt,
   charge.period_start, charge.period_end, charge.quote_id, charge.net_micros, charge.tax_micros, charge.total_micros,
-  charge.currency, charge.created_at, charge.xmoney_environment`;
+  charge.currency, charge.created_at, charge.payment_provider, charge.payment_environment`;
 
 function toSubscriptionEvent(row: SubscriptionEventRaw): SubscriptionEvent {
   return Object.freeze({
@@ -201,15 +249,17 @@ function toCharge(row: ChargeRaw): ChargeRow {
     chargeId: row.charge_id, ownerRef: row.owner_ref, subscriptionId: row.subscription_id, kind: row.kind,
     attempt: row.attempt, periodStart: row.period_start, periodEnd: row.period_end, quoteId: row.quote_id,
     netMicros: micros(row.net_micros), taxMicros: micros(row.tax_micros), totalMicros: micros(row.total_micros),
-    currency: row.currency, createdAt: row.created_at, xmoneyEnvironment: row.xmoney_environment
+    currency: row.currency, createdAt: row.created_at, paymentProvider: row.payment_provider,
+    paymentEnvironment: row.payment_environment
   });
 }
 function toChargeEvent(row: ChargeEventRaw): ChargeEventRow {
   return Object.freeze({
     eventId: row.event_id, chargeId: row.charge_id, kind: row.kind, at: row.at,
-    xmoneyTransactionId: row.xmoney_transaction_id,
+    providerPaymentId: row.provider_payment_id,
     amountMicros: row.amount_micros === null ? null : micros(row.amount_micros), errorCode: row.error_code,
-    xmoneyEnvironment: row.xmoney_environment, refundsTransactionId: row.refunds_transaction_id
+    paymentProvider: row.payment_provider, paymentEnvironment: row.payment_environment,
+    refundsTransactionId: row.refunds_transaction_id
   });
 }
 function toOutboxJob(row: OutboxRaw): OutboxJob {
@@ -219,6 +269,23 @@ function toOutboxJob(row: OutboxRaw): OutboxJob {
     claimedAt: row.claimed_at
   });
 }
+const frozen = <T extends object>(row: T): T => Object.freeze({ ...row });
+const PAYMENT_NOTICE_COLUMNS = `notice.notice_id AS "noticeId", notice.payment_provider AS "paymentProvider",
+  notice.payment_environment AS "paymentEnvironment", notice.received_at AS "receivedAt", notice.body_sha256 AS "bodySha256",
+  notice.order_id AS "orderId", notice.provider_payment_id AS "providerPaymentId", notice.provider_status AS "providerStatus",
+  notice.amount_text AS "amountText", notice.currency, notice.card_country AS "cardCountry",
+  notice.key_fingerprint AS "keyFingerprint", notice.jwt_iat AS "jwtIat", notice.allowed_ciphertext AS "allowedCiphertext",
+  notice.key_id AS "keyId"`;
+/** A token with its revocation, when there is one (ON CONFLICT DO NOTHING keeps the first). */
+const CARD_TOKEN_SELECT = `SELECT token.token_id AS "tokenId", token.customer_id AS "customerId",
+    token.payment_provider AS "paymentProvider", token.payment_environment AS "paymentEnvironment",
+    token.source_charge_id AS "sourceChargeId", token.source_tool_order AS "sourceToolOrder",
+    token.source_notice_id AS "sourceNoticeId", token.source_paid_at AS "sourcePaidAt",
+    token.token_ciphertext AS "tokenCiphertext", token.key_id AS "keyId", token.exp_month AS "expMonth",
+    token.exp_year AS "expYear", token.last4, token.card_country AS "cardCountry", token.created_at AS "createdAt",
+    revocation.at AS "revokedAt", revocation.reason AS "revocationReason"
+  FROM billing.card_token AS token
+  LEFT JOIN billing.card_token_revocation AS revocation ON revocation.token_id = token.token_id`;
 
 function groupBySubscription(rows: ReadonlyArray<SubscriptionEventRaw>): SubscriptionEventRaw[][] {
   const groups = new Map<string, SubscriptionEventRaw[]>();
@@ -642,7 +709,7 @@ export class BillingRepository {
     }
     const open = (await this.pool.query<{ subscription_id: string }>(`
       SELECT charge.subscription_id FROM billing.charge AS charge
-      WHERE charge.xmoney_environment = $1
+      WHERE charge.payment_provider = 'xmoney' AND charge.payment_environment = $1
         AND NOT EXISTS (
           SELECT 1 FROM billing.charge_event AS final
           WHERE final.charge_id = charge.charge_id AND final.kind IN ('SUCCEEDED','FAILED')
@@ -653,7 +720,7 @@ export class BillingRepository {
       WHERE job.done_at IS NULL AND job.dead_at IS NULL
         AND EXISTS (
           SELECT 1 FROM billing.charge AS charge
-          WHERE charge.xmoney_environment = $1
+          WHERE charge.payment_provider = 'xmoney' AND charge.payment_environment = $1
             AND (charge.charge_id = job.payload ->> 'charge_id'
               OR (job.kind IN ('QUADERNO_RECORD_SALE','SMARTBILL_INVOICE') AND charge.charge_id = job.ref))
         )
@@ -693,10 +760,10 @@ export class BillingRepository {
     try {
       await c.query(`
         INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end,
-          quote_id, net_micros, tax_micros, total_micros, currency, created_at, xmoney_environment)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          quote_id, net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       `, [ch.chargeId, ch.ownerRef, ch.subscriptionId, ch.kind, ch.attempt, ch.periodStart, ch.periodEnd, ch.quoteId,
-        ch.netMicros, ch.taxMicros, ch.totalMicros, ch.currency, ch.createdAt, ch.xmoneyEnvironment]);
+        ch.netMicros, ch.taxMicros, ch.totalMicros, ch.currency, ch.createdAt, ch.paymentProvider, ch.paymentEnvironment]);
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new TypedDomainError("BILLING_CHARGE_DUPLICATE", "this charge or this attempt already exists");
@@ -708,20 +775,20 @@ export class BillingRepository {
   /**
    * DUPLICATE for any unique conflict: a replay of (system, transaction, kind), a second SUCCEEDED of the charge, or
    * a transaction that already paid. After a DUPLICATE to a SUCCEEDED, `succeededTransaction` says which payment is
-   * the recorded one. The event's xMoney system is the charge's.
+   * the recorded one. The event's provider and environment are the charge's.
    */
   async appendChargeEvent(c: PoolClient, e: ChargeEventInput): Promise<"INSERTED" | "DUPLICATE"> {
-    const charge = (await c.query<{ xmoney_environment: CustomerXMoneyEnvironment }>(
-      "SELECT xmoney_environment FROM billing.charge WHERE charge_id = $1", [e.chargeId]
+    const charge = (await c.query<{ payment_provider: PaymentProviderName; payment_environment: PaymentEnvironmentName }>(
+      "SELECT payment_provider, payment_environment FROM billing.charge WHERE charge_id = $1", [e.chargeId]
     )).rows[0];
     if (charge === undefined) throw new TypedDomainError("BILLING_CHARGE_UNKNOWN", "a charge event names no known charge");
     try {
       const result = await c.query(`
-        INSERT INTO billing.charge_event (event_id, charge_id, kind, at, xmoney_transaction_id, amount_micros, error_code,
-          xmoney_environment, refunds_transaction_id, xmoney_created_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT DO NOTHING RETURNING event_id
-      `, [e.eventId ?? randomUUID(), e.chargeId, e.kind, e.at, e.xmoneyTransactionId, e.amountMicros, e.errorCode,
-        charge.xmoney_environment, e.refundsTransactionId ?? null, e.xmoneyCreatedAt ?? null]);
+        INSERT INTO billing.charge_event (event_id, charge_id, kind, at, provider_payment_id, amount_micros, error_code,
+          payment_provider, payment_environment, refunds_transaction_id, provider_created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT DO NOTHING RETURNING event_id
+      `, [e.eventId ?? randomUUID(), e.chargeId, e.kind, e.at, e.providerPaymentId, e.amountMicros, e.errorCode,
+        charge.payment_provider, charge.payment_environment, e.refundsTransactionId ?? null, e.providerCreatedAt ?? null]);
       return result.rowCount === 1 ? "INSERTED" : "DUPLICATE";
     } catch (error) {
       if (refundRefusal(error)) {
@@ -733,10 +800,10 @@ export class BillingRepository {
 
   /** The recorded SUCCEEDED payment's transaction, read in the caller's transaction (after a DUPLICATE answer). */
   async succeededTransaction(c: PoolClient, chargeId: string): Promise<string | null> {
-    const row = (await c.query<{ xmoney_transaction_id: string }>(`
-      SELECT xmoney_transaction_id FROM billing.charge_event WHERE charge_id = $1 AND kind = 'SUCCEEDED'
+    const row = (await c.query<{ provider_payment_id: string }>(`
+      SELECT provider_payment_id FROM billing.charge_event WHERE charge_id = $1 AND kind = 'SUCCEEDED'
     `, [chargeId])).rows[0];
-    return row?.xmoney_transaction_id ?? null;
+    return row?.provider_payment_id ?? null;
   }
 
   /** Both queries run on `executor`, so a caller inside its transaction reads one consistent view. */
@@ -746,8 +813,8 @@ export class BillingRepository {
     `, [chargeId])).rows[0];
     if (row === undefined) return null;
     const events = (await executor.query<ChargeEventRaw>(`
-      SELECT event_id, charge_id, kind, at, xmoney_transaction_id, amount_micros, error_code, xmoney_environment,
-        refunds_transaction_id
+      SELECT event_id, charge_id, kind, at, provider_payment_id, amount_micros, error_code, payment_provider,
+        payment_environment, refunds_transaction_id
       FROM billing.charge_event WHERE charge_id = $1 ORDER BY seq
     `, [chargeId])).rows.map(toChargeEvent);
     return Object.freeze({ ...toCharge(row), events });
@@ -978,7 +1045,7 @@ export class BillingRepository {
     }>(`
       WITH dated AS (
         -- When xMoney says the money moved; a row recorded without it falls back to when we recorded it.
-        SELECT event.*, COALESCE(event.xmoney_created_at, event.at) AS money_at FROM billing.charge_event AS event
+        SELECT event.*, COALESCE(event.provider_created_at, event.at) AS money_at FROM billing.charge_event AS event
         WHERE event.kind IN ('SUCCEEDED','REFUNDED','CHARGEBACK')
       )
       SELECT CASE dated.kind WHEN 'SUCCEEDED' THEN 'SALE' WHEN 'REFUNDED' THEN 'REFUND' ELSE 'CHARGEBACK' END AS type,
@@ -1011,7 +1078,7 @@ export class BillingRepository {
           AND dashboard_note.charge_id = dated.charge_id AND dashboard_note.kind = 'CREDIT_NOTE'
       WHERE dated.money_at >= $1 AND dated.money_at < $2
         -- Only that xMoney system's charges; the event inherits the charge's system through its foreign key.
-        AND charge.xmoney_environment = $3
+        AND charge.payment_provider = 'xmoney' AND charge.payment_environment = $3
         AND charge.kind IN ('INITIAL','RENEWAL','UPGRADE')
         -- A refund or a charge-back of a second payment (DUPLICATE_PAYMENT) moves money that was never a sale: no
         -- tax row for it.
@@ -1019,15 +1086,15 @@ export class BillingRepository {
           SELECT 1 FROM billing.charge_event AS duplicate
           WHERE dated.kind IN ('REFUNDED','CHARGEBACK') AND duplicate.charge_id = dated.charge_id
             AND duplicate.kind = 'DUPLICATE_PAYMENT'
-            AND duplicate.xmoney_transaction_id = COALESCE(dated.refunds_transaction_id, dated.xmoney_transaction_id)
+            AND duplicate.provider_payment_id = COALESCE(dated.refunds_transaction_id, dated.provider_payment_id)
         )
         -- A charge-back a dispute has won back (CHARGEBACK_RESOLVED, the owner's billing:dispute) is no longer one.
         AND NOT EXISTS (
           SELECT 1 FROM billing.charge_event AS resolved
           WHERE dated.kind = 'CHARGEBACK' AND resolved.charge_id = dated.charge_id AND resolved.kind = 'CHARGEBACK_RESOLVED'
-            -- Settled per transaction (0086's (xmoney_transaction_id, kind) key): another payment's won dispute on
+            -- Settled per transaction (0086's (provider_payment_id, kind) key): another payment's won dispute on
             -- the same charge never hides this one.
-            AND resolved.xmoney_transaction_id = dated.xmoney_transaction_id
+            AND resolved.provider_payment_id = dated.provider_payment_id
         )
       ORDER BY dated.money_at, charge.charge_id, dated.seq
     `, [from, to, environment])).rows;
@@ -1046,9 +1113,9 @@ export class BillingRepository {
     const kinds = new Map<string, Set<ChargeEventKind>>();
     if (transactionIds.length === 0) return kinds;
     const result = await this.pool.query<{ transaction_id: string; kind: ChargeEventKind }>(`
-      SELECT DISTINCT xmoney_transaction_id::text AS transaction_id, kind
+      SELECT DISTINCT provider_payment_id::text AS transaction_id, kind
       FROM billing.charge_event
-      WHERE xmoney_environment = $2 AND xmoney_transaction_id::text = ANY($1::text[])
+      WHERE payment_provider = 'xmoney' AND payment_environment = $2 AND provider_payment_id::text = ANY($1::text[])
     `, [[...new Set(transactionIds)], environment]);
     for (const row of result.rows) {
       const seen = kinds.get(row.transaction_id) ?? new Set<ChargeEventKind>();
@@ -1070,9 +1137,9 @@ export class BillingRepository {
     const amounts = new Map<string, number[]>();
     if (paymentIds.length === 0) return amounts;
     const result = await this.pool.query<{ transaction_id: string; amount_micros: string | null }>(`
-      SELECT xmoney_transaction_id::text AS transaction_id, amount_micros
+      SELECT provider_payment_id::text AS transaction_id, amount_micros
       FROM billing.charge_event
-      WHERE kind = 'REFUNDED' AND xmoney_environment = $2 AND xmoney_transaction_id::text = ANY($1::text[])
+      WHERE kind = 'REFUNDED' AND payment_provider = 'xmoney' AND payment_environment = $2 AND provider_payment_id::text = ANY($1::text[])
     `, [[...new Set(paymentIds)], environment]);
     for (const row of result.rows) {
       if (row.amount_micros === null) continue;
@@ -1095,7 +1162,7 @@ export class BillingRepository {
       FROM billing.charge AS charge
       WHERE charge.kind = ANY($1::text[])
         AND charge.created_at < $2
-        AND charge.xmoney_environment = $4
+        AND charge.payment_provider = 'xmoney' AND charge.payment_environment = $4
         AND NOT EXISTS (
           SELECT 1 FROM billing.charge_event AS event
           WHERE event.charge_id = charge.charge_id AND event.kind IN ('SUCCEEDED','FAILED')
@@ -1126,7 +1193,7 @@ export class BillingRepository {
         LIMIT 1
       ) AS last_submit ON true
       WHERE charge.kind = ANY($1::text[])
-        AND charge.xmoney_environment = $8
+        AND charge.payment_provider = 'xmoney' AND charge.payment_environment = $8
         AND charge.created_at >= $2 AND charge.created_at < $3
         AND ($4::timestamptz IS NULL OR (charge.created_at, charge.charge_id) > ($4::timestamptz, $5::text))
         AND NOT EXISTS (
@@ -1156,7 +1223,7 @@ export class BillingRepository {
       SELECT charge.charge_id, charge.kind, charge.created_at
       FROM billing.charge AS charge
       WHERE charge.kind = ANY($1::text[]) AND charge.created_at < $2
-        AND ($3::text IS NULL OR charge.xmoney_environment = $3::text)
+        AND ($3::text IS NULL OR (charge.payment_provider = 'xmoney' AND charge.payment_environment = $3::text))
         AND NOT EXISTS (
           SELECT 1 FROM billing.charge_event AS settled
           WHERE settled.charge_id = charge.charge_id AND settled.kind IN ('SUCCEEDED','FAILED')
@@ -1192,7 +1259,7 @@ export class BillingRepository {
         AND NOT EXISTS (
           SELECT 1 FROM billing.charge_event AS refunded
           WHERE refunded.charge_id = split_part(outbox.ref, ':', 1) AND refunded.kind = 'REFUNDED'
-            AND COALESCE(refunded.refunds_transaction_id, refunded.xmoney_transaction_id) = split_part(outbox.ref, ':', 2)
+            AND COALESCE(refunded.refunds_transaction_id, refunded.provider_payment_id) = split_part(outbox.ref, ':', 2)
         )
       ORDER BY outbox.dead_at, outbox.ref
     `);
@@ -1436,6 +1503,117 @@ export class BillingRepository {
       ORDER BY since, transaction_id
     `, [since]);
     return result.rows.map((row) => ({ transactionId: row.transaction_id, since: row.since }));
+  }
+
+  // ---- Spec 2026-10-05 §2.5.2: NETOPIA's messages, saved cards, hosted payments, status reads, tool orders ------
+  /** §2.7.3: stored once per body; a repeat answers the stored id (`inserted: false`), read back in its own statement. */
+  async insertPaymentNotice(c: PoolClient, n: PaymentNoticeInput): Promise<Readonly<{ noticeId: string; inserted: boolean }>> {
+    const inserted = (await c.query<{ notice_id: string }>(`
+      INSERT INTO billing.payment_notice (notice_id, payment_provider, payment_environment, received_at, body_sha256,
+        order_id, provider_payment_id, provider_status, amount_text, currency, card_country, key_fingerprint, jwt_iat,
+        allowed_ciphertext, key_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT (body_sha256) DO NOTHING RETURNING notice_id
+    `, [n.noticeId, n.paymentProvider, n.paymentEnvironment, n.receivedAt, n.bodySha256, n.orderId, n.providerPaymentId,
+      n.providerStatus, n.amountText, n.currency, n.cardCountry, n.keyFingerprint, n.jwtIat, n.allowedCiphertext,
+      n.keyId])).rows[0];
+    if (inserted !== undefined) return Object.freeze({ noticeId: inserted.notice_id, inserted: true });
+    // READ COMMITTED: this second statement sees a row a concurrent intake has just committed.
+    const existing = (await c.query<{ notice_id: string }>(
+      "SELECT notice_id FROM billing.payment_notice WHERE body_sha256 = $1", [n.bodySha256])).rows[0];
+    if (existing === undefined) throw new TypedDomainError("BILLING_NOTICE_STORE_RACE", "the stored message could not be read back");
+    return Object.freeze({ noticeId: existing.notice_id, inserted: false });
+  }
+  /** The verified bytes, sealed; `billing.purge_short_lived` deletes them after 14 days. */
+  async insertPaymentNoticeRaw(c: PoolClient, row: Readonly<{ noticeId: string; rawCiphertext: Buffer; keyId: string; storedAt: Date }>): Promise<void> {
+    await c.query(`INSERT INTO billing.payment_notice_raw (notice_id, raw_ciphertext, key_id, stored_at) VALUES ($1,$2,$3,$4)
+      ON CONFLICT (notice_id) DO NOTHING`, [row.noticeId, row.rawCiphertext, row.keyId, row.storedAt]);
+  }
+  /** A21: processing a message is a following row; a message read again after a fix gets another. */
+  async insertPaymentNoticeOutcome(c: PoolClient, row: Readonly<{ noticeId: string; at: Date; outcome: NoticeOutcome }>): Promise<void> {
+    await c.query("INSERT INTO billing.payment_notice_outcome (notice_id, at, outcome) VALUES ($1,$2,$3)", [row.noticeId, row.at, row.outcome]);
+  }
+  async newestNoticeForOrder(executor: BillingReadExecutor, orderId: string): Promise<PaymentNoticeRow | null> {
+    const row = (await executor.query<PaymentNoticeRow>(`SELECT ${PAYMENT_NOTICE_COLUMNS} FROM billing.payment_notice AS notice
+      WHERE notice.order_id = $1 ORDER BY notice.received_at DESC, notice.notice_id DESC LIMIT 1`, [orderId])).rows[0];
+    return row === undefined ? null : frozen(row);
+  }
+  /** §2.7.4: a message that failed verification, sealed; 14 days. */
+  async insertNoticeQuarantine(c: PoolClient, row: NoticeQuarantineInput): Promise<void> {
+    await c.query(`INSERT INTO billing.notice_quarantine (quarantine_id, received_at, reason, order_id, raw_ciphertext,
+      header_ciphertext, key_id) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [row.quarantineId, row.receivedAt, row.reason, row.orderId, row.rawCiphertext, row.headerCiphertext, row.keyId]);
+  }
+  /** §2.7.4's re-check: the quarantine received at or after `since`, oldest first. */
+  async quarantineSince(executor: BillingReadExecutor, since: Date): Promise<ReadonlyArray<NoticeQuarantineRow>> {
+    return (await executor.query<NoticeQuarantineRow>(`SELECT quarantine_id AS "quarantineId", received_at AS "receivedAt",
+        reason, order_id AS "orderId", raw_ciphertext AS "rawCiphertext", header_ciphertext AS "headerCiphertext",
+        key_id AS "keyId"
+      FROM billing.notice_quarantine WHERE received_at >= $1 ORDER BY received_at, quarantine_id`, [since])).rows.map(frozen);
+  }
+  /** §2.15.1: a saved card, sealed by the caller under the records key with the AAD naming this row. */
+  async insertCardToken(c: PoolClient, row: CardTokenInput): Promise<Readonly<{ tokenId: string }>> {
+    await c.query(`INSERT INTO billing.card_token (token_id, customer_id, payment_provider, payment_environment,
+        source_charge_id, source_tool_order, source_notice_id, source_paid_at, token_ciphertext, key_id, exp_month,
+        exp_year, last4, card_country, created_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+    [row.tokenId, row.customerId, row.paymentProvider, row.paymentEnvironment, row.sourceChargeId, row.sourceToolOrder,
+      row.sourceNoticeId, row.sourcePaidAt, row.tokenCiphertext, row.keyId, row.expMonth, row.expYear, row.last4,
+      row.cardCountry, row.createdAt]);
+    return Object.freeze({ tokenId: row.tokenId });
+  }
+  async cardTokenById(executor: BillingReadExecutor, tokenId: string): Promise<CardTokenRow | null> {
+    const row = (await executor.query<CardTokenRow>(`${CARD_TOKEN_SELECT} WHERE token.token_id = $1`, [tokenId])).rows[0];
+    return row === undefined ? null : frozen(row);
+  }
+  async cardTokensFromCharge(executor: BillingReadExecutor, chargeId: string): Promise<ReadonlyArray<CardTokenRow>> {
+    return (await executor.query<CardTokenRow>(`${CARD_TOKEN_SELECT} WHERE token.source_charge_id = $1
+      ORDER BY token.created_at, token.token_id`, [chargeId])).rows.map(frozen);
+  }
+  /** §2.15.4's sweep: tokens created before `before` and not revoked, oldest first. */
+  async liveCardTokensOlderThan(executor: BillingReadExecutor, before: Date): Promise<ReadonlyArray<CardTokenRow>> {
+    return (await executor.query<CardTokenRow>(`${CARD_TOKEN_SELECT} WHERE revocation.token_id IS NULL AND token.created_at < $1
+      ORDER BY token.created_at, token.token_id`, [before])).rows.map(frozen);
+  }
+  /** Content-free and once: a second revocation keeps the first one's time and reason. */
+  async revokeCardToken(c: PoolClient, row: Readonly<{ tokenId: string; at: Date; reason: CardTokenRevocationReason }>): Promise<void> {
+    await c.query(`INSERT INTO billing.card_token_revocation (token_id, at, reason) VALUES ($1,$2,$3)
+      ON CONFLICT (token_id) DO NOTHING`, [row.tokenId, row.at, row.reason]);
+  }
+  /** NETOPIA's payment page for one charge (its URL sealed by the caller). */
+  async insertHostedPayment(c: PoolClient, row: HostedPaymentInput): Promise<void> {
+    await c.query(`INSERT INTO billing.hosted_payment (charge_id, payment_provider, payment_environment, provider_payment_id,
+      redirect_ciphertext, key_id, started_at) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [row.chargeId, row.paymentProvider,
+      row.paymentEnvironment, row.providerPaymentId, row.redirectCiphertext, row.keyId, row.startedAt]);
+  }
+  async hostedPaymentForCharge(executor: BillingReadExecutor, chargeId: string): Promise<HostedPaymentRow | null> {
+    const row = (await executor.query<HostedPaymentRow>(`SELECT charge_id AS "chargeId", payment_provider AS "paymentProvider",
+        payment_environment AS "paymentEnvironment", provider_payment_id AS "providerPaymentId",
+        redirect_ciphertext AS "redirectCiphertext", key_id AS "keyId", started_at AS "startedAt"
+      FROM billing.hosted_payment WHERE charge_id = $1`, [chargeId])).rows[0];
+    return row === undefined ? null : frozen(row);
+  }
+  /** §2.14: one content-free row per status read (the state read, or the error code). */
+  async insertStatusRead(c: PoolClient, row: Readonly<{ chargeId: string; at: Date; outcome: string }>): Promise<void> {
+    await c.query("INSERT INTO billing.status_read (charge_id, at, outcome) VALUES ($1,$2,$3)", [row.chargeId, row.at, row.outcome]);
+  }
+  /** §2.20.3: the owner-run tool's orders, which are not charges. */
+  async insertToolOrder(c: PoolClient, row: ToolOrderRow): Promise<void> {
+    await c.query("INSERT INTO billing.tool_order (order_id, payment_environment, created_at, purpose) VALUES ($1,$2,$3,$4)",
+      [row.orderId, row.paymentEnvironment, row.createdAt, row.purpose]);
+  }
+  async toolOrder(executor: BillingReadExecutor, orderId: string): Promise<ToolOrderRow | null> {
+    const row = (await executor.query<ToolOrderRow>(`SELECT order_id AS "orderId", payment_environment AS "paymentEnvironment",
+      created_at AS "createdAt", purpose FROM billing.tool_order WHERE order_id = $1`, [orderId])).rows[0];
+    return row === undefined ? null : frozen(row);
+  }
+  /** §2.15.4: the daily owner job's deletes, through 0096's SECURITY DEFINER functions (A15's guard). */
+  async purgeRevokedCardTokens(now: Date): Promise<number> {
+    const row = (await this.pool.query<{ purged: string }>("SELECT billing.purge_revoked_card_tokens($1) AS purged", [now])).rows[0];
+    return Number(row?.purged ?? "0");
+  }
+  async purgeShortLived(now: Date): Promise<number> {
+    const row = (await this.pool.query<{ purged: string }>("SELECT billing.purge_short_lived($1) AS purged", [now])).rows[0];
+    return Number(row?.purged ?? "0");
   }
 
   private async chargesById(chargeIds: readonly string[]): Promise<Array<ChargeRow & { events: ChargeEventRow[] }>> {

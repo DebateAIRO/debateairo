@@ -63,10 +63,10 @@ async function renewalCharge(paid: Readonly<{ ownerRef: string; subscriptionId: 
       chargeId, ownerRef: paid.ownerRef, subscriptionId: paid.subscriptionId, kind: "RENEWAL", attempt: 1,
       periodStart: state.currentPeriodEnd!, periodEnd: computeWindows(state.periodAnchorAt!, state.currentPeriodEnd!).month.end,
       quoteId: paid.quoteId, netMicros: 20_000_000, taxMicros: totalMicros - 20_000_000, totalMicros, currency: "USD",
-      createdAt: h.clock.now, xmoneyEnvironment: "stage"
+      createdAt: h.clock.now, paymentProvider: "xmoney", paymentEnvironment: "stage"
     });
     await h.repository.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", h.clock.now, {
-      xmoneyTransactionId: null, amountMicros: totalMicros, errorCode: null
+      providerPaymentId: null, amountMicros: totalMicros, errorCode: null
     }));
   });
   return chargeId;
@@ -79,10 +79,10 @@ describe("P9b VERIFY_PAYMENT", () => {
     await h.settle(paid.transactionId);
     expect(await h.eventKinds(bought.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED"));
     // D5 5m: the row keeps the verification instant as `at` and the payment's own time for the tax rows.
-    const succeededRow = await h.database.pool.query<{ at: Date; xmoney_created_at: Date | null }>(
-      "SELECT at, xmoney_created_at FROM billing.charge_event WHERE charge_id=$1 AND kind='SUCCEEDED'", [bought.chargeId]
+    const succeededRow = await h.database.pool.query<{ at: Date; provider_created_at: Date | null }>(
+      "SELECT at, provider_created_at FROM billing.charge_event WHERE charge_id=$1 AND kind='SUCCEEDED'", [bought.chargeId]
     );
-    expect(succeededRow.rows).toEqual([{ at: h.clock.now, xmoney_created_at: paid.createdAt }]);
+    expect(succeededRow.rows).toEqual([{ at: h.clock.now, provider_created_at: paid.createdAt }]);
     const events = await h.repository.subscriptionEvents(bought.subscriptionId);
     expect(events.map((event) => event.kind)).toEqual(["CREATED", "ACTIVATED"]);
     const anchor = paid.createdAt!;
@@ -413,9 +413,9 @@ describe("P9b VERIFY_PAYMENT", () => {
       .toEqual(kindsOf("REQUESTED", "SUCCEEDED", "DUPLICATE_PAYMENT", "REFUND_REQUESTED", "REFUNDED"));
     const charge = (await h.repository.charge(paid.chargeId))!;
     expect(charge.events.find((event) => event.kind === "DUPLICATE_PAYMENT"))
-      .toMatchObject({ xmoneyTransactionId: again.transactionId, amountMicros: 24_200_000 });
+      .toMatchObject({ providerPaymentId: again.transactionId, amountMicros: 24_200_000 });
     expect(charge.events.find((event) => event.kind === "REFUND_REQUESTED"))
-      .toMatchObject({ xmoneyTransactionId: again.transactionId, errorCode: "DUPLICATE_PAYMENT" });
+      .toMatchObject({ providerPaymentId: again.transactionId, errorCode: "DUPLICATE_PAYMENT" });
     expect(await h.repository.chargesForSubscription(paid.subscriptionId)).toHaveLength(1);
     expect(await subscriptionKinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED"]);
     expect(h.xmoney.refunds.at(-1)).toEqual({ transactionId: again.transactionId, amountDecimal: null, reason: "customer-demand" });
@@ -449,9 +449,9 @@ describe("P9b VERIFY_PAYMENT", () => {
     await Promise.all([h.verify.handle(job(first.transactionId), h.clock.now), h.verify.handle(job(second.transactionId), h.clock.now)]);
     await h.worker.drain(10);
     const charge = (await h.repository.charge(bought.chargeId))!;
-    const winner = charge.events.find((event) => event.kind === "SUCCEEDED")!.xmoneyTransactionId;
+    const winner = charge.events.find((event) => event.kind === "SUCCEEDED")!.providerPaymentId;
     const loser = winner === first.transactionId ? second.transactionId : first.transactionId;
-    expect(charge.events.filter((event) => event.kind === "DUPLICATE_PAYMENT").map((event) => event.xmoneyTransactionId)).toEqual([loser]);
+    expect(charge.events.filter((event) => event.kind === "DUPLICATE_PAYMENT").map((event) => event.providerPaymentId)).toEqual([loser]);
     expect(h.xmoney.refunds.filter((refund) => refund.transactionId === winner)).toHaveLength(0);
     expect(h.xmoney.refunds.filter((refund) => refund.transactionId === loser)).toHaveLength(1);
     expect((await subscriptionKinds(bought.subscriptionId)).filter((kind) => kind === "ACTIVATED")).toHaveLength(1);
@@ -497,7 +497,7 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(h.xmoney.refunds.length - before).toBe(1);
     const [refundRow] = h.xmoney.refundTransactionsOf(paid.transaction.transactionId);
     expect((await h.repository.charge(paid.chargeId))!.events.find((event) => event.kind === "REFUNDED")).toMatchObject({
-      xmoneyTransactionId: refundRow!.transactionId, refundsTransactionId: paid.transaction.transactionId, amountMicros: 12_100_000
+      providerPaymentId: refundRow!.transactionId, refundsTransactionId: paid.transaction.transactionId, amountMicros: 12_100_000
     });
     // Its notice later reads back to the same charge as ours: nothing more is recorded.
     await h.settle(refundRow!.transactionId);
@@ -517,7 +517,7 @@ describe("P9b VERIFY_PAYMENT", () => {
     // Ours landed and is recorded on its own refund transaction (the payment still reads complete-ok: a partial refund).
     const [ours] = h.xmoney.refundTransactionsOf(paid.transaction.transactionId);
     expect((await h.repository.charge(paid.chargeId))!.events.find((event) => event.kind === "REFUNDED"))
-      .toMatchObject({ xmoneyTransactionId: ours!.transactionId, amountMicros: 12_100_000 });
+      .toMatchObject({ providerPaymentId: ours!.transactionId, amountMicros: 12_100_000 });
     // The owner then refunds the same 12.10 again in the dashboard: another refund transaction, not ours.
     await h.xmoney.refund({ transactionId: paid.transaction.transactionId, amountDecimal: "12.10", reason: "customer-demand", message: "dashboard" });
     const dashboard = h.xmoney.refundTransactionsOf(paid.transaction.transactionId).find((row) => row.transactionId !== ours!.transactionId);
@@ -639,10 +639,10 @@ describe("P9b VERIFY_PAYMENT", () => {
       await h.repository.insertCharge(client, {
         chargeId: holdCharge, ownerRef: paid.ownerRef, subscriptionId: paid.subscriptionId, kind: "CARD_CHECK", attempt: 1,
         periodStart: h.clock.now, periodEnd: new Date(h.clock.now.getTime() + 1_000), quoteId: null, netMicros: 1_000_000,
-        taxMicros: 0, totalMicros: 1_000_000, currency: "USD", createdAt: h.clock.now, xmoneyEnvironment: "stage"
+        taxMicros: 0, totalMicros: 1_000_000, currency: "USD", createdAt: h.clock.now, paymentProvider: "xmoney", paymentEnvironment: "stage"
       });
       await h.repository.appendChargeEvent(client, chargeEvent(holdCharge, "REQUESTED", h.clock.now, {
-        xmoneyTransactionId: null, amountMicros: 1_000_000, errorCode: null
+        providerPaymentId: null, amountMicros: 1_000_000, errorCode: null
       }));
     });
     // A stand-in for P12e's CARD_CHECK settlement, on a verifier of this test's own.
@@ -798,26 +798,26 @@ describe("P9b VERIFY_PAYMENT", () => {
       await h.repository.insertCharge(client, {
         chargeId: holdCharge, ownerRef: paid.ownerRef, subscriptionId: paid.subscriptionId, kind: "CARD_CHECK", attempt: 1,
         periodStart: h.clock.now, periodEnd: new Date(h.clock.now.getTime() + 1_000), quoteId: null, netMicros: 1_000_000,
-        taxMicros: 0, totalMicros: 1_000_000, currency: "USD", createdAt: h.clock.now, xmoneyEnvironment: "stage"
+        taxMicros: 0, totalMicros: 1_000_000, currency: "USD", createdAt: h.clock.now, paymentProvider: "xmoney", paymentEnvironment: "stage"
       });
       await h.repository.appendChargeEvent(client, chargeEvent(holdCharge, "REQUESTED", h.clock.now, {
-        xmoneyTransactionId: null, amountMicros: 1_000_000, errorCode: null
+        providerPaymentId: null, amountMicros: 1_000_000, errorCode: null
       }));
     });
     const hold = h.xmoney.pay({ externalOrderId: holdCharge, amountDecimal: "1.00", cardCountry: "RO", customerId: paid.transaction.customerId });
     const state = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));
     await h.repository.withTransaction(async (client) => {
       await h.repository.appendChargeEvent(client, chargeEvent(holdCharge, "SUCCEEDED", h.clock.now, {
-        xmoneyTransactionId: hold.transactionId, amountMicros: 1_000_000, errorCode: null, xmoneyCreatedAt: hold.createdAt
+        providerPaymentId: hold.transactionId, amountMicros: 1_000_000, errorCode: null, providerCreatedAt: hold.createdAt
       }));
       await h.repository.appendSubscriptionEvent(client, subscriptionEvent(state, "CARD_CHANGED", h.clock.now,
         { charge_id: holdCharge, retry_now: false }, { xmoneyOrderId: hold.orderId, cardRef: hold.cardId }));
     });
     // The renewal's rebill was sent and its answer lost; adoption never found it, and P11a closed the charge.
     const renewal = await renewalCharge(paid, 24_200_000);
-    await appendEvent(renewal, "SUBMIT_UNKNOWN", { xmoneyTransactionId: null, amountMicros: 24_200_000, errorCode: "REBILL_OUTCOME_UNKNOWN" });
+    await appendEvent(renewal, "SUBMIT_UNKNOWN", { providerPaymentId: null, amountMicros: 24_200_000, errorCode: "REBILL_OUTCOME_UNKNOWN" });
     const rebilled = await h.xmoney.rebill({ orderId: hold.orderId, customerId: hold.customerId, amountDecimal: "24.20" });
-    await appendEvent(renewal, "FAILED", { xmoneyTransactionId: null, amountMicros: 24_200_000, errorCode: "NO_TRANSACTION" });
+    await appendEvent(renewal, "FAILED", { providerPaymentId: null, amountMicros: 24_200_000, errorCode: "NO_TRANSACTION" });
     const linesBefore = h.auditLines.length;
     await h.notices.receive(h.noticeFor(await h.xmoney.getTransaction(rebilled.transactionId)));
     await h.worker.drain(10);
@@ -828,9 +828,9 @@ describe("P9b VERIFY_PAYMENT", () => {
     }
     const check = (await h.repository.charge(holdCharge))!;
     expect(check.events.find((event) => event.kind === "DUPLICATE_PAYMENT"))
-      .toMatchObject({ xmoneyTransactionId: rebilled.transactionId, amountMicros: 24_200_000 });
+      .toMatchObject({ providerPaymentId: rebilled.transactionId, amountMicros: 24_200_000 });
     expect(check.events.find((event) => event.kind === "REFUND_REQUESTED"))
-      .toMatchObject({ xmoneyTransactionId: rebilled.transactionId, amountMicros: 24_200_000, errorCode: "DUPLICATE_PAYMENT" });
+      .toMatchObject({ providerPaymentId: rebilled.transactionId, amountMicros: 24_200_000, errorCode: "DUPLICATE_PAYMENT" });
     expect(h.xmoney.refunds.at(-1)).toEqual({ transactionId: rebilled.transactionId, amountDecimal: null, reason: "customer-demand" });
     expect((await h.outboxRows(holdCharge)).map((row) => row.ref)).toContain(`M11_DUPLICATE:${holdCharge}:${rebilled.transactionId}`);
     const outcomes = await h.database.pool.query(
@@ -847,15 +847,15 @@ describe("P9b VERIFY_PAYMENT", () => {
     const paid = await h.activate();
     // The tax moved since checkout: the renewal charges 23.80, not the order's 24.20.
     const renewal = await renewalCharge(paid, 23_800_000);
-    await appendEvent(renewal, "SUBMIT_UNKNOWN", { xmoneyTransactionId: null, amountMicros: 23_800_000, errorCode: "REBILL_OUTCOME_UNKNOWN" });
+    await appendEvent(renewal, "SUBMIT_UNKNOWN", { providerPaymentId: null, amountMicros: 23_800_000, errorCode: "REBILL_OUTCOME_UNKNOWN" });
     const rebill = { orderId: paid.transaction.orderId, customerId: paid.transaction.customerId, amountDecimal: "23.80" };
     const lost = await h.xmoney.rebill(rebill);
     // Adoption missed the lost one; A2's one resubmission went through and paid the renewal.
     const resubmitted = await h.xmoney.rebill(rebill);
-    await appendEvent(renewal, "SUBMITTED", { xmoneyTransactionId: resubmitted.transactionId, amountMicros: 23_800_000, errorCode: null });
+    await appendEvent(renewal, "SUBMITTED", { providerPaymentId: resubmitted.transactionId, amountMicros: 23_800_000, errorCode: null });
     await appendEvent(renewal, "SUCCEEDED", {
-      xmoneyTransactionId: resubmitted.transactionId, amountMicros: 23_800_000, errorCode: null,
-      xmoneyCreatedAt: (await h.xmoney.getTransaction(resubmitted.transactionId)).createdAt
+      providerPaymentId: resubmitted.transactionId, amountMicros: 23_800_000, errorCode: null,
+      providerCreatedAt: (await h.xmoney.getTransaction(resubmitted.transactionId)).createdAt
     });
     const linesBefore = h.auditLines.length;
     // The lost rebill's check at the end of its not-final schedule.
@@ -864,7 +864,7 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(await h.eventKinds(renewal))
       .toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN", "SUBMITTED", "SUCCEEDED", "DUPLICATE_PAYMENT", "REFUND_REQUESTED", "REFUNDED"));
     expect((await h.repository.charge(renewal))!.events.find((event) => event.kind === "DUPLICATE_PAYMENT"))
-      .toMatchObject({ xmoneyTransactionId: lost.transactionId, amountMicros: 23_800_000 });
+      .toMatchObject({ providerPaymentId: lost.transactionId, amountMicros: 23_800_000 });
     expect(await h.eventKinds(paid.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED"));
     expect(h.xmoney.refunds.at(-1)).toEqual({ transactionId: lost.transactionId, amountDecimal: null, reason: "customer-demand" });
     const lines = h.auditLines.slice(linesBefore);
@@ -875,7 +875,7 @@ describe("P9b VERIFY_PAYMENT", () => {
   it("links an unmatched rebill to the renewal still open for it and settles it there, refunding nothing", async () => {
     const paid = await h.activate();
     const renewal = await renewalCharge(paid, 23_800_000);
-    await appendEvent(renewal, "SUBMIT_UNKNOWN", { xmoneyTransactionId: null, amountMicros: 23_800_000, errorCode: "REBILL_OUTCOME_UNKNOWN" });
+    await appendEvent(renewal, "SUBMIT_UNKNOWN", { providerPaymentId: null, amountMicros: 23_800_000, errorCode: "REBILL_OUTCOME_UNKNOWN" });
     const lost = await h.xmoney.rebill({ orderId: paid.transaction.orderId, customerId: paid.transaction.customerId, amountDecimal: "23.80" });
     // A verifier of this test's own, with a stand-in RENEWAL settlement (P11a registers the real one later).
     const verifier = new VerifyPaymentHandler({
@@ -892,7 +892,7 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(settledOn).toEqual([renewal]);
     expect(await h.eventKinds(renewal)).toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN", "SUBMITTED", "SUCCEEDED"));
     expect((await h.repository.charge(renewal))!.events.find((event) => event.kind === "SUBMITTED"))
-      .toMatchObject({ xmoneyTransactionId: lost.transactionId });
+      .toMatchObject({ providerPaymentId: lost.transactionId });
     expect(await h.eventKinds(paid.chargeId)).toEqual(kindsOf("REQUESTED", "SUCCEEDED"));
     expect(h.xmoney.refunds.length).toBe(refundsBefore);
   });

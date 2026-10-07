@@ -110,8 +110,8 @@ export function paidTransactions(charges: ReadonlyArray<ChargeWithEvents>, since
   for (const charge of charges) {
     if (charge.kind === "CARD_CHECK") continue;
     for (const event of charge.events) {
-      if (event.kind !== "SUCCEEDED" || event.xmoneyTransactionId === null || event.at.getTime() < since.getTime()) continue;
-      const transactionId = event.xmoneyTransactionId;
+      if (event.kind !== "SUCCEEDED" || event.providerPaymentId === null || event.at.getTime() < since.getTime()) continue;
+      const transactionId = event.providerPaymentId;
       paid.push(Object.freeze({
         chargeId: charge.chargeId, transactionId, paidMicros: event.amountMicros ?? 0,
         refundedMicros: refundedMicros(charge, transactionId),
@@ -146,7 +146,7 @@ export function allocateRefund(amountMicros: number, paid: ReadonlyArray<PaidTra
 
 /** Our REFUND_REQUESTED for this paid transaction that has no REFUNDED (on it, or naming it) yet, if any. */
 export function pendingRefund(charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, transactionId: string): ChargeEventRow | null {
-  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.xmoneyTransactionId === transactionId);
+  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId === transactionId);
   if (requested === undefined) return null;
   return charge.events.some((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId) ? null : requested;
 }
@@ -158,10 +158,10 @@ export function refundedAlready(charge: Readonly<{ events: ReadonlyArray<ChargeE
 
 /** The intent behind one of OUR requests; a provider refund's REFUND_REQUESTED (P9c) is not one. */
 export function refundIntentOf(charge: ChargeRow, event: ChargeEventRow): RefundIntent | null {
-  if (event.kind !== "REFUND_REQUESTED" || event.xmoneyTransactionId === null || event.amountMicros === null
+  if (event.kind !== "REFUND_REQUESTED" || event.providerPaymentId === null || event.amountMicros === null
     || event.errorCode === null || !REQUESTED_REASONS.has(event.errorCode)) return null;
   return Object.freeze({
-    chargeId: charge.chargeId, transactionId: event.xmoneyTransactionId, amountMicros: event.amountMicros, whole: false,
+    chargeId: charge.chargeId, transactionId: event.providerPaymentId, amountMicros: event.amountMicros, whole: false,
     ownerRef: charge.ownerRef, reason: event.errorCode as RequestedRefundReason
   });
 }
@@ -196,13 +196,13 @@ function refundsWholePayment(reason: RequestedRefundReason): boolean {
  * amount as its SUCCEEDED or DUPLICATE_PAYMENT row records it.
  */
 function isRequested(charge: ChargeWithEvents, intent: RefundIntent): boolean {
-  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.xmoneyTransactionId === intent.transactionId);
+  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId === intent.transactionId);
   const recorded = requested === undefined ? null : refundIntentOf(charge, requested);
   if (recorded === null || recorded.chargeId !== intent.chargeId || recorded.ownerRef !== intent.ownerRef
     || recorded.amountMicros !== intent.amountMicros || recorded.reason !== intent.reason) return false;
   if (!intent.whole) return true;
   const paid = charge.events.find((event) => (event.kind === "SUCCEEDED" || event.kind === "DUPLICATE_PAYMENT")
-    && event.xmoneyTransactionId === intent.transactionId);
+    && event.providerPaymentId === intent.transactionId);
   return refundsWholePayment(intent.reason) && paid !== undefined && paid.amountMicros === intent.amountMicros;
 }
 
@@ -249,7 +249,7 @@ export class RefundDesk {
   /** A4(a), inside the caller's transaction: the intent is on record, and its job queued, before money moves. */
   async request(client: PoolClient, intent: RefundIntent, at: Date): Promise<"REQUESTED" | "DUPLICATE"> {
     const written = await this.deps.repository.appendChargeEvent(client, chargeEvent(intent.chargeId, "REFUND_REQUESTED", at, {
-      xmoneyTransactionId: intent.transactionId, amountMicros: intent.amountMicros, errorCode: intent.reason
+      providerPaymentId: intent.transactionId, amountMicros: intent.amountMicros, errorCode: intent.reason
     }));
     if (written === "DUPLICATE") return "DUPLICATE";
     await this.deps.repository.enqueue(client, {
@@ -298,7 +298,7 @@ export class RefundDesk {
     // A refund already recorded has nothing left to do in either system (a job that died between its REFUNDED row and
     // its completion): it ends DONE quietly. Any other job of the other system ends here, before any lookup or call.
     if (refundedAlready(charge, intent.transactionId)) return DONE;
-    if (charge.xmoneyEnvironment !== this.deps.xmoneyEnvironment) {
+    if (charge.paymentProvider !== "xmoney" || charge.paymentEnvironment !== this.deps.xmoneyEnvironment) {
       return this.deadLetter(intent, otherXMoneySystem(this.deps.audit, job.kind).code, now);
     }
     // P2-I5 (1): a job its charge records no request for (a forged or corrupted outbox row) moves no money; it ends
@@ -486,9 +486,9 @@ export class RefundDesk {
       const current = await this.deps.repository.charge(intent.chargeId, client);
       if (current !== null && refundedAlready(current, intent.transactionId)) return;
       const written = await this.deps.repository.appendChargeEvent(client, chargeEvent(intent.chargeId, "REFUNDED", at, {
-        xmoneyTransactionId: refundTransactionId ?? intent.transactionId, amountMicros: intent.amountMicros,
+        providerPaymentId: refundTransactionId ?? intent.transactionId, amountMicros: intent.amountMicros,
         errorCode: intent.reason, refundsTransactionId: refundTransactionId === null ? null : intent.transactionId,
-        xmoneyCreatedAt: refundTransactionId === null ? null : refundCreatedAt
+        providerCreatedAt: refundTransactionId === null ? null : refundCreatedAt
       }));
       if (written === "DUPLICATE") return;
       await followUp(client, at);
@@ -549,7 +549,7 @@ export class RefundDesk {
   private async planEndedByRefusal(intent: RefundIntent): Promise<string | null> {
     const charge = await this.deps.repository.charge(intent.chargeId);
     if (charge === null || (charge.kind !== "RENEWAL" && charge.kind !== "UPGRADE")) return null;
-    const paidAt = charge.events.find((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === intent.transactionId)?.at;
+    const paidAt = charge.events.find((event) => event.kind === "SUCCEEDED" && event.providerPaymentId === intent.transactionId)?.at;
     if (paidAt === undefined) return null;
     const ended = (await this.deps.repository.subscriptionEvents(charge.subscriptionId)).find((event) =>
       event.kind === "ENDED" && event.data.cause === "CANCEL" && event.data.reason === "CARD_COUNTRY_BLOCKED"

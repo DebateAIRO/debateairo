@@ -42,7 +42,7 @@ async function disputed(
   const billing = new BillingRepository(database.pool);
   await billing.withTransaction(async (client) => {
     await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", new Date(), {
-      xmoneyTransactionId: seeded.initialTransactionId, amountMicros: seeded.totalMicros, errorCode: null
+      providerPaymentId: seeded.initialTransactionId, amountMicros: seeded.totalMicros, errorCode: null
     }));
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
     await billing.appendSubscriptionEvent(client, subscriptionEvent(state, "SUSPENDED", new Date(), {
@@ -68,7 +68,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     const billing = new BillingRepository(database.pool);
     expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId)).status).toBe("ACTIVE");
     expect((await billing.charge(seeded.initialChargeId))!.events.at(-1)).toMatchObject({
-      kind: "CHARGEBACK_RESOLVED", xmoneyTransactionId: seeded.initialTransactionId
+      kind: "CHARGEBACK_RESOLVED", providerPaymentId: seeded.initialTransactionId
     });
     expect(await new EntitlementRepository(database.pool).current(seeded.ownerRef, new Date())).toMatchObject({
       planId: "PRO", cause: "RESUMED", periodAnchorAt: seeded.periodStart, paidThrough: seeded.periodEnd
@@ -109,7 +109,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("RESOLVED_AFTER_END");
     // The money is recorded as won back; the plan is neither resumed nor given a paid entitlement for an ended period.
     expect((await repository.charge(seeded.initialChargeId))!.events.at(-1)).toMatchObject({
-      kind: "CHARGEBACK_RESOLVED", xmoneyTransactionId: seeded.initialTransactionId
+      kind: "CHARGEBACK_RESOLVED", providerPaymentId: seeded.initialTransactionId
     });
     const kinds = (await repository.subscriptionEvents(seeded.subscriptionId)).map((event) => event.kind);
     expect(kinds).not.toContain("RESUMED");
@@ -141,16 +141,16 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     // P9c records the charge-back on the same charge and changes no subscription.
     await billing.withTransaction(async (client) => {
       await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "DUPLICATE_PAYMENT", new Date(), {
-        xmoneyTransactionId: "7719001", amountMicros: seeded.totalMicros, errorCode: null
+        providerPaymentId: "7719001", amountMicros: seeded.totalMicros, errorCode: null
       }));
       await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", new Date(), {
-        xmoneyTransactionId: "7719001", amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
+        providerPaymentId: "7719001", amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
       }));
     });
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "lost" })).toBe("SECOND_PAYMENT");
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("SECOND_PAYMENT");
     const events = (await billing.charge(seeded.initialChargeId))!.events;
-    expect(events.filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.xmoneyTransactionId))
+    expect(events.filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.providerPaymentId))
       .toEqual(["7719001"]);
     expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId)).status).toBe("ACTIVE");
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("ALREADY_SETTLED");
@@ -162,16 +162,16 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     // After the plan's own charge-back: a second payment of the order, charged back as well (the newest CHARGEBACK).
     await repository.withTransaction(async (client) => {
       await repository.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "DUPLICATE_PAYMENT", new Date(), {
-        xmoneyTransactionId: "7719101", amountMicros: seeded.totalMicros, errorCode: null
+        providerPaymentId: "7719101", amountMicros: seeded.totalMicros, errorCode: null
       }));
       await repository.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", new Date(), {
-        xmoneyTransactionId: "7719101", amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
+        providerPaymentId: "7719101", amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
       }));
     });
     // The dispute that suspended the plan is the one on the first payment, whatever came after it.
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("RESUMED");
     const resolvedTransactions = async () => (await new BillingRepository(database.pool).charge(seeded.initialChargeId))!
-      .events.filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.xmoneyTransactionId);
+      .events.filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.providerPaymentId);
     expect(await resolvedTransactions()).toEqual([seeded.initialTransactionId]);
     // The next call settles the one still open, the second payment's; once both are settled nothing is left.
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("SECOND_PAYMENT");
@@ -188,17 +188,17 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     await billing.withTransaction(async (client) => {
       for (const transactionId of ["7719201", "7719202"]) {
         await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "DUPLICATE_PAYMENT", new Date(), {
-          xmoneyTransactionId: transactionId, amountMicros: seeded.totalMicros, errorCode: null
+          providerPaymentId: transactionId, amountMicros: seeded.totalMicros, errorCode: null
         }));
         await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", new Date(), {
-          xmoneyTransactionId: transactionId, amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
+          providerPaymentId: transactionId, amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
         }));
       }
     });
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("SECOND_PAYMENT");
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("SECOND_PAYMENT");
     const resolved = (await billing.charge(seeded.initialChargeId))!.events
-      .filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.xmoneyTransactionId);
+      .filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.providerPaymentId);
     expect([...resolved].sort()).toEqual(["7719201", "7719202"]);
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("ALREADY_SETTLED");
     expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId)).status).toBe("ACTIVE");
@@ -209,10 +209,10 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     const billing = new BillingRepository(database.pool);
     await billing.withTransaction(async (client) => {
       await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "DUPLICATE_PAYMENT", new Date(), {
-        xmoneyTransactionId: "7719301", amountMicros: seeded.totalMicros, errorCode: null
+        providerPaymentId: "7719301", amountMicros: seeded.totalMicros, errorCode: null
       }));
       await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", new Date(), {
-        xmoneyTransactionId: "7719301", amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
+        providerPaymentId: "7719301", amountMicros: seeded.totalMicros, errorCode: "DUPLICATE_PAYMENT"
       }));
     });
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "lost" })).toBe("ENDED_DISPUTE");
@@ -241,7 +241,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
         })).chargeId;
       });
       await billing.withTransaction((client) => billing.appendChargeEvent(client, chargeEvent(upgradeChargeId,
-        "CHARGEBACK", new Date(), { xmoneyTransactionId: transactionId, amountMicros: 17_850_000, errorCode: null })));
+        "CHARGEBACK", new Date(), { providerPaymentId: transactionId, amountMicros: 17_850_000, errorCode: null })));
       return { seeded, upgradeChargeId };
     };
 

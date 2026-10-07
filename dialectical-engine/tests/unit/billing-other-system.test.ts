@@ -37,14 +37,14 @@ function only<T extends object>(members: Partial<Record<string, unknown>>, name:
 /** A paid sandbox charge (the connectors below talk to live), with its payment and a refund of it. */
 function stageCharge(): ChargeRow & { events: ChargeEventRow[] } {
   const event = (kind: ChargeEventRow["kind"], amountMicros: number, errorCode: string | null = null): ChargeEventRow => ({
-    eventId: `${kind}-1`, chargeId: CHARGE_ID, kind, at: ACTIVATED, xmoneyTransactionId: "61001", amountMicros, errorCode,
-    xmoneyEnvironment: "stage", refundsTransactionId: null
+    eventId: `${kind}-1`, chargeId: CHARGE_ID, kind, at: ACTIVATED, providerPaymentId: "61001", amountMicros, errorCode,
+    paymentProvider: "xmoney", paymentEnvironment: "stage", refundsTransactionId: null
   });
   return {
     chargeId: CHARGE_ID, ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", subscriptionId: "5d0a1c2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d",
     kind: "INITIAL", attempt: 1, periodStart: ACTIVATED, periodEnd: new Date("2026-11-08T09:00:00.000Z"), quoteId: "q-1",
     netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, currency: "USD", createdAt: ACTIVATED,
-    xmoneyEnvironment: "stage",
+    paymentProvider: "xmoney", paymentEnvironment: "stage",
     events: [event("SUCCEEDED", 24_200_000), event("REFUND_REQUESTED", 24_200_000, "WITHDRAWAL"), event("REFUNDED", 24_200_000)]
   };
 }

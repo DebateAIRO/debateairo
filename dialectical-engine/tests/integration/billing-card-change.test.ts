@@ -94,7 +94,7 @@ describe("P12e the card change on real PostgreSQL", () => {
     expect(order.order.description).toBe("DebateAI card check");
     const charge = await new BillingRepository(database.pool).charge(body.charge_ref);
     expect(charge).toMatchObject({
-      kind: "CARD_CHECK", totalMicros: 1_000_000, taxMicros: 0, quoteId: null, attempt: 1, xmoneyEnvironment: "stage"
+      kind: "CARD_CHECK", totalMicros: 1_000_000, taxMicros: 0, quoteId: null, attempt: 1, paymentProvider: "xmoney", paymentEnvironment: "stage"
     });
     expect(charge!.events.map((event) => event.kind)).toEqual(["REQUESTED"]);
     // A second card change in the same period is its own row (its own day), never an attempt counter.

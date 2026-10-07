@@ -220,7 +220,7 @@ async function upgradeUnderLease(
     const submitted = transactionId;
     await deps.billing.withTransactionOn(leaseClient, async (client) => {
       await deps.billing.appendChargeEvent(client, chargeEvent(prepared.chargeId, "SUBMITTED", at, {
-        xmoneyTransactionId: submitted, amountMicros: prepared.totalMicros, errorCode: null
+        providerPaymentId: submitted, amountMicros: prepared.totalMicros, errorCode: null
       }));
       await deps.billing.enqueue(client, {
         kind: "VERIFY_PAYMENT", ref: submitted, notBefore: at, payload: { charge_id: prepared.chargeId }
@@ -241,7 +241,7 @@ async function upgradeUnderLease(
   // A2: an unknown outcome is never resubmitted here; P14a adopts its transaction or fails the charge.
   await deps.billing.withTransactionOn(leaseClient, (client) => deps.billing.appendChargeEvent(client, chargeEvent(
     prepared.chargeId, failed === null ? "SUBMIT_UNKNOWN" : "FAILED", at, {
-      xmoneyTransactionId: failed === null ? null : declinedTransactionId,
+      providerPaymentId: failed === null ? null : declinedTransactionId,
       amountMicros: prepared.totalMicros, errorCode: failed ?? "REBILL_OUTCOME_UNKNOWN"
     }
   )));
@@ -295,7 +295,7 @@ async function prepareUpgrade(
     chargeId, ownerRef: state.ownerRef, subscriptionId: state.subscriptionId, kind: "UPGRADE",
     attempt: sameKey.length + 1, periodStart: quote.createdAt, periodEnd: state.currentPeriodEnd,
     quoteId: quote.quoteId, netMicros: quote.netMicros, taxMicros: quote.taxMicros, totalMicros: quote.totalMicros,
-    currency: "USD", createdAt: now, xmoneyEnvironment: deps.xmoneyEnvironment
+    currency: "USD", createdAt: now, paymentProvider: "xmoney", paymentEnvironment: deps.xmoneyEnvironment
   });
   await deps.billing.insertCharge(client, charge);
   // A3(a), after the charge row it names: a second use of this quote rolls the whole attempt back.
@@ -303,7 +303,7 @@ async function prepareUpgrade(
     refuse(409, "QUOTE_EXPIRED");
   }
   await deps.billing.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", now, {
-    xmoneyTransactionId: null, amountMicros: quote.totalMicros, errorCode: null
+    providerPaymentId: null, amountMicros: quote.totalMicros, errorCode: null
   }));
   return Object.freeze({
     kind: "NEW", chargeId, totalMicros: quote.totalMicros, orderId: state.xmoneyOrderId, customerId: state.xmoneyCustomerId

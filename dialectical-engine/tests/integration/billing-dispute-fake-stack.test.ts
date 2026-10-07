@@ -31,7 +31,7 @@ const disputeStores = (): DisputeStores => Object.freeze({
 /** The xMoney transaction that paid this charge (its one SUCCEEDED). */
 async function paymentOf(chargeId: string): Promise<string> {
   const found = await stack.database.pool.query<{ id: string }>(
-    "SELECT xmoney_transaction_id AS id FROM billing.charge_event WHERE charge_id = $1 AND kind = 'SUCCEEDED'", [chargeId]
+    "SELECT provider_payment_id AS id FROM billing.charge_event WHERE charge_id = $1 AND kind = 'SUCCEEDED'", [chargeId]
   );
   expect(found.rows).toHaveLength(1);
   return found.rows[0]!.id;
@@ -47,7 +47,7 @@ async function chargeOf(ownerRef: string, kind: "INITIAL" | "RENEWAL" | "CARD_CH
 /** Every CHARGEBACK of the person's charges: the charge, its kind and the payment it is keyed by. */
 async function chargebacksOf(ownerRef: string): Promise<string[][]> {
   const found = await stack.database.pool.query<{ charge_id: string; kind: string; id: string }>(`
-    SELECT e.charge_id, c.kind, e.xmoney_transaction_id AS id FROM billing.charge_event e
+    SELECT e.charge_id, c.kind, e.provider_payment_id AS id FROM billing.charge_event e
     JOIN billing.charge c ON c.charge_id = e.charge_id WHERE c.owner_ref = $1 AND e.kind = 'CHARGEBACK' ORDER BY e.seq
   `, [ownerRef]);
   return found.rows.map((row) => [row.charge_id, row.kind, row.id]);

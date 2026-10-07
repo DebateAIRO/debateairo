@@ -206,14 +206,15 @@ export class BillingJobQueries {
   /**
    * A1(1): the charge that recorded this xMoney transaction in an event of `kind` (any kind when null), in ONE xMoney
    * system (D5 5h): stage and live number their transactions separately, so a live id never matches a stage row.
-   * The event's `xmoney_environment` is its charge's (P1a's foreign key on `(charge_id, xmoney_environment)`).
+   * The event's provider and environment are the charge's provider and environment (0096's foreign key on
+   * `(charge_id, payment_provider, payment_environment)`).
    */
   async chargeIdForTransaction(
     transactionId: string, kind: string | null, environment: CustomerXMoneyEnvironment
   ): Promise<string | null> {
     const result = await this.pool.query<{ charge_id: string }>(
       `SELECT charge_id FROM billing.charge_event
-        WHERE xmoney_transaction_id=$1 AND ($2::text IS NULL OR kind=$2) AND xmoney_environment=$3
+        WHERE provider_payment_id=$1 AND ($2::text IS NULL OR kind=$2) AND payment_provider='xmoney' AND payment_environment=$3
         ORDER BY at LIMIT 1`,
       [transactionId, kind, environment]
     );
@@ -241,7 +242,7 @@ export class BillingJobQueries {
   }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; createdAt: Date }>>> {
     const result = await this.pool.query<{ charge_id: string; subscription_id: string; created_at: Date }>(
       `SELECT c.charge_id, c.subscription_id, c.created_at FROM billing.charge c
-        WHERE c.xmoney_environment = $1 AND c.kind = ANY($2::text[])
+        WHERE c.payment_provider = 'xmoney' AND c.payment_environment = $1 AND c.kind = ANY($2::text[])
           AND ($3::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($3::timestamptz, $4::text))
           AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
                            WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUCCEEDED', 'FAILED'))
@@ -285,7 +286,7 @@ export class BillingJobQueries {
   }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; periodStart: Date; createdAt: Date }>>> {
     const result = await this.pool.query<{ charge_id: string; subscription_id: string; period_start: Date; created_at: Date }>(
       `SELECT c.charge_id, c.subscription_id, c.period_start, c.created_at FROM billing.charge c
-        WHERE c.xmoney_environment = $1 AND c.kind = 'RENEWAL' AND c.attempt = 1
+        WHERE c.payment_provider = 'xmoney' AND c.payment_environment = $1 AND c.kind = 'RENEWAL' AND c.attempt = 1
           AND c.period_start > $2 AND c.period_start <= $3
           AND ($5::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($5::timestamptz, $6::text))
           AND EXISTS (SELECT 1 FROM billing.charge_event s
@@ -343,7 +344,7 @@ export class BillingJobQueries {
           AND NOT EXISTS (
             SELECT 1 FROM billing.charge_event AS failed
             WHERE failed.charge_id = $1 AND failed.kind IN ('FAILED', 'CHARGEBACK')
-              AND failed.xmoney_transaction_id = notice.transaction_id
+              AND failed.provider_payment_id = notice.transaction_id
           )
           AND NOT EXISTS (
             SELECT 1 FROM billing.xmoney_notice_outcome AS outcome
@@ -358,5 +359,18 @@ export class BillingJobQueries {
       ) AS pending
     `, [chargeId, environment, notFinalSince]);
     return result.rows[0]?.pending === true;
+  }
+
+  /**
+   * Spec 2026-10-05 §2.7.3 step 4 (SR-10): a fresh message or status read brings the live job of (kind, ref) forward
+   * to `now` through A19's UPDATE grant on `not_before`, so a VERIFY_PAYMENT waiting on its not-final schedule runs at
+   * once. Never moves a job later. False when no live job exists (the caller then enqueues one).
+   */
+  async bringForward(client: PoolClient, kind: OutboxKind, ref: string, now: Date): Promise<boolean> {
+    const result = await client.query(`
+      UPDATE billing.outbox SET not_before = LEAST(not_before, $3::timestamptz)
+      WHERE kind = $1 AND ref = $2 AND done_at IS NULL AND dead_at IS NULL
+    `, [kind, ref, now]);
+    return (result.rowCount ?? 0) > 0;
   }
 }

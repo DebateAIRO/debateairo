@@ -111,7 +111,7 @@ export class VerifyPaymentHandler {
   private async namesOtherSystemCharge(job: OutboxJob): Promise<boolean> {
     if (typeof job.payload.charge_id !== "string") return false;
     const charge = await this.deps.repository.charge(job.payload.charge_id);
-    return charge !== null && charge.xmoneyEnvironment !== this.deps.xmoneyEnvironment;
+    return charge !== null && (charge.paymentProvider !== "xmoney" || charge.paymentEnvironment !== this.deps.xmoneyEnvironment);
   }
 
   /** `linked`: this run follows the unmatched-rebill path's own SUBMITTED link, so it never links a second time. */
@@ -235,10 +235,10 @@ export class VerifyPaymentHandler {
     if (external === null || !/^[0-9a-f]{32}$/.test(external)) return null;
     const charge = await this.deps.repository.charge(external);
     if (charge === null || (charge.kind !== "INITIAL" && charge.kind !== "CARD_CHECK")) return null;
-    if (charge.xmoneyEnvironment !== environment) return null;
+    if (charge.paymentProvider !== "xmoney" || charge.paymentEnvironment !== environment) return null;
     if (!(await this.paidByItsCustomer(charge, transaction))) return CUSTOMER_MISMATCH;
     const paidByAnother = transaction.status === "complete-ok"
-      && charge.events.some((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId !== transaction.transactionId);
+      && charge.events.some((event) => event.kind === "SUCCEEDED" && event.providerPaymentId !== transaction.transactionId);
     if (!paidByAnother) return Object.freeze({ kind: "CHARGE" as const, charge });
     // A second success on an order already paid: a rebill whose SUBMITTED row is not written yet (wait for it on the
     // not-final schedule), or the person paid the reused order twice (refund it).
@@ -280,9 +280,9 @@ export class VerifyPaymentHandler {
       if (row.createdAt.getTime() > createdBy) continue;
       const found = await this.deps.repository.charge(row.chargeId, client);
       if (found === null) continue;
-      const paidByAnother = found.events.some((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId !== transaction.transactionId);
+      const paidByAnother = found.events.some((event) => event.kind === "SUCCEEDED" && event.providerPaymentId !== transaction.transactionId);
       const closed = found.events.some((event) => event.kind === "SUCCEEDED" || event.kind === "FAILED");
-      const submittedOther = found.events.some((event) => event.kind === "SUBMITTED" && event.xmoneyTransactionId !== transaction.transactionId);
+      const submittedOther = found.events.some((event) => event.kind === "SUBMITTED" && event.providerPaymentId !== transaction.transactionId);
       if (paidByAnother) candidates.push(Object.freeze({ state: "PAID" as const, charge: found }));
       else if (!closed && !submittedOther) candidates.push(Object.freeze({ state: "OPEN" as const, charge: found }));
     }
@@ -321,7 +321,7 @@ export class VerifyPaymentHandler {
       if (open !== undefined) {
         // A written SUBMITTED, or one a concurrent link wrote first: either way the re-run matches it (A1 step 2).
         await this.deps.repository.appendChargeEvent(client, chargeEvent(open.charge.chargeId, "SUBMITTED", now, {
-          xmoneyTransactionId: transaction.transactionId, amountMicros: open.charge.totalMicros, errorCode: null
+          providerPaymentId: transaction.transactionId, amountMicros: open.charge.totalMicros, errorCode: null
         }));
         return "LINKED";
       }
@@ -367,8 +367,8 @@ export class VerifyPaymentHandler {
     // P1a's `charge_event_second_payment_is_money`: a zero-amount hold (X0 may switch the card check to 0) holds nothing.
     if (paid.amountMicros === 0) return false;
     const written = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "DUPLICATE_PAYMENT", now, {
-      xmoneyTransactionId: transaction.transactionId, amountMicros: paid.amountMicros, errorCode: null,
-      xmoneyCreatedAt: transaction.createdAt
+      providerPaymentId: transaction.transactionId, amountMicros: paid.amountMicros, errorCode: null,
+      providerCreatedAt: transaction.createdAt
     }));
     if (written === "DUPLICATE") return false;
     await this.deps.refunds.request(client, {
@@ -410,14 +410,14 @@ export class VerifyPaymentHandler {
   private async duplicateChargedBack(
     charge: ChargeWithEvents, paymentId: string, noticeId: string | null, now: Date
   ): Promise<OutboxOutcome> {
-    if (charge.events.some((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId === paymentId)) {
+    if (charge.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)) {
       await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
     }
-    const recorded = charge.events.find((event) => event.kind === "DUPLICATE_PAYMENT" && event.xmoneyTransactionId === paymentId);
+    const recorded = charge.events.find((event) => event.kind === "DUPLICATE_PAYMENT" && event.providerPaymentId === paymentId);
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
-        xmoneyTransactionId: paymentId, amountMicros: recorded?.amountMicros ?? charge.totalMicros,
+        providerPaymentId: paymentId, amountMicros: recorded?.amountMicros ?? charge.totalMicros,
         errorCode: "DUPLICATE_PAYMENT"
       }));
       await this.outcome(noticeId, now, "CHARGEBACK", client);
@@ -491,7 +491,7 @@ export class VerifyPaymentHandler {
   }
 
   private async succeeded(charge: ChargeWithEvents, transaction: XMoneyTransaction, noticeId: string | null, now: Date): Promise<OutboxOutcome> {
-    if (charge.events.some((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === transaction.transactionId)) {
+    if (charge.events.some((event) => event.kind === "SUCCEEDED" && event.providerPaymentId === transaction.transactionId)) {
       // Seen before. A refund we requested for it is the XMONEY_REFUND job's to finish.
       await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
@@ -513,11 +513,11 @@ export class VerifyPaymentHandler {
     const prepared = verdict === "BLOCKED" || settlement.prepare === undefined ? {} : await settlement.prepare(charge);
     const result = await this.deps.repository.withTransaction(async (client): Promise<"APPLIED" | "REFUND" | "DUPLICATE" | "DUPLICATE_PAYMENT"> => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
-      // `at` is the verification instant (the fold's activatedAt, D6b's withdrawal); `xmoneyCreatedAt` is when the
+      // `at` is the verification instant (the fold's activatedAt, D6b's withdrawal); `providerCreatedAt` is when the
       // money moved, which P1b's quarter rows date the sale by (D5 5m).
       const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUCCEEDED", now, {
-        xmoneyTransactionId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode: null,
-        xmoneyCreatedAt: transaction.createdAt
+        providerPaymentId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode: null,
+        providerCreatedAt: transaction.createdAt
       }));
       if (inserted === "DUPLICATE") {
         // D5 5f: which payment holds the charge? The same transaction is a replay. Another one committed first (two
@@ -573,7 +573,7 @@ export class VerifyPaymentHandler {
   }
 
   private async failed(charge: ChargeWithEvents, transaction: XMoneyTransaction, noticeId: string | null, now: Date, errorCode: string): Promise<OutboxOutcome> {
-    if (charge.events.some((event) => event.kind === "FAILED" && event.xmoneyTransactionId === transaction.transactionId)) {
+    if (charge.events.some((event) => event.kind === "FAILED" && event.providerPaymentId === transaction.transactionId)) {
       await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
     }
@@ -582,7 +582,7 @@ export class VerifyPaymentHandler {
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "FAILED", now, {
-        xmoneyTransactionId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode
+        providerPaymentId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode
       }));
       if (inserted === "DUPLICATE") return;
       await settlement.failed({ ...(await this.context(client, charge, transaction, owner, now)), errorCode });
@@ -633,7 +633,7 @@ export class VerifyPaymentHandler {
     if (NOT_FINAL_STATUSES.has(transaction.status)) return notFinal(job, now, "PAYMENT_NOT_FINAL");
     const { charge, paymentId } = found;
     if (transaction.status !== "complete-ok"
-      || charge.events.some((event) => event.kind === "REFUNDED" && event.xmoneyTransactionId === transaction.transactionId)) {
+      || charge.events.some((event) => event.kind === "REFUNDED" && event.providerPaymentId === transaction.transactionId)) {
       // A refund that failed moved nothing; one recorded already is a replay.
       await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
@@ -649,7 +649,7 @@ export class VerifyPaymentHandler {
     // recorded on another refund transaction (our landed refund) already settled that transaction, so a same-amount
     // refund now is a second one made elsewhere, for the owner. On the payment's own row the amount is all there is
     // to tell ours from a dashboard refund of the same amount until X0 (g)/(h) shows xMoney's real report.
-    const ours = charge.events.some((event) => event.kind === "REFUNDED" && event.xmoneyTransactionId === paymentId
+    const ours = charge.events.some((event) => event.kind === "REFUNDED" && event.providerPaymentId === paymentId
       && event.errorCode !== "PROVIDER_REFUND" && event.errorCode !== "PROVIDER_VOID"
       && amountMatches(transaction.amountDecimal, event.amountMicros ?? -1));
     if (ours) {
@@ -682,7 +682,7 @@ export class VerifyPaymentHandler {
       return DONE;
     }
     const { charge, paymentId } = found;
-    return charge.events.some((event) => event.kind === "DUPLICATE_PAYMENT" && event.xmoneyTransactionId === paymentId)
+    return charge.events.some((event) => event.kind === "DUPLICATE_PAYMENT" && event.providerPaymentId === paymentId)
       ? this.duplicateChargedBack(charge, paymentId, noticeId, now)
       : this.chargedBack(charge, paymentId, transaction, noticeId, now);
   }
@@ -711,7 +711,7 @@ export class VerifyPaymentHandler {
       });
       return DONE;
     }
-    const succeeded = charge.events.some((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === transaction.transactionId);
+    const succeeded = charge.events.some((event) => event.kind === "SUCCEEDED" && event.providerPaymentId === transaction.transactionId);
     return succeeded
       ? this.providerRefund(charge, transaction, noticeId, now, "PROVIDER_VOID")
       : this.failed(charge, transaction, noticeId, now, "VOIDED");
@@ -732,7 +732,7 @@ export class VerifyPaymentHandler {
       return DONE;
     }
     const owner = await this.owner(charge);
-    const paidRow = charge.events.find((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === transaction.transactionId);
+    const paidRow = charge.events.find((event) => event.kind === "SUCCEEDED" && event.providerPaymentId === transaction.transactionId);
     const succeeded = paidRow !== undefined;
     // What is left of THIS paid transaction, counted per transaction as P1a's guard and `paidTransactions` count it: a
     // duplicate payment's own refund on the same charge never counts against it. The `!succeeded` path below records
@@ -744,8 +744,8 @@ export class VerifyPaymentHandler {
       if (!succeeded) {
         // We never saw it paid: the money came and went. Record both, with no plan change and no invoice.
         const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUCCEEDED", now, {
-          xmoneyTransactionId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode: null,
-          xmoneyCreatedAt: transaction.createdAt
+          providerPaymentId: transaction.transactionId, amountMicros: charge.totalMicros, errorCode: null,
+          providerCreatedAt: transaction.createdAt
         }));
         if (inserted === "DUPLICATE") return;
         // P2-M5: the checkout this payment was for bought nothing, so it ends now (folded under the lock), instead of
@@ -758,7 +758,7 @@ export class VerifyPaymentHandler {
         }
       }
       if (amountMicros > 0) {
-        const fields = { xmoneyTransactionId: transaction.transactionId, amountMicros, errorCode: reason };
+        const fields = { providerPaymentId: transaction.transactionId, amountMicros, errorCode: reason };
         await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUND_REQUESTED", now, fields));
         await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUNDED", now, fields));
         if (succeeded && owner.quote !== null && reason === "PROVIDER_VOID") {
@@ -799,8 +799,8 @@ export class VerifyPaymentHandler {
       // A replay is only this refund transaction recorded already, or the same provider refund reported on the
       // payment's own row (its refund-ok or void) at this amount. Another refund transaction's REFUNDED, of any amount,
       // or one of ours, makes this one a second refund elsewhere.
-      const replay = held.some((event) => event.kind === "REFUNDED" && (event.xmoneyTransactionId === transaction.transactionId
-        || (event.xmoneyTransactionId === paymentId && event.amountMicros === amountMicros
+      const replay = held.some((event) => event.kind === "REFUNDED" && (event.providerPaymentId === transaction.transactionId
+        || (event.providerPaymentId === paymentId && event.amountMicros === amountMicros
           && (event.errorCode === "PROVIDER_REFUND" || event.errorCode === "PROVIDER_VOID"))));
       if (replay) {
         await this.outcome(noticeId, now, "DUPLICATE");
@@ -811,17 +811,17 @@ export class VerifyPaymentHandler {
       return Object.freeze({ kind: "DEAD" as const, code: "REFUND_UNRECORDED" });
     }
     const owner = await this.owner(charge);
-    const paid = charge.events.some((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === paymentId);
+    const paid = charge.events.some((event) => event.kind === "SUCCEEDED" && event.providerPaymentId === paymentId);
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       const requested = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUND_REQUESTED", now, {
-        xmoneyTransactionId: paymentId, amountMicros, errorCode: "PROVIDER_REFUND"
+        providerPaymentId: paymentId, amountMicros, errorCode: "PROVIDER_REFUND"
       }));
       if (requested === "DUPLICATE") return;
       // D5 5m: the refund transaction's own creationDate dates the REFUND tax row.
       await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUNDED", now, {
-        xmoneyTransactionId: transaction.transactionId, amountMicros, errorCode: "PROVIDER_REFUND",
-        refundsTransactionId: paymentId, xmoneyCreatedAt: transaction.createdAt
+        providerPaymentId: transaction.transactionId, amountMicros, errorCode: "PROVIDER_REFUND",
+        refundsTransactionId: paymentId, providerCreatedAt: transaction.createdAt
       }));
       // A second payment we refunded ourselves was never a sale; a charge's own payment gets its credit note.
       if (paid && owner.quote !== null) {
@@ -844,7 +844,7 @@ export class VerifyPaymentHandler {
   private async chargedBack(
     charge: ChargeWithEvents, paymentId: string, transaction: XMoneyTransaction, noticeId: string | null, now: Date
   ): Promise<OutboxOutcome> {
-    if (charge.events.some((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId === paymentId)) {
+    if (charge.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)) {
       await this.outcome(noticeId, now, "DUPLICATE");
       return DONE;
     }
@@ -852,7 +852,7 @@ export class VerifyPaymentHandler {
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
-        xmoneyTransactionId: paymentId, amountMicros: charge.totalMicros, errorCode: null
+        providerPaymentId: paymentId, amountMicros: charge.totalMicros, errorCode: null
       }));
       if (inserted === "DUPLICATE") return;
       const { subscription } = await this.context(client, charge, transaction, owner, now);
@@ -887,7 +887,7 @@ export class VerifyPaymentHandler {
     if (target.kind === "MISMATCH") return this.mismatch(target, noticeId, now);
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.repository.appendChargeEvent(client, chargeEvent(target.chargeId, "CHARGEBACK_REPRESENTED", now, {
-        xmoneyTransactionId: transaction.transactionId, amountMicros: target.totalMicros, errorCode: null
+        providerPaymentId: transaction.transactionId, amountMicros: target.totalMicros, errorCode: null
       }));
       await this.outcome(noticeId, now, "REPRESENTED", client);
     });

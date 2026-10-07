@@ -48,7 +48,7 @@ describe("P8c the checkout", () => {
     expect(used.rows).toEqual([{ charge_id: bought.chargeId }]);
     expect((await h.repository.subscriptionEvents(bought.subscriptionId)).map((event) => event.kind)).toEqual(["CREATED"]);
     const charge = await h.repository.charge(bought.chargeId);
-    expect(charge).toMatchObject({ kind: "INITIAL", attempt: 1, totalMicros: 24_200_000, quoteId: bought.quoteId, xmoneyEnvironment: "stage" });
+    expect(charge).toMatchObject({ kind: "INITIAL", attempt: 1, totalMicros: 24_200_000, quoteId: bought.quoteId, paymentProvider: "xmoney", paymentEnvironment: "stage" });
     expect(charge!.events.map((event) => event.kind)).toEqual(["REQUESTED"]);
     const customer = await h.repository.customerByOwner(bought.ownerRef);
     const profile = await h.repository.latestProfile(customer!.customerId);
@@ -228,7 +228,7 @@ describe("P8c the checkout", () => {
   it("names its xMoney system on CREATED and on the charge (D5 5h)", async () => {
     const bought = await h.buy();
     expect((await h.repository.subscriptionEvents(bought.subscriptionId))[0]?.data).toMatchObject({ xmoney_environment: "stage" });
-    expect(await h.repository.charge(bought.chargeId)).toMatchObject({ xmoneyEnvironment: "stage" });
+    expect(await h.repository.charge(bought.chargeId)).toMatchObject({ paymentProvider: "xmoney", paymentEnvironment: "stage" });
   });
 
   it("answers CHECKOUT_PENDING while the open checkout's payment is on its way, and neither reuses nor abandons it (D7 #5)", async () => {
@@ -420,7 +420,7 @@ describe("P8c the checkout", () => {
       const charge = await h.repository.charge(chargeId);
       await h.repository.withTransaction(async (client) => {
         await h.repository.appendChargeEvent(client, chargeEvent(chargeId, "CHARGEBACK", h.clock.now, {
-          xmoneyTransactionId: transactionId, amountMicros: charge?.totalMicros ?? null, errorCode: null
+          providerPaymentId: transactionId, amountMicros: charge?.totalMicros ?? null, errorCode: null
         }));
         if (noticeId !== null) await h.repository.recordNoticeOutcome(client, { noticeId, at: h.clock.now, outcome: "CHARGEBACK" });
       });

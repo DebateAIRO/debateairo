@@ -51,8 +51,8 @@ function event(
   at: Date = PAID_AT, refundsTransactionId: string | null = null
 ): ChargeEventRow {
   return {
-    eventId: `${kind}-${transactionId}-${amountMicros}`, chargeId: CHARGE_ID, kind, at, xmoneyTransactionId: transactionId,
-    amountMicros, errorCode, xmoneyEnvironment: "live", refundsTransactionId
+    eventId: `${kind}-${transactionId}-${amountMicros}`, chargeId: CHARGE_ID, kind, at, providerPaymentId: transactionId,
+    amountMicros, errorCode, paymentProvider: "xmoney", paymentEnvironment: "live", refundsTransactionId
   };
 }
 
@@ -61,7 +61,7 @@ function charge(events: ChargeEventRow[], kind: ChargeRow["kind"] = "INITIAL"): 
     chargeId: CHARGE_ID, ownerRef: OWNER_REF, subscriptionId: "5d0a1c2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d", kind, attempt: 1,
     periodStart: PAID_AT, periodEnd: new Date("2026-11-08T09:00:00.000Z"), quoteId: QUOTE_ID,
     netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: TOTAL, currency: "USD", createdAt: PAID_AT,
-    xmoneyEnvironment: "live", events
+    paymentProvider: "xmoney", paymentEnvironment: "live", events
   };
 }
 
@@ -244,7 +244,7 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
     const stagePaid = charge([
       event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "WITHDRAWAL")
     ]);
-    const made = desk({ ...stagePaid, xmoneyEnvironment: "stage" });
+    const made = desk({ ...stagePaid, paymentEnvironment: "stage" });
     expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL" }), NOW))
       .toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
     expect(made.calls).toEqual([]);

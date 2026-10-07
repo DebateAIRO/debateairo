@@ -46,7 +46,7 @@ async function chargesOf(ownerRef: string, kind: "INITIAL" | "RENEWAL" | "UPGRAD
 /** The fake xMoney transaction that paid this charge (its one SUCCEEDED). */
 async function paymentOf(chargeId: string) {
   const found = await stack.database.pool.query<{ id: string }>(
-    "SELECT xmoney_transaction_id AS id FROM billing.charge_event WHERE charge_id = $1 AND kind = 'SUCCEEDED'", [chargeId]
+    "SELECT provider_payment_id AS id FROM billing.charge_event WHERE charge_id = $1 AND kind = 'SUCCEEDED'", [chargeId]
   );
   expect(found.rows).toHaveLength(1);
   const transaction = stack.xmoney.transactions.get(found.rows[0]!.id);

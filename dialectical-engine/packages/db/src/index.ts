@@ -71,6 +71,9 @@ export {
 export {
   BillingRepository,
   type BillingReadExecutor,
+  type CardTokenInput,
+  type CardTokenRevocationReason,
+  type CardTokenRow,
   type ChargeEventInput,
   type ChargeEventKind,
   type ChargeEventRow,
@@ -79,20 +82,31 @@ export {
   type CustomerXMoneyEnvironment,
   type DueRenewalCursor,
   type DueRenewalsOptions,
+  type HostedPaymentInput,
+  type HostedPaymentRow,
   type InvoiceIntentRow,
   type InvoiceIssuerName,
   type InvoiceKind,
   type InvoiceRow,
   type LocationEvidenceRow,
   type LocationVerdict,
+  type NoticeOutcome,
+  type NoticeQuarantineInput,
+  type NoticeQuarantineReason,
+  type NoticeQuarantineRow,
   type NoticeRow,
   type OutboxClaimFence,
   type OutboxJob,
   type OutboxKind,
   type OutboxPayload,
+  type PaymentEnvironmentName,
+  type PaymentNoticeInput,
+  type PaymentNoticeRow,
+  type PaymentProviderName,
   type QuoteKind,
   type QuoteRow,
-  type TaxSummaryRow
+  type TaxSummaryRow,
+  type ToolOrderRow
 } from "./billing.js";
 
 // Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0083).

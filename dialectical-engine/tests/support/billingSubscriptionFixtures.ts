@@ -107,14 +107,14 @@ export async function seedActiveSubscription(pool: Pool, input: Readonly<{
     await billing.insertCharge(client, {
       chargeId: initialChargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1,
       periodStart, periodEnd, quoteId: initialQuoteId, netMicros, taxMicros, totalMicros, currency: "USD",
-      createdAt: checkoutAt, xmoneyEnvironment: environment
+      createdAt: checkoutAt, paymentProvider: "xmoney", paymentEnvironment: environment
     });
     await billing.useQuote(client, { quoteId: initialQuoteId, usedAt: checkoutAt, chargeId: initialChargeId });
     await billing.appendChargeEvent(client, chargeEvent(initialChargeId, "REQUESTED", checkoutAt, {
-      xmoneyTransactionId: null, amountMicros: totalMicros, errorCode: null
+      providerPaymentId: null, amountMicros: totalMicros, errorCode: null
     }));
     await billing.appendChargeEvent(client, chargeEvent(initialChargeId, "SUCCEEDED", periodStart, {
-      xmoneyTransactionId: initialTransactionId, amountMicros: totalMicros, errorCode: null
+      providerPaymentId: initialTransactionId, amountMicros: totalMicros, errorCode: null
     }));
     const base = { subscriptionId, ownerRef: input.ownerRef, planId: input.planId, xmoneyCustomerId } as const;
     await billing.appendSubscriptionEvent(client, {
@@ -150,7 +150,7 @@ export async function suspendForChargeback(pool: Pool, seeded: SeededSubscriptio
   const billing = new BillingRepository(pool);
   await billing.withTransaction(async (client) => {
     await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", at, {
-      xmoneyTransactionId: seeded.initialTransactionId, amountMicros: seeded.totalMicros, errorCode: null
+      providerPaymentId: seeded.initialTransactionId, amountMicros: seeded.totalMicros, errorCode: null
     }));
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId, client));
     await billing.appendSubscriptionEvent(client, subscriptionEvent(state, "SUSPENDED", at, { charge_id: seeded.initialChargeId }));
@@ -221,12 +221,12 @@ export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, in
       chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "UPGRADE", attempt: 1,
       periodStart: quotedAt, periodEnd: seeded.periodEnd, quoteId, netMicros: input.netMicros,
       taxMicros: input.taxMicros, totalMicros, currency: "USD", createdAt: new Date(input.at.getTime() - 30_000),
-      xmoneyEnvironment: seeded.xmoneyEnvironment
+      paymentProvider: "xmoney", paymentEnvironment: seeded.xmoneyEnvironment
     });
     await billing.useQuote(client, { quoteId, usedAt: new Date(input.at.getTime() - 30_000), chargeId });
     for (const [kind, transactionId] of [["REQUESTED", null], ["SUBMITTED", input.transactionId], ["SUCCEEDED", input.transactionId]] as const) {
       await billing.appendChargeEvent(client, chargeEvent(chargeId, kind, input.at, {
-        xmoneyTransactionId: transactionId, amountMicros: totalMicros, errorCode: null
+        providerPaymentId: transactionId, amountMicros: totalMicros, errorCode: null
       }));
     }
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));

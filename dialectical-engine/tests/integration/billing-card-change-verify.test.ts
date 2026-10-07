@@ -44,10 +44,10 @@ async function cardCheckCharge(paid: Awaited<ReturnType<BillingHarness["activate
     await h.repository.insertCharge(client, {
       chargeId, ownerRef: paid.ownerRef, subscriptionId: paid.subscriptionId, kind: "CARD_CHECK", attempt: 1,
       periodStart: h.clock.now, periodEnd: new Date(h.clock.now.getTime() + DAY), quoteId: null, netMicros: holdMicros,
-      taxMicros: 0, totalMicros: holdMicros, currency: "USD", createdAt: h.clock.now, xmoneyEnvironment: "stage"
+      taxMicros: 0, totalMicros: holdMicros, currency: "USD", createdAt: h.clock.now, paymentProvider: "xmoney", paymentEnvironment: "stage"
     });
     await h.repository.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", h.clock.now, {
-      xmoneyTransactionId: null, amountMicros: holdMicros, errorCode: null
+      providerPaymentId: null, amountMicros: holdMicros, errorCode: null
     }));
   });
   return chargeId;
@@ -68,7 +68,7 @@ describe("P12e the card change through VERIFY_PAYMENT", () => {
       })]);
       // The release is recorded either way (REFUNDED at the hold's own amount), so nothing reads as a refund still owed.
       expect((await h.repository.charge(chargeId))!.events.filter((event) => event.kind === "REFUNDED"))
-        .toEqual([expect.objectContaining({ xmoneyTransactionId: hold.transactionId, amountMicros: holdMicros })]);
+        .toEqual([expect.objectContaining({ providerPaymentId: hold.transactionId, amountMicros: holdMicros })]);
       expect((await h.repository.deadRefunds()).filter((dead) => dead.chargeId === chargeId)).toEqual([]);
       // Only a hold that holds money is released at xMoney.
       expect(h.xmoney.refunds.some((refund) => refund.transactionId === hold.transactionId)).toBe(holdMicros > 0);

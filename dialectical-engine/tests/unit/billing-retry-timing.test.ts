@@ -117,7 +117,7 @@ describe("P2-I7 a rebill's outcome rows are dated when the call returned, so A2'
     const rebill = vi.fn(async () => { clock.advance(7 * MINUTE); return { transactionId: "t-retry" }; });
     const run = service(rebill as unknown as RenewalDeps["xmoney"]["rebill"], clock);
     await run.renewal.submit(charge, state);
-    expect(run.appended).toEqual([expect.objectContaining({ kind: "SUBMITTED", xmoneyTransactionId: "t-retry", at: answered })]);
+    expect(run.appended).toEqual([expect.objectContaining({ kind: "SUBMITTED", providerPaymentId: "t-retry", at: answered })]);
     expect(run.enqueued).toEqual([expect.objectContaining({ kind: "VERIFY_PAYMENT", notBefore: answered })]);
   });
 });

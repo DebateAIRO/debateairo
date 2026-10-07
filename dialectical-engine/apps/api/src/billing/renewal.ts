@@ -494,7 +494,7 @@ export class RenewalService {
       chargeId: newChargeId(), ownerRef: state.ownerRef, subscriptionId: state.subscriptionId, kind: "RENEWAL", attempt, periodStart,
       periodEnd: computeWindows(state.periodAnchorAt!, periodStart).month.end, quoteId,
       netMicros: quote.netMicros, taxMicros: quote.taxMicros, totalMicros: quote.totalMicros, currency: "USD", createdAt: now,
-      xmoneyEnvironment: this.deps.xmoneyEnvironment
+      paymentProvider: "xmoney", paymentEnvironment: this.deps.xmoneyEnvironment
     }) as ChargeRow;
     return Object.freeze({ quote, charge });
   }
@@ -504,7 +504,7 @@ export class RenewalService {
     await this.deps.repository.insertQuote(client, rows.quote);
     await this.deps.repository.insertCharge(client, rows.charge);
     await this.deps.repository.appendChargeEvent(client, chargeEvent(rows.charge.chargeId, "REQUESTED", now, {
-      xmoneyTransactionId: null, amountMicros: rows.charge.totalMicros, errorCode: null
+      providerPaymentId: null, amountMicros: rows.charge.totalMicros, errorCode: null
     }));
   }
 
@@ -619,7 +619,7 @@ export class RenewalService {
       const kind = notSent === null ? "SUBMIT_UNKNOWN" as const : "REQUESTED" as const;
       const recorded = notSent ?? "REBILL_OUTCOME_UNKNOWN";
       await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
-        chargeEvent(charge.chargeId, kind, now, { xmoneyTransactionId: null, amountMicros: charge.totalMicros, errorCode: recorded })));
+        chargeEvent(charge.chargeId, kind, now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: recorded })));
       this.deps.audit("billing.renewal.unknown", { attempt: charge.attempt, code: recorded });
       // Q-1: the renewal itself keeps the plan while it is retried quietly (a dunning retry already runs on its grace).
       if (charge.attempt === 1) await this.holdPending(state, charge.periodStart, now, recorded);
@@ -631,7 +631,7 @@ export class RenewalService {
   private async linkTransaction(charge: ChargeRow, transactionId: string, now: Date): Promise<void> {
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUBMITTED", now, {
-        xmoneyTransactionId: transactionId, amountMicros: charge.totalMicros, errorCode: null
+        providerPaymentId: transactionId, amountMicros: charge.totalMicros, errorCode: null
       }));
       await this.deps.repository.enqueue(client, {
         kind: "VERIFY_PAYMENT", ref: transactionId, notBefore: now, payload: { charge_id: charge.chargeId }
@@ -649,7 +649,7 @@ export class RenewalService {
     await this.deps.repository.withTransaction(async (client) => {
       await this.deps.jobs.lockOwner(client, charge.ownerRef);
       const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "FAILED", now, {
-        xmoneyTransactionId: transactionId, amountMicros: charge.totalMicros, errorCode
+        providerPaymentId: transactionId, amountMicros: charge.totalMicros, errorCode
       }));
       if (inserted === "DUPLICATE") return;
       const events = await this.deps.repository.subscriptionEvents(charge.subscriptionId, client);
@@ -682,7 +682,7 @@ export class RenewalService {
       // A call's marker with no outcome after 10 minutes: the process died during the call. A blind unknown.
       if (now.getTime() - last.at.getTime() < 10 * 60_000) return false;
       await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
-        chargeEvent(charge.chargeId, "SUBMIT_UNKNOWN", now, { xmoneyTransactionId: null, amountMicros: charge.totalMicros, errorCode: "SUBMIT_INTERRUPTED" })));
+        chargeEvent(charge.chargeId, "SUBMIT_UNKNOWN", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: "SUBMIT_INTERRUPTED" })));
       this.deps.audit("billing.renewal.unknown", { attempt: charge.attempt, code: "SUBMIT_INTERRUPTED" });
       // Q-1: an interrupted renewal call is an outcome still unknown; the plan stays while it is looked for.
       if (charge.attempt === 1) {
@@ -731,7 +731,7 @@ export class RenewalService {
     // The marker is committed before the call: a process that dies during it leaves RESUBMIT_STARTED last, which
     // becomes SUBMIT_INTERRUPTED 10 minutes on, so it is never submitted blind a third time.
     await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
-      chargeEvent(charge.chargeId, "REQUESTED", now, { xmoneyTransactionId: null, amountMicros: charge.totalMicros, errorCode: RESUBMIT_STARTED })));
+      chargeEvent(charge.chargeId, "REQUESTED", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: RESUBMIT_STARTED })));
     await this.submit(charge, fresh);
     return true;
   }

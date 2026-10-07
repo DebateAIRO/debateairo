@@ -60,20 +60,20 @@ export async function recordDisputeOutcome(stores: DisputeStores, input: Dispute
   const charge = await stores.billing.charge(input.chargeRef);
   if (charge === null) throw new TypeError("BILLING_DISPUTE_CHARGE_NOT_FOUND");
   // D5 5f: a second payment of the order is a DUPLICATE_PAYMENT on this charge; its charge-back never suspended the
-  // plan. One CHARGEBACK_RESOLVED per transaction (0086's (xmoney_transaction_id, kind) key): a charge-back is open
+  // plan. One CHARGEBACK_RESOLVED per transaction (0086's (provider_payment_id, kind) key): a charge-back is open
   // while its own transaction has none. The dispute to settle is the newest OPEN charge-back of the subscription's
   // own payment, else the newest open one of a second payment.
   const secondPayments = new Set(charge.events.filter((event) => event.kind === "DUPLICATE_PAYMENT")
-    .map((event) => event.xmoneyTransactionId));
+    .map((event) => event.providerPaymentId));
   const resolved = new Set(charge.events.filter((event) => event.kind === "CHARGEBACK_RESOLVED")
-    .map((event) => event.xmoneyTransactionId));
+    .map((event) => event.providerPaymentId));
   const chargebacks = [...charge.events].reverse()
-    .filter((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId !== null);
+    .filter((event) => event.kind === "CHARGEBACK" && event.providerPaymentId !== null);
   if (chargebacks.length === 0) throw new TypeError("BILLING_DISPUTE_NO_CHARGEBACK");
-  const open = chargebacks.filter((event) => !resolved.has(event.xmoneyTransactionId));
-  const chargeback = open.find((event) => !secondPayments.has(event.xmoneyTransactionId)) ?? open[0];
+  const open = chargebacks.filter((event) => !resolved.has(event.providerPaymentId));
+  const chargeback = open.find((event) => !secondPayments.has(event.providerPaymentId)) ?? open[0];
   if (chargeback === undefined) return "ALREADY_SETTLED";
-  const transactionId = chargeback.xmoneyTransactionId;
+  const transactionId = chargeback.providerPaymentId;
   if (transactionId === null) throw new TypeError("BILLING_DISPUTE_NO_CHARGEBACK");
   const first = (await stores.billing.subscriptionEvents(charge.subscriptionId))[0];
   if (first === undefined) throw new TypeError("BILLING_DISPUTE_SUBSCRIPTION_NOT_FOUND");
@@ -84,7 +84,7 @@ export async function recordDisputeOutcome(stores: DisputeStores, input: Dispute
     return stores.billing.withTransaction(async (client): Promise<DisputeResult> => {
       await stores.jobs.lockOwner(client, first.ownerRef);
       const written = await stores.billing.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK_RESOLVED", now, {
-        xmoneyTransactionId: transactionId, amountMicros: chargeback.amountMicros ?? charge.totalMicros,
+        providerPaymentId: transactionId, amountMicros: chargeback.amountMicros ?? charge.totalMicros,
         errorCode: null
       }));
       return written === "DUPLICATE" ? "ALREADY_SETTLED" : "SECOND_PAYMENT";
@@ -102,7 +102,7 @@ export async function recordDisputeOutcome(stores: DisputeStores, input: Dispute
     }
     if (input.outcome === "won") {
       const written = await stores.billing.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK_RESOLVED", now, {
-        xmoneyTransactionId: transactionId, amountMicros: chargeback.amountMicros ?? charge.totalMicros,
+        providerPaymentId: transactionId, amountMicros: chargeback.amountMicros ?? charge.totalMicros,
         errorCode: null
       }));
       if (written === "DUPLICATE") return "ALREADY_SETTLED";
@@ -149,12 +149,12 @@ async function otherOwnChargebackOpen(
     const other = await stores.billing.charge(row.chargeId, client);
     if (other === null) continue;
     const duplicates = new Set(other.events.filter((event) => event.kind === "DUPLICATE_PAYMENT")
-      .map((event) => event.xmoneyTransactionId));
+      .map((event) => event.providerPaymentId));
     const settled = new Set(other.events.filter((event) => event.kind === "CHARGEBACK_RESOLVED")
-      .map((event) => event.xmoneyTransactionId));
-    if (other.events.some((event) => event.kind === "CHARGEBACK" && event.xmoneyTransactionId !== null
-      && !duplicates.has(event.xmoneyTransactionId) && !settled.has(event.xmoneyTransactionId)
-      && !(other.chargeId === settledChargeId && event.xmoneyTransactionId === settledTransactionId))) {
+      .map((event) => event.providerPaymentId));
+    if (other.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId !== null
+      && !duplicates.has(event.providerPaymentId) && !settled.has(event.providerPaymentId)
+      && !(other.chargeId === settledChargeId && event.providerPaymentId === settledTransactionId))) {
       return true;
     }
   }

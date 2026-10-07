@@ -75,7 +75,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
       .find((transaction) => transaction.transactionSource === "re-bill")!;
     await h.repository.withTransaction(async (client) => {
       await h.repository.appendChargeEvent(client, chargeEvent(upgrade.chargeId, "SUBMITTED", h.clock.now, {
-        xmoneyTransactionId: lost.transactionId, amountMicros: upgrade.totalMicros, errorCode: null
+        providerPaymentId: lost.transactionId, amountMicros: upgrade.totalMicros, errorCode: null
       }));
       await h.repository.enqueue(client, {
         kind: "VERIFY_PAYMENT", ref: lost.transactionId, notBefore: h.clock.now, payload: { charge_id: upgrade.chargeId }
@@ -131,7 +131,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     // The upgrade's payment verified now, before RENEWED moved the period: as P9b's VERIFY_PAYMENT calls it.
     const upgrade = (await h.repository.chargesForSubscription(paid.subscriptionId)).find((row) => row.kind === "UPGRADE")!;
     const read = (await h.repository.charge(upgrade.chargeId))!;
-    const transaction = h.xmoney.transactions.get(read.events.find((event) => event.kind === "SUBMITTED")!.xmoneyTransactionId!)!;
+    const transaction = h.xmoney.transactions.get(read.events.find((event) => event.kind === "SUBMITTED")!.providerPaymentId!)!;
     const quote = (await h.repository.quote(upgrade.quoteId!, paid.ownerRef))!;
     const customer = (await h.repository.customerByOwner(paid.ownerRef))!;
     const rowsBefore = (await h.entitlementRows(paid.ownerRef)).length;

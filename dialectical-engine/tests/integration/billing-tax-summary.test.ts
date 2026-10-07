@@ -30,12 +30,12 @@ describe("P16b the summary reads our own rows", () => {
     await billing.withTransaction(async (client) => {
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(ro.initialChargeId, kind, new Date(soon.getTime() + 3_600_000), {
-          xmoneyTransactionId: ro.initialTransactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL"
+          providerPaymentId: ro.initialTransactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL"
         }));
       }
       // A charge-back no dispute has won back yet: listed for the accountant (P1a's CHARGEBACK row).
       await billing.appendChargeEvent(client, chargeEvent(de.initialChargeId, "CHARGEBACK", new Date(soon.getTime() + 7_200_000), {
-        xmoneyTransactionId: de.initialTransactionId, amountMicros: de.totalMicros, errorCode: null
+        providerPaymentId: de.initialTransactionId, amountMicros: de.totalMicros, errorCode: null
       }));
       const ip = sealIpEvidence(TEST_RECORDS_KEY, de.initialChargeId, "192.0.2.10");
       await billing.insertLocationEvidence(client, {
@@ -100,7 +100,7 @@ describe("P16b the summary reads our own rows", () => {
       });
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(dashboard.initialChargeId, kind, new Date(), {
-          xmoneyTransactionId: dashboard.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
+          providerPaymentId: dashboard.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
         }));
       }
     });
@@ -139,15 +139,15 @@ describe("P16b the summary reads our own rows", () => {
       // P9c, xMoney's read naming no refunded amount: recorded on the payment at what was left of the charge.
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(onPayment.initialChargeId, kind, new Date(), {
-          xmoneyTransactionId: onPayment.initialTransactionId, amountMicros: onPayment.totalMicros, errorCode: "PROVIDER_REFUND"
+          providerPaymentId: onPayment.initialTransactionId, amountMicros: onPayment.totalMicros, errorCode: "PROVIDER_REFUND"
         }));
       }
       // D5 5g: a dashboard refund xMoney lists as its own transaction, naming the payment: its amount is known.
       await billing.appendChargeEvent(client, chargeEvent(ownTransaction.initialChargeId, "REFUND_REQUESTED", new Date(), {
-        xmoneyTransactionId: ownTransaction.initialTransactionId, amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND"
+        providerPaymentId: ownTransaction.initialTransactionId, amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND"
       }));
       await billing.appendChargeEvent(client, chargeEvent(ownTransaction.initialChargeId, "REFUNDED", new Date(), {
-        xmoneyTransactionId: refundTransactionId, amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND",
+        providerPaymentId: refundTransactionId, amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND",
         refundsTransactionId: ownTransaction.initialTransactionId
       }));
     });
@@ -204,11 +204,11 @@ describe("P16b the summary reads our own rows", () => {
         chargeId: renewal, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "RENEWAL", attempt: 1,
         periodStart: seeded.periodEnd, periodEnd: new Date(seeded.periodEnd.getTime() + 30 * 86_400_000),
         quoteId: seeded.initialQuoteId, netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000,
-        currency: "USD", createdAt: new Date(now.getTime() - 2 * 86_400_000), xmoneyEnvironment: "stage"
+        currency: "USD", createdAt: new Date(now.getTime() - 2 * 86_400_000), paymentProvider: "xmoney", paymentEnvironment: "stage"
       });
       for (const [kind, errorCode] of [["REQUESTED", null], ["SUBMIT_UNKNOWN", "REBILL_OUTCOME_UNKNOWN"], ["FAILED", "NO_TRANSACTION"]] as const) {
         await billing.appendChargeEvent(client, chargeEvent(renewal, kind, new Date(now.getTime() - 86_400_000), {
-          xmoneyTransactionId: null, amountMicros: 24_200_000, errorCode
+          providerPaymentId: null, amountMicros: 24_200_000, errorCode
         }));
       }
     });
@@ -319,7 +319,7 @@ describe("P16b the summary reads our own rows", () => {
       kind: "RENEWAL", attempt: 1, periodStart: seeded.periodEnd,
       periodEnd: new Date(seeded.periodEnd.getTime() + 30 * 86_400_000), quoteId: seeded.initialQuoteId,
       netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, currency: "USD", createdAt: now,
-      xmoneyEnvironment: "stage"
+      paymentProvider: "xmoney", paymentEnvironment: "stage"
     }));
     expect(await blocked(now)).toEqual([]);
   });

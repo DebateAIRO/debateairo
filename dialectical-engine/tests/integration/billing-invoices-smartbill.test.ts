@@ -347,7 +347,7 @@ describe("P10b SmartBill invoices for Romania", () => {
     const charge = (await h.repository.charge(paid.chargeId))!;
     const quote = (await h.repository.quote(charge.quoteId!, paid.ownerRef))!;
     await h.repository.withTransaction(async (client) => {
-      const fields = { xmoneyTransactionId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
+      const fields = { providerPaymentId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
       await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUND_REQUESTED", h.clock.now, fields));
       await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUNDED", h.clock.now, fields));
       await enqueueCreditNote(h.repository, client, {
@@ -381,7 +381,7 @@ describe("P10b SmartBill invoices for Romania", () => {
     const charge = (await h.repository.charge(paid.chargeId))!;
     const quote = (await h.repository.quote(charge.quoteId!, paid.ownerRef))!;
     await h.repository.withTransaction(async (client) => {
-      const fields = { xmoneyTransactionId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
+      const fields = { providerPaymentId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
       await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUND_REQUESTED", h.clock.now, fields));
       await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUNDED", h.clock.now, fields));
       await enqueueCreditNote(h.repository, client, {
@@ -413,7 +413,7 @@ describe("P10b SmartBill invoices for Romania", () => {
       const charge = (await h.repository.charge(paid.chargeId))!;
       const quote = (await h.repository.quote(charge.quoteId!, paid.ownerRef))!;
       await h.repository.withTransaction(async (client) => {
-        const fields = { xmoneyTransactionId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
+        const fields = { providerPaymentId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
         await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUND_REQUESTED", h.clock.now, fields));
         await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUNDED", h.clock.now, fields));
         await enqueueCreditNote(h.repository, client, {

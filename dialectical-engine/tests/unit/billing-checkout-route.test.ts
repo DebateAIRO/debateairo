@@ -53,7 +53,7 @@ const postCheckout = (api: ReturnType<typeof harness>, payload: unknown = BODY) 
 });
 
 const event = (kind: string, errorCode: string | null = null) =>
-  ({ eventId: "e", chargeId: CHARGE, kind, at: NOW, xmoneyTransactionId: "1", amountMicros: 24_200_000, errorCode }) as unknown as ChargeEventRow;
+  ({ eventId: "e", chargeId: CHARGE, kind, at: NOW, providerPaymentId: "1", amountMicros: 24_200_000, errorCode }) as unknown as ChargeEventRow;
 
 describe("P8c POST /v1/billing/checkout", () => {
   it("starts the embedded payment and answers only what the browser needs", async () => {

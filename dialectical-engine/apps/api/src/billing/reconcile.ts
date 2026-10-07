@@ -411,7 +411,7 @@ export class BillingReconciler {
     if (decideCheckouts && !uncertain) {
       const errors: ChargeErrors = { count: 0, codes: new Set() };
       for (const charge of stale) {
-        if (touched.has(charge.chargeId) || charge.events.some((event) => event.xmoneyTransactionId !== null)) continue;
+        if (touched.has(charge.chargeId) || charge.events.some((event) => event.providerPaymentId !== null)) continue;
         if (await this.isolated(errors, () => this.failWithoutTransaction(charge, now)) === true) failed += 1;
       }
       this.reportErrors(errors, "CHECKOUT");
@@ -502,7 +502,7 @@ export class BillingReconciler {
     if (match !== undefined) {
       const written = await this.deps.billing.withTransaction(async (client) => {
         const inserted = await this.deps.billing.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUBMITTED", now, {
-          xmoneyTransactionId: match.transactionId, amountMicros: charge.totalMicros, errorCode: null
+          providerPaymentId: match.transactionId, amountMicros: charge.totalMicros, errorCode: null
         }));
         if (inserted === "INSERTED") {
           await this.deps.billing.enqueue(client, {
@@ -530,7 +530,7 @@ export class BillingReconciler {
       const current = await this.deps.billing.charge(charge.chargeId, client);
       if (current === null || current.events.length !== charge.events.length) return false;
       await this.deps.billing.appendChargeEvent(client, chargeEvent(charge.chargeId, "FAILED", now, {
-        xmoneyTransactionId: null, amountMicros: charge.totalMicros, errorCode: "NO_TRANSACTION"
+        providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: "NO_TRANSACTION"
       }));
       return true;
     });

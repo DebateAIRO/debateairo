@@ -29,7 +29,7 @@ const quote: QuoteRow = Object.freeze({
 const charge = (periodEnd: Date = END): ChargeRow => Object.freeze({
   chargeId: "c".repeat(32), ownerRef: "owner-1", subscriptionId: "sub-1", kind: "UPGRADE", attempt: 1,
   periodStart: MIDDLE, periodEnd, quoteId: "q-1", netMicros: 15_000_000, taxMicros: 3_150_000, totalMicros: 18_150_000,
-  currency: "USD", createdAt: MIDDLE, xmoneyEnvironment: "stage"
+  currency: "USD", createdAt: MIDDLE, paymentProvider: "xmoney", paymentEnvironment: "stage"
 });
 
 describe("P12c what the UPGRADE settlement writes when an upgrade is paid", () => {

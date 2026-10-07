@@ -93,15 +93,15 @@ async function openCharge(seeded: Awaited<ReturnType<typeof seedActiveSubscripti
       chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: input.kind, attempt: 1,
       periodStart: input.createdAt, periodEnd: new Date(input.createdAt.getTime() + 30 * DAY),
       quoteId: seeded.initialQuoteId, netMicros: input.totalMicros, taxMicros: 0, totalMicros: input.totalMicros,
-      currency: "USD", createdAt: input.createdAt, xmoneyEnvironment: seeded.xmoneyEnvironment
+      currency: "USD", createdAt: input.createdAt, paymentProvider: "xmoney", paymentEnvironment: seeded.xmoneyEnvironment
     });
     await billing.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", input.createdAt, {
-      xmoneyTransactionId: null, amountMicros: input.totalMicros, errorCode: null
+      providerPaymentId: null, amountMicros: input.totalMicros, errorCode: null
     }));
     const unknowns = input.last === "SUBMIT_UNKNOWN" ? input.unknowns ?? 1 : 0;
     for (let index = 0; index < unknowns; index += 1) {
       await billing.appendChargeEvent(client, chargeEvent(chargeId, "SUBMIT_UNKNOWN", input.createdAt, {
-        xmoneyTransactionId: null, amountMicros: input.totalMicros, errorCode: "REBILL_OUTCOME_UNKNOWN"
+        providerPaymentId: null, amountMicros: input.totalMicros, errorCode: "REBILL_OUTCOME_UNKNOWN"
       }));
     }
   });
@@ -109,7 +109,7 @@ async function openCharge(seeded: Awaited<ReturnType<typeof seedActiveSubscripti
 }
 
 const kindsOf = async (chargeId: string) =>
-  (await new BillingRepository(database.pool).charge(chargeId))!.events.map((event) => [event.kind, event.errorCode ?? event.xmoneyTransactionId]);
+  (await new BillingRepository(database.pool).charge(chargeId))!.events.map((event) => [event.kind, event.errorCode ?? event.providerPaymentId]);
 
 const seed = (now: Date) => seedActiveSubscription(database.pool, {
   ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 5 * DAY), taxCountry: "RO"
@@ -305,11 +305,11 @@ describe("P14a reconciliation on real PostgreSQL", () => {
       // Our refund of part of the first payment, and a second payment of that order (P9b's DUPLICATE_PAYMENT).
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(stage.initialChargeId, kind, now, {
-          xmoneyTransactionId: stage.initialTransactionId, amountMicros: 2_000_000, errorCode: "WITHDRAWAL"
+          providerPaymentId: stage.initialTransactionId, amountMicros: 2_000_000, errorCode: "WITHDRAWAL"
         }));
       }
       await billing.appendChargeEvent(client, chargeEvent(stage.initialChargeId, "DUPLICATE_PAYMENT", now, {
-        xmoneyTransactionId: "996003", amountMicros: stage.totalMicros, errorCode: null
+        providerPaymentId: "996003", amountMicros: stage.totalMicros, errorCode: null
       }));
     });
     const xmoney = fakeXMoney();
@@ -356,13 +356,13 @@ describe("P14a reconciliation on real PostgreSQL", () => {
       // Our withdrawal refund of 2.00, recorded on the payment's own row when its call answered.
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(partly.initialChargeId, kind, now, {
-          xmoneyTransactionId: partly.initialTransactionId, amountMicros: 2_000_000, errorCode: "WITHDRAWAL"
+          providerPaymentId: partly.initialTransactionId, amountMicros: 2_000_000, errorCode: "WITHDRAWAL"
         }));
       }
       // A full dashboard refund read from the payment's own refund-ok (P9c's PROVIDER_REFUND on the payment's row).
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(whole.initialChargeId, kind, now, {
-          xmoneyTransactionId: whole.initialTransactionId, amountMicros: whole.totalMicros, errorCode: "PROVIDER_REFUND"
+          providerPaymentId: whole.initialTransactionId, amountMicros: whole.totalMicros, errorCode: "PROVIDER_REFUND"
         }));
       }
     });
@@ -394,11 +394,11 @@ describe("P14a reconciliation on real PostgreSQL", () => {
           chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "RENEWAL", attempt: 1,
           periodStart: createdAt, periodEnd: new Date(createdAt.getTime() + 30 * DAY), quoteId: seeded.initialQuoteId,
           netMicros: 24_200_000, taxMicros: 0, totalMicros: 24_200_000, currency: "USD", createdAt,
-          xmoneyEnvironment: "stage"
+          paymentProvider: "xmoney", paymentEnvironment: "stage"
         });
         for (const kind of ["REQUESTED", "SUBMIT_UNKNOWN", "SUBMIT_UNKNOWN"] as const) {
           await billing.appendChargeEvent(client, chargeEvent(chargeId, kind, createdAt, {
-            xmoneyTransactionId: null, amountMicros: 24_200_000, errorCode: kind === "REQUESTED" ? null : "REBILL_OUTCOME_UNKNOWN"
+            providerPaymentId: null, amountMicros: 24_200_000, errorCode: kind === "REQUESTED" ? null : "REBILL_OUTCOME_UNKNOWN"
           }));
         }
       }
@@ -425,7 +425,7 @@ describe("P14a reconciliation on real PostgreSQL", () => {
     const ref = `${seeded.initialChargeId}:${seeded.initialTransactionId}`;
     await billing.withTransaction(async (client) => {
       await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "REFUND_REQUESTED", now, {
-        xmoneyTransactionId: seeded.initialTransactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL"
+        providerPaymentId: seeded.initialTransactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL"
       }));
       await billing.enqueue(client, { kind: "XMONEY_REFUND", ref, notBefore: new Date(0), payload: { reason: "WITHDRAWAL" } });
     });
@@ -445,7 +445,7 @@ describe("P14a reconciliation on real PostgreSQL", () => {
     // The owner refunded it after all and xMoney reported the refund as its own transaction naming the payment
     // (D5 5g): the dead job no longer counts as money owed.
     await billing.withTransaction((client) => billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "REFUNDED", now, {
-      xmoneyTransactionId: "7790001", amountMicros: 12_100_000, errorCode: "WITHDRAWAL",
+      providerPaymentId: "7790001", amountMicros: 12_100_000, errorCode: "WITHDRAWAL",
       refundsTransactionId: seeded.initialTransactionId
     })));
     expect((await billing.deadRefunds()).map((item) => item.chargeId)).not.toContain(seeded.initialChargeId);

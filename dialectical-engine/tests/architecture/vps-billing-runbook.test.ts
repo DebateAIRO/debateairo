@@ -51,7 +51,7 @@ describe("P22 the Billing runbook", () => {
       "billing.charge_event e JOIN billing.charge c",
       // §14.8 (P14b judge, carried): a charge-back is open while ITS OWN transaction has no CHARGEBACK_RESOLVED, a
       // second payment's charge-back is marked DUPLICATE_PAYMENT, and the command's two newer answers are named.
-      "r.xmoney_transaction_id = e.xmoney_transaction_id", "e.error_code", "DUPLICATE_PAYMENT",
+      "r.provider_payment_id = e.provider_payment_id", "e.error_code", "DUPLICATE_PAYMENT",
       "STILL_DISPUTED", "BILLING_DISPUTE_AMBIGUOUS",
       // §14.8 (W2, P2-I2): a dispute xMoney reports as its own transaction is listed under the payment it names.
       "the list shows the xMoney transaction id of the payment the dispute is about",

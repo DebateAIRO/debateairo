@@ -1,6 +1,8 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  BillingJobQueries,
   BillingRepository,
   EntitlementRepository,
   migrate,
@@ -63,7 +65,7 @@ async function quoteAndCharge(
   const charge: ChargeRow = {
     chargeId: chargeIdOf(), ownerRef, subscriptionId, kind, attempt: 1, periodStart,
     periodEnd: new Date(periodStart.getTime() + 30 * 86_400_000), quoteId, netMicros: 20_000_000,
-    taxMicros: 4_200_000, totalMicros: 24_200_000, currency: "USD", createdAt: now, xmoneyEnvironment: system
+    taxMicros: 4_200_000, totalMicros: 24_200_000, currency: "USD", createdAt: now, paymentProvider: "xmoney", paymentEnvironment: system
   };
   await billing.withTransaction(async (c) => {
     await billing.insertQuote(c, {
@@ -216,9 +218,9 @@ describe("P1b — quotes, subscriptions and charges", () => {
       await billing.insertCharge(c, {
         chargeId, ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: anchor,
         periodEnd: new Date(anchor.getTime() + 30 * 86_400_000), quoteId, netMicros: 20_000_000, taxMicros: 4_200_000,
-        totalMicros: 24_200_000, currency: "USD", createdAt: now, xmoneyEnvironment: "stage"
+        totalMicros: 24_200_000, currency: "USD", createdAt: now, paymentProvider: "xmoney", paymentEnvironment: "stage"
       });
-      await billing.appendChargeEvent(c, { chargeId, kind: "REQUESTED", at: now, xmoneyTransactionId: null, amountMicros: null, errorCode: null });
+      await billing.appendChargeEvent(c, { chargeId, kind: "REQUESTED", at: now, providerPaymentId: null, amountMicros: null, errorCode: null });
       // Through the transaction's client: everything above is there.
       expect((await billing.customerByOwner(ownerRef, "stage", c))?.xmoneyCustomerId).toBe("5701");
       expect((await billing.latestProfile(customerId, c))?.locale).toBe("ro");
@@ -249,18 +251,18 @@ describe("P1b — quotes, subscriptions and charges", () => {
     await expect(billing.withTransaction((c) => billing.insertCharge(c, { ...charge, chargeId: chargeIdOf() })))
       .rejects.toMatchObject({ code: "BILLING_CHARGE_DUPLICATE" });
     const succeeded = { eventId: randomUUID(), chargeId: charge.chargeId, kind: "SUCCEEDED" as const, at: new Date(),
-      xmoneyTransactionId: "9001", amountMicros: 24_200_000, errorCode: null };
+      providerPaymentId: "9001", amountMicros: 24_200_000, errorCode: null };
     expect(await billing.withTransaction((c) => billing.appendChargeEvent(c, succeeded))).toBe("INSERTED");
     expect(await billing.withTransaction((c) => billing.appendChargeEvent(c, { ...succeeded, eventId: randomUUID() }))).toBe("DUPLICATE");
     await expect(billing.withTransaction((c) => billing.appendChargeEvent(c, {
       eventId: randomUUID(), chargeId: charge.chargeId, kind: "REFUND_REQUESTED", at: new Date(),
-      xmoneyTransactionId: "9001", amountMicros: 30_000_000, errorCode: null
+      providerPaymentId: "9001", amountMicros: 30_000_000, errorCode: null
     }))).rejects.toMatchObject({ code: "REFUND_EXCEEDS_CHARGE" });
     await expect(billing.withTransaction((c) => billing.appendChargeEvent(c, { ...succeeded, chargeId: chargeIdOf() })))
       .rejects.toMatchObject({ code: "BILLING_CHARGE_UNKNOWN" });
     const read = await billing.charge(charge.chargeId);
     expect(read?.events.map((event) => event.kind)).toEqual(["SUCCEEDED"]);
-    expect(read?.events[0]).toMatchObject({ xmoneyEnvironment: "stage", refundsTransactionId: null });
+    expect(read?.events[0]).toMatchObject({ paymentProvider: "xmoney", paymentEnvironment: "stage", refundsTransactionId: null });
     expect(read?.totalMicros).toBe(24_200_000);
     expect((await billing.chargesForSubscription(subscriptionId)).map((row) => row.chargeId)).toEqual([charge.chargeId]);
   });
@@ -271,7 +273,7 @@ describe("P1b — quotes, subscriptions and charges", () => {
     const charge = await quoteAndCharge(ownerRef, subscriptionId);
     const record = (kind: "SUCCEEDED" | "DUPLICATE_PAYMENT" | "REFUND_REQUESTED", transactionId: string) =>
       billing.withTransaction((c) => billing.appendChargeEvent(c, {
-        chargeId: charge.chargeId, kind, at: new Date(), xmoneyTransactionId: transactionId, amountMicros: 24_200_000,
+        chargeId: charge.chargeId, kind, at: new Date(), providerPaymentId: transactionId, amountMicros: 24_200_000,
         errorCode: kind === "REFUND_REQUESTED" ? "DUPLICATE_PAYMENT" : null
       }));
     expect(await record("SUCCEEDED", "63001")).toBe("INSERTED");
@@ -294,11 +296,11 @@ describe("P1b — quotes, subscriptions and charges", () => {
     const liveOwner = randomUUID();
     const liveCharge = await quoteAndCharge(liveOwner, await activeSubscription(liveOwner, anchor, "live"), "INITIAL", anchor, "live");
     const pay = (chargeId: string) => billing.withTransaction((c) => billing.appendChargeEvent(c, {
-      chargeId, kind: "SUCCEEDED", at: new Date(), xmoneyTransactionId: "62001", amountMicros: 24_200_000, errorCode: null
+      chargeId, kind: "SUCCEEDED", at: new Date(), providerPaymentId: "62001", amountMicros: 24_200_000, errorCode: null
     }));
     expect(await pay(stageCharge.chargeId)).toBe("INSERTED");
     expect(await pay(liveCharge.chargeId)).toBe("INSERTED");
-    expect((await billing.charge(liveCharge.chargeId))?.events[0]?.xmoneyEnvironment).toBe("live");
+    expect((await billing.charge(liveCharge.chargeId))?.events[0]?.paymentEnvironment).toBe("live");
   });
 });
 
@@ -389,7 +391,7 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     const charge = await quoteAndCharge(ownerRef, live, "INITIAL", anchor, "live");
     expect((await billing.openRecordCounts("live")).charges).toBe(before.charges + 1);
     await billing.withTransaction((c) => billing.appendChargeEvent(c, {
-      chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(), xmoneyTransactionId: "61001", amountMicros: 24_200_000, errorCode: null
+      chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(), providerPaymentId: "61001", amountMicros: 24_200_000, errorCode: null
     }));
     await billing.withTransaction((c) => billing.appendSubscriptionEvent(c, subscriptionEvent(live, ownerRef, "CANCEL_REQUESTED")));
     expect(await billing.openRecordCounts("live")).toEqual(before);
@@ -400,7 +402,7 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     const subscription = await activeSubscription(ownerRef, anchor, "live");
     const charge = await quoteAndCharge(ownerRef, subscription, "INITIAL", anchor, "live");
     await billing.withTransaction((c) => billing.appendChargeEvent(c, {
-      chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(), xmoneyTransactionId: "61002", amountMicros: 24_200_000, errorCode: null
+      chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(), providerPaymentId: "61002", amountMicros: 24_200_000, errorCode: null
     }));
     await billing.withTransaction((c) => billing.appendSubscriptionEvent(c, subscriptionEvent(subscription, ownerRef, "CANCEL_REQUESTED")));
     const live = await billing.openRecordCounts("live");
@@ -438,7 +440,7 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     const soon = new Date(now.getTime() + 23 * 3_600_000);
     await billing.withTransaction(async (c) => {
       await billing.appendChargeEvent(c, {
-        chargeId: todayCharge.chargeId, kind: "SUCCEEDED", at: soon, xmoneyTransactionId: "62001", amountMicros: 24_200_000, errorCode: null
+        chargeId: todayCharge.chargeId, kind: "SUCCEEDED", at: soon, providerPaymentId: "62001", amountMicros: 24_200_000, errorCode: null
       });
       await billing.enqueue(c, { kind: "SMARTBILL_INVOICE", ref: todayCharge.chargeId, notBefore: soon, payload: { card_country: "RO" } });
       // The quarter's summary is due at 06:00 on the 5th day after its quarter ends (owner-jobs.ts), so up to four
@@ -456,7 +458,7 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     const sandboxCharge = await quoteAndCharge(sandboxOwner, sandbox, "RENEWAL", moved, "stage");
     await billing.withTransaction(async (c) => {
       await billing.appendChargeEvent(c, {
-        chargeId: sandboxCharge.chargeId, kind: "SUCCEEDED", at: moved, xmoneyTransactionId: "62002", amountMicros: 24_200_000, errorCode: null
+        chargeId: sandboxCharge.chargeId, kind: "SUCCEEDED", at: moved, providerPaymentId: "62002", amountMicros: 24_200_000, errorCode: null
       });
       await entitlements.append(c, {
         ownerRef: sandboxOwner, planId: "PLUS", periodAnchorAt: moved, cause: "RENEWED", effectiveAt: moved,
@@ -529,22 +531,22 @@ describe("P1b — invoices, notices and the tax summary", () => {
     await billing.withTransaction(async (c) => {
       // eventId left out on purpose: the repository mints it.
       await billing.appendChargeEvent(c, { chargeId: charge.chargeId, kind: "SUCCEEDED", at: paidAt,
-        xmoneyTransactionId: "31001", amountMicros: 24_200_000, errorCode: null });
+        providerPaymentId: "31001", amountMicros: 24_200_000, errorCode: null });
       await billing.appendChargeEvent(c, { chargeId: charge.chargeId, kind: "REFUND_REQUESTED", at: refundedAt,
-        xmoneyTransactionId: "31001", amountMicros: 4_200_000, errorCode: "WITHDRAWAL" });
+        providerPaymentId: "31001", amountMicros: 4_200_000, errorCode: "WITHDRAWAL" });
       await billing.appendChargeEvent(c, { chargeId: charge.chargeId, kind: "REFUNDED", at: refundedAt,
-        xmoneyTransactionId: "31001", amountMicros: 4_200_000, errorCode: "WITHDRAWAL" });
+        providerPaymentId: "31001", amountMicros: 4_200_000, errorCode: "WITHDRAWAL" });
       // A second payment of the same charge and its refund: never a sale, so its refund is not a tax REFUND row.
       await billing.appendChargeEvent(c, { chargeId: charge.chargeId, kind: "DUPLICATE_PAYMENT", at: paidAt,
-        xmoneyTransactionId: "31003", amountMicros: 24_200_000, errorCode: null });
+        providerPaymentId: "31003", amountMicros: 24_200_000, errorCode: null });
       await billing.appendChargeEvent(c, { chargeId: charge.chargeId, kind: "REFUNDED", at: refundedAt,
-        xmoneyTransactionId: "31004", refundsTransactionId: "31003", amountMicros: 24_200_000, errorCode: "DUPLICATE_PAYMENT" });
+        providerPaymentId: "31004", refundsTransactionId: "31003", amountMicros: 24_200_000, errorCode: "DUPLICATE_PAYMENT" });
       await billing.insertLocationEvidence(c, { chargeId: charge.chargeId, ipCountry: "RO", declaredCountry: "RO",
         cardCountry: "RO", verdict: "AGREED", ipCiphertext: ip.ciphertext, keyId: ip.keyId, at: paidAt });
     });
     const renewal = await quoteAndCharge(ownerRef, subscriptionId, "RENEWAL", new Date(anchor.getTime() + 30 * 86_400_000));
     await billing.withTransaction((c) => billing.appendChargeEvent(c, { chargeId: renewal.chargeId, kind: "SUCCEEDED",
-      at: nextQuarter, xmoneyTransactionId: "31002", amountMicros: 24_200_000, errorCode: null }));
+      at: nextQuarter, providerPaymentId: "31002", amountMicros: 24_200_000, errorCode: null }));
     const rows = await billing.quarterSummaryRows(new Date("2031-01-01T00:00:00Z"), new Date("2031-04-01T00:00:00Z"), "stage");
     expect(rows).toEqual([
       { type: "SALE", chargeId: charge.chargeId, at: paidAt, taxCountry: "RO", taxRegion: null, taxStatus: "TAXABLE",
@@ -568,8 +570,8 @@ describe("P1b — invoices, notices and the tax summary", () => {
     const paidAt = new Date("2032-02-10T12:00:00.000Z");
     const disputedAt = new Date("2032-02-20T12:00:00.000Z");
     const event = (chargeId: string, kind: "SUCCEEDED" | "DUPLICATE_PAYMENT" | "CHARGEBACK" | "CHARGEBACK_RESOLVED",
-      at: Date, xmoneyTransactionId: string, amountMicros: number | null) =>
-      ({ chargeId, kind, at, xmoneyTransactionId, amountMicros, errorCode: null });
+      at: Date, providerPaymentId: string, amountMicros: number | null) =>
+      ({ chargeId, kind, at, providerPaymentId, amountMicros, errorCode: null });
     await billing.withTransaction(async (c) => {
       await billing.appendChargeEvent(c, event(open.chargeId, "SUCCEEDED", paidAt, "32001", 24_200_000));
       // No amount on the charge-back: the row carries the charge total.
@@ -608,8 +610,8 @@ describe("P1b — invoices, notices and the tax summary", () => {
     const takenAt = new Date("2033-03-31T23:59:00.000Z");
     const verifiedAt = new Date("2033-04-01T00:05:00.000Z");
     await billing.withTransaction((c) => billing.appendChargeEvent(c, {
-      chargeId: charge.chargeId, kind: "SUCCEEDED", at: verifiedAt, xmoneyCreatedAt: takenAt,
-      xmoneyTransactionId: "33001", amountMicros: 24_200_000, errorCode: null
+      chargeId: charge.chargeId, kind: "SUCCEEDED", at: verifiedAt, providerCreatedAt: takenAt,
+      providerPaymentId: "33001", amountMicros: 24_200_000, errorCode: null
     }));
     const first = await billing.quarterSummaryRows(new Date("2033-01-01T00:00:00Z"), new Date("2033-04-01T00:00:00Z"), "stage");
     expect(first.filter((row) => row.chargeId === charge.chargeId))
@@ -618,8 +620,8 @@ describe("P1b — invoices, notices and the tax summary", () => {
     expect(second.some((row) => row.chargeId === charge.chargeId)).toBe(false);
     // A row that names no transaction cannot carry xMoney's time (P1a's constraint), whatever the caller passes.
     await expect(billing.withTransaction((c) => billing.appendChargeEvent(c, {
-      chargeId: charge.chargeId, kind: "REQUESTED", at: verifiedAt, xmoneyCreatedAt: takenAt,
-      xmoneyTransactionId: null, amountMicros: null, errorCode: null
+      chargeId: charge.chargeId, kind: "REQUESTED", at: verifiedAt, providerCreatedAt: takenAt,
+      providerPaymentId: null, amountMicros: null, errorCode: null
     }))).rejects.toMatchObject({ code: "23514" });
   });
 
@@ -630,19 +632,19 @@ describe("P1b — invoices, notices and the tax summary", () => {
     const takenAt = new Date("2035-03-20T09:00:00.000Z");
     const refundedAt = new Date("2035-05-12T09:00:00.000Z");
     await billing.withTransaction((c) => billing.appendChargeEvent(c, {
-      chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date("2035-03-20T09:05:00.000Z"), xmoneyCreatedAt: takenAt,
-      xmoneyTransactionId: "35001", amountMicros: 24_200_000, errorCode: null
+      chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date("2035-03-20T09:05:00.000Z"), providerCreatedAt: takenAt,
+      providerPaymentId: "35001", amountMicros: 24_200_000, errorCode: null
     }));
     // refund-ok on the payment's own transaction (A9): that transaction's createdAt is the PAYMENT's, so the row
     // may not carry it — P1a's constraint refuses it (the refund-sum trigger lets it through first: 35001 paid 24.20).
     await expect(billing.withTransaction((c) => billing.appendChargeEvent(c, {
-      chargeId: charge.chargeId, kind: "REFUNDED", at: refundedAt, xmoneyCreatedAt: takenAt,
-      xmoneyTransactionId: "35001", amountMicros: 24_200_000, errorCode: null
-    }))).rejects.toMatchObject({ code: "23514", constraint: "charge_event_xmoney_time_names_transaction" });
+      chargeId: charge.chargeId, kind: "REFUNDED", at: refundedAt, providerCreatedAt: takenAt,
+      providerPaymentId: "35001", amountMicros: 24_200_000, errorCode: null
+    }))).rejects.toMatchObject({ code: "23514", constraint: "charge_event_provider_time_names_payment" });
     // As D6a's VERIFY_PAYMENT writes it: no xMoney time, so the row is dated when it was recorded.
     await billing.withTransaction((c) => billing.appendChargeEvent(c, {
       chargeId: charge.chargeId, kind: "REFUNDED", at: refundedAt,
-      xmoneyTransactionId: "35001", amountMicros: 24_200_000, errorCode: null
+      providerPaymentId: "35001", amountMicros: 24_200_000, errorCode: null
     }));
     const ours = (rows: readonly TaxSummaryRow[]) => rows.filter((row) => row.chargeId === charge.chargeId);
     expect(ours(await billing.quarterSummaryRows(new Date("2035-01-01T00:00:00Z"), new Date("2035-04-01T00:00:00Z"), "stage")))
@@ -661,20 +663,20 @@ describe("P1b — invoices, notices and the tax summary", () => {
     const refundedAt = new Date("2036-02-20T12:00:00.000Z");
     await billing.withTransaction(async (c) => {
       await billing.appendChargeEvent(c, { chargeId: onPayment.chargeId, kind: "SUCCEEDED", at: paidAt,
-        xmoneyTransactionId: "36001", amountMicros: 24_200_000, errorCode: null });
+        providerPaymentId: "36001", amountMicros: 24_200_000, errorCode: null });
       await billing.appendChargeEvent(c, { chargeId: ownTransaction.chargeId, kind: "SUCCEEDED", at: paidAt,
-        xmoneyTransactionId: "36002", amountMicros: 24_200_000, errorCode: null });
+        providerPaymentId: "36002", amountMicros: 24_200_000, errorCode: null });
       // D6a's P9c, xMoney's read naming no refunded amount: recorded on the payment at what was left of the charge
       // (an upper bound), so the summary must not subtract it.
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(c, { chargeId: onPayment.chargeId, kind, at: refundedAt,
-          xmoneyTransactionId: "36001", amountMicros: 24_200_000, errorCode: "PROVIDER_REFUND" });
+          providerPaymentId: "36001", amountMicros: 24_200_000, errorCode: "PROVIDER_REFUND" });
       }
       // A dashboard refund xMoney lists as its own transaction, naming the payment: its amount is known.
       await billing.appendChargeEvent(c, { chargeId: ownTransaction.chargeId, kind: "REFUND_REQUESTED", at: refundedAt,
-        xmoneyTransactionId: "36002", amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND" });
+        providerPaymentId: "36002", amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND" });
       await billing.appendChargeEvent(c, { chargeId: ownTransaction.chargeId, kind: "REFUNDED", at: refundedAt,
-        xmoneyTransactionId: "36003", refundsTransactionId: "36002", amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND" });
+        providerPaymentId: "36003", refundsTransactionId: "36002", amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND" });
     });
     const rows = (await billing.quarterSummaryRows(new Date("2036-01-01T00:00:00Z"), new Date("2036-04-01T00:00:00Z"), "stage"))
       .filter((row) => row.chargeId === onPayment.chargeId || row.chargeId === ownTransaction.chargeId);
@@ -700,7 +702,7 @@ describe("P1b — invoices, notices and the tax summary", () => {
       // The same transaction number in both systems: two payments, one per system (P1a keys every id by system).
       for (const chargeId of [stageCharge.chargeId, liveCharge.chargeId]) {
         await billing.appendChargeEvent(c, { chargeId, kind: "SUCCEEDED", at: paidAt,
-          xmoneyTransactionId: "34001", amountMicros: 24_200_000, errorCode: null });
+          providerPaymentId: "34001", amountMicros: 24_200_000, errorCode: null });
       }
     });
     const from = new Date("2034-01-01T00:00:00Z");
@@ -814,5 +816,116 @@ describe("P1b — account erasure leaves billing rows intact (spec §2.2 rule 5)
     expect((await billing.charge(charge.chargeId))?.chargeId).toBe(charge.chargeId);
     const profile = await billing.latestProfile(customerId);
     expect(JSON.parse(openRecord(recordsKey, aad, profile!.profileCiphertext).toString("utf8"))).toEqual({ name: "Kept for the tax law" });
+  });
+});
+
+/** A NETOPIA card check (no quote): the smallest charge of NETOPIA's sandbox, through the repository. */
+async function netopiaCharge(): Promise<ChargeRow> {
+  const charge: ChargeRow = {
+    chargeId: chargeIdOf(), ownerRef: randomUUID(), subscriptionId: randomUUID(), kind: "CARD_CHECK", attempt: 1,
+    periodStart: anchor, periodEnd: new Date(anchor.getTime() + 86_400_000), quoteId: null, netMicros: 0, taxMicros: 0,
+    totalMicros: 0, currency: "USD", createdAt: new Date(), paymentProvider: "netopia", paymentEnvironment: "sandbox"
+  };
+  await billing.withTransaction((c) => billing.insertCharge(c, charge));
+  return charge;
+}
+const sealedBytes = Buffer.from([9, 8, 7, 6]);
+const KEY_ID = "0123456789abcdef";
+const hex64 = (text: string): string => createHash("sha256").update(text).digest("hex");
+const inTx = <T>(run: (c: PoolClient) => Promise<T>): Promise<T> => billing.withTransaction(run);
+
+describe("N6 — NETOPIA's rows through the repository (spec §2.5.1, §2.5.2)", () => {
+  it("copies the charge's provider and environment onto its events, and reads both back", async () => {
+    const charge = await netopiaCharge();
+    expect(await inTx((c) => billing.appendChargeEvent(c, { chargeId: charge.chargeId, kind: "SUCCEEDED", at: new Date(),
+      providerPaymentId: "ntp-4401", amountMicros: 0, errorCode: null, providerCreatedAt: anchor }))).toBe("INSERTED");
+    const read = await billing.charge(charge.chargeId);
+    expect(read).toMatchObject({ paymentProvider: "netopia", paymentEnvironment: "sandbox" });
+    expect(read?.events[0]).toMatchObject({ providerPaymentId: "ntp-4401", paymentProvider: "netopia", paymentEnvironment: "sandbox" });
+    expect(await inTx((c) => billing.succeededTransaction(c, charge.chargeId))).toBe("ntp-4401");
+  });
+  it("stores a message once per body, keeps its raw bytes and outcomes, finds the newest for an order, quarantines the rest", async () => {
+    const orderId = chargeIdOf();
+    const message = (noticeId: string, receivedAt: Date, body: string) => ({
+      noticeId, paymentProvider: "netopia" as const, paymentEnvironment: "sandbox" as const, receivedAt, bodySha256: hex64(body),
+      orderId, providerPaymentId: "5501", providerStatus: 3, amountText: "24.2", currency: "USD", cardCountry: "RO",
+      keyFingerprint: hex64("key"), jwtIat: "1759744800", allowedCiphertext: sealedBytes, keyId: KEY_ID
+    });
+    const [first, later] = [randomUUID(), randomUUID()];
+    expect(await inTx((c) => billing.insertPaymentNotice(c, message(first, anchor, `a-${orderId}`)))).toEqual({ noticeId: first, inserted: true });
+    expect(await inTx((c) => billing.insertPaymentNotice(c, message(randomUUID(), anchor, `a-${orderId}`)))).toEqual({ noticeId: first, inserted: false });
+    await inTx(async (c) => {
+      await billing.insertPaymentNotice(c, message(later, new Date(anchor.getTime() + 60_000), `b-${orderId}`));
+      await billing.insertPaymentNoticeRaw(c, { noticeId: later, rawCiphertext: sealedBytes, keyId: KEY_ID, storedAt: new Date() });
+      await billing.insertPaymentNoticeOutcome(c, { noticeId: later, at: new Date(), outcome: "PARSE_FAILED" });
+      await billing.insertPaymentNoticeOutcome(c, { noticeId: later, at: new Date(), outcome: "APPLIED" });
+    });
+    const newest = await billing.newestNoticeForOrder(database.pool, orderId);
+    expect(newest).toMatchObject({ noticeId: later, providerPaymentId: "5501", providerStatus: 3, amountText: "24.2", orderId });
+    expect(newest?.allowedCiphertext.equals(sealedBytes)).toBe(true);
+    expect(await billing.newestNoticeForOrder(database.pool, chargeIdOf())).toBeNull();
+    expect((await database.pool.query("SELECT outcome FROM billing.payment_notice_outcome WHERE notice_id = $1", [later])).rows
+      .map((row) => row.outcome).sort()).toEqual(["APPLIED", "PARSE_FAILED"]);
+    const since = new Date();
+    const quarantineId = randomUUID();
+    await inTx((c) => billing.insertNoticeQuarantine(c, { quarantineId, receivedAt: new Date(since.getTime() + 1_000),
+      reason: "NOTICE_SIGNATURE_INVALID", orderId, rawCiphertext: sealedBytes, headerCiphertext: null, keyId: KEY_ID }));
+    expect((await billing.quarantineSince(database.pool, since)).find((row) => row.quarantineId === quarantineId))
+      .toMatchObject({ reason: "NOTICE_SIGNATURE_INVALID", headerCiphertext: null, orderId });
+    expect((await billing.quarantineSince(database.pool, new Date(since.getTime() + 60_000))).map((row) => row.quarantineId)).not.toContain(quarantineId);
+  });
+  it("stores a saved card, finds it by id and by source charge, lists live tokens, revokes once and purges it", async () => {
+    const charge = await netopiaCharge();
+    const tokenId = randomUUID();
+    const card = {
+      tokenId, customerId: randomUUID(), paymentProvider: "netopia" as const, paymentEnvironment: "sandbox" as const,
+      sourceChargeId: charge.chargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: anchor,
+      tokenCiphertext: sealedBytes, keyId: KEY_ID, expMonth: 11, expYear: 2030, last4: "1111", cardCountry: "RO",
+      createdAt: new Date(Date.now() - 3 * 86_400_000)
+    };
+    expect(await inTx((c) => billing.insertCardToken(c, card))).toEqual({ tokenId });
+    expect(await billing.cardTokenById(database.pool, tokenId))
+      .toMatchObject({ ...card, tokenCiphertext: expect.any(Buffer), revokedAt: null, revocationReason: null });
+    expect((await billing.cardTokensFromCharge(database.pool, charge.chargeId)).map((row) => row.tokenId)).toEqual([tokenId]);
+    expect((await billing.liveCardTokensOlderThan(database.pool, new Date(Date.now() - 86_400_000))).map((row) => row.tokenId)).toContain(tokenId);
+    const revokedAt = new Date(Date.now() - 2 * 86_400_000);
+    await inTx((c) => billing.revokeCardToken(c, { tokenId, at: revokedAt, reason: "PLAN_ENDED" }));
+    await inTx((c) => billing.revokeCardToken(c, { tokenId, at: new Date(), reason: "ERASURE" }));
+    expect(await billing.cardTokenById(database.pool, tokenId)).toMatchObject({ revokedAt, revocationReason: "PLAN_ENDED" });
+    expect((await billing.liveCardTokensOlderThan(database.pool, new Date())).map((row) => row.tokenId)).not.toContain(tokenId);
+    expect(await billing.purgeRevokedCardTokens(new Date())).toBeGreaterThanOrEqual(1);
+    expect(await billing.cardTokenById(database.pool, tokenId)).toBeNull();
+  });
+  it("records a hosted payment, a status read and a tool order, and runs the short-lived purge", async () => {
+    const charge = await netopiaCharge();
+    const startedAt = new Date();
+    const orderId = `t-${chargeIdOf().slice(0, 30)}`;
+    await inTx(async (c) => {
+      await billing.insertHostedPayment(c, { chargeId: charge.chargeId, paymentProvider: "netopia", paymentEnvironment: "sandbox",
+        providerPaymentId: "6601", redirectCiphertext: sealedBytes, keyId: KEY_ID, startedAt });
+      await billing.insertStatusRead(c, { chargeId: charge.chargeId, at: startedAt, outcome: "PENDING" });
+      await billing.insertToolOrder(c, { orderId, paymentEnvironment: "sandbox", createdAt: startedAt, purpose: "SANDBOX_RECORDING" });
+    });
+    expect(await billing.hostedPaymentForCharge(database.pool, charge.chargeId))
+      .toMatchObject({ chargeId: charge.chargeId, providerPaymentId: "6601", startedAt, paymentEnvironment: "sandbox" });
+    expect(await billing.hostedPaymentForCharge(database.pool, chargeIdOf())).toBeNull();
+    expect((await database.pool.query("SELECT outcome FROM billing.status_read WHERE charge_id = $1", [charge.chargeId])).rows)
+      .toEqual([{ outcome: "PENDING" }]);
+    expect(await billing.toolOrder(database.pool, orderId)).toEqual({ orderId, paymentEnvironment: "sandbox", createdAt: startedAt, purpose: "SANDBOX_RECORDING" });
+    expect(await billing.toolOrder(database.pool, `t-${"0".repeat(30)}`)).toBeNull();
+    expect(await billing.purgeShortLived(new Date())).toBeGreaterThanOrEqual(0);
+  });
+  it("brings a live job forward to now, never later, and answers false when none is live", async () => {
+    const jobs = new BillingJobQueries(database.pool);
+    const ref = chargeIdOf();
+    const now = new Date();
+    const notBefore = async () => (await database.pool.query<{ not_before: Date }>(
+      "SELECT not_before FROM billing.outbox WHERE kind = 'VERIFY_PAYMENT' AND ref = $1", [ref])).rows[0]!.not_before.getTime();
+    await inTx((c) => billing.enqueue(c, { kind: "VERIFY_PAYMENT", ref, notBefore: new Date(now.getTime() + 3_600_000), payload: { charge_id: ref } }));
+    expect(await inTx((c) => jobs.bringForward(c, "VERIFY_PAYMENT", ref, now))).toBe(true);
+    expect(await notBefore()).toBe(now.getTime());
+    expect(await inTx((c) => jobs.bringForward(c, "VERIFY_PAYMENT", ref, new Date(now.getTime() + 7_200_000)))).toBe(true);
+    expect(await notBefore()).toBe(now.getTime());
+    expect(await inTx((c) => jobs.bringForward(c, "VERIFY_PAYMENT", chargeIdOf(), now))).toBe(false);
   });
 });

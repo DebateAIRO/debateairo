@@ -237,11 +237,12 @@ export class CheckoutService implements CheckoutServicePort {
       const charge: ChargeRow = Object.freeze({
         chargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: month.start,
         periodEnd: month.end, quoteId: quote.quoteId, netMicros: quote.netMicros, taxMicros: quote.taxMicros,
-        totalMicros: quote.totalMicros, currency: "USD", createdAt: input.now, xmoneyEnvironment: this.deps.xmoneyEnvironment
+        totalMicros: quote.totalMicros, currency: "USD", createdAt: input.now, paymentProvider: "xmoney",
+        paymentEnvironment: this.deps.xmoneyEnvironment
       });
       await this.deps.repository.insertCharge(client, charge);
       await this.deps.repository.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", input.now, {
-        xmoneyTransactionId: null, amountMicros: charge.totalMicros, errorCode: null
+        providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: null
       }));
       // A3(a), after the charge row it references: a second use of this quote rolls the whole checkout back.
       if (await this.deps.repository.useQuote(client, { quoteId: quote.quoteId, usedAt: input.now, chargeId }) === "ALREADY_USED") {
@@ -326,7 +327,7 @@ export class CheckoutService implements CheckoutServicePort {
     const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId, client))
       .find((charge) => charge.kind === "INITIAL");
     if (initial === undefined || initial.totalMicros !== quote.totalMicros) return null;
-    if (initial.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return null;
+    if (initial.paymentProvider !== "xmoney" || initial.paymentEnvironment !== this.deps.xmoneyEnvironment) return null;
     const opened = initial.quoteId === null ? null : await this.deps.repository.quote(initial.quoteId, existing.ownerRef, client);
     if (opened === null || opened.taxCountry !== quote.taxCountry) return null;
     const declared = openQuoteLocation(this.deps.recordsKey, opened.quoteId, opened.locationCiphertext);
@@ -352,7 +353,7 @@ export class CheckoutService implements CheckoutServicePort {
     if (initial === undefined) return;
     const pending = new BillingRefusal(409, "CHECKOUT_PENDING", initial.chargeId);
     const notFinalSince = new Date(now.getTime() - inFlightAttemptLifeMs());
-    if (await this.deps.jobs.checkoutPaymentSignals(client, initial.chargeId, initial.xmoneyEnvironment, notFinalSince)) {
+    if (await this.deps.jobs.checkoutPaymentSignals(client, initial.chargeId, this.deps.xmoneyEnvironment, notFinalSince)) {
       throw pending;
     }
     // Another open checkout than the one listed was made by a concurrent request after this one's read: its order was
@@ -376,14 +377,14 @@ export class CheckoutService implements CheckoutServicePort {
     const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId))
       .find((charge) => charge.kind === "INITIAL");
     // The xMoney this API talks to lists only its own system's transactions.
-    if (initial === undefined || initial.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return null;
+    if (initial === undefined || initial.paymentProvider !== "xmoney" || initial.paymentEnvironment !== this.deps.xmoneyEnvironment) return null;
     const created = (await this.deps.repository.subscriptionEvents(existing.subscriptionId)).find((event) => event.kind === "CREATED");
     const customer = created?.xmoneyCustomerId ?? null;
     if (customer === null) return null;
     // P2-N1: a payment charged back before it was ever verified is recorded CHARGEBACK, not FAILED; neither is on its way.
     const failed = new Set(((await this.deps.repository.charge(initial.chargeId))?.events ?? [])
-      .filter((event) => (event.kind === "FAILED" || event.kind === "CHARGEBACK") && event.xmoneyTransactionId !== null)
-      .map((event) => event.xmoneyTransactionId));
+      .filter((event) => (event.kind === "FAILED" || event.kind === "CHARGEBACK") && event.providerPaymentId !== null)
+      .map((event) => event.providerPaymentId));
     const rejected = rejectedRows(this.deps.audit, "checkout");
     const listed = await this.deps.xmoney.listTransactions({
       from: initial.createdAt, to: now, dateType: "creation", onRejected: rejected.onRejected

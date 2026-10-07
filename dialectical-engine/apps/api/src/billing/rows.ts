@@ -8,9 +8,9 @@ export function newChargeId(): string {
 }
 
 /**
- * One charge event to append (P1b's `ChargeEventInput`): the repository takes the xMoney system from the charge row
- * itself (D5 5h), so no caller can name another. `refundsTransactionId` is set only on a REFUNDED row written for a
- * refund that is its own xMoney transaction: it names the paid transaction refunded (D5 5g). `xmoneyCreatedAt` (D5
+ * One charge event to append (P1b's `ChargeEventInput`): the repository takes the provider and environment from the
+ * charge row itself (D5 5h), so no caller can name another. `refundsTransactionId` is set only on a REFUNDED row written for a
+ * refund that is its own xMoney transaction: it names the paid transaction refunded (D5 5g). `providerCreatedAt` (D5
  * 5m) is the xMoney transaction's own `creationDate`, given only on a row that transaction IS (a payment's SUCCEEDED
  * or DUPLICATE_PAYMENT, a refund transaction's REFUNDED): P1b's quarter rows date the row by it, so a payment taken on
  * 31 March and verified on 1 April stays in Q1. P1a refuses it on a row that names no transaction.
@@ -18,16 +18,16 @@ export function newChargeId(): string {
 export function chargeEvent(
   chargeId: string, kind: ChargeEventKind, at: Date,
   fields: Readonly<{
-    xmoneyTransactionId: string | null; amountMicros: number | null; errorCode: string | null; refundsTransactionId?: string | null;
-    xmoneyCreatedAt?: Date | null;
+    providerPaymentId: string | null; amountMicros: number | null; errorCode: string | null; refundsTransactionId?: string | null;
+    providerCreatedAt?: Date | null;
   }>
 ): ChargeEventInput {
   return Object.freeze({ eventId: randomUUID(), chargeId, kind, at, ...fields });
 }
 
 /** The paid transaction a REFUND_REQUESTED / REFUNDED row refunds: its own, unless it is a separate refund transaction. */
-export function refundTarget(event: Readonly<{ xmoneyTransactionId: string | null; refundsTransactionId: string | null }>): string | null {
-  return event.refundsTransactionId ?? event.xmoneyTransactionId;
+export function refundTarget(event: Readonly<{ providerPaymentId: string | null; refundsTransactionId: string | null }>): string | null {
+  return event.refundsTransactionId ?? event.providerPaymentId;
 }
 
 /**

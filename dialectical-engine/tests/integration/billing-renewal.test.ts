@@ -207,7 +207,7 @@ describe("P11a monthly renewal", () => {
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(1);
     expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "SUBMITTED"))
-      .toMatchObject({ xmoneyTransactionId: lost!.transactionId });
+      .toMatchObject({ providerPaymentId: lost!.transactionId });
     h.clock.advance(31 * MINUTE);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(1);
@@ -557,7 +557,7 @@ describe("P11a monthly renewal", () => {
     await h.renewal.runOnce();
     const [charge] = await renewalCharges(paid.subscriptionId);
     expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMITTED"));
-    const transactionId = (await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "SUBMITTED")!.xmoneyTransactionId!;
+    const transactionId = (await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "SUBMITTED")!.providerPaymentId!;
     // VERIFY_PAYMENT cannot read the transaction: xMoney is down. The worker retries it a minute later.
     h.xmoney.failNextLookup(transactionId);
     await h.worker.drain(10);
@@ -667,7 +667,7 @@ describe("P11a monthly renewal", () => {
     expect(h.xmoney.rebillsFor(card.orderId)).toBe(0);
     expect(rebills(paid)).toBe(1);
     expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "SUBMITTED"))
-      .toMatchObject({ xmoneyTransactionId: lost!.transactionId });
+      .toMatchObject({ providerPaymentId: lost!.transactionId });
     await h.worker.drain(10);
     expect((await subscriptionKinds(paid.subscriptionId)).at(-1)).toBe("RENEWED");
     // The card change stands: the next renewal charges the new card.

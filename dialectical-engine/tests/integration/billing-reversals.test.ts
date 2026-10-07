@@ -64,7 +64,7 @@ describe("P9c reversals of a verified payment", () => {
     await h.settle(refundRow!.transactionId);
     const charge = (await h.repository.charge(paid.chargeId))!;
     expect(charge.events.filter((event) => event.kind === "REFUND_REQUESTED" || event.kind === "REFUNDED")
-      .map((event) => [event.kind, event.errorCode, event.amountMicros, event.xmoneyTransactionId, event.refundsTransactionId]).sort()).toEqual([
+      .map((event) => [event.kind, event.errorCode, event.amountMicros, event.providerPaymentId, event.refundsTransactionId]).sort()).toEqual([
       ["REFUNDED", "PROVIDER_REFUND", 5_000_000, refundRow!.transactionId, paid.transaction.transactionId],
       ["REFUND_REQUESTED", "PROVIDER_REFUND", 5_000_000, paid.transaction.transactionId, null]
     ]);
@@ -72,10 +72,10 @@ describe("P9c reversals of a verified payment", () => {
       payload: { charge_id: paid.chargeId, transaction_id: paid.transaction.transactionId, refund_micros: 5_000_000 }
     });
     // D5 5m: the REFUNDED row carries the refund transaction's own time, which dates the quarter's REFUND row.
-    const refundedRow = await h.database.pool.query<{ xmoney_created_at: Date | null }>(
-      "SELECT xmoney_created_at FROM billing.charge_event WHERE charge_id=$1 AND kind='REFUNDED'", [paid.chargeId]
+    const refundedRow = await h.database.pool.query<{ provider_created_at: Date | null }>(
+      "SELECT provider_created_at FROM billing.charge_event WHERE charge_id=$1 AND kind='REFUNDED'", [paid.chargeId]
     );
-    expect(refundedRow.rows).toEqual([{ xmoney_created_at: refundRow!.createdAt }]);
+    expect(refundedRow.rows).toEqual([{ provider_created_at: refundRow!.createdAt }]);
     expect(await kinds(paid.subscriptionId)).toEqual(["CREATED", "ACTIVATED"]);
     await h.settle(refundRow!.transactionId);
     expect((await h.eventKinds(paid.chargeId)).filter((kind) => kind === "REFUNDED")).toHaveLength(1);
@@ -114,7 +114,7 @@ describe("P9c reversals of a verified payment", () => {
     await h.settle(paid.transaction.transactionId);
     await h.settle(refundRow!.transactionId);
     expect((await h.repository.charge(paid.chargeId))!.events.filter((event) => event.kind === "REFUNDED")
-      .map((event) => [event.errorCode, event.amountMicros, event.xmoneyTransactionId])).toEqual([
+      .map((event) => [event.errorCode, event.amountMicros, event.providerPaymentId])).toEqual([
       ["PROVIDER_REFUND", 24_200_000, paid.transaction.transactionId]
     ]);
     expect((await h.outboxRows(refundRow!.transactionId)).filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === refundRow!.transactionId)
@@ -159,7 +159,7 @@ describe("P9c reversals of a verified payment", () => {
     });
     await h.settle(representment.transactionId);
     expect((await h.repository.charge(paid.chargeId))!.events.find((event) => event.kind === "CHARGEBACK_REPRESENTED"))
-      .toMatchObject({ xmoneyTransactionId: representment.transactionId });
+      .toMatchObject({ providerPaymentId: representment.transactionId });
     // The same representment reported again is a replay: recorded once, and its second check completes too.
     await h.notices.receive(h.noticeFor(h.xmoney.transactions.get(representment.transactionId)!));
     await h.worker.drain(10);
@@ -246,7 +246,7 @@ describe("P9c reversals of a verified payment", () => {
 
 describe("P2-I2 a dispute xMoney reports as its own transaction", () => {
   const chargebacksOf = async (chargeId: string) => ((await h.repository.charge(chargeId))?.events ?? [])
-    .filter((event) => event.kind === "CHARGEBACK").map((event) => [event.xmoneyTransactionId, event.errorCode, event.amountMicros]);
+    .filter((event) => event.kind === "CHARGEBACK").map((event) => [event.providerPaymentId, event.errorCode, event.amountMicros]);
   const disputeStores = (): DisputeStores => Object.freeze({
     billing: h.repository, jobs: h.jobs, entitlements: h.entitlements, clock: () => h.clock.now
   });

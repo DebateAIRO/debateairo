@@ -80,10 +80,10 @@ export async function startCardChange(
       chargeId, ownerRef: input.ownerRef, subscriptionId: before.subscriptionId, kind: "CARD_CHECK" as const,
       attempt: 1, periodStart: input.now, periodEnd: new Date(input.now.getTime() + 86_400_000), quoteId: null,
       netMicros: hold, taxMicros: 0, totalMicros: hold, currency: "USD" as const, createdAt: input.now,
-      xmoneyEnvironment: deps.xmoneyEnvironment
+      paymentProvider: "xmoney", paymentEnvironment: deps.xmoneyEnvironment
     }));
     await deps.billing.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", input.now, {
-      xmoneyTransactionId: null, amountMicros: hold, errorCode: null
+      providerPaymentId: null, amountMicros: hold, errorCode: null
     }));
   });
   // P8c words the order line (`orderText`, the catalogue's `order.cardCheck`) in the person's own language.

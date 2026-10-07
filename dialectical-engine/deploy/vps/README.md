@@ -2257,11 +2257,11 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_subscripti
 ```
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN'))"
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_charges FROM billing.charge c WHERE c.payment_provider = 'xmoney' AND c.payment_environment = 'stage' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN'))"
 ```
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_jobs FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.xmoney_environment = 'stage' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR (j.kind IN ('QUADERNO_RECORD_SALE', 'SMARTBILL_INVOICE') AND c.charge_id = j.ref)))"
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_sandbox_jobs FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.payment_provider = 'xmoney' AND c.payment_environment = 'stage' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR (j.kind IN ('QUADERNO_RECORD_SALE', 'SMARTBILL_INVOICE') AND c.charge_id = j.ref)))"
 ```
 
 The third counts the sandbox jobs still queued: the refunds, invoices and credit notes of sandbox charges, and the
@@ -2459,7 +2459,7 @@ ended (`ENDED`: either recorded as lost, or ended by the period-end sweep, when 
 you would a `SUSPENDED` one. The command:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT e.charge_id, c.kind AS charge_kind, e.xmoney_transaction_id, e.error_code, e.at, s.kind AS subscription_now FROM billing.charge_event e JOIN billing.charge c ON c.charge_id = e.charge_id JOIN billing.subscription_latest_v s ON s.subscription_id = c.subscription_id WHERE e.kind = 'CHARGEBACK' AND NOT EXISTS (SELECT 1 FROM billing.charge_event r WHERE r.charge_id = e.charge_id AND r.kind = 'CHARGEBACK_RESOLVED' AND r.xmoney_transaction_id = e.xmoney_transaction_id) ORDER BY e.at"
+sudo -u postgres psql -d debateai -c "SELECT e.charge_id, c.kind AS charge_kind, e.provider_payment_id, e.error_code, e.at, s.kind AS subscription_now FROM billing.charge_event e JOIN billing.charge c ON c.charge_id = e.charge_id JOIN billing.subscription_latest_v s ON s.subscription_id = c.subscription_id WHERE e.kind = 'CHARGEBACK' AND NOT EXISTS (SELECT 1 FROM billing.charge_event r WHERE r.charge_id = e.charge_id AND r.kind = 'CHARGEBACK_RESOLVED' AND r.provider_payment_id = e.provider_payment_id) ORDER BY e.at"
 ```
 
 An `error_code` of `DUPLICATE_PAYMENT` marks the charge-back of a second payment of the same order, which never paused

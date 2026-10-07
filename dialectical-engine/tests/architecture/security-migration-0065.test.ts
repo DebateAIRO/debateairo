@@ -488,7 +488,11 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
         // debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
         "0094_legal_runtime_api_only.sql",
         // Region picker S01: identity.registration_region and its definer writer. Next free prefix after dev's 0094; no pair.
-        "0095_registration_region.sql"
+        "0095_registration_region.sql",
+        // NETOPIA switch N6 (spec 2026-10-05 §2.5): provider-neutral charge columns, NETOPIA's messages, saved cards,
+        // hosted payments, status reads and tool orders, their purges, and 0093's contract run again. The next free
+        // prefix after 0095; no pair. Part C's currency migration takes 0097.
+        "0096_billing_netopia.sql"
       ]);
   });
 });

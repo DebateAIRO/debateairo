@@ -123,11 +123,11 @@ export function parseInvoiceArguments(args: readonly string[]): InvoiceArguments
 export async function runInvoiceCommand(deps: InvoiceCommandDeps, input: InvoiceArguments, now: Date): Promise<InvoiceResult> {
   const charge = await deps.repository.charge(input.chargeId);
   if (charge === null) return refuse("BILLING_INVOICE_CHARGE_UNKNOWN", "no charge has this reference");
-  if (charge.xmoneyEnvironment !== deps.xmoneyEnvironment) {
+  if (charge.paymentProvider !== "xmoney" || charge.paymentEnvironment !== deps.xmoneyEnvironment) {
     return refuse("BILLING_INVOICE_OTHER_XMONEY_SYSTEM", "the charge was paid in the other xMoney system");
   }
   const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
-  if (paid === undefined || paid.xmoneyTransactionId === null) {
+  if (paid === undefined || paid.providerPaymentId === null) {
     return refuse("BILLING_INVOICE_CHARGE_NOT_PAID", "the charge records no payment");
   }
   const issued = (await deps.repository.invoicesForOwner(charge.ownerRef)).filter((invoice) => invoice.chargeId === charge.chargeId);
@@ -175,7 +175,7 @@ export async function runInvoiceCommand(deps: InvoiceCommandDeps, input: Invoice
  * the one definition the credit-note jobs read.
  */
 function dashboardRefundOf(charge: PaidChargeRow, paid: ChargeEventRow): Readonly<{ upToMicros: number }> | null {
-  const sale = paid.xmoneyTransactionId === null ? null : saleRefundOf(charge, paid, paid.xmoneyTransactionId);
+  const sale = paid.providerPaymentId === null ? null : saleRefundOf(charge, paid, paid.providerPaymentId);
   return sale?.kind === "AMOUNT_UNKNOWN" ? sale : null;
 }
 

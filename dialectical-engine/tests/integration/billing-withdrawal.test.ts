@@ -56,7 +56,7 @@ async function start(label: string, input: Readonly<{ activatedDaysAgo: number; 
 const refundRequests = async (billing: BillingRepository, chargeId: string) =>
   (await billing.charge(chargeId))!.events
     .filter((event) => event.kind === "REFUND_REQUESTED")
-    .map((event) => [event.xmoneyTransactionId, event.amountMicros, event.errorCode]);
+    .map((event) => [event.providerPaymentId, event.amountMicros, event.errorCode]);
 
 const m8Of = async (subscriptionId: string) => (await database.pool.query<{ payload: Record<string, unknown> }>(
   "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref=$1", [`M8:${subscriptionId}`]
@@ -227,7 +227,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     await run.billing.withTransaction(async (client) => {
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await run.billing.appendChargeEvent(client, chargeEvent(run.seeded.initialChargeId, kind, new Date(run.now.getTime() - 60_000), {
-          xmoneyTransactionId: run.seeded.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
+          providerPaymentId: run.seeded.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
         }));
       }
     });
@@ -270,7 +270,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     // An earlier refund of ours on the INITIAL payment, still in flight: that transaction cannot take a second request.
     await run.billing.withTransaction((client) => run.billing.appendChargeEvent(client, chargeEvent(
       run.seeded.initialChargeId, "REFUND_REQUESTED", new Date(run.now.getTime() - 60_000), {
-        xmoneyTransactionId: run.seeded.initialTransactionId, amountMicros: 1_000_000, errorCode: "SUBSCRIPTION_ENDED"
+        providerPaymentId: run.seeded.initialTransactionId, amountMicros: 1_000_000, errorCode: "SUBSCRIPTION_ENDED"
       }
     )));
     const response = await run.withdraw();

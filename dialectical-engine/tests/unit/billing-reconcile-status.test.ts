@@ -181,10 +181,10 @@ function openUpgrade(
   return Object.freeze({
     chargeId, ownerRef: `owner-${subscriptionId}`, subscriptionId, kind, attempt: 1,
     periodStart: createdAt, periodEnd: new Date(createdAt.getTime() + 30 * 86_400_000), quoteId: "q",
-    netMicros: 7_000_000, taxMicros: 0, totalMicros: 7_000_000, currency: "USD", createdAt, xmoneyEnvironment: "stage",
+    netMicros: 7_000_000, taxMicros: 0, totalMicros: 7_000_000, currency: "USD", createdAt, paymentProvider: "xmoney", paymentEnvironment: "stage",
     events: [Object.freeze({
-      eventId: `${chargeId}-requested`, chargeId, kind: "REQUESTED", at: createdAt, xmoneyTransactionId: null,
-      amountMicros: 7_000_000, errorCode: null, xmoneyEnvironment: "stage", refundsTransactionId: null
+      eventId: `${chargeId}-requested`, chargeId, kind: "REQUESTED", at: createdAt, providerPaymentId: null,
+      amountMicros: 7_000_000, errorCode: null, paymentProvider: "xmoney", paymentEnvironment: "stage", refundsTransactionId: null
     })] as ChargeEventRow[]
   }) as ChargeRow & { events: ChargeEventRow[] };
 }
